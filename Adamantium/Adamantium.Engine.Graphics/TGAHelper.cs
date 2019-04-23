@@ -1,8 +1,8 @@
 ﻿using System;
 using System.IO;
 using System.Runtime.InteropServices;
-using SharpDX;
-using SharpDX.DXGI;
+using Adamantium.Core;
+using AdamantiumVulkan.Core;
 
 namespace Adamantium.Engine.Graphics
 {
@@ -97,16 +97,16 @@ namespace Adamantium.Engine.Graphics
                switch (header->BitsPerPixel)
                {
                   case 16:
-                     description.Format = Format.B5G5R5A1_UNorm;
+                     description.Format = Format.B5G5R5A1_UNORM_PACK16;
                      break;
                   case 24:
-                     description.Format = Format.R8G8B8A8_UNorm;
+                     description.Format = Format.R8G8B8A8_UNORM;
                      convFlags |= TGAConversionFlags.Expand;
                      // We could use DXGI_FORMAT_B8G8R8X8_UNORM, but we prefer DXGI 1.0 formats
                      break;
 
                   case 32:
-                     description.Format = Format.R8G8B8A8_UNorm;
+                     description.Format = Format.R8G8B8A8_UNORM;
                      // We could use DXGI_FORMAT_B8G8R8A8_UNORM, but we prefer DXGI 1.0 formats
                      break;
                }
@@ -122,7 +122,7 @@ namespace Adamantium.Engine.Graphics
                switch (header->BitsPerPixel)
                {
                   case 8:
-                     description.Format = Format.R8_UNorm;
+                     description.Format = Format.R8_UNORM;
                      break;
 
                   default:
@@ -182,34 +182,33 @@ namespace Adamantium.Engine.Graphics
 
          switch (description.Format)
          {
-            case Format.R8G8B8A8_UNorm:
-            case Format.R8G8B8A8_UNorm_SRgb:
+            case Format.R8G8B8A8_UNORM:
+            case Format.R8G8B8A8_SRGB:
                header.ImageType = (byte)TGAImageType.TrueColor;
                header.BitsPerPixel = 32;
                header.Descriptor = (byte)TGADescriptorFlags.InvertY | 8;
                flags |= TGAConversionFlags.Swizzle;
                break;
-            case Format.B8G8R8A8_UNorm:
-            case Format.B8G8R8A8_UNorm_SRgb:
+            case Format.B8G8R8A8_UNORM:
+            case Format.B8G8R8A8_SRGB:
                header.ImageType = (byte)TGAImageType.TrueColor;
                header.BitsPerPixel = 32;
                header.Descriptor = (byte)TGADescriptorFlags.InvertY | 8;
                flags |= TGAConversionFlags.Swizzle;
                break;
-            case Format.B8G8R8X8_UNorm:
-            case Format.B8G8R8X8_UNorm_SRgb:
+            case Format.B8G8R8_UNORM:
+            case Format.B8G8R8_SRGB:
                header.ImageType = (byte)TGAImageType.TrueColor;
                header.BitsPerPixel = 24;
                header.Descriptor = (byte)TGADescriptorFlags.InvertY;
                flags |= TGAConversionFlags.Format888;
                break;
-            case Format.R8_UNorm:
-            case Format.A8_UNorm:
+            case Format.R8_UNORM:
                header.ImageType = (byte)TGAImageType.BlackAndWhite;
                header.BitsPerPixel = 8;
                header.Descriptor = (byte)TGADescriptorFlags.InvertY;
                break;
-            case Format.B5G5R5A1_UNorm:
+            case Format.B5G5R5A1_UNORM_PACK16:
                header.ImageType = (byte)TGAImageType.TrueColor;
                header.BitsPerPixel = 16;
                header.Descriptor = (byte)TGADescriptorFlags.InvertY | 1;
@@ -374,7 +373,7 @@ namespace Adamantium.Engine.Graphics
          switch (description.Format)
          {
             //------------------------------------------------- 8 bit
-            case Format.R8_UNorm:
+            case Format.R8_UNORM:
                   
                for (int y = 0; y < description.Height; ++y)
                {
@@ -454,7 +453,7 @@ namespace Adamantium.Engine.Graphics
                }
                break;
 
-            case Format.B5G5R5A1_UNorm:
+            case Format.B5G5R5A1_UNORM_PACK16:
                bool nonzeroa = false;
                for (int y = 0; y < description.Height; ++y)
                {
@@ -553,7 +552,7 @@ namespace Adamantium.Engine.Graphics
                }
                break;
                
-            case Format.R8G8B8A8_UNorm:
+            case Format.R8G8B8A8_UNORM:
                nonzeroa = false;
                for (int y = 0; y < description.Height; ++y)
                {
@@ -729,7 +728,7 @@ namespace Adamantium.Engine.Graphics
 
          switch (description.Format)
          {
-            case Format.R8_UNorm: //-------------------------- 8 bit
+            case Format.R8_UNORM: //-------------------------- 8 bit
                for (int y = 0; y < description.Height; ++y)
                {
                   uint offset = (uint)(convFlags.HasFlag(TGAConversionFlags.InvertX) ? description.Width - 1 : 0);
@@ -752,7 +751,7 @@ namespace Adamantium.Engine.Graphics
                }
                break;
 
-            case Format.B5G5R5A1_UNorm: //-------------------------- 16 bit
+            case Format.B5G5R5A1_UNORM_PACK16: //-------------------------- 16 bit
                bool nonzeroa = false;
                for (int y = 0; y < description.Height; ++y)
                {
@@ -795,15 +794,13 @@ namespace Adamantium.Engine.Graphics
                break;
             
 
-            case Format.R8G8B8A8_UNorm: //----------------- 24/32 bit
+            case Format.R8G8B8A8_UNORM: //----------------- 24/32 bit
                nonzeroa = false;
                for (int y = 0; y < description.Height; ++y)
                {
                   uint offset = (uint)(convFlags.HasFlag(TGAConversionFlags.InvertX) ? description.Width - 1 : 0);
 
-                  var dPtr = (uint*)((byte*)pDestination +
-                                      (rowStride * (convFlags.HasFlag(TGAConversionFlags.InvertY) ? y : (description.Height - y - 1))))
-                             + offset;
+                  var dPtr = (uint*)((byte*)pDestination + (rowStride * (convFlags.HasFlag(TGAConversionFlags.InvertY) ? y : (description.Height - y - 1)))) + offset;
 
                   for (int x = 0; x < description.Width; ++x)
                   {

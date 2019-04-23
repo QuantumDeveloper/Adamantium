@@ -36,7 +36,7 @@ namespace Adamantium.Engine.Graphics
         public TextureDimension Dimension;
 
         /// <summary>	
-        /// <dd> <p>Texture width (in texels). The  range is from 1 to <see cref="SharpDX.Direct3D11.Resource.MaximumTexture1DSize"/> (16384). However, the range is actually constrained by the feature level at which you create the rendering device. For more information about restrictions, see Remarks.</p> </dd>	
+        /// <dd> <p>Texture width (in texels).
         /// </summary>	
         /// <remarks>
         /// This field is valid for all textures: <see cref="Texture1D"/>, <see cref="Texture2D"/>, <see cref="Texture3D"/> and <see cref="TextureCube"/>.
@@ -47,7 +47,7 @@ namespace Adamantium.Engine.Graphics
         public int Width;
 
         /// <summary>	
-        /// <dd> <p>Texture height (in texels). The  range is from 1 to <see cref="SharpDX.Direct3D11.Resource.MaximumTexture3DSize"/> (2048). However, the range is actually constrained by the feature level at which you create the rendering device. For more information about restrictions, see Remarks.</p> </dd>	
+        /// <dd> <p>Texture height (in texels).
         /// </summary>	
         /// <remarks>
         /// This field is only valid for <see cref="Texture2D"/>, <see cref="Texture3D"/> and <see cref="TextureCube"/>.
@@ -58,7 +58,7 @@ namespace Adamantium.Engine.Graphics
         public int Height;
 
         /// <summary>	
-        /// <dd> <p>Texture depth (in texels). The  range is from 1 to <see cref="SharpDX.Direct3D11.Resource.MaximumTexture3DSize"/> (2048). However, the range is actually constrained by the feature level at which you create the rendering device. For more information about restrictions, see Remarks.</p> </dd>	
+        /// <dd> <p>Texture depth (in texels).
         /// </summary>	
         /// <remarks>
         /// This field is only valid for <see cref="Texture3D"/>.
@@ -69,7 +69,7 @@ namespace Adamantium.Engine.Graphics
         public int Depth;
 
         /// <summary>	
-        /// <dd> <p>Number of textures in the array. The  range is from 1 to <see cref="SharpDX.Direct3D11.Resource.MaximumTexture1DArraySize"/> (2048). However, the range is actually constrained by the feature level at which you create the rendering device. For more information about restrictions, see Remarks.</p> </dd>	
+        /// <dd> <p>Number of textures in the array
         /// </summary>	
         /// <remarks>
         /// This field is only valid for <see cref="Texture1D"/>, <see cref="Texture2D"/> and <see cref="TextureCube"/>
@@ -83,7 +83,7 @@ namespace Adamantium.Engine.Graphics
         public int ArraySize;
 
         /// <summary>	
-        /// <dd> <p>The maximum number of mipmap levels in the texture. See the remarks in <strong><see cref="SharpDX.Direct3D11.ShaderResourceViewDescription.Texture1DResource"/></strong>. Use 1 for a multisampled texture; or 0 to generate a full set of subtextures.</p> </dd>	
+        /// <dd> <p>The maximum number of mipmap levels in the texture.
         /// </summary>	
         /// <msdn-id>ff476252</msdn-id>	
         /// <unmanaged>unsigned int MipLevels</unmanaged>	
@@ -91,12 +91,18 @@ namespace Adamantium.Engine.Graphics
         public int MipLevels;
 
         /// <summary>	
-        /// <dd> <p>Texture format (see <strong><see cref="SharpDX.DXGI.Format"/></strong>).</p> </dd>	
+        /// <dd> <p>Texture format (see <strong><see cref="AdamantiumVulkan.Core.Format"/></strong>).</p> </dd>	
+        /// </summary>	
+        /// <unmanaged>Vulkan imange Format</unmanaged>	
+        public Format Format;
+
+        /// <summary>	
+        /// <dd> <p>Texture format (see <strong><see cref="DXGI.Format"/></strong>).</p> </dd>	
         /// </summary>	
         /// <msdn-id>ff476252</msdn-id>	
         /// <unmanaged>DXGI_FORMAT Format</unmanaged>	
         /// <unmanaged-short>DXGI_FORMAT Format</unmanaged-short>	
-        public Format Format;
+        public DXGIFormat DXGIFormat;
 
         public bool Equals(ImageDescription other)
         {

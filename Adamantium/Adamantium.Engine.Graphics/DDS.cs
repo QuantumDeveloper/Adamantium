@@ -267,7 +267,7 @@ namespace Adamantium.Engine.Graphics
         [StructLayout(LayoutKind.Sequential, Pack = 1)]
         public struct HeaderDXT10
         {
-            public Format DXGIFormat;
+            public DXGIFormat DXGIFormat;
             public ResourceDimension ResourceDimension;
             public ResourceOptionFlags MiscFlags; // see DDS_RESOURCE_MISC_FLAG
             public int ArraySize;

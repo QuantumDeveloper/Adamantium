@@ -1,9 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Text;
 
 namespace Adamantium.Core
 {
@@ -14,12 +12,21 @@ namespace Adamantium.Core
             Marshal.FreeHGlobal(pointer);
         }
 
+        public static void ClearMemory(IntPtr dest, byte value, int sizeInBytesToClear)
+        {
+            unsafe
+            {
+                Span<byte> bytes = new Span<byte>(dest.ToPointer(), sizeInBytesToClear);
+                bytes.Fill(value);
+            }
+        }
+
         public static bool IsEnum<T>(T type)
         {
             return type is Enum;
         }
 
-        public static IntPtr AllocateMemory(int sizeInBytes)
+        public static IntPtr AllocateMemory(int sizeInBytes, int v)
         {
             return Marshal.AllocHGlobal(sizeInBytes);
         }
