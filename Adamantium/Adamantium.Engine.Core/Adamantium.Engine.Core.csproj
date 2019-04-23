@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.0</TargetFramework>
+    <Platforms>AnyCPU;x64</Platforms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.Core\AdamantiumVulkan.Core.csproj" />
+    <ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" />
+    <ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
+  </ItemGroup>
+
+</Project>

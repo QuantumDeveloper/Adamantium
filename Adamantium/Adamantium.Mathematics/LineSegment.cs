@@ -2,7 +2,7 @@
 
 namespace Adamantium.Mathematics
 {
-    public struct LineSegment:IEquatable<LineSegment>
+    public struct LineSegment : IEquatable<LineSegment>
     {
         public Vector3D Start { get; set; }
 
@@ -22,7 +22,6 @@ namespace Adamantium.Mathematics
 
         public bool Equals(LineSegment other)
         {
-            //return Start == other.Start && End == other.End;
             return MathHelper.WithinEpsilon(Start, other.Start, Polygon.Epsilon) && MathHelper.WithinEpsilon(End, other.End, Polygon.Epsilon);
         }
 
