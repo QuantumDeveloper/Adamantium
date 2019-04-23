@@ -72,6 +72,7 @@
 
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using Adamantium.Core;
 using AdamantiumVulkan.Core;
@@ -109,102 +110,102 @@ namespace Adamantium.Engine.Graphics
             /// <param name="format">The format.</param>
             /// <param name="conversionFlags">The conversion flags.</param>
             /// <param name="pixelFormat">The pixel format.</param>
-            public LegacyMap(Format format, ConversionFlags conversionFlags, DDS.PixelFormat pixelFormat)
+            public LegacyMap(DXGIFormat format, ConversionFlags conversionFlags, DDS.PixelFormat pixelFormat)
             {
-                Format = format;
+                DXGIFormat = format;
                 ConversionFlags = conversionFlags;
                 PixelFormat = pixelFormat;
             }
 
-            public Format Format;
+            public DXGIFormat DXGIFormat;
             public ConversionFlags ConversionFlags;
             public DDS.PixelFormat PixelFormat;
         };
 
         private static readonly LegacyMap[] LegacyMaps = new[]
                                                              {
-                                                                 new LegacyMap(Format.BC1_UNorm, ConversionFlags.None, DDS.PixelFormat.DXT1), // D3DFMT_DXT1
-                                                                 new LegacyMap(Format.BC2_UNorm, ConversionFlags.None, DDS.PixelFormat.DXT3), // D3DFMT_DXT3
-                                                                 new LegacyMap(Format.BC3_UNorm, ConversionFlags.None, DDS.PixelFormat.DXT5), // D3DFMT_DXT5
+                                                                 new LegacyMap(DXGIFormat.BC1_UNorm, ConversionFlags.None, DDS.PixelFormat.DXT1), // D3DFMT_DXT1
+                                                                 new LegacyMap(DXGIFormat.BC2_UNorm, ConversionFlags.None, DDS.PixelFormat.DXT3), // D3DFMT_DXT3
+                                                                 new LegacyMap(DXGIFormat.BC3_UNorm, ConversionFlags.None, DDS.PixelFormat.DXT5), // D3DFMT_DXT5
 
-                                                                 new LegacyMap(Format.BC2_UNorm, ConversionFlags.None, DDS.PixelFormat.DXT2), // D3DFMT_DXT2 (ignore premultiply)
-                                                                 new LegacyMap(Format.BC3_UNorm, ConversionFlags.None, DDS.PixelFormat.DXT4), // D3DFMT_DXT4 (ignore premultiply)
+                                                                 new LegacyMap(DXGIFormat.BC2_UNorm, ConversionFlags.None, DDS.PixelFormat.DXT2), // D3DFMT_DXT2 (ignore premultiply)
+                                                                 new LegacyMap(DXGIFormat.BC3_UNorm, ConversionFlags.None, DDS.PixelFormat.DXT4), // D3DFMT_DXT4 (ignore premultiply)
 
-                                                                 new LegacyMap(Format.BC4_UNorm, ConversionFlags.None, DDS.PixelFormat.BC4_UNorm),
-                                                                 new LegacyMap(Format.BC4_SNorm, ConversionFlags.None, DDS.PixelFormat.BC4_SNorm),
-                                                                 new LegacyMap(Format.BC5_UNorm, ConversionFlags.None, DDS.PixelFormat.BC5_UNorm),
-                                                                 new LegacyMap(Format.BC5_SNorm, ConversionFlags.None, DDS.PixelFormat.BC5_SNorm),
+                                                                 new LegacyMap(DXGIFormat.BC4_UNorm, ConversionFlags.None, DDS.PixelFormat.BC4_UNorm),
+                                                                 new LegacyMap(DXGIFormat.BC4_SNorm, ConversionFlags.None, DDS.PixelFormat.BC4_SNorm),
+                                                                 new LegacyMap(DXGIFormat.BC5_UNorm, ConversionFlags.None, DDS.PixelFormat.BC5_UNorm),
+                                                                 new LegacyMap(DXGIFormat.BC5_SNorm, ConversionFlags.None, DDS.PixelFormat.BC5_SNorm),
 
-                                                                 new LegacyMap(Format.BC4_UNorm, ConversionFlags.None, new DDS.PixelFormat(DDS.PixelFormatFlags.FourCC, new FourCC('A', 'T', 'I', '1'), 0, 0, 0, 0, 0)),
-                                                                 new LegacyMap(Format.BC5_UNorm, ConversionFlags.None, new DDS.PixelFormat(DDS.PixelFormatFlags.FourCC, new FourCC('A', 'T', 'I', '2'), 0, 0, 0, 0, 0)),
+                                                                 new LegacyMap(DXGIFormat.BC4_UNorm, ConversionFlags.None, new DDS.PixelFormat(DDS.PixelFormatFlags.FourCC, new FourCC('A', 'T', 'I', '1'), 0, 0, 0, 0, 0)),
+                                                                 new LegacyMap(DXGIFormat.BC5_UNorm, ConversionFlags.None, new DDS.PixelFormat(DDS.PixelFormatFlags.FourCC, new FourCC('A', 'T', 'I', '2'), 0, 0, 0, 0, 0)),
 
-                                                                 new LegacyMap(Format.R8G8_B8G8_UNorm, ConversionFlags.None, DDS.PixelFormat.R8G8_B8G8), // D3DFMT_R8G8_B8G8
-                                                                 new LegacyMap(Format.G8R8_G8B8_UNorm, ConversionFlags.None, DDS.PixelFormat.G8R8_G8B8), // D3DFMT_G8R8_G8B8
+                                                                 new LegacyMap(DXGIFormat.R8G8_B8G8_UNorm, ConversionFlags.None, DDS.PixelFormat.R8G8_B8G8), // D3DFMT_R8G8_B8G8
+                                                                 new LegacyMap(DXGIFormat.G8R8_G8B8_UNorm, ConversionFlags.None, DDS.PixelFormat.G8R8_G8B8), // D3DFMT_G8R8_G8B8
 
-                                                                 new LegacyMap(Format.B8G8R8A8_UNorm, ConversionFlags.None, DDS.PixelFormat.A8R8G8B8), // D3DFMT_A8R8G8B8 (uses DXGI 1.1 format)
-                                                                 new LegacyMap(Format.B8G8R8X8_UNorm, ConversionFlags.None, DDS.PixelFormat.X8R8G8B8), // D3DFMT_X8R8G8B8 (uses DXGI 1.1 format)
-                                                                 new LegacyMap(Format.R8G8B8A8_UNorm, ConversionFlags.None, DDS.PixelFormat.A8B8G8R8), // D3DFMT_A8B8G8R8
-                                                                 new LegacyMap(Format.R8G8B8A8_UNorm, ConversionFlags.NoAlpha, DDS.PixelFormat.X8B8G8R8), // D3DFMT_X8B8G8R8
-                                                                 new LegacyMap(Format.R16G16_UNorm, ConversionFlags.None, DDS.PixelFormat.G16R16), // D3DFMT_G16R16
+                                                                 new LegacyMap(DXGIFormat.B8G8R8A8_UNorm, ConversionFlags.None, DDS.PixelFormat.A8R8G8B8), // D3DFMT_A8R8G8B8 (uses DXGI 1.1 format)
+                                                                 new LegacyMap(DXGIFormat.B8G8R8X8_UNorm, ConversionFlags.None, DDS.PixelFormat.X8R8G8B8), // D3DFMT_X8R8G8B8 (uses DXGI 1.1 format)
+                                                                 new LegacyMap(DXGIFormat.R8G8B8A8_UNorm, ConversionFlags.None, DDS.PixelFormat.A8B8G8R8), // D3DFMT_A8B8G8R8
+                                                                 new LegacyMap(DXGIFormat.R8G8B8A8_UNorm, ConversionFlags.NoAlpha, DDS.PixelFormat.X8B8G8R8), // D3DFMT_X8B8G8R8
+                                                                 new LegacyMap(DXGIFormat.R16G16_UNorm, ConversionFlags.None, DDS.PixelFormat.G16R16), // D3DFMT_G16R16
 
-                                                                 new LegacyMap(Format.R10G10B10A2_UNorm, ConversionFlags.Swizzle, new DDS.PixelFormat(DDS.PixelFormatFlags.Rgb, 0, 32, 0x000003ff, 0x000ffc00, 0x3ff00000, 0xc0000000)),
+                                                                 new LegacyMap(DXGIFormat.R10G10B10A2_UNorm, ConversionFlags.Swizzle, new DDS.PixelFormat(DDS.PixelFormatFlags.Rgb, 0, 32, 0x000003ff, 0x000ffc00, 0x3ff00000, 0xc0000000)),
                                                                  // D3DFMT_A2R10G10B10 (D3DX reversal issue workaround)
-                                                                 new LegacyMap(Format.R10G10B10A2_UNorm, ConversionFlags.None, new DDS.PixelFormat(DDS.PixelFormatFlags.Rgb, 0, 32, 0x3ff00000, 0x000ffc00, 0x000003ff, 0xc0000000)),
+                                                                 new LegacyMap(DXGIFormat.R10G10B10A2_UNorm, ConversionFlags.None, new DDS.PixelFormat(DDS.PixelFormatFlags.Rgb, 0, 32, 0x3ff00000, 0x000ffc00, 0x000003ff, 0xc0000000)),
                                                                  // D3DFMT_A2B10G10R10 (D3DX reversal issue workaround)
 
-                                                                 new LegacyMap(Format.R8G8B8A8_UNorm, ConversionFlags.Expand
+                                                                 new LegacyMap(DXGIFormat.R8G8B8A8_UNorm, ConversionFlags.Expand
                                                                                                            | ConversionFlags.NoAlpha
                                                                                                            | ConversionFlags.Format888, DDS.PixelFormat.R8G8B8), // D3DFMT_R8G8B8
 
-                                                                 new LegacyMap(Format.B5G6R5_UNorm, ConversionFlags.Format565, DDS.PixelFormat.R5G6B5), // D3DFMT_R5G6B5
-                                                                 new LegacyMap(Format.B5G5R5A1_UNorm, ConversionFlags.Format5551, DDS.PixelFormat.A1R5G5B5), // D3DFMT_A1R5G5B5
-                                                                 new LegacyMap(Format.B5G5R5A1_UNorm, ConversionFlags.Format5551
+                                                                 new LegacyMap(DXGIFormat.B5G6R5_UNorm, ConversionFlags.Format565, DDS.PixelFormat.R5G6B5), // D3DFMT_R5G6B5
+                                                                 new LegacyMap(DXGIFormat.B5G5R5A1_UNorm, ConversionFlags.Format5551, DDS.PixelFormat.A1R5G5B5), // D3DFMT_A1R5G5B5
+                                                                 new LegacyMap(DXGIFormat.B5G5R5A1_UNorm, ConversionFlags.Format5551
                                                                                                            | ConversionFlags.NoAlpha, new DDS.PixelFormat(DDS.PixelFormatFlags.Rgb, 0, 16, 0x7c00, 0x03e0, 0x001f, 0x0000)), // D3DFMT_X1R5G5B5
      
-                                                                 new LegacyMap(Format.R8G8B8A8_UNorm, ConversionFlags.Expand
+                                                                 new LegacyMap(DXGIFormat.R8G8B8A8_UNorm, ConversionFlags.Expand
                                                                                                            | ConversionFlags.Format8332, new DDS.PixelFormat(DDS.PixelFormatFlags.Rgb, 0, 16, 0x00e0, 0x001c, 0x0003, 0xff00)),
                                                                  // D3DFMT_A8R3G3B2
-                                                                 new LegacyMap(Format.B5G6R5_UNorm, ConversionFlags.Expand
+                                                                 new LegacyMap(DXGIFormat.B5G6R5_UNorm, ConversionFlags.Expand
                                                                                                          | ConversionFlags.Format332, new DDS.PixelFormat(DDS.PixelFormatFlags.Rgb, 0, 8, 0xe0, 0x1c, 0x03, 0x00)), // D3DFMT_R3G3B2
   
-                                                                 new LegacyMap(Format.R8_UNorm, ConversionFlags.None, DDS.PixelFormat.L8), // D3DFMT_L8
-                                                                 new LegacyMap(Format.R16_UNorm, ConversionFlags.None, DDS.PixelFormat.L16), // D3DFMT_L16
-                                                                 new LegacyMap(Format.R8G8_UNorm, ConversionFlags.None, DDS.PixelFormat.A8L8), // D3DFMT_A8L8
+                                                                 new LegacyMap(DXGIFormat.R8_UNorm, ConversionFlags.None, DDS.PixelFormat.L8), // D3DFMT_L8
+                                                                 new LegacyMap(DXGIFormat.R16_UNorm, ConversionFlags.None, DDS.PixelFormat.L16), // D3DFMT_L16
+                                                                 new LegacyMap(DXGIFormat.R8G8_UNorm, ConversionFlags.None, DDS.PixelFormat.A8L8), // D3DFMT_A8L8
 
-                                                                 new LegacyMap(Format.A8_UNorm, ConversionFlags.None, DDS.PixelFormat.A8), // D3DFMT_A8
+                                                                 new LegacyMap(DXGIFormat.A8_UNorm, ConversionFlags.None, DDS.PixelFormat.A8), // D3DFMT_A8
 
-                                                                 new LegacyMap(Format.R16G16B16A16_UNorm, ConversionFlags.None, new DDS.PixelFormat(DDS.PixelFormatFlags.FourCC, 36, 0, 0, 0, 0, 0)), // D3DFMT_A16B16G16R16
-                                                                 new LegacyMap(Format.R16G16B16A16_SNorm, ConversionFlags.None, new DDS.PixelFormat(DDS.PixelFormatFlags.FourCC, 110, 0, 0, 0, 0, 0)), // D3DFMT_Q16W16V16U16
-                                                                 new LegacyMap(Format.R16_Float, ConversionFlags.None, new DDS.PixelFormat(DDS.PixelFormatFlags.FourCC, 111, 0, 0, 0, 0, 0)), // D3DFMT_R16F
-                                                                 new LegacyMap(Format.R16G16_Float, ConversionFlags.None, new DDS.PixelFormat(DDS.PixelFormatFlags.FourCC, 112, 0, 0, 0, 0, 0)), // D3DFMT_G16R16F
-                                                                 new LegacyMap(Format.R16G16B16A16_Float, ConversionFlags.None, new DDS.PixelFormat(DDS.PixelFormatFlags.FourCC, 113, 0, 0, 0, 0, 0)), // D3DFMT_A16B16G16R16F
-                                                                 new LegacyMap(Format.R32_Float, ConversionFlags.None, new DDS.PixelFormat(DDS.PixelFormatFlags.FourCC, 114, 0, 0, 0, 0, 0)), // D3DFMT_R32F
-                                                                 new LegacyMap(Format.R32G32_Float, ConversionFlags.None, new DDS.PixelFormat(DDS.PixelFormatFlags.FourCC, 115, 0, 0, 0, 0, 0)), // D3DFMT_G32R32F
-                                                                 new LegacyMap(Format.R32G32B32A32_Float, ConversionFlags.None, new DDS.PixelFormat(DDS.PixelFormatFlags.FourCC, 116, 0, 0, 0, 0, 0)), // D3DFMT_A32B32G32R32F
+                                                                 new LegacyMap(DXGIFormat.R16G16B16A16_UNorm, ConversionFlags.None, new DDS.PixelFormat(DDS.PixelFormatFlags.FourCC, 36, 0, 0, 0, 0, 0)), // D3DFMT_A16B16G16R16
+                                                                 new LegacyMap(DXGIFormat.R16G16B16A16_SNorm, ConversionFlags.None, new DDS.PixelFormat(DDS.PixelFormatFlags.FourCC, 110, 0, 0, 0, 0, 0)), // D3DFMT_Q16W16V16U16
+                                                                 new LegacyMap(DXGIFormat.R16_Float, ConversionFlags.None, new DDS.PixelFormat(DDS.PixelFormatFlags.FourCC, 111, 0, 0, 0, 0, 0)), // D3DFMT_R16F
+                                                                 new LegacyMap(DXGIFormat.R16G16_Float, ConversionFlags.None, new DDS.PixelFormat(DDS.PixelFormatFlags.FourCC, 112, 0, 0, 0, 0, 0)), // D3DFMT_G16R16F
+                                                                 new LegacyMap(DXGIFormat.R16G16B16A16_Float, ConversionFlags.None, new DDS.PixelFormat(DDS.PixelFormatFlags.FourCC, 113, 0, 0, 0, 0, 0)), // D3DFMT_A16B16G16R16F
+                                                                 new LegacyMap(DXGIFormat.R32_Float, ConversionFlags.None, new DDS.PixelFormat(DDS.PixelFormatFlags.FourCC, 114, 0, 0, 0, 0, 0)), // D3DFMT_R32F
+                                                                 new LegacyMap(DXGIFormat.R32G32_Float, ConversionFlags.None, new DDS.PixelFormat(DDS.PixelFormatFlags.FourCC, 115, 0, 0, 0, 0, 0)), // D3DFMT_G32R32F
+                                                                 new LegacyMap(DXGIFormat.R32G32B32A32_Float, ConversionFlags.None, new DDS.PixelFormat(DDS.PixelFormatFlags.FourCC, 116, 0, 0, 0, 0, 0)), // D3DFMT_A32B32G32R32F
 
-                                                                 new LegacyMap(Format.R32_Float, ConversionFlags.None, new DDS.PixelFormat(DDS.PixelFormatFlags.Rgb, 0, 32, 0xffffffff, 0x00000000, 0x00000000, 0x00000000)),
+                                                                 new LegacyMap(DXGIFormat.R32_Float, ConversionFlags.None, new DDS.PixelFormat(DDS.PixelFormatFlags.Rgb, 0, 32, 0xffffffff, 0x00000000, 0x00000000, 0x00000000)),
                                                                  // D3DFMT_R32F (D3DX uses FourCC 114 instead)
 
-                                                                 new LegacyMap(Format.R8G8B8A8_UNorm, ConversionFlags.Expand
+                                                                 new LegacyMap(DXGIFormat.R8G8B8A8_UNorm, ConversionFlags.Expand
                                                                                                            | ConversionFlags.Pal8
                                                                                                            | ConversionFlags.FormatA8P8, new DDS.PixelFormat(DDS.PixelFormatFlags.Pal8, 0, 16, 0, 0, 0, 0)), // D3DFMT_A8P8
-                                                                 new LegacyMap(Format.R8G8B8A8_UNorm, ConversionFlags.Expand
+                                                                 new LegacyMap(DXGIFormat.R8G8B8A8_UNorm, ConversionFlags.Expand
                                                                                                            | ConversionFlags.Pal8, new DDS.PixelFormat(DDS.PixelFormatFlags.Pal8, 0, 8, 0, 0, 0, 0)), // D3DFMT_P8
 #if DIRECTX11_1
-    new LegacyMap( Format.B4G4R4A4_UNorm,     ConversionFlags.Format4444,        DDS.PixelFormat.A4R4G4B4 ), // D3DFMT_A4R4G4B4 (uses DXGI 1.2 format)
-    new LegacyMap( Format.B4G4R4A4_UNorm,     ConversionFlags.NoAlpha
-                                      | ConversionFlags.Format4444,      new DDS.PixelFormat(DDS.PixelFormatFlags.Rgb,       0, 16, 0x0f00,     0x00f0,     0x000f,     0x0000     ) ), // D3DFMT_X4R4G4B4 (uses DXGI 1.2 format)
-    new LegacyMap( Format.B4G4R4A4_UNorm,     ConversionFlags.Expand
-                                      | ConversionFlags.Format44,        new DDS.PixelFormat(DDS.PixelFormatFlags.Luminance, 0,  8, 0x0f,       0x00,       0x00,       0xf0       ) ), // D3DFMT_A4L4 (uses DXGI 1.2 format)
+    new LegacyMap( DXGIFormat.B4G4R4A4_UNorm,     ConversionFlags.Format4444, DDS.PixelFormat.A4R4G4B4 ), // D3DFMT_A4R4G4B4 (uses DXGI 1.2 format)
+    new LegacyMap( DXGIFormat.B4G4R4A4_UNorm,     ConversionFlags.NoAlpha
+                                      | ConversionFlags.Format4444, new DDS.PixelFormat(DDS.PixelFormatFlags.Rgb,       0, 16, 0x0f00,     0x00f0,     0x000f,     0x0000     ) ), // D3DFMT_X4R4G4B4 (uses DXGI 1.2 format)
+    new LegacyMap( DXGIFormat.B4G4R4A4_UNorm,     ConversionFlags.Expand
+                                      | ConversionFlags.Format44, new DDS.PixelFormat(DDS.PixelFormatFlags.Luminance, 0,  8, 0x0f,       0x00,       0x00,       0xf0       ) ), // D3DFMT_A4L4 (uses DXGI 1.2 format)
 #else
                                                                  // !DXGI_1_2_FORMATS
-                                                                 new LegacyMap(Format.R8G8B8A8_UNorm, ConversionFlags.Expand
+                                                                 new LegacyMap(DXGIFormat.R8G8B8A8_UNorm, ConversionFlags.Expand
                                                                                                            | ConversionFlags.Format4444, DDS.PixelFormat.A4R4G4B4), // D3DFMT_A4R4G4B4
-                                                                 new LegacyMap(Format.R8G8B8A8_UNorm, ConversionFlags.Expand
+                                                                 new LegacyMap(DXGIFormat.R8G8B8A8_UNorm, ConversionFlags.Expand
                                                                                                            | ConversionFlags.NoAlpha
                                                                                                            | ConversionFlags.Format4444, new DDS.PixelFormat(DDS.PixelFormatFlags.Rgb, 0, 16, 0x0f00, 0x00f0, 0x000f, 0x0000)),
                                                                  // D3DFMT_X4R4G4B4
-                                                                 new LegacyMap(Format.R8G8B8A8_UNorm, ConversionFlags.Expand
+                                                                 new LegacyMap(DXGIFormat.R8G8B8A8_UNorm, ConversionFlags.Expand
                                                                                                            | ConversionFlags.Format44, new DDS.PixelFormat(DDS.PixelFormatFlags.Luminance, 0, 8, 0x0f, 0x00, 0x00, 0xf0)), // D3DFMT_A4L4
 #endif
                                                              };
@@ -214,7 +215,7 @@ namespace Adamantium.Engine.Graphics
         // RED/BLUE masks for 10:10:10:2 formats. We assume
         // below that the 'backwards' header mask is being used since it is most
         // likely written by D3DX. The more robust solution is to use the 'DX10'
-        // header extension and specify the Format.R10G10B10A2_UNorm format directly
+        // header extension and specify the DXGIFormat.R10G10B10A2_UNorm format directly
 
         // We do not support the following legacy Direct3D 9 formats:
         //      BumpDuDv D3DFMT_V8U8, D3DFMT_Q8W8V8U8, D3DFMT_V16U16, D3DFMT_A2W10V10U10
@@ -224,7 +225,7 @@ namespace Adamantium.Engine.Graphics
         //      FourCC 117 D3DFMT_CxV8U8
         //      ZBuffer D3DFMT_D16_LOCKABLE
         //      FourCC 82 D3DFMT_D32F_LOCKABLE
-        private static Format GetDXGIFormat(ref DDS.PixelFormat pixelFormat, DDSFlags flags, out ConversionFlags conversionFlags)
+        private static DXGIFormat GetDXGIFormat(ref DDS.PixelFormat pixelFormat, DDSFlags flags, out ConversionFlags conversionFlags)
         {
             conversionFlags = ConversionFlags.None;
 
@@ -258,15 +259,15 @@ namespace Adamantium.Engine.Graphics
             }
 
             if (index >= LegacyMaps.Length)
-                return Format.Unknown;
+                return DXGIFormat.Unknown;
 
             conversionFlags = LegacyMaps[index].ConversionFlags;
-            var format = LegacyMaps[index].Format;
+            var format = LegacyMaps[index].DXGIFormat;
 
             if ((conversionFlags & ConversionFlags.Expand) != 0 && (flags & DDSFlags.NoLegacyExpansion) != 0)
-                return Format.Unknown;
+                return DXGIFormat.Unknown;
 
-            if ((format == Format.R10G10B10A2_UNorm) && (flags & DDSFlags.NoR10B10G10A2Fixup) != 0)
+            if ((format == DXGIFormat.R10G10B10A2_UNorm) && (flags & DDSFlags.NoR10B10G10A2Fixup) != 0)
             {
                 conversionFlags ^= ConversionFlags.Swizzle;
             }
@@ -326,9 +327,8 @@ namespace Adamantium.Engine.Graphics
                 if (description.ArraySize == 0)
                     throw new InvalidOperationException("Unexpected ArraySize == 0 from DDS HeaderDX10 ");
 
-                description.Format = headerDX10.DXGIFormat;
-                if (!FormatHelper.IsValid(description.Format))
-                    throw new InvalidOperationException("Invalid Format from DDS HeaderDX10 ");
+                if (!DXGIFormatHelper.IsValid(headerDX10.DXGIFormat))
+                    throw new InvalidOperationException($"Invalid DXGIFormat from DDS HeaderDX10 {headerDX10.DXGIFormat}");
 
                 switch (headerDX10.ResourceDimension)
                 {
@@ -374,7 +374,7 @@ namespace Adamantium.Engine.Graphics
                         break;
 
                     default:
-                        throw new InvalidOperationException(string.Format("Unexpected dimension [{0}] from DDS HeaderDX10", headerDX10.ResourceDimension));
+                        throw new InvalidOperationException($"Unexpected dimension [{headerDX10.ResourceDimension}] from DDS HeaderDX10");
                 }
             }
             else
@@ -410,44 +410,44 @@ namespace Adamantium.Engine.Graphics
                     // Note there's no way for a legacy Direct3D 9 DDS to express a '1D' texture
                 }
 
-                description.Format = GetDXGIFormat(ref header.PixelFormat, flags, out convFlags);
+                description.DXGIFormat = GetDXGIFormat(ref header.PixelFormat, flags, out convFlags);
 
-                if (description.Format == Format.Unknown)
+                if (description.DXGIFormat == DXGIFormat.Unknown)
                     throw new InvalidOperationException("Unsupported PixelFormat from DDS Header");
             }
 
             // Special flag for handling BGR DXGI 1.1 formats
             if ((flags & DDSFlags.ForceRgb) != 0)
             {
-                switch (description.Format)
+                switch (description.DXGIFormat)
                 {
-                    case Format.B8G8R8A8_UNorm:
-                        description.Format = Format.R8G8B8A8_UNorm;
+                    case DXGIFormat.B8G8R8A8_UNorm:
+                        description.DXGIFormat = DXGIFormat.R8G8B8A8_UNorm;
                         convFlags |= ConversionFlags.Swizzle;
                         break;
 
-                    case Format.B8G8R8X8_UNorm:
-                        description.Format = Format.R8G8B8A8_UNorm;
+                    case DXGIFormat.B8G8R8X8_UNorm:
+                        description.DXGIFormat = DXGIFormat.R8G8B8A8_UNorm;
                         convFlags |= ConversionFlags.Swizzle | ConversionFlags.NoAlpha;
                         break;
 
-                    case Format.B8G8R8A8_Typeless:
-                        description.Format = Format.R8G8B8A8_Typeless;
+                    case DXGIFormat.B8G8R8A8_Typeless:
+                        description.DXGIFormat = DXGIFormat.R8G8B8A8_Typeless;
                         convFlags |= ConversionFlags.Swizzle;
                         break;
 
-                    case Format.B8G8R8A8_UNorm_SRgb:
-                        description.Format = Format.R8G8B8A8_UNorm_SRgb;
+                    case DXGIFormat.B8G8R8A8_UNorm_SRgb:
+                        description.DXGIFormat = DXGIFormat.R8G8B8A8_UNorm_SRgb;
                         convFlags |= ConversionFlags.Swizzle;
                         break;
 
-                    case Format.B8G8R8X8_Typeless:
-                        description.Format = Format.R8G8B8A8_Typeless;
+                    case DXGIFormat.B8G8R8X8_Typeless:
+                        description.DXGIFormat = DXGIFormat.R8G8B8A8_Typeless;
                         convFlags |= ConversionFlags.Swizzle | ConversionFlags.NoAlpha;
                         break;
 
-                    case Format.B8G8R8X8_UNorm_SRgb:
-                        description.Format = Format.R8G8B8A8_UNorm_SRgb;
+                    case DXGIFormat.B8G8R8X8_UNorm_SRgb:
+                        description.DXGIFormat = DXGIFormat.R8G8B8A8_UNorm_SRgb;
                         convFlags |= ConversionFlags.Swizzle | ConversionFlags.NoAlpha;
                         break;
                 }
@@ -460,16 +460,16 @@ namespace Adamantium.Engine.Graphics
             // Special flag for handling 16bpp formats
             if ((flags & DDSFlags.No16Bpp) != 0)
             {
-                switch (description.Format)
+                switch (description.DXGIFormat)
                 {
-                    case Format.B5G6R5_UNorm:
-                    case Format.B5G5R5A1_UNorm:
+                    case DXGIFormat.B5G6R5_UNorm:
+                    case DXGIFormat.B5G5R5A1_UNorm:
 #if DIRECTX11_1
-                    case Format.B4G4R4A4_UNorm:
+                    case DXGIFormat.B4G4R4A4_UNorm:
 #endif
-                        description.Format = Format.R8G8B8A8_UNorm;
+                        description.DXGIFormat = DXGIFormat.R8G8B8A8_UNorm;
                         convFlags |= ConversionFlags.Expand;
-                        if (description.Format == Format.B5G6R5_UNorm)
+                        if (description.DXGIFormat == DXGIFormat.B5G6R5_UNorm)
                             convFlags |= ConversionFlags.NoAlpha;
                         break;
                 }
@@ -501,107 +501,105 @@ namespace Adamantium.Engine.Graphics
             var ddpf = default(DDS.PixelFormat);
             if ((flags & DDSFlags.ForceDX10Ext) == 0)
             {
-                switch (description.Format)
+                switch (description.DXGIFormat)
                 {
-                    case Format.R8G8B8A8_UNorm:
+                    case DXGIFormat.R8G8B8A8_UNorm:
                         ddpf = DDS.PixelFormat.A8B8G8R8;
                         break;
-                    case Format.R16G16_UNorm:
+                    case DXGIFormat.R16G16_UNorm:
                         ddpf = DDS.PixelFormat.G16R16;
                         break;
-                    case Format.R8G8_UNorm:
+                    case DXGIFormat.R8G8_UNorm:
                         ddpf = DDS.PixelFormat.A8L8;
                         break;
-                    case Format.R16_UNorm:
+                    case DXGIFormat.R16_UNorm:
                         ddpf = DDS.PixelFormat.L16;
                         break;
-                    case Format.R8_UNorm:
+                    case DXGIFormat.R8_UNorm:
                         ddpf = DDS.PixelFormat.L8;
                         break;
-                    case Format.A8_UNorm:
+                    case DXGIFormat.A8_UNorm:
                         ddpf = DDS.PixelFormat.A8;
                         break;
-                    case Format.R8G8_B8G8_UNorm:
+                    case DXGIFormat.R8G8_B8G8_UNorm:
                         ddpf = DDS.PixelFormat.R8G8_B8G8;
                         break;
-                    case Format.G8R8_G8B8_UNorm:
+                    case DXGIFormat.G8R8_G8B8_UNorm:
                         ddpf = DDS.PixelFormat.G8R8_G8B8;
                         break;
-                    case Format.BC1_UNorm:
+                    case DXGIFormat.BC1_UNorm:
                         ddpf = DDS.PixelFormat.DXT1;
                         break;
-                    case Format.BC2_UNorm:
+                    case DXGIFormat.BC2_UNorm:
                         ddpf = DDS.PixelFormat.DXT3;
                         break;
-                    case Format.BC3_UNorm:
+                    case DXGIFormat.BC3_UNorm:
                         ddpf = DDS.PixelFormat.DXT5;
                         break;
-                    case Format.BC4_UNorm:
+                    case DXGIFormat.BC4_UNorm:
                         ddpf = DDS.PixelFormat.BC4_UNorm;
                         break;
-                    case Format.BC4_SNorm:
+                    case DXGIFormat.BC4_SNorm:
                         ddpf = DDS.PixelFormat.BC4_SNorm;
                         break;
-                    case Format.BC5_UNorm:
+                    case DXGIFormat.BC5_UNorm:
                         ddpf = DDS.PixelFormat.BC5_UNorm;
                         break;
-                    case Format.BC5_SNorm:
+                    case DXGIFormat.BC5_SNorm:
                         ddpf = DDS.PixelFormat.BC5_SNorm;
                         break;
-                    case Format.B5G6R5_UNorm:
+                    case DXGIFormat.B5G6R5_UNorm:
                         ddpf = DDS.PixelFormat.R5G6B5;
                         break;
-                    case Format.B5G5R5A1_UNorm:
+                    case DXGIFormat.B5G5R5A1_UNorm:
                         ddpf = DDS.PixelFormat.A1R5G5B5;
                         break;
-                    case Format.B8G8R8A8_UNorm:
+                    case DXGIFormat.B8G8R8A8_UNorm:
                         ddpf = DDS.PixelFormat.A8R8G8B8;
                         break; // DXGI 1.1
-                    case Format.B8G8R8X8_UNorm:
+                    case DXGIFormat.B8G8R8X8_UNorm:
                         ddpf = DDS.PixelFormat.X8R8G8B8;
                         break; // DXGI 1.1
-#if DIRECTX11_1
-                    case Format.B4G4R4A4_UNorm:
+                    case DXGIFormat.B4G4R4A4_UNorm:
                         ddpf = DDS.PixelFormat.A4R4G4B4;
                         break;
-#endif
                     // Legacy D3DX formats using D3DFMT enum value as FourCC
-                    case Format.R32G32B32A32_Float:
+                    case DXGIFormat.R32G32B32A32_Float:
                         ddpf.Size = Utilities.SizeOf<DDS.PixelFormat>();
                         ddpf.Flags = DDS.PixelFormatFlags.FourCC;
                         ddpf.FourCC = 116; // D3DFMT_A32B32G32R32F
                         break;
-                    case Format.R16G16B16A16_Float:
+                    case DXGIFormat.R16G16B16A16_Float:
                         ddpf.Size = Utilities.SizeOf<DDS.PixelFormat>();
                         ddpf.Flags = DDS.PixelFormatFlags.FourCC;
                         ddpf.FourCC = 113; // D3DFMT_A16B16G16R16F
                         break;
-                    case Format.R16G16B16A16_UNorm:
+                    case DXGIFormat.R16G16B16A16_UNorm:
                         ddpf.Size = Utilities.SizeOf<DDS.PixelFormat>();
                         ddpf.Flags = DDS.PixelFormatFlags.FourCC;
                         ddpf.FourCC = 36; // D3DFMT_A16B16G16R16
                         break;
-                    case Format.R16G16B16A16_SNorm:
+                    case DXGIFormat.R16G16B16A16_SNorm:
                         ddpf.Size = Utilities.SizeOf<DDS.PixelFormat>();
                         ddpf.Flags = DDS.PixelFormatFlags.FourCC;
                         ddpf.FourCC = 110; // D3DFMT_Q16W16V16U16
                         break;
-                    case Format.R32G32_Float:
+                    case DXGIFormat.R32G32_Float:
                         ddpf.Size = Utilities.SizeOf<DDS.PixelFormat>();
                         ddpf.Flags = DDS.PixelFormatFlags.FourCC;
                         ddpf.FourCC = 115; // D3DFMT_G32R32F
                         break;
-                    case Format.R16G16_Float:
+                    case DXGIFormat.R16G16_Float:
                         ddpf.Size = Utilities.SizeOf<DDS.PixelFormat>();
                         ddpf.Flags = DDS.PixelFormatFlags.FourCC;
                         ddpf.FourCC = 112; // D3DFMT_G16R16F
                         break;
-                    case Format.R32_Float:
+                    case DXGIFormat.R32_Float:
                         ddpf.Size = Utilities.SizeOf<DDS.PixelFormat>();
                         ddpf.Flags = DDS.PixelFormatFlags.FourCC;
                         ddpf.FourCC = 114; // D3DFMT_R32F
                         break;
-                    case Format.R16_Float:
+                    case DXGIFormat.R16_Float:
                         ddpf.Size = Utilities.SizeOf<DDS.PixelFormat>();
                         ddpf.Flags = DDS.PixelFormatFlags.FourCC;
                         ddpf.FourCC = 111; // D3DFMT_R16F
@@ -692,7 +690,7 @@ namespace Adamantium.Engine.Graphics
 
                 Utilities.ClearMemory((IntPtr) ext, 0, Utilities.SizeOf<DDS.HeaderDXT10>());
 
-                ext->DXGIFormat = description.Format;
+                ext->DXGIFormat = description.DXGIFormat;
                 switch (description.Dimension)
                 {
                     case TextureDimension.Texture1D:
@@ -778,10 +776,10 @@ namespace Adamantium.Engine.Graphics
             switch (inFormat)
             {
                 case TEXP_LEGACY_FORMAT.R8G8B8:
-                    if (outFormat != Format.R8G8B8A8_UNorm)
+                    if (outFormat != Format.R8G8B8A8_UNORM)
                         return false;
 
-                    // D3DFMT_R8G8B8 -> Format.R8G8B8A8_UNorm
+                    // D3DFMT_R8G8B8 -> DXGIFormat.R8G8B8A8_UNorm
                     {
                         var sPtr = (byte*) (pSource);
                         var dPtr = (int*) (pDestination);
@@ -802,8 +800,8 @@ namespace Adamantium.Engine.Graphics
                 case TEXP_LEGACY_FORMAT.R3G3B2:
                     switch (outFormat)
                     {
-                        case Format.R8G8B8A8_UNorm:
-                            // D3DFMT_R3G3B2 -> Format.R8G8B8A8_UNorm
+                        case Format.R8G8B8A8_UNORM:
+                            // D3DFMT_R3G3B2 -> DXGIFormat.R8G8B8A8_UNorm
                             {
                                 var sPtr = (byte*) (pSource);
                                 var dPtr = (int*) (pDestination);
@@ -821,8 +819,8 @@ namespace Adamantium.Engine.Graphics
                             }
                             return true;
 
-                        case Format.B5G6R5_UNorm:
-                            // D3DFMT_R3G3B2 -> Format.B5G6R5_UNorm
+                        case Format.B5G6R5_UNORM_PACK16:
+                            // D3DFMT_R3G3B2 -> DXGIFormat.B5G6R5_UNorm
                             {
                                 var sPtr = (byte*) (pSource);
                                 var dPtr = (short*) (pDestination);
@@ -843,10 +841,10 @@ namespace Adamantium.Engine.Graphics
                     break;
 
                 case TEXP_LEGACY_FORMAT.A8R3G3B2:
-                    if (outFormat != Format.R8G8B8A8_UNorm)
+                    if (outFormat != Format.R8G8B8A8_UNORM)
                         return false;
 
-                    // D3DFMT_A8R3G3B2 -> Format.R8G8B8A8_UNorm
+                    // D3DFMT_A8R3G3B2 -> DXGIFormat.R8G8B8A8_UNorm
                     {
                         var sPtr = (short*) (pSource);
                         var dPtr = (int*) (pDestination);
@@ -866,10 +864,10 @@ namespace Adamantium.Engine.Graphics
                     return true;
 
                 case TEXP_LEGACY_FORMAT.P8:
-                    if ((outFormat != Format.R8G8B8A8_UNorm) || pal8 == null)
+                    if ((outFormat != Format.R8G8B8A8_UNORM) || pal8 == null)
                         return false;
 
-                    // D3DFMT_P8 -> Format.R8G8B8A8_UNorm
+                    // D3DFMT_P8 -> DXGIFormat.R8G8B8A8_UNorm
                     {
                         byte* sPtr = (byte*) (pSource);
                         int* dPtr = (int*) (pDestination);
@@ -884,10 +882,10 @@ namespace Adamantium.Engine.Graphics
                     return true;
 
                 case TEXP_LEGACY_FORMAT.A8P8:
-                    if ((outFormat != Format.R8G8B8A8_UNorm) || pal8 == null)
+                    if ((outFormat != Format.R8G8B8A8_UNORM) || pal8 == null)
                         return false;
 
-                    // D3DFMT_A8P8 -> Format.R8G8B8A8_UNorm
+                    // D3DFMT_A8P8 -> DXGIFormat.R8G8B8A8_UNorm
                     {
                         short* sPtr = (short*) (pSource);
                         int* dPtr = (int*) (pDestination);
@@ -908,8 +906,8 @@ namespace Adamantium.Engine.Graphics
                     switch (outFormat)
                     {
 #if DIRECTX11_1
-                case Format.B4G4R4A4_UNorm :
-                    // D3DFMT_A4L4 -> Format.B4G4R4A4_UNorm 
+                case Format.B4G4R4A4_UNORM_PACK16:
+                    // D3DFMT_A4L4 -> DXGIFormat.B4G4R4A4_UNorm 
                     {
                         byte * sPtr = (byte*)(pSource);
                         short * dPtr = (short*)(pDestination);
@@ -928,8 +926,8 @@ namespace Adamantium.Engine.Graphics
 #endif
                             // DXGI_1_2_FORMATS
 
-                        case Format.R8G8B8A8_UNorm:
-                            // D3DFMT_A4L4 -> Format.R8G8B8A8_UNorm
+                        case Format.R8G8B8A8_UNORM:
+                            // D3DFMT_A4L4 -> DXGIFormat.R8G8B8A8_UNorm
                             {
                                 byte* sPtr = (byte*) (pSource);
                                 int* dPtr = (int*) (pDestination);
@@ -950,10 +948,10 @@ namespace Adamantium.Engine.Graphics
 
 #if !DIRECTX11_1
                 case TEXP_LEGACY_FORMAT.B4G4R4A4:
-                    if (outFormat != Format.R8G8B8A8_UNorm)
+                    if (outFormat != Format.R8G8B8A8_UNORM)
                         return false;
 
-                    // D3DFMT_A4R4G4B4 -> Format.R8G8B8A8_UNorm
+                    // D3DFMT_A4R4G4B4 -> DXGIFormat.R8G8B8A8_UNorm
                     {
                         short* sPtr = (short*) (pSource);
                         int* dPtr = (int*) (pDestination);
@@ -1012,7 +1010,7 @@ namespace Adamantium.Engine.Graphics
             return image;
         }
 
-        public static void SaveToDDSStream(PixelBuffer[] pixelBuffers, int count, ImageDescription description, System.IO.Stream imageStream)
+        public static void SaveToDDSStream(PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream)
         {
             SaveToDDSStream(pixelBuffers, count, description, DDSFlags.None, imageStream);
         }
@@ -1020,7 +1018,7 @@ namespace Adamantium.Engine.Graphics
         //-------------------------------------------------------------------------------------
         // Save a DDS to a stream
         //-------------------------------------------------------------------------------------
-        public unsafe static void SaveToDDSStream(PixelBuffer[] pixelBuffers, int count, ImageDescription metadata, DDSFlags flags, System.IO.Stream stream)
+        public unsafe static void SaveToDDSStream(PixelBuffer[] pixelBuffers, int count, ImageDescription metadata, DDSFlags flags, Stream stream)
         {
             // Determine memory required
             int totalSize;
@@ -1138,8 +1136,7 @@ namespace Adamantium.Engine.Graphics
 
                     if (FormatHelper.IsCompressed(metadata.Format))
                     {
-                       Utilities.CopyMemory(pDest, pSrc,
-                          Math.Min(images[index].BufferStride, imagesDst[index].BufferStride));
+                       Utilities.CopyMemory(pDest, pSrc, Math.Min(images[index].BufferStride, imagesDst[index].BufferStride));
                     }
                     else
                     {
@@ -1158,8 +1155,8 @@ namespace Adamantium.Engine.Graphics
                              {
                                 ImageHelper.ExpandScanline(pDest, dpitch, pSrc, spitch,
                                    (convFlags & ConversionFlags.Format565) != 0
-                                      ? Format.B5G6R5_UNorm
-                                      : Format.B5G5R5A1_UNorm, tflags);
+                                      ? Format.B5G6R5_UNORM_PACK16
+                                      : Format.B5G5R5A1_UNORM_PACK16, tflags);
                              }
                              else
                              {

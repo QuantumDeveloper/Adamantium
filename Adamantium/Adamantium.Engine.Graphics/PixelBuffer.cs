@@ -97,7 +97,7 @@ namespace Adamantium.Engine.Graphics
             }
             set
             {
-                if (PixelSize != (int)FormatHelper.SizeOfInBytes(value))
+                if (PixelSize != (int)DXGIFormatHelper.SizeOfInBytes(value))
                 {
                     throw new ArgumentException(
                        $"Format [{value}] doesn't have same pixel size in bytes than current format [{format}]");
@@ -143,7 +143,7 @@ namespace Adamantium.Engine.Graphics
             // Check that buffers are identical
             if (this.Width != pixelBuffer.Width
                 || this.Height != pixelBuffer.Height
-                || PixelSize != FormatHelper.SizeOfInBytes(pixelBuffer.Format))
+                || PixelSize != DXGIFormatHelper.SizeOfInBytes(pixelBuffer.Format))
             {
                 throw new ArgumentException("Invalid destination pixelBufferArray. Mush have same Width, Height and Format", nameof(pixelBuffer));
             }

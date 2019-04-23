@@ -682,7 +682,7 @@ namespace Adamantium.Engine.Graphics
 
         internal unsafe void Initialize(ImageDescription description, IntPtr dataPointer, int offset, GCHandle? handle, bool bufferIsDisposable, PitchFlags pitchFlags = PitchFlags.None)
         {
-            if (!FormatHelper.IsValid(description.Format))
+            if (!DXGIFormatHelper.IsValid(description.Format))
                 throw new InvalidOperationException("Unsupported DXGI Format");
 
             this.handle = handle;

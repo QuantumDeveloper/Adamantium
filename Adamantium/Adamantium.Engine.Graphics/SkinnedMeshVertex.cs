@@ -34,7 +34,7 @@ namespace Adamantium.Engine.Graphics
             UV1 = uv1;
             UV2 = uv2;
             UV3 = uv3;
-            Color = color;
+            Color = (Vector4F)color;
             Tangent = tangent;
             BiTangent = bitangent;
             JointIndices = jointIndices;
@@ -49,7 +49,7 @@ namespace Adamantium.Engine.Graphics
         /// <summary>
         /// The vertex color.
         /// </summary>
-        [VertexInputElement("COLOR")] public Color Color;
+        [VertexInputElement("COLOR")] public Vector4F Color;
 
         /// <summary>
         /// The vertex normal.
