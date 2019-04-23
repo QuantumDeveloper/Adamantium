@@ -1,0 +1,413 @@
+﻿using System.Globalization;
+using Adamantium.Mathematics;
+using Point = Adamantium.Mathematics.Point;
+
+namespace Adamantium.UI
+{
+   /// <summary>
+   /// Defines a rectangle, which can be transformed by a matrix
+   /// </summary>
+   public struct Rect
+   {
+      /// <summary>
+      /// An empty rectangle.
+      /// </summary>
+      public static readonly Rect Empty = default(Rect);
+
+      /// <summary>
+      /// Initializes a new instance of the <see cref="Rect"/> structure.
+      /// </summary>
+      /// <param name="x">The X position.</param>
+      /// <param name="y">The Y position.</param>
+      /// <param name="width">The width.</param>
+      /// <param name="height">The height.</param>
+      public Rect(double x, double y, double width, double height)
+      {
+         X = x;
+         Y = y;
+         Width = width;
+         Height = height;
+      }
+
+      /// <summary>
+      /// Initializes a new instance of the <see cref="Rect"/> structure.
+      /// </summary>
+      /// <param name="size">The size of the rectangle.</param>
+      public Rect(Size size)
+      {
+         X = 0;
+         Y = 0;
+         Width = size.Width;
+         Height = size.Height;
+      }
+
+      /// <summary>
+      /// Initializes a new instance of the <see cref="Rect"/> structure.
+      /// </summary>
+      /// <param name="position">The position of the rectangle.</param>
+      /// <param name="size">The size of the rectangle.</param>
+      public Rect(Point position, Size size)
+      {
+         X = position.X;
+         Y = position.Y;
+         Width = size.Width;
+         Height = size.Height;
+      }
+
+      /// <summary>
+      /// Initializes a new instance of the <see cref="Rect"/> structure.
+      /// </summary>
+      /// <param name="topLeft">The top left position of the rectangle.</param>
+      /// <param name="bottomRight">The bottom right position of the rectangle.</param>
+      public Rect(Point topLeft, Point bottomRight)
+      {
+         X = topLeft.X;
+         Y = topLeft.Y;
+         Width = bottomRight.X - topLeft.X;
+         Height = bottomRight.Y - topLeft.Y;
+      }
+
+      /// <summary>
+      /// Gets the X position.
+      /// </summary>
+      public double X { get; set; }
+
+      /// <summary>
+      /// Gets the Y position.
+      /// </summary>
+      public double Y { get; set; }
+
+      /// <summary>
+      /// Gets the width.
+      /// </summary>
+      public double Width { get; set; }
+
+      /// <summary>
+      /// Gets the height.
+      /// </summary>
+      public double Height { get; set; }
+
+      /// <summary>
+      /// Gets the position of the rectangle.
+      /// </summary>
+      public Point Location => new Point(X, Y);
+
+      /// <summary>
+      /// Gets the size of the rectangle.
+      /// </summary>
+      public Size Size => new Size(Width, Height);
+
+      /// <summary>
+      /// Gets the right position of the rectangle.
+      /// </summary>
+      public double Right => X + Width;
+
+      /// <summary>
+      /// Gets the bottom position of the rectangle.
+      /// </summary>
+      public double Bottom => Y + Height;
+
+      /// <summary>
+      /// Gets the top left point of the rectangle.
+      /// </summary>
+      public Point TopLeft => new Point(X, Y);
+
+      /// <summary>
+      /// Gets the top right point of the rectangle.
+      /// </summary>
+      public Point TopRight => new Point(Right, Y);
+
+      /// <summary>
+      /// Gets the bottom left point of the rectangle.
+      /// </summary>
+      public Point BottomLeft => new Point(X, Bottom);
+
+      /// <summary>
+      /// Gets the bottom right point of the rectangle.
+      /// </summary>
+      public Point BottomRight => new Point(Right, Bottom);
+
+      /// <summary>
+      /// Gets the center point of the rectangle.
+      /// </summary>
+      public Point Center => new Point(X + (Width / 2), Y + (Height / 2));
+
+      /// <summary>
+      /// Gets a value that indicates whether the rectangle is empty.
+      /// </summary>
+      public bool IsEmpty => Width == 0 && Height == 0;
+
+      /// <summary>
+      /// Checks for equality between two <see cref="Rect"/>s.
+      /// </summary>
+      /// <param name="left">The first rect.</param>
+      /// <param name="right">The second rect.</param>
+      /// <returns>True if the rects are equal; otherwise false.</returns>
+      public static bool operator ==(Rect left, Rect right)
+      {
+         return left.Location == right.Location && left.Size == right.Size;
+      }
+
+      /// <summary>
+      /// Checks for unequality between two <see cref="Rect"/>s.
+      /// </summary>
+      /// <param name="left">The first rect.</param>
+      /// <param name="right">The second rect.</param>
+      /// <returns>True if the rects are unequal; otherwise false.</returns>
+      public static bool operator !=(Rect left, Rect right)
+      {
+         return !(left == right);
+      }
+
+      /// <summary>
+      /// Multiplies a rectangle by a vector.
+      /// </summary>
+      /// <param name="rect">The rectangle.</param>
+      /// <param name="scale">The vector scale.</param>
+      /// <returns>The scaled rectangle.</returns>
+      public static Rect operator *(Rect rect, Vector2D scale)
+      {
+         return new Rect(
+             rect.X * scale.X,
+             rect.Y * scale.Y,
+             rect.Width * scale.X,
+             rect.Height * scale.Y);
+      }
+
+
+      /*
+      /// <summary>
+      /// Transforms a rectangle by a matrix and returns the axis-aligned bounding box.
+      /// </summary>
+      /// <param name="rect">The rectangle.</param>
+      /// <param name="matrix">The matrix.</param>
+      /// <returns>The axis-aligned bounding box.</returns>
+      public static Rect operator *(Rect rect, Matrix4x4F matrix)
+      {
+         return new Rect(rect.TopLeft * matrix, rect.BottomRight * matrix);
+      }
+      */
+
+
+      /// <summary>
+      /// Divides a rectangle by a vector.
+      /// </summary>
+      /// <param name="rect">The rectangle.</param>
+      /// <param name="scale">The vector scale.</param>
+      /// <returns>The scaled rectangle.</returns>
+      public static Rect operator /(Rect rect, Vector2D scale)
+      {
+         return new Rect(
+             rect.X / scale.X,
+             rect.Y / scale.Y,
+             rect.Width / scale.X,
+             rect.Height / scale.Y);
+      }
+
+      /// <summary>
+      /// Determines whether a points in in the bounds of the rectangle.
+      /// </summary>
+      /// <param name="p">The point.</param>
+      /// <returns>true if the point is in the bounds of the rectangle; otherwise false.</returns>
+      public bool Contains(Point p)
+      {
+         return p.X >= X && p.X < X + Width &&
+                p.Y >= Y && p.Y < Y + Height;
+      }
+
+      /// <summary>
+      /// Centers another rectangle in this rectangle.
+      /// </summary>
+      /// <param name="rect">The rectangle to center.</param>
+      /// <returns>The centered rectangle.</returns>
+      public Rect CenterIn(Rect rect)
+      {
+         return new Rect(
+             X + ((Width - rect.Width) / 2),
+             Y + ((Height - rect.Height) / 2),
+             rect.Width,
+             rect.Height);
+      }
+
+      /// <summary>
+      /// Inflates the rectangle.
+      /// </summary>
+      /// <param name="thickness">The thickness.</param>
+      /// <returns>The inflated rectangle.</returns>
+      public Rect Inflate(double thickness)
+      {
+         return new Rect(new Point(X - thickness, Y - thickness), Size.Inflate(new Thickness(thickness)));
+      }
+
+      /// <summary>
+      /// Inflates the rectangle.
+      /// </summary>
+      /// <param name="thickness">The thickness.</param>
+      /// <returns>The inflated rectangle.</returns>
+      public Rect Inflate(Thickness thickness)
+      {
+         return new Rect(
+             new Point(X - thickness.Left, Y - thickness.Top),
+             Size.Inflate(thickness));
+      }
+
+      /// <summary>
+      /// Deflates the rectangle.
+      /// </summary>
+      /// <param name="thickness">The thickness.</param>
+      /// <returns>The deflated rectangle.</returns>
+      /// <remarks>The deflated rectangle size cannot be less than 0.</remarks>
+      public Rect Deflate(double thickness)
+      {
+         return Deflate(new Thickness(thickness));
+      }
+
+      /// <summary>
+      /// Deflates the rectangle by a <see cref="Thickness"/>.
+      /// </summary>
+      /// <param name="thickness">The thickness.</param>
+      /// <returns>The deflated rectangle.</returns>
+      /// <remarks>The deflated rectangle size cannot be less than 0.</remarks>
+      public Rect Deflate(Thickness thickness)
+      {
+         return new Rect(
+             new Point(X + thickness.Left, Y + thickness.Top),
+             Size.Deflate(thickness));
+      }
+
+      public Rect ReplaceWidth(double width)
+      {
+         return new Rect(X, Y, width, Height);
+      }
+
+      public Rect ReplaceHeight(double height)
+      {
+         return new Rect(X, Y, Width, height);
+      }
+
+      /// <summary>
+      /// Returns a boolean indicating whether the given object is equal to this rectangle.
+      /// </summary>
+      /// <param name="obj">The object to compare against.</param>
+      /// <returns>True if the object is equal to this rectangle; false otherwise.</returns>
+      public override bool Equals(object obj)
+      {
+         if (obj is Rect)
+         {
+            var other = (Rect)obj;
+            return Location == other.Location && Size == other.Size;
+         }
+
+         return false;
+      }
+
+      /// <summary>
+      /// Returns the hash code for this instance.
+      /// </summary>
+      /// <returns>The hash code.</returns>
+      public override int GetHashCode()
+      {
+         unchecked
+         {
+            int hash = 17;
+            hash = (hash * 23) + X.GetHashCode();
+            hash = (hash * 23) + Y.GetHashCode();
+            hash = (hash * 23) + Width.GetHashCode();
+            hash = (hash * 23) + Height.GetHashCode();
+            return hash;
+         }
+      }
+
+      /// <summary>
+      /// Gets the intersection of two rectangles.
+      /// </summary>
+      /// <param name="rect">The other rectangle.</param>
+      /// <returns>The intersection.</returns>
+      public Rect Intersect(Rect rect)
+      {
+         var newLeft = (rect.X > X) ? rect.X : X;
+         var newTop = (rect.Y > Y) ? rect.Y : Y;
+         var newRight = (rect.Right < Right) ? rect.Right : Right;
+         var newBottom = (rect.Bottom < Bottom) ? rect.Bottom : Bottom;
+
+         if ((newRight > newLeft) && (newBottom > newTop))
+         {
+            return new Rect(newLeft, newTop, newRight - newLeft, newBottom - newTop);
+         }
+         else
+         {
+            return Empty;
+         }
+      }
+
+      /// <summary>
+      /// Determines whether a rectangle intersects with this rectangle.
+      /// </summary>
+      /// <param name="rect">The other rectangle.</param>
+      /// <returns>
+      /// True if the specified rectangle intersects with this one; otherwise false.
+      /// </returns>
+      public bool Intersects(Rect rect)
+      {
+         return (rect.X < Right) && (X < rect.Right) && (rect.Y < Bottom) && (Y < rect.Bottom);
+      }
+
+      //TODO:replace sharpDX matrix with my own Matrix4x4F
+      /// <summary>
+      /// Returns the axis-aligned bounding box of a transformed rectangle.
+      /// </summary>
+      /// <param name="matrix">The transform.</param>
+      /// <returns>The bounding box</returns>
+      public Rect TransformToAABB(Matrix4x4F matrix)
+      {
+         var points = new[]
+         {
+            Vector2F.TransformCoordinate(TopLeft, matrix),
+            Vector2F.TransformCoordinate(TopRight, matrix),
+            Vector2F.TransformCoordinate(BottomRight, matrix),
+            Vector2F.TransformCoordinate(BottomLeft, matrix)
+         };
+
+         var left = double.MaxValue;
+         var right = double.MinValue;
+         var top = double.MaxValue;
+         var bottom = double.MinValue;
+
+         foreach (var p in points)
+         {
+            if (p.X < left) left = p.X;
+            if (p.X > right) right = p.X;
+            if (p.Y < top) top = p.Y;
+            if (p.Y > bottom) bottom = p.Y;
+         }
+
+         return new Rect(new Point(left, top), new Point(right, bottom));
+      }
+      
+
+      /// <summary>
+      /// Translates the rectangle by an offset.
+      /// </summary>
+      /// <param name="offset">The offset.</param>
+      /// <returns>The translated rectangle.</returns>
+      public Rect Translate(Vector2D offset)
+      {
+         return new Rect(Location + offset, Size);
+      }
+
+      /// <summary>
+      /// Returns the string representation of the rectangle.
+      /// </summary>
+      /// <returns>The string representation of the rectangle.</returns>
+      public override string ToString()
+      {
+         return string.Format(
+             CultureInfo.InvariantCulture,
+             "{0}, {1}, {2}, {3}",
+             X,
+             Y,
+             Width,
+             Height);
+      }
+   }
+}

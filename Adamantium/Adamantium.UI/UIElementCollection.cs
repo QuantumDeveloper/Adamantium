@@ -1,0 +1,12 @@
+﻿using System.Collections.Generic;
+using Adamantium.Engine.Core.Collections;
+
+namespace Adamantium.UI
+{
+   public sealed class UIElementCollection:TrackingCollection<UIComponent>
+   {
+      public UIElementCollection() { }
+      public UIElementCollection(IEnumerable<UIComponent> elements ):base(elements)
+      { }
+   }
+}
