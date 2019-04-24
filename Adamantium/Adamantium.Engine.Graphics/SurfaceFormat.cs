@@ -934,175 +934,1062 @@ namespace Adamantium.Engine.Graphics
         public static class BC1
         {
             /// <summary>
-            /// Corresponds to <see cref="Format.BC1_Typeless"/>
+            /// Corresponds to <see cref="Format.BC1_RGB_UNORM_BLOCK"/>
             /// </summary>
-            public static readonly SurfaceFormat Typeless = new SurfaceFormat(Format.BC1_Typeless);
+            public static readonly SurfaceFormat RgbUNorm = new SurfaceFormat(Format.BC1_RGB_UNORM_BLOCK);
 
             /// <summary>
-            /// Corresponds to <see cref="Format.BC1_UNorm"/>
+            /// Corresponds to <see cref="Format.BC1_RGB_SRGB_BLOCK"/>
             /// </summary>
-            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.BC1_UNorm);
+            public static readonly SurfaceFormat RgbSRgbUNorm = new SurfaceFormat(Format.BC1_RGB_SRGB_BLOCK);
 
             /// <summary>
-            /// Corresponds to <see cref="Format.BC1_UNorm_SRgb"/>
+            /// Corresponds to <see cref="Format.BC1_RGBA_UNORM_BLOCK"/>
             /// </summary>
-            public static readonly SurfaceFormat UNormSRgb = new SurfaceFormat(Format.BC1_UNorm_SRgb);
+            public static readonly SurfaceFormat RgbaUNorm = new SurfaceFormat(Format.BC1_RGBA_UNORM_BLOCK);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.BC1_RGBA_SRGB_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat RgbaSRgbUNorm = new SurfaceFormat(Format.BC1_RGBA_SRGB_BLOCK);
 
         }
 
         /// <summary>
-        /// DXGI.Format.BC2 formats
+        /// <see cref="Format.BC2"/> formats family
         /// </summary>
         public static class BC2
         {
             /// <summary>
-            /// Corresponds to <see cref="Format.BC2_Typeless"/>
+            /// Corresponds to <see cref="Format.BC2_UNORM_BLOCK"/>
             /// </summary>
-            public static readonly SurfaceFormat Typeless = new SurfaceFormat(Format.BC2_Typeless);
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.BC2_UNORM_BLOCK);
 
             /// <summary>
-            /// Corresponds to <see cref="Format.BC2_UNorm"/>
+            /// Corresponds to <see cref="Format.BC2_SRGB_BLOCK"/>
             /// </summary>
-            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.BC2_UNorm);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.BC2_UNorm_SRgb"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormSRgb = new SurfaceFormat(Format.BC2_UNorm_SRgb);
+            public static readonly SurfaceFormat SRgb = new SurfaceFormat(Format.BC2_SRGB_BLOCK);
 
         }
 
         /// <summary>
-        /// DXGI.Format.BC3 formats
+        /// <see cref="Format.BC3"/> formats family
         /// </summary>
         public static class BC3
         {
             /// <summary>
-            /// Corresponds to <see cref="Format.BC3_Typeless"/>
+            /// Corresponds to <see cref="Format.BC3_UNORM_BLOCK"/>
             /// </summary>
-            public static readonly SurfaceFormat Typeless = new SurfaceFormat(Format.BC3_Typeless);
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.BC3_UNORM_BLOCK);
 
             /// <summary>
-            /// Corresponds to <see cref="Format.BC3_UNorm"/>
+            /// Corresponds to <see cref="Format.BC3_SRGB_BLOCK"/>
             /// </summary>
-            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.BC3_UNorm);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.BC3_UNorm_SRgb"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormSRgb = new SurfaceFormat(Format.BC3_UNorm_SRgb);
+            public static readonly SurfaceFormat SRgb = new SurfaceFormat(Format.BC3_SRGB_BLOCK);
 
         }
 
         /// <summary>
-        /// DXGI.Format.BC4 formats
+        /// <see cref="Format.BC4"/> formats family
         /// </summary>
         public static class BC4
         {
             /// <summary>
-            /// Corresponds to <see cref="Format.BC4_SNorm"/>
+            /// Corresponds to <see cref="Format.BC4_UNORM_BLOCK"/>
             /// </summary>
-            public static readonly SurfaceFormat SNorm = new SurfaceFormat(Format.BC4_SNorm);
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.BC4_UNORM_BLOCK);
 
             /// <summary>
-            /// Corresponds to <see cref="Format.BC4_Typeless"/>
+            /// Corresponds to <see cref="Format.BC4_SNORM_BLOCK"/>
             /// </summary>
-            public static readonly SurfaceFormat Typeless = new SurfaceFormat(Format.BC4_Typeless);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.BC4_UNorm"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.BC4_UNorm);
+            public static readonly SurfaceFormat SNorm = new SurfaceFormat(Format.BC4_SNORM_BLOCK);
 
         }
 
         /// <summary>
-        /// DXGI.Format.BC5 formats
+        /// <see cref="Format.BC5"/> formats family
         /// </summary>
         public static class BC5
         {
             /// <summary>
-            /// Corresponds to <see cref="Format.BC5_SNorm"/>
+            /// Corresponds to <see cref="Format.BC5_UNORM_BLOCK"/>
             /// </summary>
-            public static readonly SurfaceFormat SNorm = new SurfaceFormat(Format.BC5_SNorm);
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.BC5_UNORM_BLOCK);
 
             /// <summary>
-            /// Corresponds to <see cref="Format.BC5_Typeless"/>
+            /// Corresponds to <see cref="Format.BC5_SNORM_BLOCK"/>
             /// </summary>
-            public static readonly SurfaceFormat Typeless = new SurfaceFormat(Format.BC5_Typeless);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.BC5_UNorm"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.BC5_UNorm);
+            public static readonly SurfaceFormat SNorm = new SurfaceFormat(Format.BC5_SNORM_BLOCK);
 
         }
 
         /// <summary>
-        /// DXGI.Format.BC6H formats
+        /// <see cref="Format.BC7"/> formats family
         /// </summary>
         public static class BC6H
         {
             /// <summary>
-            /// Corresponds to <see cref="Format.BC6H_Typeless"/>
+            /// Corresponds to <see cref="Format.BC6H_UFLOAT_BLOCK"/>
             /// </summary>
-            public static readonly SurfaceFormat Typeless = new SurfaceFormat(Format.BC6H_Typeless);
+            public static readonly SurfaceFormat UFloat = new SurfaceFormat(Format.BC6H_UFLOAT_BLOCK);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.BC6H_SFLOAT_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat SFloat = new SurfaceFormat(Format.BC6H_SFLOAT_BLOCK);
 
         }
 
         /// <summary>
-        /// DXGI.Format.BC7 formats
+        /// <see cref="Format.BC7"/> formats family
         /// </summary>
         public static class BC7
         {
             /// <summary>
-            /// Corresponds to <see cref="Format.BC7_Typeless"/>
+            /// Corresponds to <see cref="Format.BC7_UNORM_BLOCK"/>
             /// </summary>
-            public static readonly SurfaceFormat Typeless = new SurfaceFormat(Format.BC7_Typeless);
+            public static readonly SurfaceFormat UFloat = new SurfaceFormat(Format.BC7_UNORM_BLOCK);
 
             /// <summary>
-            /// Corresponds to <see cref="Format.BC7_UNorm"/>
+            /// Corresponds to <see cref="Format.BC7_SRGB_BLOCK"/>
             /// </summary>
-            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.BC7_UNorm);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.BC7_UNorm_SRgb"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormSRgb = new SurfaceFormat(Format.BC7_UNorm_SRgb);
+            public static readonly SurfaceFormat SFloat = new SurfaceFormat(Format.BC7_SRGB_BLOCK);
 
         }
 
         /// <summary>
-        /// DXGI.Format.R10G10B10A2 formats
+        /// <see cref="Format.ETC2_R8G8B8"/> formats family
         /// </summary>
-        public static class R10G10B10A2
+        public static class ETC2R8G8B8
         {
             /// <summary>
-            /// Corresponds to <see cref="Format.R10G10B10A2_Typeless"/>
+            /// Corresponds to <see cref="Format.ETC2_R8G8B8_UNORM_BLOCK"/>
             /// </summary>
-            public static readonly SurfaceFormat Typeless = new SurfaceFormat(Format.R10G10B10A2_Typeless);
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.ETC2_R8G8B8_UNORM_BLOCK);
 
             /// <summary>
-            /// Corresponds to <see cref="Format.R10G10B10A2_UInt"/>
+            /// Corresponds to <see cref="Format.ETC2_R8G8B8_SRGB_BLOCK"/>
             /// </summary>
-            public static readonly SurfaceFormat UInt = new SurfaceFormat(Format.R10G10B10A2_UInt);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.R10G10B10A2_UNorm"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.R10G10B10A2_UNorm);
+            public static readonly SurfaceFormat SRgb = new SurfaceFormat(Format.ETC2_R8G8B8_SRGB_BLOCK);
 
         }
 
         /// <summary>
-        /// DXGI.Format.R11G11B10 formats
+        /// <see cref="Format.ETC2_R8G8B8A1"/> formats family
         /// </summary>
-        public static class R11G11B10
+        public static class ETC2R8G8B8A1
         {
             /// <summary>
-            /// Corresponds to <see cref="Format.R11G11B10_Float"/>
+            /// Corresponds to <see cref="Format.ETC2_R8G8B8A1_UNORM_BLOCK"/>
             /// </summary>
-            public static readonly SurfaceFormat Float = new SurfaceFormat(Format.R11G11B10_Float);
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.ETC2_R8G8B8A1_UNORM_BLOCK);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.ETC2_R8G8B8A1_SRGB_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat SRgb = new SurfaceFormat(Format.ETC2_R8G8B8A1_SRGB_BLOCK);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.ETC2_R8G8B8A8"/> formats family
+        /// </summary>
+        public static class ETC2_R8G8B8A8
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.ETC2_R8G8B8A8_UNORM_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.ETC2_R8G8B8A8_UNORM_BLOCK);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.ETC2_R8G8B8A8_SRGB_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat SRgb = new SurfaceFormat(Format.ETC2_R8G8B8A8_SRGB_BLOCK);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.EAC_R11"/> formats family
+        /// </summary>
+        public static class EACR11
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.EAC_R11_UNORM_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.EAC_R11_UNORM_BLOCK);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.EAC_R11_SNORM_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat SNorm = new SurfaceFormat(Format.EAC_R11_SNORM_BLOCK);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.EAC_R11G11"/> formats family
+        /// </summary>
+        public static class EACR11G11
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.EAC_R11G11_UNORM_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.EAC_R11G11_UNORM_BLOCK);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.EAC_R11G11_SNORM_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat SNorm = new SurfaceFormat(Format.EAC_R11G11_SNORM_BLOCK);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.ASTC_4x4"/> formats family
+        /// </summary>
+        public static class ASTC4x4
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.ASTC_4x4_UNORM_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.ASTC_4x4_UNORM_BLOCK);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.ASTC_4x4_SRGB_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat SRgb = new SurfaceFormat(Format.ASTC_4x4_SRGB_BLOCK);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.ASTC_5x4"/> formats family
+        /// </summary>
+        public static class ASTC5x4
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.ASTC_5x4_UNORM_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.ASTC_5x4_UNORM_BLOCK);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.ASTC_5x4_SRGB_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat SRgb = new SurfaceFormat(Format.ASTC_5x4_SRGB_BLOCK);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.ASTC_5x5"/> formats family
+        /// </summary>
+        public static class ASTC5x5
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.ASTC_5x5_UNORM_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.ASTC_5x5_UNORM_BLOCK);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.ASTC_5x5_SRGB_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat SRgb = new SurfaceFormat(Format.ASTC_5x5_SRGB_BLOCK);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.ASTC_6x5"/> formats family
+        /// </summary>
+        public static class ASTC6x5
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.ASTC_6x5_UNORM_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.ASTC_6x5_UNORM_BLOCK);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.ASTC_6x5_SRGB_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat SRgb = new SurfaceFormat(Format.ASTC_6x5_SRGB_BLOCK);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.ASTC_6x6"/> formats family
+        /// </summary>
+        public static class ASTC6x6
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.ASTC_6x6_UNORM_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.ASTC_6x6_UNORM_BLOCK);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.ASTC_6x6_SRGB_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat SRgb = new SurfaceFormat(Format.ASTC_6x6_SRGB_BLOCK);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.ASTC_8x5"/> formats family
+        /// </summary>
+        public static class ASTC8x5
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.ASTC_8x5_UNORM_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.ASTC_8x5_UNORM_BLOCK);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.ASTC_8x5_SRGB_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat SRgb = new SurfaceFormat(Format.ASTC_8x5_SRGB_BLOCK);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.ASTC_8x6"/> formats family
+        /// </summary>
+        public static class ASTC8x6
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.ASTC_8x6_UNORM_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.ASTC_8x6_UNORM_BLOCK);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.ASTC_8x6_SRGB_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat SRgb = new SurfaceFormat(Format.ASTC_8x6_SRGB_BLOCK);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.ASTC_8x8"/> formats family
+        /// </summary>
+        public static class ASTC8x8
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.ASTC_8x8_UNORM_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.ASTC_8x8_UNORM_BLOCK);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.ASTC_8x8_SRGB_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat SRgb = new SurfaceFormat(Format.ASTC_8x8_SRGB_BLOCK);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.ASTC_10x5"/> formats family
+        /// </summary>
+        public static class ASTC10x5
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.ASTC_10x5_UNORM_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.ASTC_10x5_UNORM_BLOCK);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.ASTC_10x5_SRGB_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat SRgb = new SurfaceFormat(Format.ASTC_10x5_SRGB_BLOCK);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.ASTC_10x6"/> formats family
+        /// </summary>
+        public static class ASTC10x6
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.ASTC_10x6_UNORM_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.ASTC_10x6_UNORM_BLOCK);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.ASTC_10x6_SRGB_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat SRgb = new SurfaceFormat(Format.ASTC_10x6_SRGB_BLOCK);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.ASTC_10x8"/> formats family
+        /// </summary>
+        public static class ASTC10x8
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.ASTC_10x8_UNORM_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.ASTC_10x8_UNORM_BLOCK);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.ASTC_10x8_SRGB_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat SRgb = new SurfaceFormat(Format.ASTC_10x8_SRGB_BLOCK);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.ASTC_10x10"/> formats family
+        /// </summary>
+        public static class ASTC10x10
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.ASTC_10x10_UNORM_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.ASTC_10x10_UNORM_BLOCK);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.ASTC_10x10_SRGB_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat SRgb = new SurfaceFormat(Format.ASTC_10x10_SRGB_BLOCK);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.ASTC_12x10"/> formats family
+        /// </summary>
+        public static class ASTC12x10
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.ASTC_12x10_UNORM_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.ASTC_12x10_UNORM_BLOCK);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.ASTC_12x10_SRGB_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat SRgb = new SurfaceFormat(Format.ASTC_12x10_SRGB_BLOCK);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.ASTC_12x12"/> formats family
+        /// </summary>
+        public static class ASTC12x12
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.ASTC_12x12_UNORM_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.ASTC_12x12_UNORM_BLOCK);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.ASTC_12x12_SRGB_BLOCK"/>
+            /// </summary>
+            public static readonly SurfaceFormat SRgb = new SurfaceFormat(Format.ASTC_12x12_SRGB_BLOCK);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.G8B8G8R8_422"/> formats family
+        /// </summary>
+        public static class G8B8G8R8_422
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.G8B8G8R8_422_UNORM"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G8B8G8R8_422_UNORM);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.G8B8G8R8_422_UNORM_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G8B8G8R8_422_UNORM_KHR);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.B8G8R8G8_422"/> formats family
+        /// </summary>
+        public static class B8G8R8G8_422
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.B8G8R8G8_422_UNORM"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.B8G8R8G8_422_UNORM);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.B8G8R8G8_422_UNORM_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.B8G8R8G8_422_UNORM_KHR);
+        }
+
+        /// <summary>
+        /// <see cref="Format.G8_B8_R8_3PLANE_420"/> formats family
+        /// </summary>
+        public static class G8B8R83PLANE_420
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.G8_B8_R8_3PLANE_420_UNORM"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G8_B8_R8_3PLANE_420_UNORM);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.G8_B8_R8_3PLANE_420_UNORM_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G8_B8_R8_3PLANE_420_UNORM_KHR);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.G8_B8R8_2PLANE_420"/> formats family
+        /// </summary>
+        public static class G8B8R82PLANE_420
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.G8_B8R8_2PLANE_420_UNORM"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G8_B8R8_2PLANE_420_UNORM);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.G8_B8R8_2PLANE_420_UNORM_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G8_B8R8_2PLANE_420_UNORM_KHR);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.G8_B8_R8_3PLANE_422"/> formats family
+        /// </summary>
+        public static class G8B8R83PLANE_422
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.G8_B8_R8_3PLANE_422_UNORM"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G8_B8_R8_3PLANE_422_UNORM);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.G8_B8_R8_3PLANE_422_UNORM_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G8_B8_R8_3PLANE_422_UNORM_KHR);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.G8_B8R8_2PLANE_422"/> formats family
+        /// </summary>
+        public static class G8B8R82PLANE_422
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.G8_B8R8_2PLANE_422_UNORM"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G8_B8R8_2PLANE_422_UNORM);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.G8_B8R8_2PLANE_422_UNORM_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G8_B8R8_2PLANE_422_UNORM_KHR);
+        }
+
+        /// <summary>
+        /// <see cref="Format.G8_B8_R8_3PLANE_444_UNORM"/> formats family
+        /// </summary>
+        public static class G8B8R83PLANE_444
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.G8_B8_R8_3PLANE_444_UNORM"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G8_B8_R8_3PLANE_444_UNORM);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.G8_B8_R8_3PLANE_444_UNORM_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G8_B8_R8_3PLANE_444_UNORM_KHR);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.R10X6"/> formats family
+        /// </summary>
+        public static class R10X6
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.R10X6_UNORM_PACK16"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.R10X6_UNORM_PACK16);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.R10X6_UNORM_PACK16_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.R10X6_UNORM_PACK16_KHR);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.R10X6G10X6"/> formats family
+        /// </summary>
+        public static class R10X6G10X6
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.R10X6G10X6_UNORM_2PACK16"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.R10X6G10X6_UNORM_2PACK16);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.R10X6G10X6_UNORM_2PACK16_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.R10X6G10X6_UNORM_2PACK16_KHR);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.R10X6G10X6B10X6A10X6"/> formats family
+        /// </summary>
+        public static class R10X6G10X6B10X6A10X6
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.R10X6G10X6B10X6A10X6_UNORM_4PACK16"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.R10X6G10X6B10X6A10X6_UNORM_4PACK16);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.R10X6G10X6B10X6A10X6_UNORM_4PACK16_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.R10X6G10X6B10X6A10X6_UNORM_4PACK16_KHR);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.G10X6B10X6G10X6R10X6_422"/> formats family
+        /// </summary>
+        public static class G10X6B10X6G10X6R10X6_422
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.G10X6B10X6G10X6R10X6_422_UNORM_4PACK16"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G10X6B10X6G10X6R10X6_422_UNORM_4PACK16);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.G10X6B10X6G10X6R10X6_422_UNORM_4PACK16_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G10X6B10X6G10X6R10X6_422_UNORM_4PACK16_KHR);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.B10X6G10X6R10X6G10X6_422/> formats family
+        /// </summary>
+        public static class B10X6G10X6R10X6G10X6_422
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.B10X6G10X6R10X6G10X6_422_UNORM_4PACK16"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.B10X6G10X6R10X6G10X6_422_UNORM_4PACK16);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.B10X6G10X6R10X6G10X6_422_UNORM_4PACK16_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.B10X6G10X6R10X6G10X6_422_UNORM_4PACK16_KHR);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.G10X6_B10X6_R10X6_3PLANE_420"/> formats family
+        /// </summary>
+        public static class G10X6B10X6R10X63PLANE_420
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16_KHR);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.G10X6_B10X6R10X6_2PLANE_420"/> formats family
+        /// </summary>
+        public static class G10X6B10X6R10X62PLANE_420
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16_KHR);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.G10X6_B10X6_R10X6_3PLANE_422"/> formats family
+        /// </summary>
+        public static class G10X6B10X6R10X63PLANE_422
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16_KHR);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.G10X6_B10X6R10X6_2PLANE_422"/> formats family
+        /// </summary>
+        public static class G10X6B10X6R10X62PLANE_422
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16_KHR);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.G10X6_B10X6_R10X6_3PLANE_444"/> formats family
+        /// </summary>
+        public static class G10X6B10X6R10X63PLANE_444
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16_KHR);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.R12X4_UNORM_PACK16"/> formats family
+        /// </summary>
+        public static class R12X4
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.R12X4_UNORM_PACK16"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.R12X4_UNORM_PACK16);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.R12X4_UNORM_PACK16_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.R12X4_UNORM_PACK16_KHR);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.R12X4G12X4"/> formats family
+        /// </summary>
+        public static class R12X4G12X4
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.R12X4G12X4_UNORM_2PACK16"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.R12X4G12X4_UNORM_2PACK16);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.R12X4G12X4_UNORM_2PACK16_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.R12X4G12X4_UNORM_2PACK16_KHR);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.R12X4G12X4B12X4A12X4"/> formats family
+        /// </summary>
+        public static class R12X4G12X4B12X4A12X4
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.R12X4G12X4B12X4A12X4_UNORM_4PACK16"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.R12X4G12X4B12X4A12X4_UNORM_4PACK16);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.R12X4G12X4B12X4A12X4_UNORM_4PACK16_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.R12X4G12X4B12X4A12X4_UNORM_4PACK16_KHR);
+        }
+
+        /// <summary>
+        /// <see cref="Format.G12X4B12X4G12X4R12X4_422"/> formats family
+        /// </summary>
+        public static class G12X4B12X4G12X4R12X4_422
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.G12X4B12X4G12X4R12X4_422_UNORM_4PACK16"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G12X4B12X4G12X4R12X4_422_UNORM_4PACK16);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.G12X4B12X4G12X4R12X4_422_UNORM_4PACK16_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G12X4B12X4G12X4R12X4_422_UNORM_4PACK16_KHR);
+        }
+
+        /// <summary>
+        /// <see cref="Format.G12X4_B12X4_R12X4_3PLANE_420"/> formats family
+        /// </summary>
+        public static class G12X4B12X4R12X43PLANE_420
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16_KHR);
+        }
+
+        /// <summary>
+        /// <see cref="Format.G12X4_B12X4R12X4_2PLANE_420"/> formats family
+        /// </summary>
+        public static class G12X4B12X4R12X42PLANE_420
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16_KHR);
+        }
+
+        /// <summary>
+        /// <see cref="Format.G12X4_B12X4_R12X4_3PLANE_422"/> formats family
+        /// </summary>
+        public static class G12X4B12X4R12X43PLANE_422
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16_KHR);
+        }
+
+        /// <summary>
+        /// <see cref="Format.G12X4_B12X4R12X4_2PLANE_422"/> formats family
+        /// </summary>
+        public static class G12X4B12X4R12X42PLANE_422
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16_KHR);
+        }
+
+        /// <summary>
+        /// <see cref="Format.G12X4_B12X4_R12X4_3PLANE_444"/> formats family
+        /// </summary>
+        public static class G12X4B12X4R12X43PLANE_444
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16_KHR);
+        }
+
+        /// <summary>
+        /// <see cref="Format.G16B16G16R16_422"/> formats family
+        /// </summary>
+        public static class G16B16G16R16_422
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.G16B16G16R16_422_UNORM"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G16B16G16R16_422_UNORM);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.G16B16G16R16_422_UNORM_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G16B16G16R16_422_UNORM_KHR);
+        }
+
+        /// <summary>
+        /// <see cref="Format.B16G16R16G16_422"/> formats family
+        /// </summary>
+        public static class B16G16R16G16_422
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.B16G16R16G16_422_UNORM"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.B16G16R16G16_422_UNORM);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.B16G16R16G16_422_UNORM_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.B16G16R16G16_422_UNORM_KHR);
+        }
+
+        /// <summary>
+        /// <see cref="Format.G16_B16_R16_3PLANE_420"/> formats family
+        /// </summary>
+        public static class G16B16R163PLANE_420
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.G16_B16_R16_3PLANE_420_UNORM"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G16_B16_R16_3PLANE_420_UNORM);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.G16_B16_R16_3PLANE_420_UNORM_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G16_B16_R16_3PLANE_420_UNORM_KHR);
+        }
+
+        /// <summary>
+        /// <see cref="Format.G16_B16R16_2PLANE_420"/> formats family
+        /// </summary>
+        public static class G16B16R162PLANE_420
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.G16_B16R16_2PLANE_420_UNORM"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G16_B16R16_2PLANE_420_UNORM);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.G16_B16R16_2PLANE_420_UNORM_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G16_B16R16_2PLANE_420_UNORM_KHR);
+        }
+
+        /// <summary>
+        /// <see cref="Format.G16_B16_R16_3PLANE_422"/> formats family
+        /// </summary>
+        public static class G16B16R163PLANE_422
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.G16_B16_R16_3PLANE_422_UNORM"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G16_B16_R16_3PLANE_422_UNORM);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.G16_B16_R16_3PLANE_422_UNORM_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G16_B16_R16_3PLANE_422_UNORM_KHR);
+        }
+
+        /// <summary>
+        /// <see cref="Format.G16_B16R16_2PLANE_422"/> formats family
+        /// </summary>
+        public static class G16B16R162PLANE_422
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.G16_B16R16_2PLANE_422_UNORM"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G16_B16R16_2PLANE_422_UNORM);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.G16_B16R16_2PLANE_422_UNORM_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G16_B16R16_2PLANE_422_UNORM_KHR);
+        }
+
+        /// <summary>
+        /// <see cref="Format.G16_B16_R16_3PLANE_444"/> formats family
+        /// </summary>
+        public static class G16B16R163PLANE_444
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.G16_B16_R16_3PLANE_444_UNORM"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G16_B16_R16_3PLANE_444_UNORM);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.G16_B16_R16_3PLANE_444_UNORM_KHR"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G16_B16_R16_3PLANE_444_UNORM_KHR);
+        }
+
+        /// <summary>
+        /// <see cref="Format.PVRTC1_2BPP"/> formats family
+        /// </summary>
+        public static class PVRTC1_2BPP
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.PVRTC1_2BPP_UNORM_BLOCK_IMG"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.PVRTC1_2BPP_UNORM_BLOCK_IMG);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.PVRTC1_2BPP_SRGB_BLOCK_IMG"/>
+            /// </summary>
+            public static readonly SurfaceFormat SRgb = new SurfaceFormat(Format.PVRTC1_2BPP_SRGB_BLOCK_IMG);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.PVRTC1_4BPP"/> formats family
+        /// </summary>
+        public static class PVRTC1_4BPP
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.PVRTC1_4BPP_UNORM_BLOCK_IMG"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.PVRTC1_4BPP_UNORM_BLOCK_IMG);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.PVRTC1_4BPP_SRGB_BLOCK_IMG"/>
+            /// </summary>
+            public static readonly SurfaceFormat SRgb = new SurfaceFormat(Format.PVRTC1_4BPP_SRGB_BLOCK_IMG);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.PVRTC2_2BPP"/> formats family
+        /// </summary>
+        public static class PVRTC2_2BPP
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.PVRTC2_2BPP_UNORM_BLOCK_IMG"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.PVRTC2_2BPP_UNORM_BLOCK_IMG);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.PVRTC2_2BPP_SRGB_BLOCK_IMG"/>
+            /// </summary>
+            public static readonly SurfaceFormat SRgb = new SurfaceFormat(Format.PVRTC2_2BPP_SRGB_BLOCK_IMG);
+
+        }
+
+        /// <summary>
+        /// <see cref="Format.PVRTC2_4BPP"/> formats family
+        /// </summary>
+        public static class PVRTC2_4BPP
+        {
+            /// <summary>
+            /// Corresponds to <see cref="Format.PVRTC2_4BPP_UNORM_BLOCK_IMG"/>
+            /// </summary>
+            public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.PVRTC2_4BPP_UNORM_BLOCK_IMG);
+
+            /// <summary>
+            /// Corresponds to <see cref="Format.PVRTC2_4BPP_SRGB_BLOCK_IMG"/>
+            /// </summary>
+            public static readonly SurfaceFormat SRgb = new SurfaceFormat(Format.PVRTC2_4BPP_SRGB_BLOCK_IMG);
 
         }
 

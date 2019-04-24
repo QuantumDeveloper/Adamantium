@@ -1098,7 +1098,7 @@ namespace Adamantium.Engine.Graphics
 
             // If source image == dest image and no swizzle/alpha is required, we can return it as-is
             var isCopyNeeded = (convFlags & (ConversionFlags.Expand | ConversionFlags.CopyMemory)) != 0 || ((cpFlags & Image.PitchFlags.LegacyDword) != 0);
-
+            metadata.Format = FormatConverter.DXGIToVulkan(metadata.DXGIFormat);
             var image = new Image(metadata, pDDS, offset, handle, !isCopyNeeded, cpFlags);
 
             // Size must be inferior to destination size.

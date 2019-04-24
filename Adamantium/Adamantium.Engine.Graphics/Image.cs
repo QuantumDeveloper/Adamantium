@@ -670,19 +670,19 @@ namespace Adamantium.Engine.Graphics
         static Image()
         {
             Register(ImageFileType.Dds, DDSHelper.LoadFromDDSMemory, DDSHelper.SaveToDDSStream);
-            Register(ImageFileType.Gif, WICHelper.LoadFromWICMemory, WICHelper.SaveGifToWICMemory);
-            Register(ImageFileType.Tiff, WICHelper.LoadFromWICMemory, WICHelper.SaveTiffToWICMemory);
-            Register(ImageFileType.Bmp, WICHelper.LoadFromWICMemory, WICHelper.SaveBmpToWICMemory);
-            Register(ImageFileType.Jpg, WICHelper.LoadFromWICMemory, WICHelper.SaveJpgToWICMemory);
-            Register(ImageFileType.Png, WICHelper.LoadFromWICMemory, WICHelper.SavePngToWICMemory);
-            Register(ImageFileType.Wmp, WICHelper.LoadFromWICMemory, WICHelper.SaveWmpToWICMemory);
+            //Register(ImageFileType.Gif, WICHelper.LoadFromWICMemory, WICHelper.SaveGifToWICMemory);
+            //Register(ImageFileType.Tiff, WICHelper.LoadFromWICMemory, WICHelper.SaveTiffToWICMemory);
+            //Register(ImageFileType.Bmp, WICHelper.LoadFromWICMemory, WICHelper.SaveBmpToWICMemory);
+            //Register(ImageFileType.Jpg, WICHelper.LoadFromWICMemory, WICHelper.SaveJpgToWICMemory);
+            //Register(ImageFileType.Png, WICHelper.LoadFromWICMemory, WICHelper.SavePngToWICMemory);
+            //Register(ImageFileType.Wmp, WICHelper.LoadFromWICMemory, WICHelper.SaveWmpToWICMemory);
             Register(ImageFileType.Tga, TGAHelper.LoadFromTgaMemory, TGAHelper.SaveToTgaMemory);
         }
 
 
         internal unsafe void Initialize(ImageDescription description, IntPtr dataPointer, int offset, GCHandle? handle, bool bufferIsDisposable, PitchFlags pitchFlags = PitchFlags.None)
         {
-            if (!DXGIFormatHelper.IsValid(description.Format))
+            if (!FormatHelper.IsValid(description.Format))
                 throw new InvalidOperationException("Unsupported DXGI Format");
 
             this.handle = handle;

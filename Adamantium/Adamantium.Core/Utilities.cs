@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -7,9 +8,11 @@ namespace Adamantium.Core
 {
     public static class Utilities
     {
-        public static void FreeMemory(IntPtr pointer)
+        public static unsafe void FreeMemory(IntPtr pointer)
         {
+            if (pointer == IntPtr.Zero) return;
             Marshal.FreeHGlobal(pointer);
+            //Marshal.FreeHGlobal(((IntPtr*)pointer)[-1]);
         }
 
         public static void ClearMemory(IntPtr dest, byte value, int sizeInBytesToClear)
@@ -26,9 +29,14 @@ namespace Adamantium.Core
             return type is Enum;
         }
 
-        public static IntPtr AllocateMemory(int sizeInBytes, int v)
+        public static unsafe IntPtr AllocateMemory(int sizeInBytes, int align = 16)
         {
+            int mask = align - 1;
             return Marshal.AllocHGlobal(sizeInBytes);
+            //var memPtr = Marshal.AllocHGlobal(sizeInBytes + mask + IntPtr.Size);
+            //var ptr = (long)((byte*)memPtr + sizeof(void*) + mask) & ~mask;
+            //((IntPtr*)ptr)[-1] = memPtr;
+            //return new IntPtr((void*)ptr);
         }
 
         public static byte[] ReadStream(Stream stream)
@@ -81,12 +89,9 @@ namespace Adamantium.Core
             return Marshal.SizeOf<T>();
         }
 
-        public static void CopyMemory(IntPtr destination, IntPtr source, int sizeInBytesToCopy)
+        public static unsafe void CopyMemory(IntPtr destination, IntPtr source, int sizeInBytesToCopy)
         {
-            unsafe
-            {
-                Buffer.MemoryCopy(source.ToPointer(), destination.ToPointer(), sizeInBytesToCopy, sizeInBytesToCopy);
-            }
+            Buffer.MemoryCopy(source.ToPointer(), destination.ToPointer(), sizeInBytesToCopy, sizeInBytesToCopy);
         }
 
         public static void Write<T>(IntPtr destination, ref T value) where T : struct
@@ -118,7 +123,7 @@ namespace Adamantium.Core
             var size = Marshal.SizeOf(typeof(T));
             var startPos = IntPtr.Add(source, offset);
             IntPtr currentPtr = startPos;
-            for (int i = 0; i < data.Length; i++)
+            for (int i = 0; i < count; i++)
             {
                 currentPtr = IntPtr.Add(startPos, i * size);
                 data[i] = Marshal.PtrToStructure<T>(currentPtr);
@@ -130,6 +135,11 @@ namespace Adamantium.Core
         public static T GetCustomAttribute<T>(MemberInfo memberInfo, bool inherit = true) where T : Attribute
         {
             return memberInfo.GetCustomAttribute<T>(inherit);
+        }
+
+        public static IEnumerable<T> GetCustomAttributes<T>(MemberInfo memberInfo) where T: Attribute
+        {
+            return memberInfo.GetCustomAttributes<T>();
         }
     }
 }
