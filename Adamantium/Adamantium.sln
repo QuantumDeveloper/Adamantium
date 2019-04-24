@@ -25,13 +25,17 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AdamantiumVulkan", "..\..\A
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AdamantiumVulkan.Windows", "..\..\AdamantiumVulkan\AdamantiumVulkan.Windows\AdamantiumVulkan.Windows.csproj", "{B0D8F9C6-9BEF-453B-B491-90D1C4833DF6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.EntityFramework.Components", "Adamantium.EntityFramework.Components\Adamantium.EntityFramework.Components.csproj", "{76BFB7BF-3501-440E-A189-A4C74673E96D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.EntityFramework.Components", "Adamantium.EntityFramework.Components\Adamantium.EntityFramework.Components.csproj", "{76BFB7BF-3501-440E-A189-A4C74673E96D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.UI", "Adamantium.UI\Adamantium.UI.csproj", "{B7130473-409B-4559-A4EC-8C45F7BAA15F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.UI", "Adamantium.UI\Adamantium.UI.csproj", "{B7130473-409B-4559-A4EC-8C45F7BAA15F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.Game", "Adamantium.Game\Adamantium.Game.csproj", "{A02907D8-8A1C-4D77-A397-C57CB4323021}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Game", "Adamantium.Game\Adamantium.Game.csproj", "{A02907D8-8A1C-4D77-A397-C57CB4323021}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.Engine", "Adamantium.Engine\Adamantium.Engine.csproj", "{2703C5BE-1D98-4111-A195-C465BF176357}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Engine", "Adamantium.Engine\Adamantium.Engine.csproj", "{2703C5BE-1D98-4111-A195-C465BF176357}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{3A783815-220B-420E-80CE-4CD4805A0834}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Engine.GraphicsTests", "Tests\Adamantium.Engine.GraphicsTests\Adamantium.Engine.GraphicsTests.csproj", "{E598A6F2-DE2C-4591-966C-D6BB39D667B3}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -161,9 +165,20 @@ Global
 		{2703C5BE-1D98-4111-A195-C465BF176357}.Release|Any CPU.Build.0 = Release|Any CPU
 		{2703C5BE-1D98-4111-A195-C465BF176357}.Release|x64.ActiveCfg = Release|Any CPU
 		{2703C5BE-1D98-4111-A195-C465BF176357}.Release|x64.Build.0 = Release|Any CPU
+		{E598A6F2-DE2C-4591-966C-D6BB39D667B3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E598A6F2-DE2C-4591-966C-D6BB39D667B3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E598A6F2-DE2C-4591-966C-D6BB39D667B3}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{E598A6F2-DE2C-4591-966C-D6BB39D667B3}.Debug|x64.Build.0 = Debug|Any CPU
+		{E598A6F2-DE2C-4591-966C-D6BB39D667B3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E598A6F2-DE2C-4591-966C-D6BB39D667B3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E598A6F2-DE2C-4591-966C-D6BB39D667B3}.Release|x64.ActiveCfg = Release|Any CPU
+		{E598A6F2-DE2C-4591-966C-D6BB39D667B3}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{E598A6F2-DE2C-4591-966C-D6BB39D667B3} = {3A783815-220B-420E-80CE-4CD4805A0834}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {DC88E606-C87C-4FA7-8A47-4A2BD89517F9}
