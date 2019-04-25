@@ -14,8 +14,8 @@ namespace Adamantium.Engine.GraphicsTests
             img.Save("loaded.dds", ImageFileType.Dds);
             img.Dispose();
 
-            img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\CubeTest.dds");
-            img.Save("Cubetest.dds", ImageFileType.Dds);
+            img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\TextureCube.dds");
+            img.Save("TextureCube.dds", ImageFileType.Dds);
             img.Dispose();
         }
 
@@ -29,6 +29,13 @@ namespace Adamantium.Engine.GraphicsTests
             img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\luxfon.tga");
             img.Save("luxfon_reconstructed.tga", ImageFileType.Tga);
             img.Dispose();
+        }
+
+        [Test]
+        public void BMPImageTest()
+        {
+            var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\Shapes_24.bmp");
+            img?.Dispose();
         }
     }
 }

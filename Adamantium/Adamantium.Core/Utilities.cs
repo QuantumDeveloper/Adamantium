@@ -11,8 +11,7 @@ namespace Adamantium.Core
         public static unsafe void FreeMemory(IntPtr pointer)
         {
             if (pointer == IntPtr.Zero) return;
-            Marshal.FreeHGlobal(pointer);
-            //Marshal.FreeHGlobal(((IntPtr*)pointer)[-1]);
+            Marshal.FreeHGlobal(((IntPtr*)pointer)[-1]);
         }
 
         public static void ClearMemory(IntPtr dest, byte value, int sizeInBytesToClear)
@@ -29,14 +28,13 @@ namespace Adamantium.Core
             return type is Enum;
         }
 
-        public static unsafe IntPtr AllocateMemory(int sizeInBytes, int align = 16)
+        public static unsafe IntPtr AllocateMemory(int sizeInBytes, int align = 1)
         {
             int mask = align - 1;
-            return Marshal.AllocHGlobal(sizeInBytes);
-            //var memPtr = Marshal.AllocHGlobal(sizeInBytes + mask + IntPtr.Size);
-            //var ptr = (long)((byte*)memPtr + sizeof(void*) + mask) & ~mask;
-            //((IntPtr*)ptr)[-1] = memPtr;
-            //return new IntPtr((void*)ptr);
+            var memPtr = Marshal.AllocHGlobal(sizeInBytes + mask + IntPtr.Size);
+            var ptr = (long)((byte*)memPtr + sizeof(void*) + mask) & ~mask;
+            ((IntPtr*)ptr)[-1] = memPtr;
+            return new IntPtr((void*)ptr);
         }
 
         public static byte[] ReadStream(Stream stream)
@@ -118,18 +116,23 @@ namespace Adamantium.Core
             return Marshal.PtrToStructure<T>(source);
         }
 
-        public static IntPtr Read<T>(IntPtr source, T[] data, int offset, int count) where T : struct
+        /// <summary>
+        /// Reads the specified array T[] data from a memory location.
+        /// </summary>
+        /// <typeparam name="T">Type of a data to read.</typeparam>
+        /// <param name="source">Memory location to read from.</param>
+        /// <param name="data">The data write to.</param>
+        /// <param name="offset">The offset in the array to write to.</param>
+        /// <param name="count">The number of T element to read from the memory location.</param>
+        /// <returns>source pointer + sizeof(T) * count.</returns>
+        public static unsafe IntPtr Read<T>(IntPtr source, T[] data, int offset, int count) where T : struct
         {
-            var size = Marshal.SizeOf(typeof(T));
-            var startPos = IntPtr.Add(source, offset);
-            IntPtr currentPtr = startPos;
-            for (int i = 0; i < count; i++)
-            {
-                currentPtr = IntPtr.Add(startPos, i * size);
-                data[i] = Marshal.PtrToStructure<T>(currentPtr);
-            }
-
-            return currentPtr;
+            var handle = GCHandle.Alloc(data, GCHandleType.Pinned);
+            var ptr = handle.AddrOfPinnedObject();
+            int size = Marshal.SizeOf(typeof(T)) * count;
+            Buffer.MemoryCopy((void*)source, (void*)ptr, size, size);
+            handle.Free();
+            return new IntPtr(size + (byte*)source);
         }
 
         public static T GetCustomAttribute<T>(MemberInfo memberInfo, bool inherit = true) where T : Attribute
