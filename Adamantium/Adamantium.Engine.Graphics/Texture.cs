@@ -19,7 +19,7 @@ namespace Adamantium.Engine.Graphics
             {
                 throw new InvalidOperationException($"MipLevels must be <= {maxMipLevels}");
             }
-            return maxMipLevels;
+            return mipLevels;
         }
 
         private static int CountMipLevels(int width, int height, int depth)
