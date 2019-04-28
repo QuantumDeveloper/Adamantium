@@ -104,7 +104,6 @@ namespace Adamantium.Engine.Graphics
                             convFlags |= TGAConversionFlags.Expand;
                             // We could use DXGI_FORMAT_B8G8R8X8_UNORM, but we prefer DXGI 1.0 formats
                             break;
-
                         case 32:
                             description.Format = Format.R8G8B8A8_UNORM;
                             // We could use DXGI_FORMAT_B8G8R8A8_UNORM, but we prefer DXGI 1.0 formats
@@ -314,14 +313,14 @@ namespace Adamantium.Engine.Graphics
             imageStream.Write(buffer, 0, headerSize);
             Utilities.FreeMemory(memory);
 
-            var imgDst = new Image(description, IntPtr.Zero, 0, null, false);
+            var imgDst = new Image(description, IntPtr.Zero, 0, null, true);
             var dPtr = imgDst.PixelBuffer[0].DataPointer;
 
             for (int y = 0; y < description.Height; ++y)
             {
                 if (flags.HasFlag(TGAConversionFlags.Format888))
                 {
-                    ImageHelper.Copy24bppScanline(dPtr, rowPitch, pSource, sPitch);
+                    ImageHelper.CopyScanline(dPtr, pSource, rowPitch);
                 }
                 else if (flags.HasFlag(TGAConversionFlags.Swizzle))
                 {
@@ -337,6 +336,7 @@ namespace Adamantium.Engine.Graphics
                 dPtr = (IntPtr)((byte*)dPtr + rowPitch);
                 pSource = (IntPtr)((byte*)pSource + sPitch);
             }
+
             Utilities.Read(pixelBuffers[0].DataPointer, buffer, 0, slicePitch);
             imageStream.Write(buffer, 0, slicePitch);
             imgDst.Dispose();

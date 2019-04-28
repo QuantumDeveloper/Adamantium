@@ -278,9 +278,8 @@ namespace Adamantium.Engine.Graphics
                     //    Utilities.ClearMemory(pDestination, 0xff, outSize);
                     //    return;
 
-#if DIRECTX11_1
                     //-----------------------------------------------------------------------------
-                    case Format.B4G4R4A4_UNorm:
+                    case Format.B4G4R4A4_UNORM_PACK16:
                         {
                             if (pDestination == pSource)
                             {
@@ -302,7 +301,6 @@ namespace Adamantium.Engine.Graphics
                             }
                         }
                         return;
-#endif
                         // DXGI_1_2_FORMATS
                 }
             }
@@ -422,30 +420,9 @@ namespace Adamantium.Engine.Graphics
             Utilities.CopyMemory(pDestination, pSource, Math.Min(outSize, inSize));
         }
 
-        public static unsafe void Copy24bppScanline(IntPtr pDestination, int outSize, IntPtr pSource, int inSize)
+        public static unsafe void CopyScanline(IntPtr pDestination, IntPtr pSource, int size)
         {
-            var dPtr = (uint*)pSource;
-            var sPtr = (byte*)pSource;
-
-            if (inSize >= 4 && outSize >= 3)
-            {
-                byte* endPtr = (byte*)(dPtr + outSize);
-
-                for (int cout = 0; cout < (inSize - 1); cout += 4)
-                {
-                    uint t = *(sPtr++);
-
-                    if (dPtr + 3 > endPtr)
-                    {
-                        return;
-                    }
-
-                    *(dPtr++) = (byte)(t & 0xFF);       //Blue
-                    *(dPtr++) = (byte)((t & 0xFF) >> 8);  //Green
-                    *(dPtr++) = (byte)((t & 0xFF) >> 16); //Red
-                }
-
-            }
+            Utilities.CopyMemory(pDestination, pSource, size);
         }
     }
 }
