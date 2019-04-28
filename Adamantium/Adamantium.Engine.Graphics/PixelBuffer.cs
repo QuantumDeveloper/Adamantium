@@ -160,7 +160,7 @@ namespace Adamantium.Engine.Graphics
                 var rowStride = Math.Min(RowStride, pixelBuffer.RowStride);
 
                 // Copy per scanline
-                for(int i = 0; i < Height; i++)
+                for (int i = 0; i < Height; i++)
                 {
                     Utilities.CopyMemory(new IntPtr(dstPointer), new IntPtr(srcPointer), rowStride);
                     srcPointer += this.RowStride;
@@ -192,16 +192,16 @@ namespace Adamantium.Engine.Graphics
         public void Save(Stream imageStream, ImageFileType fileType)
         {
             var description = new ImageDescription()
-                {
-                    Width = this.width,
-                    Height = this.height,
-                    Depth = 1,
-                    ArraySize = 1,
-                    Dimension = TextureDimension.Texture2D,
-                    Format = this.format,
-                    MipLevels = 1,
-                };
-            Image.Save(new [] {this}, 1, description, imageStream, fileType);
+            {
+                Width = this.width,
+                Height = this.height,
+                Depth = 1,
+                ArraySize = 1,
+                Dimension = TextureDimension.Texture2D,
+                Format = this.format,
+                MipLevels = 1,
+            };
+            Image.Save(new[] { this }, 1, description, imageStream, fileType);
         }
 
         /// <summary>
@@ -234,18 +234,18 @@ namespace Adamantium.Engine.Graphics
             Utilities.Write(new IntPtr((byte*)DataPointer + RowStride * y + x * PixelSize), ref value);
         }
 
-      /// <summary>
-      /// Gets scanline pixels from the buffer.
-      /// </summary>
-      /// <typeparam name="T">Type of the pixel data</typeparam>
-      /// <param name="yOffset">The y line offset.</param>
-      /// <returns>Scanline pixels from the buffer</returns>
-      /// <exception cref="System.ArgumentException">If the sizeof(T) is an invalid size</exception>
-      /// <remarks>
-      /// This method is working on a row basis. The <paramref name="yOffset"/> is specifying the first row to get 
-      /// the pixels from.
-      /// </remarks>
-      public T[] GetPixels<T>(int yOffset = 0) where T : struct
+        /// <summary>
+        /// Gets scanline pixels from the buffer.
+        /// </summary>
+        /// <typeparam name="T">Type of the pixel data</typeparam>
+        /// <param name="yOffset">The y line offset.</param>
+        /// <returns>Scanline pixels from the buffer</returns>
+        /// <exception cref="System.ArgumentException">If the sizeof(T) is an invalid size</exception>
+        /// <remarks>
+        /// This method is working on a row basis. The <paramref name="yOffset"/> is specifying the first row to get 
+        /// the pixels from.
+        /// </remarks>
+        public T[] GetPixels<T>(int yOffset = 0) where T : struct
         {
             var sizeOfOutputPixel = Utilities.SizeOf<T>();
             var totalSize = Width * Height * pixelSize;
@@ -257,37 +257,37 @@ namespace Adamantium.Engine.Graphics
             return buffer;
         }
 
-      /// <summary>
-      /// Gets scanline pixels from the buffer.
-      /// </summary>
-      /// <typeparam name="T">Type of the pixel data</typeparam>
-      /// <param name="pixels">An allocated scanline pixel buffer</param>
-      /// <param name="yOffset">The y line offset.</param>
-      /// <returns>Scanline pixels from the buffer</returns>
-      /// <exception cref="System.ArgumentException">If the sizeof(T) is an invalid size</exception>
-      /// <remarks>
-      /// This method is working on a row basis. The <paramref name="yOffset"/> is specifying the first row to get 
-      /// the pixels from.
-      /// </remarks>
-      public void GetPixels<T>(T[] pixels, int yOffset = 0) where T : struct
+        /// <summary>
+        /// Gets scanline pixels from the buffer.
+        /// </summary>
+        /// <typeparam name="T">Type of the pixel data</typeparam>
+        /// <param name="pixels">An allocated scanline pixel buffer</param>
+        /// <param name="yOffset">The y line offset.</param>
+        /// <returns>Scanline pixels from the buffer</returns>
+        /// <exception cref="System.ArgumentException">If the sizeof(T) is an invalid size</exception>
+        /// <remarks>
+        /// This method is working on a row basis. The <paramref name="yOffset"/> is specifying the first row to get 
+        /// the pixels from.
+        /// </remarks>
+        public void GetPixels<T>(T[] pixels, int yOffset = 0) where T : struct
         {
             GetPixels(pixels, yOffset, 0, pixels.Length);
         }
 
-      /// <summary>
-      /// Gets scanline pixels from the buffer.
-      /// </summary>
-      /// <typeparam name="T">Type of the pixel data</typeparam>
-      /// <param name="pixels">An allocated scanline pixel buffer</param>
-      /// <param name="yOffset">The y line offset.</param>
-      /// <param name="pixelIndex">Offset into the destination <paramref name="pixels"/> buffer.</param>
-      /// <param name="pixelCount">Number of pixels to write into the destination <paramref name="pixels"/> buffer.</param>
-      /// <exception cref="System.ArgumentException">If the sizeof(T) is an invalid size</exception>
-      /// <remarks>
-      /// This method is working on a row basis. The <paramref name="yOffset"/> is specifying the first row to get 
-      /// the pixels from.
-      /// </remarks>
-      public unsafe void GetPixels<T>(T[] pixels, int yOffset, int pixelIndex, int pixelCount) where T : struct
+        /// <summary>
+        /// Gets scanline pixels from the buffer.
+        /// </summary>
+        /// <typeparam name="T">Type of the pixel data</typeparam>
+        /// <param name="pixels">An allocated scanline pixel buffer</param>
+        /// <param name="yOffset">The y line offset.</param>
+        /// <param name="pixelIndex">Offset into the destination <paramref name="pixels"/> buffer.</param>
+        /// <param name="pixelCount">Number of pixels to write into the destination <paramref name="pixels"/> buffer.</param>
+        /// <exception cref="System.ArgumentException">If the sizeof(T) is an invalid size</exception>
+        /// <remarks>
+        /// This method is working on a row basis. The <paramref name="yOffset"/> is specifying the first row to get 
+        /// the pixels from.
+        /// </remarks>
+        public unsafe void GetPixels<T>(T[] pixels, int yOffset, int pixelIndex, int pixelCount) where T : struct
         {
             var pixelPointer = (byte*)this.DataPointer + yOffset * rowStride;
             if (isStrictRowStride)
@@ -299,7 +299,7 @@ namespace Adamantium.Engine.Graphics
                 var sizeOfOutputPixel = Utilities.SizeOf<T>() * pixelCount;
                 var sizePerWidth = sizeOfOutputPixel / Width;
                 var remainingPixels = sizeOfOutputPixel % Width;
-                for(int i = 0; i < sizePerWidth; i++)
+                for (int i = 0; i < sizePerWidth; i++)
                 {
                     Utilities.Read(new IntPtr(pixelPointer), pixels, pixelIndex, Width);
                     pixelPointer += rowStride;
@@ -312,36 +312,36 @@ namespace Adamantium.Engine.Graphics
             }
         }
 
-      /// <summary>
-      /// Sets scanline pixels to the buffer.
-      /// </summary>
-      /// <typeparam name="T">Type of the pixel data</typeparam>
-      /// <param name="sourcePixels">Source pixel buffer</param>
-      /// <param name="yOffset">The y line offset.</param>
-      /// <exception cref="System.ArgumentException">If the sizeof(T) is an invalid size</exception>
-      /// <remarks>
-      /// This method is working on a row basis. The <paramref name="yOffset"/> is specifying the first row to get 
-      /// the pixels from.
-      /// </remarks>
-      public void SetPixels<T>(T[] sourcePixels, int yOffset = 0) where T : struct
+        /// <summary>
+        /// Sets scanline pixels to the buffer.
+        /// </summary>
+        /// <typeparam name="T">Type of the pixel data</typeparam>
+        /// <param name="sourcePixels">Source pixel buffer</param>
+        /// <param name="yOffset">The y line offset.</param>
+        /// <exception cref="System.ArgumentException">If the sizeof(T) is an invalid size</exception>
+        /// <remarks>
+        /// This method is working on a row basis. The <paramref name="yOffset"/> is specifying the first row to get 
+        /// the pixels from.
+        /// </remarks>
+        public void SetPixels<T>(T[] sourcePixels, int yOffset = 0) where T : struct
         {
             SetPixels(sourcePixels, yOffset, 0, sourcePixels.Length);
         }
 
-      /// <summary>
-      /// Sets scanline pixels to the buffer.
-      /// </summary>
-      /// <typeparam name="T">Type of the pixel data</typeparam>
-      /// <param name="sourcePixels">Source pixel buffer</param>
-      /// <param name="yOffset">The y line offset.</param>
-      /// <param name="pixelIndex">Offset into the source <paramref name="sourcePixels"/> buffer.</param>
-      /// <param name="pixelCount">Number of pixels to write into the source <paramref name="sourcePixels"/> buffer.</param>
-      /// <exception cref="System.ArgumentException">If the sizeof(T) is an invalid size</exception>
-      /// <remarks>
-      /// This method is working on a row basis. The <paramref name="yOffset"/> is specifying the first row to get 
-      /// the pixels from.
-      /// </remarks>
-      public unsafe void SetPixels<T>(T[] sourcePixels, int yOffset, int pixelIndex, int pixelCount) where T : struct
+        /// <summary>
+        /// Sets scanline pixels to the buffer.
+        /// </summary>
+        /// <typeparam name="T">Type of the pixel data</typeparam>
+        /// <param name="sourcePixels">Source pixel buffer</param>
+        /// <param name="yOffset">The y line offset.</param>
+        /// <param name="pixelIndex">Offset into the source <paramref name="sourcePixels"/> buffer.</param>
+        /// <param name="pixelCount">Number of pixels to write into the source <paramref name="sourcePixels"/> buffer.</param>
+        /// <exception cref="System.ArgumentException">If the sizeof(T) is an invalid size</exception>
+        /// <remarks>
+        /// This method is working on a row basis. The <paramref name="yOffset"/> is specifying the first row to get 
+        /// the pixels from.
+        /// </remarks>
+        public unsafe void SetPixels<T>(T[] sourcePixels, int yOffset, int pixelIndex, int pixelCount) where T : struct
         {
             var pixelPointer = (byte*)DataPointer + yOffset * rowStride;
             if (isStrictRowStride)
@@ -364,6 +364,55 @@ namespace Adamantium.Engine.Graphics
                     Utilities.Write(new IntPtr(pixelPointer), sourcePixels, pixelIndex, remainingPixels);
                 }
             }
+        }
+
+        public void FlipBuffer(FlipBufferOptions flipOtions)
+        {
+            var buffer = new byte[bufferStride];
+            var flipped = new byte[bufferStride];
+            Utilities.Read(DataPointer, buffer, 0, bufferStride);
+            if (flipOtions == FlipBufferOptions.FlipVertically)
+            {
+                int offset = 0;
+                for (int i = Height - 1; i >= 0; --i)
+                {
+                    System.Buffer.BlockCopy(buffer, i * rowStride, flipped, offset, rowStride);
+                    offset += rowStride;
+                }
+            }
+            else if (flipOtions == FlipBufferOptions.FlipHorizontally)
+            {
+                int offset;
+                for (int i = 0; i < Height; ++i)
+                {
+                    var originalOffset = i * rowStride;
+                    offset = ((i + 1) * rowStride) - pixelSize;
+                    for (int k = 0; k < Width; ++k)
+                    {
+                        System.Buffer.BlockCopy(buffer, originalOffset, flipped, offset, pixelSize);
+                        offset -= pixelSize;
+                        originalOffset += pixelSize;
+                    }
+                }
+            }
+            else
+            {
+                int rowOffset = 0;
+                for (int i = Height - 1; i >= 0; --i)
+                {
+                    System.Buffer.BlockCopy(buffer, i * rowStride, flipped, rowOffset, rowStride);
+                    var originalOffset = i * rowStride;
+                    var columnOffset = rowOffset + rowStride - pixelSize;
+                    for (int k = 0; k < Width; ++k)
+                    {
+                        System.Buffer.BlockCopy(buffer, originalOffset, flipped, columnOffset, pixelSize);
+                        columnOffset -= pixelSize;
+                        originalOffset += pixelSize;
+                    }
+                    rowOffset += rowStride;
+                }
+            }
+            Utilities.Write(DataPointer, flipped, 0, bufferStride);
         }
     }
 }

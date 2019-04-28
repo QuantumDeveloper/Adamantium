@@ -130,7 +130,7 @@ namespace Adamantium.Core
             var handle = GCHandle.Alloc(data, GCHandleType.Pinned);
             var ptr = handle.AddrOfPinnedObject();
             int size = Marshal.SizeOf(typeof(T)) * count;
-            Buffer.MemoryCopy((void*)source, (void*)ptr, size, size);
+            Buffer.MemoryCopy((void*)source, (void*)(ptr+ (offset * Marshal.SizeOf<T>())), size, size);
             handle.Free();
             return new IntPtr(size + (byte*)source);
         }
@@ -143,6 +143,13 @@ namespace Adamantium.Core
         public static IEnumerable<T> GetCustomAttributes<T>(MemberInfo memberInfo) where T: Attribute
         {
             return memberInfo.GetCustomAttributes<T>();
+        }
+
+        public static void Swap<T>(ref T elem1, ref T elem2)
+        {
+            var tmp = elem1;
+            elem1 = elem2;
+            elem2 = tmp;
         }
     }
 }
