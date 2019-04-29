@@ -13,6 +13,8 @@ namespace Adamantium.Engine.Graphics
     {
         private const UInt16 fileType = 0x4D42;
 
+        private byte[] PngHeader = { 137, 80, 78, 71, 13, 10, 26, 10 };
+
         [StructLayout(LayoutKind.Sequential, Pack = 2)]
         public struct BMPFileHeader
         {
@@ -355,26 +357,26 @@ namespace Adamantium.Engine.Graphics
             imageStream.Write(buffer, 0, (int)offsetData);
             bufferOffset = (int)offsetData;
             Utilities.Read(pixelBuffer.DataPointer, buffer, bufferOffset, pixelBuffer.BufferStride);
-            imageStream.Write(buffer, bufferOffset, pixelBuffer.BufferStride);
-            //if (description.Width % 4 == 0)
-            //{
-                
-            //}
-            //else
-            //{
-            //    var alignedWidth = AlignStride(description.Width);
-            //    var alignDiff = alignedWidth - description.Width;
-            //    var rowStride = description.Width * description.Format.SizeOfInBytes();
-            //    for (int i = 0; i < description.Height; ++i)
-            //    {
-            //        imageStream.Write(buffer, bufferOffset, rowStride);
-            //        for (int k = 0; k < alignDiff; ++k)
-            //        {
-            //            //imageStream.WriteByte(0);
-            //        }
-            //        bufferOffset += rowStride;
-            //    }
-            //}
+
+            if (pixelBuffer.RowStride % 4 == 0)
+            {
+                imageStream.Write(buffer, bufferOffset, pixelBuffer.BufferStride);
+            }
+            else
+            {
+                var alignedWidth = AlignStride(description.Width);
+                var alignDiff = alignedWidth - description.Width;
+                var rowStride = description.Width * description.Format.SizeOfInBytes();
+                for (int i = 0; i < description.Height; ++i)
+                {
+                    imageStream.Write(buffer, bufferOffset, rowStride);
+                    for (int k = 0; k < alignDiff; ++k)
+                    {
+                        imageStream.WriteByte(0);
+                    }
+                    bufferOffset += rowStride;
+                }
+            }
         }
     };
 }
