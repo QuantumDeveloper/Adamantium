@@ -16,7 +16,7 @@ namespace Adamantium.Engine.Graphics
         private byte[] PngHeader = { 137, 80, 78, 71, 13, 10, 26, 10 };
 
         [StructLayout(LayoutKind.Sequential, Pack = 2)]
-        public struct BMPFileHeader
+        public struct BitmapFileHeader
         {
             // File type always BM which is 0x4D42
             //[FieldOffset(0)]
@@ -36,7 +36,7 @@ namespace Adamantium.Engine.Graphics
         };
 
         [StructLayout(LayoutKind.Sequential)]
-        public struct BMPInfoHeader
+        public struct BitmapInfoHeader
         {
             //Size of this header (in bytes)
             public UInt32 size;
@@ -108,7 +108,7 @@ namespace Adamantium.Engine.Graphics
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        public unsafe struct BMPColorHeader
+        public unsafe struct BitmapColorHeader
         {
             // Bit mask for the red channel
             public UInt32 redMask;
@@ -124,9 +124,9 @@ namespace Adamantium.Engine.Graphics
             public fixed UInt32 unused[16];
         }
 
-        public unsafe static Image LoadFromBMPMemory(IntPtr pSource, int size, bool makeACopy, GCHandle? handle)
+        public static Image LoadFromBitmapMemory(IntPtr pSource, int size, bool makeACopy, GCHandle? handle)
         {
-            if (!DecodeBMPHeader(pSource, size, out var description, out var dataOffset, out var compression))
+            if (!DecodeBitmapHeader(pSource, size, out var description, out var dataOffset, out var compression))
             {
                 return null;
             }
@@ -209,8 +209,6 @@ namespace Adamantium.Engine.Graphics
                 }
             }
 
-            
-
             Image image = Image.New(description);
             var bufferHandle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
             var ptr = image.PixelBuffer[0].DataPointer;
@@ -232,7 +230,7 @@ namespace Adamantium.Engine.Graphics
             return newStride;
         }
 
-        private static unsafe bool DecodeBMPHeader(IntPtr headerPtr, int size, out ImageDescription description, out int dataOffset, out BitmapCompressionMode compressionMode)
+        private static unsafe bool DecodeBitmapHeader(IntPtr headerPtr, int size, out ImageDescription description, out int dataOffset, out BitmapCompressionMode compressionMode)
         {
             dataOffset = 0;
             compressionMode = BitmapCompressionMode.BI_RGB;
@@ -240,26 +238,26 @@ namespace Adamantium.Engine.Graphics
             if (headerPtr == IntPtr.Zero)
                 throw new ArgumentException("Pointer to Bitmap header cannot be null", nameof(headerPtr));
 
-            if (size < (Utilities.SizeOf<BMPFileHeader>()))
+            if (size < (Utilities.SizeOf<BitmapFileHeader>()))
                 return false;
 
-            var fileHeader = Utilities.Read<BMPFileHeader>(headerPtr);
+            var fileHeader = Utilities.Read<BitmapFileHeader>(headerPtr);
 
             if (fileHeader.fileType != fileType)
             {
                 return false;
             }
 
-            var infoHeader = Utilities.Read<BMPInfoHeader>(IntPtr.Add(headerPtr, Marshal.SizeOf<BMPFileHeader>()));
+            var infoHeader = Utilities.Read<BitmapInfoHeader>(IntPtr.Add(headerPtr, Marshal.SizeOf<BitmapFileHeader>()));
 
             // The BMPColorHeader is used only for transparent images
             if (infoHeader.bitCount == 32)
             {
                 description.Format = Format.B8G8R8A8_UNORM;
                 // Check if the file has bit mask color information
-                if (infoHeader.size >= (Marshal.SizeOf<BMPInfoHeader>() + Marshal.SizeOf<BMPColorHeader>()))
+                if (infoHeader.size >= (Marshal.SizeOf<BitmapInfoHeader>() + Marshal.SizeOf<BitmapColorHeader>()))
                 {
-                    var colorHeader = Utilities.Read<BMPColorHeader>(IntPtr.Add(headerPtr, Marshal.SizeOf<BMPInfoHeader>() + Marshal.SizeOf<BMPFileHeader>()));
+                    var colorHeader = Utilities.Read<BitmapColorHeader>(IntPtr.Add(headerPtr, Marshal.SizeOf<BitmapInfoHeader>() + Marshal.SizeOf<BitmapFileHeader>()));
                     // Check if the pixel data is stored as BGRA and if the color space type is sRGB
                     CheckColorHeader(colorHeader);
                 }
@@ -286,7 +284,7 @@ namespace Adamantium.Engine.Graphics
             return true;
         }
 
-        private static void CheckColorHeader(BMPColorHeader colorHeader)
+        private static void CheckColorHeader(BitmapColorHeader colorHeader)
         {
             if (ColorMasks.R8G8B8A8.RedMask != colorHeader.redMask ||
                 ColorMasks.R8G8B8A8.BlueMask != colorHeader.blueMask ||
@@ -301,7 +299,7 @@ namespace Adamantium.Engine.Graphics
             }
         }
 
-        public static void SaveToBMPMemory(PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream)
+        public static void SaveToBitmapMemory(PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream)
         {
             SaveToBitmapStream(pixelBuffers, count, description, imageStream);
         }
@@ -312,7 +310,7 @@ namespace Adamantium.Engine.Graphics
 
             var pixelBuffer = pixelBuffers[0];
 
-            uint offsetData = (uint)(Marshal.SizeOf<BMPFileHeader>() + Marshal.SizeOf<BMPInfoHeader>() + Marshal.SizeOf<BMPColorHeader>());
+            uint offsetData = (uint)(Marshal.SizeOf<BitmapFileHeader>() + Marshal.SizeOf<BitmapInfoHeader>() + Marshal.SizeOf<BitmapColorHeader>());
             uint fileSize = offsetData;
 
             if (pixelBuffer.RowStride % 4 == 0)
@@ -326,31 +324,31 @@ namespace Adamantium.Engine.Graphics
                 fileSize += (uint)size;
             }
 
-            var fileHeader = new BMPFileHeader();
+            var fileHeader = new BitmapFileHeader();
             fileHeader.fileType = fileType;
             fileHeader.fileSize = fileSize;
             fileHeader.offsetData = offsetData;
 
-            var infoHeader = new BMPInfoHeader();
+            var infoHeader = new BitmapInfoHeader();
             infoHeader.bitCount = (ushort)description.Format.SizeOfInBits();
             infoHeader.width = description.Width;
             infoHeader.height = description.Height;
             infoHeader.planes = 1;
-            infoHeader.size = (uint)Marshal.SizeOf<BMPInfoHeader>();
+            infoHeader.size = (uint)Marshal.SizeOf<BitmapInfoHeader>();
 
             var buffer = new byte[fileSize];
-            IntPtr fileHeaderMemory = Utilities.AllocateMemory(Marshal.SizeOf<BMPFileHeader>(), 2);
+            IntPtr fileHeaderMemory = Utilities.AllocateMemory(Marshal.SizeOf<BitmapFileHeader>(), 2);
             Marshal.StructureToPtr(fileHeader, fileHeaderMemory, true);
-            Utilities.Read(fileHeaderMemory, buffer, 0, Marshal.SizeOf<BMPFileHeader>());
+            Utilities.Read(fileHeaderMemory, buffer, 0, Marshal.SizeOf<BitmapFileHeader>());
 
-            IntPtr infoHeaderMemory = Utilities.AllocateMemory(Marshal.SizeOf<BMPInfoHeader>());
+            IntPtr infoHeaderMemory = Utilities.AllocateMemory(Marshal.SizeOf<BitmapInfoHeader>());
             Marshal.StructureToPtr(infoHeader, infoHeaderMemory, true);
-            Utilities.Read(infoHeaderMemory, buffer, Marshal.SizeOf<BMPFileHeader>(), Marshal.SizeOf<BMPInfoHeader>());
+            Utilities.Read(infoHeaderMemory, buffer, Marshal.SizeOf<BitmapFileHeader>(), Marshal.SizeOf<BitmapInfoHeader>());
 
-            IntPtr colorHeaderMemory = Utilities.AllocateMemory(Marshal.SizeOf<BMPColorHeader>());
+            IntPtr colorHeaderMemory = Utilities.AllocateMemory(Marshal.SizeOf<BitmapColorHeader>());
             Marshal.StructureToPtr(infoHeader, colorHeaderMemory, true);
-            var bufferOffset = Marshal.SizeOf<BMPFileHeader>() + Marshal.SizeOf<BMPInfoHeader>();
-            Utilities.Read(colorHeaderMemory, buffer, bufferOffset, Marshal.SizeOf<BMPInfoHeader>());
+            var bufferOffset = Marshal.SizeOf<BitmapFileHeader>() + Marshal.SizeOf<BitmapInfoHeader>();
+            Utilities.Read(colorHeaderMemory, buffer, bufferOffset, Marshal.SizeOf<BitmapInfoHeader>());
 
             pixelBuffers[0].FlipBuffer(FlipBufferOptions.FlipVertically);
 

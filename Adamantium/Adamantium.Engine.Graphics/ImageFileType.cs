@@ -50,5 +50,10 @@
         /// </summary>
         Tga,
 
+        /// <summary>
+        /// An ICO File.
+        /// </summary>
+        Ico
+
     }
 }
