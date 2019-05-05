@@ -151,5 +151,22 @@ namespace Adamantium.Core
             elem1 = elem2;
             elem2 = tmp;
         }
+
+        public static ushort ToLittleEndian(byte left, byte right)
+        {
+            var res = BitConverter.ToUInt16(new byte[] { right, left });
+            var result = (ushort)(right | left << 8);
+            return result;
+        }
+
+        public static int SwapEndianness(int value)
+        {
+            var b1 = (value >> 0) & 0xff;
+            var b2 = (value >> 8) & 0xff;
+            var b3 = (value >> 16) & 0xff;
+            var b4 = (value >> 24) & 0xff;
+
+            return b1 << 24 | b2 << 16 | b3 << 8 | b4 << 0;
+        }
     }
 }

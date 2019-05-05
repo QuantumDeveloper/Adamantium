@@ -6,6 +6,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Linq;
+using Adamantium.Mathematics;
 
 namespace Adamantium.Engine.Graphics
 {
@@ -350,7 +351,26 @@ namespace Adamantium.Engine.Graphics
             var bufferOffset = Marshal.SizeOf<BitmapFileHeader>() + Marshal.SizeOf<BitmapInfoHeader>();
             Utilities.Read(colorHeaderMemory, buffer, bufferOffset, Marshal.SizeOf<BitmapInfoHeader>());
 
-            pixelBuffers[0].FlipBuffer(FlipBufferOptions.FlipVertically);
+            pixelBuffer.FlipBuffer(FlipBufferOptions.FlipVertically);
+            if (pixelBuffer.Format.SizeOfInBytes() == 3)
+            {
+                var colors = pixelBuffer.GetPixels<ColorRGB>();
+                for (int i = 0; i < colors.Length; ++i)
+                {
+                    Utilities.Swap(ref colors[i].R, ref colors[i].B);
+                }
+                pixelBuffer.SetPixels<ColorRGB>(colors);
+            }
+            else if (pixelBuffer.Format.SizeOfInBytes() == 4)
+            {
+                var colors = pixelBuffer.GetPixels<ColorRGBA>();
+                for (int i = 0; i < colors.Length; ++i)
+                {
+                    Utilities.Swap(ref colors[i].R, ref colors[i].B);
+                }
+                pixelBuffer.SetPixels<ColorRGBA>(colors);
+            }
+
 
             imageStream.Write(buffer, 0, (int)offsetData);
             bufferOffset = (int)offsetData;
@@ -375,6 +395,23 @@ namespace Adamantium.Engine.Graphics
                     bufferOffset += rowStride;
                 }
             }
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct ColorRGB
+        {
+            public byte R;
+            public byte G;
+            public byte B;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct ColorRGBA
+        {
+            public byte R;
+            public byte G;
+            public byte B;
+            public byte A;
         }
     };
 }
