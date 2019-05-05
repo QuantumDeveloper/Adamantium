@@ -19,6 +19,11 @@
     <ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan\AdamantiumVulkan.csproj" />
     <ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" />
     <ProjectReference Include="..\Adamantium.Engine.Core\Adamantium.Engine.Core.csproj" />
+    <ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Imaging\JPEG\" />
   </ItemGroup>
 
 </Project>

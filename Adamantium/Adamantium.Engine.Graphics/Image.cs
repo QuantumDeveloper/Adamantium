@@ -674,7 +674,7 @@ namespace Adamantium.Engine.Graphics
             //Register(ImageFileType.Gif, WICHelper.LoadFromWICMemory, WICHelper.SaveGifToWICMemory);
             //Register(ImageFileType.Tiff, WICHelper.LoadFromWICMemory, WICHelper.SaveTiffToWICMemory);
             Register(ImageFileType.Bmp, BitmapHelper.LoadFromBitmapMemory, BitmapHelper.SaveToBitmapMemory);
-            //Register(ImageFileType.Jpg, WICHelper.LoadFromWICMemory, WICHelper.SaveJpgToWICMemory);
+            Register(ImageFileType.Jpg, JPEGHelper.LoadFromJpegMemory, JPEGHelper.SaveToJpegMemory);
             //Register(ImageFileType.Png, WICHelper.LoadFromWICMemory, WICHelper.SavePngToWICMemory);
             //Register(ImageFileType.Wmp, WICHelper.LoadFromWICMemory, WICHelper.SaveWmpToWICMemory);
             Register(ImageFileType.Tga, TGAHelper.LoadFromTgaMemory, TGAHelper.SaveToTgaMemory);

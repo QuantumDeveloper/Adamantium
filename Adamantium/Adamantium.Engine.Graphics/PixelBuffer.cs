@@ -366,6 +366,11 @@ namespace Adamantium.Engine.Graphics
             }
         }
 
+        public byte[][,] ToComponentsFormat()
+        {
+            var components = new byte[pixelSize][Width, Height];
+        }
+
         public void FlipBuffer(FlipBufferOptions flipOtions)
         {
             var buffer = new byte[bufferStride];

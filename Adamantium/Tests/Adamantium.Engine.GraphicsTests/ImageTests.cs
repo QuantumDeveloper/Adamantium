@@ -39,8 +39,8 @@ namespace Adamantium.Engine.GraphicsTests
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\Shapes.bmp");
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\Small_24.bmp");
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\t2_24.bmp");
-            img.Save(@"BaseAlbedoTexture_Text.png.tga", ImageFileType.Tga);
-            img.Save(@"BaseAlbedoTexture_Text.png.bmp", ImageFileType.Bmp);
+            img.Save(@"BaseAlbedoTexture_Text.jpg", ImageFileType.Jpg);
+            img.Save(@"BaseAlbedoTexture_Text.bmp", ImageFileType.Bmp);
             img?.Dispose();
         }
 
@@ -54,6 +54,19 @@ namespace Adamantium.Engine.GraphicsTests
 
             img.Save(@"RestoredBitmap.bmp", ImageFileType.Bmp);
             img.Save(@"RestoredBitmap.tga", ImageFileType.Tga);
+            img?.Dispose();
+        }
+
+        [Test]
+        public void JpegImageTest()
+        {
+            //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\Icons\SharpGen.ico");
+            var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\1.jpg");
+            //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\Icons\SharpGen.ico");
+            //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\Icons\NewIcon.ico");
+
+            //img.Save(@"RestoredBitmap.bmp", ImageFileType.Bmp);
+            //img.Save(@"RestoredBitmap.tga", ImageFileType.Tga);
             img?.Dispose();
         }
     }
