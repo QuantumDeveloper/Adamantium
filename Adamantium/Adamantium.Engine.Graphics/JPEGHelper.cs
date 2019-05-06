@@ -24,8 +24,8 @@ namespace Adamantium.Engine.Graphics
 
         public static void SaveToJpegMemory(PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream)
         {
-            JpegEncoder encoder = new JpegEncoder(pixelBuffers[0], 1, imageStream);
-            encoder.Encode();
+            //JpegEncoder encoder = new JpegEncoder(pixelBuffers[0], 1, imageStream);
+            //encoder.Encode();
         }
 
     }

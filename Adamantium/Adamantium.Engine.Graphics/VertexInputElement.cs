@@ -516,16 +516,16 @@ namespace Adamantium.Engine.Core
       /// <exception cref="System.NotSupportedException">If the convertion for this type is not supported.</exception>
       private static Format ConvertTypeToFormat(Type typeT)
       {
-         if (typeof(Vector4F) == typeT || typeof(Color4) == typeT || typeof(RectangleF) == typeT)
+         if (typeof(Vector4F) == typeT || typeof(Color4F) == typeT || typeof(RectangleF) == typeT)
             return Format.R32G32B32A32_SFLOAT;
-         if (typeof(Vector3F) == typeT || typeof(Color3) == typeT)
+         if (typeof(Vector3F) == typeT || typeof(Color3F) == typeT)
             return Format.R32G32B32_SFLOAT;
          if (typeof(Vector2F) == typeT)
             return Format.R32G32_SFLOAT;
          if (typeof(float) == typeT)
             return Format.R32_SFLOAT;
 
-         if (typeof(Color) == typeT)
+         if (typeof(ColorRGBA) == typeT)
             return Format.R8G8B8A8_UNORM;
          if (typeof(ColorBGRA) == typeT)
             return Format.B8G8R8A8_UNORM;

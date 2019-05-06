@@ -396,22 +396,5 @@ namespace Adamantium.Engine.Graphics
                 }
             }
         }
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct ColorRGB
-        {
-            public byte R;
-            public byte G;
-            public byte B;
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct ColorRGBA
-        {
-            public byte R;
-            public byte G;
-            public byte B;
-            public byte A;
-        }
     };
 }

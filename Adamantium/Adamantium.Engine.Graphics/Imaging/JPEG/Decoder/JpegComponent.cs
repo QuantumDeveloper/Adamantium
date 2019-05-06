@@ -14,7 +14,6 @@ using System.Reflection.Emit;
 
 namespace Adamantium.Engine.Graphics.Imaging.JPEG.Decoder
 {
-
     internal class JpegComponent
     {
         public byte factorH, factorV, component_id, quant_id;

@@ -14,7 +14,7 @@ namespace Adamantium.Engine.Graphics
       /// <param name="textureCoordinate"></param>
       /// <param name="normal"></param>
       /// <param name="color"></param>
-      public VertexPositionColorNormalTexture(Vector3F position, Color color, Vector3F normal, Vector2F textureCoordinate)
+      public VertexPositionColorNormalTexture(Vector3F position, ColorRGBA color, Vector3F normal, Vector2F textureCoordinate)
       {
          Position = position;
          UV = textureCoordinate;
@@ -31,7 +31,7 @@ namespace Adamantium.Engine.Graphics
       /// The vertex color.
       /// </summary>
       [VertexInputElement("COLOR")]
-      public Color Color;
+      public ColorRGBA Color;
 
 
       /// <summary>
