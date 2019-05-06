@@ -19,6 +19,7 @@
 // THE SOFTWARE.
 
 using Adamantium.Core;
+using Adamantium.Mathematics;
 using AdamantiumVulkan.Core;
 using System;
 using System.IO;
@@ -366,9 +367,82 @@ namespace Adamantium.Engine.Graphics
             }
         }
 
-        public byte[][,] ToComponentsFormat()
+        public byte[][,] ToComponentsBuffer()
         {
-            var components = new byte[pixelSize][Width, Height];
+            return GetComponentArrayFromBuffer();
+        }
+
+        private byte[][,] GetComponentArrayFromBuffer()
+        {
+            if (pixelSize == 1)
+            {
+                var colors = GetPixels<byte>();
+                var redChannel = new byte[Width, Height];
+                for (int i = 0; i < Height; ++i)
+                {
+                    for (int k = 0; k < Width; ++k)
+                    {
+                        redChannel[i, k] = colors[i * Width + k];
+                    }
+                }
+                var componentsArray = new byte[1][,] { redChannel };
+                return componentsArray;
+            }
+            else if (pixelSize == 2)
+            {
+                var colors = GetPixels<ColorRG>();
+                var redChannel = new byte[Width, Height];
+                var greenChannel = new byte[Width, Height];
+                for (int i = 0; i < Height; ++i)
+                {
+                    for (int k = 0; k < Width; ++k)
+                    {
+                        redChannel[i, k] = colors[i * Width + k].R;
+                        greenChannel[i, k] = colors[i * Width + k].G;
+                    }
+                }
+                var componentsArray = new byte[2][,] { redChannel, greenChannel };
+                return componentsArray;
+            }
+            else if (pixelSize == 3)
+            {
+                var colors = GetPixels<ColorRGB>();
+                var redChannel = new byte[Width, Height];
+                var greenChannel = new byte[Width, Height];
+                var blueChannel = new byte[Width, Height];
+                for (int i = 0; i < Height; ++i)
+                {
+                    for (int k = 0; k < Width; ++k)
+                    {
+                        redChannel[i, k] = colors[i * Width + k].R;
+                        greenChannel[i, k] = colors[i * Width + k].G;
+                        blueChannel[i, k] = colors[i * Width + k].G;
+                    }
+                }
+                var componentsArray = new byte[3][,] { redChannel, greenChannel, blueChannel };
+                return componentsArray;
+            }
+            else if (pixelSize == 4)
+            {
+                var colors = GetPixels<ColorRGBA>();
+                var redChannel = new byte[Width, Height];
+                var greenChannel = new byte[Width, Height];
+                var blueChannel = new byte[Width, Height];
+                var alphaChannel = new byte[Width, Height];
+                for (int i = 0; i < Height; ++i)
+                {
+                    for (int k = 0; k < Width; ++k)
+                    {
+                        redChannel[i, k] = colors[i * Width + k].R;
+                        greenChannel[i, k] = colors[i * Width + k].G;
+                        blueChannel[i, k] = colors[i * Width + k].G;
+                        alphaChannel[i, k] = colors[i * Width + k].A;
+                    }
+                }
+                var componentsArray = new byte[4][,] { redChannel, greenChannel, blueChannel, alphaChannel };
+                return componentsArray;
+            }
+            return null;
         }
 
         public void FlipBuffer(FlipBufferOptions flipOtions)

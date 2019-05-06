@@ -13,7 +13,7 @@ namespace Adamantium.Engine.Graphics
       /// <param name="position"></param>
       /// <param name="normal"></param>
       /// <param name="color"></param>
-      public VertexPositionColorNormal(Vector3F position, Vector3F normal, Color color)
+      public VertexPositionColorNormal(Vector3F position, Vector3F normal, ColorRGBA color)
       {
          Position = position;
          Normal = normal;
@@ -29,7 +29,7 @@ namespace Adamantium.Engine.Graphics
       /// The vertex color.
       /// </summary>
       [VertexInputElement("COLOR")]
-      public Color Color;
+      public ColorRGBA Color;
 
 
       /// <summary>

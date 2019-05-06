@@ -10,11 +10,11 @@ namespace Adamantium.Engine.Core.Models
         public readonly Vector2F UV1;
         public readonly Vector2F UV2;
         public readonly Vector2F UV3;
-        public readonly Color Color;
+        public readonly ColorRGBA Color;
         public readonly Vector4F JointIndex;
         public readonly Vector4F JointWeight;
 
-        public Vertex(Vector3F position, Vector2F uv0, Vector2F uv1, Vector2F uv2, Vector2F uv3, Color color, Vector4F jointIndex, Vector4F jointWeight)
+        public Vertex(Vector3F position, Vector2F uv0, Vector2F uv1, Vector2F uv2, Vector2F uv3, ColorRGBA color, Vector4F jointIndex, Vector4F jointWeight)
         {
             Position = position;
             UV0 = uv0;

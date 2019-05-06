@@ -103,7 +103,7 @@ namespace Adamantium.Engine.Graphics.Imaging.JPEG
                     lastColumnIsDummy[y] = true;
                 }
 
-                // results in a multiple of 8 for compWidthz
+                // results in a multiple of 8 for compWidth
                 // this will make the rest of the program fail for the unlikely
                 // event that someone tries to compress an 16 x 16 pixel image
                 // which would of course be worse than pointless

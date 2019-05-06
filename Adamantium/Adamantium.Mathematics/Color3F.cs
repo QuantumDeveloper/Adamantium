@@ -9,19 +9,19 @@ namespace Adamantium.Mathematics
    /// Represents a color in the form of rgb.
    /// </summary>
    [StructLayout(LayoutKind.Sequential, Pack = 4)]
-   public struct Color3 : IEquatable<Color3>, IFormattable
+   public struct Color3F : IEquatable<Color3F>, IFormattable
    {
       private const string toStringFormat = "Red:{0} Green:{1} Blue:{2}";
 
       /// <summary>
       /// The Black color (0, 0, 0).
       /// </summary>
-      public static readonly Color3 Black = new Color3(0.0f, 0.0f, 0.0f);
+      public static readonly Color3F Black = new Color3F(0.0f, 0.0f, 0.0f);
 
       /// <summary>
       /// The White color (1, 1, 1, 1).
       /// </summary>
-      public static readonly Color3 White = new Color3(1.0f, 1.0f, 1.0f);
+      public static readonly Color3F White = new Color3F(1.0f, 1.0f, 1.0f);
 
       /// <summary>
       /// The red component of the color.
@@ -39,21 +39,21 @@ namespace Adamantium.Mathematics
       public float Blue;
 
       /// <summary>
-      /// Initializes a new instance of the <see cref="Color3"/> struct.
+      /// Initializes a new instance of the <see cref="Color3F"/> struct.
       /// </summary>
       /// <param name="value">The value that will be assigned to all components.</param>
-      public Color3(float value)
+      public Color3F(float value)
       {
          Red = Green = Blue = value;
       }
 
       /// <summary>
-      /// Initializes a new instance of the <see cref="Color3"/> struct.
+      /// Initializes a new instance of the <see cref="Color3F"/> struct.
       /// </summary>
       /// <param name="red">The red component of the color.</param>
       /// <param name="green">The green component of the color.</param>
       /// <param name="blue">The blue component of the color.</param>
-      public Color3(float red, float green, float blue)
+      public Color3F(float red, float green, float blue)
       {
          Red = red;
          Green = green;
@@ -61,10 +61,10 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
-      /// Initializes a new instance of the <see cref="Color3"/> struct.
+      /// Initializes a new instance of the <see cref="Color3F"/> struct.
       /// </summary>
       /// <param name="value">The red, green, and blue components of the color.</param>
-      public Color3(Vector3F value)
+      public Color3F(Vector3F value)
       {
          Red = value.X;
          Green = value.Y;
@@ -72,11 +72,11 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
-      /// Initializes a new instance of the <see cref="Color3"/> struct.
+      /// Initializes a new instance of the <see cref="Color3F"/> struct.
       /// </summary>
       /// <param name="rgb">A packed integer containing all three color components in RGB order.
       /// The alpha component is ignored.</param>
-      public Color3(int rgb)
+      public Color3F(int rgb)
       {
          Blue = ((rgb >> 16) & 255) / 255.0f;
          Green = ((rgb >> 8) & 255) / 255.0f;
@@ -84,12 +84,12 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
-      /// Initializes a new instance of the <see cref="Color3"/> struct.
+      /// Initializes a new instance of the <see cref="Color3F"/> struct.
       /// </summary>
       /// <param name="values">The values to assign to the red, green, and blue components of the color. This must be an array with three elements.</param>
       /// <exception cref="ArgumentNullException">Thrown when <paramref name="values"/> is <c>null</c>.</exception>
       /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="values"/> contains more or less than four elements.</exception>
-      public Color3(float[] values)
+      public Color3F(float[] values)
       {
          if (values == null)
             throw new ArgumentNullException("values");
@@ -198,7 +198,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first color to add.</param>
       /// <param name="right">The second color to add.</param>
       /// <param name="result">When the method completes, completes the sum of the two colors.</param>
-      public static void Add(ref Color3 left, ref Color3 right, out Color3 result)
+      public static void Add(ref Color3F left, ref Color3F right, out Color3F result)
       {
          result.Red = left.Red + right.Red;
          result.Green = left.Green + right.Green;
@@ -211,9 +211,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first color to add.</param>
       /// <param name="right">The second color to add.</param>
       /// <returns>The sum of the two colors.</returns>
-      public static Color3 Add(Color3 left, Color3 right)
+      public static Color3F Add(Color3F left, Color3F right)
       {
-         return new Color3(left.Red + right.Red, left.Green + right.Green, left.Blue + right.Blue);
+         return new Color3F(left.Red + right.Red, left.Green + right.Green, left.Blue + right.Blue);
       }
 
       /// <summary>
@@ -222,7 +222,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first color to subtract.</param>
       /// <param name="right">The second color to subtract.</param>
       /// <param name="result">WHen the method completes, contains the difference of the two colors.</param>
-      public static void Subtract(ref Color3 left, ref Color3 right, out Color3 result)
+      public static void Subtract(ref Color3F left, ref Color3F right, out Color3F result)
       {
          result.Red = left.Red - right.Red;
          result.Green = left.Green - right.Green;
@@ -235,9 +235,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first color to subtract.</param>
       /// <param name="right">The second color to subtract</param>
       /// <returns>The difference of the two colors.</returns>
-      public static Color3 Subtract(Color3 left, Color3 right)
+      public static Color3F Subtract(Color3F left, Color3F right)
       {
-         return new Color3(left.Red - right.Red, left.Green - right.Green, left.Blue - right.Blue);
+         return new Color3F(left.Red - right.Red, left.Green - right.Green, left.Blue - right.Blue);
       }
 
       /// <summary>
@@ -246,7 +246,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first color to modulate.</param>
       /// <param name="right">The second color to modulate.</param>
       /// <param name="result">When the method completes, contains the modulated color.</param>
-      public static void Modulate(ref Color3 left, ref Color3 right, out Color3 result)
+      public static void Modulate(ref Color3F left, ref Color3F right, out Color3F result)
       {
          result.Red = left.Red * right.Red;
          result.Green = left.Green * right.Green;
@@ -259,9 +259,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first color to modulate.</param>
       /// <param name="right">The second color to modulate.</param>
       /// <returns>The modulated color.</returns>
-      public static Color3 Modulate(Color3 left, Color3 right)
+      public static Color3F Modulate(Color3F left, Color3F right)
       {
-         return new Color3(left.Red * right.Red, left.Green * right.Green, left.Blue * right.Blue);
+         return new Color3F(left.Red * right.Red, left.Green * right.Green, left.Blue * right.Blue);
       }
 
       /// <summary>
@@ -270,7 +270,7 @@ namespace Adamantium.Mathematics
       /// <param name="value">The color to scale.</param>
       /// <param name="scale">The amount by which to scale.</param>
       /// <param name="result">When the method completes, contains the scaled color.</param>
-      public static void Scale(ref Color3 value, float scale, out Color3 result)
+      public static void Scale(ref Color3F value, float scale, out Color3F result)
       {
          result.Red = value.Red * scale;
          result.Green = value.Green * scale;
@@ -283,9 +283,9 @@ namespace Adamantium.Mathematics
       /// <param name="value">The color to scale.</param>
       /// <param name="scale">The amount by which to scale.</param>
       /// <returns>The scaled color.</returns>
-      public static Color3 Scale(Color3 value, float scale)
+      public static Color3F Scale(Color3F value, float scale)
       {
-         return new Color3(value.Red * scale, value.Green * scale, value.Blue * scale);
+         return new Color3F(value.Red * scale, value.Green * scale, value.Blue * scale);
       }
 
       /// <summary>
@@ -293,7 +293,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The color to negate.</param>
       /// <param name="result">When the method completes, contains the negated color.</param>
-      public static void Negate(ref Color3 value, out Color3 result)
+      public static void Negate(ref Color3F value, out Color3F result)
       {
          result.Red = 1.0f - value.Red;
          result.Green = 1.0f - value.Green;
@@ -305,9 +305,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The color to negate.</param>
       /// <returns>The negated color.</returns>
-      public static Color3 Negate(Color3 value)
+      public static Color3F Negate(Color3F value)
       {
-         return new Color3(1.0f - value.Red, 1.0f - value.Green, 1.0f - value.Blue);
+         return new Color3F(1.0f - value.Red, 1.0f - value.Green, 1.0f - value.Blue);
       }
 
       /// <summary>
@@ -317,7 +317,7 @@ namespace Adamantium.Mathematics
       /// <param name="min">The minimum value.</param>
       /// <param name="max">The maximum value.</param>
       /// <param name="result">When the method completes, contains the clamped value.</param>
-      public static void Clamp(ref Color3 value, ref Color3 min, ref Color3 max, out Color3 result)
+      public static void Clamp(ref Color3F value, ref Color3F min, ref Color3F max, out Color3F result)
       {
          float red = value.Red;
          red = (red > max.Red) ? max.Red : red;
@@ -331,7 +331,7 @@ namespace Adamantium.Mathematics
          blue = (blue > max.Blue) ? max.Blue : blue;
          blue = (blue < min.Blue) ? min.Blue : blue;
 
-         result = new Color3(red, green, blue);
+         result = new Color3F(red, green, blue);
       }
 
       /// <summary>
@@ -341,9 +341,9 @@ namespace Adamantium.Mathematics
       /// <param name="min">The minimum value.</param>
       /// <param name="max">The maximum value.</param>
       /// <returns>The clamped value.</returns>
-      public static Color3 Clamp(Color3 value, Color3 min, Color3 max)
+      public static Color3F Clamp(Color3F value, Color3F min, Color3F max)
       {
-         Color3 result;
+         Color3F result;
          Clamp(ref value, ref min, ref max, out result);
          return result;
       }
@@ -358,7 +358,7 @@ namespace Adamantium.Mathematics
       /// <remarks>
       /// Passing <paramref name="amount"/> a value of 0 will cause <paramref name="start"/> to be returned; a value of 1 will cause <paramref name="end"/> to be returned. 
       /// </remarks>
-      public static void Lerp(ref Color3 start, ref Color3 end, float amount, out Color3 result)
+      public static void Lerp(ref Color3F start, ref Color3F end, float amount, out Color3F result)
       {
          result.Red = MathHelper.Lerp(start.Red, end.Red, amount);
          result.Green = MathHelper.Lerp(start.Green, end.Green, amount);
@@ -375,9 +375,9 @@ namespace Adamantium.Mathematics
       /// <remarks>
       /// Passing <paramref name="amount"/> a value of 0 will cause <paramref name="start"/> to be returned; a value of 1 will cause <paramref name="end"/> to be returned. 
       /// </remarks>
-      public static Color3 Lerp(Color3 start, Color3 end, float amount)
+      public static Color3F Lerp(Color3F start, Color3F end, float amount)
       {
-         Color3 result;
+         Color3F result;
          Lerp(ref start, ref end, amount, out result);
          return result;
       }
@@ -389,7 +389,7 @@ namespace Adamantium.Mathematics
       /// <param name="end">End color.</param>
       /// <param name="amount">Value between 0 and 1 indicating the weight of <paramref name="end"/>.</param>
       /// <param name="result">When the method completes, contains the cubic interpolation of the two colors.</param>
-      public static void SmoothStep(ref Color3 start, ref Color3 end, float amount, out Color3 result)
+      public static void SmoothStep(ref Color3F start, ref Color3F end, float amount, out Color3F result)
       {
          amount = MathHelper.SmoothStep(amount);
          Lerp(ref start, ref end, amount, out result);
@@ -402,9 +402,9 @@ namespace Adamantium.Mathematics
       /// <param name="end">End color.</param>
       /// <param name="amount">Value between 0 and 1 indicating the weight of <paramref name="end"/>.</param>
       /// <returns>The cubic interpolation of the two colors.</returns>
-      public static Color3 SmoothStep(Color3 start, Color3 end, float amount)
+      public static Color3F SmoothStep(Color3F start, Color3F end, float amount)
       {
-         Color3 result;
+         Color3F result;
          SmoothStep(ref start, ref end, amount, out result);
          return result;
       }
@@ -415,7 +415,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first source color.</param>
       /// <param name="right">The second source color.</param>
       /// <param name="result">When the method completes, contains an new color composed of the largest components of the source colors.</param>
-      public static void Max(ref Color3 left, ref Color3 right, out Color3 result)
+      public static void Max(ref Color3F left, ref Color3F right, out Color3F result)
       {
          result.Red = (left.Red > right.Red) ? left.Red : right.Red;
          result.Green = (left.Green > right.Green) ? left.Green : right.Green;
@@ -428,9 +428,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first source color.</param>
       /// <param name="right">The second source color.</param>
       /// <returns>A color containing the largest components of the source colors.</returns>
-      public static Color3 Max(Color3 left, Color3 right)
+      public static Color3F Max(Color3F left, Color3F right)
       {
-         Color3 result;
+         Color3F result;
          Max(ref left, ref right, out result);
          return result;
       }
@@ -441,7 +441,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first source color.</param>
       /// <param name="right">The second source color.</param>
       /// <param name="result">When the method completes, contains an new color composed of the smallest components of the source colors.</param>
-      public static void Min(ref Color3 left, ref Color3 right, out Color3 result)
+      public static void Min(ref Color3F left, ref Color3F right, out Color3F result)
       {
          result.Red = (left.Red < right.Red) ? left.Red : right.Red;
          result.Green = (left.Green < right.Green) ? left.Green : right.Green;
@@ -454,9 +454,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first source color.</param>
       /// <param name="right">The second source color.</param>
       /// <returns>A color containing the smallest components of the source colors.</returns>
-      public static Color3 Min(Color3 left, Color3 right)
+      public static Color3F Min(Color3F left, Color3F right)
       {
-         Color3 result;
+         Color3F result;
          Min(ref left, ref right, out result);
          return result;
       }
@@ -467,7 +467,7 @@ namespace Adamantium.Mathematics
       /// <param name="value">The color whose contrast is to be adjusted.</param>
       /// <param name="contrast">The amount by which to adjust the contrast.</param>
       /// <param name="result">When the method completes, contains the adjusted color.</param>
-      public static void AdjustContrast(ref Color3 value, float contrast, out Color3 result)
+      public static void AdjustContrast(ref Color3F value, float contrast, out Color3F result)
       {
          result.Red = 0.5f + contrast * (value.Red - 0.5f);
          result.Green = 0.5f + contrast * (value.Green - 0.5f);
@@ -480,9 +480,9 @@ namespace Adamantium.Mathematics
       /// <param name="value">The color whose contrast is to be adjusted.</param>
       /// <param name="contrast">The amount by which to adjust the contrast.</param>
       /// <returns>The adjusted color.</returns>
-      public static Color3 AdjustContrast(Color3 value, float contrast)
+      public static Color3F AdjustContrast(Color3F value, float contrast)
       {
-         return new Color3(
+         return new Color3F(
              0.5f + contrast * (value.Red - 0.5f),
              0.5f + contrast * (value.Green - 0.5f),
              0.5f + contrast * (value.Blue - 0.5f));
@@ -494,7 +494,7 @@ namespace Adamantium.Mathematics
       /// <param name="value">The color whose saturation is to be adjusted.</param>
       /// <param name="saturation">The amount by which to adjust the saturation.</param>
       /// <param name="result">When the method completes, contains the adjusted color.</param>
-      public static void AdjustSaturation(ref Color3 value, float saturation, out Color3 result)
+      public static void AdjustSaturation(ref Color3F value, float saturation, out Color3F result)
       {
          float grey = value.Red * 0.2125f + value.Green * 0.7154f + value.Blue * 0.0721f;
 
@@ -509,11 +509,11 @@ namespace Adamantium.Mathematics
       /// <param name="value">The color whose saturation is to be adjusted.</param>
       /// <param name="saturation">The amount by which to adjust the saturation.</param>
       /// <returns>The adjusted color.</returns>
-      public static Color3 AdjustSaturation(Color3 value, float saturation)
+      public static Color3F AdjustSaturation(Color3F value, float saturation)
       {
          float grey = value.Red * 0.2125f + value.Green * 0.7154f + value.Blue * 0.0721f;
 
-         return new Color3(
+         return new Color3F(
              grey + saturation * (value.Red - grey),
              grey + saturation * (value.Green - grey),
              grey + saturation * (value.Blue - grey));
@@ -525,7 +525,7 @@ namespace Adamantium.Mathematics
       /// <param name="value">The non-premultiplied value.</param>
       /// <param name="alpha">The color alpha.</param>
       /// <param name="result">The premultiplied result.</param>
-      public static void Premultiply(ref Color3 value, float alpha, out Color3 result)
+      public static void Premultiply(ref Color3F value, float alpha, out Color3F result)
       {
          result.Red = value.Red * alpha;
          result.Green = value.Green * alpha;
@@ -538,9 +538,9 @@ namespace Adamantium.Mathematics
       /// <param name="value">The non-premultiplied value.</param>
       /// <param name="alpha">The color alpha.</param>
       /// <returns>The premultiplied color.</returns>
-      public static Color3 Premultiply(Color3 value, float alpha)
+      public static Color3F Premultiply(Color3F value, float alpha)
       {
-         Color3 result;
+         Color3F result;
          Premultiply(ref value, alpha, out result);
          return result;
       }
@@ -551,9 +551,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first color to add.</param>
       /// <param name="right">The second color to add.</param>
       /// <returns>The sum of the two colors.</returns>
-      public static Color3 operator +(Color3 left, Color3 right)
+      public static Color3F operator +(Color3F left, Color3F right)
       {
-         return new Color3(left.Red + right.Red, left.Green + right.Green, left.Blue + right.Blue);
+         return new Color3F(left.Red + right.Red, left.Green + right.Green, left.Blue + right.Blue);
       }
 
       /// <summary>
@@ -561,7 +561,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The color to assert (unchanged).</param>
       /// <returns>The asserted (unchanged) color.</returns>
-      public static Color3 operator +(Color3 value)
+      public static Color3F operator +(Color3F value)
       {
          return value;
       }
@@ -572,9 +572,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first color to subtract.</param>
       /// <param name="right">The second color to subtract.</param>
       /// <returns>The difference of the two colors.</returns>
-      public static Color3 operator -(Color3 left, Color3 right)
+      public static Color3F operator -(Color3F left, Color3F right)
       {
-         return new Color3(left.Red - right.Red, left.Green - right.Green, left.Blue - right.Blue);
+         return new Color3F(left.Red - right.Red, left.Green - right.Green, left.Blue - right.Blue);
       }
 
       /// <summary>
@@ -582,9 +582,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The color to negate.</param>
       /// <returns>A negated color.</returns>
-      public static Color3 operator -(Color3 value)
+      public static Color3F operator -(Color3F value)
       {
-         return new Color3(-value.Red, -value.Green, -value.Blue);
+         return new Color3F(-value.Red, -value.Green, -value.Blue);
       }
 
       /// <summary>
@@ -593,9 +593,9 @@ namespace Adamantium.Mathematics
       /// <param name="scale">The factor by which to scale the color.</param>
       /// <param name="value">The color to scale.</param>
       /// <returns>The scaled color.</returns>
-      public static Color3 operator *(float scale, Color3 value)
+      public static Color3F operator *(float scale, Color3F value)
       {
-         return new Color3(value.Red * scale, value.Green * scale, value.Blue * scale);
+         return new Color3F(value.Red * scale, value.Green * scale, value.Blue * scale);
       }
 
       /// <summary>
@@ -604,9 +604,9 @@ namespace Adamantium.Mathematics
       /// <param name="value">The factor by which to scale the color.</param>
       /// <param name="scale">The color to scale.</param>
       /// <returns>The scaled color.</returns>
-      public static Color3 operator *(Color3 value, float scale)
+      public static Color3F operator *(Color3F value, float scale)
       {
-         return new Color3(value.Red * scale, value.Green * scale, value.Blue * scale);
+         return new Color3F(value.Red * scale, value.Green * scale, value.Blue * scale);
       }
 
       /// <summary>
@@ -615,9 +615,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first color to modulate.</param>
       /// <param name="right">The second color to modulate.</param>
       /// <returns>The modulated color.</returns>
-      public static Color3 operator *(Color3 left, Color3 right)
+      public static Color3F operator *(Color3F left, Color3F right)
       {
-         return new Color3(left.Red * right.Red, left.Green * right.Green, left.Blue * right.Blue);
+         return new Color3F(left.Red * right.Red, left.Green * right.Green, left.Blue * right.Blue);
       }
 
       /// <summary>
@@ -627,7 +627,7 @@ namespace Adamantium.Mathematics
       /// <param name="right">The second value to compare.</param>
       /// <returns><c>true</c> if <paramref name="left"/> has the same value as <paramref name="right"/>; otherwise, <c>false</c>.</returns>
       [MethodImpl(MethodImplOptions.AggressiveInlining)]
-      public static bool operator ==(Color3 left, Color3 right)
+      public static bool operator ==(Color3F left, Color3F right)
       {
          return left.Equals(ref right);
       }
@@ -639,49 +639,49 @@ namespace Adamantium.Mathematics
       /// <param name="right">The second value to compare.</param>
       /// <returns><c>true</c> if <paramref name="left"/> has a different value than <paramref name="right"/>; otherwise, <c>false</c>.</returns>
       [MethodImpl(MethodImplOptions.AggressiveInlining)]
-      public static bool operator !=(Color3 left, Color3 right)
+      public static bool operator !=(Color3F left, Color3F right)
       {
          return !left.Equals(ref right);
       }
 
       /// <summary>
-      /// Performs an explicit conversion from <see cref="Color3"/> to <see cref="Color4"/>.
+      /// Performs an explicit conversion from <see cref="Color3F"/> to <see cref="Color4F"/>.
       /// </summary>
       /// <param name="value">The value.</param>
       /// <returns>The result of the conversion.</returns>
-      public static explicit operator Color4(Color3 value)
+      public static explicit operator Color4F(Color3F value)
       {
-         return new Color4(value.Red, value.Green, value.Blue, 1.0f);
+         return new Color4F(value.Red, value.Green, value.Blue, 1.0f);
       }
 
       /// <summary>
-      /// Performs an implicit conversion from <see cref="Color3"/> to <see cref="Vector3F"/>.
+      /// Performs an implicit conversion from <see cref="Color3F"/> to <see cref="Vector3F"/>.
       /// </summary>
       /// <param name="value">The value.</param>
       /// <returns>The result of the conversion.</returns>
-      public static implicit operator Vector3F(Color3 value)
+      public static implicit operator Vector3F(Color3F value)
       {
          return new Vector3F(value.Red, value.Green, value.Blue);
       }
 
       /// <summary>
-      /// Performs an implicit conversion from <see cref="Vector3F"/> to <see cref="Color3"/>.
+      /// Performs an implicit conversion from <see cref="Vector3F"/> to <see cref="Color3F"/>.
       /// </summary>
       /// <param name="value">The value.</param>
       /// <returns>The result of the conversion.</returns>
-      public static implicit operator Color3(Vector3F value)
+      public static implicit operator Color3F(Vector3F value)
       {
-         return new Color3(value.X, value.Y, value.Z);
+         return new Color3F(value.X, value.Y, value.Z);
       }
 
       /// <summary>
-      /// Performs an explicit conversion from <see cref="System.Int32"/> to <see cref="Color3"/>.
+      /// Performs an explicit conversion from <see cref="System.Int32"/> to <see cref="Color3F"/>.
       /// </summary>
       /// <param name="value">The value.</param>
       /// <returns>The result of the conversion.</returns>
-      public static explicit operator Color3(int value)
+      public static explicit operator Color3F(int value)
       {
-         return new Color3(value);
+         return new Color3F(value);
       }
 
       /// <summary>
@@ -757,27 +757,27 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
-      /// Determines whether the specified <see cref="Color3"/> is equal to this instance.
+      /// Determines whether the specified <see cref="Color3F"/> is equal to this instance.
       /// </summary>
-      /// <param name="other">The <see cref="Color3"/> to compare with this instance.</param>
+      /// <param name="other">The <see cref="Color3F"/> to compare with this instance.</param>
       /// <returns>
-      /// <c>true</c> if the specified <see cref="Color3"/> is equal to this instance; otherwise, <c>false</c>.
+      /// <c>true</c> if the specified <see cref="Color3F"/> is equal to this instance; otherwise, <c>false</c>.
       /// </returns>
       [MethodImpl(MethodImplOptions.AggressiveInlining)]
-      public bool Equals(ref Color3 other)
+      public bool Equals(ref Color3F other)
       {
          return Red == other.Red && Green == other.Green && Blue == other.Blue;
       }
 
       /// <summary>
-      /// Determines whether the specified <see cref="Color3"/> is equal to this instance.
+      /// Determines whether the specified <see cref="Color3F"/> is equal to this instance.
       /// </summary>
-      /// <param name="other">The <see cref="Color3"/> to compare with this instance.</param>
+      /// <param name="other">The <see cref="Color3F"/> to compare with this instance.</param>
       /// <returns>
-      /// <c>true</c> if the specified <see cref="Color3"/> is equal to this instance; otherwise, <c>false</c>.
+      /// <c>true</c> if the specified <see cref="Color3F"/> is equal to this instance; otherwise, <c>false</c>.
       /// </returns>
       [MethodImpl(MethodImplOptions.AggressiveInlining)]
-      public bool Equals(Color3 other)
+      public bool Equals(Color3F other)
       {
          return Equals(ref other);
       }
@@ -791,10 +791,10 @@ namespace Adamantium.Mathematics
       /// </returns>
       public override bool Equals(object value)
       {
-         if (!(value is Color3))
+         if (!(value is Color3F))
             return false;
 
-         var strongValue = (Color3)value;
+         var strongValue = (Color3F)value;
          return Equals(ref strongValue);
       }
 

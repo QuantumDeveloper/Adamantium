@@ -1,6 +1,10 @@
 ﻿using Adamantium.Engine.Graphics;
+using Adamantium.Engine.Graphics.Imaging.JPEG;
+using Adamantium.Engine.Graphics.Imaging.JPEG.Decoder;
+using Adamantium.Engine.Graphics.Imaging.JPEG.Encoder;
 using NUnit.Framework;
 using System.IO;
+using Image = Adamantium.Engine.Graphics.Image;
 
 namespace Adamantium.Engine.GraphicsTests
 {
@@ -47,8 +51,8 @@ namespace Adamantium.Engine.GraphicsTests
         [Test]
         public void IcoImageTest()
         {
-            //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\Icons\SharpGen.ico");
-            var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\Icons\ai.ico");
+            var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\Icons\SharpGen.ico");
+            //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\Icons\ai.ico");
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\Icons\SharpGen.ico");
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\Icons\NewIcon.ico");
 
@@ -60,6 +64,20 @@ namespace Adamantium.Engine.GraphicsTests
         [Test]
         public void JpegImageTest()
         {
+            using (var fs = new FileStream(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\1.jpg", FileMode.Open))
+            {
+                var r = (short)0.33;
+                JpegDecoder decoder = new JpegDecoder(fs);
+                var img1 = decoder.Decode();
+                using (var fs2 = new FileStream(@"converted.jpg", FileMode.OpenOrCreate))
+                {
+                    DecodedJpeg jpeg = new DecodedJpeg(img1.Image);
+                    JpegEncoder encoder = new JpegEncoder(img1, 100, fs2);
+                    encoder.Encode();
+                }
+
+            }
+
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\Icons\SharpGen.ico");
             var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\1.jpg");
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\Icons\SharpGen.ico");

@@ -244,9 +244,9 @@ namespace Adamantium.Mathematics
       /// Converts the color into a three component color.
       /// </summary>
       /// <returns>A three component color containing the red, green, and blue components of the color.</returns>
-      public Color3 ToColor3()
+      public Color3F ToColor3()
       {
-         return new Color3(R / 255.0f, G / 255.0f, B / 255.0f);
+         return new Color3F(R / 255.0f, G / 255.0f, B / 255.0f);
       }
 
       /// <summary>
@@ -270,7 +270,7 @@ namespace Adamantium.Mathematics
       /// <summary>
       /// Gets the brightness.
       /// </summary>
-      /// <returns>The Hue-Saturation-Brightness (HSB) saturation for this <see cref="Color"/></returns>
+      /// <returns>The Hue-Saturation-Brightness (HSB) saturation for this <see cref="ColorRGBA"/></returns>
       public float GetBrightness()
       {
          float r = (float)R / 255.0f;
@@ -293,7 +293,7 @@ namespace Adamantium.Mathematics
       /// <summary>
       /// Gets the hue.
       /// </summary>
-      /// <returns>The Hue-Saturation-Brightness (HSB) saturation for this <see cref="Color"/></returns>
+      /// <returns>The Hue-Saturation-Brightness (HSB) saturation for this <see cref="ColorRGBA"/></returns>
       public float GetHue()
       {
          if (R == G && G == B)
@@ -341,7 +341,7 @@ namespace Adamantium.Mathematics
       /// <summary>
       /// Gets the saturation.
       /// </summary>
-      /// <returns>The Hue-Saturation-Brightness (HSB) saturation for this <see cref="Color"/></returns>
+      /// <returns>The Hue-Saturation-Brightness (HSB) saturation for this <see cref="ColorRGBA"/></returns>
       public float GetSaturation()
       {
          float r = (float)R / 255.0f;
@@ -887,13 +887,13 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
-      /// Performs an explicit conversion from <see cref="ColorBGRA"/> to <see cref="Color3"/>.
+      /// Performs an explicit conversion from <see cref="ColorBGRA"/> to <see cref="Color3F"/>.
       /// </summary>
       /// <param name="value">The value.</param>
       /// <returns>The result of the conversion.</returns>
-      public static explicit operator Color3(ColorBGRA value)
+      public static explicit operator Color3F(ColorBGRA value)
       {
-         return new Color3(value.R, value.G, value.B);
+         return new Color3F(value.R, value.G, value.B);
       }
 
       /// <summary>
@@ -917,13 +917,13 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
-      /// Performs an explicit conversion from <see cref="ColorBGRA"/> to <see cref="Color4"/>.
+      /// Performs an explicit conversion from <see cref="ColorBGRA"/> to <see cref="Color4F"/>.
       /// </summary>
       /// <param name="value">The value.</param>
       /// <returns>The result of the conversion.</returns>
-      public static explicit operator Color4(ColorBGRA value)
+      public static explicit operator Color4F(ColorBGRA value)
       {
-         return new Color4(value.R / 255.0f, value.G / 255.0f, value.B / 255.0f, value.A / 255.0f);
+         return new Color4F(value.R / 255.0f, value.G / 255.0f, value.B / 255.0f, value.A / 255.0f);
       }
 
       /// <summary>
@@ -937,11 +937,11 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
-      /// Performs an explicit conversion from <see cref="Color3"/> to <see cref="ColorBGRA"/>.
+      /// Performs an explicit conversion from <see cref="Color3F"/> to <see cref="ColorBGRA"/>.
       /// </summary>
       /// <param name="value">The value.</param>
       /// <returns>The result of the conversion.</returns>
-      public static explicit operator ColorBGRA(Color3 value)
+      public static explicit operator ColorBGRA(Color3F value)
       {
          return new ColorBGRA(value.Red, value.Green, value.Blue, 1.0f);
       }
@@ -957,33 +957,33 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
-      /// Performs an explicit conversion from <see cref="Color4"/> to <see cref="ColorBGRA"/>.
+      /// Performs an explicit conversion from <see cref="Color4F"/> to <see cref="ColorBGRA"/>.
       /// </summary>
       /// <param name="value">The value.</param>
       /// <returns>The result of the conversion.</returns>
-      public static explicit operator ColorBGRA(Color4 value)
+      public static explicit operator ColorBGRA(Color4F value)
       {
          return new ColorBGRA(value.Red, value.Green, value.Blue, value.Alpha);
       }
 
       /// <summary>
-      /// Performs an implicit conversion from <see cref="Color"/> to <see cref="ColorBGRA"/>.
+      /// Performs an implicit conversion from <see cref="ColorRGBA"/> to <see cref="ColorBGRA"/>.
       /// </summary>
       /// <param name="value">The value.</param>
       /// <returns>The result of the conversion.</returns>
-      public static implicit operator ColorBGRA(Color value)
+      public static implicit operator ColorBGRA(ColorRGBA value)
       {
          return new ColorBGRA(value.R, value.G, value.B, value.A);
       }
 
       /// <summary>
-      /// Performs an implicit conversion from <see cref="ColorBGRA"/> to <see cref="Color"/>.
+      /// Performs an implicit conversion from <see cref="ColorBGRA"/> to <see cref="ColorRGBA"/>.
       /// </summary>
       /// <param name="value">The value.</param>
       /// <returns>The result of the conversion.</returns>
-      public static implicit operator Color(ColorBGRA value)
+      public static implicit operator ColorRGBA(ColorBGRA value)
       {
-         return new Color(value.R, value.G, value.B, value.A);
+         return new ColorRGBA(value.R, value.G, value.B, value.A);
       }
 
       /// <summary>
