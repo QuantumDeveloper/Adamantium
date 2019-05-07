@@ -22,8 +22,4 @@
     <ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Imaging\JPEG\" />
-  </ItemGroup>
-
 </Project>

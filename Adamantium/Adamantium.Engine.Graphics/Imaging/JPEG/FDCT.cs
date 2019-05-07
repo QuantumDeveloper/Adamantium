@@ -3,7 +3,7 @@ using Adamantium.Engine.Graphics.Imaging.JPEG.Decoder;
 
 namespace Adamantium.Engine.Graphics.Imaging.JPEG
 {
-    public partial class DCT
+    internal partial class DCT
     {
         public const int N = 8;
 

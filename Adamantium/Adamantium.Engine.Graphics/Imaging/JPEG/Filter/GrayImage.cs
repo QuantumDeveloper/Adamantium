@@ -1,6 +1,6 @@
 ﻿namespace Adamantium.Engine.Graphics.Imaging.JPEG.Filter
 {
-    public class GrayImage
+    internal class GrayImage
     {
         public float[] Scan0;
         private int _width;

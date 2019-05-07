@@ -8,18 +8,10 @@ using System.Text;
 
 namespace Adamantium.Engine.Graphics.Imaging.JPEG
 {
-    public class JpegHeader
+    internal class DecodedJpeg
     {
-        public byte Marker;
-        public byte[] Data;
-        internal bool IsJFIF = false;
-        public new string ToString { get { return Encoding.UTF8.GetString(Data, 0, Data.Length); } }
-    }
-
-    public class DecodedJpeg
-    {
-        private Image _image;
-        public Image Image { get { return _image; } }
+        private ComponentsBuffer _image;
+        public ComponentsBuffer Image { get { return _image; } }
 
         internal int[] BlockWidth;
         internal int[] BlockHeight;
@@ -40,7 +32,7 @@ namespace Adamantium.Engine.Graphics.Imaging.JPEG
 
         public IList<JpegHeader> MetaHeaders { get { return new ReadOnlyCollection<JpegHeader>(_metaHeaders); } }
 
-        public DecodedJpeg(Image image, IEnumerable<JpegHeader> metaHeaders)
+        public DecodedJpeg(ComponentsBuffer image, IEnumerable<JpegHeader> metaHeaders)
         {
             _image = image;
 
@@ -62,7 +54,7 @@ namespace Adamantium.Engine.Graphics.Imaging.JPEG
             Initialize();
         }
 
-        public DecodedJpeg(Image image)
+        public DecodedJpeg(ComponentsBuffer image)
             : this(image, null)
         {
             _metaHeaders = new List<JpegHeader>();

@@ -8,6 +8,7 @@ using System.Text;
 using System.IO;
 using System.Diagnostics;
 using Adamantium.Engine.Graphics.Imaging.JPEG.IO;
+using AdamantiumVulkan.Core;
 
 namespace Adamantium.Engine.Graphics.Imaging.JPEG.Decoder
 {
@@ -46,8 +47,6 @@ namespace Adamantium.Engine.Graphics.Imaging.JPEG.Decoder
         byte Xthumbnail, Ythumbnail;
         byte[] thumbnail;
         Image image;
-        int width;
-        int height;
 
         bool progressive = false;
 
@@ -142,7 +141,7 @@ namespace Adamantium.Engine.Graphics.Imaging.JPEG.Decoder
             return true;
         }
 
-        public DecodedJpeg Decode()
+        public Image Decode()
         {
             // The frames in this jpeg are loaded into a list. There is
             // usually just one frame except in heirarchial progression where
@@ -270,7 +269,7 @@ namespace Adamantium.Engine.Graphics.Imaging.JPEG.Decoder
 
                         // Skip the frame length.
                         jpegReader.ReadShort();
-                        // Bits percision, either 8 or 12.
+                        // Bits precision, either 8 or 12.
                         frame.SetPrecision(jpegReader.ReadByte());
                         // Scan lines (height) 
                         frame.ScanLines = jpegReader.ReadShort();
@@ -386,7 +385,6 @@ namespace Adamantium.Engine.Graphics.Imaging.JPEG.Decoder
 
                         Debug.WriteLine("Start of Scan (SOS)");
 
-
                         // SOS non-SOF Marker - Start Of Scan Marker, this is where the
                         // actual data is stored in a interlaced or non-interlaced with
                         // from 1-4 components of color data, if three components most
@@ -445,7 +443,6 @@ namespace Adamantium.Engine.Graphics.Imaging.JPEG.Decoder
 
                         break;
 
-
                     case JPEGMarker.DRI:
                         jpegReader.BaseStream.Seek(2, SeekOrigin.Current);
                         resetInterval = jpegReader.ReadShort();
@@ -453,7 +450,6 @@ namespace Adamantium.Engine.Graphics.Imaging.JPEG.Decoder
 
                     /// Defines the number of lines.  (Not usually present)
                     case JPEGMarker.DNL:
-
                         frame.ScanLines = jpegReader.ReadShort();
                         break;
 
@@ -470,11 +466,20 @@ namespace Adamantium.Engine.Graphics.Imaging.JPEG.Decoder
                             frame = orderedFrames.FirstOrDefault(); // Take the biggest frame and continue rasterization
                         }
 
+                        ImageDescription description = new ImageDescription();
+                        description.Width = frame.Width;
+                        description.Height = frame.Height;
+                        description.Depth = 1;
+                        description.Dimension = TextureDimension.Texture2D;
+                        description.ArraySize = 1;
+                        description.Format = frame.ComponentCount == 3 ? Format.R8G8B8A8_UNORM : Format.R8_UNORM;
+
+                        image = Image.New(description);
+
                         // Only one frame here
-                        byte[][,] raster = Image.CreateRaster(frame.Width, frame.Height, frame.ComponentCount);
+                        byte[][,] raster = ComponentsBuffer.CreateRaster(frame.Width, frame.Height, frame.ComponentCount);
 
-                        IList<JpegComponent> components = frame.Scan.Components;
-
+                        var components = frame.Scan.Components;
                         int totalSteps = components.Count * 3; // Three steps per loop
                         int stepsFinished = 0;
 
@@ -498,20 +503,22 @@ namespace Adamantium.Engine.Graphics.Imaging.JPEG.Decoder
                             UpdateProgress(++stepsFinished, totalSteps);
 
                             // Ensure garbage collection.
-                            comp = null; GC.Collect();
+                            comp = null;
                         }
 
+                        GC.Collect();
+                        ComponentsBuffer componentsBuffer = null;
                         // Grayscale Color Image (1 Component).
                         if (frame.ComponentCount == 1)
                         {
-                            ColorModel cm = new ColorModel() { colorspace = ColorSpace.Gray, Opaque = true };
-                            image = new Image(cm, raster);
+                            ColorModel cm = new ColorModel() { Colorspace = ColorSpace.Gray, Opaque = true };
+                            componentsBuffer = new ComponentsBuffer(cm, raster);
                         }
                         // YCbCr Color Image (3 Components).
                         else if (frame.ComponentCount == 3)
                         {
-                            ColorModel cm = new ColorModel() { colorspace = ColorSpace.YCbCr, Opaque = true };
-                            image = new Image(cm, raster);
+                            ColorModel cm = new ColorModel() { Colorspace = ColorSpace.YCbCr, Opaque = true };
+                            componentsBuffer = new ComponentsBuffer(cm, raster);
                         }
                         // Possibly CMYK or RGBA ?
                         else
@@ -523,11 +530,11 @@ namespace Adamantium.Engine.Graphics.Imaging.JPEG.Decoder
                         Func<double, double> conv = x =>
                             Units == UnitType.Inches ? x : x / 2.54;
 
-                        image.DensityX = conv(XDensity);
-                        image.DensityY = conv(YDensity);
+                        componentsBuffer.DensityX = conv(XDensity);
+                        componentsBuffer.DensityY = conv(YDensity);
 
-                        height = frame.Height;
-                        width = frame.Width;
+                        componentsBuffer.CopyPixels(image.DataPointer, frame.SizeInBytes);
+
                         break;
 
                     // Only SOF0 (baseline) and SOF2 (progressive) are supported by FJCore
@@ -564,9 +571,9 @@ namespace Adamantium.Engine.Graphics.Imaging.JPEG.Decoder
                 }
             }
 
-            DecodedJpeg result = new DecodedJpeg(image, headers);
+            //DecodedJpeg result = new DecodedJpeg(image, headers);
 
-            return result;
+            return image;
         }
 
         public IList<JpegHeader> ExtractHeaders()
@@ -731,6 +738,7 @@ namespace Adamantium.Engine.Graphics.Imaging.JPEG.Decoder
 
             return headers;
         }
+
         private JpegHeader ExtractHeader()
         {
             #region Extract the header

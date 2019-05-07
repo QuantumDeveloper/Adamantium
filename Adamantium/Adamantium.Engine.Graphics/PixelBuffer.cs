@@ -19,6 +19,8 @@
 // THE SOFTWARE.
 
 using Adamantium.Core;
+using Adamantium.Engine.Graphics.Imaging;
+using Adamantium.Engine.Graphics.Imaging.JPEG;
 using Adamantium.Mathematics;
 using AdamantiumVulkan.Core;
 using System;
@@ -367,13 +369,21 @@ namespace Adamantium.Engine.Graphics
             }
         }
 
-        public byte[][,] ToComponentsBuffer()
+        public byte[][,] GetComponents()
         {
             return GetComponentArrayFromBuffer();
         }
 
+        public ComponentsBuffer ToComponentsBuffer()
+        {
+            var raster = GetComponentArrayFromBuffer();
+            var colorModel = new ColorModel() { Colorspace = ColorSpace.RGB, Opaque = true };
+            return new ComponentsBuffer(colorModel, raster);
+        }
+
         private byte[][,] GetComponentArrayFromBuffer()
         {
+            var componentsArray = new byte[pixelSize][,];
             if (pixelSize == 1)
             {
                 var colors = GetPixels<byte>();
@@ -385,8 +395,7 @@ namespace Adamantium.Engine.Graphics
                         redChannel[i, k] = colors[i * Width + k];
                     }
                 }
-                var componentsArray = new byte[1][,] { redChannel };
-                return componentsArray;
+                componentsArray[0] = redChannel;
             }
             else if (pixelSize == 2)
             {
@@ -401,8 +410,8 @@ namespace Adamantium.Engine.Graphics
                         greenChannel[i, k] = colors[i * Width + k].G;
                     }
                 }
-                var componentsArray = new byte[2][,] { redChannel, greenChannel };
-                return componentsArray;
+                componentsArray[0] = redChannel;
+                componentsArray[1] = greenChannel;
             }
             else if (pixelSize == 3)
             {
@@ -410,17 +419,18 @@ namespace Adamantium.Engine.Graphics
                 var redChannel = new byte[Width, Height];
                 var greenChannel = new byte[Width, Height];
                 var blueChannel = new byte[Width, Height];
-                for (int i = 0; i < Height; ++i)
+                for (int i = 0; i < Width ; ++i)
                 {
-                    for (int k = 0; k < Width; ++k)
+                    for (int k = 0; k < Height; ++k)
                     {
                         redChannel[i, k] = colors[i * Width + k].R;
                         greenChannel[i, k] = colors[i * Width + k].G;
                         blueChannel[i, k] = colors[i * Width + k].G;
                     }
                 }
-                var componentsArray = new byte[3][,] { redChannel, greenChannel, blueChannel };
-                return componentsArray;
+                componentsArray[0] = redChannel;
+                componentsArray[1] = greenChannel;
+                componentsArray[2] = blueChannel;
             }
             else if (pixelSize == 4)
             {
@@ -439,10 +449,12 @@ namespace Adamantium.Engine.Graphics
                         alphaChannel[i, k] = colors[i * Width + k].A;
                     }
                 }
-                var componentsArray = new byte[4][,] { redChannel, greenChannel, blueChannel, alphaChannel };
-                return componentsArray;
+                componentsArray[0] = redChannel;
+                componentsArray[1] = greenChannel;
+                componentsArray[2] = blueChannel;
+                componentsArray[3] = alphaChannel;
             }
-            return null;
+            return componentsArray;
         }
 
         public void FlipBuffer(FlipBufferOptions flipOtions)

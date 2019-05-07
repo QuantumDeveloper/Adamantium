@@ -22,6 +22,8 @@ namespace Adamantium.Engine.Graphics.Imaging.JPEG.Decoder
 
         public JpegScan Scan = new JpegScan();
 
+        public int SizeInBytes => Width * Height * ComponentCount;
+
         public Action<long> ProgressUpdateMethod = null;
 
         public void AddComponent(byte componentID, byte sampleHFactor, byte sampleVFactor,
