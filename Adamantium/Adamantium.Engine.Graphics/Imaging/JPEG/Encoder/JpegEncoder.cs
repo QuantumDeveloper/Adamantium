@@ -44,7 +44,7 @@ namespace Adamantium.Engine.Graphics.Imaging.JPEG.Encoder
         public event EventHandler<JpegEncodeProgressChangedArgs> EncodeProgressChanged;
 
         public JpegEncoder(Image image, int quality, Stream outStream)
-            : this(new DecodedJpeg(image), quality, outStream) { /* see overload */ }
+            : this(image.PixelBuffer[0], quality, outStream) { /* see overload */ }
 
         /// <summary>
         /// Encodes a JPEG, preserving the colorspace and metadata of the input JPEG.
@@ -52,9 +52,9 @@ namespace Adamantium.Engine.Graphics.Imaging.JPEG.Encoder
         /// <param name="decodedJpeg">Decoded Jpeg to start with.</param>
         /// <param name="quality">Quality of the image from 0 to 100.  (Compression from max to min.)</param>
         /// <param name="outStream">Stream where the result will be placed.</param>
-        public JpegEncoder(DecodedJpeg decodedJpeg, int quality, Stream outStream)
+        public JpegEncoder(PixelBuffer decodedJpeg, int quality, Stream outStream)
         {
-            _input = decodedJpeg;
+            _input = new DecodedJpeg(decodedJpeg.ToComponentsBuffer());
 
             /* This encoder requires YCbCr */
             _input.Image.ChangeColorSpace(ColorSpace.YCbCr);
@@ -77,8 +77,7 @@ namespace Adamantium.Engine.Graphics.Imaging.JPEG.Encoder
             WriteMarker(new byte[] { 0xFF, 0xD9 }); // End of Image
 
             _progress.EncodeProgress = 1.0;
-            if (EncodeProgressChanged != null)
-                EncodeProgressChanged(this, _progress);
+            EncodeProgressChanged?.Invoke(this, _progress);
 
             _outStream.Flush();
         }
@@ -314,7 +313,7 @@ namespace Adamantium.Engine.Graphics.Imaging.JPEG.Encoder
             {
                 // Keep track of progress
                 _progress.EncodeProgress = (double)r / MinBlockHeight;
-                if (EncodeProgressChanged != null) EncodeProgressChanged(this, _progress);
+                EncodeProgressChanged?.Invoke(this, _progress);
 
                 for (c = 0; c < MinBlockWidth; c++)
                 {
@@ -335,7 +334,7 @@ namespace Adamantium.Engine.Graphics.Imaging.JPEG.Encoder
                                 yblockoffset = i * 8;
                                 for (a = 0; a < 8; a++)
                                 {
-                                    // set Y value.  check bounds
+                                    // set Y value. Check bounds
                                     int y = ypos + yblockoffset + a; if (y >= _height) break;
 
                                     for (b = 0; b < 8; b++)

@@ -71,7 +71,6 @@ namespace Adamantium.Engine.GraphicsTests
                 var img1 = decoder.Decode();
                 using (var fs2 = new FileStream(@"converted.jpg", FileMode.OpenOrCreate))
                 {
-                    DecodedJpeg jpeg = new DecodedJpeg(img1.Image);
                     JpegEncoder encoder = new JpegEncoder(img1, 100, fs2);
                     encoder.Encode();
                 }

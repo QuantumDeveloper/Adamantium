@@ -17,7 +17,7 @@ namespace Adamantium.Engine.Graphics.Imaging.JPEG
     /// <summary>
     /// Implements the Discrete Cosine Transform with dynamic CIL
     /// </summary>
-    public partial class DCT
+    internal partial class DCT
     {
         private float[] _temp = new float[64];
 

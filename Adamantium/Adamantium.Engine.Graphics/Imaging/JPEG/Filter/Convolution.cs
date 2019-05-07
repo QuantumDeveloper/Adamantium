@@ -5,7 +5,7 @@ using System;
 
 namespace Adamantium.Engine.Graphics.Imaging.JPEG.Filter
 {
-    public class Convolution
+    internal class Convolution
     {
 
         public static readonly Convolution Instance = new Convolution();
