@@ -311,7 +311,7 @@ namespace Adamantium.Engine.Graphics
 
             var pixelBuffer = pixelBuffers[0];
 
-            uint offsetData = (uint)(Marshal.SizeOf<BitmapFileHeader>() + Marshal.SizeOf<BitmapInfoHeader>() + Marshal.SizeOf<BitmapColorHeader>());
+            uint offsetData = (uint)(Marshal.SizeOf<BitmapFileHeader>() + Marshal.SizeOf<BitmapInfoHeader>()); //+ Marshal.SizeOf<BitmapColorHeader>());
             uint fileSize = offsetData;
 
             if (pixelBuffer.RowStride % 4 == 0)
@@ -337,6 +337,9 @@ namespace Adamantium.Engine.Graphics
             infoHeader.planes = 1;
             infoHeader.size = (uint)Marshal.SizeOf<BitmapInfoHeader>();
 
+            var colorHeader = new BitmapColorHeader();
+            
+
             var buffer = new byte[fileSize];
             IntPtr fileHeaderMemory = Utilities.AllocateMemory(Marshal.SizeOf<BitmapFileHeader>(), 2);
             Marshal.StructureToPtr(fileHeader, fileHeaderMemory, true);
@@ -349,7 +352,7 @@ namespace Adamantium.Engine.Graphics
             IntPtr colorHeaderMemory = Utilities.AllocateMemory(Marshal.SizeOf<BitmapColorHeader>());
             Marshal.StructureToPtr(infoHeader, colorHeaderMemory, true);
             var bufferOffset = Marshal.SizeOf<BitmapFileHeader>() + Marshal.SizeOf<BitmapInfoHeader>();
-            Utilities.Read(colorHeaderMemory, buffer, bufferOffset, Marshal.SizeOf<BitmapInfoHeader>());
+            //Utilities.Read(colorHeaderMemory, buffer, bufferOffset, Marshal.SizeOf<BitmapInfoHeader>());
 
             pixelBuffer.FlipBuffer(FlipBufferOptions.FlipVertically);
             if (pixelBuffer.Format.SizeOfInBytes() == 3)

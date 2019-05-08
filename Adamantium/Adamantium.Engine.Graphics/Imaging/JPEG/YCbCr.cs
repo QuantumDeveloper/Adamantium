@@ -5,6 +5,8 @@ namespace Adamantium.Engine.Graphics.Imaging.JPEG
 {
     internal class YCbCr
     {
+        // Not possible to convert without loss of colors YCbCr->RGB->YCbCr.
+        // For details see https://stackoverflow.com/questions/30081784/jpeg-ycrcb-rgb-conversion-precision
 
         public static void toRGB(ref byte c1, ref byte c2, ref byte c3)
         {
@@ -19,6 +21,7 @@ namespace Adamantium.Engine.Graphics.Imaging.JPEG
             c1 = dR > 255 ? (byte)255 : dR < 0 ? (byte)0 : (byte)dR;
             c2 = dG > 255 ? (byte)255 : dG < 0 ? (byte)0 : (byte)dG;
             c3 = dB > 255 ? (byte)255 : dB < 0 ? (byte)0 : (byte)dB;
+
         }
 
         public static void fromRGB(ref byte c1, ref byte c2, ref byte c3)
@@ -28,8 +31,8 @@ namespace Adamantium.Engine.Graphics.Imaging.JPEG
             double dB = c3;
 
             c1 = (byte)(0.299 * dR + 0.587 * dG + 0.114 * dB);
-            c2 = (byte)(-0.16874 * dR - 0.33126 * dG + 0.5 * dB + 128);
-            c3 = (byte)(0.5 * dR - 0.41869 * dG - 0.08131 * dB + 128);
+            c2 = (byte)(128 + (byte)(-0.168736 * dR - 0.331264 * dG + 0.5 * dB));
+            c3 = (byte)(128 + (byte)(0.5 * dR - 0.418688 * dG - 0.081312 * dB));
         }
 
         ///* RGB to YCbCr range 0-255 */

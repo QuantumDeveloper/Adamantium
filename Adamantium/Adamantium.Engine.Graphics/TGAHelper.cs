@@ -197,6 +197,7 @@ namespace Adamantium.Engine.Graphics
                     break;
                 case Format.B8G8R8_UNORM:
                 case Format.B8G8R8_SRGB:
+                case Format.R8G8B8_UNORM:
                     header.ImageType = (byte)TGAImageType.TrueColor;
                     header.BitsPerPixel = 24;
                     header.Descriptor = (byte)TGADescriptorFlags.InvertY;
