@@ -64,21 +64,13 @@ namespace Adamantium.Engine.GraphicsTests
         [Test]
         public void JpegImageTest()
         {
-            using (var fs = new FileStream(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\1.jpg", FileMode.Open))
-            {
-                var r = (short)0.33;
-                JpegDecoder decoder = new JpegDecoder(fs);
-                var img1 = decoder.Decode();
-                using (var fs2 = new FileStream(@"converted.jpg", FileMode.OpenOrCreate))
-                {
-                    JpegEncoder encoder = new JpegEncoder(img1, 100, fs2);
-                    encoder.Encode();
-                }
-
-            }
+            var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\luxfon.jpg");
+            //img?.Save("1.bmp", ImageFileType.Bmp);
+            img?.Save("1.tga", ImageFileType.Tga);
+            img?.Save("1.jpg", ImageFileType.Jpg);
 
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\Icons\SharpGen.ico");
-            var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\1.jpg");
+            //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\1.jpg");
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\Icons\SharpGen.ico");
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\Icons\NewIcon.ico");
 

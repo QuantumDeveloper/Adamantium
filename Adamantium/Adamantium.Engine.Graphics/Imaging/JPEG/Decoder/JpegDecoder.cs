@@ -472,7 +472,8 @@ namespace Adamantium.Engine.Graphics.Imaging.JPEG.Decoder
                         description.Depth = 1;
                         description.Dimension = TextureDimension.Texture2D;
                         description.ArraySize = 1;
-                        description.Format = frame.ComponentCount == 3 ? Format.R8G8B8A8_UNORM : Format.R8_UNORM;
+                        description.MipLevels = 1;
+                        description.Format = frame.ComponentCount == 3 ? Format.R8G8B8_UNORM : Format.R8_UNORM;
 
                         image = Image.New(description);
 
@@ -532,6 +533,8 @@ namespace Adamantium.Engine.Graphics.Imaging.JPEG.Decoder
 
                         componentsBuffer.DensityX = conv(XDensity);
                         componentsBuffer.DensityY = conv(YDensity);
+
+                        componentsBuffer.ChangeColorSpace(ColorSpace.RGB);
 
                         componentsBuffer.CopyPixels(image.DataPointer, frame.SizeInBytes);
 

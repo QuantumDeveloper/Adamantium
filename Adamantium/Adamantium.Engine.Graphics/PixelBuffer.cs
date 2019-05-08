@@ -25,6 +25,7 @@ using Adamantium.Mathematics;
 using AdamantiumVulkan.Core;
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 
 namespace Adamantium.Engine.Graphics
 {
@@ -384,6 +385,7 @@ namespace Adamantium.Engine.Graphics
         private byte[][,] GetComponentArrayFromBuffer()
         {
             var componentsArray = new byte[pixelSize][,];
+            int counter = 0;
             if (pixelSize == 1)
             {
                 var colors = GetPixels<byte>();
@@ -392,7 +394,8 @@ namespace Adamantium.Engine.Graphics
                 {
                     for (int k = 0; k < Width; ++k)
                     {
-                        redChannel[i, k] = colors[i * Width + k];
+                        redChannel[i, k] = colors[counter];
+                        counter++;
                     }
                 }
                 componentsArray[0] = redChannel;
@@ -406,8 +409,9 @@ namespace Adamantium.Engine.Graphics
                 {
                     for (int k = 0; k < Width; ++k)
                     {
-                        redChannel[i, k] = colors[i * Width + k].R;
-                        greenChannel[i, k] = colors[i * Width + k].G;
+                        redChannel[i, k] = colors[counter].R;
+                        greenChannel[i, k] = colors[counter].G;
+                        counter++;
                     }
                 }
                 componentsArray[0] = redChannel;
@@ -419,13 +423,14 @@ namespace Adamantium.Engine.Graphics
                 var redChannel = new byte[Width, Height];
                 var greenChannel = new byte[Width, Height];
                 var blueChannel = new byte[Width, Height];
-                for (int i = 0; i < Width ; ++i)
+                for (int i = 0; i < Height; ++i)
                 {
-                    for (int k = 0; k < Height; ++k)
+                    for (int k = 0; k < Width; ++k)
                     {
-                        redChannel[i, k] = colors[i * Width + k].R;
-                        greenChannel[i, k] = colors[i * Width + k].G;
-                        blueChannel[i, k] = colors[i * Width + k].G;
+                        redChannel[k, i] = colors[counter].R;
+                        greenChannel[k, i] = colors[counter].G;
+                        blueChannel[k, i] = colors[counter].B;
+                        counter++;
                     }
                 }
                 componentsArray[0] = redChannel;
@@ -443,10 +448,11 @@ namespace Adamantium.Engine.Graphics
                 {
                     for (int k = 0; k < Width; ++k)
                     {
-                        redChannel[i, k] = colors[i * Width + k].R;
-                        greenChannel[i, k] = colors[i * Width + k].G;
-                        blueChannel[i, k] = colors[i * Width + k].G;
-                        alphaChannel[i, k] = colors[i * Width + k].A;
+                        redChannel[k, i] = colors[counter].R;
+                        greenChannel[k, i] = colors[counter].G;
+                        blueChannel[k, i] = colors[counter].B;
+                        alphaChannel[k, i] = colors[counter].A;
+                        counter++;
                     }
                 }
                 componentsArray[0] = redChannel;

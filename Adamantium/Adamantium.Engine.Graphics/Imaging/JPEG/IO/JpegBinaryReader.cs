@@ -1,17 +1,10 @@
 ﻿/// Copyright (c) 2008 Jeffrey Powers for Fluxcapacity Open Source.
 /// Under the MIT License, details: License.txt.
 
-using System;
 using System.IO;
 
 namespace Adamantium.Engine.Graphics.Imaging.JPEG.IO
 {
-    internal class JPEGMarkerFoundException : Exception
-    {
-        public JPEGMarkerFoundException(byte marker) { Marker = marker; }
-        public byte Marker;
-    }
-
     internal class JPEGBinaryReader : BinaryReader
     {
         public int eob_run = 0;

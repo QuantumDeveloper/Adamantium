@@ -109,17 +109,18 @@ namespace Adamantium.Engine.Graphics.Imaging
             return this;
         }
 
-        public unsafe void CopyPixels(IntPtr dataPointer, int rowStride, int sizeInBytes)
+        public unsafe void CopyPixels(IntPtr dataPointer, int sizeInBytes)
         {
             var colorBuffer = new byte[Width * Height * ComponentCount];
-
+            int counter = 0;
             for (int i = 0; i< Height; ++i)
             {
-                for (int j = 0; j< Width; ++j)
+                for (int j = 0; j < Width; ++j)
                 {
-                    for (int k = 0; k < colorBuffer.Length; ++k)
+                    for (int k = 0; k < Raster.Length; ++k)
                     {
-                        colorBuffer[i * Width + j + k] = Raster[k][j, i];
+                        colorBuffer[counter] = Raster[k][j, i];
+                        counter++;
                     }
                 }
             }

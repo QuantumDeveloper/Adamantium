@@ -35,7 +35,7 @@ namespace Adamantium.Engine.Graphics.Imaging.JPEG.Filter
             _newHeight = newHeight;
             _newWidth = newWidth;
             _color = !(imageData.Length == 1);
-            _destinationData = Image.CreateRaster(newWidth, newHeight, imageData.Length);
+            _destinationData = ComponentsBuffer.CreateRaster(newWidth, newHeight, imageData.Length);
             _sourceData = imageData;
 
             ApplyFilter();
