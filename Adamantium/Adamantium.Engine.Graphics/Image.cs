@@ -621,6 +621,30 @@ namespace Adamantium.Engine.Graphics
             Save(pixelBuffers, this.pixelBuffers.Length, Description, imageStream, fileType);
         }
 
+        public void ApplyPixelBuffer(PixelBuffer pixelBuffer, int index, bool freeBuffer)
+        {
+            var destinationBuffer = PixelBuffer[index];
+            if (destinationBuffer == null)
+            {
+                throw new ArgumentOutOfRangeException($"Parameter index is outside pixel array bounds. Maximum numbers of elemnts in array: {PixelBuffer.Count}");
+            }
+
+            if (destinationBuffer.BufferStride != pixelBuffer.BufferStride)
+            {
+                throw new ArgumentOutOfRangeException($"Source pixel buffer stride is not the same as destination buffer stride. Source is {pixelBuffer.BufferStride}, destination - is {destinationBuffer.BufferStride}. Buffer size shuld be the same");
+            }
+
+            Utilities.CopyMemory(destinationBuffer.DataPointer, pixelBuffer.DataPointer, pixelBuffer.BufferStride);
+
+            destinationBuffer.Format = pixelBuffer.Format;
+            destinationBuffer.Width
+
+            if (freeBuffer)
+            {
+                Utilities.FreeMemory(pixelBuffer.DataPointer);
+            }
+        }
+
 
         /// <summary>
         /// Loads an image from the specified pointer.

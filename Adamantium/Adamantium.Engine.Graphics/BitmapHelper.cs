@@ -215,7 +215,7 @@ namespace Adamantium.Engine.Graphics
             var ptr = image.PixelBuffer[0].DataPointer;
             Utilities.CopyMemory(ptr, bufferHandle.AddrOfPinnedObject(), buffer.Length);
             bufferHandle.Free();
-            image.PixelBuffer[0].FlipBuffer(FlipBufferOptions.FlipVertically);
+            image.PixelBuffer[0] = PixelBuffer.FlipBuffer(image.PixelBuffer[0], FlipBufferOptions.FlipVertically);
 
             return image;
         }
