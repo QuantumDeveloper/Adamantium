@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using Adamantium.Core;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Content;
+using Adamantium.Engine.Graphics.Imaging.GIF;
 using AdamantiumVulkan.Core;
 
 namespace Adamantium.Engine.Graphics
@@ -637,7 +638,8 @@ namespace Adamantium.Engine.Graphics
             Utilities.CopyMemory(destinationBuffer.DataPointer, pixelBuffer.DataPointer, pixelBuffer.BufferStride);
 
             destinationBuffer.Format = pixelBuffer.Format;
-            destinationBuffer.Width
+            destinationBuffer.Width = pixelBuffer.Width;
+            destinationBuffer.Height = pixelBuffer.Height;
 
             if (freeBuffer)
             {
@@ -695,7 +697,7 @@ namespace Adamantium.Engine.Graphics
         {
             Register(ImageFileType.Dds, DDSHelper.LoadFromDDSMemory, DDSHelper.SaveToDDSStream);
             Register(ImageFileType.Ico, ICOHelper.LoadFromICOMemory, ICOHelper.SaveToICOStream);
-            //Register(ImageFileType.Gif, WICHelper.LoadFromWICMemory, WICHelper.SaveGifToWICMemory);
+            Register(ImageFileType.Gif, GIFHelper.LoadFromGifMemory, GIFHelper.SaveToGIFStream);
             //Register(ImageFileType.Tiff, WICHelper.LoadFromWICMemory, WICHelper.SaveTiffToWICMemory);
             Register(ImageFileType.Bmp, BitmapHelper.LoadFromBitmapMemory, BitmapHelper.SaveToBitmapMemory);
             Register(ImageFileType.Jpg, JPEGHelper.LoadFromJpegMemory, JPEGHelper.SaveToJpegMemory);

@@ -65,7 +65,7 @@ namespace Adamantium.Engine.GraphicsTests
         public void JpegImageTest()
         {
             var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\luxfon.jpg");
-            //img?.Save("1.bmp", ImageFileType.Bmp);
+            img?.Save("1.bmp", ImageFileType.Bmp);
             img?.Save("1.tga", ImageFileType.Tga);
             img?.Save("1.jpg", ImageFileType.Jpg);
 
@@ -76,6 +76,18 @@ namespace Adamantium.Engine.GraphicsTests
 
             //img.Save(@"RestoredBitmap.bmp", ImageFileType.Bmp);
             //img.Save(@"RestoredBitmap.tga", ImageFileType.Tga);
+            img?.Dispose();
+        }
+
+        [Test]
+        public void GIFImageTest()
+        {
+            var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\Rotating_earth.gif");
+            //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\225px-GIF_-_bubble_animation.gif");
+            //img?.Save("1.bmp", ImageFileType.Bmp);
+            //img?.Save("1.tga", ImageFileType.Tga);
+            //img?.Save("1.jpg", ImageFileType.Jpg);
+
             img?.Dispose();
         }
     }
