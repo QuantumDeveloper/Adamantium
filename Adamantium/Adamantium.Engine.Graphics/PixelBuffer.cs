@@ -34,19 +34,7 @@ namespace Adamantium.Engine.Graphics
     /// </summary>
     public sealed class PixelBuffer
     {
-        private readonly int width;
-
-        private readonly int height;
-
         private Format format;
-
-        private readonly int rowStride;
-
-        private readonly int bufferStride;
-
-        private readonly IntPtr dataPointer;
-
-        private readonly int pixelSize;
 
         /// <summary>
         /// True when RowStride == sizeof(pixelformat) * width
@@ -67,27 +55,27 @@ namespace Adamantium.Engine.Graphics
             if (dataPointer == IntPtr.Zero)
                 throw new ArgumentException("Pointer cannot be equal to IntPtr.Zero", nameof(dataPointer));
 
-            this.width = width;
-            this.height = height;
+            Width = width;
+            Height = height;
             this.format = format;
-            this.rowStride = rowStride;
-            this.bufferStride = bufferStride;
-            this.dataPointer = dataPointer;
-            pixelSize = format.SizeOfInBytes();
-            isStrictRowStride = (pixelSize * width) == rowStride;
+            RowStride = rowStride;
+            BufferStride = bufferStride;
+            DataPointer = dataPointer;
+            PixelSize = format.SizeOfInBytes();
+            isStrictRowStride = (PixelSize * width) == rowStride;
         }
 
         /// <summary>
         /// Gets the width.
         /// </summary>
         /// <value>The width.</value>
-        public int Width => width;
+        public int Width { get; internal set; }
 
         /// <summary>
         /// Gets the height.
         /// </summary>
         /// <value>The height.</value>
-        public int Height => height;
+        public int Height { get; internal set; }
 
         /// <summary>
         /// Gets the format (this value can be changed)
@@ -114,25 +102,25 @@ namespace Adamantium.Engine.Graphics
         /// Gets the pixel size in bytes.
         /// </summary>
         /// <value>The pixel size in bytes.</value>
-        public int PixelSize => pixelSize;
+        public int PixelSize { get; private set; }
 
         /// <summary>
         /// Gets the row stride in number of bytes.
         /// </summary>
         /// <value>The row stride in number of bytes.</value>
-        public int RowStride => rowStride;
+        public int RowStride { get; private set; }
 
         /// <summary>
         /// Gets the total size in bytes of this pixel buffer.
         /// </summary>
         /// <value>The size in bytes of the pixel buffer.</value>
-        public int BufferStride => bufferStride;
+        public int BufferStride { get; private set; }
 
         /// <summary>
         /// Gets the pointer to the pixel buffer.
         /// </summary>
         /// <value>The pointer to the pixel buffer.</value>
-        public IntPtr DataPointer => dataPointer;
+        public IntPtr DataPointer { get; private set; }
 
         /// <summary>
         /// Copies this pixel buffer to a destination pixel buffer.
@@ -197,8 +185,8 @@ namespace Adamantium.Engine.Graphics
         {
             var description = new ImageDescription()
             {
-                Width = this.width,
-                Height = this.height,
+                Width = Width,
+                Height = Height,
                 Depth = 1,
                 ArraySize = 1,
                 Dimension = TextureDimension.Texture2D,
@@ -252,7 +240,7 @@ namespace Adamantium.Engine.Graphics
         public T[] GetPixels<T>(int yOffset = 0) where T : struct
         {
             var sizeOfOutputPixel = Utilities.SizeOf<T>();
-            var totalSize = Width * Height * pixelSize;
+            var totalSize = Width * Height * PixelSize;
             if ((totalSize % sizeOfOutputPixel) != 0)
                 throw new ArgumentException($"Invalid sizeof(T), not a multiple of current size [{totalSize}]in bytes ");
 
@@ -293,7 +281,7 @@ namespace Adamantium.Engine.Graphics
         /// </remarks>
         public unsafe void GetPixels<T>(T[] pixels, int yOffset, int pixelIndex, int pixelCount) where T : struct
         {
-            var pixelPointer = (byte*)this.DataPointer + yOffset * rowStride;
+            var pixelPointer = (byte*)this.DataPointer + yOffset * RowStride;
             if (isStrictRowStride)
             {
                 Utilities.Read(new IntPtr(pixelPointer), pixels, 0, pixelCount);
@@ -306,7 +294,7 @@ namespace Adamantium.Engine.Graphics
                 for (int i = 0; i < sizePerWidth; i++)
                 {
                     Utilities.Read(new IntPtr(pixelPointer), pixels, pixelIndex, Width);
-                    pixelPointer += rowStride;
+                    pixelPointer += RowStride;
                     pixelIndex += Width;
                 }
                 if (remainingPixels > 0)
@@ -347,7 +335,7 @@ namespace Adamantium.Engine.Graphics
         /// </remarks>
         public unsafe void SetPixels<T>(T[] sourcePixels, int yOffset, int pixelIndex, int pixelCount) where T : struct
         {
-            var pixelPointer = (byte*)DataPointer + yOffset * rowStride;
+            var pixelPointer = (byte*)DataPointer + yOffset * RowStride;
             if (isStrictRowStride)
             {
                 Utilities.Write(new IntPtr(pixelPointer), sourcePixels, 0, pixelCount);
@@ -360,7 +348,7 @@ namespace Adamantium.Engine.Graphics
                 for (int i = 0; i < sizePerWidth; i++)
                 {
                     Utilities.Write(new IntPtr(pixelPointer), sourcePixels, pixelIndex, Width);
-                    pixelPointer += rowStride;
+                    pixelPointer += RowStride;
                     pixelIndex += Width;
                 }
                 if (remainingPixels > 0)
@@ -384,9 +372,9 @@ namespace Adamantium.Engine.Graphics
 
         private byte[][,] GetComponentArrayFromBuffer()
         {
-            var componentsArray = new byte[pixelSize][,];
+            var componentsArray = new byte[PixelSize][,];
             int counter = 0;
-            if (pixelSize == 1)
+            if (PixelSize == 1)
             {
                 var colors = GetPixels<byte>();
                 var redChannel = new byte[Width, Height];
@@ -400,7 +388,7 @@ namespace Adamantium.Engine.Graphics
                 }
                 componentsArray[0] = redChannel;
             }
-            else if (pixelSize == 2)
+            else if (PixelSize == 2)
             {
                 var colors = GetPixels<ColorRG>();
                 var redChannel = new byte[Width, Height];
@@ -417,7 +405,7 @@ namespace Adamantium.Engine.Graphics
                 componentsArray[0] = redChannel;
                 componentsArray[1] = greenChannel;
             }
-            else if (pixelSize == 3)
+            else if (PixelSize == 3)
             {
                 var colors = GetPixels<ColorRGB>();
                 var redChannel = new byte[Width, Height];
@@ -437,7 +425,7 @@ namespace Adamantium.Engine.Graphics
                 componentsArray[1] = greenChannel;
                 componentsArray[2] = blueChannel;
             }
-            else if (pixelSize == 4)
+            else if (PixelSize == 4)
             {
                 var colors = GetPixels<ColorRGBA>();
                 var redChannel = new byte[Width, Height];

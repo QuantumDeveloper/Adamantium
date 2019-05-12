@@ -139,7 +139,6 @@ namespace Adamantium.Engine.Graphics
         {
             var originalFormat = description.Format;
             var realFormatSize = FormatHelper.SizeOfInBytes(description.Format);
-            description.Format = Format.R8G8B8A8_UNORM;
             var sizeinBytes = FormatHelper.SizeOfInBytes(description.Format);
             var bufferSize = description.Width * description.Height * sizeinBytes;
             byte[] buffer = new byte[bufferSize];
@@ -215,7 +214,8 @@ namespace Adamantium.Engine.Graphics
             var ptr = image.PixelBuffer[0].DataPointer;
             Utilities.CopyMemory(ptr, bufferHandle.AddrOfPinnedObject(), buffer.Length);
             bufferHandle.Free();
-            image.PixelBuffer[0] = PixelBuffer.FlipBuffer(image.PixelBuffer[0], FlipBufferOptions.FlipVertically);
+            var px = PixelBuffer.FlipBuffer(image.PixelBuffer[0], FlipBufferOptions.FlipVertically);
+            image.ApplyPixelBuffer(px, 0, true); 
 
             return image;
         }
@@ -354,34 +354,34 @@ namespace Adamantium.Engine.Graphics
             var bufferOffset = Marshal.SizeOf<BitmapFileHeader>() + Marshal.SizeOf<BitmapInfoHeader>();
             //Utilities.Read(colorHeaderMemory, buffer, bufferOffset, Marshal.SizeOf<BitmapInfoHeader>());
 
-            pixelBuffer.FlipBuffer(FlipBufferOptions.FlipVertically);
-            if (pixelBuffer.Format.SizeOfInBytes() == 3)
+            var px = PixelBuffer.FlipBuffer(pixelBuffer, FlipBufferOptions.FlipVertically);
+            if (px.Format.SizeOfInBytes() == 3)
             {
-                var colors = pixelBuffer.GetPixels<ColorRGB>();
+                var colors = px.GetPixels<ColorRGB>();
                 for (int i = 0; i < colors.Length; ++i)
                 {
                     Utilities.Swap(ref colors[i].R, ref colors[i].B);
                 }
-                pixelBuffer.SetPixels<ColorRGB>(colors);
+                px.SetPixels<ColorRGB>(colors);
             }
-            else if (pixelBuffer.Format.SizeOfInBytes() == 4)
+            else if (px.Format.SizeOfInBytes() == 4)
             {
-                var colors = pixelBuffer.GetPixels<ColorRGBA>();
+                var colors = px.GetPixels<ColorRGBA>();
                 for (int i = 0; i < colors.Length; ++i)
                 {
                     Utilities.Swap(ref colors[i].R, ref colors[i].B);
                 }
-                pixelBuffer.SetPixels<ColorRGBA>(colors);
+                px.SetPixels<ColorRGBA>(colors);
             }
 
 
             imageStream.Write(buffer, 0, (int)offsetData);
             bufferOffset = (int)offsetData;
-            Utilities.Read(pixelBuffer.DataPointer, buffer, bufferOffset, pixelBuffer.BufferStride);
+            Utilities.Read(px.DataPointer, buffer, bufferOffset, px.BufferStride);
 
-            if (pixelBuffer.RowStride % 4 == 0)
+            if (px.RowStride % 4 == 0)
             {
-                imageStream.Write(buffer, bufferOffset, pixelBuffer.BufferStride);
+                imageStream.Write(buffer, bufferOffset, px.BufferStride);
             }
             else
             {
