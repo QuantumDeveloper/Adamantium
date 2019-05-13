@@ -32,7 +32,7 @@ namespace Adamantium.Engine.Graphics
     /// <summary>
     /// An unmanaged buffer of pixels.
     /// </summary>
-    public sealed class PixelBuffer
+    public sealed partial class PixelBuffer
     {
         private Format format;
 
@@ -360,19 +360,31 @@ namespace Adamantium.Engine.Graphics
 
         public byte[][,] GetComponents()
         {
-            return GetComponentArrayFromBuffer();
+            return GetComponentArrayFromBuffer(ComponentBufferType.Jpg);
         }
 
-        public ComponentsBuffer ToComponentsBuffer()
+        public ComponentsBuffer ToComponentsBuffer(ComponentBufferType bufferType)
         {
-            var raster = GetComponentArrayFromBuffer();
-            var colorModel = new ColorModel() { Colorspace = ColorSpace.RGB, Opaque = true };
-            return new ComponentsBuffer(colorModel, raster);
+            if (bufferType == ComponentBufferType.Jpg)
+            {
+                var raster = GetComponentArrayFromBuffer(bufferType);
+                var colorModel = new ColorModel() { Colorspace = ColorSpace.RGB, Opaque = true };
+                return new ComponentsBuffer(colorModel, raster);
+            }
+            return null;
         }
 
-        private byte[][,] GetComponentArrayFromBuffer()
+        private byte[][,] GetComponentArrayFromBuffer(ComponentBufferType bufferType)
         {
-            var componentsArray = new byte[PixelSize][,];
+            byte[][,] componentsArray = null;
+            if (bufferType == ComponentBufferType.Jpg && PixelSize > 3)
+            {
+                componentsArray = new byte[3][,];
+            }
+            else
+            {
+                componentsArray = new byte[PixelSize][,];
+            }
             int counter = 0;
             if (PixelSize == 1)
             {
@@ -446,7 +458,10 @@ namespace Adamantium.Engine.Graphics
                 componentsArray[0] = redChannel;
                 componentsArray[1] = greenChannel;
                 componentsArray[2] = blueChannel;
-                componentsArray[3] = alphaChannel;
+                if (bufferType != ComponentBufferType.Jpg)
+                {
+                    componentsArray[3] = alphaChannel;
+                }
             }
             return componentsArray;
         }

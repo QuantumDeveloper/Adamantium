@@ -121,10 +121,6 @@ namespace Adamantium.Engine.Graphics
                 {
                     stream.Read(buffer, bufferOffset, sizeinBytes);
                     Utilities.Swap(ref buffer[bufferOffset], ref buffer[bufferOffset + 2]);
-                    //buffer[bufferOffset] = (byte)(buffer[bufferOffset] & iconImageInfo.R);
-                    //buffer[bufferOffset + 1] = (byte)(buffer[bufferOffset + 1] & iconImageInfo.G);
-                    //buffer[bufferOffset + 2] = (byte)(buffer[bufferOffset + 2] & iconImageInfo.B);
-                    //buffer[bufferOffset + 3] = (byte)(buffer[bufferOffset + 3] & 0xff);
                     bufferOffset += sizeinBytes;
                 }
             }
@@ -180,7 +176,6 @@ namespace Adamantium.Engine.Graphics
 
                 int boundary = width * realBitsCount; //!!! 32 bit boundary (http://www.daubnet.com/en/file-format-ico)
                 while (boundary % 32 != 0) boundary++;
-                dataPtr += boundary * height / 8;
 
                 boundary = width;
                 while (boundary % 32 != 0) boundary++;
@@ -194,16 +189,13 @@ namespace Adamantium.Engine.Graphics
                     {
                         shift = 4 * (x + y * width) + 3;
                         bit = (byte)(7 - (x % 8));
-                        //shift2 = (x + (height - y - 1) * boundary) / 8;
-                        shift2 = (x + y * boundary) / 8;
+                        shift2 = (x + (height - y - 1) * boundary) / 8;
                         var b = transparencyBuffer[shift2];
                         mask = (0x01 & (b >> bit));
+                        var before = buffer[shift];
                         buffer[shift] *= (byte)(1 - mask);
-                        //buffer[shift] = b;
                     }
                 }
-                var str = string.Join(',', transparencyBuffer);
-                Debug.WriteLine(str);
             }
 
             stream.Dispose();
