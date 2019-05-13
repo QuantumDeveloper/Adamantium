@@ -57,7 +57,8 @@ namespace Adamantium.Engine.GraphicsTests
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\Icons\NewIcon.ico");
 
             img.Save(@"RestoredBitmap.bmp", ImageFileType.Bmp);
-            img.Save(@"RestoredBitmap.tga", ImageFileType.Tga);
+            img.Save(@"RestoredBitmap.jpg", ImageFileType.Jpg);
+            img.Save(@"RestoredBitmap.dds", ImageFileType.Dds);
             img?.Dispose();
         }
 
