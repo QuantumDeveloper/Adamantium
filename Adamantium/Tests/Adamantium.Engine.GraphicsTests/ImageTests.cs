@@ -51,9 +51,9 @@ namespace Adamantium.Engine.GraphicsTests
         [Test]
         public void IcoImageTest()
         {
-            var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\Icons\SharpGen.ico");
-            //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\Icons\ai.ico");
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\Icons\SharpGen.ico");
+            //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\Icons\Testicon24.ico");
+            var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\Icons\Testicon32.ico");
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\Icons\NewIcon.ico");
 
             img.Save(@"RestoredBitmap.bmp", ImageFileType.Bmp);
