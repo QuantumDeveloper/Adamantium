@@ -1,4 +1,5 @@
 ﻿using Adamantium.Core;
+using Adamantium.Mathematics;
 using AdamantiumVulkan.Core;
 using System;
 using System.Collections.Generic;
@@ -109,7 +110,8 @@ namespace Adamantium.Engine.Graphics
             int realBitsCount = (int)iconImageInfo.Header.bitCount;
             bool hasAndMask = /*(realBitsCount < 32) &&*/ (height != iconImageInfo.Header.height);
 
-            dataPtr = IntPtr.Add(dataPtr, Marshal.SizeOf<IconImageInfo>());
+            //dataPtr = IntPtr.Add(dataPtr, Marshal.SizeOf<IconImageInfo>());
+            dataPtr = IntPtr.Add(dataPtr, 40);
             var buffer = new byte[width * height * 4];
 
             var stream = new UnmanagedMemoryStream((byte*)dataPtr, iconInfo.BytesInRes);
@@ -167,36 +169,39 @@ namespace Adamantium.Engine.Graphics
             }
 
             // Read AND mask after base color data - 1 BIT MASK
-            if (hasAndMask)
-            {
-                int shift;
-                int shift2;
-                byte bit;
-                int mask;
+            //if (hasAndMask)
+            //{
+            //    int shift;
+            //    int shift2;
+            //    byte bit;
+            //    int mask;
 
-                int boundary = width * realBitsCount; //!!! 32 bit boundary (http://www.daubnet.com/en/file-format-ico)
-                while (boundary % 32 != 0) boundary++;
+            //    int boundary = width * realBitsCount; //!!! 32 bit boundary (http://www.daubnet.com/en/file-format-ico)
+            //    while (boundary % 32 != 0) boundary++;
 
-                boundary = width;
-                while (boundary % 32 != 0) boundary++;
+            //    boundary = width;
+            //    while (boundary % 32 != 0) boundary++;
 
-                var bufSize = iconInfo.BytesInRes - (width * height * (realBitsCount / 8));
-                var transparencyBuffer = new byte[bufSize];
-                stream.Read(transparencyBuffer, 0, (int)bufSize);
-                for (int y = 0; y < height; y++)
-                {
-                    for (int x = 0; x < width; x++)
-                    {
-                        shift = 4 * (x + y * width) + 3;
-                        bit = (byte)(7 - (x % 8));
-                        shift2 = (x + (height - y - 1) * boundary) / 8;
-                        var b = transparencyBuffer[shift2];
-                        mask = (0x01 & (b >> bit));
-                        var before = buffer[shift];
-                        buffer[shift] *= (byte)(1 - mask);
-                    }
-                }
-            }
+            //    var bufSize = iconImageInfo.Header.sizeImage - (width * height * (realBitsCount / 8));
+            //    if (bufSize > 0)
+            //    {
+            //        var transparencyBuffer = new byte[bufSize];
+            //        stream.Read(transparencyBuffer, 0, (int)bufSize);
+            //        for (int y = 0; y < height; y++)
+            //        {
+            //            for (int x = 0; x < width; x++)
+            //            {
+            //                shift = 4 * (x + y * width) + 3;
+            //                bit = (byte)(7 - (x % 8));
+            //                shift2 = (x + (height - y - 1) * boundary) / 8;
+            //                var b = transparencyBuffer[shift2];
+            //                mask = (0x01 & (b >> bit));
+            //                var before = buffer[shift];
+            //                buffer[shift] *= (byte)(1 - mask);
+            //            }
+            //        }
+            //    }
+            //}
 
             stream.Dispose();
 
@@ -213,6 +218,7 @@ namespace Adamantium.Engine.Graphics
             Utilities.CopyMemory(ptr, bufferHandle.AddrOfPinnedObject(), buffer.Length);
             bufferHandle.Free();
             var px = PixelBuffer.FlipBuffer(image.PixelBuffer[0], FlipBufferOptions.FlipVertically);
+            var colorsBuf = px.GetPixels<ColorRGBA>();
             image.ApplyPixelBuffer(px, 0, true);
 
             return image;
