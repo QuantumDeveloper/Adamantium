@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Adamantium.Core
@@ -137,6 +138,18 @@ namespace Adamantium.Core
         public static UInt64 ReadUInt64(this Stream ms)
         {
             return BitConverter.ToUInt64(ReadBytes(ms, 8), 0);
+        }
+
+        public static unsafe T ReadStruct<T>(this Stream ms) where T: unmanaged
+        {
+            var buffer = ReadBytes(ms, Marshal.SizeOf<T>());
+            T result;
+            fixed(byte* bPtr = buffer)
+            {
+                result = *(T*)bPtr;
+            }
+
+            return result;
         }
 
         #endregion Read

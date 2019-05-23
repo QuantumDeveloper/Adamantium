@@ -81,6 +81,18 @@ namespace Adamantium.Engine.GraphicsTests
         }
 
         [Test]
+        public void PngImageTest()
+        {
+            var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\BaseAlbedoTexture_Text.png");
+            //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\225px-GIF_-_bubble_animation.gif");
+            //img?.Save("1.bmp", ImageFileType.Bmp);
+            //img?.Save("1.tga", ImageFileType.Tga);
+            //img?.Save("1.jpg", ImageFileType.Jpg);
+
+            img?.Dispose();
+        }
+
+        [Test]
         public void GIFImageTest()
         {
             var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\Rotating_earth.gif");
