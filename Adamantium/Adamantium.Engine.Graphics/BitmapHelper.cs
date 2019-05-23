@@ -14,8 +14,6 @@ namespace Adamantium.Engine.Graphics
     {
         private const UInt16 fileType = 0x4D42;
 
-        private byte[] PngHeader = { 137, 80, 78, 71, 13, 10, 26, 10 };
-
         [StructLayout(LayoutKind.Sequential, Pack = 2)]
         public struct BitmapFileHeader
         {

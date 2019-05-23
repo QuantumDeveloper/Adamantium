@@ -6,6 +6,7 @@ using Adamantium.Core;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Content;
 using Adamantium.Engine.Graphics.Imaging.GIF;
+using Adamantium.Engine.Graphics.Imaging.PNG;
 using AdamantiumVulkan.Core;
 
 namespace Adamantium.Engine.Graphics
@@ -701,7 +702,7 @@ namespace Adamantium.Engine.Graphics
             //Register(ImageFileType.Tiff, WICHelper.LoadFromWICMemory, WICHelper.SaveTiffToWICMemory);
             Register(ImageFileType.Bmp, BitmapHelper.LoadFromBitmapMemory, BitmapHelper.SaveToBitmapMemory);
             Register(ImageFileType.Jpg, JPEGHelper.LoadFromJpegMemory, JPEGHelper.SaveToJpegMemory);
-            //Register(ImageFileType.Png, WICHelper.LoadFromWICMemory, WICHelper.SavePngToWICMemory);
+            Register(ImageFileType.Png, PNGHelper.LoadFromPNGMemory, PNGHelper.SavePngToMemory);
             //Register(ImageFileType.Wmp, WICHelper.LoadFromWICMemory, WICHelper.SaveWmpToWICMemory);
             Register(ImageFileType.Tga, TGAHelper.LoadFromTgaMemory, TGAHelper.SaveToTgaMemory);
         }
