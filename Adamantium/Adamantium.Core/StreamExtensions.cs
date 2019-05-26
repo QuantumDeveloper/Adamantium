@@ -110,6 +110,12 @@ namespace Adamantium.Core
             return BitConverter.ToChar(ReadBytes(ms, 2), 0);
         }
 
+        public static string ReadString(this Stream ms, int length, Encoding encoder)
+        {
+            var bytes = ReadBytes(ms, length);
+            return encoder.GetString(bytes);
+        }
+
         public static Int16 ReadInt16(this Stream ms)
         {
             return BitConverter.ToInt16(ReadBytes(ms, 2), 0);
