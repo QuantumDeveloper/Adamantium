@@ -1,11 +1,18 @@
-﻿using System.Collections.Generic;
+﻿using Adamantium.Engine.Graphics.Imaging.PNG.Chunks;
+using System.Collections.Generic;
 using System.Text;
 
 namespace Adamantium.Engine.Graphics.Imaging.PNG
 {
     internal class PNGDecoderSettings
     {
-        /*if 1, continue and don't give an error message if the Adler32 checksum is corrupted*/
+        public PNGDecoderSettings()
+        {
+            ColorСonvert = true;
+            ReadTextChunks = true;
+        }
+
+        /*if true, continue and don't give an error message if the Adler32 checksum is corrupted*/
         public bool IgnoreAdler32 { get; set; }
         /*ignore CRC checksums*/
         public bool IgnoreCrc { get; set; }
@@ -14,7 +21,9 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         /*ignore issues at end of file if possible (missing IEND chunk, too large chunk, ...)*/
         public bool IgnoreEnd { get; set; }
         /*whether to convert the PNG to the color type you want. Default: yes*/
-        public bool ColorСonvert { get; set; } = true;
+        public bool ColorСonvert { get; set; }
+
+        public bool ReadTextChunks { get; set; }
 
         public static bool operator ==(PNGDecoderSettings left, PNGDecoderSettings right)
         {
@@ -40,13 +49,20 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
     internal class PNGState
     {
+        public PNGState()
+        {
+            DecoderSettings = new PNGDecoderSettings();
+            InfoRaw = new PNGColorMode();
+            InfoPng = new PNGInfo();
+        }
+
         public PNGDecoderSettings DecoderSettings { get; set; }
 
         public PNGColorMode InfoRaw { get; set; }
 
         public PNGInfo InfoPng { get; set; }
 
-        uint Error { get; set; }
+        public uint Error { get; set; }
 
         public static bool operator ==(PNGState left, PNGState right)
         {
@@ -70,7 +86,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         }
     }
 
-    public enum InterlaceMethod
+    public enum InterlaceMethod : byte
     {
         None = 0,
         Adam7 = 1
@@ -78,6 +94,13 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
     internal class PNGInfo
     {
+        public PNGInfo()
+        {
+            ColorMode = new PNGColorMode();
+            TextKeys = new List<string>();
+            TextStrings = new List<string>();
+        }
+
         /*header (IHDR), palette (PLTE) and transparency (tRNS) chunks*/
         /*compression method of the original file. Always 0.*/
         public uint CompressionMethod { get; set; }
@@ -86,7 +109,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         /*interlace method of the original file: 0=none, 1=Adam7*/
         public InterlaceMethod InterlaceMethod;
         /*color type and bits, palette and transparency of the PNG file*/
-        public PNGColorMode Color;
+        public PNGColorMode ColorMode;
 
         /*
         Suggested background color chunk (bKGD)
@@ -129,8 +152,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         correctly and use lodepng_add_text and lodepng_clear_text.
         */
         public ulong TextNum; /*the amount of texts in these string buffers (there may be more texts in itext)*/
-        public string[] TextKeys; /*the keyword of a text chunk (e.g. "Comment")*/
-        public string[] TextStrings; /*the actual text*/
+        public List<string> TextKeys; /*the keyword of a text chunk (e.g. "Comment")*/
+        public List<string> TextStrings; /*the actual text*/
 
         /*
         international text chunks (iTXt)
@@ -161,7 +184,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         public bool IsPhysDefined; 
         public uint PhysX; /*pixels per unit in x direction*/
         public uint PhysY; /*pixels per unit in y direction*/
-        public uint PhysUnit; /*may be 0 (unknown unit) or 1 (metre)*/
+        public Unit PhysUnit; /*may be 0 (unknown unit) or 1 (metre)*/
 
         /*
         Color profile related chunks: gAMA, cHRM, sRGB, iCPP
@@ -173,18 +196,18 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
         /* gAMA chunk: optional, overridden by sRGB or iCCP if those are present. */
         public bool IsGamaDefined; /* Whether a gAMA chunk is present (0 = not present, 1 = present). */
-        public uint gama_gamma;   /* Gamma exponent times 100000 */
+        public uint Gamma;   /* Gamma exponent times 100000 */
 
         /* cHRM chunk: optional, overridden by sRGB or iCCP if those are present. */
-        public bool IsChrmDefined; /* Whether a cHRM chunk is present (0 = not present, 1 = present). */
-        public uint chrm_white_x; /* White Point x times 100000 */
-        public uint chrm_white_y; /* White Point y times 100000 */
-        public uint chrm_red_x;   /* Red x times 100000 */
-        public uint chrm_red_y;   /* Red y times 100000 */
-        public uint chrm_green_x; /* Green x times 100000 */
-        public uint chrm_green_y; /* Green y times 100000 */
-        public uint chrm_blue_x;  /* Blue x times 100000 */
-        public uint chrm_blue_y;  /* Blue y times 100000 */
+        public bool IsChrmDefined;  /* Whether a cHRM chunk is present (0 = not present, 1 = present). */
+        public uint ChrmWhiteX;     /* White Point x times 100000 */
+        public uint ChrmWhiteY;     /* White Point y times 100000 */
+        public uint ChrmRedX;       /* Red x times 100000 */
+        public uint ChrmRedY;       /* Red y times 100000 */
+        public uint ChrmGreenX;     /* Green x times 100000 */
+        public uint ChrmGreenY;     /* Green y times 100000 */
+        public uint ChrmBlueX;      /* Blue x times 100000 */
+        public uint ChrmBlueY;      /* Blue y times 100000 */
 
         /*
         sRGB chunk: optional. May not appear at the same time as iCCP.
@@ -192,7 +215,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         If cHRM is also present cHRM must contain respectively 31270,32900,64000,33000,30000,60000,15000,6000.
         */
         public bool IsSrgbDefined; /* Whether an sRGB chunk is present (0 = not present, 1 = present). */
-        public uint srgb_intent;  /* Rendering intent: 0=perceptual, 1=rel. colorimetric, 2=saturation, 3=abs. colorimetric */
+        public RenderingIntent SrgbIntent;  /* Rendering intent: 0=perceptual, 1=rel. colorimetric, 2=saturation, 3=abs. colorimetric */
 
         /*
         iCCP chunk: optional. May not appear at the same time as sRGB.
@@ -220,7 +243,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         correctly and use lodepng_set_icc and lodepng_clear_icc.
         */
         public byte[] IccpProfile;
-        public uint iccp_profile_size; /* The size of iccp_profile in bytes */
+        public uint IccpProfileSize; /* The size of iccp_profile in bytes */
 
         /* End of color profile related chunks */
 
@@ -247,7 +270,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         public static bool operator ==(PNGInfo left, PNGInfo right)
         {
             if (left.CompressionMethod == right.CompressionMethod && left.FilterMethod == right.FilterMethod
-                && left.InterlaceMethod == right.InterlaceMethod && left.Color == right.Color)
+                && left.InterlaceMethod == right.InterlaceMethod && left.ColorMode == right.ColorMode)
             {
                 return true;
             }
