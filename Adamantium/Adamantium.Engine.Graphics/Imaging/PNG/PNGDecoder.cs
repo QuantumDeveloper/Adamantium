@@ -44,7 +44,13 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
         private Image Decode(PNGState state)
         {
-            DecodeGeneric(state, out var colors, out int width, out int height);
+            var error = DecodeGeneric(state, out var rawBuffer, out int width, out int height);
+
+            if (error != 0)
+            {
+                throw new PNGDecodeException(error.ToString());
+            }
+
             ImageDescription descr = new ImageDescription();
             descr.Width = width;
             descr.Height = height;
@@ -53,22 +59,21 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             descr.MipLevels = 1;
             descr.Depth = 1;
             var img = Image.New(descr);
-            var handle = GCHandle.Alloc(colors, GCHandleType.Pinned);
+            var handle = GCHandle.Alloc(rawBuffer, GCHandleType.Pinned);
             Utilities.CopyMemory(img.DataPointer, handle.AddrOfPinnedObject(), img.PixelBuffer[0].BufferStride);
             handle.Free();
 
             return img;
         }
 
-        private void DecodeGeneric(PNGState state, out byte[] colors, out int width, out int height)
+        private uint DecodeGeneric(PNGState state, out byte[] rawBuffer, out int width, out int height)
         {
             bool IEND = false;
             string chunk;
             ulong i;
             /*the data from idat chunks*/
             List<byte> idat = new List<byte>();
-            List<byte> scanlines = new List<byte>();
-            ulong predict = 0;
+            long predict = 0;
 
             /*for unknown chunk order*/
             uint unknown = 0;
@@ -76,7 +81,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             uint criticalPos = 1;
 
             // initialize out parameters in case of errors
-            colors = new byte[0];
+            rawBuffer = new byte[0];
             width = height = 0;
 
             ReadHeaderChunk(state, out width, out height);
@@ -218,12 +223,26 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 }
                 predict += GetRawSizeIdat((width), (height) >> 1, state.InfoPng.ColorMode);
             }
-            //colors = new byte[width * height * 4];
-            colors = new byte[predict];
-            Decompress(idat, state.DecoderSettings, colors);
+            var scanlines = new byte[predict];
+            var error = Decompress(idat, state.DecoderSettings, scanlines);
+
+            long bufferSize = 0;
+
+            bufferSize = GetRawSizeLct(width, height, state.InfoPng.ColorMode);
+            rawBuffer = new byte[bufferSize];
+
+            if (error == 0)
+            {
+                for (int k = 0; k< rawBuffer.Length; ++k)
+                {
+
+                }
+            }
+
+            return error;
         }
 
-        private uint Decompress(List<byte> inputData, PNGDecoderSettings settings, byte[] outData)
+        private uint Decompress(List<byte> inputData, PNGDecoderSettings settings, byte[] scanlines)
         {
             uint error = 0;
             int CM, CINFO, FDICT;
@@ -259,12 +278,127 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 return 26;
             }
             var range = inputData.ToArray()[2..];
-            error = Inflate(range, outData);
+            error = Inflate(range, scanlines);
+
+            if (!settings.IgnoreAdler32)
+            {
+                var ADLER32 = ReadInt32FromArray(inputData.ToArray(), inputData.Count - 4);
+                var checksum = Adler32(scanlines);
+
+                if (checksum != ADLER32)
+                {
+                    /*error, adler checksum not correct, data must be corrupted*/
+                    return 58;
+                }
+            }
 
             return error;
         }
 
-        private uint Inflate(byte[] inputData, byte[] outData)
+        private uint Adler32(byte[] data)
+        {
+            return UpdateAdler32(1, data);
+        }
+
+        private uint UpdateAdler32(uint adler, byte[] data)
+        {
+            uint s1 = adler & 0xffff;
+            uint s2 = (adler >> 16) & 0xffff;
+            var len = data.Length;
+            int i = 0;
+
+            while (len > 0)
+            {
+                /*at least 5552 sums can be done before the sums overflow, saving a lot of module divisions*/
+                var amount = len > 5552 ? 5552 : len;
+                len -= amount;
+                while (amount > 0)
+                {
+                    s1 += data[i++];
+                    s2 += s1;
+                    --amount;
+                }
+                s1 %= 65521;
+                s2 %= 65521;
+            }
+
+            return (s2 << 16) | s1;
+        }
+
+        private uint PostProcessScanline(byte[] rawBuffer, byte[] inputData, int width, int height, PNGInfo infoPng)
+        {
+            /*
+            This function converts the filtered-padded-interlaced data into pure 2D image buffer with the PNG's colortype.
+            Steps:
+            *) if no Adam7: 1) unfilter 2) remove padding bits (= posible extra bits per scanline if bpp < 8)
+            *) if adam7: 1) 7x unfilter 2) 7x remove padding bits 3) Adam7_deinterlace
+            NOTE: the in buffer will be overwritten with intermediate data!
+            */
+            var bpp = GetBitsPerPixel(infoPng.ColorMode);
+            if (bpp == 0)
+            {
+                /*error: invalid colortype*/
+                return 31;
+            }
+
+            if (infoPng.InterlaceMethod == 0)
+            {
+                if (bpp < 8 && width * bpp != ((width * bpp + 7) /8) * 8)
+                {
+
+                }
+            }
+        }
+
+        private uint Unfilter(byte[] rawBuffer, byte[] inputData, int width, int height, int bpp)
+        {
+            /*
+            For PNG filter method 0
+            this function unfilters a single image (e.g. without interlacing this is called once, with Adam7 seven times)
+            rawBuffer must have enough bytes allocated already, in must have the scanlines + 1 filtertype byte per scanline
+            w and h are image dimensions or dimensions of reduced image, bpp is bits per pixel
+            in and out are allowed to be the same memory address (but aren't the same size since in has the extra filter bytes)
+            */
+
+            byte prevLine = 0;
+            uint error = 0;
+
+            /*bytewidth is used for filtering, is 1 when bpp < 8, number of bytes per pixel otherwise*/
+            int byteWidth = (bpp + 7) / 8;
+            int lineBytes = (width * bpp + 7) / 8;
+
+            for (int i = 0; i< height; ++i)
+            {
+                var rawIndex = lineBytes * i;
+                var inindex = (1 + lineBytes) * i; /*the extra filterbyte added to each row*/
+                byte filterType = inputData[inindex];
+
+                error = UnfilterScanline();
+
+                prevLine = rawBuffer[rawIndex];
+            }
+
+            return error;
+        }
+
+        private uint UnfilterScanline(byte[] recon, byte[] scanline, byte precon, int bytewidth, byte filterType, int length)
+        {
+            /*
+            For PNG filter method 0
+            unfilter a PNG image scanline by scanline. when the pixels are smaller than 1 byte,
+            the filter works byte per byte (bytewidth = 1)
+            precon is the previous unfiltered scanline, recon the result, scanline the current one
+            the incoming scanlines do NOT include the filtertype byte, that one is given in the parameter filterType instead
+            recon and scanline MAY be the same memory address! precon must be disjoint.
+            */
+        }
+
+        private int ReadInt32FromArray(byte[] buffer, int startIndex)
+        {
+            return ((buffer[startIndex] << 24) | (buffer[startIndex + 1] << 16) | (buffer[startIndex + 2] << 8) | buffer[startIndex + 3]);
+        }
+
+        private uint Inflate(byte[] inputData, byte[] scanlines)
         {
             /*bit pointer in the "in" data, current byte is bp >> 3, current bit is bp & 0x7 (from lsb to msb of the byte)*/
             int bp = 0;
@@ -290,18 +424,22 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 }
                 else if (BTYPE == 0)
                 {
-                    error = InflateNoCompression(inputData, ref bp, ref pos, ref outData);
+                    error = InflateNoCompression(inputData, ref bp, ref pos, ref scanlines);
                 }
                 else
                 {
-                    error = InflateHuffmanBlock(inputData, ref bp, ref pos, BTYPE, ref outData);
+                    error = InflateHuffmanBlock(inputData, ref bp, ref pos, BTYPE, ref scanlines);
                 }
-                //cnt++;
-                //Debug.WriteLine(cnt);
+
                 if (error > 0)
                 {
                     return error;
                 }
+            }
+
+            if (pos != scanlines.Length)
+            {
+                error = 91;
             }
 
             return error;
@@ -388,8 +526,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
                 if (codeLL <= 255) /*literal symbol*/
                 {
-                    //Array.Resize(ref outData, pos + 1);
                     outData[pos] = (byte)codeLL;
+                    //Debug.WriteLine($"pos = {pos}, data = {codeLL}");
                     ++pos;
                 }
                 /*length code*/
@@ -451,17 +589,19 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                     }
                     backward = start - distance;
 
-                    //Array.Resize(ref outData, (int)(pos + length));
                     if (distance < length)
                     {
                         for (forward = 0; forward < length; ++forward)
                         {
+                            //var val = outData[backward++];
+                            //Debug.WriteLine($"pos = {pos}, data = {outData[backward]}");
+                            //outData[pos++] = val;
                             outData[pos++] = outData[backward++];
                         }
                     }
                     else
                     {
-                        Buffer.BlockCopy(outData, pos, outData, (int)backward, (int)length);
+                        Buffer.BlockCopy(outData, (int)backward, outData, pos, (int)length);
                         pos += (int)length;
                     }
                 }
@@ -480,9 +620,13 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 
                 cnt++;
             };
+
+            for (int i = 0; i< outData.Length; i++)
+            {
+                Debug.WriteLine($"pos = {i} {outData[i]}");
+            }
             TIMER.Stop();
-            Debug.WriteLine($"{TIMER.ElapsedMilliseconds} - {cnt}");
-            //Debug.WriteLine(cnt);
+            //Debug.WriteLine($"{TIMER.ElapsedMilliseconds} - {cnt}");
             return error;
         }
 
@@ -531,7 +675,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             while(error == 0)
             {
                 /*read the code length codes out of 3 * (amount of code length codes) bits*/
-                bitlenCl = new uint[HuffmanTree.NumCodeLengthCodes * Marshal.SizeOf<uint>()];
+                bitlenCl = new uint[HuffmanTree.NumCodeLengthCodes];
 
                 for (i = 0; i != HuffmanTree.NumCodeLengthCodes; ++i)
                 {
@@ -551,8 +695,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 if (error != 0) break;
 
                 /*now we can use this tree to read the lengths for the tree that this function will return*/
-                bitlenLL = new uint[HuffmanTree.NumDeflateCodeSymbols * Marshal.SizeOf<uint>()];
-                bitlenDist = new uint[HuffmanTree.NumDistanceSymbols * Marshal.SizeOf<uint>()];
+                bitlenLL = new uint[HuffmanTree.NumDeflateCodeSymbols];
+                bitlenDist = new uint[HuffmanTree.NumDistanceSymbols];
 
                 i = 0;
                 while( i < HLIT + HDIST)
@@ -727,12 +871,19 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         /*in an idat chunk, each scanline is a multiple of 8 bits, unlike the lodepng output buffer,
         and in addition has one extra byte per line: the filter byte. So this gives a larger
         result than lodepng_get_raw_size. */
-        private ulong GetRawSizeIdat(int width, int height, PNGColorMode colorMode)
+        private long GetRawSizeIdat(int width, int height, PNGColorMode colorMode)
         {
             var bpp = GetBitsPerPixel(colorMode);
             /* + 1 for the filter byte, and possibly plus padding bits per line */
-            ulong line = ((ulong)(width / 8) * bpp) + 1 + ((ulong)(width & 7) * bpp + 7) / 8;
-            return (ulong)height * line;
+            var line = ((width / 8) * bpp) + 1 + ((width & 7) * bpp + 7) / 8;
+            return height * line;
+        }
+
+        private long GetRawSizeLct(int width, int height, PNGColorMode colorMode)
+        {
+            var bpp = GetBitsPerPixel(colorMode);
+            var n = width * height;
+            return ((n / 8) * bpp) + ((n & 7) * bpp + 7) / 8;
         }
 
         private void ReadtEXtChunk(PNGState state, uint chunkLength)

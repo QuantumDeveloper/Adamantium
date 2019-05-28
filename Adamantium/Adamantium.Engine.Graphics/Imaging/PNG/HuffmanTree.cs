@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
+//using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Adamantium.Engine.Graphics.Imaging.PNG
@@ -34,12 +34,14 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         {
             LengthBase = new uint[29] 
             {
-                3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258
+                3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59,
+                67, 83, 99, 115, 131, 163, 195, 227, 258
             };
 
             LengthExtra = new uint[29]
             {
-                0, 0, 0, 0, 0, 0, 0,  0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0
+                0, 0, 0, 0, 0, 0, 0,  0,  1,  1,  1,  1,  2,  2,  2,  2,  3,  3,  3,  3,
+                4,  4,  4,   4,   5,   5,   5,   5,   0
             };
 
             DistanceBase = new uint[30]
@@ -50,7 +52,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
             DistanceExtra = new uint[30]
             {
-                0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13
+                0, 0, 0, 0, 1, 1, 2,  2,  3,  3,  4,  4,  5,  5,   6,   6,   7,   7,   8,
+                8,    9,    9,   10,   10,   11,   11,   12,    12,    13,    13
             };
 
             ClclOrder = new uint[]
@@ -77,7 +80,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             uint treepos = 0; /*position in the tree (1 of the numcodes columns)*/
             uint n, i;
 
-            tree.Tree2D = new uint[tree.Numcodes * 2 * Marshal.SizeOf<uint>()];
+            tree.Tree2D = new uint[tree.Numcodes * 2];
 
             /*
             convert tree1d[] to tree2d[][]. In the 2D array, a value of 32767 means
@@ -145,7 +148,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         public static uint MakeFromLength(HuffmanTree tree, uint[] bitlen, uint numcodes, uint maxbitlen )
         {
             uint i;
-            tree.Lenghts = new uint[numcodes * Marshal.SizeOf<uint>()];
+            //tree.Lenghts = new uint[numcodes * Marshal.SizeOf<uint>()];
+            tree.Lenghts = new uint[numcodes];
             for (i = 0; i != numcodes; ++i)
             {
                 tree.Lenghts[i] = bitlen[i];
@@ -162,7 +166,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             uint error = 0;
             uint bits, n;
 
-            tree.Tree1D = new uint[tree.Numcodes * Marshal.SizeOf<uint>()];
+            //tree.Tree1D = new uint[tree.Numcodes * Marshal.SizeOf<uint>()];
+            tree.Tree1D = new uint[tree.Numcodes];
 
             /*step 1: count number of instances of each code length*/
             for (bits = 0; bits != tree.Numcodes; ++bits)
@@ -190,7 +195,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         {
             int i = 0;
             uint error = 0;
-            uint[] bitlen = new uint[NumDeflateCodeSymbols * Marshal.SizeOf<uint>()];
+            //uint[] bitlen = new uint[NumDeflateCodeSymbols * Marshal.SizeOf<uint>()];
+            uint[] bitlen = new uint[NumDeflateCodeSymbols];
             /*288 possible codes: 0-255=literals, 256=endcode, 257-285=lengthcodes, 286-287=unused*/
             for (i = 0; i <= 143; ++i) bitlen[i] = 8;
             for (i = 144; i <= 255; ++i) bitlen[i] = 9;
@@ -205,10 +211,9 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
         public static uint GenerateFixedDistanceTree(HuffmanTree tree)
         {
-            int i = 0;
-            uint[] bitlen = new uint[NumDistanceSymbols * Marshal.SizeOf<uint>()];
+            uint[] bitlen = new uint[NumDistanceSymbols];
 
-            for (i = 0; i!= NumDistanceSymbols; ++i)
+            for (int i = 0; i!= NumDistanceSymbols; ++i)
             {
                 bitlen[i] = 5;
             }
