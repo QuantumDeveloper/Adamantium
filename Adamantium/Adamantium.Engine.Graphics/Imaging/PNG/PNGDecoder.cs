@@ -1,5 +1,7 @@
-﻿using System;
+﻿using Adamantium.Core;
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -14,9 +16,9 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             this.stream = stream;
         }
 
-        public void Decode()
+        public Image Decode()
         {
-            Decode(PNGColorType.RGBA, 8);
+            return Decode(PNGColorType.RGBA, 8);
         }
 
         private bool ReadPNGHeader()
@@ -32,17 +34,30 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             return true;
         }
 
-        private void Decode(PNGColorType colorType = PNGColorType.RGBA, uint bitDepth = 8)
+        private Image Decode(PNGColorType colorType = PNGColorType.RGBA, uint bitDepth = 8)
         {
             PNGState state = new PNGState();
             state.InfoRaw.ColorType = colorType;
             state.InfoRaw.BitDepth = bitDepth;
-            Decode(state);
+            return Decode(state);
         }
 
-        private void Decode(PNGState state)
+        private Image Decode(PNGState state)
         {
-            DecodeGeneric(state, out var volors, out int width, out int height);
+            DecodeGeneric(state, out var colors, out int width, out int height);
+            ImageDescription descr = new ImageDescription();
+            descr.Width = width;
+            descr.Height = height;
+            descr.ArraySize = 1;
+            descr.Format = AdamantiumVulkan.Core.Format.R8G8B8A8_UNORM;
+            descr.MipLevels = 1;
+            descr.Depth = 1;
+            var img = Image.New(descr);
+            var handle = GCHandle.Alloc(colors, GCHandleType.Pinned);
+            Utilities.CopyMemory(img.DataPointer, handle.AddrOfPinnedObject(), img.PixelBuffer[0].BufferStride);
+            handle.Free();
+
+            return img;
         }
 
         private void DecodeGeneric(PNGState state, out byte[] colors, out int width, out int height)
@@ -203,15 +218,15 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 }
                 predict += GetRawSizeIdat((width), (height) >> 1, state.InfoPng.ColorMode);
             }
-
-            Decompress(idat, state.DecoderSettings, out var outData);
+            //colors = new byte[width * height * 4];
+            colors = new byte[predict];
+            Decompress(idat, state.DecoderSettings, colors);
         }
 
-        private uint Decompress(List<byte> inputData, PNGDecoderSettings settings, out byte[] outData)
+        private uint Decompress(List<byte> inputData, PNGDecoderSettings settings, byte[] outData)
         {
             uint error = 0;
             int CM, CINFO, FDICT;
-            outData = new byte[0];
 
             if (inputData.Count < 2)
             {
@@ -244,14 +259,13 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 return 26;
             }
             var range = inputData.ToArray()[2..];
-            error = Inflate(range, out outData);
+            error = Inflate(range, outData);
 
             return error;
         }
 
-        private uint Inflate(byte[] inputData, out byte[] outData)
+        private uint Inflate(byte[] inputData, byte[] outData)
         {
-            outData = new byte[0];
             /*bit pointer in the "in" data, current byte is bp >> 3, current bit is bp & 0x7 (from lsb to msb of the byte)*/
             int bp = 0;
             byte BFINAL = 0;
@@ -282,11 +296,18 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 {
                     error = InflateHuffmanBlock(inputData, ref bp, ref pos, BTYPE, ref outData);
                 }
-                bp = 395692;
+                //cnt++;
+                //Debug.WriteLine(cnt);
+                if (error > 0)
+                {
+                    return error;
+                }
             }
 
             return error;
         }
+
+        private int cnt = 0;
 
         private uint InflateNoCompression(byte[] inputData, ref int bitPointer, ref int pos, ref byte[] outData)
         {
@@ -319,7 +340,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 return 21;
             }
 
-            Array.Resize<byte>(ref outData, (int)(pos + LEN));
+            //Array.Resize<byte>(ref outData, (int)(pos + LEN));
 
             /*read the literal data: LEN bytes are now stored in the out buffer*/
             if (position + LEN > inputData.Length)
@@ -357,20 +378,92 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 error = GetHuffmanTreeInflateDynamic(treeLL, treeDist, inputData, ref bitPointer);
             }
 
+            cnt = 0;
+            Stopwatch TIMER;
+            TIMER = Stopwatch.StartNew();
             while (error == 0) /*decode all symbols until end reached, breaks at end code*/
             {
-                int codeLL = HuffmanTree.DecodeSymbol(inputData, ref bitPointer, treeLL);
+                /*code_ll is literal, length or end code*/
+                int codeLL = HuffmanTree.DecodeSymbol(inputData, ref bitPointer, treeLL, bitLength);
 
                 if (codeLL <= 255) /*literal symbol*/
                 {
-                    Array.Resize(ref outData, pos + 1);
+                    //Array.Resize(ref outData, pos + 1);
                     outData[pos] = (byte)codeLL;
                     ++pos;
                 }
                 /*length code*/
                 else if (codeLL >= HuffmanTree.FirstLengthCodeIndex && codeLL <= HuffmanTree.LastLengthCodeIndex)
                 {
+                    int codeDist;
+                    uint distance;
+                    uint numExtrabitsL, numExtrabitsD; /*extra bits for length and distance*/
+                    uint start, forward, backward, length;
 
+                    /*part 1: get length base*/
+                    length = HuffmanTree.LengthBase[codeLL - HuffmanTree.FirstLengthCodeIndex];
+
+                    /*part 2: get extra bits and add the value of that to length*/
+                    numExtrabitsL = HuffmanTree.LengthExtra[codeLL - HuffmanTree.FirstLengthCodeIndex];
+                    if (bitPointer + numExtrabitsL > bitLength)
+                    {
+                        /*error, bit pointer will jump past memory*/
+                        return 51;
+                    }
+
+                    length += ReadBitsFromStream(ref bitPointer, inputData, (int)numExtrabitsL);
+
+                    /*part 3: get distance code*/
+                    codeDist = HuffmanTree.DecodeSymbol(inputData, ref bitPointer, treeDist, bitLength);
+                    if (codeDist > 29)
+                    {
+                        if (codeDist == -1)
+                        {
+                            /*huffmanDecodeSymbol returns (unsigned)(-1) in case of error*/
+                            /*return error code 10 or 11 depending on the situation that happened in huffmanDecodeSymbol
+                            (10=no endcode, 11=wrong jump outside of tree)*/
+                            error = bitPointer > length * 8 ? 10u : 11u;
+                        }
+                        else
+                        {
+                            /*error: invalid distance code (30-31 are never used)*/
+                            error = 18;
+                        }
+                        break;
+                    }
+                    distance = HuffmanTree.DistanceBase[codeDist];
+
+                    /*part 4: get extra bits from distance*/
+                    numExtrabitsD = HuffmanTree.DistanceExtra[codeDist];
+                    if (bitPointer + numExtrabitsD > bitLength)
+                    {
+                        /*error, bit pointer will jump past memory*/
+                        return 51;
+                    }
+                    distance += ReadBitsFromStream(ref bitPointer, inputData, (int)numExtrabitsD);
+
+                    /*part 5: fill in all the out[n] values based on the length and dist*/
+                    start = (uint)pos;
+                    if (distance > start)
+                    {
+                        /*too long backward distance*/
+                        return 52;
+                    }
+                    backward = start - distance;
+
+                    //Array.Resize(ref outData, (int)(pos + length));
+                    if (distance < length)
+                    {
+                        for (forward = 0; forward < length; ++forward)
+                        {
+                            outData[pos++] = outData[backward++];
+                        }
+                    }
+                    else
+                    {
+                        Buffer.BlockCopy(outData, pos, outData, (int)backward, (int)length);
+                        pos += (int)length;
+                    }
                 }
                 else if (codeLL == 256)
                 {
@@ -384,8 +477,12 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                     error = bitPointer > inputData.Length * 8 ? 10u : 11u;
                     break;
                 }
+                
+                cnt++;
             };
-
+            TIMER.Stop();
+            Debug.WriteLine($"{TIMER.ElapsedMilliseconds} - {cnt}");
+            //Debug.WriteLine(cnt);
             return error;
         }
 
@@ -419,9 +516,9 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             /*number of literal/length codes + 257. Unlike the spec, the value 257 is added to it here already*/
             HLIT = ReadBitsFromStream(ref bitPointer, inputData, 5) + 257;
             /*number of distance codes. Unlike the spec, the value 1 is added to it here already*/
-            HDIST = ReadBitsFromStream(ref bitPointer, inputData, 5) + 257;
+            HDIST = ReadBitsFromStream(ref bitPointer, inputData, 5) + 1;
             /*number of code length codes. Unlike the spec, the value 4 is added to it here already*/
-            HCLEN = ReadBitsFromStream(ref bitPointer, inputData, 5) + 257;
+            HCLEN = ReadBitsFromStream(ref bitPointer, inputData, 4) + 4;
 
             if (bitPointer + HCLEN * 3 > inputData.Length << 3)
             {
@@ -460,7 +557,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 i = 0;
                 while( i < HLIT + HDIST)
                 {
-                    int code = HuffmanTree.DecodeSymbol(inputData, ref bitPointer, treeCl);
+                    int code = HuffmanTree.DecodeSymbol(inputData, ref bitPointer, treeCl, bitLength);
                     if (code <= 15) /*a length code*/
                     {
                         if (i < HLIT)
@@ -483,7 +580,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                         if (i == 0) return 54; /*can't repeat previous if i is 0*/
 
                         /*error, bit pointer jumps past memory*/
-                        if (bitPointer + 2 > inputData.Length) return 50;
+                        if (bitPointer + 2 > bitLength) return 50;
 
                         repLength += ReadBitsFromStream(ref bitPointer, inputData, 2);
 
@@ -512,8 +609,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                             else
                             {
                                 bitlenDist[i - HLIT] = value;
-                                ++i;
                             }
+                            ++i;
                         }
                     }
                     else if (code == 17) /*repeat "0" 3-10 times*/
@@ -521,7 +618,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                         /*read in the bits that indicate repeat length*/
                         uint repLength = 3;
 
-                        if (bitPointer + 3 > inputData.Length) return 50; /*error, bit pointer jumps past memory*/
+                        if (bitPointer + 3 > bitLength) return 50; /*error, bit pointer jumps past memory*/
 
                         repLength += ReadBitsFromStream(ref bitPointer, inputData, 3);
 
@@ -549,7 +646,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                         /*read in the bits that indicate repeat length*/
                         uint repLength = 11;
 
-                        if (bitPointer + 7 > inputData.Length)
+                        if (bitPointer + 7 > bitLength)
                         {
                             /*error, bit pointer jumps past memory*/
                             return 50;
@@ -584,7 +681,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                             /*return error code 10 or 11 depending on the situation that happened in huffmanDecodeSymbol
                             (10=no endcode, 11=wrong jump outside of tree)*/
 
-                            error = bitPointer > inputData.Length ? 10u : 11u;
+                            error = bitPointer > bitLength ? 10u : 11u;
                         }
                         else
                         {
@@ -609,10 +706,9 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
             return error;
         }
-
         private byte ReadBitFromStream(ref int bitPointer, byte[] data)
         {
-            byte result = (byte)((data[bitPointer >> 3] >> (bitPointer & 0x07)) & 1);
+            byte result = (byte)((data[bitPointer >> 3] >> (bitPointer & 0x7)) & 1);
             ++bitPointer;
             return result;
         }
@@ -622,7 +718,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             uint result = 0;
             for (int i = 0; i!= count; ++i)
             {
-                result += (uint)((data[bitPointer >> 3] >> (bitPointer & 0x07)) & 1) << i;
+                result += (uint)((data[bitPointer >> 3] >> (bitPointer & 0x7)) & 1) << i;
                 ++bitPointer;
             }
             return result;
