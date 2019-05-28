@@ -101,7 +101,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 /*the bits for this code*/
                 for (i = 0; i!= tree.Lenghts[n]; ++i)
                 {
-                    byte bit = (byte)(tree.Tree1D[n] >> (int)(tree.Lenghts[n] - i - 1) & 1);
+                    byte bit = (byte)((tree.Tree1D[n] >> (int)(tree.Lenghts[n] - i - 1)) & 1);
                     if (treepos > int.MaxValue || treepos + 2 > tree.Numcodes)
                     {
                         return 55;
@@ -216,26 +216,30 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             return MakeFromLength(tree, bitlen, NumDistanceSymbols, 15);
         }
 
-        public static int DecodeSymbol(byte[] inputData, ref int bitPointer, HuffmanTree codeTree)
+        /*
+        returns the code, or (unsigned)(-1) if error happened
+        bitlength is the length of the complete buffer, in bits (so its byte length times 8)
+        */
+        public static int DecodeSymbol(byte[] inputData, ref int bitPointer, HuffmanTree codeTree, int bitLength)
         {
             uint treepos = 0, ct;
             for (; ; )
             {
-                if (bitPointer >= inputData.Length)
+                if (bitPointer >= bitLength)
                 {
                     /*error: end of input memory reached without endcode*/
-                    return 1;
+                    return -1;
                 }
                 /*
                 decode the symbol from the tree. The "readBitFromStream" code is inlined in
                 the expression below because this is the biggest bottleneck while decoding
                 */
-                ct = codeTree.Tree2D[treepos << 1] + (uint)((inputData[bitPointer >> 3] >> (bitPointer & 0x07)) & 1);
+                ct = codeTree.Tree2D[(treepos << 1) + (uint)((inputData[bitPointer >> 3] >> (bitPointer & 0x7)) & 1)];
                 ++bitPointer;
                 if (ct < codeTree.Numcodes)
                 {
                     /*the symbol is decoded, return it*/
-                    return ct;
+                    return (int)ct;
                 }
                 else
                 {

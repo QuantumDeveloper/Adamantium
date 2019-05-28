@@ -49,8 +49,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         {
             var stream = new PNGStream(pSource, size);
             PNGDecoder decoder = new PNGDecoder(stream);
-            decoder.Decode();
-            return null;
+            var img = decoder.Decode();
+            return img;
         }
 
         public static void SavePngToMemory(PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream)
