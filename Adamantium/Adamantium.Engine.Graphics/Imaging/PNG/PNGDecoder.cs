@@ -55,7 +55,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             descr.Width = width;
             descr.Height = height;
             descr.ArraySize = 1;
-            descr.Format = AdamantiumVulkan.Core.Format.R8G8B8A8_UNORM;
+            descr.Format = AdamantiumVulkan.Core.Format.R8G8B8_UNORM;
             descr.MipLevels = 1;
             descr.Depth = 1;
             var img = Image.New(descr);
@@ -233,10 +233,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
             if (error == 0)
             {
-                for (int k = 0; k< rawBuffer.Length; ++k)
-                {
-
-                }
+                state.Error = PostProcessScanline(rawBuffer, scanlines, width, height, state.InfoPng);
             }
 
             return error;
@@ -325,7 +322,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             return (s2 << 16) | s1;
         }
 
-        private uint PostProcessScanline(byte[] rawBuffer, byte[] inputData, int width, int height, PNGInfo infoPng)
+        private unsafe uint PostProcessScanline(byte[] rawBuffer, byte[] inputData, int width, int height, PNGInfo infoPng)
         {
             /*
             This function converts the filtered-padded-interlaced data into pure 2D image buffer with the PNG's colortype.
@@ -334,6 +331,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             *) if adam7: 1) 7x unfilter 2) 7x remove padding bits 3) Adam7_deinterlace
             NOTE: the in buffer will be overwritten with intermediate data!
             */
+            uint error = 0;
             var bpp = GetBitsPerPixel(infoPng.ColorMode);
             if (bpp == 0)
             {
@@ -343,10 +341,93 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
             if (infoPng.InterlaceMethod == 0)
             {
-                if (bpp < 8 && width * bpp != ((width * bpp + 7) /8) * 8)
+                fixed (byte* inPtr = &inputData[0])
                 {
-
+                    fixed (byte* rawPtr = &rawBuffer[0])
+                    {
+                        if (bpp < 8 && width * bpp != ((width * bpp + 7) / 8) * 8)
+                        {
+                            error = Unfilter2(inPtr, inPtr, width, height, (int)bpp);
+                            if (error > 0)
+                            {
+                                return error;
+                            }
+                            RemovePaddingBits(rawPtr, inPtr, (uint)(width * bpp), (uint)((width * bpp + 7) / 8) * 8, (uint)height);
+                        }
+                        else
+                        {
+                            error = Unfilter2(rawPtr, inPtr, width, height, (int)bpp);
+                        }
+                    }
                 }
+            }
+            else /*interlace_method is 1 (Adam7)*/
+            {
+                uint[] passWidth = new uint[7];
+                uint[] passHeight = new uint[7];
+                uint[] filterPassStart = new uint[8];
+                uint[] paddedPassStart = new uint[8];
+                uint[] passStart = new uint[8];
+
+                Adam7.GetPassValues(passWidth, passHeight, filterPassStart, paddedPassStart, passStart, (uint)width, (uint)height, bpp);
+
+                for (int i = 0; i != 7; ++i)
+                {
+                    fixed (byte* rawPtr = &inputData[paddedPassStart[i]])
+                    {
+                        fixed (byte* inPtr = &inputData[filterPassStart[i]])
+                        {
+                            error = Unfilter2(rawPtr, inPtr, (int)passWidth[i], (int)passHeight[i], (int)bpp);
+                        }
+                    }
+
+                    /*TODO: possible efficiency improvement: if in this reduced image the bits fit nicely in 1 scanline,
+                    move bytes instead of bits or move not at all*/
+                    if (bpp < 8)
+                    {
+                        /*remove padding bits in scanlines; after this there still may be padding
+                        bits between the different reduced images: each reduced image still starts nicely at a byte*/
+                        fixed (byte* rawPtr = &inputData[passStart[i]])
+                        {
+                            fixed (byte* inPtr = &inputData[paddedPassStart[i]])
+                            {
+                                RemovePaddingBits(rawPtr, inPtr, passWidth[i] * bpp, 
+                                    ((passWidth[i] * bpp + 7) / 8) * 8, passHeight[i]);
+                            }
+                        }
+                    }
+                }
+
+                Adam7.Deinterlace(rawBuffer, inputData, (uint)width, (uint)height, bpp);
+            }
+
+            return error;
+        }
+
+        private unsafe void RemovePaddingBits(byte* rawBuffer, byte* inputData, uint olinebits, uint ilinebits, uint height)
+        {
+            /*
+            After filtering there are still padding bits if scanlines have non multiple of 8 bit amounts. They need
+            to be removed (except at last scanline of (Adam7-reduced) image) before working with pure image buffers
+            for the Adam7 code, the color convert code and the output to the user.
+            in and out are allowed to be the same buffer, in may also be higher but still overlapping; in must
+            have >= ilinebits*h bits, out must have >= olinebits*h bits, olinebits must be <= ilinebits
+            also used to move bits after earlier such operations happened, e.g. in a sequence of reduced images from Adam7
+            only useful if (ilinebits - olinebits) is a value in the range 1..7
+            */
+            uint diff = ilinebits - olinebits;
+            /*input and output bit pointers*/
+            int ibp = 0;
+            int obp = 0;
+            for (int i = 0; i < height; ++i)
+            {
+                for (int x = 0; x < olinebits; ++x)
+                {
+                    byte bit = ReadBitFromReversedStream(ref ibp, inputData);
+                    SetBitOfReversedStream(ref obp, rawBuffer, bit);
+                }
+
+                ibp += (int)diff;
             }
         }
 
@@ -360,7 +441,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             in and out are allowed to be the same memory address (but aren't the same size since in has the extra filter bytes)
             */
 
-            byte prevLine = 0;
+            int prevLine = 0;
             uint error = 0;
 
             /*bytewidth is used for filtering, is 1 when bpp < 8, number of bytes per pixel otherwise*/
@@ -369,19 +450,118 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
             for (int i = 0; i< height; ++i)
             {
-                var rawIndex = lineBytes * i;
+                var outIndex = lineBytes * i;
                 var inindex = (1 + lineBytes) * i; /*the extra filterbyte added to each row*/
                 byte filterType = inputData[inindex];
 
-                error = UnfilterScanline();
+                error = UnfilterScanline(rawBuffer, outIndex, inputData, inindex+1, prevLine, byteWidth, filterType, lineBytes);
 
-                prevLine = rawBuffer[rawIndex];
+                prevLine = outIndex;
             }
 
             return error;
         }
 
-        private uint UnfilterScanline(byte[] recon, byte[] scanline, byte precon, int bytewidth, byte filterType, int length)
+        private unsafe uint Unfilter2(byte* rawBuffer, byte* inputData, int width, int height, int bpp)
+        {
+            /*
+            For PNG filter method 0
+            this function unfilters a single image (e.g. without interlacing this is called once, with Adam7 seven times)
+            rawBuffer must have enough bytes allocated already, in must have the scanlines + 1 filtertype byte per scanline
+            w and h are image dimensions or dimensions of reduced image, bpp is bits per pixel
+            in and out are allowed to be the same memory address (but aren't the same size since in has the extra filter bytes)
+            */
+
+            int prevLine = 0;
+            uint error = 0;
+
+            /*bytewidth is used for filtering, is 1 when bpp < 8, number of bytes per pixel otherwise*/
+            int byteWidth = (bpp + 7) / 8;
+            int lineBytes = (width * bpp + 7) / 8;
+            
+            for (int i = 0; i < height; ++i)
+            {
+                var outIndex = lineBytes * i;
+                var inindex = (1 + lineBytes) * i; /*the extra filterbyte added to each row*/
+                byte filterType = inputData[inindex];
+
+                error = UnfilterScanline2(&rawBuffer[outIndex], &inputData[inindex + 1], prevLine, byteWidth, filterType, lineBytes);
+
+                prevLine = outIndex;
+            }
+
+            return error;
+        }
+
+        private unsafe uint UnfilterScanline2(byte* recon, byte* scanline, int preconIndex, int bytewidth, byte filterType, int length)
+        {
+            int i = 0;
+            switch (filterType)
+            {
+                case 0:
+                    for (i = 0; i != length; ++i)
+                    {
+                        recon[i] = scanline[i];
+                        Debug.WriteLine($"unfiltered [{i}] = {recon[i]}");
+                    }
+                    break;
+                case 1:
+                    for (i = 0; i != bytewidth; ++i) recon[i] = scanline[i];
+                    for (i = bytewidth; i < length; ++i) recon[i] = (byte)(scanline[i] + recon[i - bytewidth]);
+                    break;
+                case 2:
+                    if (preconIndex > 0)
+                    {
+                        for (i = 0; i != length; ++i) recon[i] = (byte)(scanline[i] + recon[preconIndex + i]);
+                    }
+                    else
+                    {
+                        for (i = 0; i != length; ++i) recon[i] = scanline[i];
+                    }
+                    break;
+                case 3:
+                    if (preconIndex > 0)
+                    {
+                        for (i = 0; i != bytewidth; ++i) recon[i] = (byte)(scanline[i] + (recon[preconIndex + i] >> 1));
+                        for (i = bytewidth; i < length; ++i) recon[i] = (byte)(scanline[i] + ((recon[i - bytewidth] + recon[preconIndex + i]) >> 1));
+                    }
+                    else
+                    {
+                        for (i = 0; i != bytewidth; ++i) recon[i] = scanline[i];
+                        for (i = bytewidth; i < length; ++i) recon[i] = (byte)(scanline[i] + (recon[i - bytewidth] >> 1));
+                    }
+                    break;
+                case 4:
+                    if (preconIndex > 0)
+                    {
+                        for (i = 0; i != bytewidth; ++i)
+                        {
+                            recon[i] = (byte)(scanline[i] + recon[preconIndex + i]); /*paethPredictor(0, precon[i], 0) is always precon[i]*/
+                        }
+                        for (i = bytewidth; i < length; ++i)
+                        {
+                            recon[i] = (byte)(scanline[i] + PaethPredictor(recon[i - bytewidth], recon[preconIndex + i], recon[preconIndex + i - bytewidth]));
+                        }
+                    }
+                    else
+                    {
+                        for (i = 0; i != bytewidth; ++i)
+                        {
+                            recon[i] = scanline[i];
+                        }
+                        for (i = bytewidth; i < length; ++i)
+                        {
+                            /*paethPredictor(recon[i - bytewidth], 0, 0) is always recon[i - bytewidth]*/
+                            recon[i] = (byte)(scanline[i] + recon[i - bytewidth]);
+                        }
+                    }
+                    break;
+                default: return 36; /*error: unexisting filter type given*/
+            }
+            return 0;
+        }
+
+        private uint UnfilterScanline(byte[] recon, int reconIndex, byte[] scanline, int scanlineIndex, int preconIndex, int bytewidth, byte filterType, int length)
         {
             /*
             For PNG filter method 0
@@ -391,6 +571,84 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             the incoming scanlines do NOT include the filtertype byte, that one is given in the parameter filterType instead
             recon and scanline MAY be the same memory address! precon must be disjoint.
             */
+            int i = 0;
+            switch(filterType)
+            {
+                case 0:
+                    for (i = 0; i != length; ++i) recon[reconIndex + i] = scanline[scanlineIndex + i];
+                    break;
+                case 1:
+                    for (i = 0; i != bytewidth; ++i) recon[reconIndex + i] = scanline[scanlineIndex + i];
+                    for (i = 0; i< length; ++i) recon[reconIndex + i] = (byte)(scanline[scanlineIndex + i] + recon[reconIndex + i - bytewidth]);
+                    break;
+                case 2:
+                    if (preconIndex > 0)
+                    {
+                        for (i = 0; i != length; ++i) recon[reconIndex + i] = (byte)(scanline[scanlineIndex + i] + recon[preconIndex + i]);
+                    }
+                    else
+                    {
+                        for (i = 0; i != length; ++i) recon[reconIndex + i] = scanline[scanlineIndex + i];
+                    }
+                    break;
+                case 3:
+                    if (preconIndex > 0)
+                    {
+                        for (i = 0; i != bytewidth; ++i) recon[i] = (byte)(scanline[scanlineIndex + i] + (recon[preconIndex + i] >> 1));
+                        for (i = bytewidth; i < length; ++i) recon[reconIndex + i] = (byte)(scanline[scanlineIndex + i] + ((recon[reconIndex + i - bytewidth] + recon[preconIndex + i]) >> 1));
+                    }
+                    else
+                    {
+                        for (i = 0; i != bytewidth; ++i) recon[reconIndex + i] = scanline[scanlineIndex + i];
+                        for (i = bytewidth; i < length; ++i) recon[i] = (byte)(scanline[scanlineIndex + i] + (recon[reconIndex + i - bytewidth] >> 1));
+                    }
+                    break;
+                case 4:
+                    if (preconIndex > 0)
+                    {
+                        for (i = 0; i != bytewidth; ++i)
+                        {
+                            recon[reconIndex + i] = (byte)(scanline[scanlineIndex + i] + recon[preconIndex + i]); /*paethPredictor(0, precon[i], 0) is always precon[i]*/
+                        }
+                        for (i = bytewidth; i < length; ++i)
+                        {
+                            recon[reconIndex + i] = (byte)(scanline[scanlineIndex + i] + PaethPredictor(recon[reconIndex + i - bytewidth], recon[preconIndex + i], recon[preconIndex + i - bytewidth]));
+                        }
+                    }
+                    else
+                    {
+                        for (i = 0; i != bytewidth; ++i)
+                        {
+                            recon[i] = scanline[i];
+                        }
+                        for (i = bytewidth; i < length; ++i)
+                        {
+                            /*paethPredictor(recon[i - bytewidth], 0, 0) is always recon[i - bytewidth]*/
+                            recon[i] = (byte)(scanline[scanlineIndex + i] + recon[reconIndex + i - bytewidth]);
+                        }
+                    }
+                    break;
+                default:
+                    return 36;
+            }
+
+            return 0;
+        }
+
+        /*
+        Paeth predictor, used by PNG filter type 4
+        The parameters are of type short, but should come from unsigned chars, the shorts
+        are only needed to make the paeth calculation correct.
+        */
+        static byte PaethPredictor(short a, short b, short c)
+        {
+            short pa = (short)Math.Abs(b - c);
+            short pb = (short)Math.Abs(a - c);
+            short pc = (short)Math.Abs(a + b - c - c);
+
+            if (pc < pa && pc < pb) return (byte)c;
+            else if (pb < pa) return (byte)b;
+            else return (byte)a;
         }
 
         private int ReadInt32FromArray(byte[] buffer, int startIndex)
@@ -866,6 +1124,38 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 ++bitPointer;
             }
             return result;
+        }
+
+        internal static unsafe byte ReadBitFromReversedStream(ref int bitPointer, byte* data)
+        {
+            byte result = (byte)((data[bitPointer >> 3] >> (7 - (bitPointer & 0x7))) & 1);
+            ++bitPointer;
+            return result;
+        }
+
+        private unsafe void SetBitOfReversedStream(ref int bitPointer, byte* bitStream, byte bit)
+        {
+            /*the current bit in bitstream may be 0 or 1 for this to work*/
+            if (bit == 0)
+            {
+                bitStream[bitPointer >> 3] &= (byte)~(1 << (7 - (bitPointer & 0x7)));
+            }
+            else
+            {
+                bitStream[bitPointer >> 3] |= (byte)(1 << (7 - (bitPointer & 0x7)));
+            }
+            ++bitPointer;
+        }
+
+        internal static unsafe void SetBitOfReversedStream0(ref int bitPointer, byte* bitStream, byte bit)
+        {
+            /*the current bit in bitstream must be 0 for this to work*/
+            if (bit > 0)
+            {
+                /*earlier bit of huffman code is in a lesser significant bit of an earlier byte*/
+                bitStream[bitPointer >> 3] |= (byte)(bit << (7 - (bitPointer & 0x7)));
+            }
+            ++bitPointer;
         }
 
         /*in an idat chunk, each scanline is a multiple of 8 bits, unlike the lodepng output buffer,
