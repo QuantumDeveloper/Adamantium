@@ -24,7 +24,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         /*palette in RGBARGBA... order. When allocated, must be either 0, or have size 1024*/
         public byte[] Palette { get; set; }
         /*palette size in number of colors (amount of bytes is 4 * palettesize)*/
-        Int64 PaletteSize { get; set; }
+        public Int64 PaletteSize { get; set; }
 
         /*
         transparent color key (tRNS)
@@ -36,7 +36,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         */
 
         /*is a transparent color key given? 0 = false, 1 = true*/
-        public bool IsAlphaPresent;
+        public bool IsKeyDefined;
 
         /*red/grayscale component of color key*/
         public uint KeyR;
@@ -48,7 +48,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         public static bool operator ==(PNGColorMode left, PNGColorMode right)
         {
             if (left.ColorType == right.ColorType && left.BitDepth == right.BitDepth
-                && left.PaletteSize == right.PaletteSize && left.IsAlphaPresent == right.IsAlphaPresent
+                && left.PaletteSize == right.PaletteSize && left.IsKeyDefined == right.IsKeyDefined
                 && left.KeyR == right.KeyR && left.KeyG == right.KeyG && left.KeyB == right.KeyB)
             {
                 return true;
