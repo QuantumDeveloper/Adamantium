@@ -177,7 +177,9 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         /*set to 1 to make the encoder generate a tIME chunk*/
         public bool IsTimeDefined { get; set; } 
 
-        public PNGTime Time { get; set; }
+        public tIME Time { get; set; }
+
+        public iTXt InternationalText { get; set; }
 
         /*phys chunk (pHYs)*/
         /*if 0, there is no pHYs chunk and the values below are undefined, if 1 else there is one*/
@@ -208,6 +210,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         public uint ChrmGreenY;     /* Green y times 100000 */
         public uint ChrmBlueX;      /* Blue x times 100000 */
         public uint ChrmBlueY;      /* Blue y times 100000 */
+
+        public cHRM cHRM { get; set; }
 
         /*
         sRGB chunk: optional. May not appear at the same time as iCCP.

@@ -92,6 +92,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             descr.ArraySize = 1;
             descr.MipLevels = 1;
             descr.Depth = 1;
+            descr.Dimension = TextureDimension.Texture2D;
             if (bitsPerPixel == 24)
             {
                 descr.Format = AdamantiumVulkan.Core.Format.R8G8B8_UNORM;
@@ -99,6 +100,16 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             else if (bitsPerPixel == 32)
             {
                 descr.Format = AdamantiumVulkan.Core.Format.R8G8B8A8_UNORM;
+            }
+
+            //Premultiply alpha for formats, which does not support tansparency
+            for (int i = 0; i < rawBuffer.Length; i+=4)
+            {
+                float alpha = rawBuffer[i + 3] / 255.0f;
+
+                rawBuffer[i] = (byte)(((rawBuffer[i]/255.0f) * alpha) * 255);
+                rawBuffer[i + 1] = (byte)(((rawBuffer[i+1] / 255.0f) * alpha) * 255);
+                rawBuffer[i + 2] = (byte)(((rawBuffer[i+2] / 255.0f) * alpha) * 255);
             }
 
             var img = Image.New(descr);
@@ -145,7 +156,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
             while (!IEND && state.Error == 0)
             {
-                uint chunkLength = 0;
+                uint chunkSize = 0;
 
                 /*error: size of the in buffer too small to contain next chunk*/
                 if ((stream.Position+12)> stream.Length )
@@ -159,9 +170,9 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 }
 
                 /*length of the data of the chunk, excluding the length bytes, chunk type and CRC bytes*/
-                chunkLength = (uint)stream.ReadChunkSize();
+                chunkSize = (uint)stream.ReadChunkSize();
 
-                if (chunkLength > int.MaxValue)
+                if (chunkSize > int.MaxValue)
                 {
                     if (state.DecoderSettings.IgnoreEnd)
                     {
@@ -171,7 +182,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                     state.Error = 63;
                 }
 
-                if ((stream.Position + chunkLength + 12) > stream.Length)
+                if ((stream.Position + chunkSize + 12) > stream.Length)
                 {
                     /*error: size of the in buffer too small to contain next chunk*/
                     state.Error = 64;
@@ -182,7 +193,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 switch (chunkType)
                 {
                     case "IDAT":
-                        var bytes = stream.ReadBytes((int)chunkLength);
+                        var bytes = stream.ReadBytes((int)chunkSize);
                         idat.AddRange(bytes);
                         break;
                     case "IEND":
@@ -197,14 +208,17 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                     case "tEXt":
                         if (state.DecoderSettings.ReadTextChunks)
                         {
-                            ReadtEXtChunk(state, chunkLength);
+                            ReadtEXtChunk(state, chunkSize);
                         }
                         break;
                     case "zTXt":
+                        ReadzTXtChunk(state, this, chunkSize);
                         break;
                     case "iTXt":
+                        ReadiTXtChunk(state, this, chunkSize);
                         break;
                     case "tIME":
+                        ReadtIMEChunk(state);
                         break;
                     case "pHYs":
                         ReadpHYsChunk(state.InfoPng);
@@ -213,11 +227,13 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                         ReadgAMAChunk(state.InfoPng);
                         break;
                     case "cHRM":
+                        ReadcHRMChunk(state, chunkSize);
                         break;
                     case "sRGB":
                         ReadsRGBChunk(state.InfoPng);
                         break;
                     case "iCCP":
+                        ReadiCCPChunk(state, chunkSize);
                         break;
                     /*it's not an implemented chunk type, so ignore it: skip over the data*/
                     default:
@@ -234,7 +250,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
                 if (!IEND)
                 {
-                    currentPosition += chunkLength + 12;
+                    currentPosition += chunkSize + 12;
                     stream.Position = currentPosition;
                 }
 
@@ -266,8 +282,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 }
                 predict += GetRawSizeIdat((width), (height) >> 1, state.InfoPng.ColorMode);
             }
-            var scanlines = new byte[predict];
-            var error = Decompress(idat, state.DecoderSettings, scanlines);
+            var scanlines = new List<byte>((int)predict);
+            var error = Decompress(idat.ToArray(), state.DecoderSettings, scanlines);
 
             long bufferSize = 0;
 
@@ -276,18 +292,44 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
             if (error == 0)
             {
-                state.Error = PostProcessScanline(outBuffer, scanlines, width, height, state.InfoPng);
+                state.Error = PostProcessScanline(outBuffer, scanlines.ToArray(), width, height, state.InfoPng);
             }
 
             return error;
         }
 
-        private uint Decompress(List<byte> inputData, PNGDecoderSettings settings, byte[] scanlines)
+        private void ReadzTXtChunk(PNGState state, PNGDecoder pNGDecoder, uint chunkSize)
+        {
+            stream.ReadzTXt(state, pNGDecoder, chunkSize);
+        }
+
+        private void ReadtIMEChunk(PNGState state)
+        {
+            stream.ReadtIME(state);
+        }
+
+        private void ReadiTXtChunk(PNGState state, PNGDecoder pNGDecoder, uint chunkSize)
+        {
+            stream.ReadiTXt(state, pNGDecoder, chunkSize);
+        }
+
+        private void ReadcHRMChunk(PNGState state, uint chunkSize)
+        {
+            if (chunkSize != 32)
+            {
+                /*invalid cHRM chunk size*/
+                state.Error = 97;
+                return;
+            }
+            state.InfoPng.cHRM = stream.ReadcHRM();
+        }
+
+        internal uint Decompress(byte[] inputData, PNGDecoderSettings settings, List<byte> outData)
         {
             uint error = 0;
             int CM, CINFO, FDICT;
 
-            if (inputData.Count < 2)
+            if (inputData.Length < 2)
             {
                 /*error, size of zlib data too small*/
                 return 53;
@@ -317,13 +359,13 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 "The additional flags shall not specify a preset dictionary."*/
                 return 26;
             }
-            var range = inputData.ToArray()[2..];
-            error = Inflate(range, scanlines);
+            var range = inputData[2..];
+            error = Inflate(range, outData);
 
             if (!settings.IgnoreAdler32)
             {
-                var ADLER32 = ReadInt32FromArray(inputData.ToArray(), inputData.Count - 4);
-                var checksum = Adler32(scanlines);
+                var ADLER32 = ReadInt32FromArray(inputData, inputData.Length - 4);
+                var checksum = Adler32(outData.ToArray());
 
                 if (checksum != ADLER32)
                 {
@@ -484,13 +526,13 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             in and out are allowed to be the same memory address (but aren't the same size since in has the extra filter bytes)
             */
 
-            int prevLine = 0;
+            byte* prevLine = null;
             uint error = 0;
 
             /*bytewidth is used for filtering, is 1 when bpp < 8, number of bytes per pixel otherwise*/
             int byteWidth = (bpp + 7) / 8;
             int lineBytes = (width * bpp + 7) / 8;
-            
+
             for (int i = 0; i < height; ++i)
             {
                 var outIndex = lineBytes * i;
@@ -499,13 +541,13 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
                 error = UnfilterScanline(&rawBuffer[outIndex], &inputData[inindex + 1], prevLine, byteWidth, filterType, lineBytes);
 
-                prevLine = outIndex;
+                prevLine = &rawBuffer[outIndex];
             }
 
             return error;
         }
 
-        private unsafe uint UnfilterScanline(byte* recon, byte* scanline, int preconIndex, int bytewidth, byte filterType, int length)
+        private unsafe uint UnfilterScanline(byte* recon, byte* scanline, byte* precon, int bytewidth, byte filterType, int length)
         {
             int i = 0;
             switch (filterType)
@@ -521,9 +563,9 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                     for (i = bytewidth; i < length; ++i) recon[i] = (byte)(scanline[i] + recon[i - bytewidth]);
                     break;
                 case 2:
-                    if (preconIndex > 0)
+                    if (precon != null)
                     {
-                        for (i = 0; i != length; ++i) recon[i] = (byte)(scanline[i] + recon[preconIndex + i]);
+                        for (i = 0; i != length; ++i) recon[i] = (byte)(scanline[i] + precon[i]);
                     }
                     else
                     {
@@ -531,10 +573,10 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                     }
                     break;
                 case 3:
-                    if (preconIndex > 0)
+                    if (precon != null)
                     {
-                        for (i = 0; i != bytewidth; ++i) recon[i] = (byte)(scanline[i] + (recon[preconIndex + i] >> 1));
-                        for (i = bytewidth; i < length; ++i) recon[i] = (byte)(scanline[i] + ((recon[i - bytewidth] + recon[preconIndex + i]) >> 1));
+                        for (i = 0; i != bytewidth; ++i) recon[i] = (byte)(scanline[i] + (precon[i] >> 1));
+                        for (i = bytewidth; i < length; ++i) recon[i] = (byte)(scanline[i] + ((recon[i - bytewidth] + precon[i]) >> 1));
                     }
                     else
                     {
@@ -543,15 +585,15 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                     }
                     break;
                 case 4:
-                    if (preconIndex > 0)
+                    if (precon != null)
                     {
                         for (i = 0; i != bytewidth; ++i)
                         {
-                            recon[i] = (byte)(scanline[i] + recon[preconIndex + i]); /*paethPredictor(0, precon[i], 0) is always precon[i]*/
+                            recon[i] = (byte)(scanline[i] + precon[i]); /*paethPredictor(0, precon[i], 0) is always precon[i]*/
                         }
                         for (i = bytewidth; i < length; ++i)
                         {
-                            recon[i] = (byte)(scanline[i] + PaethPredictor(recon[i - bytewidth], recon[preconIndex + i], recon[preconIndex + i - bytewidth]));
+                            recon[i] = (byte)(scanline[i] + PaethPredictor(recon[i - bytewidth], precon[i], precon[i - bytewidth]));
                         }
                     }
                     else
@@ -588,12 +630,12 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             else return (byte)a;
         }
 
-        private int ReadInt32FromArray(byte[] buffer, int startIndex)
+        private uint ReadInt32FromArray(byte[] buffer, int startIndex)
         {
-            return ((buffer[startIndex] << 24) | (buffer[startIndex + 1] << 16) | (buffer[startIndex + 2] << 8) | buffer[startIndex + 3]);
+            return (uint)((buffer[startIndex] << 24) | (buffer[startIndex + 1] << 16) | (buffer[startIndex + 2] << 8) | buffer[startIndex + 3]);
         }
 
-        private uint Inflate(byte[] inputData, byte[] scanlines)
+        private uint Inflate(byte[] inputData, List<byte> outData)
         {
             /*bit pointer in the "in" data, current byte is bp >> 3, current bit is bp & 0x7 (from lsb to msb of the byte)*/
             int bp = 0;
@@ -619,11 +661,11 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 }
                 else if (BTYPE == 0)
                 {
-                    error = InflateNoCompression(inputData, ref bp, ref pos, ref scanlines);
+                    error = InflateNoCompression(inputData, ref bp, ref pos, ref outData);
                 }
                 else
                 {
-                    error = InflateHuffmanBlock(inputData, ref bp, ref pos, BTYPE, ref scanlines);
+                    error = InflateHuffmanBlock(inputData, ref bp, ref pos, BTYPE, ref outData);
                 }
 
                 if (error > 0)
@@ -632,7 +674,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 }
             }
 
-            if (pos != scanlines.Length)
+            if (pos != outData.Count)
             {
                 error = 91;
             }
@@ -640,16 +682,13 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             return error;
         }
 
-        private int cnt = 0;
-
-        private uint InflateNoCompression(byte[] inputData, ref int bitPointer, ref int pos, ref byte[] outData)
+        private uint InflateNoCompression(byte[] inputData, ref int bitPointer, ref int pos, ref List<byte> outData)
         {
             int position;
             uint LEN, NLEN, n, error = 0;
-            outData = new byte[0];
 
             /*go to first boundary of byte*/
-            while (((bitPointer) & 0x07) != 0) ++bitPointer;
+            while (((bitPointer) & 0x7) != 0) ++bitPointer;
             
             /*byte position*/
             position = bitPointer / 8;
@@ -661,7 +700,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 return 52;
             }
 
-            LEN = inputData[position] + 256u + inputData[position + 1];
+            LEN = inputData[position] + 256u * inputData[position + 1];
             position += 2;
             NLEN = inputData[position] + 256u * inputData[position + 1];
             position += 2;
@@ -673,7 +712,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 return 21;
             }
 
-            //Array.Resize<byte>(ref outData, (int)(pos + LEN));
+            outData.AddRange(new byte[LEN]);
 
             /*read the literal data: LEN bytes are now stored in the out buffer*/
             if (position + LEN > inputData.Length)
@@ -692,7 +731,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         }
 
         /*inflate a block with dynamic of fixed Huffman tree*/
-        private uint InflateHuffmanBlock(byte[] inputData, ref int bitPointer, ref int pos, uint bType, ref byte[] outData)
+        private uint InflateHuffmanBlock(byte[] inputData, ref int bitPointer, ref int pos, uint bType, ref List<byte> outData)
         {
             uint error = 0;
             HuffmanTree treeLL; /*the huffman tree for literal and length codes*/
@@ -711,7 +750,6 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 error = GetHuffmanTreeInflateDynamic(treeLL, treeDist, inputData, ref bitPointer);
             }
 
-            cnt = 0;
             Stopwatch TIMER;
             TIMER = Stopwatch.StartNew();
             while (error == 0) /*decode all symbols until end reached, breaks at end code*/
@@ -721,8 +759,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
                 if (codeLL <= 255) /*literal symbol*/
                 {
+                    outData.Add(0);
                     outData[pos] = (byte)codeLL;
-                    //Debug.WriteLine($"pos = {pos}, data = {codeLL}");
                     ++pos;
                 }
                 /*length code*/
@@ -784,20 +822,25 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                     }
                     backward = start - distance;
 
+                    //Add new elements to list
+                    for (int i = 0; i < length; ++i)
+                    {
+                        outData.Add(0);
+                    }
+
                     if (distance < length)
                     {
                         for (forward = 0; forward < length; ++forward)
                         {
-                            //var val = outData[backward++];
-                            //Debug.WriteLine($"pos = {pos}, data = {outData[backward]}");
-                            //outData[pos++] = val;
-                            outData[pos++] = outData[backward++];
+                            outData[pos++] = outData[(int)backward++];
                         }
                     }
                     else
                     {
-                        Buffer.BlockCopy(outData, (int)backward, outData, pos, (int)length);
-                        pos += (int)length;
+                        for (int i = 0; i< length; ++i)
+                        {
+                            outData[pos++] = outData[(int)backward++];
+                        }
                     }
                 }
                 else if (codeLL == 256)
@@ -812,16 +855,9 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                     error = bitPointer > inputData.Length * 8 ? 10u : 11u;
                     break;
                 }
-                
-                cnt++;
             };
 
-            //for (int i = 0; i< outData.Length; i++)
-            //{
-            //    Debug.WriteLine($"pos = {i} {outData[i]}");
-            //}
             TIMER.Stop();
-            //Debug.WriteLine($"{TIMER.ElapsedMilliseconds} - {cnt}");
             return error;
         }
 
@@ -1127,7 +1163,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
         private void ReadtEXtChunk(PNGState state, uint chunkLength)
         {
-            var text = stream.ReadtEXtChunk(state, chunkLength);
+            var text = stream.ReadtEXt(state, chunkLength);
             state.InfoPng.TextKeys.Add(text.Key);
             state.InfoPng.TextStrings.Add(text.Text);
         }
@@ -1193,6 +1229,11 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             if (info.FilterMethod != 0) state.Error = 33;
 
             state.Error = CheckColorValidity(info.ColorMode.ColorType, info.ColorMode.BitDepth);
+        }
+
+        private void ReadiCCPChunk(PNGState state, uint chunkSize)
+        {
+            var iccp = stream.ReadiCCP(state, this, chunkSize);
         }
 
         private void ReadsRGBChunk(PNGInfo info)

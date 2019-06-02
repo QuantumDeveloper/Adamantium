@@ -488,7 +488,7 @@ namespace Adamantium.Engine.Graphics
         /// <exception cref="ArgumentException">If the argument headerPtr is null</exception>
         /// <exception cref="InvalidOperationException">If the DDS header contains invalid data.</exception>
         /// <returns>True if the decoding is successful, false if this is not a DDS header.</returns>
-        private unsafe static void EncodeDDSHeader( ImageDescription description, DDSFlags flags,  IntPtr pDestination, int maxsize, out int required )
+        private unsafe static void EncodeDDSHeader( ImageDescription description, DDSFlags flags, IntPtr pDestination, int maxsize, out int required )
         {
             if (description.ArraySize > 1)
             {
@@ -497,6 +497,8 @@ namespace Adamantium.Engine.Graphics
                     flags |= DDSFlags.ForceDX10Ext;
                 }
             }
+
+            description.DXGIFormat = DXGIFormat.R8G8B8A8_UNorm;
 
             var ddpf = default(DDS.PixelFormat);
             if ((flags & DDSFlags.ForceDX10Ext) == 0)
