@@ -195,9 +195,14 @@ namespace Adamantium.Engine.Graphics
                     header.Descriptor = (byte)TGADescriptorFlags.InvertY | 8;
                     flags |= TGAConversionFlags.Swizzle;
                     break;
+                case Format.R8G8B8_UNORM:
+                    header.ImageType = (byte)TGAImageType.TrueColor;
+                    header.BitsPerPixel = 24;
+                    header.Descriptor = (byte)TGADescriptorFlags.InvertY;
+                    flags |= TGAConversionFlags.Format888 | TGAConversionFlags.Swizzle;
+                    break;
                 case Format.B8G8R8_UNORM:
                 case Format.B8G8R8_SRGB:
-                case Format.R8G8B8_UNORM:
                     header.ImageType = (byte)TGAImageType.TrueColor;
                     header.BitsPerPixel = 24;
                     header.Descriptor = (byte)TGADescriptorFlags.InvertY;
@@ -305,7 +310,6 @@ namespace Adamantium.Engine.Graphics
             IntPtr pSource = pixelBuffers[0].DataPointer;
             int sPitch = pixelBuffers[0].RowStride;
 
-
             int headerSize = Utilities.SizeOf<TGAHeader>();
             var buffer = new byte[Math.Max(slicePitch, headerSize)];
             IntPtr memory = Utilities.AllocateMemory(headerSize, 1);
@@ -325,7 +329,7 @@ namespace Adamantium.Engine.Graphics
                 }
                 else if (flags.HasFlag(TGAConversionFlags.Swizzle))
                 {
-                    ImageHelper.SwizzleScanline(pSource, rowPitch, pSource, sPitch,
+                    ImageHelper.SwizzleScanline(dPtr, rowPitch, pSource, sPitch,
                        description.Format, ImageHelper.ScanlineFlags.None);
                 }
                 else
@@ -338,7 +342,10 @@ namespace Adamantium.Engine.Graphics
                 pSource = (IntPtr)((byte*)pSource + sPitch);
             }
 
-            Utilities.Read(pixelBuffers[0].DataPointer, buffer, 0, slicePitch);
+            //renew pointer address as far as it was moved by code above
+            dPtr = imgDst.PixelBuffer[0].DataPointer;
+
+            Utilities.Read(dPtr, buffer, 0, slicePitch);
             imageStream.Write(buffer, 0, slicePitch);
             imgDst.Dispose();
         }

@@ -7,9 +7,9 @@ using System.Text;
 
 namespace Adamantium.Engine.Graphics.Imaging.PNG
 {
-    public unsafe class PNGStream: UnmanagedMemoryStream
+    public unsafe class PNGStream : UnmanagedMemoryStream
     {
-        public PNGStream(IntPtr pSource, int size): base((byte*)pSource, size)
+        public PNGStream(IntPtr pSource, int size) : base((byte*)pSource, size)
         {
         }
         public byte[] ReadBytes(int count)
@@ -73,7 +73,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
         public sRGB ReadsRGB()
         {
-            var pos = Position-4;
+            var pos = Position - 4;
             sRGB srgb = new sRGB();
             srgb.RenderingIntent = (RenderingIntent)ReadByte();
             srgb.CRC = ReadUInt32();
@@ -130,7 +130,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             text.Text = Encoding.ASCII.GetString(data, length, data.Length - length);
             text.CRC = ReadUInt32();
             Position = pos;
-            var bytes = ReadBytes(4+(int)chunkLength);
+            var bytes = ReadBytes(4 + (int)chunkLength);
             text.CheckSum = Chunk.CalculateCheckSum(bytes, bytes.Length);
 
             return text;
@@ -232,7 +232,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             itxt.Key = Encoding.ASCII.GetString(data, 0, length);
             length++;
             compressed = data[length];
-            if (data[length+1] != 0)
+            if (data[length + 1] != 0)
             {
                 /*the 0 byte indicating compression must be 0*/
                 state.Error = 72;
@@ -240,7 +240,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
             /*even though it's not allowed by the standard, no error is thrown if
             there's no null termination char, if the text is empty for the next 3 texts*/
-            length+=1;
+            length += 1;
             var begin = length;
             length = 0;
             for (int i = begin; i < chunkLength && data[i] != 0; ++i) ++length;
@@ -279,7 +279,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             itxt.Text = Encoding.ASCII.GetString(decoded.ToArray());
             itxt.CRC = ReadUInt32();
             Position = pos;
-            var bytes = ReadBytes(4+(int)chunkLength);
+            var bytes = ReadBytes(4 + (int)chunkLength);
             itxt.CheckSum = Chunk.CalculateCheckSum(bytes, bytes.Length);
 
             state.InfoPng.InternationalText = itxt;
@@ -360,6 +360,172 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             state.InfoPng.Time = time;
 
             return time;
+        }
+
+        internal bKGD ReadbKGD(PNGState state, uint chunkLength)
+        {
+            var pos = Position - 4;
+            var info = state.InfoPng;
+            var bkgd = new bKGD();
+            if (info.ColorMode.ColorType == PNGColorType.Palette)
+            {
+                if (chunkLength != 1)
+                {
+                    /*error: this chunk must be 1 byte for indexed color image*/
+                    state.Error = 43;
+                    return null;
+                }
+
+                var colorByte = ReadByte();
+                if (colorByte >= info.ColorMode.PaletteSize)
+                {
+                    /*error: invalid palette index, or maybe this chunk appeared before PLTE*/
+                    state.Error = 103;
+                    return null;
+                }
+
+                info.IsBackgroundDefined = true;
+                bkgd.BackgroundR = bkgd.BackgroundB = bkgd.BackgroundB = (uint)colorByte;
+                info.BackgroundR = info.BackgroundG = info.BackgroundB = (uint)colorByte;
+            }
+            else if (info.ColorMode.ColorType == PNGColorType.Grey || info.ColorMode.ColorType == PNGColorType.GreyAlpha)
+            {
+                /*error: this chunk must be 2 bytes for grayscale image*/
+                if (chunkLength != 2)
+                {
+                    state.Error = 44;
+                }
+
+                /*the values are truncated to bitdepth in the PNG file*/
+                info.IsBackgroundDefined = true;
+                var color = ReadUInt16();
+                bkgd.BackgroundR = bkgd.BackgroundB = bkgd.BackgroundB = (uint)color;
+                info.BackgroundR = info.BackgroundG = info.BackgroundB = (uint)color;
+            }
+            else if (info.ColorMode.ColorType == PNGColorType.RGB || info.ColorMode.ColorType == PNGColorType.RGBA)
+            {
+                /*error: this chunk must be 6 bytes for grayscale image*/
+                if (chunkLength != 6)
+                {
+                    state.Error = 45;
+                    return null;
+                }
+
+                /*the values are truncated to bitdepth in the PNG file*/
+                info.IsBackgroundDefined = true;
+                var redColor = ReadUInt16();
+                var greenColor = ReadUInt16();
+                var blueColor = ReadUInt16();
+                info.IsBackgroundDefined = true;
+                bkgd.BackgroundR = (uint)redColor;
+                bkgd.BackgroundB = (uint)greenColor;
+                bkgd.BackgroundB = (uint)blueColor;
+                info.BackgroundR = bkgd.BackgroundR;
+                info.BackgroundG = bkgd.BackgroundG;
+                info.BackgroundB = bkgd.BackgroundB;
+            }
+
+            bkgd.CRC = ReadUInt32();
+            Position = pos;
+            var bytes = ReadBytes(4 + (int)chunkLength);
+            bkgd.CheckSum = Chunk.CalculateCheckSum(bytes, bytes.Length);
+
+            return bkgd;
+        }
+
+        internal tRNS ReadtRNS(PNGState state, uint chunkLength)
+        {
+            var pos = Position - 4;
+            var trns = new tRNS();
+            var colorMode = state.InfoPng.ColorMode;
+            if (colorMode.ColorType == PNGColorType.Palette)
+            {
+                /*error: more alpha values given than there are palette entries*/
+                if (chunkLength > colorMode.PaletteSize)
+                {
+                    state.Error = 39;
+                }
+
+                for (int i = 0; i != chunkLength; ++i)
+                {
+                    colorMode.Palette[4 * i + 3] = (byte)ReadByte();
+                }
+            }
+            else if (colorMode.ColorType == PNGColorType.Grey)
+            {
+                /*error: this chunk must be 2 bytes for grayscale image*/
+                if (chunkLength != 2)
+                {
+                    state.Error = 30;
+                }
+
+                colorMode.IsKeyDefined = true;
+                var keyValue = ReadUInt16();
+                colorMode.KeyR = colorMode.KeyG = colorMode.KeyB = keyValue;
+                trns.KeyR = trns.KeyG = trns.KeyB = keyValue;
+            }
+            else if (colorMode.ColorType == PNGColorType.RGB)
+            {
+                /*error: this chunk must be 6 bytes for RGB image*/
+                if (chunkLength != 6)
+                {
+                    state.Error = 41;
+                }
+                colorMode.IsKeyDefined = true;
+                trns.KeyR = ReadUInt16();
+                trns.KeyG = ReadUInt16();
+                trns.KeyB = ReadUInt16();
+
+                colorMode.KeyR = trns.KeyR;
+                colorMode.KeyG = trns.KeyG;
+                colorMode.KeyB = trns.KeyB;
+            }
+            else
+            {
+                /*error: tRNS chunk not allowed for other color models*/
+                state.Error = 42;
+            }
+
+            trns.CRC = ReadUInt32();
+            Position = pos;
+            var bytes = ReadBytes(4 + (int)chunkLength);
+            trns.CheckSum = Chunk.CalculateCheckSum(bytes, bytes.Length);
+
+            return trns;
+        }
+
+        internal PLTE ReadPLTE(PNGState state, uint chunkLength)
+        {
+            var pos = Position - 4;
+            var plte = new PLTE();
+            var colorMode = state.InfoPng.ColorMode;
+            plte.PaletteSize = (int)(chunkLength / 3);
+            plte.Palette = new byte[4 * plte.PaletteSize];
+
+            if (plte.PaletteSize > 256)
+            {
+                /*error: palette too big*/
+                state.Error = 38;
+            }
+
+            int index = 0;
+            var data = ReadBytes((int)chunkLength);
+            for (int i = 0; i != plte.PaletteSize; ++i)
+            {
+                plte.Palette[4 * i + 0] = data[index++]; // R
+                plte.Palette[4 * i + 1] = data[index++]; // G
+                plte.Palette[4 * i + 2] = data[index++]; // B
+                plte.Palette[4 * i + 3] = 255; // aplha
+            }
+
+            state.InfoPng.ColorMode.PaletteSize = plte.PaletteSize;
+            state.InfoPng.ColorMode.Palette = plte.Palette;
+
+            plte.CRC = ReadUInt32();
+            Position = pos;
+            var bytes = ReadBytes(4 + (int)chunkLength);
+            plte.CheckSum = Chunk.CalculateCheckSum(bytes, bytes.Length);
+            return plte;
         }
     }
 }

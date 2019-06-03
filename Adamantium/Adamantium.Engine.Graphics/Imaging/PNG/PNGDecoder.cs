@@ -200,16 +200,16 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                         IEND = true;
                         break;
                     case "PLTE":
+                        ReadPLTEChunk(state, chunkSize);
                         break;
                     case "tRNS":
+                        ReadtRNSChunk(state, chunkSize);
                         break;
                     case "bkGD":
+                        ReadbKGDChunk(state, chunkSize);
                         break;
                     case "tEXt":
-                        if (state.DecoderSettings.ReadTextChunks)
-                        {
-                            ReadtEXtChunk(state, chunkSize);
-                        }
+                        ReadtEXtChunk(state, chunkSize);
                         break;
                     case "zTXt":
                         ReadzTXtChunk(state, this, chunkSize);
@@ -296,6 +296,21 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             }
 
             return error;
+        }
+
+        private void ReadPLTEChunk(PNGState state, uint chunkSize)
+        {
+            stream.ReadPLTE(state, chunkSize);
+        }
+
+        private void ReadtRNSChunk(PNGState state, uint chunkSize)
+        {
+            stream.ReadtRNS(state, chunkSize);
+        }
+
+        private void ReadbKGDChunk(PNGState state, uint chunkSize)
+        {
+            stream.ReadbKGD(state, chunkSize);
         }
 
         private void ReadzTXtChunk(PNGState state, PNGDecoder pNGDecoder, uint chunkSize)
@@ -1163,6 +1178,10 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
         private void ReadtEXtChunk(PNGState state, uint chunkLength)
         {
+            if (!state.DecoderSettings.ReadTextChunks)
+            {
+                return;
+            }
             var text = stream.ReadtEXt(state, chunkLength);
             state.InfoPng.TextKeys.Add(text.Key);
             state.InfoPng.TextStrings.Add(text.Text);

@@ -96,9 +96,9 @@ namespace Adamantium.Engine.GraphicsTests
             //Utilities.CopyMemory(img.DataPointer, handle.AddrOfPinnedObject(), bytes.Length);
             //handle.Free();
 
-            //img?.Save("1.bmp", ImageFileType.Bmp);
-            //img?.Save("1.tga", ImageFileType.Tga);
-            //img?.Save("1.dds", ImageFileType.Dds);
+            img?.Save("1.bmp", ImageFileType.Bmp);
+            img?.Save("1.tga", ImageFileType.Tga);
+            img?.Save("1.dds", ImageFileType.Dds);
             img?.Save("1.jpg", ImageFileType.Jpg);
 
 
