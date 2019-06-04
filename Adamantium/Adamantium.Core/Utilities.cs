@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 
@@ -167,6 +168,29 @@ namespace Adamantium.Core
             var b4 = (value >> 24) & 0xff;
 
             return b1 << 24 | b2 << 16 | b3 << 8 | b4 << 0;
+        }
+
+        public static ushort SwapEndianness(ushort value)
+        {
+            var b1 = (value >> 0) & 0xff;
+            var b2 = (value >> 8) & 0xff;
+
+            return (ushort)(b1 << 8 | b2 << 0);
+        }
+
+        public static IEnumerable<byte> GetBytesWithReversedEndian(int value)
+        {
+            return BitConverter.GetBytes(value).Reverse();
+        }
+
+        public static IEnumerable<byte> GetBytesWithReversedEndian(uint value)
+        {
+            return BitConverter.GetBytes(value).Reverse();
+        }
+
+        public static IEnumerable<byte> GetBytesWithReversedEndian(ushort value)
+        {
+            return BitConverter.GetBytes(value).Reverse();
         }
 
         public static byte GetBitsCount(this int i)

@@ -103,9 +103,9 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
         /*header (IHDR), palette (PLTE) and transparency (tRNS) chunks*/
         /*compression method of the original file. Always 0.*/
-        public uint CompressionMethod { get; set; }
+        public byte CompressionMethod { get; set; }
         /*filter method of the original file*/
-        public uint FilterMethod { get; set; }
+        public byte FilterMethod { get; set; }
         /*interlace method of the original file: 0=none, 1=Adam7*/
         public InterlaceMethod InterlaceMethod;
         /*color type and bits, palette and transparency of the PNG file*/

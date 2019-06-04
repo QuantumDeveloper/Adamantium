@@ -21,19 +21,6 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             return Decode(PNGColorType.RGBA, 8);
         }
 
-        private bool ReadPNGHeader()
-        {
-            var bytes = stream.ReadBytes(8);
-            for(int i = 0; i<bytes.Length; ++i)
-            {
-                if (bytes[i] != PNGHelper.PngHeader[i])
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
-
         private Image Decode(PNGColorType colorType = PNGColorType.RGBA, uint bitDepth = 8)
         {
             PNGState state = new PNGState();
@@ -1204,7 +1191,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 state.Error = 27;
             }
 
-            if (!ReadPNGHeader())
+            if (!stream.ReadPNGSignature())
             {
                 /*error: the first 8 bytes are not the correct PNG signature*/
                 state.Error = 28;

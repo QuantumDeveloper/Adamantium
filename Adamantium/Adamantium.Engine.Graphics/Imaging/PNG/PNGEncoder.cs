@@ -6,5 +6,9 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 {
     public class PNGEncoder
     {
+        public void Encode()
+        {
+
+        }
     }
 }
