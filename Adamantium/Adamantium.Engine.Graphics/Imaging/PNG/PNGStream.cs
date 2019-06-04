@@ -1,4 +1,5 @@
-﻿using Adamantium.Engine.Graphics.Imaging.PNG.Chunks;
+﻿using Adamantium.Core;
+using Adamantium.Engine.Graphics.Imaging.PNG.Chunks;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -9,6 +10,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 {
     public unsafe class PNGStream : UnmanagedMemoryStream
     {
+        internal static byte[] PngHeader = { 137, 80, 78, 71, 13, 10, 26, 10 };
+
         public PNGStream(IntPtr pSource, int size) : base((byte*)pSource, size)
         {
         }
@@ -42,6 +45,32 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             return BitConverter.ToInt32(bytes.Reverse().ToArray(), 0);
         }
 
+        public void WriteBytes(byte[] bytes)
+        {
+            for (int i = 0; i< bytes.Length; ++i)
+            {
+                WriteByte(bytes[i]);
+            }
+        }
+
+        public void WriteUInt16(ushort value)
+        {
+            var bytes = BitConverter.GetBytes(value);
+            WriteBytes(bytes.Reverse().ToArray());
+        }
+
+        public void WriteUInt32(uint value)
+        {
+            var bytes = BitConverter.GetBytes(value);
+            WriteBytes(bytes.Reverse().ToArray());
+        }
+
+        public void WriteInt32(int value)
+        {
+            var bytes = BitConverter.GetBytes(value);
+            WriteBytes(bytes.Reverse().ToArray());
+        }
+
         public uint ReadChunkSize()
         {
             return ReadUInt32();
@@ -53,6 +82,19 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             return Encoding.ASCII.GetString(bytes);
         }
 
+        internal bool ReadPNGSignature()
+        {
+            var bytes = ReadBytes(8);
+            for (int i = 0; i < bytes.Length; ++i)
+            {
+                if (bytes[i] != PngHeader[i])
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         public IHDR ReadIHDR()
         {
             IHDR header = new IHDR();
@@ -60,13 +102,13 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             header.Height = ReadInt32();
             header.BitDepth = (byte)ReadByte();
             header.ColorType = (PNGColorType)ReadByte();
-            header.CompressionMethod = (uint)ReadByte();
-            header.FilterMethod = (uint)ReadByte();
+            header.CompressionMethod = (byte)ReadByte();
+            header.FilterMethod = (byte)ReadByte();
             header.InterlaceMethod = (InterlaceMethod)ReadByte();
             header.CRC = ReadUInt32();
             Position = 12;
             var data = ReadBytes(17);
-            header.CheckSum = Chunk.CalculateCheckSum(data, data.Length);
+            header.CheckSum = Chunk.CalculateCheckSum(data);
 
             return header;
         }
@@ -79,7 +121,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             srgb.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(5);
-            srgb.CheckSum = Chunk.CalculateCheckSum(bytes, bytes.Length);
+            srgb.CheckSum = Chunk.CalculateCheckSum(bytes);
             return srgb;
         }
 
@@ -92,7 +134,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             gama.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(5);
-            gama.CheckSum = Chunk.CalculateCheckSum(bytes, bytes.Length);
+            gama.CheckSum = Chunk.CalculateCheckSum(bytes);
             return gama;
         }
 
@@ -106,7 +148,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             phys.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(13);
-            phys.CheckSum = Chunk.CalculateCheckSum(bytes, bytes.Length);
+            phys.CheckSum = Chunk.CalculateCheckSum(bytes);
             return phys;
         }
 
@@ -131,7 +173,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             text.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(4 + (int)chunkLength);
-            text.CheckSum = Chunk.CalculateCheckSum(bytes, bytes.Length);
+            text.CheckSum = Chunk.CalculateCheckSum(bytes);
 
             return text;
         }
@@ -176,7 +218,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             iccp.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(4 + (int)chunkLength);
-            iccp.CheckSum = Chunk.CalculateCheckSum(bytes, bytes.Length);
+            iccp.CheckSum = Chunk.CalculateCheckSum(bytes);
 
             return iccp;
         }
@@ -197,7 +239,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             chrm.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(36);
-            chrm.CheckSum = Chunk.CalculateCheckSum(bytes, bytes.Length);
+            chrm.CheckSum = Chunk.CalculateCheckSum(bytes);
             return chrm;
         }
 
@@ -280,7 +322,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             itxt.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(4 + (int)chunkLength);
-            itxt.CheckSum = Chunk.CalculateCheckSum(bytes, bytes.Length);
+            itxt.CheckSum = Chunk.CalculateCheckSum(bytes);
 
             state.InfoPng.InternationalText = itxt;
             return itxt;
@@ -336,7 +378,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             ztxt.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(4 + (int)chunkLength);
-            ztxt.CheckSum = Chunk.CalculateCheckSum(bytes, bytes.Length);
+            ztxt.CheckSum = Chunk.CalculateCheckSum(bytes);
 
             return ztxt;
         }
@@ -355,7 +397,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             time.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(11);
-            time.CheckSum = Chunk.CalculateCheckSum(bytes, bytes.Length);
+            time.CheckSum = Chunk.CalculateCheckSum(bytes);
 
             state.InfoPng.Time = time;
 
@@ -428,7 +470,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             bkgd.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(4 + (int)chunkLength);
-            bkgd.CheckSum = Chunk.CalculateCheckSum(bytes, bytes.Length);
+            bkgd.CheckSum = Chunk.CalculateCheckSum(bytes);
 
             return bkgd;
         }
@@ -489,7 +531,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             trns.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(4 + (int)chunkLength);
-            trns.CheckSum = Chunk.CalculateCheckSum(bytes, bytes.Length);
+            trns.CheckSum = Chunk.CalculateCheckSum(bytes);
 
             return trns;
         }
@@ -524,8 +566,30 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             plte.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(4 + (int)chunkLength);
-            plte.CheckSum = Chunk.CalculateCheckSum(bytes, bytes.Length);
+            plte.CheckSum = Chunk.CalculateCheckSum(bytes);
             return plte;
+        }
+
+        internal void WriteSignature()
+        {
+            WriteBytes(PngHeader);
+        }
+
+        internal void WriteIHDR(IHDR header)
+        {
+            var name = header.GetNameAsBytes();
+            WriteUInt32(17);
+            WriteBytes(name);
+            WriteInt32(header.Width);
+            WriteInt32(header.Height);
+            WriteByte(header.BitDepth);
+            WriteByte((byte)header.ColorType);
+            WriteByte(header.CompressionMethod);
+            WriteByte(header.FilterMethod);
+            WriteByte((byte)header.InterlaceMethod);
+            var crcBytes = header.GetChunkBytes();
+            var crc = Chunk.CalculateCheckSum(crcBytes);
+            WriteUInt32(crc);
         }
     }
 }
