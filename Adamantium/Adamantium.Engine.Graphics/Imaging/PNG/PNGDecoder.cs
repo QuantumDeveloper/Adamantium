@@ -367,7 +367,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             if (!settings.IgnoreAdler32)
             {
                 var ADLER32 = ReadInt32FromArray(inputData, inputData.Length - 4);
-                var checksum = Adler32(outData.ToArray());
+                var checksum = Adler32.GetAdler32(outData.ToArray());
 
                 if (checksum != ADLER32)
                 {
@@ -377,36 +377,6 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             }
 
             return error;
-        }
-
-        private uint Adler32(byte[] data)
-        {
-            return UpdateAdler32(1, data);
-        }
-
-        private uint UpdateAdler32(uint adler, byte[] data)
-        {
-            uint s1 = adler & 0xffff;
-            uint s2 = (adler >> 16) & 0xffff;
-            var len = data.Length;
-            int i = 0;
-
-            while (len > 0)
-            {
-                /*at least 5552 sums can be done before the sums overflow, saving a lot of module divisions*/
-                var amount = len > 5552 ? 5552 : len;
-                len -= amount;
-                while (amount > 0)
-                {
-                    s1 += data[i++];
-                    s2 += s1;
-                    --amount;
-                }
-                s1 %= 65521;
-                s2 %= 65521;
-            }
-
-            return (s2 << 16) | s1;
         }
 
         private unsafe uint PostProcessScanline(byte[] rawBuffer, byte[] inputData, int width, int height, PNGInfo infoPng)
