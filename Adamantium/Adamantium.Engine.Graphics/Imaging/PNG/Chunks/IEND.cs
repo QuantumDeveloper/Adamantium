@@ -4,19 +4,19 @@ using System.Text;
 
 namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
 {
-    internal class IDAT : Chunk
+    internal class IEND : Chunk
     {
-        public IDAT()
+        public IEND()
         {
-            Name = "IDAT";
+            Name = "IEND";
         }
-
-        public byte[] RawData { get; set; }
 
         public override byte[] GetChunkBytes()
         {
             var bytes = new List<byte>();
             bytes.AddRange(GetNameAsBytes());
+
+            return bytes.ToArray();
         }
     }
 }
