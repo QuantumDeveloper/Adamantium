@@ -19,6 +19,34 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             buffer.Add((byte)((value >> 0) & 0xff));
         }
 
+        private void AddBitToStream(ref int bitPointer, List<byte> bitStream, byte bit)
+        {
+            /*add a new byte at the end*/
+            if ((bitPointer & 7) == 0)
+            {
+                bitStream.Add(0);
+            }
+            /*earlier bit of huffman code is in a lesser significant bit of an earlier byte*/
+            bitStream[bitStream.Count - 1] |= (byte)(bit << (bitPointer & 0x7));
+            ++bitPointer;
+        }
+
+        private void AddBitsToStream(ref int bitPointer, List<byte> bitStream, uint value, int count)
+        {
+            for (int i = 0; i != count; ++i)
+            {
+                AddBitToStream(ref bitPointer, bitStream, (byte)((value >> i) & 1));
+            }
+        }
+
+        private void AddBitsToStreamReversed(ref int bitPointer, List<byte> bitStream, uint value, int count)
+        {
+            for (int i = 0; i != count; ++i)
+            {
+                AddBitToStream(ref bitPointer, bitStream, (byte)((value >> (count - 1 - i)) & 1));
+            }
+        }
+
         private unsafe uint EncodeLZ77(byte[] inData, int inPos, List<int> outData, Hash hash, 
             int windowSize, int minmatch, int nicematch, bool lazymatching)
         {
@@ -243,6 +271,31 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             return error;
         }
 
+        private void WriteLZ77Data(ref int bitPointer, List<int> lz77Encoded, List<byte> outData, HuffmanTree treeLL, HuffmanTree treeDist)
+        {
+            for (int i = 0; i != lz77Encoded.Count; ++i)
+            {
+                var val = lz77Encoded[i];
+                AddBitsToStreamReversed(ref bitPointer, outData, treeLL.GetCode(val), (int)treeLL.GetLength(val));
+                if (val > 256) /*for a length code, 3 more things have to be added*/
+                {
+                    var lengthIndex = val - HuffmanTree.FirstLengthCodeIndex;
+                    var nLengthExtraBits = (int)HuffmanTree.LengthExtra[lengthIndex];
+                    var lengthExtraBits = (uint)lz77Encoded[++i];
+
+                    var distanceCode = lz77Encoded[++i];
+
+                    var distanceIndex = distanceCode;
+                    var nDistanceExtraBits = HuffmanTree.DistanceExtra[distanceIndex];
+                    var distanceExtraBits = lz77Encoded[++i];
+
+                    AddBitsToStream(ref bitPointer, outData, lengthExtraBits, nLengthExtraBits);
+                    AddBitsToStreamReversed(ref bitPointer, outData, treeDist.GetCode(distanceCode), (int)treeDist.GetLength(distanceCode));
+                    AddBitsToStream(ref bitPointer, outData, (uint)distanceExtraBits, (int)nDistanceExtraBits);
+                }
+            }
+        }
+
         private void AddLengthDistance(List<int> values, int length, int distance)
         {
             /*values in encoded vector are those used by deflate:
@@ -314,6 +367,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             uint error = 0;
             int blockSize = 0;
             int numDeflateBlocks = 0;
+            Hash hash = null;
+            int bitPointer = 0;
 
             if (settings.BType > 2)
             {
@@ -335,7 +390,165 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 if (blockSize > 262144) blockSize = 262144;
             }
 
-            numDeflateBlocks = 
+            numDeflateBlocks = (inData.Length + blockSize - 1) / blockSize;
+            if (numDeflateBlocks == 0) numDeflateBlocks = 1;
+
+            hash = new Hash();
+            hash.Initialize(settings.WindowSize);
+
+            for (int i = 0; i != numDeflateBlocks && error == 0; ++i)
+            {
+                var final = Convert.ToByte(i == numDeflateBlocks - 1);
+                var start = i * blockSize;
+                var end = start + blockSize;
+                if (end > inData.Length) end = inData.Length;
+
+                if (settings.BType == 1)
+                {
+                    error = DeflateFixed(inData, outData, ref bitPointer, ref hash, start, end, settings, final);
+                }
+                else if (settings.BType == 2)
+                {
+                    error = DeflateDynamic(inData, outData, ref bitPointer, ref hash, start, end, settings, final);
+                }
+            }
+
+            return error;
+        }
+
+        private uint DeflateFixed(byte[] data, List<byte> outData, ref int bitPointer, ref Hash hash, int dataPos, int dataEnd, PNGEncoderSettings settings, byte final)
+        {
+            uint error = 0;
+
+            HuffmanTree treeLL = new HuffmanTree(); /*tree for literal values and length codes*/
+            HuffmanTree treeDist = new HuffmanTree(); /*tree for distance codes*/
+            HuffmanTree.GenerateFixedLitLenTree(treeLL);
+            HuffmanTree.GenerateFixedDistanceTree(treeDist);
+
+            byte BFINAL = final;
+
+            AddBitToStream(ref bitPointer, outData, BFINAL);
+            AddBitToStream(ref bitPointer, outData, 1); /*first bit of BTYPE*/
+            AddBitToStream(ref bitPointer, outData, 0); /*second bit of BTYPE*/
+
+            if (settings.UseLZ77)
+            {
+                List<int> lz77Encoded = new List<int>();
+                error = EncodeLZ77(data, dataPos, lz77Encoded, hash, settings.WindowSize, (int)settings.MinMatch, (int)settings.NiceMatch, settings.LazyMatching);
+                if (error == 0)
+                {
+                    WriteLZ77Data(ref bitPointer, lz77Encoded, outData, treeLL, treeDist);
+                }
+            }
+            else /*no LZ77, but still will be Huffman compressed*/
+            {
+                for (int i = dataPos; i< dataEnd; ++i)
+                {
+                    AddBitsToStreamReversed(ref bitPointer, outData, treeLL.GetCode(data[i]), (int)treeLL.GetLength(data[i]));
+                }
+            }
+            /*add END code*/
+            if (error == 0)
+            {
+                AddBitsToStreamReversed(ref bitPointer, outData, treeLL.GetCode(256), (int)treeLL.GetLength(256));
+            }
+
+            return error;
+        }
+
+        private uint DeflateDynamic(byte[] data, List<byte> outData, ref int bitPointer, ref Hash hash, int dataPos, int dataEnd, PNGEncoderSettings settings, byte final)
+        {
+            uint error = 0;
+
+            /*
+            A block is compressed as follows: The PNG data is lz77 encoded, resulting in
+            literal bytes and length/distance pairs. This is then huffman compressed with
+            two huffman trees. One huffman tree is used for the lit and len values ("ll"),
+            another huffman tree is used for the dist values ("d"). These two trees are
+            stored using their code lengths, and to compress even more these code lengths
+            are also run-length encoded and huffman compressed. This gives a huffman tree
+            of code lengths "cl". The code lenghts used to describe this third tree are
+            the code length code lengths ("clcl").
+            */
+
+            /*The lz77 encoded data, represented with integers since there will also be length and distance codes in it*/
+            List<int> lz77Encoded = new List<int>();
+            HuffmanTree treeLL = new HuffmanTree(); /*tree for lit,len values*/
+            HuffmanTree treeDist = new HuffmanTree(); /*tree for distance codes*/
+            HuffmanTree treeCl = new HuffmanTree(); /*tree for encoding the code lengths representing tree_ll and tree_d*/
+            List<uint> frenquenciesLL = new List<uint>(); /*frequency of lit,len codes*/
+            List<uint> frenquenciesDist = new List<uint>(); /*frequency of dist codes*/
+            List<uint> frenquenciesCl = new List<uint>(); /*frequency of code length codes*/
+            List<uint> bitlenLld = new List<uint>(); /*lit,len,dist code lenghts (int bits), literally (without repeat codes).*/
+            /*bitlen_lld encoded with repeat codes (this is a rudimentary run length compression)*/
+            List<int> bitlenLldE = new List<int>();
+            /*bitlen_cl is the code length code lengths ("clcl"). The bit lengths of codes to represent tree_cl
+            (these are written as is in the file, it would be crazy to compress these using yet another huffman
+            tree that needs to be represented by yet another set of code lengths)*/
+            List<int> bitlenCl = new List<int>();
+            int dataSize = dataEnd - dataPos;
+
+            byte BFINAL = final;
+            int numCodesLL, numCodesDist;
+            uint HLIT, HDIST, HCLEN;
+
+            /*This while loop never loops due to a break at the end, it is here to
+            allow breaking out of it to the cleanup phase on error conditions.*/
+            while(error == 0)
+            {
+                if (settings.UseLZ77)
+                {
+                    error = EncodeLZ77(data, dataPos, lz77Encoded, hash, settings.WindowSize, (int)settings.MinMatch, (int)settings.NiceMatch, settings.LazyMatching);
+                    if (error > 0) break;
+                }
+                else
+                {
+                    for (int i = dataPos; i< dataEnd; ++i)
+                    {
+                        lz77Encoded.Add(data[i]); /*no LZ77, but still will be Huffman compressed*/
+                    }
+                }
+
+                /*Count the frequencies of lit, len and dist codes*/
+                for(int i = 0; i != lz77Encoded.Count; ++i)
+                {
+                    var symbol = lz77Encoded[i];
+                    ++frenquenciesLL[symbol];
+                    if (symbol > 256)
+                    {
+                        var dist = lz77Encoded[i + 2];
+                        ++frenquenciesDist[dist];
+                        i += 3;
+                    }
+                }
+                frenquenciesLL[256] = 1; /*there will be exactly 1 end code, at the end of the block*/
+
+                /*Make both huffman trees, one for the lit and len codes, one for the dist codes*/
+                error = HuffmanTree.MakeFromFrequences(treeLL, frenquenciesLL.ToArray(), 257, frenquenciesLL.Count, 15);
+                if (error > 0) break;
+                /*2, not 1, is chosen for mincodes: some buggy PNG decoders require at least 2 symbols in the dist tree*/
+                error = HuffmanTree.MakeFromFrequences(treeDist, frenquenciesDist.ToArray(), 2, frenquenciesLL.Count, 15);
+
+                if (error > 0) break;
+
+                numCodesLL = (int)treeLL.Numcodes;
+                if (numCodesLL > 286) numCodesLL = 286;
+
+                numCodesDist = (int)treeDist.Numcodes;
+                if (numCodesDist > 30) numCodesDist = 30;
+
+                /*store the code lengths of both generated trees in bitlen_lld*/
+                for(int i = 0; i != numCodesLL; ++i)
+                {
+                    bitlenLld.Add(treeLL.GetLength(i));
+                }
+                for (int i = 0; i != numCodesDist; ++i)
+                {
+                    bitlenLld.Add(treeDist.GetLength(i));
+                }
+
+                67874+947+947+974797
+            }
 
             return error;
         }

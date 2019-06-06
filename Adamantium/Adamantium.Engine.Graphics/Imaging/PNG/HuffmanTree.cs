@@ -74,6 +74,16 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         /*number of symbols in the alphabet = number of codes*/
         public uint Numcodes { get; set; }
 
+        public uint GetCode(int index)
+        {
+            return Tree1D[index];
+        }
+
+        public uint GetLength(int index)
+        {
+            return Lenghts[index];
+        }
+
         public static uint Make2DTree(HuffmanTree tree)
         {
             uint nodeFilled = 0; /*up to which node it is filled*/
@@ -259,5 +269,121 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 }
             }
         }
+
+        public static uint MakeFromFrequences(HuffmanTree tree, uint[] frequencies, int mincodes, int numcodes, uint maxbitlen)
+        {
+            uint error = 0;
+
+            while (frequencies[numcodes - 1] != 0 && numcodes > mincodes) --numcodes;
+
+            tree.MaxBitLen = maxbitlen;
+            tree.Numcodes = (uint)numcodes; /*number of symbols*/
+            tree.Lenghts = new uint[numcodes];
+
+            error = CodeLength(tree.Lenghts, frequencies, numcodes, maxbitlen);
+            if (error == 0)
+            {
+                error = MakeFromLength2(tree);
+            }
+
+            return error;
+        }
+
+        public static uint CodeLength(uint[] lengths, uint[] freauencies, int numcodes, uint maxbitlen)
+        {
+            uint error = 0;
+
+            int numpresent = 0; /*number of symbols with non-zero frequency*/
+            BPMNode[] leaves; /*the symbols, only those with > 0 frequency*/
+
+            if (numcodes == 0)
+            {
+                /*error: a tree of 0 symbols is not supposed to be made*/
+                return 80;
+            }
+
+            if ((1 << (int)maxbitlen) < numcodes)
+            {
+                /*error: represent all symbols*/
+                return 80;
+            }
+
+            leaves = new BPMNode[numcodes];
+
+            for (int i = 0; i != numcodes; ++i)
+            {
+                if (freauencies[i] > 0)
+                {
+                    leaves[numpresent].Weight = (int)freauencies[i];
+                    leaves[numpresent].Index = i;
+                    ++numpresent;
+                }
+            }
+
+            for (int i = 0; i != numcodes; ++i) lengths[i] = 0;
+
+            /*ensure at least two present symbols. There should be at least one symbol
+            according to RFC 1951 section 3.2.7. Some decoders incorrectly require two. To
+            make these work as well ensure there are at least two symbols. The
+            Package-Merge code below also doesn't work correctly if there's only one
+            symbol, it'd give it the theoritical 0 bits but in practice zlib wants 1 bit*/
+
+            if (numpresent == 0)
+            {
+                /*note that for RFC 1951 section 3.2.7, only lengths[0] = 1 is needed*/
+                lengths[0] = lengths[1] = 1;
+            }
+            else if (numpresent == 1)
+            {
+                lengths[leaves[0].Index] = 1;
+                lengths[leaves[0].Index == 0 ? 1 : 0] = 1;
+            }
+            else
+            {
+                BPMLists lists = null;
+                BPMNode node = null;
+
+                BPMNode.Sort(ref leaves, numpresent);
+                lists.ListSize = maxbitlen;
+                lists.MemSize = 2 * maxbitlen * (maxbitlen + 1);
+                lists.NextFree = 0;
+                lists.Memory = new BPMNode[lists.MemSize];
+                lists.FreeList = new BPMNode[lists.MemSize];
+                lists.Chains0 = new BPMNode[lists.ListSize];
+                lists.Chains1 = new BPMNode[lists.ListSize];
+
+                for (int i = 0; i != lists.MemSize; ++i)
+                {
+                    lists.FreeList[i] = lists.Memory[i];
+                }
+
+                BPMNode.Create(lists, leaves[0].Weight, 1, null);
+                BPMNode.Create(lists, leaves[1].Weight, 2, null);
+
+                for (int i = 0; i != lists.ListSize; ++i)
+                {
+                    lists.Chains0[i] = lists.Memory[0];
+                    lists.Chains1[i] = lists.Memory[1];
+                }
+
+                /*each boundaryPM call adds one chain to the last list, and we need 2 * numpresent - 2 chains.*/
+                for (int i = 2; i != 2 * numpresent -2; ++i)
+                {
+                    BPMNode.BoundaryPackageMerge(lists, leaves, numpresent, (int)maxbitlen - 1, i);
+                }
+
+                for (node = lists.Chains1[maxbitlen - 1]; node != null; node = node.Tail)
+                {
+                    for (int i = 0; i != node.Index; ++i)
+                    {
+                        ++lengths[leaves[i].Index];
+                    }
+                }
+            }
+
+            return error;
+        }
+
+        
     }
 }
