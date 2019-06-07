@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Adamantium.Engine.Graphics.Imaging.PNG
 {
-    internal class PNGDecoderSettings
+    public class PNGDecoderSettings
     {
         public PNGDecoderSettings()
         {

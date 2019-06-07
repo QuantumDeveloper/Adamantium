@@ -108,7 +108,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             header.CRC = ReadUInt32();
             Position = 12;
             var data = ReadBytes(17);
-            header.CheckSum = Chunk.CalculateCheckSum(data);
+            header.CheckSum = CRC32.CalculateCheckSum(data);
 
             return header;
         }
@@ -121,7 +121,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             srgb.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(5);
-            srgb.CheckSum = Chunk.CalculateCheckSum(bytes);
+            srgb.CheckSum = CRC32.CalculateCheckSum(bytes);
             return srgb;
         }
 
@@ -134,7 +134,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             gama.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(5);
-            gama.CheckSum = Chunk.CalculateCheckSum(bytes);
+            gama.CheckSum = CRC32.CalculateCheckSum(bytes);
             return gama;
         }
 
@@ -148,7 +148,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             phys.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(13);
-            phys.CheckSum = Chunk.CalculateCheckSum(bytes);
+            phys.CheckSum = CRC32.CalculateCheckSum(bytes);
             return phys;
         }
 
@@ -173,7 +173,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             text.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(4 + (int)chunkLength);
-            text.CheckSum = Chunk.CalculateCheckSum(bytes);
+            text.CheckSum = CRC32.CalculateCheckSum(bytes);
 
             return text;
         }
@@ -209,7 +209,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
             var slice = data[length..];
             List<byte> decoded = new List<byte>();
-            state.Error = decoder.Decompress(slice, state.DecoderSettings, decoded);
+            PNGCompressor compressor = new PNGCompressor();
+            state.Error = compressor.Decompress(slice, state.DecoderSettings, decoded);
             if (state.Error == 0)
             {
                 iccp.Profile = decoded.ToArray();
@@ -218,7 +219,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             iccp.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(4 + (int)chunkLength);
-            iccp.CheckSum = Chunk.CalculateCheckSum(bytes);
+            iccp.CheckSum = CRC32.CalculateCheckSum(bytes);
 
             return iccp;
         }
@@ -239,7 +240,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             chrm.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(36);
-            chrm.CheckSum = Chunk.CalculateCheckSum(bytes);
+            chrm.CheckSum = CRC32.CalculateCheckSum(bytes);
             return chrm;
         }
 
@@ -307,7 +308,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             List<byte> decoded = new List<byte>();
             if (compressed == 1)
             {
-                state.Error = decoder.Decompress(slice, state.DecoderSettings, decoded);
+                PNGCompressor compressor = new PNGCompressor();
+                state.Error = compressor.Decompress(slice, state.DecoderSettings, decoded);
                 if (state.Error > 0)
                 {
                     return null;
@@ -322,7 +324,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             itxt.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(4 + (int)chunkLength);
-            itxt.CheckSum = Chunk.CalculateCheckSum(bytes);
+            itxt.CheckSum = CRC32.CalculateCheckSum(bytes);
 
             state.InfoPng.InternationalText = itxt;
             return itxt;
@@ -367,7 +369,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
             List<byte> decoded = new List<byte>();
             var slice = data[begin..];
-            state.Error = decoder.Decompress(slice, state.DecoderSettings, decoded);
+            PNGCompressor compressor = new PNGCompressor();
+            state.Error = compressor.Decompress(slice, state.DecoderSettings, decoded);
 
             if (state.Error > 0)
             {
@@ -378,7 +381,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             ztxt.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(4 + (int)chunkLength);
-            ztxt.CheckSum = Chunk.CalculateCheckSum(bytes);
+            ztxt.CheckSum = CRC32.CalculateCheckSum(bytes);
 
             return ztxt;
         }
@@ -397,7 +400,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             time.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(11);
-            time.CheckSum = Chunk.CalculateCheckSum(bytes);
+            time.CheckSum = CRC32.CalculateCheckSum(bytes);
 
             state.InfoPng.Time = time;
 
@@ -470,7 +473,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             bkgd.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(4 + (int)chunkLength);
-            bkgd.CheckSum = Chunk.CalculateCheckSum(bytes);
+            bkgd.CheckSum = CRC32.CalculateCheckSum(bytes);
 
             return bkgd;
         }
@@ -531,7 +534,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             trns.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(4 + (int)chunkLength);
-            trns.CheckSum = Chunk.CalculateCheckSum(bytes);
+            trns.CheckSum = CRC32.CalculateCheckSum(bytes);
 
             return trns;
         }
@@ -566,7 +569,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             plte.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(4 + (int)chunkLength);
-            plte.CheckSum = Chunk.CalculateCheckSum(bytes);
+            plte.CheckSum = CRC32.CalculateCheckSum(bytes);
             return plte;
         }
 
@@ -588,7 +591,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             WriteByte(header.FilterMethod);
             WriteByte((byte)header.InterlaceMethod);
             var crcBytes = header.GetChunkBytes();
-            var crc = Chunk.CalculateCheckSum(crcBytes);
+            var crc = CRC32.CalculateCheckSum(crcBytes);
             WriteUInt32(crc);
         }
     }

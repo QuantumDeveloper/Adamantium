@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Adamantium.Core;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -21,15 +22,17 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
         {
             var bytes = new List<byte>();
             bytes.AddRange(GetNameAsBytes());
-            bytes.AddRange(Utilities.GetBytesWithReversedEndian(Year));
-            bytes.Add(Month);
-            bytes.Add(Day);
-            bytes.Add(Hour);
-            bytes.Add(Minute);
-            bytes.Add(Second);
+            //bytes.AddRange(Utilities.GetBytesWithReversedEndian(Year));
+            //bytes.Add(Month);
+            //bytes.Add(Day);
+            //bytes.Add(Hour);
+            //bytes.Add(Minute);
+            //bytes.Add(Second);
 
             var crc = CRC32.CalculateCheckSum(bytes.ToArray());
             bytes.AddRange(Utilities.GetBytesWithReversedEndian(crc));
+
+            return bytes.ToArray();
         }
     }
 }

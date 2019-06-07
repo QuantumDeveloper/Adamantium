@@ -274,7 +274,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         {
             uint error = 0;
 
-            while (frequencies[numcodes - 1] != 0 && numcodes > mincodes) --numcodes;
+            while (frequencies[numcodes - 1] == 0 && numcodes > mincodes) --numcodes;
 
             tree.MaxBitLen = maxbitlen;
             tree.Numcodes = (uint)numcodes; /*number of symbols*/
@@ -314,6 +314,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             {
                 if (freauencies[i] > 0)
                 {
+                    leaves[numpresent] = new BPMNode();
                     leaves[numpresent].Weight = (int)freauencies[i];
                     leaves[numpresent].Index = i;
                     ++numpresent;
@@ -340,7 +341,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             }
             else
             {
-                BPMLists lists = null;
+                BPMLists lists = new BPMLists();
                 BPMNode node = null;
 
                 BPMNode.Sort(ref leaves, numpresent);

@@ -17,6 +17,9 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
         {
             var bytes = new List<byte>();
             bytes.AddRange(GetNameAsBytes());
+
+
+            return bytes.ToArray();
         }
     }
 }

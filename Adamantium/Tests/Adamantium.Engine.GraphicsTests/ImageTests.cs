@@ -3,9 +3,12 @@ using Adamantium.Engine.Graphics;
 using Adamantium.Engine.Graphics.Imaging.JPEG;
 using Adamantium.Engine.Graphics.Imaging.JPEG.Decoder;
 using Adamantium.Engine.Graphics.Imaging.JPEG.Encoder;
+using Adamantium.Engine.Graphics.Imaging.PNG;
 using NUnit.Framework;
+using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 using Image = Adamantium.Engine.Graphics.Image;
 
 namespace Adamantium.Engine.GraphicsTests
@@ -86,6 +89,19 @@ namespace Adamantium.Engine.GraphicsTests
         [Test]
         public void PngImageTest()
         {
+            PNGCompressor compressor = new PNGCompressor();
+            string str = "This is a check for PNGCompressor!";
+            var bytes = Encoding.ASCII.GetBytes(str);
+            var settings = new PNGEncoderSettings();
+            settings.UseLZ77 = true;
+            settings.BType = 2;
+            var lst = new List<byte>();
+            var error = compressor.Compress(bytes, settings, lst);
+            var decoderSettings = new PNGDecoderSettings();
+            var decompressedLst = new List<byte>();
+            error = compressor.Decompress(lst.ToArray(), decoderSettings, decompressedLst);
+            var decompressedStr = Encoding.ASCII.GetString(decompressedLst.ToArray());
+
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\BaseAlbedoTexture_Text.png");
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\testpng1.png");
             var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\testpng2.png");
