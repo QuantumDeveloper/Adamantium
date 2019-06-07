@@ -31,13 +31,18 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         /// <returns></returns>
         public static BPMNode Create(BPMLists lists, int weight, int index, BPMNode tail)
         {
-            BPMNode result = null;
-
             /*memory full, so garbage collect*/
             if (lists.NextFree >= lists.Numfree)
             {
                 /*mark only those that are in use*/
-                for (int i = 0; i != lists.MemSize; ++i) lists.Memory[i].InUse = false;
+                for (int i = 0; i != lists.MemSize; ++i)
+                {
+                    if (lists.Memory[i] == null)
+                    {
+                        lists.Memory[i] = new BPMNode();
+                    }
+                    lists.Memory[i].InUse = false;
+                }
 
                 for (int i = 0; i != lists.ListSize; ++i)
                 {
@@ -57,6 +62,12 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 lists.NextFree = 0;
             }
 
+            BPMNode result;
+            result = lists.FreeList[lists.NextFree++];
+            result.Weight = weight;
+            result.Index = index;
+            result.Tail = tail;
+
             return result;
         }
 
@@ -68,7 +79,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             for (width = 1; width < num; width *= 2)
             {
                 BPMNode[] a = (counter & 1) == 1 ? mem : leaves;
-                BPMNode[] b = (counter & 1) == 1 ? mem : leaves;
+                BPMNode[] b = (counter & 1) == 1 ? leaves : mem;
                 int p;
                 for (p = 0; p < num; p+= 2 * width)
                 {

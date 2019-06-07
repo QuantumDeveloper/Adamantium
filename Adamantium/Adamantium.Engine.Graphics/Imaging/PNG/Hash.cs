@@ -6,9 +6,9 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 {
     internal class Hash
     {
-        public static int HashNumValues = ushort.MaxValue;
-        public static int HashBitMask = ushort.MaxValue;
-        public static int MaxSupportedDeflateLength = 258;
+        public const int HashNumValues = ushort.MaxValue;
+        public const int HashBitMask = ushort.MaxValue;
+        public const int MaxSupportedDeflateLength = 258;
 
         /*hash value to head circular pos - can be outdated if went around window*/
         public int[] Head { get; set; }
