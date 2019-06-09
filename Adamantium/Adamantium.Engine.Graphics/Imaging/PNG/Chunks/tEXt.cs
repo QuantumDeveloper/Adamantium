@@ -6,13 +6,13 @@ using System.Text;
 
 namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
 {
-    public class tEXt : Chunk
+    internal class tEXt : Chunk
     {
         public string Key { get; set; }
 
         public string Text { get; set; }
 
-        public override byte[] GetChunkBytes()
+        internal override byte[] GetChunkBytes(PNGColorMode info, PNGEncoderSettings settings)
         {
             var bytes = new List<byte>();
             bytes.AddRange(GetNameAsBytes());

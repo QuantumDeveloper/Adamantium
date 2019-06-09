@@ -6,6 +6,68 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 {
     internal class PNGColorConvertion
     {
+        public static uint GetBitsPerPixel(PNGColorMode colorMode)
+        {
+            return (uint)GetNumberOfColorChannels(colorMode.ColorType) * colorMode.BitDepth;
+        }
+
+        private static int GetNumberOfColorChannels(PNGColorType colorType)
+        {
+            switch (colorType)
+            {
+                case PNGColorType.Grey:
+                case PNGColorType.Palette:
+                    return 1;
+                case PNGColorType.GreyAlpha:
+                    return 2;
+                case PNGColorType.RGB:
+                    return 3;
+                case PNGColorType.RGBA:
+                    return 4;
+            }
+
+            return 0;
+        }
+
+        public static uint CheckColorValidity(PNGColorType colorType, uint bitDepth)
+        {
+            switch(colorType)
+            {
+                case PNGColorType.Grey:
+                    if (!(bitDepth == 1 || bitDepth == 2 || bitDepth == 4 || bitDepth == 8 || bitDepth == 16))
+                    {
+                        return 37;
+                    }
+                    break;
+                case PNGColorType.RGB:
+                    if (!(bitDepth == 8 || bitDepth == 16))
+                    {
+                        return 37;
+                    }
+                    break;
+                case PNGColorType.Palette:
+                    if (!(bitDepth == 1 || bitDepth == 2 || bitDepth == 4 || bitDepth == 8))
+                    {
+                        return 37;
+                    }
+                    break;
+                case PNGColorType.GreyAlpha:
+                    if (!(bitDepth == 8 || bitDepth == 16))
+                    {
+                        return 37;
+                    }
+                    break;
+                case PNGColorType.RGBA:
+                    if (!(bitDepth == 8 || bitDepth == 16))
+                    {
+                        return 37;
+                    }
+                    break;
+                default: return 31;
+            }
+            return 0; /*allowed color type / bits combination*/
+        }
+
         public static uint Convert(byte[] outBuffer, byte[] inBuffer, PNGColorMode outMode, PNGColorMode inMode, int width, int height)
         {
             uint error = 0;
@@ -96,6 +158,334 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             return error;
         }
 
+        /// <summary>
+        /// Converts a single rgb color without alpha from one type to another, color bits truncated to
+        /// their bitdepth.In case of single channel (gray or palette), only the r channel is used.Slow
+        /// function, do not use to process all pixels of an image.Alpha channel not supported on purpose:
+        /// this is for bKGD, supporting alpha may prevent it from finding a color in the palette, from the
+        /// specification it looks like bKGD should ignore the alpha values of the palette since it can use
+        /// any palette index but doesn't have an alpha channel. Idem with ignoring color key.
+        /// </summary>
+        /// <param name=""></param>
+        /// <returns></returns>
+        public static uint ConvertRGB(ref uint rOut, ref uint gOut, ref uint bOut,
+            uint rIn, uint gIn, uint bIn, PNGColorMode modeOut, PNGColorMode modeIn)
+        {
+            uint r = 0;
+            uint g = 0;
+            uint b = 0;
+            int mul = 65535 / ((1 << (int)modeIn.BitDepth) - 1); /*65535, 21845, 4369, 257, 1*/
+            int shift = (int)(16 - modeOut.BitDepth);
+
+            if (modeIn.ColorType == PNGColorType.Grey || modeIn.ColorType == PNGColorType.GreyAlpha)
+            {
+                r = g = b = (ushort)(rIn * mul);
+            }
+            else if (modeIn.ColorType == PNGColorType.RGB || modeIn.ColorType == PNGColorType.RGBA)
+            {
+                r = (uint)(rIn * mul);
+                g = (uint)(gIn * mul);
+                b = (uint)(bIn * mul);
+            }
+            else if (modeIn.ColorType == PNGColorType.Palette)
+            {
+                if (rIn >= modeIn.PaletteSize) return 82;
+                r = (uint)(modeIn.Palette[rIn * 4 + 0] * 257);
+                b = (uint)(modeIn.Palette[rIn * 4 + 1] * 257);
+                b = (uint)(modeIn.Palette[rIn * 4 + 2] * 257);
+            }
+            else return 31;
+
+            /* now convert to output format */
+            if (modeOut.ColorType == PNGColorType.Grey || modeOut.ColorType == PNGColorType.GreyAlpha)
+            {
+                rOut = r >> shift;
+            }
+            else if (modeOut.ColorType == PNGColorType.RGB || modeOut.ColorType == PNGColorType.RGBA)
+            {
+                rOut = r >> shift;
+                gOut = g >> shift;
+                bOut = b >> shift;
+            }
+            else if (modeOut.ColorType == PNGColorType.Palette)
+            {
+                if (((r >> 8) != (r & 255))
+                    || ((g >> 8) != (g & 255))
+                    || (b >> 8) != (b & 255))
+                {
+                    return 82;
+                }
+                for (int i = 0; i < modeOut.PaletteSize; ++i)
+                {
+                    var j = i * 4;
+                    if ((r >> 8) == modeOut.Palette[j]
+                        && (g >> 8) == modeOut.Palette[j + 1]
+                        && (b >> 8) == modeOut.Palette[j + 2])
+                    {
+                        rOut = (uint)i;
+                        return 0;
+                    }
+                }
+                return 82;
+            }
+            else return 31;
+
+            return 0;
+        }
+
+        public static bool IsGrayScaleType(PNGColorType type)
+        {
+            return type == PNGColorType.Grey || type == PNGColorType.GreyAlpha;
+        }
+
+        public static bool IsAlphaType(PNGColorType type)
+        {
+            return type == PNGColorType.GreyAlpha || type == PNGColorType.RGBA;
+        }
+
+        public static bool HasPaletteAlpha(PNGColorMode mode)
+        {
+            for (int i = 0; i != mode.PaletteSize; ++i)
+            {
+                if (mode.Palette[i * 4 + 3] < 255) return true;
+            }
+            return false;
+        }
+
+        public static bool CanHaveAlpha(PNGColorMode mode)
+        {
+            return mode.IsKeyDefined || IsAlphaType(mode.ColorType) || HasPaletteAlpha(mode);
+        }
+
+        /*Returns how many bits needed to represent given value (max 8 bit)*/
+        public static byte GetValueRequiredBits(byte value)
+        {
+            if (value == 0 || value == 255) return 1;
+            /*The scaling of 2-bit and 4-bit values uses multiples of 85 and 17*/
+            if (value % 17 == 0) return value % 85 == 0 ? (byte)2 : (byte)4;
+
+            return 8;
+        }
+
+        public static void GetColorProfile(PNGColorProfile profile, byte[] inData, uint width, uint height, PNGColorMode modeIn)
+        {
+            ColorTree tree = null;
+            int numpixels = (int)(width * height);
+
+            /* mark things as done already if it would be impossible to have a more expensive case */
+            bool coloredDone = IsGrayScaleType(modeIn.ColorType) ? true : false;
+            bool alphaDone = CanHaveAlpha(modeIn) ? false : true;
+            bool numcolorsDone = false;
+            uint bpp = GetBitsPerPixel(modeIn);
+            bool bitsDone = (profile.Bits == 1 && bpp == 1) ? true : false;
+            bool isSixteen = false; /* whether the input image is 16 bit */
+            long maxnumcolors = 257;
+
+            if (bpp <= 8) maxnumcolors = Math.Min(257, profile.Numcolors + (1 << (int)bpp));
+
+            profile.Numpixels += (uint)numpixels;
+            tree = new ColorTree();
+            tree.Initialize();
+
+            /*If the profile was already filled in from previous data, fill its palette in tree
+            and mark things as done already if we know they are the most expensive case already*/
+            if (profile.Alpha) alphaDone = true;
+            if (profile.Colored) coloredDone = true;
+            if (profile.Bits == 16) numcolorsDone = true;
+            if (profile.Bits >= bpp) bitsDone = true;
+            if (profile.Numcolors >= maxnumcolors) numcolorsDone = true;
+
+            if (!numcolorsDone)
+            {
+                for (int i = 0; i < profile.Numcolors; ++i)
+                {
+                    ColorTree.Add(ref tree, 
+                        profile.Palette[i * 4], 
+                        profile.Palette[i * 4 + 1],
+                        profile.Palette[i * 4 + 2],
+                        profile.Palette[i * 4 + 3], i);
+                }
+            }
+
+            /*Check if the 16-bit input is truly 16-bit*/
+            if (modeIn.BitDepth == 16 && !isSixteen)
+            {
+                ushort r = 0;
+                ushort g = 0;
+                ushort b = 0;
+                ushort a = 0;
+                for (int i = 0; i != numpixels; ++i)
+                {
+                    GetPixelColorRGBA16(ref r, ref g, ref b, ref a, inData, i, modeIn);
+                    if ((r & 255) != ((r >> 8) & 255) || (g & 255) != ((g >> 8) & 255) ||
+                        (b & 255) != ((b >> 8) & 255) || (a & 255) != ((a >> 8) & 255)) /*first and second byte differ*/
+                    {
+                        profile.Bits = 16;
+                        isSixteen = true;
+                        bitsDone = true;
+                        numcolorsDone = true; /*counting colors no longer useful, palette doesn't support 16-bit*/
+                        break;
+                    }
+                }
+            }
+
+            if (isSixteen)
+            {
+                ushort r = 0;
+                ushort g = 0;
+                ushort b = 0;
+                ushort a = 0;
+
+                for (int i = 0; i != numpixels; ++i)
+                {
+                    GetPixelColorRGBA16(ref r, ref g, ref b, ref a, inData, i, modeIn);
+
+                    if (!coloredDone && (r != g || r != b))
+                    {
+                        profile.Colored = true;
+                        coloredDone = true;
+                    }
+
+                    if (!alphaDone)
+                    {
+                        var matchkey = (r == profile.KeyR && g == profile.KeyG && b == profile.KeyB);
+                        if (a != 65535 && (a != 0 || (profile.Key && !matchkey)))
+                        {
+                            profile.Alpha = true;
+                            profile.Key = false;
+                            alphaDone = true;
+                        }
+                        else if (a == 0 && !profile.Alpha && !profile.Key)
+                        {
+                            profile.Key = true;
+                            profile.KeyR = r;
+                            profile.KeyG = g;
+                            profile.KeyB = b;
+                        }
+                        else if (a == ushort.MaxValue && profile.Key && matchkey)
+                        {
+                            /* Color key cannot be used if an opaque pixel also has that RGB color. */
+                            profile.Alpha = true;
+                            profile.Key = false;
+                            alphaDone = true;
+                        }
+                    }
+                    if (alphaDone && numcolorsDone && coloredDone && bitsDone) break;
+                }
+
+                if (profile.Key && !profile.Alpha)
+                {
+                    for (int i = 0; i != numpixels; ++i)
+                    {
+                        GetPixelColorRGBA16(ref r, ref g, ref b, ref a, inData, i, modeIn);
+                        if (a != 0 && r == profile.KeyR && g == profile.KeyG && b == profile.KeyB)
+                        {
+                            /* Color key cannot be used if an opaque pixel also has that RGB color. */
+                            profile.Alpha = true;
+                            profile.Key = false;
+                            alphaDone = true;
+                        }
+                    }
+                }
+            }
+            else /* < 16-bit */
+            {
+                byte r = 0;
+                byte g = 0;
+                byte b = 0;
+                byte a = 0;
+
+                for (int i = 0; i != numpixels; ++i)
+                {
+                    GetPixelColorRGBA8(ref r, ref g, ref b, ref a, inData, i, modeIn);
+
+                    if (!bitsDone && profile.Bits < 8)
+                    {
+                        /*only r is checked, < 8 bits is only relevant for grayscale*/
+                        var bits = GetValueRequiredBits(r);
+                        if (bits > profile.Bits) profile.Bits = bits;
+                    }
+                    bitsDone = (profile.Bits >= bpp);
+
+                    if (!coloredDone && (r != g || r != b))
+                    {
+                        profile.Colored = true;
+                        coloredDone = true;
+                        if (profile.Bits < 8) profile.Bits = 8; /*PNG has no colored modes with less than 8-bit per channel*/
+                    }
+
+                    if (!alphaDone)
+                    {
+                        var matchkey = (r == profile.KeyR && g == profile.KeyG && b == profile.KeyB);
+                        if (a != 255 && (a != 0 || (profile.Key && !matchkey)))
+                        {
+                            profile.Alpha = true;
+                            profile.Key = false;
+                            alphaDone = true;
+                            if (profile.Bits < 8) profile.Bits = 8; /*PNG has no alphachannel modes with less than 8-bit per channel*/
+                        }
+                        else if (a == 0 && !profile.Alpha && !profile.Key)
+                        {
+                            profile.Key = true;
+                            profile.KeyR = r;
+                            profile.KeyG = g;
+                            profile.KeyB = b;
+                        }
+                        else if (a == 255 && profile.Key && matchkey)
+                        {
+                            /* Color key cannot be used if an opaque pixel also has that RGB color. */
+                            profile.Alpha = true;
+                            profile.Key = false;
+                            alphaDone = true;
+                            if (profile.Bits < 8) profile.Bits = 8; /*PNG has no alphachannel modes with less than 8-bit per channel*/
+                        }
+                    }
+
+                    if (!numcolorsDone)
+                    {
+                        if (!ColorTree.Has(tree, r, g, b, a))
+                        {
+                            ColorTree.Add(ref tree, r, g, b, a, (int)profile.Numcolors);
+                            if (profile.Numcolors < 256)
+                            {
+                                var p = profile.Palette;
+                                var n = profile.Numcolors;
+                                p[n * 4 + 0] = r;
+                                p[n * 4 + 1] = g;
+                                p[n * 4 + 2] = b;
+                                p[n * 4 + 3] = a;
+                            }
+                            ++profile.Numcolors;
+                            numcolorsDone = profile.Numcolors >= maxnumcolors;
+                        }
+                    }
+
+                    if (alphaDone && numcolorsDone && coloredDone && bitsDone) break;
+                }
+
+                if (profile.Key && !profile.Alpha)
+                {
+                    for (int i = 0; i != numpixels; ++i)
+                    {
+                        GetPixelColorRGBA8(ref r, ref g, ref b, ref a, inData, i, modeIn);
+                        if (a != 0 && r == profile.KeyR && g == profile.KeyG && b == profile.KeyB)
+                        {
+                            /* Color key cannot be used if an opaque pixel also has that RGB color. */
+                            profile.Alpha = true;
+                            profile.Key = false;
+                            alphaDone = true;
+                            if (profile.Bits < 8) profile.Bits = 8; /*PNG has no alphachannel modes with less than 8-bit per channel*/
+                        }
+                    }
+                }
+
+                /*make the profile's key always 16-bit for consistency - repeat each byte twice*/
+                profile.KeyR += (ushort)(profile.KeyR << 8);
+                profile.KeyG += (ushort)(profile.KeyG << 8);
+                profile.KeyB += (ushort)(profile.KeyB << 8);
+            }
+        }
+
         /*Get RGBA16 color of pixel with index i (y * width + x) from the raw image with
         given color type, but the given color type must be 16-bit itself.*/
         private static void GetPixelColorRGBA16(ref ushort r, ref ushort g, ref ushort b, ref ushort a, byte[] inBuffer, int index, PNGColorMode mode)
@@ -174,7 +564,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                         buffer[bufIndex] = buffer[bufIndex + 1] = buffer[bufIndex + 2] = inBuffer[i * 2];
                         if (hasAlpha)
                         {
-                            buffer[bufIndex + 3] = (byte)(mode.IsKeyDefined && 256U * inBuffer[i * 2] + inBuffer[i * 2 +1] == mode.KeyR ? 0 : 255);
+                            buffer[bufIndex + 3] = (byte)(mode.IsKeyDefined && 256U * inBuffer[i * 2] + inBuffer[i * 2 + 1] == mode.KeyR ? 0 : 255);
                         }
                     }
                 }
@@ -182,17 +572,14 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 {
                     /*highest possible value for this bit depth*/
                     var highest = ((1U << (int)mode.BitDepth) - 1U);
-                    fixed (byte* inPtr = &inBuffer[0])
+                    for (int i = 0; i != numPixels; ++i)
                     {
-                        for (int i = 0; i != numPixels; ++i)
+                        int bufIndex = numChannels * i;
+                        var value = BitHelper.ReadBitsFromReversedStream(ref i, inBuffer, (int)mode.BitDepth);
+                        buffer[bufIndex] = buffer[bufIndex + 1] = buffer[bufIndex + 2] = (byte)((value * 255) / highest);
+                        if (hasAlpha)
                         {
-                            int bufIndex = numChannels * i;
-                            var value = PNGDecoder.ReadBitsFromReversedStream(ref i, inPtr, (int)mode.BitDepth);
-                            buffer[bufIndex] = buffer[bufIndex + 1] = buffer[bufIndex + 2] = (byte)((value * 255) / highest);
-                            if (hasAlpha)
-                            {
-                                buffer[bufIndex + 3] = (byte)(mode.IsKeyDefined && value == mode.KeyR ? 0 : 255);
-                            }
+                            buffer[bufIndex + 3] = (byte)(mode.IsKeyDefined && value == mode.KeyR ? 0 : 255);
                         }
                     }
                 }
@@ -209,9 +596,9 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                         buffer[bufIndex + 2] = inBuffer[i * 3 + 2];
                         if (hasAlpha)
                         {
-                            buffer[bufIndex + 3] = mode.IsKeyDefined 
-                                && buffer[bufIndex] == mode.KeyR 
-                                && buffer[bufIndex + 1] == mode.KeyG 
+                            buffer[bufIndex + 3] = mode.IsKeyDefined
+                                && buffer[bufIndex] == mode.KeyR
+                                && buffer[bufIndex + 1] == mode.KeyG
                                 && buffer[bufIndex + 2] == mode.KeyB ? (byte)0 : (byte)255;
                         }
                     }
@@ -226,9 +613,9 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                         buffer[bufIndex + 2] = inBuffer[i * 6 + 4];
                         if (hasAlpha)
                         {
-                            buffer[bufIndex + 3] = mode.IsKeyDefined 
-                                && 256U * inBuffer[i * 6] + inBuffer[i * 6 + 1] == mode.KeyR 
-                                && 256U * inBuffer[i * 6 + 2] + inBuffer[i * 6 + 3] == mode.KeyG 
+                            buffer[bufIndex + 3] = mode.IsKeyDefined
+                                && 256U * inBuffer[i * 6] + inBuffer[i * 6 + 1] == mode.KeyR
+                                && 256U * inBuffer[i * 6 + 2] + inBuffer[i * 6 + 3] == mode.KeyG
                                 && 256U * inBuffer[i * 6 + 4] + inBuffer[i * 6 + 5] == mode.KeyB ? (byte)0 : (byte)255;
                         }
                     }
@@ -236,40 +623,37 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             }
             else if (mode.ColorType == PNGColorType.Palette)
             {
-                int index = 0;
-                fixed (byte* inPtr = &inBuffer[0])
+                for (int i = 0; i != numPixels; ++i)
                 {
-                    for (int i = 0; i != numPixels; ++i)
+                    int bufIndex = numChannels * i;
+                    int index;
+                    if (mode.BitDepth == 8)
                     {
-                        int bufIndex = numChannels * i;
-                        if (mode.BitDepth == 8)
-                        {
-                            index = inBuffer[i];
-                        }
-                        else
-                        {
-                            index = (int)PNGDecoder.ReadBitsFromReversedStream(ref i, inPtr, (int)mode.BitDepth);
-                        }
+                        index = inBuffer[i];
+                    }
+                    else
+                    {
+                        index = (int)BitHelper.ReadBitsFromReversedStream(ref i, inBuffer, (int)mode.BitDepth);
+                    }
 
-                        if (index >= mode.PaletteSize)
+                    if (index >= mode.PaletteSize)
+                    {
+                        /*This is an error according to the PNG spec, but most PNG decoders make it black instead.
+                        Done here too, slightly faster due to no error handling needed.*/
+                        buffer[bufIndex] = buffer[bufIndex + 1] = buffer[bufIndex + 2] = 0;
+                        if (hasAlpha)
                         {
-                            /*This is an error according to the PNG spec, but most PNG decoders make it black instead.
-                            Done here too, slightly faster due to no error handling needed.*/
-                            buffer[bufIndex] = buffer[bufIndex + 1] = buffer[bufIndex + 2] = 0;
-                            if (hasAlpha)
-                            {
-                                buffer[bufIndex + 3] = 255;
-                            }
+                            buffer[bufIndex + 3] = 255;
                         }
-                        else
+                    }
+                    else
+                    {
+                        buffer[bufIndex] = mode.Palette[index * 4];
+                        buffer[bufIndex + 1] = mode.Palette[index * 4 + 1];
+                        buffer[bufIndex + 2] = mode.Palette[index * 4 + 2];
+                        if (hasAlpha)
                         {
-                            buffer[bufIndex] = mode.Palette[index * 4];
-                            buffer[bufIndex + 1] = mode.Palette[index * 4 + 1];
-                            buffer[bufIndex + 2] = mode.Palette[index * 4 + 2];
-                            if (hasAlpha)
-                            {
-                                buffer[bufIndex + 3] = mode.Palette[index * 4 + 3];
-                            }
+                            buffer[bufIndex + 3] = mode.Palette[index * 4 + 3];
                         }
                     }
                 }
@@ -354,7 +738,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 else if (mode.BitDepth == 16)
                 {
                     r = g = b = a = inBuffer[index * 2];
-                    if (mode.IsKeyDefined 
+                    if (mode.IsKeyDefined
                         && 256U * inBuffer[index * 2] + inBuffer[index * 2 + 1] == mode.KeyR)
                     {
                         a = 0;
@@ -369,18 +753,15 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                     /*highest possible value for this bit depth*/
                     var highest = ((1U << (int)mode.BitDepth) - 1U);
                     int j = (int)(index * mode.BitDepth);
-                    fixed (byte* inPtr = &inBuffer[0])
+                    var value = BitHelper.ReadBitsFromReversedStream(ref j, inBuffer, (int)mode.BitDepth);
+                    r = g = b = (byte)((value * 255) / highest);
+                    if (mode.IsKeyDefined && value == mode.KeyR)
                     {
-                        var value = PNGDecoder.ReadBitsFromReversedStream(ref j, inPtr, (int)mode.BitDepth);
-                        r = g = b = (byte)((value * 255) / highest);
-                        if (mode.IsKeyDefined && value == mode.KeyR)
-                        {
-                            a = 0;
-                        }
-                        else
-                        {
-                            a = 255;
-                        }
+                        a = 0;
+                    }
+                    else
+                    {
+                        a = 255;
                     }
                 }
             }
@@ -431,10 +812,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 else
                 {
                     int j = (int)(index * mode.BitDepth);
-                    fixed (byte* inPtr = &inBuffer[0])
-                    {
-                        i = (int)PNGDecoder.ReadBitsFromReversedStream(ref j, inPtr, (int)mode.BitDepth);
-                    }
+                    i = (int)BitHelper.ReadBitsFromReversedStream(ref j, inBuffer, (int)mode.BitDepth);
                 }
 
                 if ( i >= mode.PaletteSize)

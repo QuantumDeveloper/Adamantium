@@ -19,13 +19,15 @@
 // THE SOFTWARE.
 
 using System;
+using System.Collections;
+using System.Collections.Generic;
 
 namespace Adamantium.Engine.Graphics
 {
     /// <summary>
     /// Used by <see cref="Image"/> to provide a selector to a <see cref="PixelBuffer"/>.
     /// </summary>
-    public sealed class PixelBufferArray
+    public sealed class PixelBufferArray : IEnumerable
     {
         private readonly Image image;
 
@@ -51,6 +53,8 @@ namespace Adamantium.Engine.Graphics
         /// </summary>
         /// <returns>The total number of pixel buffers.</returns>
         public int Count { get { return this.image.pixelBuffers.Length; } }
+
+        public object Current => throw new NotImplementedException();
 
         /// <summary>
         /// Gets the pixel buffer for the specified array/z slice and mipmap level.
@@ -79,6 +83,21 @@ namespace Adamantium.Engine.Graphics
             {
                 return this.image.GetPixelBuffer(arrayIndex, zIndex, mipIndex);
             }
+        }
+
+        public IEnumerator GetEnumerator()
+        {
+            return image.pixelBuffers.GetEnumerator();
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+
+        public static implicit operator PixelBuffer[] (PixelBufferArray pixelBuffer)
+        {
+            return pixelBuffer.image.pixelBuffers;
         }
     }
 }

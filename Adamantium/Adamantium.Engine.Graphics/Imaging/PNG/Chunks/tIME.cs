@@ -14,7 +14,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
         public byte Minute { get; set; }
         public byte Second { get; set; }
 
-        public override byte[] GetChunkBytes()
+        internal override byte[] GetChunkBytes(PNGColorMode info, PNGEncoderSettings settings)
         {
             var bytes = new List<byte>();
             bytes.AddRange(GetNameAsBytes());

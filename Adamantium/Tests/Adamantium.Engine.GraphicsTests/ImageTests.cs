@@ -89,18 +89,18 @@ namespace Adamantium.Engine.GraphicsTests
         [Test]
         public void PngImageTest()
         {
-            PNGCompressor compressor = new PNGCompressor();
-            string str = "This is a check for PNGCompressor!";
-            var bytes = Encoding.ASCII.GetBytes(str);
-            var settings = new PNGEncoderSettings();
-            settings.UseLZ77 = true;
-            settings.BType = 2;
-            var lst = new List<byte>();
-            var error = compressor.Compress(bytes, settings, lst);
-            var decoderSettings = new PNGDecoderSettings();
-            var decompressedLst = new List<byte>();
-            error = compressor.Decompress(lst.ToArray(), decoderSettings, decompressedLst);
-            var decompressedStr = Encoding.ASCII.GetString(decompressedLst.ToArray());
+            //PNGCompressor compressor = new PNGCompressor();
+            //string str = "This is a check for PNGCompressor!";
+            //var bytes = Encoding.ASCII.GetBytes(str);
+            //var settings = new PNGEncoderSettings();
+            //settings.UseLZ77 = true;
+            //settings.BType = 2;
+            //var lst = new List<byte>();
+            //var error = compressor.Compress(bytes, settings, lst);
+            //var decoderSettings = new PNGDecoderSettings();
+            //var decompressedLst = new List<byte>();
+            //error = compressor.Decompress(lst.ToArray(), decoderSettings, decompressedLst);
+            //var decompressedStr = Encoding.ASCII.GetString(decompressedLst.ToArray());
 
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\BaseAlbedoTexture_Text.png");
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\testpng1.png");
@@ -113,9 +113,10 @@ namespace Adamantium.Engine.GraphicsTests
             //handle.Free();
 
             img?.Save("1.bmp", ImageFileType.Bmp);
-            img?.Save("1.tga", ImageFileType.Tga);
-            img?.Save("1.dds", ImageFileType.Dds);
-            img?.Save("1.jpg", ImageFileType.Jpg);
+            img?.Save("1.png", ImageFileType.Png);
+            //img?.Save("1.tga", ImageFileType.Tga);
+            //img?.Save("1.dds", ImageFileType.Dds);
+            //img?.Save("1.jpg", ImageFileType.Jpg);
 
 
             img?.Dispose();

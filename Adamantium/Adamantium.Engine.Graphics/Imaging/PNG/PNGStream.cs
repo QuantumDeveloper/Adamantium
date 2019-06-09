@@ -15,6 +15,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         public PNGStream(IntPtr pSource, int size) : base((byte*)pSource, size)
         {
         }
+
+        #region PNG Reader
         public byte[] ReadBytes(int count)
         {
             var buffer = new byte[count];
@@ -45,32 +47,6 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             return BitConverter.ToInt32(bytes.Reverse().ToArray(), 0);
         }
 
-        public void WriteBytes(byte[] bytes)
-        {
-            for (int i = 0; i< bytes.Length; ++i)
-            {
-                WriteByte(bytes[i]);
-            }
-        }
-
-        public void WriteUInt16(ushort value)
-        {
-            var bytes = BitConverter.GetBytes(value);
-            WriteBytes(bytes.Reverse().ToArray());
-        }
-
-        public void WriteUInt32(uint value)
-        {
-            var bytes = BitConverter.GetBytes(value);
-            WriteBytes(bytes.Reverse().ToArray());
-        }
-
-        public void WriteInt32(int value)
-        {
-            var bytes = BitConverter.GetBytes(value);
-            WriteBytes(bytes.Reverse().ToArray());
-        }
-
         public uint ReadChunkSize()
         {
             return ReadUInt32();
@@ -95,7 +71,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             return true;
         }
 
-        public IHDR ReadIHDR()
+        internal IHDR ReadIHDR()
         {
             IHDR header = new IHDR();
             header.Width = ReadInt32();
@@ -113,7 +89,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             return header;
         }
 
-        public sRGB ReadsRGB()
+        internal sRGB ReadsRGB()
         {
             var pos = Position - 4;
             sRGB srgb = new sRGB();
@@ -125,7 +101,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             return srgb;
         }
 
-        public gAMA ReadgAMA()
+        internal gAMA ReadgAMA()
         {
             var pos = Position - 4;
             gAMA gama = new gAMA();
@@ -138,7 +114,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             return gama;
         }
 
-        public pHYs ReadpHYs()
+        internal pHYs ReadpHYs()
         {
             var pos = Position - 4;
             pHYs phys = new pHYs();
@@ -573,12 +549,42 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             return plte;
         }
 
+        #endregion
+
+        #region PNG Writer
+
+        public void WriteBytes(byte[] bytes)
+        {
+            for (int i = 0; i < bytes.Length; ++i)
+            {
+                WriteByte(bytes[i]);
+            }
+        }
+
+        public void WriteUInt16(ushort value)
+        {
+            var bytes = BitConverter.GetBytes(value);
+            WriteBytes(bytes.Reverse().ToArray());
+        }
+
+        public void WriteUInt32(uint value)
+        {
+            var bytes = BitConverter.GetBytes(value);
+            WriteBytes(bytes.Reverse().ToArray());
+        }
+
+        public void WriteInt32(int value)
+        {
+            var bytes = BitConverter.GetBytes(value);
+            WriteBytes(bytes.Reverse().ToArray());
+        }
+
         internal void WriteSignature()
         {
             WriteBytes(PngHeader);
         }
 
-        internal void WriteIHDR(IHDR header)
+        internal void WriteIHDR(IHDR header, PNGColorMode info, PNGEncoderSettings settings)
         {
             var name = header.GetNameAsBytes();
             WriteUInt32(17);
@@ -590,9 +596,11 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             WriteByte(header.CompressionMethod);
             WriteByte(header.FilterMethod);
             WriteByte((byte)header.InterlaceMethod);
-            var crcBytes = header.GetChunkBytes();
+            var crcBytes = header.GetChunkBytes(info, settings);
             var crc = CRC32.CalculateCheckSum(crcBytes);
             WriteUInt32(crc);
         }
+
+        #endregion
     }
 }

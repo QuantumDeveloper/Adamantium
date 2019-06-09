@@ -4,6 +4,35 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 {
     internal class PNGColorMode
     {
+        public PNGColorMode()
+        {
+
+        }
+
+        public PNGColorMode(PNGColorMode copy)
+        {
+            ColorType = copy.ColorType;
+            BitDepth = copy.BitDepth;
+            if (copy.Palette != null)
+            {
+                Palette = new byte[Palette.Length];
+                Array.Copy(copy.Palette, Palette, copy.Palette.Length);
+            }
+            PaletteSize = copy.PaletteSize;
+            IsKeyDefined = copy.IsKeyDefined;
+            KeyR = copy.KeyR;
+            KeyG = copy.KeyG;
+            KeyB = copy.KeyB;
+        }
+
+        public static PNGColorMode Create(PNGColorType colorType, uint bitDepth)
+        {
+            PNGColorMode colorMode = new PNGColorMode();
+            colorMode.ColorType = colorType;
+            colorMode.BitDepth = bitDepth;
+            return colorMode;
+        }
+
         /*color type, see PNG standard or documentation further in this header file*/
         public PNGColorType ColorType { get; set; }
 

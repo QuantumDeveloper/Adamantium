@@ -7,41 +7,6 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
     public class PNGCompressor
     {
         #region Compressor
-        private static void Add32BitInt(List<byte> buffer, uint value)
-        {
-            buffer.Add((byte)((value >> 24) & 0xff));
-            buffer.Add((byte)((value >> 16) & 0xff));
-            buffer.Add((byte)((value >> 8) & 0xff));
-            buffer.Add((byte)((value >> 0) & 0xff));
-        }
-
-        private void AddBitToStream(ref int bitPointer, List<byte> bitStream, byte bit)
-        {
-            /*add a new byte at the end*/
-            if ((bitPointer & 7) == 0)
-            {
-                bitStream.Add(0);
-            }
-            /*earlier bit of huffman code is in a lesser significant bit of an earlier byte*/
-            bitStream[bitStream.Count - 1] |= (byte)(bit << (bitPointer & 0x7));
-            ++bitPointer;
-        }
-
-        private void AddBitsToStream(ref int bitPointer, List<byte> bitStream, uint value, int count)
-        {
-            for (int i = 0; i != count; ++i)
-            {
-                AddBitToStream(ref bitPointer, bitStream, (byte)((value >> i) & 1));
-            }
-        }
-
-        private void AddBitsToStreamReversed(ref int bitPointer, List<byte> bitStream, uint value, int count)
-        {
-            for (int i = 0; i != count; ++i)
-            {
-                AddBitToStream(ref bitPointer, bitStream, (byte)((value >> (count - 1 - i)) & 1));
-            }
-        }
 
         private unsafe uint EncodeLZ77(byte[] inData, int inPos, List<int> outData, Hash hash,
             int windowSize, int minmatch, int nicematch, bool lazymatching)
@@ -271,7 +236,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             for (int i = 0; i != lz77Encoded.Count; ++i)
             {
                 var val = lz77Encoded[i];
-                AddBitsToStreamReversed(ref bitPointer, outData, treeLL.GetCode(val), (int)treeLL.GetLength(val));
+                BitHelper.AddBitsToStreamReversed(ref bitPointer, outData, treeLL.GetCode(val), (int)treeLL.GetLength(val));
                 if (val > 256) /*for a length code, 3 more things have to be added*/
                 {
                     var lengthIndex = val - HuffmanTree.FirstLengthCodeIndex;
@@ -284,9 +249,9 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                     var nDistanceExtraBits = HuffmanTree.DistanceExtra[distanceIndex];
                     var distanceExtraBits = lz77Encoded[++i];
 
-                    AddBitsToStream(ref bitPointer, outData, lengthExtraBits, nLengthExtraBits);
-                    AddBitsToStreamReversed(ref bitPointer, outData, treeDist.GetCode(distanceCode), (int)treeDist.GetLength(distanceCode));
-                    AddBitsToStream(ref bitPointer, outData, (uint)distanceExtraBits, (int)nDistanceExtraBits);
+                    BitHelper.AddBitsToStream(ref bitPointer, outData, lengthExtraBits, nLengthExtraBits);
+                    BitHelper.AddBitsToStreamReversed(ref bitPointer, outData, treeDist.GetCode(distanceCode), (int)treeDist.GetLength(distanceCode));
+                    BitHelper.AddBitsToStream(ref bitPointer, outData, (uint)distanceExtraBits, (int)nDistanceExtraBits);
                 }
             }
         }
@@ -354,7 +319,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             {
                 uint ADLER32 = Adler32.GetAdler32(inData);
                 outData.AddRange(deflatedData);
-                Add32BitInt(outData, ADLER32);
+                BitHelper.Add32BitInt(outData, ADLER32);
             }
 
             return error;
@@ -425,9 +390,9 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
             byte BFINAL = final;
 
-            AddBitToStream(ref bitPointer, outData, BFINAL);
-            AddBitToStream(ref bitPointer, outData, 1); /*first bit of BTYPE*/
-            AddBitToStream(ref bitPointer, outData, 0); /*second bit of BTYPE*/
+            BitHelper.AddBitToStream(ref bitPointer, outData, BFINAL);
+            BitHelper.AddBitToStream(ref bitPointer, outData, 1); /*first bit of BTYPE*/
+            BitHelper.AddBitToStream(ref bitPointer, outData, 0); /*second bit of BTYPE*/
 
             if (settings.UseLZ77)
             {
@@ -442,13 +407,13 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             {
                 for (int i = dataPos; i < dataEnd; ++i)
                 {
-                    AddBitsToStreamReversed(ref bitPointer, outData, treeLL.GetCode(data[i]), (int)treeLL.GetLength(data[i]));
+                    BitHelper.AddBitsToStreamReversed(ref bitPointer, outData, treeLL.GetCode(data[i]), (int)treeLL.GetLength(data[i]));
                 }
             }
             /*add END code*/
             if (error == 0)
             {
-                AddBitsToStreamReversed(ref bitPointer, outData, treeLL.GetCode(256), (int)treeLL.GetLength(256));
+                BitHelper.AddBitsToStreamReversed(ref bitPointer, outData, treeLL.GetCode(256), (int)treeLL.GetLength(256));
             }
 
             return error;
@@ -645,9 +610,9 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 - 256 (end code)
                 */
 
-                AddBitToStream(ref bitPointer, outData, BFINAL);
-                AddBitToStream(ref bitPointer, outData, 0); /*first bit of BTYPE "dynamic"*/
-                AddBitToStream(ref bitPointer, outData, 1); /*second bit of BTYPE "dynamic"*/
+                BitHelper.AddBitToStream(ref bitPointer, outData, BFINAL);
+                BitHelper.AddBitToStream(ref bitPointer, outData, 0); /*first bit of BTYPE "dynamic"*/
+                BitHelper.AddBitToStream(ref bitPointer, outData, 1); /*second bit of BTYPE "dynamic"*/
 
                 /*write the HLIT, HDIST and HCLEN values*/
                 HLIT = (uint)(numCodesLL - 257);
@@ -655,32 +620,32 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 HCLEN = (uint)(bitlenCl.Count - 4);
                 /*trim zeroes for HCLEN. HLIT and HDIST were already trimmed at tree creation*/
                 while (bitlenCl[(int)HCLEN + 4 - 1] == 0 && HCLEN > 0) --HCLEN;
-                AddBitsToStream(ref bitPointer, outData, HLIT, 5);
-                AddBitsToStream(ref bitPointer, outData, HDIST, 5);
-                AddBitsToStream(ref bitPointer, outData, HCLEN, 4);
+                BitHelper.AddBitsToStream(ref bitPointer, outData, HLIT, 5);
+                BitHelper.AddBitsToStream(ref bitPointer, outData, HDIST, 5);
+                BitHelper.AddBitsToStream(ref bitPointer, outData, HCLEN, 4);
 
                 /*write the code lenghts of the code length alphabet*/
                 for (int i = 0; i != HCLEN + 4; ++i)
                 {
-                    AddBitsToStream(ref bitPointer, outData, (uint)bitlenCl[i], 3);
+                    BitHelper.AddBitsToStream(ref bitPointer, outData, (uint)bitlenCl[i], 3);
                 }
 
                 /*write the lenghts of the lit/len AND the dist alphabet*/
                 for (int i = 0; i != bitlenLldE.Count; ++i)
                 {
-                    AddBitsToStreamReversed(ref bitPointer, outData, treeCl.GetCode(bitlenLldE[i]), (int)treeCl.GetLength(bitlenLldE[i]));
+                    BitHelper.AddBitsToStreamReversed(ref bitPointer, outData, treeCl.GetCode(bitlenLldE[i]), (int)treeCl.GetLength(bitlenLldE[i]));
                     /*extra bits of repeat codes*/
                     if (bitlenLldE[i] == 16)
                     {
-                        AddBitsToStream(ref bitPointer, outData, (uint)bitlenLldE[++i], 2);
+                        BitHelper.AddBitsToStream(ref bitPointer, outData, (uint)bitlenLldE[++i], 2);
                     }
                     else if (bitlenLldE[i] == 17)
                     {
-                        AddBitsToStream(ref bitPointer, outData, (uint)bitlenLldE[++i], 3);
+                        BitHelper.AddBitsToStream(ref bitPointer, outData, (uint)bitlenLldE[++i], 3);
                     }
                     else if (bitlenLldE[i] == 18)
                     {
-                        AddBitsToStream(ref bitPointer, outData, (uint)bitlenLldE[++i], 7);
+                        BitHelper.AddBitsToStream(ref bitPointer, outData, (uint)bitlenLldE[++i], 7);
                     }
                 }
 
@@ -691,7 +656,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 if (treeLL.GetLength(256) == 0) return 64;
 
                 /*write the end code*/
-                AddBitsToStreamReversed(ref bitPointer, outData, treeLL.GetCode(256), (int)treeLL.GetLength(256));
+                BitHelper.AddBitsToStreamReversed(ref bitPointer, outData, treeLL.GetCode(256), (int)treeLL.GetLength(256));
 
                 break;
             }

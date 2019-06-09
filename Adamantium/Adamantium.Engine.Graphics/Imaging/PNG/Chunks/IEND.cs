@@ -11,7 +11,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
             Name = "IEND";
         }
 
-        public override byte[] GetChunkBytes()
+        internal override byte[] GetChunkBytes(PNGColorMode info, PNGEncoderSettings settings)
         {
             var bytes = new List<byte>();
             bytes.AddRange(GetNameAsBytes());

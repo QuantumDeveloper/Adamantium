@@ -4,7 +4,7 @@ using System.Collections.Generic;
 
 namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
 {
-    public class IHDR : Chunk
+    internal class IHDR : Chunk
     {
         public IHDR()
         {
@@ -25,7 +25,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
 
         public InterlaceMethod InterlaceMethod { get; set; }
 
-        public override byte[] GetChunkBytes()
+        internal override byte[] GetChunkBytes(PNGColorMode info, PNGEncoderSettings settings)
         {
             var bytes = new List<byte>();
             bytes.AddRange(GetNameAsBytes());
