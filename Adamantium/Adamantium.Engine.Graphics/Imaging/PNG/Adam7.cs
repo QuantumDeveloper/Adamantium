@@ -100,13 +100,78 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                                 {
                                     for (b = 0; b < bpp; ++b)
                                     {
-                                        byte bit = PNGDecoder.ReadBitFromReversedStream(ref ibp, inputPtr);
+                                        byte bit = BitHelper.ReadBitFromReversedStream(ref ibp, inputPtr);
                                         /*note that this function assumes the out buffer is completely 0, use setBitOfReversedStream otherwise*/
-                                        PNGDecoder.SetBitOfReversedStream0(ref obp, outPtr, bit);
+                                        BitHelper.SetBitOfReversedStream0(ref obp, outPtr, bit);
                                     }
                                 }
                             }
                         }
+                }
+            }
+        }
+
+
+        /*
+        in: non-interlaced image with size w*h
+        out: the same pixels, but re-ordered according to PNG's Adam7 interlacing, with
+         no padding bits between scanlines, but between reduced images so that each
+         reduced image starts at a byte.
+        bpp: bits per pixel
+        there are no padding bits, not between scanlines, not between reduced images
+        in has the following size in bits: w * h * bpp.
+        out is possibly bigger due to padding bits between reduced images
+        NOTE: comments about padding bits are only relevant if bpp < 8
+        */
+        public static void Interlace(byte[] outBuffer, byte[] inputData, uint width, uint height, uint bpp)
+        {
+            uint[] passw = new uint[7];
+            uint[] passh = new uint[7];
+            uint[] filterPassStart = new uint[8];
+            uint[] paddedPassStart = new uint[8];
+            uint[] passStart = new uint[8];
+
+            GetPassValues(passw, passh, filterPassStart, paddedPassStart, passStart, width, height, bpp);
+
+            if (bpp >= 8)
+            {
+                for (int i = 0; i != 7; ++i)
+                {
+                    var byteWidth = bpp / 8;
+                    for (int y = 0; y < passh[i]; ++y)
+                    {
+                        for (int x = 0; x < passh[i]; ++x)
+                        {
+                            var pixelInStart = ((Adam7_IY[i] + y * Adam7_DY[i]) * width + Adam7_IX[i] + x * Adam7_DX[i]) * byteWidth;
+                            var pixelOutStart = passStart[i] + (y * passw[i] + x) * byteWidth;
+                            for (int b = 0; b < byteWidth; ++b)
+                            {
+                                outBuffer[pixelOutStart + b] = inputData[pixelInStart + b];
+                            }
+                        }
+                    }
+                }
+            }
+            else /*bpp < 8: Adam7 with pixels < 8 bit is a bit trickier: with bit pointers*/
+            {
+                for (int i = 0; i != 7; ++i)
+                {
+                    var ilinebits = bpp * passw[i];
+                    var olinebits = bpp * width;
+                    int obp, ibp; /*bit pointers (for out and in buffer)*/
+                    for (int y = 0; y< passh[i]; ++y)
+                    {
+                        for (int x = 0; x < passw[i]; ++x)
+                        {
+                            ibp = (int)((Adam7_DY[i] + y * Adam7_DY[i]) * olinebits + (Adam7_IX[i] + x * Adam7_DX[i]) * bpp);
+                            obp = (int)((8 * passStart[i]) + (y * ilinebits + x * bpp));
+                            for (int b = 0; b < bpp; ++b)
+                            {
+                                byte bit = BitHelper.ReadBitFromReversedStream(ref ibp, inputData);
+                                BitHelper.SetBitOfReversedStream(ref obp, outBuffer, bit);
+                            }
+                        }
+                    }
                 }
             }
         }

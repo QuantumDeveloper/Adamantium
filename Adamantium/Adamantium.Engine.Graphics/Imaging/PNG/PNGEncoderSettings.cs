@@ -15,6 +15,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         filter_strategy must be LFS_MINSUM*/
         public bool FilterPaletteZero { get; set; }
 
+        /*Which filter strategy to use when not using zeroes due to filter_palette_zero.
+        Set filter_palette_zero to 0 to ensure always using your chosen strategy. Default: LFS_MINSUM*/
         public FilterStrategy FilterStrategy { get; set; }
 
         // ZLIB settings
@@ -34,27 +36,12 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         public uint NiceMatch { get; set; } = 128;
 
         public bool LazyMatching { get; set; } = true;
-    }
 
-    public enum FilterStrategy
-    {
-        /// <summary>
-        /// Every filter at zero
-        /// </summary>
-        Zero,
-        /// <summary>
-        /// Use filter that gives minimum sum, as described in the official PNG filter heuristic.
-        /// </summary>
-        MinSum,
-        /// <summary>
-        /// Use the filter type that gives smallest Shannon entropy for this scanline. Depending
-        /// on the image, this is better or worse than minsum.
-        /// </summary>
-        Entropy,
-        /// <summary>
-        /// Brute-force-search PNG filters by compressing each filter for each scanline.
-        /// Experimental, very slow, and only rarely gives better compression than MINSUM.
-        /// </summary>
-        BruteForce,
+        /*encode text chunks as zTXt chunks instead of tEXt chunks, and use compression in iTXt chunks*/
+        public bool TextCompression { get; set; }
+
+        /*force creating a PLTE chunk if colortype is 2 or 6 (= a suggested palette).
+        If colortype is 3, PLTE is _always_ created.*/
+        public bool ForcePalette { get; set; }
     }
 }

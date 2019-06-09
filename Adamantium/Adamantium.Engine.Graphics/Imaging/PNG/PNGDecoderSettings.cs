@@ -52,11 +52,14 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         public PNGState()
         {
             DecoderSettings = new PNGDecoderSettings();
+            EncoderSettings = new PNGEncoderSettings();
             InfoRaw = new PNGColorMode();
             InfoPng = new PNGInfo();
         }
 
         public PNGDecoderSettings DecoderSettings { get; set; }
+
+        public PNGEncoderSettings EncoderSettings { get; set; }
 
         public PNGColorMode InfoRaw { get; set; }
 
@@ -99,6 +102,27 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             ColorMode = new PNGColorMode();
             TextKeys = new List<string>();
             TextStrings = new List<string>();
+            ItextKeys = new List<string>();
+            ItextLangTags = new List<string>();
+            ItextTranskeys = new List<string>();
+            ItextStrings = new List<string>();
+        }
+
+        public PNGInfo(PNGInfo info)
+        {
+            ColorMode = new PNGColorMode(info.ColorMode);
+            TextKeys = new List<string>(info.TextKeys);
+            TextStrings = new List<string>(info.TextStrings);
+            ItextKeys = new List<string>(info.ItextKeys);
+            ItextLangTags = new List<string>(info.ItextLangTags);
+            ItextTranskeys = new List<string>(info.ItextTranskeys);
+            ItextStrings = new List<string>(info.ItextStrings);
+            CompressionMethod = info.CompressionMethod;
+            FilterMethod = info.FilterMethod;
+            InterlaceMethod = info.InterlaceMethod;
+            IccpName = info.IccpName;
+            IccpProfile = info.IccpProfile;
+            IccpProfileSize = info.IccpProfileSize;
         }
 
         /*header (IHDR), palette (PLTE) and transparency (tRNS) chunks*/
@@ -164,13 +188,13 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         /*the amount of international texts in this PNG*/
         public ulong ItextNum;
         /*the English keyword of the text chunk (e.g. "Comment")*/
-        public string[] ItextKeys;
+        public List<string> ItextKeys;
         /*language tag for this text's language, ISO/IEC 646 string, e.g. ISO 639 language tag*/
-        public string[] ItextLangtags;
+        public List<string> ItextLangTags;
         /*keyword translated to the international language - UTF-8 string*/
-        public string[] ItextTranskeys;
+        public List<string> ItextTranskeys;
         /*the actual international text - UTF-8 string*/
-        public string[] ItextStrings;
+        public List<string> ItextStrings;
 
         /*time chunk (tIME)*/
 
@@ -238,7 +262,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         To avoid this do not set an ICC profile in the image unless there is a good reason for it, and when doing so
         make sure you compute it carefully to avoid the above problems.
         */
-        public bool ISIccpDefined;      /* Whether an iCCP chunk is present (0 = not present, 1 = present). */
+        public bool IsIccpDefined;      /* Whether an iCCP chunk is present (0 = not present, 1 = present). */
         public string IccpName;            /* Null terminated string with profile name, 1-79 bytes */
 
         /*

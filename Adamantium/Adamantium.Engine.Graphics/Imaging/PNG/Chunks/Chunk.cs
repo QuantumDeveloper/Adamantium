@@ -2,7 +2,7 @@
 
 namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
 {
-    public abstract class Chunk
+    internal abstract class Chunk
     {
         public string Name { get; set; }
 
@@ -15,6 +15,6 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
             return Encoding.ASCII.GetBytes(Name);
         }
 
-        public abstract byte[] GetChunkBytes();
+        internal abstract byte[] GetChunkBytes(PNGColorMode info, PNGEncoderSettings settings);
     }
 }

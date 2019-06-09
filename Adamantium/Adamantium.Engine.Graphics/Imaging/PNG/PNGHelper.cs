@@ -1,4 +1,5 @@
-﻿using System;
+﻿using AdamantiumVulkan.Core;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -18,7 +19,15 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
         public static void SavePngToMemory(PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream)
         {
-
+            PNGEncoder encoder = new PNGEncoder(imageStream);
+            PNGState state = new PNGState();
+            //state.InfoRaw.ColorType = PNGColorType.RGBA;
+            //state.InfoRaw.BitDepth = (uint)description.Format.SizeOfInBits() / (uint)description.Format.SizeOfInBytes();
+            state.InfoRaw.ColorType = PNGColorType.Grey;
+            state.InfoRaw.BitDepth = 1;
+            state.InfoPng.ColorMode.ColorType = PNGColorType.RGBA;
+            state.InfoPng.ColorMode.BitDepth = (uint)description.Format.SizeOfInBits() / (uint)description.Format.SizeOfInBytes(); ;
+            encoder.Encode(pixelBuffers, state);
         }
     }
 }
