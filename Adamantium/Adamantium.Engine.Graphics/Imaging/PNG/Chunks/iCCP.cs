@@ -46,7 +46,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
             }
         }
 
-        internal override byte[] GetChunkBytes(PNGColorMode info, PNGEncoderSettings settings)
+        internal override byte[] GetChunkBytes(PNGState state)
         {
             var bytes = new List<byte>();
             bytes.AddRange(GetNameAsBytes());
@@ -61,7 +61,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
 
             PNGCompressor compressor = new PNGCompressor();
             var compressedBytes = new List<byte>();
-            var result = compressor.Compress(Profile, settings, compressedBytes);
+            var result = compressor.Compress(Profile, state.EncoderSettings, compressedBytes);
             if (result > 0)
             {
                 throw new PNGEncoderException(result.ToString());
@@ -95,6 +95,15 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
             if (profile == null || profile.Length < 20) return false;
             var slice = profile[16..];
             return Encoding.ASCII.GetString(slice) == "RGB ";
+        }
+
+        internal static iCCP FromState(PNGState state)
+        {
+            var iccp = new iCCP();
+            iccp.ICCPName = state.InfoPng.IccpName;
+            iccp.Profile = state.InfoPng.IccpProfile;
+
+            return iccp;
         }
     }
 }

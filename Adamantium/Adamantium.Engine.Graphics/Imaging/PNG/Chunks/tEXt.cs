@@ -12,7 +12,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
 
         public string Text { get; set; }
 
-        internal override byte[] GetChunkBytes(PNGColorMode info, PNGEncoderSettings settings)
+        internal override byte[] GetChunkBytes(PNGState state)
         {
             var bytes = new List<byte>();
             bytes.AddRange(GetNameAsBytes());

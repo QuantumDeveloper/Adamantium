@@ -15,6 +15,6 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
             return Encoding.ASCII.GetBytes(Name);
         }
 
-        internal abstract byte[] GetChunkBytes(PNGColorMode info, PNGEncoderSettings settings);
+        internal abstract byte[] GetChunkBytes(PNGState state);
     }
 }

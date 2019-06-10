@@ -22,10 +22,11 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
         public uint BlueX { get; set; }
         public uint BlueY { get; set; }
 
-        internal override byte[] GetChunkBytes(PNGColorMode info, PNGEncoderSettings settings)
+        internal override byte[] GetChunkBytes(PNGState state)
         {
             var bytes = new List<byte>();
             bytes.AddRange(GetNameAsBytes());
+            bytes.AddRange(Utilities.GetBytesWithReversedEndian(32u));
             bytes.AddRange(Utilities.GetBytesWithReversedEndian(WhitePointX));
             bytes.AddRange(Utilities.GetBytesWithReversedEndian(WhitePointY));
             bytes.AddRange(Utilities.GetBytesWithReversedEndian(RedX));
@@ -39,6 +40,20 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
             bytes.AddRange(Utilities.GetBytesWithReversedEndian(crc));
 
             return bytes.ToArray();
+        }
+
+        internal static cHRM FromState(PNGState state)
+        {
+            var chrm = new cHRM();
+            chrm.WhitePointX = state.InfoPng.ChrmWhiteX;
+            chrm.WhitePointY = state.InfoPng.ChrmWhiteY;
+            chrm.RedX = state.InfoPng.ChrmRedX;
+            chrm.RedY = state.InfoPng.ChrmRedY;
+            chrm.GreenX = state.InfoPng.ChrmGreenX;
+            chrm.GreenY = state.InfoPng.ChrmGreenY;
+            chrm.BlueX = state.InfoPng.ChrmBlueX;
+            chrm.BlueY = state.InfoPng.ChrmBlueY;
+            return chrm;
         }
     }
 }

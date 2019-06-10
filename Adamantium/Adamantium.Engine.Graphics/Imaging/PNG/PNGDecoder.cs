@@ -10,9 +10,9 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 {
     public class PNGDecoder
     {
-        private PNGStream stream;
+        private PNGStreamReader stream;
         private PNGCompressor compressor;
-        public PNGDecoder(PNGStream stream)
+        public PNGDecoder(PNGStreamReader stream)
         {
             this.stream = stream;
             compressor = new PNGCompressor();

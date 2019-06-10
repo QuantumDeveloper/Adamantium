@@ -11,7 +11,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
     {
         public static unsafe Image LoadFromPNGMemory(IntPtr pSource, int size, bool makeACopy, GCHandle? handle)
         {
-            var stream = new PNGStream(pSource, size);
+            var stream = new PNGStreamReader(pSource, size);
             PNGDecoder decoder = new PNGDecoder(stream);
             var img = decoder.Decode();
             return img;

@@ -18,14 +18,15 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
 
         public ushort KeyB { get; set; }
 
-        internal override byte[] GetChunkBytes(PNGColorMode info, PNGEncoderSettings settings)
+        internal override byte[] GetChunkBytes(PNGState state)
         {
             var bytes = new List<byte>();
             bytes.AddRange(GetNameAsBytes());
-            
+            var info = state.InfoRaw;
+
             if (info.ColorType == PNGColorType.Palette)
             {
-                var amount = info.PaletteSize;
+                var amount = state.InfoRaw.PaletteSize;
                 /*the tail of palette values that all have 255 as alpha, does not have to be encoded*/
                 for (long i = info.PaletteSize; i != 0; --i)
                 {
@@ -60,6 +61,15 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
             bytes.AddRange(Utilities.GetBytesWithReversedEndian(crc));
 
             return bytes.ToArray();
+        }
+
+        internal static tRNS FromState(PNGState state)
+        {
+            var trns = new tRNS();
+            trns.KeyR = (ushort)state.InfoRaw.KeyR;
+            trns.KeyG = (ushort)state.InfoRaw.KeyG;
+            trns.KeyB = (ushort)state.InfoRaw.KeyB;
+            return trns;
         }
     }
 }

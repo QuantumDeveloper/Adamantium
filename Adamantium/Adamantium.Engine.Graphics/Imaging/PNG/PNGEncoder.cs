@@ -10,7 +10,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
     {
         private PNGCompressor compressor;
         private Stream memoryStream;
-        private PNGStream pngStream;
+        private PNGStreamReader pngStream;
         public PNGEncoder(Stream memoryStream)
         {
             compressor = new PNGCompressor();
