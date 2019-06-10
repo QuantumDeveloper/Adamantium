@@ -25,10 +25,11 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
 
         public InterlaceMethod InterlaceMethod { get; set; }
 
-        internal override byte[] GetChunkBytes(PNGColorMode info, PNGEncoderSettings settings)
+        internal override byte[] GetChunkBytes(PNGState state)
         {
             var bytes = new List<byte>();
             bytes.AddRange(GetNameAsBytes());
+            bytes.AddRange(Utilities.GetBytesWithReversedEndian(9u));
             bytes.AddRange(Utilities.GetBytesWithReversedEndian(Width));
             bytes.AddRange(Utilities.GetBytesWithReversedEndian(Height));
             bytes.Add(BitDepth);
@@ -41,6 +42,19 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
             bytes.AddRange(Utilities.GetBytesWithReversedEndian(crc));
 
             return bytes.ToArray();
+        }
+
+        internal static IHDR FromState(PNGState state, int width, int height)
+        {
+            IHDR header = new IHDR();
+            header.Width = width;
+            header.Height = height;
+            header.BitDepth = (byte)state.InfoRaw.BitDepth;
+            header.ColorType = state.InfoRaw.ColorType;
+            header.CompressionMethod = state.InfoPng.CompressionMethod;
+            header.FilterMethod = state.InfoPng.FilterMethod;
+            header.InterlaceMethod = state.InfoPng.InterlaceMethod;
+            return header;
         }
     }
 }

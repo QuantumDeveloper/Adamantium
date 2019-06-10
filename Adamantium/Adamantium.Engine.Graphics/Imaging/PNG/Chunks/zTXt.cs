@@ -17,7 +17,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
 
         public string Text { get; set; }
 
-        internal override byte[] GetChunkBytes(PNGColorMode info, PNGEncoderSettings settings)
+        internal override byte[] GetChunkBytes(PNGState state)
         {
             var bytes = new List<byte>();
             bytes.AddRange(GetNameAsBytes());
@@ -34,7 +34,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
             PNGCompressor compressor = new PNGCompressor();
             var textBytes = Encoding.ASCII.GetBytes(Text);
             var compressedText = new List<byte>();
-            var result = compressor.Compress(textBytes, settings, compressedText);
+            var result = compressor.Compress(textBytes, state.EncoderSettings, compressedText);
             if (result > 0)
             {
                 throw new PNGEncoderException(result.ToString());

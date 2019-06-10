@@ -8,15 +8,12 @@ using System.Text;
 
 namespace Adamantium.Engine.Graphics.Imaging.PNG
 {
-    public unsafe class PNGStream : UnmanagedMemoryStream
+    public unsafe class PNGStreamReader : UnmanagedMemoryStream
     {
-        internal static byte[] PngHeader = { 137, 80, 78, 71, 13, 10, 26, 10 };
-
-        public PNGStream(IntPtr pSource, int size) : base((byte*)pSource, size)
+        public PNGStreamReader(IntPtr pSource, int size) : base((byte*)pSource, size)
         {
         }
 
-        #region PNG Reader
         public byte[] ReadBytes(int count)
         {
             var buffer = new byte[count];
@@ -548,59 +545,5 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             plte.CheckSum = CRC32.CalculateCheckSum(bytes);
             return plte;
         }
-
-        #endregion
-
-        #region PNG Writer
-
-        public void WriteBytes(byte[] bytes)
-        {
-            for (int i = 0; i < bytes.Length; ++i)
-            {
-                WriteByte(bytes[i]);
-            }
-        }
-
-        public void WriteUInt16(ushort value)
-        {
-            var bytes = BitConverter.GetBytes(value);
-            WriteBytes(bytes.Reverse().ToArray());
-        }
-
-        public void WriteUInt32(uint value)
-        {
-            var bytes = BitConverter.GetBytes(value);
-            WriteBytes(bytes.Reverse().ToArray());
-        }
-
-        public void WriteInt32(int value)
-        {
-            var bytes = BitConverter.GetBytes(value);
-            WriteBytes(bytes.Reverse().ToArray());
-        }
-
-        internal void WriteSignature()
-        {
-            WriteBytes(PngHeader);
-        }
-
-        internal void WriteIHDR(IHDR header, PNGColorMode info, PNGEncoderSettings settings)
-        {
-            var name = header.GetNameAsBytes();
-            WriteUInt32(17);
-            WriteBytes(name);
-            WriteInt32(header.Width);
-            WriteInt32(header.Height);
-            WriteByte(header.BitDepth);
-            WriteByte((byte)header.ColorType);
-            WriteByte(header.CompressionMethod);
-            WriteByte(header.FilterMethod);
-            WriteByte((byte)header.InterlaceMethod);
-            var crcBytes = header.GetChunkBytes(info, settings);
-            var crc = CRC32.CalculateCheckSum(crcBytes);
-            WriteUInt32(crc);
-        }
-
-        #endregion
     }
 }
