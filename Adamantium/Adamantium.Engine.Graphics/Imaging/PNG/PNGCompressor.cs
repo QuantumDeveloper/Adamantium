@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 
 namespace Adamantium.Engine.Graphics.Imaging.PNG
@@ -78,8 +79,13 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 length = 0;
                 offset = 0;
 
+                if (pos == 152)
+                {
+
+                }
+
                 hashpos = hash.Chain[wpos];
-                int index = inData.Length < pos + Hash.MaxSupportedDeflateLength ? inData.Length - 1 : pos + Hash.MaxSupportedDeflateLength;
+                int index = inData.Length < pos + Hash.MaxSupportedDeflateLength ? inData.Length - 1 : pos + Hash.MaxSupportedDeflateLength - 1;
                 fixed (byte* lastPtr = &inData[index])
                 {
                     prevOffset = 0;
@@ -345,7 +351,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             {
                 blockSize = inData.Length;
             }
-            else /*if(settings->btype == 2)*/
+            else /*if(settings.BType == 2)*/
             {
                 /*on PNGs, deflate blocks of 65-262k seem to give most dense encoding*/
                 blockSize = inData.Length / 8 + 8;
@@ -464,9 +470,11 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 }
                 else
                 {
+                    lz77Encoded.AddRange(new int[dataSize]);
                     for (int i = dataPos; i < dataEnd; ++i)
                     {
-                        lz77Encoded.Add(data[i]); /*no LZ77, but still will be Huffman compressed*/
+                        //lz77Encoded.Add(data[i]); /*no LZ77, but still will be Huffman compressed*/
+                        lz77Encoded[i - dataPos] = data[i];
                     }
                 }
 
@@ -515,15 +523,15 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 17 (3-10 zeroes), 18 (11-138 zeroes)*/
                 for (int i = 0; i != bitlenLld.Count; ++i)
                 {
-                    int j = 0;
+                    int j = 0; /*amount of repititions*/
                     while (i + j + 1 < bitlenLld.Count && bitlenLld[i + j + 1] == bitlenLld[i])
                     {
                         ++j;
                     }
-
+                    
                     if (bitlenLld[i] == 0 && j >= 2) /*repeat code for zeroes*/
                     {
-                        ++j;
+                        ++j; /*include the first zero*/
                         if (j <= 10) /*repeat code 17 supports max 10 zeroes*/
                         {
                             bitlenLldE.Add(17);
@@ -541,6 +549,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                     {
                         var num = j / 6;
                         var rest = j % 6;
+                        bitlenLldE.Add((int)bitlenLld[i]);
                         for (int k = 0; k < num; ++k)
                         {
                             bitlenLldE.Add(16);

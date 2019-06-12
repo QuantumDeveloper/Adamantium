@@ -20,20 +20,19 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
         internal override byte[] GetChunkBytes(PNGState state)
         {
             var bytes = new List<byte>();
-            bytes.AddRange(Utilities.GetBytesWithReversedEndian((uint)RawData.Length));
-            bytes.AddRange(GetNameAsBytes());
-
             PNGCompressor compressor = new PNGCompressor();
             var compressedData = new List<byte>();
             var result = compressor.Compress(RawData, state.EncoderSettings, compressedData);
             if (result > 0)
             {
-                throw new PNGEncoderException(result.ToString());
+                throw new PNGEncoderException(result);
             }
 
+            bytes.AddRange(Utilities.GetBytesWithReversedEndian((uint)compressedData.Count));
+            bytes.AddRange(GetNameAsBytes());
             bytes.AddRange(compressedData);
-
-            var crc = CRC32.CalculateCheckSum(compressedData.ToArray());
+            var crcBytes = bytes.ToArray()[4..];
+            var crc = CRC32.CalculateCheckSum(crcBytes);
             bytes.AddRange(Utilities.GetBytesWithReversedEndian(crc));
 
             return bytes.ToArray();

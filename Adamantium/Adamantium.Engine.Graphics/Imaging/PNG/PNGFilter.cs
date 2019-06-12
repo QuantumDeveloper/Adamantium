@@ -321,16 +321,13 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 {
                     for (type = 0; type != 5; ++type)
                     {
-                        uint testSize = lineBytes;
-                        /*if(testsize > 8) testsize /= 8;*/ /*it already works good enough by testing a part of the row*/
-
                         fixed (byte* attemptPtr = &attempt[type][0])
                         {
                             FilterScalnline(attemptPtr, &inData[y * lineBytes], prevLine, (int)lineBytes, (int)byteWidth, (byte)type);
                         }
 
                         size[type] = 0;
-                        compressor.Compress(attempt[type], settings, dummy);
+                        error = compressor.Compress(attempt[type], settings, dummy);
                         /*check if this is smallest size (or if type == 0 it's the first case so always store the values)*/
                         if (type == 0 || size[type] < smallest)
                         {
