@@ -21,13 +21,14 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         {
             PNGEncoder encoder = new PNGEncoder(imageStream);
             PNGState state = new PNGState();
-            state.EncoderSettings.BType = 0;
-            state.InfoPng.InterlaceMethod = InterlaceMethod.Adam7;
+            state.EncoderSettings.BType = 2;
+            state.EncoderSettings.UseLZ77 = true;
+            state.InfoPng.InterlaceMethod = InterlaceMethod.None;
             state.EncoderSettings.FilterStrategy = FilterStrategy.MinSum;
             state.InfoRaw.ColorType = PNGColorType.RGBA;
             state.InfoRaw.BitDepth = (uint)description.Format.SizeOfInBits() / (uint)description.Format.SizeOfInBytes();
             //state.InfoRaw.ColorType = PNGColorType.Grey;
-            //state.InfoRaw.BitDepth = 1;
+            //state.InfoRaw.BitDepth = 8;
             state.InfoPng.ColorMode.ColorType = PNGColorType.RGBA;
             state.InfoPng.ColorMode.BitDepth = (uint)description.Format.SizeOfInBits() / (uint)description.Format.SizeOfInBytes(); ;
             encoder.Encode(pixelBuffers, state);

@@ -30,7 +30,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         public int WindowSize { get; set; } = 2048;
 
         /*mininum lz77 length. 3 is normally best, 6 can be better for some PNGs. Default: 0*/
-        public uint MinMatch { get; set; }
+        public uint MinMatch { get; set; } = 3;
 
         /*stop searching if >= this length found. Set to 258 for best compression. Default: 128*/
         public uint NiceMatch { get; set; } = 128;

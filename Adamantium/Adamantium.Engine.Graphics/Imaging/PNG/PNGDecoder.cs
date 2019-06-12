@@ -180,7 +180,16 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 switch (chunkType)
                 {
                     case "IDAT":
+                        var pos = stream.Position - 4;
                         var bytes = stream.ReadBytes((int)chunkSize);
+                        var crc = stream.ReadUInt32();
+                        stream.Position = pos;
+                        var data = stream.ReadBytes(bytes.Length + 4);
+                        var checksum = CRC32.CalculateCheckSum(data);
+                        if (crc != checksum)
+                        {
+                            state.Error = 57; // checksum mismatch;
+                        }
                         idat.AddRange(bytes);
                         break;
                     case "IEND":

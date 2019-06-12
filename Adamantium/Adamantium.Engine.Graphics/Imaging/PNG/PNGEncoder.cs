@@ -125,7 +125,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 {
                     long size = (frame.Width * frame.Height * PNGColorConvertion.GetBitsPerPixel(info.ColorMode) + 7) / 8;
                     var converted = new byte[size];
-                    state.Error = PNGColorConvertion.Convert(converted, frame.RawPixelBuffer, info.ColorMode, state.InfoRaw, frame.Width, frame.Height);
+                    state.Error = PNGColorConvertion.Convert(converted, frame.RawPixelBuffer, info.ColorMode, state.InfoPng.ColorMode, frame.Width, frame.Height);
                     if (state.Error > 0)
                     {
                         throw new PNGEncoderException(state.Error);
@@ -208,7 +208,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             /*IDAT (multiple IDAT chunks must be consecutive)*/
             pngStream.WriteIDAT(state, pngImage.Frames[0].CompressedPixelBuffer);
 
-            pngStream.WritetIME(state);
+            //pngStream.WritetIME(state);
 
             pngStream.WriteIEND(state);
 

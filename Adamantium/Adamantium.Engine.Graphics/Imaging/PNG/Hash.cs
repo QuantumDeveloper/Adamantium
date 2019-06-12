@@ -41,7 +41,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             Headz = new int[MaxSupportedDeflateLength+1];
             Chainz = new ushort[windowSize];
 
-            int i = 0;
+            int i;
             for (i = 0; i != HashNumValues; ++i) Head[i] = -1;
             for (i = 0; i != windowSize; ++i) Val[i] = -1;
             for (i = 0; i != windowSize; ++i) Chain[i] = (ushort)i; /*same value as index indicates uninitialized*/
@@ -66,7 +66,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             }
             else
             {
-                int amount = 0;
+                int amount;
                 if (pos >= data.Length) return 0;
 
                 amount = data.Length - pos;
@@ -121,7 +121,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             {
                 Chainz[wpos] = (ushort)Headz[numzeros];
             }
-            Headz[numzeros] = (int)wpos;
+            Headz[numzeros] = wpos;
         }
     }
 }
