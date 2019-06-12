@@ -766,7 +766,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             var range = inputData[2..];
             error = Inflate(range, outData);
 
-            if (!settings.IgnoreAdler32)
+            if (!settings.IgnoreAdler32 && error == 0)
             {
                 var ADLER32 = ReadInt32FromArray(inputData, inputData.Length - 4);
                 var checksum = Adler32.GetAdler32(outData.ToArray());
@@ -1018,13 +1018,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             int bitLength = inputData.Length * 8;
 
             /*see comments in deflateDynamic for explanation of the context and these variables, it is analogous*/
-            uint[] bitlenLL = null; /*lit,len code lengths*/
-            uint[] bitlenDist = null; /*dist code lengths*/
 
             /*code length code lengths ("clcl"), the bit lengths of the huffman tree used to compress bitlen_ll and bitlen_d*/
-            uint[] bitlenCl = null;
-            HuffmanTree treeCl = null;
-
             if (bitPointer + 14 > (inputData.Length << 3))
             {
                 /*error: the bit pointer is or will go past the memory*/
@@ -1044,12 +1039,12 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 return 50;
             }
 
-            treeCl = new HuffmanTree();
+            HuffmanTree treeCl = new HuffmanTree();
 
             while (error == 0)
             {
                 /*read the code length codes out of 3 * (amount of code length codes) bits*/
-                bitlenCl = new uint[HuffmanTree.NumCodeLengthCodes];
+                uint[] bitlenCl = new uint[HuffmanTree.NumCodeLengthCodes];
 
                 for (i = 0; i != HuffmanTree.NumCodeLengthCodes; ++i)
                 {
@@ -1069,8 +1064,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 if (error != 0) break;
 
                 /*now we can use this tree to read the lengths for the tree that this function will return*/
-                bitlenLL = new uint[HuffmanTree.NumDeflateCodeSymbols];
-                bitlenDist = new uint[HuffmanTree.NumDistanceSymbols];
+                uint[] bitlenLL = new uint[HuffmanTree.NumDeflateCodeSymbols];
+                uint[] bitlenDist = new uint[HuffmanTree.NumDistanceSymbols];
 
                 i = 0;
                 while (i < HLIT + HDIST)

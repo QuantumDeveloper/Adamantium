@@ -21,7 +21,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
         internal override byte[] GetChunkBytes(PNGState state)
         {
             var bytes = new List<byte>();
-            bytes.AddRange(GetNameAsBytes());
+
+            var transparencyBytes = new List<byte>();
             var info = state.InfoRaw;
 
             if (info.ColorType == PNGColorType.Palette)
@@ -39,23 +40,26 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
                 /*add only alpha channel*/
                 for (int i = 0; i != amount; ++i)
                 {
-                    bytes.Add(info.Palette[4 * i + 3]);
+                    transparencyBytes.Add(info.Palette[4 * i + 3]);
                 }
             }
             else if (info.ColorType == PNGColorType.Grey)
             {
-                bytes.Add((byte)(KeyR >> 8));
-                bytes.Add((byte)(KeyR & 255));
+                transparencyBytes.Add((byte)(KeyR >> 8));
+                transparencyBytes.Add((byte)(KeyR & 255));
             }
             else if (info.ColorType == PNGColorType.RGB)
             {
-                bytes.Add((byte)(KeyR >> 8));
-                bytes.Add((byte)(KeyR & 255));
-                bytes.Add((byte)(KeyG >> 8));
-                bytes.Add((byte)(KeyG & 255));
-                bytes.Add((byte)(KeyB >> 8));
-                bytes.Add((byte)(KeyB & 255));
+                transparencyBytes.Add((byte)(KeyR >> 8));
+                transparencyBytes.Add((byte)(KeyR & 255));
+                transparencyBytes.Add((byte)(KeyG >> 8));
+                transparencyBytes.Add((byte)(KeyG & 255));
+                transparencyBytes.Add((byte)(KeyB >> 8));
+                transparencyBytes.Add((byte)(KeyB & 255));
             }
+            bytes.AddRange(Utilities.GetBytesWithReversedEndian(transparencyBytes.Count));
+            bytes.AddRange(GetNameAsBytes());
+            bytes.AddRange(transparencyBytes);
 
             var crc = CRC32.CalculateCheckSum(bytes.ToArray());
             bytes.AddRange(Utilities.GetBytesWithReversedEndian(crc));

@@ -7,6 +7,11 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
 {
     internal class tIME : Chunk
     {
+        public tIME()
+        {
+            Name = "tIME";
+        }
+
         public ushort Year { get; set; }
         public byte Month { get; set; }
         public byte Day { get; set; }
@@ -17,6 +22,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
         internal override byte[] GetChunkBytes(PNGState state)
         {
             var bytes = new List<byte>();
+            bytes.AddRange(Utilities.GetBytesWithReversedEndian(7u));
             bytes.AddRange(GetNameAsBytes());
             bytes.AddRange(Utilities.GetBytesWithReversedEndian(Year));
             bytes.Add(Month);

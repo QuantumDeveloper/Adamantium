@@ -86,20 +86,32 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
         internal void WriteiTXt(PNGState state)
         {
-            var bytes = IHDR.FromState(state).GetChunkBytes(state);
-            WriteBytes(bytes);
+            foreach (var item in state.InfoPng.ITextItems)
+            {
+                var bytes = iTXt.FromTextItem(item).GetChunkBytes(state);
+                WriteBytes(bytes);
+            }
         }
 
         internal void WritetEXt(PNGState state)
         {
-            var bytes = IHDR.FromState(state).GetChunkBytes(state);
-            WriteBytes(bytes);
+            foreach (var item in state.InfoPng.TextItems)
+            {
+                var bytes = tEXt.FromTextItem(item).GetChunkBytes(state);
+                WriteBytes(bytes);
+            }
         }
 
         internal void WritezTXt(PNGState state)
         {
-            var bytes = IHDR.FromState(state).GetChunkBytes(state);
-            WriteBytes(bytes);
+            if (state.EncoderSettings.TextCompression)
+            {
+                foreach (var item in state.InfoPng.TextItems)
+                {
+                    var bytes = zTXt.FromTextItem(item).GetChunkBytes(state);
+                    WriteBytes(bytes);
+                }
+            }
         }
 
         internal void WritepHYs(PNGState state)

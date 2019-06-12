@@ -10,6 +10,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 {
     public unsafe class PNGStreamReader : UnmanagedMemoryStream
     {
+        internal static byte[] PngHeader = { 137, 80, 78, 71, 13, 10, 26, 10 };
+
         public PNGStreamReader(IntPtr pSource, int size) : base((byte*)pSource, size)
         {
         }
@@ -517,8 +519,9 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             var pos = Position - 4;
             var plte = new PLTE();
             var colorMode = state.InfoPng.ColorMode;
-            plte.PaletteSize = (int)(chunkLength / 3);
-            plte.Palette = new byte[4 * plte.PaletteSize];
+            //plte.PaletteSize = (int)(chunkLength / 3);
+            var paletteSize = (int)(chunkLength / 3);
+            plte.Palette = new byte[4 * paletteSize];
 
             if (plte.PaletteSize > 256)
             {

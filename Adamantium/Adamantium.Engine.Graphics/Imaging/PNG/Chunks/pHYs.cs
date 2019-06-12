@@ -17,6 +17,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
         internal override byte[] GetChunkBytes(PNGState state)
         {
             var bytes = new List<byte>();
+            bytes.AddRange(Utilities.GetBytesWithReversedEndian(9u));
+
             bytes.AddRange(GetNameAsBytes());
             bytes.AddRange(Utilities.GetBytesWithReversedEndian(PhysX));
             bytes.AddRange(Utilities.GetBytesWithReversedEndian(PhysY));

@@ -20,16 +20,18 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
         internal override byte[] GetChunkBytes(PNGState state)
         {
             var bytes = new List<byte>();
-            bytes.AddRange(GetNameAsBytes());
+            var compressedBytes = new List<byte>();
+
+            
             var keyWord = Encoding.ASCII.GetBytes(Key);
             if (keyWord.Length < 1 || keyWord.Length > 79)
             {
                 throw new PNGEncoderException("Keyword should have from 1 to 79 chars");
             }
 
-            bytes.AddRange(keyWord);
-            bytes.Add(0); // Null terminator
-            bytes.Add(0); // Compression method
+            compressedBytes.AddRange(keyWord);
+            compressedBytes.Add(0); // Null terminator
+            compressedBytes.Add(0); // Compression method
 
             PNGCompressor compressor = new PNGCompressor();
             var textBytes = Encoding.ASCII.GetBytes(Text);
@@ -39,12 +41,25 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
             {
                 throw new PNGEncoderException(result.ToString());
             }
-            bytes.AddRange(compressedText);
+            compressedBytes.AddRange(compressedText);
+
+            bytes.AddRange(Utilities.GetBytesWithReversedEndian(compressedBytes.Count));
+            bytes.AddRange(GetNameAsBytes());
+            bytes.AddRange(compressedBytes);
 
             var crc = CRC32.CalculateCheckSum(bytes.ToArray());
             bytes.AddRange(Utilities.GetBytesWithReversedEndian(crc));
 
             return bytes.ToArray();
+        }
+
+        internal static zTXt FromTextItem(TXTItem item)
+        {
+            var ztext = new zTXt();
+            ztext.Key = item.Key;
+            ztext.Text = item.Text;
+
+            return ztext;
         }
     }
 }

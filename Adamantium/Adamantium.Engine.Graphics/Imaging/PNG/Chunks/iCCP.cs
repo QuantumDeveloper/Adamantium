@@ -49,6 +49,16 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
         internal override byte[] GetChunkBytes(PNGState state)
         {
             var bytes = new List<byte>();
+
+            PNGCompressor compressor = new PNGCompressor();
+            var compressedBytes = new List<byte>();
+            var result = compressor.Compress(Profile, state.EncoderSettings, compressedBytes);
+            if (result > 0)
+            {
+                throw new PNGEncoderException(result.ToString());
+            }
+
+            bytes.AddRange(Utilities.GetBytesWithReversedEndian(ICCPName.Length + 2 + compressedBytes.Count));
             bytes.AddRange(GetNameAsBytes());
             var iccpProfile = Encoding.ASCII.GetBytes(ICCPName);
             if (iccpProfile.Length < 1 || iccpProfile.Length > 79)
@@ -59,13 +69,6 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
             bytes.Add(0); // null terminator
             bytes.Add(0); // compression method
 
-            PNGCompressor compressor = new PNGCompressor();
-            var compressedBytes = new List<byte>();
-            var result = compressor.Compress(Profile, state.EncoderSettings, compressedBytes);
-            if (result > 0)
-            {
-                throw new PNGEncoderException(result.ToString());
-            }
             bytes.AddRange(compressedBytes);
 
             var crc = CRC32.CalculateCheckSum(bytes.ToArray());

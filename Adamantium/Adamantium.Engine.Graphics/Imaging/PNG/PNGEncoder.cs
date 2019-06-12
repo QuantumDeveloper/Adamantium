@@ -9,19 +9,18 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
     internal class PNGEncoder
     {
         private PNGCompressor compressor;
-        private Stream memoryStream;
-        private PNGStreamReader pngStream;
-        public PNGEncoder(Stream memoryStream)
+        private Stream outputStream;
+        private PNGStreamWriter pngStream;
+        public PNGEncoder(Stream outputStream)
         {
             compressor = new PNGCompressor();
-            this.memoryStream = memoryStream;
-            //pngStream = new PNGStream();
+            this.outputStream = outputStream;
+            pngStream = new PNGStreamWriter();
         }
 
         public uint Encode(PixelBuffer[] pixelBuffers, PNGState state)
         {
             uint error = 0;
-            
 
             /*check input values validity*/
             if ((state.InfoPng.ColorMode.ColorType == PNGColorType.Palette || state.EncoderSettings.ForcePalette)
@@ -124,7 +123,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             {
                 foreach (PNGFrame frame in pngImage.Frames)
                 {
-                    long size = frame.Width * frame.Height * PNGColorConvertion.GetBitsPerPixel(info.ColorMode) + 7 / 8;
+                    long size = (frame.Width * frame.Height * PNGColorConvertion.GetBitsPerPixel(info.ColorMode) + 7) / 8;
                     var converted = new byte[size];
                     state.Error = PNGColorConvertion.Convert(converted, frame.RawPixelBuffer, info.ColorMode, state.InfoRaw, frame.Width, frame.Height);
                     if (state.Error > 0)
@@ -132,7 +131,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                         throw new PNGEncoderException(state.Error);
                     }
                     var compressedBuffer = new byte[0];
-                    state.Error = PresprocessScanlines(ref compressedBuffer, converted, (uint)frame.Width, (uint)frame.Height, info, state.EncoderSettings);
+                    state.Error = PreprocessScanlines(ref compressedBuffer, converted, (uint)frame.Width, (uint)frame.Height, info, state.EncoderSettings);
                     frame.CompressedPixelBuffer = compressedBuffer;
                     if (state.Error > 0)
                     {
@@ -145,7 +144,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 foreach (PNGFrame frame in pngImage.Frames)
                 {
                     var compressedBuffer = new byte[0];
-                    state.Error = PresprocessScanlines(ref compressedBuffer, frame.RawPixelBuffer, (uint)frame.Width, (uint)frame.Height, info, state.EncoderSettings);
+                    state.Error = PreprocessScanlines(ref compressedBuffer, frame.RawPixelBuffer, (uint)frame.Width, (uint)frame.Height, info, state.EncoderSettings);
                     frame.CompressedPixelBuffer = compressedBuffer;
                     if (state.Error > 0)
                     {
@@ -153,6 +152,68 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                     }
                 }
             }
+            state.InfoPng = info;
+            var width = pngImage.Frames[0].Width;
+            var height = pngImage.Frames[0].Height;
+            pngStream.WriteSignature();
+            pngStream.WriteIHDR(state, width, height);
+            if (info.IsIccpDefined)
+            {
+                pngStream.WriteiCCP(state);
+            }
+            if (info.IsSrgbDefined)
+            {
+                pngStream.WritesRGB(state);
+            }
+            if (info.IsGamaDefined)
+            {
+                pngStream.WritegAMA(state);
+            }
+            if (info.IsChrmDefined)
+            {
+                pngStream.WritecHRM(state);
+            }
+
+            /*PLTE*/
+            if (info.ColorMode.ColorType == PNGColorType.Palette)
+            {
+                pngStream.WritePLTE(state);
+            }
+            if (state.EncoderSettings.ForcePalette 
+                && (info.ColorMode.ColorType == PNGColorType.RGB 
+                || info.ColorMode.ColorType == PNGColorType.RGBA))
+            {
+                pngStream.WritePLTE(state);
+            }
+            /*tRNS*/
+            if ((info.ColorMode.ColorType == PNGColorType.Grey ||
+                info.ColorMode.ColorType == PNGColorType.RGB)
+                && info.ColorMode.IsKeyDefined)
+            {
+                pngStream.WritetRNS(state);
+            }
+
+            /*bKGD (must come between PLTE and the IDAt chunks*/
+            if (info.IsBackgroundDefined)
+            {
+                pngStream.WritebKGD(state);
+            }
+
+            /*pHYs (must come before the IDAT chunks)*/
+            if (info.IsPhysDefined)
+            {
+                pngStream.WritepHYs(state);
+            }
+
+            /*IDAT (multiple IDAT chunks must be consecutive)*/
+            pngStream.WriteIDAT(state, pngImage.Frames[0].CompressedPixelBuffer);
+
+            pngStream.WritetIME(state);
+
+            pngStream.WriteIEND(state);
+
+            pngStream.Position = 0;
+            pngStream.CopyTo(outputStream);
 
             return error;
         }
@@ -190,7 +251,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         */
         /*out must be buffer big enough to contain uncompressed IDAT chunk data, and in must contain the full image.
         return value is error**/
-        private unsafe uint PresprocessScanlines(ref byte[] outData, byte[] inData, uint width, uint height, PNGInfo pngInfo, PNGEncoderSettings settings)
+        private unsafe uint PreprocessScanlines(ref byte[] outData, byte[] inData, uint width, uint height, PNGInfo pngInfo, PNGEncoderSettings settings)
         {
             uint error = 0;
             var bpp = PNGColorConvertion.GetBitsPerPixel(pngInfo.ColorMode);
