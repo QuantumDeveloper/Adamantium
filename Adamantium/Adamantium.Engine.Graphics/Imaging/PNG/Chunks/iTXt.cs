@@ -24,34 +24,50 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
         internal override byte[] GetChunkBytes(PNGState state)
         {
             var bytes = new List<byte>();
-            bytes.AddRange(GetNameAsBytes());
+
             var keyWord = Encoding.ASCII.GetBytes(Key);
             if (keyWord.Length < 1 || keyWord.Length > 79)
             {
                 throw new PNGEncoderException("Keyword should have from 1 to 79 chars");
             }
-
-            bytes.AddRange(keyWord);
-            bytes.Add(0); // Null terminator
-            bytes.Add(state.EncoderSettings.TextCompression ? (byte)1 : (byte)0); /*compression flag*/
-            bytes.Add(0); // Compression method
             var langTagBytes = Encoding.ASCII.GetBytes(LangTag);
-            bytes.AddRange(langTagBytes);
-            bytes.Add(0); // Null terminator
             var transKeyBytes = Encoding.ASCII.GetBytes(TransKey);
-            bytes.AddRange(transKeyBytes);
-            bytes.Add(0); // Null terminator
+
+            uint numBytes = (uint)(keyWord.Length + langTagBytes.Length + transKeyBytes.Length + 5);
 
             var textBytes = Encoding.ASCII.GetBytes(Text);
+
+            var compressedData = new List<byte>();
             if (state.EncoderSettings.TextCompression)
             {
-                var compressedData = new List<byte>();
                 PNGCompressor compressor = new PNGCompressor();
                 var error = compressor.Compress(textBytes, state.EncoderSettings, compressedData);
                 if (error > 0)
                 {
                     throw new PNGEncoderException(error.ToString());
                 }
+                numBytes += (uint)compressedData.Count;
+            }
+            else /*not compressed*/
+            {
+                numBytes += (uint)textBytes.Length;
+            }
+
+            bytes.AddRange(Utilities.GetBytesWithReversedEndian(numBytes));
+            bytes.AddRange(GetNameAsBytes());
+            bytes.AddRange(keyWord);
+            bytes.Add(0); // Null terminator
+            bytes.Add(state.EncoderSettings.TextCompression ? (byte)1 : (byte)0); /*compression flag*/
+            bytes.Add(0); // Compression method
+            
+            bytes.AddRange(langTagBytes);
+            bytes.Add(0); // Null terminator
+            
+            bytes.AddRange(transKeyBytes);
+            bytes.Add(0); // Null terminator
+
+            if (state.EncoderSettings.TextCompression)
+            {
                 bytes.AddRange(compressedData);
             }
             else /*not compressed*/
@@ -63,6 +79,17 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
             bytes.AddRange(Utilities.GetBytesWithReversedEndian(crc));
 
             return bytes.ToArray();
+        }
+
+        internal static iTXt FromTextItem(ITextItem item)
+        {
+            var itxt = new iTXt();
+            itxt.Key = item.Key;
+            itxt.LangTag = item.LangTag;
+            itxt.TransKey = item.TransKey;
+            itxt.Text = item.Text;
+
+            return itxt;
         }
     }
 }

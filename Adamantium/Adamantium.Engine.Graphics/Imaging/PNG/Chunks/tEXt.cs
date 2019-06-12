@@ -15,6 +15,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
         internal override byte[] GetChunkBytes(PNGState state)
         {
             var bytes = new List<byte>();
+            bytes.AddRange(Utilities.GetBytesWithReversedEndian(Key.Length + 1 + Text.Length));
             bytes.AddRange(GetNameAsBytes());
             var keyWord = Encoding.ASCII.GetBytes(Key);
             if (keyWord.Length < 1 || keyWord.Length > 79)
@@ -31,6 +32,15 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
             bytes.AddRange(Utilities.GetBytesWithReversedEndian(crc));
 
             return bytes.ToArray();
+        }
+
+        internal static tEXt FromTextItem(TXTItem item)
+        {
+            var text = new tEXt();
+            text.Key = item.Key;
+            text.Text = item.Text;
+
+            return text;
         }
     }
 }

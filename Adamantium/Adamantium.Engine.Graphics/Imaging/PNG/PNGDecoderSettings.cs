@@ -100,23 +100,15 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         public PNGInfo()
         {
             ColorMode = new PNGColorMode();
-            TextKeys = new List<string>();
-            TextStrings = new List<string>();
-            ItextKeys = new List<string>();
-            ItextLangTags = new List<string>();
-            ItextTranskeys = new List<string>();
-            ItextStrings = new List<string>();
+            TextItems = new List<TXTItem>();
+            ITextItems = new List<ITextItem>();
         }
 
         public PNGInfo(PNGInfo info)
         {
             ColorMode = new PNGColorMode(info.ColorMode);
-            TextKeys = new List<string>(info.TextKeys);
-            TextStrings = new List<string>(info.TextStrings);
-            ItextKeys = new List<string>(info.ItextKeys);
-            ItextLangTags = new List<string>(info.ItextLangTags);
-            ItextTranskeys = new List<string>(info.ItextTranskeys);
-            ItextStrings = new List<string>(info.ItextStrings);
+            TextItems = new List<TXTItem>(info.TextItems);
+            ITextItems = new List<ITextItem>(info.ITextItems);
             CompressionMethod = info.CompressionMethod;
             FilterMethod = info.FilterMethod;
             InterlaceMethod = info.InterlaceMethod;
@@ -175,9 +167,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         Don't allocate these text buffers yourself. Use the init/cleanup functions
         correctly and use lodepng_add_text and lodepng_clear_text.
         */
-        public ulong TextNum; /*the amount of texts in these string buffers (there may be more texts in itext)*/
-        public List<string> TextKeys; /*the keyword of a text chunk (e.g. "Comment")*/
-        public List<string> TextStrings; /*the actual text*/
+        public List<TXTItem> TextItems;
 
         /*
         international text chunks (iTXt)
@@ -185,16 +175,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         "langtags" and "transkeys".
         */
 
-        /*the amount of international texts in this PNG*/
-        public ulong ItextNum;
-        /*the English keyword of the text chunk (e.g. "Comment")*/
-        public List<string> ItextKeys;
-        /*language tag for this text's language, ISO/IEC 646 string, e.g. ISO 639 language tag*/
-        public List<string> ItextLangTags;
-        /*keyword translated to the international language - UTF-8 string*/
-        public List<string> ItextTranskeys;
-        /*the actual international text - UTF-8 string*/
-        public List<string> ItextStrings;
+        public List<ITextItem> ITextItems { get; }
 
         /*time chunk (tIME)*/
 

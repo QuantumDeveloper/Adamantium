@@ -140,7 +140,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                     var byteWidth = bpp / 8;
                     for (int y = 0; y < passh[i]; ++y)
                     {
-                        for (int x = 0; x < passh[i]; ++x)
+                        for (int x = 0; x < passw[i]; ++x)
                         {
                             var pixelInStart = ((Adam7_IY[i] + y * Adam7_DY[i]) * width + Adam7_IX[i] + x * Adam7_DX[i]) * byteWidth;
                             var pixelOutStart = passStart[i] + (y * passw[i] + x) * byteWidth;

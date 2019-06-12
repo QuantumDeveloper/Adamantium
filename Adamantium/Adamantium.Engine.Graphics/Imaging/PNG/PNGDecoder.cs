@@ -118,8 +118,6 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             List<byte> idat = new List<byte>();
             long predict = 0;
 
-            /*for unknown chunk order*/
-            uint unknown = 0;
             /*1 = after IHDR, 2 = after PLTE, 3 = after IDAT*/
             uint criticalPos = 1;
 
@@ -159,7 +157,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 }
 
                 /*length of the data of the chunk, excluding the length bytes, chunk type and CRC bytes*/
-                chunkSize = (uint)stream.ReadChunkSize();
+                chunkSize = stream.ReadChunkSize();
 
                 if (chunkSize > int.MaxValue)
                 {
@@ -231,9 +229,6 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                         {
                             state.Error = 69;
                         }
-
-                        unknown = 1;
-
                         break;
                 }
 
@@ -254,22 +249,22 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             {
                 /*Adam-7 interlaced: predicted size is the sum of the 7 sub-images sizes*/
                 var colorMode = state.InfoPng.ColorMode;
-                predict += GetRawSizeIdat((width + 7) >> 3 , (height + 7) >> 3, state.InfoPng.ColorMode);
+                predict += GetRawSizeIdat((width + 7) >> 3 , (height + 7) >> 3, colorMode);
                 if (width > 4)
                 {
-                    predict += GetRawSizeIdat((width + 3) >> 3, (height + 7) >> 3, state.InfoPng.ColorMode);
+                    predict += GetRawSizeIdat((width + 3) >> 3, (height + 7) >> 3, colorMode);
                 }
-                predict += GetRawSizeIdat((width + 3) >> 2, (height + 3) >> 3, state.InfoPng.ColorMode);
+                predict += GetRawSizeIdat((width + 3) >> 2, (height + 3) >> 3, colorMode);
                 if (width > 2)
                 {
-                    predict += GetRawSizeIdat((width + 1) >> 2, (height + 3) >> 2, state.InfoPng.ColorMode);
+                    predict += GetRawSizeIdat((width + 1) >> 2, (height + 3) >> 2, colorMode);
                 }
-                predict += GetRawSizeIdat((width + 1) >> 1, (height + 1) >> 2, state.InfoPng.ColorMode);
+                predict += GetRawSizeIdat((width + 1) >> 1, (height + 1) >> 2, colorMode);
                 if (width > 1)
                 {
-                    predict += GetRawSizeIdat((width) >> 1, (height + 1) >> 1, state.InfoPng.ColorMode);
+                    predict += GetRawSizeIdat((width) >> 1, (height + 1) >> 1, colorMode);
                 }
-                predict += GetRawSizeIdat((width), (height) >> 1, state.InfoPng.ColorMode);
+                predict += GetRawSizeIdat((width), (height) >> 1, colorMode);
             }
             var scanlines = new List<byte>((int)predict);
             var error = compressor.Decompress(idat.ToArray(), state.DecoderSettings, scanlines);
@@ -466,8 +461,10 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 return;
             }
             var text = stream.ReadtEXt(state, chunkLength);
-            state.InfoPng.TextKeys.Add(text.Key);
-            state.InfoPng.TextStrings.Add(text.Text);
+            var textItem = new TXTItem();
+            textItem.Key = text.Key;
+            textItem.Text = text.Text;
+            state.InfoPng.TextItems.Add(textItem);
         }
 
         /*reads header and resets other parameters in state->info_png*/
