@@ -9,7 +9,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
     {
         #region Compressor
 
-        private unsafe uint EncodeLZ77(byte[] inData, int inPos, List<int> outData, Hash hash,
+        private unsafe uint EncodeLZ77(byte[] inData, int inPos, int inSize, List<int> outData, Hash hash,
             int windowSize, int minmatch, int nicematch, bool lazymatching)
         {
             uint error = 0;
@@ -49,7 +49,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 nicematch = Hash.MaxSupportedDeflateLength;
             }
 
-            for (pos = inPos; pos < inData.Length; ++pos)
+            for (pos = inPos; pos < inSize; ++pos)
             {
                 /*position for in 'circular' hash buffers*/
                 int wpos = pos & (windowSize - 1);
@@ -57,13 +57,15 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
                 hashval = hash.GetHash(inData, pos);
 
+                //Debug.WriteLine($"position {pos}: {hashval}");
+
                 if (useZeros && hashval == 0)
                 {
                     if (numZeros == 0)
                     {
-                        numZeros = hash.CountZeros(inData, pos);
+                        numZeros = hash.CountZeros(inData, inSize, pos);
                     }
-                    else if (pos + numZeros > inData.Length || inData[pos + numZeros - 1] != 0)
+                    else if (pos + numZeros > inSize || inData[pos + numZeros - 1] != 0)
                     {
                         --numZeros;
                     }
@@ -73,19 +75,19 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                     numZeros = 0;
                 }
 
+                
+
                 hash.UpdateHashChain(wpos, hashval, (ushort)numZeros);
 
                 /*the length and offset found for the current position*/
                 length = 0;
                 offset = 0;
 
-                if (pos == 152)
-                {
-
-                }
+                
 
                 hashpos = hash.Chain[wpos];
-                int index = inData.Length < pos + Hash.MaxSupportedDeflateLength ? inData.Length - 1 : pos + Hash.MaxSupportedDeflateLength - 1;
+                //Debug.WriteLine($"hashpos {hashpos}");
+                int index = inSize < pos + Hash.MaxSupportedDeflateLength ? inSize : pos + Hash.MaxSupportedDeflateLength;
                 fixed (byte* lastPtr = &inData[index])
                 {
                     prevOffset = 0;
@@ -211,13 +213,17 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                         for (int i = 1; i < length; ++i)
                         {
                             ++pos;
+                            if (pos == 6221877)
+                            {
+
+                            }
                             wpos = pos & (windowSize - 1);
                             hashval = hash.GetHash(inData, pos);
                             if (useZeros && hashval == 0)
                             {
                                 if (numZeros == 0)
                                 {
-                                    numZeros = hash.CountZeros(inData, pos);
+                                    numZeros = hash.CountZeros(inData, inSize, pos);
                                 }
                                 else if (pos + numZeros > inData.Length || inData[pos + numZeros - 1] != 0)
                                 {
@@ -370,7 +376,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 var final = Convert.ToByte(i == numDeflateBlocks - 1);
                 var start = i * blockSize;
                 var end = start + blockSize;
-                if (end > inData.Length) end = inData.Length;
+                if (end >= inData.Length) end = inData.Length - 1;
 
                 if (settings.BType == 1)
                 {
@@ -403,7 +409,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             if (settings.UseLZ77)
             {
                 List<int> lz77Encoded = new List<int>();
-                error = EncodeLZ77(data, dataPos, lz77Encoded, hash, settings.WindowSize, (int)settings.MinMatch, (int)settings.NiceMatch, settings.LazyMatching);
+                error = EncodeLZ77(data, dataPos, dataEnd, lz77Encoded, hash, settings.WindowSize, (int)settings.MinMatch, (int)settings.NiceMatch, settings.LazyMatching);
                 if (error == 0)
                 {
                     WriteLZ77Data(ref bitPointer, lz77Encoded, outData, treeLL, treeDist);
@@ -465,7 +471,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             {
                 if (settings.UseLZ77)
                 {
-                    error = EncodeLZ77(data, dataPos, lz77Encoded, hash, settings.WindowSize, (int)settings.MinMatch, (int)settings.NiceMatch, settings.LazyMatching);
+                    error = EncodeLZ77(data, dataPos, dataEnd, lz77Encoded, hash, settings.WindowSize, (int)settings.MinMatch, (int)settings.NiceMatch, settings.LazyMatching);
                     if (error > 0) break;
                 }
                 else

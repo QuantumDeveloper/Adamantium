@@ -20,7 +20,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
             var keyWord = Encoding.ASCII.GetBytes(Key);
             if (keyWord.Length < 1 || keyWord.Length > 79)
             {
-                throw new PNGEncoderException("Keyword should have from 1 to 79 chars");
+                throw new PNGEncoderException(89);
             }
 
             bytes.AddRange(keyWord);

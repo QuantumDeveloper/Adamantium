@@ -6,8 +6,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 {
     internal class Hash
     {
-        public const int HashNumValues = ushort.MaxValue;
-        public const int HashBitMask = ushort.MaxValue;
+        public const int HashNumValues = ushort.MaxValue + 1;
+        public const int HashBitMask = ushort.MaxValue; /*HASH_NUM_VALUES - 1, but C90 does not like that as initializer*/
         public const int MaxSupportedDeflateLength = 258;
 
         /*hash value to head circular pos - can be outdated if went around window*/
@@ -79,13 +79,13 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             return result & HashBitMask;
         }
 
-        public uint CountZeros(byte[] data, int pos)
+        public uint CountZeros(byte[] data, int size, int pos)
         {
             int start = pos;
             int end = start + MaxSupportedDeflateLength;
-            if (end > data.Length)
+            if (end > size)
             {
-                end = data.Length;
+                end = size;
             }
 
             bool proceed = true;

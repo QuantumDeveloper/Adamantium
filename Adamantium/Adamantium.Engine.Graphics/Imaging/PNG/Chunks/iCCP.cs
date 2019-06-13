@@ -55,7 +55,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
             var result = compressor.Compress(Profile, state.EncoderSettings, compressedBytes);
             if (result > 0)
             {
-                throw new PNGEncoderException(result.ToString());
+                throw new PNGEncoderException(result);
             }
 
             bytes.AddRange(Utilities.GetBytesWithReversedEndian(ICCPName.Length + 2 + compressedBytes.Count));
@@ -63,7 +63,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
             var iccpProfile = Encoding.ASCII.GetBytes(ICCPName);
             if (iccpProfile.Length < 1 || iccpProfile.Length > 79)
             {
-                throw new PNGEncoderException("Keyword should have from 1 to 79 chars");
+                throw new PNGEncoderException(89);
             }
             bytes.AddRange(iccpProfile);
             bytes.Add(0); // null terminator

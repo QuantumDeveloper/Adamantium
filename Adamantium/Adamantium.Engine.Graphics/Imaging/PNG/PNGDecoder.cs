@@ -37,7 +37,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
             if (error != 0)
             {
-                throw new PNGDecodeException(error.ToString());
+                throw new PNGDecodeException(error);
             }
 
             byte[] rawBuffer = null;
@@ -60,7 +60,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 {
                     /*unsupported color mode conversion*/
                     error = 56;
-                    throw new PNGDecodeException(error.ToString());
+                    throw new PNGDecodeException(error);
                 }
 
                 int rawBufferSize = (int)GetRawSizeLct(width, height, state.InfoRaw);
@@ -70,7 +70,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
                 if (error > 0)
                 {
-                    throw new PNGDecodeException(error.ToString());
+                    throw new PNGDecodeException(error);
                 }
             }
 
@@ -91,15 +91,16 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 descr.Format = AdamantiumVulkan.Core.Format.R8G8B8A8_UNORM;
             }
 
-            //Premultiply alpha for formats, which does not support tansparency
-            for (int i = 0; i < rawBuffer.Length; i+=4)
-            {
-                float alpha = rawBuffer[i + 3] / 255.0f;
+            // TODO: should move these code to another place
+            ////Premultiply alpha for formats, which does not support tansparency
+            //for (int i = 0; i < rawBuffer.Length; i+=4)
+            //{
+            //    float alpha = rawBuffer[i + 3] / 255.0f;
 
-                rawBuffer[i] = (byte)(((rawBuffer[i]/255.0f) * alpha) * 255);
-                rawBuffer[i + 1] = (byte)(((rawBuffer[i+1] / 255.0f) * alpha) * 255);
-                rawBuffer[i + 2] = (byte)(((rawBuffer[i+2] / 255.0f) * alpha) * 255);
-            }
+            //    rawBuffer[i] = (byte)(((rawBuffer[i]/255.0f) * alpha) * 255);
+            //    rawBuffer[i + 1] = (byte)(((rawBuffer[i+1] / 255.0f) * alpha) * 255);
+            //    rawBuffer[i + 2] = (byte)(((rawBuffer[i+2] / 255.0f) * alpha) * 255);
+            //}
 
             var img = Image.New(descr);
             var handle = GCHandle.Alloc(rawBuffer, GCHandleType.Pinned);
@@ -128,7 +129,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             ReadHeaderChunk(state, out width, out height);
             if (state.Error != 0)
             {
-                throw new PNGDecodeException("");
+                throw new PNGDecodeException(state.Error);
             }
 
             if (CheckPixelOverflow(width, height, state.InfoPng.ColorMode, state.InfoRaw))
