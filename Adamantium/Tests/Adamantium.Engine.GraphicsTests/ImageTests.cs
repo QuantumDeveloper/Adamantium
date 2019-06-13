@@ -6,6 +6,7 @@ using Adamantium.Engine.Graphics.Imaging.JPEG.Encoder;
 using Adamantium.Engine.Graphics.Imaging.PNG;
 using NUnit.Framework;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -104,21 +105,22 @@ namespace Adamantium.Engine.GraphicsTests
             //error = compressor.Decompress(lst.ToArray(), decoderSettings, decompressedLst);
             //var decompressedStr = Encoding.ASCII.GetString(decompressedLst.ToArray());
 
-            //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\BaseAlbedoTexture_Text.png");
+            var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\BaseAlbedoTexture_Text.png");
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\testpng1.png");
-            var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\testpng3.png");
+            //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\testpng6.png");
 
             //var bytes = File.ReadAllBytes(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\converted2.png");
             //var img = Image.New2D(1920, 1080, 1, SurfaceFormat.R8G8B8A8.UNorm);
             //var handle = GCHandle.Alloc(bytes, GCHandleType.Pinned);
             //Utilities.CopyMemory(img.DataPointer, handle.AddrOfPinnedObject(), bytes.Length);
             //handle.Free();
-
+            var timer = Stopwatch.StartNew();
             //img?.Save("1.bmp", ImageFileType.Bmp);
             img?.Save("1.png", ImageFileType.Png);
+            timer.Stop();
             //img?.Save("1.tga", ImageFileType.Tga);
             //img?.Save("1.dds", ImageFileType.Dds);
-            img?.Save("1.jpg", ImageFileType.Jpg);
+            //img?.Save("1.jpg", ImageFileType.Jpg);
 
 
             img?.Dispose();
