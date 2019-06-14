@@ -5,7 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 
-namespace Adamantium.Engine.Graphics.Imaging.PNG
+namespace Adamantium.Engine.Graphics.Imaging.PNG.IO
 {
     internal class PNGStreamWriter : MemoryStream
     {

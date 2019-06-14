@@ -1,12 +1,11 @@
-﻿using Adamantium.Core;
-using Adamantium.Engine.Graphics.Imaging.PNG.Chunks;
+﻿using Adamantium.Engine.Graphics.Imaging.PNG.Chunks;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
 
-namespace Adamantium.Engine.Graphics.Imaging.PNG
+namespace Adamantium.Engine.Graphics.Imaging.PNG.IO
 {
     public unsafe class PNGStreamReader : UnmanagedMemoryStream
     {
@@ -28,19 +27,19 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
         public uint ErrorCode { get; private set; }
 
-        public UInt16 ReadUInt16()
+        public ushort ReadUInt16()
         {
             var bytes = ReadBytes(2);
             return BitConverter.ToUInt16(bytes.Reverse().ToArray(), 0);
         }
 
-        public UInt32 ReadUInt32()
+        public uint ReadUInt32()
         {
             var bytes = ReadBytes(4);
             return BitConverter.ToUInt32(bytes.Reverse().ToArray(), 0);
         }
 
-        public Int32 ReadInt32()
+        public int ReadInt32()
         {
             var bytes = ReadBytes(4);
             return BitConverter.ToInt32(bytes.Reverse().ToArray(), 0);
@@ -419,8 +418,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 /*the values are truncated to bitdepth in the PNG file*/
                 info.IsBackgroundDefined = true;
                 var color = ReadUInt16();
-                bkgd.BackgroundR = bkgd.BackgroundB = bkgd.BackgroundB = (uint)color;
-                info.BackgroundR = info.BackgroundG = info.BackgroundB = (uint)color;
+                bkgd.BackgroundR = bkgd.BackgroundB = bkgd.BackgroundB = color;
+                info.BackgroundR = info.BackgroundG = info.BackgroundB = color;
             }
             else if (info.ColorMode.ColorType == PNGColorType.RGB || info.ColorMode.ColorType == PNGColorType.RGBA)
             {
@@ -437,9 +436,9 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 var greenColor = ReadUInt16();
                 var blueColor = ReadUInt16();
                 info.IsBackgroundDefined = true;
-                bkgd.BackgroundR = (uint)redColor;
-                bkgd.BackgroundB = (uint)greenColor;
-                bkgd.BackgroundB = (uint)blueColor;
+                bkgd.BackgroundR = redColor;
+                bkgd.BackgroundB = greenColor;
+                bkgd.BackgroundB = blueColor;
                 info.BackgroundR = bkgd.BackgroundR;
                 info.BackgroundG = bkgd.BackgroundG;
                 info.BackgroundB = bkgd.BackgroundB;
@@ -547,6 +546,55 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             var bytes = ReadBytes(4 + (int)chunkLength);
             plte.CheckSum = CRC32.CalculateCheckSum(bytes);
             return plte;
+        }
+
+        internal acTL ReadacTL(PNGState state)
+        {
+            var pos = Position - 4;
+            var actl = new acTL();
+            actl.FramesCount = ReadUInt32();
+            actl.RepeatCout = ReadUInt32();
+
+            state.InfoPng.FramesCount = actl.FramesCount;
+            state.InfoPng.RepeatCount = actl.RepeatCout;
+
+            ReadCRC(state, actl, pos, 12);
+            return actl;
+        }
+
+        internal fcTL ReadfcTL(PNGState state, PNGFrame frame)
+        {
+            var pos = Position - 4;
+            var fctl = new fcTL();
+
+            fctl.SequenceNumber = ReadUInt32();
+            fctl.Width = ReadUInt32();
+            fctl.Height = ReadUInt32();
+            fctl.XOffset = ReadUInt32();
+            fctl.YOffset = ReadUInt32();
+            fctl.DelayNum = ReadUInt16();
+            fctl.DelayDen = ReadUInt16();
+            fctl.DisposeOp = (DisposeOp)ReadByte();
+            fctl.BlendOp = (BlendOp)ReadByte();
+
+            ReadCRC(state, fctl, pos, 30);
+
+            frame.FrameControl = fctl;
+
+            return fctl;
+        }
+
+        internal void ReadCRC(PNGState state, Chunk chunk, long position, uint sizeToRead)
+        {
+            chunk.CRC = ReadUInt32();
+            Position = position;
+            var bytes = ReadBytes((int)sizeToRead);
+            chunk.CheckSum = CRC32.CalculateCheckSum(bytes);
+
+            if (chunk.CRC != chunk.CheckSum)
+            {
+                state.Error = 57; // checksum mismatch;
+            }
         }
     }
 }

@@ -105,7 +105,7 @@ namespace Adamantium.Engine.GraphicsTests
             //error = compressor.Decompress(lst.ToArray(), decoderSettings, decompressedLst);
             //var decompressedStr = Encoding.ASCII.GetString(decompressedLst.ToArray());
 
-            var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\BaseAlbedoTexture_Text.png");
+            var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\elephant.png");
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\testpng1.png");
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\testpng6.png");
 
@@ -115,7 +115,7 @@ namespace Adamantium.Engine.GraphicsTests
             //Utilities.CopyMemory(img.DataPointer, handle.AddrOfPinnedObject(), bytes.Length);
             //handle.Free();
             var timer = Stopwatch.StartNew();
-            //img?.Save("1.bmp", ImageFileType.Bmp);
+            img?.Save("1.bmp", ImageFileType.Bmp);
             img?.Save("1.png", ImageFileType.Png);
             timer.Stop();
             //img?.Save("1.tga", ImageFileType.Tga);

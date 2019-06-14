@@ -117,6 +117,10 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             IccpProfileSize = info.IccpProfileSize;
         }
 
+        public bool IsAnimated => FramesCount > 1;
+        public uint FramesCount { get; set; }
+        public uint RepeatCount { get; set; }
+
         /*header (IHDR), palette (PLTE) and transparency (tRNS) chunks*/
         /*compression method of the original file. Always 0.*/
         public byte CompressionMethod { get; set; }
