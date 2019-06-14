@@ -1,6 +1,7 @@
-﻿using System;
+﻿using Adamantium.Engine.Graphics.Imaging.PNG.Chunks;
+using System;
 using System.Collections.Generic;
-using System.Text;
+using System.Linq;
 
 namespace Adamantium.Engine.Graphics.Imaging.PNG
 {
@@ -11,7 +12,17 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             Frames = new List<PNGFrame>();
         }
 
+        public uint FramesCount { get; set; }
+
+        public uint RepeatCout { get; set; }
+
+        public IHDR Header { get; set; }
+
         public List<PNGFrame> Frames { get; }
+
+        public PNGFrame DefaultImage => Frames.FirstOrDefault(x => !x.IsPartOfAnimation);
+
+        public bool IsMultiFrame => Frames.Count > 1;
 
         public static PNGImage FromImage(Image image)
         {

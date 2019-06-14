@@ -71,7 +71,7 @@ namespace Adamantium.Engine.Graphics.Imaging.JPEG.Decoder
                 val.Add(JpegHuffmanTable.StdDCChrominance.Values);
                 val.Add(JpegHuffmanTable.StdACChrominance.Values);
 
-                initHuf();
+                InitHuf();
             }
         }
 
@@ -307,7 +307,7 @@ namespace Adamantium.Engine.Graphics.Imaging.JPEG.Decoder
         /// This code results in the same tables created in the IJG Jpeg-6a
         /// library.
         /// </summary>
-        public void initHuf()
+        public void InitHuf()
         {
             DC_matrix0 = new int[12, 2];
             DC_matrix1 = new int[12, 2];

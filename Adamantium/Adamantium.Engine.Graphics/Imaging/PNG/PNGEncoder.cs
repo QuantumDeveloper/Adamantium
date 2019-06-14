@@ -1,4 +1,5 @@
 ﻿using Adamantium.Engine.Graphics.Imaging.PNG.Chunks;
+using Adamantium.Engine.Graphics.Imaging.PNG.IO;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -132,7 +133,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                     }
                     var compressedBuffer = new byte[0];
                     state.Error = PreprocessScanlines(ref compressedBuffer, converted, (uint)frame.Width, (uint)frame.Height, info, state.EncoderSettings);
-                    frame.CompressedPixelBuffer = compressedBuffer;
+                    frame.FrameData = compressedBuffer;
                     if (state.Error > 0)
                     {
                         throw new PNGEncoderException(state.Error);
@@ -145,7 +146,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 {
                     var compressedBuffer = new byte[0];
                     state.Error = PreprocessScanlines(ref compressedBuffer, frame.RawPixelBuffer, (uint)frame.Width, (uint)frame.Height, info, state.EncoderSettings);
-                    frame.CompressedPixelBuffer = compressedBuffer;
+                    frame.FrameData = compressedBuffer;
                     if (state.Error > 0)
                     {
                         throw new PNGEncoderException(state.Error);
@@ -206,7 +207,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             }
 
             /*IDAT (multiple IDAT chunks must be consecutive)*/
-            pngStream.WriteIDAT(state, pngImage.Frames[0].CompressedPixelBuffer);
+            pngStream.WriteIDAT(state, pngImage.Frames[0].FrameData);
 
             //pngStream.WritetIME(state);
 
