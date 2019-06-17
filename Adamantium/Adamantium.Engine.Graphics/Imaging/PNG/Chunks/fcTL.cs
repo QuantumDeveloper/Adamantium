@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Adamantium.Core;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -50,7 +51,39 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
 
         internal override byte[] GetChunkBytes(PNGState state)
         {
-            throw new NotImplementedException();
+            var bytes = new List<byte>();
+            bytes.AddRange(Utilities.GetBytesWithReversedEndian(26u));
+            bytes.AddRange(GetNameAsBytes());
+            bytes.AddRange(Utilities.GetBytesWithReversedEndian(SequenceNumber));
+            bytes.AddRange(Utilities.GetBytesWithReversedEndian(Width));
+            bytes.AddRange(Utilities.GetBytesWithReversedEndian(Height));
+            bytes.AddRange(Utilities.GetBytesWithReversedEndian(XOffset));
+            bytes.AddRange(Utilities.GetBytesWithReversedEndian(YOffset));
+            bytes.AddRange(Utilities.GetBytesWithReversedEndian(DelayNum));
+            bytes.AddRange(Utilities.GetBytesWithReversedEndian(DelayDen));
+            bytes.Add((byte)DisposeOp);
+            bytes.Add((byte)BlendOp);
+
+            var crc = CRC32.CalculateCheckSum(bytes.ToArray()[4..]);
+            bytes.AddRange(Utilities.GetBytesWithReversedEndian(crc));
+
+            return bytes.ToArray();
+        }
+
+        internal static fcTL FromFrame(PixelBuffer frame)
+        {
+            var fctl = new fcTL();
+            fctl.SequenceNumber = frame.SequenceNumber;
+            fctl.Width = (uint)frame.Width;
+            fctl.Height = (uint)frame.Height;
+            fctl.XOffset = frame.XOffset;
+            fctl.YOffset = frame.YOffset;
+            fctl.DelayNum = frame.DelayNum;
+            fctl.DelayDen = frame.DelayDen;
+            fctl.DisposeOp = DisposeOp.Background;
+            fctl.BlendOp = BlendOp.Source;
+
+            return fctl;
         }
     }
 }

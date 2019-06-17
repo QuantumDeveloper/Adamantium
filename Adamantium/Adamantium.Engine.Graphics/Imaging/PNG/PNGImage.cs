@@ -36,7 +36,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             {
                 var pixelBuffer = buffers[i];
                 var colors = pixelBuffer.GetPixels<byte>();
-                var frame = new PNGFrame(colors, pixelBuffer.Width, pixelBuffer.Height, pixelBuffer.PixelSize * 8);
+                var frame = new PNGFrame(colors, (uint)pixelBuffer.Width, (uint)pixelBuffer.Height, pixelBuffer.PixelSize * 8);
                 pngImage.Frames.Add(frame);
             }
 

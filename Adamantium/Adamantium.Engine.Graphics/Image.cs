@@ -29,6 +29,8 @@ namespace Adamantium.Engine.Graphics
         private int zBufferCountPerArraySlice;
         private MipMapDescription[] mipmapDescriptions;
         private static List<LoadSaveDelegate> loadSaveDelegates = new List<LoadSaveDelegate>();
+        private bool isAnimated;
+        private uint numberOfReplays;
 
         /// <summary>
         /// Provides access to all pixel buffers.
@@ -64,6 +66,32 @@ namespace Adamantium.Engine.Graphics
         /// </summary>
         public ImageDescription Description;
 
+        public bool IsAnimated => IsAnimated1;
+
+        public uint NumberOfReplays => numberOfReplays;
+
+        /// <summary>
+        /// Gets a pointer to the image buffer in memory.
+        /// </summary>
+        /// <value>A pointer to the image buffer in memory.</value>
+        public IntPtr DataPointer => this.buffer;
+
+        /// <summary>
+        /// Provides access to all pixel buffers.
+        /// </summary>
+        /// <remarks>
+        /// For Texture3D, each z slice of the Texture3D has a pixelBufferArray * by the number of mipmaps.
+        /// For other textures, there is Description.MipLevels * Description.ArraySize pixel buffers.
+        /// </remarks>
+        public PixelBufferArray PixelBuffer => pixelBufferArray;
+
+        /// <summary>
+        /// Gets the total number of bytes occupied by this image in memory.
+        /// </summary>
+        public int TotalSizeInBytes => totalSizeInBytes;
+
+        public bool IsAnimated1 { get => isAnimated; set => isAnimated = value; }
+
         private Image()
         {
         }
@@ -80,6 +108,11 @@ namespace Adamantium.Engine.Graphics
         internal Image(ImageDescription description, IntPtr dataPointer, int offset, GCHandle? handle, bool bufferIsDisposable, PitchFlags pitchFlags = PitchFlags.None)
         {
             Initialize(description, dataPointer, offset, handle, bufferIsDisposable, pitchFlags);
+        }
+
+        internal Image(ImageDescription mainDescription, uint numberOfReplays, params AnimatedImageDescription[] animatedDescriptions)
+        {
+            InitializeAnimated(mainDescription, numberOfReplays, animatedDescriptions);
         }
 
         protected override void Dispose(bool disposeManagedResources)
@@ -190,26 +223,6 @@ namespace Adamantium.Engine.Graphics
 
 
         /// <summary>
-        /// Gets a pointer to the image buffer in memory.
-        /// </summary>
-        /// <value>A pointer to the image buffer in memory.</value>
-        public IntPtr DataPointer => this.buffer;
-
-        /// <summary>
-        /// Provides access to all pixel buffers.
-        /// </summary>
-        /// <remarks>
-        /// For Texture3D, each z slice of the Texture3D has a pixelBufferArray * by the number of mipmaps.
-        /// For other textures, there is Description.MipLevels * Description.ArraySize pixel buffers.
-        /// </remarks>
-        public PixelBufferArray PixelBuffer => pixelBufferArray;
-
-        /// <summary>
-        /// Gets the total number of bytes occupied by this image in memory.
-        /// </summary>
-        public int TotalSizeInBytes => totalSizeInBytes;
-
-        /// <summary>
         /// Gets the databox from this image.
         /// </summary>
         /// <returns>The databox of this image.</returns>
@@ -243,6 +256,23 @@ namespace Adamantium.Engine.Graphics
         }
 
         /// <summary>
+        /// Gets the databox from this image.
+        /// </summary>
+        /// <returns>The databox of this image.</returns>
+        private DataBox[] ComputeAnimatedDataBox()
+        {
+            dataBoxArray = new DataBox[Description.ArraySize * Description.MipLevels];
+            int i = 0;
+            for (int arrayIndex = 0; arrayIndex < PixelBuffer.Count; arrayIndex++)
+            {
+                dataBoxArray[i].DataPointer = PixelBuffer[i].DataPointer;
+                dataBoxArray[i].RowPitch = PixelBuffer[i].RowStride;
+                dataBoxArray[i].SlicePitch = PixelBuffer[i].BufferStride;
+            }
+            return dataBoxArray;
+        }
+
+        /// <summary>
         /// Creates a new instance of <see cref="Image"/> from an image description.
         /// </summary>
         /// <param name="description">The image description.</param>
@@ -250,6 +280,16 @@ namespace Adamantium.Engine.Graphics
         public static Image New(ImageDescription description)
         {
             return New(description, IntPtr.Zero);
+        }
+
+        /// <summary>
+        /// Creates a new instance of animated <see cref="Image"/> from an image description.
+        /// </summary>
+        /// <param name="description">The image description.</param>
+        /// <returns>A new image.</returns>
+        public static Image New(ImageDescription mainDescription, uint numberOfReplays, params AnimatedImageDescription[] descriptions)
+        {
+            return new Image(mainDescription, numberOfReplays, descriptions);
         }
 
         /// <summary>
@@ -711,7 +751,7 @@ namespace Adamantium.Engine.Graphics
         internal unsafe void Initialize(ImageDescription description, IntPtr dataPointer, int offset, GCHandle? handle, bool bufferIsDisposable, PitchFlags pitchFlags = PitchFlags.None)
         {
             if (!FormatHelper.IsValid(description.Format))
-                throw new InvalidOperationException("Unsupported DXGI Format");
+                throw new InvalidOperationException("Unsupported Image Format");
 
             this.handle = handle;
 
@@ -771,12 +811,42 @@ namespace Adamantium.Engine.Graphics
                 this.bufferIsDisposable = true;
             }
 
-            SetupImageArray((IntPtr)((byte*)buffer + offset), totalSizeInBytes, description, pitchFlags, pixelBuffers);
+            SetupImageArray((IntPtr)((byte*)buffer + offset), description, pitchFlags, pixelBuffers);
 
             Description = description;
 
             // PreCompute databoxes
             dataBoxArray = ComputeDataBox();
+        }
+
+
+        internal unsafe void InitializeAnimated(ImageDescription mainDescription, uint numberOfReplays, params AnimatedImageDescription[] animatedDescriptions)
+        {
+            if (!FormatHelper.IsValid(mainDescription.Format))
+                throw new InvalidOperationException("Unsupported Image Format");
+
+            if (animatedDescriptions == null || animatedDescriptions.Length < 2)
+                throw new InvalidOperationException("Animated descriptions count must be more than 1");
+
+            IsAnimated1 = true;
+
+            // Calculate mipmaps
+            int pixelBufferCount = animatedDescriptions.Length;
+            totalSizeInBytes = CalculateAnimatedImageArray(animatedDescriptions);
+
+            // Allocate all pixel buffers
+            pixelBuffers = new PixelBuffer[pixelBufferCount];
+            pixelBufferArray = new PixelBufferArray(this);
+
+            buffer = Utilities.AllocateMemory(totalSizeInBytes);
+            this.bufferIsDisposable = true;
+
+            SetupImageArray((IntPtr)((byte*)buffer), mainDescription.Format, animatedDescriptions, pixelBuffers);
+
+            Description = mainDescription;
+
+            // PreCompute databoxes
+            dataBoxArray = ComputeAnimatedDataBox();
         }
 
         private PixelBuffer GetPixelBufferUnsafe(int arrayIndex, int zIndex, int mipmap)
@@ -917,6 +987,20 @@ namespace Adamantium.Engine.Graphics
             return mipmaps;
         }
 
+        private static int CalculateAnimatedImageArray(params AnimatedImageDescription[] descriptions)
+        {
+            if (descriptions == null)
+                return 0;
+
+            long allocateSize = 0;
+            foreach(var desc in descriptions)
+            {
+                allocateSize += desc.Width * desc.Height * desc.BytesPerPixel;
+            }
+
+            return (int)allocateSize;
+        }
+
         /// <summary>
         /// Determines number of image array entries and pixel size.
         /// </summary>
@@ -969,15 +1053,47 @@ namespace Adamantium.Engine.Graphics
             return mipmapToZIndex;
         }
 
+
+        /// <summary>
+        /// Allocates PixelBuffers for animated image
+        /// </summary>
+        /// <param name="buffer"></param>
+        /// <param name="imageDesc"></param>
+        /// <param name="pitchFlags"></param>
+        /// <param name="output"></param>
+        private static unsafe void SetupImageArray(IntPtr buffer, Format format, AnimatedImageDescription[] imageDesc, PixelBuffer[] output)
+        {
+            int index = 0;
+            var pixels = (byte*)buffer;
+            foreach (var desc in imageDesc)
+            {
+                int rowPitch, slicePitch;
+                int widthPacked;
+                int heightPacked;
+                ComputePitch(format, desc.Width, desc.Height, out rowPitch, out slicePitch, out widthPacked, out heightPacked);
+
+                // We use the same memory organization that Direct3D 11 needs for D3D11_SUBRESOURCE_DATA
+                // with all slices of a given miplevel being continuous in memory
+                var pxBuffer = new PixelBuffer(desc.Width, desc.Height, format, rowPitch, slicePitch, (IntPtr)pixels);
+                pxBuffer.XOffset = desc.XOffset;
+                pxBuffer.YOffset = desc.YOffset;
+                pxBuffer.DelayNum = desc.DelayNumerator;
+                pxBuffer.DelayDen = desc.DelayDenominator;
+                output[index] = pxBuffer;
+                ++index;
+
+                pixels += slicePitch;
+            }
+        }
+
         /// <summary>
         /// Allocates PixelBuffers 
         /// </summary>
         /// <param name="buffer"></param>
-        /// <param name="pixelSize"></param>
         /// <param name="imageDesc"></param>
         /// <param name="pitchFlags"></param>
         /// <param name="output"></param>
-        private static unsafe void SetupImageArray(IntPtr buffer, int pixelSize, ImageDescription imageDesc, PitchFlags pitchFlags, PixelBuffer[] output)
+        private static unsafe void SetupImageArray(IntPtr buffer, ImageDescription imageDesc, PitchFlags pitchFlags, PixelBuffer[] output)
         {
             int index = 0;
             var pixels = (byte*)buffer;

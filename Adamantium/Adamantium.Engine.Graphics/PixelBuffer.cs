@@ -123,6 +123,31 @@ namespace Adamantium.Engine.Graphics
         public IntPtr DataPointer { get; private set; }
 
         /// <summary>
+        /// Gets the horizontal offset to this pixel buffer regarding main image
+        /// </summary>
+        public uint XOffset { get; internal set; }
+
+        /// <summary>
+        /// Gets the vertical offset to this pixel buffer regarding main image
+        /// </summary>
+        public uint YOffset { get; internal set; }
+
+        /// <summary>
+        /// Frame delay fraction numerator
+        /// </summary>
+        public ushort DelayNum { get; internal set; }
+        
+        /// <summary>
+        /// Frame delay fraction denominator
+        /// </summary>
+        public ushort DelayDen { get; internal set; }
+
+        /// <summary>
+        /// Sequence number of current pixel buffer aka frame
+        /// </summary>
+        public uint SequenceNumber { get; internal set; }
+
+        /// <summary>
         /// Copies this pixel buffer to a destination pixel buffer.
         /// </summary>
         /// <param name="pixelBuffer">The destination pixel buffer.</param>

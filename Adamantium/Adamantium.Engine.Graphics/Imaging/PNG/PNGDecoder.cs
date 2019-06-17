@@ -3,11 +3,7 @@ using Adamantium.Engine.Graphics.Imaging.PNG.Chunks;
 using Adamantium.Engine.Graphics.Imaging.PNG.IO;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Runtime.InteropServices;
-using System.Text;
 
 namespace Adamantium.Engine.Graphics.Imaging.PNG
 {
@@ -43,72 +39,11 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 throw new PNGDecodeException(error);
             }
 
-            foreach (var frame in pngImage.Frames)
+            if (pngImage.IsMultiFrame)
             {
-                if (!state.DecoderSettings.ColorСonvert || state.InfoRaw == state.InfoPng.ColorMode)
-                {
-                    /*same color type, no copying or converting of data needed*/
-                    /*store the info_png color settings on the info_raw so that the info_raw still reflects what colortype
-                    the raw image has to the end user*/
-                    if (!state.DecoderSettings.ColorСonvert)
-                    {
-                        state.InfoRaw = state.InfoPng.ColorMode;
-                    }
-                }
-                else
-                {
-                    /*color conversion needed; sort of copy of the data*/
-                    if (!(state.InfoRaw.ColorType == PNGColorType.RGB || state.InfoRaw.ColorType == PNGColorType.RGBA)
-                        && state.InfoRaw.BitDepth != 8)
-                    {
-                        /*unsupported color mode conversion*/
-                        error = 56;
-                        throw new PNGDecodeException(error);
-                    }
-
-                    int width, height;
-                    if (frame.FrameControl == null)
-                    {
-                        width = pngImage.Header.Width;
-                        height = pngImage.Header.Height;
-                    }
-                    else
-                    {
-                        width = (int)frame.FrameControl.Width;
-                        height = (int)frame.FrameControl.Height;
-                    }
-
-                    int rawBufferSize = (int)GetRawSizeLct(width, height, state.InfoRaw);
-                    var outBuffer = new byte[rawBufferSize];
-
-                    error = PNGColorConvertion.Convert(outBuffer, frame.RawPixelBuffer, state.InfoRaw, state.InfoPng.ColorMode, width, height);
-                    frame.RawPixelBuffer = outBuffer;
-                    if (error > 0)
-                    {
-                        throw new PNGDecodeException(error);
-                    }
-                }
+                return GetMultiFrameImage(pngImage, state);
             }
-
-            var bitsPerPixel = PNGColorConvertion.GetBitsPerPixel(state.InfoRaw);
-            ImageDescription descr = new ImageDescription();
-            //descr.Width = pngImage.Header.Width;
-            //descr.Height = pngImage.Header.Height;
-            //descr.ArraySize = pngImage.Frames.Count;
-            descr.Width = (int)pngImage.Frames[0].FrameControl.Width;
-            descr.Height = (int)pngImage.Frames[0].FrameControl.Height;
-            descr.ArraySize = 1;
-            descr.MipLevels = 1;
-            descr.Depth = 1;
-            descr.Dimension = TextureDimension.Texture2D;
-            if (bitsPerPixel == 24)
-            {
-                descr.Format = AdamantiumVulkan.Core.Format.R8G8B8_UNORM;
-            }
-            else if (bitsPerPixel == 32)
-            {
-                descr.Format = AdamantiumVulkan.Core.Format.R8G8B8A8_UNORM;
-            }
+            return GetSingleFrameImage(pngImage, state);
 
             // TODO: should move these code to another place
             ////Premultiply alpha for formats, which does not support tansparency
@@ -120,20 +55,117 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             //    rawBuffer[i + 1] = (byte)(((rawBuffer[i+1] / 255.0f) * alpha) * 255);
             //    rawBuffer[i + 2] = (byte)(((rawBuffer[i+2] / 255.0f) * alpha) * 255);
             //}
+        }
 
+        private Image GetSingleFrameImage(PNGImage pngImage, PNGState state)
+        {
+            var frame = pngImage.Frames[0];
+            ConvertColorsIfNeeded(frame, state);
+            var descr = GetImageDescription(state, pngImage.Header.Width, pngImage.Header.Height);
             var img = Image.New(descr);
-            //for (int i = 0; i < img.PixelBuffer.Count; ++i)
-            //{
-            //    var handle = GCHandle.Alloc(pngImage.Frames[i].RawPixelBuffer, GCHandleType.Pinned);
-            //    Utilities.CopyMemory(img.PixelBuffer[i].DataPointer, handle.AddrOfPinnedObject(), pngImage.Frames[i].RawPixelBuffer.Length);
-            //    handle.Free();
-            //}
-
-            var handle = GCHandle.Alloc(pngImage.Frames[0].RawPixelBuffer, GCHandleType.Pinned);
-            Utilities.CopyMemory(img.PixelBuffer[0].DataPointer, handle.AddrOfPinnedObject(), pngImage.Frames[0].RawPixelBuffer.Length);
+            var handle = GCHandle.Alloc(frame.RawPixelBuffer, GCHandleType.Pinned);
+            Utilities.CopyMemory(img.DataPointer, handle.AddrOfPinnedObject(), frame.RawPixelBuffer.Length);
             handle.Free();
 
             return img;
+        }
+
+        private Image GetMultiFrameImage(PNGImage pngImage, PNGState state)
+        {
+            var animatedDescriptions = new List<AnimatedImageDescription>();
+            foreach (var frame in pngImage.Frames)
+            {
+                var description = new AnimatedImageDescription();
+                description.Width = (int)frame.Width;
+                description.Height = (int)frame.Height;
+                description.SequenceNumber = frame.SequenceNumber;
+                description.XOffset = frame.XOffset;
+                description.YOffset = frame.YOffset;
+                description.DelayNumerator = frame.DelayNum;
+                description.DelayDenominator = frame.DelayDen;
+                description.BytesPerPixel = (int)(PNGColorConvertion.GetBitsPerPixel(state.InfoRaw) / 8);
+                if (description.BytesPerPixel == 0)
+                {
+                    description.BytesPerPixel = 1;
+                }
+                animatedDescriptions.Add(description);
+                ConvertColorsIfNeeded(frame, state);
+            }
+
+            var descr = GetImageDescription(state, pngImage.Header.Width, pngImage.Header.Height);
+
+            var img = Image.New(descr, pngImage.RepeatCout, animatedDescriptions.ToArray());
+            for (int i = 0; i < img.PixelBuffer.Count; ++i)
+            {
+                var handle = GCHandle.Alloc(pngImage.Frames[i].RawPixelBuffer, GCHandleType.Pinned);
+                Utilities.CopyMemory(img.PixelBuffer[i].DataPointer, handle.AddrOfPinnedObject(), pngImage.Frames[i].RawPixelBuffer.Length);
+                handle.Free();
+            }
+
+            return img;
+        }
+
+        private ImageDescription GetImageDescription(PNGState state, int width, int height)
+        {
+            var bitsPerPixel = PNGColorConvertion.GetBitsPerPixel(state.InfoRaw);
+            ImageDescription descr = new ImageDescription();
+            descr.Width = width;
+            descr.Height = height;
+            descr.ArraySize = 1;
+            descr.MipLevels = 1;
+            descr.Depth = 1;
+            descr.Dimension = TextureDimension.Texture2D;
+            if (bitsPerPixel == 8)
+            {
+                descr.Format = AdamantiumVulkan.Core.Format.R8_UNORM;
+            }
+            else if (bitsPerPixel == 24)
+            {
+                descr.Format = AdamantiumVulkan.Core.Format.R8G8B8_UNORM;
+            }
+            else if (bitsPerPixel == 32)
+            {
+                descr.Format = AdamantiumVulkan.Core.Format.R8G8B8A8_UNORM;
+            }
+
+            return descr;
+        }
+
+        private void ConvertColorsIfNeeded(PNGFrame frame, PNGState state)
+        {
+            if (!state.DecoderSettings.ColorСonvert || state.InfoRaw == state.InfoPng.ColorMode)
+            {
+                /*same color type, no copying or converting of data needed*/
+                /*store the info_png color settings on the info_raw so that the info_raw still reflects what colortype
+                the raw image has to the end user*/
+                if (!state.DecoderSettings.ColorСonvert)
+                {
+                    state.InfoRaw = state.InfoPng.ColorMode;
+                }
+            }
+            else
+            {
+                /*color conversion needed; sort of copy of the data*/
+                if (!(state.InfoRaw.ColorType == PNGColorType.RGB || state.InfoRaw.ColorType == PNGColorType.RGBA)
+                    && state.InfoRaw.BitDepth != 8)
+                {
+                    /*unsupported color mode conversion*/
+                    throw new PNGDecodeException(56);
+                }
+
+                var width = (int)frame.Width;
+                var height = (int)frame.Height;
+
+                int rawBufferSize = (int)GetRawSizeLct(width, height, state.InfoRaw);
+                var outBuffer = new byte[rawBufferSize];
+
+                state.Error = PNGColorConvertion.Convert(outBuffer, frame.RawPixelBuffer, state.InfoRaw, state.InfoPng.ColorMode, width, height);
+                frame.RawPixelBuffer = outBuffer;
+                if (state.Error > 0)
+                {
+                    throw new PNGDecodeException(state.Error);
+                }
+            }
         }
 
         private uint DecodeGeneric(PNGState state, out PNGImage pngImage)
@@ -324,17 +356,10 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
             }
 
-            //var idatFrame = new PNGFrame();
-            //idatFrame.FrameData = idat.ToArray();
-            //if (idat.Count > 0)
-            //{
-            //    pngImage.Frames.Add(idatFrame);
-            //}
-
             foreach (var frame in pngImage.Frames)
             {
-                int width = frame.FrameControl != null ? (int)frame.FrameControl.Width : pngImage.Header.Width;
-                int height = frame.FrameControl != null ? (int)frame.FrameControl.Height : pngImage.Header.Height;
+                int width = frame.Width != 0 ? (int)frame.Width : pngImage.Header.Width;
+                int height = frame.Height != 0 ? (int)frame.Height : pngImage.Header.Height;
                 predict = 0;
                 if (state.InfoPng.InterlaceMethod == InterlaceMethod.None)
                 {
@@ -361,7 +386,6 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                     }
                     predict += GetRawSizeIdat((width), (height) >> 1, colorMode);
                 }
-
 
                 var scanlines = new List<byte>((int)predict);
 
