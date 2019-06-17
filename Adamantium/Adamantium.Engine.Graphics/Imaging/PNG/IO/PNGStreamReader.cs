@@ -562,26 +562,22 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.IO
             return actl;
         }
 
-        internal fcTL ReadfcTL(PNGState state, PNGFrame frame)
+        internal void ReadfcTL(PNGState state, PNGFrame frame)
         {
             var pos = Position - 4;
             var fctl = new fcTL();
 
-            fctl.SequenceNumber = ReadUInt32();
-            fctl.Width = ReadUInt32();
-            fctl.Height = ReadUInt32();
-            fctl.XOffset = ReadUInt32();
-            fctl.YOffset = ReadUInt32();
-            fctl.DelayNum = ReadUInt16();
-            fctl.DelayDen = ReadUInt16();
-            fctl.DisposeOp = (DisposeOp)ReadByte();
-            fctl.BlendOp = (BlendOp)ReadByte();
+            frame.SequenceNumber = ReadUInt32();
+            frame.Width = ReadUInt32();
+            frame.Height = ReadUInt32();
+            frame.XOffset = ReadUInt32();
+            frame.YOffset = ReadUInt32();
+            frame.DelayNum = ReadUInt16();
+            frame.DelayDen = ReadUInt16();
+            frame.DisposeOp = (DisposeOp)ReadByte();
+            frame.BlendOp = (BlendOp)ReadByte();
 
             ReadCRC(state, fctl, pos, 30);
-
-            frame.FrameControl = fctl;
-
-            return fctl;
         }
 
         internal void ReadCRC(PNGState state, Chunk chunk, long position, uint sizeToRead)

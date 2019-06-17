@@ -21,7 +21,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
             bytes.AddRange(GetNameAsBytes());
             bytes.Add((byte)RenderingIntent);
 
-            var crc = CRC32.CalculateCheckSum(bytes.ToArray());
+            var crc = CRC32.CalculateCheckSum(bytes.ToArray()[4..]);
             bytes.AddRange(Utilities.GetBytesWithReversedEndian(crc));
 
             return bytes.ToArray();

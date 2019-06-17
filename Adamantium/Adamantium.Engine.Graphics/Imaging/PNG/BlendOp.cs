@@ -1,4 +1,4 @@
-﻿namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
+﻿namespace Adamantium.Engine.Graphics.Imaging.PNG
 {
     internal enum BlendOp : byte
     {

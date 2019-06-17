@@ -21,21 +21,6 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
         internal override byte[] GetChunkBytes(PNGState state)
         {
             var bytes = new List<byte>();
-            //Write chunk size
-            if (state.InfoRaw.ColorType == PNGColorType.Grey || state.InfoRaw.ColorType == PNGColorType.GreyAlpha)
-            {
-                bytes.AddRange(Utilities.GetBytesWithReversedEndian(2u));
-            }
-            else if (state.InfoRaw.ColorType == PNGColorType.RGB || state.InfoRaw.ColorType == PNGColorType.RGBA)
-            {
-                bytes.AddRange(Utilities.GetBytesWithReversedEndian(6u));
-            }
-            else if (state.InfoRaw.ColorType == PNGColorType.Palette)
-            {
-                bytes.AddRange(Utilities.GetBytesWithReversedEndian(1u));
-            }
-
-            bytes.AddRange(GetNameAsBytes());
             var bkgd = new List<byte>();
             if (state.InfoRaw.ColorType == PNGColorType.Grey || state.InfoRaw.ColorType == PNGColorType.GreyAlpha)
             {
@@ -58,8 +43,10 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
                 bytes.AddRange(Utilities.GetBytesWithReversedEndian(1u));
                 bkgd.Add((byte)(BackgroundR & 255)); /*palette index*/
             }
+
+            bytes.AddRange(GetNameAsBytes());
             bytes.AddRange(bkgd);
-            var crc = CRC32.CalculateCheckSum(bytes.ToArray());
+            var crc = CRC32.CalculateCheckSum(bytes.ToArray()[4..]);
             bytes.AddRange(Utilities.GetBytesWithReversedEndian(crc));
 
             return bytes.ToArray();
