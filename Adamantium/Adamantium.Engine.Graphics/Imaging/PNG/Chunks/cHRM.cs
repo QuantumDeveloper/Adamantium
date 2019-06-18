@@ -1,7 +1,5 @@
 ﻿using Adamantium.Core;
-using System;
 using System.Collections.Generic;
-using System.Text;
 
 namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
 {
@@ -25,7 +23,6 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
         internal override byte[] GetChunkBytes(PNGState state)
         {
             var bytes = new List<byte>();
-            bytes.AddRange(Utilities.GetBytesWithReversedEndian(32u));
             bytes.AddRange(GetNameAsBytes());
             bytes.AddRange(Utilities.GetBytesWithReversedEndian(WhitePointX));
             bytes.AddRange(Utilities.GetBytesWithReversedEndian(WhitePointY));
@@ -35,9 +32,6 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
             bytes.AddRange(Utilities.GetBytesWithReversedEndian(GreenY));
             bytes.AddRange(Utilities.GetBytesWithReversedEndian(BlueX));
             bytes.AddRange(Utilities.GetBytesWithReversedEndian(BlueY));
-
-            var crc = CRC32.CalculateCheckSum(bytes.ToArray()[4..]);
-            bytes.AddRange(Utilities.GetBytesWithReversedEndian(crc));
 
             return bytes.ToArray();
         }

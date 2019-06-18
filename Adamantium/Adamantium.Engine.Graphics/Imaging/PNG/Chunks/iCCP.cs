@@ -58,7 +58,6 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
                 throw new PNGEncoderException(result);
             }
 
-            bytes.AddRange(Utilities.GetBytesWithReversedEndian(ICCPName.Length + 2 + compressedBytes.Count));
             bytes.AddRange(GetNameAsBytes());
             var iccpProfile = Encoding.ASCII.GetBytes(ICCPName);
             if (iccpProfile.Length < 1 || iccpProfile.Length > 79)
@@ -68,11 +67,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
             bytes.AddRange(iccpProfile);
             bytes.Add(0); // null terminator
             bytes.Add(0); // compression method
-
             bytes.AddRange(compressedBytes);
-
-            var crc = CRC32.CalculateCheckSum(bytes.ToArray()[4..]);
-            bytes.AddRange(Utilities.GetBytesWithReversedEndian(crc));
 
             return bytes.ToArray();
         }
