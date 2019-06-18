@@ -37,6 +37,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.IO
             WriteBytes(bytes.Reverse().ToArray());
         }
 
+        /*CHUNKS*/
         internal void WriteSignature()
         {
             WriteBytes(PngHeader);
@@ -45,43 +46,43 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.IO
         internal void WriteIHDR(PNGState state, int width, int height)
         {
             var bytes = IHDR.FromState(state, width, height).GetChunkBytes(state);
-            WriteBytes(bytes);
+            WriteChunk(bytes);
         }
 
         internal void WriteIDAT(PNGState state, byte[] rawBytes)
         {
             var bytes = IDAT.FromState(state, rawBytes).GetChunkBytes(state);
-            WriteBytes(bytes);
+            WriteChunk(bytes);
         }
 
         internal void WritebKGD(PNGState state)
         {
             var bytes = bKGD.FromState(state).GetChunkBytes(state);
-            WriteBytes(bytes);
+            WriteChunk(bytes);
         }
 
         internal void WritecHRM(PNGState state)
         {
             var bytes = cHRM.FromState(state).GetChunkBytes(state);
-            WriteBytes(bytes);
+            WriteChunk(bytes);
         }
 
         internal void WritegAMA(PNGState state)
         {
             var bytes = gAMA.FromState(state).GetChunkBytes(state);
-            WriteBytes(bytes);
+            WriteChunk(bytes);
         }
 
         internal void WriteiCCP(PNGState state)
         {
             var bytes = iCCP.FromState(state).GetChunkBytes(state);
-            WriteBytes(bytes);
+            WriteChunk(bytes);
         }
 
         internal void WriteIEND(PNGState state)
         {
             var bytes = new IEND().GetChunkBytes(state);
-            WriteBytes(bytes);
+            WriteChunk(bytes);
         }
 
         internal void WriteiTXt(PNGState state)
@@ -89,7 +90,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.IO
             foreach (var item in state.InfoPng.ITextItems)
             {
                 var bytes = iTXt.FromTextItem(item).GetChunkBytes(state);
-                WriteBytes(bytes);
+                WriteChunk(bytes);
             }
         }
 
@@ -98,7 +99,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.IO
             foreach (var item in state.InfoPng.TextItems)
             {
                 var bytes = tEXt.FromTextItem(item).GetChunkBytes(state);
-                WriteBytes(bytes);
+                WriteChunk(bytes);
             }
         }
 
@@ -109,7 +110,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.IO
                 foreach (var item in state.InfoPng.TextItems)
                 {
                     var bytes = zTXt.FromTextItem(item).GetChunkBytes(state);
-                    WriteBytes(bytes);
+                    WriteChunk(bytes);
                 }
             }
         }
@@ -117,31 +118,63 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.IO
         internal void WritepHYs(PNGState state)
         {
             var bytes = pHYs.FromState(state).GetChunkBytes(state);
-            WriteBytes(bytes);
+            WriteChunk(bytes);
         }
 
         internal void WritePLTE(PNGState state)
         {
             var bytes = PLTE.FromState(state).GetChunkBytes(state);
-            WriteBytes(bytes);
+            WriteChunk(bytes);
         }
 
         internal void WritesRGB(PNGState state)
         {
             var bytes = sRGB.FromState(state).GetChunkBytes(state);
-            WriteBytes(bytes);
+            WriteChunk(bytes);
         }
 
         internal void WritetIME(PNGState state)
         {
             var bytes = tIME.FromState(state).GetChunkBytes(state);
-            WriteBytes(bytes);
+            WriteChunk(bytes);
         }
 
         internal void WritetRNS(PNGState state)
         {
             var bytes = tRNS.FromState(state).GetChunkBytes(state);
-            WriteBytes(bytes);
+            WriteChunk(bytes);
+        }
+
+        /*Animated PNG*/
+        internal void WriteacTL(PNGState state)
+        {
+            var bytes = acTL.FromState(state).GetChunkBytes(state);
+            WriteChunk(bytes);
+        }
+
+        internal void WritefcTL(PixelBuffer buffer)
+        {
+            var bytes = fcTL.FromFrame(buffer).GetChunkBytes(null);
+            WriteChunk(bytes);
+        }
+
+        internal void WritefdAT(byte[] rawData, uint sequenceNumber)
+        {
+            var bytes = new fdAT() { FrameData = rawData, SequenceNumber = sequenceNumber }.GetChunkBytes(null);
+            WriteChunk(bytes);
+        }
+
+        internal void WriteChunk(byte[] chunkBytes)
+        {
+            WriteUInt32((uint)(chunkBytes.Length - 4));
+            WriteBytes(chunkBytes);
+            CalculateAndWriteCRC(chunkBytes);
+        }
+
+        internal void CalculateAndWriteCRC(byte[] chunkBytes)
+        {
+            var crc = CRC32.CalculateCheckSum(chunkBytes);
+            WriteUInt32(crc);
         }
     }
 }

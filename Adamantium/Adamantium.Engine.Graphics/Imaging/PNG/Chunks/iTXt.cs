@@ -33,8 +33,6 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
             var langTagBytes = Encoding.ASCII.GetBytes(LangTag);
             var transKeyBytes = Encoding.ASCII.GetBytes(TransKey);
 
-            uint numBytes = (uint)(keyWord.Length + langTagBytes.Length + transKeyBytes.Length + 5);
-
             var textBytes = Encoding.ASCII.GetBytes(Text);
 
             var compressedData = new List<byte>();
@@ -46,14 +44,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
                 {
                     throw new PNGEncoderException(error);
                 }
-                numBytes += (uint)compressedData.Count;
-            }
-            else /*not compressed*/
-            {
-                numBytes += (uint)textBytes.Length;
             }
 
-            bytes.AddRange(Utilities.GetBytesWithReversedEndian(numBytes));
             bytes.AddRange(GetNameAsBytes());
             bytes.AddRange(keyWord);
             bytes.Add(0); // Null terminator
@@ -74,9 +66,6 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
             {
                 bytes.AddRange(textBytes);
             }
-
-            var crc = CRC32.CalculateCheckSum(bytes.ToArray()[4..]);
-            bytes.AddRange(Utilities.GetBytesWithReversedEndian(crc));
 
             return bytes.ToArray();
         }

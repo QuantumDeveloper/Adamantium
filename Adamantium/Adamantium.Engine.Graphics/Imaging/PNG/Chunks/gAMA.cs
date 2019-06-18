@@ -11,18 +11,14 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
         {
             Name = "gAMA";
         }
+
         public uint Gamma { get; set; }
 
         internal override byte[] GetChunkBytes(PNGState state)
         {
             var bytes = new List<byte>();
-            bytes.AddRange(Utilities.GetBytesWithReversedEndian(4u));
-
             bytes.AddRange(GetNameAsBytes());
             bytes.AddRange(Utilities.GetBytesWithReversedEndian(Gamma));
-
-            var crc = CRC32.CalculateCheckSum(bytes.ToArray()[4..]);
-            bytes.AddRange(Utilities.GetBytesWithReversedEndian(crc));
 
             return bytes.ToArray();
         }

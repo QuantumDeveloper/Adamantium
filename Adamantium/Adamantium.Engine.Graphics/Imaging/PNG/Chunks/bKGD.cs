@@ -21,33 +21,25 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
         internal override byte[] GetChunkBytes(PNGState state)
         {
             var bytes = new List<byte>();
-            var bkgd = new List<byte>();
+            bytes.AddRange(GetNameAsBytes());
             if (state.InfoRaw.ColorType == PNGColorType.Grey || state.InfoRaw.ColorType == PNGColorType.GreyAlpha)
             {
-                bytes.AddRange(Utilities.GetBytesWithReversedEndian(2u));
-                bkgd.Add((byte)(BackgroundR >> 8));
-                bkgd.Add((byte)(BackgroundR & 255));
+                bytes.Add((byte)(BackgroundR >> 8));
+                bytes.Add((byte)(BackgroundR & 255));
             }
             else if (state.InfoRaw.ColorType == PNGColorType.RGB || state.InfoRaw.ColorType == PNGColorType.RGBA)
             {
-                bytes.AddRange(Utilities.GetBytesWithReversedEndian(6u));
-                bkgd.Add((byte)(BackgroundR >> 8));
-                bkgd.Add((byte)(BackgroundR & 255));
-                bkgd.Add((byte)(BackgroundG >> 8));
-                bkgd.Add((byte)(BackgroundG & 255));
-                bkgd.Add((byte)(BackgroundB >> 8));
-                bkgd.Add((byte)(BackgroundB & 255));
+                bytes.Add((byte)(BackgroundR >> 8));
+                bytes.Add((byte)(BackgroundR & 255));
+                bytes.Add((byte)(BackgroundG >> 8));
+                bytes.Add((byte)(BackgroundG & 255));
+                bytes.Add((byte)(BackgroundB >> 8));
+                bytes.Add((byte)(BackgroundB & 255));
             }
             else if (state.InfoRaw.ColorType == PNGColorType.Palette)
             {
-                bytes.AddRange(Utilities.GetBytesWithReversedEndian(1u));
-                bkgd.Add((byte)(BackgroundR & 255)); /*palette index*/
+                bytes.Add((byte)(BackgroundR & 255)); /*palette index*/
             }
-
-            bytes.AddRange(GetNameAsBytes());
-            bytes.AddRange(bkgd);
-            var crc = CRC32.CalculateCheckSum(bytes.ToArray()[4..]);
-            bytes.AddRange(Utilities.GetBytesWithReversedEndian(crc));
 
             return bytes.ToArray();
         }

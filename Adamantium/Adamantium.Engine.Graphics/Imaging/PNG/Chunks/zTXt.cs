@@ -43,12 +43,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
             }
             compressedBytes.AddRange(compressedText);
 
-            bytes.AddRange(Utilities.GetBytesWithReversedEndian(compressedBytes.Count));
             bytes.AddRange(GetNameAsBytes());
             bytes.AddRange(compressedBytes);
-
-            var crc = CRC32.CalculateCheckSum(bytes.ToArray()[4..]);
-            bytes.AddRange(Utilities.GetBytesWithReversedEndian(crc));
 
             return bytes.ToArray();
         }

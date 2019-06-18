@@ -28,13 +28,9 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
                 throw new PNGEncoderException(result);
             }
 
-            bytes.AddRange(Utilities.GetBytesWithReversedEndian((uint)compressedData.Count));
             bytes.AddRange(GetNameAsBytes());
             bytes.AddRange(compressedData);
-            var crcBytes = bytes.ToArray()[4..];
-            var crc = CRC32.CalculateCheckSum(crcBytes);
-            bytes.AddRange(Utilities.GetBytesWithReversedEndian(crc));
-
+ 
             return bytes.ToArray();
         }
 

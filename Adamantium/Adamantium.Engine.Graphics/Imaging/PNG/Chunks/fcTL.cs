@@ -52,7 +52,6 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
         internal override byte[] GetChunkBytes(PNGState state)
         {
             var bytes = new List<byte>();
-            bytes.AddRange(Utilities.GetBytesWithReversedEndian(26u));
             bytes.AddRange(GetNameAsBytes());
             bytes.AddRange(Utilities.GetBytesWithReversedEndian(SequenceNumber));
             bytes.AddRange(Utilities.GetBytesWithReversedEndian(Width));
@@ -63,9 +62,6 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
             bytes.AddRange(Utilities.GetBytesWithReversedEndian(DelayDen));
             bytes.Add((byte)DisposeOp);
             bytes.Add((byte)BlendOp);
-
-            var crc = CRC32.CalculateCheckSum(bytes.ToArray()[4..]);
-            bytes.AddRange(Utilities.GetBytesWithReversedEndian(crc));
 
             return bytes.ToArray();
         }
