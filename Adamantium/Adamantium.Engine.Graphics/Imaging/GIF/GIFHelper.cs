@@ -252,37 +252,6 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
             return _colors[index];
         }
     }
-    enum GifChunkCodes : byte
-    {
-        None = 0x0,
-        PlainTextExtension = 0x01,
-        ExtensionIntroducer = 0x21,
-        ImageDescriptor = 0x2C,
-        Trailer = 0x3B,
-        GraphicControl = 0xF9,
-        ApplicationExtension = 0xFF,
-        CommentExtension = 0xFE
-    }
-
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    internal struct ScreenDescriptor
-    {
-        public ushort width;
-        public ushort height;
-        public byte fields;
-        public byte backgroundColorIndex;
-        public byte pixelAspectRatio;
-    }
-
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    internal struct GifImageDescriptor
-    {
-        public ushort offsetLeft;
-        public ushort offsetTop;
-        public ushort width;
-        public ushort height;
-        public byte fields;
-    }
 
     internal struct DictionaryEntry
     {
@@ -291,68 +260,9 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
         public int len;
     }
 
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    internal struct GifExtension
-    {
-        public GifChunkCodes extensionCode;
-        public byte blockSize;
-    }
-
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    internal struct GraphicControlExtension
-    {
-        public byte fields;
-        public ushort delayTime;
-        public byte transparentColorIndex;
-    }
-
-    internal class ApplicationExtension
-    {
-        public byte[] applicationId;
-        public byte[] version;
-    }
-
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    internal struct PlainTextExtension
-    {
-        public ushort left;
-        public ushort top;
-        public ushort width;
-        public ushort height;
-        public byte cellWidth;
-        public byte cellHeight;
-        public byte foregroundColor;
-        public byte bckgroundColor;
-    }
-
-    public class GifImage
-    {
-        public List<ColorRGB> GlobalColorTable { get; internal set; }
-
-        public List<GifFrame> Frames { get; }
-
-        public GifFrame CurrentFrame { get; set; }
-
-        public byte ColorDepth { get; internal set; }
-
-        public GifImage()
-        {
-            Frames = new List<GifFrame>();
-            GlobalColorTable = new List<ColorRGB>();
-        }
-    }
-
-    public class GifFrame
-    {
-        internal GifImageDescriptor descriptor;
-
-        public ColorRGB[] ColorTable { get; internal set; }
-    }
-
     public static class GIFHelper
     {
         private const string GIFHeader = "GIF89a";
-        
 
         public static unsafe Image LoadFromGifMemory(IntPtr pSource, int size, bool makeACopy, GCHandle? handle)
         {
@@ -416,20 +326,18 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
             GraphicControlExtension graphicControlExtension;
             ApplicationExtension applicationExtension;
             PlainTextExtension plainTextExtension;
-            int size = 0;
+            var position = stream.Position;
             switch (ext.extensionCode)
             {
                 case GifChunkCodes.GraphicControl:
                     ptr = ((UnmanagedMemoryStream)stream).PositionPointer;
                     graphicControlExtension = *(GraphicControlExtension*)ptr;
-                    stream.Position += Marshal.SizeOf<GraphicControlExtension>();
-                    size = Marshal.SizeOf<GraphicControlExtension>();
+                    
                     break;
                 case GifChunkCodes.ApplicationExtension:
                     applicationExtension = new ApplicationExtension();
                     applicationExtension.applicationId = stream.ReadBytes(8);
                     applicationExtension.version = stream.ReadBytes(3);
-                    size = 11;
                     break;
                 case GifChunkCodes.CommentExtension:
                     // comment extension; do nothing - all the data is in the
@@ -438,19 +346,12 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
                 case GifChunkCodes.PlainTextExtension:
                     ptr = ((UnmanagedMemoryStream)stream).PositionPointer;
                     plainTextExtension = *(PlainTextExtension*)ptr;
-                    stream.Position += Marshal.SizeOf<PlainTextExtension>();
-                    size = Marshal.SizeOf<PlainTextExtension>();
                     break;
                 default:
-                    int x = 0;
                     break;
             }
-            var diif = ext.blockSize - size;
-            if (diif > 0)
-            {
-                var bytes = stream.ReadBytes(diif);
-            }
-            //ReadSubBlocks(stream, out var extensionData);
+            stream.Position = position;
+            stream.Position += ext.blockSize;
         }
 
         private static bool ReadGIFHeader(Stream stream)
@@ -485,7 +386,7 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
                 stream.Read(сolorTable, 0, сolorTable.Length);
                 int cnt = 0;
                 frame.ColorTable = new ColorRGB[size];
-                for (int i = 0; i < сolorTable.Length; i += 3)
+                for (int i = 0; i < size; i += 3)
                 {
                     frame.ColorTable[i] = new ColorRGB(сolorTable[i], сolorTable[i + 1], сolorTable[i + 2]);
                     cnt++;
@@ -499,7 +400,7 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
             gifImage.Frames.Add(frame);
             var imageData = ReadImageData(stream);
             imageData.colorTable = frame.ColorTable;
-            imageData.decode();
+            //imageData.decode();
         }
 
         /// Decompress image pixels.
