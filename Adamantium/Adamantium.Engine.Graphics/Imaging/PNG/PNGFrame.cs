@@ -1,9 +1,12 @@
-﻿namespace Adamantium.Engine.Graphics.Imaging.PNG
+﻿using System.Collections.Generic;
+
+namespace Adamantium.Engine.Graphics.Imaging.PNG
 {
     internal class PNGFrame
     {
         public PNGFrame()
         {
+            frameData = new List<byte>();
         }
 
         public PNGFrame(byte[] pixels, uint width, uint height, int bitDepth)
@@ -12,16 +15,19 @@
             Width = width;
             Height = height;
             BitDepth = bitDepth;
+            frameData = new List<byte>();
         }
 
-        public bool IsPartOfAnimation { get; set; }
+        private List<byte> frameData;
 
         public int BitDepth { get; set; }
 
         /// <summary>
         /// Sequence number of the animation chunk, starting from 0
         /// </summary>
-        public uint SequenceNumber { get; set; }
+        public uint SequenceNumberFCTL { get; set; }
+
+        public uint SequenceNumberFDAT { get; set; }
         /// <summary>
         /// Width of the following frame
         /// </summary>
@@ -57,6 +63,22 @@
 
         public byte[] RawPixelBuffer { get; set; }
 
-        public byte[] FrameData { get; set; }
+        public byte[] FrameData
+        {
+            get => frameData.ToArray();
+            set
+            {
+                frameData.Clear();
+                frameData.AddRange(value);
+            }
+        }
+
+        public void AddBytes(params byte[] bytes)
+        {
+            if (bytes == null)
+                return;
+
+            frameData.AddRange(bytes);
+        }
     }
 }

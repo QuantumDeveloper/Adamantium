@@ -18,7 +18,7 @@ namespace Adamantium.Engine.Graphics
     public sealed class Image : DisposableObject
     {
         public delegate Image ImageLoadDelegate(IntPtr dataPointer, int dataSize, bool makeACopy, GCHandle? handle);
-        public delegate void ImageSaveDelegate(PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream);
+        public delegate void ImageSaveDelegate(Image img, PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream);
 
         /// <summary>
         /// Pixel buffers.
@@ -66,7 +66,7 @@ namespace Adamantium.Engine.Graphics
         /// </summary>
         public ImageDescription Description;
 
-        public bool IsAnimated => IsAnimated1;
+        public bool IsAnimated => isAnimated;
 
         public uint NumberOfReplays => numberOfReplays;
 
@@ -86,11 +86,14 @@ namespace Adamantium.Engine.Graphics
         public PixelBufferArray PixelBuffer => pixelBufferArray;
 
         /// <summary>
+        /// Gets or sets default image. Actual for APNG if you want to exclude some <see cref="PixelBuffer"/> from animation sequence
+        /// </summary>
+        public PixelBuffer DefaultImage { get; set; }
+
+        /// <summary>
         /// Gets the total number of bytes occupied by this image in memory.
         /// </summary>
         public int TotalSizeInBytes => totalSizeInBytes;
-
-        public bool IsAnimated1 { get => isAnimated; set => isAnimated = value; }
 
         private Image()
         {
@@ -660,7 +663,7 @@ namespace Adamantium.Engine.Graphics
         /// <remarks>This method support the following format: <c>dds, bmp, jpg, png, gif, tiff, wmp, tga</c>.</remarks>
         public void Save(Stream imageStream, ImageFileType fileType)
         {
-            Save(pixelBuffers, this.pixelBuffers.Length, Description, imageStream, fileType);
+            Save(this, pixelBuffers, pixelBuffers.Length, Description, imageStream, fileType);
         }
 
         public void ApplyPixelBuffer(PixelBuffer pixelBuffer, int index, bool freeBuffer)
@@ -720,13 +723,13 @@ namespace Adamantium.Engine.Graphics
         /// <param name="imageStream">The destination stream.</param>
         /// <param name="fileType">Specify the output format.</param>
         /// <remarks>This method support the following format: <c>dds, bmp, jpg, png, gif, tiff, wmp, tga</c>.</remarks>
-        internal static void Save(PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream, ImageFileType fileType)
+        internal static void Save(Image img, PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream, ImageFileType fileType)
         {
             foreach (var loadSaveDelegate in loadSaveDelegates)
             {
                 if (loadSaveDelegate.FileType == fileType)
                 {
-                    loadSaveDelegate.Save(pixelBuffers, count, description, imageStream);
+                    loadSaveDelegate.Save(img, pixelBuffers, count, description, imageStream);
                     return;
                 }
 
@@ -828,7 +831,9 @@ namespace Adamantium.Engine.Graphics
             if (animatedDescriptions == null || animatedDescriptions.Length < 2)
                 throw new InvalidOperationException("Animated descriptions count must be more than 1");
 
-            IsAnimated1 = true;
+            isAnimated = true;
+
+            this.numberOfReplays = numberOfReplays;
 
             // Calculate mipmaps
             int pixelBufferCount = animatedDescriptions.Length;

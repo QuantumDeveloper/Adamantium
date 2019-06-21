@@ -536,7 +536,7 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
             return imageData;
         }
 
-        public static unsafe void SaveToGIFStream(PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream)
+        public static unsafe void SaveToGIFStream(Image img, PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream)
         {
 
         }

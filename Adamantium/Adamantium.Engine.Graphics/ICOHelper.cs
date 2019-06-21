@@ -224,7 +224,7 @@ namespace Adamantium.Engine.Graphics
             return image;
         }
 
-        public static unsafe void SaveToICOStream(PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream)
+        public static unsafe void SaveToICOStream(Image img, PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream)
         {
 
         }

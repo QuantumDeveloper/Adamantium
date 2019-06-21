@@ -54,7 +54,7 @@ namespace Adamantium.Engine.Graphics.Imaging.JPEG.Encoder
         /// <param name="outStream">Stream where the result will be placed.</param>
         public JpegEncoder(PixelBuffer decodedJpeg, int quality, Stream outStream)
         {
-            _input = new DecodedJpeg(decodedJpeg.ToComponentsBuffer(PixelBuffer.ComponentBufferType.Jpg));
+            _input = new DecodedJpeg(decodedJpeg.ToComponentsBuffer(ComponentBufferType.Jpg));
 
             /* This encoder requires YCbCr */
             _input.Image.ChangeColorSpace(ColorSpace.YCbCr);

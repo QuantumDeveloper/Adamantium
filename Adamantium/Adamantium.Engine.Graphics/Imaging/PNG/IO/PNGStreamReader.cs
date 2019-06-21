@@ -567,7 +567,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.IO
             var pos = Position - 4;
             var fctl = new fcTL();
 
-            frame.SequenceNumber = ReadUInt32();
+            frame.SequenceNumberFCTL = ReadUInt32();
             frame.Width = ReadUInt32();
             frame.Height = ReadUInt32();
             frame.XOffset = ReadUInt32();

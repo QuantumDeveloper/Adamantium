@@ -20,27 +20,50 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
         public List<PNGFrame> Frames { get; }
 
-        public PNGFrame DefaultImage => Frames.FirstOrDefault(x => !x.IsPartOfAnimation);
+        public PNGFrame DefaultImage { get; set; }
 
         public bool IsMultiFrame => Frames.Count > 1;
 
         public static PNGImage FromImage(Image image)
         {
-            return FromPixelBuffers(image.PixelBuffer);
+            var png = FromPixelBuffers(image.PixelBuffer);
+            png.DefaultImage = GetFrameFromBuffer(image.DefaultImage);
+            png.Header = new IHDR();
+            png.Header.Width = image.Description.Width;
+            png.Header.Height = image.Description.Height;
+
+            return png;
         }
 
-        public static PNGImage FromPixelBuffers(PixelBuffer[] buffers)
+        public static PNGImage FromPixelBuffers(params PixelBuffer[] buffers)
         {
             var pngImage = new PNGImage();
             for (int i = 0; i < buffers.Length; ++i)
             {
                 var pixelBuffer = buffers[i];
-                var colors = pixelBuffer.GetPixels<byte>();
-                var frame = new PNGFrame(colors, (uint)pixelBuffer.Width, (uint)pixelBuffer.Height, pixelBuffer.PixelSize * 8);
+                var frame = GetFrameFromBuffer(pixelBuffer);
                 pngImage.Frames.Add(frame);
             }
 
             return pngImage;
+        }
+
+        private static PNGFrame GetFrameFromBuffer(PixelBuffer pixelBuffer)
+        {
+            if (pixelBuffer == null)
+            {
+                return null;
+            }
+
+            var pixels = pixelBuffer.GetPixels<byte>();
+            var frame = new PNGFrame(pixels, (uint)pixelBuffer.Width, (uint)pixelBuffer.Height, pixelBuffer.PixelSize * 8);
+            frame.DelayNum = pixelBuffer.DelayNum;
+            frame.DelayDen = pixelBuffer.DelayDen;
+            frame.XOffset = pixelBuffer.XOffset;
+            frame.YOffset = pixelBuffer.YOffset;
+            frame.SequenceNumberFCTL = pixelBuffer.SequenceNumber;
+
+            return frame;
         }
     }
 }

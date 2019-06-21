@@ -152,15 +152,15 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.IO
             WriteChunk(bytes);
         }
 
-        internal void WritefcTL(PixelBuffer buffer)
+        internal void WritefcTL(PNGFrame frame)
         {
-            var bytes = fcTL.FromFrame(buffer).GetChunkBytes(null);
+            var bytes = fcTL.FromFrame(frame).GetChunkBytes(null);
             WriteChunk(bytes);
         }
 
-        internal void WritefdAT(byte[] rawData, uint sequenceNumber)
+        internal void WritefdAT(byte[] rawData, uint sequenceNumber, PNGState state)
         {
-            var bytes = new fdAT() { FrameData = rawData, SequenceNumber = sequenceNumber }.GetChunkBytes(null);
+            var bytes = new fdAT() { FrameData = rawData, SequenceNumber = sequenceNumber }.GetChunkBytes(state);
             WriteChunk(bytes);
         }
 

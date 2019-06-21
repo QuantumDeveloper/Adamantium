@@ -90,9 +90,9 @@ namespace Adamantium.Engine.GraphicsTests
         [Test]
         public void PngImageTest()
         {
-            //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\elephant.png");
-            var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\BaseAlbedoTexture_Text.png");
-            //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\testpng1.png");
+            var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\APNG\APNG-cube.png");
+            //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\BaseAlbedoTexture_Text.png");
+            //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\1.png");
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\testpng6.png");
 
             //var bytes = File.ReadAllBytes(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\converted2.png");
@@ -101,8 +101,8 @@ namespace Adamantium.Engine.GraphicsTests
             //Utilities.CopyMemory(img.DataPointer, handle.AddrOfPinnedObject(), bytes.Length);
             //handle.Free();
             var timer = Stopwatch.StartNew();
-            img?.Save("1.bmp", ImageFileType.Bmp);
-            img?.Save("1.png", ImageFileType.Png);
+            img?.Save("test.bmp", ImageFileType.Bmp);
+            img?.Save("test.png", ImageFileType.Png);
             timer.Stop();
             //img?.Save("1.tga", ImageFileType.Tga);
             //img?.Save("1.dds", ImageFileType.Dds);

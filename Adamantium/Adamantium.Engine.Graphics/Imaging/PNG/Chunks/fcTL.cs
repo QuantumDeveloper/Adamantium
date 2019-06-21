@@ -66,12 +66,12 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
             return bytes.ToArray();
         }
 
-        internal static fcTL FromFrame(PixelBuffer frame)
+        internal static fcTL FromFrame(PNGFrame frame)
         {
             var fctl = new fcTL();
-            fctl.SequenceNumber = frame.SequenceNumber;
-            fctl.Width = (uint)frame.Width;
-            fctl.Height = (uint)frame.Height;
+            fctl.SequenceNumber = frame.SequenceNumberFCTL;
+            fctl.Width = frame.Width;
+            fctl.Height = frame.Height;
             fctl.XOffset = frame.XOffset;
             fctl.YOffset = frame.YOffset;
             fctl.DelayNum = frame.DelayNum;

@@ -1012,7 +1012,7 @@ namespace Adamantium.Engine.Graphics
             return image;
         }
 
-        public static void SaveToDDSStream(PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream)
+        public static void SaveToDDSStream(Image img, PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream)
         {
             SaveToDDSStream(pixelBuffers, count, description, DDSFlags.None, imageStream);
         }

@@ -4,6 +4,7 @@ using Adamantium.Engine.Graphics.Imaging.PNG.IO;
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Linq;
 
 namespace Adamantium.Engine.Graphics.Imaging.PNG
 {
@@ -60,6 +61,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         private Image GetSingleFrameImage(PNGImage pngImage, PNGState state)
         {
             var frame = pngImage.Frames[0];
+            frame.Width = (uint)pngImage.Header.Width;
+            frame.Height = (uint)pngImage.Header.Height;
             ConvertColorsIfNeeded(frame, state);
             var descr = GetImageDescription(state, pngImage.Header.Width, pngImage.Header.Height);
             var img = Image.New(descr);
@@ -78,7 +81,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 var description = new AnimatedImageDescription();
                 description.Width = (int)frame.Width;
                 description.Height = (int)frame.Height;
-                description.SequenceNumber = frame.SequenceNumber;
+                description.SequenceNumber = frame.SequenceNumberFCTL;
                 description.XOffset = frame.XOffset;
                 description.YOffset = frame.YOffset;
                 description.DelayNumerator = frame.DelayNum;
@@ -174,7 +177,6 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             string chunk;
             ulong i;
             /*the data from idat chunks*/
-            List<byte> idat = new List<byte>();
             long predict = 0;
 
             // initialize out parameters in case of errors
@@ -255,7 +257,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                     2                  second `fdAT` for first frame
                     ....
                 */
-
+                bool isPartOfAnimation = false;
                 switch (chunkType)
                 {
                     case "acTL":
@@ -265,12 +267,12 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                         break;
                     case "fcTL":
                         currentFrame = new PNGFrame();
-                        currentFrame.IsPartOfAnimation = true;
+                        isPartOfAnimation = true;
                         pngImage.Frames.Add(currentFrame);
                         stream.ReadfcTL(state, currentFrame);
                         break;
                     case "fdAT":
-                        currentFrame.SequenceNumber = stream.ReadUInt32();
+                        currentFrame.SequenceNumberFDAT = stream.ReadUInt32();
                         currentFrame.FrameData = stream.ReadBytes((int)chunkSize - 4);
                         crc = stream.ReadUInt32();
                         stream.Position = pos;
@@ -282,9 +284,10 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                         }
                         break;
                     case "IDAT":
-                        if (currentFrame == null)
+                        if (currentFrame == null && !isPartOfAnimation)
                         {
                             currentFrame = new PNGFrame();
+                            pngImage.DefaultImage = currentFrame;
                             pngImage.Frames.Add(currentFrame);
                         }
                         var bytes = stream.ReadBytes((int)chunkSize);
@@ -296,8 +299,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                         {
                             state.Error = 57; // checksum mismatch;
                         }
-                        idat.AddRange(bytes);
-                        currentFrame.FrameData = idat.ToArray();
+                        currentFrame.AddBytes(bytes);
                         break;
                     case "IEND":
                         IEND = true;
@@ -353,7 +355,6 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                     currentPosition += chunkSize + 12;
                     stream.Position = currentPosition;
                 }
-
             }
 
             foreach (var frame in pngImage.Frames)

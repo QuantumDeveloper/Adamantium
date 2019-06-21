@@ -19,7 +19,13 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             pngStream = new PNGStreamWriter();
         }
 
-        public uint Encode(PixelBuffer[] pixelBuffers, PNGState state)
+        public PNGEncoder()
+        {
+            compressor = new PNGCompressor();
+            pngStream = new PNGStreamWriter();
+        }
+
+        public uint Encode(PNGImage pngImage, PNGState state)
         {
             uint error = 0;
 
@@ -51,7 +57,6 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
             /* color convert and compute scanline filter types */
             PNGInfo info = new PNGInfo(state.InfoPng);
-            PNGImage pngImage = PNGImage.FromPixelBuffers(pixelBuffers);
 
             if (state.EncoderSettings.AutoConvert)
             {
@@ -68,7 +73,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                     PNGColorMode mode16 = PNGColorMode.Create(PNGColorType.RGB, 16);
                     PNGColorConvertion.ConvertRGB(ref r, ref g, ref b, bgR, bgG, bgB, mode16, state.InfoPng.ColorMode);
                     var frame = pngImage.Frames[0];
-                    PNGColorConvertion.GetColorProfile(profile, frame.RawPixelBuffer, (uint)frame.Width, (uint)frame.Height, state.InfoRaw);
+                    PNGColorConvertion.GetColorProfile(profile, frame.RawPixelBuffer, frame.Width, frame.Height, state.InfoRaw);
                     profile.Add(r, g, b, ushort.MaxValue);
                     PNGColorProfile.AutoChooseColorFromProfile(info.ColorMode, state.InfoRaw, profile);
                     error = PNGColorConvertion.ConvertRGB(ref info.BackgroundR, ref info.BackgroundG,
@@ -81,7 +86,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 else
                 {
                     var frame = pngImage.Frames[0];
-                    PNGColorProfile.AutoChooseColor(info.ColorMode, frame.RawPixelBuffer, (uint)frame.Width, (uint)frame.Height, state.InfoRaw);
+                    PNGColorProfile.AutoChooseColor(info.ColorMode, frame.RawPixelBuffer, frame.Width, frame.Height, state.InfoRaw);
                 }
             }
 
@@ -132,7 +137,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                         throw new PNGEncoderException(state.Error);
                     }
                     var compressedBuffer = new byte[0];
-                    state.Error = PreprocessScanlines(ref compressedBuffer, converted, (uint)frame.Width, (uint)frame.Height, info, state.EncoderSettings);
+                    state.Error = PreprocessScanlines(ref compressedBuffer, converted, frame.Width, frame.Height, info, state.EncoderSettings);
                     frame.FrameData = compressedBuffer;
                     if (state.Error > 0)
                     {
@@ -145,7 +150,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 foreach (PNGFrame frame in pngImage.Frames)
                 {
                     var compressedBuffer = new byte[0];
-                    state.Error = PreprocessScanlines(ref compressedBuffer, frame.RawPixelBuffer, (uint)frame.Width, (uint)frame.Height, info, state.EncoderSettings);
+                    state.Error = PreprocessScanlines(ref compressedBuffer, frame.RawPixelBuffer, frame.Width, frame.Height, info, state.EncoderSettings);
                     frame.FrameData = compressedBuffer;
                     if (state.Error > 0)
                     {
@@ -154,10 +159,11 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 }
             }
             state.InfoPng = info;
-            var width = pngImage.Frames[0].Width;
-            var height = pngImage.Frames[0].Height;
+            var width = pngImage.Header.Width;
+            var height = pngImage.Header.Height;
             pngStream.WriteSignature();
             pngStream.WriteIHDR(state, (int)width, (int)height);
+
             if (info.IsIccpDefined)
             {
                 pngStream.WriteiCCP(state);
@@ -206,8 +212,41 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 pngStream.WritepHYs(state);
             }
 
-            /*IDAT (multiple IDAT chunks must be consecutive)*/
-            pngStream.WriteIDAT(state, pngImage.Frames[0].FrameData);
+            if (pngImage.IsMultiFrame)
+            {
+                pngStream.WriteacTL(state);
+                if (pngImage.DefaultImage != null)
+                {
+                    pngStream.WriteIDAT(state, pngImage.DefaultImage.FrameData);
+                }
+
+                uint sequenceNumber = 0;
+                for(int i = 0; i< pngImage.Frames.Count; ++i)
+                {
+                    var frame = pngImage.Frames[i];
+                    if (pngImage.DefaultImage == null && i == 0)
+                    {
+                        pngStream.WritefcTL(frame);
+                        pngStream.WriteIDAT(state, frame.FrameData);
+                        ++sequenceNumber;
+                        continue;
+                    }
+
+                    if (pngImage.DefaultImage!= null && frame.SequenceNumberFCTL == pngImage.DefaultImage.SequenceNumberFCTL)
+                        continue;
+
+                    frame.SequenceNumberFCTL = sequenceNumber;
+                    ++sequenceNumber;
+                    pngStream.WritefcTL(frame);
+                    pngStream.WritefdAT(frame.FrameData, sequenceNumber, state);
+                    sequenceNumber++;
+                }
+            }
+            else
+            {
+                /*IDAT (multiple IDAT chunks must be consecutive)*/
+                pngStream.WriteIDAT(state, pngImage.Frames[0].FrameData);
+            }
 
             pngStream.WritetIME(state);
 
@@ -219,7 +258,11 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             return error;
         }
 
-
+        public byte[] GetAllBytes()
+        {
+            pngStream.Position = 0;
+            return pngStream.GetBuffer();
+        }
 
         private unsafe void AddPaddingBits(byte[] outData, byte* inData, long olineBits, long ilineBits, uint height)
         {
