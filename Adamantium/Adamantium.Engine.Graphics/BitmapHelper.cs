@@ -298,7 +298,7 @@ namespace Adamantium.Engine.Graphics
             }
         }
 
-        public static void SaveToBitmapMemory(PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream)
+        public static void SaveToBitmapMemory(Image img, PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream)
         {
             SaveToBitmapStream(pixelBuffers, count, description, imageStream);
         }

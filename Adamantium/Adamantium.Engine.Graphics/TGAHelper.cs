@@ -284,7 +284,7 @@ namespace Adamantium.Engine.Graphics
             return true;
         }
 
-        public static void SaveToTgaMemory(PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream)
+        public static void SaveToTgaMemory(Image img, PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream)
         {
             SaveToTgaStream(pixelBuffers, count, description, imageStream);
         }

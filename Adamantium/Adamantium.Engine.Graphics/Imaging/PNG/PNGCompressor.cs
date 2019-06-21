@@ -55,9 +55,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 int wpos = pos & (windowSize - 1);
                 int chainLength = 0;
 
-                hashval = hash.GetHash(inData, pos);
-
-                //Debug.WriteLine($"position {pos}: {hashval}");
+                hashval = hash.GetHash(inData, inSize, pos);
 
                 if (useZeros && hashval == 0)
                 {
@@ -75,21 +73,22 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                     numZeros = 0;
                 }
 
-                
-
                 hash.UpdateHashChain(wpos, hashval, (ushort)numZeros);
 
                 /*the length and offset found for the current position*/
                 length = 0;
                 offset = 0;
 
-                
+                if (pos == 672094)
+                {
+
+                }
 
                 hashpos = hash.Chain[wpos];
-                //Debug.WriteLine($"hashpos {hashpos}");
                 int index = inSize < pos + Hash.MaxSupportedDeflateLength ? inSize : pos + Hash.MaxSupportedDeflateLength;
-                fixed (byte* lastPtr = &inData[index])
+                fixed (byte* inDataPtr = &inData[0])
                 {
+                    byte* lastPtr = inDataPtr + index;
                     prevOffset = 0;
                     for (; ; )
                     {
@@ -213,19 +212,15 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                         for (int i = 1; i < length; ++i)
                         {
                             ++pos;
-                            if (pos == 6221877)
-                            {
-
-                            }
                             wpos = pos & (windowSize - 1);
-                            hashval = hash.GetHash(inData, pos);
+                            hashval = hash.GetHash(inData, inSize, pos);
                             if (useZeros && hashval == 0)
                             {
                                 if (numZeros == 0)
                                 {
                                     numZeros = hash.CountZeros(inData, inSize, pos);
                                 }
-                                else if (pos + numZeros > inData.Length || inData[pos + numZeros - 1] != 0)
+                                else if (pos + numZeros > inSize || inData[pos + numZeros - 1] != 0)
                                 {
                                     --numZeros;
                                 }
@@ -309,7 +304,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             return left;
         }
 
-        public uint Compress(byte[] inData, PNGEncoderSettings settings, List<byte> outData)
+        public uint Compress(byte[] rawData, PNGEncoderSettings settings, List<byte> outData)
         {
             uint error = 0;
 
@@ -325,11 +320,11 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             outData.Add((byte)(CMFFLG & 255));
 
             var deflatedData = new List<byte>();
-            error = Deflate(inData, settings, deflatedData);
+            error = Deflate(rawData, settings, deflatedData);
 
             if (error == 0)
             {
-                uint ADLER32 = Adler32.GetAdler32(inData);
+                uint ADLER32 = Adler32.GetAdler32(rawData);
                 outData.AddRange(deflatedData);
                 BitHelper.Add32BitInt(outData, ADLER32);
             }
@@ -376,7 +371,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 var final = Convert.ToByte(i == numDeflateBlocks - 1);
                 var start = i * blockSize;
                 var end = start + blockSize;
-                if (end >= inData.Length) end = inData.Length - 1;
+                if (end > inData.Length) end = inData.Length;
 
                 if (settings.BType == 1)
                 {

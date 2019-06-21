@@ -25,7 +25,6 @@ using Adamantium.Mathematics;
 using AdamantiumVulkan.Core;
 using System;
 using System.IO;
-using System.Runtime.InteropServices;
 
 namespace Adamantium.Engine.Graphics
 {
@@ -192,11 +191,11 @@ namespace Adamantium.Engine.Graphics
         /// <param name="fileName">The destination file.</param>
         /// <param name="fileType">Specify the output format.</param>
         /// <remarks>This method support the following format: <c>dds, bmp, jpg, png, gif, tiff, wmp, tga</c>.</remarks>
-        public void Save(string fileName, ImageFileType fileType)
+        public void Save(Image img, string fileName, ImageFileType fileType)
         {
             using (var imageStream = new FileStream(fileName, FileMode.Create, FileAccess.Write))
             {
-                Save(imageStream, fileType);
+                Save(img, imageStream, fileType);
             }
         }
 
@@ -206,7 +205,7 @@ namespace Adamantium.Engine.Graphics
         /// <param name="imageStream">The destination stream.</param>
         /// <param name="fileType">Specify the output format.</param>
         /// <remarks>This method support the following format: <c>dds, bmp, jpg, png, gif, tiff, wmp, tga</c>.</remarks>
-        public void Save(Stream imageStream, ImageFileType fileType)
+        public void Save(Image img, Stream imageStream, ImageFileType fileType)
         {
             var description = new ImageDescription()
             {
@@ -215,10 +214,10 @@ namespace Adamantium.Engine.Graphics
                 Depth = 1,
                 ArraySize = 1,
                 Dimension = TextureDimension.Texture2D,
-                Format = this.format,
+                Format = format,
                 MipLevels = 1,
             };
-            Image.Save(new[] { this }, 1, description, imageStream, fileType);
+            Image.Save(img, new[] { this }, 1, description, imageStream, fileType);
         }
 
         /// <summary>

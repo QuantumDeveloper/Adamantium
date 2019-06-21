@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Adamantium.Engine.Graphics.Imaging.PNG
+﻿namespace Adamantium.Engine.Graphics.Imaging.PNG
 {
     internal class Hash
     {
@@ -50,10 +46,10 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             for (i = 0; i != windowSize; ++i) Chainz[i] = (ushort)i; /*same value as index indicates uninitialized*/
         }
 
-        public int GetHash(byte[] data, int pos)
+        public int GetHash(byte[] data, int size, int pos)
         {
             int result = 0;
-            if (pos + 2 < data.Length)
+            if (pos + 2 < size)
             {
                 /*A simple shift and xor hash is used. Since the data of PNGs is dominated
                 by zeroes due to the filters, a better hash does not have a significant
@@ -67,9 +63,9 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             else
             {
                 int amount;
-                if (pos >= data.Length) return 0;
+                if (pos >= size) return 0;
 
-                amount = data.Length - pos;
+                amount = size - pos;
                 for (int i = 0; i != amount; ++i)
                 {
                     result ^= (data[pos + i] << (i * 8));
@@ -79,31 +75,25 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             return result & HashBitMask;
         }
 
-        public uint CountZeros(byte[] data, int size, int pos)
+        public unsafe uint CountZeros(byte[] inData, int size, int pos)
         {
-            int start = pos;
-            int end = start + MaxSupportedDeflateLength;
-            if (end > size)
+            fixed(byte* inDataPtr = &inData[0])
             {
-                end = size;
-            }
+                byte* data = inDataPtr;
+                byte* start = inDataPtr + pos;
+                byte* end = start + MaxSupportedDeflateLength;
 
-            bool proceed = true;
-            int count = 0;
-            while(proceed)
-            {
-                if (data[start] == 0 && start != end)
+                if (end > data + size)
                 {
-                    start++;
-                    count++;
+                    end = data + size;
                 }
-                else
-                {
-                    proceed = false;
-                }
-            }
 
-            return (uint)count;
+                data = start;
+
+                while (data != end && *data == 0) ++data;
+
+                return (uint)(data - start);
+            }
         }
 
         /*wpos = pos & (windowsize - 1)*/
