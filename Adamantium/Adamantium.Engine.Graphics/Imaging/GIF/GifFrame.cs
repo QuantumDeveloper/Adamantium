@@ -8,6 +8,8 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
 
         public ColorRGB[] ColorTable { get; internal set; }
 
+        public GifImageData ImageData { get; set; }
+
         public GraphicControlExtension GraphicControlExtension { get; set;}
     }
 }

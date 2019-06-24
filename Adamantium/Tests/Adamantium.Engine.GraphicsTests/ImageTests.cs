@@ -116,7 +116,7 @@ namespace Adamantium.Engine.GraphicsTests
         public void GIFImageTest()
         {
             var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\gif\cube.gif");
-            //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\225px-GIF_-_bubble_animation.gif");
+            //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\gif\bubble_animation.gif");
             //img?.Save("1.bmp", ImageFileType.Bmp);
             //img?.Save("1.tga", ImageFileType.Tga);
             //img?.Save("1.jpg", ImageFileType.Jpg);
