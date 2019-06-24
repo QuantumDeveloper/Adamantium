@@ -2,7 +2,7 @@
 {
     internal class ApplicationExtension
     {
-        public byte[] applicationId;
-        public byte[] version;
+        public string applicationId;
+        public string version;
     }
 }
