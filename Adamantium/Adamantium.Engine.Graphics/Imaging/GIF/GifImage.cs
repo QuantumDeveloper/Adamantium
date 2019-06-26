@@ -13,6 +13,8 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
 
         public byte ColorDepth { get; internal set; }
 
+        public ScreenDescriptor Descriptor { get; set; }
+
         public GifImage()
         {
             Frames = new List<GifFrame>();

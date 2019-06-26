@@ -2,7 +2,6 @@
 using Adamantium.Mathematics;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -22,9 +21,6 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
             }
 
             var gifImage = new GifImage();
-            //var bytes = stream.ReadBytes(2);
-            //var result = bytes[0] + (bytes[1] << 8);
-            //stream.Seek(0, SeekOrigin.Begin);
             ScreenDescriptor screenDescriptor = *(ScreenDescriptor*)stream.PositionPointer;
             stream.Position += Marshal.SizeOf<ScreenDescriptor>();
 
@@ -39,14 +35,18 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
             {
                 var сolorTable = new byte[3 * gctSize];
                 stream.Read(сolorTable, 0, сolorTable.Length);
-                for (int i = 0; i < сolorTable.Length; i += 3)
+                int offset = 0;
+                for (int i = 0; i < gctSize; i++)
                 {
-                    gifImage.GlobalColorTable.Add(new ColorRGB(сolorTable[i], сolorTable[i + 1], сolorTable[i + 2]));
+                    gifImage.GlobalColorTable.Add(new ColorRGB(сolorTable[offset], сolorTable[offset + 1], сolorTable[offset + 2]));
+                    offset += 3;
                 }
             }
 
-            GifChunkCodes blockType = GifChunkCodes.None;
+            gifImage.Descriptor = screenDescriptor;
 
+            GifChunkCodes blockType = GifChunkCodes.None;
+            int frameIndex = 0;
             while (blockType != GifChunkCodes.Trailer)
             {
                 blockType = (GifChunkCodes)stream.ReadByte();
@@ -55,6 +55,7 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
                 {
                     case GifChunkCodes.ImageDescriptor:
                         ProcessImageDescriptor(stream, gifImage, stream.PositionPointer);
+                        frameIndex++;
                         break;
                     case GifChunkCodes.ExtensionIntroducer:
                         ProcessExtension(stream);
@@ -64,8 +65,8 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
                 }
             }
 
-            DecodeInternal(gifImage);
-            return null;
+            //return DecodeInternal(gifImage);
+            return DecodeInternalAlternative(gifImage);
         }
 
         struct DictionaryEntry
@@ -75,7 +76,7 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
             public int len;
         }
 
-        private void DecodeInternal(GifImage gif)
+        private unsafe Image DecodeInternal(GifImage gif)
         {
             var frame = gif.Frames[0];
 
@@ -87,17 +88,19 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
             int resetCodeLength; //This varies depending on codeLength
             int clearCode;
             int stopCode;
-            int matchLen;
+            int streamOffset = 0;
 
-
-            codeLength = frame.ImageData.LzwMinimumCodeSize;
+            codeLength = frame.LzwMinimumCodeSize;
             clearCode = 1 << codeLength;
             stopCode = clearCode + 1;
             resetCodeLength = codeLength;
 
-            var inputData = frame.ImageData.blockBytes;
-            var codeTable = new Dictionary<int, List<int>>();
+            var inputData = frame.CompressedData;
             var dictionary = new DictionaryEntry[1 << (codeLength + 1)];
+
+            var width = gif.Descriptor.width;
+            var height = gif.Descriptor.height;
+            var colorTable = frame.ColorTable;
 
             //init dictionary
             for (index = 0; index < (1 << codeLength); index++)
@@ -116,7 +119,7 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
             index++;
             index++;
 
-            var indexStream = new List<int>();
+            var indexStream = new int[width * height];
             int inputOffset = 0;
             int inputLength = inputData.Count;
 
@@ -142,7 +145,6 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
                 if (code == clearCode)
                 {
                     codeLength = resetCodeLength;
-                    codeTable.Clear();
                     //init dictionary
                     dictionary = new DictionaryEntry[1 << (codeLength + 1)];
                     for (index = 0; index < (1 << codeLength); index++)
@@ -179,25 +181,23 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
                         throw new Exception($"code = {code}, but index = {index}");
                     }
 
+                    int ptr;
                     //Special handling for KwKwK
                     if (code == index)
                     {
-                        int ptr = prev;
-                        while (dictionary[ptr].prev != -1)
-                        {
-                            ptr = dictionary[ptr].prev;
-                        }
-                        dictionary[index].@byte = dictionary[ptr].@byte;
+                        ptr = prev;
                     }
                     else
                     {
-                        int ptr = code;
-                        while (dictionary[ptr].prev != -1)
-                        {
-                            ptr = dictionary[ptr].prev;
-                        }
-                        dictionary[index].@byte = dictionary[ptr].@byte;
+                        ptr = code;
                     }
+
+                    while (dictionary[ptr].prev != -1)
+                    {
+                        ptr = dictionary[ptr].prev;
+                    }
+
+                    dictionary[index].@byte = dictionary[ptr].@byte;
 
                     dictionary[index].prev = prev;
                     dictionary[index].len = dictionary[prev].len + 1;
@@ -214,17 +214,159 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
 
                 prev = code;
                 // Now copy the dictionary entry backwards into "indexStream"
-                matchLen = dictionary[code].len;
-                while (code != -1)
+                var matchLen = dictionary[code].len;
+                fixed (int* indexPtr = &indexStream[streamOffset])
                 {
-                    indexStream.Add(dictionary[code].@byte);
-                    if (dictionary[code].prev == code)
+                    //int* indexCopy = &indexPtr[streamOffset];
+                    while (code != -1)
                     {
-                        throw new Exception("INternal error; self-reference");
+                        indexPtr[dictionary[code].len - 1] = dictionary[code].@byte;
+                        if (dictionary[code].prev == code)
+                        {
+                            throw new Exception("Internal error; self-reference");
+                        }
+                        code = dictionary[code].prev;
                     }
-                    code = dictionary[code].prev;
+                }
+                streamOffset += matchLen;
+            }
+
+            var pixels = new byte[width * height * 3];
+            int offset = 0;
+            for (i = 0; i < width * height; i++)
+            {
+                var colors = colorTable[indexStream[i]];
+                pixels[offset] = colors.R;
+                pixels[offset + 1] = colors.G;
+                pixels[offset + 2] = colors.B;
+                offset += 3;
+            }
+
+            ImageDescription description = new ImageDescription();
+            description.Width = width;
+            description.Height = height;
+            description.MipLevels = 1;
+            description.Dimension = TextureDimension.Texture2D;
+            description.Format = AdamantiumVulkan.Core.Format.R8G8B8_UNORM;
+            description.ArraySize = 1;
+            description.Depth = 1;
+
+            var img = Image.New(description);
+            var handle = GCHandle.Alloc(pixels, GCHandleType.Pinned);
+            Utilities.CopyMemory(img.DataPointer, handle.AddrOfPinnedObject(), pixels.Length);
+            handle.Free();
+
+            return img;
+        }
+
+        private Image DecodeInternalAlternative(GifImage gif)
+        {
+            var frame = gif.Frames[0];
+            var data = frame.CompressedData;
+            var minCodeSize = frame.LzwMinimumCodeSize;
+            uint mask = 0x01;
+            int inputLength = data.Count;
+            int index = 0;
+
+            var pos = 0;
+            int readCode(int size)
+            {
+                int code = 0x0;
+                for (var i = 0; i < size; i++)
+                {
+                    var val = data[pos];
+                    int bit = (val & mask) != 0 ? 1 : 0;
+                    mask <<= 1;
+
+                    if (mask == 0x100)
+                    {
+                        mask = 0x01;
+                        pos++;
+                        inputLength--;
+                    }
+
+                    code |= (bit << i);
+                }
+                return code;
+            };
+
+            var output = new List<int>();
+
+            var clearCode = 1 << minCodeSize;
+            var eoiCode = clearCode + 1;
+
+            var codeSize = minCodeSize + 1;
+
+            var dict = new Dictionary<int, List<int>>();
+            //var dict = new List<List<int>>();
+            
+
+            void Clear()
+            {
+                dict.Clear();
+                codeSize = frame.LzwMinimumCodeSize + 1;
+                for (index = 0; index < clearCode; index++)
+                {
+                    dict.Add(index, new List<int>() { index });
+                }
+                dict.Add(index++, new List<int>());
+                dict.Add(index++, null);
+            }
+
+            int code = 0x0;
+            int last = 0;
+
+            while (inputLength > 0)
+            {
+                last = code;
+                code = readCode(codeSize);
+
+                if (code == clearCode)
+                {
+                    Clear();
+                    continue;
+                }
+                if (code == eoiCode)
+                {
+                    break;
+                }
+
+                if (dict.ContainsKey(code))
+                //if (code < dict.Count)
+                {
+                    if (last != clearCode)
+                    {
+                        dict[last].Add(dict[code][0]);
+                        //dict.Add(new List<int>(dict[last]));
+                        dict[last].AddRange(new List<int>(dict[last]));
+                        //dict[last].AddRange(dict[code]);
+                        //dict[code].AddRange(dict[last]);
+
+                    }
+                }
+                else
+                {
+                    //if (code != dict.Count) throw new Exception("Invalid LZW code.");
+                    if (last != clearCode)
+                    {
+                        dict[last].Add(dict[last][0]);
+                        //dict.Add(new List<int>(dict[last]));
+                        dict.Add(code, new List<int>(dict[last]));
+                        index++;
+                    }
+                }
+                
+                //last = code;
+                output.AddRange(dict[last]);
+
+                if (dict.Count == (1 << codeSize) && codeSize < 12)
+                {
+                    // If we're at the last code and codeSize is 12, the next code will be a clearCode, and it'll be 12 bits long.
+                    codeSize++;
                 }
             }
+
+            return null;
         }
 
         /// <summary>
@@ -239,18 +381,19 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
             stream.Position += Marshal.SizeOf<GifImageDescriptor>();
             int interlace = gifImageDescriptor.fields & 0x40;
             GifFrame frame = new GifFrame();
+            frame.Interlaced = Convert.ToBoolean(interlace);
             if ((gifImageDescriptor.fields & 0x80) != 0)
             {
                 //Read local color table
                 var size = 1 << ((gifImageDescriptor.fields & 0x07) + 1);
                 var сolorTable = new byte[3 * size];
                 stream.Read(сolorTable, 0, сolorTable.Length);
-                int cnt = 0;
+                int offset = 0;
                 frame.ColorTable = new ColorRGB[size];
-                for (int i = 0; i < size; i += 3)
+                for (int i = 0; i < size; i++)
                 {
-                    frame.ColorTable[i] = new ColorRGB(сolorTable[i], сolorTable[i + 1], сolorTable[i + 2]);
-                    cnt++;
+                    frame.ColorTable[i] = new ColorRGB(сolorTable[offset], сolorTable[offset + 1], сolorTable[offset + 2]);
+                    offset += 3;
                 }
             }
             else
@@ -258,18 +401,15 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
                 frame.ColorTable = gifImage.GlobalColorTable.ToArray();
             }
 
-            var imageData = ReadImageData(stream);
-            frame.ImageData = imageData;
-            imageData.colorTable = frame.ColorTable;
+            frame.Descriptor = gifImageDescriptor;
+            ReadImageData(stream, frame);
             gifImage.Frames.Add(frame);
         }
 
         /// Decompress image pixels.
-        private static GifImageData ReadImageData(Stream stream)
+        private static void ReadImageData(Stream stream, GifFrame frame)
         {
-            GifImageData imageData = new GifImageData();
-            byte lzwCodeSize = (byte)stream.ReadByte();
-            imageData.LzwMinimumCodeSize = lzwCodeSize;
+            frame.LzwMinimumCodeSize = (byte)stream.ReadByte();
 
             byte blockSize;
 
@@ -292,10 +432,8 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
                 }
 
                 var bytes = stream.ReadBytes(blockSize);
-                imageData.blockBytes.AddRange(bytes);
+                frame.CompressedData.AddRange(bytes);
             }
-
-            return imageData;
         }
 
         private static unsafe void ProcessExtension(Stream stream)
