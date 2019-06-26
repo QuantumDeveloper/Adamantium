@@ -15,8 +15,8 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
             var stream = new UnmanagedMemoryStream((byte*)pSource, (long)size);
 
             GifDecoder decoder = new GifDecoder();
-            decoder.Decode(stream);
-            return null;
+            var img = decoder.Decode(stream);
+            return img;
         }
 
         public static unsafe void SaveToGIFStream(Image img, PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream)
