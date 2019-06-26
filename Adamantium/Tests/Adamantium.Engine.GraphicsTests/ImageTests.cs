@@ -115,13 +115,14 @@ namespace Adamantium.Engine.GraphicsTests
         [Test]
         public void GIFImageTest()
         {
-            var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\gif\cube.gif");
+            //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\gif\cube.gif");
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\gif\Rotating_earth.gif");
-            //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\gif\bubble_animation.gif");
+            var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\gif\giphy.gif");
+            //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\gif\RotatingEarth2.gif");
             //img?.Save("1.bmp", ImageFileType.Bmp);
             //img?.Save("1.tga", ImageFileType.Tga);
             //img?.Save("1.jpg", ImageFileType.Jpg);
-            img?.Save("cube.bmp", ImageFileType.Bmp);
+            img?.Save("cube.png", ImageFileType.Png);
             img?.Dispose();
         }
     }
