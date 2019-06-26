@@ -26,7 +26,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             state.EncoderSettings.UseLZ77 = true;
             state.InfoPng.InterlaceMethod = InterlaceMethod.None;
             state.EncoderSettings.FilterStrategy = FilterStrategy.MinSum;
-            state.InfoRaw.ColorType = PNGColorType.RGBA;
+            state.InfoRaw.ColorType = PNGColorType.RGB;
             state.InfoRaw.BitDepth = (uint)description.Format.SizeOfInBits() / (uint)description.Format.SizeOfInBytes();
 
             state.InfoPng.FramesCount = (uint)count;
@@ -35,7 +35,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 state.InfoPng.FramesCount--;
             }
             state.InfoPng.RepeatCount = img.NumberOfReplays;
-            state.InfoPng.ColorMode.ColorType = PNGColorType.RGBA;
+            state.InfoPng.ColorMode.ColorType = PNGColorType.RGB;
             state.InfoPng.ColorMode.BitDepth = (uint)description.Format.SizeOfInBits() / (uint)description.Format.SizeOfInBytes();
 
             PNGImage pngImage = PNGImage.FromImage(img);

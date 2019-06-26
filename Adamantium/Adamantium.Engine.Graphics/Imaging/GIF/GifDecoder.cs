@@ -54,7 +54,12 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
                 switch (blockType)
                 {
                     case GifChunkCodes.ImageDescriptor:
+                        if (frameIndex == 54)
+                        {
+
+                        }
                         ProcessImageDescriptor(stream, gifImage, stream.PositionPointer);
+                        frameIndex++;
                         frameIndex++;
                         break;
                     case GifChunkCodes.ExtensionIntroducer:
@@ -78,7 +83,7 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
 
         private unsafe Image DecodeInternal(GifImage gif)
         {
-            var frame = gif.Frames[0];
+            var frame = gif.Frames[20];
 
             uint mask = 0x01;
             int i;
@@ -261,12 +266,11 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
 
         private Image DecodeInternalAlternative(GifImage gif)
         {
-            var frame = gif.Frames[0];
+            var frame = gif.Frames[70];
             var data = frame.CompressedData;
             var minCodeSize = frame.LzwMinimumCodeSize;
             uint mask = 0x01;
             int inputLength = data.Count;
-            int index = 0;
 
             var pos = 0;
             int readCode(int size)
@@ -290,27 +294,25 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
                 return code;
             };
 
-            var output = new List<int>();
+            var indexStream = new List<int>();
 
             var clearCode = 1 << minCodeSize;
             var eoiCode = clearCode + 1;
 
             var codeSize = minCodeSize + 1;
 
-            var dict = new Dictionary<int, List<int>>();
-            //var dict = new List<List<int>>();
-            
+            var dict = new List<List<int>>();
 
             void Clear()
             {
                 dict.Clear();
                 codeSize = frame.LzwMinimumCodeSize + 1;
-                for (index = 0; index < clearCode; index++)
+                for (int i = 0; i < clearCode; i++)
                 {
-                    dict.Add(index, new List<int>() { index });
+                    dict.Add(new List<int>() { i });
                 }
-                dict.Add(index++, new List<int>());
-                dict.Add(index++, null);
+                dict.Add(new List<int>());
+                dict.Add(null);
             }
 
             int code = 0x0;
@@ -331,33 +333,26 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
                     break;
                 }
 
-                if (dict.ContainsKey(code))
-                //if (code < dict.Count)
+                if (code < dict.Count)
                 {
                     if (last != clearCode)
                     {
-                        dict[last].Add(dict[code][0]);
-                        //dict.Add(new List<int>(dict[last]));
-                        dict[last].AddRange(new List<int>(dict[last]));
-                        //dict[last].AddRange(dict[code]);
-                        //dict[code].AddRange(dict[last]);
-
+                        var lst = new List<int>(dict[last]);
+                        lst.Add(dict[code][0]);
+                        dict.Add(lst);
                     }
                 }
                 else
                 {
-                    //if (code != dict.Count) throw new Exception("Invalid LZW code.");
                     if (last != clearCode)
                     {
-                        dict[last].Add(dict[last][0]);
-                        //dict.Add(new List<int>(dict[last]));
-                        dict.Add(code, new List<int>(dict[last]));
-                        index++;
+                        var lst = new List<int>(dict[last]);
+                        lst.Add(dict[last][0]);
+                        dict.Add(lst);
                     }
                 }
                 
-                //last = code;
-                output.AddRange(dict[last]);
+                indexStream.AddRange(dict[code]);
 
                 if (dict.Count == (1 << codeSize) && codeSize < 12)
                 {
@@ -366,7 +361,36 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
                 }
             }
 
-            return null;
+            var width = frame.Descriptor.width;
+            var height = frame.Descriptor.height;
+            var colorTable = frame.ColorTable;
+
+            var pixels = new byte[width * height * 3];
+            int offset = 0;
+            for (int i = 0; i < width * height; i++)
+            {
+                var colors = colorTable[indexStream[i]];
+                pixels[offset] = colors.R;
+                pixels[offset + 1] = colors.G;
+                pixels[offset + 2] = colors.B;
+                offset += 3;
+            }
+
+            ImageDescription description = new ImageDescription();
+            description.Width = width;
+            description.Height = height;
+            description.MipLevels = 1;
+            description.Dimension = TextureDimension.Texture2D;
+            description.Format = AdamantiumVulkan.Core.Format.R8G8B8_UNORM;
+            description.ArraySize = 1;
+            description.Depth = 1;
+
+            var img = Image.New(description);
+            var handle = GCHandle.Alloc(pixels, GCHandleType.Pinned);
+            Utilities.CopyMemory(img.DataPointer, handle.AddrOfPinnedObject(), pixels.Length);
+            handle.Free();
+
+            return img;
         }
 
         /// <summary>
