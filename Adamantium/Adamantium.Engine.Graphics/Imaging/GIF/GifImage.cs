@@ -15,6 +15,8 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
 
         public ScreenDescriptor Descriptor { get; set; }
 
+        public ApplicationExtension ApplicationExtension { get; set; }
+
         public GifImage()
         {
             Frames = new List<GifFrame>();

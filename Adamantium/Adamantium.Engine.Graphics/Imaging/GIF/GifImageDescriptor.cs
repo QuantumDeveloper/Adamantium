@@ -2,13 +2,12 @@
 
 namespace Adamantium.Engine.Graphics.Imaging.GIF
 {
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    internal struct GifImageDescriptor
+    internal class GifImageDescriptor
     {
-        public ushort offsetLeft;
-        public ushort offsetTop;
-        public ushort width;
-        public ushort height;
-        public byte fields;
+        public ushort OffsetLeft { get; set; }
+        public ushort OffsetTop { get; set; }
+        public ushort Width { get; set; }
+        public ushort Height { get; set; }
+        public byte Fields { get; set; }
     }
 }

@@ -57,8 +57,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
             var pixels = pixelBuffer.GetPixels<byte>();
             var frame = new PNGFrame(pixels, (uint)pixelBuffer.Width, (uint)pixelBuffer.Height, pixelBuffer.PixelSize * 8);
-            frame.DelayNum = pixelBuffer.DelayNum;
-            frame.DelayDen = pixelBuffer.DelayDen;
+            frame.DelayNumerator = pixelBuffer.DelayNumerator;
+            frame.DelayDenominator = pixelBuffer.DelayDenominator;
             frame.XOffset = pixelBuffer.XOffset;
             frame.YOffset = pixelBuffer.YOffset;
             frame.SequenceNumberFCTL = pixelBuffer.SequenceNumber;

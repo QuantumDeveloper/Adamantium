@@ -134,12 +134,12 @@ namespace Adamantium.Engine.Graphics
         /// <summary>
         /// Frame delay fraction numerator
         /// </summary>
-        public ushort DelayNum { get; internal set; }
+        public ushort DelayNumerator { get; internal set; }
         
         /// <summary>
         /// Frame delay fraction denominator
         /// </summary>
-        public ushort DelayDen { get; internal set; }
+        public ushort DelayDenominator { get; internal set; }
 
         /// <summary>
         /// Sequence number of current pixel buffer aka frame

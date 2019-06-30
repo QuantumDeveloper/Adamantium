@@ -74,8 +74,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.Chunks
             fctl.Height = frame.Height;
             fctl.XOffset = frame.XOffset;
             fctl.YOffset = frame.YOffset;
-            fctl.DelayNum = frame.DelayNum;
-            fctl.DelayDen = frame.DelayDen;
+            fctl.DelayNum = frame.DelayNumerator;
+            fctl.DelayDen = frame.DelayDenominator;
             fctl.DisposeOp = DisposeOp.Background;
             fctl.BlendOp = BlendOp.Source;
 

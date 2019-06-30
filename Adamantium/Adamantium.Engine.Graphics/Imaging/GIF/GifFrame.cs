@@ -20,7 +20,9 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
 
         public List<byte> CompressedData { get; set; }
 
-        public byte[] RawPixels;
+        public byte[] RawPixels { get; set; }
+
+        public int[] IndexData { get; set; }
 
         public bool Interlaced { get; set; }
     }

@@ -572,8 +572,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG.IO
             frame.Height = ReadUInt32();
             frame.XOffset = ReadUInt32();
             frame.YOffset = ReadUInt32();
-            frame.DelayNum = ReadUInt16();
-            frame.DelayDen = ReadUInt16();
+            frame.DelayNumerator = ReadUInt16();
+            frame.DelayDenominator = ReadUInt16();
             frame.DisposeOp = (DisposeOp)ReadByte();
             frame.BlendOp = (BlendOp)ReadByte();
 

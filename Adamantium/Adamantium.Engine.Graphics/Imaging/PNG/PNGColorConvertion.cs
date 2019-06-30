@@ -300,7 +300,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 for (int i = 0; i < profile.Numcolors; ++i)
                 {
                     ColorTree.Add(ref tree, 
-                        profile.Palette[i * 4], 
+                        profile.Palette[i * 4 + 0], 
                         profile.Palette[i * 4 + 1],
                         profile.Palette[i * 4 + 2],
                         profile.Palette[i * 4 + 3], i);

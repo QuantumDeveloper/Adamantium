@@ -4,7 +4,6 @@ using Adamantium.Engine.Graphics.Imaging.PNG.IO;
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using System.Linq;
 
 namespace Adamantium.Engine.Graphics.Imaging.PNG
 {
@@ -75,35 +74,79 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
         private Image GetMultiFrameImage(PNGImage pngImage, PNGState state)
         {
-            var animatedDescriptions = new List<AnimatedImageDescription>();
-            foreach (var frame in pngImage.Frames)
+            for (int i = 0; i < pngImage.Frames.Count; i++)
             {
-                var description = new AnimatedImageDescription();
-                description.Width = (int)frame.Width;
-                description.Height = (int)frame.Height;
-                description.SequenceNumber = frame.SequenceNumberFCTL;
-                description.XOffset = frame.XOffset;
-                description.YOffset = frame.YOffset;
-                description.DelayNumerator = frame.DelayNum;
-                description.DelayDenominator = frame.DelayDen;
-                description.BytesPerPixel = (int)(PNGColorConvertion.GetBitsPerPixel(state.InfoRaw) / 8);
-                if (description.BytesPerPixel == 0)
+                PNGFrame frame = pngImage.Frames[i];
+                var bytesPerPixel = (int)(PNGColorConvertion.GetBitsPerPixel(state.InfoRaw) / 8);
+                if (bytesPerPixel == 0)
                 {
-                    description.BytesPerPixel = 1;
+                    bytesPerPixel = 1;
                 }
-                animatedDescriptions.Add(description);
+
                 ConvertColorsIfNeeded(frame, state);
+
+                if (i > 0)
+                {
+                    var baseFrame = pngImage.Frames[i - 1];
+                    byte[] pixels = new byte[baseFrame.RawPixelBuffer.Length];
+                    if (frame.DisposeOp == DisposeOp.None)
+                    {
+                        Array.Copy(baseFrame.RawPixelBuffer, pixels, pixels.Length);
+                    }
+                    int lineLength = pngImage.Header.Width * bytesPerPixel;
+
+                    for (int k = 0; k < frame.Height; ++k)
+                    {
+                        var dstIndex = ((frame.YOffset + k) * lineLength) + (frame.XOffset * bytesPerPixel);
+                        var srcIndex = k * frame.Width * bytesPerPixel;
+
+                        if (frame.BlendOp == BlendOp.Over)
+                        {
+                            var basePixelBuffer = baseFrame.RawPixelBuffer;
+                            var pixelBuffer = frame.RawPixelBuffer;
+                            // output = alpha * foreground + (1-alpha) * background for each color channel 
+                            // where the alpha value and the input and output sample values are expressed as fractions in the range 0 to 1
+                            int offset = 0;
+                            for (var n = srcIndex; n < pixelBuffer.Length; n+=4)
+                            {
+                                var alpha = pixelBuffer[n + 3] / 255.0f;
+                                var baseAlpha = basePixelBuffer[dstIndex + 3] / 255.0f;
+                                pixelBuffer[n + 0] = (byte)(alpha * (pixelBuffer[n + 0] / 255.0f) + (1 - baseAlpha) * (basePixelBuffer[dstIndex + offset + 0] / 255.0f) * 255);
+                                pixelBuffer[n + 1] = (byte)(alpha * (pixelBuffer[n + 1] / 255.0f) + (1 - baseAlpha) * (basePixelBuffer[dstIndex + offset + 1] / 255.0f) * 255);
+                                pixelBuffer[n + 2] = (byte)(alpha * (pixelBuffer[n + 2] / 255.0f) + (1 - baseAlpha) * (basePixelBuffer[dstIndex + offset + 2] / 255.0f) * 255);
+                                offset += 4;
+                            }
+                        }
+
+                        Array.Copy(frame.RawPixelBuffer, srcIndex, pixels, dstIndex, frame.Width * bytesPerPixel);
+                    }
+                    frame.Width = (uint)pngImage.Header.Width;
+                    frame.Height = (uint)pngImage.Header.Height;
+                    frame.XOffset = 0;
+                    frame.YOffset = 0;
+                    frame.RawPixelBuffer = pixels;
+
+                }
             }
 
-            var descr = GetImageDescription(state, pngImage.Header.Width, pngImage.Header.Height);
-
-            var img = Image.New(descr, pngImage.RepeatCout, animatedDescriptions.ToArray());
+            var img = Image.New3D(pngImage.Header.Width, pngImage.Header.Height, pngImage.Frames.Count, new MipMapCount(1),SurfaceFormat.R8G8B8A8.UNorm);
             for (int i = 0; i < img.PixelBuffer.Count; ++i)
             {
-                var handle = GCHandle.Alloc(pngImage.Frames[i].RawPixelBuffer, GCHandleType.Pinned);
+                var frame = pngImage.Frames[i];
+                var handle = GCHandle.Alloc(frame.RawPixelBuffer, GCHandleType.Pinned);
                 Utilities.CopyMemory(img.PixelBuffer[i].DataPointer, handle.AddrOfPinnedObject(), pngImage.Frames[i].RawPixelBuffer.Length);
+                img.PixelBuffer[i].DelayNumerator = frame.DelayNumerator;
+                img.PixelBuffer[i].DelayDenominator = frame.DelayDenominator;
                 handle.Free();
             }
+
+            //int x = 1;
+            //descr.Width = (int)pngImage.Frames[x].Width;
+            //descr.Height = (int)pngImage.Frames[x].Height;
+            //var img = Image.New(descr);
+            //var handle = GCHandle.Alloc(pngImage.Frames[x].RawPixelBuffer, GCHandleType.Pinned);
+            //Utilities.CopyMemory(img.DataPointer, handle.AddrOfPinnedObject(), pngImage.Frames[x].RawPixelBuffer.Length);
+            //handle.Free();
 
             return img;
         }

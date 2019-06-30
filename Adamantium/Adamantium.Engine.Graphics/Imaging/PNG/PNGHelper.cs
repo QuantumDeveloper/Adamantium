@@ -20,13 +20,19 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
 
         public static void SavePngToMemory(Image img, PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream)
         {
+            PNGColorType colorType = PNGColorType.RGB;
+            if (description.Format.SizeOfInBytes() == 4)
+            {
+                colorType = PNGColorType.RGBA;
+            }
+
             PNGEncoder encoder = new PNGEncoder(imageStream);
             PNGState state = new PNGState();
             state.EncoderSettings.BType = 2;
             state.EncoderSettings.UseLZ77 = true;
             state.InfoPng.InterlaceMethod = InterlaceMethod.None;
             state.EncoderSettings.FilterStrategy = FilterStrategy.MinSum;
-            state.InfoRaw.ColorType = PNGColorType.RGB;
+            state.InfoRaw.ColorType = colorType;
             state.InfoRaw.BitDepth = (uint)description.Format.SizeOfInBits() / (uint)description.Format.SizeOfInBytes();
 
             state.InfoPng.FramesCount = (uint)count;
@@ -35,13 +41,12 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
                 state.InfoPng.FramesCount--;
             }
             state.InfoPng.RepeatCount = img.NumberOfReplays;
-            state.InfoPng.ColorMode.ColorType = PNGColorType.RGB;
+            state.InfoPng.ColorMode.ColorType = colorType;
             state.InfoPng.ColorMode.BitDepth = (uint)description.Format.SizeOfInBits() / (uint)description.Format.SizeOfInBytes();
 
             PNGImage pngImage = PNGImage.FromImage(img);
 
             encoder.Encode(pngImage, state);
-            
 
             //var images = new PNGImage[pngImage.Frames.Count];
             //for (int i = 0; i < images.Length; ++i)
