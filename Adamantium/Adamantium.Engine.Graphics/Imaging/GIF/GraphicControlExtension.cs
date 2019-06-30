@@ -1,12 +1,10 @@
-﻿using System.Runtime.InteropServices;
-
-namespace Adamantium.Engine.Graphics.Imaging.GIF
+﻿namespace Adamantium.Engine.Graphics.Imaging.GIF
 {
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    internal struct GraphicControlExtension
+    internal class GraphicControlExtension
     {
-        public byte fields;
-        public ushort delayTime;
-        public byte transparentColorIndex;
+        public byte Fields { get; set; }
+        public ushort DelayTime { get; set; }
+        public byte TransparentColorIndex { get; set; }
+        public DisposalMethod DisposalMethod { get; set; }
     }
 }

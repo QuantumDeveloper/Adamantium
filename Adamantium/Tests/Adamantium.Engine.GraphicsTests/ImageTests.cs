@@ -92,7 +92,7 @@ namespace Adamantium.Engine.GraphicsTests
         {
             var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\APNG\APNG-cube.png");
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\BaseAlbedoTexture_Text.png");
-            //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\1.png");
+            //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\APNG\elephant.png");
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\testpng6.png");
 
             //var bytes = File.ReadAllBytes(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\converted2.png");
@@ -117,7 +117,7 @@ namespace Adamantium.Engine.GraphicsTests
         {
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\gif\cube.gif");
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\gif\Rotating_earth.gif");
-            var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\gif\giphy.gif");
+            var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\gif\infinity.gif");
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\gif\RotatingEarth2.gif");
             //img?.Save("1.bmp", ImageFileType.Bmp);
             //img?.Save("1.tga", ImageFileType.Tga);

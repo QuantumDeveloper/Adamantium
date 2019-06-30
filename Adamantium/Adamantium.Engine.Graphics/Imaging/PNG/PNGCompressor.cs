@@ -32,7 +32,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             int prevOffset;
             int hashpos;
 
-            if (windowSize == 0 || windowSize > short.MaxValue)
+            if (windowSize == 0 || windowSize > short.MaxValue+1)
             {
                 /*error: windowsize smaller/larger than allowed*/
                 return 60;
@@ -364,7 +364,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             if (numDeflateBlocks == 0) numDeflateBlocks = 1;
 
             hash = new Hash();
-            hash.Initialize(settings.WindowSize);
+            hash.Initialize((int)settings.CompressionLevel);
 
             for (int i = 0; i != numDeflateBlocks && error == 0; ++i)
             {
@@ -404,7 +404,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             if (settings.UseLZ77)
             {
                 List<int> lz77Encoded = new List<int>();
-                error = EncodeLZ77(data, dataPos, dataEnd, lz77Encoded, hash, settings.WindowSize, (int)settings.MinMatch, (int)settings.NiceMatch, settings.LazyMatching);
+                error = EncodeLZ77(data, dataPos, dataEnd, lz77Encoded, hash, (int)settings.CompressionLevel, (int)settings.MinMatch, (int)settings.NiceMatch, settings.LazyMatching);
                 if (error == 0)
                 {
                     WriteLZ77Data(ref bitPointer, lz77Encoded, outData, treeLL, treeDist);
@@ -466,7 +466,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
             {
                 if (settings.UseLZ77)
                 {
-                    error = EncodeLZ77(data, dataPos, dataEnd, lz77Encoded, hash, settings.WindowSize, (int)settings.MinMatch, (int)settings.NiceMatch, settings.LazyMatching);
+                    error = EncodeLZ77(data, dataPos, dataEnd, lz77Encoded, hash, (int)settings.CompressionLevel, (int)settings.MinMatch, (int)settings.NiceMatch, settings.LazyMatching);
                     if (error > 0) break;
                 }
                 else

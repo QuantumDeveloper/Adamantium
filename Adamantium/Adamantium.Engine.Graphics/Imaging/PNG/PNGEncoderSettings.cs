@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Adamantium.Engine.Graphics.Imaging.PNG
+﻿namespace Adamantium.Engine.Graphics.Imaging.PNG
 {
     public class PNGEncoderSettings
     {
@@ -26,8 +22,10 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         /*whether or not to use LZ77. Should be 1 for proper compression.*/
         public bool UseLZ77 { get; set; }
 
-        /*must be a power of two <= 32768. higher compresses more but is slower. Default value: 2048.*/
-        public int WindowSize { get; set; } = 2048;
+        /// <summary>
+        /// must be a power of two <= 32768 (2 in power 15). higher compresses more but is slower. Default value: 2048.*/
+        /// </summary>
+        public CompressionLevel CompressionLevel { get; set; } = CompressionLevel.Level0;
 
         /*mininum lz77 length. 3 is normally best, 6 can be better for some PNGs. Default: 0*/
         public uint MinMatch { get; set; } = 3;

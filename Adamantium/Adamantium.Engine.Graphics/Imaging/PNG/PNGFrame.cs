@@ -47,11 +47,11 @@ namespace Adamantium.Engine.Graphics.Imaging.PNG
         /// <summary>
         /// Frame delay fraction numerator
         /// </summary>
-        public ushort DelayNum { get; set; }
+        public ushort DelayNumerator { get; set; }
         /// <summary>
         /// Frame delay fraction denominator
         /// </summary>
-        public ushort DelayDen { get; set; }
+        public ushort DelayDenominator { get; set; }
         /// <summary>
         /// Type of frame area disposal to be done after rendering this frame
         /// </summary>

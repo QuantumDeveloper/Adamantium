@@ -413,7 +413,7 @@ namespace Adamantium.Engine.Graphics
         /// <returns>A new image.</returns>
         public static Image New3D(int width, int height, int depth, MipMapCount mipMapCount, SurfaceFormat format, IntPtr dataPointer)
         {
-            return new Image(CreateDescription(TextureDimension.Texture3D, width, width, depth, mipMapCount, format, 1), dataPointer, 0, null, false);
+            return new Image(CreateDescription(TextureDimension.Texture3D, width, height, depth, mipMapCount, format, 1), dataPointer, 0, null, false);
         }
 
         /// <summary>
@@ -1082,8 +1082,8 @@ namespace Adamantium.Engine.Graphics
                 var pxBuffer = new PixelBuffer(desc.Width, desc.Height, format, rowPitch, slicePitch, (IntPtr)pixels);
                 pxBuffer.XOffset = desc.XOffset;
                 pxBuffer.YOffset = desc.YOffset;
-                pxBuffer.DelayNum = desc.DelayNumerator;
-                pxBuffer.DelayDen = desc.DelayDenominator;
+                pxBuffer.DelayNumerator = desc.DelayNumerator;
+                pxBuffer.DelayDenominator = desc.DelayDenominator;
                 output[index] = pxBuffer;
                 ++index;
 

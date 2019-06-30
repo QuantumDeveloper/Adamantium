@@ -2,7 +2,7 @@
 {
     internal class ApplicationExtension
     {
-        public string applicationId;
-        public string version;
+        public string ApplicationId { get; set; }
+        public string Version { get; set; }
     }
 }

@@ -18,5 +18,10 @@ namespace Adamantium.Mathematics
         public byte R;
         public byte G;
         public byte B;
+
+        public override string ToString()
+        {
+            return $"R: {R} G: {G} B: {B}";
+        }
     }
 }
