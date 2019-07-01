@@ -214,6 +214,11 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
                         mask = 0x01;
                         pos++;
                         inputLength--;
+                        if (inputLength == 0)
+                        {
+                            //break here if there is the end of data and still no EOI code (maybe because of buggy encoder)
+                            break;
+                        }
                     }
 
                     code |= (bit << i);
