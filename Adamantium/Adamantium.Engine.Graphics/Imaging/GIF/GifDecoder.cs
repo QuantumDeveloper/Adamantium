@@ -91,24 +91,24 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
             description.Height = gif.Descriptor.Height;
             description.MipLevels = 1;
             description.Dimension = TextureDimension.Texture2D;
-            description.Format = AdamantiumVulkan.Core.Format.R8G8B8_UNORM;
+            description.Format = AdamantiumVulkan.Core.Format.R8G8B8A8_UNORM;
             description.ArraySize = 1;
             description.Depth = 1;
 
             var img = Image.New(description);
-            //for (int i = 0; i < gif.Frames.Count; i++)
-            //{
-            //    GifFrame frame = gif.Frames[i];
-            //    var handle = GCHandle.Alloc(frame.RawPixels, GCHandleType.Pinned);
-            //    Utilities.CopyMemory(img.pixelBuffers[i].DataPointer, handle.AddrOfPinnedObject(), frame.RawPixels.Length);
-            //    handle.Free();
-            //}
+            for (int i = 0; i < gif.Frames.Count; i++)
             {
-                var frame = gif.Frames[40];
+                GifFrame frame = gif.Frames[i];
                 var handle = GCHandle.Alloc(frame.RawPixels, GCHandleType.Pinned);
-                Utilities.CopyMemory(img.DataPointer, handle.AddrOfPinnedObject(), frame.RawPixels.Length);
+                Utilities.CopyMemory(img.pixelBuffers[i].DataPointer, handle.AddrOfPinnedObject(), frame.RawPixels.Length);
                 handle.Free();
             }
+            //{
+            //    var frame = gif.Frames[24];
+            //    var handle = GCHandle.Alloc(frame.RawPixels, GCHandleType.Pinned);
+            //    Utilities.CopyMemory(img.DataPointer, handle.AddrOfPinnedObject(), frame.RawPixels.Length);
+            //    handle.Free();
+            //}
             return img;
         }
 
@@ -120,15 +120,16 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
 
             byte[] pixels = null;
             int offset = 0;
+            int bytesPerPixel = 4;
 
-            if (frameIndex == 1)
+            if (frame.Interlaced)
             {
-
+                frame.IndexData = Deinterlace(frame);
             }
 
             if (frameIndex == 0 || frame.GraphicControlExtension == null || (frame.GraphicControlExtension != null && frame.GraphicControlExtension.DisposalMethod == DisposalMethod.None))
             {
-                pixels = new byte[width * height * 3];
+                pixels = new byte[width * height * bytesPerPixel];
 
                 for (int i = 0; i < width * height; i++)
                 {
@@ -136,12 +137,22 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
                     pixels[offset] = colors.R;
                     pixels[offset + 1] = colors.G;
                     pixels[offset + 2] = colors.B;
-                    offset += 3;
+                    if (frame.GraphicControlExtension != null &&
+                        frame.GraphicControlExtension.TransparentColorIndex == i)
+                    {
+                        pixels[offset + 3] = 0;
+                    }
+                    else
+                    {
+                        pixels[offset + 3] = 255;
+                    }
+
+                    offset += bytesPerPixel;
                 }
             }
             else if (frameIndex > 0 && frame.GraphicControlExtension != null && frame.GraphicControlExtension.DisposalMethod == DisposalMethod.DoNotDispose)
             {
-                pixels = new byte[gifImage.Descriptor.Width * gifImage.Descriptor.Height * 3];
+                pixels = new byte[gifImage.Descriptor.Width * gifImage.Descriptor.Height * bytesPerPixel];
                 var baseFrame = gifImage.Frames[frameIndex - 1];
                 var originalIndexStream = baseFrame.IndexData;
                 var currentIndexStream = new List<int>(originalIndexStream).ToArray();
@@ -165,7 +176,16 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
                     pixels[offset] = colors.R;
                     pixels[offset + 1] = colors.G;
                     pixels[offset + 2] = colors.B;
-                    offset += 3;
+                    if (frame.GraphicControlExtension != null &&
+                        frame.GraphicControlExtension.TransparentColorIndex == i)
+                    {
+                        pixels[offset + 3] = 0;
+                    }
+                    else
+                    {
+                        pixels[offset + 3] = 255;
+                    }
+                    offset += bytesPerPixel;
                 }
                 frame.IndexData = currentIndexStream;
                 frame.RawPixels = pixels;
@@ -176,6 +196,55 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
             }
 
             frame.RawPixels = pixels;
+        }
+
+        /*
+            interlaced GIF images are stored as 4 separated images
+            1. containing every 8th line of image (1/8 of size)
+            2. containing every missing 4th line of image (1/8 of size)
+            3. containing every missing even line of image (1/4 of size)
+            4. containing every odd line of image (1/2 of size)
+            http://www.fileformat.info/format/gif/egff.htm
+         */
+        private int[] Deinterlace(GifFrame frame)
+        {
+            var width = frame.Descriptor.Width;
+            var height = frame.Descriptor.Height;
+            int i, j;
+            int[] interlacedRowTable = new int[height];
+            int[] deinterlacedTable = new int[height];
+            for (i = 0; i < height; ++i)
+            {
+                interlacedRowTable[i] = i;
+            }
+
+            j = 0;
+            for (i = 0; i < height; i += 8, ++j) /* Interlace Pass 1 */
+            {
+                deinterlacedTable[i] = interlacedRowTable[j];
+            }
+            for (i = 4; i < height; i += 8, ++j) /* Interlace Pass 2 */
+            {
+                deinterlacedTable[i] = interlacedRowTable[j];
+            }
+            for (i = 2; i < height; i += 4, ++j) /* Interlace Pass 3 */
+            {
+                deinterlacedTable[i] = interlacedRowTable[j];
+            }
+            for (i = 1; i < height; i += 2, ++j) /* Interlace Pass 4 */
+            {
+                deinterlacedTable[i] = interlacedRowTable[j];
+            }
+
+            int[] deinterlacedIndexData = new int[width * height];
+            for (i = 0; i < height; i++)
+            {
+                var srcIndex = deinterlacedTable[i] * width;
+                var dstIndex = i * width;
+                Array.Copy(frame.IndexData, srcIndex, deinterlacedIndexData, dstIndex, width);
+            }
+
+            return deinterlacedIndexData;
         }
 
         /// <summary>
@@ -285,12 +354,8 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
                         {
                             @byte = (byte)stream.ReadByte();
                             bytes.Add(@byte);
-                            //var result = stream.ReadBytes(size);
-                            //bytes.AddRange(result);
-                            //size = stream.ReadByte();
                         }
                         var resultArray = bytes.ToArray()[..^257];
-                        var str = Encoding.UTF8.GetString(resultArray);
                         blockSize += bytes.Count;
                     }
 
