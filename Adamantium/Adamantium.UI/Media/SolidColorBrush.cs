@@ -4,17 +4,17 @@ namespace Adamantium.UI.Media
 {
    public class SolidColorBrush:Brush
    {
-      public SolidColorBrush(ColorRGBA color)
+      public SolidColorBrush(Color color)
       {
          Color = color;
       }
 
       public static readonly AdamantiumProperty ColorProperty = AdamantiumProperty.Register(nameof(Opacity),
-         typeof(ColorRGBA), typeof(SolidColorBrush), new PropertyMetadata(Colors.Transparent));
+         typeof(Color), typeof(SolidColorBrush), new PropertyMetadata(Colors.Transparent));
 
-      public ColorRGBA Color
+      public Color Color
       {
-         get { return GetValue<ColorRGBA>(ColorProperty); }
+         get { return GetValue<Color>(ColorProperty); }
          set { SetValue(ColorProperty, value);}
       }
 

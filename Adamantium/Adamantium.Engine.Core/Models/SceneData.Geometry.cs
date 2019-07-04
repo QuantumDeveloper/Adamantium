@@ -20,7 +20,7 @@ namespace Adamantium.Engine.Core.Models
             IndexBuffer = new List<int>();
             Tangents = new List<Vector3F>();
             Bitangents = new List<Vector3F>();
-            Colors = new List<ColorRGBA>();
+            Colors = new List<Color>();
             JointIndices = new List<Vector4F>();
             JointWeights = new List<Vector4F>();
          }
@@ -36,7 +36,7 @@ namespace Adamantium.Engine.Core.Models
          public List<Vector2F> UV2 { get; set; }
          public List<Vector2F> UV3 { get; set; }
 
-         public List<ColorRGBA> Colors { get; set; }
+         public List<Color> Colors { get; set; }
 
          public List<Vector3F> Normals { get; set; }
 

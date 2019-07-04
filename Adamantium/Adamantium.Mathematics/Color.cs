@@ -9,7 +9,7 @@ namespace Adamantium.Mathematics
     /// Represents a 32-bit color (4 bytes) in the form of RGBA (in byte order: R, G, B, A).
     /// </summary>
     [StructLayout(LayoutKind.Sequential, Size = 4)]
-    public struct ColorRGBA : IEquatable<ColorRGBA>, IFormattable
+    public struct Color : IEquatable<Color>, IFormattable
     {
         private const string toStringFormat = "A:{0} R:{1} G:{2} B:{3}";
 
@@ -34,31 +34,31 @@ namespace Adamantium.Mathematics
         public byte A;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ColorRGBA"/> struct.
+        /// Initializes a new instance of the <see cref="Color"/> struct.
         /// </summary>
         /// <param name="value">The value that will be assigned to all components.</param>
-        public ColorRGBA(byte value)
+        public Color(byte value)
         {
             A = R = G = B = value;
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ColorRGBA"/> struct.
+        /// Initializes a new instance of the <see cref="Color"/> struct.
         /// </summary>
         /// <param name="value">The value that will be assigned to all components.</param>
-        public ColorRGBA(float value)
+        public Color(float value)
         {
             A = R = G = B = ToByte(value);
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ColorRGBA"/> struct.
+        /// Initializes a new instance of the <see cref="Color"/> struct.
         /// </summary>
         /// <param name="red">The red component of the color.</param>
         /// <param name="green">The green component of the color.</param>
         /// <param name="blue">The blue component of the color.</param>
         /// <param name="alpha">The alpha component of the color.</param>
-        public ColorRGBA(byte red, byte green, byte blue, byte alpha)
+        public Color(byte red, byte green, byte blue, byte alpha)
         {
             R = red;
             G = green;
@@ -67,12 +67,12 @@ namespace Adamantium.Mathematics
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ColorRGBA"/> struct.  Alpha is set to 255.
+        /// Initializes a new instance of the <see cref="Color"/> struct.  Alpha is set to 255.
         /// </summary>
         /// <param name="red">The red component of the color.</param>
         /// <param name="green">The green component of the color.</param>
         /// <param name="blue">The blue component of the color.</param>
-        public ColorRGBA(byte red, byte green, byte blue)
+        public Color(byte red, byte green, byte blue)
         {
             R = red;
             G = green;
@@ -81,12 +81,12 @@ namespace Adamantium.Mathematics
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ColorRGBA"/> struct.  Passed values are clamped within byte range.
+        /// Initializes a new instance of the <see cref="Color"/> struct.  Passed values are clamped within byte range.
         /// </summary>
         /// <param name="red">The red component of the color.</param>
         /// <param name="green">The green component of the color.</param>
         /// <param name="blue">The blue component of the color.</param>
-        public ColorRGBA(int red, int green, int blue, int alpha)
+        public Color(int red, int green, int blue, int alpha)
         {
             R = ToByte(red);
             G = ToByte(green);
@@ -95,22 +95,22 @@ namespace Adamantium.Mathematics
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ColorRGBA"/> struct.  Alpha is set to 255.  Passed values are clamped within byte range.
+        /// Initializes a new instance of the <see cref="Color"/> struct.  Alpha is set to 255.  Passed values are clamped within byte range.
         /// </summary>
         /// <param name="red">The red component of the color.</param>
         /// <param name="green">The green component of the color.</param>
         /// <param name="blue">The blue component of the color.</param>
-        public ColorRGBA(int red, int green, int blue)
+        public Color(int red, int green, int blue)
             : this(red, green, blue, 255) { }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ColorRGBA"/> struct.
+        /// Initializes a new instance of the <see cref="Color"/> struct.
         /// </summary>
         /// <param name="red">The red component of the color.</param>
         /// <param name="green">The green component of the color.</param>
         /// <param name="blue">The blue component of the color.</param>
         /// <param name="alpha">The alpha component of the color.</param>
-        public ColorRGBA(float red, float green, float blue, float alpha)
+        public Color(float red, float green, float blue, float alpha)
         {
             R = ToByte(red);
             G = ToByte(green);
@@ -119,12 +119,12 @@ namespace Adamantium.Mathematics
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ColorRGBA"/> struct.  Alpha is set to 255.
+        /// Initializes a new instance of the <see cref="Color"/> struct.  Alpha is set to 255.
         /// </summary>
         /// <param name="red">The red component of the color.</param>
         /// <param name="green">The green component of the color.</param>
         /// <param name="blue">The blue component of the color.</param>
-        public ColorRGBA(float red, float green, float blue)
+        public Color(float red, float green, float blue)
         {
             R = ToByte(red);
             G = ToByte(green);
@@ -133,10 +133,10 @@ namespace Adamantium.Mathematics
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ColorRGBA"/> struct.
+        /// Initializes a new instance of the <see cref="Color"/> struct.
         /// </summary>
         /// <param name="value">The red, green, blue, and alpha components of the color.</param>
-        public ColorRGBA(Vector4F value)
+        public Color(Vector4F value)
         {
             R = ToByte(value.X);
             G = ToByte(value.Y);
@@ -145,11 +145,11 @@ namespace Adamantium.Mathematics
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ColorRGBA"/> struct.
+        /// Initializes a new instance of the <see cref="Color"/> struct.
         /// </summary>
         /// <param name="value">The red, green, and blue components of the color.</param>
         /// <param name="alpha">The alpha component of the color.</param>
-        public ColorRGBA(Vector3F value, float alpha)
+        public Color(Vector3F value, float alpha)
         {
             R = ToByte(value.X);
             G = ToByte(value.Y);
@@ -158,10 +158,10 @@ namespace Adamantium.Mathematics
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ColorRGBA"/> struct. Alpha is set to 255.
+        /// Initializes a new instance of the <see cref="Color"/> struct. Alpha is set to 255.
         /// </summary>
         /// <param name="value">The red, green, and blue components of the color.</param>
-        public ColorRGBA(Vector3F value)
+        public Color(Vector3F value)
         {
             R = ToByte(value.X);
             G = ToByte(value.Y);
@@ -170,36 +170,36 @@ namespace Adamantium.Mathematics
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ColorRGBA"/> struct.
+        /// Initializes a new instance of the <see cref="Color"/> struct.
         /// </summary>
         /// <param name="rgba">A packed integer containing all four color components in RGBA order.</param>
-        public ColorRGBA(uint rgba)
+        public Color(uint rgba)
         {
             A = (byte)((rgba >> 24) & 255);
-            B = (byte)((rgba >> 16) & 255);
+            R = (byte)((rgba >> 16) & 255);
             G = (byte)((rgba >> 8) & 255);
-            R = (byte)(rgba & 255);
+            B = (byte)(rgba & 255);
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ColorRGBA"/> struct.
+        /// Initializes a new instance of the <see cref="Color"/> struct.
         /// </summary>
-        /// <param name="rgba">A packed integer containing all four color components in RGBA order.</param>
-        public ColorRGBA(int rgba)
+        /// <param name="rgba">A packed integer containing all four color components in ARGB order.</param>
+        public Color(int rgba)
         {
             A = (byte)((rgba >> 24) & 255);
-            B = (byte)((rgba >> 16) & 255);
+            R = (byte)((rgba >> 16) & 255);
             G = (byte)((rgba >> 8) & 255);
-            R = (byte)(rgba & 255);
+            B = (byte)(rgba & 255);
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ColorRGBA"/> struct.
+        /// Initializes a new instance of the <see cref="Color"/> struct.
         /// </summary>
         /// <param name="values">The values to assign to the red, green, and blue, alpha components of the color. This must be an array with four elements.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="values"/> is <c>null</c>.</exception>
         /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="values"/> contains more or less than four elements.</exception>
-        public ColorRGBA(float[] values)
+        public Color(float[] values)
         {
             if (values == null)
                 throw new ArgumentNullException(nameof(values));
@@ -213,12 +213,12 @@ namespace Adamantium.Mathematics
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ColorRGBA"/> struct.
+        /// Initializes a new instance of the <see cref="Color"/> struct.
         /// </summary>
         /// <param name="values">The values to assign to the alpha, red, green, and blue components of the color. This must be an array with four elements.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="values"/> is <c>null</c>.</exception>
         /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="values"/> contains more or less than four elements.</exception>
-        public ColorRGBA(byte[] values)
+        public Color(byte[] values)
         {
             if (values == null)
                 throw new ArgumentNullException("values");
@@ -277,7 +277,7 @@ namespace Adamantium.Mathematics
             value |= R << 16;
             value |= A << 24;
 
-            return (int)value;
+            return value;
         }
 
         /// <summary>
@@ -291,7 +291,7 @@ namespace Adamantium.Mathematics
             value |= B << 16;
             value |= A << 24;
 
-            return (int)value;
+            return value;
         }
 
         /// <summary>
@@ -305,7 +305,21 @@ namespace Adamantium.Mathematics
             value |= G << 16;
             value |= R << 24;
 
-            return (int)value;
+            return value;
+        }
+
+        /// <summary>
+        /// Converts the color into a packed integer.
+        /// </summary>
+        /// <returns>A packed integer containing all four color components.</returns>
+        public int ToArgb()
+        {
+            int value = A;
+            value |= R << 8;
+            value |= G << 16;
+            value |= B << 24;
+
+            return value;
         }
 
         /// <summary>
@@ -347,7 +361,7 @@ namespace Adamantium.Mathematics
         /// <summary>
         /// Gets the brightness.
         /// </summary>
-        /// <returns>The Hue-Saturation-Brightness (HSB) saturation for this <see cref="ColorRGBA"/></returns>
+        /// <returns>The Hue-Saturation-Brightness (HSB) saturation for this <see cref="Color"/></returns>
         public float GetBrightness()
         {
             float r = (float)R / 255.0f;
@@ -370,7 +384,7 @@ namespace Adamantium.Mathematics
         /// <summary>
         /// Gets the hue.
         /// </summary>
-        /// <returns>The Hue-Saturation-Brightness (HSB) saturation for this <see cref="ColorRGBA"/></returns>
+        /// <returns>The Hue-Saturation-Brightness (HSB) saturation for this <see cref="Color"/></returns>
         public float GetHue()
         {
             if (R == G && G == B)
@@ -418,7 +432,7 @@ namespace Adamantium.Mathematics
         /// <summary>
         /// Gets the saturation.
         /// </summary>
-        /// <returns>The Hue-Saturation-Brightness (HSB) saturation for this <see cref="ColorRGBA"/></returns>
+        /// <returns>The Hue-Saturation-Brightness (HSB) saturation for this <see cref="Color"/></returns>
         public float GetSaturation()
         {
             float r = (float)R / 255.0f;
@@ -461,7 +475,7 @@ namespace Adamantium.Mathematics
         /// <param name="left">The first color to add.</param>
         /// <param name="right">The second color to add.</param>
         /// <param name="result">When the method completes, completes the sum of the two colors.</param>
-        public static void Add(ref ColorRGBA left, ref ColorRGBA right, out ColorRGBA result)
+        public static void Add(ref Color left, ref Color right, out Color result)
         {
             result.A = (byte)(left.A + right.A);
             result.R = (byte)(left.R + right.R);
@@ -475,9 +489,9 @@ namespace Adamantium.Mathematics
         /// <param name="left">The first color to add.</param>
         /// <param name="right">The second color to add.</param>
         /// <returns>The sum of the two colors.</returns>
-        public static ColorRGBA Add(ColorRGBA left, ColorRGBA right)
+        public static Color Add(Color left, Color right)
         {
-            return new ColorRGBA(left.R + right.R, left.G + right.G, left.B + right.B, left.A + right.A);
+            return new Color(left.R + right.R, left.G + right.G, left.B + right.B, left.A + right.A);
         }
 
         /// <summary>
@@ -486,7 +500,7 @@ namespace Adamantium.Mathematics
         /// <param name="left">The first color to subtract.</param>
         /// <param name="right">The second color to subtract.</param>
         /// <param name="result">WHen the method completes, contains the difference of the two colors.</param>
-        public static void Subtract(ref ColorRGBA left, ref ColorRGBA right, out ColorRGBA result)
+        public static void Subtract(ref Color left, ref Color right, out Color result)
         {
             result.A = (byte)(left.A - right.A);
             result.R = (byte)(left.R - right.R);
@@ -500,9 +514,9 @@ namespace Adamantium.Mathematics
         /// <param name="left">The first color to subtract.</param>
         /// <param name="right">The second color to subtract</param>
         /// <returns>The difference of the two colors.</returns>
-        public static ColorRGBA Subtract(ColorRGBA left, ColorRGBA right)
+        public static Color Subtract(Color left, Color right)
         {
-            return new ColorRGBA(left.R - right.R, left.G - right.G, left.B - right.B, left.A - right.A);
+            return new Color(left.R - right.R, left.G - right.G, left.B - right.B, left.A - right.A);
         }
 
         /// <summary>
@@ -511,7 +525,7 @@ namespace Adamantium.Mathematics
         /// <param name="left">The first color to modulate.</param>
         /// <param name="right">The second color to modulate.</param>
         /// <param name="result">When the method completes, contains the modulated color.</param>
-        public static void Modulate(ref ColorRGBA left, ref ColorRGBA right, out ColorRGBA result)
+        public static void Modulate(ref Color left, ref Color right, out Color result)
         {
             result.A = (byte)(left.A * right.A / 255.0f);
             result.R = (byte)(left.R * right.R / 255.0f);
@@ -525,9 +539,9 @@ namespace Adamantium.Mathematics
         /// <param name="left">The first color to modulate.</param>
         /// <param name="right">The second color to modulate.</param>
         /// <returns>The modulated color.</returns>
-        public static ColorRGBA Modulate(ColorRGBA left, ColorRGBA right)
+        public static Color Modulate(Color left, Color right)
         {
-            return new ColorRGBA(left.R * right.R, left.G * right.G, left.B * right.B, left.A * right.A);
+            return new Color(left.R * right.R, left.G * right.G, left.B * right.B, left.A * right.A);
         }
 
         /// <summary>
@@ -536,7 +550,7 @@ namespace Adamantium.Mathematics
         /// <param name="value">The color to scale.</param>
         /// <param name="scale">The amount by which to scale.</param>
         /// <param name="result">When the method completes, contains the scaled color.</param>
-        public static void Scale(ref ColorRGBA value, float scale, out ColorRGBA result)
+        public static void Scale(ref Color value, float scale, out Color result)
         {
             result.A = (byte)(value.A * scale);
             result.R = (byte)(value.R * scale);
@@ -550,9 +564,9 @@ namespace Adamantium.Mathematics
         /// <param name="value">The color to scale.</param>
         /// <param name="scale">The amount by which to scale.</param>
         /// <returns>The scaled color.</returns>
-        public static ColorRGBA Scale(ColorRGBA value, float scale)
+        public static Color Scale(Color value, float scale)
         {
-            return new ColorRGBA((byte)(value.R * scale), (byte)(value.G * scale), (byte)(value.B * scale), (byte)(value.A * scale));
+            return new Color((byte)(value.R * scale), (byte)(value.G * scale), (byte)(value.B * scale), (byte)(value.A * scale));
         }
 
         /// <summary>
@@ -560,7 +574,7 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="value">The color to negate.</param>
         /// <param name="result">When the method completes, contains the negated color.</param>
-        public static void Negate(ref ColorRGBA value, out ColorRGBA result)
+        public static void Negate(ref Color value, out Color result)
         {
             result.A = (byte)(255 - value.A);
             result.R = (byte)(255 - value.R);
@@ -573,9 +587,9 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="value">The color to negate.</param>
         /// <returns>The negated color.</returns>
-        public static ColorRGBA Negate(ColorRGBA value)
+        public static Color Negate(Color value)
         {
-            return new ColorRGBA(255 - value.R, 255 - value.G, 255 - value.B, 255 - value.A);
+            return new Color(255 - value.R, 255 - value.G, 255 - value.B, 255 - value.A);
         }
 
         /// <summary>
@@ -585,7 +599,7 @@ namespace Adamantium.Mathematics
         /// <param name="min">The minimum value.</param>
         /// <param name="max">The maximum value.</param>
         /// <param name="result">When the method completes, contains the clamped value.</param>
-        public static void Clamp(ref ColorRGBA value, ref ColorRGBA min, ref ColorRGBA max, out ColorRGBA result)
+        public static void Clamp(ref Color value, ref Color min, ref Color max, out Color result)
         {
             byte alpha = value.A;
             alpha = (alpha > max.A) ? max.A : alpha;
@@ -603,7 +617,7 @@ namespace Adamantium.Mathematics
             blue = (blue > max.B) ? max.B : blue;
             blue = (blue < min.B) ? min.B : blue;
 
-            result = new ColorRGBA(red, green, blue, alpha);
+            result = new Color(red, green, blue, alpha);
         }
 
         /// <summary>
@@ -611,7 +625,7 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="value">The non-premultiplied value.</param>
         /// <param name="result">The premultiplied result.</param>
-        public static void Premultiply(ref ColorRGBA value, out ColorRGBA result)
+        public static void Premultiply(ref Color value, out Color result)
         {
             var a = value.A / (255f * 255f);
             result.A = value.A;
@@ -625,9 +639,9 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="value">The non-premultiplied value.</param>
         /// <returns>The premultiplied result.</returns>
-        public static ColorRGBA Premultiply(ColorRGBA value)
+        public static Color Premultiply(Color value)
         {
-            ColorRGBA result;
+            Color result;
             Premultiply(ref value, out result);
             return result;
         }
@@ -640,9 +654,22 @@ namespace Adamantium.Mathematics
         /// <param name="b">A value for blue channel</param>
         /// <param name="a">A value for alpha channel</param>
         /// <returns>A color.</returns>
-        public static ColorRGBA FromRgba(byte r, byte g, byte b, byte a)
+        public static Color FromRgba(byte r, byte g, byte b, byte a)
         {
-            return new ColorRGBA(r, g, b, a);
+            return new Color(r, g, b, a);
+        }
+
+        /// <summary>
+        /// Converts the color from a separate RGBA values.
+        /// </summary>
+        /// <param name="r">A value for red channel</param>
+        /// <param name="g">A value for green channel</param>
+        /// <param name="b">A value for blue channel</param>
+        /// <param name="a">A value for alpha channel = 255</param>
+        /// <returns>A color.</returns>
+        public static Color FromRgba(byte r, byte g, byte b)
+        {
+            return new Color(r, g, b);
         }
 
         /// <summary>
@@ -650,9 +677,9 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="color">A packed integer containing all four color components in BGRA order</param>
         /// <returns>A color.</returns>
-        public static ColorRGBA FromBgra(int color)
+        public static Color FromBgra(int color)
         {
-            return new ColorRGBA((byte)((color >> 16) & 255), (byte)((color >> 8) & 255), (byte)(color & 255), (byte)((color >> 24) & 255));
+            return new Color((byte)((color >> 16) & 255), (byte)((color >> 8) & 255), (byte)(color & 255), (byte)((color >> 24) & 255));
         }
 
         /// <summary>
@@ -660,7 +687,7 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="color">A packed integer containing all four color components in BGRA order</param>
         /// <returns>A color.</returns>
-        public static ColorRGBA FromBgra(uint color)
+        public static Color FromBgra(uint color)
         {
             return FromBgra(unchecked((int)color));
         }
@@ -670,9 +697,9 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="color">A packed integer containing all four color components in ABGR order</param>
         /// <returns>A color.</returns>
-        public static ColorRGBA FromAbgr(int color)
+        public static Color FromAbgr(int color)
         {
-            return new ColorRGBA((byte)(color >> 24), (byte)(color >> 16), (byte)(color >> 8), (byte)color);
+            return new Color((byte)(color >> 24), (byte)(color >> 16), (byte)(color >> 8), (byte)color);
         }
 
         /// <summary>
@@ -680,7 +707,7 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="color">A packed integer containing all four color components in ABGR order</param>
         /// <returns>A color.</returns>
-        public static ColorRGBA FromAbgr(uint color)
+        public static Color FromAbgr(uint color)
         {
             return FromAbgr(unchecked((int)color));
         }
@@ -690,9 +717,9 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="color">A packed integer containing all four color components in RGBA order</param>
         /// <returns>A color.</returns>
-        public static ColorRGBA FromRgba(int color)
+        public static Color FromArgb(int color)
         {
-            return new ColorRGBA(color);
+            return new Color(color);
         }
 
         /// <summary>
@@ -700,9 +727,9 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="color">A packed integer containing all four color components in RGBA order</param>
         /// <returns>A color.</returns>
-        public static ColorRGBA FromRgba(uint color)
+        public static Color FromArgb(uint color)
         {
-            return new ColorRGBA(color);
+            return new Color(color);
         }
 
         /// <summary>
@@ -712,9 +739,9 @@ namespace Adamantium.Mathematics
         /// <param name="min">The minimum value.</param>
         /// <param name="max">The maximum value.</param>
         /// <returns>The clamped value.</returns>
-        public static ColorRGBA Clamp(ColorRGBA value, ColorRGBA min, ColorRGBA max)
+        public static Color Clamp(Color value, Color min, Color max)
         {
-            ColorRGBA result;
+            Color result;
             Clamp(ref value, ref min, ref max, out result);
             return result;
         }
@@ -729,7 +756,7 @@ namespace Adamantium.Mathematics
         /// <remarks>
         /// Passing <paramref name="amount"/> a value of 0 will cause <paramref name="start"/> to be returned; a value of 1 will cause <paramref name="end"/> to be returned. 
         /// </remarks>
-        public static void Lerp(ref ColorRGBA start, ref ColorRGBA end, float amount, out ColorRGBA result)
+        public static void Lerp(ref Color start, ref Color end, float amount, out Color result)
         {
             result.R = MathHelper.Lerp(start.R, end.R, amount);
             result.G = MathHelper.Lerp(start.G, end.G, amount);
@@ -747,9 +774,9 @@ namespace Adamantium.Mathematics
         /// <remarks>
         /// Passing <paramref name="amount"/> a value of 0 will cause <paramref name="start"/> to be returned; a value of 1 will cause <paramref name="end"/> to be returned. 
         /// </remarks>
-        public static ColorRGBA Lerp(ColorRGBA start, ColorRGBA end, float amount)
+        public static Color Lerp(Color start, Color end, float amount)
         {
-            ColorRGBA result;
+            Color result;
             Lerp(ref start, ref end, amount, out result);
             return result;
         }
@@ -761,7 +788,7 @@ namespace Adamantium.Mathematics
         /// <param name="end">End color.</param>
         /// <param name="amount">Value between 0 and 1 indicating the weight of <paramref name="end"/>.</param>
         /// <param name="result">When the method completes, contains the cubic interpolation of the two colors.</param>
-        public static void SmoothStep(ref ColorRGBA start, ref ColorRGBA end, float amount, out ColorRGBA result)
+        public static void SmoothStep(ref Color start, ref Color end, float amount, out Color result)
         {
             amount = MathHelper.SmoothStep(amount);
             Lerp(ref start, ref end, amount, out result);
@@ -774,9 +801,9 @@ namespace Adamantium.Mathematics
         /// <param name="end">End color.</param>
         /// <param name="amount">Value between 0 and 1 indicating the weight of <paramref name="end"/>.</param>
         /// <returns>The cubic interpolation of the two colors.</returns>
-        public static ColorRGBA SmoothStep(ColorRGBA start, ColorRGBA end, float amount)
+        public static Color SmoothStep(Color start, Color end, float amount)
         {
-            ColorRGBA result;
+            Color result;
             SmoothStep(ref start, ref end, amount, out result);
             return result;
         }
@@ -787,7 +814,7 @@ namespace Adamantium.Mathematics
         /// <param name="left">The first source color.</param>
         /// <param name="right">The second source color.</param>
         /// <param name="result">When the method completes, contains an new color composed of the largest components of the source colors.</param>
-        public static void Max(ref ColorRGBA left, ref ColorRGBA right, out ColorRGBA result)
+        public static void Max(ref Color left, ref Color right, out Color result)
         {
             result.A = (left.A > right.A) ? left.A : right.A;
             result.R = (left.R > right.R) ? left.R : right.R;
@@ -801,9 +828,9 @@ namespace Adamantium.Mathematics
         /// <param name="left">The first source color.</param>
         /// <param name="right">The second source color.</param>
         /// <returns>A color containing the largest components of the source colors.</returns>
-        public static ColorRGBA Max(ColorRGBA left, ColorRGBA right)
+        public static Color Max(Color left, Color right)
         {
-            ColorRGBA result;
+            Color result;
             Max(ref left, ref right, out result);
             return result;
         }
@@ -814,7 +841,7 @@ namespace Adamantium.Mathematics
         /// <param name="left">The first source color.</param>
         /// <param name="right">The second source color.</param>
         /// <param name="result">When the method completes, contains an new color composed of the smallest components of the source colors.</param>
-        public static void Min(ref ColorRGBA left, ref ColorRGBA right, out ColorRGBA result)
+        public static void Min(ref Color left, ref Color right, out Color result)
         {
             result.A = (left.A < right.A) ? left.A : right.A;
             result.R = (left.R < right.R) ? left.R : right.R;
@@ -828,9 +855,9 @@ namespace Adamantium.Mathematics
         /// <param name="left">The first source color.</param>
         /// <param name="right">The second source color.</param>
         /// <returns>A color containing the smallest components of the source colors.</returns>
-        public static ColorRGBA Min(ColorRGBA left, ColorRGBA right)
+        public static Color Min(Color left, Color right)
         {
-            ColorRGBA result;
+            Color result;
             Min(ref left, ref right, out result);
             return result;
         }
@@ -841,7 +868,7 @@ namespace Adamantium.Mathematics
         /// <param name="value">The color whose contrast is to be adjusted.</param>
         /// <param name="contrast">The amount by which to adjust the contrast.</param>
         /// <param name="result">When the method completes, contains the adjusted color.</param>
-        public static void AdjustContrast(ref ColorRGBA value, float contrast, out ColorRGBA result)
+        public static void AdjustContrast(ref Color value, float contrast, out Color result)
         {
             result.A = value.A;
             result.R = ToByte(0.5f + contrast * (value.R / 255.0f - 0.5f));
@@ -855,9 +882,9 @@ namespace Adamantium.Mathematics
         /// <param name="value">The color whose contrast is to be adjusted.</param>
         /// <param name="contrast">The amount by which to adjust the contrast.</param>
         /// <returns>The adjusted color.</returns>
-        public static ColorRGBA AdjustContrast(ColorRGBA value, float contrast)
+        public static Color AdjustContrast(Color value, float contrast)
         {
-            return new ColorRGBA(
+            return new Color(
                 ToByte(0.5f + contrast * (value.R / 255.0f - 0.5f)),
                 ToByte(0.5f + contrast * (value.G / 255.0f - 0.5f)),
                 ToByte(0.5f + contrast * (value.B / 255.0f - 0.5f)),
@@ -870,7 +897,7 @@ namespace Adamantium.Mathematics
         /// <param name="value">The color whose saturation is to be adjusted.</param>
         /// <param name="saturation">The amount by which to adjust the saturation.</param>
         /// <param name="result">When the method completes, contains the adjusted color.</param>
-        public static void AdjustSaturation(ref ColorRGBA value, float saturation, out ColorRGBA result)
+        public static void AdjustSaturation(ref Color value, float saturation, out Color result)
         {
             float grey = value.R / 255.0f * 0.2125f + value.G / 255.0f * 0.7154f + value.B / 255.0f * 0.0721f;
 
@@ -886,11 +913,11 @@ namespace Adamantium.Mathematics
         /// <param name="value">The color whose saturation is to be adjusted.</param>
         /// <param name="saturation">The amount by which to adjust the saturation.</param>
         /// <returns>The adjusted color.</returns>
-        public static ColorRGBA AdjustSaturation(ColorRGBA value, float saturation)
+        public static Color AdjustSaturation(Color value, float saturation)
         {
             float grey = value.R / 255.0f * 0.2125f + value.G / 255.0f * 0.7154f + value.B / 255.0f * 0.0721f;
 
-            return new ColorRGBA(
+            return new Color(
                 ToByte(grey + saturation * (value.R / 255.0f - grey)),
                 ToByte(grey + saturation * (value.G / 255.0f - grey)),
                 ToByte(grey + saturation * (value.B / 255.0f - grey)),
@@ -903,9 +930,9 @@ namespace Adamantium.Mathematics
         /// <param name="left">The first color to add.</param>
         /// <param name="right">The second color to add.</param>
         /// <returns>The sum of the two colors.</returns>
-        public static ColorRGBA operator +(ColorRGBA left, ColorRGBA right)
+        public static Color operator +(Color left, Color right)
         {
-            return new ColorRGBA(left.R + right.R, left.G + right.G, left.B + right.B, left.A + right.A);
+            return new Color(left.R + right.R, left.G + right.G, left.B + right.B, left.A + right.A);
         }
 
         /// <summary>
@@ -913,7 +940,7 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="value">The color to assert (unchanged).</param>
         /// <returns>The asserted (unchanged) color.</returns>
-        public static ColorRGBA operator +(ColorRGBA value)
+        public static Color operator +(Color value)
         {
             return value;
         }
@@ -924,9 +951,9 @@ namespace Adamantium.Mathematics
         /// <param name="left">The first color to subtract.</param>
         /// <param name="right">The second color to subtract.</param>
         /// <returns>The difference of the two colors.</returns>
-        public static ColorRGBA operator -(ColorRGBA left, ColorRGBA right)
+        public static Color operator -(Color left, Color right)
         {
-            return new ColorRGBA(left.R - right.R, left.G - right.G, left.B - right.B, left.A - right.A);
+            return new Color(left.R - right.R, left.G - right.G, left.B - right.B, left.A - right.A);
         }
 
         /// <summary>
@@ -934,9 +961,9 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="value">The color to negate.</param>
         /// <returns>A negated color.</returns>
-        public static ColorRGBA operator -(ColorRGBA value)
+        public static Color operator -(Color value)
         {
-            return new ColorRGBA(-value.R, -value.G, -value.B, -value.A);
+            return new Color(-value.R, -value.G, -value.B, -value.A);
         }
 
         /// <summary>
@@ -945,9 +972,9 @@ namespace Adamantium.Mathematics
         /// <param name="scale">The factor by which to scale the color.</param>
         /// <param name="value">The color to scale.</param>
         /// <returns>The scaled color.</returns>
-        public static ColorRGBA operator *(float scale, ColorRGBA value)
+        public static Color operator *(float scale, Color value)
         {
-            return new ColorRGBA((byte)(value.R * scale), (byte)(value.G * scale), (byte)(value.B * scale), (byte)(value.A * scale));
+            return new Color((byte)(value.R * scale), (byte)(value.G * scale), (byte)(value.B * scale), (byte)(value.A * scale));
         }
 
         /// <summary>
@@ -956,9 +983,9 @@ namespace Adamantium.Mathematics
         /// <param name="value">The factor by which to scale the color.</param>
         /// <param name="scale">The color to scale.</param>
         /// <returns>The scaled color.</returns>
-        public static ColorRGBA operator *(ColorRGBA value, float scale)
+        public static Color operator *(Color value, float scale)
         {
-            return new ColorRGBA((byte)(value.R * scale), (byte)(value.G * scale), (byte)(value.B * scale), (byte)(value.A * scale));
+            return new Color((byte)(value.R * scale), (byte)(value.G * scale), (byte)(value.B * scale), (byte)(value.A * scale));
         }
 
         /// <summary>
@@ -967,9 +994,9 @@ namespace Adamantium.Mathematics
         /// <param name="left">The first color to modulate.</param>
         /// <param name="right">The second color to modulate.</param>
         /// <returns>The modulated color.</returns>
-        public static ColorRGBA operator *(ColorRGBA left, ColorRGBA right)
+        public static Color operator *(Color left, Color right)
         {
-            return new ColorRGBA((byte)(left.R * right.R / 255.0f), (byte)(left.G * right.G / 255.0f), (byte)(left.B * right.B / 255.0f), (byte)(left.A * right.A / 255.0f));
+            return new Color((byte)(left.R * right.R / 255.0f), (byte)(left.G * right.G / 255.0f), (byte)(left.B * right.B / 255.0f), (byte)(left.A * right.A / 255.0f));
         }
 
         /// <summary>
@@ -979,7 +1006,7 @@ namespace Adamantium.Mathematics
         /// <param name="right">The second value to compare.</param>
         /// <returns><c>true</c> if <paramref name="left"/> has the same value as <paramref name="right"/>; otherwise, <c>false</c>.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool operator ==(ColorRGBA left, ColorRGBA right)
+        public static bool operator ==(Color left, Color right)
         {
             return left.Equals(ref right);
         }
@@ -991,13 +1018,13 @@ namespace Adamantium.Mathematics
         /// <param name="right">The second value to compare.</param>
         /// <returns><c>true</c> if <paramref name="left"/> has a different value than <paramref name="right"/>; otherwise, <c>false</c>.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool operator !=(ColorRGBA left, ColorRGBA right)
+        public static bool operator !=(Color left, Color right)
         {
             return !left.Equals(ref right);
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="ColorRGBA"/> to <see cref="Color3F"/>.
+        /// Performs an explicit conversion from <see cref="Color"/> to <see cref="Color3F"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -1011,17 +1038,17 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
-        public static explicit operator Vector3F(ColorRGBA value)
+        public static explicit operator Vector3F(Color value)
         {
             return new Vector3F(value.R / 255.0f, value.G / 255.0f, value.B / 255.0f);
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="ColorRGBA"/> to <see cref="Vector4F"/>.
+        /// Performs an explicit conversion from <see cref="Color"/> to <see cref="Vector4F"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
-        public static explicit operator Vector4F(ColorRGBA value)
+        public static explicit operator Vector4F(Color value)
         {
             return new Vector4F(value.R / 255.0f, value.G / 255.0f, value.B / 255.0f, value.A / 255.0f);
         }
@@ -1036,27 +1063,27 @@ namespace Adamantium.Mathematics
         }
 
         /// <summary>
-        /// Performs an implicit conversion from <see cref="ColorRGBA"/> to <see cref="Color4F"/>.
+        /// Performs an implicit conversion from <see cref="Color"/> to <see cref="Color4F"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
-        public static implicit operator Color4F(ColorRGBA value)
+        public static implicit operator Color4F(Color value)
         {
             return value.ToColor4();
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Vector3F"/> to <see cref="ColorRGBA"/>.
+        /// Performs an explicit conversion from <see cref="Vector3F"/> to <see cref="Color"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
-        public static explicit operator ColorRGBA(Vector3F value)
+        public static explicit operator Color(Vector3F value)
         {
-            return new ColorRGBA(value.X, value.Y, value.Z, 1.0f);
+            return new Color(value.X, value.Y, value.Z, 1.0f);
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Color3F"/> to <see cref="ColorRGBA"/>.
+        /// Performs an explicit conversion from <see cref="Color3F"/> to <see cref="Color"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -1070,43 +1097,43 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
-        public static explicit operator ColorRGBA(Vector4F value)
+        public static explicit operator Color(Vector4F value)
         {
-            return new ColorRGBA(value.X, value.Y, value.Z, value.W);
+            return new Color(value.X, value.Y, value.Z, value.W);
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Color4F"/> to <see cref="ColorRGBA"/>.
+        /// Performs an explicit conversion from <see cref="Color4F"/> to <see cref="Color"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
-        public static explicit operator ColorRGBA(Color4F value)
+        public static explicit operator Color(Color4F value)
         {
-            return new ColorRGBA(value.Red, value.Green, value.Blue, value.Alpha);
+            return new Color(value.Red, value.Green, value.Blue, value.Alpha);
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="System.Int32"/> to <see cref="ColorRGBA"/>.
+        /// Performs an explicit conversion from <see cref="System.Int32"/> to <see cref="Color"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>
         /// The result of the conversion.
         /// </returns>
-        public static explicit operator int(ColorRGBA value)
+        public static explicit operator int(Color value)
         {
             return value.ToRgba();
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="System.Int32"/> to <see cref="ColorRGBA"/>.
+        /// Performs an explicit conversion from <see cref="System.Int32"/> to <see cref="Color"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>
         /// The result of the conversion.
         /// </returns>
-        public static explicit operator ColorRGBA(int value)
+        public static explicit operator Color(int value)
         {
-            return new ColorRGBA(value);
+            return new Color(value);
         }
 
         /// <summary>
@@ -1184,27 +1211,27 @@ namespace Adamantium.Mathematics
         }
 
         /// <summary>
-        /// Determines whether the specified <see cref="ColorRGBA"/> is equal to this instance.
+        /// Determines whether the specified <see cref="Color"/> is equal to this instance.
         /// </summary>
-        /// <param name="other">The <see cref="ColorRGBA"/> to compare with this instance.</param>
+        /// <param name="other">The <see cref="Color"/> to compare with this instance.</param>
         /// <returns>
-        /// <c>true</c> if the specified <see cref="ColorRGBA"/> is equal to this instance; otherwise, <c>false</c>.
+        /// <c>true</c> if the specified <see cref="Color"/> is equal to this instance; otherwise, <c>false</c>.
         /// </returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Equals(ref ColorRGBA other)
+        public bool Equals(ref Color other)
         {
             return R == other.R && G == other.G && B == other.B && A == other.A;
         }
 
         /// <summary>
-        /// Determines whether the specified <see cref="ColorRGBA"/> is equal to this instance.
+        /// Determines whether the specified <see cref="Color"/> is equal to this instance.
         /// </summary>
-        /// <param name="other">The <see cref="ColorRGBA"/> to compare with this instance.</param>
+        /// <param name="other">The <see cref="Color"/> to compare with this instance.</param>
         /// <returns>
-        /// <c>true</c> if the specified <see cref="ColorRGBA"/> is equal to this instance; otherwise, <c>false</c>.
+        /// <c>true</c> if the specified <see cref="Color"/> is equal to this instance; otherwise, <c>false</c>.
         /// </returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Equals(ColorRGBA other)
+        public bool Equals(Color other)
         {
             return Equals(ref other);
         }
@@ -1218,10 +1245,10 @@ namespace Adamantium.Mathematics
         /// </returns>
         public override bool Equals(object value)
         {
-            if (!(value is ColorRGBA))
+            if (!(value is Color))
                 return false;
 
-            var strongValue = (ColorRGBA)value;
+            var strongValue = (Color)value;
             return Equals(ref strongValue);
         }
 

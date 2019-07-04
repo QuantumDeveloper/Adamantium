@@ -463,7 +463,7 @@ namespace Adamantium.Engine.Graphics
             }
             else if (PixelSize == 4)
             {
-                var colors = GetPixels<ColorRGBA>();
+                var colors = GetPixels<Color>();
                 var redChannel = new byte[Width, Height];
                 var greenChannel = new byte[Width, Height];
                 var blueChannel = new byte[Width, Height];

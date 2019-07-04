@@ -14,7 +14,7 @@ namespace Adamantium.Engine.Core.Models
             UpAxis = UpAxis.Y_UP_LH;
 
             Positions = new Vector3F[0];
-            Colors = new ColorRGBA[0];
+            Colors = new Color[0];
             Normals = new Vector3F[0];
             UV0 = new Vector2F[0];
             UV1 = new Vector2F[0];
@@ -29,7 +29,7 @@ namespace Adamantium.Engine.Core.Models
 
         public Vector3F[] Positions { get; private set; }
 
-        public ColorRGBA[] Colors { get; private set; }
+        public Color[] Colors { get; private set; }
 
         public Vector3F[] Normals { get; private set; }
 
@@ -158,7 +158,7 @@ namespace Adamantium.Engine.Core.Models
             MeshTopology = primitiveType;
         }
 
-        public void SetColors(List<ColorRGBA> inColors)
+        public void SetColors(List<Color> inColors)
         {
             if (inColors == null || inColors.Count == 0)
             {
@@ -455,7 +455,7 @@ namespace Adamantium.Engine.Core.Models
             clonedMesh.UV3 = new Vector2F[UV3.Length];
             UV3.CopyTo(clonedMesh.UV3, 0);
 
-            clonedMesh.Colors = new ColorRGBA[Colors.Length];
+            clonedMesh.Colors = new Color[Colors.Length];
             Colors.CopyTo(clonedMesh.Colors, 0);
 
             if (transform.IsIdentity)
@@ -512,7 +512,7 @@ namespace Adamantium.Engine.Core.Models
             List<Vector2F> optimizedUV1 = new List<Vector2F>();
             List<Vector2F> optimizedUV2 = new List<Vector2F>();
             List<Vector2F> optimizedUV3 = new List<Vector2F>();
-            List<ColorRGBA> optimizedColors = new List<ColorRGBA>();
+            List<Color> optimizedColors = new List<Color>();
             List<Vector4F> optimizedBoneIndices = new List<Vector4F>();
             List<Vector4F> optimizedBoneWeights = new List<Vector4F>();
 
@@ -531,7 +531,7 @@ namespace Adamantium.Engine.Core.Models
                 Vector2F uv1 = UV1 != null && UV1.Length - 1 >= i ? UV1[index] : Vector2F.Zero;
                 Vector2F uv2 = UV2 != null && UV2.Length - 1 >= i ? UV2[index] : Vector2F.Zero;
                 Vector2F uv3 = UV3 != null && UV3.Length - 1 >= i ? UV3[index] : Vector2F.Zero;
-                ColorRGBA color = Colors != null && Colors.Length - 1 >= i ? Colors[index] : Mathematics.Colors.White;
+                Color color = Colors != null && Colors.Length - 1 >= i ? Colors[index] : Mathematics.Colors.White;
                 Vector4F jointIndex = BoneIndices != null && BoneIndices.Length - 1 >= i ? BoneIndices[index] : Vector4F.Zero;
                 Vector4F jointWeight = BoneWeights != null && BoneWeights.Length - 1 >= i ? BoneWeights[index] : Vector4F.Zero;
                 var vertex = new Vertex(position, uv0, uv1, uv2, uv3, color, jointIndex, jointWeight);
@@ -839,7 +839,7 @@ namespace Adamantium.Engine.Core.Models
                 return;
             }
 
-            var assembledColors = new List<ColorRGBA>();
+            var assembledColors = new List<Color>();
             for (int i = 0; i < colorIndices.Count; i++)
             {
                 assembledColors.Add(Colors[colorIndices[i]]);

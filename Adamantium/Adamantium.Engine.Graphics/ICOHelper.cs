@@ -218,7 +218,7 @@ namespace Adamantium.Engine.Graphics
             Utilities.CopyMemory(ptr, bufferHandle.AddrOfPinnedObject(), buffer.Length);
             bufferHandle.Free();
             var px = PixelBuffer.FlipBuffer(image.PixelBuffer[0], FlipBufferOptions.FlipVertically);
-            var colorsBuf = px.GetPixels<ColorRGBA>();
+            var colorsBuf = px.GetPixels<Color>();
             image.ApplyPixelBuffer(px, 0, true);
 
             return image;

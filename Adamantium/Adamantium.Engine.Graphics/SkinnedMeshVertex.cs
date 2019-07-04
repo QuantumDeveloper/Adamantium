@@ -25,7 +25,7 @@ namespace Adamantium.Engine.Graphics
         /// <param name="bitangent">tangent.</param>
         /// <param name="jointIndices">Joint indices.</param>
         /// <param name="jointWeights">Joint weights.</param>
-        public SkinnedMeshVertex(Vector3F position, Vector3F normal, ColorRGBA color, Vector2F uv0, Vector2F uv1, Vector2F uv2, Vector2F uv3, Vector4F tangent,
+        public SkinnedMeshVertex(Vector3F position, Vector3F normal, Color color, Vector2F uv0, Vector2F uv1, Vector2F uv2, Vector2F uv3, Vector4F tangent,
             Vector3F bitangent, Vector4F jointIndices, Vector4F jointWeights) : this()
         {
             Position = position;

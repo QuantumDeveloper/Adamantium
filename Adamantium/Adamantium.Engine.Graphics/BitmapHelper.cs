@@ -364,12 +364,12 @@ namespace Adamantium.Engine.Graphics
             }
             else if (px.Format.SizeOfInBytes() == 4)
             {
-                var colors = px.GetPixels<ColorRGBA>();
+                var colors = px.GetPixels<Color>();
                 for (int i = 0; i < colors.Length; ++i)
                 {
                     Utilities.Swap(ref colors[i].R, ref colors[i].B);
                 }
-                px.SetPixels<ColorRGBA>(colors);
+                px.SetPixels<Color>(colors);
             }
 
 
