@@ -270,7 +270,7 @@ namespace Adamantium.Mathematics
       /// <summary>
       /// Gets the brightness.
       /// </summary>
-      /// <returns>The Hue-Saturation-Brightness (HSB) saturation for this <see cref="ColorRGBA"/></returns>
+      /// <returns>The Hue-Saturation-Brightness (HSB) saturation for this <see cref="Color"/></returns>
       public float GetBrightness()
       {
          float r = (float)R / 255.0f;
@@ -293,7 +293,7 @@ namespace Adamantium.Mathematics
       /// <summary>
       /// Gets the hue.
       /// </summary>
-      /// <returns>The Hue-Saturation-Brightness (HSB) saturation for this <see cref="ColorRGBA"/></returns>
+      /// <returns>The Hue-Saturation-Brightness (HSB) saturation for this <see cref="Color"/></returns>
       public float GetHue()
       {
          if (R == G && G == B)
@@ -341,7 +341,7 @@ namespace Adamantium.Mathematics
       /// <summary>
       /// Gets the saturation.
       /// </summary>
-      /// <returns>The Hue-Saturation-Brightness (HSB) saturation for this <see cref="ColorRGBA"/></returns>
+      /// <returns>The Hue-Saturation-Brightness (HSB) saturation for this <see cref="Color"/></returns>
       public float GetSaturation()
       {
          float r = (float)R / 255.0f;
@@ -967,23 +967,23 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
-      /// Performs an implicit conversion from <see cref="ColorRGBA"/> to <see cref="ColorBGRA"/>.
+      /// Performs an implicit conversion from <see cref="Color"/> to <see cref="ColorBGRA"/>.
       /// </summary>
       /// <param name="value">The value.</param>
       /// <returns>The result of the conversion.</returns>
-      public static implicit operator ColorBGRA(ColorRGBA value)
+      public static implicit operator ColorBGRA(Color value)
       {
          return new ColorBGRA(value.R, value.G, value.B, value.A);
       }
 
       /// <summary>
-      /// Performs an implicit conversion from <see cref="ColorBGRA"/> to <see cref="ColorRGBA"/>.
+      /// Performs an implicit conversion from <see cref="ColorBGRA"/> to <see cref="Color"/>.
       /// </summary>
       /// <param name="value">The value.</param>
       /// <returns>The result of the conversion.</returns>
-      public static implicit operator ColorRGBA(ColorBGRA value)
+      public static implicit operator Color(ColorBGRA value)
       {
-         return new ColorRGBA(value.R, value.G, value.B, value.A);
+         return new Color(value.R, value.G, value.B, value.A);
       }
 
       /// <summary>

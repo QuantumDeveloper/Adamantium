@@ -27,7 +27,7 @@ namespace Adamantium.Engine.Graphics
     /// <summary>
     /// Used by <see cref="Image"/> to provide a selector to a <see cref="PixelBuffer"/>.
     /// </summary>
-    public sealed class PixelBufferArray : IEnumerable
+    public sealed class PixelBufferArray : IEnumerable<PixelBuffer>
     {
         private readonly Image image;
 
@@ -90,10 +90,57 @@ namespace Adamantium.Engine.Graphics
             return image.pixelBuffers.GetEnumerator();
         }
 
-        IEnumerator IEnumerable.GetEnumerator()
+        IEnumerator<PixelBuffer> IEnumerable<PixelBuffer>.GetEnumerator()
         {
-            return GetEnumerator();
+            return new Enumerator(this);
         }
+
+        public struct Enumerator : IEnumerator<PixelBuffer>
+        {
+            private readonly PixelBufferArray collection;
+
+            private int index;
+
+            private PixelBuffer current;
+
+            internal Enumerator(PixelBufferArray collection)
+            {
+                this.collection = collection;
+                index = 0;
+                current = default(PixelBuffer);
+            }
+
+            public void Dispose()
+            {
+            }
+
+            public bool MoveNext()
+            {
+                if (index < collection.Count)
+                {
+                    current = collection[index];
+                    index++;
+                    return true;
+                }
+                else
+                {
+                    index = 0;
+                    current = default(PixelBuffer);
+                    return false;
+                }
+            }
+
+            public void Reset()
+            {
+                index = 0;
+                current = default(PixelBuffer);
+            }
+
+            object IEnumerator.Current => current;
+
+            public PixelBuffer Current => current;
+        }
+
 
         public static implicit operator PixelBuffer[] (PixelBufferArray pixelBuffer)
         {

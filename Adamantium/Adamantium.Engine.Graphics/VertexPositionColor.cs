@@ -16,7 +16,7 @@ namespace Adamantium.Engine.Graphics
       /// </summary>
       /// <param name="position">position of the vertex</param>
       /// <param name="color">vertex color</param>
-      public VertexPositionColor(Vector3F position, ColorRGBA color)
+      public VertexPositionColor(Vector3F position, Color color)
       {
          Position = position;
          Color = color;
@@ -32,7 +32,7 @@ namespace Adamantium.Engine.Graphics
       /// UV texture coordinates.
       /// </summary>
       [VertexInputElement("COLOR0")]
-      public ColorRGBA Color;
+      public Color Color;
 
       /// <summary>
       /// Defines structure byte size.

@@ -95,7 +95,7 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
             description.ArraySize = 1;
             description.Depth = 1;
 
-            var img = Image.New(description);
+            var img = Image.New3D(gif.Descriptor.Width, gif.Descriptor.Height, gif.Frames.Count, new MipMapCount(1), SurfaceFormat.R8G8B8A8.UNorm);
             for (int i = 0; i < gif.Frames.Count; i++)
             {
                 GifFrame frame = gif.Frames[i];

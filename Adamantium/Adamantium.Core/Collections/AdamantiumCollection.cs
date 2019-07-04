@@ -518,8 +518,6 @@ namespace Adamantium.Engine.Core.Collections
             public T Current => current;
         }
 
-
-
         /// <summary>
         /// Returns a string that represents the current object.
         /// </summary>

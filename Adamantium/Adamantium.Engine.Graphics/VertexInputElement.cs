@@ -525,7 +525,7 @@ namespace Adamantium.Engine.Core
          if (typeof(float) == typeT)
             return Format.R32_SFLOAT;
 
-         if (typeof(ColorRGBA) == typeT)
+         if (typeof(Color) == typeT)
             return Format.R8G8B8A8_UNORM;
          if (typeof(ColorBGRA) == typeT)
             return Format.B8G8R8A8_UNORM;

@@ -109,7 +109,7 @@ namespace Adamantium.UI.Media
       /// <returns>array of type <see cref="VertexPositionColor"/></returns>
       /// <remarks> To draw it, use TriangleStrip primitive type</remarks>
       public static Shape EmptyCircle(Point center, Size radius, float strokeThickness,
-         ColorRGBA strockeColor, bool needOptimization = true)
+         Color strockeColor, bool needOptimization = true)
       {
          Shape circle = new Shape();
          circle.PrimitiveType = PrimitiveType.TriangleStrip;
