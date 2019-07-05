@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers;
+using Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.PathProviders;
 using Adamantium.Mathematics;
-using SimplePaletteQuantizer.Helpers;
-using SimplePaletteQuantizer.PathProviders;
 
-namespace SimplePaletteQuantizer.Quantizers
+namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Quantizers
 {
     /// <summary>
     /// This interface provides a color quantization capabilities.

@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.ColorCaches.Common;
 using Adamantium.Mathematics;
-using SimplePaletteQuantizer.ColorCaches.Common;
 
-namespace SimplePaletteQuantizer.Helpers
+namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers
 {
     public class ColorModelHelper
     {

@@ -1,9 +1,9 @@
 ﻿using System;
-using SimplePaletteQuantizer.Helpers;
-using SimplePaletteQuantizer.PathProviders;
-using SimplePaletteQuantizer.Quantizers;
+using Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers;
+using Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.PathProviders;
+using Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Quantizers;
 
-namespace SimplePaletteQuantizer.Ditherers
+namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Ditherers
 {
     public interface IColorDitherer : IPathProvider
     {

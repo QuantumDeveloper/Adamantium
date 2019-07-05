@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers;
+using Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Quantizers;
 
 namespace Adamantium.Engine.Graphics.Imaging.GIF
 {
@@ -63,40 +65,12 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
         private void WriteImageData(Image img, Stream stream)
         {
             var descr = img.Description;
+            var quantizedImages = new List<PixelBuffer>();
             foreach(PixelBuffer pixelBuffer in img.PixelBuffer)
             {
-                int[] indexBuffer = new int[descr.Width * descr.Height]; 
-                if (pixelBuffer.PixelSize == 4)
-                {
-                    var colorsRGBA = pixelBuffer.GetPixels<Color>();
-                    var colorTable = colorsRGBA.Distinct().ToArray();
-                    if (colorTable.Length > 256)
-                    {
-
-                    }
-
-
-
-                    var tmp = pixelBuffer.GetPixels<byte>();
-                    var colors = new byte[descr.Width * descr.Height * 3];
-                    int offset = 0;
-                    for (int i = 0; i < 0; i += 4)
-                    {
-                        colors[offset + 0] = tmp[i + 0];
-                        colors[offset + 1] = tmp[i + 1];
-                        colors[offset + 2] = tmp[i + 2];
-                        offset += 3;
-                    }
-                }
-                else
-                {
-                    var colorsRGB = pixelBuffer.GetPixels<ColorRGB>();
-                    var colorTable = colorsRGB.Distinct().ToArray();
-                    if (colorTable.Length > 256)
-                    {
-
-                    }
-                }
+                var quant = new NeuralColorQuantizer();
+                var result = ImageBuffer.QuantizeImage(pixelBuffer, quant, null, 256);
+                quantizedImages.Add(result);
             }
         }
     }

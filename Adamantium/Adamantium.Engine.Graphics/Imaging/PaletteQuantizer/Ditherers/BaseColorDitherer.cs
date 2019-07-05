@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers;
+using Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.PathProviders;
+using Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Quantizers;
 using Adamantium.Mathematics;
-using SimplePaletteQuantizer.Helpers;
-using SimplePaletteQuantizer.PathProviders;
-using SimplePaletteQuantizer.Quantizers;
 
-namespace SimplePaletteQuantizer.Ditherers
+namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Ditherers
 {
     public abstract class BaseColorDitherer : IColorDitherer
     {

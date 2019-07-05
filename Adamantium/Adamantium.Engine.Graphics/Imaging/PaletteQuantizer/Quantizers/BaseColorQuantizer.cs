@@ -3,11 +3,11 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers;
+using Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.PathProviders;
 using Adamantium.Mathematics;
-using SimplePaletteQuantizer.Helpers;
-using SimplePaletteQuantizer.PathProviders;
 
-namespace SimplePaletteQuantizer.Quantizers
+namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Quantizers
 {
     public abstract class BaseColorQuantizer : IColorQuantizer
     {

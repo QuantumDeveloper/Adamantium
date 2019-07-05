@@ -1,8 +1,8 @@
 ﻿using System;
 using Adamantium.Mathematics;
-using SimplePaletteQuantizer.Helpers;
+using Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers;
 
-namespace SimplePaletteQuantizer.Ditherers.Ordered
+namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Ditherers.Ordered
 {
     public abstract class BaseOrderedDitherer : BaseColorDitherer
     {
@@ -11,12 +11,12 @@ namespace SimplePaletteQuantizer.Ditherers.Ordered
         /// <summary>
         /// Gets the width of the matrix.
         /// </summary>
-        protected abstract Byte MatrixWidth { get; }
+        protected abstract byte MatrixWidth { get; }
 
         /// <summary>
         /// Gets the height of the matrix.
         /// </summary>
-        protected abstract Byte MatrixHeight { get; }
+        protected abstract byte MatrixHeight { get; }
 
         #endregion
 
@@ -25,7 +25,7 @@ namespace SimplePaletteQuantizer.Ditherers.Ordered
         /// <summary>
         /// See <see cref="BaseColorDitherer.OnProcessPixel"/> for more details.
         /// </summary>
-        protected override Boolean OnProcessPixel(Pixel sourcePixel, Pixel targetPixel)
+        protected override bool OnProcessPixel(Pixel sourcePixel, Pixel targetPixel)
         {
             // reads the source pixel
             Color oldColor = SourceBuffer.GetColorFromPixel(sourcePixel);
@@ -34,24 +34,24 @@ namespace SimplePaletteQuantizer.Ditherers.Ordered
             oldColor = QuantizationHelper.ConvertAlpha(oldColor);
 
             // retrieves matrix coordinates
-            Int32 x = targetPixel.X % MatrixWidth;
-            Int32 y = targetPixel.Y % MatrixHeight;
+            int x = targetPixel.X % MatrixWidth;
+            int y = targetPixel.Y % MatrixHeight;
 
             // determines the threshold
-            Int32 threshold = Convert.ToInt32(CachedMatrix[x, y]);
+            int threshold = Convert.ToInt32(CachedMatrix[x, y]);
 
             // only process dithering if threshold is substantial
             if (threshold > 0)
             {
-                Int32 red = GetClampedColorElement(oldColor.R + threshold);
-                Int32 green = GetClampedColorElement(oldColor.G + threshold);
-                Int32 blue = GetClampedColorElement(oldColor.B + threshold);
+                int red = GetClampedColorElement(oldColor.R + threshold);
+                int green = GetClampedColorElement(oldColor.G + threshold);
+                int blue = GetClampedColorElement(oldColor.B + threshold);
 
                 Color newColor = Color.FromRgba((byte)red, (byte)green, (byte)blue, 255);
 
                 if (TargetBuffer.UsePalette)
                 {
-                    Byte newPixelIndex = (Byte) Quantizer.GetPaletteIndex(newColor, targetPixel.X, targetPixel.Y);
+                    byte newPixelIndex = (byte)Quantizer.GetPaletteIndex(newColor, targetPixel.X, targetPixel.Y);
                     targetPixel.Index = newPixelIndex;
                 }
                 else
@@ -71,7 +71,7 @@ namespace SimplePaletteQuantizer.Ditherers.Ordered
         /// <summary>
         /// See <see cref="IColorDitherer.IsInplace"/> for more details.
         /// </summary>
-        public override Boolean IsInplace
+        public override bool IsInplace
         {
             get { return true; }
         }

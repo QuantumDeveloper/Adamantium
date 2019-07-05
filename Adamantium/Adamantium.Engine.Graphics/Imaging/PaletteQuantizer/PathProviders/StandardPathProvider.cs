@@ -1,8 +1,8 @@
-﻿using Adamantium.Mathematics;
-using System;
+﻿using System;
 using System.Collections.Generic;
+using Adamantium.Mathematics;
 
-namespace SimplePaletteQuantizer.PathProviders
+namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.PathProviders
 {
     public class StandardPathProvider : IPathProvider
     {

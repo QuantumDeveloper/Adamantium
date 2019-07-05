@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.ColorCaches.Common;
 using Adamantium.Mathematics;
-using SimplePaletteQuantizer.ColorCaches.Common;
 
-namespace SimplePaletteQuantizer.ColorCaches
+namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.ColorCaches
 {
     public abstract class BaseColorCache : IColorCache
     {

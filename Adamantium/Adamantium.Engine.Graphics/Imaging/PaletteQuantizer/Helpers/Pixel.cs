@@ -4,9 +4,8 @@ using System.Runtime.InteropServices;
 using Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers.Pixels;
 using Adamantium.Mathematics;
 using AdamantiumVulkan.Core;
-using SimplePaletteQuantizer.Helpers.Pixels;
 
-namespace SimplePaletteQuantizer.Helpers
+namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers
 {
     /// <summary>
     /// This is a pixel format independent pixel.

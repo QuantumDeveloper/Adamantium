@@ -3,16 +3,15 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Adamantium.Core;
-using Adamantium.Engine.Graphics;
+using Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.ColorCaches.Common;
+using Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Ditherers;
+using Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Extensions;
+using Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.PathProviders;
+using Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Quantizers;
 using Adamantium.Mathematics;
 using AdamantiumVulkan.Core;
-using SimplePaletteQuantizer.ColorCaches.Common;
-using SimplePaletteQuantizer.Ditherers;
-using SimplePaletteQuantizer.Extensions;
-using SimplePaletteQuantizer.PathProviders;
-using SimplePaletteQuantizer.Quantizers;
 
-namespace SimplePaletteQuantizer.Helpers
+namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers
 {
     public class ImageBuffer : IDisposable
     {
@@ -1064,7 +1063,7 @@ namespace SimplePaletteQuantizer.Helpers
             public Int32 EndOffset { get; private set; }
 
             /// <summary>
-            /// Initializes a new instance of the <see cref="SimplePaletteQuantizer.Helpers.ImageBuffer.LineTask"/> class.
+            /// Initializes a new instance of the <see cref="LineTask"/> class.
             /// </summary>
             public LineTask(Int32 startOffset, Int32 endOffset)
             {

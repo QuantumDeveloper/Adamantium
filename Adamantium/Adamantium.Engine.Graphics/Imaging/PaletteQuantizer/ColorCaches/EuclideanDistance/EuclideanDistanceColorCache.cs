@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using SimplePaletteQuantizer.Helpers;
-using SimplePaletteQuantizer.ColorCaches.Common;
+using Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.ColorCaches.Common;
+using Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers;
 using Adamantium.Mathematics;
 
-namespace SimplePaletteQuantizer.ColorCaches.EuclideanDistance
+namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.ColorCaches.EuclideanDistance
 {
     public class EuclideanDistanceColorCache : BaseColorCache
     {

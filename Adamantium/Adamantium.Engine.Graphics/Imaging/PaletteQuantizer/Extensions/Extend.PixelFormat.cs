@@ -1,7 +1,7 @@
-﻿using AdamantiumVulkan.Core;
-using System;
+﻿using System;
+using AdamantiumVulkan.Core;
 
-namespace SimplePaletteQuantizer.Extensions
+namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Extensions
 {
     /// <summary>
     /// The utility extender class.

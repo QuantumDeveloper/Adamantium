@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace SimplePaletteQuantizer.Ditherers.ErrorDiffusion
+namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Ditherers.ErrorDiffusion
 {
     public class JarvisJudiceNinkeDitherer : BaseErrorDistributionDitherer
     {

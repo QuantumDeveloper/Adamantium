@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.ColorCaches.Common;
+using Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers;
 using Adamantium.Mathematics;
-using SimplePaletteQuantizer.ColorCaches.Common;
-using SimplePaletteQuantizer.Helpers;
 
-namespace SimplePaletteQuantizer.ColorCaches.Octree
+namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.ColorCaches.Octree
 {
     public class OctreeColorCache : BaseColorCache
     {

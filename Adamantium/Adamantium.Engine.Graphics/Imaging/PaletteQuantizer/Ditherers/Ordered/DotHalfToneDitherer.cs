@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace SimplePaletteQuantizer.Ditherers.Ordered
+namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Ditherers.Ordered
 {
     public class DotHalfToneDitherer : BaseOrderedDitherer
     {

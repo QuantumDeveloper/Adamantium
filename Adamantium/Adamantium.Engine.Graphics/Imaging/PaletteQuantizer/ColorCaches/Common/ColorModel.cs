@@ -1,4 +1,4 @@
-﻿namespace SimplePaletteQuantizer.ColorCaches.Common
+﻿namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.ColorCaches.Common
 {
     public enum ColorModel
     {
