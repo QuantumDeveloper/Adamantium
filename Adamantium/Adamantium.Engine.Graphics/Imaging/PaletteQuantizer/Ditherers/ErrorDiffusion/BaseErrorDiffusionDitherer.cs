@@ -1,8 +1,8 @@
 ﻿using System;
+using Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers;
 using Adamantium.Mathematics;
-using SimplePaletteQuantizer.Helpers;
 
-namespace SimplePaletteQuantizer.Ditherers.ErrorDiffusion
+namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Ditherers.ErrorDiffusion
 {
     public abstract class BaseErrorDistributionDitherer : BaseColorDitherer
     {

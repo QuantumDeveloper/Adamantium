@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace SimplePaletteQuantizer.Helpers
+namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers
 {
     public static class Guard
     {
@@ -13,7 +13,7 @@ namespace SimplePaletteQuantizer.Helpers
         {
             if (argument == null)
             {
-                String message = string.Format("Cannot use '{0}' when it is null!", argumentName);
+                String message = $"Cannot use '{argumentName}' when it is null!";
                 throw new ArgumentNullException(message);
             }
         }

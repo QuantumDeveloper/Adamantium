@@ -1,7 +1,7 @@
-﻿using Adamantium.Mathematics;
-using System;
+﻿using System;
+using Adamantium.Mathematics;
 
-namespace SimplePaletteQuantizer.Helpers.Pixels
+namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers.Pixels
 {
     public interface IGenericPixel
     {

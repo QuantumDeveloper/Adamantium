@@ -252,8 +252,7 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
         /// </summary>
         /// <param name="stream"></param>
         /// <param name="gifImage"></param>
-        /// <param name="position"></param>
-        private static unsafe void ProcessImageDescriptor(Stream stream, GifImage gifImage)
+        private static void ProcessImageDescriptor(Stream stream, GifImage gifImage)
         {
             var descriptor = new GifImageDescriptor();
             descriptor.OffsetLeft = stream.ReadUInt16();

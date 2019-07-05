@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace SimplePaletteQuantizer.Helpers
+namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers
 {
     public class FastRandom
     {

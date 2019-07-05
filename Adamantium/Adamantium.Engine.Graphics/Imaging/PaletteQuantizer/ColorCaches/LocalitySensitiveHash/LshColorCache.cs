@@ -1,11 +1,11 @@
 ﻿using System;
-using System.Linq;
 using System.Collections.Generic;
-using SimplePaletteQuantizer.Helpers;
-using SimplePaletteQuantizer.ColorCaches.Common;
+using System.Linq;
+using Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.ColorCaches.Common;
+using Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers;
 using Adamantium.Mathematics;
 
-namespace SimplePaletteQuantizer.ColorCaches.LocalitySensitiveHash
+namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.ColorCaches.LocalitySensitiveHash
 {
     public class LshColorCache : BaseColorCache
     {

@@ -1,5 +1,4 @@
 ﻿using Adamantium.Mathematics;
-using SimplePaletteQuantizer.Helpers.Pixels;
 using System;
 using System.Runtime.InteropServices;
 

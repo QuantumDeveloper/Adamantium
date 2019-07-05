@@ -1,11 +1,10 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers;
 using Adamantium.Mathematics;
-//using System.Drawing;
-using SimplePaletteQuantizer.Helpers;
 
-namespace SimplePaletteQuantizer.Quantizers.NeuQuant
+namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Quantizers
 {
     /// <summary>
     /// The NeuQuant Neural-Net image quantization algorithm (© Anthony Dekker 1994) 

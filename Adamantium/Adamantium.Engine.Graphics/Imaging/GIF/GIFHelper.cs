@@ -1,13 +1,6 @@
-﻿using Adamantium.Core;
-using Adamantium.Mathematics;
-using SimplePaletteQuantizer.Ditherers.Ordered;
-using SimplePaletteQuantizer.Helpers;
-using SimplePaletteQuantizer.Quantizers.NeuQuant;
-using System;
+﻿using System;
 using System.IO;
-using System.Linq;
 using System.Runtime.InteropServices;
-using System.Text;
 
 namespace Adamantium.Engine.Graphics.Imaging.GIF
 {
@@ -27,9 +20,11 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
         {
             GifEncoder encoder = new GifEncoder();
             encoder.Encode(img, imageStream);
-            //var quant = new NeuralColorQuantizer();
-            //var result = ImageBuffer.QuantizeImage(pixelBuffers[0], quant, null, 256, true, 1);
 
+            //var quant = new NeuralColorQuantizer();
+            //var quant = new DistinctSelectionQuantizer();
+
+            //var result = ImageBuffer.QuantizeImage(pixelBuffers[0], quant, null, 256, true, 1);
             //var img2 = Image.New2D(description.Width, description.Height, new MipMapCount(1), SurfaceFormat.R8G8B8.UNorm);
             //Utilities.CopyMemory(img2.DataPointer, result.DataPointer, result.BufferStride);
             //img2?.Save(imageStream, ImageFileType.Png);

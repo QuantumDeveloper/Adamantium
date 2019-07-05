@@ -673,6 +673,16 @@ namespace Adamantium.Mathematics
         }
 
         /// <summary>
+        /// Converts the color from merged RGBA value.
+        /// </summary>
+        /// <param name="color">An int value, which represents RGBA color</param>
+        /// <returns>A color.</returns>
+        public static Color FromRgba(int color)
+        {
+            return new Color(BitConverter.GetBytes(color));
+        }
+
+        /// <summary>
         /// Converts the color from a packed BGRA integer.
         /// </summary>
         /// <param name="color">A packed integer containing all four color components in BGRA order</param>
