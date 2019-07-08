@@ -104,7 +104,7 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
                 handle.Free();
             }
             //{
-            //    var frame = gif.Frames[24];
+            //    var frame = gif.Frames[75];
             //    var handle = GCHandle.Alloc(frame.RawPixels, GCHandleType.Pinned);
             //    Utilities.CopyMemory(img.DataPointer, handle.AddrOfPinnedObject(), frame.RawPixels.Length);
             //    handle.Free();
@@ -114,6 +114,10 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
 
         private void GetImageFromIndexStream(GifFrame frame, int frameIndex, GifImage gifImage)
         {
+            if (frameIndex == 75)
+            {
+
+            }
             var width = frame.Descriptor.Width;
             var height = frame.Descriptor.Height;
             var colorTable = frame.ColorTable;
@@ -127,7 +131,9 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
                 frame.IndexData = Deinterlace(frame);
             }
 
-            if (frameIndex == 0 || frame.GraphicControlExtension == null || (frame.GraphicControlExtension != null && frame.GraphicControlExtension.DisposalMethod == DisposalMethod.None))
+            if (frameIndex == 0 || 
+                (frame.Descriptor.OffsetLeft == 0 && frame.Descriptor.OffsetTop == 0) || 
+                (frame.GraphicControlExtension != null && frame.GraphicControlExtension.DisposalMethod == DisposalMethod.None))
             {
                 pixels = new byte[width * height * bytesPerPixel];
 
@@ -150,7 +156,10 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
                     offset += bytesPerPixel;
                 }
             }
-            else if (frameIndex > 0 && frame.GraphicControlExtension != null && frame.GraphicControlExtension.DisposalMethod == DisposalMethod.DoNotDispose)
+            else if (frameIndex > 0 && 
+                     (frame.Descriptor.OffsetLeft != 0 || frame.Descriptor.OffsetTop != 0))
+                     //frame.GraphicControlExtension != null && 
+                     //frame.GraphicControlExtension.DisposalMethod == DisposalMethod.DoNotDispose)
             {
                 pixels = new byte[gifImage.Descriptor.Width * gifImage.Descriptor.Height * bytesPerPixel];
                 var baseFrame = gifImage.Frames[frameIndex - 1];
@@ -295,7 +304,7 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
             frame.LzwMinimumCodeSize = (byte)stream.ReadByte();
             if (frame.LzwMinimumCodeSize > 8)
             {
-                //throw new Exception($"LZW minimum code could not be more than 8. Current value is {frame.LzwMinimumCodeSize}");
+                throw new Exception($"LZW minimum code could not be more than 8. Current value is {frame.LzwMinimumCodeSize}");
             }
             byte blockSize;
 
@@ -322,7 +331,7 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
             }
         }
 
-        private static unsafe void ProcessExtension(Stream stream, GifImage gifImage)
+        private static void ProcessExtension(Stream stream, GifImage gifImage)
         {
             var extensionCode = (GifChunkCodes)stream.ReadByte();
             int blockSize = stream.ReadByte();
@@ -345,7 +354,12 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
                     applicationExtension.ApplicationId = Encoding.ASCII.GetString(stream.ReadBytes(8));
                     applicationExtension.Version = Encoding.ASCII.GetString(stream.ReadBytes(3));
                     gifImage.ApplicationExtension = applicationExtension;
-                    if (applicationExtension.Version == "XMP")
+                    if (applicationExtension.ApplicationId == "NETSCAPE")
+                    {
+                        var extBlockSize = stream.ReadByte();
+                        stream.ReadBytes(extBlockSize);
+                    }
+                    else if (applicationExtension.Version == "XMP")
                     {
                         var @byte = (byte)stream.ReadByte();
                         var bytes = new List<byte>() { @byte};
@@ -354,10 +368,9 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
                             @byte = (byte)stream.ReadByte();
                             bytes.Add(@byte);
                         }
-                        var resultArray = bytes.ToArray()[..^257];
+                        //var resultArray = bytes.ToArray()[..^257];
                         blockSize += bytes.Count;
                     }
-
                     break;
                 case GifChunkCodes.CommentExtension:
                     // comment extension; do nothing - all the data is in the

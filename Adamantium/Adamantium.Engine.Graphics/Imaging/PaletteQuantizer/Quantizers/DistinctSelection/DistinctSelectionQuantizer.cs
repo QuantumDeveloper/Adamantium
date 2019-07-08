@@ -157,7 +157,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Quantizers.Distinc
             }
 
             // adds the selected colors to a final palette
-            palette.AddRange(colorInfoList.Select(colorInfo => Color.FromArgb(colorInfo.Color)));
+            palette.AddRange(colorInfoList.Select(colorInfo => Color.FromRgba(colorInfo.Color)));
 
             // returns our new palette
             return palette;

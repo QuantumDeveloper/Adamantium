@@ -298,6 +298,19 @@ namespace Adamantium.Mathematics
         /// Converts the color into a packed integer.
         /// </summary>
         /// <returns>A packed integer containing all four color components.</returns>
+        public int ToRgb()
+        {
+            int value = R;
+            value |= G << 8;
+            value |= B << 16;
+
+            return value;
+        }
+
+        /// <summary>
+        /// Converts the color into a packed integer.
+        /// </summary>
+        /// <returns>A packed integer containing all four color components.</returns>
         public int ToAbgr()
         {
             int value = A;

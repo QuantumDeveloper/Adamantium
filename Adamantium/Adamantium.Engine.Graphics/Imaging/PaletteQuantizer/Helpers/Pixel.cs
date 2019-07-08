@@ -23,10 +23,10 @@ namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers
         internal const Byte NibbleMask = 0xF;
         internal const Byte ByteMask = 0xFF;
 
-        internal const Int32 AlphaShift = 24;
-        internal const Int32 RedShift = 16;
+        internal const Int32 RedShift = 0;
         internal const Int32 GreenShift = 8;
-        internal const Int32 BlueShift = 0;
+        internal const Int32 BlueShift = 16;
+        internal const Int32 AlphaShift = 24;
 
         internal const Int32 AlphaMask = ByteMask << AlphaShift;
         internal const Int32 RedGreenBlueMask = 0xFFFFFF;
@@ -78,8 +78,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers
         /// <value>The color.</value>
         public Color Color
         {
-            get { return ((IGenericPixel) pixelData).GetColor(); }
-            set { ((IGenericPixel) pixelData).SetColor(value); }
+            get => ((IGenericPixel) pixelData).GetColor();
+            set => ((IGenericPixel) pixelData).SetColor(value);
         }
 
         /// <summary>
@@ -88,10 +88,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers
         /// <value>
         /// 	<c>true</c> if this instance is indexed; otherwise, <c>false</c>.
         /// </value>
-        public Boolean UsePalette
-        {
-            get { return Parent.UsePalette; }
-        }
+        public Boolean UsePalette => Parent.UsePalette;
 
         #endregion
 
@@ -132,11 +129,13 @@ namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers
                 case Format.R5G5B5A1_UNORM_PACK16: return typeof(PixelDataArgb1555);
                 case Format.R5G6B5_UNORM_PACK16: return typeof(PixelDataRgb565);
                 case Format.R8G8B8_UNORM:
-                case Format.B8G8R8_UNORM:
                     return typeof(PixelDataRgb888);
+                case Format.B8G8R8_UNORM:
+                    return typeof(PixelDataBgr888);
                 case Format.R8G8B8A8_UNORM:
-                case Format.B8G8R8A8_UNORM:
                     return typeof(PixelDataRgb8888);
+                case Format.B8G8R8A8_UNORM:
+                    return typeof(PixelDataBgr8888);
                 case Format.R16G16B16_UNORM:
                     return typeof(PixelDataRgb48);
                 case Format.R16G16B16A16_UNORM:

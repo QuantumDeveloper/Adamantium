@@ -21,25 +21,22 @@ namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers.Pixels
         [FieldOffset(0)] private ushort raw;    // 00 - 15
 
         // processed raw values
-        public int Alpha { get { return alpha >> 7 & 0x1; } }
-        public int Red { get { return red >> 2 & 0xF; } }
-        public int Green { get { return green >> 5 & 0xF; } }
-        public int Blue { get { return blue & 0xF; } }
+        public int Alpha => alpha >> 7 & 0x1;
+        public int Red => red >> 2 & 0xF;
+        public int Green => green >> 5 & 0xF;
+        public int Blue => blue & 0xF;
 
         /// <summary>
-        /// See <see cref="IGenericPixel.Argb"/> for more details.
+        /// See <see cref="IGenericPixel.Rgba"/> for more details.
         /// </summary>
-        public int Argb
-        {
-            get { return (Alpha == 0 ? 0 : Pixel.AlphaMask) | Red << Pixel.RedShift | Green << Pixel.GreenShift | Blue; }
-        }
+        public int Rgba => (Alpha == 0 ? 0 : Pixel.AlphaMask) | Red << Pixel.RedShift | Green << Pixel.GreenShift | Blue;
 
         /// <summary>
         /// See <see cref="IGenericPixel.GetColor"/> for more details.
         /// </summary>
         public Color GetColor()
         {
-            return Color.FromArgb(Argb);
+            return Color.FromArgb(Rgba);
         }
 
         /// <summary>
@@ -59,8 +56,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers.Pixels
         /// </summary>
         public ulong Value
         {
-            get { return raw; }
-            set { raw = (ushort)(value & 0xFFFF); }
+            get => raw;
+            set => raw = (ushort)(value & 0xFFFF);
         }
     }
 }

@@ -8,6 +8,13 @@ namespace Adamantium.Mathematics
     [StructLayout(LayoutKind.Sequential)]
     public struct ColorRGB : IEquatable<ColorRGB>
     {
+        public ColorRGB(int rgb)
+        {
+            R = (byte)((rgb >> 16) & 255);
+            G = (byte)((rgb >> 8) & 255);
+            B = (byte)(rgb & 255);
+        }
+
         public ColorRGB(byte r, byte g, byte b)
         {
             R = r;
@@ -18,6 +25,11 @@ namespace Adamantium.Mathematics
         public byte R;
         public byte G;
         public byte B;
+
+        public byte[] ToArray()
+        {
+            return new byte[] { R, G, B };
+        }
 
         public override string ToString()
         {
@@ -45,6 +57,16 @@ namespace Adamantium.Mathematics
         public bool Equals(ColorRGB other)
         {
             return R == other.R && G == other.G && B == other.B;
+        }
+
+        public static bool operator ==(ColorRGB colorA, ColorRGB colorB)
+        {
+            return colorA.Equals(colorB);
+        }
+
+        public static bool operator !=(ColorRGB colorA, ColorRGB colorB)
+        {
+            return !(colorA == colorB);
         }
     }
 }

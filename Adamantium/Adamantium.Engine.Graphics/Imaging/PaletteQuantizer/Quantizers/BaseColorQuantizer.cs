@@ -121,7 +121,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Quantizers
                 // generates the palette from unique numbers
                 return UniqueColors.
                     OrderBy(pair => pair.Value).
-                    Select(pair => Color.FromArgb(pair.Key)).
+                    Select(pair => Color.FromRgba(pair.Key)).
                     Select(color => Color.FromRgba(color.R, color.G, color.B, 255)).
                     ToList();
             }

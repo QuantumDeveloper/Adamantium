@@ -12,7 +12,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers.Pixels
         Int32 Blue { get; }
 
         // higher-level values
-        Int32 Argb { get; }
+        Int32 Rgba { get; }
         UInt64 Value { get; set; }
 
         // color methods

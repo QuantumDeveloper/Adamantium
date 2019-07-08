@@ -80,8 +80,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers
                 }
             }
 
-            Int32 argb = 255 << 24 | red << 16 | green << 8 | blue;
-            return Color.FromArgb(argb);
+            return Color.FromRgba((byte)red, (byte)green, (byte)blue);
         }
 
         #endregion
