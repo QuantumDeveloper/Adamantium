@@ -103,6 +103,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Extensions
             switch (pixelFormat)
             {
                 case Format.R8G8B8A8_UNORM:
+                case Format.B8G8R8A8_UNORM:
                     return true;
                 default:
                     return false;

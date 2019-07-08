@@ -590,7 +590,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers
             target.Palette = targetPalette;
 
             // step 3 - prepares ditherer (optional)
-            if (ditherer != null) ditherer.Prepare(quantizer, colorCount, this, target);
+            ditherer?.Prepare(quantizer, colorCount, this, target);
 
             // step 4 - prepares the quantization function
             TransformPixelFunction quantize = (sourcePixel, targetPixel) =>
@@ -634,13 +634,13 @@ namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers
             quantizer.Finish();
         }
 
-        public static PixelBuffer QuantizeImage(ImageBuffer source, IColorQuantizer quantizer, Int32 colorCount, bool usePalette = true, Int32 parallelTaskCount = 4)
+        public static QuantizerResult QuantizeImage(ImageBuffer source, IColorQuantizer quantizer, Int32 colorCount, bool usePalette = true, Int32 parallelTaskCount = 4)
         {
             // performs the pure quantization wihout dithering
             return QuantizeImage(source, quantizer, null, colorCount, usePalette, parallelTaskCount);
         }
 
-        public static PixelBuffer QuantizeImage(ImageBuffer source, IColorQuantizer quantizer, IColorDitherer ditherer, Int32 colorCount, bool usePalette = true, Int32 parallelTaskCount = 4)
+        public static QuantizerResult QuantizeImage(ImageBuffer source, IColorQuantizer quantizer, IColorDitherer ditherer, Int32 colorCount, bool usePalette = true, Int32 parallelTaskCount = 4)
         {
             // checks parameters
             Guard.CheckNull(source, "source");
@@ -656,17 +656,17 @@ namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers
             using (ImageBuffer target = new ImageBuffer(result, usePalette))
             {
                 source.Quantize(target, quantizer, ditherer, colorCount, parallelTaskCount);
-                return result;
+                return new QuantizerResult(result, target.Palette.ToArray());
             }
         }
 
-        public static PixelBuffer QuantizeImage(PixelBuffer sourceImage, IColorQuantizer quantizer, Int32 colorCount, bool usePalette = true, Int32 parallelTaskCount = 4)
+        public static QuantizerResult QuantizeImage(PixelBuffer sourceImage, IColorQuantizer quantizer, Int32 colorCount, bool usePalette = true, Int32 parallelTaskCount = 4)
         {
             // performs the pure quantization wihout dithering
             return QuantizeImage(sourceImage, quantizer, null, colorCount, usePalette, parallelTaskCount);
         }
 
-        public static PixelBuffer QuantizeImage(PixelBuffer sourceImage, IColorQuantizer quantizer, IColorDitherer ditherer, Int32 colorCount, bool usePalette = true, Int32 parallelTaskCount = 4)
+        public static QuantizerResult QuantizeImage(PixelBuffer sourceImage, IColorQuantizer quantizer, IColorDitherer ditherer, Int32 colorCount, bool usePalette = true, Int32 parallelTaskCount = 4)
         {
             // checks parameters
             Guard.CheckNull(sourceImage, "sourceImage");
@@ -852,11 +852,11 @@ namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers
                     Color color = GetColorFromPixel(sourcePixel);
 
                     // if alpha is not present in the source image, but is present in the target, make one up
-                    if (!hasSourceAlpha && hasTargetAlpha)
-                    {
-                        Int32 argb = 255 << 24 | color.R << 16 | color.G << 8 | color.B;
-                        color = Color.FromArgb(argb);
-                    }
+                    //if (!hasSourceAlpha && hasTargetAlpha)
+                    //{
+                    //    Int32 argb = 255 << 24 | color.R << 16 | color.G << 8 | color.B;
+                    //    color = Color.FromRgba(argb);
+                    //}
 
                     // sets the color to a target pixel
                     SetColorToPixel(targetPixel, color, quantizer);

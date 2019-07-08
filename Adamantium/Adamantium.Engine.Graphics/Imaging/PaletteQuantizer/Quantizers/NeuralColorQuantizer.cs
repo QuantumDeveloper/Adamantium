@@ -70,7 +70,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Quantizers
         /// <value>The quality.</value>
         public Byte Quality
         {
-            get { return quality; }
+            get => quality;
             set 
             { 
                 quality = value;
@@ -411,7 +411,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Quantizers
                 Int32 green = network[neuronIndex][1];
                 Int32 blue = network[neuronIndex][0];
 
-                Color color = Color.FromRgba((byte)red, (byte)green, (byte)blue, 255);
+                Color color = Color.FromRgba((byte)red, (byte)green, (byte)blue);
                 result.Add(color);
             }
 
@@ -529,10 +529,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Quantizers
         /// <summary>
         /// See <see cref="IColorQuantizer.AllowParallel"/> for more details.
         /// </summary>
-        public override Boolean AllowParallel
-        {
-            get { return true; }
-        }
+        public override Boolean AllowParallel => true;
 
         #endregion
     }

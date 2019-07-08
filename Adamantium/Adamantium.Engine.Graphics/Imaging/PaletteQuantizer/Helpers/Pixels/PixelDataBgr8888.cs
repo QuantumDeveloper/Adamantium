@@ -5,12 +5,12 @@ using System.Runtime.InteropServices;
 namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers.Pixels
 {
     /// <summary>
-    /// Name |          Red         |        Green          |           Red         |         Unused        |
+    /// Name |          Blue         |        Green          |           Red         |         Unused        |
     /// Bit  |00|01|02|03|04|05|06|07|08|09|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|
     /// Byte |00000000000000000000000|11111111111111111111111|22222222222222222222222|33333333333333333333333|
     /// </summary>
     [StructLayout(LayoutKind.Explicit, Size = 4)]
-    public struct PixelDataRgb8888 : IGenericPixel
+    public struct PixelDataBgr8888 : IGenericPixel
     {
         // raw component values
         [FieldOffset(0)] private readonly byte red;    // 00 - 07
@@ -37,7 +37,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers.Pixels
         /// </summary>
         public Color GetColor()
         {
-            return Color.FromRgba(Rgba);
+            return Color.FromBgra(Rgba);
         }
 
         /// <summary>
@@ -45,7 +45,7 @@ namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers.Pixels
         /// </summary>
         public void SetColor(Color color)
         {
-            raw = color.ToRgba() & Pixel.RedGreenBlueMask;
+            raw = color.ToBgra() & Pixel.RedGreenBlueMask;
         }
 
         /// <summary>

@@ -22,25 +22,22 @@ namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers.Pixels
         [FieldOffset(0)] private ulong raw;    // 00 - 63
 
         // processed component values
-        public int Alpha { get { return alpha >> 8; } }
-        public int Red { get { return red >> 8; } }
-        public int Green { get { return green >> 8; } }
-        public int Blue { get { return blue >> 8; } }
+        public int Alpha => alpha >> 8;
+        public int Red => red >> 8;
+        public int Green => green >> 8;
+        public int Blue => blue >> 8;
 
         /// <summary>
-        /// See <see cref="IGenericPixel.Argb"/> for more details.
+        /// See <see cref="IGenericPixel.Rgba"/> for more details.
         /// </summary>
-        public int Argb
-        {
-            get { return Alpha << 48 | Red << 32 | Green << 16 | Blue; }
-        }
+        public int Rgba => Alpha << 48 | Red << 32 | Green << 16 | Blue;
 
         /// <summary>
         /// See <see cref="IGenericPixel.GetColor"/> for more details.
         /// </summary>
         public Color GetColor()
         {
-            return Color.FromArgb(Argb);
+            return Color.FromArgb(Rgba);
         }
 
         /// <summary>
@@ -59,8 +56,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers.Pixels
         /// </summary>
         public ulong Value
         {
-            get { return raw; }
-            set { raw = value; }
+            get => raw;
+            set => raw = value;
         }
     }
 }

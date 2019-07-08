@@ -35,34 +35,36 @@ namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer.Helpers
         /// </summary>
         /// <param name="color">The alpha blended color (ARGB).</param>
         /// <returns>The non-alpha blended color (RGB).</returns>
-        internal static Color ConvertAlpha(Adamantium.Mathematics.Color color)
+        internal static Color ConvertAlpha(Color color)
         {
-            Int32 argb;
-            return ConvertAlpha(color, out argb);
+            Int32 rgb;
+            return ConvertAlpha(color, out rgb);
         }
 
         /// <summary>
         /// Converts the alpha blended color to a non-alpha blended color.
         /// </summary>
-        internal static Color ConvertAlpha(Adamantium.Mathematics.Color color, out Int32 argb)
+        internal static Color ConvertAlpha(Color color, out Int32 rgba)
         {
-            Adamantium.Mathematics.Color result = color;
+            Color result = color;
 
             if (color.A < 255)
             {
                 // performs a alpha blending (second color is BackgroundColor, by default a Control color)
                 Double colorFactor = Factors[color.A];
                 Double backgroundFactor = Factors[255 - color.A];
-                Int32 red = (Int32) (color.R*colorFactor + BackgroundColor.R*backgroundFactor);
-                Int32 green = (Int32) (color.G*colorFactor + BackgroundColor.G*backgroundFactor);
-                Int32 blue = (Int32) (color.B*colorFactor + BackgroundColor.B*backgroundFactor);
-                argb = red << 16 | green << 8 | blue;
-                Adamantium.Mathematics.Color.FromRgba((byte)red, (byte)green, (byte)blue);
-                result = Adamantium.Mathematics.Color.FromArgb(Alpha | argb);
+                Int32 red = (Int32) (color.R * colorFactor + BackgroundColor.R * backgroundFactor);
+                Int32 green = (Int32) (color.G * colorFactor + BackgroundColor.G * backgroundFactor);
+                Int32 blue = (Int32) (color.B * colorFactor + BackgroundColor.B * backgroundFactor);
+                result.R = (byte)red;
+                result.G = (byte)green;
+                result.B = (byte)blue;
+                result.A = 255;
+                rgba = color.ToRgba();
             }
             else
             {
-                argb = color.R << 16 | color.G << 8 | color.B;
+                rgba = color.ToRgba();
             }
 
             return result;
