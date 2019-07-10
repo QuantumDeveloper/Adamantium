@@ -116,19 +116,19 @@ namespace Adamantium.Engine.GraphicsTests
         public void GIFImageTest()
         {
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\gif\cube.gif");
-            //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\gif\Rotating_earth.gif");
+            var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\gif\Rotating_earth.gif");
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\gif\infinity.gif");
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\gif\RotatingEarth2.gif");
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\gif\interlaced.gif");
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\coloredImage.jpg");
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\gif\coloredImage.gif");
-            var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\gif\mygif.gif");
+            //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\gif\mygif.gif");
             //var img = Image.Load(@"m:\AdamantiumProject\Adamantium\Tests\TestAssets\testpng1.png");
             //img?.Save("1.bmp", ImageFileType.Bmp);
             //img?.Save("1.tga", ImageFileType.Tga);
             //img?.Save("1.jpg", ImageFileType.Jpg);
             img?.Save("mygif2.gif", ImageFileType.Gif);
-            //img?.Save("cube.png", ImageFileType.Png);
+            img?.Save("cube.png", ImageFileType.Png);
             img?.Dispose();
         }
     }
