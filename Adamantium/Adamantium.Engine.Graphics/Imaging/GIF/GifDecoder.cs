@@ -3,6 +3,7 @@ using Adamantium.Mathematics;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -96,6 +97,8 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
             description.Depth = 1;
 
             var img = Image.New3D(gif.Descriptor.Width, gif.Descriptor.Height, gif.Frames.Count, new MipMapCount(1), SurfaceFormat.R8G8B8A8.UNorm);
+            //var img = Image.New3D(gif.Descriptor.Width, gif.Descriptor.Height, 1, new MipMapCount(1), SurfaceFormat.R8G8B8A8.UNorm);
+            //var img = Image.New3D(gif.Frames[45].Descriptor.Width, gif.Frames[45].Descriptor.Height, 1, new MipMapCount(1), SurfaceFormat.R8G8B8A8.UNorm);
             for (int i = 0; i < gif.Frames.Count; i++)
             {
                 GifFrame frame = gif.Frames[i];
@@ -131,8 +134,13 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
                 frame.IndexData = Deinterlace(frame);
             }
 
+            if (frame.GraphicControlExtension != null)
+            {
+                Debug.WriteLine($"{frameIndex} Disposal method: {frame.GraphicControlExtension.DisposalMethod}");
+            }
+
             if (frameIndex == 0 || 
-                (frame.Descriptor.OffsetLeft == 0 && frame.Descriptor.OffsetTop == 0) || 
+                (frame.Descriptor.Width == gifImage.Descriptor.Width && frame.Descriptor.Height == gifImage.Descriptor.Height) || 
                 (frame.GraphicControlExtension != null && frame.GraphicControlExtension.DisposalMethod == DisposalMethod.None))
             {
                 pixels = new byte[width * height * bytesPerPixel];
@@ -155,9 +163,10 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
 
                     offset += bytesPerPixel;
                 }
+                Debug.WriteLine($"{frameIndex} - Condition 1");
             }
             else if (frameIndex > 0 && 
-                     (frame.Descriptor.OffsetLeft != 0 || frame.Descriptor.OffsetTop != 0))
+                     (frame.Descriptor.OffsetLeft != gifImage.Descriptor.Width || frame.Descriptor.OffsetTop != gifImage.Descriptor.Height))
                      //frame.GraphicControlExtension != null && 
                      //frame.GraphicControlExtension.DisposalMethod == DisposalMethod.DoNotDispose)
             {
@@ -172,15 +181,32 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
                     Array.Copy(frame.IndexData, srcIndex, currentIndexStream, dstIndex, frame.Descriptor.Width);
                 }
 
-                var index = frame.IndexData[0];
+                int transparentIndex = 0;
+                bool transparencyAvailable = false;
+                if (baseFrame.GraphicControlExtension != null && baseFrame.GraphicControlExtension.TransparencyAvailable)
+                {
+                    transparencyAvailable = baseFrame.GraphicControlExtension.TransparencyAvailable;
+                    transparentIndex = baseFrame.GraphicControlExtension.TransparentColorIndex;
+                }
+                Debug.WriteLine($"{frameIndex}: transparency index - {transparentIndex}");
                 for (int i = 0; i < currentIndexStream.Length; i++)
                 {
-                    if (currentIndexStream[i] == frame.IndexData[0])
+                    bool useBaseColorTable = false;
+                    if (currentIndexStream[i] == transparentIndex && transparencyAvailable)
                     {
                         currentIndexStream[i] = originalIndexStream[i];
+                        useBaseColorTable = true;
                     }
 
-                    var colors = colorTable[currentIndexStream[i]];
+                    ColorRGB colors;
+                    if (useBaseColorTable)
+                    {
+                        colors = baseFrame.ColorTable[currentIndexStream[i]];
+                    }
+                    else
+                    {
+                        colors = colorTable[currentIndexStream[i]];
+                    }
 
                     pixels[offset] = colors.R;
                     pixels[offset + 1] = colors.G;
@@ -197,11 +223,11 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
                     offset += bytesPerPixel;
                 }
                 frame.IndexData = currentIndexStream;
-                frame.RawPixels = pixels;
+                Debug.WriteLine($"{frameIndex} - Condition 2");
             }
             else
             {
-                //throw new NotImplementedException($"Current disposal method: {frame.GraphicControlExtension.DisposalMethod} is not supported");
+                throw new NotImplementedException($"Current disposal method: {frame.GraphicControlExtension?.DisposalMethod} is not supported");
             }
 
             frame.RawPixels = pixels;
@@ -343,6 +369,7 @@ namespace Adamantium.Engine.Graphics.Imaging.GIF
                     graphicControlExtension.Fields = (byte)stream.ReadByte();
                     graphicControlExtension.DelayTime = stream.ReadUInt16();
                     graphicControlExtension.TransparentColorIndex = (byte)stream.ReadByte();
+                    graphicControlExtension.TransparencyAvailable = Convert.ToBoolean(graphicControlExtension.Fields & 0x07);
                     graphicControlExtension.DisposalMethod = (DisposalMethod)(graphicControlExtension.Fields & 0x03);
                     if (gifImage.CurrentFrame != null)
                     {

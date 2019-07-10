@@ -11,6 +11,8 @@ namespace Adamantium.Engine.Graphics.Imaging.PaletteQuantizer
 
         public Color[] ColorTable { get; set; }
 
+        public byte[] CompressedPixels { get; set; }
+
         public QuantizerResult()
         {
         }
