@@ -22,7 +22,7 @@ using System;
 using System.ComponentModel;
 using System.Runtime.Serialization;
 
-namespace Adamantium.Engine.Core
+namespace Adamantium.Core
 {
    /// <summary>
    /// A lightweight base class providing possibility to assign Name and a Tag to class.

@@ -1,4 +1,6 @@
-﻿namespace Adamantium.Engine.Core
+﻿using Adamantium.Core;
+
+namespace Adamantium.Engine.Core
 {
    /// <summary>
    /// Defines an interface for abstract system.

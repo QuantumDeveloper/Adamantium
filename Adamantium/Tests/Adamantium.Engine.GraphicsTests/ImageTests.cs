@@ -1,16 +1,6 @@
-﻿using Adamantium.Core;
-using Adamantium.Engine.Graphics;
-using Adamantium.Engine.Graphics.Imaging.JPEG;
-using Adamantium.Engine.Graphics.Imaging.JPEG.Decoder;
-using Adamantium.Engine.Graphics.Imaging.JPEG.Encoder;
-using Adamantium.Engine.Graphics.Imaging.PNG;
-using NUnit.Framework;
-using System.Collections.Generic;
+﻿using NUnit.Framework;
 using System.Diagnostics;
-using System.IO;
-using System.Runtime.InteropServices;
-using System.Text;
-using Image = Adamantium.Engine.Graphics.Image;
+using Adamantium.Imaging;
 
 namespace Adamantium.Engine.GraphicsTests
 {

@@ -1,4 +1,4 @@
-﻿using Adamantium.Engine.Core.Collections;
+﻿using Adamantium.Core.Collections;
 
 namespace Adamantium.UI.Controls
 {

@@ -5,7 +5,7 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 
-namespace Adamantium.Engine.Core
+namespace Adamantium.Core
 {
    /// <summary>
    /// Implementing <see cref="INotifyPropertyChanged"/> for binding

@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.ComponentModel;
 
-namespace Adamantium.Engine.Core.Collections
+namespace Adamantium.Core.Collections
 {
    /// <summary>
    /// Observable dictionary with binding support

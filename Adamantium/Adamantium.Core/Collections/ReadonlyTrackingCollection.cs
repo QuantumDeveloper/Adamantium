@@ -2,7 +2,7 @@
 using System.Collections.Specialized;
 using System.ComponentModel;
 
-namespace Adamantium.Engine.Core.Collections
+namespace Adamantium.Core.Collections
 {
     public class ReadonlyTrackingCollection<T> : ReadOnlyCollection<T>, INotifyCollectionChanged, INotifyPropertyChanged
     {

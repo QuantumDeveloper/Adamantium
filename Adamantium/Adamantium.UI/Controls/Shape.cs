@@ -1,5 +1,5 @@
 ﻿using System;
-using Adamantium.Engine.Core.Collections;
+using Adamantium.Core.Collections;
 using Adamantium.UI.Media;
 
 namespace Adamantium.UI.Controls

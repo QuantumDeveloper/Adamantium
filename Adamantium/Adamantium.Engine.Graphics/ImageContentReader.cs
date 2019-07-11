@@ -1,5 +1,6 @@
 ﻿using System.Threading.Tasks;
 using Adamantium.Engine.Core.Content;
+using Adamantium.Imaging;
 
 namespace Adamantium.Engine.Graphics
 {

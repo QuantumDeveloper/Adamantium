@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
-using Adamantium.Engine.Core.Collections;
+using Adamantium.Core.Collections;
 
 namespace Adamantium.UI
 {
