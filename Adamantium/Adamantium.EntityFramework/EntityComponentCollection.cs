@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using Adamantium.Core.Collections;
 using Adamantium.Engine.Core;
-using Adamantium.Engine.Core.Collections;
 using Adamantium.EntityFramework.Components;
 using Adamantium.EntityFramework.ComponentsBasics;
 

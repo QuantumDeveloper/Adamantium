@@ -5,7 +5,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 
-namespace Adamantium.Engine.Core.Collections
+namespace Adamantium.Core.Collections
 {
     /// <summary>
     /// Observable collection, which could be used for binding 

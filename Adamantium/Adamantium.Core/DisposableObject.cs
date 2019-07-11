@@ -18,10 +18,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-using Adamantium.Core;
 using System;
 
-namespace Adamantium.Engine.Core
+namespace Adamantium.Core
 {
    /// <summary>
    /// A disposable object base class.

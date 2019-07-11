@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.0</TargetFramework>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DocumentationFile>M:\AdamantiumProject\Adamantium\Adamantium.Imaging\Adamantium.Imaging.xml</DocumentationFile>
+    <PlatformTarget>x64</PlatformTarget>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.Core\AdamantiumVulkan.Core.csproj" />
+    <ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" />
+    <ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
+  </ItemGroup>
+
+</Project>

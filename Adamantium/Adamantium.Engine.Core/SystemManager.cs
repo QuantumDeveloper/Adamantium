@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Adamantium.Engine.Core.Collections;
+using Adamantium.Core.Collections;
 
 namespace Adamantium.Engine.Core
 {

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Adamantium.Core;
 using Adamantium.Engine.Core;
 using Adamantium.EntityFramework.Templates;
 

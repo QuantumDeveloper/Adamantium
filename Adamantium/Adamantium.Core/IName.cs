@@ -1,4 +1,4 @@
-namespace Adamantium.Engine.Core
+namespace Adamantium.Core
 {
     /// <summary>
     /// Base interface for a component base.

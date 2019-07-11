@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using Adamantium.Core;
+using Adamantium.Core.Collections;
 using Adamantium.Engine.Core;
-using Adamantium.Engine.Core.Collections;
 using Adamantium.EntityFramework.ComponentsBasics;
 using IComponent = Adamantium.EntityFramework.ComponentsBasics.IComponent;
 

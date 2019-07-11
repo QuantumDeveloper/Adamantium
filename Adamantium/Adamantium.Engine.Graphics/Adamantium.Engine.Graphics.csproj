@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netcoreapp3.0</TargetFramework>
@@ -20,6 +20,7 @@
     <ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan\AdamantiumVulkan.csproj" />
     <ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" />
     <ProjectReference Include="..\Adamantium.Engine.Core\Adamantium.Engine.Core.csproj" />
+    <ProjectReference Include="..\Adamantium.Imaging\Adamantium.Imaging.csproj" />
     <ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
   </ItemGroup>
 

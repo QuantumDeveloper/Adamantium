@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using Adamantium.Core;
 using Adamantium.Engine.Core;
 using Adamantium.EntityFramework.Components;
 
