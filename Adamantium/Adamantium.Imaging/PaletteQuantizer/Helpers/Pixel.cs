@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Linq.Expressions;
-using System.Runtime.InteropServices;
 using Adamantium.Core;
 using Adamantium.Imaging.PaletteQuantizer.Helpers.Pixels;
 using Adamantium.Mathematics;
@@ -140,14 +138,6 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
             }
         }
 
-        private static IntPtr MarshalToPointer(Object data)
-        {
-            Int32 size = Marshal.SizeOf(data);
-            IntPtr pointer = Marshal.AllocHGlobal(size);
-            Marshal.StructureToPtr(data, pointer, false);
-            return pointer;
-        }
-
         #endregion
 
         #region | Update methods |
@@ -167,7 +157,6 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
         /// <param name="imagePointer">The image pointer.</param>
         public void ReadRawData(IntPtr imagePointer)
         {
-            //pixelData = Marshal.PtrToStructure(imagePointer, pixelType);
             var data = new byte[Parent.BytesPerPixel];
             Utilities.Read(imagePointer, data, 0, Parent.BytesPerPixel);
             Color color = new Color();
@@ -193,8 +182,6 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
                 color[index++] = buffer[i];
             }
             pixelData.SetColor(color);
-            //Marshal.Copy(buffer, offset, pixelDataPointer, Parent.BytesPerPixel);
-            //pixelData = Marshal.PtrToStructure(pixelDataPointer, pixelType);
         }
 
         /// <summary>
@@ -204,7 +191,6 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
         public void WriteRawData(IntPtr imagePointer)
         {
             Utilities.Write(imagePointer, pixelData.GetColor().ToArray(), 0, Parent.BytesPerPixel);
-            //Marshal.StructureToPtr(pixelData, imagePointer, false);
         }
 
         /// <summary>
@@ -214,12 +200,9 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
         /// <param name="offset">The offset.</param>
         public void WriteData(Byte[] buffer, Int32 offset)
         {
-            //Color color = new Color();
-            //var color = new Color(pixelData.Red, pixelData.Green, pixelData.Blue);
             int index = 0;
             var color = pixelData.GetColor();
             int end = offset + Parent.BytesPerPixel;
-            //Marshal.Copy(pixelDataPointer, buffer, offset, Parent.BytesPerPixel);
             for (int i = offset; i< end; ++i)
             {
                 buffer[i] = color[index++];
