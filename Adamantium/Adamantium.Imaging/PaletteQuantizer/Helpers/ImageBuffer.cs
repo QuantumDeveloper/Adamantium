@@ -23,6 +23,9 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
 
         private readonly PixelBuffer bitmap;
         private List<Color> cachedPalette;
+        private int[] indicesStream;
+        private byte[] sourcePixels;
+        private byte[] targetPixels;
 
         #endregion
 
@@ -85,6 +88,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
             UsePalette = usePalette;
             BitDepth = PixelFormat.SizeOfInBits();
             BytesPerPixel = Math.Max(1, BitDepth >> 3);
+            indicesStream = new int[Width * Height];
 
             // creates internal buffer
             Stride = bitmap.RowStride;
@@ -382,7 +386,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
                     pixel.Update((int)point.X, (int)point.Y);
 
                     // when read is allowed, retrieves current value (in bytes)
-                    ReadPixel(pixel);
+                    ReadPixel(pixel, sourcePixels);
 
                     // process the pixel by custom user operation
                     if (isAdvanced)
@@ -458,8 +462,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
                     targetPixel.Update((int)point.X, (int)point.Y);
 
                     // when read is allowed, retrieves current value (in bytes)
-                    ReadPixel(sourcePixel);
-                    target.ReadPixel(targetPixel);
+                    ReadPixel(sourcePixel, sourcePixels);
 
                     // process the pixel by custom user operation
                     if (isAdvanced)
@@ -479,9 +482,10 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
                         if (target.UsePalette)
                         {
                             var paletteColor = target.Palette[targetPixel.Index];
-                            targetPixel.ReadData(paletteColor.ToArray()[0..3], 0); 
+                            targetPixel.ReadData(paletteColor.ToArray()[..3], 0); 
                         }
-                        target.WritePixel(targetPixel);
+                        target.WritePixel(targetPixel, targetPixels);
+                        indicesStream[pathOffset] = targetPixel.Index;
                     }
                 }
             };
@@ -583,6 +587,10 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
             Guard.CheckNull(quantizer, "quantizer");
 
             ColorCount = colorCount;
+
+            sourcePixels = bitmap.GetPixels<byte>();
+            targetPixels = new byte[Width * Height * target.BytesPerPixel];
+
             // step 1 - prepares the palettes
             List<Color> targetPalette = target.UsePalette ? SynthetizePalette(quantizer, colorCount, parallelTaskCount) : null;
 
@@ -628,7 +636,9 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
             }
 
             // step 7 - finishes the dithering (optional)
-            if (ditherer != null) ditherer.Finish();
+            ditherer?.Finish();
+
+            target.bitmap.SetPixels(targetPixels);
 
             // step 8 - clean-up
             quantizer.Finish();
@@ -656,7 +666,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
             using (ImageBuffer target = new ImageBuffer(result, usePalette))
             {
                 source.Quantize(target, quantizer, ditherer, colorCount, parallelTaskCount);
-                return new QuantizerResult(result, target.Palette.ToArray());
+                return new QuantizerResult(result, target.Palette.ToArray(), source.indicesStream);
             }
         }
 

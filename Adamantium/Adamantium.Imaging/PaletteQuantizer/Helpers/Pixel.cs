@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq.Expressions;
 using System.Runtime.InteropServices;
+using Adamantium.Core;
 using Adamantium.Imaging.PaletteQuantizer.Helpers.Pixels;
 using Adamantium.Mathematics;
 using AdamantiumVulkan.Core;
@@ -10,7 +11,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
     /// <summary>
     /// This is a pixel format independent pixel.
     /// </summary>
-    public class Pixel : IDisposable
+    public class Pixel
     {
         #region | Constants |
 
@@ -35,10 +36,8 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
 
         #region | Fields |
 
-        private Type pixelType;
         private Int32 bitOffset;
-        private Object pixelData;
-        private IntPtr pixelDataPointer;
+        private IGenericPixel pixelData;
 
         #endregion
 
@@ -78,8 +77,8 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
         /// <value>The color.</value>
         public Color Color
         {
-            get => ((IGenericPixel) pixelData).GetColor();
-            set => ((IGenericPixel) pixelData).SetColor(value);
+            get => pixelData.GetColor();
+            set => pixelData.SetColor(value);
         }
 
         /// <summary>
@@ -107,12 +106,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
         private void Initialize()
         {
             // creates pixel data
-            pixelType = GetPixelType(Parent.PixelFormat);
-            NewExpression newType = Expression.New(pixelType);
-            UnaryExpression convertNewType = Expression.Convert(newType, typeof (Object));
-            Expression<Func<Object>> indexedExpression = Expression.Lambda<Func<Object>>(convertNewType);
-            pixelData = indexedExpression.Compile().Invoke();
-            pixelDataPointer = MarshalToPointer(pixelData);
+            pixelData = GetPixelType(Parent.PixelFormat);
         }
 
         #endregion
@@ -122,26 +116,26 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
         /// <summary>
         /// Gets the type of the pixel format.
         /// </summary>
-        internal Type GetPixelType(Format pixelFormat)
+        internal IGenericPixel GetPixelType(Format pixelFormat)
         {
             switch (pixelFormat)
             {
-                case Format.R5G5B5A1_UNORM_PACK16: return typeof(PixelDataArgb1555);
-                case Format.R5G6B5_UNORM_PACK16: return typeof(PixelDataRgb565);
+                case Format.R5G5B5A1_UNORM_PACK16: return new PixelDataArgb1555();
+                case Format.R5G6B5_UNORM_PACK16: return new PixelDataRgb565();
                 case Format.R8G8B8_UNORM:
-                    return typeof(PixelDataRgb888);
+                    return new PixelDataRgb888();
                 case Format.B8G8R8_UNORM:
-                    return typeof(PixelDataBgr888);
+                    return new PixelDataBgr888();
                 case Format.R8G8B8A8_UNORM:
-                    return typeof(PixelDataRgb8888);
+                    return new PixelDataRgb8888();
                 case Format.B8G8R8A8_UNORM:
-                    return typeof(PixelDataBgr8888);
+                    return new PixelDataBgr8888();
                 case Format.R16G16B16_UNORM:
-                    return typeof(PixelDataRgb48);
+                    return new PixelDataRgb48();
                 case Format.R16G16B16A16_UNORM:
-                    return typeof(PixelDataArgb64);
+                    return new PixelDataArgb64();
                 default:
-                    String message = String.Format("This pixel format '{0}' is either indexed, or not supported.", pixelFormat);
+                    String message = $"This pixel format '{pixelFormat}' is either indexed, or not supported.";
                     throw new NotSupportedException(message);
             }
         }
@@ -173,7 +167,15 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
         /// <param name="imagePointer">The image pointer.</param>
         public void ReadRawData(IntPtr imagePointer)
         {
-            pixelData = Marshal.PtrToStructure(imagePointer, pixelType);
+            //pixelData = Marshal.PtrToStructure(imagePointer, pixelType);
+            var data = new byte[Parent.BytesPerPixel];
+            Utilities.Read(imagePointer, data, 0, Parent.BytesPerPixel);
+            Color color = new Color();
+            for (int i = 0; i<data.Length; ++i)
+            {
+                color[i] = data[i];
+            }
+            pixelData.SetColor(color);
         }
 
         /// <summary>
@@ -183,8 +185,16 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
         /// <param name="offset">The offset.</param>
         public void ReadData(Byte[] buffer, Int32 offset)
         {
-            Marshal.Copy(buffer, offset, pixelDataPointer, Parent.BytesPerPixel);
-            pixelData = Marshal.PtrToStructure(pixelDataPointer, pixelType);
+            Color color = new Color();
+            int index = 0;
+            int end = offset + Parent.BytesPerPixel;
+            for (int i = offset; i < end; ++i)
+            {
+                color[index++] = buffer[i];
+            }
+            pixelData.SetColor(color);
+            //Marshal.Copy(buffer, offset, pixelDataPointer, Parent.BytesPerPixel);
+            //pixelData = Marshal.PtrToStructure(pixelDataPointer, pixelType);
         }
 
         /// <summary>
@@ -193,7 +203,8 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
         /// <param name="imagePointer">The image pointer.</param>
         public void WriteRawData(IntPtr imagePointer)
         {
-            Marshal.StructureToPtr(pixelData, imagePointer, false);
+            Utilities.Write(imagePointer, pixelData.GetColor().ToArray(), 0, Parent.BytesPerPixel);
+            //Marshal.StructureToPtr(pixelData, imagePointer, false);
         }
 
         /// <summary>
@@ -203,19 +214,16 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
         /// <param name="offset">The offset.</param>
         public void WriteData(Byte[] buffer, Int32 offset)
         {
-            Marshal.Copy(pixelDataPointer, buffer, offset, Parent.BytesPerPixel);
-        }
-
-        #endregion
-
-        #region << IDisposable >>
-
-        /// <summary>
-        /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
-        /// </summary>
-        public void Dispose()
-        {
-            Marshal.FreeHGlobal(pixelDataPointer);
+            //Color color = new Color();
+            //var color = new Color(pixelData.Red, pixelData.Green, pixelData.Blue);
+            int index = 0;
+            var color = pixelData.GetColor();
+            int end = offset + Parent.BytesPerPixel;
+            //Marshal.Copy(pixelDataPointer, buffer, offset, Parent.BytesPerPixel);
+            for (int i = offset; i< end; ++i)
+            {
+                buffer[i] = color[index++];
+            }
         }
 
         #endregion

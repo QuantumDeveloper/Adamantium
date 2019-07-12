@@ -10,14 +10,17 @@ namespace Adamantium.Imaging.PaletteQuantizer
 
         public byte[] CompressedPixels { get; set; }
 
+        public int[] IndexTable { get; set; }
+
         public QuantizerResult()
         {
         }
 
-        public QuantizerResult(PixelBuffer image, Color[] colorTable)
+        public QuantizerResult(PixelBuffer image, Color[] colorTable, int[] indexTable)
         {
             Image = image;
             ColorTable = colorTable;
+            IndexTable = indexTable;
         }
     }
 }
