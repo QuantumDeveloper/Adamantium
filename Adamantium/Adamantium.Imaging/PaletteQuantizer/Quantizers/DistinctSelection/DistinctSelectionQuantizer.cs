@@ -26,9 +26,10 @@ namespace Adamantium.Imaging.PaletteQuantizer.Quantizers.DistinctSelection
 
         private List<Color> palette;
         private Int32 foundColorCount;
+        private object lockObject = new object();
 
 #if (UseDictionary)
-        private ConcurrentDictionary<Int32, DistinctColorInfo> colorMap;
+        private Dictionary<Int32, DistinctColorInfo> colorMap;
 #else
         private DistinctBucket rootBucket;
 #endif
@@ -94,9 +95,17 @@ namespace Adamantium.Imaging.PaletteQuantizer.Quantizers.DistinctSelection
         protected override void OnAddColor(Color color, Int32 key, Int32 x, Int32 y)
         {
 #if (UseDictionary)
-            colorMap.AddOrUpdate(key,
-                colorKey => new DistinctColorInfo(color),
-                (colorKey, colorInfo) => colorInfo.IncreaseCount());
+            lock (lockObject)
+            {
+                if (colorMap.ContainsKey(key))
+                {
+                    colorMap[key].IncreaseCount();
+                }
+                else
+                {
+                    colorMap.Add(key, new DistinctColorInfo(color));
+                }
+            }
 #else
             color = QuantizationHelper.ConvertAlpha(color);
             rootBucket.StoreColor(color);
@@ -181,7 +190,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Quantizers.DistinctSelection
             palette = new List<Color>();
 
 #if (UseDictionary)
-            colorMap = new ConcurrentDictionary<Int32, DistinctColorInfo>();
+            colorMap = new Dictionary<int, DistinctColorInfo>();
 #else
             rootBucket = new DistinctBucket();
 #endif

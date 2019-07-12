@@ -109,22 +109,11 @@ namespace Adamantium.Imaging.Gif
                         }
 
                         result.ColorTable = lst.ToArray();
-
-                        var pixels = result.Image.GetPixels<ColorRGB>();
-
-                        int colorIndex = 0;
-                        var colorTableDict = result.ColorTable.Distinct().ToDictionary(x => x, x => colorIndex++);
-                        var imageSize = result.Image.Width * result.Image.Height;
-                        var indices = new int[imageSize];
-                        for (int i = 0; i < imageSize; ++i)
-                        {
-                            indices[i] = colorTableDict[new Color(pixels[i].R, pixels[i].G, pixels[i].B)];
-                        }
-
-                        result.CompressedPixels = lzw.Compress(indices, 8);
-                        quantizerResults[index] = result;
                     }
-                });
+                    result.CompressedPixels = lzw.Compress(result.IndexTable, 8);
+                    quantizerResults[index] = result;
+                }
+            );
             for (var k = 0; k < quantizerResults.Length; k++)
             {
                 var result = quantizerResults[k];

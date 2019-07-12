@@ -175,10 +175,10 @@ namespace Adamantium.Mathematics
         /// <param name="rgba">A packed integer containing all four color components in RGBA order.</param>
         public Color(uint rgba)
         {
-            A = (byte)((rgba >> 24) & 255);
-            R = (byte)((rgba >> 16) & 255);
+            R = (byte)(rgba & 255);
             G = (byte)((rgba >> 8) & 255);
-            B = (byte)(rgba & 255);
+            B = (byte)((rgba >> 16) & 255);
+            A = (byte)((rgba >> 24) & 255);
         }
 
         /// <summary>
@@ -187,10 +187,10 @@ namespace Adamantium.Mathematics
         /// <param name="rgba">A packed integer containing all four color components in ARGB order.</param>
         public Color(int rgba)
         {
-            A = (byte)((rgba >> 24) & 255);
-            R = (byte)((rgba >> 16) & 255);
+            R = (byte)(rgba & 255);
             G = (byte)((rgba >> 8) & 255);
-            B = (byte)(rgba & 255);
+            B = (byte)((rgba >> 16) & 255);
+            A = (byte)((rgba >> 24) & 255);
         }
 
         /// <summary>
@@ -692,7 +692,8 @@ namespace Adamantium.Mathematics
         /// <returns>A color.</returns>
         public static Color FromRgba(int color)
         {
-            return new Color(BitConverter.GetBytes(color));
+            //return new Color(BitConverter.GetBytes(color));
+            return new Color(color);
         }
 
         /// <summary>

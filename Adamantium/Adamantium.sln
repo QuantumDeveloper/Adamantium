@@ -37,7 +37,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{3A783815
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Engine.GraphicsTests", "Tests\Adamantium.Engine.GraphicsTests\Adamantium.Engine.GraphicsTests.csproj", "{E598A6F2-DE2C-4591-966C-D6BB39D667B3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.Imaging", "Adamantium.Imaging\Adamantium.Imaging.csproj", "{E625BE65-9BAF-4573-81A9-92861020FE5C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Imaging", "Adamantium.Imaging\Adamantium.Imaging.csproj", "{E625BE65-9BAF-4573-81A9-92861020FE5C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.Imaging.Playground", "Adamantium.Imaging.Playground\Adamantium.Imaging.Playground.csproj", "{D7642FD8-CF5C-4AA8-A5F6-909F1258AF2F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -183,6 +185,14 @@ Global
 		{E625BE65-9BAF-4573-81A9-92861020FE5C}.Release|Any CPU.Build.0 = Release|Any CPU
 		{E625BE65-9BAF-4573-81A9-92861020FE5C}.Release|x64.ActiveCfg = Release|Any CPU
 		{E625BE65-9BAF-4573-81A9-92861020FE5C}.Release|x64.Build.0 = Release|Any CPU
+		{D7642FD8-CF5C-4AA8-A5F6-909F1258AF2F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D7642FD8-CF5C-4AA8-A5F6-909F1258AF2F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D7642FD8-CF5C-4AA8-A5F6-909F1258AF2F}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{D7642FD8-CF5C-4AA8-A5F6-909F1258AF2F}.Debug|x64.Build.0 = Debug|Any CPU
+		{D7642FD8-CF5C-4AA8-A5F6-909F1258AF2F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D7642FD8-CF5C-4AA8-A5F6-909F1258AF2F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D7642FD8-CF5C-4AA8-A5F6-909F1258AF2F}.Release|x64.ActiveCfg = Release|Any CPU
+		{D7642FD8-CF5C-4AA8-A5F6-909F1258AF2F}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

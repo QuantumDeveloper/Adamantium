@@ -10,7 +10,8 @@ namespace Adamantium.Imaging.PaletteQuantizer.ColorCaches
     {
         #region | Fields |
 
-        private readonly ConcurrentDictionary<Int32, Int32> cache;
+        private readonly Dictionary<Int32, Int32> cache;
+        private object lockObject = new object();
 
         #endregion
 
@@ -39,7 +40,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.ColorCaches
         /// </summary>
         protected BaseColorCache()
         {
-            cache = new ConcurrentDictionary<Int32, Int32>();
+            cache = new Dictionary<Int32, Int32>();
         }
 
         #endregion
@@ -97,16 +98,20 @@ namespace Adamantium.Imaging.PaletteQuantizer.ColorCaches
         /// </summary>
         public void GetColorPaletteIndex(Color color, out Int32 paletteIndex)
         {
-            Int32 key = color.R << 16 | color.G << 8 | color.B;
+            Int32 key = color.R | color.G << 8 | color.B << 16;
 
-            paletteIndex = cache.AddOrUpdate(key,
-                colorKey =>
+            lock (lockObject)
+            {
+                if (cache.ContainsKey(key))
                 {
-                    Int32 paletteIndexInside;
-                    OnGetColorPaletteIndex(color, out paletteIndexInside);
-                    return paletteIndexInside;
-                }, 
-                (colorKey, inputIndex) => inputIndex);
+                    paletteIndex = cache[key];
+                }
+                else
+                {
+                    OnGetColorPaletteIndex(color, out paletteIndex);
+                    cache.Add(key, paletteIndex);
+                }
+            }
         }
 
         #endregion
