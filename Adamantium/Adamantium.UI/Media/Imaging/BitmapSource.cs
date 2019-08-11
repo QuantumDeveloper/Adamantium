@@ -1,5 +1,5 @@
 ﻿using System;
-using Adamantium.Engine.Graphics;
+using Adamantium.Imaging;
 
 namespace Adamantium.UI.Media.Imaging
 {

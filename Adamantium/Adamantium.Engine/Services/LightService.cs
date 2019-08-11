@@ -235,7 +235,7 @@ namespace Adamantium.Engine.Services
             return null;
         }
 
-        public void DrawIcons(Effect effect, Camera camera, D3DGraphicsDevice drawingContext, IGameTime gametime)
+        public void DrawIcons(Effect effect, Camera camera, GraphicsDevice drawingContext, IGameTime gametime)
         {
             var directionRender = DirectionalLightIcon.GetComponent<RenderableComponent>();
             var pointRender = PointLightIcon.GetComponent<RenderableComponent>();
@@ -289,7 +289,7 @@ namespace Adamantium.Engine.Services
             effect.Techniques["MeshVertex"].Passes["NoLight"].UnApply();
         }
 
-        public void DrawDebugLight(Entity lightEntity, Effect effect, CameraService cameraService, Camera activeCamera, D3DGraphicsDevice drawingContext, IGameTime gameTime)
+        public void DrawDebugLight(Entity lightEntity, Effect effect, CameraService cameraService, Camera activeCamera, GraphicsDevice drawingContext, IGameTime gameTime)
         {
             if (lightEntity == null || !lightEntity.IsEnabled)
                 return;
@@ -318,7 +318,7 @@ namespace Adamantium.Engine.Services
             effect.Techniques["MeshVertex"].Passes["NoLight"].UnApply(true);
         }
 
-        private void ProcessLight(Entity current, Effect effect, Camera camera, D3DGraphicsDevice drawingContext, IGameTime gameTime)
+        private void ProcessLight(Entity current, Effect effect, Camera camera, GraphicsDevice drawingContext, IGameTime gameTime)
         {
             var transformation = current.Transform.GetMetadata(camera);
             if (!transformation.Enabled || !current.Visible)
@@ -347,12 +347,12 @@ namespace Adamantium.Engine.Services
             }
         }
 
-        public void DrawPointLightMesh(D3DGraphicsDevice device, IGameTime gameTime)
+        public void DrawPointLightMesh(GraphicsDevice device, IGameTime gameTime)
         {
             pointLightRenderer.Draw(device, gameTime);
         }
 
-        public void DrawSpotLightMesh(D3DGraphicsDevice device, IGameTime gameTime)
+        public void DrawSpotLightMesh(GraphicsDevice device, IGameTime gameTime)
         {
             spotLightRenderer.Draw(device, gameTime);
         }

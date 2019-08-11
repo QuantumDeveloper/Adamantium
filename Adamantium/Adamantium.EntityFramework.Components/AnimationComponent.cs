@@ -3,29 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Models;
-using Adamantium.EntityFramework.Extensions;
+using Adamantium.EntityFramework.ComponentsBasics;
 using Adamantium.Mathematics;
 using Adamantium.Win32;
 
 namespace Adamantium.EntityFramework.Components
 {
-    public enum CalculateOptions
-    {
-        CyclicForward,
-        CyclicBackward,
-        CyclicForwardBackward,
-        CyclicBackwardForward,
-        OneTimeForward,
-        OneTimeBackward,
-        OneTimeForwardBackward,
-        NoAnimation
-    }
-
-    public enum CalculateKeyFrameOptions
-    {
-        Forward,
-        Backward
-    }
 
     public class AnimationComponent : ActivatableComponent
     {

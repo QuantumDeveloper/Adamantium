@@ -4,7 +4,6 @@ using System.Linq;
 using System.Reflection;
 using Adamantium.Core;
 using Adamantium.Engine.Core;
-using Adamantium.EntityFramework.Components;
 
 namespace Adamantium.EntityFramework.ComponentsBasics
 {
@@ -122,7 +121,6 @@ namespace Adamantium.EntityFramework.ComponentsBasics
         }
 
         public bool Initialized => initialized;
-
 
         public virtual IComponent Clone()
         {

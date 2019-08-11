@@ -1,4 +1,4 @@
-﻿using Adamantium.EntityFramework.Components;
+﻿using Adamantium.EntityFramework.ComponentsBasics;
 
 namespace Adamantium.UI.Controls
 {

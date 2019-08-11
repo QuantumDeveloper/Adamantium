@@ -2,11 +2,25 @@
 using System.Collections.Generic;
 using System.Text;
 using Adamantium.Imaging;
+using Adamantium.Core;
 
 namespace Adamantium.Engine.Graphics
 {
-    public abstract class Texture
+    public abstract class Texture : DisposableBase
     {
+        public int Width { get; set; }
+
+        public int Height { get; set; }
+
+        public SurfaceFormat Format { get; set; }
+
+        public IntPtr NativePointer { get; }
+
+        public void Save(string path, ImageFileType fileType)
+        {
+
+        }
+
         //public static int CalculateMipLevels(int width, int height, MipMapCount mipLevels)
         //{
         //    return CalculateMipLevels(width, height, 1, mipLevels);

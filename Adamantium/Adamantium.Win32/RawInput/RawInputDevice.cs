@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using Adamantium.Core;
 
 namespace Adamantium.Win32.RawInput
 {

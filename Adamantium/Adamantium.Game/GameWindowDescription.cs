@@ -1,8 +1,9 @@
 ﻿using System;
-using Adamantium.Engine.Core;
+using Adamantium.Core;
 using Adamantium.Engine.Graphics;
-using SharpDX.Direct3D11;
-using SharpDX.DXGI;
+using Adamantium.Imaging;
+using Adamantium.Imaging.Dds;
+using AdamantiumVulkan.Core;
 
 namespace Adamantium.Engine
 {
@@ -13,7 +14,7 @@ namespace Adamantium.Engine
          PresenterType = presenterType;
 
          MSAALevel = MSAALevel.None;
-         PixelFormat = Format.R8G8B8A8_UNorm;
+         PixelFormat = Format.R8G8B8A8_UNORM;
          DepthFormat = DepthFormat.Depth32Stencil8X24;
 
          RefreshRate = new Rational(60, 1);
@@ -52,7 +53,7 @@ namespace Adamantium.Engine
          Handle = handle;
 
          MSAALevel = MSAALevel.None;
-         PixelFormat = Format.R8G8B8A8_UNorm;
+         PixelFormat = Format.R8G8B8A8_UNORM;
          DepthFormat = DepthFormat.Depth32Stencil8X24;
 
          RefreshRate = new Rational(60, 1);
@@ -67,7 +68,7 @@ namespace Adamantium.Engine
 
       public GameWindowDescription(PresenterType presenterType, Int32 width, Int32 height, IntPtr handle, MSAALevel msaa,
          Rational refreshRate,
-         Format pixelFormat = Format.R8G8B8A8_UNorm, DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24,
+         Format pixelFormat = Format.R8G8B8A8_UNORM, DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24,
          Usage usage = Usage.RenderTargetOutput,
          SwapEffect swapEffect = SwapEffect.Discard, Int32 buffresCount = 2, Boolean isWindowed = true, SwapChainFlags flags = SwapChainFlags.None, 
          Scaling scaling = Scaling.Stretch, AlphaMode alphaMode = AlphaMode.Unspecified)

@@ -7,6 +7,7 @@ using Adamantium.UI.Controls;
 using Adamantium.UI.Input;
 using Rectangle = Adamantium.Mathematics.Rectangle;
 using AUIKeys = Adamantium.UI.Input.Key;
+using Adamantium.Imaging;
 
 namespace Adamantium.Engine
 {
@@ -350,11 +351,11 @@ namespace Adamantium.Engine
             }
         }
 
-        internal override GraphicsPresenter CreatePresenter(D3DGraphicsDevice device)
-        {
-            Presenter = new RenderTargetGraphicsPresenter(device, Description.ToPresentationParameters(), GeneratePresenterName());
-            return Presenter;
-        }
+        //internal override GraphicsPresenter CreatePresenter(GraphicsDevice device)
+        //{
+        //    Presenter = new RenderTargetGraphicsPresenter(device, Description.ToPresentationParameters(), GeneratePresenterName());
+        //    return Presenter;
+        //}
 
     }
 }

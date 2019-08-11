@@ -2159,11 +2159,6 @@
             <param name="buffer">The buffer.</param>
             <param name="offset">The offset.</param>
         </member>
-        <member name="M:Adamantium.Imaging.PaletteQuantizer.Helpers.Pixel.Dispose">
-            <summary>
-            Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
-            </summary>
-        </member>
         <member name="T:Adamantium.Imaging.PaletteQuantizer.Helpers.Pixels.PixelDataArgb1555">
             <summary>
             Name |     Blue     |    Green     |     Red      | Alpha (bit)

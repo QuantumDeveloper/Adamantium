@@ -427,7 +427,7 @@ namespace Adamantium.Engine.Services
             }
         }
 
-        public void DrawCameraIcons(Effect effect, Camera camera, D3DGraphicsDevice drawingContext, IGameTime gameTime)
+        public void DrawCameraIcons(Effect effect, Camera camera, GraphicsDevice drawingContext, IGameTime gameTime)
         {
             lock (syncRoot)
             {
@@ -467,7 +467,7 @@ namespace Adamantium.Engine.Services
             effect.Techniques["MeshVertex"].Passes["NoLight"].UnApply();
         }
 
-        public void DrawDebugCamera(Effect effect, Camera camera, D3DGraphicsDevice drawingContext, IGameTime gametime)
+        public void DrawDebugCamera(Effect effect, Camera camera, GraphicsDevice drawingContext, IGameTime gametime)
         {
             if (SelectedCamera == null || !SelectedCamera.IsEnabled)
                 return;

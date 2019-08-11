@@ -262,13 +262,13 @@ namespace Adamantium.Imaging.Png.IO
             length = 0;
             for (int i = begin; i < chunkLength && data[i] != 0; ++i) ++length;
 
-            var langTag = data[begin..begin + length];
+            var langTag = data[begin..(begin + length)];
             itxt.LangTag = Encoding.ASCII.GetString(langTag);
 
             begin += length + 1;
             length = 0;
             for (int i = begin; i < chunkLength && data[i] != 0; ++i) ++length;
-            var transKey = data[begin..begin + length];
+            var transKey = data[begin..(begin + length)];
             itxt.TransKey = Encoding.ASCII.GetString(transKey);
 
             if (length == 0)

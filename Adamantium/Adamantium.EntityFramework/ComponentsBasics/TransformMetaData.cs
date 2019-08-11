@@ -13,7 +13,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             Scale = Vector3F.One;
         }
 
-        public Camera Camera { get; set; }
+        public CameraBase Camera { get; set; }
 
         public Vector3F RelativePosition { get; set; }
 

@@ -15,14 +15,14 @@ namespace Adamantium.UI.Controls
 
       public Brush Background
       {
-         get { return GetValue<Brush>(BackgroundProperty); }
-         set { SetValue(BackgroundProperty, value);}
+         get => GetValue<Brush>(BackgroundProperty);
+         set => SetValue(BackgroundProperty, value);
       }
 
       public Brush Foreground
       {
-         get { return GetValue<Brush>(BackgroundProperty); }
-         set { SetValue(BackgroundProperty, value); }
+         get => GetValue<Brush>(BackgroundProperty);
+         set => SetValue(BackgroundProperty, value);
       }
 
       public Control()

@@ -8,8 +8,6 @@ using Adamantium.EntityFramework;
 using Adamantium.UI.Processors;
 using Adamantium.Win32;
 using Adamantium.Win32.RawInput;
-using SharpDX.Direct3D;
-using SharpDX.Direct3D11;
 
 namespace Adamantium.UI
 {
@@ -24,7 +22,7 @@ namespace Adamantium.UI
         public Uri StartupUri { get; set; }
 
 
-        private D3DGraphicsDevice GraphicsDevice;
+        private GraphicsDevice GraphicsDevice;
         private EntityWorld _entityWorld;
         private Dictionary<Window, UIRenderProcessor> windowToSystem;
 
@@ -95,7 +93,6 @@ namespace Adamantium.UI
 
         public void Run()
         {
-
             Win32.Message msg;
             IsApplicationRunning = true;
 
@@ -196,7 +193,7 @@ namespace Adamantium.UI
 
         protected void Initialize()
         {
-            GraphicsDevice = D3DGraphicsDevice.Create(GraphicsAdapter.Default, DeviceCreationFlags.BgraSupport | DeviceCreationFlags.Debug, FeatureLevel.Level_11_0);
+            GraphicsDevice = Engine.Graphics.GraphicsDevice.Create(GraphicsAdapter.Default, DeviceCreationFlags.BgraSupport | DeviceCreationFlags.Debug, FeatureLevel.Level_11_0);
             GraphicsDevice.BlendState = GraphicsDevice.BlendStates.AlphaBlend;
             GraphicsDevice.RasterizerState = GraphicsDevice.RasterizerStates.CullNoneClipEnabled;
             GraphicsDevice.DepthStencilState = GraphicsDevice.DepthStencilStates.DepthEnableGreaterEqual;

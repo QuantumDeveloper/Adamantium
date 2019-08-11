@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Diagnostics;
 using Adamantium.Engine.Graphics;
+using Adamantium.Imaging;
 using Adamantium.UI.Media;
 using Adamantium.UI.Media.Imaging;
 using Adamantium.Win32;
-using SharpDX.Direct3D11;
 
 namespace Adamantium.UI.Controls
 {

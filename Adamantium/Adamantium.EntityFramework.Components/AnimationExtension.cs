@@ -1,9 +1,8 @@
 ﻿using System;
 using Adamantium.Engine.Core.Models;
-using Adamantium.EntityFramework.Components;
 using Adamantium.Mathematics;
 
-namespace Adamantium.EntityFramework.Extensions
+namespace Adamantium.EntityFramework.Components.Extensions
 {
    public static class AnimationHelper
    {

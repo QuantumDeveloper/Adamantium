@@ -13,7 +13,7 @@ namespace Adamantium.Engine
 {
    public class ModelContentReader:GraphicsResourceContentReader<Entity>
    {
-       protected override async Task<Entity> ReadContentAsync(IContentManager contentManager, D3DGraphicsDevice graphicsDevice,
+       protected override async Task<Entity> ReadContentAsync(IContentManager contentManager, GraphicsDevice graphicsDevice,
          ContentReaderParameters parameters)
       {
          var converter = contentManager.ServiceProvider.Get<ModelConverter>();

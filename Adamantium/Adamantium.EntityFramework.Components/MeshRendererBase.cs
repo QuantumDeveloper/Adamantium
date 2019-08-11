@@ -1,8 +1,9 @@
 ﻿using System;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
-using Buffer = Adamantium.Engine.Graphics.Buffer;
-using RasterizerState = Adamantium.Engine.Graphics.RasterizerState;
+using Adamantium.EntityFramework.ComponentsBasics;
+//using Buffer = Adamantium.Engine.Graphics.Buffer;
+//using RasterizerState = Adamantium.Engine.Graphics.RasterizerState;
 
 namespace Adamantium.EntityFramework.Components
 {
@@ -11,7 +12,7 @@ namespace Adamantium.EntityFramework.Components
     {
         private bool _isWireFrame;
 
-        protected Buffer VertexBuffer { get; set; }
+        //protected Buffer VertexBuffer { get; set; }
         protected MeshData MeshData { get; set; }
 
         protected bool MeshDataChanged { get; set; }
@@ -39,7 +40,7 @@ namespace Adamantium.EntityFramework.Components
             MeshDataChanged = true;
         }
 
-        protected virtual void UpdateCore(D3DGraphicsDevice graphicsContext)
+        protected virtual void UpdateCore(GraphicsDevice graphicsContext)
         {
             if (Update(graphicsContext))
             {
@@ -47,9 +48,9 @@ namespace Adamantium.EntityFramework.Components
             }
         }
 
-        protected abstract bool Update(D3DGraphicsDevice graphicsContext);
+        protected abstract bool Update(GraphicsDevice graphicsContext);
 
-        public override void Draw(D3DGraphicsDevice graphicsContext, IGameTime gameTime)
+        public override void Draw(GraphicsDevice graphicsContext, IGameTime gameTime)
         {
             if (!IsEnabled)
             {
@@ -58,40 +59,40 @@ namespace Adamantium.EntityFramework.Components
 
             UpdateCore(graphicsContext);
 
-            if (VertexBuffer == null || VertexBuffer.IsDisposed)
-            {
-                return;
-            }
+            //if (VertexBuffer == null || VertexBuffer.IsDisposed)
+            //{
+            //    return;
+            //}
 
-            graphicsContext.SetVertexBuffer(VertexBuffer);
-            graphicsContext.VertexInputLayout = InputLayout;
+            //graphicsContext.SetVertexBuffer(VertexBuffer);
+            //graphicsContext.VertexInputLayout = InputLayout;
 
-            if (MeshData.Mesh.Indices.Length > 0)
-            {
-                graphicsContext.SetIndexBuffer(IndexBuffer);
-            }
+            //if (MeshData.Mesh.Indices.Length > 0)
+            //{
+            //    graphicsContext.SetIndexBuffer(IndexBuffer);
+            //}
 
-            RasterizerState prevRasterState = null;
+            //RasterizerState prevRasterState = null;
 
-            if (IsWireFrame)
-            {
-                prevRasterState = graphicsContext.RasterizerState;
-                graphicsContext.RasterizerState = graphicsContext.RasterizerStates.WireFrameCullNoneClipEnabled;
-            }
+            //if (IsWireFrame)
+            //{
+            //    prevRasterState = graphicsContext.RasterizerState;
+            //    graphicsContext.RasterizerState = graphicsContext.RasterizerStates.WireFrameCullNoneClipEnabled;
+            //}
 
-            if (MeshData.Mesh.Indices.Length > 0)
-            {
-                graphicsContext.DrawIndexed(MeshData.Mesh.MeshTopology, MeshData.Mesh.Indices.Length);
-            }
-            else
-            {
-                graphicsContext.Draw(MeshData.Mesh.MeshTopology, MeshData.Mesh.Positions.Length);
-            }
+            //if (MeshData.Mesh.Indices.Length > 0)
+            //{
+            //    graphicsContext.DrawIndexed(MeshData.Mesh.MeshTopology, MeshData.Mesh.Indices.Length);
+            //}
+            //else
+            //{
+            //    graphicsContext.Draw(MeshData.Mesh.MeshTopology, MeshData.Mesh.Positions.Length);
+            //}
 
-            if (prevRasterState != null)
-            {
-                graphicsContext.RasterizerState = prevRasterState;
-            }
+            //if (prevRasterState != null)
+            //{
+            //    graphicsContext.RasterizerState = prevRasterState;
+            //}
         }
     }
 }

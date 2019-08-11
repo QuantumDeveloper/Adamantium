@@ -13,7 +13,7 @@ namespace Adamantium.UI.Media.Imaging
          var o = adamantiumObject as BitmapImage;
          if (o != null)
          {
-            var device = Application.Current.Services.Get<D3DGraphicsDevice>();
+            var device = Application.Current.Services.Get<GraphicsDevice>();
             if (device != null)
             {
                var source = (Uri) e.NewValue;
@@ -38,7 +38,7 @@ namespace Adamantium.UI.Media.Imaging
 
       public BitmapImage(Uri source)
       {
-         var device = Application.Current.Services.Get<D3DGraphicsDevice>();
+         var device = Application.Current.Services.Get<GraphicsDevice>();
          try
          {
             DXTexture = Texture.Load(device, source.IsAbsoluteUri ? source.AbsolutePath : source.OriginalString);

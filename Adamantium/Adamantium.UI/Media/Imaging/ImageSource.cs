@@ -12,7 +12,7 @@ namespace Adamantium.UI.Media.Imaging
 
       public void Dispose()
       {
-         DXTexture.Dispose();
+         DXTexture?.Dispose();
          DXTexture = null;
       }
    }

@@ -1,12 +1,12 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Windows.Input;
+using Adamantium.Core;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
+using Adamantium.Imaging;
 using Adamantium.Mathematics;
 using Adamantium.Win32;
-using SharpDX.Direct3D11;
-using SharpDX.DXGI;
 using MouseEventArgs = Adamantium.UI.Input.MouseEventArgs;
 
 namespace Adamantium.Engine
@@ -112,7 +112,7 @@ namespace Adamantium.Engine
             Name = $"Window_{GamePlatform.WindowId++}";
         }
 
-        internal virtual GraphicsPresenter CreatePresenter(D3DGraphicsDevice device)
+        internal virtual GraphicsPresenter CreatePresenter(GraphicsDevice device)
         {
             return null;
         }

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using Adamantium.EntityFramework.Extensions;
 using Adamantium.Mathematics;
 
 namespace Adamantium.EntityFramework.ComponentsBasics
@@ -15,7 +14,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             PivotRotation = QuaternionF.Identity;
             baseScale = Vector3F.One;
             scaleFactor = Vector3F.One;
-            TransformData = new Dictionary<Camera, TransformMetaData>();
+            TransformData = new Dictionary<CameraBase, TransformMetaData>();
         }
 
         private Vector3D initialPosition;
@@ -26,14 +25,14 @@ namespace Adamantium.EntityFramework.ComponentsBasics
         private Vector3D pivot;
         private QuaternionF pivotRotation;
 
-        private readonly Dictionary<Camera, TransformMetaData> TransformData;
+        private readonly Dictionary<CameraBase, TransformMetaData> TransformData;
 
         public Vector3F GetRelativePosition(Vector3D offset)
         {
             return Position - offset;
         }
 
-        public void RemoveMetadata(Camera camera)
+        public void RemoveMetadata(CameraBase camera)
         {
             if (TransformData.ContainsKey(camera))
             {
@@ -41,7 +40,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             }
         }
 
-        public TransformMetaData GetMetadata(Camera camera)
+        public TransformMetaData GetMetadata(CameraBase camera)
         {
             TransformMetaData metaData;
             TransformData.TryGetValue(camera, out metaData);
@@ -54,7 +53,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             return metaData;
         }
 
-        public void SetMetadata(Camera camera, TransformMetaData metadata)
+        public void SetMetadata(CameraBase camera, TransformMetaData metadata)
         {
             //Make sure metadata contains correct camera instance
             metadata.Camera = camera;
@@ -68,7 +67,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             }
         }
 
-        public void SetEnableForCamera(Camera camera, bool enabled)
+        public void SetEnableForCamera(CameraBase camera, bool enabled)
         {
             GetMetadata(camera).Enabled = enabled;
         }
@@ -485,9 +484,9 @@ namespace Adamantium.EntityFramework.ComponentsBasics
         ///<summary>
         ///Sync entity orientation with camera forward axis for left handed coordinate system
         ///</summary>
-        public void SyncOrientationWithCameraForwardLH(Camera camera)
+        public void SyncOrientationWithCameraForwardLH(CameraBase camera)
         {
-            var rotMatr = camera.GetCameraRotationMatrix();
+            var rotMatr = camera.RotationMatrix;
             var quat = QuaternionF.RotationLookAtLH(rotMatr.Forward, rotMatr.Up);
             Owner.Transform.SetRotation(quat);
         }
@@ -495,9 +494,9 @@ namespace Adamantium.EntityFramework.ComponentsBasics
         ///<summary>
         ///Sync entity orientation with camera backward axis for left handed coordinate system
         ///</summary>
-        public void SyncOrientationWithCameraBackwardLH(Camera camera)
+        public void SyncOrientationWithCameraBackwardLH(CameraBase camera)
         {
-            var rotMatr = camera.GetCameraRotationMatrix();
+            var rotMatr = camera.RotationMatrix;
             var quat = QuaternionF.RotationLookAtLH(rotMatr.Backward, rotMatr.Up);
             Owner.Transform.SetRotation(quat);
         }
@@ -697,12 +696,12 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             }
         }
 
-        public Matrix4x4F CalculateFinalTransform(Camera camera, Vector3F pivotCorrection)
+        public Matrix4x4F CalculateFinalTransform(CameraBase camera, Vector3F pivotCorrection)
         {
             Matrix4x4F matrix;
             var scaling = Scale;
-            var relativePosition = GetRelativePosition(camera.GetOwnerPosition());
-            var finalPivot = (Vector3F)pivot;
+            var relativePosition = GetRelativePosition(camera.Owner.Transform.Position);
+            var finalPivot = (Vector3F)pivot + pivotCorrection;
             var scalingCenter = finalPivot;
             
             Matrix4x4F.Transformation(ref scalingCenter, ref pivotRotation, ref scaling, ref finalPivot, ref rotation, ref relativePosition, out matrix);
@@ -718,8 +717,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
 
         public override void CloneValues(IComponent component)
         {
-            var transform = component as Transform;
-            if (transform != null)
+            if (component is Transform transform)
             {
                 transform.Rotation = Rotation;
                 transform.BaseScale = BaseScale;

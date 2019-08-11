@@ -16,14 +16,14 @@ namespace Adamantium.EntityFramework.Processors
     public class RenderProcessor : EntityProcessor
     {
         protected CommandList CommandList;
-        protected D3DGraphicsDevice DeferredDevice;
+        protected GraphicsDevice DeferredDevice;
         protected D2DGraphicDevice D2dDevice;
         protected SpriteBatch SpriteBatch;
         public String Text;
 
         protected IGraphicsDeviceManager GraphicsDeviceManager;
         protected IGraphicsDeviceService GraphicsDeviceService;
-        protected D3DGraphicsDevice GraphicsDevice => GraphicsDeviceService.GraphicsDevice;
+        protected GraphicsDevice GraphicsDevice => GraphicsDeviceService.GraphicsDevice;
         protected IContentManager Content { get; }
         protected GameWindow Window { get; }
 

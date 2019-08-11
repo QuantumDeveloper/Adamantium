@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using Adamantium.Core;
 using Adamantium.Engine.Core;
-using Adamantium.EntityFramework.Components;
 
 namespace Adamantium.EntityFramework
 {
