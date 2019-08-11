@@ -11,7 +11,7 @@ using RawInputEventArgs = Adamantium.UI.Input.Raw.RawInputEventArgs;
 
 namespace Adamantium.UI
 {
-    public class Window : ContentControl, IRootVisual
+    public class Window : ContentControl, IWindow, IRootVisual
     {
         private delegate IntPtr WndProc(IntPtr hWnd, WindowMessages msg, IntPtr wParam, IntPtr lParam);
 

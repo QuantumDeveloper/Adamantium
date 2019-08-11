@@ -3,26 +3,33 @@ using Adamantium.Engine.Core;
 using Adamantium.EntityFramework.ComponentsBasics;
 using Adamantium.EntityFramework.Extensions;
 using Adamantium.Mathematics;
-using BoundingFrustum = Adamantium.Mathematics.BoundingFrustum;
 
 namespace Adamantium.EntityFramework.Components
 {
-    public enum CameraProjectionType
-    {
-        Perspective = 0,
-        Ortho = 1,
-        UI = 2,
-        Isometric = 3
-    }
-
     /// <summary>
     /// Component represents camera
     /// </summary>
-    public class Camera : ActivatableComponent
+    public class Camera : CameraBase
     {
+        private QuaternionF rotationToSync;
+        private int rotationTime;
+        private bool rotationDone = true;
+        private double rotationDuration;
+        private QuaternionF startingRotation;
+        private Vector3D lookAtRotationPoint;
+        private int moveTime;
+        private bool moveToObjectDone = true;
+        private double moveToDuration = 0;
+        private Vector3D startingOffset;
+        private Vector3D endingPosition;
+        private Vector3D distance;
+        private Vector3D diameter;
+        private Vector3D center;
+
+        public Single OrthoScaleFactor = 1;
+
         public Camera()
         {
-            
         }
 
         /// <summary>
@@ -123,196 +130,9 @@ namespace Adamantium.EntityFramework.Components
             Frustum.Matrix4x4F = ViewMatrix * ProjectionMatrix;
         }
 
-        public CameraProjectionType ProjectionType { get; set; }
-        private Vector3D offset;
-        private int width;
-        private int height;
-        private QuaternionF rotation = QuaternionF.Identity;
-        private Single fov;
-        private Vector3F up;
-        private Vector3D? lookAt;
-        private Double radius;
-        private bool isDepthInversed;
-
-        public Matrix4x4F ViewMatrix { get; set; } = Matrix4x4F.Identity;
-
-        public Matrix4x4F PerspectiveProjection { get; set; }
-
-        public Matrix4x4F UiProjection { get; set; }
-
-        public Matrix4x4F OrthoProjection { get; set; } = Matrix4x4F.Identity;
-
-        public Matrix4x4F IsometricProjection { get; set; }
-
-        public Matrix4x4F ProjectionMatrix
-        {
-            get
-            {
-                switch (ProjectionType)
-                {
-                    case CameraProjectionType.Perspective:
-                        return PerspectiveProjection;
-                    case CameraProjectionType.Ortho:
-                        return OrthoProjection;
-                    case CameraProjectionType.UI:
-                        return UiProjection;
-                    case CameraProjectionType.Isometric:
-                        return IsometricProjection;
-                    default:
-                        return PerspectiveProjection;
-                }
-            }
-        }
-
         private Matrix4x4F _viewProjectionMatrix;
 
         public Matrix4x4F ViewProjectionMatrix => _viewProjectionMatrix;
-
-        public BoundingFrustum Frustum { get; private set; }
-
-
-        public Int32 Width
-        {
-            get => width;
-            set => SetProperty(ref width, value);
-        }
-
-        public Int32 Height
-        {
-            get => height;
-            set => SetProperty(ref height, value);
-        }
-
-        private float _tanFov;
-
-        public float TanFov => _tanFov;
-
-        public Single Fov
-        {
-            get => fov;
-            set => SetProperty(ref fov, value);
-        }
-
-        public Single FovY
-        {
-            get => fovY;
-            set => SetProperty(ref fovY, value);
-        }
-
-        public Single ZNear
-        {
-            get => zNear;
-            set => SetProperty(ref zNear, value);
-        }
-
-        public Single ZFar
-        {
-            get => zFar;
-            set => SetProperty(ref zFar, value);
-        }
-
-        public Single AspectRatio
-        {
-            get => aspectRatio;
-            set => SetProperty(ref aspectRatio, value);
-        }
-
-        // ------- 3rd person related
-        public Double Radius
-        {
-            get => radius;
-            set => SetProperty(ref radius, value);
-        }
-
-        public Vector3F HostUpVector { get; set; }
-
-        public bool IsLookingBackwards { get; set; }
-
-        public QuaternionF FormerRotation { get; set; }
-        // ------- 3rd person related END
-
-        private CameraType cameraType;
-
-        public CameraType Type
-        {
-            get => cameraType;
-            set => SetProperty(ref cameraType, value);
-        }
-
-        //public Vector3D Offset
-        //{
-        //    get
-        //    {
-        //        return offset;
-        //    }
-        //    set
-        //    {
-        //        if (offset == value)
-        //        {
-        //            return;
-        //        }
-
-        //        offset = value;
-        //        IsInActualState = false;
-        //    }
-        //}
-
-        public QuaternionF Rotation
-        {
-            get => rotation1;
-            set => SetProperty(ref rotation1, value);
-        }
-
-        public Vector3D? LookAt
-        {
-            get => lookAt;
-            set => SetProperty(ref lookAt, value);
-        }
-
-        public Double Velocity { get; set; }
-
-        public Double DragVelocity { get; set; }
-
-        public Double CurrentVelocity { get; set; }
-
-        public Double WheelVelocity { get; set; }
-
-        public Single RotationSpeed { get; set; }
-
-        public Single MouseSensitivity { get; set; }
-
-        public Boolean IsUserControlled { get; set; }
-
-        /// <summary>
-        /// Gets or gets value does this camera is currently active (bind to window and displaying content)
-        /// </summary>
-        public Boolean IsActive { get; set; }
-
-        /// <summary>
-        /// Camera relative X axis from view matrix
-        /// </summary>
-        public Vector3F Right { get; private set; }
-
-        /// <summary>
-        /// Camera relative Y axis from view matrix
-        /// </summary>
-        public Vector3F Up { get; private set; }
-
-        /// <summary>
-        /// Camera relative Z axis from view matrix
-        /// </summary>
-        public Vector3F Forward { get; private set; }
-
-        public Vector3F Backward => -Forward;
-
-        /// <summary>
-        /// Gets or Sets value indicating does ZNear and ZFar planes should be reversed for inverted depth buffer
-        /// </summary>
-        public bool IsDepthInversed
-        {
-            get => isDepthInversed;
-            set => SetProperty(ref isDepthInversed, value);
-        }
 
         ///<summary>
         ///Decides which algorithm will be used for building the field of view.
@@ -340,13 +160,10 @@ namespace Adamantium.EntityFramework.Components
             }
         }
 
-
         public void BuildIsometricProjection()
         {
             IsometricProjection = Matrix4x4F.IsometricProjection(0.5f);
         }
-
-        public Single OrthoScaleFactor = 1;
 
         private void BuildOffscreenProjective()
         {
@@ -371,7 +188,7 @@ namespace Adamantium.EntityFramework.Components
             float yScale = xScale / aspectInv;
             var fovY = (float)(2 * Math.Atan(Math.Tan(Fov / 2.0f) * ((float)Height / Width)));
             FovY = MathHelper.RadiansToDegrees(fovY);
-            _tanFov = (float)Math.Tan(MathHelper.DegreesToRadians(Fov));
+            TanFov = (float)Math.Tan(MathHelper.DegreesToRadians(Fov));
             PerspectiveProjection = new Matrix4x4F
             {
                 M11 = xScale,
@@ -395,13 +212,7 @@ namespace Adamantium.EntityFramework.Components
             Forward = new Vector3F(ViewMatrix.M13, ViewMatrix.M23, ViewMatrix.M33);
         }
 
-        private QuaternionF rotationToSync;
-        private int rotationTime;
-        private bool rotationDone = true;
-        private double rotationDuration;
-        private QuaternionF startingRotation;
-        private Vector3D lookAtRotationPoint;
-        
+        /// <inheritdoc />
         public void RotateAroundSelectedObject(QuaternionF newRotation, int time)
         {
             rotationDuration = 0;
@@ -412,7 +223,7 @@ namespace Adamantium.EntityFramework.Components
             startingOffset = Owner.Transform.Position;
             if (LookAtObject != null)
             {
-                diameter = ((Vector3D)Forward * LookAtObject.GetDiameter() * Fov);
+                diameter = (Vector3D)Forward * LookAtObject.GetDiameter() * Fov;
                 center = LookAtObject.GetCenterAbsolute() + diameter + Owner.Transform.Position - LookAtObject.GetLocalCenter();
             }
             Type = CameraType.Special;
@@ -435,31 +246,10 @@ namespace Adamantium.EntityFramework.Components
             }
         }
 
-        public void SetLookAtObject(Entity lookAtObject)
+        /// <inheritdoc />
+        public override void JumpToObject(Entity lookAtObject, int time)
         {
             LookAtObject = lookAtObject;
-        }
-
-        private Entity LookAtObject;
-
-
-        private int moveTime;
-        private bool moveToObjectDone = true;
-        private double moveToDuration = 0;
-        private Vector3D startingOffset;
-        private Vector3D endingPosition;
-        private Vector3D distance;
-        private Vector3D diameter;
-        private Vector3D center;
-        private float fovY;
-        private float zNear;
-        private float zFar;
-        private float aspectRatio;
-        private QuaternionF rotation1;
-
-        public void JumpToObject(Entity lookAtObject, int time)
-        {
-            SetLookAtObject(lookAtObject);
             moveTime = time;
             moveToObjectDone = false;
             moveToDuration = 0;
@@ -486,8 +276,7 @@ namespace Adamantium.EntityFramework.Components
             }
         }
 
-
-        public void Update(IGameTime gameTime)
+        public override void Update(IGameTime gameTime)
         {
             Rotation.Normalize();
             MoveToPoint(gameTime);
@@ -554,13 +343,8 @@ namespace Adamantium.EntityFramework.Components
             _viewProjectionMatrix = ViewMatrix * ProjectionMatrix;
         }
 
-        ///<summary>
-        ///Rotate camera absolutely around base X, Y and Z axis.
-        ///</summary>
-        ///<remarks>
-        ///Angles must be in degrees.
-        ///</remarks>
-        public void SetAbsoluteRotation(float angleX, float angleY, float angleZ)
+        /// <inheritdoc />
+        public override void SetAbsoluteRotation(float angleX, float angleY, float angleZ)
         {
             if (Type != CameraType.ThirdPersonLocked)
             {
@@ -572,13 +356,8 @@ namespace Adamantium.EntityFramework.Components
             }
         }
 
-        ///<summary>
-        ///Move camera along X axis relative to the current position and view direction.
-        ///</summary>
-        ///<remarks>
-        ///relativeX: value defines distance on which camera will be moved along X axis.
-        ///</remarks>
-        public void TranslateRight(Double relativeX)
+        /// <inheritdoc />
+        public override void TranslateRight(Double relativeX)
         {
             if (Type == CameraType.Free)
             {
@@ -586,13 +365,8 @@ namespace Adamantium.EntityFramework.Components
             }
         }
 
-        ///<summary>
-        ///Move camera along Y axis relative to the current position and view direction.
-        ///</summary>
-        ///<remarks>
-        ///relativeY: value defines distance on which camera will be moved along Y axis.
-        ///</remarks>
-        public void TranslateUp(Double relativeY)
+        /// <inheritdoc />
+        public override void TranslateUp(Double relativeY)
         {
             if (Type == CameraType.Free)
             {
@@ -600,13 +374,8 @@ namespace Adamantium.EntityFramework.Components
             }
         }
 
-        ///<summary>
-        ///Move camera along Z axis relative to the current position and view direction.
-        ///</summary>
-        ///<remarks>
-        ///relativeZ: value defines distance on which camera will be moved along Z axis.
-        ///</remarks>
-        public void TranslateForward(Double relativeZ)
+        /// <inheritdoc />
+        public override void TranslateForward(Double relativeZ)
         {
             if (Type == CameraType.Free)
             {
@@ -622,13 +391,8 @@ namespace Adamantium.EntityFramework.Components
             }
         }
 
-        ///<summary>
-        ///Rotate camera around X and Y axis.
-        ///</summary>
-        ///<remarks>
-        ///Angles must be in degrees.
-        ///</remarks>
-        public void RotateRelativeXY(float angleX, float angleY)
+        /// <inheritdoc />
+        public override void RotateRelativeXY(float angleX, float angleY)
         {
             if ((Type == CameraType.ThirdPersonFree) || (Type == CameraType.ThirdPersonFreeAlt) ||
                 (Type == CameraType.ThirdPersonLocked))
@@ -663,13 +427,8 @@ namespace Adamantium.EntityFramework.Components
             }
         }
 
-        ///<summary>
-        ///Rotate camera around X axis.
-        ///</summary>
-        ///<remarks>
-        ///Angle must be in degrees.
-        ///</remarks>
-        public void RotateRight(float angle)
+        /// <inheritdoc />
+        public override void RotateRight(float angle)
         {
             if ((Type == CameraType.ThirdPersonFree) || (Type == CameraType.ThirdPersonFreeAlt) ||
                 (Type == CameraType.ThirdPersonLocked))
@@ -680,13 +439,8 @@ namespace Adamantium.EntityFramework.Components
             Rotation = QuaternionF.Multiply(QuaternionF.RotationAxis(Vector3F.UnitX, MathHelper.DegreesToRadians(angle)), Rotation);
         }
 
-        ///<summary>
-        ///Rotate camera around Y axis.
-        ///</summary>
-        ///<remarks>
-        ///Angle must be in degrees.
-        ///</remarks>
-        public void RotateUp(float angle)
+        /// <inheritdoc />
+        public override void RotateUp(float angle)
         {
             if (Type != CameraType.ThirdPersonLocked)
             {
@@ -709,13 +463,8 @@ namespace Adamantium.EntityFramework.Components
             }
         }
 
-        ///<summary>
-        ///Rotate camera around Z axis.
-        ///</summary>
-        ///<remarks>
-        ///Angle must be in degrees.
-        ///</remarks>
-        public void RotateForward(float angle)
+        /// <inheritdoc />
+        public override void RotateForward(float angle)
         {
             if (Type != CameraType.ThirdPersonLocked)
             {
@@ -725,10 +474,8 @@ namespace Adamantium.EntityFramework.Components
             }
         }
 
-        ///<summary>
-        ///Sets camera as Free with specific parameters.
-        ///</summary>
-        public void SetFreeCamera(Vector3D position, Vector3D lookAt, Vector3F up)
+        /// <inheritdoc />
+        public override void SetFreeCamera(Vector3D position, Vector3D lookAt, Vector3F up)
         {
             DeleteThirdPersonConfig(); // sets camera type to Free here (inside method)
 
@@ -744,19 +491,15 @@ namespace Adamantium.EntityFramework.Components
             Type = CameraType.Free;
         }
 
-        ///<summary>
-        ///Sets camera as Free without any parameters
-        ///</summary>
-        public void SetFreeCamera()
+        /// <inheritdoc />
+        public override void SetFreeCamera()
         {
             DeleteThirdPersonConfig(); // sets camera type to Free here (inside method)
             Type = CameraType.Free;
         }
 
-        ///<summary>
-        ///Changes the Position (Offset) of Free camera.
-        ///</summary>
-        public void SetFreePosition(Vector3D position)
+        /// <inheritdoc />
+        public override void SetFreePosition(Vector3D position)
         {
             if (Type == CameraType.Free)
             {
@@ -764,10 +507,8 @@ namespace Adamantium.EntityFramework.Components
             }
         }
 
-        ///<summary>
-        ///Changes the LookAt of Free camera.
-        ///</summary>
-        public void SetFreeLookAt(Vector3D lookAt)
+        /// <inheritdoc />
+        public override void SetFreeLookAt(Vector3D lookAt)
         {
             if (Type == CameraType.Free)
             {
@@ -785,13 +526,8 @@ namespace Adamantium.EntityFramework.Components
             }
         }
 
-        ///<summary>
-        ///Sets camera as First Person with specific parameters.
-        ///</summary>
-        ///<remarks>
-        ///objectRotation - rotation of the camera host (e.g. position of human body (and face) in space).
-        ///</remarks>
-        public void SetFirstPersonCamera(Vector3D position, QuaternionF objectRotation, Double faceDistance)
+        /// <inheritdoc />
+        public override void SetFirstPersonCamera(Vector3D position, QuaternionF objectRotation, Double faceDistance)
         {
             Type = CameraType.FirstPerson;
 
@@ -800,10 +536,8 @@ namespace Adamantium.EntityFramework.Components
             Rotation = objectRotation;
         }
 
-        ///<summary>
-        ///Changes the Position (Offset) and Rotation of First Person camera.
-        ///</summary>
-        public void SetFirstPersonPositionRotation(Vector3D position, QuaternionF objectRotation)
+        /// <inheritdoc />
+        public override void SetFirstPersonPositionRotation(Vector3D position, QuaternionF objectRotation)
         {
             if (Type == CameraType.FirstPerson)
             {
@@ -812,17 +546,8 @@ namespace Adamantium.EntityFramework.Components
             }
         }
 
-        ///<summary>
-        ///Sets camera as Third Person with specific parameters.
-        ///</summary>
-        ///<remarks>
-        ///<param name="hostObject">the host object of the camera. Camera spins around host object's center.</param>
-        ///<param name="initialRelRotation">initial rotation relative to host object's rotation.</param>
-        ///<param name="lookAt">initial point at which camera is looking at creation (not always the same as center!).</param>
-        ///<param name="distanceToObject">initial distance from host object's center</param>
-        ///<param name="desiredType">is camera mode alternative (spinning around self Y axis (alt = false) or host object Y axis (alt = true)) - ignored, if isLocked is true.</param>
-        ///</remarks>
-        public void SetThirdPersonCamera(Entity hostObject, Vector3F initialRelRotation, CameraType desiredType,
+        /// <inheritdoc />
+        public override void SetThirdPersonCamera(Entity hostObject, Vector3F initialRelRotation, CameraType desiredType,
            Vector3D? lookAt = null, Double? distanceToObject = null)
         {
             if (!desiredType.IsThirdPerson() || hostObject == Owner)
@@ -833,7 +558,7 @@ namespace Adamantium.EntityFramework.Components
             {
                 Owner.Owner = hostObject;
 
-                HostUpVector = GetEntityRotationMatrix().Up;
+                HostUpVector = EntityRotationMatrix.Up;
 
                 LookAt = lookAt;
                 if (desiredType.IsThirdPerson())
@@ -864,17 +589,16 @@ namespace Adamantium.EntityFramework.Components
             }
         }
 
-        public void SetSpecialCamera(Vector3D lookAt)
+        /// <inheritdoc />
+        public override void SetSpecialCamera(Vector3D lookAt)
         {
             Type = CameraType.Special;
 
             LookAt = lookAt;
         }
 
-        ///<summary>
-        ///Sets the Radius of spinning for 1st and 3rd person camera.
-        ///</summary>
-        public void SetRadius(Double radius)
+        /// <inheritdoc />
+        public override void SetRadius(Double radius)
         {
             if (Type != CameraType.Free)
             {
@@ -882,10 +606,8 @@ namespace Adamantium.EntityFramework.Components
             }
         }
 
-        ///<summary>
-        ///Sets the LookAt of Third Person camera.
-        ///</summary>
-        public void SetThirdPersonLookAt(Vector3D lookAt)
+        /// <inheritdoc />
+        public override void SetThirdPersonLookAt(Vector3D lookAt)
         {
             if ((Type == CameraType.ThirdPersonFree) || (Type == CameraType.ThirdPersonFreeAlt))
             {
@@ -893,10 +615,8 @@ namespace Adamantium.EntityFramework.Components
             }
         }
 
-        ///<summary>
-        ///Sets the camera's rear view.
-        ///</summary>
-        public void SetThirdPersonLookBackwards(bool lookBackwards)
+        /// <inheritdoc />
+        public override void SetThirdPersonLookBackwards(bool lookBackwards)
         {
             if (lookBackwards != IsLookingBackwards)
             {
@@ -926,50 +646,11 @@ namespace Adamantium.EntityFramework.Components
             }
         }
 
-        ///<summary>
-        ///Resets all third person related properties and set the camera type to Free.
-        ///</summary>
-        public void DeleteThirdPersonConfig()
+        /// <inheritdoc />
+        public override void DeleteThirdPersonConfig()
         {
             Type = CameraType.Free;
             Owner.Owner = null;
         }
-
-        ///<summary>
-        ///Returns rotation matrix for camera host object all third person related properties and set the camera type to Free.
-        ///</summary>
-        public Matrix4x4F GetEntityRotationMatrix()
-        {
-            if (Owner?.Owner == null)
-            {
-                return Matrix4x4F.Identity;
-            }
-            return Matrix4x4F.RotationQuaternion(Owner.Transform.Rotation);
-        }
-
-        public Matrix4x4F GetCameraRotationMatrix()
-        {
-            return Matrix4x4F.RotationQuaternion(Rotation);
-        }
-
-        ///<summary>
-        ///Returns quaternion, which has the same angle as the forward vector of the hosted object in left handed coordinate system
-        ///</summary>
-        public QuaternionF SyncRotationWithEntityForwardLH()
-        {
-            var rotMatr = GetEntityRotationMatrix();
-            return QuaternionF.RotationLookAtLH(rotMatr.Forward, rotMatr.Up);
-
-        }
-
-        ///<summary>
-        ///Returns quaternion, which has the same angle as the backward vector of the hosted object in left handed coordinate system
-        ///</summary>
-        public QuaternionF SyncRotationWithEntityBackwardLH()
-        {
-            var rotMatr = GetEntityRotationMatrix();
-            return QuaternionF.RotationLookAtLH(rotMatr.Backward, rotMatr.Up);
-        }
-
     }
 }

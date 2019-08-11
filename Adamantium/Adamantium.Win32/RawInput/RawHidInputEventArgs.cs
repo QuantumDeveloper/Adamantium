@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Adamantium.Core;
+using System;
 
 namespace Adamantium.Win32.RawInput
 {

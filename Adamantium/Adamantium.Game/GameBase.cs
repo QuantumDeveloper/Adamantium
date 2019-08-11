@@ -6,8 +6,9 @@ using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Content;
 using Adamantium.Engine.Compiler.Converter;
 using Adamantium.Engine.Graphics;
+using Adamantium.Imaging;
 using Adamantium.Win32;
-using SharpDX;
+using Adamantium.Core;
 
 namespace Adamantium.Engine
 {
@@ -158,7 +159,7 @@ namespace Adamantium.Engine
         /// <summary>
         /// Represents a D3D graphics device which do all rendering work
         /// </summary>
-        public D3DGraphicsDevice GraphicsDevice => graphicsDeviceService.GraphicsDevice;
+        public GraphicsDevice GraphicsDevice => graphicsDeviceService.GraphicsDevice;
 
         /// <summary>
         /// Game services which could be added to the game
@@ -584,8 +585,8 @@ namespace Adamantium.Engine
         /// </summary>
         protected virtual void Initialize()
         {
-            GraphicsDevice.BlendState = GraphicsDevice.BlendStates.Default;
-            GraphicsDevice.DepthStencilState = GraphicsDevice.DepthStencilStates.DepthEnableGreaterEqual;
+            //GraphicsDevice.BlendState = GraphicsDevice.BlendStates.Default;
+            //GraphicsDevice.DepthStencilState = GraphicsDevice.DepthStencilStates.DepthEnableGreaterEqual;
         }
 
         /// <summary>
@@ -635,8 +636,8 @@ namespace Adamantium.Engine
             {
                 return false;
             }
-            GraphicsDevice.SetRenderTargets(MainWindow.DepthBuffer, MainWindow.BackBuffer);
-            GraphicsDevice.SetViewport(MainWindow.Viewport);
+            //GraphicsDevice.SetRenderTargets(MainWindow.DepthBuffer, MainWindow.BackBuffer);
+            //GraphicsDevice.SetViewport(MainWindow.Viewport);
             return true;
         }
 

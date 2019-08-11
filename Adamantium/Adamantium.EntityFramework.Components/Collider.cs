@@ -2,7 +2,7 @@
 using Adamantium.Engine.Graphics;
 using Adamantium.EntityFramework.ComponentsBasics;
 using Adamantium.Mathematics;
-using Buffer = Adamantium.Engine.Graphics.Buffer;
+//using Buffer = Adamantium.Engine.Graphics.Buffer;
 
 namespace Adamantium.EntityFramework.Components
 {
@@ -30,9 +30,9 @@ namespace Adamantium.EntityFramework.Components
             set => SetProperty(ref displayCollider, value);
         }
 
-        protected Buffer<MeshVertex> VertexBuffer;
-        protected Buffer<int> IndexBuffer;
-        protected VertexInputLayout InputLayout;
+        //protected Buffer<MeshVertex> VertexBuffer;
+        //protected Buffer<int> IndexBuffer;
+        //protected VertexInputLayout InputLayout;
 
         private bool displayCollider;
 
@@ -49,7 +49,7 @@ namespace Adamantium.EntityFramework.Components
         public abstract void ClearData();
 
 
-        public abstract bool ContainsDataFor(Camera camera);
+        public abstract bool ContainsDataFor(CameraBase camera);
 
 
         protected Collider()
@@ -58,7 +58,7 @@ namespace Adamantium.EntityFramework.Components
 
         public abstract Mesh GetVisualRepresentation();
 
-        public abstract void UpdateForCamera(Camera camera);
+        public abstract void UpdateForCamera(CameraBase camera);
 
         public abstract ContainmentType IsInsideCameraFrustum(Camera camera);
 
@@ -77,7 +77,7 @@ namespace Adamantium.EntityFramework.Components
 
         public abstract bool IntersectsForCamera(Camera camera, ref Ray ray, out Vector3F point);
 
-        public virtual void Draw(D3DGraphicsDevice renderContext, Camera camera)
+        public virtual void Draw(GraphicsDevice renderContext, Camera camera)
         {
             if (!Initialized)
             {
@@ -100,12 +100,12 @@ namespace Adamantium.EntityFramework.Components
                 Geometry.AcceptChanges();
             }
 
-            renderContext.SetVertexBuffer(VertexBuffer);
-            renderContext.VertexInputLayout = InputLayout;
+            //renderContext.SetVertexBuffer(VertexBuffer);
+            //renderContext.VertexInputLayout = InputLayout;
 
             if (Geometry.Indices != null)
             {
-                renderContext.SetIndexBuffer(IndexBuffer);
+                //renderContext.SetIndexBuffer(IndexBuffer);
             }
 
             if (Geometry.Indices != null)
@@ -118,7 +118,7 @@ namespace Adamantium.EntityFramework.Components
             }
         }
 
-        protected void CreateVertexData(D3DGraphicsDevice renderContext)
+        protected void CreateVertexData(GraphicsDevice renderContext)
         {
             int length = Geometry.Positions.Length;
 
@@ -164,13 +164,13 @@ namespace Adamantium.EntityFramework.Components
                 vertices[i] = vertex;
             }
 
-            VertexBuffer?.Dispose();
-            VertexBuffer = ToDispose(Buffer.Vertex.New(renderContext, vertices, ResourceUsage.Dynamic));
+            //VertexBuffer?.Dispose();
+            //VertexBuffer = ToDispose(Buffer.Vertex.New(renderContext, vertices, ResourceUsage.Dynamic));
 
-            IndexBuffer?.Dispose();
-            IndexBuffer = ToDispose(Buffer.Index.New(renderContext, Geometry.Indices, ResourceUsage.Dynamic));
+            //IndexBuffer?.Dispose();
+            //IndexBuffer = ToDispose(Buffer.Index.New(renderContext, Geometry.Indices, ResourceUsage.Dynamic));
 
-            InputLayout = VertexInputLayout.FromBuffer(0, VertexBuffer);
+            //InputLayout = VertexInputLayout.FromBuffer(0, VertexBuffer);
         }
     }
 }

@@ -21,7 +21,7 @@ namespace Adamantium.Engine.NoiseGenerator
       public readonly Vector3F cubeStep;
       private PerlinNoiseManager manager;
       public Texture2D lookupTexture;
-      private D3DGraphicsDevice graphicsDevice;
+      private GraphicsDevice graphicsDevice;
       private EntityWorld entityWorld;
       private Buffer<Vector3F> vertex;
       private Effect MarchingCubesEffect;
@@ -30,7 +30,7 @@ namespace Adamantium.Engine.NoiseGenerator
       public Vector3F[] decals;
       private OpenSimplexNoise noise;
 
-      public MarchingCube(D3DGraphicsDevice device, EntityWorld entityWorld)
+      public MarchingCube(GraphicsDevice device, EntityWorld entityWorld)
       {
          graphicsDevice = device.MainDevice;
          this.entityWorld = entityWorld;

@@ -510,7 +510,7 @@ namespace Adamantium.Engine
             }
         }
 
-        internal override GraphicsPresenter CreatePresenter(D3DGraphicsDevice device)
+        internal override GraphicsPresenter CreatePresenter(GraphicsDevice device)
         {
             Presenter = new SwapChainGraphicsPresenter(device, Description.ToPresentationParameters(), GeneratePresenterName());
             return Presenter;

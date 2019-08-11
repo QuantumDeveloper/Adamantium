@@ -1,5 +1,5 @@
 ﻿using System;
-using SharpDX;
+using Adamantium.Core;
 
 namespace Adamantium.Engine
 {

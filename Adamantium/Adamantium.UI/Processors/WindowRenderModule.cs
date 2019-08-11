@@ -7,15 +7,13 @@ using Adamantium.Engine.Graphics;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Media;
-using SharpDX.Direct3D11;
-using SharpDX.Mathematics.Interop;
 
 namespace Adamantium.UI.Processors
 {
     public class WindowRenderModule : DisposableObject
     {
-        private readonly D3DGraphicsDevice _graphicsDevice;
-        private readonly D3DGraphicsDevice _mainGraphicsDevice;
+        private readonly GraphicsDevice _graphicsDevice;
+        private readonly GraphicsDevice _mainGraphicsDevice;
         private GraphicsPresenter Presenter;
         private D2DGraphicDevice d2D1Device;
         private VertexInputLayout _vertexLayout;
@@ -30,7 +28,7 @@ namespace Adamantium.UI.Processors
         private MSAALevel _msaaLevel;
         private bool _isWindowResized;
 
-        public WindowRenderModule(Window window, D3DGraphicsDevice mainDevice, MSAALevel msaaLevel)
+        public WindowRenderModule(Window window, GraphicsDevice mainDevice, MSAALevel msaaLevel)
         {
             if (window == null)
             {
@@ -104,7 +102,7 @@ namespace Adamantium.UI.Processors
             TraverseByLayer(_window, ProcessControl);
         }
 
-        public void Render(IGameTime gameTime, D3DGraphicsDevice mainDevice)
+        public void Render(IGameTime gameTime, GraphicsDevice mainDevice)
         {
             var commandList = _graphicsDevice.FinishCommandList(true);
             mainDevice.ExecuteCommandList(commandList);

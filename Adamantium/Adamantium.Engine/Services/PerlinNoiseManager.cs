@@ -17,7 +17,7 @@ namespace Adamantium.Engine.Services
          randomizer = new Randomizer();
       }
 
-      public void GenerateNoiseMap(int size, int seed, D3DGraphicsDevice device, Mesh geometry, Vector4F modifiers)
+      public void GenerateNoiseMap(int size, int seed, GraphicsDevice device, Mesh geometry, Vector4F modifiers)
       {
          PerlinNoise.SetSeed(seed);
          uint octaveCount = (uint)Math.Floor(Math.Log(size + 1, 2));

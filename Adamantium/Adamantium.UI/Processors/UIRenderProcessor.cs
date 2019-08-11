@@ -9,10 +9,10 @@ namespace Adamantium.UI.Processors
     {
         private IGameTime _gameTime;
         private Dictionary<Window, WindowRenderModule> windowToModule;
-        private readonly D3DGraphicsDevice GraphicsDevice;
+        private readonly GraphicsDevice GraphicsDevice;
         private MSAALevel msaaLevel;
 
-        public UIRenderProcessor(EntityWorld world, D3DGraphicsDevice graphicsDevice)
+        public UIRenderProcessor(EntityWorld world, GraphicsDevice graphicsDevice)
             : base(world)
         {
             GraphicsDevice = graphicsDevice.MainDevice;

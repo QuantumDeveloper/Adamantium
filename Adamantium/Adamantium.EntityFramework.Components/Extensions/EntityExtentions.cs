@@ -1,11 +1,12 @@
 ﻿using System;
 using Adamantium.Engine.Core;
 using Adamantium.EntityFramework.Components;
+using Adamantium.EntityFramework.ComponentsBasics;
 using Adamantium.Mathematics;
 
 namespace Adamantium.EntityFramework.Extensions
 {
-    public static class EntityExtention
+    public static class EntityExtentions
     {
         public static void SetWireFrame(this Entity entity, bool isWireFrame = true)
         {
@@ -21,11 +22,10 @@ namespace Adamantium.EntityFramework.Extensions
                });
         }
 
-        public static void BringIntoView(this Entity owner, Camera camera)
+        public static void BringIntoView(this Entity owner, CameraBase camera)
         {
             camera?.SetThirdPersonCamera(owner, Vector3F.Zero, CameraType.ThirdPersonFree);
         }
-
 
         public static Vector3D GetCenterAbsolute(this Entity owner)
         {
@@ -49,7 +49,7 @@ namespace Adamantium.EntityFramework.Extensions
             return collision.LocalCenter;
         }
 
-        public static Vector3F GetCenterRelative(this Entity owner, Camera camera)
+        public static Vector3F GetCenterRelative(this Entity owner, CameraBase camera)
         {
             var collision = owner?.GetComponent<Collider>();
             if (collision != null && collision.ContainsDataFor(camera))
@@ -80,17 +80,17 @@ namespace Adamantium.EntityFramework.Extensions
             return Vector3F.Max(collision.Bounds.Size);
         }
 
-        public static Matrix4x4F GetActualMatrix(this Entity owner, Camera camera)
+        public static Matrix4x4F GetActualMatrix(this Entity owner, CameraBase camera)
         {
             return owner.Transform.GetMetadata(camera).WorldMatrix;
         }
 
-        public static Single GetDistanceToCamera(this Entity owner, Camera camera)
+        public static Single GetDistanceToCamera(this Entity owner, CameraBase camera)
         {
             return owner.GetRelativePosition(camera).Length();
         }
 
-        public static Vector3F GetRelativePosition(this Entity owner, Camera camera)
+        public static Vector3F GetRelativePosition(this Entity owner, CameraBase camera)
         {
             return owner.Transform.GetRelativePosition(camera.GetOwnerPosition());
         }
@@ -105,12 +105,12 @@ namespace Adamantium.EntityFramework.Extensions
             return component.Owner.Transform.Rotation;
         }
 
-        public static Vector3D GetPositionForNewObject(this Entity owner, Camera camera)
+        public static Vector3D GetPositionForNewObject(this Entity owner, CameraBase camera)
         {
             return camera.GetOwnerPosition() + (owner.GetDiameter() * (Vector3D)camera.Forward * camera.Fov);
         }
 
-        public static Vector3D GetPositionForNewObject(this Entity owner, Camera camera, double diameter)
+        public static Vector3D GetPositionForNewObject(this Entity owner, CameraBase camera, double diameter)
         {
             return camera.GetOwnerPosition() + (diameter * (Vector3D)camera.Forward * (camera.Fov/4));
         }

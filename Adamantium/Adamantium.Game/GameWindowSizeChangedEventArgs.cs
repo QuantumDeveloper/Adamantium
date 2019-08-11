@@ -1,11 +1,10 @@
 ﻿using System;
-using SharpDX;
 
 namespace Adamantium.Engine
 {
    public class GameWindowSizeChangedEventArgs:EventArgs
    {
-      public Size2 Size { get; }
+      public Size Size { get; }
 
       public GameWindow Window { get; }
 

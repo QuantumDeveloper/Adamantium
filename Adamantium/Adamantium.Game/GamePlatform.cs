@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using Adamantium.Engine.Core.Collections;
+using Adamantium.Core.Collections;
 using Adamantium.Engine.Graphics;
+using Adamantium.Imaging;
 using Adamantium.UI.Controls;
-using SharpDX;
 //using Control = System.Windows.Forms.Control;
 
 namespace Adamantium.Engine

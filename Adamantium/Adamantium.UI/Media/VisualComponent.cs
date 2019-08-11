@@ -25,26 +25,26 @@ namespace Adamantium.UI.Media
 
       public Point Location
       {
-         get { return GetValue<Point>(PositionProperty); }
-         set { SetValue(PositionProperty, value); }
+         get => GetValue<Point>(PositionProperty);
+         set => SetValue(PositionProperty, value);
       }
 
       public Vector2D Scale
       {
-         get { return GetValue<Vector2D>(ScaleProperty); }
-         set { SetValue(ScaleProperty, value); }
+         get => GetValue<Vector2D>(ScaleProperty);
+         set => SetValue(ScaleProperty, value);
       }
 
       public Double Rotation
       {
-         get { return GetValue<Double>(RotationProperty); }
-         set { SetValue(RotationProperty, value); }
+         get => GetValue<Double>(RotationProperty);
+         set => SetValue(RotationProperty, value);
       }
 
       public Visibility Visibility
       {
-         get { return GetValue<Visibility>(VisibilityProperty); }
-         set { SetValue(VisibilityProperty, value); }
+         get => GetValue<Visibility>(VisibilityProperty);
+         set => SetValue(VisibilityProperty, value);
       }
 
       public VisualComponent()
@@ -141,9 +141,10 @@ namespace Adamantium.UI.Media
 
          if (VisualChildren.Count > 0)
          {
-            foreach (VisualComponent visualChild in VisualChildren)
+            foreach (var visual in VisualChildren)
             {
-               visualChild.DetachedFromVisualTree(e);
+                var visualChild = (VisualComponent) visual;
+                visualChild.DetachedFromVisualTree(e);
             }
          }
       }

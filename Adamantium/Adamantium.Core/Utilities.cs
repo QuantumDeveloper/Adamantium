@@ -193,6 +193,12 @@ namespace Adamantium.Core
             return BitConverter.GetBytes(value).Reverse();
         }
 
+        public static void Dispose<T>(ref T arg) where T: IDisposable
+        {
+            var disposable = arg as IDisposable;
+            disposable?.Dispose();
+        }
+
         public static byte GetBitsCount(this int i)
         {
             byte count = 0;
@@ -225,6 +231,11 @@ namespace Adamantium.Core
             }
 
             return result;
+        }
+
+        public static bool IsTypeInheritFrom(Type type, string baseType)
+        {
+            throw new NotImplementedException();
         }
     }
 }

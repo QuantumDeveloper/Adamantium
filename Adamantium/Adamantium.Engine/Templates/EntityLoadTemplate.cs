@@ -14,9 +14,9 @@ namespace Adamantium.Engine.Templates
    {
       private String pathToFile;
       private IContentManager manager;
-      private D3DGraphicsDevice graphicsDevice;
+      private GraphicsDevice graphicsDevice;
       private Vector3D initialPosition;
-      public EntityLoadTemplate(String pathToFile, IContentManager manager, D3DGraphicsDevice graphicsDevice, Vector3D initialPosition)
+      public EntityLoadTemplate(String pathToFile, IContentManager manager, GraphicsDevice graphicsDevice, Vector3D initialPosition)
       {
          this.pathToFile = pathToFile;
          this.manager = manager;

@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using Adamantium.Engine.Core;
+using Adamantium.EntityFramework.Components;
+using Adamantium.EntityFramework.ComponentsBasics;
 using Adamantium.Mathematics;
 
 namespace Adamantium.EntityFramework.Extensions
@@ -9,7 +11,7 @@ namespace Adamantium.EntityFramework.Extensions
     {
         public static Ray CalculateRay(
            Vector2F mousePosition,
-           Camera camera,
+           CameraBase camera,
            Matrix4x4F worldMatrix,
            bool reversedDepth = true)
         {
@@ -36,7 +38,7 @@ namespace Adamantium.EntityFramework.Extensions
 
         public static Ray CalculateRay(
            Vector2F cursorPosition,
-           Camera camera,
+           CameraBase camera,
            Matrix4x4F world,
            Matrix4x4F projection,
            bool useViewMatrix,
@@ -73,7 +75,7 @@ namespace Adamantium.EntityFramework.Extensions
 
         public static CollisionResult Intersects(
            this Entity owner,
-           Camera camera,
+           CameraBase camera,
            Vector2F cursorPosition,
            bool useViewMatrix,
            Matrix4x4F projectionMatrix,
@@ -149,7 +151,7 @@ namespace Adamantium.EntityFramework.Extensions
         public static CollisionResult
            Intersects(
               this Entity owner,
-              Camera camera,
+              CameraBase camera,
               Vector2F cursorPosition,
               CollisionMode collisionMode,
               CompareOrder compareOrder,
@@ -210,7 +212,7 @@ namespace Adamantium.EntityFramework.Extensions
         private static CollisionResult FindFirstAvailableCollider(
             Entity owner,
             Vector2F cursorPosition,
-            Camera camera,
+            CameraBase camera,
             bool useViewMatrix,
             Matrix4x4F projectionMatrix,
             CompareOrder compareOrder,
@@ -250,7 +252,7 @@ namespace Adamantium.EntityFramework.Extensions
         private static CollisionResult IgnoreNonGeometryParts(
             Entity owner,
             Vector2F cursorPosition,
-            Camera camera,
+            CameraBase camera,
             bool useViewMatrix,
             Matrix4x4F projectionMatrix,
             CompareOrder compareOrder,
@@ -278,7 +280,7 @@ namespace Adamantium.EntityFramework.Extensions
         private static CollisionResult HighestPrecision(
             Entity owner,
             Vector2F cursorPosition,
-            Camera camera,
+            CameraBase camera,
             bool useViewMatrix,
             Matrix4x4F projectionMatrix,
             float limitDistance,
@@ -337,7 +339,7 @@ namespace Adamantium.EntityFramework.Extensions
         private static CollisionResult MixedCollisionDetection(
             Entity owner,
             Vector2F cursorPosition,
-            Camera camera,
+            CameraBase camera,
             CollisionMode collisionMode,
             bool useViewMatrix,
             Matrix4x4F projectionMatrix,
@@ -378,7 +380,7 @@ namespace Adamantium.EntityFramework.Extensions
         private static CollisionResult CollidersOnlyDetection(
             Entity owner,
             Vector2F cursorPosition,
-            Camera camera,
+            CameraBase camera,
             CollisionMode collisionMode,
             bool useViewMatrix,
             Matrix4x4F projectionMatrix,

@@ -1,6 +1,6 @@
 ﻿using System;
 using Adamantium.Engine.Graphics;
-using SharpDX.Direct3D11;
+using Adamantium.Imaging;
 using Texture2D = Adamantium.Engine.Graphics.Texture2D;
 
 namespace Adamantium.UI.Media.Imaging
@@ -16,7 +16,7 @@ namespace Adamantium.UI.Media.Imaging
       private void CreateTexture(int width, int height, SurfaceFormat format, MSAALevel level, int arraysize = 1,
          TextureFlags flags = TextureFlags.ShaderResource, ResourceUsage usage = ResourceUsage.Default, ResourceOptionFlags optionFlags = ResourceOptionFlags.None)
       {
-         var device = Application.Current.Services.Get<D3DGraphicsDevice>();
+         var device = Application.Current.Services.Get<GraphicsDevice>();
          try
          {
             //ensure that this texture can be used as render target

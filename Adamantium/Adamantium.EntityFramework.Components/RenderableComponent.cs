@@ -1,14 +1,15 @@
 ﻿using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Models;
 using Adamantium.Engine.Graphics;
+using Adamantium.EntityFramework.ComponentsBasics;
 
 namespace Adamantium.EntityFramework.Components
 {
     public abstract class RenderableComponent: ActivatableComponent
     {
-        protected VertexInputLayout InputLayout { get; set; }
+        //protected VertexInputLayout InputLayout { get; set; }
 
-        protected Buffer<int> IndexBuffer { get; set; }
+        //protected Buffer<int> IndexBuffer { get; set; }
 
         protected MeshVertex[] ToMeshVertices(Mesh mesh)
         {
@@ -126,6 +127,6 @@ namespace Adamantium.EntityFramework.Components
             return vertices;
         }
 
-        public abstract void Draw(D3DGraphicsDevice renderContext, IGameTime gameTime);
+        public abstract void Draw(GraphicsDevice renderContext, IGameTime gameTime);
     }
 }

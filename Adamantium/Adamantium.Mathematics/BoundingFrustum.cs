@@ -15,11 +15,9 @@ namespace Adamantium.Mathematics
 
       #endregion Private Fields
 
-      
       #region Public Fields
       public const int CornerCount = 8;
       #endregion
-      
 
       #region Public Constructors
 
@@ -32,7 +30,6 @@ namespace Adamantium.Mathematics
       }
 
       #endregion Public Constructors
-
 
       #region Public Properties
 
@@ -62,7 +59,6 @@ namespace Adamantium.Mathematics
       public Boolean EnableFarPlaneCheck { get; set; }
 
       #endregion Public Properties
-
 
       #region Public Methods
 
@@ -346,7 +342,6 @@ namespace Adamantium.Mathematics
       }
 
       #endregion Public Methods
-
 
       #region Private Methods
 

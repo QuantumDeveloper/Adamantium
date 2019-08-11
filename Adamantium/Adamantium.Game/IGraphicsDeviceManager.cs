@@ -4,7 +4,7 @@ using SharpDX.Direct3D;
 namespace Adamantium.Engine
 {
    /// <summary>
-   /// Interface containing stubs to control <see cref="D3DGraphicsDevice"/> lifecycle inside <see cref="GameBase"/> class
+   /// Interface containing stubs to control <see cref="GraphicsDevice"/> lifecycle inside <see cref="GameBase"/> class
    /// </summary>
    public interface IGraphicsDeviceManager
    {

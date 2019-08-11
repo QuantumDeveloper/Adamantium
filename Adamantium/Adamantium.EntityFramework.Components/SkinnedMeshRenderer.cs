@@ -17,7 +17,7 @@ namespace Adamantium.EntityFramework.Components
             InputLayout = VertexInputLayout.New<SkinnedMeshVertex>(0);
         }
 
-        protected override unsafe bool Update(D3DGraphicsDevice graphicsContext)
+        protected override unsafe bool Update(GraphicsDevice graphicsContext)
         {
             if (MeshData != null && (MeshData.Mesh.IsModified || MeshDataChanged))
             {

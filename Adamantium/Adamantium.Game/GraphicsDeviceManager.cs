@@ -1,21 +1,20 @@
 ﻿using System;
 using System.Threading;
+using Adamantium.Core;
 using Adamantium.Engine.Graphics;
-using SharpDX;
-using SharpDX.Direct3D;
 
 namespace Adamantium.Engine
 {
    public sealed class GraphicsDeviceManager : IGraphicsDeviceManager, IGraphicsDeviceService, IDisposable 
    {
       private GameBase gameBase;
-      private D3DGraphicsDevice graphicsDevice;
+      private GraphicsDevice graphicsDevice;
 
       private GraphicsDeviceParameters graphicsDeviceParameters;
       private Boolean deviceUpdateNeeded;
       private Boolean applyChanges;
 
-      public D3DGraphicsDevice GraphicsDevice
+      public GraphicsDevice GraphicsDevice
       {
          get { return graphicsDevice; }
          internal set { graphicsDevice = value; }
@@ -196,22 +195,6 @@ namespace Adamantium.Engine
          }
       }
 
-      public FeatureLevel Profile
-      {
-         get
-         {
-            return graphicsDeviceParameters.Profile;
-         }
-         set
-         {
-            if (graphicsDeviceParameters.Profile != value)
-            {
-               graphicsDeviceParameters.Profile = value;
-               deviceUpdateNeeded = true;
-            }
-         }
-      }
-
       #region Events
 
       public event EventHandler<EventArgs> DeviceCreated;
@@ -229,7 +212,7 @@ namespace Adamantium.Engine
       internal void CreateDevice(GraphicsDeviceParameters parameters)
       {
          Utilities.Dispose(ref graphicsDevice);
-         GraphicsDevice = D3DGraphicsDevice.Create(parameters);
+            GraphicsDevice = Graphics.GraphicsDevice.Create(parameters);
 
          GraphicsDevice.Disposing += GraphicsDeviceDisposing;
          OnDeviceCreated();
