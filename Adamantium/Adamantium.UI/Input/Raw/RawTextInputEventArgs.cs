@@ -2,7 +2,7 @@
 
 namespace Adamantium.UI.Input.Raw
 {
-   class RawTextInputEventArgs:RawInputEventArgs
+   public class RawTextInputEventArgs:RawInputEventArgs
    {
       public string Text { get; }
 

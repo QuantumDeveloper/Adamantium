@@ -20,7 +20,7 @@ namespace Adamantium.UI.Media.Imaging
                o.DXTexture?.Dispose();
                try
                {
-                  o.DXTexture = Texture.Load(device, source.IsAbsoluteUri ? source.AbsolutePath : source.OriginalString);
+                  //o.DXTexture = Texture.Load(device, source.IsAbsoluteUri ? source.AbsolutePath : source.OriginalString);
                }
                catch (Exception exception)
                {
@@ -41,7 +41,7 @@ namespace Adamantium.UI.Media.Imaging
          var device = Application.Current.Services.Get<GraphicsDevice>();
          try
          {
-            DXTexture = Texture.Load(device, source.IsAbsoluteUri ? source.AbsolutePath : source.OriginalString);
+            //DXTexture = Texture.Load(device, source.IsAbsoluteUri ? source.AbsolutePath : source.OriginalString);
          }
          catch (Exception exception)
          {

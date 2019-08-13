@@ -3,7 +3,7 @@ using Adamantium.Mathematics;
 
 namespace Adamantium.UI.Input.Raw
 {
-    internal class RawMouseEventArgs : RawInputEventArgs
+    public class RawMouseEventArgs : RawInputEventArgs
     {
         public RawMouseEventArgs(RawMouseEventType eventType, IInputElement rootElement, Point position, InputModifiers modifiers, MouseDevice device, UInt32 timeStep)
            : base(modifiers, timeStep)

@@ -1,6 +1,6 @@
 ﻿namespace Adamantium.UI.Input.Raw
 {
-   internal enum RawKeyboardEventType
+   public enum RawKeyboardEventType
    {
       KeyDown,
       KeyUp,

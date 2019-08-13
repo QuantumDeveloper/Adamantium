@@ -2,7 +2,7 @@
 
 namespace Adamantium.UI.Input.Raw
 {
-   internal class RawInputMouseEventArgs : RawMouseEventArgs
+   public class RawInputMouseEventArgs : RawMouseEventArgs
    {
       public Point Delta { get; }
 

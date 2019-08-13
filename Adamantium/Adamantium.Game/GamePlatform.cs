@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Adamantium.Core.Collections;
 using Adamantium.Engine.Graphics;
 using Adamantium.Imaging;
+using Adamantium.UI;
 using Adamantium.UI.Controls;
 //using Control = System.Windows.Forms.Control;
 
@@ -303,8 +304,7 @@ namespace Adamantium.Engine
             wnd.OnWindowSizeChanged();
 
             WindowSizeChanged?.Invoke(this,
-               new GameWindowSizeChangedEventArgs(wnd,
-                  new Size2(wnd.Width, wnd.Height)));
+               new GameWindowSizeChangedEventArgs(wnd, new Size(wnd.Width, wnd.Height)));
         }
 
 

@@ -2,7 +2,7 @@
 
 namespace Adamantium.UI.Input.Raw
 {
-   internal class RawKeyboardEventArgs:RawInputEventArgs
+   public class RawKeyboardEventArgs:RawInputEventArgs
    {
       public Key ChangedKey { get; }
       public RawKeyboardEventType EventType { get; }

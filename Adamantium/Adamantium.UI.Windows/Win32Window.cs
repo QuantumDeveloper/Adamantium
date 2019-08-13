@@ -11,13 +11,13 @@ using RawInputEventArgs = Adamantium.UI.Input.Raw.RawInputEventArgs;
 
 namespace Adamantium.UI
 {
-    public class Window : ContentControl, IWindow, IRootVisual
+    public class Win32Window : ContentControl, IWindow
     {
         private delegate IntPtr WndProc(IntPtr hWnd, WindowMessages msg, IntPtr wParam, IntPtr lParam);
 
         private const int ERROR_CLASS_ALREADY_EXISTS = 1410;
 
-        public IntPtr WindowHandle { get; private set; }
+        public IntPtr Handle { get; private set; }
 
         private Interop.WndProc wndProcDelegate;
 
@@ -26,12 +26,12 @@ namespace Adamantium.UI
 
         private static string className = "Adamantium Window";
 
-        static Window()
+        static Win32Window()
         {
             //CreateAndRegisterWndClass();
         }
 
-        public Window()
+        public Win32Window()
         {
 
         }
@@ -63,7 +63,7 @@ namespace Adamantium.UI
         {
             CreateAndRegisterWndClass();
             // Create window
-            WindowHandle = Interop.CreateWindowExW(
+            Handle = Interop.CreateWindowExW(
                WindowStyleEx.Appwindow | WindowStyleEx.Acceptfiles,
                className,
                String.Empty,
@@ -78,7 +78,7 @@ namespace Adamantium.UI
                IntPtr.Zero
                );
 
-            var r = GetClientRectangle(WindowHandle);
+            var r = GetClientRectangle(Handle);
             ClientWidth = (int)r.Width;
             ClientHeight = (int)r.Height;
             Width = (int)r.Width;
@@ -100,19 +100,19 @@ namespace Adamantium.UI
         public void Show()
         {
             CreateNativeWindow();
-            if (WindowHandle != IntPtr.Zero)
+            if (Handle != IntPtr.Zero)
             {
-                Interop.ShowWindow(WindowHandle, WindowShowStyle.ShowNormal);
+                Interop.ShowWindow(Handle, WindowShowStyle.ShowNormal);
                 OnLoaded();
             }
         }
 
         public void Close()
         {
-            if (WindowHandle != IntPtr.Zero)
+            if (Handle != IntPtr.Zero)
             {
-                Interop.DestroyWindow(WindowHandle);
-                WindowHandle = IntPtr.Zero;
+                Interop.DestroyWindow(Handle);
+                Handle = IntPtr.Zero;
             }
             IsClosed = true;
             OnClosed();
@@ -171,16 +171,16 @@ namespace Adamantium.UI
                 //    uint color = 0;
                 //    color |= 255 << 8;
                 //    color |= 0 << 16;
-                //    var hdc = Interop.GetWindowDC(WindowHandle);
-                //    var windowRect = GetWindowRectangle(WindowHandle);
+                //    var hdc = Interop.GetWindowDC(Handle);
+                //    var windowRect = GetWindowRectangle(Handle);
                 //    var brush = Interop.CreateSolidBrush(color);
                 //    Interop.SelectObject(hdc, brush);
                 //    var pen = Interop.CreatePen(PenStyle.Solid, 1, color);
                 //    Interop.SelectObject(hdc, pen);
-                //    Interop.SendMessage(WindowHandle, WindowMessages.Print, hdc, new IntPtr((int)PrintOptions.NonClient));
+                //    Interop.SendMessage(Handle, WindowMessages.Print, hdc, new IntPtr((int)PrintOptions.NonClient));
                 //    Interop.Rectangle(hdc, 0, 0, windowRect.Width, windowRect.Height);
-                //    Interop.ReleaseDC(WindowHandle, hdc);
-                //    Interop.RedrawWindow(WindowHandle, ref windowRect, wParam, RedrawWindowFlags.Validate | RedrawWindowFlags.Frame);
+                //    Interop.ReleaseDC(Handle, hdc);
+                //    Interop.RedrawWindow(Handle, ref windowRect, wParam, RedrawWindowFlags.Validate | RedrawWindowFlags.Frame);
 
                     return IntPtr.Zero;
 
@@ -214,7 +214,7 @@ namespace Adamantium.UI
                     margins.Right = 5;
                     margins.Top = 5;
                     margins.Bottom = 5;
-                    //Interop.DwmExtendFrameIntoClientArea(WindowHandle, ref margins);
+                    //Interop.DwmExtendFrameIntoClientArea(Handle, ref margins);
                     //var lastError = Marshal.GetLastWin32Error();
                     var state = Messages.GetWindowActivationState(wParam);
                     switch (state)
@@ -300,7 +300,7 @@ namespace Adamantium.UI
                             Close();
                             break;
                         case SystemCommands.MOVE:
-                            Interop.SetWindowPos(WindowHandle, IntPtr.Zero, (int)p.X, (int)p.Y, (int)Width,
+                            Interop.SetWindowPos(Handle, IntPtr.Zero, (int)p.X, (int)p.Y, (int)Width,
                                (int)Height, SetWindowPosFlags.Asyncwindowpos | SetWindowPosFlags.Nosize);
                             break;
                         default:
@@ -319,7 +319,7 @@ namespace Adamantium.UI
                         {
                             cbSize = Marshal.SizeOf(typeof(TRACKMOUSEEVENT)),
                             dwFlags = 2,
-                            hwndTrack = WindowHandle,
+                            hwndTrack = Handle,
                             dwHoverTime = 0,
                         };
                         _trackMouse = true;
@@ -559,7 +559,8 @@ namespace Adamantium.UI
         private void OnClosed()
         {
             Application.Current.Windows.Remove(this);
-            Closed?.Invoke(this, new EventArgs());
+            Closing?.Invoke(this, EventArgs.Empty);
+            Closed?.Invoke(this, EventArgs.Empty);
         }
 
         public event EventHandler<SizeChangedEventArgs> ClientSizeChanged;
@@ -594,15 +595,20 @@ namespace Adamantium.UI
         private Point ScreenToClient(Point p)
         {
             var point = new NativePoint((int)p.X, (int)p.Y);
-            Interop.ScreenToClient(WindowHandle, ref point);
+            Interop.ScreenToClient(Handle, ref point);
             return point;
         }
 
         private Point ClientToScreen(Point p)
         {
             var point = new NativePoint((int)p.X, (int)p.Y);
-            Interop.ClientToScreen(WindowHandle, ref point);
+            Interop.ClientToScreen(Handle, ref point);
             return point;
+        }
+
+        public void Hide()
+        {
+            throw new NotImplementedException();
         }
     }
 

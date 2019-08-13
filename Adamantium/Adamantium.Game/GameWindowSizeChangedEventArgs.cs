@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Adamantium.UI;
+using System;
 
 namespace Adamantium.Engine
 {
@@ -8,7 +9,7 @@ namespace Adamantium.Engine
 
       public GameWindow Window { get; }
 
-      public GameWindowSizeChangedEventArgs(GameWindow window, Size2 size)
+      public GameWindowSizeChangedEventArgs(GameWindow window, Size size)
       {
          Size = size;
          Window = window;

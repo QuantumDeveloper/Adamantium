@@ -1,8 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
 using Adamantium.Engine.Core;
 using Adamantium.EntityFramework;
-using Adamantium.EntityFramework.Components;
+using Adamantium.UI.Controls;
 using Adamantium.UI.Media;
 
 namespace Adamantium.UI.Processors
@@ -18,7 +17,7 @@ namespace Adamantium.UI.Processors
         {
             foreach (var entity in Entities)
             {
-                var window = entity.GetComponent<Window>();
+                var window = entity.GetComponent<IWindow>();
                 if (window != null)
                 {
                     TraverseInDepth(window, ProcessControl);

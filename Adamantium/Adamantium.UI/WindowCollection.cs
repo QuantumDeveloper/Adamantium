@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Adamantium.UI.Controls;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 
@@ -8,10 +9,10 @@ namespace Adamantium.UI
    {
       public WindowCollection()
       {
-         windows = new List<Window>();
+         windows = new List<IWindow>();
       }
 
-      private List<Window> windows; 
+      private List<IWindow> windows; 
 
       public IEnumerator GetEnumerator()
       {
@@ -21,7 +22,7 @@ namespace Adamantium.UI
          }
       }
 
-      public void CopyTo(Window[] array, int index)
+      public void CopyTo(IWindow[] array, int index)
       {
          lock (windows)
          {
@@ -29,7 +30,7 @@ namespace Adamantium.UI
          }
       }
 
-      internal void Add(Window window)
+      public void Add(IWindow window)
       {
          lock (windows)
          {
@@ -41,7 +42,7 @@ namespace Adamantium.UI
          }
       }
 
-      internal void Remove(Window window)
+      public void Remove(IWindow window)
       {
          lock (windows)
          {
@@ -53,7 +54,7 @@ namespace Adamantium.UI
          }
       }
 
-      public Window this[int index]
+      public IWindow this[int index]
       {
          get
          {
@@ -81,9 +82,9 @@ namespace Adamantium.UI
 
    public class WindowEventArgs : EventArgs
    {
-      public Window Window { get; private set; }
+      public IWindow Window { get; private set; }
 
-      public WindowEventArgs(Window window)
+      public WindowEventArgs(IWindow window)
       {
          Window = window;
       }

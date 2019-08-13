@@ -1,4 +1,5 @@
-﻿using AdamantiumVulkan.Core;
+﻿using Adamantium.Imaging;
+using AdamantiumVulkan.Core;
 using System;
 
 namespace Adamantium.Engine.Graphics
@@ -33,13 +34,13 @@ namespace Adamantium.Engine.Graphics
          DepthFormat = parameters.DepthFormat;
          MSAALevel = parameters.MSAALevel;
 
-         RefreshRate = parameters.RefreshRate;
-         BuffersCount = parameters.BuffersCount;
-         IsWindowed = parameters.IsWindowed;
-         Flags = parameters.Flags;
-         Scaling = parameters.Scaling;
-         Usage = parameters.Usage;
-         AlphaMode = parameters.AlphaMode;
+         //RefreshRate = parameters.RefreshRate;
+         //BuffersCount = parameters.BuffersCount;
+         //IsWindowed = parameters.IsWindowed;
+         //Flags = parameters.Flags;
+         //Scaling = parameters.Scaling;
+         //Usage = parameters.Usage;
+         //AlphaMode = parameters.AlphaMode;
       }
 
       public PresentationParameters(PresenterType presenterType, Int32 backbufferWidth, Int32 backbufferHeight, IntPtr handle, MSAALevel msaaLevel = MSAALevel.None)
@@ -64,29 +65,29 @@ namespace Adamantium.Engine.Graphics
          //AlphaMode = AlphaMode.Unspecified;
       }
 
-      public PresentationParameters(PresenterType presenterType, Int32 backbufferWidth, Int32 backbufferHeight, IntPtr handle, MSAALevel msaa,
-         Rational refreshRate, Format pixelFormat = Format.R8G8B8A8_UNORM, DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24,
-         Usage usage = Usage.RenderTargetOutput, SwapEffect swapEffect = SwapEffect.Discard, Int32 buffresCount = 2, Boolean isWindowed = true, 
-         SwapChainFlags flags = SwapChainFlags.None, Scaling scaling = Scaling.Stretch, AlphaMode alphaMode = AlphaMode.Unspecified)
-      {
-         PresenterType = presenterType;
+      //public PresentationParameters(PresenterType presenterType, Int32 backbufferWidth, Int32 backbufferHeight, IntPtr handle, MSAALevel msaa,
+      //   Rational refreshRate, Format pixelFormat = Format.R8G8B8A8_UNORM, DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24,
+      //   Usage usage = Usage.RenderTargetOutput, SwapEffect swapEffect = SwapEffect.Discard, Int32 buffresCount = 2, Boolean isWindowed = true, 
+      //   SwapChainFlags flags = SwapChainFlags.None, Scaling scaling = Scaling.Stretch, AlphaMode alphaMode = AlphaMode.Unspecified)
+      //{
+      //   PresenterType = presenterType;
 
-         BackBufferWidth = backbufferWidth;
-         BackBufferHeight = backbufferHeight;
-         OutputHandle = handle;
-         PixelFormat = pixelFormat;
-         DepthFormat = depthFormat;
-         MSAALevel = msaa;
+      //   BackBufferWidth = backbufferWidth;
+      //   BackBufferHeight = backbufferHeight;
+      //   OutputHandle = handle;
+      //   PixelFormat = pixelFormat;
+      //   DepthFormat = depthFormat;
+      //   MSAALevel = msaa;
 
-         RefreshRate = refreshRate;
-         BuffersCount = buffresCount;
-         SwapEffect = swapEffect;
-         Usage = usage;
-         IsWindowed = isWindowed;
-         Flags = flags;
-         Scaling = scaling;
-         AlphaMode = alphaMode;
-      }
+      //   RefreshRate = refreshRate;
+      //   BuffersCount = buffresCount;
+      //   SwapEffect = swapEffect;
+      //   Usage = usage;
+      //   IsWindowed = isWindowed;
+      //   Flags = flags;
+      //   Scaling = scaling;
+      //   AlphaMode = alphaMode;
+      //}
 
       public PresenterType PresenterType { get; }
 
@@ -110,25 +111,25 @@ namespace Adamantium.Engine.Graphics
 
       public Boolean IsWindowed { get; internal set; }
 
-      public Rational RefreshRate { get; }
+      //public Rational RefreshRate { get; }
 
       public Int32 BuffersCount
       {
          get; internal set;
       }
 
-      public SwapEffect SwapEffect { get; }
+      //public SwapEffect SwapEffect { get; }
 
-      public Usage Usage
-      {
-         get;
-      }
+      //public Usage Usage
+      //{
+      //   get;
+      //}
 
-      public Scaling Scaling { get; }
+      //public Scaling Scaling { get; }
 
-      public AlphaMode AlphaMode { get; }
+      //public AlphaMode AlphaMode { get; }
 
-      public SwapChainFlags Flags { get; internal set; }
+      //public SwapChainFlags Flags { get; internal set; }
 
       public PresentationParameters Clone()
       {

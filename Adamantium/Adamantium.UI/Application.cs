@@ -5,17 +5,19 @@ using System.Threading.Tasks;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.EntityFramework;
+using Adamantium.UI.Controls;
+using Adamantium.UI.Input;
 using Adamantium.UI.Processors;
 using Adamantium.Win32;
 using Adamantium.Win32.RawInput;
 
 namespace Adamantium.UI
 {
-    public class Application : DependencyComponent, IRunningService
+    public abstract class Application : DependencyComponent, IRunningService
     {
         public ShutDownMode ShutDownMode;
         public Boolean IsApplicationRunning { get; private set; }
-        public Window MainWindow { get; set; }
+        public IWindow MainWindow { get; set; }
         public WindowCollection Windows { get; private set; }
 
         public static Application Current { get; internal set; }
@@ -24,7 +26,7 @@ namespace Adamantium.UI
 
         private GraphicsDevice GraphicsDevice;
         private EntityWorld _entityWorld;
-        private Dictionary<Window, UIRenderProcessor> windowToSystem;
+        private Dictionary<IWindow, UIRenderProcessor> windowToSystem;
 
         protected ApplicationTime appTime;
 
@@ -46,7 +48,7 @@ namespace Adamantium.UI
             ShutDownMode = ShutDownMode.OnMainWindowClosed;
             Current = this;
             _systemManager = new ApplicationSystemManager(this);
-            windowToSystem = new Dictionary<Window, UIRenderProcessor>();
+            windowToSystem = new Dictionary<IWindow, UIRenderProcessor>();
             Windows = new WindowCollection();
             Windows.WindowAdded += WindowAdded;
             Windows.WindowRemoved += WindowRemoved;
@@ -59,6 +61,10 @@ namespace Adamantium.UI
             Initialize();
         }
 
+        public abstract MouseDevice MouseDevice { get; }
+
+        public abstract KeyboardDevice KeyboardDevice { get; }
+
         private void WindowAdded(object sender, WindowEventArgs e)
         {
             var transformProcessor = new UITransformProcessor(_entityWorld);
@@ -69,12 +75,12 @@ namespace Adamantium.UI
             _entityWorld.AddProcessor(transformProcessor);
             _entityWorld.AddProcessor(renderProcessor);
 
-            InputDevice mouseDevice = new InputDevice();
-            mouseDevice.WindowHandle = e.Window.WindowHandle;
-            mouseDevice.UsagePage = HIDUsagePage.Generic;
-            mouseDevice.UsageId = HIDUsageId.Mouse;
-            mouseDevice.Flags = InputDeviceFlags.None;
-            Interop.RegisterRawInputDevices(new[] { mouseDevice }, 1, Marshal.SizeOf(mouseDevice));
+            //InputDevice mouseDevice = new InputDevice();
+            //mouseDevice.WindowHandle = e.Window.Handle;
+            //mouseDevice.UsagePage = HIDUsagePage.Generic;
+            //mouseDevice.UsageId = HIDUsageId.Mouse;
+            //mouseDevice.Flags = InputDeviceFlags.None;
+            //Interop.RegisterRawInputDevices(new[] { mouseDevice }, 1, Marshal.SizeOf(mouseDevice));
 
             windowToSystem.Add(e.Window, renderProcessor);
         }
@@ -193,11 +199,11 @@ namespace Adamantium.UI
 
         protected void Initialize()
         {
-            GraphicsDevice = Engine.Graphics.GraphicsDevice.Create(GraphicsAdapter.Default, DeviceCreationFlags.BgraSupport | DeviceCreationFlags.Debug, FeatureLevel.Level_11_0);
-            GraphicsDevice.BlendState = GraphicsDevice.BlendStates.AlphaBlend;
-            GraphicsDevice.RasterizerState = GraphicsDevice.RasterizerStates.CullNoneClipEnabled;
-            GraphicsDevice.DepthStencilState = GraphicsDevice.DepthStencilStates.DepthEnableGreaterEqual;
-            Services.Add(GraphicsDevice);
+            //GraphicsDevice = Engine.Graphics.GraphicsDevice.Create(GraphicsAdapter.Default, DeviceCreationFlags.BgraSupport | DeviceCreationFlags.Debug, FeatureLevel.Level_11_0);
+            //GraphicsDevice.BlendState = GraphicsDevice.BlendStates.AlphaBlend;
+            //GraphicsDevice.RasterizerState = GraphicsDevice.RasterizerStates.CullNoneClipEnabled;
+            //GraphicsDevice.DepthStencilState = GraphicsDevice.DepthStencilStates.DepthEnableGreaterEqual;
+            //Services.Add(GraphicsDevice);
 
             _isRunning = true;
             Initialized?.Invoke(this, EventArgs.Empty);

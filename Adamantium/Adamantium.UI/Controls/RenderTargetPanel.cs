@@ -85,18 +85,18 @@ namespace Adamantium.UI.Controls
                var pixelHeight = PixelHeight;
 
                rendertarget?.Dispose();
-               rendertarget = new RenderTargetImage(pixelWidth, pixelHeight, PixelFormat, MSAALevel.None, 1, TextureFlags.ShaderResource, ResourceUsage.Default, ResourceOptionFlags.Shared);
-               Debug.WriteLine("RenderTargetPanel size changed = "+ pixelWidth + " "+ pixelHeight);
-               Handle = rendertarget.NativePointer;
-               if (!isInitialized)
-               {
-                  RenderTargetInitialized?.Invoke(this, new RenderTargetEventArgs(rendertarget.NativePointer, pixelWidth, pixelHeight, PixelFormat));
-                  isInitialized = true;
-               }
-               else
-               {
-                  RenderTargetChanged?.Invoke(this, new RenderTargetEventArgs(rendertarget.NativePointer, pixelWidth, pixelHeight, PixelFormat));
-               }
+               //rendertarget = new RenderTargetImage(pixelWidth, pixelHeight, PixelFormat, MSAALevel.None, 1, TextureFlags.ShaderResource, ResourceUsage.Default, ResourceOptionFlags.Shared);
+               //Debug.WriteLine("RenderTargetPanel size changed = "+ pixelWidth + " "+ pixelHeight);
+               //Handle = rendertarget.NativePointer;
+               //if (!isInitialized)
+               //{
+               //   RenderTargetInitialized?.Invoke(this, new RenderTargetEventArgs(rendertarget.NativePointer, pixelWidth, pixelHeight, PixelFormat));
+               //   isInitialized = true;
+               //}
+               //else
+               //{
+               //   RenderTargetChanged?.Invoke(this, new RenderTargetEventArgs(rendertarget.NativePointer, pixelWidth, pixelHeight, PixelFormat));
+               //}
             }
          }
          catch (Exception e)

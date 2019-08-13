@@ -20,10 +20,10 @@ namespace Adamantium.Engine
 
         internal GraphicsPresenter Presenter { get; set; }
 
-        public Texture2DDescription GetDescription()
-        {
-            return Description.ToTexture2DDescription();
-        }
+        //public Texture2DDescription GetDescription()
+        //{
+        //    return Description.ToTexture2DDescription();
+        //}
 
         /// <summary>
         /// Contains <see cref="GameWindow"/> description
@@ -81,9 +81,9 @@ namespace Adamantium.Engine
         protected abstract void Initialize(GameContext context, SurfaceFormat pixelFormat,
            DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24, MSAALevel msaaLevel = MSAALevel.X4);
 
-        public RenderTarget2D BackBuffer => Presenter.BackBuffer;
+        //public RenderTarget2D BackBuffer => Presenter.BackBuffer;
 
-        public DepthStencilBuffer DepthBuffer => Presenter.DepthBuffer;
+        //public DepthStencilBuffer DepthBuffer => Presenter.DepthBuffer;
 
         public ViewportF Viewport => Presenter.Viewport;
 
@@ -163,13 +163,13 @@ namespace Adamantium.Engine
         internal void ResizePresenter()
         {
             Presenter?.Resize(Description.Width, Description.Height, Description.BuffersCount, Description.PixelFormat,
-               Description.DepthFormat, Description.Flags);
+               Description.DepthFormat/*, Description.Flags*/);
         }
 
         internal void SetPresentOptions()
         {
             Presenter.PresentInterval = Description.PresentInterval;
-            Presenter.PresentFlags = Description.PresentFlags;
+            //Presenter.PresentFlags = Description.PresentFlags;
         }
 
         /// <summary>
@@ -413,24 +413,6 @@ namespace Adamantium.Engine
             }
         }
 
-        public virtual SwapEffect PresenterSwapEffect
-        {
-            get { return Description.SwapEffect; }
-            set
-            {
-                if (Description.SwapEffect != value)
-                {
-                    Description.SwapEffect = value;
-                    if (Description.PresenterType == PresenterType.Swapchain)
-                    {
-                        UpdateRequested = true;
-                    }
-                    RaisePropertyChanged();
-                }
-            }
-        }
-
-
         public virtual Boolean IsWindowed
         {
             get { return Description.IsWindowed; }
@@ -449,22 +431,22 @@ namespace Adamantium.Engine
         }
 
 
-        public virtual Rational RefreshRate
-        {
-            get { return Description.RefreshRate; }
-            set
-            {
-                if (Description.RefreshRate != value)
-                {
-                    Description.RefreshRate = value;
-                    if (Description.PresenterType == PresenterType.Swapchain)
-                    {
-                        UpdateRequested = true;
-                    }
-                    RaisePropertyChanged();
-                }
-            }
-        }
+        //public virtual Rational RefreshRate
+        //{
+        //    get { return Description.RefreshRate; }
+        //    set
+        //    {
+        //        if (Description.RefreshRate != value)
+        //        {
+        //            Description.RefreshRate = value;
+        //            if (Description.PresenterType == PresenterType.Swapchain)
+        //            {
+        //                UpdateRequested = true;
+        //            }
+        //            RaisePropertyChanged();
+        //        }
+        //    }
+        //}
 
         public virtual Int32 BuffersCount
         {
@@ -483,88 +465,88 @@ namespace Adamantium.Engine
             }
         }
 
-        public virtual SwapEffect SwapEffect
-        {
-            get { return Description.SwapEffect; }
-            set
-            {
-                if (Description.SwapEffect != value)
-                {
-                    Description.SwapEffect = value;
-                    if (Description.PresenterType == PresenterType.Swapchain)
-                    {
-                        UpdateRequested = true;
-                    }
-                    RaisePropertyChanged();
-                }
-            }
-        }
+        //public virtual SwapEffect SwapEffect
+        //{
+        //    get { return Description.SwapEffect; }
+        //    set
+        //    {
+        //        if (Description.SwapEffect != value)
+        //        {
+        //            Description.SwapEffect = value;
+        //            if (Description.PresenterType == PresenterType.Swapchain)
+        //            {
+        //                UpdateRequested = true;
+        //            }
+        //            RaisePropertyChanged();
+        //        }
+        //    }
+        //}
 
-        public virtual Usage Usage
-        {
-            get { return Description.Usage; }
-            set
-            {
-                if (Description.Usage != value)
-                {
-                    Description.Usage = value;
-                    if (Description.PresenterType == PresenterType.Swapchain)
-                    {
-                        UpdateRequested = true;
-                    }
-                    RaisePropertyChanged();
-                }
-            }
-        }
+        //public virtual Usage Usage
+        //{
+        //    get { return Description.Usage; }
+        //    set
+        //    {
+        //        if (Description.Usage != value)
+        //        {
+        //            Description.Usage = value;
+        //            if (Description.PresenterType == PresenterType.Swapchain)
+        //            {
+        //                UpdateRequested = true;
+        //            }
+        //            RaisePropertyChanged();
+        //        }
+        //    }
+        //}
 
-        public virtual Scaling Scaling
-        {
-            get { return Description.Scaling; }
-            set
-            {
-                if (Description.Scaling != value)
-                {
-                    Description.Scaling = value;
-                    if (Description.PresenterType == PresenterType.Swapchain)
-                    {
-                        UpdateRequested = true;
-                    }
-                    RaisePropertyChanged();
-                }
-            }
-        }
+        //public virtual Scaling Scaling
+        //{
+        //    get { return Description.Scaling; }
+        //    set
+        //    {
+        //        if (Description.Scaling != value)
+        //        {
+        //            Description.Scaling = value;
+        //            if (Description.PresenterType == PresenterType.Swapchain)
+        //            {
+        //                UpdateRequested = true;
+        //            }
+        //            RaisePropertyChanged();
+        //        }
+        //    }
+        //}
 
-        public virtual AlphaMode AlphaMode
-        {
-            get => Description.AlphaMode;
-            set
-            {
-                if (SetProperty(Description.AlphaMode, value))
-                {
-                    if (Description.PresenterType == PresenterType.Swapchain)
-                    {
-                        UpdateRequested = true;
-                    }
-                }
-            }
-        }
+        //public virtual AlphaMode AlphaMode
+        //{
+        //    get => Description.AlphaMode;
+        //    set
+        //    {
+        //        if (SetProperty(Description.AlphaMode, value))
+        //        {
+        //            if (Description.PresenterType == PresenterType.Swapchain)
+        //            {
+        //                UpdateRequested = true;
+        //            }
+        //        }
+        //    }
+        //}
 
-        public virtual SwapChainFlags Flags
-        {
-            get { return Description.Flags; }
-            set
-            {
-                if (Description.Flags != value)
-                {
-                    Description.Flags = value;
-                    if (Description.PresenterType == PresenterType.Swapchain)
-                    {
-                        ResizeRequested = true;
-                    }
-                    RaisePropertyChanged();
-                }
-            }
-        }
+        //public virtual SwapChainFlags Flags
+        //{
+        //    get { return Description.Flags; }
+        //    set
+        //    {
+        //        if (Description.Flags != value)
+        //        {
+        //            Description.Flags = value;
+        //            if (Description.PresenterType == PresenterType.Swapchain)
+        //            {
+        //                ResizeRequested = true;
+        //            }
+        //            RaisePropertyChanged();
+        //        }
+        //    }
+        //}
 
         public virtual PresentInterval PresentInterval
         {
@@ -572,10 +554,10 @@ namespace Adamantium.Engine
             set { Description.PresentInterval = value; }
         }
 
-        public virtual PresentFlags PresentFlags
-        {
-            get { return Description.PresentFlags; }
-            set { Description.PresentFlags = value; }
-        }
+        //public virtual PresentFlags PresentFlags
+        //{
+        //    get { return Description.PresentFlags; }
+        //    set { Description.PresentFlags = value; }
+        //}
     }
 }
