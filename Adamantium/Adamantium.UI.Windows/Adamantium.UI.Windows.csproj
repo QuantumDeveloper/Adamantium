@@ -1,7 +1,13 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netcoreapp3.0</TargetFramework>
+    <Platforms>AnyCPU;x64</Platforms>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Adamantium.UI\Adamantium.UI.csproj" />
+    <ProjectReference Include="..\Adamantium.Win32\Adamantium.Win32.csproj" />
+  </ItemGroup>
 
 </Project>

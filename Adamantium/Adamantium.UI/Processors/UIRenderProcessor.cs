@@ -2,22 +2,23 @@
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.EntityFramework;
+using Adamantium.UI.Controls;
 
 namespace Adamantium.UI.Processors
 {
     public class UIRenderProcessor : UIProcessor
     {
         private IGameTime _gameTime;
-        private Dictionary<Window, WindowRenderModule> windowToModule;
+        private Dictionary<IWindow, WindowRenderModule> windowToModule;
         private readonly GraphicsDevice GraphicsDevice;
         private MSAALevel msaaLevel;
 
         public UIRenderProcessor(EntityWorld world, GraphicsDevice graphicsDevice)
             : base(world)
         {
-            GraphicsDevice = graphicsDevice.MainDevice;
+            //GraphicsDevice = graphicsDevice.MainDevice;
             msaaLevel = MSAALevel.X4;
-            windowToModule = new Dictionary<Window, WindowRenderModule>();
+            windowToModule = new Dictionary<IWindow, WindowRenderModule>();
         }
 
         protected override void OnEntityAdded(Entity entity)
@@ -26,14 +27,14 @@ namespace Adamantium.UI.Processors
                 entity,
                 current =>
                 {
-                    var window = entity.GetComponent<Window>();
+                    var window = entity.GetComponent<IWindow>();
                     if (window != null)
                     {
-                        var renderer = new WindowRenderModule(window, GraphicsDevice, msaaLevel);
-                        if (!windowToModule.ContainsKey(window))
-                        {
-                            windowToModule.Add(window, renderer);
-                        }
+                        //var renderer = new WindowRenderModule(window, GraphicsDevice, msaaLevel);
+                        //if (!windowToModule.ContainsKey(window))
+                        //{
+                        //    windowToModule.Add(window, renderer);
+                        //}
                     }
                 });
         }
@@ -44,7 +45,7 @@ namespace Adamantium.UI.Processors
                 entity,
                 current =>
                 {
-                    var window = entity.GetComponent<Window>();
+                    var window = entity.GetComponent<IWindow>();
                     if (window != null)
                     {
                         if (windowToModule.ContainsKey(window))
@@ -63,13 +64,13 @@ namespace Adamantium.UI.Processors
                     entity,
                     current =>
                     {
-                        var window = entity.GetComponent<Window>();
+                        var window = entity.GetComponent<IWindow>();
                         if (window != null)
                         {
-                            var renderer = new WindowRenderModule(window, GraphicsDevice, msaaLevel);
+                            //var renderer = new WindowRenderModule(window, GraphicsDevice, msaaLevel);
                             if (!windowToModule.ContainsKey(window))
                             {
-                                windowToModule.Add(window, renderer);
+                                //windowToModule.Add(window, renderer);
                             }
                         }
                     });
@@ -90,11 +91,11 @@ namespace Adamantium.UI.Processors
             _gameTime = gameTime;
             base.Draw(gameTime);
 
-            foreach (var window in windowToModule)
-            {
-                window.Value.Preapare();
-                window.Value.Render(gameTime, GraphicsDevice);
-            }
+            //foreach (var window in windowToModule)
+            //{
+            //    window.Value.Preapare();
+            //    window.Value.Render(gameTime, GraphicsDevice);
+            //}
         }
     }
 }

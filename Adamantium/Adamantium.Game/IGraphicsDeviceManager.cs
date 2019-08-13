@@ -35,21 +35,21 @@ namespace Adamantium.Engine
       /// <summary>
       /// Enable or disable support for D2D interop
       /// </summary>
-      bool D2DSupportEnabled { get; set; }
+      //bool D2DSupportEnabled { get; set; }
 
       /// <summary>
       /// Enable or disable video playback support
       /// </summary>
-      bool VideoSupportEnabled { get; set; }
+      //bool VideoSupportEnabled { get; set; }
 
       /// <summary>
       /// Enable or disable debug mode with detao;ed output
       /// </summary>
-      bool DebugModeEnabled { get; set; }
+      //bool DebugModeEnabled { get; set; }
 
       /// <summary>
       /// Adapter on which device will create
       /// </summary>
-      GraphicsAdapter Adapter { get; set; }
+      //GraphicsAdapter Adapter { get; set; }
    }
 }

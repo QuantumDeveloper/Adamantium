@@ -1,6 +1,6 @@
 ﻿namespace Adamantium.UI.Input.Raw
 {
-   internal enum RawMouseEventType : uint
+   public enum RawMouseEventType : uint
    {
       MouseMove = 0x0200,
       EnterWindow,

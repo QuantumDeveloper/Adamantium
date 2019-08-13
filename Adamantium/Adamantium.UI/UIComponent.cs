@@ -153,11 +153,11 @@ namespace Adamantium.UI
 
       #region Events
 
-      public event RawMouseEventHandler RawMouseMove
-      {
-         add { AddHandler(Mouse.RawMouseMoveEvent, value);}
-         remove { RemoveHandler(Mouse.RawMouseMoveEvent, value);}
-      }
+      //public event RawMouseEventHandler RawMouseMove
+      //{
+      //   add { AddHandler(Mouse.RawMouseMoveEvent, value);}
+      //   remove { RemoveHandler(Mouse.RawMouseMoveEvent, value);}
+      //}
 
       public event MouseButtonEventHandler RawMouseDown
       {
@@ -554,7 +554,7 @@ namespace Adamantium.UI
          Mouse.RawMouseDownEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(RawMouseDownHandler));
          Mouse.RawMouseUpEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(RawMouseUpHandler));
          Mouse.MouseMoveEvent.RegisterClassHandler<UIComponent>(new MouseEventHandler(MouseMoveHandler));
-         Mouse.RawMouseMoveEvent.RegisterClassHandler<UIComponent>(new RawMouseEventHandler(RawMouseMoveHandler));
+         //Mouse.RawMouseMoveEvent.RegisterClassHandler<UIComponent>(new RawMouseEventHandler(RawMouseMoveHandler));
 
          PreviewMouseLeftButtonDownEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(PreviewMouseLeftButtonDownHandler));
          PreviewMouseLeftButtonUpEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(PreviewMouseLeftButtonUpHandler));

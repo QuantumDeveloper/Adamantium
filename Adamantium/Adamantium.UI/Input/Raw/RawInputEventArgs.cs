@@ -2,7 +2,7 @@
 
 namespace Adamantium.UI.Input.Raw
 {
-   internal class RawInputEventArgs:EventArgs
+   public class RawInputEventArgs:EventArgs
    {
       public RawInputEventArgs(InputModifiers modifiers, UInt32 timeStep)
       {

@@ -159,7 +159,7 @@ namespace Adamantium.UI.Input
          return Convert.ToBoolean(Interop.GetKeyState((uint)key) & KEY_TOGGLED);
       }
 
-      internal void ProcessEvent(RawInputEventArgs eventArgs)
+      public void ProcessEvent(RawInputEventArgs eventArgs)
       {
          if (FocusedElement != null)
          {

@@ -10,7 +10,7 @@ namespace Adamantium.UI.Input
    /// </summary>
    public sealed class Cursor
    {
-      internal IntPtr CursorHandle { get; private set; }
+      public IntPtr CursorHandle { get; private set; }
 
       /// <summary>
       /// Specifies a new instance of cursor class from a .cur or .ani file
