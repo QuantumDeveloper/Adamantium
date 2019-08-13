@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using Adamantium.Core.Collections;
 using Adamantium.Engine.Core;
-using Adamantium.Engine.Core.Collections;
 using Adamantium.Engine.Graphics;
 using Adamantium.Engine.Templates.Camera;
 using Adamantium.EntityFramework;
@@ -427,76 +427,76 @@ namespace Adamantium.Engine.Services
             }
         }
 
-        public void DrawCameraIcons(Effect effect, Camera camera, GraphicsDevice drawingContext, IGameTime gameTime)
-        {
-            lock (syncRoot)
-            {
-                var view = camera.ViewMatrix;
-                var proj = camera.ProjectionMatrix;
-                effect.Parameters["viewMatrix"].SetValue(view);
-                effect.Parameters["projectionMatrix"].SetValue(proj);
+//        public void DrawCameraIcons(Effect effect, Camera camera, GraphicsDevice drawingContext, IGameTime gameTime)
+//        {
+//            lock (syncRoot)
+//            {
+//                var view = camera.ViewMatrix;
+//                var proj = camera.ProjectionMatrix;
+//                effect.Parameters["viewMatrix"].SetValue(view);
+//                effect.Parameters["projectionMatrix"].SetValue(proj);
+//
+//                foreach (var currentCamera in Cameras)
+//                {
+//                    if (currentCamera == camera || !currentCamera.Owner.IsEnabled)
+//                    {
+//                        continue;
+//                    }
+//
+//                    var transform = currentCamera.Owner.Transform.GetMetadata(camera);
+//                    if (transform.RelativePosition.Length() < CameraIcon.GetDiameter())
+//                    {
+//                        continue;
+//                    }
+//
+//                    var transparency = 1 - (1 / transform.RelativePosition.Length());
+//
+//                    var billboard = Matrix4x4F.BillboardRH(transform.RelativePosition, Vector3F.Zero, camera.Up, camera.Forward);
+//                    var rotation = MathHelper.GetRotationFromMatrix(billboard);
+//                    var world = Matrix4x4F.RotationQuaternion(rotation) * Matrix4x4F.Translation(transform.RelativePosition);
+//
+//                    effect.Parameters["transparency"].SetValue(transparency);
+//                    effect.Parameters["worldMatrix"].SetValue(world);
+//                    effect.Parameters["wvp"].SetValue(world * view * proj);
+//                    effect.Parameters["meshColor"].SetValue(Colors.White.ToVector3());
+//                    effect.Techniques["MeshVertex"].Passes["NoLight"].Apply();
+//                    cameraIconRenderer.Draw(drawingContext, gameTime);
+//                }
+//            }
+//
+//            effect.Techniques["MeshVertex"].Passes["NoLight"].UnApply();
+//        }
 
-                foreach (var currentCamera in Cameras)
-                {
-                    if (currentCamera == camera || !currentCamera.Owner.IsEnabled)
-                    {
-                        continue;
-                    }
-
-                    var transform = currentCamera.Owner.Transform.GetMetadata(camera);
-                    if (transform.RelativePosition.Length() < CameraIcon.GetDiameter())
-                    {
-                        continue;
-                    }
-
-                    var transparency = 1 - (1 / transform.RelativePosition.Length());
-
-                    var billboard = Matrix4x4F.BillboardRH(transform.RelativePosition, Vector3F.Zero, camera.Up, camera.Forward);
-                    var rotation = MathHelper.GetRotationFromMatrix(billboard);
-                    var world = Matrix4x4F.RotationQuaternion(rotation) * Matrix4x4F.Translation(transform.RelativePosition);
-
-                    effect.Parameters["transparency"].SetValue(transparency);
-                    effect.Parameters["worldMatrix"].SetValue(world);
-                    effect.Parameters["wvp"].SetValue(world * view * proj);
-                    effect.Parameters["meshColor"].SetValue(Colors.White.ToVector3());
-                    effect.Techniques["MeshVertex"].Passes["NoLight"].Apply();
-                    cameraIconRenderer.Draw(drawingContext, gameTime);
-                }
-            }
-
-            effect.Techniques["MeshVertex"].Passes["NoLight"].UnApply();
-        }
-
-        public void DrawDebugCamera(Effect effect, Camera camera, GraphicsDevice drawingContext, IGameTime gametime)
-        {
-            if (SelectedCamera == null || !SelectedCamera.IsEnabled)
-                return;
-
-            var cameraRender = CameraVisual.GetComponent<RenderableComponent>();
-            lock (syncRoot)
-            {
-                var view = camera.ViewMatrix;
-                var proj = camera.ProjectionMatrix;
-                effect.Parameters["viewMatrix"].SetValue(view);
-                effect.Parameters["projectionMatrix"].SetValue(proj);
-
-                if (SelectedCamera == camera.Owner)
-                {
-                    return;
-                }
-
-                var transform = SelectedCamera.Transform.GetMetadata(camera);
-                var world = Matrix4x4F.RotationQuaternion(camera.Rotation) * transform.WorldMatrix;
-                effect.Parameters["transparency"].SetValue(1.0f);
-                effect.Parameters["worldMatrix"].SetValue(world);
-                effect.Parameters["wvp"].SetValue(world * view * proj);
-                effect.Parameters["meshColor"].SetValue(Colors.Beige.ToVector3());
-                effect.Techniques["MeshVertex"].Passes["NoLight"].Apply();
-                cameraRender.Draw(drawingContext, gametime);
-            }
-
-            effect.Techniques["MeshVertex"].Passes["NoLight"].UnApply();
-        }
+//        public void DrawDebugCamera(Effect effect, Camera camera, GraphicsDevice drawingContext, IGameTime gametime)
+//        {
+//            if (SelectedCamera == null || !SelectedCamera.IsEnabled)
+//                return;
+//
+//            var cameraRender = CameraVisual.GetComponent<RenderableComponent>();
+//            lock (syncRoot)
+//            {
+//                var view = camera.ViewMatrix;
+//                var proj = camera.ProjectionMatrix;
+//                effect.Parameters["viewMatrix"].SetValue(view);
+//                effect.Parameters["projectionMatrix"].SetValue(proj);
+//
+//                if (SelectedCamera == camera.Owner)
+//                {
+//                    return;
+//                }
+//
+//                var transform = SelectedCamera.Transform.GetMetadata(camera);
+//                var world = Matrix4x4F.RotationQuaternion(camera.Rotation) * transform.WorldMatrix;
+//                effect.Parameters["transparency"].SetValue(1.0f);
+//                effect.Parameters["worldMatrix"].SetValue(world);
+//                effect.Parameters["wvp"].SetValue(world * view * proj);
+//                effect.Parameters["meshColor"].SetValue(Colors.Beige.ToVector3());
+//                effect.Techniques["MeshVertex"].Passes["NoLight"].Apply();
+//                cameraRender.Draw(drawingContext, gametime);
+//            }
+//
+//            effect.Techniques["MeshVertex"].Passes["NoLight"].UnApply();
+//        }
 
         //Индексатор для ключа
         public List<Camera> this[GameWindow key]

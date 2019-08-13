@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using Adamantium.Engine.Core.Models;
 using Adamantium.Engine.Graphics;
+using Adamantium.EntityFramework.ComponentsBasics;
 using Adamantium.Mathematics;
 
 namespace Adamantium.EntityFramework.Components
@@ -9,18 +10,18 @@ namespace Adamantium.EntityFramework.Components
     {
         public BoxCollider()
         {
-            ColliderData = new Dictionary<Camera, OrientedBoundingBox>();
+            ColliderData = new Dictionary<CameraBase, OrientedBoundingBox>();
         }
 
         private OrientedBoundingBox obb;
-        protected Dictionary<Camera, OrientedBoundingBox> ColliderData { get; }
+        protected Dictionary<CameraBase, OrientedBoundingBox> ColliderData { get; }
 
         public override void ClearData()
         {
             ColliderData.Clear();
         }
 
-        public override bool ContainsDataFor(Camera camera)
+        public override bool ContainsDataFor(CameraBase camera)
         {
             return ColliderData.ContainsKey(camera);
         }
@@ -31,7 +32,7 @@ namespace Adamantium.EntityFramework.Components
             return Geometry;
         }
 
-        public override void UpdateForCamera(Camera camera)
+        public override void UpdateForCamera(CameraBase camera)
         {
             var bb = obb.Transform(Owner.Transform.Scale, Owner.Transform.Rotation, Owner.Transform.GetMetadata(camera).RelativePosition);
 

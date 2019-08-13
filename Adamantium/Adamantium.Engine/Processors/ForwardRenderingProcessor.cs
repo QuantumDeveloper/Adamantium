@@ -5,7 +5,6 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using Adamantium.Engine;
 using Adamantium.Engine.Core;
-using Adamantium.Engine.Core.SpriteFont;
 using Adamantium.Engine.GameInput;
 using Adamantium.Engine.Graphics;
 using Adamantium.Engine.NoiseGenerator;
@@ -14,13 +13,10 @@ using Adamantium.EntityFramework.Extensions;
 using Adamantium.Mathematics;
 using Adamantium.Win32;
 using Noise;
-using SharpDX;
-using SharpDX.Direct3D11;
-using SharpDX.DXGI;
-using Buffer = Adamantium.Engine.Graphics.Buffer;
+//using Buffer = Adamantium.Engine.Graphics.Buffer;
 using ContainmentType = Adamantium.Mathematics.ContainmentType;
-using Texture2D = Adamantium.Engine.Graphics.Texture2D;
-using Texture3D = Adamantium.Engine.Graphics.Texture3D;
+//using Texture2D = Adamantium.Engine.Graphics.Texture2D;
+//using Texture3D = Adamantium.Engine.Graphics.Texture3D;
 using ViewportF = Adamantium.Mathematics.ViewportF;
 
 namespace Adamantium.EntityFramework.Processors
@@ -30,14 +26,14 @@ namespace Adamantium.EntityFramework.Processors
         public ForwardRenderingProcessor(EntityWorld world, GameWindow window) : base(world, window)
         {
             //DeferredDevice = GraphicsDevice.CreateDeferred();
-            DeferredDevice = GraphicsDeviceService.GraphicsDevice;
+            //DeferredDevice = GraphicsDeviceService.GraphicsDevice;
         }
 
         public override void LoadContent()
         {
             //DeferredDevice = GraphicsDeviceService.GraphicsDevice.CreateDeferred();
-            DeferredDevice = GraphicsDeviceService.GraphicsDevice;
-            SpriteBatch = new SpriteBatch(DeferredDevice, 80000);
+            //DeferredDevice = GraphicsDeviceService.GraphicsDevice;
+//            SpriteBatch = new SpriteBatch(DeferredDevice, 80000);
             CreateResources();
             CreateSystemResources();
             
@@ -56,29 +52,29 @@ namespace Adamantium.EntityFramework.Processors
 
         public override void UnloadContent()
         {
-            solidWIreframeEffect?.Dispose();
-            normalsRenderEffect?.Dispose();
-            D2dDevice?.Dispose();
-            fractalEffect?.Dispose();
-            BasicEffect?.Dispose();
-            MarchingCubesEffect?.Dispose();
-            ProtoEffect?.Dispose();
-            base.UnloadContent();
+//            solidWIreframeEffect?.Dispose();
+//            normalsRenderEffect?.Dispose();
+//            D2dDevice?.Dispose();
+//            fractalEffect?.Dispose();
+//            BasicEffect?.Dispose();
+//            MarchingCubesEffect?.Dispose();
+//            ProtoEffect?.Dispose();
+//            base.UnloadContent();
         }
 
         public sealed override void CreateSystemResources()
         {
             CreateWindowResources();
-            if (DeferredDevice.IsD2dSupportEnabled)
-            {
-                D2dDevice = D2DGraphicDevice.New(DeferredDevice, backBuffer);
-            }
+//            if (DeferredDevice.IsD2dSupportEnabled)
+//            {
+//                D2dDevice = D2DGraphicDevice.New(DeferredDevice, backBuffer);
+//            }
         }
 
         protected override void OnDeviceChangeEnd()
         {
             //DeferredDevice = GraphicsDeviceService.GraphicsDevice.CreateDeferred();
-            DeferredDevice = GraphicsDeviceService.GraphicsDevice;
+            //DeferredDevice = GraphicsDeviceService.GraphicsDevice;
             //spriteBatch = new SpriteBatch(DeferredDevice, 25000);
             //CreateResources();
         }
@@ -96,63 +92,63 @@ namespace Adamantium.EntityFramework.Processors
         }
 
 
-        public Effect solidWIreframeEffect;
-        public Effect fractalEffect;
-        public Effect normalsRenderEffect;
-        private Texture2D pointer;
-        private TextureCube cube;
-        private Effect cubeMapEffect;
-        private Vector2F pointerCenterWhite;
-        private Vector2F pointerCenterBlack;
-        private Vector2F pointerScaleWhite;
-        private Vector2F pointerScaleBlack;
-
-        private Texture2D backBuffer;
-        public Texture2D lookupTexture;
-        private DepthStencilBuffer depthBuffer;
-        private RenderTarget2D renderTarget;
-        private RenderTarget2D fractalrenderTarget;
-        private ViewportF viewPort;
-
-        private Texture2D nullTexture = null;
-        private Texture2D nullTexture2 = null;
-        private Texture2D nullTexture3 = null;
-        private Texture2D nullTexture4 = null;
-        private Texture2D nullTexture5 = null;
-        private Texture2D nullTexture6 = null;
-        private Texture2D nullTexture7 = null;
-        private Effect skybox = null;
-        private Entity skyCube = null;
+//        public Effect solidWIreframeEffect;
+//        public Effect fractalEffect;
+//        public Effect normalsRenderEffect;
+//        private Texture2D pointer;
+//        private TextureCube cube;
+//        private Effect cubeMapEffect;
+//        private Vector2F pointerCenterWhite;
+//        private Vector2F pointerCenterBlack;
+//        private Vector2F pointerScaleWhite;
+//        private Vector2F pointerScaleBlack;
+//
+//        private Texture2D backBuffer;
+//        public Texture2D lookupTexture;
+//        private DepthStencilBuffer depthBuffer;
+//        private RenderTarget2D renderTarget;
+//        private RenderTarget2D fractalrenderTarget;
+//        private ViewportF viewPort;
+//
+//        private Texture2D nullTexture = null;
+//        private Texture2D nullTexture2 = null;
+//        private Texture2D nullTexture3 = null;
+//        private Texture2D nullTexture4 = null;
+//        private Texture2D nullTexture5 = null;
+//        private Texture2D nullTexture6 = null;
+//        private Texture2D nullTexture7 = null;
+//        private Effect skybox = null;
+//        private Entity skyCube = null;
 
         // 3D texture containing all the density values for the chunk (block)
-        private Texture3D densityVolume;
-        private Buffer<int> densityIndexBuffer;
-        private Buffer<Vector4F> normalsStreamOutBuffer;
-        private Effect FillDensityEffect;
-        private VertexInputLayout normalsLayout = VertexInputLayout.New<SVPosition>(0);
-        private float wireframeWidthValue = 0.1f;
-        private float patternPeriod = 0.5f;
-        private MarchingCube mcube;
-
-
-
-        private Effect ProtoEffect;
-        private Effect MarchingCubesEffect;
-        private VertexInputLayout Layout;
-        private VertexInputLayout MCLayout = VertexInputLayout.New<VertexPosition>(0);
-        private Vector3F blockOrigin = Vector3F.Zero;
-        private Buffer<Vector3F> vertex;
-        private Buffer<VertexPositionNormalTexture> protoPlainStreamOut;
-        private StreamOutStatisticsQuery streamOutStatisticsQuery;
-        private VertexInputLayout ProtoPlainLayout = VertexInputLayout.New<VertexPositionNormalTexture>(0);
-        private Entity protoPlainEntity;
-        private int voxelsQuantity;
-
-        private SpriteFontData cambriaTrueTypeData;
-        private SpriteFontData cambriaBMFontData;
-
-        private SpriteFont cambriaTrueType;
-        private SpriteFont cambriaBMFont;
+//        private Texture3D densityVolume;
+//        private Buffer<int> densityIndexBuffer;
+//        private Buffer<Vector4F> normalsStreamOutBuffer;
+//        private Effect FillDensityEffect;
+//        private VertexInputLayout normalsLayout = VertexInputLayout.New<SVPosition>(0);
+//        private float wireframeWidthValue = 0.1f;
+//        private float patternPeriod = 0.5f;
+//        private MarchingCube mcube;
+//
+//
+//
+//        private Effect ProtoEffect;
+//        private Effect MarchingCubesEffect;
+//        private VertexInputLayout Layout;
+//        private VertexInputLayout MCLayout = VertexInputLayout.New<VertexPosition>(0);
+//        private Vector3F blockOrigin = Vector3F.Zero;
+//        private Buffer<Vector3F> vertex;
+//        private Buffer<VertexPositionNormalTexture> protoPlainStreamOut;
+//        private StreamOutStatisticsQuery streamOutStatisticsQuery;
+//        private VertexInputLayout ProtoPlainLayout = VertexInputLayout.New<VertexPositionNormalTexture>(0);
+//        private Entity protoPlainEntity;
+//        private int voxelsQuantity;
+//
+//        private SpriteFontData cambriaTrueTypeData;
+//        private SpriteFontData cambriaBMFontData;
+//
+//        private SpriteFont cambriaTrueType;
+//        private SpriteFont cambriaBMFont;
 
         private void CreateProtoPlainGrid(float plainSize, int sqrsInPlain)
         {
@@ -169,58 +165,57 @@ namespace Adamantium.EntityFramework.Processors
                 }
             }
 
-            vertex = Buffer.Vertex.New(DeferredDevice.MainDevice, positions.ToArray(), ResourceUsage.Dynamic);
+            //vertex = Buffer.Vertex.New(DeferredDevice.MainDevice, positions.ToArray(), ResourceUsage.Dynamic);
         }
 
         private void CreateVertexGrid(float chunkSize, int voxelsInChunk)
         {
-            this.voxelsQuantity = voxelsInChunk;
-            var voxelSize = chunkSize / voxelsInChunk;
-            //PerlinNoise.SetSeed(123);
-            Stopwatch time = Stopwatch.StartNew();
-            List<Vector3F> positions = new List<Vector3F>();
-            for (float x = blockOrigin.X; x < chunkSize; x += voxelSize)
-            {
-                for (float y = blockOrigin.Y; y < chunkSize; y += voxelSize)
-                {
-                    for (float z = blockOrigin.Z; z < chunkSize; z += voxelSize)
-                    {
-                        {
-                            positions.Add(new Vector3F(x, y, z));
-                        }
-                    }
-                }
-            }
-
-            time.Stop();
-            var elapsed = time.ElapsedMilliseconds;
-            //positions.Clear();
-            //positions.Add(new Vector3F(-1,-1,10));
-            //positions.Add(new Vector3F(-1, 1, 10));
-            //positions.Add(new Vector3F(1, 1, 10));
-            //positions.Add(new Vector3F(1, 1, 10));
-            //positions.Add(new Vector3F(-1, -1, 10));
-            //positions.Add(new Vector3F(1, -1, 10));
-
-            vertex = Buffer.Vertex.New(DeferredDevice.MainDevice, positions.ToArray(), ResourceUsage.Dynamic);
-            //streamOut = Buffer.New<Vector3F>(DeferredDevice.MainDevice, positions.Count *15, BufferFlags.StreamOutput);
-            FillDecals(voxelSize);
+//            this.voxelsQuantity = voxelsInChunk;
+//            var voxelSize = chunkSize / voxelsInChunk;
+//            //PerlinNoise.SetSeed(123);
+//            Stopwatch time = Stopwatch.StartNew();
+//            List<Vector3F> positions = new List<Vector3F>();
+//            for (float x = blockOrigin.X; x < chunkSize; x += voxelSize)
+//            {
+//                for (float y = blockOrigin.Y; y < chunkSize; y += voxelSize)
+//                {
+//                    for (float z = blockOrigin.Z; z < chunkSize; z += voxelSize)
+//                    {
+//                        {
+//                            positions.Add(new Vector3F(x, y, z));
+//                        }
+//                    }
+//                }
+//            }
+//
+//            time.Stop();
+//            var elapsed = time.ElapsedMilliseconds;
+//            //positions.Clear();
+//            //positions.Add(new Vector3F(-1,-1,10));
+//            //positions.Add(new Vector3F(-1, 1, 10));
+//            //positions.Add(new Vector3F(1, 1, 10));
+//            //positions.Add(new Vector3F(1, 1, 10));
+//            //positions.Add(new Vector3F(-1, -1, 10));
+//            //positions.Add(new Vector3F(1, -1, 10));
+//
+//            vertex = Buffer.Vertex.New(DeferredDevice.MainDevice, positions.ToArray(), ResourceUsage.Dynamic);
+//            //streamOut = Buffer.New<Vector3F>(DeferredDevice.MainDevice, positions.Count *15, BufferFlags.StreamOutput);
+//            FillDecals(voxelSize);
         }
 
         private void CreateLookUpTexture2D()
         {
-            GCHandle handle = GCHandle.Alloc(MarchingCubes.TrianglesTable, GCHandleType.Pinned);
-            try
-            {
-                var ptr = handle.AddrOfPinnedObject();
-                DataBox box = new DataBox(ptr, 16 * sizeof(int), 0);
-                lookupTexture = Texture2D.New(DeferredDevice, box, 16, 256, SurfaceFormat.R32.SInt);
-            }
-            finally
-            {
-                handle.Free();
-            }
-
+//            GCHandle handle = GCHandle.Alloc(MarchingCubes.TrianglesTable, GCHandleType.Pinned);
+//            try
+//            {
+//                var ptr = handle.AddrOfPinnedObject();
+//                DataBox box = new DataBox(ptr, 16 * sizeof(int), 0);
+//                lookupTexture = Texture2D.New(DeferredDevice, box, 16, 256, SurfaceFormat.R32.SInt);
+//            }
+//            finally
+//            {
+//                handle.Free();
+//            }
         }
 
         private void FillDecals(float voxelSize)
@@ -247,7 +242,7 @@ namespace Adamantium.EntityFramework.Processors
 
         private void CreateResources()
         {
-            DeferredDevice.SetTargets(null);
+//            DeferredDevice.SetTargets(null);
 
             //var vbFlags = BufferFlags.VertexBuffer | BufferFlags.StreamOutput;
             //normalsStreamOutBuffer = Buffer.New<Vector4F>(DeferredDevice.MainDevice, 1000000, vbFlags);
@@ -274,14 +269,14 @@ namespace Adamantium.EntityFramework.Processors
             //nullTexture = game.Content.Load<Texture2D>("Textures/tgatest.tga");
             //nullTexture = game.Content.Load<Texture2D>("Textures/2RLEExpand.tga");
             //nullTexture = game.Content.Load<Texture2D>("Textures/TestExpand.tga");
-            nullTexture2 = Content.Load<Texture2D>("Textures/luxfon.jpg");
+            //nullTexture2 = Content.Load<Texture2D>("Textures/luxfon.jpg");
             //nullTexture = game.Content.Load<Texture2D>("Textures/BaseAlbedoTextureRLE.tga");
-            nullTexture = Content.Load<Texture2D>("Textures/BaseAlbedoTexture_Text.png");
-            nullTexture3 = Content.Load<Texture2D>("Textures/BaseAlbedoTexture16.tga");
-            nullTexture4 = Content.Load<Texture2D>("Textures/UntitledRLE.tga");
-            nullTexture5 = Content.Load<Texture2D>("Textures/1.jpg");
-            nullTexture6 = Content.Load<Texture2D>("Textures/19093.jpg");
-            pointer = Content.Load<Texture2D>("Textures/circle.png");
+//            nullTexture = Content.Load<Texture2D>("Textures/BaseAlbedoTexture_Text.png");
+//            nullTexture3 = Content.Load<Texture2D>("Textures/BaseAlbedoTexture16.tga");
+//            nullTexture4 = Content.Load<Texture2D>("Textures/UntitledRLE.tga");
+//            nullTexture5 = Content.Load<Texture2D>("Textures/1.jpg");
+//            nullTexture6 = Content.Load<Texture2D>("Textures/19093.jpg");
+//            pointer = Content.Load<Texture2D>("Textures/circle.png");
             //cube = game.Content.Load<TextureCube>("Textures/CubeTest.dds");
             //cube = (TextureCube)Texture.Load(DeferredDevice, new[]
             //{
@@ -289,11 +284,11 @@ namespace Adamantium.EntityFramework.Processors
             //   "Content/Textures/skybox/skyblue_c03.tga", "Content/Textures/skybox/skyblue_c04.tga", "Content/Textures/skybox/skyblue_c05.tga"
             //});
 
-            pointerScaleWhite = new Vector2F(0.25f);
-            pointerScaleBlack = new Vector2F(0.35f);
-            pointerCenterWhite = new Vector2F(pointer.Width / 2.0f * pointerScaleWhite.X, pointer.Height / 2.0f * pointerScaleWhite.Y);
-            pointerCenterBlack = new Vector2F(pointer.Width / 2.0f * pointerScaleBlack.X,
-               pointer.Height / 2.0f * pointerScaleBlack.Y);
+//            pointerScaleWhite = new Vector2F(0.25f);
+//            pointerScaleBlack = new Vector2F(0.35f);
+//            pointerCenterWhite = new Vector2F(pointer.Width / 2.0f * pointerScaleWhite.X, pointer.Height / 2.0f * pointerScaleWhite.Y);
+//            pointerCenterBlack = new Vector2F(pointer.Width / 2.0f * pointerScaleBlack.X,
+//               pointer.Height / 2.0f * pointerScaleBlack.Y);
 
             //cubeMapEffect = Asset.Load<Effect>("Effects/SkyboxEffect.fx");
 
@@ -325,49 +320,49 @@ namespace Adamantium.EntityFramework.Processors
 
         private void CreateWindowResources()
         {
-            var desc = Window.GetDescription();
-            backBuffer = Texture2D.New(DeferredDevice, desc);
-
-            // Renderview on the backbuffer
-            renderTarget = RenderTarget2D.New(DeferredDevice, backBuffer);
-            fractalrenderTarget = RenderTarget2D.New(DeferredDevice, desc);
-
-            // Create the depth buffer and depth buffer view
-            depthBuffer = DepthStencilBuffer.New(DeferredDevice, new Texture2DDescription()
-            {
-                Format = Format.D32_Float_S8X24_UInt,
-                ArraySize = 1,
-                MipLevels = 1,
-                Width = Window.Width,
-                Height = Window.Height,
-                SampleDescription = new SampleDescription((Int32)Window.MSAALevel, 0),
-                Usage = ResourceUsage.Default,
-                BindFlags = BindFlags.DepthStencil,
-                CpuAccessFlags = CpuAccessFlags.None,
-                OptionFlags = ResourceOptionFlags.None
-            });
-
-            viewPort = new ViewportF(0.0f, 0.0f, Window.Width, Window.Height, 0.0f, 1.0f);
+//            var desc = Window.GetDescription();
+//            backBuffer = Texture2D.New(DeferredDevice, desc);
+//
+//            // Renderview on the backbuffer
+//            renderTarget = RenderTarget2D.New(DeferredDevice, backBuffer);
+//            fractalrenderTarget = RenderTarget2D.New(DeferredDevice, desc);
+//
+//            // Create the depth buffer and depth buffer view
+//            depthBuffer = DepthStencilBuffer.New(DeferredDevice, new Texture2DDescription()
+//            {
+//                Format = Format.D32_Float_S8X24_UInt,
+//                ArraySize = 1,
+//                MipLevels = 1,
+//                Width = Window.Width,
+//                Height = Window.Height,
+//                SampleDescription = new SampleDescription((Int32)Window.MSAALevel, 0),
+//                Usage = ResourceUsage.Default,
+//                BindFlags = BindFlags.DepthStencil,
+//                CpuAccessFlags = CpuAccessFlags.None,
+//                OptionFlags = ResourceOptionFlags.None
+//            });
+//
+//            viewPort = new ViewportF(0.0f, 0.0f, Window.Width, Window.Height, 0.0f, 1.0f);
 
             CreateLookUpTexture2D();
         }
 
         private void DisposeWindowsResources()
         {
-            D2dDevice?.Dispose();
-            backBuffer?.Dispose();
-            depthBuffer?.Dispose();
-            renderTarget?.Dispose();
-            fractalrenderTarget?.Dispose();
-            mcube?.Dispose();
-            lookupTexture?.Dispose();
+//            D2dDevice?.Dispose();
+//            backBuffer?.Dispose();
+//            depthBuffer?.Dispose();
+//            renderTarget?.Dispose();
+//            fractalrenderTarget?.Dispose();
+//            mcube?.Dispose();
+//            lookupTexture?.Dispose();
         }
 
         public override bool BeginDraw()
         {
-            DeferredDevice.SetRenderTargets(depthBuffer, renderTarget);
-            DeferredDevice.ClearTargets(Colors.Gray, depthBuffer, renderTarget);
-            DeferredDevice.SetViewport(viewPort);
+//            DeferredDevice.SetRenderTargets(depthBuffer, renderTarget);
+//            DeferredDevice.ClearTargets(Colors.Gray, depthBuffer, renderTarget);
+//            DeferredDevice.SetViewport(viewPort);
             return base.BeginDraw();
         }
 
@@ -379,9 +374,9 @@ namespace Adamantium.EntityFramework.Processors
                 return;
             }
 
-            DeferredDevice.DepthStencilState = DeferredDevice.DepthStencilStates.DepthEnableGreaterEqual;
-            DeferredDevice.BlendState = DeferredDevice.BlendStates.NonPremultiplied;
-            DeferredDevice.RasterizerState = DeferredDevice.RasterizerStates.CullNoneClipDisabled;
+//            DeferredDevice.DepthStencilState = DeferredDevice.DepthStencilStates.DepthEnableGreaterEqual;
+//            DeferredDevice.BlendState = DeferredDevice.BlendStates.NonPremultiplied;
+//            DeferredDevice.RasterizerState = DeferredDevice.RasterizerStates.CullNoneClipDisabled;
 
             Text = "FPS: " + GameTime.FpsCount + "\n";
             /*
@@ -763,35 +758,35 @@ namespace Adamantium.EntityFramework.Processors
             }
             */
             // Precalculate some constants
-            int textureHalfSize = pointer.Width / 2;
-            int spriteSceneWidth = backBuffer.Width / 2;
-            int spriteSceneHeight = backBuffer.Height / 2;
-            int spriteSceneRadiusWidth = backBuffer.Width / 2 - textureHalfSize;
-            int spriteSceneRadiusHeight = backBuffer.Height / 2 - textureHalfSize;
-
-            // Time used to animate the balls
-            var time = (float)gameTime.TotalTime.TotalSeconds;
-
-            // Draw sprites on the screen
-            var random = new Random(0);
-            const int SpriteCount = 50000;
-
-            if (InputService.IsKeyPressed(Keys.F6))
-            {
-                mode = SpriteSortMode.NoSort;
-            }
-            if (InputService.IsKeyPressed(Keys.F7))
-            {
-                mode = SpriteSortMode.BackToFront;
-            }
-            if (InputService.IsKeyPressed(Keys.F8))
-            {
-                mode = SpriteSortMode.FrontToBack;
-            }
-            if (InputService.IsKeyPressed(Keys.F9))
-            {
-                mode = SpriteSortMode.Texture;
-            }
+//            int textureHalfSize = pointer.Width / 2;
+//            int spriteSceneWidth = backBuffer.Width / 2;
+//            int spriteSceneHeight = backBuffer.Height / 2;
+//            int spriteSceneRadiusWidth = backBuffer.Width / 2 - textureHalfSize;
+//            int spriteSceneRadiusHeight = backBuffer.Height / 2 - textureHalfSize;
+//
+//            // Time used to animate the balls
+//            var time = (float)gameTime.TotalTime.TotalSeconds;
+//
+//            // Draw sprites on the screen
+//            var random = new Random(0);
+//            const int SpriteCount = 50000;
+//
+//            if (InputService.IsKeyPressed(Keys.F6))
+//            {
+//                mode = SpriteSortMode.NoSort;
+//            }
+//            if (InputService.IsKeyPressed(Keys.F7))
+//            {
+//                mode = SpriteSortMode.BackToFront;
+//            }
+//            if (InputService.IsKeyPressed(Keys.F8))
+//            {
+//                mode = SpriteSortMode.FrontToBack;
+//            }
+//            if (InputService.IsKeyPressed(Keys.F9))
+//            {
+//                mode = SpriteSortMode.Texture;
+//            }
             /*
             //spriteBatch.Begin(SpriteSortMode.NoSort, GraphicsDeviceService.GraphicsDevice.BlendStates.NonPremultiplied);
             spriteBatch.Begin(mode, GraphicsDeviceService.GraphicsDevice.BlendStates.NonPremultiplied, null, GraphicsDevice.DepthStencilStates.DepthDisable);
@@ -849,7 +844,7 @@ namespace Adamantium.EntityFramework.Processors
 
         float rotation = 0;
 
-        SpriteSortMode mode = SpriteSortMode.NoSort;
+//        SpriteSortMode mode = SpriteSortMode.NoSort;
         private OpenSimplexNoise noise = new OpenSimplexNoise(144);
         private float zoom = 3;
         private Vector2F pan = new Vector2F(0.0f, 0);
@@ -888,32 +883,32 @@ namespace Adamantium.EntityFramework.Processors
                 seed.Y -= 0.001f;
             }
 
-            fractalEffect.Parameters["Zoom"].SetValue(zoom);
-            fractalEffect.Parameters["Pan"].SetValue(pan);
-            fractalEffect.Parameters["JuliaSeed"].SetValue(seed);
-            fractalEffect.Parameters["Iterations"].SetValue(128);
-            fractalEffect.Parameters["ColorScale"].SetValue(new Vector3F(7, 8, 9));
-            fractalEffect.Techniques["Julia"].Passes[0].Apply();
+//            fractalEffect.Parameters["Zoom"].SetValue(zoom);
+//            fractalEffect.Parameters["Pan"].SetValue(pan);
+//            fractalEffect.Parameters["JuliaSeed"].SetValue(seed);
+//            fractalEffect.Parameters["Iterations"].SetValue(128);
+//            fractalEffect.Parameters["ColorScale"].SetValue(new Vector3F(7, 8, 9));
+//            fractalEffect.Techniques["Julia"].Passes[0].Apply();
             //fractalEffect.Techniques["Mandelbrot"].Passes[0].Apply();
-            DeferredDevice.Quad.Draw();
+//            DeferredDevice.Quad.Draw();
         }
 
         public override void EndDraw()
         {
             base.EndDraw();
 
-            if (DeferredDevice.IsD2dSupportEnabled)
-            {
-                D2dDevice.BeginDraw();
-                D2dDevice.DrawText(Text);
-                D2dDevice.EndDraw();
-            }
-
-            if (renderTarget.Description.Width == Window.Width &&
-                renderTarget.Description.Height == Window.Height)
-            {
-                DeferredDevice.MainDevice.CopyResource(renderTarget, Window.BackBuffer);
-            }
+//            if (DeferredDevice.IsD2dSupportEnabled)
+//            {
+//                D2dDevice.BeginDraw();
+//                D2dDevice.DrawText(Text);
+//                D2dDevice.EndDraw();
+//            }
+//
+//            if (renderTarget.Description.Width == Window.Width &&
+//                renderTarget.Description.Height == Window.Height)
+//            {
+//                DeferredDevice.MainDevice.CopyResource(renderTarget, Window.BackBuffer);
+//            }
         }
     }
 }

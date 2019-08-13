@@ -110,11 +110,11 @@ namespace Adamantium.EntityFramework.Components
 
             if (Geometry.Indices != null)
             {
-                renderContext.DrawIndexed(Geometry.MeshTopology, Geometry.Indices.Length);
+//                renderContext.DrawIndexed(Geometry.MeshTopology, Geometry.Indices.Length);
             }
             else
             {
-                renderContext.Draw(Geometry.MeshTopology, Geometry.Positions.Length);
+//                renderContext.Draw(Geometry.MeshTopology, Geometry.Positions.Length);
             }
         }
 

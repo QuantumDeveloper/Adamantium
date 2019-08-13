@@ -6,6 +6,7 @@ using Adamantium.Engine.GameInput;
 using Adamantium.Engine.Graphics;
 using Adamantium.Engine.Services;
 using Adamantium.EntityFramework.Extensions;
+using Adamantium.Imaging;
 using Adamantium.Mathematics;
 
 namespace Adamantium.EntityFramework.Processors
@@ -318,10 +319,8 @@ namespace Adamantium.EntityFramework.Processors
                     window?.TakeScreenShot(filename, ImageFileType.Tga);
                     filename = $"Screenshot_{window.Name}" + DateTime.Now.ToString("dd_MM_yyyy hh_mm_ss_ffff", CultureInfo.InvariantCulture) + ".bmp";
                     window?.TakeScreenShot(filename, ImageFileType.Bmp);
-                    filename = $"Screenshot_{window.Name}" + DateTime.Now.ToString("dd_MM_yyyy hh_mm_ss_ffff", CultureInfo.InvariantCulture) + ".wmp";
-                    window?.TakeScreenShot(filename, ImageFileType.Wmp);
-                    filename = $"Screenshot_{window.Name}" + DateTime.Now.ToString("dd_MM_yyyy hh_mm_ss_ffff", CultureInfo.InvariantCulture) + ".tiff";
-                    window?.TakeScreenShot(filename, ImageFileType.Tiff);
+//                    filename = $"Screenshot_{window.Name}" + DateTime.Now.ToString("dd_MM_yyyy hh_mm_ss_ffff", CultureInfo.InvariantCulture) + ".tiff";
+//                    window?.TakeScreenShot(filename, ImageFileType.Tiff);
                 }
             }
 

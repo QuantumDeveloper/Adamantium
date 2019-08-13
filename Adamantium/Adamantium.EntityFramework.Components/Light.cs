@@ -1,5 +1,6 @@
 ﻿using System;
-using Adamantium.Engine.Core;
+using Adamantium.Engine.Core.Models;
+using Adamantium.EntityFramework.ComponentsBasics;
 using Adamantium.Mathematics;
 
 namespace Adamantium.EntityFramework.Components

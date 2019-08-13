@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Models;
+using Adamantium.EntityFramework.ComponentsBasics;
 using Adamantium.Mathematics;
 using Adamantium.Win32;
 

@@ -6,7 +6,6 @@ using Adamantium.Engine.Graphics;
 using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Templates;
 using Adamantium.Mathematics;
-using SharpDX.IO;
 
 namespace Adamantium.Engine.Templates
 {
@@ -31,7 +30,7 @@ namespace Adamantium.Engine.Templates
 
       private Task<Entity> LoadEntityFromFile(Entity owner)
       {
-         Stream input = new NativeFileStream(pathToFile, NativeFileMode.Open, NativeFileAccess.Read);
+         var input = File.ReadAllBytes(pathToFile);
          GameContainer container = null;
          /*
          try

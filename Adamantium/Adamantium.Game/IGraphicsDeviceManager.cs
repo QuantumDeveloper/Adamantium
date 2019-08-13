@@ -1,5 +1,4 @@
 ﻿using Adamantium.Engine.Graphics;
-using SharpDX.Direct3D;
 
 namespace Adamantium.Engine
 {
@@ -52,10 +51,5 @@ namespace Adamantium.Engine
       /// Adapter on which device will create
       /// </summary>
       GraphicsAdapter Adapter { get; set; }
-
-      /// <summary>
-      /// Device feature level
-      /// </summary>
-      FeatureLevel Profile { get; set; }
    }
 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Adamantium.Engine;
 using Adamantium.Engine.Core.Models;
 using Adamantium.Engine.Graphics;
+using Adamantium.EntityFramework.ComponentsBasics;
 using Adamantium.Mathematics;
 
 namespace Adamantium.EntityFramework.Components
@@ -10,11 +11,11 @@ namespace Adamantium.EntityFramework.Components
    public class SphereCollider: Collider
    {
       private BoundingSphere sphere;
-      protected Dictionary<Camera, BoundingSphere> ColliderData { get; }
+      protected Dictionary<CameraBase, BoundingSphere> ColliderData { get; }
 
       public SphereCollider()
       {
-         ColliderData = new Dictionary<Camera, BoundingSphere>();
+         ColliderData = new Dictionary<CameraBase, BoundingSphere>();
       }
 
       public override void ClearData()
@@ -22,7 +23,7 @@ namespace Adamantium.EntityFramework.Components
          ColliderData.Clear();
       }
 
-      public override bool ContainsDataFor(Camera camera)
+      public override bool ContainsDataFor(CameraBase camera)
       {
          return ColliderData.ContainsKey(camera);
       }
@@ -39,7 +40,7 @@ namespace Adamantium.EntityFramework.Components
          base.CalculateFromMesh(mesh);
       }
 
-      public override void UpdateForCamera(Camera camera)
+      public override void UpdateForCamera(CameraBase camera)
       {
          var bb = sphere.Transform(Vector3F.Max(Owner.Transform.Scale), Owner.Transform.GetMetadata(camera).RelativePosition);
          if (!ColliderData.ContainsKey(camera))

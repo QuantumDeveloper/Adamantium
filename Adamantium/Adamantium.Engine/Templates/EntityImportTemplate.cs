@@ -6,11 +6,11 @@ using Adamantium.Engine.Core.Content;
 using Adamantium.Engine.Core.Models;
 using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
+using Adamantium.EntityFramework.ComponentsBasics;
 using Adamantium.EntityFramework.Extensions;
 using Adamantium.EntityFramework.Templates;
 using Adamantium.Mathematics;
 using Adamantium.Win32;
-using Texture2D = Adamantium.Engine.Graphics.Texture2D;
 
 namespace Adamantium.Engine.Templates
 {
@@ -218,7 +218,7 @@ namespace Adamantium.Engine.Templates
                                 AllowDuplication = false,
                                 IgnoreRootDirectory = true
                             };
-                            material.Texture = contentManager.Load<Texture2D>(material.TexturePath, options);
+//                            material.Texture = contentManager.Load<Texture2D>(material.TexturePath, options);
                         }
                     }
                     entity.AddComponent(material);
