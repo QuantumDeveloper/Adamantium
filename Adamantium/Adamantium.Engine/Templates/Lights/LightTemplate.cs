@@ -1,7 +1,7 @@
 ﻿using System;
+using Adamantium.Engine.Core.Models;
 using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
-using LightType = Adamantium.Engine.Core.LightType;
 
 namespace Adamantium.Engine.Templates.Lights
 {

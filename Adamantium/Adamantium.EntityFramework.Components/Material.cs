@@ -1,8 +1,8 @@
 ﻿using System;
 using System.ComponentModel;
 using Adamantium.Engine.Graphics;
-using Adamantium.EntityFramework.ComponentsBasics;
 using Adamantium.Mathematics;
+using Component = Adamantium.EntityFramework.ComponentsBasics.Component;
 using TextureDimension = Adamantium.Engine.Core.Models.TextureDimension;
 
 namespace Adamantium.EntityFramework.Components

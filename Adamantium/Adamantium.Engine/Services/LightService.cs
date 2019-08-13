@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using Adamantium.Engine.Core;
+using Adamantium.Engine.Core.Models;
 using Adamantium.Engine.GameInput;
 using Adamantium.Engine.Graphics;
 using Adamantium.Engine.Templates.Lights;
@@ -17,7 +18,7 @@ namespace Adamantium.Engine.Services
     public class LightService
     {
         private List<Light> lights;
-        private Effect depthWriter;
+        //private Effect depthWriter;
         private Game _game;
 
         private object _syncObj = new object();
@@ -235,117 +236,117 @@ namespace Adamantium.Engine.Services
             return null;
         }
 
-        public void DrawIcons(Effect effect, Camera camera, GraphicsDevice drawingContext, IGameTime gametime)
-        {
-            var directionRender = DirectionalLightIcon.GetComponent<RenderableComponent>();
-            var pointRender = PointLightIcon.GetComponent<RenderableComponent>();
-            var spotRender = SpotLightIcon.GetComponent<RenderableComponent>();
-            lock (_syncObj)
-            {
-                var view = camera.ViewMatrix;
-                var proj = camera.ProjectionMatrix;
-                effect.Parameters["viewMatrix"].SetValue(view);
-                effect.Parameters["projectionMatrix"].SetValue(proj);
-
-                foreach (var light in lights)
-                {
-                    if (!light.Owner.IsEnabled)
-                    {
-                        continue;
-                    }
-
-                    var transform = light.Owner.Transform.GetMetadata(camera);
-
-                    if (transform.RelativePosition.Length() < PointLightIcon.GetDiameter())
-                    {
-                        continue;
-                    }
-
-                    var billboard = Matrix4x4F.BillboardRH(transform.RelativePosition, Vector3F.Zero, camera.Up, camera.Forward);
-                    var rotation = MathHelper.GetRotationFromMatrix(billboard);
-                    var world = Matrix4x4F.RotationQuaternion(rotation) * Matrix4x4F.Translation(transform.RelativePosition);
-
-                    var transparency = 1 - (1 / transform.RelativePosition.Length());
-                    effect.Parameters["transparency"].SetValue(transparency);
-                    effect.Parameters["worldMatrix"].SetValue(world);
-                    effect.Parameters["wvp"].SetValue(world * view * proj);
-                    effect.Parameters["meshColor"].SetValue(light.Color);
-                    effect.Techniques["MeshVertex"].Passes["NoLight"].Apply();
-                    if (light.Type == LightType.Directional)
-                    {
-                        directionRender.Draw(drawingContext, gametime);
-                    }
-                    else if (light.Type == LightType.Point)
-                    {
-                        pointRender.Draw(drawingContext, gametime);
-                    }
-                    else if (light.Type == LightType.Spot)
-                    {
-                        spotRender.Draw(drawingContext, gametime);
-                    }
-                }
-            }
-
-            effect.Techniques["MeshVertex"].Passes["NoLight"].UnApply();
-        }
-
-        public void DrawDebugLight(Entity lightEntity, Effect effect, CameraService cameraService, Camera activeCamera, GraphicsDevice drawingContext, IGameTime gameTime)
-        {
-            if (lightEntity == null || !lightEntity.IsEnabled)
-                return;
-
-            if (!Contains(lightEntity))
-            {
-                return;
-            }
-
-            var light = lightEntity.GetComponent<Light>();
-            LightTool tool = null;
-            switch (light.Type)
-            {
-                case LightType.Directional:
-                    tool = DirectionalLightTool;
-                    break;
-                case LightType.Point:
-                    tool = PointLightTool;
-                    break;
-                case LightType.Spot:
-                    tool = SpotLightTool;
-                    break;
-            }
-            tool.TransformTool(lightEntity, light, cameraService, activeCamera);
-            tool.Tool.TraverseByLayer(current => ProcessLight(current, effect, cameraService.UserControlledCamera, drawingContext, gameTime), true);
-            effect.Techniques["MeshVertex"].Passes["NoLight"].UnApply(true);
-        }
-
-        private void ProcessLight(Entity current, Effect effect, Camera camera, GraphicsDevice drawingContext, IGameTime gameTime)
-        {
-            var transformation = current.Transform.GetMetadata(camera);
-            if (!transformation.Enabled || !current.Visible)
-            {
-                return;
-            }
-
-            var geometries = current.GetComponents<MeshRendererBase>();
-            foreach (var component in geometries)
-            {
-                var world = transformation.WorldMatrix;
-                var wvp = world * camera.ViewMatrix * camera.ProjectionMatrix;
-                effect.Parameters["wvp"].SetValue(wvp);
-
-                if (!current.IsSelected)
-                {
-                    effect.Parameters["meshColor"].SetValue(Colors.Yellow.ToVector3());
-                }
-                else
-                {
-                    effect.Parameters["meshColor"].SetValue(Colors.Red.ToVector3());
-                }
-
-                effect.Techniques["MeshVertex"].Passes["NoLight"].Apply();
-                component.Draw(drawingContext, gameTime);
-            }
-        }
+//        public void DrawIcons(Effect effect, Camera camera, GraphicsDevice drawingContext, IGameTime gametime)
+//        {
+//            var directionRender = DirectionalLightIcon.GetComponent<RenderableComponent>();
+//            var pointRender = PointLightIcon.GetComponent<RenderableComponent>();
+//            var spotRender = SpotLightIcon.GetComponent<RenderableComponent>();
+//            lock (_syncObj)
+//            {
+//                var view = camera.ViewMatrix;
+//                var proj = camera.ProjectionMatrix;
+//                effect.Parameters["viewMatrix"].SetValue(view);
+//                effect.Parameters["projectionMatrix"].SetValue(proj);
+//
+//                foreach (var light in lights)
+//                {
+//                    if (!light.Owner.IsEnabled)
+//                    {
+//                        continue;
+//                    }
+//
+//                    var transform = light.Owner.Transform.GetMetadata(camera);
+//
+//                    if (transform.RelativePosition.Length() < PointLightIcon.GetDiameter())
+//                    {
+//                        continue;
+//                    }
+//
+//                    var billboard = Matrix4x4F.BillboardRH(transform.RelativePosition, Vector3F.Zero, camera.Up, camera.Forward);
+//                    var rotation = MathHelper.GetRotationFromMatrix(billboard);
+//                    var world = Matrix4x4F.RotationQuaternion(rotation) * Matrix4x4F.Translation(transform.RelativePosition);
+//
+//                    var transparency = 1 - (1 / transform.RelativePosition.Length());
+//                    effect.Parameters["transparency"].SetValue(transparency);
+//                    effect.Parameters["worldMatrix"].SetValue(world);
+//                    effect.Parameters["wvp"].SetValue(world * view * proj);
+//                    effect.Parameters["meshColor"].SetValue(light.Color);
+//                    effect.Techniques["MeshVertex"].Passes["NoLight"].Apply();
+//                    if (light.Type == LightType.Directional)
+//                    {
+//                        directionRender.Draw(drawingContext, gametime);
+//                    }
+//                    else if (light.Type == LightType.Point)
+//                    {
+//                        pointRender.Draw(drawingContext, gametime);
+//                    }
+//                    else if (light.Type == LightType.Spot)
+//                    {
+//                        spotRender.Draw(drawingContext, gametime);
+//                    }
+//                }
+//            }
+//
+//            effect.Techniques["MeshVertex"].Passes["NoLight"].UnApply();
+//        }
+//
+//        public void DrawDebugLight(Entity lightEntity, Effect effect, CameraService cameraService, Camera activeCamera, GraphicsDevice drawingContext, IGameTime gameTime)
+//        {
+//            if (lightEntity == null || !lightEntity.IsEnabled)
+//                return;
+//
+//            if (!Contains(lightEntity))
+//            {
+//                return;
+//            }
+//
+//            var light = lightEntity.GetComponent<Light>();
+//            LightTool tool = null;
+//            switch (light.Type)
+//            {
+//                case LightType.Directional:
+//                    tool = DirectionalLightTool;
+//                    break;
+//                case LightType.Point:
+//                    tool = PointLightTool;
+//                    break;
+//                case LightType.Spot:
+//                    tool = SpotLightTool;
+//                    break;
+//            }
+//            tool.TransformTool(lightEntity, light, cameraService, activeCamera);
+//            tool.Tool.TraverseByLayer(current => ProcessLight(current, effect, cameraService.UserControlledCamera, drawingContext, gameTime), true);
+//            effect.Techniques["MeshVertex"].Passes["NoLight"].UnApply(true);
+//        }
+//
+//        private void ProcessLight(Entity current, Effect effect, Camera camera, GraphicsDevice drawingContext, IGameTime gameTime)
+//        {
+//            var transformation = current.Transform.GetMetadata(camera);
+//            if (!transformation.Enabled || !current.Visible)
+//            {
+//                return;
+//            }
+//
+//            var geometries = current.GetComponents<MeshRendererBase>();
+//            foreach (var component in geometries)
+//            {
+//                var world = transformation.WorldMatrix;
+//                var wvp = world * camera.ViewMatrix * camera.ProjectionMatrix;
+//                effect.Parameters["wvp"].SetValue(wvp);
+//
+//                if (!current.IsSelected)
+//                {
+//                    effect.Parameters["meshColor"].SetValue(Colors.Yellow.ToVector3());
+//                }
+//                else
+//                {
+//                    effect.Parameters["meshColor"].SetValue(Colors.Red.ToVector3());
+//                }
+//
+//                effect.Techniques["MeshVertex"].Passes["NoLight"].Apply();
+//                component.Draw(drawingContext, gameTime);
+//            }
+//        }
 
         public void DrawPointLightMesh(GraphicsDevice device, IGameTime gameTime)
         {

@@ -138,11 +138,7 @@ namespace Adamantium.Engine
 
         internal static GameWindow New(GameContext gameContext)
         {
-            if (gameContext.ContextType == GameContextType.WinForms)
-            {
-                return new GameWindowWinForms(gameContext);
-            }
-            else if (gameContext.ContextType == GameContextType.RenderTargetPanel)
+            if (gameContext.ContextType == GameContextType.RenderTargetPanel)
             {
                 return new GameWindowAdamantium(gameContext);
             }
@@ -152,11 +148,7 @@ namespace Adamantium.Engine
 
         internal static GameWindow New(GameContext gameContext, SurfaceFormat pixelFormat, DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24, MSAALevel msaaLevel = MSAALevel.X4)
         {
-            if (gameContext.ContextType == GameContextType.WinForms)
-            {
-                return new GameWindowWinForms(gameContext, pixelFormat, depthFormat, msaaLevel);
-            }
-            else if (gameContext.ContextType == GameContextType.RenderTargetPanel)
+            if (gameContext.ContextType == GameContextType.RenderTargetPanel)
             {
                 return new GameWindowAdamantium(gameContext, pixelFormat, depthFormat, msaaLevel);
             }
