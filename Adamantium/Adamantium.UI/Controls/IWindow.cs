@@ -12,8 +12,7 @@ namespace Adamantium.UI.Controls
         void Hide();
 
         IntPtr Handle { get; }
-
-        public bool IsClosed { get; }
+        bool IsClosed { get; }
 
         event EventHandler<SizeChangedEventArgs> ClientSizeChanged;
         event EventHandler<EventArgs> Loaded;
