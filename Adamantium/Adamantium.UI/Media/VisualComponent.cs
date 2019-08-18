@@ -7,7 +7,7 @@ using Adamantium.Mathematics;
 
 namespace Adamantium.UI.Media
 {
-   public class VisualComponent:DependencyComponent, IVisual
+   public class VisualComponent: DependencyComponent, IVisual
    {
       public static readonly AdamantiumProperty PositionProperty = AdamantiumProperty.Register(nameof(Location),
          typeof (Point), typeof (VisualComponent), new PropertyMetadata(Point.Zero));

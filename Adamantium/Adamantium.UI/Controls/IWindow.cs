@@ -15,8 +15,7 @@ namespace Adamantium.UI.Controls
         bool IsClosed { get; }
 
         event EventHandler<SizeChangedEventArgs> ClientSizeChanged;
-        event EventHandler<EventArgs> Loaded;
-        event EventHandler<EventArgs> Closing;
+        event EventHandler<WindowClosingEventArgs> Closing;
         event EventHandler<EventArgs> Closed;
     }
 }

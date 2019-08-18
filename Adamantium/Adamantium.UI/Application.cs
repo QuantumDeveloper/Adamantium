@@ -24,8 +24,8 @@ namespace Adamantium.UI
         public Uri StartupUri { get; set; }
 
 
-        private GraphicsDevice GraphicsDevice;
-        private EntityWorld _entityWorld;
+        private GraphicsDevice graphicsDevice;
+        private EntityWorld entityWorld;
         private Dictionary<IWindow, UIRenderProcessor> windowToSystem;
 
         protected ApplicationTime appTime;
@@ -57,23 +57,29 @@ namespace Adamantium.UI
             Services = new ServiceStorage();
             Services.Add(_systemManager);
             Services.Add<IRunningService>(Current);
-            _entityWorld = new EntityWorld(Services);
+            entityWorld = new EntityWorld(Services);
             Initialize();
         }
 
-        public abstract MouseDevice MouseDevice { get; }
+        private void MainWindow_Closed(object sender, EventArgs e)
+        {
+            MainWindow.Closed -= MainWindow_Closed;
+            MainWindow = null;
+        }
 
-        public abstract KeyboardDevice KeyboardDevice { get; }
+        internal abstract MouseDevice MouseDevice { get; }
+
+        internal abstract KeyboardDevice KeyboardDevice { get; }
 
         private void WindowAdded(object sender, WindowEventArgs e)
         {
-            var transformProcessor = new UITransformProcessor(_entityWorld);
-            var renderProcessor = new UIRenderProcessor(_entityWorld, GraphicsDevice);
+            var transformProcessor = new UITransformProcessor(entityWorld);
+            var renderProcessor = new UIRenderProcessor(entityWorld, graphicsDevice);
             var entity = new Entity();
             entity.AddComponent(e.Window);
-            _entityWorld.AddEntity(entity);
-            _entityWorld.AddProcessor(transformProcessor);
-            _entityWorld.AddProcessor(renderProcessor);
+            entityWorld.AddEntity(entity);
+            entityWorld.AddProcessor(transformProcessor);
+            entityWorld.AddProcessor(renderProcessor);
 
             //InputDevice mouseDevice = new InputDevice();
             //mouseDevice.WindowHandle = e.Window.Handle;
@@ -91,7 +97,7 @@ namespace Adamantium.UI
             if (!windowToSystem.ContainsKey(e.Window)) return;
             var processor = windowToSystem[e.Window];
             processor.UnloadContent();
-            _entityWorld.RemoveProcessor(processor);
+            entityWorld.RemoveProcessor(processor);
         }
 
         public bool IsRunning => _isRunning;
@@ -99,6 +105,10 @@ namespace Adamantium.UI
 
         public void Run()
         {
+            if (MainWindow != null)
+            {
+                MainWindow.Closed += MainWindow_Closed;
+            }
             Win32.Message msg;
             IsApplicationRunning = true;
 
@@ -126,8 +136,11 @@ namespace Adamantium.UI
                     UnhandledException?.Invoke(this, new UnhandledExceptionEventArgs(ex));
                 }
 
-                if (ShutDownMode != ShutDownMode.OnMainWindowClosed) continue;
-                if (MainWindow != null && MainWindow.IsClosed)
+                if (ShutDownMode == ShutDownMode.OnMainWindowClosed && MainWindow == null)
+                {
+                    IsApplicationRunning = false;
+                }
+                else if (ShutDownMode == ShutDownMode.OnLastWindowClosed && Windows.Count == 0)
                 {
                     IsApplicationRunning = false;
                 }
@@ -213,7 +226,7 @@ namespace Adamantium.UI
         {
             IsApplicationRunning = false;
             ContentUnloading?.Invoke(this, EventArgs.Empty);
-            GraphicsDevice.Dispose();
+            graphicsDevice.Dispose();
         }
 
         /// <summary>
