@@ -7,7 +7,7 @@ namespace Adamantium.UI.Windows
 {
     public class WindowsApplication : Application
     {
-        public override MouseDevice MouseDevice => WindowsMouseDevice.Instance;
-        public override KeyboardDevice KeyboardDevice => WindowsKeyboardDevice.Instance;
+        internal override MouseDevice MouseDevice => WindowsMouseDevice.Instance;
+        internal override KeyboardDevice KeyboardDevice => WindowsKeyboardDevice.Instance;
     }
 }

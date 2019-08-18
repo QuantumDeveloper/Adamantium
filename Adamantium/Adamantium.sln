@@ -27,8 +27,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AdamantiumVulkan.Windows", 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.EntityFramework.Components", "Adamantium.EntityFramework.Components\Adamantium.EntityFramework.Components.csproj", "{76BFB7BF-3501-440E-A189-A4C74673E96D}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.UI", "Adamantium.UI\Adamantium.UI.csproj", "{B7130473-409B-4559-A4EC-8C45F7BAA15F}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Game", "Adamantium.Game\Adamantium.Game.csproj", "{A02907D8-8A1C-4D77-A397-C57CB4323021}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Engine", "Adamantium.Engine\Adamantium.Engine.csproj", "{2703C5BE-1D98-4111-A195-C465BF176357}"
@@ -45,7 +43,14 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.UI.Windows", "Ad
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Engine.Compiler", "Adamantium.Engine.Compiler\Adamantium.Engine.Compiler.csproj", "{7745D669-6AE3-4BBD-8A3F-200D5918056C}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.UI.Playground", "Adamantium.UI.Playground\Adamantium.UI.Playground.csproj", "{CB099BE3-3263-4452-A566-F794FD2C0EF4}"
+EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Adamantium.UI", "Adamantium.UI\Adamantium.UI.shproj", "{AE306D9C-09E3-4E7A-BBFA-B45DE2A66F59}"
+EndProject
 Global
+	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		Adamantium.UI\Adamantium.UI.projitems*{ae306d9c-09e3-4e7a-bbfa-b45de2a66f59}*SharedItemsImports = 13
+	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Debug|x64 = Debug|x64
@@ -145,14 +150,6 @@ Global
 		{76BFB7BF-3501-440E-A189-A4C74673E96D}.Release|Any CPU.Build.0 = Release|Any CPU
 		{76BFB7BF-3501-440E-A189-A4C74673E96D}.Release|x64.ActiveCfg = Release|Any CPU
 		{76BFB7BF-3501-440E-A189-A4C74673E96D}.Release|x64.Build.0 = Release|Any CPU
-		{B7130473-409B-4559-A4EC-8C45F7BAA15F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{B7130473-409B-4559-A4EC-8C45F7BAA15F}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{B7130473-409B-4559-A4EC-8C45F7BAA15F}.Debug|x64.ActiveCfg = Debug|x64
-		{B7130473-409B-4559-A4EC-8C45F7BAA15F}.Debug|x64.Build.0 = Debug|x64
-		{B7130473-409B-4559-A4EC-8C45F7BAA15F}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{B7130473-409B-4559-A4EC-8C45F7BAA15F}.Release|Any CPU.Build.0 = Release|Any CPU
-		{B7130473-409B-4559-A4EC-8C45F7BAA15F}.Release|x64.ActiveCfg = Release|Any CPU
-		{B7130473-409B-4559-A4EC-8C45F7BAA15F}.Release|x64.Build.0 = Release|Any CPU
 		{A02907D8-8A1C-4D77-A397-C57CB4323021}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{A02907D8-8A1C-4D77-A397-C57CB4323021}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A02907D8-8A1C-4D77-A397-C57CB4323021}.Debug|x64.ActiveCfg = Debug|x64
@@ -209,6 +206,14 @@ Global
 		{7745D669-6AE3-4BBD-8A3F-200D5918056C}.Release|Any CPU.Build.0 = Release|Any CPU
 		{7745D669-6AE3-4BBD-8A3F-200D5918056C}.Release|x64.ActiveCfg = Release|Any CPU
 		{7745D669-6AE3-4BBD-8A3F-200D5918056C}.Release|x64.Build.0 = Release|Any CPU
+		{CB099BE3-3263-4452-A566-F794FD2C0EF4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CB099BE3-3263-4452-A566-F794FD2C0EF4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CB099BE3-3263-4452-A566-F794FD2C0EF4}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{CB099BE3-3263-4452-A566-F794FD2C0EF4}.Debug|x64.Build.0 = Debug|Any CPU
+		{CB099BE3-3263-4452-A566-F794FD2C0EF4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CB099BE3-3263-4452-A566-F794FD2C0EF4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CB099BE3-3263-4452-A566-F794FD2C0EF4}.Release|x64.ActiveCfg = Release|Any CPU
+		{CB099BE3-3263-4452-A566-F794FD2C0EF4}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
