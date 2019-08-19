@@ -104,29 +104,25 @@ namespace Adamantium.Mathematics
 
             var vertices = new List<Vector3F>();
 
-            var triangTask = Task.Run(() =>
+            Parallel.ForEach(polygons, item =>
             {
-                MergePoints();
-                MergeSegments();
-
-                MergeSelfIntersectedPoints();
-                MergeSelfIntersectedSegments();
-
-                CheckPolygonsIntersection();
-
-                UpdateBoundingBox();
-
-                var result = Triangulator.Triangulate(this);
-
-                lock(vertexLocker)
-                {
-                    vertices.AddRange(result);
-                }
+                var result1 = TriangulatePolygonItem(item);
+                vertices.AddRange(result1);
             });
 
-            Parallel.ForEach(polygons, item => { TriangulatePolygonItem(item); });
+            MergePoints();
+            MergeSegments();
 
-            Task.WaitAll(triangTask);
+            MergeSelfIntersectedPoints();
+            MergeSelfIntersectedSegments();
+
+            CheckPolygonsIntersection();
+
+            UpdateBoundingBox();
+
+            var result = Triangulator.Triangulate(this);
+
+            vertices.AddRange(result);
 
             return vertices;
         }
