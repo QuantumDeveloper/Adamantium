@@ -22,10 +22,16 @@ namespace Adamantium.Mathematics
         /// Polygon name
         /// </summary>
         public string Name { get; set; }
+
         /// <summary>
         /// Collection of <see cref="PolygonItem"/>
         /// </summary>
         public List<PolygonItem> Polygons { get; private set; }
+
+        /// <summary>
+        /// Collection of <see cref="PolygonItem"/>
+        /// </summary>
+        internal List<PolygonItem> PolygonsCopy { get; private set; }
 
         /// <summary>
         /// Colllection of points from all <see cref="PolygonItem"/>s in current <see cref="Polygon"/>
@@ -63,6 +69,7 @@ namespace Adamantium.Mathematics
         public FillRule FillRule { get; set; }
 
         private readonly List<PolygonPair> checkedPolygons;
+        private object vertexLocker = new object();
 
         /// <summary>
         /// Constructs <see cref="Polygon"/>
@@ -85,23 +92,94 @@ namespace Adamantium.Mathematics
         /// <returns></returns>
         public List<Vector3F> Fill()
         {
-            Parallel.For(0, Polygons.Count, i =>
+            PolygonsCopy = new List<PolygonItem>(Polygons);
+
+            Parallel.For(0, PolygonsCopy.Count, i =>
             {
-                Polygons[i].SplitOnSegments();
-                Polygons[i].CheckForSelfIntersection(FillRule);
+                PolygonsCopy[i].SplitOnSegments();
+                PolygonsCopy[i].CheckForSelfIntersection(FillRule);
             });
 
-            MergePoints();
-            MergeSegments();
+            var polygons = CheckPolygonItemIntersections();
 
-            MergeSelfIntersectedPoints();
-            MergeSelfIntersectedSegments();
+            var vertices = new List<Vector3F>();
 
-            CheckPolygonsIntersection();
+            var triangTask = Task.Run(() =>
+            {
+                MergePoints();
+                MergeSegments();
 
-            UpdateBoundingBox();
+                MergeSelfIntersectedPoints();
+                MergeSelfIntersectedSegments();
+
+                CheckPolygonsIntersection();
+
+                UpdateBoundingBox();
+
+                var result = Triangulator.Triangulate(this);
+
+                lock(vertexLocker)
+                {
+                    vertices.AddRange(result);
+                }
+            });
+
+            Parallel.ForEach(polygons, item => { TriangulatePolygonItem(item); });
+
+            Task.WaitAll(triangTask);
+
+            return vertices;
+        }
+
+        private List<Vector3F> TriangulatePolygonItem(PolygonItem item)
+        {
+            var itemCopy = item;
+            var polygon = new Polygon();
+            polygon.MergedPoints = itemCopy.Points;
+            polygon.MergedSegments = itemCopy.Segments;
+            polygon.SelfIntersectedPoints = itemCopy.SelfIntersectedPoints;
+            polygon.SelfIntersectedSegments = itemCopy.SelfIntersectedSegments;
+
+            polygon.UpdateBoundingBox();
 
             return Triangulator.Triangulate(this);
+        }
+
+        private List<PolygonItem> CheckPolygonItemIntersections()
+        {
+            var polygonsList = new List<PolygonItem>();
+
+            if (PolygonsCopy.Count <= 1)
+            {
+                return polygonsList;
+            }
+
+            foreach(var polygon1 in PolygonsCopy)
+            {
+                foreach(var polygon2 in PolygonsCopy)
+                {
+                    if (polygon1 == polygon2) continue;
+
+                    var bb2 = polygon2.BoundingBox;
+                    var containment = polygon1.BoundingBox.Contains(ref bb2);
+                    if (containment != ContainmentType.Disjoint)
+                    {
+                        break;
+                    }
+
+                    polygonsList.Add(polygon1);
+                }
+            }
+
+            foreach(var p in polygonsList)
+            {
+                if (PolygonsCopy.Contains(p))
+                {
+                    PolygonsCopy.Remove(p);
+                }
+            }
+
+            return polygonsList;
         }
 
         /// <summary>
@@ -110,9 +188,9 @@ namespace Adamantium.Mathematics
         private void MergePoints()
         {
             MergedPoints.Clear();
-            for (int i = 0; i < Polygons.Count; ++i)
+            for (int i = 0; i < PolygonsCopy.Count; ++i)
             {
-                MergedPoints.AddRange(Polygons[i].Points);
+                MergedPoints.AddRange(PolygonsCopy[i].Points);
             }
         }
 
@@ -122,9 +200,9 @@ namespace Adamantium.Mathematics
         private void MergeSelfIntersectedPoints()
         {
             SelfIntersectedPoints.Clear();
-            for (int i = 0; i < Polygons.Count; ++i)
+            for (int i = 0; i < PolygonsCopy.Count; ++i)
             {
-                SelfIntersectedPoints.AddRange(Polygons[i].SelfIntersectedPoints);
+                SelfIntersectedPoints.AddRange(PolygonsCopy[i].SelfIntersectedPoints);
             }
         }
 
@@ -134,9 +212,9 @@ namespace Adamantium.Mathematics
         private void MergeSegments()
         {
             MergedSegments.Clear();
-            for (int i = 0; i < Polygons.Count; ++i)
+            for (int i = 0; i < PolygonsCopy.Count; ++i)
             {
-                MergedSegments.AddRange(Polygons[i].Segments);
+                MergedSegments.AddRange(PolygonsCopy[i].Segments);
             }
         }
 
@@ -146,9 +224,9 @@ namespace Adamantium.Mathematics
         private void MergeSelfIntersectedSegments()
         {
             SelfIntersectedSegments.Clear();
-            for (int i = 0; i < Polygons.Count; ++i)
+            for (int i = 0; i < PolygonsCopy.Count; ++i)
             {
-                SelfIntersectedSegments.AddRange(Polygons[i].SelfIntersectedSegments);
+                SelfIntersectedSegments.AddRange(PolygonsCopy[i].SelfIntersectedSegments);
             }
         }
 
@@ -157,18 +235,18 @@ namespace Adamantium.Mathematics
         /// </summary>
         private void CheckPolygonsIntersection()
         {
-            if (Polygons.Count <= 1)
+            if (PolygonsCopy.Count <= 1)
             {
                 return;
             }
 
             List<Vector3D> edgePoints = new List<Vector3D>();
-            for (int i = 0; i < Polygons.Count; i++)
+            for (int i = 0; i < PolygonsCopy.Count; i++)
             {
-                var polygon1 = Polygons[i];
-                for (int j = 0; j < Polygons.Count; j++)
+                var polygon1 = PolygonsCopy[i];
+                for (int j = 0; j < PolygonsCopy.Count; j++)
                 {
-                    var polygon2 = Polygons[j];
+                    var polygon2 = PolygonsCopy[j];
                     if (polygon1 == polygon2 || ContainsPolygonPair(polygon1, polygon2))
                     {
                         continue;
@@ -260,7 +338,7 @@ namespace Adamantium.Mathematics
         /// <returns></returns>
         private bool IsBelongToPolygonWithHole(ref LineSegment segment)
         {
-            foreach (var polygon in Polygons)
+            foreach (var polygon in PolygonsCopy)
             {
                 if (!polygon.IsHole)
                 {
@@ -464,7 +542,7 @@ namespace Adamantium.Mathematics
                         var index = tempSegments.IndexOf(segment);
                         tempSegments.RemoveAt(index);
                         LineSegment seg1 = new LineSegment(segment.Start, interPoint);
-                        //if (ContainsInInterPointsKeepHoles(seg1, selfIntersectionPoints, FillRule, Polygons))
+                        //if (ContainsInInterPointsKeepHoles(seg1, selfIntersectionPoints, FillRule, PolygonsCopy))
                         {
                             if (InsertSegment(tempSegments, seg1, index))
                             {
@@ -473,7 +551,7 @@ namespace Adamantium.Mathematics
                         }
 
                         LineSegment seg2 = new LineSegment(interPoint, segment.End);
-                        //if (ContainsInInterPointsKeepHoles(seg2, selfIntersectionPoints, FillRule, Polygons))
+                        //if (ContainsInInterPointsKeepHoles(seg2, selfIntersectionPoints, FillRule, PolygonsCopy))
                         {
                             if (InsertSegment(tempSegments, seg2, index))
                             {
@@ -786,7 +864,7 @@ namespace Adamantium.Mathematics
 
         public override string ToString()
         {
-            return $"{Name}, PolygonItems: {Polygons.Count}";
+            return $"{Name}, PolygonItems: {PolygonsCopy.Count}";
         }
 
         private class PolygonPair: IEquatable<PolygonPair>

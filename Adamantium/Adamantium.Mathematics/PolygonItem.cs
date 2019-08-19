@@ -26,6 +26,8 @@ namespace Adamantium.Mathematics
         /// </summary>
         public bool IsHole { get; internal set; }
 
+        public OrientedBoundingBox BoundingBox { get; internal set; }
+
         /// <summary>
         /// Collection of points in places, where it intersects itself
         /// </summary>
@@ -80,7 +82,7 @@ namespace Adamantium.Mathematics
         {
             if (Points.Count > 0)
             {
-                //BoundingBox = OrientedBoundingBox.FromPoints(Points.ToArray());
+                BoundingBox = OrientedBoundingBox.FromPoints(Points.ToArray());
                 //Size = new Size2F(BoundingBox.Size.X, BoundingBox.Size.Y);
             }
         }
