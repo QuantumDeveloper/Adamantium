@@ -49,15 +49,14 @@ namespace Adamantium.Mathematics
         /// </remarks>
         public static List<Vector3F> Triangulate(Polygon polygon)
         {
-            var polygonCopy = polygon;
             var rays = new List<Ray2D>();
             var sortedX = new List<double>();
             var rayIntersectionPoints = new List<Vector3D[]>();
             List<Vector3D> interPoints = new List<Vector3D>();
 
-            var sortedList = polygonCopy.SortVertices();
+            var sortedList = polygon.SortVertices();
             var ray = new Ray2D(Vector2D.Zero, -Vector2D.UnitY);
-            var highestPoint = polygonCopy.HighestPoint.Y;
+            var highestPoint = polygon.HighestPoint.Y;
             for (int i = 0; i < sortedList.Count; ++i)
             {
                 var point = sortedList[i];
@@ -72,16 +71,16 @@ namespace Adamantium.Mathematics
                 rays.Add(ray);
 
                 List<Vector3D> rayPoints = new List<Vector3D>();
-                for (int j = 0; j < polygonCopy.MergedSegments.Count; ++j)
+                for (int j = 0; j < polygon.MergedSegments.Count; ++j)
                 {
-                    var segment = polygonCopy.MergedSegments[j];
+                    var segment = polygon.MergedSegments[j];
                     Vector3D interPoint;
                     if (Collision2D.RaySegmentIntersection(ref ray, ref segment, out interPoint))
                     {
                         // We need to filter points very close to each other to avoid producing incorrect results during generation of triangles
                         if (!IsYPointSimilarTo(interPoint, rayPoints))
                         {
-                            if (!IsSimilarTo(interPoint, interPoints) && !IsSimilarTo(interPoint, polygonCopy.MergedPoints))
+                            if (!IsSimilarTo(interPoint, interPoints) && !IsSimilarTo(interPoint, polygon.MergedPoints))
                             {
                                 interPoints.Add(interPoint);
                             }
@@ -96,7 +95,7 @@ namespace Adamantium.Mathematics
                 rayIntersectionPoints.Add(rayPoints.ToArray());
             }
 
-            polygonCopy.UpdatePolygonUsingRayInterPoints(interPoints);
+            polygon.UpdatePolygonUsingRayInterPoints(interPoints);
 
             List<Vector3F> finalTriangles = new List<Vector3F>();
             for (int i = 0; i < rays.Count - 1; ++i)
@@ -110,7 +109,7 @@ namespace Adamantium.Mathematics
                 {
                     for (int k = 0; k < rightInterPoints.Length; k++)
                     {
-                        if (Polygon.IsConnected(leftInterPoints[j], rightInterPoints[k], polygonCopy.MergedSegments))
+                        if (Polygon.IsConnected(leftInterPoints[j], rightInterPoints[k], polygon.MergedSegments))
                         {
                             startEndSegmnets.Add(new LineSegment(leftInterPoints[j], rightInterPoints[k]));
                         }
