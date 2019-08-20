@@ -107,22 +107,30 @@ namespace Adamantium.Mathematics
             Parallel.ForEach(polygons, item =>
             {
                 var result1 = TriangulatePolygonItem(item);
-                vertices.AddRange(result1);
+                lock (vertexLocker)
+                {
+                    vertices.AddRange(result1);
+                }
             });
 
-            MergePoints();
-            MergeSegments();
+            if (PolygonsCopy.Count > 0)
+            {
+                MergePoints();
+                MergeSegments();
 
-            MergeSelfIntersectedPoints();
-            MergeSelfIntersectedSegments();
+                MergeSelfIntersectedPoints();
+                MergeSelfIntersectedSegments();
 
-            CheckPolygonsIntersection();
+                CheckPolygonsIntersection();
 
-            UpdateBoundingBox();
+                UpdateBoundingBox();
 
-            var result = Triangulator.Triangulate(this);
-
-            vertices.AddRange(result);
+                var result = Triangulator.Triangulate(this);
+                lock (vertexLocker)
+                {
+                    vertices.AddRange(result);
+                }
+            }
 
             return vertices;
         }
@@ -138,7 +146,7 @@ namespace Adamantium.Mathematics
 
             polygon.UpdateBoundingBox();
 
-            return Triangulator.Triangulate(this);
+            return Triangulator.Triangulate(polygon);
         }
 
         private List<PolygonItem> CheckPolygonItemIntersections()
@@ -152,17 +160,24 @@ namespace Adamantium.Mathematics
 
             foreach(var polygon1 in PolygonsCopy)
             {
+                bool canAdd = true;
                 foreach(var polygon2 in PolygonsCopy)
                 {
                     if (polygon1 == polygon2) continue;
 
+                    var bb1 = polygon1.BoundingBox;
                     var bb2 = polygon2.BoundingBox;
-                    var containment = polygon1.BoundingBox.Contains(ref bb2);
-                    if (containment != ContainmentType.Disjoint)
+                    var containment1 = polygon1.BoundingBox.Contains(ref bb2);
+                    var containment2 = polygon2.BoundingBox.Contains(ref bb1);
+                    if (containment1 != ContainmentType.Disjoint || containment2 != ContainmentType.Disjoint)
                     {
+                        canAdd = false;
                         break;
                     }
+                }
 
+                if (canAdd)
+                {
                     polygonsList.Add(polygon1);
                 }
             }
