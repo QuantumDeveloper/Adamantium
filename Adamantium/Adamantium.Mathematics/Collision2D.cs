@@ -6,10 +6,6 @@ namespace Adamantium.Mathematics
     {
         public static bool IsPointOnSegment(ref LineSegment segment, ref Vector3D point)
         {
-            var v1 = segment.Direction;
-            var v2 = point - segment.Start;
-            var v3 = point - segment.End;
-
             //Find cross product for (v3-v1)-(v2-v1) to tell if points v1,v2 and v3 are aligned.
             //If it is so, then value should be near zero (less than Epsilon)
             //This additional calculation gives more precision and exclude false positive results
@@ -17,9 +13,9 @@ namespace Adamantium.Mathematics
             //if (MathHelper.IsZero(cross))
             //    return false;
 
-            v1 = segment.DirectionNormalized;
-            v2 = Vector3D.Normalize(point - segment.Start);
-            v3 = point - segment.End;
+            var v1 = segment.DirectionNormalized;
+            var v2 = Vector3D.Normalize(point - segment.Start);
+            var v3 = point - segment.End;
 
             var v2v1 = Vector3F.Dot(v2, v1) - 1.0f;
             if (MathHelper.NearEqual(v2v1, Polygon.Epsilon) && Vector3D.Dot(v3, v1) < 0)
