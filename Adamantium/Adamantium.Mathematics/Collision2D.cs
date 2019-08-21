@@ -17,7 +17,7 @@ namespace Adamantium.Mathematics
             var v2 = Vector3D.Normalize(point - segment.Start);
             var v3 = point - segment.End;
 
-            var v2v1 = Vector3F.Dot(v2, v1) - 1.0f;
+            var v2v1 = Vector3D.Dot(v2, v1) - 1.0f;
             if (MathHelper.NearEqual(v2v1, Polygon.Epsilon) && Vector3D.Dot(v3, v1) < 0)
             {
                 return true;
