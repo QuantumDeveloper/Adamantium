@@ -64,6 +64,11 @@ namespace Adamantium.Engine.Graphics
 
         //public GraphicsDeviceFeatures Features { get; private set; }
 
+        public static GraphicsDevice Create()
+        {
+            return new GraphicsDevice();
+        }
+
         //public BlendState BlendState
         //{
         //    get => _blendState;

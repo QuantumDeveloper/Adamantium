@@ -1,53 +1,54 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
-using System.Threading.Tasks;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.EntityFramework;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Input;
 using Adamantium.UI.Processors;
-using Adamantium.Win32;
-using Adamantium.Win32.RawInput;
 
 namespace Adamantium.UI
 {
     public abstract class Application : DependencyComponent, IRunningService
     {
         public ShutDownMode ShutDownMode;
-        public Boolean IsApplicationRunning { get; private set; }
-        public IWindow MainWindow { get; set; }
+        public IWindow MainWindow
+        {
+            get => mainWindow;
+            set
+            {
+                if (mainWindow != null)
+                {
+                    mainWindow.Closed -= MainWindow_Closed;
+                    mainWindow.Closed += MainWindow_Closed;
+                }
+                mainWindow = value;
+            }
+        }
         public WindowCollection Windows { get; private set; }
 
         public static Application Current { get; internal set; }
         public Uri StartupUri { get; set; }
 
-
         private GraphicsDevice graphicsDevice;
         private EntityWorld entityWorld;
         private Dictionary<IWindow, UIRenderProcessor> windowToSystem;
 
-        protected ApplicationTime appTime;
-
-        protected TimeSpan totalTime;
-
-        protected PreciseTimer preciseTimer;
-
-        protected Double fpsTime;
-        protected Int32 fpsCounter;
-        protected Boolean isPaused;
-        private bool _isRunning;
-        private bool _isPaused;
+        private ApplicationTime appTime;
+        private TimeSpan totalTime;
+        private PreciseTimer preciseTimer;
+        private Double fpsTime;
+        private Int32 fpsCounter;
 
         internal ServiceStorage Services { get; set; }
-        private SystemManager _systemManager;
+        private SystemManager systemManager;
+        private IWindow mainWindow;
 
         public Application()
         {
             ShutDownMode = ShutDownMode.OnMainWindowClosed;
             Current = this;
-            _systemManager = new ApplicationSystemManager(this);
+            systemManager = new ApplicationSystemManager(this);
             windowToSystem = new Dictionary<IWindow, UIRenderProcessor>();
             Windows = new WindowCollection();
             Windows.WindowAdded += WindowAdded;
@@ -55,11 +56,39 @@ namespace Adamantium.UI
             appTime = new ApplicationTime();
             preciseTimer = new PreciseTimer();
             Services = new ServiceStorage();
-            Services.Add(_systemManager);
+            Services.Add(systemManager);
             Services.Add<IRunningService>(Current);
             entityWorld = new EntityWorld(Services);
             Initialize();
         }
+
+        public bool IsRunning { get; private set; }
+        public bool IsPaused { get; private set; }
+
+        protected void OnWindowAdded(IWindow window)
+        {
+            var transformProcessor = new UITransformProcessor(entityWorld);
+            var renderProcessor = new UIRenderProcessor(entityWorld, graphicsDevice);
+            var entity = new Entity();
+            entity.AddComponent(window);
+            entityWorld.AddEntity(entity);
+            entityWorld.AddProcessor(transformProcessor);
+            entityWorld.AddProcessor(renderProcessor);
+
+            windowToSystem.Add(window, renderProcessor);
+        }
+
+        protected void OnWindowRemoved(IWindow window)
+        {
+            if (!windowToSystem.ContainsKey(window)) return;
+            var processor = windowToSystem[window];
+            processor.UnloadContent();
+            entityWorld.RemoveProcessor(processor);
+        }
+
+        internal abstract MouseDevice MouseDevice { get; }
+
+        internal abstract KeyboardDevice KeyboardDevice { get; }
 
         private void MainWindow_Closed(object sender, EventArgs e)
         {
@@ -67,90 +96,52 @@ namespace Adamantium.UI
             MainWindow = null;
         }
 
-        internal abstract MouseDevice MouseDevice { get; }
-
-        internal abstract KeyboardDevice KeyboardDevice { get; }
-
         private void WindowAdded(object sender, WindowEventArgs e)
         {
-            var transformProcessor = new UITransformProcessor(entityWorld);
-            var renderProcessor = new UIRenderProcessor(entityWorld, graphicsDevice);
-            var entity = new Entity();
-            entity.AddComponent(e.Window);
-            entityWorld.AddEntity(entity);
-            entityWorld.AddProcessor(transformProcessor);
-            entityWorld.AddProcessor(renderProcessor);
-
-            //InputDevice mouseDevice = new InputDevice();
-            //mouseDevice.WindowHandle = e.Window.Handle;
-            //mouseDevice.UsagePage = HIDUsagePage.Generic;
-            //mouseDevice.UsageId = HIDUsageId.Mouse;
-            //mouseDevice.Flags = InputDeviceFlags.None;
-            //Interop.RegisterRawInputDevices(new[] { mouseDevice }, 1, Marshal.SizeOf(mouseDevice));
-
-            windowToSystem.Add(e.Window, renderProcessor);
+            OnWindowAdded(e.Window);
         }
-
 
         private void WindowRemoved(object sender, WindowEventArgs e)
         {
-            if (!windowToSystem.ContainsKey(e.Window)) return;
-            var processor = windowToSystem[e.Window];
-            processor.UnloadContent();
-            entityWorld.RemoveProcessor(processor);
+            OnWindowRemoved(e.Window);
         }
 
-        public bool IsRunning => _isRunning;
-        public bool IsPaused => _isPaused;
+        public abstract void Run();
 
-        public void Run()
+        protected void RunUpdateDrawBlock()
         {
-            if (MainWindow != null)
+            try
             {
-                MainWindow.Closed += MainWindow_Closed;
-            }
-            Win32.Message msg;
-            IsApplicationRunning = true;
+                var frametime = preciseTimer.GetElapsedTime();
+                Update(appTime);
+                BeginScene();
+                Draw(appTime);
+                EndScene();
 
-            while (IsApplicationRunning)
+                UpdateGameTime(frametime);
+                CalculateFps(frametime);
+            }
+            catch (Exception ex)
             {
-                while (Messages.PeekMessage(out msg, IntPtr.Zero, 0, 0, PeekMessageFlag.Remove))
-                {
-                    Messages.TranslateMessage(ref msg);
-                    Messages.DispatchMessage(ref msg);
-                }
-
-                try
-                {
-                    var frametime = preciseTimer.GetElapsedTime();
-                    Update(appTime);
-                    BeginScene();
-                    Draw(appTime);
-                    EndScene();
-
-                    UpdateGameTime(frametime);
-                    CalculateFps(frametime);
-                }
-                catch (Exception ex)
-                {
-                    UnhandledException?.Invoke(this, new UnhandledExceptionEventArgs(ex));
-                }
-
-                if (ShutDownMode == ShutDownMode.OnMainWindowClosed && MainWindow == null)
-                {
-                    IsApplicationRunning = false;
-                }
-                else if (ShutDownMode == ShutDownMode.OnLastWindowClosed && Windows.Count == 0)
-                {
-                    IsApplicationRunning = false;
-                }
+                UnhandledException?.Invoke(this, new UnhandledExceptionEventArgs(ex));
             }
+        }
 
+        protected void CheckExitCondition()
+        {
+            if (ShutDownMode == ShutDownMode.OnMainWindowClosed && MainWindow == null)
+            {
+                IsRunning = false;
+            }
+            else if (ShutDownMode == ShutDownMode.OnLastWindowClosed && Windows.Count == 0)
+            {
+                IsRunning = false;
+            }
         }
 
         public void Run(object context)
         {
-            
+
         }
 
         protected void UpdateGameTime(double elapsed)
@@ -158,7 +149,7 @@ namespace Adamantium.UI
             appTime.FrameTime = elapsed;
 
             TimeSpan frameTimeSpan = TimeSpan.FromSeconds(appTime.FrameTime);
-            if (!isPaused)
+            if (!IsPaused)
             {
                 totalTime += frameTimeSpan;
             }
@@ -189,20 +180,20 @@ namespace Adamantium.UI
 
         public IGameTime Time { get; private set; }
 
-        protected void BeginScene()
+        protected virtual void BeginScene()
         {
         }
 
         protected void Update(IGameTime frameTime)
         {
             Time = frameTime;
-            _systemManager.Update(frameTime);
+            systemManager.Update(frameTime);
         }
 
         protected void Draw(IGameTime frameTime)
         {
             Time = frameTime;
-            _systemManager.Draw(frameTime);
+            systemManager.Draw(frameTime);
         }
 
         protected void EndScene()
@@ -212,19 +203,19 @@ namespace Adamantium.UI
 
         protected void Initialize()
         {
-            //GraphicsDevice = Engine.Graphics.GraphicsDevice.Create(GraphicsAdapter.Default, DeviceCreationFlags.BgraSupport | DeviceCreationFlags.Debug, FeatureLevel.Level_11_0);
+            graphicsDevice = Engine.Graphics.GraphicsDevice.Create(GraphicsAdapter.Default, DeviceCreationFlags.BgraSupport | DeviceCreationFlags.Debug, FeatureLevel.Level_11_0);
             //GraphicsDevice.BlendState = GraphicsDevice.BlendStates.AlphaBlend;
             //GraphicsDevice.RasterizerState = GraphicsDevice.RasterizerStates.CullNoneClipEnabled;
             //GraphicsDevice.DepthStencilState = GraphicsDevice.DepthStencilStates.DepthEnableGreaterEqual;
-            //Services.Add(GraphicsDevice);
+            Services.Add(graphicsDevice);
 
-            _isRunning = true;
+            IsRunning = true;
             Initialized?.Invoke(this, EventArgs.Empty);
         }
 
         public void ShutDown()
         {
-            IsApplicationRunning = false;
+            IsRunning = false;
             ContentUnloading?.Invoke(this, EventArgs.Empty);
             graphicsDevice.Dispose();
         }
@@ -236,7 +227,7 @@ namespace Adamantium.UI
         {
             if (!IsPaused)
             {
-                _isPaused = true;
+                IsPaused = true;
                 Paused?.Invoke(this, new EventArgs());
             }
         }
@@ -248,7 +239,7 @@ namespace Adamantium.UI
         {
             if (IsPaused)
             {
-                _isPaused = false;
+                IsPaused = false;
                 Resumed?.Invoke(this, new EventArgs());
             }
         }
