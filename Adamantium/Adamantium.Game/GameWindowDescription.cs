@@ -33,7 +33,7 @@ namespace Adamantium.Engine
             Width = parameters.BackBufferWidth;
             Height = parameters.BackBufferHeight;
             Handle = parameters.OutputHandle;
-            PixelFormat = parameters.PixelFormat;
+            PixelFormat = parameters.ImageFormat;
             DepthFormat = parameters.DepthFormat;
             MSAALevel = parameters.MSAALevel;
 

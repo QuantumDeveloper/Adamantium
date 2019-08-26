@@ -22,6 +22,7 @@
     <ProjectReference Include="..\Adamantium.Engine.Core\Adamantium.Engine.Core.csproj" />
     <ProjectReference Include="..\Adamantium.Imaging\Adamantium.Imaging.csproj" />
     <ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
+    <ProjectReference Include="..\Adamantium.Win32\Adamantium.Win32.csproj" />
   </ItemGroup>
 
 </Project>

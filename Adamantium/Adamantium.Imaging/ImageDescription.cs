@@ -45,7 +45,7 @@ namespace Adamantium.Imaging
         /// <msdn-id>ff476252</msdn-id>	
         /// <unmanaged>unsigned int Width</unmanaged>	
         /// <unmanaged-short>unsigned int Width</unmanaged-short>	
-        public int Width;
+        public uint Width;
 
         /// <summary>	
         /// <dd> <p>Texture height (in texels).
@@ -56,7 +56,7 @@ namespace Adamantium.Imaging
         /// <msdn-id>ff476254</msdn-id>	
         /// <unmanaged>unsigned int Height</unmanaged>	
         /// <unmanaged-short>unsigned int Height</unmanaged-short>	
-        public int Height;
+        public uint Height;
 
         /// <summary>	
         /// <dd> <p>Texture depth (in texels).
@@ -67,7 +67,7 @@ namespace Adamantium.Imaging
         /// <msdn-id>ff476254</msdn-id>	
         /// <unmanaged>unsigned int Depth</unmanaged>	
         /// <unmanaged-short>unsigned int Depth</unmanaged-short>	
-        public int Depth;
+        public uint Depth;
 
         /// <summary>	
         /// <dd> <p>Number of textures in the array
@@ -81,7 +81,7 @@ namespace Adamantium.Imaging
         /// <msdn-id>ff476252</msdn-id>	
         /// <unmanaged>unsigned int ArraySize</unmanaged>	
         /// <unmanaged-short>unsigned int ArraySize</unmanaged-short>	
-        public int ArraySize;
+        public uint ArraySize;
 
         /// <summary>	
         /// <dd> <p>The maximum number of mipmap levels in the texture.
@@ -89,7 +89,7 @@ namespace Adamantium.Imaging
         /// <msdn-id>ff476252</msdn-id>	
         /// <unmanaged>unsigned int MipLevels</unmanaged>	
         /// <unmanaged-short>unsigned int MipLevels</unmanaged-short>	
-        public int MipLevels;
+        public uint MipLevels;
 
         /// <summary>	
         /// <dd> <p>Texture format (see <strong><see cref="AdamantiumVulkan.Core.Format"/></strong>).</p> </dd>	
@@ -116,11 +116,11 @@ namespace Adamantium.Imaging
             unchecked
             {
                 int hashCode = Dimension.GetHashCode();
-                hashCode = (hashCode * 397) ^ Width;
-                hashCode = (hashCode * 397) ^ Height;
-                hashCode = (hashCode * 397) ^ Depth;
-                hashCode = (hashCode * 397) ^ ArraySize;
-                hashCode = (hashCode * 397) ^ MipLevels;
+                hashCode = (hashCode * 397) ^ (int)Width;
+                hashCode = (hashCode * 397) ^ (int)Height;
+                hashCode = (hashCode * 397) ^ (int)Depth;
+                hashCode = (hashCode * 397) ^ (int)ArraySize;
+                hashCode = (hashCode * 397) ^ (int)MipLevels;
                 hashCode = (hashCode * 397) ^ Format.GetHashCode();
                 return hashCode;
             }

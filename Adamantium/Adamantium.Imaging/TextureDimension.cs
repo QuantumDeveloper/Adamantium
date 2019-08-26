@@ -8,26 +8,26 @@
       /// <summary>
       /// The texture dimension is unknown.
       /// </summary>
-      Undefined,
+      Undefined = -1,
       
       /// <summary>
       /// The texture dimension is 1D.
       /// </summary>
-      Texture1D,
+      Texture1D = 0,
 
       /// <summary>
       /// The texture dimension is 2D.
       /// </summary>
-      Texture2D,
+      Texture2D = 1,
 
       /// <summary>
       /// The texture dimension is 3D.
       /// </summary>
-      Texture3D,
+      Texture3D = 2,
 
       /// <summary>
       /// The texture dimension is a CubeMap.
       /// </summary>
-      TextureCube,
+      TextureCube = 3,
    }
 }

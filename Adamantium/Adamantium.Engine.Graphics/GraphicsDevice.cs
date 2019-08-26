@@ -1,15 +1,31 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
+using System.Runtime.InteropServices;
 using Adamantium.Core;
 using Adamantium.Engine.Core;
 using Adamantium.Mathematics;
-
+using AdamantiumVulkan.Core;
 
 namespace Adamantium.Engine.Graphics
 {
     public class GraphicsDevice : DisposableObject
     {
+        private VulkanInstance instance;
+        private PhysicalDevice physicalDevice;
+        private Device logicalDevice;
+        private Queue graphicsQueue;
+
+        
+
+        private GraphicsDevice(VulkanInstance instance, PhysicalDevice physicalDevice)
+        {
+            this.instance = instance;
+            this.physicalDevice = physicalDevice;
+            CreateLogicalDevice();
+        }
+
         //private Device2 Device;
         //private DeviceContext2 Context;
         //private DeviceDebug debug;
@@ -35,8 +51,8 @@ namespace Adamantium.Engine.Graphics
         //internal PixelShaderStage PixelShaderStage;
         //internal ComputeShaderStage ComputeShaderStage;
         //private VertexInputLayout _vertexInputLayout;
-        private Color4F _blendFactor;
-        private int _blendSampleMask;
+        //private Color4F _blendFactor;
+        //private int _blendSampleMask;
 
         //public ObservableCollection<EffectPool> EffectPools { get; set; }
 
@@ -44,7 +60,7 @@ namespace Adamantium.Engine.Graphics
 
         //public FullScreenQuad Quad { get; internal set; }
 
-        //public Boolean IsInDebugMode { get; private set; }
+        public static VulkanInstance Instance { get; private set; }
 
         //public Boolean IsD2dSupportEnabled { get; private set; }
 
@@ -64,10 +80,52 @@ namespace Adamantium.Engine.Graphics
 
         //public GraphicsDeviceFeatures Features { get; private set; }
 
-        public static GraphicsDevice Create()
+        public static GraphicsDevice Create(VulkanInstance instance, PhysicalDevice physicalDevice)
         {
-            return new GraphicsDevice();
+            return new GraphicsDevice(instance, physicalDevice);
         }
+
+        private void CreateLogicalDevice()
+        {
+            var indices = FindQueueFamilies(physicalDevice);
+
+            var queueInfos = new List<DeviceQueueCreateInfo>();
+            HashSet<uint> uniqueQueueFamilies = new HashSet<uint>() { indices.graphicsFamily.Value, indices.presentFamily.Value };
+            float queuePriority = 1.0f;
+            foreach (var queueFamily in uniqueQueueFamilies)
+            {
+                var queueCreateInfo = new DeviceQueueCreateInfo();
+                queueCreateInfo.QueueFamilyIndex = queueFamily;
+                queueCreateInfo.QueueCount = 1;
+                queueCreateInfo.PQueuePriorities = queuePriority;
+                queueInfos.Add(queueCreateInfo);
+            }
+
+            var deviceFeatures = physicalDevice.GetPhysicalDeviceFeatures();
+            deviceFeatures.SamplerAnisotropy = true;
+
+            var createInfo = new DeviceCreateInfo();
+            createInfo.QueueCreateInfoCount = (uint)queueInfos.Count;
+            createInfo.PQueueCreateInfos = queueInfos.ToArray();
+            createInfo.PEnabledFeatures = deviceFeatures;
+            createInfo.EnabledExtensionCount = (uint)VulkanInstance.DeviceExtensions.Count;
+            createInfo.PpEnabledExtensionNames = VulkanInstance.DeviceExtensions.ToArray();
+
+            if (instance.IsInDebugMode)
+            {
+                createInfo.EnabledLayerCount = (uint)VulkanInstance.ValidationLayers.Count;
+                createInfo.PpEnabledLayerNames = VulkanInstance.ValidationLayers.ToArray();
+            }
+
+            logicalDevice = physicalDevice.CreateDevice(createInfo);
+
+            createInfo.Dispose();
+
+            graphicsQueue = logicalDevice.GetDeviceQueue(indices.graphicsFamily.Value, 0);
+            
+        }
+
+
 
         //public BlendState BlendState
         //{
@@ -825,5 +883,15 @@ namespace Adamantium.Engine.Graphics
         //    var inputLayout = CurrentPass.GetInputLayout(_vertexInputLayout);
         //    Context.InputAssembler.InputLayout = inputLayout;
         //}
+
+        public static implicit operator PhysicalDevice (GraphicsDevice device)
+        {
+            return device.physicalDevice;
+        }
+
+        public static implicit operator Device(GraphicsDevice device)
+        {
+            return device.logicalDevice;
+        }
     }
 }
