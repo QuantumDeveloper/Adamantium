@@ -5,136 +5,68 @@ using System;
 namespace Adamantium.Engine.Graphics
 {
     public class PresentationParameters
-   {
-      public PresentationParameters(PresenterType presenterType)
-      {
-         PresenterType = presenterType;
+    {
+        public PresentationParameters(PresenterType presenterType)
+        {
+            PresenterType = presenterType;
 
-         MSAALevel = MSAALevel.None;
-         PixelFormat = Format.R8G8B8A8_UNORM;
-         DepthFormat = DepthFormat.Depth32;
+            MSAALevel = MSAALevel.None;
+            ImageFormat = Format.R8G8B8A8_UNORM;
+            DepthFormat = DepthFormat.Depth32Stencil8X24;
+            BuffersCount = 2;
+            CompositeAlpha = AlphaMode.Opaque;
+        }
 
-         //RefreshRate = new Rational(60, 1);
-         //BuffersCount = 2;
-         //SwapEffect = SwapEffect.Discard;
-         //Usage = Usage.RenderTargetOutput;
-         //IsWindowed = true;
-         //Scaling = Scaling.Stretch;
-         //AlphaMode = AlphaMode.Unspecified;
-      }
+        public PresentationParameters(PresentationParameters parameters)
+        {
+            PresenterType = parameters.PresenterType;
 
-      public PresentationParameters(PresentationParameters parameters)
-      {
-         PresenterType = parameters.PresenterType;
+            BackBufferWidth = parameters.BackBufferWidth;
+            BackBufferHeight = parameters.BackBufferHeight;
+            OutputHandle = parameters.OutputHandle;
+            ImageFormat = parameters.ImageFormat;
+            DepthFormat = parameters.DepthFormat;
+            MSAALevel = parameters.MSAALevel;
+        }
 
-         BackBufferWidth = parameters.BackBufferWidth;
-         BackBufferHeight = parameters.BackBufferHeight;
-         OutputHandle = parameters.OutputHandle;
-         PixelFormat = parameters.PixelFormat;
-         DepthFormat = parameters.DepthFormat;
-         MSAALevel = parameters.MSAALevel;
+        public PresentationParameters(PresenterType presenterType, UInt32 backbufferWidth, UInt32 backbufferHeight, IntPtr handle, MSAALevel msaaLevel = MSAALevel.None)
+        {
+            PresenterType = presenterType;
 
-         //RefreshRate = parameters.RefreshRate;
-         //BuffersCount = parameters.BuffersCount;
-         //IsWindowed = parameters.IsWindowed;
-         //Flags = parameters.Flags;
-         //Scaling = parameters.Scaling;
-         //Usage = parameters.Usage;
-         //AlphaMode = parameters.AlphaMode;
-      }
+            BackBufferWidth = backbufferWidth;
+            BackBufferHeight = backbufferHeight;
+            OutputHandle = handle;
 
-      public PresentationParameters(PresenterType presenterType, Int32 backbufferWidth, Int32 backbufferHeight, IntPtr handle, MSAALevel msaaLevel = MSAALevel.None)
-      {
-         PresenterType = presenterType;
+            MSAALevel = msaaLevel;
+            ImageFormat = Format.R8G8B8A8_UNORM;
+            DepthFormat = DepthFormat.Depth32Stencil8X24;
+        }
 
-         BackBufferWidth = backbufferWidth;
-         BackBufferHeight = backbufferHeight;
-         OutputHandle = handle;
+        public PresenterType PresenterType { get; }
+        public UInt32 BackBufferWidth { get; internal set; }
+        public UInt32 BackBufferHeight { get; internal set; }
+        public IntPtr OutputHandle { get; }
+        public IntPtr HInstanceHandle { get; }
+        public SurfaceFormat ImageFormat { get; internal set; }
+        public DepthFormat DepthFormat { get; internal set; }
+        public MSAALevel MSAALevel { get; }
+        public Int32 BuffersCount { get; internal set; }
+        public SwapchainCreateFlags Flags { get; set; }
+        public uint MinImageCount { get; set; }
+        public ColorSpace ImageColorSpace { get; set; }
 
-         MSAALevel = msaaLevel;
-         PixelFormat = Format.R8G8B8A8_UNORM;
-         DepthFormat = DepthFormat.Depth32Stencil8X24;
+        //Should be 1 for monoscopic and 2 for stereoscopic swapchain
+        public uint ImageArrayLayers { get; set; }
+        public ImageUsage ImageUsage { get; set; }
+        public SharingMode ImageSharingMode { get; set; }
+        public SurfaceTransform PreTransform { get; set; }
+        public AlphaMode CompositeAlpha { get; set; }
+        public PresentMode PresentMode { get; set; }
+        public bool Clipped { get; set; }
 
-         //RefreshRate = new Rational(60, 1);
-         //BuffersCount = 2;
-         //SwapEffect = SwapEffect.Discard;
-         //Usage = Usage.RenderTargetOutput;
-         //IsWindowed = true;
-         //Flags = SwapChainFlags.None;
-         //Scaling = Scaling.Stretch;
-         //AlphaMode = AlphaMode.Unspecified;
-      }
-
-      //public PresentationParameters(PresenterType presenterType, Int32 backbufferWidth, Int32 backbufferHeight, IntPtr handle, MSAALevel msaa,
-      //   Rational refreshRate, Format pixelFormat = Format.R8G8B8A8_UNORM, DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24,
-      //   Usage usage = Usage.RenderTargetOutput, SwapEffect swapEffect = SwapEffect.Discard, Int32 buffresCount = 2, Boolean isWindowed = true, 
-      //   SwapChainFlags flags = SwapChainFlags.None, Scaling scaling = Scaling.Stretch, AlphaMode alphaMode = AlphaMode.Unspecified)
-      //{
-      //   PresenterType = presenterType;
-
-      //   BackBufferWidth = backbufferWidth;
-      //   BackBufferHeight = backbufferHeight;
-      //   OutputHandle = handle;
-      //   PixelFormat = pixelFormat;
-      //   DepthFormat = depthFormat;
-      //   MSAALevel = msaa;
-
-      //   RefreshRate = refreshRate;
-      //   BuffersCount = buffresCount;
-      //   SwapEffect = swapEffect;
-      //   Usage = usage;
-      //   IsWindowed = isWindowed;
-      //   Flags = flags;
-      //   Scaling = scaling;
-      //   AlphaMode = alphaMode;
-      //}
-
-      public PresenterType PresenterType { get; }
-
-      public Int32 BackBufferWidth { get; internal set; }
-
-      public Int32 BackBufferHeight { get; internal set; }
-
-      public IntPtr OutputHandle { get; }
-
-      public SurfaceFormat PixelFormat
-      {
-         get; internal set;
-      }
-
-      public DepthFormat DepthFormat
-      {
-         get; internal set;
-      }
-
-      public MSAALevel MSAALevel { get; }
-
-      public Boolean IsWindowed { get; internal set; }
-
-      //public Rational RefreshRate { get; }
-
-      public Int32 BuffersCount
-      {
-         get; internal set;
-      }
-
-      //public SwapEffect SwapEffect { get; }
-
-      //public Usage Usage
-      //{
-      //   get;
-      //}
-
-      //public Scaling Scaling { get; }
-
-      //public AlphaMode AlphaMode { get; }
-
-      //public SwapChainFlags Flags { get; internal set; }
-
-      public PresentationParameters Clone()
-      {
-         return (PresentationParameters)MemberwiseClone();
-      }
-   }
-
+        public PresentationParameters Clone()
+        {
+            return (PresentationParameters)MemberwiseClone();
+        }
+    }
 }

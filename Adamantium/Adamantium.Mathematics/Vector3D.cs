@@ -784,6 +784,7 @@ namespace Adamantium.Mathematics
         /// <remarks>
         /// Passing <paramref name="amount"/> a value of 0 will cause <paramref name="start"/> to be returned; a value of 1 will cause <paramref name="end"/> to be returned. 
         /// </remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Lerp(ref Vector3D start, ref Vector3D end, double amount, out Vector3D result)
         {
             result.X = MathHelper.Lerp(start.X, end.X, amount);
@@ -801,6 +802,7 @@ namespace Adamantium.Mathematics
         /// <remarks>
         /// Passing <paramref name="amount"/> a value of 0 will cause <paramref name="start"/> to be returned; a value of 1 will cause <paramref name="end"/> to be returned. 
         /// </remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Vector3D Lerp(Vector3D start, Vector3D end, double amount)
         {
             Vector3D result;
@@ -923,6 +925,7 @@ namespace Adamantium.Mathematics
         /// <param name="left">The first source vector.</param>
         /// <param name="right">The second source vector.</param>
         /// <param name="result">When the method completes, contains an new vector composed of the largest components of the source vectors.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Max(ref Vector3D left, ref Vector3D right, out Vector3D result)
         {
             result.X = (left.X > right.X) ? left.X : right.X;
@@ -949,6 +952,7 @@ namespace Adamantium.Mathematics
         /// <param name="left">The first source vector.</param>
         /// <param name="right">The second source vector.</param>
         /// <param name="result">When the method completes, contains an new vector composed of the smallest components of the source vectors.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Min(ref Vector3D left, ref Vector3D right, out Vector3D result)
         {
             result.X = (left.X < right.X) ? left.X : right.X;
@@ -962,6 +966,7 @@ namespace Adamantium.Mathematics
         /// <param name="left">The first source vector.</param>
         /// <param name="right">The second source vector.</param>
         /// <returns>A vector containing the smallest components of the source vectors.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Vector3D Min(Vector3D left, Vector3D right)
         {
             Vector3D result;
@@ -1060,6 +1065,7 @@ namespace Adamantium.Mathematics
         /// <param name="result">When the method completes, contains the reflected vector.</param>
         /// <remarks>Reflect only gives the direction of a reflection off a surface, it does not determine 
         /// whether the original vector was close enough to the surface to hit it.</remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Reflect(ref Vector3D vector, ref Vector3D normal, out Vector3D result)
         {
             double dot = (vector.X * normal.X) + (vector.Y * normal.Y) + (vector.Z * normal.Z);
@@ -1077,6 +1083,7 @@ namespace Adamantium.Mathematics
         /// <returns>The reflected vector.</returns>
         /// <remarks>Reflect only gives the direction of a reflection off a surface, it does not determine 
         /// whether the original vector was close enough to the surface to hit it.</remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Vector3D Reflect(Vector3D vector, Vector3D normal)
         {
             Vector3D result;
@@ -1512,6 +1519,7 @@ namespace Adamantium.Mathematics
         /// <param name="left">The first vector to add.</param>
         /// <param name="right">The second vector to add.</param>
         /// <returns>The sum of the two vectors.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Vector3D operator +(Vector3D left, Vector3D right)
         {
             return new Vector3D(left.X + right.X, left.Y + right.Y, left.Z + right.Z);
@@ -1523,6 +1531,7 @@ namespace Adamantium.Mathematics
         /// <param name="left">The first vector to add.</param>
         /// <param name="right">The second vector to add.</param>
         /// <returns>The sum of the two vectors.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Vector3D operator +(Vector3D left, Vector3F right)
         {
             return new Vector3D(left.X + right.X, left.Y + right.Y, left.Z + right.Z);
@@ -1534,6 +1543,7 @@ namespace Adamantium.Mathematics
         /// <param name="left">The first vector to add.</param>
         /// <param name="right">The second vector to add.</param>
         /// <returns>The sum of the two vectors.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Vector3D operator +(Vector3F left, Vector3D right)
         {
             return new Vector3D(left.X + right.X, left.Y + right.Y, left.Z + right.Z);
@@ -1545,6 +1555,7 @@ namespace Adamantium.Mathematics
         /// <param name="left">The first vector to multiply.</param>
         /// <param name="right">The second vector to multiply.</param>
         /// <returns>The multiplication of the two vectors.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Vector3D operator *(Vector3D left, Vector3D right)
         {
             return new Vector3D(left.X * right.X, left.Y * right.Y, left.Z * right.Z);
@@ -1555,6 +1566,7 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="value">The vector to assert (unchanged).</param>
         /// <returns>The asserted (unchanged) vector.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Vector3D operator +(Vector3D value)
         {
             return value;
@@ -1566,6 +1578,7 @@ namespace Adamantium.Mathematics
         /// <param name="left">The first vector to subtract.</param>
         /// <param name="right">The second vector to subtract.</param>
         /// <returns>The difference of the two vectors.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Vector3D operator -(Vector3D left, Vector3D right)
         {
             return new Vector3D(left.X - right.X, left.Y - right.Y, left.Z - right.Z);
@@ -1576,6 +1589,7 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="value">The vector to negate.</param>
         /// <returns>A vector facing in the opposite direction.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Vector3D operator -(Vector3D value)
         {
             return new Vector3D(-value.X, -value.Y, -value.Z);
@@ -1587,6 +1601,7 @@ namespace Adamantium.Mathematics
         /// <param name="value">The vector to scale.</param>
         /// <param name="scale">The amount by which to scale the vector.</param>
         /// <returns>The scaled vector.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Vector3D operator *(double scale, Vector3D value)
         {
             return new Vector3D(value.X * scale, value.Y * scale, value.Z * scale);
@@ -1598,6 +1613,7 @@ namespace Adamantium.Mathematics
         /// <param name="value">The vector to scale.</param>
         /// <param name="scale">The amount by which to scale the vector.</param>
         /// <returns>The scaled vector.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Vector3D operator *(Vector3D value, double scale)
         {
             return new Vector3D(value.X * scale, value.Y * scale, value.Z * scale);
@@ -1609,6 +1625,7 @@ namespace Adamantium.Mathematics
         /// <param name="value">The vector to scale.</param>
         /// <param name="scale">The amount by which to scale the vector.</param>
         /// <returns>The scaled vector.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Vector3D operator /(Vector3D value, double scale)
         {
             return new Vector3D(value.X / scale, value.Y / scale, value.Z / scale);
@@ -1620,6 +1637,7 @@ namespace Adamantium.Mathematics
         /// <param name="scale">The amount by which to scale the vector.</param>
         /// <param name="value">The vector to scale.</param>  
         /// <returns>The scaled vector.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Vector3D operator /(double scale, Vector3D value)
         {
             return new Vector3D(scale / value.X, scale / value.Y, scale / value.Z);
@@ -1631,6 +1649,7 @@ namespace Adamantium.Mathematics
         /// <param name="value">The vector to scale.</param>
         /// <param name="scale">The amount by which to scale the vector.</param>
         /// <returns>The scaled vector.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Vector3D operator /(Vector3D value, Vector3D scale)
         {
             return new Vector3D(value.X / scale.X, value.Y / scale.Y, value.Z / scale.Z);
@@ -1642,6 +1661,7 @@ namespace Adamantium.Mathematics
         /// <param name="value">The input vector.</param>
         /// <param name="scalar">The scalar value to be added on elements</param>
         /// <returns>The vector with added scalar for each element.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Vector3D operator +(Vector3D value, double scalar)
         {
             return new Vector3D(value.X + scalar, value.Y + scalar, value.Z + scalar);
@@ -1653,6 +1673,7 @@ namespace Adamantium.Mathematics
         /// <param name="value">The input vector.</param>
         /// <param name="scalar">The scalar value to be added on elements</param>
         /// <returns>The vector with added scalar for each element.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Vector3D operator +(double scalar, Vector3D value)
         {
             return new Vector3D(scalar + value.X, scalar + value.Y, scalar + value.Z);
@@ -1664,6 +1685,7 @@ namespace Adamantium.Mathematics
         /// <param name="value">The input vector.</param>
         /// <param name="scalar">The scalar value to be subtraced from elements</param>
         /// <returns>The vector with added scalar from each element.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Vector3D operator -(Vector3D value, double scalar)
         {
             return new Vector3D(value.X - scalar, value.Y - scalar, value.Z - scalar);
@@ -1675,6 +1697,7 @@ namespace Adamantium.Mathematics
         /// <param name="value">The input vector.</param>
         /// <param name="scalar">The scalar value to be subtraced from elements</param>
         /// <returns>The vector with subtraced scalar from each element.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Vector3D operator -(double scalar, Vector3D value)
         {
             return new Vector3D(scalar - value.X, scalar - value.Y, scalar - value.Z);
