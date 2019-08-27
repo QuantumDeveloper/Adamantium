@@ -125,7 +125,10 @@ namespace Adamantium.Engine.Graphics
             
         }
 
-
+        public void DeviceWaitIdle()
+        {
+            logicalDevice.DeviceWaitIdle();
+        }
 
         //public BlendState BlendState
         //{
