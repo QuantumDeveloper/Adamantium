@@ -1,4 +1,5 @@
 ﻿using Adamantium.Imaging;
+using Adamantium.Win32;
 using AdamantiumVulkan.Core;
 using AdamantiumVulkan.Windows;
 using System;
@@ -254,7 +255,17 @@ namespace Adamantium.Engine.Graphics
             presentInfo.PSwapchains = swapchains;
             presentInfo.PImageIndices = new uint[] { imageIndex };
 
-            result = presentQueue.QueuePresentKHR(presentInfo);
+            var result = presentQueue.QueuePresentKHR(presentInfo);
+            if (result == Result.ErrorOutOfDateKhr || result == Result.SuboptimalKhr)
+            {
+                //Console.WriteLine(result);
+                RecreateSwapchain();
+            }
+            else if (result != Result.Success)
+            {
+                MessageBox.Show("Failed to present swap chain image");
+                throw new Exception();
+            }
         }
 
 
@@ -284,9 +295,47 @@ namespace Adamantium.Engine.Graphics
             return true;
         }
 
-        //public static implicit operator SwapChain2(SwapChainGraphicsPresenter presenter)
-        //{
-        //    return presenter.swapChain;
-        //}
+        private void RecreateSwapchain()
+        {
+            //if (WindowState == FormWindowState.Minimized)
+            //{
+            //    _pauseEvent.WaitOne();
+            //}
+
+            GraphicsDevice.DeviceWaitIdle();
+
+            CleanupSwapChain();
+
+            CreateSwapchain();
+            CreateImageViews();
+            CreateRenderPass();
+            CreateGraphicsPipeline();
+            CreateFramebuffers();
+            CreateCommandBuffers();
+        }
+
+        private void CleanupSwapChain()
+        {
+            foreach (var buffer in swapchainFramebuffers)
+            {
+                logicalDevice.DestroyFramebuffer(buffer);
+            }
+
+            logicalDevice.DestroyPipeline(graphicsPipeline);
+            //logicalDevice.DestroyPipelineLayout(pipelineLayout);
+            //logicalDevice.DestroyRenderPass(renderPass);
+
+            foreach (var view in swapchainImageViews)
+            {
+                logicalDevice.DestroyImageView(view);
+            }
+
+            logicalDevice.DestroySwapchainKHR(swapchain);
+        }
+
+        public static implicit operator SwapchainKHR(SwapChainGraphicsPresenter presenter)
+        {
+            return presenter.swapchain;
+        }
     }
 }
