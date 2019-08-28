@@ -5,10 +5,13 @@ using Adamantium.Imaging;
 using Adamantium.Core;
 using System.IO;
 using Adamantium.Win32;
+using VulkanImage = AdamantiumVulkan.Core.Image;
+using AdamantiumVulkan.Core;
+using Image = Adamantium.Imaging.Image;
 
 namespace Adamantium.Engine.Graphics
 {
-    public abstract class Texture : DisposableBase
+    public class Texture : DisposableBase
     {
         public int Width { get; set; }
 
@@ -20,7 +23,11 @@ namespace Adamantium.Engine.Graphics
 
         public GraphicsDevice GraphicsDevice { get; private set; }
 
-        protected Texture(GraphicsDevice device)
+        protected VulkanImage Image { get; set; }
+
+        protected ImageView ImageView { get; set; }
+
+        protected Texture(GraphicsDevice device, TextureDescription description)
         {
             GraphicsDevice = device;
         }
@@ -68,7 +75,7 @@ namespace Adamantium.Engine.Graphics
                 throw new ArgumentNullException(nameof(graphicsDevice));
             }
 
-            if ((description.SharingMode & BindFlags.RenderTarget) != 0)
+            if (description.Usage.HasFlag(ImageUsageFlagBits.ColorAttachmentBit))
             {
                 switch (description.Dimension)
                 {
@@ -82,25 +89,26 @@ namespace Adamantium.Engine.Graphics
                         return RenderTargetCube.New(graphicsDevice, description);
                 }
             }
-            else if ((description.SharingMode & BindFlags.DepthStencil) != 0)
+            else if (description.Usage.HasFlag(ImageUsageFlagBits.DepthStencilAttachmentBit))
             {
                 return DepthBuffer.New(graphicsDevice, description);
             }
             else
             {
-                switch (description.Dimension)
-                {
-                    case TextureDimension.Texture1D:
-                        return Texture1D.New(graphicsDevice, description);
-                    case TextureDimension.Texture2D:
-                        return Texture2D.New(graphicsDevice, description);
-                    case TextureDimension.Texture3D:
-                        return Texture3D.New(graphicsDevice, description);
-                    case TextureDimension.TextureCube:
-                        return TextureCube.New(graphicsDevice, description);
-                }
-            }
+                return new Texture(graphicsDevice, description);
+                //switch (description.Dimension)
+                //{
 
+                //    case TextureDimension.Texture1D:
+                //        return Texture1D.New(graphicsDevice, description);
+                //    case TextureDimension.Texture2D:
+                //        return Texture2D.New(graphicsDevice, description);
+                //    case TextureDimension.Texture3D:
+                //        return Texture3D.New(graphicsDevice, description);
+                //    case TextureDimension.TextureCube:
+                //        return TextureCube.New(graphicsDevice, description);
+                //}
+            }
             return null;
         }
 
@@ -128,9 +136,9 @@ namespace Adamantium.Engine.Graphics
         /// <param name="flags">Texture flags</param>
         /// <param name="usage">Resource usage</param>
         /// <returns>A <see cref="Texture"/></returns>
-        public static Texture Load(GraphicsDevice device, Stream stream, TextureFlags flags = TextureFlags.ShaderResource, ResourceUsage usage = ResourceUsage.Immutable, ImageFileType fileType = ImageFileType.Unknown)
+        public static Texture Load(GraphicsDevice device, Stream stream, ImageUsageFlagBits flags = ImageUsageFlagBits.SampledBit, ImageLayout usage = ImageLayout.ShaderReadOnlyOptimal, ImageFileType fileType = ImageFileType.Unknown)
         {
-            var image = Image.Load(stream, fileType);
+            var image = Adamantium.Imaging.Image.Load(stream, fileType);
             try
             {
                 return GetTextureFromImage(image, device, flags, usage);
@@ -147,7 +155,7 @@ namespace Adamantium.Engine.Graphics
             throw new InvalidOperationException("Dimension not supported");
         }
 
-        private static Texture GetTextureFromImage(Image image, GraphicsDevice device, TextureFlags flags, ResourceUsage usage)
+        private static Texture GetTextureFromImage(Image image, GraphicsDevice device, ImageUsageFlagBits flags, ImageLayout usage)
         {
             if (image == null)
             {
@@ -179,12 +187,12 @@ namespace Adamantium.Engine.Graphics
         /// <param name="flags">Texture flags</param>
         /// <param name="usage">Resource usage</param>
         /// <returns>A <see cref="Texture"/></returns>
-        public static Texture Load(GraphicsDevice device, String filePath, TextureFlags flags = TextureFlags.ShaderResource, ResourceUsage usage = ResourceUsage.Immutable)
+        public static Texture Load(GraphicsDevice device, String filePath, ImageUsageFlagBits flags = ImageUsageFlagBits.SampledBit, ImageLayout layout = ImageLayout.ShaderReadOnlyOptimal)
         {
-            var image = Image.Load(filePath);
+            var image = Adamantium.Imaging.Image.Load(filePath);
             try
             {
-                return GetTextureFromImage(image, device, flags, usage);
+                return GetTextureFromImage(image, device, flags, layout);
             }
             catch (Exception exception)
             {
@@ -209,7 +217,7 @@ namespace Adamantium.Engine.Graphics
         /// <remarks>This method is used only for loading <see cref="TextureCube"/> texture. Number of strings in array must be equals to 6</remarks>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="InvalidOperationException"></exception>
-        public static Texture Load(GraphicsDevice device, String[] filePath, TextureFlags flags = TextureFlags.ShaderResource, ResourceUsage usage = ResourceUsage.Immutable)
+        public static Texture Load(GraphicsDevice device, String[] filePath, ImageUsageFlagBits flags = ImageUsageFlagBits.SampledBit, ImageLayout usage = ImageLayout.ShaderReadOnlyOptimal)
         {
             if (filePath?.Length != 6)
             {
@@ -220,7 +228,7 @@ namespace Adamantium.Engine.Graphics
             {
                 for (int i = 0; i < filePath.Length; i++)
                 {
-                    images[i] = Image.Load(filePath[i]);
+                    images[i] = Adamantium.Imaging.Image .Load(filePath[i]);
                 }
                 return TextureCube.New(device, images, flags, usage);
             }
@@ -240,6 +248,11 @@ namespace Adamantium.Engine.Graphics
         }
 
         public void Save(string path, ImageFileType fileType)
+        {
+
+        }
+
+        protected override void Dispose(bool disposeManaged)
         {
 
         }
