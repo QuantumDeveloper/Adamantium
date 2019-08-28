@@ -7,9 +7,13 @@ namespace Adamantium.Engine.Graphics
 {
     public class Texture2D : Texture
     {
-        public static Texture2D New(GraphicsDevice device, VulkanImage image)
+        public Texture2D(GraphicsDevice device) : base(device)
         {
-            return new Texture2D();
+        }
+
+        public static Texture2D New(GraphicsDevice device, TextureDescription description)
+        {
+            return new Texture2D(device);
         }
 
         protected override void Dispose(bool disposeManaged)

@@ -249,7 +249,6 @@ namespace Adamantium.Engine.Graphics
 
             presentInfo.WaitSemaphoreCount = 1;
             presentInfo.PWaitSemaphores = signalSemaphores;
-
             SwapchainKHR[] swapchains = { swapchain };
             presentInfo.SwapchainCount = 1;
             presentInfo.PSwapchains = swapchains;
@@ -306,12 +305,9 @@ namespace Adamantium.Engine.Graphics
 
             CleanupSwapChain();
 
-            CreateSwapchain();
-            CreateImageViews();
+            CreateSwapchain(GraphicsDevice);
             CreateRenderPass();
-            CreateGraphicsPipeline();
             CreateFramebuffers();
-            CreateCommandBuffers();
         }
 
         private void CleanupSwapChain()
