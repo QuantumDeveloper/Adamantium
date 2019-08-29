@@ -53,7 +53,7 @@ namespace Adamantium.Engine.Graphics
             }
         }
 
-        public PhysicalDevice SelectedDevice { get; set; }
+        public PhysicalDevice CurrentDevice { get; set; }
 
         private VulkanInstance(string appName, bool enableDebug)
         {

@@ -17,7 +17,7 @@ namespace Adamantium.Engine.Graphics
         private Device logicalDevice;
         private Queue graphicsQueue;
 
-        
+        public CommandPool CommandPool { get; set; }
 
         private GraphicsDevice(VulkanInstance instance, PhysicalDevice physicalDevice)
         {
@@ -87,7 +87,7 @@ namespace Adamantium.Engine.Graphics
 
         private void CreateLogicalDevice()
         {
-            var indices = FindQueueFamilies(physicalDevice);
+            var indices = physicalDevice.FindQueueFamilies();
 
             var queueInfos = new List<DeviceQueueCreateInfo>();
             HashSet<uint> uniqueQueueFamilies = new HashSet<uint>() { indices.graphicsFamily.Value, indices.presentFamily.Value };
@@ -123,6 +123,21 @@ namespace Adamantium.Engine.Graphics
 
             graphicsQueue = logicalDevice.GetDeviceQueue(indices.graphicsFamily.Value, 0);
             
+        }
+
+        private void CreateCommandPool()
+        {
+            var queueFamilyIndices = physicalDevice.FindQueueFamilies();
+
+            var poolInfo = new CommandPoolCreateInfo();
+            poolInfo.QueueFamilyIndex = queueFamilyIndices.graphicsFamily.Value;
+            poolInfo.Flags = (uint)CommandPoolCreateFlagBits.ResetCommandBufferBit;
+            CommandPool = logicalDevice.CreateCommandPool(poolInfo);
+        }
+
+        public Queue GetDeviceQueue(uint queueFamilyIndex, uint queueIndex)
+        {
+            return logicalDevice.GetDeviceQueue(queueFamilyIndex, queueIndex);
         }
 
         public void DeviceWaitIdle()

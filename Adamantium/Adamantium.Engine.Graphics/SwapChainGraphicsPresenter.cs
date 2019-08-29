@@ -14,7 +14,8 @@ namespace Adamantium.Engine.Graphics
         private VulkanImage[] swapchainImages;
         private ImageView[] swapchainImageViews;
         private Queue presentQueue;
-        private Texture2D[] backbuffers;
+        private Texture[] backbuffers;
+        private Framebuffer[] framebuffers;
 
         public SwapChainGraphicsPresenter(GraphicsDevice graphicsDevice, PresentationParameters description, string name = "") : base(graphicsDevice, description, name)
         {
@@ -35,17 +36,6 @@ namespace Adamantium.Engine.Graphics
             public SurfaceFormatKHR[] Formats;
             public PresentModeKHR[] PresentModes;
         };
-
-        class QueueFamilyIndices
-        {
-            public uint? graphicsFamily;
-            public uint? presentFamily;
-
-            public bool isComplete()
-            {
-                return graphicsFamily.HasValue && presentFamily.HasValue;
-            }
-        }
 
         private void CreateSurface(IntPtr hwnd, IntPtr hInstance, Instance instance)
         {
@@ -90,7 +80,7 @@ namespace Adamantium.Engine.Graphics
             createInfo.ImageArrayLayers = 1;
             createInfo.ImageUsage = (uint)ImageUsageFlagBits.ColorAttachmentBit;
 
-            QueueFamilyIndices indices = FindQueueFamilies(physicalDevice);
+            QueueFamilyIndices indices = physicalDevice.FindQueueFamilies(surface);
             var queueFamilyIndices = new uint[] { indices.graphicsFamily.Value, indices.presentFamily.Value };
 
             if (indices.graphicsFamily != indices.presentFamily)
@@ -146,44 +136,6 @@ namespace Adamantium.Engine.Graphics
 
                 swapchainImageViews[i] = logicalDevice.CreateImageView(createInfo);
             }
-        }
-
-        QueueFamilyIndices FindQueueFamilies(PhysicalDevice device)
-        {
-            QueueFamilyIndices indices = new QueueFamilyIndices();
-
-            uint queueFamilyCount = 0;
-            device.GetPhysicalDeviceQueueFamilyProperties(ref queueFamilyCount, null);
-
-            var queueFamilies = new QueueFamilyProperties[queueFamilyCount];
-            device.GetPhysicalDeviceQueueFamilyProperties(ref queueFamilyCount, queueFamilies);
-
-            uint i = 0;
-            foreach (var queueFamily in queueFamilies)
-            {
-                if ((queueFamily.QueueFlags & (uint)QueueFlagBits.GraphicsBit) > 0)
-                {
-                    indices.graphicsFamily = i;
-
-                }
-
-                bool presentSupport = false;
-                device.GetPhysicalDeviceSurfaceSupportKHR(i, surface, ref presentSupport);
-
-                if (queueFamily.QueueCount > 0 && presentSupport)
-                {
-                    indices.presentFamily = i;
-                }
-
-                if (indices.isComplete())
-                {
-                    break;
-                }
-
-                i++;
-            }
-
-            return indices;
         }
 
         SurfaceFormatKHR ChooseSwapSurfaceFormat(SurfaceFormatKHR[] availableFormats)
@@ -312,21 +264,17 @@ namespace Adamantium.Engine.Graphics
 
         private void CleanupSwapChain()
         {
-            foreach (var buffer in swapchainFramebuffers)
+            foreach (var buffer in framebuffers)
             {
-                logicalDevice.DestroyFramebuffer(buffer);
+                buffer.Destroy(GraphicsDevice);
             }
-
-            logicalDevice.DestroyPipeline(graphicsPipeline);
-            //logicalDevice.DestroyPipelineLayout(pipelineLayout);
-            //logicalDevice.DestroyRenderPass(renderPass);
 
             foreach (var view in swapchainImageViews)
             {
-                logicalDevice.DestroyImageView(view);
+                view.Destroy(GraphicsDevice);
             }
 
-            logicalDevice.DestroySwapchainKHR(swapchain);
+            swapchain?.Destroy(GraphicsDevice);
         }
 
         public static implicit operator SwapchainKHR(SwapChainGraphicsPresenter presenter)
