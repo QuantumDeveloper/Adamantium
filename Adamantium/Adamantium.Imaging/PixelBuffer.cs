@@ -48,7 +48,7 @@ namespace Adamantium.Imaging
         /// <param name="rowStride">The row pitch.</param>
         /// <param name="bufferStride">The slice pitch.</param>
         /// <param name="dataPointer">The pixels.</param>
-        public PixelBuffer(int width, int height, Format format, int rowStride, int bufferStride, IntPtr dataPointer)
+        public PixelBuffer(uint width, uint height, Format format, int rowStride, int bufferStride, IntPtr dataPointer)
         {
             if (dataPointer == IntPtr.Zero)
                 throw new ArgumentException("Pointer cannot be equal to IntPtr.Zero", nameof(dataPointer));
@@ -67,13 +67,13 @@ namespace Adamantium.Imaging
         /// Gets the width.
         /// </summary>
         /// <value>The width.</value>
-        public int Width { get; internal set; }
+        public uint Width { get; internal set; }
 
         /// <summary>
         /// Gets the height.
         /// </summary>
         /// <value>The height.</value>
-        public int Height { get; internal set; }
+        public uint Height { get; internal set; }
 
         /// <summary>
         /// Gets the format (this value can be changed)
@@ -299,7 +299,7 @@ namespace Adamantium.Imaging
         /// This method is working on a row basis. The <paramref name="yOffset"/> is specifying the first row to get 
         /// the pixels from.
         /// </remarks>
-        public unsafe void GetPixels<T>(T[] pixels, int yOffset, int pixelIndex, int pixelCount) where T : struct
+        public unsafe void GetPixels<T>(T[] pixels, int yOffset, uint pixelIndex, int pixelCount) where T : struct
         {
             var pixelPointer = (byte*)this.DataPointer + yOffset * RowStride;
             if (isStrictRowStride)

@@ -30,17 +30,15 @@ namespace Adamantium.Imaging
       /// <param name="allMipMaps">if set to <c>true</c> generates all mip maps.</param>
       public MipMapCount(bool allMipMaps)
       {
-         this.Count = allMipMaps ? 0 : 1;
+         this.Count = allMipMaps ? 0u : 1;
       }
 
       /// <summary>
       /// Initializes a new instance of the <see cref="MipMapCount" /> struct.
       /// </summary>
       /// <param name="count">The count.</param>
-      public MipMapCount(int count)
+      public MipMapCount(uint count)
       {
-         if (count < 0)
-            throw new ArgumentException("mipCount must be >= 0");
          this.Count = count;
       }
 
@@ -50,7 +48,7 @@ namespace Adamantium.Imaging
       /// <remarks>
       /// Zero(0) means generate all mipmaps. One(1) generates a single mipmap... etc.
       /// </remarks>
-      public readonly int Count;
+      public readonly uint Count;
 
       public bool Equals(MipMapCount other)
       {
@@ -66,7 +64,7 @@ namespace Adamantium.Imaging
 
       public override int GetHashCode()
       {
-         return this.Count;
+         return this.Count.GetHashCode();
       }
 
       public static bool operator ==(MipMapCount left, MipMapCount right)
@@ -104,7 +102,7 @@ namespace Adamantium.Imaging
       /// </summary>
       /// <param name="mipMap">The value.</param>
       /// <returns>The count of mipmap (0 means all mipmaps).</returns>
-      public static implicit operator int (MipMapCount mipMap)
+      public static implicit operator uint (MipMapCount mipMap)
       {
          return mipMap.Count;
       }
@@ -114,7 +112,7 @@ namespace Adamantium.Imaging
       /// </summary>
       /// <param name="mipMapCount">True to generate all mipmaps, false to use a single mipmap.</param>
       /// <returns>The result of the conversion.</returns>
-      public static implicit operator MipMapCount(int mipMapCount)
+      public static implicit operator MipMapCount(uint mipMapCount)
       {
          return new MipMapCount(mipMapCount);
       }

@@ -40,7 +40,7 @@ namespace Adamantium.Imaging
         /// <dd> <p>Texture width (in texels).
         /// </summary>	
         /// <remarks>
-        /// This field is valid for all textures: <see cref="Texture1D"/>, <see cref="Texture2D"/>, <see cref="Texture3D"/> and <see cref="TextureCube"/>.
+        /// This field is valid for all textures: <see cref="Texture"/>.
         /// </remarks>
         /// <msdn-id>ff476252</msdn-id>	
         /// <unmanaged>unsigned int Width</unmanaged>	
