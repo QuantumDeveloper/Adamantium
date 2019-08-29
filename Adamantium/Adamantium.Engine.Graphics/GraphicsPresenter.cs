@@ -45,21 +45,11 @@ namespace Adamantium.Engine.Graphics
       //   }
       //}
 
-      public Boolean IsFullScreen
-      {
-         get { return Description.IsWindowed; }
-         protected set
-         {
-            Description.IsWindowed = value;
-            RaisePropertyChanged();
-         }
-      }
-
 
       protected GraphicsPresenter(GraphicsDevice graphicsDevice, PresentationParameters description, String name="")
       {
          Name = name;
-         //GraphicsDevice = graphicsDevice.MainDevice;
+         GraphicsDevice = graphicsDevice;
          Description = description.Clone();
          CreateDepthBuffer();
          CreateViewPort();

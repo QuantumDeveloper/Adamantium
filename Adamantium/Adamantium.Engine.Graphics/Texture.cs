@@ -13,9 +13,9 @@ namespace Adamantium.Engine.Graphics
 {
     public class Texture : DisposableBase
     {
-        public int Width { get; set; }
+        public uint Width { get; set; }
 
-        public int Height { get; set; }
+        public uint Height { get; set; }
 
         public SurfaceFormat Format { get; set; }
 
@@ -24,21 +24,62 @@ namespace Adamantium.Engine.Graphics
         public GraphicsDevice GraphicsDevice { get; private set; }
 
         protected VulkanImage Image { get; set; }
-
+        protected DeviceMemory ImageMemory { get; set; }
         protected ImageView ImageView { get; set; }
 
         protected Texture(GraphicsDevice device, TextureDescription description)
         {
             GraphicsDevice = device;
+            
         }
 
-        public static int CalculateMipLevels(int width, int height, MipMapCount mipLevels)
+        private ImageCreateInfo TextureDescriptionToImageInfo(TextureDescription description)
+        {
+            ImageCreateInfo imageInfo = new ImageCreateInfo();
+            imageInfo.ImageType = description.ImageType;
+            imageInfo.Extent = new Extent3D();
+            imageInfo.Extent.Width = description.Width;
+            imageInfo.Extent.Height = description.Height;
+            imageInfo.Extent.Depth = description.Depth;
+            imageInfo.MipLevels = description.MipLevels;
+            imageInfo.ArrayLayers = description.ArrayLayers;
+            imageInfo.Format = description.Format;
+            imageInfo.Tiling = description.ImageTiling;
+            imageInfo.InitialLayout = description.ImageLayout;
+            imageInfo.Usage = (uint)description.Usage;
+            imageInfo.Samples = description.Samples;
+            imageInfo.SharingMode = description.SharingMode;
+        }
+
+        protected void CreateImageandView()
+        {
+            var device = (Device) GraphicsDevice;
+            if (device.CreateImage(imageInfo, null, out image) != Result.Success)
+            {
+                throw new Exception("failed to create image!");
+            }
+
+            device.GetImageMemoryRequirements(image, out var memRequirements);
+
+            MemoryAllocateInfo allocInfo = new MemoryAllocateInfo();
+            allocInfo.AllocationSize = memRequirements.Size;
+            allocInfo.MemoryTypeIndex = FindMemoryType(memRequirements.MemoryTypeBits, properties);
+
+            if (device.AllocateMemory(allocInfo, null, out imageMemory) != Result.Success)
+            {
+                throw new Exception("failed to allocate image memory!");
+            }
+
+            device.BindImageMemory(image, imageMemory, 0);
+        }
+
+        public static uint CalculateMipLevels(int width, int height, MipMapCount mipLevels)
         {
             return CalculateMipLevels(width, height, 1, mipLevels);
         }
 
 
-        public static int CalculateMipLevels(int width, int height, int depth, MipMapCount mipLevels)
+        public static uint CalculateMipLevels(int width, int height, int depth, MipMapCount mipLevels)
         {
             var maxMipLevels = CountMipLevels(width, height, depth);
             if (mipLevels > 1 && maxMipLevels > mipLevels)
@@ -91,7 +132,7 @@ namespace Adamantium.Engine.Graphics
             }
             else if (description.Usage.HasFlag(ImageUsageFlagBits.DepthStencilAttachmentBit))
             {
-                return DepthBuffer.New(graphicsDevice, description);
+                return new DepthBuffer(graphicsDevice, description);
             }
             else
             {

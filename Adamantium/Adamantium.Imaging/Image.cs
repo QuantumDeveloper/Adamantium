@@ -861,7 +861,7 @@ namespace Adamantium.Imaging
             return pixelBuffers[pixelBufferIndex];
         }
 
-        private static ImageDescription CreateDescription(TextureDimension dimension, int width, int height, int depth, MipMapCount mipMapCount, SurfaceFormat format, int arraySize)
+        private static ImageDescription CreateDescription(TextureDimension dimension, uint width, uint height, uint depth, MipMapCount mipMapCount, SurfaceFormat format, uint arraySize)
         {
             return new ImageDescription()
             {
