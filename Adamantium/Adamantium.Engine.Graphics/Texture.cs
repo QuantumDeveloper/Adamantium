@@ -13,6 +13,9 @@ namespace Adamantium.Engine.Graphics
 {
     public class Texture : DisposableBase
     {
+        private VulkanImage image;
+        private DeviceMemory imageMemory;
+
         public uint Width { get; set; }
 
         public uint Height { get; set; }
@@ -23,14 +26,26 @@ namespace Adamantium.Engine.Graphics
 
         public GraphicsDevice GraphicsDevice { get; private set; }
 
-        protected VulkanImage Image { get; set; }
-        protected DeviceMemory ImageMemory { get; set; }
+        protected VulkanImage Image { get => image; set => image = value; }
+        protected DeviceMemory ImageMemory { get => imageMemory; set => imageMemory = value; }
         protected ImageView ImageView { get; set; }
 
         protected Texture(GraphicsDevice device, TextureDescription description)
         {
             GraphicsDevice = device;
-            
+
+        }
+
+        protected Texture(GraphicsDevice device, Image img, ImageUsageFlagBits flags, ImageLayout usage)
+        {
+            GraphicsDevice = device;
+
+        }
+
+        protected Texture(GraphicsDevice device, Image[] img, ImageUsageFlagBits flags, ImageLayout usage)
+        {
+            GraphicsDevice = device;
+
         }
 
         private ImageCreateInfo TextureDescriptionToImageInfo(TextureDescription description)
@@ -49,11 +64,14 @@ namespace Adamantium.Engine.Graphics
             imageInfo.Usage = (uint)description.Usage;
             imageInfo.Samples = description.Samples;
             imageInfo.SharingMode = description.SharingMode;
+
+            return imageInfo;
         }
 
-        protected void CreateImageandView()
+        protected void CreateImageandView(TextureDescription description)
         {
-            var device = (Device) GraphicsDevice;
+            var device = (Device)GraphicsDevice;
+            var imageInfo = TextureDescriptionToImageInfo(description);
             if (device.CreateImage(imageInfo, null, out image) != Result.Success)
             {
                 throw new Exception("failed to create image!");
@@ -63,7 +81,7 @@ namespace Adamantium.Engine.Graphics
 
             MemoryAllocateInfo allocInfo = new MemoryAllocateInfo();
             allocInfo.AllocationSize = memRequirements.Size;
-            allocInfo.MemoryTypeIndex = FindMemoryType(memRequirements.MemoryTypeBits, properties);
+            allocInfo.MemoryTypeIndex = GraphicsDevice.Instance.CurrentDevice.FindCorrespondingMemoryType(memRequirements.MemoryTypeBits, MemoryPropertyFlagBits.DeviceLocalBit);
 
             if (device.AllocateMemory(allocInfo, null, out imageMemory) != Result.Success)
             {
@@ -118,17 +136,17 @@ namespace Adamantium.Engine.Graphics
 
             if (description.Usage.HasFlag(ImageUsageFlagBits.ColorAttachmentBit))
             {
-                switch (description.Dimension)
-                {
-                    case TextureDimension.Texture1D:
-                        return RenderTarget1D.New(graphicsDevice, description);
-                    case TextureDimension.Texture2D:
-                        return RenderTarget2D.New(graphicsDevice, description);
-                    case TextureDimension.Texture3D:
-                        return RenderTarget3D.New(graphicsDevice, description);
-                    case TextureDimension.TextureCube:
-                        return RenderTargetCube.New(graphicsDevice, description);
-                }
+                //switch (description.Dimension)
+                //{
+                //    case TextureDimension.Texture1D:
+                //        return RenderTarget1D.New(graphicsDevice, description);
+                //    case TextureDimension.Texture2D:
+                //        return RenderTarget2D.New(graphicsDevice, description);
+                //    case TextureDimension.Texture3D:
+                //        return RenderTarget3D.New(graphicsDevice, description);
+                //    case TextureDimension.TextureCube:
+                //        return RenderTargetCube.New(graphicsDevice, description);
+                //}
             }
             else if (description.Usage.HasFlag(ImageUsageFlagBits.DepthStencilAttachmentBit))
             {
@@ -137,36 +155,8 @@ namespace Adamantium.Engine.Graphics
             else
             {
                 return new Texture(graphicsDevice, description);
-                //switch (description.Dimension)
-                //{
-
-                //    case TextureDimension.Texture1D:
-                //        return Texture1D.New(graphicsDevice, description);
-                //    case TextureDimension.Texture2D:
-                //        return Texture2D.New(graphicsDevice, description);
-                //    case TextureDimension.Texture3D:
-                //        return Texture3D.New(graphicsDevice, description);
-                //    case TextureDimension.TextureCube:
-                //        return TextureCube.New(graphicsDevice, description);
-                //}
             }
             return null;
-        }
-
-        private static TextureDimension FindCorrespondingDimension(TextureDimension dimension)
-        {
-            switch (dimension)
-            {
-                case TextureDimension.Texture1D:
-                    return TextureDimension.Texture1D;
-                case TextureDimension.Texture2D:
-                    return TextureDimension.Texture2D;
-                case TextureDimension.Texture3D:
-                    return TextureDimension.Texture3D;
-                case TextureDimension.TextureCube:
-                    return TextureDimension.TextureCube;
-            }
-            return TextureDimension.Undefined;
         }
 
         /// <summary>
@@ -203,21 +193,7 @@ namespace Adamantium.Engine.Graphics
                 return null;
             }
 
-            var dimension = FindCorrespondingDimension(image.Description.Dimension);
-
-            switch (dimension)
-            {
-                case TextureDimension.Texture1D:
-                    return Texture1D.New(device, image, flags, usage);
-                case TextureDimension.Texture2D:
-                    return Texture2D.New(device, image, flags, usage);
-                case TextureDimension.Texture3D:
-                    return Texture3D.New(device, image, flags, usage);
-                case TextureDimension.TextureCube:
-                    return TextureCube.New(device, image, flags, usage);
-                default:
-                    throw new InvalidOperationException("Dimension not supported");
-            }
+            return new Texture(device, image, flags, usage);
         }
 
         /// <summary>
@@ -269,9 +245,9 @@ namespace Adamantium.Engine.Graphics
             {
                 for (int i = 0; i < filePath.Length; i++)
                 {
-                    images[i] = Adamantium.Imaging.Image .Load(filePath[i]);
+                    images[i] = Adamantium.Imaging.Image.Load(filePath[i]);
                 }
-                return TextureCube.New(device, images, flags, usage);
+                return new Texture(device, images, flags, usage);
             }
             catch (Exception exception)
             {
