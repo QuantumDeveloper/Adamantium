@@ -1,7 +1,6 @@
 ﻿using Adamantium.Imaging;
 using Adamantium.Win32;
 using AdamantiumVulkan.Core;
-using AdamantiumVulkan.Windows;
 using System;
 using VulkanImage = AdamantiumVulkan.Core.Image;
 
@@ -12,22 +11,19 @@ namespace Adamantium.Engine.Graphics
         private SwapchainKHR swapchain;
         private SurfaceKHR surface;
         private VulkanImage[] swapchainImages;
-        private ImageView[] swapchainImageViews;
+        internal ImageView[] swapchainImageViews;
         private Queue presentQueue;
-        private Texture[] backbuffers;
-        private Framebuffer[] framebuffers;
 
         public SwapChainGraphicsPresenter(GraphicsDevice graphicsDevice, PresentationParameters description, string name = "") : base(graphicsDevice, description, name)
         {
             //Dispose swapchain before creation to be 100% sure we avoid memory leak
             RemoveAndDispose(ref swapchain);
+            CreateSurface();
             CreateSwapchain(graphicsDevice);
             CreateImageViews(graphicsDevice);
-
+            Backbuffers = new Texture[Description.BuffersCount];
+            var indices = GraphicsDevice.Instance.CurrentDevice.FindQueueFamilies(surface);
             presentQueue = graphicsDevice.GetDeviceQueue(indices.presentFamily.Value, 0);
-
-            //Create RenderTargetView from backbuffer
-            //backbuffer = ToDispose(RenderTarget2D.New(GraphicsDevice, swapChain.GetBackBuffer<SharpDX.Direct3D11.Texture2D>(0)));
         }
 
         class SwapChainSupportDetails
@@ -37,12 +33,9 @@ namespace Adamantium.Engine.Graphics
             public PresentModeKHR[] PresentModes;
         };
 
-        private void CreateSurface(IntPtr hwnd, IntPtr hInstance, Instance instance)
+        private void CreateSurface()
         {
-            var surfaceInfo = new Win32SurfaceCreateInfoKHR();
-            surfaceInfo.Hwnd = hwnd;
-            surfaceInfo.Hinstance = hInstance;
-            surface = instance.CreateWin32Surface(surfaceInfo);
+            surface = GraphicsDevice.Instance.CreateSurface(Description);
         }
 
         SwapChainSupportDetails QuerySwapChainSupport(PhysicalDevice device)
@@ -183,7 +176,7 @@ namespace Adamantium.Engine.Graphics
             }
             else
             {
-                Extent2D actualExtent = new Extent2D() { Width = Description.BackBufferWidth, Height = Description.BackBufferHeight };
+                Extent2D actualExtent = new Extent2D() { Width = Description.Width, Height = Description.Height };
 
                 actualExtent.Width = Math.Max(capabilities.MinImageExtent.Width, Math.Min(capabilities.MaxImageExtent.Width, actualExtent.Width));
                 actualExtent.Height = Math.Max(capabilities.MinImageExtent.Height, Math.Min(capabilities.MaxImageExtent.Height, actualExtent.Height));
@@ -197,14 +190,15 @@ namespace Adamantium.Engine.Graphics
         /// </summary>
         public override void Present()
         {
+            Semaphore[] waitSemaphores = new[] { GraphicsDevice.GetRenderFinishedSemaphoreForCurrentFrame() };
             var presentInfo = new PresentInfoKHR();
 
             presentInfo.WaitSemaphoreCount = 1;
-            presentInfo.PWaitSemaphores = signalSemaphores;
+            presentInfo.PWaitSemaphores = waitSemaphores;
             SwapchainKHR[] swapchains = { swapchain };
             presentInfo.SwapchainCount = 1;
             presentInfo.PSwapchains = swapchains;
-            presentInfo.PImageIndices = new uint[] { imageIndex };
+            presentInfo.PImageIndices = new uint[] { GraphicsDevice.CurrentFrame };
 
             var result = presentQueue.QueuePresentKHR(presentInfo);
             if (result == Result.ErrorOutOfDateKhr || result == Result.SuboptimalKhr)
@@ -236,6 +230,7 @@ namespace Adamantium.Engine.Graphics
                 return false;
             }
 
+            RecreateSwapchain();
             //RemoveAndDispose(ref backbuffer);
 
             //swapChain.ResizeBuffers(Description.BuffersCount, width, height, format, flags);
@@ -248,30 +243,24 @@ namespace Adamantium.Engine.Graphics
 
         private void RecreateSwapchain()
         {
-            //if (WindowState == FormWindowState.Minimized)
-            //{
-            //    _pauseEvent.WaitOne();
-            //}
-
             GraphicsDevice.DeviceWaitIdle();
 
             CleanupSwapChain();
 
             CreateSwapchain(GraphicsDevice);
-            CreateRenderPass();
-            CreateFramebuffers();
+            CreateImageViews(GraphicsDevice);
         }
 
         private void CleanupSwapChain()
         {
-            foreach (var buffer in framebuffers)
-            {
-                buffer.Destroy(GraphicsDevice);
-            }
-
             foreach (var view in swapchainImageViews)
             {
                 view.Destroy(GraphicsDevice);
+            }
+
+            foreach (var img in swapchainImages)
+            {
+                img.Destroy(GraphicsDevice);
             }
 
             swapchain?.Destroy(GraphicsDevice);

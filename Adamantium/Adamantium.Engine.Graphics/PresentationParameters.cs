@@ -21,8 +21,8 @@ namespace Adamantium.Engine.Graphics
         {
             PresenterType = parameters.PresenterType;
 
-            BackBufferWidth = parameters.BackBufferWidth;
-            BackBufferHeight = parameters.BackBufferHeight;
+            Width = parameters.Width;
+            Height = parameters.Height;
             OutputHandle = parameters.OutputHandle;
             ImageFormat = parameters.ImageFormat;
             DepthFormat = parameters.DepthFormat;
@@ -33,8 +33,8 @@ namespace Adamantium.Engine.Graphics
         {
             PresenterType = presenterType;
 
-            BackBufferWidth = backbufferWidth;
-            BackBufferHeight = backbufferHeight;
+            Width = backbufferWidth;
+            Height = backbufferHeight;
             OutputHandle = handle;
 
             MSAALevel = msaaLevel;
@@ -43,14 +43,14 @@ namespace Adamantium.Engine.Graphics
         }
 
         public PresenterType PresenterType { get; }
-        public UInt32 BackBufferWidth { get; internal set; }
-        public UInt32 BackBufferHeight { get; internal set; }
+        public UInt32 Width { get; internal set; }
+        public UInt32 Height { get; internal set; }
         public IntPtr OutputHandle { get; }
         public IntPtr HInstanceHandle { get; }
         public SurfaceFormat ImageFormat { get; internal set; }
         public DepthFormat DepthFormat { get; internal set; }
         public MSAALevel MSAALevel { get; }
-        public Int32 BuffersCount { get; internal set; }
+        public UInt32 BuffersCount { get; internal set; }
         public SwapchainCreateFlags Flags { get; set; }
         public uint MinImageCount { get; set; }
         public ColorSpace ImageColorSpace { get; set; }
