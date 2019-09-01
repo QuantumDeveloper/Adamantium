@@ -35,6 +35,8 @@ namespace Adamantium.Engine.Graphics
          }
       }
 
+        public Texture[] Backbuffers { get; protected set; }
+
       //public PresentFlags PresentFlags
       //{
       //   get { return presentFlags; }
@@ -64,7 +66,7 @@ namespace Adamantium.Engine.Graphics
 
       private void CreateViewPort()
       {
-         Viewport = new ViewportF(0, 0, Description.BackBufferWidth, Description.BackBufferHeight, 0.0f, 1.0f);
+         Viewport = new ViewportF(0, 0, Description.Width, Description.Height, 0.0f, 1.0f);
       }
 
       /// <summary>
@@ -79,7 +81,7 @@ namespace Adamantium.Engine.Graphics
       public virtual bool Resize(Int32 width, Int32 height, int buffersCount, SurfaceFormat pixelFormat, DepthFormat depthFormat/*, SwapChainFlags flags = SwapChainFlags.None*/)
       {
          bool updateDepthStencil = false;
-         if (Description.DepthFormat != depthFormat || (Description.BackBufferWidth != width || Description.BackBufferHeight != height))
+         if (Description.DepthFormat != depthFormat || (Description.Width != width || Description.Height != height))
          {
             Description.DepthFormat = depthFormat;
             updateDepthStencil = true;

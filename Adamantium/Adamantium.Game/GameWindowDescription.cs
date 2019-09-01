@@ -30,8 +30,8 @@ namespace Adamantium.Engine
         {
             PresenterType = parameters.PresenterType;
 
-            Width = parameters.BackBufferWidth;
-            Height = parameters.BackBufferHeight;
+            Width = parameters.Width;
+            Height = parameters.Height;
             Handle = parameters.OutputHandle;
             PixelFormat = parameters.ImageFormat;
             DepthFormat = parameters.DepthFormat;

@@ -2,6 +2,7 @@
 using Adamantium.Core.Collections;
 using AdamantiumVulkan.Core;
 using AdamantiumVulkan.Core.Interop;
+using AdamantiumVulkan.Windows;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -28,7 +29,7 @@ namespace Adamantium.Engine.Graphics
         static VulkanInstance()
         {
             var deviceExt = new List<string>();
-            deviceExt.Add(Constants.VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+            deviceExt.Add(AdamantiumVulkan.Core.Constants.VK_KHR_SWAPCHAIN_EXTENSION_NAME);
             DeviceExtensions = new ReadOnlyCollection<string>(deviceExt);
             var validationLayers = new List<string>();
             validationLayers.Add("VK_LAYER_LUNARG_standard_validation");
@@ -70,8 +71,8 @@ namespace Adamantium.Engine.Graphics
             appInfo.PApplicationName = appName;
             appInfo.ApplicationVersion = AdamantiumVulkan.Core.Constants.VK_MAKE_VERSION(1, 0, 0);
             appInfo.PEngineName = EngineName;
-            appInfo.EngineVersion = Constants.VK_MAKE_VERSION(1, 0, 0);
-            appInfo.ApiVersion = Constants.VK_MAKE_VERSION(1, 0, 0);
+            appInfo.EngineVersion = AdamantiumVulkan.Core.Constants.VK_MAKE_VERSION(1, 0, 0);
+            appInfo.ApiVersion = AdamantiumVulkan.Core.Constants.VK_MAKE_VERSION(1, 0, 0);
 
             DebugUtilsMessengerCreateInfoEXT debugInfo = new DebugUtilsMessengerCreateInfoEXT();
             debugInfo.MessageSeverity = (uint)(DebugUtilsMessageSeverityFlagBitsEXT.VerboseBitExt | DebugUtilsMessageSeverityFlagBitsEXT.WarningBitExt | DebugUtilsMessageSeverityFlagBitsEXT.ErrorBitExt);
@@ -108,6 +109,19 @@ namespace Adamantium.Engine.Graphics
         public static VulkanInstance Create(string appName, bool enableDebug)
         {
             return new VulkanInstance(appName, enableDebug);
+        }
+
+        public SurfaceKHR CreateSurface(PresentationParameters parameters)
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                var surfaceInfo = new Win32SurfaceCreateInfoKHR();
+                surfaceInfo.Hwnd = parameters.OutputHandle;
+                surfaceInfo.Hinstance = parameters.HInstanceHandle;
+                return instance.CreateWin32Surface(surfaceInfo);
+            }
+
+            throw new NotSupportedException("Current platform is not supported yet for Surface creation");
         }
 
         private uint DebugCallback(DebugUtilsMessageSeverityFlagBitsEXT messageSeverity, uint messageTypes, AdamantiumVulkan.Core.Interop.VkDebugUtilsMessengerCallbackDataEXT pCallbackData, IntPtr pUserData)

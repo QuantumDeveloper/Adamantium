@@ -15,12 +15,13 @@ namespace Adamantium.Engine.Graphics
     {
         private VulkanImage image;
         private DeviceMemory imageMemory;
+        private TextureDescription description;
 
         public uint Width { get; set; }
 
         public uint Height { get; set; }
 
-        public SurfaceFormat Format { get; set; }
+        public SurfaceFormat Format => description.Format;
 
         public IntPtr NativePointer { get; }
 
@@ -33,7 +34,8 @@ namespace Adamantium.Engine.Graphics
         protected Texture(GraphicsDevice device, TextureDescription description)
         {
             GraphicsDevice = device;
-
+            this.description = description;
+            Initialize();
         }
 
         protected Texture(GraphicsDevice device, Image img, ImageUsageFlagBits flags, ImageLayout usage)
@@ -68,7 +70,13 @@ namespace Adamantium.Engine.Graphics
             return imageInfo;
         }
 
-        protected void CreateImageandView(TextureDescription description)
+        protected void Initialize()
+        {
+            CreateImage(description);
+            CreateImageView();
+        }
+
+        protected void CreateImage(TextureDescription description)
         {
             var device = (Device)GraphicsDevice;
             var imageInfo = TextureDescriptionToImageInfo(description);
@@ -89,6 +97,29 @@ namespace Adamantium.Engine.Graphics
             }
 
             device.BindImageMemory(image, imageMemory, 0);
+        }
+
+        protected void CreateImageView()
+        {
+            var createInfo = new ImageViewCreateInfo();
+            createInfo.Image = Image;
+            createInfo.ViewType = ImageViewType._2d;
+            createInfo.Format = Format;
+            ComponentMapping componentMapping = new ComponentMapping();
+            componentMapping.R = ComponentSwizzle.Identity;
+            componentMapping.G = ComponentSwizzle.Identity;
+            componentMapping.B = ComponentSwizzle.Identity;
+            componentMapping.A = ComponentSwizzle.Identity;
+            createInfo.Components = componentMapping;
+            ImageSubresourceRange subresourceRange = new ImageSubresourceRange();
+            subresourceRange.AspectMask = (uint)ImageAspectFlagBits.ColorBit;
+            subresourceRange.BaseMipLevel = 0;
+            subresourceRange.LevelCount = 1;
+            subresourceRange.BaseArrayLayer = 0;
+            subresourceRange.LayerCount = 1;
+            createInfo.SubresourceRange = subresourceRange;
+
+            ImageView = GraphicsDevice.LogicalDevice.CreateImageView(createInfo);
         }
 
         public static uint CalculateMipLevels(int width, int height, MipMapCount mipLevels)
@@ -269,9 +300,21 @@ namespace Adamantium.Engine.Graphics
 
         }
 
+        public static implicit operator VulkanImage (Texture texture)
+        {
+            return texture.Image;
+        }
+
+        public static implicit operator ImageView(Texture texture)
+        {
+            return texture.ImageView;
+        }
+
         protected override void Dispose(bool disposeManaged)
         {
-
+            Image?.Destroy(GraphicsDevice);
+            ImageView?.Destroy(GraphicsDevice);
+            ImageMemory?.FreeMemory(GraphicsDevice);
         }
     }
 }
