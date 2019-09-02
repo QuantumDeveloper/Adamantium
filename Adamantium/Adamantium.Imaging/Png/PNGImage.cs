@@ -27,8 +27,8 @@ namespace Adamantium.Imaging.Png
             var png = FromPixelBuffers(image.PixelBuffer);
             png.DefaultImage = GetFrameFromBuffer(image.DefaultImage);
             png.Header = new IHDR();
-            png.Header.Width = image.Description.Width;
-            png.Header.Height = image.Description.Height;
+            png.Header.Width = (int)image.Description.Width;
+            png.Header.Height = (int)image.Description.Height;
 
             return png;
         }

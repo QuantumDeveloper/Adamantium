@@ -8,8 +8,8 @@ namespace Adamantium.EntityFramework.ComponentsBasics
     {
         private QuaternionF rotation = QuaternionF.Identity;
         private Vector3D offset;
-        private int width;
-        private int height;
+        private uint width;
+        private uint height;
         private Single fov;
         private Single fovY;
         private Single tanFov;
@@ -97,13 +97,13 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             set => SetProperty(ref isDepthInversed, value);
         }
 
-        public Int32 Width
+        public UInt32 Width
         {
             get => width;
             set => SetProperty(ref width, value);
         }
 
-        public Int32 Height
+        public UInt32 Height
         {
             get => height;
             set => SetProperty(ref height, value);

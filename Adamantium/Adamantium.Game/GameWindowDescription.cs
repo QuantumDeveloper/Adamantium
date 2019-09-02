@@ -44,7 +44,7 @@ namespace Adamantium.Engine
             //Usage = Usage.RenderTargetOutput;
         }
 
-        public GameWindowDescription(PresenterType presenterType, Int32 width, Int32 height, IntPtr handle)
+        public GameWindowDescription(PresenterType presenterType, UInt32 width, UInt32 height, IntPtr handle)
         {
             PresenterType = presenterType;
 
@@ -92,15 +92,15 @@ namespace Adamantium.Engine
         //   AlphaMode = alphaMode;
         //}
 
-        public Int32 Width { get; set; }
-        public Int32 Height { get; set; }
+        public UInt32 Width { get; set; }
+        public UInt32 Height { get; set; }
         public IntPtr Handle { get; set; }
         public SurfaceFormat PixelFormat { get; set; }
         public DepthFormat DepthFormat { get; set; }
         public MSAALevel MSAALevel { get; set; }
 
         //public Rational RefreshRate { get; set; }
-        public Int32 BuffersCount { get; set; }
+        public UInt32 BuffersCount { get; set; }
         public Boolean IsWindowed { get; set; }
         //public SwapEffect SwapEffect { get; set; }
         //public Usage Usage { get; set; }

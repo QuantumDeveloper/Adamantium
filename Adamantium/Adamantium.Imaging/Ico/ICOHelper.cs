@@ -165,8 +165,8 @@ namespace Adamantium.Imaging.Ico
 
             stream.Dispose();
 
-            description.Width = width;
-            description.Height = height;
+            description.Width = (uint)width;
+            description.Height = (uint)height;
             description.Format = Format.R8G8B8A8_UNORM;
             description.MipLevels = 1;
             description.ArraySize = 1;

@@ -82,8 +82,8 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
             this.bitmap = bitmap;
 
             // gathers the informations
-            Width = bitmap.Width;
-            Height = bitmap.Height;
+            Width = (int)bitmap.Width;
+            Height = (int)bitmap.Height;
             PixelFormat = bitmap.Format;
             UsePalette = usePalette;
             BitDepth = PixelFormat.SizeOfInBits();
@@ -660,7 +660,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
             var dataPointer = Utilities.AllocateMemory(source.Width * source.Height * source.PixelFormat.SizeOfInBytes());
             var rowStride = source.Width * targetPixelFormat.SizeOfInBytes();
             var bufferStride = rowStride * source.Height;
-            var result = new PixelBuffer(source.Width, source.Height, targetPixelFormat, rowStride, bufferStride, dataPointer);
+            var result = new PixelBuffer((uint)source.Width, (uint)source.Height, targetPixelFormat, rowStride, bufferStride, dataPointer);
 
             // wraps target image to a buffer
             using (ImageBuffer target = new ImageBuffer(result, usePalette))
@@ -888,7 +888,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
 
             // creates a target bitmap in an appropriate format
             var dataPointer = Utilities.AllocateMemory(source.Width * source.Height * source.PixelFormat.SizeOfInBytes());
-            targetImage = new PixelBuffer(source.Width, source.Height, targetFormat, source.Stride, source.Size, dataPointer);
+            targetImage = new PixelBuffer((uint)source.Width, (uint)source.Height, targetFormat, source.Stride, source.Size, dataPointer);
 
             // wraps target image to a buffer
             using (ImageBuffer target = new ImageBuffer(targetImage))

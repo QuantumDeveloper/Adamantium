@@ -313,13 +313,13 @@ namespace Adamantium.Imaging
                 var remainingPixels = sizeOfOutputPixel % Width;
                 for (int i = 0; i < sizePerWidth; i++)
                 {
-                    Utilities.Read(new IntPtr(pixelPointer), pixels, pixelIndex, Width);
+                    Utilities.Read(new IntPtr(pixelPointer), pixels, (int)pixelIndex, (int)Width);
                     pixelPointer += RowStride;
                     pixelIndex += Width;
                 }
                 if (remainingPixels > 0)
                 {
-                    Utilities.Read(new IntPtr(pixelPointer), pixels, pixelIndex, remainingPixels);
+                    Utilities.Read(new IntPtr(pixelPointer), pixels, (int)pixelIndex, (int)remainingPixels);
                 }
             }
         }
@@ -353,7 +353,7 @@ namespace Adamantium.Imaging
         /// This method is working on a row basis. The <paramref name="yOffset"/> is specifying the first row to get 
         /// the pixels from.
         /// </remarks>
-        public unsafe void SetPixels<T>(T[] sourcePixels, int yOffset, int pixelIndex, int pixelCount) where T : struct
+        public unsafe void SetPixels<T>(T[] sourcePixels, int yOffset, uint pixelIndex, int pixelCount) where T : struct
         {
             var pixelPointer = (byte*)DataPointer + yOffset * RowStride;
             if (isStrictRowStride)
@@ -367,13 +367,13 @@ namespace Adamantium.Imaging
                 var remainingPixels = sizeOfOutputPixel % Width;
                 for (int i = 0; i < sizePerWidth; i++)
                 {
-                    Utilities.Write(new IntPtr(pixelPointer), sourcePixels, pixelIndex, Width);
+                    Utilities.Write(new IntPtr(pixelPointer), sourcePixels, (int)pixelIndex, (int)Width);
                     pixelPointer += RowStride;
                     pixelIndex += Width;
                 }
                 if (remainingPixels > 0)
                 {
-                    Utilities.Write(new IntPtr(pixelPointer), sourcePixels, pixelIndex, remainingPixels);
+                    Utilities.Write(new IntPtr(pixelPointer), sourcePixels, (int)pixelIndex, (int)remainingPixels);
                 }
             }
         }
@@ -501,9 +501,9 @@ namespace Adamantium.Imaging
             if (flipOtions == FlipBufferOptions.FlipVertically)
             {
                 int offset = 0;
-                for (int i = height - 1; i >= 0; --i)
+                for (uint i = height - 1; i >= 0; --i)
                 {
-                    System.Buffer.BlockCopy(buffer, i * rowStride, flipped, offset, rowStride);
+                    System.Buffer.BlockCopy(buffer, (int)i * rowStride, flipped, offset, rowStride);
                     offset += rowStride;
                 }
             }
@@ -525,14 +525,14 @@ namespace Adamantium.Imaging
             else
             {
                 int rowOffset = 0;
-                for (int i = height - 1; i >= 0; --i)
+                for (uint i = height - 1; i >= 0; --i)
                 {
-                    System.Buffer.BlockCopy(buffer, i * rowStride, flipped, rowOffset, rowStride);
+                    System.Buffer.BlockCopy(buffer, (int)i * rowStride, flipped, rowOffset, rowStride);
                     var originalOffset = i * rowStride;
                     var columnOffset = rowOffset + rowStride - pixelSize;
                     for (int k = 0; k < width; ++k)
                     {
-                        System.Buffer.BlockCopy(buffer, originalOffset, flipped, columnOffset, pixelSize);
+                        System.Buffer.BlockCopy(buffer, (int)originalOffset, flipped, columnOffset, pixelSize);
                         columnOffset -= pixelSize;
                         originalOffset += pixelSize;
                     }

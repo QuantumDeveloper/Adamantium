@@ -263,7 +263,7 @@ namespace Adamantium.Imaging.Dds
                 return false;
 
             // Setup MipLevels
-            description.MipLevels = header.MipMapCount;
+            description.MipLevels = (uint)header.MipMapCount;
             if (description.MipLevels == 0)
                 description.MipLevels = 1;
 
@@ -277,7 +277,7 @@ namespace Adamantium.Imaging.Dds
                 var headerDX10 = *(HeaderDXT10*) ((byte*) headerPtr + sizeof (int) + Utilities.SizeOf<Header>());
                 convFlags |= ConversionFlags.DX10;
 
-                description.ArraySize = headerDX10.ArraySize;
+                description.ArraySize = (uint)headerDX10.ArraySize;
                 if (description.ArraySize == 0)
                     throw new InvalidOperationException("Unexpected ArraySize == 0 from DDS HeaderDX10 ");
 
@@ -292,7 +292,7 @@ namespace Adamantium.Imaging.Dds
                         if ((header.Flags & HeaderFlags.Height) != 0 && header.Height != 1)
                             throw new InvalidOperationException("Unexpected Height != 1 from DDS HeaderDX10 ");
 
-                        description.Width = header.Width;
+                        description.Width = (uint)header.Width;
                         description.Height = 1;
                         description.Depth = 1;
                         description.Dimension = TextureDimension.Texture1D;
@@ -309,8 +309,8 @@ namespace Adamantium.Imaging.Dds
                             description.Dimension = TextureDimension.Texture2D;
                         }
 
-                        description.Width = header.Width;
-                        description.Height = header.Height;
+                        description.Width = (uint)header.Width;
+                        description.Height = (uint)header.Height;
                         description.Depth = 1;
                         break;
 
@@ -321,9 +321,9 @@ namespace Adamantium.Imaging.Dds
                         if (description.ArraySize > 1)
                             throw new InvalidOperationException("Unexpected ArraySize > 1 for Texture3D from DDS HeaderDX10");
 
-                        description.Width = header.Width;
-                        description.Height = header.Height;
-                        description.Depth = header.Depth;
+                        description.Width = (uint)header.Width;
+                        description.Height = (uint)header.Height;
+                        description.Depth = (uint)header.Depth;
                         description.Dimension = TextureDimension.Texture3D;
                         break;
 
@@ -337,9 +337,9 @@ namespace Adamantium.Imaging.Dds
 
                 if ((header.Flags & HeaderFlags.Volume) != 0)
                 {
-                    description.Width = header.Width;
-                    description.Height = header.Height;
-                    description.Depth = header.Depth;
+                    description.Width = (uint)header.Width;
+                    description.Height = (uint)header.Height;
+                    description.Depth = (uint)header.Depth;
                     description.Dimension = TextureDimension.Texture3D;
                 }
                 else
@@ -358,8 +358,8 @@ namespace Adamantium.Imaging.Dds
                         description.Dimension = TextureDimension.Texture2D;
                     }
 
-                    description.Width = header.Width;
-                    description.Height = header.Height;
+                    description.Width = (uint)header.Width;
+                    description.Height = (uint)header.Height;
                     description.Depth = 1;
                     // Note there's no way for a legacy Direct3D 9 DDS to express a '1D' texture
                 }
@@ -584,7 +584,7 @@ namespace Adamantium.Imaging.Dds
             if (description.MipLevels > 0)
             {
                 header->Flags |= HeaderFlags.Mipmap;
-                header->MipMapCount = description.MipLevels;
+                header->MipMapCount = (int)description.MipLevels;
 
                 if (header->MipMapCount > 1)
                     header->SurfaceFlags |= SurfaceFlags.Mipmap;
@@ -593,14 +593,14 @@ namespace Adamantium.Imaging.Dds
             switch (description.Dimension)
             {
                 case TextureDimension.Texture1D:
-                    header->Height = description.Height;
+                    header->Height = (int)description.Height;
                     header->Width = header->Depth = 1;
                     break;
 
                 case TextureDimension.Texture2D:
                 case TextureDimension.TextureCube:
-                    header->Height = description.Height;
-                    header->Width = description.Width;
+                    header->Height = (int)description.Height;
+                    header->Width = (int)description.Width;
                     header->Depth = 1;
 
                     if (description.Dimension == TextureDimension.TextureCube)
@@ -614,16 +614,16 @@ namespace Adamantium.Imaging.Dds
 
                     header->Flags |= HeaderFlags.Volume;
                     header->CubemapFlags |= CubemapFlags.Volume;
-                    header->Height = description.Height;
-                    header->Width = description.Width;
-                    header->Depth = description.Depth;
+                    header->Height = (int)description.Height;
+                    header->Width = (int)description.Width;
+                    header->Depth = (int)description.Depth;
                     break;
             }
 
             int rowPitch, slicePitch;
             int newWidth;
             int newHeight;
-            Image.ComputePitch(description.Format, description.Width, description.Height, out rowPitch, out slicePitch, out newWidth, out newHeight);
+            Image.ComputePitch(description.Format, (int)description.Width, (int)description.Height, out rowPitch, out slicePitch, out newWidth, out newHeight);
 
             if (description.Format.IsCompressed())
             {
@@ -663,11 +663,11 @@ namespace Adamantium.Imaging.Dds
                 if (description.Dimension == TextureDimension.TextureCube)
                 {
                     ext->MiscFlags |= ResourceOptionFlags.TextureCube;
-                    ext->ArraySize = description.ArraySize / 6;
+                    ext->ArraySize = (int)(description.ArraySize / 6);
                 }
                 else
                 {
-                    ext->ArraySize = description.ArraySize;
+                    ext->ArraySize = (int)description.ArraySize;
                 }
             }
             else
@@ -1001,7 +1001,7 @@ namespace Adamantium.Imaging.Dds
             int index = 0;
             for (int item = 0; item < metadata.ArraySize; ++item)
             {
-                int d = metadata.Depth;
+                uint d = metadata.Depth;
 
                 for (int level = 0; level < metadata.MipLevels; ++level)
                 {
@@ -1069,7 +1069,7 @@ namespace Adamantium.Imaging.Dds
 
            for (int arrayIndex = 0; arrayIndex < metadata.ArraySize; arrayIndex++)
            {
-              int d = metadata.Depth;
+              uint d = metadata.Depth;
               // Else we need to go through each mips/depth slice to convert all scanlines.
               for (int level = 0; level < metadata.MipLevels; ++level)
               {

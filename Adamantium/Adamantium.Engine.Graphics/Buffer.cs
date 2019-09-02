@@ -21,7 +21,7 @@ namespace Adamantium.Engine.Graphics
 
         public ulong ElementSize { get; private set; }
 
-        public ulong ElementCount { get; private set; }
+        public uint ElementCount { get; private set; }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Buffer" /> class.
@@ -72,21 +72,21 @@ namespace Adamantium.Engine.Graphics
             return new Buffer(GraphicsDevice, stagingDesc, BufferUsageFlags, ViewFormat, IntPtr.Zero);
         }
 
-        private void CreateBuffer(ulong size, BufferUsageFlagBits usage, MemoryPropertyFlagBits memoryProperties, out Buffer buffer, out DeviceMemory bufferMemory)
+        private void CreateBuffer(ulong size, BufferUsageFlagBits usage, MemoryPropertyFlagBits memoryProperties, out VulkanBuffer buffer, out DeviceMemory bufferMemory)
         {
             BufferCreateInfo bufferInfo = new BufferCreateInfo();
             bufferInfo.Size = size;
             bufferInfo.Usage = (uint)usage;
             bufferInfo.SharingMode = SharingMode.Exclusive;
 
-            buffer = logicalDevice.CreateBuffer(bufferInfo);
+            buffer = GraphicsDevice.LogicalDevice.CreateBuffer(bufferInfo);
 
-            MemoryRequirements memoryRequirements = logicalDevice.GetBufferMemoryRequirements(buffer);
+            MemoryRequirements memoryRequirements = GraphicsDevice.LogicalDevice.GetBufferMemoryRequirements(buffer);
 
             MemoryAllocateInfo allocInfo = new MemoryAllocateInfo();
             allocInfo.AllocationSize = memoryRequirements.Size;
 
-            var memProperties = physicalDevice.GetPhysicalDeviceMemoryProperties();
+            var memProperties = GraphicsDevice.Instance.CurrentDevice.GetPhysicalDeviceMemoryProperties();
 
             var properties = MemoryPropertyFlagBits.HostVisibleBit | MemoryPropertyFlagBits.HostCoherentBit;
             for (uint i = 0; i < memProperties.MemoryTypeCount; i++)
@@ -99,12 +99,12 @@ namespace Adamantium.Engine.Graphics
                 }
             }
 
-            bufferMemory = logicalDevice.AllocateMemory(allocInfo);
+            bufferMemory = GraphicsDevice.LogicalDevice.AllocateMemory(allocInfo);
 
-            var result = logicalDevice.BindBufferMemory(buffer, bufferMemory, 0);
+            var result = GraphicsDevice.LogicalDevice.BindBufferMemory(buffer, bufferMemory, 0);
         }
 
-        private void CopyBuffer(Buffer srcBuffer, Buffer dstBuffer, ulong size)
+        private void CopyBuffer(VulkanBuffer srcBuffer, VulkanBuffer dstBuffer, ulong size)
         {
             var commandBuffer = logicalDevice.BeginSingleTimeCommand(commandPool);
 
@@ -402,6 +402,11 @@ namespace Adamantium.Engine.Graphics
             viewFormat = CheckPixelFormat(bufferFlags, elementSize, viewFormat);
             var description = NewDescription(bufferSize, elementSize, bufferFlags, memoryFlags);
             return new Buffer(device, description, bufferFlags, viewFormat, dataPointer.Pointer);
+        }
+
+        public static implicit operator VulkanBuffer(Buffer buffer)
+        {
+            return buffer.VulkanBuffer;
         }
     }
 

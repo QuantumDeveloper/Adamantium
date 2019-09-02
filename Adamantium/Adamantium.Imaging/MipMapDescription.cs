@@ -17,14 +17,14 @@ namespace Adamantium.Imaging
       /// <param name="depthStride">The depth stride.</param>
       /// <param name="widthPacked">The packed width.</param>
       /// <param name="heightPacked">The packed height.</param>
-      public MipMapDescription(int width, int height, int depth, int rowStride, int depthStride, int widthPacked, int heightPacked)
+      public MipMapDescription(uint width, uint height, uint depth, int rowStride, int depthStride, int widthPacked, int heightPacked)
       {
          Width = width;
          Height = height;
          Depth = depth;
          RowStride = rowStride;
          DepthStride = depthStride;
-         MipmapSize = depthStride * depth;
+         MipmapSize = (uint)depthStride * depth;
          WidthPacked = widthPacked;
          HeightPacked = heightPacked;
       }
@@ -32,12 +32,12 @@ namespace Adamantium.Imaging
       /// <summary>
       /// Width of this mipmap.
       /// </summary>
-      public readonly int Width;
+      public readonly uint Width;
 
       /// <summary>
       /// Height of this mipmap.
       /// </summary>
-      public readonly int Height;
+      public readonly uint Height;
 
       /// <summary>
       /// Width of this mipmap.
@@ -52,7 +52,7 @@ namespace Adamantium.Imaging
       /// <summary>
       /// Depth of this mipmap.
       /// </summary>
-      public readonly int Depth;
+      public readonly uint Depth;
 
       /// <summary>
       /// RowStride of this mipmap (number of bytes per row).
@@ -67,7 +67,7 @@ namespace Adamantium.Imaging
       /// <summary>
       /// Size in bytes of this whole mipmap.
       /// </summary>
-      public readonly int MipmapSize;
+      public readonly uint MipmapSize;
 
       public bool Equals(MipMapDescription other)
       {
@@ -93,13 +93,13 @@ namespace Adamantium.Imaging
       {
          unchecked
          {
-            int hashCode = this.Width;
-            hashCode = (hashCode * 397) ^ this.Height;
+            int hashCode = (int)this.Width;
+            hashCode = (hashCode * 397) ^ (int)this.Height;
             hashCode = (hashCode * 397) ^ this.WidthPacked;
             hashCode = (hashCode * 397) ^ this.HeightPacked;
-            hashCode = (hashCode * 397) ^ this.Depth;
+            hashCode = (hashCode * 397) ^ (int)this.Depth;
             hashCode = (hashCode * 397) ^ this.RowStride;
-            hashCode = (hashCode * 397) ^ this.MipmapSize;
+            hashCode = (hashCode * 397) ^ (int)this.MipmapSize;
             hashCode = (hashCode * 397) ^ this.DepthStride;
             return hashCode;
          }

@@ -63,7 +63,7 @@ namespace Adamantium.Imaging.Png
             frame.Width = (uint)pngImage.Header.Width;
             frame.Height = (uint)pngImage.Header.Height;
             ConvertColorsIfNeeded(frame, state);
-            var descr = GetImageDescription(state, pngImage.Header.Width, pngImage.Header.Height);
+            var descr = GetImageDescription(state, (uint)pngImage.Header.Width, (uint)pngImage.Header.Height);
             var img = Image.New(descr);
             var handle = GCHandle.Alloc(frame.RawPixelBuffer, GCHandleType.Pinned);
             Utilities.CopyMemory(img.DataPointer, handle.AddrOfPinnedObject(), frame.RawPixelBuffer.Length);
@@ -129,7 +129,7 @@ namespace Adamantium.Imaging.Png
                 }
             }
 
-            var img = Image.New3D(pngImage.Header.Width, pngImage.Header.Height, pngImage.Frames.Count, new MipMapCount(1),SurfaceFormat.R8G8B8A8.UNorm);
+            var img = Image.New3D((uint)pngImage.Header.Width, (uint)pngImage.Header.Height, (uint)pngImage.Frames.Count, new MipMapCount(1),SurfaceFormat.R8G8B8A8.UNorm);
             for (int i = 0; i < img.PixelBuffer.Count; ++i)
             {
                 var frame = pngImage.Frames[i];
@@ -151,7 +151,7 @@ namespace Adamantium.Imaging.Png
             return img;
         }
 
-        private ImageDescription GetImageDescription(PNGState state, int width, int height)
+        private ImageDescription GetImageDescription(PNGState state, uint width, uint height)
         {
             var bitsPerPixel = PNGColorConvertion.GetBitsPerPixel(state.InfoRaw);
             ImageDescription descr = new ImageDescription();

@@ -216,18 +216,18 @@ namespace Adamantium.Engine
             nativeWindow.GotFocus += NativeWindow_GotFocus;
             nativeWindow.LostFocus += NativeWindow_LostFocus;
             Description = new GameWindowDescription(PresenterType.RenderTarget);
-            Width = (int)nativeWindow.ActualWidth;
-            Height = (int)nativeWindow.ActualHeight;
+            Width = (uint)nativeWindow.ActualWidth;
+            Height = (uint)nativeWindow.ActualHeight;
             Handle = nativeWindow.Handle;
-            clientBounds = new Rectangle(0, 0, Description.Width, Description.Height);
+            clientBounds = new Rectangle(0, 0, (int)Description.Width, (int)Description.Height);
         }
 
         private void NativeWindow_RenderTargetChanged(object sender, RenderTargetEventArgs e)
         {
             Handle = e.Handle;
             clientBounds = new Rectangle(0, 0, e.Width, e.Height);
-            Width = (int)nativeWindow.ActualWidth;
-            Height = (int)nativeWindow.ActualHeight;
+            Width = (uint)nativeWindow.ActualWidth;
+            Height = (uint)nativeWindow.ActualHeight;
             Debug.WriteLine("RenderTarget window size = " + Description.Width + " " + Description.Height);
         }
 

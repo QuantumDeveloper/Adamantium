@@ -203,7 +203,8 @@ namespace Adamantium.UI
 
         protected void Initialize()
         {
-            graphicsDevice = Engine.Graphics.GraphicsDevice.Create(GraphicsAdapter.Default, DeviceCreationFlags.BgraSupport | DeviceCreationFlags.Debug, FeatureLevel.Level_11_0);
+            var vulkanInstance = VulkanInstance.Create("Adamantium Engine", true);
+            graphicsDevice = Engine.Graphics.GraphicsDevice.Create(vulkanInstance, vulkanInstance.CurrentDevice);
             //GraphicsDevice.BlendState = GraphicsDevice.BlendStates.AlphaBlend;
             //GraphicsDevice.RasterizerState = GraphicsDevice.RasterizerStates.CullNoneClipEnabled;
             //GraphicsDevice.DepthStencilState = GraphicsDevice.DepthStencilStates.DepthEnableGreaterEqual;

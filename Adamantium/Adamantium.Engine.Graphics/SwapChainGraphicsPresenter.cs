@@ -198,7 +198,7 @@ namespace Adamantium.Engine.Graphics
             SwapchainKHR[] swapchains = { swapchain };
             presentInfo.SwapchainCount = 1;
             presentInfo.PSwapchains = swapchains;
-            presentInfo.PImageIndices = new uint[] { GraphicsDevice.CurrentFrame };
+            presentInfo.PImageIndices = new uint[] { GraphicsDevice.CurrentImageIndex };
 
             var result = presentQueue.QueuePresentKHR(presentInfo);
             if (result == Result.ErrorOutOfDateKhr || result == Result.SuboptimalKhr)
@@ -223,7 +223,7 @@ namespace Adamantium.Engine.Graphics
         /// <param name="format"></param>
         /// <param name="depthFormat"></param>
         /// <param name="flags"></param>
-        public override bool Resize(int width, int height, int buffersCount, SurfaceFormat format, DepthFormat depthFormat/*, SwapChainFlags flags = SwapChainFlags.None*/)
+        public override bool Resize(uint width, uint height, uint buffersCount, SurfaceFormat format, DepthFormat depthFormat/*, SwapChainFlags flags = SwapChainFlags.None*/)
         {
             if (!base.Resize(width, height, buffersCount, format, depthFormat/*, flags*/))
             {

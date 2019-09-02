@@ -23,7 +23,7 @@ namespace Adamantium.Imaging
         /// <msdn-id>ff476252</msdn-id>	
         /// <unmanaged>unsigned int Width</unmanaged>	
         /// <unmanaged-short>unsigned int Width</unmanaged-short>	
-        public int Width;
+        public uint Width;
 
         /// <summary>	
         /// <dd> <p>Texture height (in texels).
@@ -34,7 +34,7 @@ namespace Adamantium.Imaging
         /// <msdn-id>ff476254</msdn-id>	
         /// <unmanaged>unsigned int Height</unmanaged>	
         /// <unmanaged-short>unsigned int Height</unmanaged-short>	
-        public int Height;
+        public uint Height;
 
         /// <summary>
         /// Horizontal offset for current frame from the top left corner
@@ -111,31 +111,22 @@ namespace Adamantium.Imaging
             return obj is AnimatedImageDescription && Equals((AnimatedImageDescription)obj);
         }
 
+        /// <inheritdoc />
         public override int GetHashCode()
         {
             unchecked
             {
-                int hashCode = Dimension.GetHashCode();
-                hashCode = (hashCode * 397) ^ Width;
-                hashCode = (hashCode * 397) ^ Height;
-                hashCode = (hashCode * 397) ^ Depth;
-                hashCode = (hashCode * 397) ^ ArraySize;
-                hashCode = (hashCode * 397) ^ MipLevels;
+                var hashCode = (int) Width;
+                hashCode = (hashCode * 397) ^ (int) Height;
+                hashCode = (hashCode * 397) ^ (int) XOffset;
+                hashCode = (hashCode * 397) ^ (int) YOffset;
+                hashCode = (hashCode * 397) ^ DelayNumerator.GetHashCode();
+                hashCode = (hashCode * 397) ^ DelayDenominator.GetHashCode();
+                hashCode = (hashCode * 397) ^ (int) SequenceNumber;
                 hashCode = (hashCode * 397) ^ BytesPerPixel;
                 return hashCode;
             }
         }
-
-        //void IDataSerializable.Serialize(BinarySerializer serializer)
-        //{
-        //    serializer.SerializeEnum(ref Dimension);
-        //    serializer.Serialize(ref Width);
-        //    serializer.Serialize(ref Height);
-        //    serializer.Serialize(ref Depth);
-        //    serializer.Serialize(ref ArraySize);
-        //    serializer.Serialize(ref MipLevels);
-        //    serializer.SerializeEnum(ref Format);
-        //}
 
         public static bool operator ==(AnimatedImageDescription left, AnimatedImageDescription right)
         {
@@ -147,6 +138,7 @@ namespace Adamantium.Imaging
             return !left.Equals(right);
         }
 
+        /// <inheritdoc />
         public override string ToString()
         {
             return
