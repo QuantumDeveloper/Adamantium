@@ -329,7 +329,7 @@ namespace Adamantium.Engine
         }
 
 
-        public virtual Int32 Width
+        public virtual UInt32 Width
         {
             get => Description.Width;
             protected set
@@ -343,7 +343,7 @@ namespace Adamantium.Engine
             }
         }
 
-        public virtual Int32 Height
+        public virtual UInt32 Height
         {
             get => Description.Height;
             protected set
@@ -448,7 +448,7 @@ namespace Adamantium.Engine
         //    }
         //}
 
-        public virtual Int32 BuffersCount
+        public virtual UInt32 BuffersCount
         {
             get { return Description.BuffersCount; }
             set

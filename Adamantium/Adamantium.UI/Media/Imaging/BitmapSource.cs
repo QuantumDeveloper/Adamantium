@@ -5,9 +5,9 @@ namespace Adamantium.UI.Media.Imaging
 {
    public abstract class BitmapSource:ImageSource
    {
-      public virtual Int32 PixelWidth => DXTexture.Width;
+      public virtual UInt32 PixelWidth => DXTexture.Width;
 
-      public virtual Int32 PixelHeight => DXTexture.Height;
+      public virtual UInt32 PixelHeight => DXTexture.Height;
 
       public virtual SurfaceFormat PixelFormat => DXTexture.Format;
 

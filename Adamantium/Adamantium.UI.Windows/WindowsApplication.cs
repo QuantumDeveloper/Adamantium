@@ -43,6 +43,6 @@ namespace Adamantium.UI.Windows
             }
         }
 
-        protected override 
+        //protected override 
     }
 }

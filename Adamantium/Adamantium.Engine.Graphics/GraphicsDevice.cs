@@ -33,10 +33,13 @@ namespace Adamantium.Engine.Graphics
 
         public uint CurrentFrame { get; private set; }
 
+        public uint CurrentImageIndex => currentImageIndex;
+
         public readonly uint MaxFramesInFlight;
 
 
         private SubmitInfo[] submitInfos = new SubmitInfo[1];
+        private uint currentImageIndex;
 
         private GraphicsDevice(VulkanInstance instance, PhysicalDevice physicalDevice)
         {
@@ -351,8 +354,7 @@ namespace Adamantium.Engine.Graphics
         {
             var renderFence = InFlightFences[CurrentFrame];
             var result = LogicalDevice.WaitForFences(1, renderFence, true, ulong.MaxValue);
-            uint imageIndex = 0;
-            result = LogicalDevice.AcquireNextImageKHR((SwapChainGraphicsPresenter)Presenter, ulong.MaxValue, ImageAvailableSemaphores[CurrentFrame], null, ref imageIndex);
+            result = LogicalDevice.AcquireNextImageKHR((SwapChainGraphicsPresenter)Presenter, ulong.MaxValue, ImageAvailableSemaphores[CurrentFrame], null, ref currentImageIndex);
 
             //if (result == Result.ErrorOutOfDateKhr)
             //{
@@ -370,7 +372,7 @@ namespace Adamantium.Engine.Graphics
                 throw new ArgumentException("Failed to acquire swap chain image!");
             }
 
-            var commandBuffer = commandBuffers[imageIndex];
+            var commandBuffer = commandBuffers[CurrentImageIndex];
 
             var beginInfo = new CommandBufferBeginInfo();
             beginInfo.Flags = (uint)CommandBufferUsageFlagBits.SimultaneousUseBit;
@@ -408,7 +410,7 @@ namespace Adamantium.Engine.Graphics
 
         public void EndDrawCommand()
         {
-            var commandBuffer = commandBuffers[i];
+            var commandBuffer = commandBuffers[CurrentImageIndex];
             commandBuffer.CmdEndRenderPass();
 
             var result = commandBuffer.EndCommandBuffer();
@@ -446,28 +448,28 @@ namespace Adamantium.Engine.Graphics
             }
         }
 
-        public void Draw()
+        public void Draw(Buffer vertexBuffer)
         {
             ulong offset = 0;
+            var commandBuffer = commandBuffers[CurrentFrame];
             commandBuffer.CmdBindVertexBuffers(0, 1, vertexBuffer, ref offset);
 
-            commandBuffer.CmdBindIndexBuffer(indexBuffer, 0, IndexType.Uint32);
+            commandBuffer.CmdBindDescriptorSets(PipelineBindPoint.Graphics, pipelineLayout, 0, 1, descriptorSets[CurrentImageIndex], 0, 0);
 
-            commandBuffer.CmdBindDescriptorSets(PipelineBindPoint.Graphics, pipelineLayout, 0, 1, descriptorSets[imageIndex], 0, 0);
-
-            commandBuffer.CmdDrawIndexed((uint)indices.Length, 1, 0, 0, 0);
+            commandBuffer.CmdDraw(vertexBuffer.ElementCount, 1, 0, 0);
         }
 
-        public void DrawIndexed()
+        public void DrawIndexed(Buffer vertexBuffer, Buffer indexBuffer)
         {
             ulong offset = 0;
+            var commandBuffer = commandBuffers[CurrentFrame];
             commandBuffer.CmdBindVertexBuffers(0, 1, vertexBuffer, ref offset);
 
             commandBuffer.CmdBindIndexBuffer(indexBuffer, 0, IndexType.Uint32);
 
-            commandBuffer.CmdBindDescriptorSets(PipelineBindPoint.Graphics, pipelineLayout, 0, 1, descriptorSets[imageIndex], 0, 0);
+            commandBuffer.CmdBindDescriptorSets(PipelineBindPoint.Graphics, pipelineLayout, 0, 1, descriptorSets[CurrentImageIndex], 0, 0);
 
-            commandBuffer.CmdDrawIndexed((uint)indices.Length, 1, 0, 0, 0);
+            commandBuffer.CmdDrawIndexed(indexBuffer.ElementCount, 1, 0, 0, 0);
         }
 
         internal Semaphore GetImageAvailableSemaphoreForCurrentFrame()

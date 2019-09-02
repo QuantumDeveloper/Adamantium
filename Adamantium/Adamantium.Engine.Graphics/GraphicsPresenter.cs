@@ -78,7 +78,7 @@ namespace Adamantium.Engine.Graphics
       /// <param name="pixelFormat"></param>
       /// <param name="depthFormat"></param>
       /// <param name="flags"></param>
-      public virtual bool Resize(Int32 width, Int32 height, int buffersCount, SurfaceFormat pixelFormat, DepthFormat depthFormat/*, SwapChainFlags flags = SwapChainFlags.None*/)
+      public virtual bool Resize(UInt32 width, UInt32 height, uint buffersCount, SurfaceFormat pixelFormat, DepthFormat depthFormat/*, SwapChainFlags flags = SwapChainFlags.None*/)
       {
          bool updateDepthStencil = false;
          if (Description.DepthFormat != depthFormat || (Description.Width != width || Description.Height != height))

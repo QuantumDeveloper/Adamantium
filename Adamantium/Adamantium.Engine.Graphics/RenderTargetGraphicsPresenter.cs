@@ -57,7 +57,7 @@ namespace Adamantium.Engine.Graphics
       /// <param name="depthFormat"></param>
       /// <param name="flags"></param>
       /// <param name="pixelFormat"></param>
-      public override bool Resize(int width, int height, int buffersCount, SurfaceFormat pixelFormat, DepthFormat depthFormat/*, SwapChainFlags flags = SwapChainFlags.None*/)
+      public override bool Resize(uint width, uint height, uint buffersCount, SurfaceFormat pixelFormat, DepthFormat depthFormat/*, SwapChainFlags flags = SwapChainFlags.None*/)
       {
          if (!base.Resize(width, height, buffersCount, pixelFormat, depthFormat/*, flags*/))
          {

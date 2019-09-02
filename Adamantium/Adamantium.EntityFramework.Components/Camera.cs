@@ -42,7 +42,7 @@ namespace Adamantium.EntityFramework.Components
         /// <param name="zfar">Distance to far plane</param>
         /// <param name="inverseDepth">Is depth should be inverted</param>
         /// <remarks>If <paramref name="inverseDepth"/> is true, then znear and zfar will be swap when creating projection matrix</remarks>
-        public Camera(Single fov, Int32 width, Int32 height, Single znear, Single zfar, bool inverseDepth = true)
+        public Camera(Single fov, UInt32 width, UInt32 height, Single znear, Single zfar, bool inverseDepth = true)
         {
             IsDepthInversed = inverseDepth;
             Rotation = QuaternionF.Identity;
@@ -82,7 +82,7 @@ namespace Adamantium.EntityFramework.Components
         /// <param name="zfar">Distance to far plane</param>
         /// <param name="inverseDepth">Is depth should be inverted</param>
         /// <remarks>If <paramref name="inverseDepth"/> is true, then znear and zfar will be swap when creating projection matrix</remarks>
-        public Camera(Vector3F lookAt, Vector3F up, Single fov, Int32 width, Int32 height,
+        public Camera(Vector3F lookAt, Vector3F up, Single fov, UInt32 width, UInt32 height,
            Single znear, Single zfar, bool inverseDepth = true)
         {
             IsDepthInversed = inverseDepth;

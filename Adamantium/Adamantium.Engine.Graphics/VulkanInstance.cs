@@ -63,6 +63,8 @@ namespace Adamantium.Engine.Graphics
             IsInDebugMode = enableDebug;
             CreateInstance(appName, enableDebug);
             PhysicalDevices = new AdamantiumCollection<PhysicalDevice>();
+            EnumerateDevices();
+            CurrentDevice = PhysicalDevices[0];
         }
 
         private void CreateInstance(string appName, bool enableDebug)

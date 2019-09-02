@@ -28,7 +28,7 @@ namespace Adamantium.Imaging.Bmp
             var sizeinBytes = description.Format.SizeOfInBytes();
             var bufferSize = description.Width * description.Height * sizeinBytes;
             byte[] buffer = new byte[bufferSize];
-            var rowStride = description.Width * realFormatSize;
+            var rowStride = (int)(description.Width * realFormatSize);
             var alignedRowStride = AlignStride(rowStride);
             int rowStrideDiff = alignedRowStride - rowStride;
             var convertionsFlags = ConvertionFlags.None;
@@ -159,8 +159,8 @@ namespace Adamantium.Imaging.Bmp
             }
 
             description.MipLevels = 1;
-            description.Width = infoHeader.width;
-            description.Height = infoHeader.height;
+            description.Width = (uint)infoHeader.width;
+            description.Height = (uint)infoHeader.height;
             description.Depth = 1;
             description.ArraySize = 1;
             description.Dimension = TextureDimension.Texture2D;
@@ -206,7 +206,7 @@ namespace Adamantium.Imaging.Bmp
             }
             else
             {
-                var width = AlignStride(description.Width);
+                var width = AlignStride((int)description.Width);
                 var size = width * description.Height * description.Format.SizeOfInBytes();
                 fileSize += (uint)size;
             }
@@ -218,8 +218,8 @@ namespace Adamantium.Imaging.Bmp
 
             var infoHeader = new BitmapInfoHeader();
             infoHeader.bitCount = (ushort)description.Format.SizeOfInBits();
-            infoHeader.width = description.Width;
-            infoHeader.height = description.Height;
+            infoHeader.width = (int)description.Width;
+            infoHeader.height = (int)description.Height;
             infoHeader.planes = 1;
             infoHeader.size = (uint)Marshal.SizeOf<BitmapInfoHeader>();
 
@@ -270,9 +270,9 @@ namespace Adamantium.Imaging.Bmp
             }
             else
             {
-                var alignedWidth = AlignStride(description.Width);
+                var alignedWidth = AlignStride((int)description.Width);
                 var alignDiff = alignedWidth - description.Width;
-                var rowStride = description.Width * description.Format.SizeOfInBytes();
+                int rowStride = (int)(description.Width * description.Format.SizeOfInBytes());
                 for (int i = 0; i < description.Height; ++i)
                 {
                     imageStream.Write(buffer, bufferOffset, rowStride);

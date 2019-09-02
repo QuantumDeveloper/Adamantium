@@ -249,13 +249,13 @@ namespace Adamantium.Imaging.Tga
             int rowPitch, slicePitch;
             if (flags.HasFlag(TGAConversionFlags.Format888))
             {
-                rowPitch = description.Width * 3;
-                slicePitch = description.Height * rowPitch;
+                rowPitch = (int)description.Width * 3;
+                slicePitch = (int)description.Height * rowPitch;
             }
             else
             {
                 int widthCount, heightCount;
-                Image.ComputePitch(description.Format, description.Width, description.Height, out rowPitch, out slicePitch, out widthCount, out heightCount);
+                Image.ComputePitch(description.Format, (int)description.Width, (int)description.Height, out rowPitch, out slicePitch, out widthCount, out heightCount);
             }
 
             IntPtr pSource = pixelBuffers[0].DataPointer;
@@ -309,13 +309,13 @@ namespace Adamantium.Imaging.Tga
             int slicePitch = 0;
             if (convFlags.HasFlag(TGAConversionFlags.Expand))
             {
-                rowPitch = description.Width * 3;
+                rowPitch = (int)description.Width * 3;
             }
             else
             {
                 int newWidth;
                 int newHeight;
-                Image.ComputePitch(description.Format, description.Width, description.Height, out rowPitch, out slicePitch, out newWidth, out newHeight);
+                Image.ComputePitch(description.Format, (int)description.Width, (int)description.Height, out rowPitch, out slicePitch, out newWidth, out newHeight);
             }
 
 
@@ -336,7 +336,7 @@ namespace Adamantium.Imaging.Tga
 
                     for (int y = 0; y < description.Height; ++y)
                     {
-                        int offset = convFlags.HasFlag(TGAConversionFlags.InvertX) ? description.Width - 1 : 0;
+                        int offset = convFlags.HasFlag(TGAConversionFlags.InvertX) ? (int)description.Width - 1 : 0;
 
                         var dPtr = ((byte*)pDestination +
                                             (rowStride *
@@ -416,7 +416,7 @@ namespace Adamantium.Imaging.Tga
                     bool nonzeroa = false;
                     for (int y = 0; y < description.Height; ++y)
                     {
-                        int offset = convFlags.HasFlag(TGAConversionFlags.InvertX) ? description.Width - 1 : 0;
+                        int offset = convFlags.HasFlag(TGAConversionFlags.InvertX) ? (int)description.Width - 1 : 0;
 
                         var dPtr = (ushort*)((byte*)pDestination +
                                               (rowStride *
@@ -515,7 +515,7 @@ namespace Adamantium.Imaging.Tga
                     nonzeroa = false;
                     for (int y = 0; y < description.Height; ++y)
                     {
-                        int offset = convFlags.HasFlag(TGAConversionFlags.InvertX) ? description.Width - 1 : 0;
+                        int offset = convFlags.HasFlag(TGAConversionFlags.InvertX) ? (int)description.Width - 1 : 0;
 
                         var dPtr = (uint*)((byte*)pDestination +
                                             (rowStride *
@@ -668,12 +668,12 @@ namespace Adamantium.Imaging.Tga
             int rowPitch, slicePitch;
             if (convFlags.HasFlag(TGAConversionFlags.Format888))
             {
-                rowPitch = description.Width * 3;
+                rowPitch = (int)description.Width * 3;
             }
             else
             {
                 int widthCount, heightCount;
-                Image.ComputePitch(description.Format, description.Width, description.Height, out rowPitch, out slicePitch,
+                Image.ComputePitch(description.Format, (int)description.Width, (int)description.Height, out rowPitch, out slicePitch,
                    out widthCount, out heightCount);
             }
 
