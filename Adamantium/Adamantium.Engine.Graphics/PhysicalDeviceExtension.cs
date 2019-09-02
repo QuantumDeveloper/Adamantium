@@ -44,6 +44,21 @@ namespace Adamantium.Engine.Graphics
 
             return indices;
         }
+
+        public static UInt32 FindMemoryIndex(this PhysicalDevice physicalDevice, UInt32 memoryTypeBits, MemoryPropertyFlags propertyFlags)
+        {
+            var memProperties = physicalDevice.GetPhysicalDeviceMemoryProperties();
+            for (uint i = 0; i < memProperties.MemoryTypeCount; i++)
+            {
+                if (((memoryTypeBits >> (int)i) & 1) == 1
+                    && memProperties.MemoryTypes[i].PropertyFlags == (uint)propertyFlags)
+                {
+                    return i;
+                }
+            }
+
+            return 0;
+        }
     }
 
     public class QueueFamilyIndices

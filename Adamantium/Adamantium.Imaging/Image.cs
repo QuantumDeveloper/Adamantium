@@ -306,7 +306,7 @@ namespace Adamantium.Imaging
         /// <param name="format">The format.</param>
         /// <param name="arraySize">Size of the array.</param>
         /// <returns>A new image.</returns>
-        public static Image New1D(uint width, MipMapCount mipMapCount, SurfaceFormat format, uint arraySize = 1)
+        public static Image New1D(int width, MipMapCount mipMapCount, SurfaceFormat format, int arraySize = 1)
         {
             return New1D(width, mipMapCount, format, arraySize, IntPtr.Zero);
         }
@@ -320,7 +320,7 @@ namespace Adamantium.Imaging
         /// <param name="format">The format.</param>
         /// <param name="arraySize">Size of the array.</param>
         /// <returns>A new image.</returns>
-        public static Image New2D(uint width, uint height, MipMapCount mipMapCount, SurfaceFormat format, uint arraySize = 1)
+        public static Image New2D(int width, int height, MipMapCount mipMapCount, SurfaceFormat format, int arraySize = 1)
         {
             return New2D(width, height, mipMapCount, format, arraySize, IntPtr.Zero);
         }
@@ -332,7 +332,7 @@ namespace Adamantium.Imaging
         /// <param name="mipMapCount">The mip map count.</param>
         /// <param name="format">The format.</param>
         /// <returns>A new image.</returns>
-        public static Image NewCube(uint width, MipMapCount mipMapCount, SurfaceFormat format)
+        public static Image NewCube(int width, MipMapCount mipMapCount, SurfaceFormat format)
         {
             return NewCube(width, mipMapCount, format, IntPtr.Zero);
         }
@@ -346,7 +346,7 @@ namespace Adamantium.Imaging
         /// <param name="mipMapCount">The mip map count.</param>
         /// <param name="format">The format.</param>
         /// <returns>A new image.</returns>
-        public static Image New3D(uint width, uint height, uint depth, MipMapCount mipMapCount, SurfaceFormat format)
+        public static Image New3D(int width, int height, int depth, MipMapCount mipMapCount, SurfaceFormat format)
         {
             return New3D(width, height, depth, mipMapCount, format, IntPtr.Zero);
         }
@@ -371,7 +371,7 @@ namespace Adamantium.Imaging
         /// <param name="arraySize">Size of the array.</param>
         /// <param name="dataPointer">Pointer to an existing buffer.</param>
         /// <returns>A new image.</returns>
-        public static Image New1D(uint width, MipMapCount mipMapCount, SurfaceFormat format, uint arraySize, IntPtr dataPointer)
+        public static Image New1D(int width, MipMapCount mipMapCount, SurfaceFormat format, int arraySize, IntPtr dataPointer)
         {
             return new Image(CreateDescription(TextureDimension.Texture1D, width, 1, 1, mipMapCount, format, arraySize), dataPointer, 0, null, false);
         }
@@ -386,7 +386,7 @@ namespace Adamantium.Imaging
         /// <param name="arraySize">Size of the array.</param>
         /// <param name="dataPointer">Pointer to an existing buffer.</param>
         /// <returns>A new image.</returns>
-        public static Image New2D(uint width, uint height, MipMapCount mipMapCount, SurfaceFormat format, uint arraySize, IntPtr dataPointer)
+        public static Image New2D(int width, int height, MipMapCount mipMapCount, SurfaceFormat format, int arraySize, IntPtr dataPointer)
         {
             return new Image(CreateDescription(TextureDimension.Texture2D, width, height, 1, mipMapCount, format, arraySize), dataPointer, 0, null, false);
         }
@@ -399,7 +399,7 @@ namespace Adamantium.Imaging
         /// <param name="format">The format.</param>
         /// <param name="dataPointer">Pointer to an existing buffer.</param>
         /// <returns>A new image.</returns>
-        public static Image NewCube(uint width, MipMapCount mipMapCount, SurfaceFormat format, IntPtr dataPointer)
+        public static Image NewCube(int width, MipMapCount mipMapCount, SurfaceFormat format, IntPtr dataPointer)
         {
             return new Image(CreateDescription(TextureDimension.TextureCube, width, width, 1, mipMapCount, format, 6), dataPointer, 0, null, false);
         }
@@ -414,7 +414,7 @@ namespace Adamantium.Imaging
         /// <param name="format">The format.</param>
         /// <param name="dataPointer">Pointer to an existing buffer.</param>
         /// <returns>A new image.</returns>
-        public static Image New3D(uint width, uint height, uint depth, MipMapCount mipMapCount, SurfaceFormat format, IntPtr dataPointer)
+        public static Image New3D(int width, int height, int depth, MipMapCount mipMapCount, SurfaceFormat format, IntPtr dataPointer)
         {
             return new Image(CreateDescription(TextureDimension.Texture3D, width, height, depth, mipMapCount, format, 1), dataPointer, 0, null, false);
         }
@@ -470,7 +470,7 @@ namespace Adamantium.Imaging
         /// <remarks>If <paramref name="makeACopy"/> is set to false, the returned image is now the holder of the unmanaged pointer and will release it on Dispose. </remarks>
         public static Image Load(DataPointer dataBuffer, bool makeACopy = false)
         {
-            return Load(dataBuffer.Pointer, dataBuffer.Size, makeACopy);
+            return Load(dataBuffer.Pointer, dataBuffer.ElementSize, makeACopy);
         }
 
         /// <summary>
@@ -794,9 +794,9 @@ namespace Adamantium.Imaging
 
             // Calculate mipmaps
             int pixelBufferCount;
-            mipMapToZIndex = CalculateImageArray(description, pitchFlags, out pixelBufferCount, out totalSizeInBytes);
-            mipmapDescriptions = CalculateMipMapDescription(description, pitchFlags);
-            zBufferCountPerArraySlice = mipMapToZIndex[^1];
+            this.mipMapToZIndex = CalculateImageArray(description, pitchFlags, out pixelBufferCount, out totalSizeInBytes);
+            this.mipmapDescriptions = CalculateMipMapDescription(description, pitchFlags);
+            zBufferCountPerArraySlice = this.mipMapToZIndex[this.mipMapToZIndex.Count - 1];
 
             // Allocate all pixel buffers
             pixelBuffers = new PixelBuffer[pixelBufferCount];
@@ -954,9 +954,9 @@ namespace Adamantium.Imaging
             pixelSize = 0;
             nImages = 0;
 
-            var w = metadata.Width;
-            var h = metadata.Height;
-            var d = metadata.Depth;
+            int w = metadata.Width;
+            int h = metadata.Height;
+            int d = metadata.Depth;
 
             var mipmaps = new MipMapDescription[metadata.MipLevels];
 
@@ -965,7 +965,7 @@ namespace Adamantium.Imaging
                 int rowPitch, slicePitch;
                 int widthPacked;
                 int heightPacked;
-                ComputePitch(metadata.Format, (int)w, (int)h, out rowPitch, out slicePitch, out widthPacked, out heightPacked, PitchFlags.None);
+                ComputePitch(metadata.Format, w, h, out rowPitch, out slicePitch, out widthPacked, out heightPacked, PitchFlags.None);
 
                 mipmaps[level] = new MipMapDescription(
                     w,
@@ -977,8 +977,8 @@ namespace Adamantium.Imaging
                     heightPacked
                     );
 
-                pixelSize += (int)d * slicePitch;
-                nImages += (int)d;
+                pixelSize += d * slicePitch;
+                nImages += d;
 
                 if (h > 1)
                     h >>= 1;
@@ -1022,24 +1022,24 @@ namespace Adamantium.Imaging
 
             for (int j = 0; j < imageDesc.ArraySize; j++)
             {
-                var w = imageDesc.Width;
-                var h = imageDesc.Height;
-                var d = imageDesc.Depth;
+                int w = imageDesc.Width;
+                int h = imageDesc.Height;
+                int d = imageDesc.Depth;
 
                 for (int i = 0; i < imageDesc.MipLevels; i++)
                 {
                     int rowPitch, slicePitch;
                     int widthPacked;
                     int heightPacked;
-                    ComputePitch(imageDesc.Format, (int)w, (int)h, out rowPitch, out slicePitch, out widthPacked, out heightPacked, pitchFlags);
+                    ComputePitch(imageDesc.Format, w, h, out rowPitch, out slicePitch, out widthPacked, out heightPacked, pitchFlags);
 
                     // Store the number of z-slices per miplevel
                     if (j == 0)
                         mipmapToZIndex.Add(bufferCount);
 
                     // Keep a trace of indices for the 1st array size, for each mip levels
-                    pixelSizeInBytes += (int)d * slicePitch;
-                    bufferCount += (int)d;
+                    pixelSizeInBytes += d * slicePitch;
+                    bufferCount += d;
 
                     if (h > 1)
                         h >>= 1;
@@ -1075,7 +1075,7 @@ namespace Adamantium.Imaging
                 int rowPitch, slicePitch;
                 int widthPacked;
                 int heightPacked;
-                ComputePitch(format, (int)desc.Width, (int)desc.Height, out rowPitch, out slicePitch, out widthPacked, out heightPacked);
+                ComputePitch(format, desc.Width, desc.Height, out rowPitch, out slicePitch, out widthPacked, out heightPacked);
 
                 // We use the same memory organization that Direct3D 11 needs for D3D11_SUBRESOURCE_DATA
                 // with all slices of a given miplevel being continuous in memory
@@ -1104,16 +1104,16 @@ namespace Adamantium.Imaging
             var pixels = (byte*)buffer;
             for (uint item = 0; item < imageDesc.ArraySize; ++item)
             {
-                var w = imageDesc.Width;
-                var h = imageDesc.Height;
-                var d = imageDesc.Depth;
+                int w = imageDesc.Width;
+                int h = imageDesc.Height;
+                int d = imageDesc.Depth;
 
                 for (uint level = 0; level < imageDesc.MipLevels; ++level)
                 {
                     int rowPitch, slicePitch;
                     int widthPacked;
                     int heightPacked;
-                    ComputePitch(imageDesc.Format, (int)w, (int)h, out rowPitch, out slicePitch, out widthPacked, out heightPacked, pitchFlags);
+                    ComputePitch(imageDesc.Format, w, h, out rowPitch, out slicePitch, out widthPacked, out heightPacked, pitchFlags);
 
                     for (uint zSlice = 0; zSlice < d; ++zSlice)
                     {
@@ -1137,13 +1137,13 @@ namespace Adamantium.Imaging
             }
         }
 
-        public static uint CalculateMipLevels(uint width, uint height, MipMapCount mipLevels)
+        public static int CalculateMipLevels(int width, int height, MipMapCount mipLevels)
         {
             return CalculateMipLevels(width, height, 1, mipLevels);
         }
 
 
-        public static uint CalculateMipLevels(uint width, uint height, uint depth, MipMapCount mipLevels)
+        public static int CalculateMipLevels(int width, int height, int depth, MipMapCount mipLevels)
         {
             var maxMipLevels = CountMipLevels(width, height, depth);
             if (mipLevels > 1 && maxMipLevels > mipLevels)
@@ -1153,7 +1153,7 @@ namespace Adamantium.Imaging
             return mipLevels;
         }
 
-        private static int CountMipLevels(uint width, uint height, uint depth)
+        private static int CountMipLevels(int width, int height, int depth)
         {
             /*
              * Math.Max function selects the largest dimension. 
