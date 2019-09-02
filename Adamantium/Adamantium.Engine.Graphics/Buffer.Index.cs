@@ -33,7 +33,7 @@ namespace Adamantium.Engine.Graphics
             /// <param name="indexCount">Number of indices.</param>
             /// <param name="memoryFlags">The memoryFlags.</param>
             /// <returns>A index buffer</returns>
-            public static Buffer<T> New<T>(GraphicsDevice device, int indexCount, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal) where T : struct
+            public static Buffer<T> New<T>(GraphicsDevice device, uint indexCount, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal) where T : struct
             {
                 return Buffer.New<T>(device, indexCount, BufferUsageFlags.IndexBuffer, memoryFlags);
             }
@@ -74,7 +74,7 @@ namespace Adamantium.Engine.Graphics
             /// <returns>A index buffer</returns>
             public static Buffer New(GraphicsDevice device, byte[] value, bool is32BitIndex, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.Protected)
             {
-                return Buffer.New(device, value, is32BitIndex ? 4 : 2, BufferUsageFlags.IndexBuffer, Format.UNDEFINED, memoryFlags);
+                return Buffer.New(device, value, is32BitIndex ? 4 : 2, BufferUsageFlags.IndexBuffer, memoryFlags);
             }
 
             /// <summary>
@@ -86,7 +86,7 @@ namespace Adamantium.Engine.Graphics
             /// <returns>A index buffer</returns>
             public static Buffer New(GraphicsDevice device, DataPointer value, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.Protected)
             {
-                return Buffer.New(device, value, 0, BufferUsageFlags.IndexBuffer, memoryFlags);
+                return Buffer.New(device, value, BufferUsageFlags.IndexBuffer, memoryFlags);
             }
         }
     }

@@ -50,6 +50,12 @@
             </summary>	
             <unmanaged>Vulkan imange Format</unmanaged>	
         </member>
+        <member name="M:Adamantium.Imaging.AnimatedImageDescription.GetHashCode">
+            <inheritdoc />
+        </member>
+        <member name="M:Adamantium.Imaging.AnimatedImageDescription.ToString">
+            <inheritdoc />
+        </member>
         <member name="P:Adamantium.Imaging.ComponentsBuffer.DensityX">
             <summary> X density (dots per inch).</summary>
         </member>
@@ -540,7 +546,7 @@
             <param name="description">The image description.</param>
             <returns>A new image.</returns>
         </member>
-        <member name="M:Adamantium.Imaging.Image.New1D(System.Int32,Adamantium.Imaging.MipMapCount,Adamantium.Imaging.SurfaceFormat,System.Int32)">
+        <member name="M:Adamantium.Imaging.Image.New1D(System.UInt32,Adamantium.Imaging.MipMapCount,Adamantium.Imaging.SurfaceFormat,System.UInt32)">
             <summary>
             Creates a new instance of a 1D <see cref="T:Adamantium.Imaging.Image"/>.
             </summary>
@@ -550,7 +556,7 @@
             <param name="arraySize">Size of the array.</param>
             <returns>A new image.</returns>
         </member>
-        <member name="M:Adamantium.Imaging.Image.New2D(System.Int32,System.Int32,Adamantium.Imaging.MipMapCount,Adamantium.Imaging.SurfaceFormat,System.Int32)">
+        <member name="M:Adamantium.Imaging.Image.New2D(System.UInt32,System.UInt32,Adamantium.Imaging.MipMapCount,Adamantium.Imaging.SurfaceFormat,System.UInt32)">
             <summary>
             Creates a new instance of a 2D <see cref="T:Adamantium.Imaging.Image"/>.
             </summary>
@@ -561,7 +567,7 @@
             <param name="arraySize">Size of the array.</param>
             <returns>A new image.</returns>
         </member>
-        <member name="M:Adamantium.Imaging.Image.NewCube(System.Int32,Adamantium.Imaging.MipMapCount,Adamantium.Imaging.SurfaceFormat)">
+        <member name="M:Adamantium.Imaging.Image.NewCube(System.UInt32,Adamantium.Imaging.MipMapCount,Adamantium.Imaging.SurfaceFormat)">
             <summary>
             Creates a new instance of a Cube <see cref="T:Adamantium.Imaging.Image"/>.
             </summary>
@@ -570,7 +576,7 @@
             <param name="format">The format.</param>
             <returns>A new image.</returns>
         </member>
-        <member name="M:Adamantium.Imaging.Image.New3D(System.Int32,System.Int32,System.Int32,Adamantium.Imaging.MipMapCount,Adamantium.Imaging.SurfaceFormat)">
+        <member name="M:Adamantium.Imaging.Image.New3D(System.UInt32,System.UInt32,System.UInt32,Adamantium.Imaging.MipMapCount,Adamantium.Imaging.SurfaceFormat)">
             <summary>
             Creates a new instance of a 3D <see cref="T:Adamantium.Imaging.Image"/>.
             </summary>
@@ -589,7 +595,7 @@
             <param name="dataPointer">Pointer to an existing buffer.</param>
             <returns>A new image.</returns>
         </member>
-        <member name="M:Adamantium.Imaging.Image.New1D(System.Int32,Adamantium.Imaging.MipMapCount,Adamantium.Imaging.SurfaceFormat,System.Int32,System.IntPtr)">
+        <member name="M:Adamantium.Imaging.Image.New1D(System.UInt32,Adamantium.Imaging.MipMapCount,Adamantium.Imaging.SurfaceFormat,System.UInt32,System.IntPtr)">
             <summary>
             Creates a new instance of a 1D <see cref="T:Adamantium.Imaging.Image"/>.
             </summary>
@@ -600,7 +606,7 @@
             <param name="dataPointer">Pointer to an existing buffer.</param>
             <returns>A new image.</returns>
         </member>
-        <member name="M:Adamantium.Imaging.Image.New2D(System.Int32,System.Int32,Adamantium.Imaging.MipMapCount,Adamantium.Imaging.SurfaceFormat,System.Int32,System.IntPtr)">
+        <member name="M:Adamantium.Imaging.Image.New2D(System.UInt32,System.UInt32,Adamantium.Imaging.MipMapCount,Adamantium.Imaging.SurfaceFormat,System.UInt32,System.IntPtr)">
             <summary>
             Creates a new instance of a 2D <see cref="T:Adamantium.Imaging.Image"/>.
             </summary>
@@ -612,7 +618,7 @@
             <param name="dataPointer">Pointer to an existing buffer.</param>
             <returns>A new image.</returns>
         </member>
-        <member name="M:Adamantium.Imaging.Image.NewCube(System.Int32,Adamantium.Imaging.MipMapCount,Adamantium.Imaging.SurfaceFormat,System.IntPtr)">
+        <member name="M:Adamantium.Imaging.Image.NewCube(System.UInt32,Adamantium.Imaging.MipMapCount,Adamantium.Imaging.SurfaceFormat,System.IntPtr)">
             <summary>
             Creates a new instance of a Cube <see cref="T:Adamantium.Imaging.Image"/>.
             </summary>
@@ -622,7 +628,7 @@
             <param name="dataPointer">Pointer to an existing buffer.</param>
             <returns>A new image.</returns>
         </member>
-        <member name="M:Adamantium.Imaging.Image.New3D(System.Int32,System.Int32,System.Int32,Adamantium.Imaging.MipMapCount,Adamantium.Imaging.SurfaceFormat,System.IntPtr)">
+        <member name="M:Adamantium.Imaging.Image.New3D(System.UInt32,System.UInt32,System.UInt32,Adamantium.Imaging.MipMapCount,Adamantium.Imaging.SurfaceFormat,System.IntPtr)">
             <summary>
             Creates a new instance of a 3D <see cref="T:Adamantium.Imaging.Image"/>.
             </summary>
@@ -1288,7 +1294,7 @@
             </summary>
             <param name="allMipMaps">if set to <c>true</c> generates all mip maps.</param>
         </member>
-        <member name="M:Adamantium.Imaging.MipMapCount.#ctor(System.Int32)">
+        <member name="M:Adamantium.Imaging.MipMapCount.#ctor(System.UInt32)">
             <summary>
             Initializes a new instance of the <see cref="T:Adamantium.Imaging.MipMapCount" /> struct.
             </summary>
@@ -1316,14 +1322,14 @@
             <param name="mipMapAll">True to generate all mipmaps, false to use a single mipmap.</param>
             <returns>The result of the conversion.</returns>
         </member>
-        <member name="M:Adamantium.Imaging.MipMapCount.op_Implicit(Adamantium.Imaging.MipMapCount)~System.Int32">
+        <member name="M:Adamantium.Imaging.MipMapCount.op_Implicit(Adamantium.Imaging.MipMapCount)~System.UInt32">
             <summary>
             Performs an explicit conversion from <see cref="T:Adamantium.Imaging.MipMapCount"/> to <see cref="T:System.Int32"/>.
             </summary>
             <param name="mipMap">The value.</param>
             <returns>The count of mipmap (0 means all mipmaps).</returns>
         </member>
-        <member name="M:Adamantium.Imaging.MipMapCount.op_Implicit(System.Int32)~Adamantium.Imaging.MipMapCount">
+        <member name="M:Adamantium.Imaging.MipMapCount.op_Implicit(System.UInt32)~Adamantium.Imaging.MipMapCount">
             <summary>
             Performs an explicit conversion from <see cref="T:System.Int32"/> to <see cref="T:Adamantium.Imaging.MipMapCount"/>.
             </summary>
@@ -1335,7 +1341,7 @@
             Describes a mipmap.
             </summary>
         </member>
-        <member name="M:Adamantium.Imaging.MipMapDescription.#ctor(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)">
+        <member name="M:Adamantium.Imaging.MipMapDescription.#ctor(System.UInt32,System.UInt32,System.UInt32,System.Int32,System.Int32,System.Int32,System.Int32)">
             <summary>
             Initializes a new instance of the <see cref="T:Adamantium.Imaging.MipMapDescription" /> class.
             </summary>
@@ -3376,7 +3382,7 @@
             True when RowStride == sizeof(pixelformat) * width
             </summary>
         </member>
-        <member name="M:Adamantium.Imaging.PixelBuffer.#ctor(System.Int32,System.Int32,AdamantiumVulkan.Core.Format,System.Int32,System.Int32,System.IntPtr)">
+        <member name="M:Adamantium.Imaging.PixelBuffer.#ctor(System.UInt32,System.UInt32,AdamantiumVulkan.Core.Format,System.Int32,System.Int32,System.IntPtr)">
             <summary>
             Initializes a new instance of the <see cref="T:Adamantium.Imaging.PixelBuffer" /> struct.
             </summary>
@@ -3531,7 +3537,7 @@
             the pixels from.
             </remarks>
         </member>
-        <member name="M:Adamantium.Imaging.PixelBuffer.GetPixels``1(``0[],System.Int32,System.Int32,System.Int32)">
+        <member name="M:Adamantium.Imaging.PixelBuffer.GetPixels``1(``0[],System.Int32,System.UInt32,System.Int32)">
             <summary>
             Gets scanline pixels from the buffer.
             </summary>
@@ -3559,7 +3565,7 @@
             the pixels from.
             </remarks>
         </member>
-        <member name="M:Adamantium.Imaging.PixelBuffer.SetPixels``1(``0[],System.Int32,System.Int32,System.Int32)">
+        <member name="M:Adamantium.Imaging.PixelBuffer.SetPixels``1(``0[],System.Int32,System.UInt32,System.Int32)">
             <summary>
             Sets scanline pixels to the buffer.
             </summary>
