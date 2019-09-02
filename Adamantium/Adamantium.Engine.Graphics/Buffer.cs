@@ -4,7 +4,6 @@ using AdamantiumVulkan.Core;
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using System.Text;
 using VulkanBuffer = AdamantiumVulkan.Core.Buffer;
 
 namespace Adamantium.Engine.Graphics
@@ -13,15 +12,19 @@ namespace Adamantium.Engine.Graphics
     {
         private VulkanBuffer VulkanBuffer;
         private DeviceMemory BufferMemory;
-        private BufferUsageFlags BufferUsageFlags;
         private GraphicsDevice GraphicsDevice;
 
+        public BufferUsageFlags Usage { get; private set; }
 
-        public readonly BufferCreateInfo Description;
+        public SharingMode SharingMode { get; private set; }
 
-        public ulong ElementSize { get; private set; }
+        public MemoryPropertyFlags MemoryFlags { get; private set; }
+
+        public uint ElementSize { get; private set; }
 
         public uint ElementCount { get; private set; }
+
+        public ulong TotalSize => ElementSize * ElementCount;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Buffer" /> class.
@@ -31,48 +34,75 @@ namespace Adamantium.Engine.Graphics
         /// <param name="bufferFlags">Type of the buffer.</param>
         /// <param name="viewFormat">The view format.</param>
         /// <param name="dataPointer">The data pointer.</param>
-        protected Buffer(GraphicsDevice device, BufferCreateInfo description, BufferUsageFlags bufferFlags, SurfaceFormat viewFormat, IntPtr dataPointer)
+        protected Buffer(GraphicsDevice device, BufferUsageFlags bufferFlags, DataPointer dataPointer, MemoryPropertyFlags memoryFlags, SharingMode sharingMode)
         {
             GraphicsDevice = device;
-            Description = description;
-            BufferUsageFlags = bufferFlags;
-            ElementSize = Description.Size / ElementCount;
+            Usage = bufferFlags;
+            MemoryFlags = memoryFlags;
+            SharingMode = sharingMode;
+            ElementSize = (uint)(dataPointer.Size / dataPointer.Count);
+            ElementCount = dataPointer.Count;
 
-            Initialize(new SharpDX.Direct3D11.Buffer(device, dataPointer, Description));
+            Initialize(dataPointer);
         }
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="Buffer" /> class.
-        /// </summary>
-        /// <param name="device">The <see cref="GraphicsDevice"/>.</param>
-        /// <param name="nativeBuffer">The native buffer.</param>
-        /// <param name="bufferFlags">Type of the buffer.</param>
-        /// <param name="viewFormat">The view format.</param>
-        protected Buffer(GraphicsDevice device, VulkanBuffer nativeBuffer, BufferUsageFlags bufferFlags, SurfaceFormat viewFormat)
+        protected Buffer(GraphicsDevice device, BufferCreateInfo description, uint count, MemoryPropertyFlags memoryFlags)
         {
             GraphicsDevice = device;
-            Description = nativeBuffer.Description;
-            BufferUsageFlags = bufferFlags;
-            InitCountAndViewFormat(out ElementCount, ref ViewFormat);
-            ElementSize = Description.Size / ElementCount;
-            Initialize(nativeBuffer);
+            Usage = (BufferUsageFlags)description.Usage;
+            MemoryFlags = memoryFlags;
+            SharingMode = description.SharingMode;
+            ElementSize = (uint)(description.Size / count);
+            ElementCount = count;
+        }
+
+        protected Buffer(GraphicsDevice device, BufferUsageFlags bufferFlags, ulong size, uint count, MemoryPropertyFlags memoryflags, SharingMode sharingMode)
+        {
+            GraphicsDevice = device;
+            Usage = bufferFlags;
+            MemoryFlags = memoryflags;
+            SharingMode = sharingMode;
+            ElementSize = (uint)size / count;
+            ElementCount = count;
+
+            CreateBuffer(size, BufferUsageFlags.TransferDst | Usage, MemoryFlags, out VulkanBuffer, out BufferMemory);
+        }
+
+        private void Initialize(DataPointer dataPointer)
+        {
+            VulkanBuffer stagingBuffer;
+            DeviceMemory stagingBufferMemory;
+            CreateBuffer(TotalSize, BufferUsageFlags.TransferSrc, MemoryPropertyFlags.HostCached | MemoryPropertyFlags.HostCoherent, out stagingBuffer, out stagingBufferMemory);
+
+            var data = GraphicsDevice.MapMemory(stagingBufferMemory, 0, TotalSize, 0);
+            unsafe
+            {
+                System.Buffer.MemoryCopy(dataPointer.Pointer.ToPointer(), data.ToPointer(), (long)TotalSize, (long)TotalSize);
+            }
+
+            GraphicsDevice.UnmapMemory(stagingBufferMemory);
+
+            CreateBuffer(TotalSize, BufferUsageFlags.TransferDst | Usage, MemoryFlags, out VulkanBuffer, out BufferMemory);
+            CopyBuffer(stagingBuffer, VulkanBuffer, TotalSize);
+
+            stagingBuffer.Destroy(GraphicsDevice);
+            stagingBufferMemory.FreeMemory(GraphicsDevice);
         }
 
         /// <summary>
         /// Return an equivalent staging texture CPU read-writable from this instance.
         /// </summary>
         /// <returns>A new instance of this buffer as a staging resource</returns>
-        public Buffer ToStaging()
-        {
-            var stagingDesc = Description;
-            stagingDesc.BindFlags = BindFlags.None;
-            stagingDesc.CpuAccessFlags = CpuAccessFlags.Read | CpuAccessFlags.Write;
-            stagingDesc.Usage = MemoryPropertyFlags.Staging;
-            stagingDesc.OptionFlags = ResourceOptionFlags.None;
-            return new Buffer(GraphicsDevice, stagingDesc, BufferUsageFlags, ViewFormat, IntPtr.Zero);
-        }
+        //public Buffer ToStaging()
+        //{
+        //    stagingDesc.BindFlags = BindFlags.None;
+        //    stagingDesc.CpuAccessFlags = CpuAccessFlags.Read | CpuAccessFlags.Write;
+        //    stagingDesc.Usage = MemoryPropertyFlags.Staging;
+        //    stagingDesc.OptionFlags = ResourceOptionFlags.None;
+        //    return new Buffer(GraphicsDevice, stagingDesc, BufferUsageFlags, ViewFormat, IntPtr.Zero);
+        //}
 
-        private void CreateBuffer(ulong size, BufferUsageFlagBits usage, MemoryPropertyFlagBits memoryProperties, out VulkanBuffer buffer, out DeviceMemory bufferMemory)
+        private void CreateBuffer(ulong size, BufferUsageFlags usage, MemoryPropertyFlags memoryProperties, out VulkanBuffer buffer, out DeviceMemory bufferMemory)
         {
             BufferCreateInfo bufferInfo = new BufferCreateInfo();
             bufferInfo.Size = size;
@@ -85,51 +115,27 @@ namespace Adamantium.Engine.Graphics
 
             MemoryAllocateInfo allocInfo = new MemoryAllocateInfo();
             allocInfo.AllocationSize = memoryRequirements.Size;
-
-            var memProperties = GraphicsDevice.Instance.CurrentDevice.GetPhysicalDeviceMemoryProperties();
-
-            var properties = MemoryPropertyFlagBits.HostVisibleBit | MemoryPropertyFlagBits.HostCoherentBit;
-            for (uint i = 0; i < memProperties.MemoryTypeCount; i++)
-            {
-                if (((memoryRequirements.MemoryTypeBits >> (int)i) & 1) == 1
-                    && memProperties.MemoryTypes[i].PropertyFlags == (uint)properties)
-                {
-                    allocInfo.MemoryTypeIndex = i;
-                    break;
-                }
-            }
+            allocInfo.MemoryTypeIndex = GraphicsDevice.Instance.CurrentDevice.FindMemoryIndex(memoryRequirements.MemoryTypeBits, memoryProperties);
 
             bufferMemory = GraphicsDevice.LogicalDevice.AllocateMemory(allocInfo);
 
             var result = GraphicsDevice.LogicalDevice.BindBufferMemory(buffer, bufferMemory, 0);
+            if (result != Result.Success)
+            {
+                throw new GraphicsEngineException("Failed to bind buffer memory to buffer");
+            }
         }
 
         private void CopyBuffer(VulkanBuffer srcBuffer, VulkanBuffer dstBuffer, ulong size)
         {
-            var commandBuffer = logicalDevice.BeginSingleTimeCommand(commandPool);
+            var commandBuffer = GraphicsDevice.BeginSingleTimeCommand();
 
             BufferCopy copyRegin = new BufferCopy();
             copyRegin.Size = size;
             var regions = new BufferCopy[1] { copyRegin };
             commandBuffer.CmdCopyBuffer(srcBuffer, dstBuffer, 1, regions);
 
-            logicalDevice.EndSingleTimeCommands(graphicsQueue, commandPool, commandBuffer);
-        }
-
-        /// <summary>
-        /// Creates a new <see cref="Buffer"/> instance.
-        /// </summary>
-        /// <param name="device">The <see cref="GraphicsDevice"/>.</param>
-        /// <param name="buffer">The original buffer to duplicate the definition from.</param>
-        /// <param name="viewFormat">The view format must be specified if the buffer is declared as a shared resource view.</param>
-        /// <returns>An instance of a new <see cref="Buffer"/></returns>
-        /// <msdn-id>ff476501</msdn-id>	
-        /// <unmanaged>HRESULT ID3D11Device::CreateBuffer([In] const D3D11_BUFFER_DESC* pDesc,[In, Optional] const D3D11_SUBRESOURCE_DATA* pInitialData,[Out, Fast] ID3D11Buffer** ppBuffer)</unmanaged>	
-        /// <unmanaged-short>ID3D11Device::CreateBuffer</unmanaged-short>	
-        public static Buffer New(GraphicsDevice device, Buffer buffer, Format viewFormat = Format.UNDEFINED)
-        {
-            var bufferType = GetBufferFlagsFromDescription(buffer.Description);
-            return new Buffer(device, buffer, bufferType, viewFormat);
+            GraphicsDevice.EndSingleTimeCommands(commandBuffer);
         }
 
         /// <summary>
@@ -141,10 +147,9 @@ namespace Adamantium.Engine.Graphics
         /// <returns>An instance of a new <see cref="Buffer" /></returns>
         /// <unmanaged>HRESULT ID3D11Device::CreateBuffer([In] const D3D11_BUFFER_DESC* pDesc,[In, Optional] const D3D11_SUBRESOURCE_DATA* pInitialData,[Out, Fast] ID3D11Buffer** ppBuffer)</unmanaged>
         /// <unmanaged-short>ID3D11Device::CreateBuffer</unmanaged-short>
-        public static Buffer New(GraphicsDevice device, BufferCreateInfo description, Format viewFormat = Format.UNDEFINED)
+        public static Buffer New(GraphicsDevice device, BufferCreateInfo description, uint count, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal)
         {
-            var bufferType = GetBufferFlagsFromDescription(description);
-            return new Buffer(device, description, bufferType, viewFormat, IntPtr.Zero);
+            return new Buffer(device, description, count, memoryFlags);
         }
 
         /// <summary>
@@ -160,7 +165,7 @@ namespace Adamantium.Engine.Graphics
         /// <unmanaged-short>ID3D11Device::CreateBuffer</unmanaged-short>
         public static Buffer New(GraphicsDevice device, int bufferSize, BufferUsageFlags bufferFlags, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal)
         {
-            return New(device, bufferSize, 0, bufferFlags, SurfaceFormat.Unknown, memoryFlags);
+            return New(device, bufferSize, 0, bufferFlags, memoryFlags, SharingMode.Exclusive);
         }
 
         /// <summary>
@@ -174,30 +179,16 @@ namespace Adamantium.Engine.Graphics
         /// <msdn-id>ff476501</msdn-id>
         /// <unmanaged>HRESULT ID3D11Device::CreateBuffer([In] const D3D11_BUFFER_DESC* pDesc,[In, Optional] const D3D11_SUBRESOURCE_DATA* pInitialData,[Out, Fast] ID3D11Buffer** ppBuffer)</unmanaged>
         /// <unmanaged-short>ID3D11Device::CreateBuffer</unmanaged-short>
-        public static Buffer<T> New<T>(GraphicsDevice device, int elementCount, BufferUsageFlags bufferFlags, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal) where T : struct
+        public static Buffer<T> New<T>(GraphicsDevice device, uint elementCount, BufferUsageFlags bufferFlags, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal) where T : struct
         {
-            int bufferSize = Utilities.SizeOf<T>() * elementCount;
             int elementSize = Utilities.SizeOf<T>();
+            var bufferSize = elementSize * elementCount;
+            BufferCreateInfo info = new BufferCreateInfo();
+            info.SharingMode = SharingMode.Exclusive;
+            info.Size = (ulong)bufferSize;
+            info.Usage = (uint)bufferFlags;
 
-            var description = NewDescription(bufferSize, elementSize, bufferFlags, memoryFlags);
-            return new Buffer<T>(device, description, bufferFlags, SurfaceFormat.Unknown, IntPtr.Zero);
-        }
-
-        /// <summary>
-        /// Creates a new <see cref="Buffer" /> instance.
-        /// </summary>
-        /// <param name="device">The <see cref="GraphicsDevice"/>.</param>
-        /// <param name="bufferSize">Size of the buffer in bytes.</param>
-        /// <param name="bufferFlags">The buffer flags to specify the type of buffer.</param>
-        /// <param name="viewFormat">The view format must be specified if the buffer is declared as a shared resource view.</param>
-        /// <param name="memoryFlags">The memoryFlags.</param>
-        /// <returns>An instance of a new <see cref="Buffer" /></returns>
-        /// <msdn-id>ff476501</msdn-id>
-        /// <unmanaged>HRESULT ID3D11Device::CreateBuffer([In] const D3D11_BUFFER_DESC* pDesc,[In, Optional] const D3D11_SUBRESOURCE_DATA* pInitialData,[Out, Fast] ID3D11Buffer** ppBuffer)</unmanaged>
-        /// <unmanaged-short>ID3D11Device::CreateBuffer</unmanaged-short>
-        public static Buffer New(GraphicsDevice device, int bufferSize, BufferUsageFlags bufferFlags, Format viewFormat, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal)
-        {
-            return New(device, bufferSize, 0, bufferFlags, viewFormat, memoryFlags);
+            return new Buffer<T>(device, info, elementCount, memoryFlags);
         }
 
         /// <summary>
@@ -207,6 +198,24 @@ namespace Adamantium.Engine.Graphics
         /// <param name="bufferSize">Size of the buffer in bytes.</param>
         /// <param name="elementSize">Size of an element in the buffer.</param>
         /// <param name="bufferFlags">The buffer flags to specify the type of buffer.</param>
+        /// <param name="memoryFlags">The memoryFlags.</param>
+        /// <returns>An instance of a new <see cref="Buffer" /></returns>
+        /// <msdn-id>ff476501</msdn-id>
+        /// <unmanaged>HRESULT ID3D11Device::CreateBuffer([In] const D3D11_BUFFER_DESC* pDesc,[In, Optional] const D3D11_SUBRESOURCE_DATA* pInitialData,[Out, Fast] ID3D11Buffer** ppBuffer)</unmanaged>
+        /// <unmanaged-short>ID3D11Device::CreateBuffer</unmanaged-short>
+        public static Buffer New(GraphicsDevice device, int bufferSize, int elementSize, BufferUsageFlags bufferFlags, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal, SharingMode sharingMode = SharingMode.Exclusive)
+        {
+            return New(device, bufferSize, elementSize, bufferFlags, memoryFlags, sharingMode);
+        }
+
+        /// <summary>
+        /// Creates a new <see cref="Buffer" /> instance.
+        /// </summary>
+        /// <param name="device">The <see cref="GraphicsDevice"/>.</param>
+        /// <param name="bufferSize">Size of the buffer in bytes.</param>
+        /// <param name="elementSize">Size of an element in the buffer.</param>
+        /// <param name="bufferFlags">The buffer flags to specify the type of buffer.</param>
+        /// <param name="viewFormat">The view format must be specified if the buffer is declared as a shared resource view.</param>
         /// <param name="memoryFlags">The memoryFlags.</param>
         /// <returns>An instance of a new <see cref="Buffer" /></returns>
         /// <msdn-id>ff476501</msdn-id>
@@ -214,27 +223,7 @@ namespace Adamantium.Engine.Graphics
         /// <unmanaged-short>ID3D11Device::CreateBuffer</unmanaged-short>
         public static Buffer New(GraphicsDevice device, int bufferSize, int elementSize, BufferUsageFlags bufferFlags, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal)
         {
-            return New(device, bufferSize, elementSize, bufferFlags, SurfaceFormat.Unknown, memoryFlags);
-        }
-
-        /// <summary>
-        /// Creates a new <see cref="Buffer" /> instance.
-        /// </summary>
-        /// <param name="device">The <see cref="GraphicsDevice"/>.</param>
-        /// <param name="bufferSize">Size of the buffer in bytes.</param>
-        /// <param name="elementSize">Size of an element in the buffer.</param>
-        /// <param name="bufferFlags">The buffer flags to specify the type of buffer.</param>
-        /// <param name="viewFormat">The view format must be specified if the buffer is declared as a shared resource view.</param>
-        /// <param name="memoryFlags">The memoryFlags.</param>
-        /// <returns>An instance of a new <see cref="Buffer" /></returns>
-        /// <msdn-id>ff476501</msdn-id>
-        /// <unmanaged>HRESULT ID3D11Device::CreateBuffer([In] const D3D11_BUFFER_DESC* pDesc,[In, Optional] const D3D11_SUBRESOURCE_DATA* pInitialData,[Out, Fast] ID3D11Buffer** ppBuffer)</unmanaged>
-        /// <unmanaged-short>ID3D11Device::CreateBuffer</unmanaged-short>
-        public static Buffer New(GraphicsDevice device, int bufferSize, int elementSize, BufferUsageFlags bufferFlags, Format viewFormat, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal)
-        {
-            viewFormat = CheckPixelFormat(bufferFlags, elementSize, viewFormat);
-            var description = NewDescription(bufferSize, elementSize, bufferFlags, memoryFlags);
-            return new Buffer(device, description, bufferFlags, viewFormat, IntPtr.Zero);
+            return New(device, bufferSize, elementSize, bufferFlags, memoryFlags, SharingMode.Exclusive);
         }
 
         /// <summary>
@@ -251,7 +240,7 @@ namespace Adamantium.Engine.Graphics
         /// <unmanaged-short>ID3D11Device::CreateBuffer</unmanaged-short>
         public static Buffer<T> New<T>(GraphicsDevice device, ref T value, BufferUsageFlags bufferFlags, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal) where T : struct
         {
-            return New(device, ref value, bufferFlags, SurfaceFormat.Unknown, memoryFlags);
+            return New(device, ref value, bufferFlags, memoryFlags);
         }
 
         /// <summary>
@@ -273,12 +262,10 @@ namespace Adamantium.Engine.Graphics
             try
             {
                 int bufferSize = Utilities.SizeOf<T>();
-                int elementSize = ((bufferFlags & BufferUsageFlags.StructuredBuffer) != 0) ? Utilities.SizeOf<T>() : 0;
+                int elementSize = Utilities.SizeOf<T>();
+                var data = new DataPointer(handle.AddrOfPinnedObject(), (ulong)bufferSize, (uint)(bufferSize / elementSize));
 
-                viewFormat = CheckPixelFormat(bufferFlags, elementSize, viewFormat);
-                var description = NewDescription(bufferSize, elementSize, bufferFlags, memoryFlags);
-
-                return new Buffer<T>(device, description, bufferFlags, viewFormat, handle.AddrOfPinnedObject());
+                return new Buffer<T>(device, bufferFlags, data, memoryFlags);
             }
             finally
             {
@@ -300,7 +287,7 @@ namespace Adamantium.Engine.Graphics
         /// <unmanaged-short>ID3D11Device::CreateBuffer</unmanaged-short>
         public static Buffer<T> New<T>(GraphicsDevice device, T[] initialValue, BufferUsageFlags bufferFlags, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal) where T : struct
         {
-            return New(device, initialValue, bufferFlags, SurfaceFormat.Unknown, memoryFlags);
+            return New(device, initialValue, bufferFlags, memoryFlags);
         }
 
         /// <summary>
@@ -316,18 +303,16 @@ namespace Adamantium.Engine.Graphics
         /// <msdn-id>ff476501</msdn-id>
         /// <unmanaged>HRESULT ID3D11Device::CreateBuffer([In] const D3D11_BUFFER_DESC* pDesc,[In, Optional] const D3D11_SUBRESOURCE_DATA* pInitialData,[Out, Fast] ID3D11Buffer** ppBuffer)</unmanaged>
         /// <unmanaged-short>ID3D11Device::CreateBuffer</unmanaged-short>
-        public static Buffer<T> New<T>(GraphicsDevice device, T[] initialValue, BufferUsageFlags bufferFlags, Format viewFormat, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal) where T : struct
+        public static Buffer<T> New<T>(GraphicsDevice device, T[] initialValue, BufferUsageFlags bufferFlags, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal, SharingMode sharingMode = SharingMode.Exclusive) where T : struct
         {
             GCHandle handle = GCHandle.Alloc(initialValue, GCHandleType.Pinned);
             try
             {
-                int bufferSize = Utilities.SizeOf<T>() * initialValue.Length;
                 int elementSize = Utilities.SizeOf<T>();
-                viewFormat = CheckPixelFormat(bufferFlags, elementSize, viewFormat);
+                int bufferSize = elementSize * initialValue.Length;
+                var data = new DataPointer(handle.AddrOfPinnedObject(), (uint)initialValue.Length, (uint)elementSize);
 
-                var description = NewDescription(bufferSize, elementSize, bufferFlags, memoryFlags);
-
-                return new Buffer<T>(device, description, bufferFlags, viewFormat, handle.AddrOfPinnedObject());
+                return new Buffer<T>(device, bufferFlags, data, memoryFlags, sharingMode);
             }
             finally
             {
@@ -348,17 +333,15 @@ namespace Adamantium.Engine.Graphics
         /// <msdn-id>ff476501</msdn-id>
         /// <unmanaged>HRESULT ID3D11Device::CreateBuffer([In] const D3D11_BUFFER_DESC* pDesc,[In, Optional] const D3D11_SUBRESOURCE_DATA* pInitialData,[Out, Fast] ID3D11Buffer** ppBuffer)</unmanaged>
         /// <unmanaged-short>ID3D11Device::CreateBuffer</unmanaged-short>
-        public static Buffer New(GraphicsDevice device, byte[] initialValue, int elementSize, BufferUsageFlags bufferFlags, Format viewFormat = Format.Unknown, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal)
+        public static Buffer New(GraphicsDevice device, byte[] initialValue, int elementSize, BufferUsageFlags bufferFlags, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal)
         {
             GCHandle handle = GCHandle.Alloc(initialValue, GCHandleType.Pinned);
             try
             {
                 int bufferSize = initialValue.Length;
-                viewFormat = CheckPixelFormat(bufferFlags, elementSize, viewFormat);
+                var data = new DataPointer(handle.AddrOfPinnedObject(), (ulong)initialValue.Length, (uint)(initialValue.Length / elementSize));
 
-                var description = NewDescription(bufferSize, elementSize, bufferFlags, memoryFlags);
-
-                return new Buffer(device, description, bufferFlags, viewFormat, handle.AddrOfPinnedObject());
+                return new Buffer(device, bufferFlags, data, memoryFlags, SharingMode.Exclusive);
             }
             finally
             {
@@ -378,9 +361,9 @@ namespace Adamantium.Engine.Graphics
         /// <msdn-id>ff476501</msdn-id>
         /// <unmanaged>HRESULT ID3D11Device::CreateBuffer([In] const D3D11_BUFFER_DESC* pDesc,[In, Optional] const D3D11_SUBRESOURCE_DATA* pInitialData,[Out, Fast] ID3D11Buffer** ppBuffer)</unmanaged>
         /// <unmanaged-short>ID3D11Device::CreateBuffer</unmanaged-short>
-        public static Buffer New(GraphicsDevice device, DataPointer dataPointer, int elementSize, BufferUsageFlags bufferFlags, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal)
+        public static Buffer New(GraphicsDevice device, DataPointer dataPointer, BufferUsageFlags bufferFlags, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal)
         {
-            return New(device, dataPointer, elementSize, bufferFlags, SurfaceFormat.Undefined, memoryFlags);
+            return New(device, dataPointer, bufferFlags, memoryFlags, SharingMode.Exclusive);
         }
 
         /// <summary>
@@ -396,12 +379,9 @@ namespace Adamantium.Engine.Graphics
         /// <msdn-id>ff476501</msdn-id>
         /// <unmanaged>HRESULT ID3D11Device::CreateBuffer([In] const D3D11_BUFFER_DESC* pDesc,[In, Optional] const D3D11_SUBRESOURCE_DATA* pInitialData,[Out, Fast] ID3D11Buffer** ppBuffer)</unmanaged>
         /// <unmanaged-short>ID3D11Device::CreateBuffer</unmanaged-short>
-        public static Buffer New(GraphicsDevice device, DataPointer dataPointer, int elementSize, BufferUsageFlags bufferFlags, Format viewFormat, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal)
+        public static Buffer New(GraphicsDevice device, DataPointer dataPointer, BufferUsageFlags bufferFlags, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal, SharingMode sharingMode = SharingMode.Exclusive)
         {
-            int bufferSize = dataPointer.Size;
-            viewFormat = CheckPixelFormat(bufferFlags, elementSize, viewFormat);
-            var description = NewDescription(bufferSize, elementSize, bufferFlags, memoryFlags);
-            return new Buffer(device, description, bufferFlags, viewFormat, dataPointer.Pointer);
+            return new Buffer(device, bufferFlags, dataPointer, memoryFlags, sharingMode);
         }
 
         public static implicit operator VulkanBuffer(Buffer buffer)
@@ -416,16 +396,15 @@ namespace Adamantium.Engine.Graphics
     /// <typeparam name="T">Type of an element of this buffer.</typeparam>
     public class Buffer<T> : Buffer where T : struct
     {
-        internal Buffer(GraphicsDevice device, BufferCreateInfo description, BufferUsageFlags bufferFlags, SurfaceFormat viewFormat, IntPtr dataPointer)
-           : base(device, description, bufferFlags, viewFormat, dataPointer)
+        internal Buffer(GraphicsDevice device, BufferUsageFlags bufferFlags, DataPointer dataPointer, MemoryPropertyFlags memoryFlags, SharingMode sharingMode = SharingMode.Exclusive)
+           : base(device, bufferFlags, dataPointer, memoryFlags, sharingMode)
         {
         }
 
-        internal Buffer(GraphicsDevice device, VulkanBuffer nativeBuffer, BufferUsageFlags bufferFlags, SurfaceFormat viewFormat)
-           : base(device, nativeBuffer, bufferFlags, viewFormat)
+        internal Buffer(GraphicsDevice device, BufferCreateInfo bufferInfo, uint count, MemoryPropertyFlags memoryFlags)
+           : base(device, bufferInfo, count, memoryFlags)
         {
         }
-
 
         /// <summary>
         /// Gets the content of this texture to an array of data.
@@ -437,10 +416,10 @@ namespace Adamantium.Engine.Graphics
         /// <remarks>This method is only working when called from the main thread that is accessing the main <see cref="GraphicsDevice" />.
         /// This method creates internally a staging resource if this texture is not already a staging resource, copies to it and map it to memory. Use method with explicit staging resource
         /// for optimal performances.</remarks>
-        public T[] GetData()
-        {
-            return GetData<T>();
-        }
+        //public T[] GetData()
+        //{
+        //    return GetData<T>();
+        //}
 
         /// <summary>
         /// Copies the content of a single structure data from CPU memory to this buffer into GPU memory.
@@ -455,10 +434,10 @@ namespace Adamantium.Engine.Graphics
         /// <msdn-id>ff476457</msdn-id>
         /// <unmanaged>HRESULT ID3D11DeviceContext::Map([In] ID3D11Resource* pResource,[In] unsigned int Subresource,[In] D3D11_MAP MapType,[In] D3D11_MAP_FLAG MapFlags,[Out] D3D11_MAPPED_SUBRESOURCE* pMappedResource)</unmanaged>
         /// <unmanaged-short>ID3D11DeviceContext::Map</unmanaged-short>
-        public void SetData(ref T fromData, int offsetInBytes = 0, SetDataOptions options = SetDataOptions.Discard)
-        {
-            base.SetData(ref fromData, offsetInBytes, options);
-        }
+        //public void SetData(ref T fromData, int offsetInBytes = 0, SetDataOptions options = SetDataOptions.Discard)
+        //{
+        //    base.SetData(ref fromData, offsetInBytes, options);
+        //}
 
         /// <summary>
         /// Copies the content an array of data from CPU memory to this buffer into GPU memory.
@@ -474,10 +453,10 @@ namespace Adamantium.Engine.Graphics
         /// <msdn-id>ff476457</msdn-id>
         /// <unmanaged>HRESULT ID3D11DeviceContext::Map([In] ID3D11Resource* pResource,[In] unsigned int Subresource,[In] D3D11_MAP MapType,[In] D3D11_MAP_FLAG MapFlags,[Out] D3D11_MAPPED_SUBRESOURCE* pMappedResource)</unmanaged>
         /// <unmanaged-short>ID3D11DeviceContext::Map</unmanaged-short>
-        public void SetData(T[] fromData, int startIndex = 0, int elementCount = 0, int offsetInBytes = 0, SetDataOptions options = SetDataOptions.Discard)
-        {
-            base.SetData(fromData, startIndex, elementCount, offsetInBytes, options);
-        }
+        //public void SetData(T[] fromData, int startIndex = 0, int elementCount = 0, int offsetInBytes = 0, SetDataOptions options = SetDataOptions.Discard)
+        //{
+        //    base.SetData(fromData, startIndex, elementCount, offsetInBytes, options);
+        //}
 
         /// <summary>
         /// Copies the content of a single structure data from CPU memory to this buffer into GPU memory.
@@ -493,10 +472,10 @@ namespace Adamantium.Engine.Graphics
         /// <msdn-id>ff476457</msdn-id>
         /// <unmanaged>HRESULT ID3D11DeviceContext::Map([In] ID3D11Resource* pResource,[In] unsigned int Subresource,[In] D3D11_MAP MapType,[In] D3D11_MAP_FLAG MapFlags,[Out] D3D11_MAPPED_SUBRESOURCE* pMappedResource)</unmanaged>
         /// <unmanaged-short>ID3D11DeviceContext::Map</unmanaged-short>
-        public void SetData(GraphicsDevice device, ref T fromData, int offsetInBytes = 0, SetDataOptions options = SetDataOptions.Discard)
-        {
-            base.SetData(device, ref fromData, offsetInBytes, options);
-        }
+        //public void SetData(GraphicsDevice device, ref T fromData, int offsetInBytes = 0, SetDataOptions options = SetDataOptions.Discard)
+        //{
+        //    base.SetData(device, ref fromData, offsetInBytes, options);
+        //}
 
         /// <summary>
         /// Copies the content an array of data from CPU memory to this buffer into GPU memory.
@@ -513,9 +492,9 @@ namespace Adamantium.Engine.Graphics
         /// <msdn-id>ff476457</msdn-id>
         /// <unmanaged>HRESULT ID3D11DeviceContext::Map([In] ID3D11Resource* pResource,[In] unsigned int Subresource,[In] D3D11_MAP MapType,[In] D3D11_MAP_FLAG MapFlags,[Out] D3D11_MAPPED_SUBRESOURCE* pMappedResource)</unmanaged>
         /// <unmanaged-short>ID3D11DeviceContext::Map</unmanaged-short>
-        public void SetData(GraphicsDevice device, T[] fromData, int startIndex = 0, int elementCount = 0, int offsetInBytes = 0, SetDataOptions options = SetDataOptions.Discard)
-        {
-            base.SetData(device, fromData, startIndex, elementCount, offsetInBytes, options);
-        }
+        //public void SetData(GraphicsDevice device, T[] fromData, int startIndex = 0, int elementCount = 0, int offsetInBytes = 0, SetDataOptions options = SetDataOptions.Discard)
+        //{
+        //    base.SetData(device, fromData, startIndex, elementCount, offsetInBytes, options);
+        //}
     }
 }

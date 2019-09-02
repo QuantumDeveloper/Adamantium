@@ -32,7 +32,7 @@ namespace Adamantium.Engine.Graphics
             /// <param name="vertexBufferCount">Number of vertex in this buffer with the sizeof(T).</param>
             /// <param name="memoryFlags">The memoryFlags.</param>
             /// <returns>A Vertex buffer</returns>
-            public static Buffer<T> New<T>(GraphicsDevice device, int vertexBufferCount, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal) where T : struct
+            public static Buffer<T> New<T>(GraphicsDevice device, uint vertexBufferCount, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal) where T : struct
             {
                 return Buffer.New<T>(device, vertexBufferCount, BufferUsageFlags.VertexBuffer, memoryFlags);
             }
@@ -59,7 +59,7 @@ namespace Adamantium.Engine.Graphics
             /// <returns>A Vertex buffer</returns>
             public static Buffer New(GraphicsDevice device, DataPointer value, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.Protected)
             {
-                return Buffer.New(device, value, 0, BufferUsageFlags.VertexBuffer, memoryFlags);
+                return Buffer.New(device, value, BufferUsageFlags.VertexBuffer, memoryFlags);
             }
         }
     }

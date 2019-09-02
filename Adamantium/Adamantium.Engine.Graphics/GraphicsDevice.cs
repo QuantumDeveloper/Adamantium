@@ -472,6 +472,26 @@ namespace Adamantium.Engine.Graphics
             commandBuffer.CmdDrawIndexed(indexBuffer.ElementCount, 1, 0, 0, 0);
         }
 
+        public CommandBuffer BeginSingleTimeCommand()
+        {
+            return LogicalDevice.BeginSingleTimeCommand(CommandPool);
+        }
+
+        public void EndSingleTimeCommands(CommandBuffer commandBuffer)
+        {
+            LogicalDevice.EndSingleTimeCommands(graphicsQueue, CommandPool, commandBuffer);
+        }
+
+        public IntPtr MapMemory(DeviceMemory memory, ulong offset, ulong size, uint flags)
+        {
+            return LogicalDevice.MapMemory(memory, offset, size, flags);
+        }
+
+        public void UnmapMemory(DeviceMemory memory)
+        {
+            LogicalDevice.UnmapMemory(memory);
+        }
+
         internal Semaphore GetImageAvailableSemaphoreForCurrentFrame()
         {
             return ImageAvailableSemaphores[CurrentFrame];
