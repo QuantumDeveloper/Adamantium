@@ -4,6 +4,7 @@ using System.Diagnostics;
 using Adamantium.Core;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
+using Adamantium.Imaging;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Media;
@@ -12,48 +13,36 @@ namespace Adamantium.UI.Processors
 {
     public class WindowRenderModule : DisposableObject
     {
-        //private readonly GraphicsDevice _graphicsDevice;
-        //private readonly GraphicsDevice _mainGraphicsDevice;
-        //private GraphicsPresenter Presenter;
+        private readonly GraphicsDevice GraphicsDevice;
         //private D2DGraphicDevice d2D1Device;
         //private VertexInputLayout _vertexLayout;
-        //public CommandList CommandList;
         //private Effect _uiEffect;
         //private DrawingContext _context;
         //private bool windowSizeChanged = false;
-        //private Window _window;
+        private IWindow _window;
         //private Matrix4x4F projection;
         //private RenderTarget2D _backBuffer;
         //private DepthStencilBuffer _depthBuffer;
         //private MSAALevel _msaaLevel;
-        //private bool _isWindowResized;
+        private bool _isWindowResized;
 
-        //public WindowRenderModule(Window window, GraphicsDevice mainDevice, MSAALevel msaaLevel)
-        //{
-        //    if (window == null)
-        //    {
-        //        throw new ArgumentException(nameof(window));
-        //    }
+        public WindowRenderModule(IWindow window, GraphicsDevice device, MSAALevel msaaLevel)
+        {
+            if (window == null)
+            {
+                throw new ArgumentException(nameof(window));
+            }
 
-        //    _msaaLevel = msaaLevel;
-        //    _mainGraphicsDevice = mainDevice;
-        //    _window = window;
-        //    _window.ClientSizeChanged += Window_ClientSizeChanged;
-        //    _graphicsDevice = _mainGraphicsDevice.CreateDeferred();
-        //    _vertexLayout = VertexInputLayout.FromType<VertexPositionTexture>();
+            //_msaaLevel = msaaLevel;
+            //_mainGraphicsDevice = mainDevice;
+            _window = window;
+            _window.ClientSizeChanged += Window_ClientSizeChanged;
+            GraphicsDevice = device;
+            //_vertexLayout = VertexInputLayout.FromType<VertexPositionTexture>();
 
-        //    _uiEffect = ToDispose(Effect.Load(@"Content\Effects\UIEffect.fx.compiled", _graphicsDevice));
-        //    InitializeResources();
-            
-        //    Presenter = GraphicsPresenter.Create(
-        //        _graphicsDevice,
-        //        new PresentationParameters(
-        //            PresenterType.Swapchain,
-        //            window.ClientWidth,
-        //            window.ClientHeight,
-        //            window.WindowHandle,
-        //            _msaaLevel));
-        //}
+            //_uiEffect = ToDispose(Effect.Load(@"Content\Effects\UIEffect.fx.compiled", _graphicsDevice));
+            //InitializeResources();
+        }
 
         //private void InitializeResources()
         //{
@@ -80,41 +69,45 @@ namespace Adamantium.UI.Processors
         //    projection = Matrix4x4F.OrthoOffCenterLH(0, _window.ClientWidth, _window.ClientHeight, 0, 1000.0f, 1f);
         //}
 
-        //private void Window_ClientSizeChanged(object sender, SizeChangedEventArgs e)
-        //{
-        //    _isWindowResized = true;
-            
-        //}
+        private void Window_ClientSizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            _isWindowResized = true;
+        }
 
-        //public void Preapare()
-        //{
-        //    if (_isWindowResized)
-        //    {
-        //        _isWindowResized = false;
-        //        InitializeResources();
-        //        Presenter.Resize(_window.ClientWidth, _window.ClientHeight, 2, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
-        //    }
+        public void Prepare()
+        {
+            if (_isWindowResized)
+            {
+                _isWindowResized = false;
+                //InitializeResources();
+                GraphicsDevice.Presenter.Resize((uint)_window.ClientWidth, (uint)_window.ClientHeight, 2, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
+            }
 
-        //    _graphicsDevice.SetRenderTargets(_depthBuffer, _backBuffer);
-        //    _graphicsDevice.ClearTargets(Colors.White);
-        //    _graphicsDevice.SetViewport(Presenter.Viewport);
-        //    _graphicsDevice.BlendState = _graphicsDevice.BlendStates.AlphaBlend;
-        //    TraverseByLayer(_window, ProcessControl);
-        //}
+            GraphicsDevice.BeginDrawCommand();
 
-        //public void Render(IGameTime gameTime, GraphicsDevice mainDevice)
-        //{
-        //    //var commandList = _graphicsDevice.FinishCommandList(true);
-        //    //mainDevice.ExecuteCommandList(commandList);
-        //    //commandList.Dispose();
+            //_graphicsDevice.SetRenderTargets(_depthBuffer, _backBuffer);
+            //_graphicsDevice.ClearTargets(Colors.White);
+            //_graphicsDevice.SetViewport(Presenter.Viewport);
+            //_graphicsDevice.BlendState = _graphicsDevice.BlendStates.AlphaBlend;
+            //TraverseByLayer(_window, ProcessControl);
+        }
 
-        //    //d2D1Device.BeginDraw();
-        //    //d2D1Device.DrawText("FPS: " + gameTime.FpsCount);
-        //    //d2D1Device.EndDraw();
+        public void Render(IGameTime gameTime)
+        {
+            //var commandList = _graphicsDevice.FinishCommandList(true);
+            //mainDevice.ExecuteCommandList(commandList);
+            //commandList.Dispose();
 
-        //    //mainDevice.CopyResource(_backBuffer, Presenter.BackBuffer);
-        //    //Presenter.Present();
-        //}
+            //d2D1Device.BeginDraw();
+            //d2D1Device.DrawText("FPS: " + gameTime.FpsCount);
+            //d2D1Device.EndDraw();
+
+            //mainDevice.CopyResource(_backBuffer, Presenter.BackBuffer);
+           
+            GraphicsDevice.Draw(0,0,0,0);
+            GraphicsDevice.EndDrawCommand();
+            GraphicsDevice.Presenter.Present();
+        }
 
         //public void TraverseByLayer(IVisual visualElement, Action<IVisual> action)
         //{

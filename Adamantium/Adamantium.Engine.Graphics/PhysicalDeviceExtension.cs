@@ -23,7 +23,6 @@ namespace Adamantium.Engine.Graphics
                 if ((queueFamily.QueueFlags & (uint)QueueFlagBits.GraphicsBit) > 0)
                 {
                     indices.graphicsFamily = i;
-
                 }
 
                 bool presentSupport = false;

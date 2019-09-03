@@ -35,7 +35,7 @@ namespace Adamantium.Engine.Graphics
 
         private void CreateSurface()
         {
-            surface = GraphicsDevice.Instance.CreateSurface(Description);
+            surface = GraphicsDevice.Instance.GetOrCreateSurface(Description);
         }
 
         SwapChainSupportDetails QuerySwapChainSupport(PhysicalDevice device)

@@ -29,12 +29,12 @@ namespace Adamantium.Engine.Graphics
             MSAALevel = parameters.MSAALevel;
         }
 
-        public PresentationParameters(PresenterType presenterType, UInt32 backbufferWidth, UInt32 backbufferHeight, IntPtr handle, MSAALevel msaaLevel = MSAALevel.None)
+        public PresentationParameters(PresenterType presenterType, UInt32 width, UInt32 height, IntPtr handle, MSAALevel msaaLevel = MSAALevel.None)
         {
             PresenterType = presenterType;
 
-            Width = backbufferWidth;
-            Height = backbufferHeight;
+            Width = width;
+            Height = height;
             OutputHandle = handle;
 
             MSAALevel = msaaLevel;
@@ -43,14 +43,14 @@ namespace Adamantium.Engine.Graphics
         }
 
         public PresenterType PresenterType { get; }
-        public UInt32 Width { get; internal set; }
-        public UInt32 Height { get; internal set; }
-        public IntPtr OutputHandle { get; }
-        public IntPtr HInstanceHandle { get; }
-        public SurfaceFormat ImageFormat { get; internal set; }
-        public DepthFormat DepthFormat { get; internal set; }
+        public UInt32 Width { get; set; }
+        public UInt32 Height { get; set; }
+        public IntPtr OutputHandle { get; set; }
+        public IntPtr HInstanceHandle { get; set; }
+        public SurfaceFormat ImageFormat { get; set; }
+        public DepthFormat DepthFormat { get; set; }
         public MSAALevel MSAALevel { get; }
-        public UInt32 BuffersCount { get; internal set; }
+        public UInt32 BuffersCount { get; set; }
         public SwapchainCreateFlags Flags { get; set; }
         public uint MinImageCount { get; set; }
         public ColorSpace ImageColorSpace { get; set; }

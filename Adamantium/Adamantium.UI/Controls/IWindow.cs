@@ -14,6 +14,10 @@ namespace Adamantium.UI.Controls
         IntPtr Handle { get; }
         bool IsClosed { get; }
 
+        int ClientWidth { get; set; }
+
+        int ClientHeight { get; set; }
+
         event EventHandler<SizeChangedEventArgs> ClientSizeChanged;
         event EventHandler<WindowClosingEventArgs> Closing;
         event EventHandler<EventArgs> Closed;

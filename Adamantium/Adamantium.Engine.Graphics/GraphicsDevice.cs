@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using Adamantium.Core;
@@ -12,14 +13,14 @@ namespace Adamantium.Engine.Graphics
 {
     public class GraphicsDevice : DisposableObject
     {
-        private VulkanInstance instance;
-        private PhysicalDevice physicalDevice;
+        private static PhysicalDevice PhysicalDevice { get; set; }
         internal Device LogicalDevice { get; private set; }
         private Queue graphicsQueue;
         private RenderPass renderPass;
         private Framebuffer[] framebuffers;
         private SurfaceKHR surface;
-        private DescriptorSetLayout samplerDescriptor;
+        private DescriptorSetLayout descriptorSetLayout;
+
         private DescriptorPool descriptorPool;
         private Pipeline graphicsPipeline;
         private Framebuffer[] swapchainFramebuffers;
@@ -43,13 +44,20 @@ namespace Adamantium.Engine.Graphics
 
         private GraphicsDevice(VulkanInstance instance, PhysicalDevice physicalDevice)
         {
-            this.instance = instance;
-            this.physicalDevice = physicalDevice;
-            CreateMainDevice();
+            Instance = instance;
+            PhysicalDevice = physicalDevice;
+            //CreateMainDevice();
         }
 
         private GraphicsDevice(GraphicsDevice main, PresentationParameters presentationParameters)
         {
+            this.surface = GraphicsDevice.Instance.GetOrCreateSurface(presentationParameters);
+            if (!main.IsMain)
+            {
+                CreateMainDevice();
+                main.MainDevice = this;
+                main.LogicalDevice = this.LogicalDevice;
+            }
             MaxFramesInFlight = presentationParameters.BuffersCount;
             MainDevice = main.MainDevice;
             LogicalDevice = main.LogicalDevice;
@@ -72,8 +80,9 @@ namespace Adamantium.Engine.Graphics
             CreateCommandPool();
             CreateCommandBuffers();
             CreateDescriptorPool();
-            CreateSyncObjects();
+            //CreateDescriptorSetLayout();
             CreateGraphicsPipeline();
+            CreateSyncObjects();
         }
 
         public static GraphicsDevice Create(VulkanInstance instance, PhysicalDevice physicalDevice)
@@ -81,7 +90,7 @@ namespace Adamantium.Engine.Graphics
             return new GraphicsDevice(instance, physicalDevice);
         }
 
-        private GraphicsDevice CreateRenderDevice(PresentationParameters parameters)
+        public GraphicsDevice CreateRenderDevice(PresentationParameters parameters)
         {
             return new GraphicsDevice(this, parameters);
         }
@@ -95,7 +104,7 @@ namespace Adamantium.Engine.Graphics
 
         private void CreateLogicalDevice()
         {
-            var indices = physicalDevice.FindQueueFamilies(surface);
+            var indices = PhysicalDevice.FindQueueFamilies(surface);
 
             var queueInfos = new List<DeviceQueueCreateInfo>();
             HashSet<uint> uniqueQueueFamilies = new HashSet<uint>() { indices.graphicsFamily.Value, indices.presentFamily.Value };
@@ -109,7 +118,7 @@ namespace Adamantium.Engine.Graphics
                 queueInfos.Add(queueCreateInfo);
             }
 
-            var deviceFeatures = physicalDevice.GetPhysicalDeviceFeatures();
+            var deviceFeatures = PhysicalDevice.GetPhysicalDeviceFeatures();
             deviceFeatures.SamplerAnisotropy = true;
 
             var createInfo = new DeviceCreateInfo();
@@ -119,13 +128,13 @@ namespace Adamantium.Engine.Graphics
             createInfo.EnabledExtensionCount = (uint)VulkanInstance.DeviceExtensions.Count;
             createInfo.PpEnabledExtensionNames = VulkanInstance.DeviceExtensions.ToArray();
 
-            if (instance.IsInDebugMode)
+            if (Instance.IsInDebugMode)
             {
                 createInfo.EnabledLayerCount = (uint)VulkanInstance.ValidationLayers.Count;
                 createInfo.PpEnabledLayerNames = VulkanInstance.ValidationLayers.ToArray();
             }
 
-            LogicalDevice = physicalDevice.CreateDevice(createInfo);
+            LogicalDevice = PhysicalDevice.CreateDevice(createInfo);
 
             createInfo.Dispose();
 
@@ -173,40 +182,64 @@ namespace Adamantium.Engine.Graphics
             poolInfo.PPoolSizes = poolSize;
             poolInfo.MaxSets = Presenter.Description.BuffersCount;
 
-            if (LogicalDevice.CreateDescriptorPool(poolInfo, null, out descriptorPool) != Result.Success)
-            {
-                throw new Exception("failed to create descriptor pool!");
-            }
+            descriptorPool = LogicalDevice.CreateDescriptorPool(poolInfo);
+        }
+
+        private void CreateDescriptorSetLayout()
+        {
+            var bindings = new List<DescriptorSetLayoutBinding>();
+
+            //DescriptorSetLayoutBinding uboLayoutBinding = new DescriptorSetLayoutBinding();
+            //uboLayoutBinding.Binding = 0;
+            //uboLayoutBinding.DescriptorCount = 1;
+            //uboLayoutBinding.DescriptorType = DescriptorType.UniformBuffer;
+            //uboLayoutBinding.PImmutableSamplers = null;
+            //uboLayoutBinding.StageFlags = (uint)ShaderStageFlagBits.VertexBit;
+
+            DescriptorSetLayoutBinding samplerLayoutBinding = new DescriptorSetLayoutBinding();
+            samplerLayoutBinding.Binding = 0;
+            samplerLayoutBinding.DescriptorCount = 1;
+            samplerLayoutBinding.DescriptorType = DescriptorType.CombinedImageSampler;
+            samplerLayoutBinding.PImmutableSamplers = null;
+            samplerLayoutBinding.StageFlags = (uint)ShaderStageFlagBits.FragmentBit;
+
+            bindings.Add(samplerLayoutBinding);
+
+            DescriptorSetLayoutCreateInfo layoutInfo = new DescriptorSetLayoutCreateInfo();
+            layoutInfo.BindingCount = 1;
+            layoutInfo.PBindings = bindings.ToArray();
+
+            descriptorSetLayout = LogicalDevice.CreateDescriptorSetLayout(layoutInfo, null);
         }
 
         private void CreateGraphicsPipeline()
         {
-            //var vertexContent = File.ReadAllBytes(@"shaders\vert.spv");
-            //var fragmentContent = File.ReadAllBytes(@"shaders\frag.spv");
+            var vertexContent = File.ReadAllBytes(@"Shaders\vert.spv");
+            var fragmentContent = File.ReadAllBytes(@"Shaders\frag.spv");
 
-            //var vertexShaderModule = CreateShaderModule(vertexContent);
-            //var fragmentShaderModule = CreateShaderModule(fragmentContent);
+            var vertexShaderModule = CreateShaderModule(vertexContent);
+            var fragmentShaderModule = CreateShaderModule(fragmentContent);
 
-            //var vertShaderStageInfo = new PipelineShaderStageCreateInfo();
-            //vertShaderStageInfo.Stage = ShaderStageFlagBits.VertexBit;
-            //vertShaderStageInfo.Module = vertexShaderModule;
-            //vertShaderStageInfo.PName = "main";
+            var vertShaderStageInfo = new PipelineShaderStageCreateInfo();
+            vertShaderStageInfo.Stage = ShaderStageFlagBits.VertexBit;
+            vertShaderStageInfo.Module = vertexShaderModule;
+            vertShaderStageInfo.PName = "main";
 
-            //var fragShaderStageInfo = new PipelineShaderStageCreateInfo();
-            //fragShaderStageInfo.Stage = ShaderStageFlagBits.FragmentBit;
-            //fragShaderStageInfo.Module = fragmentShaderModule;
-            //fragShaderStageInfo.PName = "main";
+            var fragShaderStageInfo = new PipelineShaderStageCreateInfo();
+            fragShaderStageInfo.Stage = ShaderStageFlagBits.FragmentBit;
+            fragShaderStageInfo.Module = fragmentShaderModule;
+            fragShaderStageInfo.PName = "main";
 
-            //PipelineShaderStageCreateInfo[] shaderStages = new[] { vertShaderStageInfo, fragShaderStageInfo };
+            PipelineShaderStageCreateInfo[] shaderStages = new[] { vertShaderStageInfo, fragShaderStageInfo };
 
-            //var bindingDescr = GetBindingDescription<Vertex>();
-            //var attributesDescriptions = GetVertexAttributeDescription<Vertex>();
+            var bindingDescr = GetBindingDescription<MeshVertex>();
+            var attributesDescriptions = GetVertexAttributeDescription<MeshVertex>();
 
-            //var vertexInputInfo = new PipelineVertexInputStateCreateInfo();
-            //vertexInputInfo.VertexBindingDescriptionCount = 1;
-            //vertexInputInfo.VertexAttributeDescriptionCount = (uint)attributesDescriptions.Length;
-            //vertexInputInfo.PVertexBindingDescriptions = new VertexInputBindingDescription[] { bindingDescr };
-            //vertexInputInfo.PVertexAttributeDescriptions = attributesDescriptions;
+            var vertexInputInfo = new PipelineVertexInputStateCreateInfo();
+            vertexInputInfo.VertexBindingDescriptionCount = 1;
+            vertexInputInfo.VertexAttributeDescriptionCount = (uint)attributesDescriptions.Length;
+            vertexInputInfo.PVertexBindingDescriptions = new VertexInputBindingDescription[] { bindingDescr };
+            vertexInputInfo.PVertexAttributeDescriptions = attributesDescriptions;
 
             var inputAssembly = new PipelineInputAssemblyStateCreateInfo();
             inputAssembly.Topology = PrimitiveTopology.TriangleList;
@@ -259,21 +292,24 @@ namespace Adamantium.Engine.Graphics
             colorBlending.BlendConstants[3] = 0.0f;
 
             var pipelineLayoutInfo = new PipelineLayoutCreateInfo();
+            //pipelineLayoutInfo.SetLayoutCount = 1;
+            //pipelineLayoutInfo.PSetLayouts = new DescriptorSetLayout[] { descriptorSetLayout };
             pipelineLayoutInfo.SetLayoutCount = 0;
-            //pipelineLayoutInfo.PSetLayouts = descriptorSetLayout;
+            pipelineLayoutInfo.PushConstantRangeCount = 0;
+            //pipelineLayoutInfo.PSetLayouts = new DescriptorSetLayout[] { descriptorSetLayout };
 
-            //pipelineLayout = logicalDevice.CreatePipelineLayout(pipelineLayoutInfo);
+            var pipelineLayout = LogicalDevice.CreatePipelineLayout(pipelineLayoutInfo);
 
             var pipelineInfo = new GraphicsPipelineCreateInfo();
-            pipelineInfo.StageCount = 0;
-            //pipelineInfo.PStages = shaderStages;
-            //pipelineInfo.PVertexInputState = vertexInputInfo;
+            pipelineInfo.StageCount = (uint)shaderStages.Length;
+            pipelineInfo.PStages = shaderStages;
+            pipelineInfo.PVertexInputState = vertexInputInfo;
             pipelineInfo.PInputAssemblyState = inputAssembly;
             pipelineInfo.PViewportState = viewportState;
             pipelineInfo.PRasterizationState = rasterizer;
             pipelineInfo.PMultisampleState = multisampling;
             pipelineInfo.PColorBlendState = colorBlending;
-            //pipelineInfo.Layout = pipelineLayout;
+            pipelineInfo.Layout = pipelineLayout;
             pipelineInfo.RenderPass = renderPass;
             pipelineInfo.Subpass = 0;
 
@@ -285,9 +321,20 @@ namespace Adamantium.Engine.Graphics
             //logicalDevice.DestroyShaderModule(fragmentShaderModule);
         }
 
+        ShaderModule CreateShaderModule(byte[] code)
+        {
+            ShaderModuleCreateInfo createInfo = new ShaderModuleCreateInfo();
+            createInfo.CodeSize = (ulong)code.Length;
+            createInfo.PCode = code;
+
+            var shaderModule = LogicalDevice.CreateShaderModule(createInfo);
+            createInfo.Dispose();
+            return shaderModule;
+        }
+
         private void CreateCommandPool()
         {
-            var queueFamilyIndices = physicalDevice.FindQueueFamilies(surface);
+            var queueFamilyIndices = PhysicalDevice.FindQueueFamilies(surface);
 
             var poolInfo = new CommandPoolCreateInfo();
             poolInfo.QueueFamilyIndex = queueFamilyIndices.graphicsFamily.Value;
@@ -448,15 +495,19 @@ namespace Adamantium.Engine.Graphics
             }
         }
 
-        public void Draw(Buffer vertexBuffer)
+        public void SetVertexBuffer(Buffer vertexBuffer)
         {
             ulong offset = 0;
             var commandBuffer = commandBuffers[CurrentFrame];
             commandBuffer.CmdBindVertexBuffers(0, 1, vertexBuffer, ref offset);
+        }
 
-            commandBuffer.CmdBindDescriptorSets(PipelineBindPoint.Graphics, pipelineLayout, 0, 1, descriptorSets[CurrentImageIndex], 0, 0);
+        public void Draw(uint vertexCount, uint instanceCount, uint firstVertex, uint firstInstance)
+        {
+            var commandBuffer = commandBuffers[CurrentFrame];
+            //commandBuffer.CmdBindDescriptorSets(PipelineBindPoint.Graphics, pipelineLayout, 0, 1, descriptorSets[CurrentImageIndex], 0, 0);
 
-            commandBuffer.CmdDraw(vertexBuffer.ElementCount, 1, 0, 0);
+            commandBuffer.CmdDraw(vertexCount, instanceCount, firstVertex, firstInstance);
         }
 
         public void DrawIndexed(Buffer vertexBuffer, Buffer indexBuffer)
@@ -467,7 +518,7 @@ namespace Adamantium.Engine.Graphics
 
             commandBuffer.CmdBindIndexBuffer(indexBuffer, 0, IndexType.Uint32);
 
-            commandBuffer.CmdBindDescriptorSets(PipelineBindPoint.Graphics, pipelineLayout, 0, 1, descriptorSets[CurrentImageIndex], 0, 0);
+            //commandBuffer.CmdBindDescriptorSets(PipelineBindPoint.Graphics, pipelineLayout, 0, 1, descriptorSets[CurrentImageIndex], 0, 0);
 
             commandBuffer.CmdDrawIndexed(indexBuffer.ElementCount, 1, 0, 0, 0);
         }
@@ -504,12 +555,65 @@ namespace Adamantium.Engine.Graphics
 
         public static implicit operator PhysicalDevice (GraphicsDevice device)
         {
-            return device.physicalDevice;
+            return GraphicsDevice.PhysicalDevice;
         }
 
         public static implicit operator Device(GraphicsDevice device)
         {
             return device.LogicalDevice;
+        }
+
+
+
+        private VertexInputBindingDescription GetBindingDescription<T>() where T : struct
+        {
+            var decr = new VertexInputBindingDescription();
+            decr.Binding = 0;
+            decr.Stride = (uint)Marshal.SizeOf<T>();
+            decr.InputRate = VertexInputRate.Vertex;
+
+            return decr;
+        }
+
+        private VertexInputAttributeDescription[] GetVertexAttributeDescription<T>()
+        {
+            var fields = typeof(T).GetFields();
+
+            var attributes = new List<VertexInputAttributeDescription>();
+            uint location = 0;
+
+            foreach (var field in fields)
+            {
+                if (field.IsInitOnly) continue;
+
+                var desc = new VertexInputAttributeDescription();
+                desc.Binding = 0;
+                desc.Location = location;
+                desc.Format = GetFormat(Marshal.SizeOf(field.FieldType));
+                desc.Offset = (uint)Marshal.OffsetOf<T>(field.Name).ToInt32();
+                location++;
+                attributes.Add(desc);
+            }
+
+            return attributes.ToArray();
+        }
+
+        private Format GetFormat(int size)
+        {
+            switch (size)
+            {
+                case 4:
+                    return Format.R32_SFLOAT;
+                case 8:
+                    return Format.R32G32_SFLOAT;
+                case 12:
+                    return Format.R32G32B32_SFLOAT;
+                case 16:
+                    return Format.R32G32B32A32_SFLOAT;
+
+                default:
+                    throw new Exception($"size {size} is not supported");
+            }
         }
     }
 }
