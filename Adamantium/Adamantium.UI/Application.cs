@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.EntityFramework;
@@ -67,8 +68,17 @@ namespace Adamantium.UI
 
         protected void OnWindowAdded(IWindow window)
         {
+            var @params = new PresentationParameters(PresenterType.Swapchain)
+            {
+                Width = (uint)window.ClientWidth,
+                Height = (uint)window.ClientHeight,
+                BuffersCount = 2,
+                OutputHandle = window.Handle,
+                HInstanceHandle = Process.GetCurrentProcess().Handle
+            };
+            var device = graphicsDevice.CreateRenderDevice(@params);
             var transformProcessor = new UITransformProcessor(entityWorld);
-            var renderProcessor = new UIRenderProcessor(entityWorld, graphicsDevice);
+            var renderProcessor = new UIRenderProcessor(entityWorld, device);
             var entity = new Entity();
             entity.AddComponent(window);
             entityWorld.AddEntity(entity);
@@ -204,7 +214,7 @@ namespace Adamantium.UI
         protected void Initialize()
         {
             var vulkanInstance = VulkanInstance.Create("Adamantium Engine", true);
-            graphicsDevice = Engine.Graphics.GraphicsDevice.Create(vulkanInstance, vulkanInstance.CurrentDevice);
+            graphicsDevice = GraphicsDevice.Create(vulkanInstance, vulkanInstance.CurrentDevice);
             //GraphicsDevice.BlendState = GraphicsDevice.BlendStates.AlphaBlend;
             //GraphicsDevice.RasterizerState = GraphicsDevice.RasterizerStates.CullNoneClipEnabled;
             //GraphicsDevice.DepthStencilState = GraphicsDevice.DepthStencilStates.DepthEnableGreaterEqual;

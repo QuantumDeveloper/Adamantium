@@ -26,8 +26,11 @@ namespace Adamantium.Engine.Graphics
 
         public static ReadOnlyCollection<string> ValidationLayers { get; private set; }
 
+        private static Dictionary<IntPtr, SurfaceKHR> availableSurfaces;
+
         static VulkanInstance()
         {
+            availableSurfaces = new Dictionary<IntPtr, SurfaceKHR>();
             var deviceExt = new List<string>();
             deviceExt.Add(AdamantiumVulkan.Core.Constants.VK_KHR_SWAPCHAIN_EXTENSION_NAME);
             DeviceExtensions = new ReadOnlyCollection<string>(deviceExt);
@@ -113,14 +116,23 @@ namespace Adamantium.Engine.Graphics
             return new VulkanInstance(appName, enableDebug);
         }
 
-        public SurfaceKHR CreateSurface(PresentationParameters parameters)
+        public SurfaceKHR GetOrCreateSurface(PresentationParameters parameters)
         {
+            if (availableSurfaces.ContainsKey(parameters.OutputHandle))
+            {
+                return availableSurfaces[parameters.OutputHandle];
+            }
+
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 var surfaceInfo = new Win32SurfaceCreateInfoKHR();
                 surfaceInfo.Hwnd = parameters.OutputHandle;
                 surfaceInfo.Hinstance = parameters.HInstanceHandle;
-                return instance.CreateWin32Surface(surfaceInfo);
+                var surface = instance.CreateWin32Surface(surfaceInfo);
+
+                availableSurfaces.Add(parameters.OutputHandle, surface);
+
+                return surface;
             }
 
             throw new NotSupportedException("Current platform is not supported yet for Surface creation");

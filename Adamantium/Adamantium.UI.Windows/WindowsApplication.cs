@@ -10,10 +10,10 @@ namespace Adamantium.UI.Windows
     {
         public WindowsApplication()
         {
-            Windows.WindowAdded += Windows_WindowAdded;
+            Windows.WindowAdded += OnWindowAdded;
         }
 
-        private void Windows_WindowAdded(object sender, WindowEventArgs e)
+        private void OnWindowAdded(object sender, WindowEventArgs e)
         {
             //InputDevice mouseDevice = new InputDevice();
             //mouseDevice.WindowHandle = e.Window.Handle;
