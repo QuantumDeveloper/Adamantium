@@ -81,8 +81,10 @@ namespace Adamantium.UI.Processors
             _gameTime = gameTime;
             base.Draw(gameTime);
 
-            windowRenderModule.Prepare();
-            windowRenderModule.Render(gameTime);
+            if (windowRenderModule.Prepare())
+            {
+                windowRenderModule.Render(gameTime);
+            }
         }
     }
 }

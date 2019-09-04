@@ -99,8 +99,8 @@ namespace Adamantium.Engine.Graphics
             swapchainImages = logicalDevice.GetSwapchainImagesKHR(swapchain);
 
             Description.ImageFormat = surfaceFormat.Format;
-            //Description.BackBufferWidth = extent.Width;
-            //Description.BackBufferHeight = extent.Height;
+            Description.Width = extent.Width;
+            Description.Height = extent.Height;
         }
 
         private void CreateImageViews(Device logicalDevice)
@@ -243,7 +243,7 @@ namespace Adamantium.Engine.Graphics
 
         private void RecreateSwapchain()
         {
-            GraphicsDevice.DeviceWaitIdle();
+            var result = GraphicsDevice.DeviceWaitIdle();
 
             CleanupSwapChain();
 
@@ -258,10 +258,10 @@ namespace Adamantium.Engine.Graphics
                 view.Destroy(GraphicsDevice);
             }
 
-            foreach (var img in swapchainImages)
-            {
-                img.Destroy(GraphicsDevice);
-            }
+            //foreach (var img in swapchainImages)
+            //{
+            //    img.Destroy(GraphicsDevice);
+            //}
 
             swapchain?.Destroy(GraphicsDevice);
         }

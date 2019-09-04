@@ -6,6 +6,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using Adamantium.Core;
 using Adamantium.Engine.Core;
+using Adamantium.Imaging;
 using Adamantium.Mathematics;
 using AdamantiumVulkan.Core;
 
@@ -17,13 +18,14 @@ namespace Adamantium.Engine.Graphics
         internal Device LogicalDevice { get; private set; }
         private Queue graphicsQueue;
         private RenderPass renderPass;
-        private Framebuffer[] framebuffers;
         private SurfaceKHR surface;
         private DescriptorSetLayout descriptorSetLayout;
 
         private DescriptorPool descriptorPool;
         private Pipeline graphicsPipeline;
-        private Framebuffer[] swapchainFramebuffers;
+        private Framebuffer[] defaultFramebuffers;
+
+        private PipelineLayout pipelineLayout;
 
         private CommandBuffer[] commandBuffers;
         public CommandPool CommandPool { get; private set; }
@@ -81,6 +83,7 @@ namespace Adamantium.Engine.Graphics
             CreateCommandBuffers();
             CreateDescriptorPool();
             //CreateDescriptorSetLayout();
+            CreatePipelineLayout();
             CreateGraphicsPipeline();
             CreateSyncObjects();
         }
@@ -212,6 +215,18 @@ namespace Adamantium.Engine.Graphics
             descriptorSetLayout = LogicalDevice.CreateDescriptorSetLayout(layoutInfo, null);
         }
 
+        private void CreatePipelineLayout()
+        {
+            var pipelineLayoutInfo = new PipelineLayoutCreateInfo();
+            //pipelineLayoutInfo.SetLayoutCount = 1;
+            //pipelineLayoutInfo.PSetLayouts = new DescriptorSetLayout[] { descriptorSetLayout };
+            pipelineLayoutInfo.SetLayoutCount = 0;
+            pipelineLayoutInfo.PushConstantRangeCount = 0;
+            //pipelineLayoutInfo.PSetLayouts = new DescriptorSetLayout[] { descriptorSetLayout };
+
+            pipelineLayout = LogicalDevice.CreatePipelineLayout(pipelineLayoutInfo);
+        }
+
         private void CreateGraphicsPipeline()
         {
             var vertexContent = File.ReadAllBytes(@"Shaders\vert.spv");
@@ -236,10 +251,13 @@ namespace Adamantium.Engine.Graphics
             var attributesDescriptions = GetVertexAttributeDescription<MeshVertex>();
 
             var vertexInputInfo = new PipelineVertexInputStateCreateInfo();
-            vertexInputInfo.VertexBindingDescriptionCount = 1;
-            vertexInputInfo.VertexAttributeDescriptionCount = (uint)attributesDescriptions.Length;
-            vertexInputInfo.PVertexBindingDescriptions = new VertexInputBindingDescription[] { bindingDescr };
-            vertexInputInfo.PVertexAttributeDescriptions = attributesDescriptions;
+            vertexInputInfo.VertexBindingDescriptionCount = 0;
+            vertexInputInfo.VertexAttributeDescriptionCount = 0;
+
+            //vertexInputInfo.VertexBindingDescriptionCount = 1;
+            //vertexInputInfo.VertexAttributeDescriptionCount = (uint)attributesDescriptions.Length;
+            //vertexInputInfo.PVertexBindingDescriptions = new VertexInputBindingDescription[] { bindingDescr };
+            //vertexInputInfo.PVertexAttributeDescriptions = attributesDescriptions;
 
             var inputAssembly = new PipelineInputAssemblyStateCreateInfo();
             inputAssembly.Topology = PrimitiveTopology.TriangleList;
@@ -291,15 +309,6 @@ namespace Adamantium.Engine.Graphics
             colorBlending.BlendConstants[2] = 0.0f;
             colorBlending.BlendConstants[3] = 0.0f;
 
-            var pipelineLayoutInfo = new PipelineLayoutCreateInfo();
-            //pipelineLayoutInfo.SetLayoutCount = 1;
-            //pipelineLayoutInfo.PSetLayouts = new DescriptorSetLayout[] { descriptorSetLayout };
-            pipelineLayoutInfo.SetLayoutCount = 0;
-            pipelineLayoutInfo.PushConstantRangeCount = 0;
-            //pipelineLayoutInfo.PSetLayouts = new DescriptorSetLayout[] { descriptorSetLayout };
-
-            var pipelineLayout = LogicalDevice.CreatePipelineLayout(pipelineLayoutInfo);
-
             var pipelineInfo = new GraphicsPipelineCreateInfo();
             pipelineInfo.StageCount = (uint)shaderStages.Length;
             pipelineInfo.PStages = shaderStages;
@@ -317,8 +326,8 @@ namespace Adamantium.Engine.Graphics
             graphicsPipeline = pipelines[0];
 
             pipelineInfo.Dispose();
-            //logicalDevice.DestroyShaderModule(vertexShaderModule);
-            //logicalDevice.DestroyShaderModule(fragmentShaderModule);
+            LogicalDevice.DestroyShaderModule(vertexShaderModule);
+            LogicalDevice.DestroyShaderModule(fragmentShaderModule);
         }
 
         ShaderModule CreateShaderModule(byte[] code)
@@ -344,12 +353,12 @@ namespace Adamantium.Engine.Graphics
 
         private void CreateCommandBuffers()
         {
-            commandBuffers = new CommandBuffer[swapchainFramebuffers.Length];
+            commandBuffers = new CommandBuffer[defaultFramebuffers.Length];
 
             var allocInfo = new CommandBufferAllocateInfo();
             allocInfo.CommandPool = CommandPool;
             allocInfo.Level = CommandBufferLevel.Primary;
-            allocInfo.CommandBufferCount = (uint)swapchainFramebuffers.Length;
+            allocInfo.CommandBufferCount = (uint)defaultFramebuffers.Length;
 
             commandBuffers = LogicalDevice.AllocateCommandBuffers(allocInfo);
         }
@@ -368,9 +377,9 @@ namespace Adamantium.Engine.Graphics
 
         private void CreateDefaultFramebuffers()
         {
-            swapchainFramebuffers = new Framebuffer[Presenter.Description.BuffersCount];
+            defaultFramebuffers = new Framebuffer[Presenter.Description.BuffersCount];
 
-            for (int i = 0; i < swapchainFramebuffers.Length; i++)
+            for (int i = 0; i < defaultFramebuffers.Length; i++)
             {
                 FramebufferCreateInfo framebufferInfo = new FramebufferCreateInfo();
                 framebufferInfo.RenderPass = renderPass;
@@ -381,7 +390,7 @@ namespace Adamantium.Engine.Graphics
                 framebufferInfo.Height = Presenter.Description.Height;
                 framebufferInfo.Layers = 1;
 
-                swapchainFramebuffers[i] = LogicalDevice.CreateFramebuffer(framebufferInfo);
+                defaultFramebuffers[i] = LogicalDevice.CreateFramebuffer(framebufferInfo);
 
                 framebufferInfo.Dispose();
             }
@@ -392,12 +401,12 @@ namespace Adamantium.Engine.Graphics
             return LogicalDevice.GetDeviceQueue(queueFamilyIndex, queueIndex);
         }
 
-        public void DeviceWaitIdle()
+        public Result DeviceWaitIdle()
         {
-            LogicalDevice.DeviceWaitIdle();
+            return LogicalDevice.DeviceWaitIdle();
         }
 
-        public void BeginDrawCommand()
+        public void BeginDraw()
         {
             var renderFence = InFlightFences[CurrentFrame];
             var result = LogicalDevice.WaitForFences(1, renderFence, true, ulong.MaxValue);
@@ -405,12 +414,12 @@ namespace Adamantium.Engine.Graphics
 
             //if (result == Result.ErrorOutOfDateKhr)
             //{
-            //    Presenter.Resize()
-            //    return;
+            //    ResizeBuffers()
+            //    //return;
             //}
             //else if (result != Result.Success && result != Result.SuboptimalKhr)
             //{
-            //    MessageBox.Show("Failed to acquire swap chain image!");
+            //    //MessageBox.Show("Failed to acquire swap chain image!");
             //    throw new ArgumentException();
             //}
 
@@ -438,7 +447,7 @@ namespace Adamantium.Engine.Graphics
 
             var renderPassInfo = new RenderPassBeginInfo();
             renderPassInfo.RenderPass = renderPass;
-            renderPassInfo.Framebuffer = swapchainFramebuffers[CurrentFrame];
+            renderPassInfo.Framebuffer = defaultFramebuffers[CurrentFrame];
             renderPassInfo.RenderArea = new Rect2D();
             renderPassInfo.RenderArea.Offset = new Offset2D();
             renderPassInfo.RenderArea.Extent = new Extent2D() { Width = Presenter.Description.Width, Height = Presenter.Description.Height };
@@ -455,9 +464,10 @@ namespace Adamantium.Engine.Graphics
             commandBuffer.CmdBindPipeline(PipelineBindPoint.Graphics, graphicsPipeline);
         }
 
-        public void EndDrawCommand()
+        public void EndDraw()
         {
             var commandBuffer = commandBuffers[CurrentImageIndex];
+
             commandBuffer.CmdEndRenderPass();
 
             var result = commandBuffer.EndCommandBuffer();
@@ -493,6 +503,8 @@ namespace Adamantium.Engine.Graphics
             {
                 throw new Exception($"failed to submit draw command buffer! Result was {result}");
             }
+
+            CurrentFrame = (CurrentFrame + 1) % MaxFramesInFlight;
         }
 
         public void SetVertexBuffer(Buffer vertexBuffer)
@@ -543,6 +555,15 @@ namespace Adamantium.Engine.Graphics
             LogicalDevice.UnmapMemory(memory);
         }
 
+        public void ResizeBuffers(uint width, uint height, uint buffersCount, SurfaceFormat surfaceFormat, DepthFormat depthFormat)
+        {
+            DestroyFrameBuffers();
+            graphicsPipeline?.Destroy(LogicalDevice);
+            Presenter.Resize(width, height, buffersCount, surfaceFormat, depthFormat);
+            CreateDefaultFramebuffers();
+            CreateGraphicsPipeline();
+        }
+
         internal Semaphore GetImageAvailableSemaphoreForCurrentFrame()
         {
             return ImageAvailableSemaphores[CurrentFrame];
@@ -563,6 +584,13 @@ namespace Adamantium.Engine.Graphics
             return device.LogicalDevice;
         }
 
+        private void DestroyFrameBuffers()
+        {
+            for (int i = 0; i< defaultFramebuffers.Length; ++i)
+            {
+                defaultFramebuffers[i].Destroy(LogicalDevice);
+            }
+        }
 
 
         private VertexInputBindingDescription GetBindingDescription<T>() where T : struct

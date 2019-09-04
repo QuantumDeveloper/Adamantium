@@ -4,6 +4,7 @@ using System.Diagnostics;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.EntityFramework;
+using Adamantium.Imaging;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Input;
 using Adamantium.UI.Processors;
@@ -34,6 +35,7 @@ namespace Adamantium.UI
         private GraphicsDevice graphicsDevice;
         private EntityWorld entityWorld;
         private Dictionary<IWindow, UIRenderProcessor> windowToSystem;
+        private Dictionary<IWindow, GraphicsDevice> windowToDevices;
 
         private ApplicationTime appTime;
         private TimeSpan totalTime;
@@ -51,6 +53,7 @@ namespace Adamantium.UI
             Current = this;
             systemManager = new ApplicationSystemManager(this);
             windowToSystem = new Dictionary<IWindow, UIRenderProcessor>();
+            windowToDevices = new Dictionary<IWindow, GraphicsDevice>();
             Windows = new WindowCollection();
             Windows.WindowAdded += WindowAdded;
             Windows.WindowRemoved += WindowRemoved;
@@ -68,6 +71,7 @@ namespace Adamantium.UI
 
         protected void OnWindowAdded(IWindow window)
         {
+            window.ClientSizeChanged += Window_ClientSizeChanged;
             var @params = new PresentationParameters(PresenterType.Swapchain)
             {
                 Width = (uint)window.ClientWidth,
@@ -77,6 +81,8 @@ namespace Adamantium.UI
                 HInstanceHandle = Process.GetCurrentProcess().Handle
             };
             var device = graphicsDevice.CreateRenderDevice(@params);
+            windowToDevices[window] = device;
+
             var transformProcessor = new UITransformProcessor(entityWorld);
             var renderProcessor = new UIRenderProcessor(entityWorld, device);
             var entity = new Entity();
@@ -88,12 +94,26 @@ namespace Adamantium.UI
             windowToSystem.Add(window, renderProcessor);
         }
 
+        private void Window_ClientSizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            if (e.NewSize.Width == 0 || e.NewSize.Height == 0) return;
+
+            var wnd = sender as IWindow;
+            var device = windowToDevices[wnd];
+            device.ResizeBuffers((uint)wnd.ClientWidth, (uint)wnd.ClientHeight, 2, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
+            wnd.ClientSizeChanged -= Window_ClientSizeChanged;
+        }
+
         protected void OnWindowRemoved(IWindow window)
         {
             if (!windowToSystem.ContainsKey(window)) return;
             var processor = windowToSystem[window];
             processor.UnloadContent();
             entityWorld.RemoveProcessor(processor);
+            windowToSystem.Remove(window);
+            var device = windowToDevices[window];
+            device?.Dispose();
+            windowToDevices.Remove(window);
         }
 
         internal abstract MouseDevice MouseDevice { get; }
