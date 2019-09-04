@@ -74,22 +74,29 @@ namespace Adamantium.UI.Processors
             _isWindowResized = true;
         }
 
-        public void Prepare()
+        public bool Prepare()
         {
+            if (_window.ClientWidth == 0 || _window.ClientHeight == 0)
+            {
+                return false;
+            }
+
             if (_isWindowResized)
             {
                 _isWindowResized = false;
                 //InitializeResources();
-                GraphicsDevice.Presenter.Resize((uint)_window.ClientWidth, (uint)_window.ClientHeight, 2, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
+                GraphicsDevice.ResizeBuffers((uint)_window.ClientWidth, (uint)_window.ClientHeight, 2, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
             }
 
-            GraphicsDevice.BeginDrawCommand();
+            GraphicsDevice.BeginDraw();
 
             //_graphicsDevice.SetRenderTargets(_depthBuffer, _backBuffer);
             //_graphicsDevice.ClearTargets(Colors.White);
             //_graphicsDevice.SetViewport(Presenter.Viewport);
             //_graphicsDevice.BlendState = _graphicsDevice.BlendStates.AlphaBlend;
             //TraverseByLayer(_window, ProcessControl);
+
+            return true;
         }
 
         public void Render(IGameTime gameTime)
@@ -104,8 +111,8 @@ namespace Adamantium.UI.Processors
 
             //mainDevice.CopyResource(_backBuffer, Presenter.BackBuffer);
            
-            GraphicsDevice.Draw(0,0,0,0);
-            GraphicsDevice.EndDrawCommand();
+            GraphicsDevice.Draw(3,1,0,0);
+            GraphicsDevice.EndDraw();
             GraphicsDevice.Presenter.Present();
         }
 
