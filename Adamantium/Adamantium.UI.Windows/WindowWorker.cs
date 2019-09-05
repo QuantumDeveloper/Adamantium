@@ -25,7 +25,7 @@ namespace Adamantium.UI.Windows
             messageTable = new Dictionary<WindowMessages, HandleMessage>();
             messageTable[WindowMessages.Activate] = HandleActivate;
             messageTable[WindowMessages.Syscommand] = HandleSysCommand;
-            messageTable[WindowMessages.Nclbuttondown] = HandleNcButtonDown;
+            //messageTable[WindowMessages.Nclbuttondown] = HandleNcButtonDown;
             messageTable[WindowMessages.Nchittest] = HandleNcHittest;
             //messageTable[WindowMessages.Nccalcsize] = HandleNcCalcSize;
             messageTable[WindowMessages.Size] = HandleResize;

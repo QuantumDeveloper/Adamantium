@@ -211,6 +211,8 @@ namespace Adamantium.Engine.Graphics
                 MessageBox.Show("Failed to present swap chain image");
                 throw new Exception();
             }
+
+            OnPresentFinished();
         }
 
 
@@ -243,8 +245,6 @@ namespace Adamantium.Engine.Graphics
 
         private void RecreateSwapchain()
         {
-            var result = GraphicsDevice.DeviceWaitIdle();
-
             CleanupSwapChain();
 
             CreateSwapchain(GraphicsDevice);
@@ -263,7 +263,7 @@ namespace Adamantium.Engine.Graphics
             //    img.Destroy(GraphicsDevice);
             //}
 
-            swapchain?.Destroy(GraphicsDevice);
+            //swapchain?.Destroy(GraphicsDevice);
         }
 
         public static implicit operator SwapchainKHR(SwapChainGraphicsPresenter presenter)

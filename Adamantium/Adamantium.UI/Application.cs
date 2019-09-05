@@ -32,7 +32,7 @@ namespace Adamantium.UI
         public static Application Current { get; internal set; }
         public Uri StartupUri { get; set; }
 
-        private GraphicsDevice graphicsDevice;
+        protected GraphicsDevice GraphicsDevice;
         private EntityWorld entityWorld;
         private Dictionary<IWindow, UIRenderProcessor> windowToSystem;
         private Dictionary<IWindow, GraphicsDevice> windowToDevices;
@@ -71,7 +71,7 @@ namespace Adamantium.UI
 
         protected void OnWindowAdded(IWindow window)
         {
-            window.ClientSizeChanged += Window_ClientSizeChanged;
+            //window.ClientSizeChanged += Window_ClientSizeChanged;
             var @params = new PresentationParameters(PresenterType.Swapchain)
             {
                 Width = (uint)window.ClientWidth,
@@ -80,7 +80,7 @@ namespace Adamantium.UI
                 OutputHandle = window.Handle,
                 HInstanceHandle = Process.GetCurrentProcess().Handle
             };
-            var device = graphicsDevice.CreateRenderDevice(@params);
+            var device = GraphicsDevice.CreateRenderDevice(@params);
             windowToDevices[window] = device;
 
             var transformProcessor = new UITransformProcessor(entityWorld);
@@ -234,11 +234,11 @@ namespace Adamantium.UI
         protected void Initialize()
         {
             var vulkanInstance = VulkanInstance.Create("Adamantium Engine", true);
-            graphicsDevice = GraphicsDevice.Create(vulkanInstance, vulkanInstance.CurrentDevice);
+            GraphicsDevice = GraphicsDevice.Create(vulkanInstance, vulkanInstance.CurrentDevice);
             //GraphicsDevice.BlendState = GraphicsDevice.BlendStates.AlphaBlend;
             //GraphicsDevice.RasterizerState = GraphicsDevice.RasterizerStates.CullNoneClipEnabled;
             //GraphicsDevice.DepthStencilState = GraphicsDevice.DepthStencilStates.DepthEnableGreaterEqual;
-            Services.Add(graphicsDevice);
+            Services.Add(GraphicsDevice);
 
             IsRunning = true;
             Initialized?.Invoke(this, EventArgs.Empty);
@@ -248,7 +248,9 @@ namespace Adamantium.UI
         {
             IsRunning = false;
             ContentUnloading?.Invoke(this, EventArgs.Empty);
-            graphicsDevice.Dispose();
+
+            GraphicsDevice.DeviceWaitIdle();
+            GraphicsDevice?.Dispose();
         }
 
         /// <summary>
