@@ -412,17 +412,6 @@ namespace Adamantium.Engine.Graphics
             var result = LogicalDevice.WaitForFences(1, renderFence, true, ulong.MaxValue);
             result = LogicalDevice.AcquireNextImageKHR((SwapChainGraphicsPresenter)Presenter, ulong.MaxValue, ImageAvailableSemaphores[CurrentFrame], null, ref currentImageIndex);
 
-            //if (result == Result.ErrorOutOfDateKhr)
-            //{
-            //    ResizeBuffers()
-            //    //return;
-            //}
-            //else if (result != Result.Success && result != Result.SuboptimalKhr)
-            //{
-            //    //MessageBox.Show("Failed to acquire swap chain image!");
-            //    throw new ArgumentException();
-            //}
-
             if (result != Result.Success && result != Result.SuboptimalKhr)
             {
                 throw new ArgumentException("Failed to acquire swap chain image!");
@@ -503,20 +492,23 @@ namespace Adamantium.Engine.Graphics
             {
                 throw new Exception($"failed to submit draw command buffer! Result was {result}");
             }
+        }
 
+        internal void UpdateCurrentFrameNumber()
+        {
             CurrentFrame = (CurrentFrame + 1) % MaxFramesInFlight;
         }
 
         public void SetVertexBuffer(Buffer vertexBuffer)
         {
             ulong offset = 0;
-            var commandBuffer = commandBuffers[CurrentFrame];
+            var commandBuffer = commandBuffers[CurrentImageIndex];
             commandBuffer.CmdBindVertexBuffers(0, 1, vertexBuffer, ref offset);
         }
 
         public void Draw(uint vertexCount, uint instanceCount, uint firstVertex, uint firstInstance)
         {
-            var commandBuffer = commandBuffers[CurrentFrame];
+            var commandBuffer = commandBuffers[CurrentImageIndex];
             //commandBuffer.CmdBindDescriptorSets(PipelineBindPoint.Graphics, pipelineLayout, 0, 1, descriptorSets[CurrentImageIndex], 0, 0);
 
             commandBuffer.CmdDraw(vertexCount, instanceCount, firstVertex, firstInstance);
@@ -525,7 +517,7 @@ namespace Adamantium.Engine.Graphics
         public void DrawIndexed(Buffer vertexBuffer, Buffer indexBuffer)
         {
             ulong offset = 0;
-            var commandBuffer = commandBuffers[CurrentFrame];
+            var commandBuffer = commandBuffers[CurrentImageIndex];
             commandBuffer.CmdBindVertexBuffers(0, 1, vertexBuffer, ref offset);
 
             commandBuffer.CmdBindIndexBuffer(indexBuffer, 0, IndexType.Uint32);
@@ -557,6 +549,7 @@ namespace Adamantium.Engine.Graphics
 
         public void ResizeBuffers(uint width, uint height, uint buffersCount, SurfaceFormat surfaceFormat, DepthFormat depthFormat)
         {
+            var result = LogicalDevice.DeviceWaitIdle();
             DestroyFrameBuffers();
             graphicsPipeline?.Destroy(LogicalDevice);
             Presenter.Resize(width, height, buffersCount, surfaceFormat, depthFormat);
@@ -571,7 +564,7 @@ namespace Adamantium.Engine.Graphics
 
         internal Semaphore GetRenderFinishedSemaphoreForCurrentFrame()
         {
-            return ImageAvailableSemaphores[CurrentFrame];
+            return RenderFinishedSemaphores[CurrentFrame];
         }
 
         public static implicit operator PhysicalDevice (GraphicsDevice device)

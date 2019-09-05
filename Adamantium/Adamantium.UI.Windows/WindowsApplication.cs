@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
 using Adamantium.UI.Input;
 using Adamantium.Win32;
 
@@ -8,9 +9,12 @@ namespace Adamantium.UI.Windows
 {
     public class WindowsApplication : Application
     {
+        Thread renderThread;
         public WindowsApplication()
         {
             Windows.WindowAdded += OnWindowAdded;
+            renderThread = new Thread(RenderThread);
+            renderThread.Start();
         }
 
         private void OnWindowAdded(object sender, WindowEventArgs e)
@@ -38,11 +42,16 @@ namespace Adamantium.UI.Windows
                     Messages.DispatchMessage(ref msg);
                 }
 
-                RunUpdateDrawBlock();
                 CheckExitCondition();
             }
         }
 
-        //protected override 
+        private void RenderThread()
+        {
+            while(IsRunning)
+            {
+                RunUpdateDrawBlock();
+            }
+        }
     }
 }

@@ -24,7 +24,7 @@ namespace Adamantium.UI.Processors
         //private RenderTarget2D _backBuffer;
         //private DepthStencilBuffer _depthBuffer;
         //private MSAALevel _msaaLevel;
-        private bool _isWindowResized;
+        private bool isWindowResized;
 
         public WindowRenderModule(IWindow window, GraphicsDevice device, MSAALevel msaaLevel)
         {
@@ -38,6 +38,7 @@ namespace Adamantium.UI.Processors
             _window = window;
             _window.ClientSizeChanged += Window_ClientSizeChanged;
             GraphicsDevice = device;
+            isWindowResized = true;
             //_vertexLayout = VertexInputLayout.FromType<VertexPositionTexture>();
 
             //_uiEffect = ToDispose(Effect.Load(@"Content\Effects\UIEffect.fx.compiled", _graphicsDevice));
@@ -71,7 +72,7 @@ namespace Adamantium.UI.Processors
 
         private void Window_ClientSizeChanged(object sender, SizeChangedEventArgs e)
         {
-            _isWindowResized = true;
+            isWindowResized = true;
         }
 
         public bool Prepare()
@@ -81,11 +82,12 @@ namespace Adamantium.UI.Processors
                 return false;
             }
 
-            if (_isWindowResized)
+            if (isWindowResized)
             {
-                _isWindowResized = false;
+                isWindowResized = false;
                 //InitializeResources();
                 GraphicsDevice.ResizeBuffers((uint)_window.ClientWidth, (uint)_window.ClientHeight, 2, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
+                return false;
             }
 
             GraphicsDevice.BeginDraw();
@@ -114,6 +116,8 @@ namespace Adamantium.UI.Processors
             GraphicsDevice.Draw(3,1,0,0);
             GraphicsDevice.EndDraw();
             GraphicsDevice.Presenter.Present();
+
+            
         }
 
         //public void TraverseByLayer(IVisual visualElement, Action<IVisual> action)
