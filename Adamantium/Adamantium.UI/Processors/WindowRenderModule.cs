@@ -19,7 +19,7 @@ namespace Adamantium.UI.Processors
         //private Effect _uiEffect;
         //private DrawingContext _context;
         //private bool windowSizeChanged = false;
-        private IWindow _window;
+        private IWindow window;
         //private Matrix4x4F projection;
         //private RenderTarget2D _backBuffer;
         //private DepthStencilBuffer _depthBuffer;
@@ -35,8 +35,8 @@ namespace Adamantium.UI.Processors
 
             //_msaaLevel = msaaLevel;
             //_mainGraphicsDevice = mainDevice;
-            _window = window;
-            _window.ClientSizeChanged += Window_ClientSizeChanged;
+            this.window = window;
+            window.ClientSizeChanged += Window_ClientSizeChanged;
             GraphicsDevice = device;
             isWindowResized = true;
             //_vertexLayout = VertexInputLayout.FromType<VertexPositionTexture>();
@@ -77,18 +77,18 @@ namespace Adamantium.UI.Processors
 
         public bool Prepare()
         {
-            if (_window.ClientWidth == 0 || _window.ClientHeight == 0)
+            if (window.ClientWidth == 0 || window.ClientHeight == 0)
             {
                 return false;
             }
 
-            if (isWindowResized)
-            {
-                isWindowResized = false;
-                //InitializeResources();
-                GraphicsDevice.ResizeBuffers((uint)_window.ClientWidth, (uint)_window.ClientHeight, 2, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
-                return false;
-            }
+            //if (isWindowResized)
+            //{
+            //    isWindowResized = false;
+            //    //InitializeResources();
+            //    GraphicsDevice.ResizeBuffers((uint)window.ClientWidth, (uint)window.ClientHeight, 2, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
+            //    return false;
+            //}
 
             GraphicsDevice.BeginDraw();
 
@@ -117,7 +117,14 @@ namespace Adamantium.UI.Processors
             GraphicsDevice.EndDraw();
             GraphicsDevice.Presenter.Present();
 
-            
+            if (isWindowResized)
+            {
+                isWindowResized = false;
+                //InitializeResources();
+                GraphicsDevice.ResizeBuffers((uint)window.ClientWidth, (uint)window.ClientHeight, 2, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
+            }
+
+            GraphicsDevice.UpdateCurrentFrameNumber();
         }
 
         //public void TraverseByLayer(IVisual visualElement, Action<IVisual> action)

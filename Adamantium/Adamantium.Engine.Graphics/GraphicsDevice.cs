@@ -36,13 +36,13 @@ namespace Adamantium.Engine.Graphics
 
         public uint CurrentFrame { get; private set; }
 
-        public uint CurrentImageIndex => currentImageIndex;
+        public uint ImageIndex => imageIndex;
 
         public readonly uint MaxFramesInFlight;
 
 
         private SubmitInfo[] submitInfos = new SubmitInfo[1];
-        private uint currentImageIndex;
+        private uint imageIndex;
 
         private GraphicsDevice(VulkanInstance instance, PhysicalDevice physicalDevice)
         {
@@ -394,6 +394,7 @@ namespace Adamantium.Engine.Graphics
 
                 framebufferInfo.Dispose();
             }
+            createCount++;
         }
 
         public Queue GetDeviceQueue(uint queueFamilyIndex, uint queueIndex)
@@ -410,14 +411,14 @@ namespace Adamantium.Engine.Graphics
         {
             var renderFence = InFlightFences[CurrentFrame];
             var result = LogicalDevice.WaitForFences(1, renderFence, true, ulong.MaxValue);
-            result = LogicalDevice.AcquireNextImageKHR((SwapChainGraphicsPresenter)Presenter, ulong.MaxValue, ImageAvailableSemaphores[CurrentFrame], null, ref currentImageIndex);
+            result = LogicalDevice.AcquireNextImageKHR((SwapChainGraphicsPresenter)Presenter, ulong.MaxValue, ImageAvailableSemaphores[CurrentFrame], null, ref imageIndex);
 
             if (result != Result.Success && result != Result.SuboptimalKhr)
             {
                 throw new ArgumentException("Failed to acquire swap chain image!");
             }
 
-            var commandBuffer = commandBuffers[CurrentImageIndex];
+            var commandBuffer = commandBuffers[ImageIndex];
 
             var beginInfo = new CommandBufferBeginInfo();
             beginInfo.Flags = (uint)CommandBufferUsageFlagBits.SimultaneousUseBit;
@@ -436,7 +437,7 @@ namespace Adamantium.Engine.Graphics
 
             var renderPassInfo = new RenderPassBeginInfo();
             renderPassInfo.RenderPass = renderPass;
-            renderPassInfo.Framebuffer = defaultFramebuffers[CurrentFrame];
+            renderPassInfo.Framebuffer = defaultFramebuffers[ImageIndex];
             renderPassInfo.RenderArea = new Rect2D();
             renderPassInfo.RenderArea.Offset = new Offset2D();
             renderPassInfo.RenderArea.Extent = new Extent2D() { Width = Presenter.Description.Width, Height = Presenter.Description.Height };
@@ -455,7 +456,7 @@ namespace Adamantium.Engine.Graphics
 
         public void EndDraw()
         {
-            var commandBuffer = commandBuffers[CurrentImageIndex];
+            var commandBuffer = commandBuffers[ImageIndex];
 
             commandBuffer.CmdEndRenderPass();
 
@@ -494,7 +495,7 @@ namespace Adamantium.Engine.Graphics
             }
         }
 
-        internal void UpdateCurrentFrameNumber()
+        public void UpdateCurrentFrameNumber()
         {
             CurrentFrame = (CurrentFrame + 1) % MaxFramesInFlight;
         }
@@ -502,13 +503,13 @@ namespace Adamantium.Engine.Graphics
         public void SetVertexBuffer(Buffer vertexBuffer)
         {
             ulong offset = 0;
-            var commandBuffer = commandBuffers[CurrentImageIndex];
+            var commandBuffer = commandBuffers[ImageIndex];
             commandBuffer.CmdBindVertexBuffers(0, 1, vertexBuffer, ref offset);
         }
 
         public void Draw(uint vertexCount, uint instanceCount, uint firstVertex, uint firstInstance)
         {
-            var commandBuffer = commandBuffers[CurrentImageIndex];
+            var commandBuffer = commandBuffers[ImageIndex];
             //commandBuffer.CmdBindDescriptorSets(PipelineBindPoint.Graphics, pipelineLayout, 0, 1, descriptorSets[CurrentImageIndex], 0, 0);
 
             commandBuffer.CmdDraw(vertexCount, instanceCount, firstVertex, firstInstance);
@@ -517,7 +518,7 @@ namespace Adamantium.Engine.Graphics
         public void DrawIndexed(Buffer vertexBuffer, Buffer indexBuffer)
         {
             ulong offset = 0;
-            var commandBuffer = commandBuffers[CurrentImageIndex];
+            var commandBuffer = commandBuffers[ImageIndex];
             commandBuffer.CmdBindVertexBuffers(0, 1, vertexBuffer, ref offset);
 
             commandBuffer.CmdBindIndexBuffer(indexBuffer, 0, IndexType.Uint32);
@@ -547,14 +548,23 @@ namespace Adamantium.Engine.Graphics
             LogicalDevice.UnmapMemory(memory);
         }
 
-        public void ResizeBuffers(uint width, uint height, uint buffersCount, SurfaceFormat surfaceFormat, DepthFormat depthFormat)
+        public bool ResizeBuffers(uint width, uint height, uint buffersCount, SurfaceFormat surfaceFormat, DepthFormat depthFormat)
         {
+            if (destroyCount == 126)
+            {
+
+            }
             var result = LogicalDevice.DeviceWaitIdle();
             DestroyFrameBuffers();
+            var resizeResult = Presenter.Resize(width, height, buffersCount, surfaceFormat, depthFormat);
+            if (!resizeResult)
+            {
+                return false;
+            }
             graphicsPipeline?.Destroy(LogicalDevice);
-            Presenter.Resize(width, height, buffersCount, surfaceFormat, depthFormat);
-            CreateDefaultFramebuffers();
             CreateGraphicsPipeline();
+            CreateDefaultFramebuffers();
+            return true;
         }
 
         internal Semaphore GetImageAvailableSemaphoreForCurrentFrame()
@@ -576,13 +586,15 @@ namespace Adamantium.Engine.Graphics
         {
             return device.LogicalDevice;
         }
-
+        static int destroyCount = 0;
+        static int createCount = 0;
         private void DestroyFrameBuffers()
         {
             for (int i = 0; i< defaultFramebuffers.Length; ++i)
             {
                 defaultFramebuffers[i].Destroy(LogicalDevice);
             }
+            destroyCount++;
         }
 
 

@@ -94,10 +94,9 @@ namespace Adamantium.Engine.Graphics
             //   return false;
             //}
 
-            //Description.BackBufferWidth = width;
-            //Description.BackBufferHeight = height;
-            //Description.PixelFormat = pixelFormat;
-            //Description.Flags = flags;
+            Description.Width = width;
+            Description.Height = height;
+            Description.ImageFormat = pixelFormat;
 
             //if (updateDepthStencil)
             //{

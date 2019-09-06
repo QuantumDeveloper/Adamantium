@@ -198,7 +198,7 @@ namespace Adamantium.Engine.Graphics
             SwapchainKHR[] swapchains = { swapchain };
             presentInfo.SwapchainCount = 1;
             presentInfo.PSwapchains = swapchains;
-            presentInfo.PImageIndices = new uint[] { GraphicsDevice.CurrentImageIndex };
+            presentInfo.PImageIndices = new uint[] { GraphicsDevice.ImageIndex };
 
             var result = presentQueue.QueuePresentKHR(presentInfo);
             if (result == Result.ErrorOutOfDateKhr || result == Result.SuboptimalKhr)
@@ -212,7 +212,7 @@ namespace Adamantium.Engine.Graphics
                 throw new Exception();
             }
 
-            OnPresentFinished();
+            //OnPresentFinished();
         }
 
 
@@ -232,13 +232,14 @@ namespace Adamantium.Engine.Graphics
                 return false;
             }
 
-            RecreateSwapchain();
-            //RemoveAndDispose(ref backbuffer);
-
-            //swapChain.ResizeBuffers(Description.BuffersCount, width, height, format, flags);
-
-            ////Create RenderTargetView from backbuffer
-            //backbuffer = ToDispose(RenderTarget2D.New(GraphicsDevice, swapChain.GetBackBuffer<SharpDX.Direct3D11.Texture2D>(0)));
+            try
+            {
+                RecreateSwapchain();
+            }
+            catch(Exception ex)
+            {
+                return false;
+            }
 
             return true;
         }
@@ -263,7 +264,7 @@ namespace Adamantium.Engine.Graphics
             //    img.Destroy(GraphicsDevice);
             //}
 
-            //swapchain?.Destroy(GraphicsDevice);
+            swapchain?.Destroy(GraphicsDevice);
         }
 
         public static implicit operator SwapchainKHR(SwapChainGraphicsPresenter presenter)
