@@ -94,15 +94,15 @@ namespace Adamantium.UI
             windowToSystem.Add(window, renderProcessor);
         }
 
-        private void Window_ClientSizeChanged(object sender, SizeChangedEventArgs e)
-        {
-            if (e.NewSize.Width == 0 || e.NewSize.Height == 0) return;
+        //private void Window_ClientSizeChanged(object sender, SizeChangedEventArgs e)
+        //{
+        //    if (e.NewSize.Width == 0 || e.NewSize.Height == 0) return;
 
-            var wnd = sender as IWindow;
-            var device = windowToDevices[wnd];
-            device.ResizeBuffers((uint)wnd.ClientWidth, (uint)wnd.ClientHeight, 2, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
-            wnd.ClientSizeChanged -= Window_ClientSizeChanged;
-        }
+        //    var wnd = sender as IWindow;
+        //    var device = windowToDevices[wnd];
+        //    device.ResizeBuffers((uint)wnd.ClientWidth, (uint)wnd.ClientHeight, 2, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
+        //    wnd.ClientSizeChanged -= Window_ClientSizeChanged;
+        //}
 
         protected void OnWindowRemoved(IWindow window)
         {
