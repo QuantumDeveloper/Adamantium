@@ -115,7 +115,7 @@ namespace Adamantium.UI.Processors
            
             GraphicsDevice.Draw(3,1,0,0);
             GraphicsDevice.EndDraw();
-            GraphicsDevice.Presenter.Present();
+            GraphicsDevice.Present();
 
             if (isWindowResized)
             {
@@ -123,8 +123,6 @@ namespace Adamantium.UI.Processors
                 //InitializeResources();
                 GraphicsDevice.ResizeBuffers((uint)window.ClientWidth, (uint)window.ClientHeight, 2, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
             }
-
-            GraphicsDevice.UpdateCurrentFrameNumber();
         }
 
         //public void TraverseByLayer(IVisual visualElement, Action<IVisual> action)
