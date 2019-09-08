@@ -68,7 +68,7 @@ namespace Adamantium.Engine.Graphics
 
         public static VulkanInstance Instance { get; private set; }
 
-        public GraphicsPresenter Presenter { get; private set; }
+        internal GraphicsPresenter Presenter { get; private set; }
 
         public GraphicsDevice MainDevice { get; private set; }
 
@@ -495,7 +495,7 @@ namespace Adamantium.Engine.Graphics
             }
         }
 
-        public void UpdateCurrentFrameNumber()
+        private void UpdateCurrentFrameNumber()
         {
             CurrentFrame = (CurrentFrame + 1) % MaxFramesInFlight;
         }
@@ -565,6 +565,12 @@ namespace Adamantium.Engine.Graphics
             CreateGraphicsPipeline();
             CreateDefaultFramebuffers();
             return true;
+        }
+
+        public void Present()
+        {
+            Presenter.Present();
+            UpdateCurrentFrameNumber();
         }
 
         internal Semaphore GetImageAvailableSemaphoreForCurrentFrame()
