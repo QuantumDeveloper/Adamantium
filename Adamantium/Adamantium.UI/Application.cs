@@ -1,13 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.EntityFramework;
-using Adamantium.Imaging;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Input;
+using Adamantium.UI.OSX;
 using Adamantium.UI.Processors;
+using Adamantium.UI.Windows;
 
 namespace Adamantium.UI
 {
@@ -47,7 +49,7 @@ namespace Adamantium.UI
         private SystemManager systemManager;
         private IWindow mainWindow;
 
-        public Application()
+        protected Application()
         {
             ShutDownMode = ShutDownMode.OnMainWindowClosed;
             Current = this;
@@ -93,16 +95,6 @@ namespace Adamantium.UI
 
             windowToSystem.Add(window, renderProcessor);
         }
-
-        //private void Window_ClientSizeChanged(object sender, SizeChangedEventArgs e)
-        //{
-        //    if (e.NewSize.Width == 0 || e.NewSize.Height == 0) return;
-
-        //    var wnd = sender as IWindow;
-        //    var device = windowToDevices[wnd];
-        //    device.ResizeBuffers((uint)wnd.ClientWidth, (uint)wnd.ClientHeight, 2, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
-        //    wnd.ClientSizeChanged -= Window_ClientSizeChanged;
-        //}
 
         protected void OnWindowRemoved(IWindow window)
         {
@@ -285,5 +277,19 @@ namespace Adamantium.UI
         public event EventHandler<EventArgs> Initialized;
         public event EventHandler<EventArgs> ContentLoading;
         public event EventHandler<EventArgs> ContentUnloading;
+
+        public static Application New()
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                return new WindowsApplication();
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                return new OSXApplication();
+            }
+            
+            throw new ArgumentException($"current platform {RuntimeInformation.OSDescription} is not currently supported");
+        }
     }
 }
