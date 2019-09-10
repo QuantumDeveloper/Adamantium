@@ -114,11 +114,6 @@ namespace Adamantium.Engine.Graphics
         /// </summary>
         public abstract void Present();
 
-        public virtual void OnPresentFinished()
-        {
-            GraphicsDevice.UpdateCurrentFrameNumber();
-        }
-
         /// <summary>
         /// Takes screenshot from current backbuffer frame
         /// </summary>

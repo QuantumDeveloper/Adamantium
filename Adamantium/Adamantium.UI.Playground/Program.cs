@@ -1,4 +1,5 @@
 ﻿using Adamantium.UI.Windows;
+using Adamantium.UI;
 using System;
 
 namespace Adamantium.UI.Playground
@@ -7,8 +8,8 @@ namespace Adamantium.UI.Playground
     {
         static void Main(string[] args)
         {
-            var app = new WindowsApplication();
-            var mainWindow = new Win32Window();
+            var app = Application.New();
+            var mainWindow = Window.New();
             app.MainWindow = mainWindow;
             mainWindow.Show();
             app.Run();

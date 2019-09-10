@@ -5,7 +5,7 @@ using Adamantium.Win32;
 
 namespace Adamantium.UI.Windows
 {
-    public class Win32Window : ContentControl, IWindow
+    public class Win32Window : Window, IWindow
     {
         internal static string DefaultClassName { get; private set; } = "Adamantium Window";
         public IntPtr Handle { get; internal set; }
