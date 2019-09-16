@@ -57,7 +57,7 @@ namespace Adamantium.UI.Input
 
         public void SetCursor(Cursor cursor)
         {
-            Interop.SetCursor(cursor.CursorHandle);
+            Win32Interop.SetCursor(cursor.CursorHandle);
         }
 
         public void UpdateCursor()
@@ -68,7 +68,7 @@ namespace Adamantium.UI.Input
         public Point GetScreenPosition()
         {
             NativePoint point;
-            Interop.GetCursorPos(out point);
+            Win32Interop.GetCursorPos(out point);
             return point;
         }
 

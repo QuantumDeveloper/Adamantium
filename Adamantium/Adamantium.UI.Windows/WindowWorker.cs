@@ -73,7 +73,7 @@ namespace Adamantium.UI.Windows
                 this.window.ApplyTemplate();
                 Application.Current.Windows.Add(this.window);
                 this.window.OnSourceInitialized();
-                Interop.ShowWindow(source.Handle, WindowShowStyle.ShowNormal);
+                Win32Interop.ShowWindow(source.Handle, WindowShowStyle.ShowNormal);
             }
         }
 
@@ -129,12 +129,12 @@ namespace Adamantium.UI.Windows
                 window.Close();
             }
             handled = false;
-            return Interop.DefWindowProcW(window.Handle, windowMessage, wParam, lParam);
+            return Win32Interop.DefWindowProcW(window.Handle, windowMessage, wParam, lParam);
         }
 
         private IntPtr HandleNcHittest(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
         {
-            var uHitTest = Interop.DefWindowProcW(window.Handle, WindowMessages.Nchittest, wParam, lParam);
+            var uHitTest = Win32Interop.DefWindowProcW(window.Handle, WindowMessages.Nchittest, wParam, lParam);
             var result = (NcHitTest)(Environment.Is64BitProcess ? uHitTest.ToInt64() : uHitTest.ToInt32());
             if (result != NcHitTest.Client)
             {
@@ -145,7 +145,7 @@ namespace Adamantium.UI.Windows
                 isOverSizeFrame = false;
             }
             handled = false;
-            return Interop.DefWindowProcW(window.Handle, windowMessage, wParam, lParam);
+            return Win32Interop.DefWindowProcW(window.Handle, windowMessage, wParam, lParam);
         }
 
         private IntPtr HandleNcCalcSize(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
@@ -178,7 +178,7 @@ namespace Adamantium.UI.Windows
                 handled = true;
                 return IntPtr.Zero;
             }
-            return Interop.DefWindowProcW(window.Handle, windowMessage, wParam, lParam);
+            return Win32Interop.DefWindowProcW(window.Handle, windowMessage, wParam, lParam);
         }
 
         private IntPtr HandleSysCommand(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
@@ -196,11 +196,11 @@ namespace Adamantium.UI.Windows
                     }
                     break;
                 case SystemCommands.MOVE:
-                    Interop.SetWindowPos(window.Handle, IntPtr.Zero, (int)p.X, (int)p.Y, (int)window.Width,
+                    Win32Interop.SetWindowPos(window.Handle, IntPtr.Zero, (int)p.X, (int)p.Y, (int)window.Width,
                        (int)window.Height, SetWindowPosFlags.Asyncwindowpos | SetWindowPosFlags.Nosize);
                     break;
                 default:
-                    Interop.DefWindowProcW(window.Handle, windowMessage, wParam, lParam);
+                    Win32Interop.DefWindowProcW(window.Handle, windowMessage, wParam, lParam);
                     break;
             }
 
@@ -210,11 +210,11 @@ namespace Adamantium.UI.Windows
 
         private IntPtr HandleResize(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
         {
-            Interop.GetWindowRect(window.Handle, out var rect);
+            Win32Interop.GetWindowRect(window.Handle, out var rect);
             window.Width = rect.Width;
             window.Height = rect.Height;
 
-            Interop.GetClientRect(window.Handle, out var client);
+            Win32Interop.GetClientRect(window.Handle, out var client);
             var oldClientSize = new Size(window.ClientWidth, window.ClientHeight);
             window.ClientWidth = client.Width;
             window.ClientHeight = client.Height;
@@ -269,7 +269,7 @@ namespace Adamantium.UI.Windows
                     dwHoverTime = 0,
                 };
                 trackMouse = true;
-                Interop.TrackMouseEvent(ref tm);
+                Win32Interop.TrackMouseEvent(ref tm);
             }
             var eventArgs = new RawMouseEventArgs(RawMouseEventType.MouseMove, window, Messages.PointFromLParam(lParam),
                WindowsMouseDevice.GetKeyModifiers(windowMessage, wParam), WindowsMouseDevice.Instance, GetTimeStamp());
@@ -318,20 +318,20 @@ namespace Adamantium.UI.Windows
             int outSize = 0;
             int size = Marshal.SizeOf(typeof(RawInputData));
 
-            outSize = Interop.GetRawInputData(lParam, RawInputCommand.Input, out inputData, ref size,
+            outSize = Win32Interop.GetRawInputData(lParam, RawInputCommand.Input, out inputData, ref size,
                Marshal.SizeOf(typeof(RawInputHeader)));
             if (outSize == -1)
             {
                 handled = false;
-                return Interop.DefWindowProcW(window.Handle, windowMessage, wParam, lParam);
+                return Win32Interop.DefWindowProcW(window.Handle, windowMessage, wParam, lParam);
             }
 
             if (inputData.Header.DeviceType == DeviceType.Mouse)
             {
                 var position = WindowsMouseDevice.Instance.GetScreenPosition();
                 RECT wndRect;
-                Interop.GetWindowRect(window.Handle, out wndRect);
-                WindowStyle value = Interop.GetWindowStyle(window.Handle, WindowLongType.Style);
+                Win32Interop.GetWindowRect(window.Handle, out wndRect);
+                WindowStyle value = Win32Interop.GetWindowStyle(window.Handle, WindowLongType.Style);
                 if (!window.IsLocked)
                 {
                     Point delta = new Point(inputData.Data.Mouse.LastX, inputData.Data.Mouse.LastY);
@@ -382,10 +382,10 @@ namespace Adamantium.UI.Windows
         private IntPtr HandleSetCursor(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
         {
             handled = false;
-            Interop.SetCursor(Mouse.Cursor.CursorHandle);
+            Win32Interop.SetCursor(Mouse.Cursor.CursorHandle);
             if (isOverSizeFrame)
             {
-                return Interop.DefWindowProcW(window.Handle, windowMessage, wParam, lParam);
+                return Win32Interop.DefWindowProcW(window.Handle, windowMessage, wParam, lParam);
             }
             else
             {
@@ -396,7 +396,7 @@ namespace Adamantium.UI.Windows
 
         private static uint GetTimeStamp()
         {
-            return unchecked((uint)Interop.GetMessageTime());
+            return unchecked((uint)Win32Interop.GetMessageTime());
         }
 
         private void HandleActivation()

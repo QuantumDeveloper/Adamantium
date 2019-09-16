@@ -92,7 +92,7 @@ namespace Adamantium.UI.Input
 
       private void UpdateKeyStates()
       {
-         if (!Interop.GetKeyboardState(keyCodes))
+         if (!Win32Interop.GetKeyboardState(keyCodes))
          {
             int err = Marshal.GetLastWin32Error();
             throw new Win32Exception(err);
@@ -106,7 +106,7 @@ namespace Adamantium.UI.Input
       /// <returns></returns>
       public bool IsKeyDown(Key key)
       {
-         return Convert.ToBoolean(Interop.GetKeyState((uint)key) & KEY_PRESSED);
+         return Convert.ToBoolean(Win32Interop.GetKeyState((uint)key) & KEY_PRESSED);
       }
 
       /// <summary>
@@ -148,7 +148,7 @@ namespace Adamantium.UI.Input
             var parameters = keyStates[key];
             if (parameters.CurrentState == KeyStates.Down)
             {
-               return Interop.GetTickCount64() - parameters.PressTime;
+               return Win32Interop.GetTickCount64() - parameters.PressTime;
             }
          }
          return 0;
@@ -156,7 +156,7 @@ namespace Adamantium.UI.Input
 
       public bool IsKeyToggled(Key key)
       {
-         return Convert.ToBoolean(Interop.GetKeyState((uint)key) & KEY_TOGGLED);
+         return Convert.ToBoolean(Win32Interop.GetKeyState((uint)key) & KEY_TOGGLED);
       }
 
       public void ProcessEvent(RawInputEventArgs eventArgs)

@@ -5,6 +5,6 @@ namespace Adamantium.UI
 {
    public static class PlatformSettings
    {
-      public static UInt32 DoubleClickTime => Interop.GetDoubleClickTime();
+      public static UInt32 DoubleClickTime => Win32Interop.GetDoubleClickTime();
    }
 }
