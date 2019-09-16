@@ -10,7 +10,7 @@ namespace Adamantium.UI.Windows
     public class WindowsApplication : Application
     {
         Thread renderThread;
-        internal WindowsApplication()
+        public WindowsApplication()
         {
             Windows.WindowAdded += OnWindowAdded;
             renderThread = new Thread(RenderThread);

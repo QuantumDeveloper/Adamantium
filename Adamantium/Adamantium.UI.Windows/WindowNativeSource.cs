@@ -64,7 +64,7 @@ namespace Adamantium.UI.Windows
         }
 
         private List<WndProcHook> hooks;
-        private Interop.WndProc wndProcDelegate;
+        private Win32Interop.WndProc wndProcDelegate;
 
         public IntPtr Handle { get; private set; }
 
@@ -95,7 +95,7 @@ namespace Adamantium.UI.Windows
                 return IntPtr.Zero;
             }
 
-            return Interop.DefWindowProcW(hWnd, msg, wParam, lParam);
+            return Win32Interop.DefWindowProcW(hWnd, msg, wParam, lParam);
         }
 
         private void CreateAndRegisterWndClass(string className, WindowClassStyle classStyle)
@@ -105,11 +105,11 @@ namespace Adamantium.UI.Windows
             {
                 style = classStyle,
                 lpszClassName = className,
-                hCursor = Interop.LoadCursor(IntPtr.Zero, NativeCursors.Arrow),
+                hCursor = Win32Interop.LoadCursor(IntPtr.Zero, NativeCursors.Arrow),
                 lpfnWndProc = Marshal.GetFunctionPointerForDelegate(wndProcDelegate)
             };
 
-            ushort classAtom = Interop.RegisterClassW(ref wndClass);
+            ushort classAtom = Win32Interop.RegisterClassW(ref wndClass);
 
             int lastError = Marshal.GetLastWin32Error();
 
@@ -133,7 +133,7 @@ namespace Adamantium.UI.Windows
             CreateAndRegisterWndClass(className, classStyle);
 
             // Create window
-            Handle = Interop.CreateWindowExW(
+            Handle = Win32Interop.CreateWindowExW(
                wndStyleEx,
                className,
                string.Empty,
@@ -151,7 +151,7 @@ namespace Adamantium.UI.Windows
 
         public void Destroy()
         {
-            Interop.DestroyWindow(Handle);
+            Win32Interop.DestroyWindow(Handle);
             Handle = IntPtr.Zero;
         }
 

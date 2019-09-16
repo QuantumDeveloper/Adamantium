@@ -78,14 +78,14 @@ namespace Adamantium.UI.Windows
         internal Point ScreenToClient(Point p)
         {
             var point = new NativePoint((int)p.X, (int)p.Y);
-            Interop.ScreenToClient(Handle, ref point);
+            Win32Interop.ScreenToClient(Handle, ref point);
             return point;
         }
 
         internal Point ClientToScreen(Point p)
         {
             var point = new NativePoint((int)p.X, (int)p.Y);
-            Interop.ClientToScreen(Handle, ref point);
+            Win32Interop.ClientToScreen(Handle, ref point);
             return point;
         }
 

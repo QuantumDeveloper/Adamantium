@@ -106,7 +106,7 @@ namespace Adamantium.Engine.Graphics
 
         public void EnumerateDevices()
         {
-             var devices = instance.EnumeratePhysicalDevices();
+            var devices = instance.EnumeratePhysicalDevices();
             PhysicalDevices.Clear();
             PhysicalDevices.AddRange(devices);
         }

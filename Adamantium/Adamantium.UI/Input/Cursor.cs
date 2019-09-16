@@ -18,7 +18,7 @@ namespace Adamantium.UI.Input
       /// <param name="cursorFile"></param>
       public Cursor(String cursorFile)
       {
-         CursorHandle = Interop.LoadCursorFromFile(cursorFile);
+         CursorHandle = Win32Interop.LoadCursorFromFile(cursorFile);
          if (CursorHandle == IntPtr.Zero)
          {
             var err = Marshal.GetLastWin32Error();
@@ -31,6 +31,6 @@ namespace Adamantium.UI.Input
          CursorHandle = cursorHandle;
       }
 
-      public static Cursor Default => new Cursor(Interop.LoadCursor(IntPtr.Zero, NativeCursors.Arrow));
+      public static Cursor Default => new Cursor(Win32Interop.LoadCursor(IntPtr.Zero, NativeCursors.Arrow));
    }
 }
