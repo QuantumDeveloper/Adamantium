@@ -2,6 +2,7 @@
 using Adamantium.Core.Collections;
 using AdamantiumVulkan.Core;
 using AdamantiumVulkan.Core.Interop;
+using AdamantiumVulkan.MacOS;
 using AdamantiumVulkan.Windows;
 using System;
 using System.Collections.Generic;
@@ -106,7 +107,7 @@ namespace Adamantium.Engine.Graphics
 
         public void EnumerateDevices()
         {
-             var devices = instance.EnumeratePhysicalDevices();
+            var devices = instance.EnumeratePhysicalDevices();
             PhysicalDevices.Clear();
             PhysicalDevices.AddRange(devices);
         }
@@ -129,6 +130,16 @@ namespace Adamantium.Engine.Graphics
                 surfaceInfo.Hwnd = parameters.OutputHandle;
                 surfaceInfo.Hinstance = parameters.HInstanceHandle;
                 var surface = instance.CreateWin32Surface(surfaceInfo);
+
+                availableSurfaces.Add(parameters.OutputHandle, surface);
+
+                return surface;
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                var surfaceInfo = new MacOSSurfaceCreateInfoMVK();
+                surfaceInfo.PView = parameters.OutputHandle;
+                var surface = instance.CreateMacOSSurfaceMVK(surfaceInfo);
 
                 availableSurfaces.Add(parameters.OutputHandle, surface);
 
