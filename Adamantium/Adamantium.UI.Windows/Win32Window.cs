@@ -38,11 +38,6 @@ namespace Adamantium.UI.Windows
             OnClosed();
         }
 
-        internal void OnSourceInitialized()
-        {
-            SourceInitialized?.Invoke(this, EventArgs.Empty);
-        }
-
         private void OnClosed()
         {
             var closingArgs = new WindowClosingEventArgs();
@@ -56,7 +51,7 @@ namespace Adamantium.UI.Windows
         public override event EventHandler<SizeChangedEventArgs> ClientSizeChanged;
         public override event EventHandler<WindowClosingEventArgs> Closing;
         public override event EventHandler<EventArgs> Closed;
-        public event EventHandler<EventArgs> SourceInitialized;
+        
 
         internal void OnClientSizeChanged(SizeChangedEventArgs e)
         {

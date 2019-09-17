@@ -9,9 +9,9 @@ namespace Adamantium.UI.Playground
         static void Main(string[] args)
         {
             var app = Application.New();
-            //var mainWindow = Window.New();
-            //app.MainWindow = mainWindow;
-            //mainWindow.Show();
+            var mainWindow = Window.New();
+            app.MainWindow = mainWindow;
+            mainWindow.Show();
             app.Run();
         }
     }

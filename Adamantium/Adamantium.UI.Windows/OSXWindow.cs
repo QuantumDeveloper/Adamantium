@@ -18,6 +18,13 @@ namespace Adamantium.UI.Windows
         public override event EventHandler<SizeChangedEventArgs> ClientSizeChanged;
         public override event EventHandler<WindowClosingEventArgs> Closing;
         public override event EventHandler<EventArgs> Closed;
+        
+        internal OSXWindowWorker WindowWorker { get; }
+
+        public OSXWindow()
+        {
+            WindowWorker = new OSXWindowWorker();
+        }
 
         public override void Close()
         {
@@ -41,7 +48,10 @@ namespace Adamantium.UI.Windows
 
         public override void Show()
         {
-            
+            if (Handle == IntPtr.Zero)
+            {
+                WindowWorker.SetWindow(this);
+            }
         }
     }
 }
