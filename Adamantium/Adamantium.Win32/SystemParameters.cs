@@ -9,7 +9,7 @@ namespace Adamantium.Win32
             get
             {
                 IntPtr speedPtr = IntPtr.Zero;
-                Interop.SystemParametersInfo(SPI.GetMouseSpeed, 0, ref speedPtr, SPIF.None);
+                Win32Interop.SystemParametersInfo(SPI.GetMouseSpeed, 0, ref speedPtr, SPIF.None);
                 return (int) speedPtr;
             }
         }
@@ -19,13 +19,13 @@ namespace Adamantium.Win32
             get
             {
                 int[] data = new int [3];
-                Interop.SystemParametersInfo(SPI.GetMouse, 0, data, SPIF.None);
+                Win32Interop.SystemParametersInfo(SPI.GetMouse, 0, data, SPIF.None);
                 return data;
             }
         }
 
-        public static int VirtualScreenWidth => Interop.GetSystemMetrics(SystemMetrics.CxVirtualscreen);
+        public static int VirtualScreenWidth => Win32Interop.GetSystemMetrics(SystemMetrics.CxVirtualscreen);
 
-        public static int VirtualScreenHeight => Interop.GetSystemMetrics(SystemMetrics.CyVirtualscreen);
+        public static int VirtualScreenHeight => Win32Interop.GetSystemMetrics(SystemMetrics.CyVirtualscreen);
     }
 }

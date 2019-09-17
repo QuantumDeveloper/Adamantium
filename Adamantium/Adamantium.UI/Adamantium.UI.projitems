@@ -186,6 +186,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Visibility.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)VisualExtensions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)VisualTreeAttachmentEventArgs.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Window.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)WindowClosingEventArgs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)WindowCollection.cs" />
   </ItemGroup>

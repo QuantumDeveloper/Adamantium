@@ -5,7 +5,7 @@ using Adamantium.Win32.RawInput;
 
 namespace Adamantium.Win32
 {
-    public class Interop
+    public class Win32Interop
     {
         [DllImport("user32.dll", SetLastError = true)]
         public static extern UInt16 RegisterClassW([In] ref WndClass lpWndClass);

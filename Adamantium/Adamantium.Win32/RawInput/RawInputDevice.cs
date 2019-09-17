@@ -54,7 +54,7 @@ namespace Adamantium.Win32.RawInput
             Flags = flags,
             WindowHandle = target
          };
-         Interop.RegisterRawInputDevices(new[] { device }, 1, Marshal.SizeOf(device));
+         Win32Interop.RegisterRawInputDevices(new[] { device }, 1, Marshal.SizeOf(device));
          return device;
       }
 
@@ -64,14 +64,14 @@ namespace Adamantium.Win32.RawInput
        public static List<DeviceInfo> GetDevices()
        {
            int deviceCount = 0;
-           Interop.GetRawInputDeviceList(null, ref deviceCount, Utilities.SizeOf<RawInputDeviceList>());
+           Win32Interop.GetRawInputDeviceList(null, ref deviceCount, Utilities.SizeOf<RawInputDeviceList>());
            if (deviceCount == 0)
            {
                return null;
            }
 
            var rawInputDeviceList = new RawInputDeviceList[deviceCount];
-           Interop.GetRawInputDeviceList(rawInputDeviceList, ref deviceCount, Utilities.SizeOf<RawInputDeviceList>());
+           Win32Interop.GetRawInputDeviceList(rawInputDeviceList, ref deviceCount, Utilities.SizeOf<RawInputDeviceList>());
 
            var deviceList = new List<DeviceInfo>();
 
@@ -80,17 +80,17 @@ namespace Adamantium.Win32.RawInput
                var deviceHandle = rawInputDeviceList[i].Device;
 
                int countDeviceNameChars = 0;
-               Interop.GetRawInputDeviceInfo(deviceHandle, RawInputDeviceInfoCommand.DeviceName, IntPtr.Zero,
+               Win32Interop.GetRawInputDeviceInfo(deviceHandle, RawInputDeviceInfoCommand.DeviceName, IntPtr.Zero,
                    ref countDeviceNameChars);
                IntPtr pData = Marshal.AllocHGlobal(countDeviceNameChars);
-               Interop.GetRawInputDeviceInfo(deviceHandle, RawInputDeviceInfoCommand.DeviceName, pData,
+               Win32Interop.GetRawInputDeviceInfo(deviceHandle, RawInputDeviceInfoCommand.DeviceName, pData,
                    ref countDeviceNameChars);
                string name = Marshal.PtrToStringAnsi(pData);
                int structsize = Marshal.SizeOf(typeof (RawDeviceInfo));
                RawDeviceInfo rawDeviceInfo;
                rawDeviceInfo.Size = structsize;
                pData = Marshal.AllocHGlobal(structsize);
-               Interop.GetRawInputDeviceInfo(deviceHandle, RawInputDeviceInfoCommand.DeviceInfo, pData, ref structsize);
+               Win32Interop.GetRawInputDeviceInfo(deviceHandle, RawInputDeviceInfoCommand.DeviceInfo, pData, ref structsize);
                rawDeviceInfo = (RawDeviceInfo) Marshal.PtrToStructure(pData, typeof (RawDeviceInfo));
 
                deviceList.Add(DeviceInfo.Convert(ref rawDeviceInfo, name, deviceHandle));
@@ -109,7 +109,7 @@ namespace Adamantium.Win32.RawInput
            RawInputData inputData;
            int outSize = 0;
            int size = Marshal.SizeOf(typeof (RawInputData));
-           outSize = Interop.GetRawInputData(rawInputMessagePointer, RawInputCommand.Input, out inputData, ref size,
+           outSize = Win32Interop.GetRawInputData(rawInputMessagePointer, RawInputCommand.Input, out inputData, ref size,
                Marshal.SizeOf(typeof (RawInputHeader)));
            if (outSize != -1)
            {

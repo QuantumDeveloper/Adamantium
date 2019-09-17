@@ -13,6 +13,7 @@
     <ProjectReference Include="..\Adamantium.EntityFramework\Adamantium.EntityFramework.csproj" />
     <ProjectReference Include="..\Adamantium.Imaging\Adamantium.Imaging.csproj" />
     <ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
+    <ProjectReference Include="..\Adamantium.UI.Windows\Adamantium.UI.Windows.csproj" />
     <ProjectReference Include="..\Adamantium.Win32\Adamantium.Win32.csproj" />
     <ProjectReference Include="..\Adamantium.XInput\Adamantium.XInput.csproj" />
   </ItemGroup>
