@@ -88,10 +88,10 @@ namespace Adamantium.UI.Input
          get
          {
             NativePoint point;
-            Interop.GetCursorPos(out point);
+            Win32Interop.GetCursorPos(out point);
             return point;
          }
-         set { Interop.SetCursorPos((int)value.X, (int)value.Y); }
+         set { Win32Interop.SetCursorPos((int)value.X, (int)value.Y); }
       }
 
       public static Point GetPosition(IInputElement element)
@@ -110,7 +110,7 @@ namespace Adamantium.UI.Input
          set
          {
             _cursor = value;
-            Interop.SetCursor(value.CursorHandle);
+            Win32Interop.SetCursor(value.CursorHandle);
          }
       }
 

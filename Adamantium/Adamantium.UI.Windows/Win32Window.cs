@@ -5,15 +5,15 @@ using Adamantium.Win32;
 
 namespace Adamantium.UI.Windows
 {
-    public class Win32Window : ContentControl, IWindow
+    public class Win32Window : Window, IWindow
     {
         internal static string DefaultClassName { get; private set; } = "Adamantium Window";
-        public IntPtr Handle { get; internal set; }
+        public override IntPtr Handle { get; internal set; }
 
-        public int ClientWidth { get; set; }
-        public int ClientHeight { get; set; }
+        public override int ClientWidth { get; set; }
+        public override int ClientHeight { get; set; }
 
-        public bool IsClosed { get; set; }
+        public override bool IsClosed { get; protected set; }
         internal bool IsLocked = false;
 
 
@@ -24,7 +24,7 @@ namespace Adamantium.UI.Windows
             windowWorker = new WindowWorker();
         }
 
-        public void Show()
+        public override void Show()
         {
             if (Handle == IntPtr.Zero)
             {
@@ -32,15 +32,10 @@ namespace Adamantium.UI.Windows
             }
         }
 
-        public void Close()
+        public override  void Close()
         {
             IsClosed = true;
             OnClosed();
-        }
-
-        internal void OnSourceInitialized()
-        {
-            SourceInitialized?.Invoke(this, EventArgs.Empty);
         }
 
         private void OnClosed()
@@ -53,10 +48,10 @@ namespace Adamantium.UI.Windows
             }
         }
 
-        public event EventHandler<SizeChangedEventArgs> ClientSizeChanged;
-        public event EventHandler<WindowClosingEventArgs> Closing;
-        public event EventHandler<EventArgs> Closed;
-        public event EventHandler<EventArgs> SourceInitialized;
+        public override event EventHandler<SizeChangedEventArgs> ClientSizeChanged;
+        public override event EventHandler<WindowClosingEventArgs> Closing;
+        public override event EventHandler<EventArgs> Closed;
+        
 
         internal void OnClientSizeChanged(SizeChangedEventArgs e)
         {
@@ -65,12 +60,12 @@ namespace Adamantium.UI.Windows
 
         public bool IsActive { get; internal set; }
 
-        public Point PointToClient(Point point)
+        public override  Point PointToClient(Point point)
         {
             return ScreenToClient(point);
         }
 
-        public Point PointToScreen(Point point)
+        public override Point PointToScreen(Point point)
         {
             return ClientToScreen(point);
         }
@@ -78,20 +73,20 @@ namespace Adamantium.UI.Windows
         internal Point ScreenToClient(Point p)
         {
             var point = new NativePoint((int)p.X, (int)p.Y);
-            Interop.ScreenToClient(Handle, ref point);
+            Win32Interop.ScreenToClient(Handle, ref point);
             return point;
         }
 
         internal Point ClientToScreen(Point p)
         {
             var point = new NativePoint((int)p.X, (int)p.Y);
-            Interop.ClientToScreen(Handle, ref point);
+            Win32Interop.ClientToScreen(Handle, ref point);
             return point;
         }
 
-        public void Hide()
+        public override void Hide()
         {
-            throw new NotImplementedException();
+            
         }
     }
 

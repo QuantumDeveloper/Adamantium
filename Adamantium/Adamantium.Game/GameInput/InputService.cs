@@ -225,7 +225,7 @@ namespace Adamantium.Engine.GameInput
             get
             {
                 NativePoint point = new NativePoint((int)_absolutePosition.X, (int)_absolutePosition.Y);
-                Interop.ScreenToClient(Handle, ref point);
+                Win32Interop.ScreenToClient(Handle, ref point);
                 return new Vector2F(point.X, point.Y);
             }
         }
@@ -254,14 +254,14 @@ namespace Adamantium.Engine.GameInput
 
         protected virtual void SetMousePosition(Vector2F position)
         {
-            Interop.SetCursorPos((int)position.X, (int)position.Y);
+            Win32Interop.SetCursorPos((int)position.X, (int)position.Y);
         }
 
         protected virtual void LockMousePosition(bool lockToCenter = true)
         {
             IsMousePositionLocked = true;
             _isLockedToCenter = lockToCenter;
-            Interop.GetCursorPos(out var point);
+            Win32Interop.GetCursorPos(out var point);
             _lockMousePosition = new Vector2F(point.X, point.Y);
             SetLockedMousePosition();
             if (_window != null)
@@ -358,7 +358,7 @@ namespace Adamantium.Engine.GameInput
         {
             if (!IsMousePositionLocked)
             {
-                Interop.GetCursorPos(out NativePoint np);
+                Win32Interop.GetCursorPos(out NativePoint np);
                 _absolutePosition = new Vector2F(np.X, np.Y);
             }
             else
@@ -567,7 +567,7 @@ namespace Adamantium.Engine.GameInput
                     _absolutePosition.X = Bounds.Right;
                     _virtualPositionMultiplierX--;
                 }
-                Interop.SetCursorPos((int)_absolutePosition.X, (int)_absolutePosition.Y);
+                Win32Interop.SetCursorPos((int)_absolutePosition.X, (int)_absolutePosition.Y);
             }
 
             if (IsOutsideYBounds())
@@ -582,7 +582,7 @@ namespace Adamantium.Engine.GameInput
                     _absolutePosition.Y = Bounds.Bottom;
                     _virtualPositionMultiplierY--;
                 }
-                Interop.SetCursorPos((int)_absolutePosition.X, (int)_absolutePosition.Y);
+                Win32Interop.SetCursorPos((int)_absolutePosition.X, (int)_absolutePosition.Y);
             }
 
             if (_absolutePosition.X == _absolutePositionPrevious.X && RawMouseDelta.X != 0)
@@ -597,7 +597,7 @@ namespace Adamantium.Engine.GameInput
                     _absolutePosition.X = Bounds.Right;
                     _virtualPositionMultiplierX--;
                 }
-                Interop.SetCursorPos((int)_absolutePosition.X, (int)_absolutePosition.Y);
+                Win32Interop.SetCursorPos((int)_absolutePosition.X, (int)_absolutePosition.Y);
             }
 
             if (_absolutePosition.Y == _absolutePositionPrevious.Y && RawMouseDelta.Y != 0)
@@ -612,7 +612,7 @@ namespace Adamantium.Engine.GameInput
                     _absolutePosition.Y = Bounds.Bottom;
                     _virtualPositionMultiplierY--;
                 }
-                Interop.SetCursorPos((int)_absolutePosition.X, (int)_absolutePosition.Y);
+                Win32Interop.SetCursorPos((int)_absolutePosition.X, (int)_absolutePosition.Y);
             }
         }
 
@@ -640,11 +640,11 @@ namespace Adamantium.Engine.GameInput
         {
             if (!_isLockedToCenter)
             {
-                Interop.SetCursorPos((int)_lockMousePosition.X, (int)_lockMousePosition.Y);
+                Win32Interop.SetCursorPos((int)_lockMousePosition.X, (int)_lockMousePosition.Y);
             }
             else
             {
-                Interop.SetCursorPos((int)Bounds.Center.X, (int)Bounds.Center.Y);
+                Win32Interop.SetCursorPos((int)Bounds.Center.X, (int)Bounds.Center.Y);
             }
         }
 

@@ -8,6 +8,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Adamantium.EntityFramework.Components\Adamantium.EntityFramework.Components.csproj" />
     <ProjectReference Include="..\Adamantium.EntityFramework\Adamantium.EntityFramework.csproj" />
+    <ProjectReference Include="..\Adamantium.MacOS\Adamantium.MacOS.csproj" />
     <ProjectReference Include="..\Adamantium.Win32\Adamantium.Win32.csproj" />
   </ItemGroup>
 

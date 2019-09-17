@@ -22,7 +22,7 @@ namespace Adamantium.UI.Media
          typeof(Visibility), typeof(VisualComponent),
          new PropertyMetadata(Visibility.Visible,
             PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsArrange));
-
+      
       public Point Location
       {
          get => GetValue<Point>(PositionProperty);
