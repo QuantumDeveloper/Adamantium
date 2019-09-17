@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Adamantium.MacOS;
 using Adamantium.Mathematics;
 
@@ -10,11 +11,11 @@ namespace Adamantium.UI.Windows
         private OSXWindow window;
         private IntPtr windowDelegate;
         
-        private MacOSInterop.OnWindowWillResize resizeDelegate;
-        
-        private void WindowWillResize(float width, float height)
+        private MacOSInterop.OnWindowWillResize willResizeDelegate;
+
+        public OSXWindowWorker()
         {
-            Debug.WriteLine($"Window Resize width: {width}, height: {height}");
+            willResizeDelegate = OnWindowWillResize;
         }
 
         public void SetWindow(OSXWindow window)
@@ -23,8 +24,29 @@ namespace Adamantium.UI.Windows
             var wndStyle = OSXWindowStyle.Borderless | OSXWindowStyle.Resizable |
                            OSXWindowStyle.Titled |
                            OSXWindowStyle.Miniaturizable | OSXWindowStyle.Closable;
-            this.window.Handle = MacOSInterop.CreateWindow(new Rectangle(0, 0, 1280, 720),  (uint)wndStyle, "Adamantium engine");
+            this.window.Handle = MacOSInterop.CreateWindow(new Rectangle((int)window.Left, 0, window.ClientWidth, window.ClientHeight),  (uint)wndStyle, "Adamantium engine");
             windowDelegate = MacOSInterop.CreateWindowDelegate();
+            MacOSInterop.SetWindowDelegate(window.Handle, windowDelegate);
+
+            MacOSInterop.AddWindowWillResizeResizeCallback(windowDelegate,
+                Marshal.GetFunctionPointerForDelegate(willResizeDelegate));
+            
+            this.window.ApplyTemplate();
+            Application.Current.Windows.Add(this.window);
+            this.window.OnSourceInitialized();
+            MacOSInterop.ShowWindow(window.Handle);
+        }
+
+        private void OnWindowWillResize(float width, float height)
+        {
+            window.Width = (int)width;
+            window.Height = (int)height;
+
+        }
+
+        public static implicit operator IntPtr(OSXWindowWorker worker)
+        {
+            return worker.windowDelegate;
         }
     }
 }

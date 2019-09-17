@@ -82,18 +82,18 @@ namespace Adamantium.UI
                 OutputHandle = window.Handle,
                 HInstanceHandle = Process.GetCurrentProcess().Handle
             };
-            var device = GraphicsDevice.CreateRenderDevice(@params);
-            windowToDevices[window] = device;
-
-            var transformProcessor = new UITransformProcessor(entityWorld);
-            var renderProcessor = new UIRenderProcessor(entityWorld, device);
-            var entity = new Entity();
-            entity.AddComponent(window);
-            entityWorld.AddEntity(entity);
-            entityWorld.AddProcessor(transformProcessor);
-            entityWorld.AddProcessor(renderProcessor);
-
-            windowToSystem.Add(window, renderProcessor);
+//            var device = GraphicsDevice.CreateRenderDevice(@params);
+//            windowToDevices[window] = device;
+//
+//            var transformProcessor = new UITransformProcessor(entityWorld);
+//            var renderProcessor = new UIRenderProcessor(entityWorld, device);
+//            var entity = new Entity();
+//            entity.AddComponent(window);
+//            entityWorld.AddEntity(entity);
+//            entityWorld.AddProcessor(transformProcessor);
+//            entityWorld.AddProcessor(renderProcessor);
+//
+//            windowToSystem.Add(window, renderProcessor);
         }
 
         protected void OnWindowRemoved(IWindow window)
@@ -134,14 +134,14 @@ namespace Adamantium.UI
         {
             try
             {
-                var frametime = preciseTimer.GetElapsedTime();
+                var frameTime = preciseTimer.GetElapsedTime();
                 Update(appTime);
                 BeginScene();
                 Draw(appTime);
                 EndScene();
 
-                UpdateGameTime(frametime);
-                CalculateFps(frametime);
+                UpdateGameTime(frameTime);
+                CalculateFps(frameTime);
             }
             catch (Exception ex)
             {

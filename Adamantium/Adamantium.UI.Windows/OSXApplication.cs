@@ -12,24 +12,32 @@ namespace Adamantium.UI.OSX
         internal override MouseDevice MouseDevice { get; }
         internal override KeyboardDevice KeyboardDevice { get; }
 
-        private MacOSInterop.OnWindowWillResize resizeDelegate;
+        private IntPtr appDelegate;
+        private IntPtr app;
+
+        public OSXApplication()
+        {
+            Windows.WindowAdded += OnWindowAdded;
+            Windows.WindowRemoved -= OnWindowRemoved;
+            appDelegate = MacOSInterop.CreateApplicationDelegate();
+            app = MacOSInterop.CreateApplication(appDelegate);
+            //Services.Add();
+        }
+        
+        private void OnWindowAdded(object sender, WindowEventArgs e)
+        {
+            MacOSInterop.AddWindowToAppDelegate(appDelegate, e.Window.Handle);
+        }
+        
+        private void OnWindowRemoved(object sender, WindowEventArgs e)
+        {
+            //MacOSInterop.AddWindowToAppDelegate(appDelegate, e.Window.Handle);
+        }
         
         public override void Run()
         {
             try
             {
-                resizeDelegate = WindowWillResize;
-                var appDelegate = MacOSInterop.CreateApplicationDelegate();
-                var app = MacOSInterop.CreateApplication(appDelegate);
-                var wndStyle = OSXWindowStyle.Borderless | OSXWindowStyle.Resizable |
-                               OSXWindowStyle.Titled |
-                               OSXWindowStyle.Miniaturizable | OSXWindowStyle.Closable;
-                var wnd = MacOSInterop.CreateWindow(new Rectangle(100, 100, 1280, 720), (uint)wndStyle, "Adamantium window");
-                var wndDelegate = MacOSInterop.CreateWindowDelegate();
-                MacOSInterop.SetWindowDelegate(wnd, wndDelegate);
-                MacOSInterop.AddWindowToAppDelegate(appDelegate, wnd);
-                var resizeDelegatePtr = Marshal.GetFunctionPointerForDelegate(resizeDelegate);
-                MacOSInterop.AddWindowResizeCallback(wndDelegate, resizeDelegatePtr);
                 MacOSInterop.RunApplication(app);
             }
             catch (Exception e)
@@ -39,16 +47,11 @@ namespace Adamantium.UI.OSX
             }
         }
 
-        public void WindowWillResize(float width, float height)
-        {
-            Debug.WriteLine($"Window Resize width: {width}, height: {height}");
-        }
-        
-        
-        
 
-        
-        
+
+
+
+
 
     }
 }

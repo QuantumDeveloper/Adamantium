@@ -19,9 +19,27 @@ namespace Adamantium.UI
                 return new OSXWindow();
             }
             
-            throw new NotSupportedException("This ");
+            throw new NotSupportedException($"Window for {RuntimeInformation.OSArchitecture} is not yet supported");
         }
+        
+        public static readonly AdamantiumProperty LeftProperty = AdamantiumProperty.Register(nameof(Left),
+            typeof(Double), typeof(Window), new PropertyMetadata(0d));
+        
+        public static readonly AdamantiumProperty TopProperty = AdamantiumProperty.Register(nameof(Top),
+            typeof(Double), typeof(Window), new PropertyMetadata(0d));
 
+        public Double Left
+        {
+            get => GetValue<Double>(LeftProperty);
+            set => SetValue(LeftProperty, value);
+        }
+        
+        public Double Top
+        {
+            get => GetValue<Double>(TopProperty);
+            set => SetValue(TopProperty, value);
+        }
+        
         public abstract Point PointToClient(Point point);
         public abstract Point PointToScreen(Point point);
         public abstract void Show();
@@ -34,5 +52,12 @@ namespace Adamantium.UI
         public abstract event EventHandler<SizeChangedEventArgs> ClientSizeChanged;
         public abstract event EventHandler<WindowClosingEventArgs> Closing;
         public abstract event EventHandler<EventArgs> Closed;
+        
+        public event EventHandler<EventArgs> SourceInitialized;
+        
+        internal void OnSourceInitialized()
+        {
+            SourceInitialized?.Invoke(this, EventArgs.Empty);
+        }
     }
 }

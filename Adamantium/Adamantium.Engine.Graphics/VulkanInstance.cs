@@ -134,6 +134,10 @@ namespace Adamantium.Engine.Graphics
 
                 return surface;
             }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                
+            }
 
             throw new NotSupportedException("Current platform is not supported yet for Surface creation");
         }

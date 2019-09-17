@@ -4,7 +4,7 @@ using Adamantium.Mathematics;
 
 namespace Adamantium.MacOS
 {
-    public static class MacOSInterop
+    public static partial class MacOSInterop
     {
         public const string WrapperFramework = "MacOSAppWrapper.framework/MacOSAppWrapper";
 
@@ -29,14 +29,17 @@ namespace Adamantium.MacOS
         [DllImport(WrapperFramework, EntryPoint = "GetViewPtr")]
         public static extern IntPtr GetViewPtr(IntPtr window);
         
+        [DllImport(WrapperFramework, EntryPoint = "ShowWindow")]
+        public static extern void ShowWindow(IntPtr window);
+        
         [DllImport(WrapperFramework, EntryPoint = "AddWindowToAppDelegate")]
         public static extern IntPtr AddWindowToAppDelegate(IntPtr appDelegate, IntPtr window);
         
         [DllImport(WrapperFramework, EntryPoint = "GetDelegateFromApp")]
         public static extern IntPtr GetDelegateFromApp(IntPtr app);
 
-        [DllImport(WrapperFramework, EntryPoint = "AddWindowResizeCallback")]
-        public static extern void AddWindowResizeCallback(IntPtr appDelegate, IntPtr resizeCallback);
+        [DllImport(WrapperFramework, EntryPoint = "AddWindowWillResizeResizeCallback")]
+        public static extern void AddWindowWillResizeResizeCallback(IntPtr windowDelegate, IntPtr resizeCallback);
         
         public delegate void OnWindowWillResize(float width, float height);
     }
