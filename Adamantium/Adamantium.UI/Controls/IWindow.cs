@@ -18,6 +18,8 @@ namespace Adamantium.UI.Controls
 
         int ClientHeight { get; set; }
 
+        IntPtr GetSurfaceHandle();
+
         event EventHandler<SizeChangedEventArgs> ClientSizeChanged;
         event EventHandler<WindowClosingEventArgs> Closing;
         event EventHandler<EventArgs> Closed;
