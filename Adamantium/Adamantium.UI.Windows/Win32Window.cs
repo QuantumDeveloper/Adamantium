@@ -48,15 +48,10 @@ namespace Adamantium.UI.Windows
             }
         }
 
-        public override event EventHandler<SizeChangedEventArgs> ClientSizeChanged;
+        public override IntPtr SurfaceHandle => Handle;
+        //public override event EventHandler<SizeChangedEventArgs> ClientSizeChanged;
         public override event EventHandler<WindowClosingEventArgs> Closing;
         public override event EventHandler<EventArgs> Closed;
-        
-
-        internal void OnClientSizeChanged(SizeChangedEventArgs e)
-        {
-            ClientSizeChanged?.Invoke(this, e);
-        }
 
         public bool IsActive { get; internal set; }
 

@@ -29,6 +29,9 @@ namespace Adamantium.MacOS
         [DllImport(WrapperFramework, EntryPoint = "GetViewPtr")]
         public static extern IntPtr GetViewPtr(IntPtr window);
         
+        [DllImport(WrapperFramework, EntryPoint = "GetViewSize")]
+        public static extern SizeF GetViewSize(IntPtr window);
+        
         [DllImport(WrapperFramework, EntryPoint = "ShowWindow")]
         public static extern void ShowWindow(IntPtr window);
         
@@ -38,9 +41,14 @@ namespace Adamantium.MacOS
         [DllImport(WrapperFramework, EntryPoint = "GetDelegateFromApp")]
         public static extern IntPtr GetDelegateFromApp(IntPtr app);
 
-        [DllImport(WrapperFramework, EntryPoint = "AddWindowWillResizeResizeCallback")]
-        public static extern void AddWindowWillResizeResizeCallback(IntPtr windowDelegate, IntPtr resizeCallback);
+        [DllImport(WrapperFramework, EntryPoint = "AddWindowWillResizeCallback")]
+        public static extern void AddWindowWillResizeCallback(IntPtr windowDelegate, IntPtr willResizeCallback);
         
-        public delegate void OnWindowWillResize(float width, float height);
+        [DllImport(WrapperFramework, EntryPoint = "AddWindowDidResizeCallback")]
+        public static extern void AddWindowDidResizeCallback(IntPtr windowDelegate, IntPtr didResizeCallback);
+        
+        public delegate void OnWindowWillResize(SizeF current, SizeF future);
+        
+        public delegate void OnWindowDidResize(SizeF current);
     }
 }

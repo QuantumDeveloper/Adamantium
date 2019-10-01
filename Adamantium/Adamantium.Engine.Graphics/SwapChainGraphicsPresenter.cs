@@ -57,7 +57,7 @@ namespace Adamantium.Engine.Graphics
             PresentModeKHR presentMode = ChooseSwapPresentMode(swapChainSupport.PresentModes);
             Extent2D extent = ChooseSwapExtent(swapChainSupport.Capabilities);
 
-            uint imageCount = swapChainSupport.Capabilities.MinImageCount + 1;
+            uint imageCount = swapChainSupport.Capabilities.MinImageCount;
             if (swapChainSupport.Capabilities.MaxImageCount > 0 && imageCount > swapChainSupport.Capabilities.MaxImageCount)
             {
                 imageCount = swapChainSupport.Capabilities.MaxImageCount;
@@ -211,8 +211,6 @@ namespace Adamantium.Engine.Graphics
                 MessageBox.Show("Failed to present swap chain image");
                 throw new Exception();
             }
-
-            //OnPresentFinished();
         }
 
 

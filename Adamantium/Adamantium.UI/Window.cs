@@ -8,7 +8,7 @@ namespace Adamantium.UI
 {
     public abstract class Window : ContentControl, IWindow
     {
-        public static IWindow New()
+        public static Window New()
         {
             if (RuntimeInformation.IsOSPlatform((OSPlatform.Windows)))
             {
@@ -49,7 +49,8 @@ namespace Adamantium.UI
         public abstract bool IsClosed { get; protected set; }
         public abstract int ClientWidth { get; set; }
         public abstract int ClientHeight { get; set; }
-        public abstract event EventHandler<SizeChangedEventArgs> ClientSizeChanged;
+        public abstract IntPtr SurfaceHandle { get; }
+        public event EventHandler<SizeChangedEventArgs> ClientSizeChanged;
         public abstract event EventHandler<WindowClosingEventArgs> Closing;
         public abstract event EventHandler<EventArgs> Closed;
         
@@ -58,6 +59,11 @@ namespace Adamantium.UI
         internal void OnSourceInitialized()
         {
             SourceInitialized?.Invoke(this, EventArgs.Empty);
+        }
+        
+        internal void OnClientSizeChanged(SizeChangedEventArgs e)
+        {
+            ClientSizeChanged?.Invoke(this, e);
         }
     }
 }

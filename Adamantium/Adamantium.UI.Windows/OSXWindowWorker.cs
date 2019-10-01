@@ -12,10 +12,12 @@ namespace Adamantium.UI.Windows
         private IntPtr windowDelegate;
         
         private MacOSInterop.OnWindowWillResize willResizeDelegate;
+        private MacOSInterop.OnWindowDidResize didResizeDelegate;
 
         public OSXWindowWorker()
         {
             willResizeDelegate = OnWindowWillResize;
+            didResizeDelegate = OnWindowDidResize;
         }
 
         public void SetWindow(OSXWindow window)
@@ -24,12 +26,18 @@ namespace Adamantium.UI.Windows
             var wndStyle = OSXWindowStyle.Borderless | OSXWindowStyle.Resizable |
                            OSXWindowStyle.Titled |
                            OSXWindowStyle.Miniaturizable | OSXWindowStyle.Closable;
-            this.window.Handle = MacOSInterop.CreateWindow(new Rectangle((int)window.Left, 0, window.ClientWidth, window.ClientHeight),  (uint)wndStyle, "Adamantium engine");
+            this.window.Handle = MacOSInterop.CreateWindow(new Rectangle((int)window.Left, 0, (int)window.Width, (int)window.Height),  (uint)wndStyle, "Adamantium engine");
             windowDelegate = MacOSInterop.CreateWindowDelegate();
             MacOSInterop.SetWindowDelegate(window.Handle, windowDelegate);
 
-            MacOSInterop.AddWindowWillResizeResizeCallback(windowDelegate,
-                Marshal.GetFunctionPointerForDelegate(willResizeDelegate));
+            window.ClientWidth = (int) window.Width;
+            window.ClientHeight = (int) window.Height;
+
+//            MacOSInterop.AddWindowWillResizeResizeCallback(windowDelegate,
+//                Marshal.GetFunctionPointerForDelegate(willResizeDelegate));
+
+            MacOSInterop.AddWindowDidResizeCallback(windowDelegate,
+                Marshal.GetFunctionPointerForDelegate(didResizeDelegate));
             
             this.window.ApplyTemplate();
             Application.Current.Windows.Add(this.window);
@@ -37,10 +45,37 @@ namespace Adamantium.UI.Windows
             MacOSInterop.ShowWindow(window.Handle);
         }
 
-        private void OnWindowWillResize(float width, float height)
+        private void OnWindowWillResize(SizeF current, SizeF future)
         {
-            window.Width = (int)width;
-            window.Height = (int)height;
+            window.Width = (int)future.Width;
+            window.Height = (int)future.Height;
+
+            var size = MacOSInterop.GetViewSize(window.Handle);
+            window.ClientWidth = (int)size.Width;
+            window.ClientHeight = (int) size.Height;
+
+            if (window.ClientWidth != 0 && window.ClientHeight != 0)
+            {
+                var oldSize = new Size(current.Width, current.Height); 
+                window.OnClientSizeChanged(new SizeChangedEventArgs(new Size(window.ClientWidth, window.ClientHeight), oldSize, true, true));
+            }
+
+        }
+        
+        private void OnWindowDidResize(SizeF current)
+        {
+            window.Width = (int)current.Width;
+            window.Height = (int)current.Height;
+
+            var size = MacOSInterop.GetViewSize(window.Handle);
+            window.ClientWidth = (int)size.Width;
+            window.ClientHeight = (int) size.Height;
+
+            if (window.ClientWidth != 0 && window.ClientHeight != 0)
+            {
+                var oldSize = new Size(current.Width, current.Height); 
+                window.OnClientSizeChanged(new SizeChangedEventArgs(new Size(window.ClientWidth, window.ClientHeight), oldSize, true, true));
+            }
 
         }
 

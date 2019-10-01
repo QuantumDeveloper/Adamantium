@@ -25,6 +25,7 @@ namespace Adamantium.UI.Processors
         //private DepthStencilBuffer _depthBuffer;
         //private MSAALevel _msaaLevel;
         private bool isWindowResized;
+        private uint buffersCount = 2; 
 
         public WindowRenderModule(IWindow window, GraphicsDevice device, MSAALevel msaaLevel)
         {
@@ -82,15 +83,19 @@ namespace Adamantium.UI.Processors
                 return false;
             }
 
-            //if (isWindowResized)
-            //{
-            //    isWindowResized = false;
-            //    //InitializeResources();
-            //    GraphicsDevice.ResizeBuffers((uint)window.ClientWidth, (uint)window.ClientHeight, 2, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
-            //    return false;
-            //}
+//            if (isWindowResized)
+//            {
+//                isWindowResized = false;
+//                //InitializeResources();
+//                GraphicsDevice.ResizeBuffers((uint)window.ClientWidth, (uint)window.ClientHeight, 2, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
+//                return false;
+//            }
 
-            GraphicsDevice.BeginDraw();
+            if (!GraphicsDevice.BeginDraw())
+            {
+                GraphicsDevice.ResizeBuffers((uint)window.ClientWidth, (uint)window.ClientHeight, buffersCount, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
+                return false;
+            }
 
             //_graphicsDevice.SetRenderTargets(_depthBuffer, _backBuffer);
             //_graphicsDevice.ClearTargets(Colors.White);
@@ -112,16 +117,16 @@ namespace Adamantium.UI.Processors
             //d2D1Device.EndDraw();
 
             //mainDevice.CopyResource(_backBuffer, Presenter.BackBuffer);
-           
+
             GraphicsDevice.Draw(3,1,0,0);
             GraphicsDevice.EndDraw();
             GraphicsDevice.Present();
-
+            
             if (isWindowResized)
             {
                 isWindowResized = false;
-                //InitializeResources();
-                GraphicsDevice.ResizeBuffers((uint)window.ClientWidth, (uint)window.ClientHeight, 2, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
+                GraphicsDevice.ResizeBuffers((uint)window.ClientWidth, (uint)window.ClientHeight, buffersCount, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
+                //return;
             }
         }
 

@@ -85,6 +85,7 @@ namespace Adamantium.UI.Processors
             {
                 windowRenderModule.Render(gameTime);
             }
+            
         }
     }
 }
