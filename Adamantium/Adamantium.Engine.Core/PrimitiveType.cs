@@ -6,10 +6,10 @@ namespace Adamantium.Engine.Core
 {
     /// <summary>
     /// Values that indicate how the pipeline interprets vertex data that is bound to the input-assembler stage. These primitive topology values determine how the vertex data is rendered on screen.
-    /// PrimitiveType is equivalent to <see cref="SharpDX.Direct3D.PrimitiveTopology"/>.
+    /// PrimitiveType is equivalent to <see cref="AdamantiumVulkan.Core.PrimitiveTopology"/>.
     /// </summary>
     /// <remarks>
-    /// This structure is implicitly castable to and from <see cref="SharpDX.Direct3D.PrimitiveTopology"/>, you can use it in place where <see cref="SharpDX.Direct3D.PrimitiveTopology"/> is required
+    /// This structure is implicitly castable to and from <see cref="AdamantiumVulkan.Core.PrimitiveTopology"/>, you can use it in place where <see cref="AdamantiumVulkan.Core.PrimitiveTopology"/> is required
     /// and vice-versa.
     /// </remarks>
     /// <msdn-id>ff728726</msdn-id>	
@@ -19,7 +19,7 @@ namespace Adamantium.Engine.Core
     public struct PrimitiveType : IEquatable<PrimitiveType>
     {
         /// <summary>
-        /// Gets the value as a <see cref="SharpDX.Direct3D.PrimitiveTopology"/> enum.
+        /// Gets the value as a <see cref="AdamantiumVulkan.Core.PrimitiveTopology"/> enum.
         /// </summary>
         private readonly PrimitiveTopology Topology;
 
@@ -112,7 +112,6 @@ namespace Adamantium.Engine.Core
         /// <summary>	
         /// Interpret the vertex data as a patch list.
         /// </summary>	
-        /// <param name="controlPoints">Number of control points. Value must be in the range 1 to 32.</param>
         /// <unmanaged>D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP_ADJ</unmanaged>	
         /// <unmanaged-short>D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP_ADJ</unmanaged-short>	
         public static PrimitiveType PatchList = new PrimitiveType(PrimitiveTopology.PatchList);

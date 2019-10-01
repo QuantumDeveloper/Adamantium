@@ -48,7 +48,7 @@ namespace Adamantium.Engine.Core.Models
 
          public List<Vector4F> JointWeights { get; set; } 
 
-         public Mathematics.OrientedBoundingBox OrientedBoundingBox { get; set; }
+         public OrientedBoundingBox OrientedBoundingBox { get; set; }
 
          public String MaterialId { get; set; }
 

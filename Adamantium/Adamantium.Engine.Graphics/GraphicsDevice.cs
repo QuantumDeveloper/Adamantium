@@ -559,6 +559,7 @@ namespace Adamantium.Engine.Graphics
 
         public bool ResizeBuffers(uint width, uint height, uint buffersCount, SurfaceFormat surfaceFormat, DepthFormat depthFormat)
         {
+            Console.WriteLine("Resize buffers called");
             var result = LogicalDevice.DeviceWaitIdle();
             DestroyFrameBuffers();
             var resizeResult = Presenter.Resize(width, height, buffersCount, surfaceFormat, depthFormat);
