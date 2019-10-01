@@ -64,6 +64,7 @@ namespace Adamantium.UI.Windows
         
         private void OnWindowDidResize(SizeF current)
         {
+            Console.WriteLine("Did resize");
             window.Width = (int)current.Width;
             window.Height = (int)current.Height;
 

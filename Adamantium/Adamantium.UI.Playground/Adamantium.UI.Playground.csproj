@@ -7,6 +7,10 @@
     <StartupObject />
   </PropertyGroup>
 
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+
   <ItemGroup>
     <None Remove="Shaders\frag.spv" />
     <None Remove="Shaders\vert.spv" />
@@ -22,7 +26,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Adamantium.UI.Windows\Adamantium.UI.Windows.csproj" />
+    <ProjectReference Include="..\Adamantium.UI\Adamantium.UI.csproj" />
   </ItemGroup>
 
 </Project>
