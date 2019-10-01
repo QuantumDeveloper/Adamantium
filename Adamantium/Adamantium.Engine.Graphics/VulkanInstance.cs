@@ -1,5 +1,4 @@
-﻿using Adamantium.Core;
-using Adamantium.Core.Collections;
+﻿using Adamantium.Core.Collections;
 using AdamantiumVulkan.Core;
 using AdamantiumVulkan.Core.Interop;
 using AdamantiumVulkan.MacOS;
@@ -9,6 +8,10 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Runtime.InteropServices;
+using AdamantiumVulkan;
+using AdamantiumVulkan.MacOS.Interop;
+using Constants = AdamantiumVulkan.Core.Constants;
+using DisposableObject = Adamantium.Core.DisposableObject;
 
 namespace Adamantium.Engine.Graphics
 {
@@ -101,6 +104,17 @@ namespace Adamantium.Engine.Graphics
             }
 
             instance = Instance.Create(createInfo);
+            
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                //var config = instance.GetMoltenVKConfigurationMVK();
+
+                //config.presentWithCommandBuffer = false;
+                //config.synchronousQueueSubmits = false;
+                //config.debugMode = true;
+                //config.displayWatermark = true;
+                //instance.SetMoltenVKConfigurationMVK(config);
+            }
 
             createInfo.Dispose();
         }

@@ -53,7 +53,7 @@ namespace Adamantium.Engine.Graphics
 
         private GraphicsDevice(GraphicsDevice main, PresentationParameters presentationParameters)
         {
-            this.surface = GraphicsDevice.Instance.GetOrCreateSurface(presentationParameters);
+            surface = Instance.GetOrCreateSurface(presentationParameters);
             if (!main.IsMain)
             {
                 CreateMainDevice();
@@ -229,8 +229,8 @@ namespace Adamantium.Engine.Graphics
 
         private void CreateGraphicsPipeline()
         {
-            var vertexContent = File.ReadAllBytes(@"Shaders\vert.spv");
-            var fragmentContent = File.ReadAllBytes(@"Shaders\frag.spv");
+            var vertexContent = File.ReadAllBytes(Path.Combine("Shaders","vert.spv"));
+            var fragmentContent = File.ReadAllBytes(Path.Combine("Shaders","frag.spv"));
 
             var vertexShaderModule = CreateShaderModule(vertexContent);
             var fragmentShaderModule = CreateShaderModule(fragmentContent);
@@ -407,11 +407,17 @@ namespace Adamantium.Engine.Graphics
             return LogicalDevice.DeviceWaitIdle();
         }
 
-        public void BeginDraw()
+        public bool BeginDraw()
         {
             var renderFence = InFlightFences[CurrentFrame];
             var result = LogicalDevice.WaitForFences(1, renderFence, true, ulong.MaxValue);
-            result = LogicalDevice.AcquireNextImageKHR((SwapChainGraphicsPresenter)Presenter, ulong.MaxValue, ImageAvailableSemaphores[CurrentFrame], null, ref imageIndex);
+            result = LogicalDevice.AcquireNextImageKHR((SwapChainGraphicsPresenter) Presenter, ulong.MaxValue,
+                ImageAvailableSemaphores[CurrentFrame], null, ref imageIndex);
+
+            if (result == Result.ErrorOutOfDateKhr)
+            {
+                return false;
+            }
 
             if (result != Result.Success && result != Result.SuboptimalKhr)
             {
@@ -421,7 +427,7 @@ namespace Adamantium.Engine.Graphics
             var commandBuffer = commandBuffers[ImageIndex];
 
             var beginInfo = new CommandBufferBeginInfo();
-            beginInfo.Flags = (uint)CommandBufferUsageFlagBits.SimultaneousUseBit;
+            beginInfo.Flags = (uint) CommandBufferUsageFlagBits.SimultaneousUseBit;
 
             result = commandBuffer.ResetCommandBuffer(0);
             if (result != Result.Success)
@@ -440,18 +446,21 @@ namespace Adamantium.Engine.Graphics
             renderPassInfo.Framebuffer = defaultFramebuffers[ImageIndex];
             renderPassInfo.RenderArea = new Rect2D();
             renderPassInfo.RenderArea.Offset = new Offset2D();
-            renderPassInfo.RenderArea.Extent = new Extent2D() { Width = Presenter.Description.Width, Height = Presenter.Description.Height };
+            renderPassInfo.RenderArea.Extent = new Extent2D()
+                {Width = Presenter.Description.Width, Height = Presenter.Description.Height};
 
             ClearValue clearValue = new ClearValue();
             clearValue.Color = new ClearColorValue();
-            clearValue.Color.Float32 = new float[4] { 0.5f, 0.7f, 1.0f, 0.0f };
+            clearValue.Color.Float32 = new float[4] {0.5f, 0.7f, 1.0f, 0.0f};
 
             renderPassInfo.ClearValueCount = 1;
-            renderPassInfo.PClearValues = new ClearValue[] { clearValue };
+            renderPassInfo.PClearValues = new ClearValue[] {clearValue};
 
             commandBuffer.CmdBeginRenderPass(renderPassInfo, SubpassContents.Inline);
 
             commandBuffer.CmdBindPipeline(PipelineBindPoint.Graphics, graphicsPipeline);
+
+            return true;
         }
 
         public void EndDraw()
@@ -550,10 +559,6 @@ namespace Adamantium.Engine.Graphics
 
         public bool ResizeBuffers(uint width, uint height, uint buffersCount, SurfaceFormat surfaceFormat, DepthFormat depthFormat)
         {
-            if (destroyCount == 126)
-            {
-
-            }
             var result = LogicalDevice.DeviceWaitIdle();
             DestroyFrameBuffers();
             var resizeResult = Presenter.Resize(width, height, buffersCount, surfaceFormat, depthFormat);

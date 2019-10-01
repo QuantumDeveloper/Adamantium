@@ -10,6 +10,7 @@ using Adamantium.UI.Input;
 using Adamantium.UI.OSX;
 using Adamantium.UI.Processors;
 using Adamantium.UI.Windows;
+using AdamantiumVulkan;
 
 namespace Adamantium.UI
 {
@@ -51,6 +52,7 @@ namespace Adamantium.UI
 
         protected Application()
         {
+            VulkanDllMap.Register();
             ShutDownMode = ShutDownMode.OnMainWindowClosed;
             Current = this;
             systemManager = new ApplicationSystemManager(this);
@@ -79,21 +81,21 @@ namespace Adamantium.UI
                 Width = (uint)window.ClientWidth,
                 Height = (uint)window.ClientHeight,
                 BuffersCount = 2,
-                OutputHandle = window.Handle,
                 HInstanceHandle = Process.GetCurrentProcess().Handle
             };
-//            var device = GraphicsDevice.CreateRenderDevice(@params);
-//            windowToDevices[window] = device;
-//
-//            var transformProcessor = new UITransformProcessor(entityWorld);
-//            var renderProcessor = new UIRenderProcessor(entityWorld, device);
-//            var entity = new Entity();
-//            entity.AddComponent(window);
-//            entityWorld.AddEntity(entity);
-//            entityWorld.AddProcessor(transformProcessor);
-//            entityWorld.AddProcessor(renderProcessor);
-//
-//            windowToSystem.Add(window, renderProcessor);
+            @params.OutputHandle = window.SurfaceHandle;
+            var device = GraphicsDevice.CreateRenderDevice(@params);
+            windowToDevices[window] = device;
+
+            var transformProcessor = new UITransformProcessor(entityWorld);
+            var renderProcessor = new UIRenderProcessor(entityWorld, device);
+            var entity = new Entity();
+            entity.AddComponent(window);
+            entityWorld.AddEntity(entity);
+            entityWorld.AddProcessor(transformProcessor);
+            entityWorld.AddProcessor(renderProcessor);
+
+            windowToSystem.Add(window, renderProcessor);
         }
 
         protected void OnWindowRemoved(IWindow window)
@@ -192,6 +194,7 @@ namespace Adamantium.UI
             fpsTime += elapsed;
             if (fpsTime >= 1.0d)
             {
+                Console.WriteLine($"FPS = {fpsCounter}");
                 appTime.FpsCount = (fpsCounter) / (Single)fpsTime;
                 fpsCounter = 0;
                 fpsTime = 0;
