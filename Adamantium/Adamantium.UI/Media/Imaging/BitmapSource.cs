@@ -9,7 +9,7 @@ namespace Adamantium.UI.Media.Imaging
 
       public virtual UInt32 PixelHeight => DXTexture.Height;
 
-      public virtual SurfaceFormat PixelFormat => DXTexture.Format;
+      public virtual SurfaceFormat PixelFormat => DXTexture.SurfaceFormat;
 
       public override double Width => DXTexture.Width*DpiXScale;
 

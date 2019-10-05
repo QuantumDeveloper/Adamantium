@@ -13,6 +13,7 @@ namespace Adamantium.Engine.Graphics
         private VulkanImage[] swapchainImages;
         internal ImageView[] swapchainImageViews;
         private Queue presentQueue;
+        
 
         public SwapChainGraphicsPresenter(GraphicsDevice graphicsDevice, PresentationParameters description, string name = "") : base(graphicsDevice, description, name)
         {
@@ -21,8 +22,8 @@ namespace Adamantium.Engine.Graphics
             CreateSurface();
             CreateSwapchain(graphicsDevice);
             CreateImageViews(graphicsDevice);
-            Backbuffers = new Texture[Description.BuffersCount];
-            var indices = GraphicsDevice.Instance.CurrentDevice.FindQueueFamilies(surface);
+            BackBuffers = new Texture[Description.BuffersCount];
+            var indices = GraphicsDevice.VulkanInstance.CurrentDevice.FindQueueFamilies(surface);
             presentQueue = graphicsDevice.GetDeviceQueue(indices.presentFamily.Value, 0);
         }
 
@@ -35,7 +36,7 @@ namespace Adamantium.Engine.Graphics
 
         private void CreateSurface()
         {
-            surface = GraphicsDevice.Instance.GetOrCreateSurface(Description);
+            surface = GraphicsDevice.VulkanInstance.GetOrCreateSurface(Description);
         }
 
         SwapChainSupportDetails QuerySwapChainSupport(PhysicalDevice device)
@@ -102,6 +103,7 @@ namespace Adamantium.Engine.Graphics
             Description.Width = extent.Width;
             Description.Height = extent.Height;
         }
+
 
         private void CreateImageViews(Device logicalDevice)
         {
@@ -248,6 +250,7 @@ namespace Adamantium.Engine.Graphics
 
             CreateSwapchain(GraphicsDevice);
             CreateImageViews(GraphicsDevice);
+            CreateDepthBuffer();
         }
 
         private void CleanupSwapChain()
@@ -257,6 +260,7 @@ namespace Adamantium.Engine.Graphics
                 view.Destroy(GraphicsDevice);
             }
 
+            DepthBuffer.Dispose();
             //foreach (var img in swapchainImages)
             //{
             //    img.Destroy(GraphicsDevice);

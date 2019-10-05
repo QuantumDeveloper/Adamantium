@@ -362,6 +362,12 @@ namespace Adamantium.Mathematics
             return new Vector4F(R / 255.0f, G / 255.0f, B / 255.0f, A / 255.0f);
         }
 
+        public Single[] ToFloatArray()
+        {
+            return new [] {R / 255.0f, G / 255.0f, B / 255.0f, A / 255.0f};
+        }
+        
+
         /// <summary>
         /// Creates an array containing the elements of the color.
         /// </summary>

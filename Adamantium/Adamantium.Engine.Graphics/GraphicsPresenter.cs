@@ -4,6 +4,7 @@ using Adamantium.Core;
 using Adamantium.Engine.Core;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
+using AdamantiumVulkan.Core;
 
 namespace Adamantium.Engine.Graphics
 {
@@ -15,19 +16,18 @@ namespace Adamantium.Engine.Graphics
 
         //public RenderTarget2D BackBuffer => backbuffer;
 
-        //public DepthStencilBuffer DepthBuffer => depthbuffer;
+        public DepthStencilBuffer DepthBuffer => depthBuffer;
 
         public ViewportF Viewport { get; protected set; }
 
         //protected RenderTarget2D backbuffer = null;
-        //protected DepthStencilBuffer depthbuffer = null;
-
+        private DepthStencilBuffer depthBuffer;
         private PresentInterval presentInterval = 0;
         //private PresentFlags presentFlags = PresentFlags.None;
 
         public PresentInterval PresentInterval
         {
-            get { return presentInterval; }
+            get => presentInterval;
             set
             {
                 presentInterval = value;
@@ -35,7 +35,7 @@ namespace Adamantium.Engine.Graphics
             }
         }
 
-        public Texture[] Backbuffers { get; protected set; }
+        public Texture[] BackBuffers { get; protected set; }
 
         //public PresentFlags PresentFlags
         //{
@@ -57,11 +57,12 @@ namespace Adamantium.Engine.Graphics
             CreateViewPort();
         }
 
-        private void CreateDepthBuffer()
+        protected void CreateDepthBuffer()
         {
             // Create the depth buffer/stencil view
-            //depthbuffer = ToDispose(DepthStencilBuffer.New(GraphicsDevice, Description.BackBufferWidth, Description.BackBufferHeight,
-            //      Description.MSAALevel, Description.DepthFormat));
+            depthBuffer = DepthStencilBuffer.New(GraphicsDevice, Description.Width, Description.Height, Description.DepthFormat,
+                ImageUsageFlagBits.DepthStencilAttachmentBit,
+                ImageAspectFlagBits.DepthBit);
         }
 
         private void CreateViewPort()
@@ -118,16 +119,16 @@ namespace Adamantium.Engine.Graphics
         /// Takes screenshot from current backbuffer frame
         /// </summary>
         /// <param name="fileName">File path for image to save</param>
-        /// <param name="filetype">Type of the saving image</param>
-        public void TakeScreenshot(String fileName, ImageFileType filetype)
+        /// <param name="fileType">Type of the saving image</param>
+        public void TakeScreenshot(String fileName, ImageFileType fileType)
         {
             Task.Factory.StartNew(() =>
             {
-             //using (var image = backbuffer.GetDataAsImage())
-             //{
-             //   image.Save(fileName, filetype);
-             //}
-         }, TaskCreationOptions.LongRunning);
+//                using (var image = backbuffer.GetDataAsImage())
+//                {
+//                    image.Save(fileName, fileType);
+//                }
+            }, TaskCreationOptions.LongRunning);
         }
 
         /// <summary>
@@ -140,15 +141,15 @@ namespace Adamantium.Engine.Graphics
         /// <exception cref="NotSupportedException"></exception>
         public static GraphicsPresenter Create(GraphicsDevice device, PresentationParameters parameters, String name = "")
         {
-            if (parameters.PresenterType == PresenterType.Swapchain)
+            switch (parameters.PresenterType)
             {
-                return new SwapChainGraphicsPresenter(device, parameters, name);
+                case PresenterType.Swapchain:
+                    return new SwapChainGraphicsPresenter(device, parameters, name);
+                case PresenterType.RenderTarget:
+                    return new RenderTargetGraphicsPresenter(device, parameters, name);
+                default:
+                    throw new NotSupportedException($"Presenter type: {parameters.PresenterType} is not supported");
             }
-            else if (parameters.PresenterType == PresenterType.RenderTarget)
-            {
-                return new RenderTargetGraphicsPresenter(device, parameters, name);
-            }
-            throw new NotSupportedException("Presenter type - " + parameters.PresenterType + " is not supported");
         }
     }
 }

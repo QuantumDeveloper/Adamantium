@@ -93,6 +93,10 @@ namespace Adamantium.Engine.Graphics
 
             var layersAvailable = Instance.EnumerateInstanceLayerProperties();
             var extensions = Instance.EnumerateInstanceExtensionProperties();
+            
+//            var ext = new string[] {"VK_MVK_macos_surface", "VK_KHR_surface", "VK_KHR_swapchain"};
+//            createInfo.EnabledExtensionCount = (uint)ext.Length;
+//            createInfo.PpEnabledExtensionNames = ext.ToArray();
 
             createInfo.EnabledExtensionCount = (uint)extensions.Length;
             createInfo.PpEnabledExtensionNames = extensions.Select(x => x.ExtensionName).ToArray();
