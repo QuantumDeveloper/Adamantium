@@ -115,7 +115,7 @@ namespace Adamantium.Engine.Graphics
 
             MemoryAllocateInfo allocInfo = new MemoryAllocateInfo();
             allocInfo.AllocationSize = memoryRequirements.Size;
-            allocInfo.MemoryTypeIndex = GraphicsDevice.Instance.CurrentDevice.FindMemoryIndex(memoryRequirements.MemoryTypeBits, memoryProperties);
+            allocInfo.MemoryTypeIndex = GraphicsDevice.VulkanInstance.CurrentDevice.FindMemoryIndex(memoryRequirements.MemoryTypeBits, memoryProperties);
 
             bufferMemory = GraphicsDevice.LogicalDevice.AllocateMemory(allocInfo);
 
@@ -128,7 +128,7 @@ namespace Adamantium.Engine.Graphics
 
         private void CopyBuffer(VulkanBuffer srcBuffer, VulkanBuffer dstBuffer, ulong size)
         {
-            var commandBuffer = GraphicsDevice.BeginSingleTimeCommand();
+            var commandBuffer = GraphicsDevice.BeginSingleTimeCommands();
 
             BufferCopy copyRegin = new BufferCopy();
             copyRegin.Size = size;

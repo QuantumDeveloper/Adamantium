@@ -107,7 +107,9 @@ namespace Adamantium.Engine.Graphics
 
         public ImageType ImageType;
 
-        public ImageLayout ImageLayout;
+        public ImageLayout DesiredImageLayout;
+
+        public ImageAspectFlagBits ImageAspect;
 
         /// <summary>
         /// Gets the staging description for this instance.
@@ -136,7 +138,7 @@ namespace Adamantium.Engine.Graphics
                 SharingMode == other.SharingMode &&
                 ImageTiling == other.ImageTiling &&
                 ImageType == other.ImageType &&
-                ImageLayout == other.ImageLayout &&
+                DesiredImageLayout == other.DesiredImageLayout &&
                 Flags == other.Flags;
         }
 
@@ -165,7 +167,7 @@ namespace Adamantium.Engine.Graphics
                 hashCode = (hashCode * 397) ^ SharingMode.GetHashCode();
                 hashCode = (hashCode * 397) ^ ImageTiling.GetHashCode();
                 hashCode = (hashCode * 397) ^ ImageType.GetHashCode();
-                hashCode = (hashCode * 397) ^ ImageLayout.GetHashCode();
+                hashCode = (hashCode * 397) ^ DesiredImageLayout.GetHashCode();
                 hashCode = (hashCode * 397) ^ Flags.GetHashCode();
 
                 return hashCode;
@@ -203,7 +205,7 @@ namespace Adamantium.Engine.Graphics
                 SharingMode = description.SharingMode,
                 ImageTiling = description.Tiling,
                 ImageType = description.ImageType,
-                ImageLayout = description.InitialLayout,
+                DesiredImageLayout = description.InitialLayout,
                 Flags = (ImageCreateFlagBits)description.Flags
             };
         }
@@ -226,7 +228,7 @@ namespace Adamantium.Engine.Graphics
                 Usage = (uint)description.Usage,
                 SharingMode = description.SharingMode,
                 Tiling = description.ImageTiling,
-                InitialLayout = description.ImageLayout,
+                InitialLayout = description.DesiredImageLayout,
                 Flags = (uint)description.Flags,
             };
         }

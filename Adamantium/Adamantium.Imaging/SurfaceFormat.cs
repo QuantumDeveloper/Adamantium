@@ -1994,6 +1994,22 @@ namespace Adamantium.Imaging
         }
 
         /// <summary>
+        /// Checks if current surface format contains surface bits
+        /// </summary>
+        /// <returns>True if surface format is suitable for stencil, otherwise false</returns>
+        public bool HasStencilFormat()
+        {
+            if (Value == Format.D16_UNORM_S8_UINT || 
+                Value == Format.D24_UNORM_S8_UINT ||
+                Value == Format.D32_SFLOAT_S8_UINT)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
         /// Returns <see cref="Format"/> from <see cref="SurfaceFormat"/>
         /// </summary>
         /// <param name="from"></param>

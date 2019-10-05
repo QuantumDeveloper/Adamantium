@@ -46,14 +46,14 @@ namespace Adamantium.Engine.Graphics
 
         private GraphicsDevice(VulkanInstance instance, PhysicalDevice physicalDevice)
         {
-            Instance = instance;
+            VulkanInstance = instance;
             PhysicalDevice = physicalDevice;
             //CreateMainDevice();
         }
 
         private GraphicsDevice(GraphicsDevice main, PresentationParameters presentationParameters)
         {
-            surface = Instance.GetOrCreateSurface(presentationParameters);
+            surface = VulkanInstance.GetOrCreateSurface(presentationParameters);
             if (!main.IsMain)
             {
                 CreateMainDevice();
@@ -66,7 +66,7 @@ namespace Adamantium.Engine.Graphics
             InitializeRenderDevice(presentationParameters);
         }
 
-        public static VulkanInstance Instance { get; private set; }
+        public static VulkanInstance VulkanInstance { get; private set; }
 
         internal GraphicsPresenter Presenter { get; private set; }
 
@@ -76,10 +76,10 @@ namespace Adamantium.Engine.Graphics
 
         private void InitializeRenderDevice(PresentationParameters presentationParameters)
         {
-            Presenter = GraphicsPresenter.Create(this, presentationParameters);
+            CreateCommandPool();
+            CreateGraphicsPresenter(presentationParameters);
             CreateRenderPass();
             CreateDefaultFramebuffers();
-            CreateCommandPool();
             CreateCommandBuffers();
             CreateDescriptorPool();
             //CreateDescriptorSetLayout();
@@ -131,7 +131,7 @@ namespace Adamantium.Engine.Graphics
             createInfo.EnabledExtensionCount = (uint)VulkanInstance.DeviceExtensions.Count;
             createInfo.PpEnabledExtensionNames = VulkanInstance.DeviceExtensions.ToArray();
 
-            if (Instance.IsInDebugMode)
+            if (VulkanInstance.IsInDebugMode)
             {
                 createInfo.EnabledLayerCount = (uint)VulkanInstance.ValidationLayers.Count;
                 createInfo.PpEnabledLayerNames = VulkanInstance.ValidationLayers.ToArray();
@@ -160,16 +160,42 @@ namespace Adamantium.Engine.Graphics
             colorAttachmentRef.Attachment = 0;
             colorAttachmentRef.Layout = ImageLayout.ColorAttachmentOptimal;
 
+            var depthAttachment = new AttachmentDescription();
+            depthAttachment.Format = (Format)Presenter.Description.DepthFormat;
+            depthAttachment.Samples = (SampleCountFlagBits)Presenter.Description.MSAALevel;
+            depthAttachment.LoadOp = AttachmentLoadOp.Clear;
+            depthAttachment.StoreOp = AttachmentStoreOp.Store;
+            depthAttachment.StencilLoadOp = AttachmentLoadOp.DontCare;
+            depthAttachment.StencilStoreOp = AttachmentStoreOp.DontCare;
+            depthAttachment.InitialLayout = ImageLayout.Undefined;
+            depthAttachment.FinalLayout = Presenter.DepthBuffer.ImageLayout;
+
+            var depthAttachmentRef = new AttachmentReference();
+            colorAttachmentRef.Attachment = 0;
+            colorAttachmentRef.Layout = Presenter.DepthBuffer.ImageLayout;
+
             var subpass = new SubpassDescription();
             subpass.PipelineBindPoint = PipelineBindPoint.Graphics;
             subpass.ColorAttachmentCount = 1;
-            subpass.PColorAttachments = colorAttachmentRef;
+            subpass.PColorAttachments = new [] {colorAttachmentRef};
+            subpass.PDepthStencilAttachment = depthAttachmentRef;
+            
+            SubpassDependency subpassDependency = new SubpassDependency();
+            subpassDependency.SrcSubpass = Constants.VK_SUBPASS_EXTERNAL;
+            subpassDependency.DstSubpass = 0;
+            subpassDependency.SrcStageMask = (uint)PipelineStageFlagBits.ColorAttachmentOutputBit;
+            subpassDependency.SrcAccessMask = 0;
+            subpassDependency.DstStageMask = (uint) PipelineStageFlagBits.ColorAttachmentOutputBit;
+            subpassDependency.DstAccessMask = (uint)(AccessFlagBits.ColorAttachmentReadBit | AccessFlagBits.ColorAttachmentWriteBit);
 
+            var attachments = new [] { colorAttachment, depthAttachment}; 
             var renderPassInfo = new RenderPassCreateInfo();
-            renderPassInfo.AttachmentCount = 1;
-            renderPassInfo.PAttachments = colorAttachment;
+            renderPassInfo.AttachmentCount = (uint)attachments.Length;
+            renderPassInfo.PAttachments = attachments;
             renderPassInfo.SubpassCount = 1;
-            renderPassInfo.PSubpasses = subpass;
+            renderPassInfo.PSubpasses = new[] {subpass};
+            renderPassInfo.DependencyCount = 1;
+            renderPassInfo.PDependencies = new[] {subpassDependency};
 
             renderPass = LogicalDevice.CreateRenderPass(renderPassInfo);
         }
@@ -297,6 +323,17 @@ namespace Adamantium.Engine.Graphics
             var colorBlendAttachment = new PipelineColorBlendAttachmentState();
             colorBlendAttachment.ColorWriteMask = (uint)(ColorComponentFlagBits.RBit | ColorComponentFlagBits.GBit | ColorComponentFlagBits.BBit | ColorComponentFlagBits.ABit);
             colorBlendAttachment.BlendEnable = false;
+            
+            var depthStencil = new PipelineDepthStencilStateCreateInfo();
+            depthStencil.DepthTestEnable = true;
+            depthStencil.DepthWriteEnable = true;
+            depthStencil.DepthCompareOp = CompareOp.Less;
+            depthStencil.DepthBoundsTestEnable = false;
+            depthStencil.MinDepthBounds = 0.0f;
+            depthStencil.MaxDepthBounds = 1.0f;
+//            depthStencil.StencilTestEnable = true;
+//            depthStencil.Front = new StencilOpState();
+//            depthStencil.Back = new StencilOpState();
 
             var colorBlending = new PipelineColorBlendStateCreateInfo();
             colorBlending.LogicOpEnable = false;
@@ -320,6 +357,7 @@ namespace Adamantium.Engine.Graphics
             pipelineInfo.PColorBlendState = colorBlending;
             pipelineInfo.Layout = pipelineLayout;
             pipelineInfo.RenderPass = renderPass;
+            pipelineInfo.PDepthStencilState = depthStencil;
             pipelineInfo.Subpass = 0;
 
             var pipelines = LogicalDevice.CreateGraphicsPipelines(null, 1, pipelineInfo);
@@ -349,6 +387,11 @@ namespace Adamantium.Engine.Graphics
             poolInfo.QueueFamilyIndex = queueFamilyIndices.graphicsFamily.Value;
             poolInfo.Flags = (uint)CommandPoolCreateFlagBits.ResetCommandBufferBit;
             CommandPool = LogicalDevice.CreateCommandPool(poolInfo);
+        }
+
+        private void CreateGraphicsPresenter(PresentationParameters parameters)
+        {
+            Presenter = GraphicsPresenter.Create(this, parameters);
         }
 
         private void CreateCommandBuffers()
@@ -383,9 +426,9 @@ namespace Adamantium.Engine.Graphics
             {
                 FramebufferCreateInfo framebufferInfo = new FramebufferCreateInfo();
                 framebufferInfo.RenderPass = renderPass;
-                framebufferInfo.AttachmentCount = 1;
+                framebufferInfo.AttachmentCount = 2;
                 var swapchainPresenter = (SwapChainGraphicsPresenter)Presenter;
-                framebufferInfo.PAttachments = swapchainPresenter.swapchainImageViews[i];
+                framebufferInfo.PAttachments = new [] {swapchainPresenter.swapchainImageViews[i], Presenter.DepthBuffer};
                 framebufferInfo.Width = Presenter.Description.Width;
                 framebufferInfo.Height = Presenter.Description.Height;
                 framebufferInfo.Layers = 1;
@@ -407,7 +450,7 @@ namespace Adamantium.Engine.Graphics
             return LogicalDevice.DeviceWaitIdle();
         }
 
-        public bool BeginDraw()
+        public bool BeginDraw(Color clearColor, float depth = 1.0f, uint stencil = 0)
         {
             var renderFence = InFlightFences[CurrentFrame];
             var result = LogicalDevice.WaitForFences(1, renderFence, true, ulong.MaxValue);
@@ -449,12 +492,17 @@ namespace Adamantium.Engine.Graphics
             renderPassInfo.RenderArea.Extent = new Extent2D()
                 {Width = Presenter.Description.Width, Height = Presenter.Description.Height};
 
-            ClearValue clearValue = new ClearValue();
-            clearValue.Color = new ClearColorValue();
-            clearValue.Color.Float32 = new float[4] {0.5f, 0.7f, 1.0f, 0.0f};
-
-            renderPassInfo.ClearValueCount = 1;
-            renderPassInfo.PClearValues = new ClearValue[] {clearValue};
+            ClearValue clearColorValue = new ClearValue();
+            clearColorValue.Color = new ClearColorValue();
+            clearColorValue.Color.Float32 = clearColor.ToFloatArray();
+            
+            ClearValue clearDepthValue = new ClearValue();
+            clearColorValue.DepthStencil = new ClearDepthStencilValue();
+            clearColorValue.DepthStencil.Depth = depth;
+            clearColorValue.DepthStencil.Stencil = stencil;
+            
+            renderPassInfo.PClearValues = new [] {clearColorValue, clearDepthValue};
+            renderPassInfo.ClearValueCount = (uint)renderPassInfo.PClearValues.Length;
 
             commandBuffer.CmdBeginRenderPass(renderPassInfo, SubpassContents.Inline);
 
@@ -537,7 +585,7 @@ namespace Adamantium.Engine.Graphics
             commandBuffer.CmdDrawIndexed(indexBuffer.ElementCount, 1, 0, 0, 0);
         }
 
-        public CommandBuffer BeginSingleTimeCommand()
+        public CommandBuffer BeginSingleTimeCommands()
         {
             return LogicalDevice.BeginSingleTimeCommand(CommandPool);
         }

@@ -17,11 +17,13 @@ namespace Adamantium.Engine.Graphics
         private DeviceMemory imageMemory;
         private TextureDescription description;
 
-        public uint Width { get; set; }
+        public uint Width => description.Width;
 
-        public uint Height { get; set; }
+        public uint Height => description.Height;
 
-        public SurfaceFormat Format => description.Format;
+        public SurfaceFormat SurfaceFormat => description.Format;
+
+        public ImageLayout ImageLayout { get; private set; }
 
         public IntPtr NativePointer { get; }
 
@@ -36,15 +38,16 @@ namespace Adamantium.Engine.Graphics
             GraphicsDevice = device;
             this.description = description;
             Initialize();
+            TransitionImageLayout(description.DesiredImageLayout);
         }
 
-        protected Texture(GraphicsDevice device, Image img, ImageUsageFlagBits flags, ImageLayout usage)
+        protected Texture(GraphicsDevice device, Image img, ImageUsageFlagBits usage, ImageLayout desiredLayout)
         {
             GraphicsDevice = device;
 
         }
 
-        protected Texture(GraphicsDevice device, Image[] img, ImageUsageFlagBits flags, ImageLayout usage)
+        protected Texture(GraphicsDevice device, Image[] img, ImageUsageFlagBits usage, ImageLayout desiredLayout)
         {
             GraphicsDevice = device;
 
@@ -62,7 +65,7 @@ namespace Adamantium.Engine.Graphics
             imageInfo.ArrayLayers = description.ArrayLayers;
             imageInfo.Format = description.Format;
             imageInfo.Tiling = description.ImageTiling;
-            imageInfo.InitialLayout = description.ImageLayout;
+            imageInfo.InitialLayout = ImageLayout.Undefined;
             imageInfo.Usage = (uint)description.Usage;
             imageInfo.Samples = description.Samples;
             imageInfo.SharingMode = description.SharingMode;
@@ -73,7 +76,7 @@ namespace Adamantium.Engine.Graphics
         protected void Initialize()
         {
             CreateImage(description);
-            CreateImageView();
+            CreateImageView(description);
         }
 
         protected void CreateImage(TextureDescription description)
@@ -87,9 +90,13 @@ namespace Adamantium.Engine.Graphics
 
             device.GetImageMemoryRequirements(image, out var memRequirements);
 
-            MemoryAllocateInfo allocInfo = new MemoryAllocateInfo();
-            allocInfo.AllocationSize = memRequirements.Size;
-            allocInfo.MemoryTypeIndex = GraphicsDevice.Instance.CurrentDevice.FindCorrespondingMemoryType(memRequirements.MemoryTypeBits, MemoryPropertyFlagBits.DeviceLocalBit);
+            var allocInfo = new MemoryAllocateInfo
+            {
+                AllocationSize = memRequirements.Size,
+                MemoryTypeIndex =
+                    GraphicsDevice.VulkanInstance.CurrentDevice.FindCorrespondingMemoryType(memRequirements.MemoryTypeBits,
+                        MemoryPropertyFlagBits.DeviceLocalBit)
+            };
 
             if (device.AllocateMemory(allocInfo, null, out imageMemory) != Result.Success)
             {
@@ -97,31 +104,121 @@ namespace Adamantium.Engine.Graphics
             }
 
             device.BindImageMemory(image, imageMemory, 0);
+            ImageLayout = imageInfo.InitialLayout;
         }
 
-        protected void CreateImageView()
+        protected void CreateImageView(TextureDescription description)
         {
             var createInfo = new ImageViewCreateInfo();
             createInfo.Image = Image;
-            createInfo.ViewType = ImageViewType._2d;
-            createInfo.Format = Format;
-            ComponentMapping componentMapping = new ComponentMapping();
-            componentMapping.R = ComponentSwizzle.Identity;
-            componentMapping.G = ComponentSwizzle.Identity;
-            componentMapping.B = ComponentSwizzle.Identity;
-            componentMapping.A = ComponentSwizzle.Identity;
+            createInfo.ViewType = (ImageViewType)description.Dimension;
+            createInfo.Format = SurfaceFormat;
+            ComponentMapping componentMapping = new ComponentMapping
+            {
+                R = ComponentSwizzle.Identity,
+                G = ComponentSwizzle.Identity,
+                B = ComponentSwizzle.Identity,
+                A = ComponentSwizzle.Identity
+            };
             createInfo.Components = componentMapping;
-            ImageSubresourceRange subresourceRange = new ImageSubresourceRange();
-            subresourceRange.AspectMask = (uint)ImageAspectFlagBits.ColorBit;
-            subresourceRange.BaseMipLevel = 0;
-            subresourceRange.LevelCount = 1;
-            subresourceRange.BaseArrayLayer = 0;
-            subresourceRange.LayerCount = 1;
+            ImageSubresourceRange subresourceRange = new ImageSubresourceRange
+            {
+                AspectMask = (uint) description.ImageAspect,
+                BaseMipLevel = 0,
+                LevelCount = 1,
+                BaseArrayLayer = 0,
+                LayerCount = 1
+            };
             createInfo.SubresourceRange = subresourceRange;
 
             ImageView = GraphicsDevice.LogicalDevice.CreateImageView(createInfo);
         }
 
+        public void TransitionImageLayout(ImageLayout newLayout)
+        {
+            var commandBuffer = GraphicsDevice.BeginSingleTimeCommands();
+
+            var barrier = new ImageMemoryBarrier
+            {
+                OldLayout = ImageLayout,
+                NewLayout = newLayout,
+                SrcQueueFamilyIndex = Constants.VK_QUEUE_FAMILY_IGNORED,
+                DstQueueFamilyIndex = Constants.VK_QUEUE_FAMILY_IGNORED,
+                Image = image,
+                SubresourceRange = new ImageSubresourceRange()
+            };
+            
+            if (newLayout == ImageLayout.DepthStencilAttachmentOptimal)
+            {
+                barrier.SubresourceRange.AspectMask = (uint)ImageAspectFlagBits.DepthBit;
+
+                if (SurfaceFormat.HasStencilFormat())
+                {
+                    barrier.SubresourceRange.AspectMask |= (uint) ImageAspectFlagBits.StencilBit;
+                }
+            }
+            else
+            {
+                barrier.SubresourceRange.AspectMask = (uint)ImageAspectFlagBits.ColorBit;
+            }
+
+            barrier.SubresourceRange.BaseMipLevel = 0;
+            barrier.SubresourceRange.LevelCount = 1;
+            barrier.SubresourceRange.BaseArrayLayer = 0;
+            barrier.SubresourceRange.LayerCount = 1;
+
+            PipelineStageFlagBits sourceStage;
+            PipelineStageFlagBits destinationStage;
+
+            if ((ImageLayout == ImageLayout.Undefined || ImageLayout == ImageLayout.Preinitialized) &&
+                newLayout == ImageLayout.TransferDstOptimal)
+            {
+                barrier.SrcAccessMask = 0;
+                barrier.DstAccessMask = (uint)AccessFlagBits.TransferWriteBit;
+
+                sourceStage = PipelineStageFlagBits.TopOfPipeBit;
+                destinationStage = PipelineStageFlagBits.TransferBit;
+            }
+            else if (ImageLayout == ImageLayout.TransferSrcOptimal && newLayout == ImageLayout.ShaderReadOnlyOptimal)
+            {
+                barrier.SrcAccessMask = (uint)AccessFlagBits.TransferWriteBit;
+                barrier.DstAccessMask = (uint) AccessFlagBits.ShaderReadBit;
+
+                sourceStage = PipelineStageFlagBits.TransferBit;
+                destinationStage = PipelineStageFlagBits.FragmentShaderBit;
+            }
+            else if (ImageLayout == ImageLayout.Undefined && newLayout == ImageLayout.DepthStencilAttachmentOptimal)
+            {
+                barrier.SrcAccessMask = 0;
+                barrier.DstAccessMask = (uint)(AccessFlagBits.DepthStencilAttachmentReadBit |
+                                        AccessFlagBits.DepthStencilAttachmentWriteBit);
+
+                sourceStage = PipelineStageFlagBits.TopOfPipeBit;
+                destinationStage = PipelineStageFlagBits.EarlyFragmentTestsBit;
+            }
+            else
+            {
+                throw new ImageLayoutTransitionException(
+                    $"Transition from {ImageLayout} to {newLayout} is not supported");
+            }
+
+            commandBuffer.CmdPipelineBarrier(
+                (uint) sourceStage, 
+                (uint) destinationStage, 
+                0, 
+                0, 
+                null, 
+                0, 
+                null, 
+                1,
+                barrier);
+
+            ImageLayout = newLayout;
+
+            GraphicsDevice.EndSingleTimeCommands(commandBuffer);
+        }
+        
+        
         public static uint CalculateMipLevels(int width, int height, MipMapCount mipLevels)
         {
             return CalculateMipLevels(width, height, 1, mipLevels);
@@ -181,7 +278,7 @@ namespace Adamantium.Engine.Graphics
             }
             else if (description.Usage.HasFlag(ImageUsageFlagBits.DepthStencilAttachmentBit))
             {
-                return new DepthBuffer(graphicsDevice, description);
+                return new DepthStencilBuffer(graphicsDevice, description);
             }
             else
             {
