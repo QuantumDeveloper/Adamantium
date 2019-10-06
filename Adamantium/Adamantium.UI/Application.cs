@@ -75,7 +75,6 @@ namespace Adamantium.UI
 
         protected void OnWindowAdded(IWindow window)
         {
-            //window.ClientSizeChanged += Window_ClientSizeChanged;
             var @params = new PresentationParameters(PresenterType.Swapchain)
             {
                 Width = (uint)window.ClientWidth,

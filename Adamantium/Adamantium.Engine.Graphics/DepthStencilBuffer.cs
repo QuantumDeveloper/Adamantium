@@ -12,13 +12,13 @@ namespace Adamantium.Engine.Graphics
         {
         }
 
-        public static DepthStencilBuffer New(GraphicsDevice graphicsDevice, uint width, uint height, DepthFormat format, ImageUsageFlagBits usage, ImageAspectFlagBits imageAspect)
+        public static DepthStencilBuffer New(GraphicsDevice graphicsDevice, uint width, uint height, DepthFormat format, MSAALevel msaa, ImageUsageFlagBits usage, ImageAspectFlagBits imageAspect)
         {
             if (imageAspect.HasFlag(ImageAspectFlagBits.DepthBit))
             {
                 imageAspect |= ImageAspectFlagBits.StencilBit;
             }
-            
+
             TextureDescription description = new TextureDescription
             {
                 Width = width,
@@ -27,13 +27,14 @@ namespace Adamantium.Engine.Graphics
                 Dimension = TextureDimension.Texture2D,
                 ArrayLayers = 1,
                 Usage = usage,
-                Format = (Format) format,
+                Format = (Format)format,
                 DesiredImageLayout = ImageLayout.DepthStencilAttachmentOptimal,
                 ImageTiling = ImageTiling.Optimal,
                 ImageType = ImageType._2d,
                 MipLevels = 1,
                 SharingMode = SharingMode.Exclusive,
-                ImageAspect = imageAspect
+                ImageAspect = imageAspect,
+                Samples = msaa
             };
 
             return (DepthStencilBuffer)New(graphicsDevice, description);

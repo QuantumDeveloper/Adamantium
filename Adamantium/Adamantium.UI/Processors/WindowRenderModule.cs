@@ -83,14 +83,15 @@ namespace Adamantium.UI.Processors
                 return false;
             }
 
-//            if (isWindowResized)
-//            {
-//                isWindowResized = false;
-//                //InitializeResources();
-//                GraphicsDevice.ResizeBuffers((uint)window.ClientWidth, (uint)window.ClientHeight, 2, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
-//                return false;
-//            }
+            //            if (isWindowResized)
+            //            {
+            //                isWindowResized = false;
+            //                //InitializeResources();
+            //                GraphicsDevice.ResizeBuffers((uint)window.ClientWidth, (uint)window.ClientHeight, 2, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
+            //                return false;
+            //            }
 
+            var c = Color.FromRgba(0xFF6495ED);
             if (!GraphicsDevice.BeginDraw(Colors.CornflowerBlue, 1.0f, 0))
             {
                 GraphicsDevice.ResizeBuffers((uint)window.ClientWidth, (uint)window.ClientHeight, buffersCount, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);

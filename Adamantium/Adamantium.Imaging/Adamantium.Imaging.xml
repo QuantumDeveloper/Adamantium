@@ -5626,6 +5626,12 @@
             Corresponds to <see cref="F:AdamantiumVulkan.Core.Format.PVRTC2_4BPP_SRGB_BLOCK_IMG"/>
             </summary>
         </member>
+        <member name="M:Adamantium.Imaging.SurfaceFormat.HasStencilFormat">
+            <summary>
+            Checks if current surface format contains surface bits
+            </summary>
+            <returns>True if surface format is suitable for stencil, otherwise false</returns>
+        </member>
         <member name="M:Adamantium.Imaging.SurfaceFormat.op_Implicit(Adamantium.Imaging.SurfaceFormat)~AdamantiumVulkan.Core.Format">
             <summary>
             Returns <see cref="T:AdamantiumVulkan.Core.Format"/> from <see cref="T:Adamantium.Imaging.SurfaceFormat"/>

@@ -60,9 +60,9 @@ namespace Adamantium.Mathematics
         /// <param name="alpha">The alpha component of the color.</param>
         public Color(byte red, byte green, byte blue, byte alpha)
         {
-            R = red;
+            B = red;
             G = green;
-            B = blue;
+            R = blue;
             A = alpha;
         }
 
@@ -697,6 +697,17 @@ namespace Adamantium.Mathematics
         /// <param name="color">An int value, which represents RGBA color</param>
         /// <returns>A color.</returns>
         public static Color FromRgba(int color)
+        {
+            //return new Color(BitConverter.GetBytes(color));
+            return new Color(color);
+        }
+
+        /// <summary>
+        /// Converts the color from merged RGBA value.
+        /// </summary>
+        /// <param name="color">A uint value, which represents RGBA color</param>
+        /// <returns>A color.</returns>
+        public static Color FromRgba(uint color)
         {
             //return new Color(BitConverter.GetBytes(color));
             return new Color(color);

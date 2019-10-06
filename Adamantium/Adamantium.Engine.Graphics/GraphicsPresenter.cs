@@ -21,7 +21,7 @@ namespace Adamantium.Engine.Graphics
         public ViewportF Viewport { get; protected set; }
 
         //protected RenderTarget2D backbuffer = null;
-        private DepthStencilBuffer depthBuffer;
+        protected DepthStencilBuffer depthBuffer;
         private PresentInterval presentInterval = 0;
         //private PresentFlags presentFlags = PresentFlags.None;
 
@@ -60,9 +60,8 @@ namespace Adamantium.Engine.Graphics
         protected void CreateDepthBuffer()
         {
             // Create the depth buffer/stencil view
-            depthBuffer = DepthStencilBuffer.New(GraphicsDevice, Description.Width, Description.Height, Description.DepthFormat,
-                ImageUsageFlagBits.DepthStencilAttachmentBit,
-                ImageAspectFlagBits.DepthBit);
+            depthBuffer = ToDispose(DepthStencilBuffer.New(GraphicsDevice, Description.Width, Description.Height, Description.DepthFormat, Description.MSAALevel,
+                ImageUsageFlagBits.DepthStencilAttachmentBit, ImageAspectFlagBits.DepthBit));
         }
 
         private void CreateViewPort()
@@ -98,12 +97,13 @@ namespace Adamantium.Engine.Graphics
             Description.Width = width;
             Description.Height = height;
             Description.ImageFormat = pixelFormat;
+            Console.WriteLine($"Base Extent = {width} : {height}");
 
-            //if (updateDepthStencil)
-            //{
-            //   RemoveAndDispose(ref depthbuffer);
-            //   CreateDepthBuffer();
-            //}
+            if (updateDepthStencil)
+            {
+                //RemoveAndDispose(ref depthBuffer);
+                //CreateDepthBuffer();
+            }
 
             CreateViewPort();
 

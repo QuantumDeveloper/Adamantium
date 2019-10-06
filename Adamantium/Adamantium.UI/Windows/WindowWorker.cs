@@ -70,6 +70,11 @@ namespace Adamantium.UI.Windows
             if (source.Handle != IntPtr.Zero)
             {
                 source.AddHook(CustomWndProc);
+
+                Win32Interop.GetClientRect(window.Handle, out var client);
+                this.window.ClientWidth = client.Width;
+                this.window.ClientHeight = client.Height;
+
                 this.window.ApplyTemplate();
                 Application.Current.Windows.Add(this.window);
                 this.window.OnSourceInitialized();
