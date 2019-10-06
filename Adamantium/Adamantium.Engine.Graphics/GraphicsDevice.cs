@@ -156,10 +156,6 @@ namespace Adamantium.Engine.Graphics
             colorAttachment.InitialLayout = ImageLayout.Undefined;
             colorAttachment.FinalLayout = ImageLayout.PresentSrcKhr;
 
-            var colorAttachmentRef = new AttachmentReference();
-            colorAttachmentRef.Attachment = 0;
-            colorAttachmentRef.Layout = ImageLayout.ColorAttachmentOptimal;
-
             var depthAttachment = new AttachmentDescription();
             depthAttachment.Format = (Format)Presenter.Description.DepthFormat;
             depthAttachment.Samples = (SampleCountFlagBits)Presenter.Description.MSAALevel;
@@ -170,9 +166,13 @@ namespace Adamantium.Engine.Graphics
             depthAttachment.InitialLayout = ImageLayout.Undefined;
             depthAttachment.FinalLayout = Presenter.DepthBuffer.ImageLayout;
 
-            var depthAttachmentRef = new AttachmentReference();
+            var colorAttachmentRef = new AttachmentReference();
             colorAttachmentRef.Attachment = 0;
-            colorAttachmentRef.Layout = Presenter.DepthBuffer.ImageLayout;
+            colorAttachmentRef.Layout = ImageLayout.ColorAttachmentOptimal;
+
+            var depthAttachmentRef = new AttachmentReference();
+            depthAttachmentRef.Attachment = 1;
+            depthAttachmentRef.Layout = Presenter.DepthBuffer.ImageLayout;
 
             var subpass = new SubpassDescription();
             subpass.PipelineBindPoint = PipelineBindPoint.Graphics;
@@ -325,7 +325,7 @@ namespace Adamantium.Engine.Graphics
             colorBlendAttachment.BlendEnable = false;
             
             var depthStencil = new PipelineDepthStencilStateCreateInfo();
-            depthStencil.DepthTestEnable = true;
+            depthStencil.DepthTestEnable = false;
             depthStencil.DepthWriteEnable = true;
             depthStencil.DepthCompareOp = CompareOp.Less;
             depthStencil.DepthBoundsTestEnable = false;

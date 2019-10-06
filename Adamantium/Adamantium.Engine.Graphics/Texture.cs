@@ -53,26 +53,6 @@ namespace Adamantium.Engine.Graphics
 
         }
 
-        private ImageCreateInfo TextureDescriptionToImageInfo(TextureDescription description)
-        {
-            ImageCreateInfo imageInfo = new ImageCreateInfo();
-            imageInfo.ImageType = description.ImageType;
-            imageInfo.Extent = new Extent3D();
-            imageInfo.Extent.Width = description.Width;
-            imageInfo.Extent.Height = description.Height;
-            imageInfo.Extent.Depth = description.Depth;
-            imageInfo.MipLevels = description.MipLevels;
-            imageInfo.ArrayLayers = description.ArrayLayers;
-            imageInfo.Format = description.Format;
-            imageInfo.Tiling = description.ImageTiling;
-            imageInfo.InitialLayout = ImageLayout.Undefined;
-            imageInfo.Usage = (uint)description.Usage;
-            imageInfo.Samples = description.Samples;
-            imageInfo.SharingMode = description.SharingMode;
-
-            return imageInfo;
-        }
-
         protected void Initialize()
         {
             CreateImage(description);
@@ -82,7 +62,7 @@ namespace Adamantium.Engine.Graphics
         protected void CreateImage(TextureDescription description)
         {
             var device = (Device)GraphicsDevice;
-            var imageInfo = TextureDescriptionToImageInfo(description);
+            var imageInfo = description.ToImageCreateInfo();
             if (device.CreateImage(imageInfo, null, out image) != Result.Success)
             {
                 throw new Exception("failed to create image!");
@@ -409,6 +389,7 @@ namespace Adamantium.Engine.Graphics
 
         protected override void Dispose(bool disposeManaged)
         {
+            Console.WriteLine("Called Dispose on Texture");
             Image?.Destroy(GraphicsDevice);
             ImageView?.Destroy(GraphicsDevice);
             ImageMemory?.FreeMemory(GraphicsDevice);

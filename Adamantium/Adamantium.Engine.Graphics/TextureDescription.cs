@@ -85,7 +85,7 @@ namespace Adamantium.Engine.Graphics
         /// This field is only valid for <see cref="Texture2D"/>.
         /// </remarks>
         /// <unmanaged-short>DXGI_SAMPLE_DESC SampleDesc</unmanaged-short>	
-        public SampleCountFlagBits Samples;
+        public MSAALevel Samples;
 
         /// <summary>	
         /// <dd> <p>Value that identifies how the texture is to be read from and written to.</p> </dd>	
@@ -119,7 +119,7 @@ namespace Adamantium.Engine.Graphics
         {
             var copy = this;
             copy.SharingMode = SharingMode.Exclusive;
-            copy.Samples = SampleCountFlagBits._1Bit;
+            copy.Samples = MSAALevel.None;
             copy.Usage = ImageUsageFlagBits.StorageBit;
             return copy;
         }
@@ -200,7 +200,7 @@ namespace Adamantium.Engine.Graphics
                 MipLevels = description.MipLevels,
                 ArrayLayers = description.ArrayLayers,
                 Format = description.Format,
-                Samples = SampleCountFlagBits._1Bit,
+                Samples = MSAALevel.None,
                 Usage = (ImageUsageFlagBits)description.Usage,
                 SharingMode = description.SharingMode,
                 ImageTiling = description.Tiling,
@@ -215,21 +215,21 @@ namespace Adamantium.Engine.Graphics
         /// </summary>
         /// <param name="description">The texture description.</param>
         /// <returns>The result of the conversion.</returns>
-        public static implicit operator ImageCreateInfo(TextureDescription description)
+        public ImageCreateInfo ToImageCreateInfo()
         {
             return new ImageCreateInfo()
             {
-                ImageType = description.ImageType,
-                Extent = new Extent3D() { Width = description.Width, Height = description.Height, Depth = description.Depth },
-                MipLevels = description.MipLevels,
-                ArrayLayers = description.ArrayLayers,
-                Format = description.Format,
-                Samples = description.Samples,
-                Usage = (uint)description.Usage,
-                SharingMode = description.SharingMode,
-                Tiling = description.ImageTiling,
-                InitialLayout = description.DesiredImageLayout,
-                Flags = (uint)description.Flags,
+                ImageType = ImageType,
+                Extent = new Extent3D() { Width = Width, Height = Height, Depth = Depth },
+                MipLevels = MipLevels,
+                ArrayLayers = ArrayLayers,
+                Format = Format,
+                Samples = (SampleCountFlagBits)Samples,
+                Usage = (uint)Usage,
+                SharingMode = SharingMode,
+                Tiling = ImageTiling,
+                InitialLayout = ImageLayout.Undefined,
+                Flags = (uint)Flags,
             };
         }
 
@@ -268,7 +268,7 @@ namespace Adamantium.Engine.Graphics
                 ArrayLayers = description.ArraySize,
                 MipLevels = description.MipLevels,
                 Format = description.Format,
-                Samples = SampleCountFlagBits._1Bit,
+                Samples = MSAALevel.None,
                 Usage = ImageUsageFlagBits.SampledBit,
                 ImageTiling = ImageTiling.Optimal,
                 SharingMode = SharingMode.Exclusive,

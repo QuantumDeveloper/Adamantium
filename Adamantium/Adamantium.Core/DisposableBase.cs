@@ -23,7 +23,7 @@ namespace Adamantium.Core
 
         public void Dispose()
         {
-            Dispose(true);
+            DisposeInternal(true);
         }
 
         private void DisposeInternal(bool disposeManaged)

@@ -17,11 +17,9 @@ namespace Adamantium.Engine.Graphics
 
         public SwapChainGraphicsPresenter(GraphicsDevice graphicsDevice, PresentationParameters description, string name = "") : base(graphicsDevice, description, name)
         {
-            //Dispose swapchain before creation to be 100% sure we avoid memory leak
-            RemoveAndDispose(ref swapchain);
             CreateSurface();
-            CreateSwapchain(graphicsDevice);
-            CreateImageViews(graphicsDevice);
+            CreateSwapchain();
+            CreateImageViews();
             BackBuffers = new Texture[Description.BuffersCount];
             var indices = GraphicsDevice.VulkanInstance.CurrentDevice.FindQueueFamilies(surface);
             presentQueue = graphicsDevice.GetDeviceQueue(indices.presentFamily.Value, 0);
@@ -48,17 +46,22 @@ namespace Adamantium.Engine.Graphics
             return details;
         }
 
-        private void CreateSwapchain(GraphicsDevice device)
+        private void CreateSwapchain()
         {
-            PhysicalDevice physicalDevice = device;
-            Device logicalDevice = device;
+            PhysicalDevice physicalDevice = GraphicsDevice;
+            Device logicalDevice = GraphicsDevice;
             var swapChainSupport = QuerySwapChainSupport(physicalDevice);
-
+            Console.WriteLine($"Extent1 = {Description.Width} : {Description.Height}");
             SurfaceFormatKHR surfaceFormat = ChooseSwapSurfaceFormat(swapChainSupport.Formats);
             PresentModeKHR presentMode = ChooseSwapPresentMode(swapChainSupport.PresentModes);
             Extent2D extent = ChooseSwapExtent(swapChainSupport.Capabilities);
-
+            Console.WriteLine($"Extent2 = {extent.Width} : {extent.Height}");
             uint imageCount = swapChainSupport.Capabilities.MinImageCount;
+            if (imageCount < Description.BuffersCount)
+            {
+                imageCount = Description.BuffersCount;
+            }
+
             if (swapChainSupport.Capabilities.MaxImageCount > 0 && imageCount > swapChainSupport.Capabilities.MaxImageCount)
             {
                 imageCount = swapChainSupport.Capabilities.MaxImageCount;
@@ -94,19 +97,19 @@ namespace Adamantium.Engine.Graphics
             createInfo.Clipped = true;
 
             swapchain = logicalDevice.CreateSwapchainKHR(createInfo);
+            Description.Width = extent.Width;
+            Description.Height = extent.Height;
+            Description.ImageFormat = surfaceFormat.Format;
 
             createInfo.Dispose();
 
             swapchainImages = logicalDevice.GetSwapchainImagesKHR(swapchain);
-
-            Description.ImageFormat = surfaceFormat.Format;
-            Description.Width = extent.Width;
-            Description.Height = extent.Height;
         }
 
 
-        private void CreateImageViews(Device logicalDevice)
+        private void CreateImageViews()
         {
+            Device logicalDevice = GraphicsDevice;
             swapchainImageViews = new ImageView[swapchainImages.Length];
 
             for (int i = 0; i < swapchainImages.Length; i++)
@@ -225,9 +228,9 @@ namespace Adamantium.Engine.Graphics
         /// <param name="format"></param>
         /// <param name="depthFormat"></param>
         /// <param name="flags"></param>
-        public override bool Resize(uint width, uint height, uint buffersCount, SurfaceFormat format, DepthFormat depthFormat/*, SwapChainFlags flags = SwapChainFlags.None*/)
+        public override bool Resize(uint width, uint height, uint buffersCount, SurfaceFormat format, DepthFormat depthFormat)
         {
-            if (!base.Resize(width, height, buffersCount, format, depthFormat/*, flags*/))
+            if (!base.Resize(width, height, buffersCount, format, depthFormat))
             {
                 return false;
             }
@@ -248,8 +251,8 @@ namespace Adamantium.Engine.Graphics
         {
             CleanupSwapChain();
 
-            CreateSwapchain(GraphicsDevice);
-            CreateImageViews(GraphicsDevice);
+            CreateSwapchain();
+            CreateImageViews();
             CreateDepthBuffer();
         }
 
@@ -260,11 +263,7 @@ namespace Adamantium.Engine.Graphics
                 view.Destroy(GraphicsDevice);
             }
 
-            DepthBuffer.Dispose();
-            //foreach (var img in swapchainImages)
-            //{
-            //    img.Destroy(GraphicsDevice);
-            //}
+            RemoveAndDispose(ref depthBuffer);
 
             swapchain?.Destroy(GraphicsDevice);
         }
