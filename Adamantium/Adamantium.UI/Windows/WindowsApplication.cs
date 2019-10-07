@@ -42,8 +42,7 @@ namespace Adamantium.UI.Windows
                     Messages.DispatchMessage(ref msg);
                 }
 
-                //RunUpdateDrawBlock();
-                CheckExitCondition();
+                //CheckExitConditions();
             }
         }
 

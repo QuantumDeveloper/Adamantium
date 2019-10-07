@@ -45,9 +45,9 @@ namespace Adamantium.UI.OSX
             {
                 //var appDelegate = MacOSInterop.CreateApplicationDelegate();
                 //var app = MacOSInterop.CreateApplication(appDelegate);
-                var wndStyle = OSXWindowStyle.Borderless | OSXWindowStyle.Resizable |
-                               OSXWindowStyle.Titled |
-                               OSXWindowStyle.Miniaturizable | OSXWindowStyle.Closable;
+                //var wndStyle = OSXWindowStyle.Borderless | OSXWindowStyle.Resizable |
+                //               OSXWindowStyle.Titled |
+                //               OSXWindowStyle.Miniaturizable | OSXWindowStyle.Closable;
 //                var wnd = MacOSInterop.CreateWindow(new Rectangle(100, 100, 1280, 720), (uint)wndStyle, "Adamantium window");
 //                var wndDelegate = MacOSInterop.CreateWindowDelegate();
 //                MacOSInterop.SetWindowDelegate(wnd, wndDelegate);
