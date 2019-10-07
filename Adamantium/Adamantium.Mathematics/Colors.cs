@@ -106,7 +106,7 @@ namespace Adamantium.Mathematics
       /// <summary>
       /// CornflowerBlue color.
       /// </summary>
-      public static readonly Color CornflowerBlue = Color.FromRgba(0xFF6495ED);
+      public static readonly Color CornflowerBlue = Color.FromBgra(0xFF6495ED);
 
       /// <summary>
       /// Cornsilk color.

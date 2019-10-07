@@ -60,9 +60,9 @@ namespace Adamantium.Mathematics
         /// <param name="alpha">The alpha component of the color.</param>
         public Color(byte red, byte green, byte blue, byte alpha)
         {
-            B = red;
+            R = red;
             G = green;
-            R = blue;
+            B = blue;
             A = alpha;
         }
 

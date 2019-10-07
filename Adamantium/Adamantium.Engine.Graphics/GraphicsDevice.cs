@@ -494,7 +494,8 @@ namespace Adamantium.Engine.Graphics
 
             ClearValue clearColorValue = new ClearValue();
             clearColorValue.Color = new ClearColorValue();
-            clearColorValue.Color.Float32 = clearColor.ToFloatArray();
+            //clearColorValue.Color.Float32 = clearColor.ToFloatArray();
+            clearColorValue.Color.Float32 = new float[]{0,0,1,0};
             
             ClearValue clearDepthValue = new ClearValue();
             clearColorValue.DepthStencil = new ClearDepthStencilValue();
