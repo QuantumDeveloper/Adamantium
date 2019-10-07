@@ -192,12 +192,9 @@ namespace Adamantium.EntityFramework
 
         public void AddProcessors(IEnumerable<EntityProcessor> processors)
         {
-            lock (syncObject)
+            foreach (var processor in processors)
             {
-                foreach (var processor in processors)
-                {
-                    AddProcessor(processor);
-                }
+                AddProcessor(processor);
             }
         }
 
@@ -219,12 +216,9 @@ namespace Adamantium.EntityFramework
 
         public void RemoveProcessors(IEnumerable<EntityProcessor> processors)
         {
-            lock (syncObject)
+            foreach (var processor in processors)
             {
-                foreach (var processor in processors)
-                {
-                    RemoveProcessor(processor);
-                }
+                RemoveProcessor(processor);
             }
         }
 

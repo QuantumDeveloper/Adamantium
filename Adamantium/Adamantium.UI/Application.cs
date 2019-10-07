@@ -16,7 +16,6 @@ namespace Adamantium.UI
 {
     public abstract class Application : DependencyComponent, IRunningService
     {
-        public ShutDownMode ShutDownMode;
         public IWindow MainWindow
         {
             get => mainWindow;
@@ -30,12 +29,19 @@ namespace Adamantium.UI
                 mainWindow = value;
             }
         }
+
+        private object applicationLocker = new object();
+
         public WindowCollection Windows { get; private set; }
 
         public static Application Current { get; internal set; }
         public Uri StartupUri { get; set; }
 
+        public ShutDownMode ShutDownMode { get; set; }
+
         protected GraphicsDevice GraphicsDevice;
+        internal ServiceStorage Services { get; set; }
+
         private EntityWorld entityWorld;
         private Dictionary<IWindow, UIRenderProcessor> windowToSystem;
         private Dictionary<IWindow, GraphicsDevice> windowToDevices;
@@ -46,9 +52,10 @@ namespace Adamantium.UI
         private Double fpsTime;
         private Int32 fpsCounter;
 
-        internal ServiceStorage Services { get; set; }
         private SystemManager systemManager;
         private IWindow mainWindow;
+        private List<IWindow> addedWindows;
+        private List<IWindow> closedWindows;
 
         protected Application()
         {
@@ -58,6 +65,8 @@ namespace Adamantium.UI
             systemManager = new ApplicationSystemManager(this);
             windowToSystem = new Dictionary<IWindow, UIRenderProcessor>();
             windowToDevices = new Dictionary<IWindow, GraphicsDevice>();
+            addedWindows = new List<IWindow>();
+            closedWindows = new List<IWindow>();
             Windows = new WindowCollection();
             Windows.WindowAdded += WindowAdded;
             Windows.WindowRemoved += WindowRemoved;
@@ -107,6 +116,11 @@ namespace Adamantium.UI
             var device = windowToDevices[window];
             device?.Dispose();
             windowToDevices.Remove(window);
+
+            if (window == MainWindow)
+            {
+                MainWindow = null;
+            }
         }
 
         internal abstract MouseDevice MouseDevice { get; }
@@ -121,12 +135,18 @@ namespace Adamantium.UI
 
         private void WindowAdded(object sender, WindowEventArgs e)
         {
-            OnWindowAdded(e.Window);
+            lock (applicationLocker)
+            {
+                addedWindows.Add(e.Window);
+            }
         }
 
         private void WindowRemoved(object sender, WindowEventArgs e)
         {
-            OnWindowRemoved(e.Window);
+            lock (applicationLocker)
+            {
+                closedWindows.Add(e.Window);
+            }
         }
 
         public abstract void Run();
@@ -143,6 +163,9 @@ namespace Adamantium.UI
 
                 UpdateGameTime(frameTime);
                 CalculateFps(frameTime);
+
+                ProcessPendingWindows();
+                CheckExitConditions();
             }
             catch (Exception ex)
             {
@@ -150,8 +173,28 @@ namespace Adamantium.UI
             }
         }
 
-        protected void CheckExitCondition()
+        private void ProcessPendingWindows()
         {
+            lock (applicationLocker)
+            {
+                for (int i = 0; i < closedWindows.Count; ++i)
+                {
+                    OnWindowRemoved(closedWindows[i]);
+                }
+                closedWindows.Clear();
+
+                for (int i = 0; i < addedWindows.Count; ++i)
+                {
+                    OnWindowAdded(addedWindows[i]);
+                }
+                addedWindows.Clear();
+            }
+        }
+
+        protected void CheckExitConditions()
+        {
+            if (!IsRunning) return;
+
             if (ShutDownMode == ShutDownMode.OnMainWindowClosed && MainWindow == null)
             {
                 IsRunning = false;
