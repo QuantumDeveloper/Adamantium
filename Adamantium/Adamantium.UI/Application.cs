@@ -56,6 +56,7 @@ namespace Adamantium.UI
         private IWindow mainWindow;
         private List<IWindow> addedWindows;
         private List<IWindow> closedWindows;
+        private bool firstWindowAdded;
 
         protected Application()
         {
@@ -104,6 +105,11 @@ namespace Adamantium.UI
             entityWorld.AddProcessor(renderProcessor);
 
             windowToSystem.Add(window, renderProcessor);
+
+            if (!firstWindowAdded)
+            {
+                firstWindowAdded = true;
+            }
         }
 
         protected void OnWindowRemoved(IWindow window)
@@ -193,7 +199,8 @@ namespace Adamantium.UI
 
         protected void CheckExitConditions()
         {
-            if (!IsRunning) return;
+            // Solving an issue with early closing on the renderCycle
+            if (ShutDownMode != ShutDownMode.OnExplicitShutDown && !firstWindowAdded) return;
 
             if (ShutDownMode == ShutDownMode.OnMainWindowClosed && MainWindow == null)
             {
