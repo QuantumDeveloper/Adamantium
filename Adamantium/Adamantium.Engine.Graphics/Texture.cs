@@ -176,6 +176,13 @@ namespace Adamantium.Engine.Graphics
                 sourceStage = PipelineStageFlagBits.TopOfPipeBit;
                 destinationStage = PipelineStageFlagBits.EarlyFragmentTestsBit;
             }
+            else if (ImageLayout == ImageLayout.Undefined && newLayout == ImageLayout.ColorAttachmentOptimal)
+            {
+                barrier.SrcAccessMask = 0;
+                barrier.DstAccessMask = (uint)(AccessFlagBits.ColorAttachmentReadBit| AccessFlagBits.ColorAttachmentWriteBit);
+                sourceStage = PipelineStageFlagBits.TopOfPipeBit;
+                destinationStage = PipelineStageFlagBits.ColorAttachmentOutputBit;
+            }
             else
             {
                 throw new ImageLayoutTransitionException(
