@@ -59,9 +59,7 @@ namespace Adamantium.Engine.Graphics
 
         protected void CreateDepthBuffer()
         {
-            // Create the depth buffer/stencil view
-            depthBuffer = ToDispose(DepthStencilBuffer.New(GraphicsDevice, Description.Width, Description.Height, Description.DepthFormat, Description.MSAALevel,
-                ImageUsageFlagBits.DepthStencilAttachmentBit, ImageAspectFlagBits.DepthBit));
+            depthBuffer = ToDispose(DepthStencilBuffer.New(GraphicsDevice, Description.Width, Description.Height, Description.DepthFormat, Description.MSAALevel, ImageAspectFlagBits.DepthBit));
         }
 
         private void CreateViewPort()
