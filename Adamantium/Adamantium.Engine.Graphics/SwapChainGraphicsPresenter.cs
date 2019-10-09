@@ -19,6 +19,7 @@ namespace Adamantium.Engine.Graphics
         {
             CreateSurface();
             CreateSwapchain();
+            CreateRenderTarget();
             CreateImageViews();
             BackBuffers = new Texture[Description.BuffersCount];
             var indices = GraphicsDevice.VulkanInstance.CurrentDevice.FindQueueFamilies(surface);
@@ -35,6 +36,11 @@ namespace Adamantium.Engine.Graphics
         private void CreateSurface()
         {
             surface = GraphicsDevice.VulkanInstance.GetOrCreateSurface(Description);
+        }
+
+        private void CreateRenderTarget()
+        {
+            renderTarget = ToDispose(RenderTarget.New(GraphicsDevice, Width, Height, MSAALevel, ImageFormat));
         }
 
         SwapChainSupportDetails QuerySwapChainSupport(PhysicalDevice device)
@@ -252,6 +258,7 @@ namespace Adamantium.Engine.Graphics
             CleanupSwapChain();
 
             CreateSwapchain();
+            CreateRenderTarget();
             CreateImageViews();
             CreateDepthBuffer();
         }
@@ -264,6 +271,7 @@ namespace Adamantium.Engine.Graphics
             }
 
             RemoveAndDispose(ref depthBuffer);
+            RemoveAndDispose(ref renderTarget);
 
             swapchain?.Destroy(GraphicsDevice);
         }

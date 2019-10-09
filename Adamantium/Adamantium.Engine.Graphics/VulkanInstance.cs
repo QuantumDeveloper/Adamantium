@@ -76,6 +76,7 @@ namespace Adamantium.Engine.Graphics
 
         private void CreateInstance(string appName, bool enableDebug)
         {
+            //enableDebug = false;
             var appInfo = new ApplicationInfo();
             appInfo.PApplicationName = appName;
             appInfo.ApplicationVersion = AdamantiumVulkan.Core.Constants.VK_MAKE_VERSION(1, 0, 0);

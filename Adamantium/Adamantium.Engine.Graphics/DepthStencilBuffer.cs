@@ -42,7 +42,7 @@ namespace Adamantium.Engine.Graphics
                 Samples = msaa
             };
 
-            return (DepthStencilBuffer)New(graphicsDevice, description);
+            return new DepthStencilBuffer(graphicsDevice, description);
         }
     }
 }
