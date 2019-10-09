@@ -90,6 +90,7 @@ namespace Adamantium.UI
                 Width = (uint)window.ClientWidth,
                 Height = (uint)window.ClientHeight,
                 BuffersCount = 2,
+                MSAALevel = MSAALevel.X4,
                 HInstanceHandle = Process.GetCurrentProcess().Handle
             };
             @params.OutputHandle = window.SurfaceHandle;

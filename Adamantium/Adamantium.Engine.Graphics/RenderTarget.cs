@@ -16,12 +16,10 @@ namespace Adamantium.Engine.Graphics
             UInt32 height, 
             MSAALevel msaa, 
             SurfaceFormat format, 
-            ImageAspectFlagBits imageAspect,
             ImageLayout desiredLayout = ImageLayout.ColorAttachmentOptimal)
         {
-            var usage = ImageUsageFlagBits.TransferSrcBit | 
-                        ImageUsageFlagBits.TransferDstBit |
-                        ImageUsageFlagBits.SampledBit;
+            var usage = ImageUsageFlagBits.TransientAttachmentBit |
+                        ImageUsageFlagBits.ColorAttachmentBit;
             
             TextureDescription description = new TextureDescription
             {
@@ -37,11 +35,11 @@ namespace Adamantium.Engine.Graphics
                 ImageType = ImageType._2d,
                 MipLevels = 1,
                 SharingMode = SharingMode.Exclusive,
-                ImageAspect = imageAspect,
+                ImageAspect = ImageAspectFlagBits.ColorBit,
                 Samples = msaa
             };
 
-            return (RenderTarget)New(graphicsDevice, description);
+            return new RenderTarget(graphicsDevice, description);
         }
     }
 }

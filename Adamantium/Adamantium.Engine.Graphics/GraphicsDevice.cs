@@ -123,6 +123,7 @@ namespace Adamantium.Engine.Graphics
 
             var deviceFeatures = PhysicalDevice.GetPhysicalDeviceFeatures();
             deviceFeatures.SamplerAnisotropy = true;
+            deviceFeatures.SampleRateShading = true;
 
             var createInfo = new DeviceCreateInfo();
             createInfo.QueueCreateInfoCount = (uint)queueInfos.Count;
@@ -154,7 +155,7 @@ namespace Adamantium.Engine.Graphics
             colorAttachment.StencilLoadOp = AttachmentLoadOp.DontCare;
             colorAttachment.StencilStoreOp = AttachmentStoreOp.DontCare;
             colorAttachment.InitialLayout = ImageLayout.Undefined;
-            colorAttachment.FinalLayout = ImageLayout.PresentSrcKhr;
+            colorAttachment.FinalLayout = ImageLayout.ColorAttachmentOptimal;
 
             var depthAttachment = new AttachmentDescription();
             depthAttachment.Format = (Format)Presenter.Description.DepthFormat;
@@ -166,6 +167,16 @@ namespace Adamantium.Engine.Graphics
             depthAttachment.InitialLayout = ImageLayout.Undefined;
             depthAttachment.FinalLayout = Presenter.DepthBuffer.ImageLayout;
 
+            var colorAttachmentResolve = new AttachmentDescription();
+            colorAttachmentResolve.Format = Presenter.Description.ImageFormat;
+            colorAttachmentResolve.Samples = SampleCountFlagBits._1Bit;
+            colorAttachmentResolve.LoadOp = AttachmentLoadOp.Clear;
+            colorAttachmentResolve.StoreOp = AttachmentStoreOp.Store;
+            colorAttachmentResolve.StencilLoadOp = AttachmentLoadOp.DontCare;
+            colorAttachmentResolve.StencilStoreOp = AttachmentStoreOp.DontCare;
+            colorAttachmentResolve.InitialLayout = ImageLayout.Undefined;
+            colorAttachmentResolve.FinalLayout = ImageLayout.PresentSrcKhr;
+
             var colorAttachmentRef = new AttachmentReference();
             colorAttachmentRef.Attachment = 0;
             colorAttachmentRef.Layout = ImageLayout.ColorAttachmentOptimal;
@@ -174,11 +185,16 @@ namespace Adamantium.Engine.Graphics
             depthAttachmentRef.Attachment = 1;
             depthAttachmentRef.Layout = Presenter.DepthBuffer.ImageLayout;
 
+            var colorAttachmentResolveRef = new AttachmentReference();
+            colorAttachmentResolveRef.Attachment = 2;
+            colorAttachmentResolveRef.Layout = ImageLayout.ColorAttachmentOptimal;
+
             var subpass = new SubpassDescription();
             subpass.PipelineBindPoint = PipelineBindPoint.Graphics;
             subpass.ColorAttachmentCount = 1;
-            subpass.PColorAttachments = new [] {colorAttachmentRef};
+            subpass.PColorAttachments = new[] { colorAttachmentRef };
             subpass.PDepthStencilAttachment = depthAttachmentRef;
+            subpass.PResolveAttachments = new[] { colorAttachmentResolveRef };
             
             SubpassDependency subpassDependency = new SubpassDependency();
             subpassDependency.SrcSubpass = Constants.VK_SUBPASS_EXTERNAL;
@@ -188,7 +204,7 @@ namespace Adamantium.Engine.Graphics
             subpassDependency.DstStageMask = (uint) PipelineStageFlagBits.ColorAttachmentOutputBit;
             subpassDependency.DstAccessMask = (uint)(AccessFlagBits.ColorAttachmentReadBit | AccessFlagBits.ColorAttachmentWriteBit);
 
-            var attachments = new [] { colorAttachment, depthAttachment}; 
+            var attachments = new [] { colorAttachment, depthAttachment, colorAttachmentResolve}; 
             var renderPassInfo = new RenderPassCreateInfo();
             renderPassInfo.AttachmentCount = (uint)attachments.Length;
             renderPassInfo.PAttachments = attachments;
@@ -317,8 +333,9 @@ namespace Adamantium.Engine.Graphics
             rasterizer.DepthBiasEnable = false;
 
             var multisampling = new PipelineMultisampleStateCreateInfo();
-            multisampling.SampleShadingEnable = false;
-            multisampling.RasterizationSamples = SampleCountFlagBits._1Bit;
+            multisampling.SampleShadingEnable = true;
+            multisampling.MinSampleShading = 0.8f;
+            multisampling.RasterizationSamples = (SampleCountFlagBits)Presenter.Description.MSAALevel;
 
             var colorBlendAttachment = new PipelineColorBlendAttachmentState();
             colorBlendAttachment.ColorWriteMask = (uint)(ColorComponentFlagBits.RBit | ColorComponentFlagBits.GBit | ColorComponentFlagBits.BBit | ColorComponentFlagBits.ABit);
@@ -426,9 +443,9 @@ namespace Adamantium.Engine.Graphics
             {
                 FramebufferCreateInfo framebufferInfo = new FramebufferCreateInfo();
                 framebufferInfo.RenderPass = renderPass;
-                framebufferInfo.AttachmentCount = 2;
                 var swapchainPresenter = (SwapChainGraphicsPresenter)Presenter;
-                framebufferInfo.PAttachments = new [] {swapchainPresenter.swapchainImageViews[i], Presenter.DepthBuffer};
+                framebufferInfo.PAttachments = new [] { Presenter.RenderTarget, Presenter.DepthBuffer, swapchainPresenter.swapchainImageViews[i] };
+                framebufferInfo.AttachmentCount = (uint)framebufferInfo.PAttachments.Length;
                 framebufferInfo.Width = Presenter.Description.Width;
                 framebufferInfo.Height = Presenter.Description.Height;
                 framebufferInfo.Layers = 1;
@@ -500,8 +517,12 @@ namespace Adamantium.Engine.Graphics
             clearDepthValue.DepthStencil = new ClearDepthStencilValue();
             clearDepthValue.DepthStencil.Depth = depth;
             clearDepthValue.DepthStencil.Stencil = stencil;
-            
-            renderPassInfo.PClearValues = new [] {clearColorValue, clearDepthValue};
+
+            ClearValue clearColorValueResolve = new ClearValue();
+            clearColorValueResolve.Color = new ClearColorValue();
+            clearColorValueResolve.Color.Float32 = clearColor.ToFloatArray();
+
+            renderPassInfo.PClearValues = new [] {clearColorValue, clearDepthValue, clearColorValueResolve };
             renderPassInfo.ClearValueCount = (uint)renderPassInfo.PClearValues.Length;
 
             commandBuffer.CmdBeginRenderPass(renderPassInfo, SubpassContents.Inline);
@@ -609,7 +630,7 @@ namespace Adamantium.Engine.Graphics
         {
             Console.WriteLine("Resize buffers called");
             var result = LogicalDevice.DeviceWaitIdle();
-            DestroyFrameBuffers();
+            DestroyFramebuffers();
             var resizeResult = Presenter.Resize(width, height, buffersCount, surfaceFormat, depthFormat);
             if (!resizeResult)
             {
@@ -648,7 +669,7 @@ namespace Adamantium.Engine.Graphics
         }
         static int destroyCount = 0;
         static int createCount = 0;
-        private void DestroyFrameBuffers()
+        private void DestroyFramebuffers()
         {
             for (int i = 0; i< defaultFramebuffers.Length; ++i)
             {

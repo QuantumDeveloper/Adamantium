@@ -14,13 +14,23 @@ namespace Adamantium.Engine.Graphics
 
         public PresentationParameters Description { get; private set; }
 
-        //public RenderTarget2D BackBuffer => backbuffer;
+        public uint Width => Description.Width;
+
+        public uint Height => Description.Height;
+
+        public SurfaceFormat ImageFormat => Description.ImageFormat;
+
+        public DepthFormat DepthFormat => Description.DepthFormat;
+
+        public MSAALevel MSAALevel => Description.MSAALevel;
+
+        public RenderTarget RenderTarget => renderTarget;
 
         public DepthStencilBuffer DepthBuffer => depthBuffer;
 
         public ViewportF Viewport { get; protected set; }
 
-        //protected RenderTarget2D backbuffer = null;
+        protected RenderTarget renderTarget = null;
         protected DepthStencilBuffer depthBuffer;
         private PresentInterval presentInterval = 0;
         //private PresentFlags presentFlags = PresentFlags.None;

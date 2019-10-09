@@ -49,7 +49,7 @@ namespace Adamantium.Engine.Graphics
         public IntPtr HInstanceHandle { get; set; }
         public SurfaceFormat ImageFormat { get; set; }
         public DepthFormat DepthFormat { get; set; }
-        public MSAALevel MSAALevel { get; }
+        public MSAALevel MSAALevel { get; set; }
         public UInt32 BuffersCount { get; set; }
         public SwapchainCreateFlags Flags { get; set; }
         public uint MinImageCount { get; set; }
