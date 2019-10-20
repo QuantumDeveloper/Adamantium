@@ -1389,12 +1389,6 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.G8B8G8R8_422_UNORM"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G8B8G8R8_422_UNORM);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.G8B8G8R8_422_UNORM_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G8B8G8R8_422_UNORM_KHR);
-
         }
 
         /// <summary>
@@ -1406,11 +1400,6 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.B8G8R8G8_422_UNORM"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.B8G8R8G8_422_UNORM);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.B8G8R8G8_422_UNORM_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.B8G8R8G8_422_UNORM_KHR);
         }
 
         /// <summary>
@@ -1422,12 +1411,6 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.G8_B8_R8_3PLANE_420_UNORM"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G8_B8_R8_3PLANE_420_UNORM);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.G8_B8_R8_3PLANE_420_UNORM_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G8_B8_R8_3PLANE_420_UNORM_KHR);
-
         }
 
         /// <summary>
@@ -1439,12 +1422,6 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.G8_B8R8_2PLANE_420_UNORM"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G8_B8R8_2PLANE_420_UNORM);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.G8_B8R8_2PLANE_420_UNORM_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G8_B8R8_2PLANE_420_UNORM_KHR);
-
         }
 
         /// <summary>
@@ -1456,12 +1433,6 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.G8_B8_R8_3PLANE_422_UNORM"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G8_B8_R8_3PLANE_422_UNORM);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.G8_B8_R8_3PLANE_422_UNORM_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G8_B8_R8_3PLANE_422_UNORM_KHR);
-
         }
 
         /// <summary>
@@ -1473,11 +1444,6 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.G8_B8R8_2PLANE_422_UNORM"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G8_B8R8_2PLANE_422_UNORM);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.G8_B8R8_2PLANE_422_UNORM_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G8_B8R8_2PLANE_422_UNORM_KHR);
         }
 
         /// <summary>
@@ -1489,12 +1455,6 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.G8_B8_R8_3PLANE_444_UNORM"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G8_B8_R8_3PLANE_444_UNORM);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.G8_B8_R8_3PLANE_444_UNORM_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G8_B8_R8_3PLANE_444_UNORM_KHR);
-
         }
 
         /// <summary>
@@ -1506,12 +1466,6 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.R10X6_UNORM_PACK16"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.R10X6_UNORM_PACK16);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.R10X6_UNORM_PACK16_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.R10X6_UNORM_PACK16_KHR);
-
         }
 
         /// <summary>
@@ -1523,12 +1477,6 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.R10X6G10X6_UNORM_2PACK16"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.R10X6G10X6_UNORM_2PACK16);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.R10X6G10X6_UNORM_2PACK16_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.R10X6G10X6_UNORM_2PACK16_KHR);
-
         }
 
         /// <summary>
@@ -1540,12 +1488,6 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.R10X6G10X6B10X6A10X6_UNORM_4PACK16"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.R10X6G10X6B10X6A10X6_UNORM_4PACK16);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.R10X6G10X6B10X6A10X6_UNORM_4PACK16_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.R10X6G10X6B10X6A10X6_UNORM_4PACK16_KHR);
-
         }
 
         /// <summary>
@@ -1557,12 +1499,6 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.G10X6B10X6G10X6R10X6_422_UNORM_4PACK16"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G10X6B10X6G10X6R10X6_422_UNORM_4PACK16);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.G10X6B10X6G10X6R10X6_422_UNORM_4PACK16_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G10X6B10X6G10X6R10X6_422_UNORM_4PACK16_KHR);
-
         }
 
         /// <summary>
@@ -1574,16 +1510,10 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.B10X6G10X6R10X6G10X6_422_UNORM_4PACK16"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.B10X6G10X6R10X6G10X6_422_UNORM_4PACK16);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.B10X6G10X6R10X6G10X6_422_UNORM_4PACK16_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.B10X6G10X6R10X6G10X6_422_UNORM_4PACK16_KHR);
-
         }
 
         /// <summary>
-        /// <see cref="Format.G10X6_B10X6_R10X6_3PLANE_420"/> formats family
+        /// <see cref="Format.G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16"/> formats family
         /// </summary>
         public static class G10X6B10X6R10X63PLANE_420
         {
@@ -1591,16 +1521,10 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16_KHR);
-
         }
 
         /// <summary>
-        /// <see cref="Format.G10X6_B10X6R10X6_2PLANE_420"/> formats family
+        /// <see cref="Format.G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16"/> formats family
         /// </summary>
         public static class G10X6B10X6R10X62PLANE_420
         {
@@ -1608,16 +1532,10 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16_KHR);
-
         }
 
         /// <summary>
-        /// <see cref="Format.G10X6_B10X6_R10X6_3PLANE_422"/> formats family
+        /// <see cref="Format.G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16"/> formats family
         /// </summary>
         public static class G10X6B10X6R10X63PLANE_422
         {
@@ -1625,16 +1543,10 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16_KHR);
-
         }
 
         /// <summary>
-        /// <see cref="Format.G10X6_B10X6R10X6_2PLANE_422"/> formats family
+        /// <see cref="Format.G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16"/> formats family
         /// </summary>
         public static class G10X6B10X6R10X62PLANE_422
         {
@@ -1642,12 +1554,6 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16_KHR);
-
         }
 
         /// <summary>
@@ -1659,12 +1565,6 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16_KHR);
-
         }
 
         /// <summary>
@@ -1676,12 +1576,6 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.R12X4_UNORM_PACK16"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.R12X4_UNORM_PACK16);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.R12X4_UNORM_PACK16_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.R12X4_UNORM_PACK16_KHR);
-
         }
 
         /// <summary>
@@ -1693,12 +1587,6 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.R12X4G12X4_UNORM_2PACK16"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.R12X4G12X4_UNORM_2PACK16);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.R12X4G12X4_UNORM_2PACK16_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.R12X4G12X4_UNORM_2PACK16_KHR);
-
         }
 
         /// <summary>
@@ -1710,11 +1598,6 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.R12X4G12X4B12X4A12X4_UNORM_4PACK16"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.R12X4G12X4B12X4A12X4_UNORM_4PACK16);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.R12X4G12X4B12X4A12X4_UNORM_4PACK16_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.R12X4G12X4B12X4A12X4_UNORM_4PACK16_KHR);
         }
 
         /// <summary>
@@ -1726,15 +1609,10 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.G12X4B12X4G12X4R12X4_422_UNORM_4PACK16"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G12X4B12X4G12X4R12X4_422_UNORM_4PACK16);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.G12X4B12X4G12X4R12X4_422_UNORM_4PACK16_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G12X4B12X4G12X4R12X4_422_UNORM_4PACK16_KHR);
         }
 
         /// <summary>
-        /// <see cref="Format.G12X4_B12X4_R12X4_3PLANE_420"/> formats family
+        /// <see cref="Format.G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16"/> formats family
         /// </summary>
         public static class G12X4B12X4R12X43PLANE_420
         {
@@ -1742,15 +1620,10 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16_KHR);
         }
 
         /// <summary>
-        /// <see cref="Format.G12X4_B12X4R12X4_2PLANE_420"/> formats family
+        /// <see cref="Format.G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16"/> formats family
         /// </summary>
         public static class G12X4B12X4R12X42PLANE_420
         {
@@ -1758,15 +1631,10 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16_KHR);
         }
 
         /// <summary>
-        /// <see cref="Format.G12X4_B12X4_R12X4_3PLANE_422"/> formats family
+        /// <see cref="Format.G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16"/> formats family
         /// </summary>
         public static class G12X4B12X4R12X43PLANE_422
         {
@@ -1774,15 +1642,10 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16_KHR);
         }
 
         /// <summary>
-        /// <see cref="Format.G12X4_B12X4R12X4_2PLANE_422"/> formats family
+        /// <see cref="Format.G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16"/> formats family
         /// </summary>
         public static class G12X4B12X4R12X42PLANE_422
         {
@@ -1790,15 +1653,10 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16_KHR);
         }
 
         /// <summary>
-        /// <see cref="Format.G12X4_B12X4_R12X4_3PLANE_444"/> formats family
+        /// <see cref="Format.G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16"/> formats family
         /// </summary>
         public static class G12X4B12X4R12X43PLANE_444
         {
@@ -1806,11 +1664,6 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16_KHR);
         }
 
         /// <summary>
@@ -1822,11 +1675,6 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.G16B16G16R16_422_UNORM"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G16B16G16R16_422_UNORM);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.G16B16G16R16_422_UNORM_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G16B16G16R16_422_UNORM_KHR);
         }
 
         /// <summary>
@@ -1838,15 +1686,10 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.B16G16R16G16_422_UNORM"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.B16G16R16G16_422_UNORM);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.B16G16R16G16_422_UNORM_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.B16G16R16G16_422_UNORM_KHR);
         }
 
         /// <summary>
-        /// <see cref="Format.G16_B16_R16_3PLANE_420"/> formats family
+        /// <see cref="Format.G16_B16_R16_3PLANE_420_UNORM"/> formats family
         /// </summary>
         public static class G16B16R163PLANE_420
         {
@@ -1854,15 +1697,10 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.G16_B16_R16_3PLANE_420_UNORM"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G16_B16_R16_3PLANE_420_UNORM);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.G16_B16_R16_3PLANE_420_UNORM_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G16_B16_R16_3PLANE_420_UNORM_KHR);
         }
 
         /// <summary>
-        /// <see cref="Format.G16_B16R16_2PLANE_420"/> formats family
+        /// <see cref="Format.G16_B16R16_2PLANE_420_UNORM"/> formats family
         /// </summary>
         public static class G16B16R162PLANE_420
         {
@@ -1870,15 +1708,10 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.G16_B16R16_2PLANE_420_UNORM"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G16_B16R16_2PLANE_420_UNORM);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.G16_B16R16_2PLANE_420_UNORM_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G16_B16R16_2PLANE_420_UNORM_KHR);
         }
 
         /// <summary>
-        /// <see cref="Format.G16_B16_R16_3PLANE_422"/> formats family
+        /// <see cref="Format.G16_B16_R16_3PLANE_422_UNORM"/> formats family
         /// </summary>
         public static class G16B16R163PLANE_422
         {
@@ -1886,15 +1719,10 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.G16_B16_R16_3PLANE_422_UNORM"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G16_B16_R16_3PLANE_422_UNORM);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.G16_B16_R16_3PLANE_422_UNORM_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G16_B16_R16_3PLANE_422_UNORM_KHR);
         }
 
         /// <summary>
-        /// <see cref="Format.G16_B16R16_2PLANE_422"/> formats family
+        /// <see cref="Format.G16_B16R16_2PLANE_422_UNORM"/> formats family
         /// </summary>
         public static class G16B16R162PLANE_422
         {
@@ -1902,15 +1730,10 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.G16_B16R16_2PLANE_422_UNORM"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G16_B16R16_2PLANE_422_UNORM);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.G16_B16R16_2PLANE_422_UNORM_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G16_B16R16_2PLANE_422_UNORM_KHR);
         }
 
         /// <summary>
-        /// <see cref="Format.G16_B16_R16_3PLANE_444"/> formats family
+        /// <see cref="Format.G16_B16_R16_3PLANE_444_UNORM"/> formats family
         /// </summary>
         public static class G16B16R163PLANE_444
         {
@@ -1918,11 +1741,6 @@ namespace Adamantium.Imaging
             /// Corresponds to <see cref="Format.G16_B16_R16_3PLANE_444_UNORM"/>
             /// </summary>
             public static readonly SurfaceFormat UNorm = new SurfaceFormat(Format.G16_B16_R16_3PLANE_444_UNORM);
-
-            /// <summary>
-            /// Corresponds to <see cref="Format.G16_B16_R16_3PLANE_444_UNORM_KHR"/>
-            /// </summary>
-            public static readonly SurfaceFormat UNormKhr = new SurfaceFormat(Format.G16_B16_R16_3PLANE_444_UNORM_KHR);
         }
 
         /// <summary>
