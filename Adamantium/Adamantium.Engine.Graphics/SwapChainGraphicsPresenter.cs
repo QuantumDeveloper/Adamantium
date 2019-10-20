@@ -146,7 +146,7 @@ namespace Adamantium.Engine.Graphics
         {
             if (availableFormats.Length == 1 && availableFormats[0].Format == Format.UNDEFINED)
             {
-                return new SurfaceFormatKHR() { Format = Format.B8G8R8A8_UNORM, ColorSpace = ColorSpaceKHR.ColorspaceSrgbNonlinearKhr };
+                return new SurfaceFormatKHR() { Format = Format.B8G8R8A8_UNORM, ColorSpace = ColorSpaceKHR.SrgbNonlinearKhr };
             }
 
             foreach (var availableFormat in availableFormats)
