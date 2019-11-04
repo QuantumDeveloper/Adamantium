@@ -470,7 +470,7 @@ namespace Adamantium.Imaging
         /// <remarks>If <paramref name="makeACopy"/> is set to false, the returned image is now the holder of the unmanaged pointer and will release it on Dispose. </remarks>
         public static Image Load(DataPointer dataBuffer, bool makeACopy = false)
         {
-            return Load(dataBuffer.Pointer, (int)dataBuffer.Size, makeACopy);
+            return Load(dataBuffer.Pointer, dataBuffer.Size, makeACopy);
         }
 
         /// <summary>

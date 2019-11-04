@@ -1,9 +1,11 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace Adamantium.Core
 {
@@ -88,6 +90,11 @@ namespace Adamantium.Core
             return Marshal.SizeOf<T>();
         }
 
+        public static int SizeOf<T>(T[] array) where T : struct
+        {
+            return array == null ? 0 : array.Length * SizeOf<T>();
+        }
+
         public static unsafe void CopyMemory(IntPtr destination, IntPtr source, int sizeInBytesToCopy)
         {
             Buffer.MemoryCopy(source.ToPointer(), destination.ToPointer(), sizeInBytesToCopy, sizeInBytesToCopy);
@@ -103,7 +110,7 @@ namespace Adamantium.Core
 
         public static IntPtr Write<T>(IntPtr destination, T[] data, int offset, int count) where T : struct
         {
-            var size = Marshal.SizeOf(typeof(T));
+            var size = SizeOf<T>();
             var startPos = IntPtr.Add(destination, offset);
             var source = GCHandle.Alloc(data, GCHandleType.Pinned);
             CopyMemory(destination, source.AddrOfPinnedObject(), size * data.Length);
@@ -115,6 +122,11 @@ namespace Adamantium.Core
         public static T Read<T>(IntPtr source) where T : struct
         {
             return Marshal.PtrToStructure<T>(source);
+        }
+
+        public static void Read<T>(IntPtr source, ref T data) where T : struct
+        {
+            data = Marshal.PtrToStructure<T>(source);
         }
 
         /// <summary>
@@ -231,6 +243,48 @@ namespace Adamantium.Core
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// String helper join method to display an array of object as a single string.
+        /// </summary>
+        /// <param name="separator">The separator.</param>
+        /// <param name="array">The array.</param>
+        /// <returns>A string with array elements separated by the separator.</returns>
+        public static string Join<T>(string separator, T[] array)
+        {
+            var text = new StringBuilder();
+            if (array != null)
+            {
+                for (int i = 0; i < array.Length; i++)
+                {
+                    if (i > 0) text.Append(separator);
+                    text.Append(array[i]);
+                }
+            }
+            return text.ToString();
+        }
+
+        /// <summary>
+        /// String helper join method to display an enumerable of object as a single string.
+        /// </summary>
+        /// <param name="separator">The separator.</param>
+        /// <param name="elements">The enumerable.</param>
+        /// <returns>A string with array elements separated by the separator.</returns>
+        public static string Join(string separator, IEnumerable elements)
+        {
+            var elementList = new List<string>();
+            foreach (var element in elements)
+                elementList.Add(element.ToString());
+
+            var text = new StringBuilder();
+            for (int i = 0; i < elementList.Count; i++)
+            {
+                var element = elementList[i];
+                if (i > 0) text.Append(separator);
+                text.Append(element);
+            }
+            return text.ToString();
         }
 
         public static bool IsTypeInheritFrom(Type type, string baseType)

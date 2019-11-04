@@ -263,7 +263,7 @@ namespace Adamantium.Engine.Graphics
             {
                 int bufferSize = Utilities.SizeOf<T>();
                 int elementSize = Utilities.SizeOf<T>();
-                var data = new DataPointer(handle.AddrOfPinnedObject(), (ulong)bufferSize, (uint)(bufferSize / elementSize));
+                var data = new DataPointer(handle.AddrOfPinnedObject(), bufferSize, (uint)(bufferSize / elementSize));
 
                 return new Buffer<T>(device, bufferFlags, data, memoryFlags);
             }
@@ -310,7 +310,7 @@ namespace Adamantium.Engine.Graphics
             {
                 int elementSize = Utilities.SizeOf<T>();
                 int bufferSize = elementSize * initialValue.Length;
-                var data = new DataPointer(handle.AddrOfPinnedObject(), (uint)initialValue.Length, (uint)elementSize);
+                var data = new DataPointer(handle.AddrOfPinnedObject(), initialValue.Length, (uint)elementSize);
 
                 return new Buffer<T>(device, bufferFlags, data, memoryFlags, sharingMode);
             }
@@ -339,7 +339,7 @@ namespace Adamantium.Engine.Graphics
             try
             {
                 int bufferSize = initialValue.Length;
-                var data = new DataPointer(handle.AddrOfPinnedObject(), (ulong)initialValue.Length, (uint)(initialValue.Length / elementSize));
+                var data = new DataPointer(handle.AddrOfPinnedObject(), initialValue.Length, (uint)(initialValue.Length / elementSize));
 
                 return new Buffer(device, bufferFlags, data, memoryFlags, SharingMode.Exclusive);
             }
