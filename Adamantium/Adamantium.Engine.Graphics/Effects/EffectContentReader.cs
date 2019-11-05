@@ -1,6 +1,7 @@
 ﻿using Adamantium.Engine.Core.Content;
 using Adamantium.Engine.Core.Effects;
 using Adamantium.Engine.Graphics;
+using System.Threading.Tasks;
 
 namespace Adamantium.Engine.Effects
 {

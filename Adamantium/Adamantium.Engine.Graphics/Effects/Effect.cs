@@ -3,6 +3,9 @@ using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Content;
 using Adamantium.Engine.Core.Effects;
 using Adamantium.Engine.Graphics;
+using System;
+using System.Collections.Generic;
+using System.IO;
 
 namespace Adamantium.Engine.Effects
 {

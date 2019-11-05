@@ -3,7 +3,7 @@
     /// <summary>
     /// A collection of <see cref="EffectPass"/>.
     /// </summary>
-    public sealed class EffectPassCollection:EffectResourcesCollection<EffectPass>
+    public sealed class EffectPassCollection:NamedObjectsCollection<EffectPass>
    {
       /// <summary>
       /// Initializes a new instance of the <see cref="EffectPassCollection" /> class.

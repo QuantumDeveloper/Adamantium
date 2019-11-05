@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using Adamantium.Core;
 
-namespace Adamantium.Engine.Effects
+namespace Adamantium.Core.Collections
 {
     /// <summary>
     /// Collection, containing ComponentBase instances

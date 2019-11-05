@@ -4,7 +4,7 @@ namespace Adamantium.Engine.Core.Effects
 {
    public partial class EffectData
    {
-      public struct ShaderMacro : IEquatable<SharpDX.Direct3D.ShaderMacro>
+      public struct ShaderMacro : IEquatable<ShaderMacro>
       {
          /// <summary>
          /// The name of the macro.
@@ -27,16 +27,16 @@ namespace Adamantium.Engine.Core.Effects
             Value = value == null ? null : value.ToString();
          }
 
-         public bool Equals(SharpDX.Direct3D.ShaderMacro other)
+         public bool Equals(ShaderMacro other)
          {
-            return string.Equals(this.Name, other.Name) && string.Equals(this.Value, other.Definition);
+            return string.Equals(this.Name, other.Name) && string.Equals(this.Value, other.Value);
          }
 
          public override bool Equals(object obj)
          {
             if (ReferenceEquals(null, obj))
                return false;
-            return obj is SharpDX.Direct3D.ShaderMacro && Equals((SharpDX.Direct3D.ShaderMacro)obj);
+            return obj is ShaderMacro && Equals((ShaderMacro)obj);
          }
 
          public override int GetHashCode()

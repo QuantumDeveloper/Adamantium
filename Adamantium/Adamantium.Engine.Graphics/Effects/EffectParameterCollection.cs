@@ -3,7 +3,7 @@
     /// <summary>
     /// A collection of <see cref="EffectParameter"/>.
     /// </summary>
-    public sealed class EffectParameterCollection:EffectResourcesCollection<EffectParameter>
+    public sealed class EffectParameterCollection:NamedObjectsCollection<EffectParameter>
    {
       /// <summary>
       /// Initializes a new instance of the <see cref="EffectParameterCollection" /> class.

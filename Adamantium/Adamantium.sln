@@ -49,8 +49,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.MacOS", "Adamant
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AdamantiumVulkan.MacOS", "..\..\AdamantiumVulkan\AdamantiumVulkan.MacOS\AdamantiumVulkan.MacOS.csproj", "{94F005CA-07DA-4701-9E3B-488B8798F2B4}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Engine.Effects", "Adamantium.Engine.Effects\Adamantium.Engine.Effects.csproj", "{1D2B7531-92E4-43EE-9B4D-AE3C858C696E}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AdamantiumVulkan.Shaders", "..\..\AdamantiumVulkan\AdamantiumVulkan.Shaders\AdamantiumVulkan.Shaders.csproj", "{A472A3C1-99A2-4777-B39E-16857AAEEC54}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AdamantiumVulkan.SPIRV.Cross", "..\..\AdamantiumVulkan\AdamantiumVulkan.SPIRV.Cross\AdamantiumVulkan.SPIRV.Cross.csproj", "{C5B9CA38-3883-40CA-A0AF-AC0C843A89A2}"
@@ -237,14 +235,6 @@ Global
 		{94F005CA-07DA-4701-9E3B-488B8798F2B4}.Release|Any CPU.Build.0 = Release|Any CPU
 		{94F005CA-07DA-4701-9E3B-488B8798F2B4}.Release|x64.ActiveCfg = Release|Any CPU
 		{94F005CA-07DA-4701-9E3B-488B8798F2B4}.Release|x64.Build.0 = Release|Any CPU
-		{1D2B7531-92E4-43EE-9B4D-AE3C858C696E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{1D2B7531-92E4-43EE-9B4D-AE3C858C696E}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{1D2B7531-92E4-43EE-9B4D-AE3C858C696E}.Debug|x64.ActiveCfg = Debug|x64
-		{1D2B7531-92E4-43EE-9B4D-AE3C858C696E}.Debug|x64.Build.0 = Debug|x64
-		{1D2B7531-92E4-43EE-9B4D-AE3C858C696E}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{1D2B7531-92E4-43EE-9B4D-AE3C858C696E}.Release|Any CPU.Build.0 = Release|Any CPU
-		{1D2B7531-92E4-43EE-9B4D-AE3C858C696E}.Release|x64.ActiveCfg = Release|Any CPU
-		{1D2B7531-92E4-43EE-9B4D-AE3C858C696E}.Release|x64.Build.0 = Release|Any CPU
 		{A472A3C1-99A2-4777-B39E-16857AAEEC54}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{A472A3C1-99A2-4777-B39E-16857AAEEC54}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A472A3C1-99A2-4777-B39E-16857AAEEC54}.Debug|x64.ActiveCfg = Debug|x64

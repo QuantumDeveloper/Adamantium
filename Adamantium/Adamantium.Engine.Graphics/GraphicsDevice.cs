@@ -6,6 +6,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using Adamantium.Core;
 using Adamantium.Engine.Core;
+using Adamantium.Engine.Effects;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
 using AdamantiumVulkan.Core;
@@ -39,6 +40,8 @@ namespace Adamantium.Engine.Graphics
         public uint ImageIndex => imageIndex;
 
         public readonly uint MaxFramesInFlight;
+
+        public List<EffectPool> EffectPools { get; }
 
 
         private SubmitInfo[] submitInfos = new SubmitInfo[1];

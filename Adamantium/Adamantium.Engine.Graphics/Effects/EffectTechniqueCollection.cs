@@ -3,7 +3,7 @@
     /// <summary>
     /// A collection of <see cref="EffectTechnique"/>.
     /// </summary>
-    public sealed class EffectTechniqueCollection:EffectResourcesCollection<EffectTechnique>
+    public sealed class EffectTechniqueCollection:NamedObjectsCollection<EffectTechnique>
    {
       /// <summary>
       /// Initializes a new instance of the <see cref="EffectTechniqueCollection" /> class.

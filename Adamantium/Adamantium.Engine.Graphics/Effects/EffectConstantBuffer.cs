@@ -1,6 +1,8 @@
 ﻿using Adamantium.Core;
 using Adamantium.Engine.Core.Effects;
 using Adamantium.Engine.Graphics;
+using System;
+using Buffer = Adamantium.Engine.Graphics.Buffer;
 
 namespace Adamantium.Engine.Effects
 {

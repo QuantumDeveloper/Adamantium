@@ -7,20 +7,12 @@ namespace Adamantium.Engine.Core.Effects
     {
         public static readonly string CompiledExtension = "fx.compiled";
 
-        private static readonly RuntimeTypeModel Scheme;
+        //private static readonly RuntimeTypeModel Scheme;
 
         static EffectData()
         {
-            Scheme = TypeModel.Create();
-            Scheme.AutoAddMissingTypes = true;
-
-            var streamElement = Scheme.Add(typeof(StreamOutputElement), true);
-            streamElement.AddField(1, "ComponentCount");
-            streamElement.AddField(2, "OutputSlot");
-            streamElement.AddField(3, "SemanticIndex");
-            streamElement.AddField(4, "SemanticName");
-            streamElement.AddField(5, "StartComponent");
-            streamElement.AddField(6, "Stream");
+            //Scheme = TypeModel.Create();
+            //Scheme.AutoAddMissingTypes = true;
         }
 
         public EffectData() { }
@@ -41,7 +33,7 @@ namespace Adamantium.Engine.Core.Effects
         /// <param name="stream">The stream.</param>
         public void Save(Stream stream)
         {
-            Scheme.Serialize(stream, this);
+            //Scheme.Serialize(stream, this);
         }
 
         /// <summary>
@@ -63,8 +55,9 @@ namespace Adamantium.Engine.Core.Effects
         /// </remarks>
         public static EffectData Load(Stream stream)
         {
-            EffectData effect = (EffectData)Scheme.Deserialize(stream, null, typeof(EffectData));
-            return effect;
+            //EffectData effect = (EffectData)Scheme.Deserialize(stream, null, typeof(EffectData));
+            //return effect;
+            return null;
         }
 
         /// <summary>
