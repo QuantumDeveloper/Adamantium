@@ -41,7 +41,7 @@ namespace Adamantium.Engine.Compiler.Effects
         public IncludeFileDelegate IncludeFileDelegate;
         private Include includeHandler;
         private EffectCompilerLogger logger;
-        private List<ShaderMacro> macros;
+        private List<EffectData.ShaderMacro> macros;
         private EffectParserResult parserResult;
         private EffectData.Pass pass;
         private string preprocessorText;
@@ -119,12 +119,12 @@ namespace Adamantium.Engine.Compiler.Effects
         /// <returns>The result of compilation.</returns>
         public EffectCompilerResult Compile(string sourceCode, string filePath, EffectCompilerFlags flags = EffectCompilerFlags.None, List<EffectData.ShaderMacro> macrosArgs = null, List<string> includeDirectoryList = null, bool allowDynamicCompiling = false, string dependencyFilePath = null)
         {
-            var nativeMacros = new List<ShaderMacro>();
+            var nativeMacros = new List<EffectData.ShaderMacro>();
             if (macrosArgs != null)
             {
                 foreach (var macro in macrosArgs)
                 {
-                    nativeMacros.Add(new ShaderMacro(macro.Name, macro.Value));
+                    nativeMacros.Add(new EffectData.ShaderMacro(macro.Name, macro.Value));
                 }
             }
 

@@ -1,23 +1,19 @@
 ﻿using System;
-using ProtoBuf;
 
 namespace Adamantium.Engine.Core.Effects
 {
    public partial class EffectData
    {
-      [ProtoContract]
       public struct ShaderMacro : IEquatable<SharpDX.Direct3D.ShaderMacro>
       {
          /// <summary>
          /// The name of the macro.
          /// </summary>
-         [ProtoMember(1)]
          public string Name;
 
          /// <summary>
          /// The value of the macro.
          /// </summary>
-         [ProtoMember(2)]
          public string Value;
 
          /// <summary>

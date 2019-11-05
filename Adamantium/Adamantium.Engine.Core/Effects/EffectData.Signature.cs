@@ -1,5 +1,4 @@
 ﻿using System;
-using ProtoBuf;
 
 namespace Adamantium.Engine.Core.Effects
 {
@@ -11,25 +10,21 @@ namespace Adamantium.Engine.Core.Effects
       /// <remarks>	
       /// Describes an input or output signature, composed of <see cref="Semantic"/> descriptions.
       /// </remarks>	
-      [ProtoContract]
       public sealed class Signature : IEquatable<Signature>
       {
          /// <summary>
          /// Gets or sets the semantics
          /// </summary>
-         [ProtoMember(1)]
          public Semantic[] Semantics;
 
          /// <summary>
          /// Gets the bytecode of this signature. This field is only valid for Input Vertex Shader.
          /// </summary>
-         [ProtoMember(2)]
          public byte[] Bytecode;
 
          /// <summary>
          /// Gets the hashcode associated with the signature bytecode.
          /// </summary>
-         [ProtoMember(3)]
          public int Hashcode;
 
          public bool Equals(Signature other)

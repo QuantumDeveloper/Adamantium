@@ -1,10 +1,8 @@
-﻿using ProtoBuf;
-
+﻿
 namespace Adamantium.Engine.Core.Effects
 {
    public sealed partial class EffectData
    {
-      [ProtoContract]
       public sealed class Pass
       {
          private CommonData.PropertyCollection properties;
@@ -12,29 +10,25 @@ namespace Adamantium.Engine.Core.Effects
          /// <summary>
          /// Name of this pass.
          /// </summary>
-         [ProtoMember(1)]
          public string Name;
 
          /// <summary>
          /// True if this pass is the sub-pass of a root pass.
          /// </summary>
-         [ProtoMember(2)]
          public bool IsSubPass;
 
          /// <summary>
          /// List of <see cref="EffectData.Properties"/>.
          /// </summary>
-         [ProtoMember(3)]
          public CommonData.PropertyCollection Properties
          {
-            get { return properties ?? (properties = new CommonData.PropertyCollection()); }
-            set { properties = value; }
+            get { return properties ??= new CommonData.PropertyCollection(); }
+            set => properties = value;
          }
 
          /// <summary>
          /// Description of the shader stage <see cref="Pipeline"/>.
          /// </summary>
-         [ProtoMember(4)]
          public Pipeline Pipeline;
 
 

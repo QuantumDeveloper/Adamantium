@@ -1,17 +1,14 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
-using ProtoBuf;
 
 namespace Adamantium.Engine.Core.Effects
 {
    public sealed partial class EffectData
    {
-      [ProtoContract(IgnoreListHandling = true)]
       public sealed class Pipeline : IEnumerable<ShaderLink>
       {
          private const int ShaderLinkCount = 6;
-
-         [ProtoMember(1, OverwriteList = true)]
+         
          public ShaderLink[] Links;
 
          /// <summary>
@@ -40,8 +37,7 @@ namespace Adamantium.Engine.Core.Effects
             }
             return pipeline;
          }
-
-         [ProtoAfterDeserialization]
+         
          private void OnDeserializationCallback()
          {
             var temp = Links;

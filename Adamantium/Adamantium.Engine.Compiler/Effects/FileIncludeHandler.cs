@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using AdamantiumVulkan.Shaders;
 using SharpDX;
 using SharpDX.D3DCompiler;
 
 namespace Adamantium.Engine.Compiler.Effects
 {
-   internal class FileIncludeHandler: CallbackBase, Include
+   internal class FileIncludeHandler
    {
       public readonly Stack<string> CurrentDirectory;
 
@@ -25,7 +26,7 @@ namespace Adamantium.Engine.Compiler.Effects
 
       #region Include Members
 
-      public Stream Open(IncludeType type, string fileName, Stream parentStream)
+      public Stream Open(ShadercIncludeType type, string fileName, Stream parentStream)
       {
          var currentDirectory = CurrentDirectory.Peek();
          if (currentDirectory == null)
@@ -58,7 +59,7 @@ namespace Adamantium.Engine.Compiler.Effects
             // Else try to use the include file callback
             if (IncludeFileCallback != null)
             {
-               stream = IncludeFileCallback(type == IncludeType.System, fileName);
+               stream = IncludeFileCallback(type == ShadercIncludeType.Standard, fileName);
                if (stream != null)
                {
                   FileResolved.Add(fileName, new FileItem(fileName, CleanPath(fileName), DateTime.Now));

@@ -1,7 +1,7 @@
-﻿using System.Collections.Generic;
-using Adamantium.Engine.Core.Effects;
+﻿using Adamantium.Engine.Core.Effects;
+using Adamantium.Engine.Graphics;
 
-namespace Adamantium.Engine.Graphics
+namespace Adamantium.Engine.Effects
 {
    internal class EffectResourceLinker
    {

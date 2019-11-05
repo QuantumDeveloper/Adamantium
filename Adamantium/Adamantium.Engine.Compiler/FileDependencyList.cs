@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
-using SharpDX.IO;
 
 namespace Adamantium.Engine.Compiler
 {
@@ -51,12 +50,12 @@ namespace Adamantium.Engine.Compiler
       public void AddDependencyPath(string filePath)
       {
          if (!ContainsKey(filePath))
-            Add(filePath, NativeFile.GetLastWriteTime(filePath));
+            Add(filePath, File.GetLastWriteTime(filePath));
       }
 
       public static FileDependencyList FromFile(string file)
       {
-         using (var stream = new NativeFileStream(file, NativeFileMode.Open, NativeFileAccess.Read, NativeFileShare.ReadWrite)) return FromStream(stream);
+         using (var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)) return FromStream(stream);
       }
 
       public static string GetDependencyFileNameFromSourcePath(string pathToFxFile)
@@ -111,7 +110,7 @@ namespace Adamantium.Engine.Compiler
             Directory.CreateDirectory(dirPath);
          }
 
-         using (var stream = new NativeFileStream(file, NativeFileMode.Create, NativeFileAccess.Write, NativeFileShare.ReadWrite)) Save(stream);
+         using (var stream = new FileStream(file, FileMode.Create, FileAccess.Write, FileShare.ReadWrite)) Save(stream);
       }
 
       /// <summary>
@@ -133,7 +132,7 @@ namespace Adamantium.Engine.Compiler
                return true;
             }
 
-            var fileTime = NativeFile.GetLastWriteTime(fileItem.Key);
+            var fileTime = File.GetLastWriteTime(fileItem.Key);
 
             if (fileItem.Value != fileTime)
             {

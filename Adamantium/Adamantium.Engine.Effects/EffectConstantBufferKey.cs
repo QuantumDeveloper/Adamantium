@@ -1,7 +1,6 @@
-﻿using System;
-using Adamantium.Engine.Core.Effects;
+﻿using Adamantium.Engine.Core.Effects;
 
-namespace Adamantium.Engine.Graphics
+namespace Adamantium.Engine.Effects
 {
    internal class EffectConstantBufferKey : IEquatable<EffectConstantBufferKey>
    {

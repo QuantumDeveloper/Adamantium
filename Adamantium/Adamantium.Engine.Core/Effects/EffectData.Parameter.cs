@@ -1,31 +1,24 @@
 ﻿using System;
-using ProtoBuf;
 
 namespace Adamantium.Engine.Core.Effects
 {
    public partial class EffectData
    {
-      [ProtoContract] 
-      [ProtoInclude(10, typeof(ValueTypeParameter))]
-      [ProtoInclude(11, typeof(ResourceParameter))]
       public abstract class Parameter : IEquatable<Parameter>
       {
          /// <summary>
          /// Name of this parameter.
          /// </summary>
-         [ProtoMember(1)]
          public string Name;
 
          /// <summary>
          /// The <see cref="EffectParameterClass"/> of this parameter.
          /// </summary>
-         [ProtoMember(2)]
          public EffectParameterClass Class;
 
          /// <summary>
          /// The <see cref="EffectParameterType"/> of this parameter.
          /// </summary>
-         [ProtoMember(3)]
          public EffectParameterType Type;
 
          public bool Equals(Parameter other)

@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace Adamantium.Engine.Graphics
+﻿namespace Adamantium.Engine.Effects
 {
    public class EffectPoolEventArgs:EventArgs
    {

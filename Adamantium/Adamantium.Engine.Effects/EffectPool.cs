@@ -1,11 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using Adamantium.Core;
+﻿using Adamantium.Core;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Effects;
+using Adamantium.Engine.Graphics;
 
-namespace Adamantium.Engine.Graphics
+namespace Adamantium.Engine.Effects
 {
    /// <summary>
    /// This class manages a pool of <see cref="Effect"/>.

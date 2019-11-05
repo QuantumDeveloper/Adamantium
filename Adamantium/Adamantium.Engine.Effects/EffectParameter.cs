@@ -1,9 +1,7 @@
 ﻿using Adamantium.Core;
-using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Effects;
-using Adamantium.Mathematics;
 
-namespace Adamantium.Engine.Graphics
+namespace Adamantium.Engine.Effects
 {
    /// <summary>
    /// Contains information about effect parameter

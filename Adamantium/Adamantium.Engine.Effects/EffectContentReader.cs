@@ -1,8 +1,8 @@
-﻿using System.Threading.Tasks;
-using Adamantium.Engine.Core.Content;
+﻿using Adamantium.Engine.Core.Content;
 using Adamantium.Engine.Core.Effects;
+using Adamantium.Engine.Graphics;
 
-namespace Adamantium.Engine.Graphics
+namespace Adamantium.Engine.Effects
 {
    public class EffectContentReader:GraphicsResourceContentReader<Effect>
    {

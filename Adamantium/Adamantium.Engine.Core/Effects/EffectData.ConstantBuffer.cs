@@ -1,31 +1,26 @@
 ﻿using System;
 using System.Collections.Generic;
 using Adamantium.Core;
-using ProtoBuf;
 
 namespace Adamantium.Engine.Core.Effects
 {
    public partial class EffectData
    {
-      [ProtoContract]
       public sealed class ConstantBuffer : IEquatable<ConstantBuffer>
       {
          /// <summary>
          /// Name of this constant buffer.
          /// </summary>
-         [ProtoMember(1)]
          public string Name;
 
          /// <summary>
          /// Size in bytes of this constant buffer.
          /// </summary>
-         [ProtoMember(2)]
          public int Size;
 
          /// <summary>
          /// List of parameters in this constant buffer.
          /// </summary>
-         [ProtoMember(3)]
          public List<ValueTypeParameter> Parameters;
 
          public bool Equals(ConstantBuffer other)

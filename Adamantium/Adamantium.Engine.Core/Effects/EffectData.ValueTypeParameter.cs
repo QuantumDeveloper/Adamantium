@@ -1,48 +1,39 @@
 ﻿using System;
-using ProtoBuf;
-using SharpDX;
 
 namespace Adamantium.Engine.Core.Effects
 {
    public partial class EffectData
    {
-      [ProtoContract]
       public sealed class ValueTypeParameter : Parameter, IEquatable<ValueTypeParameter>
       {
          /// <summary>
          /// Offset in bytes into the <see cref="ConstantBuffer"/>.
          /// </summary>
-         [ProtoMember(1)]
          public int Offset;
 
          /// <summary>
          /// Number of elements.
          /// </summary>
-         [ProtoMember(2)]
          public int Count;
 
          /// <summary>
          /// Size in bytes in the <see cref="ConstantBuffer"/>.
          /// </summary>
-         [ProtoMember(3)]
          public int Size;
 
          /// <summary>
          /// Number of rows for this element.
          /// </summary>
-         [ProtoMember(4)]
          public byte RowCount;
 
          /// <summary>
          /// Number of columns for this element.
          /// </summary>
-         [ProtoMember(5)]
          public byte ColumnCount;
 
          /// <summary>
          /// The default value.
          /// </summary>
-         [ProtoMember(6)]
          public byte[] DefaultValue;
 
          public bool Equals(ValueTypeParameter other)

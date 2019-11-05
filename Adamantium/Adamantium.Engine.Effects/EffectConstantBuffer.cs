@@ -1,9 +1,8 @@
-﻿using System;
-using Adamantium.Core;
-using Adamantium.Engine.Core;
+﻿using Adamantium.Core;
 using Adamantium.Engine.Core.Effects;
+using Adamantium.Engine.Graphics;
 
-namespace Adamantium.Engine.Graphics
+namespace Adamantium.Engine.Effects
 {
    /// <summary>
    /// A constant buffer exposed by an effect.
@@ -50,7 +49,7 @@ namespace Adamantium.Engine.Graphics
          // By default, all constant buffers are cleared with 0
          BackingBuffer.Clear();
 
-         NativeBuffer = ToDispose(Buffer.Constant.New(device, BackingBuffer.Size));
+         NativeBuffer = ToDispose(Buffer.Uniform.New(device, BackingBuffer.Size));
 
          // The buffer is considered dirty for the first usage.
          IsDirty = true;

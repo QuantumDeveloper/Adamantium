@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using Adamantium.Engine.Core.Effects;
 
 namespace Adamantium.Engine.Compiler.Effects
 {
@@ -40,7 +41,7 @@ namespace Adamantium.Engine.Compiler.Effects
       public EffectParser()
       {
          includeDirectoryList = new List<string>();
-         Macros = new List<ShaderMacro>();
+         Macros = new List<EffectData.ShaderMacro>();
       }
 
       /// <summary>
@@ -53,7 +54,7 @@ namespace Adamantium.Engine.Compiler.Effects
       /// Gets the macros.
       /// </summary>
       /// <value>The macros.</value>
-      public List<ShaderMacro> Macros { get; private set; }
+      public List<EffectData.ShaderMacro> Macros { get; private set; }
 
       /// <summary>
       /// Gets the include directory list.

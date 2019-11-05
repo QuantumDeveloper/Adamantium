@@ -1,6 +1,4 @@
-﻿using Adamantium.Engine.Effects;
-
-namespace Adamantium.Engine.Graphics
+﻿namespace Adamantium.Engine.Effects
 {
     /// <summary>
     /// A collection of <see cref="EffectTechnique"/>.

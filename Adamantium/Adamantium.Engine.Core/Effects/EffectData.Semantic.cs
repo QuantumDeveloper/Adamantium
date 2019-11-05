@@ -1,5 +1,4 @@
 ﻿using System;
-using ProtoBuf;
 
 namespace Adamantium.Engine.Core.Effects
 {
@@ -21,7 +20,6 @@ namespace Adamantium.Engine.Core.Effects
       /// <msdn-id>ff476215</msdn-id>	
       /// <unmanaged>D3D11_SIGNATURE_PARAMETER_DESC</unmanaged>	
       /// <unmanaged-short>D3D11_SIGNATURE_PARAMETER_DESC</unmanaged-short>	
-      [ProtoContract]
       public sealed class Semantic : IEquatable<Semantic>
       {
          /// <summary>
@@ -61,7 +59,6 @@ namespace Adamantium.Engine.Core.Effects
          /// <msdn-id>ff476215</msdn-id>	
          /// <unmanaged>const char* SemanticName</unmanaged>	
          /// <unmanaged-short>char SemanticName</unmanaged-short>	
-         [ProtoMember(1)]
          public string Name { get; internal set; }
 
          /// <summary>	
@@ -70,7 +67,6 @@ namespace Adamantium.Engine.Core.Effects
          /// <msdn-id>ff476215</msdn-id>	
          /// <unmanaged>unsigned int SemanticIndex</unmanaged>	
          /// <unmanaged-short>unsigned int SemanticIndex</unmanaged-short>	
-         [ProtoMember(2)]
          public byte Index { get; internal set; }
 
          /// <summary>	
@@ -79,7 +75,6 @@ namespace Adamantium.Engine.Core.Effects
          /// <msdn-id>ff476215</msdn-id>	
          /// <unmanaged>unsigned int Register</unmanaged>	
          /// <unmanaged-short>unsigned int Register</unmanaged-short>	
-         [ProtoMember(3)]
          public byte Register { get; internal set; }
 
          /// <summary>	
@@ -88,7 +83,6 @@ namespace Adamantium.Engine.Core.Effects
          /// <msdn-id>ff476215</msdn-id>	
          /// <unmanaged>D3D_NAME SystemValueType</unmanaged>	
          /// <unmanaged-short>D3D_NAME SystemValueType</unmanaged-short>	
-         [ProtoMember(4)]
          public byte SystemValueType { get; internal set; }
 
          /// <summary>	
@@ -97,7 +91,6 @@ namespace Adamantium.Engine.Core.Effects
          /// <msdn-id>ff476215</msdn-id>	
          /// <unmanaged>D3D_REGISTER_COMPONENT_TYPE ComponentType</unmanaged>	
          /// <unmanaged-short>D3D_REGISTER_COMPONENT_TYPE ComponentType</unmanaged-short>	
-         [ProtoMember(5)]
          public byte ComponentType { get; internal set; }
 
          /// <summary>	
@@ -106,7 +99,6 @@ namespace Adamantium.Engine.Core.Effects
          /// <msdn-id>ff476215</msdn-id>	
          /// <unmanaged>D3D11_REGISTER_COMPONENT_MASK_FLAG Mask</unmanaged>	
          /// <unmanaged-short>D3D11_REGISTER_COMPONENT_MASK_FLAG Mask</unmanaged-short>	
-         [ProtoMember(6)]
          public byte UsageMask { get; internal set; }
 
          /// <summary>	
@@ -115,7 +107,6 @@ namespace Adamantium.Engine.Core.Effects
          /// <msdn-id>ff476215</msdn-id>	
          /// <unmanaged>D3D11_REGISTER_COMPONENT_MASK_FLAG ReadWriteMask</unmanaged>	
          /// <unmanaged-short>D3D11_REGISTER_COMPONENT_MASK_FLAG ReadWriteMask</unmanaged-short>	
-         [ProtoMember(7)]
          public byte ReadWriteMask { get; internal set; }
 
          /// <summary>	
@@ -124,7 +115,6 @@ namespace Adamantium.Engine.Core.Effects
          /// <msdn-id>ff476215</msdn-id>	
          /// <unmanaged>unsigned int Stream</unmanaged>	
          /// <unmanaged-short>unsigned int Stream</unmanaged-short>	
-         [ProtoMember(8)]
          public byte Stream { get; internal set; }
 
          public bool Equals(Semantic other)

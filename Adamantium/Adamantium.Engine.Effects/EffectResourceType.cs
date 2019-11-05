@@ -1,6 +1,6 @@
 ﻿using Adamantium.Engine.Core.Effects;
 
-namespace Adamantium.Engine.Graphics
+namespace Adamantium.Engine.Effects
 {
    /// <summary>
    /// Type of a resource for an <see cref="EffectParameter" />.

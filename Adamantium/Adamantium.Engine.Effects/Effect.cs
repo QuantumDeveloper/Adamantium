@@ -1,12 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using Adamantium.Core;
+﻿using Adamantium.Core;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Content;
 using Adamantium.Engine.Core.Effects;
+using Adamantium.Engine.Graphics;
 
-namespace Adamantium.Engine.Graphics
+namespace Adamantium.Engine.Effects
 {
     /// <summary>
     /// Effect class. Representing a wrapper over the shaders to make work with shaders easier
@@ -223,17 +221,18 @@ namespace Adamantium.Engine.Graphics
 
              // If same type
              if (comparison == 0)
-                {
+             {
                  // Order by resource type
-                 comparison = ((int)left.ResourceType).CompareTo((int)right.ResourceType);
+                 comparison = ((int) left.ResourceType).CompareTo((int) right.ResourceType);
 
                  // If same, order by resource index
                  if (comparison == 0)
-                    {
-                        comparison = left.Offset.CompareTo(right.Offset);
-                    }
-                }
-                return comparison;
+                 {
+                     comparison = left.Offset.CompareTo(right.Offset);
+                 }
+             }
+
+             return comparison;
             });
 
             // Prelink constant buffers

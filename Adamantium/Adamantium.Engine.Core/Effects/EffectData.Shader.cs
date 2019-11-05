@@ -1,42 +1,35 @@
 ﻿using System.Collections.Generic;
 using Adamantium.Core;
-using ProtoBuf;
 
 namespace Adamantium.Engine.Core.Effects
 {
    public sealed partial class EffectData
    {
-      [ProtoContract]
       public sealed class Shader
       {
          /// <summary>
          /// Name of this shader, only valid for public shaders, else null.
          /// </summary>
-         [ProtoMember(1)]
          public string Name;
 
          /// <summary>
          /// Type of this shader.
          /// </summary>
-         [ProtoMember(2)]
          public EffectShaderType Type;
 
          /// <summary>
          /// Compiler flags used to compile this shader.
          /// </summary>
-         [ProtoMember(3)]
          public EffectCompilerFlags CompilerFlags;
 
          /// <summary>
          /// Level of this shader.
          /// </summary>
-         [ProtoMember(4)]
          public FeatureLevel Level;
 
          /// <summary>
          /// Bytecode of this shader.
          /// </summary>
-         [ProtoMember(5)]
          public byte[] Bytecode;
 
          /// <summary>
@@ -45,39 +38,34 @@ namespace Adamantium.Engine.Core.Effects
          /// <remarks>
          /// Shaders with same bytecode with have same hashcode.
          /// </remarks>
-         [ProtoMember(6)]
          public int Hashcode;
 
          /// <summary>
          /// Description of the input <see cref="Signature"/>.
          /// </summary>
-         [ProtoMember(7)]
          public Signature InputSignature;
 
          /// <summary>
          /// Description of the output <see cref="Signature"/>.
          /// </summary>
-         [ProtoMember(8)]
          public Signature OutputSignature;
 
          /// <summary>
          /// List of constant buffers used by this shader.
          /// </summary>
-         [ProtoMember(9)]
          public List<ConstantBuffer> ConstantBuffers
          {
-            get { return constantBuffers ?? (constantBuffers = new List<ConstantBuffer>()); }
-            set { constantBuffers = value; }
+            get { return constantBuffers ??= new List<ConstantBuffer>(); }
+            set => constantBuffers = value;
          }
 
          /// <summary>
          /// List of resource parameters used by this shader.
          /// </summary>
-         [ProtoMember(10)]
          public List<ResourceParameter> ResourceParameters
          {
-            get { return resourceParameters ??(resourceParameters = new List<ResourceParameter>()); }
-            set { resourceParameters = value; }
+            get { return resourceParameters ??= new List<ResourceParameter>(); }
+            set => resourceParameters = value;
          }
 
          private List<ConstantBuffer> constantBuffers;

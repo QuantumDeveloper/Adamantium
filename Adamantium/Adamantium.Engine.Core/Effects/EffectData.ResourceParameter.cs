@@ -1,23 +1,19 @@
 ﻿using System;
-using ProtoBuf;
 
 namespace Adamantium.Engine.Core.Effects
 {
    public partial class EffectData
    {
-      [ProtoContract]
       public sealed class ResourceParameter : Parameter, IEquatable<ResourceParameter>
       {
          /// <summary>
          /// The slot index register to bind to.
          /// </summary>
-         [ProtoMember(1)]
          public byte Slot;
 
          /// <summary>
          /// The number of slots to bind.
          /// </summary>
-         [ProtoMember(2)]
          public byte Count;
 
          public bool Equals(ResourceParameter other)

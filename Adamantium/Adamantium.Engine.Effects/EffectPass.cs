@@ -1,12 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Runtime.InteropServices;
-using Adamantium.Core;
+﻿using Adamantium.Core;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Effects;
-using Adamantium.Mathematics;
+using Adamantium.Engine.Graphics;
 
-namespace Adamantium.Engine.Graphics
+namespace Adamantium.Engine.Effects
 {
     /// <summary>
     /// Contains rendering state for drawing with an effect;  updates constant buffers and directly sets all needed resources for each <see cref="CommonShaderStage"/>

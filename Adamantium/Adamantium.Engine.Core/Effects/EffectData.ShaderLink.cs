@@ -1,12 +1,9 @@
 ﻿using System;
-using ProtoBuf;
-using SharpDX.Direct3D11;
 
 namespace Adamantium.Engine.Core.Effects
 {
    public sealed partial class EffectData
    {
-      [ProtoContract(SkipConstructor = true)]
       public sealed class ShaderLink : IEquatable<ShaderLink>
       {
          public static readonly ShaderLink NullShader = new ShaderLink();
@@ -17,13 +14,11 @@ namespace Adamantium.Engine.Core.Effects
          /// <summary>
          /// The stream output rasterized stream (-1 if no rasterized stream).
          /// </summary>
-         [ProtoMember(1)]
          public int StreamOutputRasterizedStream;
 
          /// <summary>
          /// The stream output elements only valid for a geometry shader, can be null.
          /// </summary>
-         [ProtoMember(2)]
          public StreamOutputElement[] StreamOutputElements;
 
          /// <summary>
@@ -51,7 +46,6 @@ namespace Adamantium.Engine.Core.Effects
          /// <remarks>
          /// This index is a direct reference to the shader in <see cref="EffectData.Shaders"/>.
          /// </remarks>
-         [ProtoMember(3)]
          public int Index
          {
             get { return index; }
@@ -65,14 +59,12 @@ namespace Adamantium.Engine.Core.Effects
          /// <remarks>
          /// This property is not null when there is no shader compiled and this is an import.
          /// </remarks>
-         [ProtoMember(4)]
          public string ImportName
          {
             get { return importName; }
             set { importName = value; }
          }
-
-         [ProtoMember(5)]
+         
          public EffectShaderType ShaderType;
 
          /// <summary>

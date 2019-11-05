@@ -1,11 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.IO;
-using ProtoBuf;
-using ProtoBuf.Meta;
 
 namespace Adamantium.Engine.Core.Effects
 {
-    [ProtoContract]
     public sealed partial class EffectData
     {
         public static readonly string CompiledExtension = "fx.compiled";
@@ -31,13 +28,11 @@ namespace Adamantium.Engine.Core.Effects
         /// <summary>
         /// List of compiled shaders.
         /// </summary>
-        [ProtoMember(1)]
         public List<Shader> Shaders;
 
         /// <summary>
         /// Complete Effect description
         /// </summary>
-        [ProtoMember(2)]
         public Effect Description;
 
         /// <summary>

@@ -1,11 +1,9 @@
 ﻿using System.Collections.Generic;
-using ProtoBuf;
 
 namespace Adamantium.Engine.Core.Effects
 {
    public sealed partial class EffectData
    {
-      [ProtoContract]
       public sealed class Technique
       {
          /// <summary>
@@ -14,13 +12,11 @@ namespace Adamantium.Engine.Core.Effects
          /// <remarks>
          /// This value can be null.
          /// </remarks>
-         [ProtoMember(1)]
          public string Name;
 
          /// <summary>
          /// List of <see cref="Pass"/>.
          /// </summary>
-         [ProtoMember(2)]
          public List<Pass> Passes;
 
          public override string ToString()
@@ -41,7 +37,7 @@ namespace Adamantium.Engine.Core.Effects
                for (int i = 0; i < Passes.Count; i++)
                {
                   var pass = Passes[i];
-                  technique.Passes.Add(pass != null ? pass.Clone() : null);
+                  technique.Passes.Add(pass?.Clone());
                }
             }
             return technique;
