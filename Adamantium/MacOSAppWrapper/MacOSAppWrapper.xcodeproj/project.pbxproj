@@ -14,6 +14,7 @@
 		EC4584C9232D029800418B58 /* Cursor.h in Headers */ = {isa = PBXBuildFile; fileRef = EC4584C8232D029800418B58 /* Cursor.h */; };
 		EC4584CB232D045200418B58 /* Cursor.m in Sources */ = {isa = PBXBuildFile; fileRef = EC4584CA232D045200418B58 /* Cursor.m */; };
 		EC4584D323326F4600418B58 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EC4584D223326F4500418B58 /* Metal.framework */; };
+		EC8EC7592372CDD9000047C7 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EC8EC7582372CDD9000047C7 /* Foundation.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -26,6 +27,7 @@
 		EC4584C8232D029800418B58 /* Cursor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Cursor.h; sourceTree = "<group>"; };
 		EC4584CA232D045200418B58 /* Cursor.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Cursor.m; sourceTree = "<group>"; };
 		EC4584D223326F4500418B58 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
+		EC8EC7582372CDD9000047C7 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -33,6 +35,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EC8EC7592372CDD9000047C7 /* Foundation.framework in Frameworks */,
 				EC4584D323326F4600418B58 /* Metal.framework in Frameworks */,
 				EC4584BE232C1C8300418B58 /* AppKit.framework in Frameworks */,
 			);
@@ -74,6 +77,7 @@
 		EC4584BC232C1C8300418B58 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				EC8EC7582372CDD9000047C7 /* Foundation.framework */,
 				EC4584D223326F4500418B58 /* Metal.framework */,
 				EC4584BD232C1C8300418B58 /* AppKit.framework */,
 			);
@@ -220,7 +224,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.14;
+				MACOSX_DEPLOYMENT_TARGET = 10.15;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -276,7 +280,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.14;
+				MACOSX_DEPLOYMENT_TARGET = 10.15;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = macosx;
