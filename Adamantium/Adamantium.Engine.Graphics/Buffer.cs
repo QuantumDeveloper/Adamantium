@@ -24,7 +24,7 @@ namespace Adamantium.Engine.Graphics
 
         public uint ElementCount { get; private set; }
 
-        public ulong TotalSize => ElementSize * ElementCount;
+        public int TotalSize => (int)(ElementSize * ElementCount);
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Buffer" /> class.
@@ -56,7 +56,7 @@ namespace Adamantium.Engine.Graphics
             ElementCount = count;
         }
 
-        protected Buffer(GraphicsDevice device, BufferUsageFlags bufferFlags, ulong size, uint count, MemoryPropertyFlags memoryflags, SharingMode sharingMode)
+        protected Buffer(GraphicsDevice device, BufferUsageFlags bufferFlags, int size, uint count, MemoryPropertyFlags memoryflags, SharingMode sharingMode)
         {
             GraphicsDevice = device;
             Usage = bufferFlags;
@@ -74,19 +74,22 @@ namespace Adamantium.Engine.Graphics
             DeviceMemory stagingBufferMemory;
             CreateBuffer(TotalSize, BufferUsageFlags.TransferSrc, MemoryPropertyFlags.HostCached | MemoryPropertyFlags.HostCoherent, out stagingBuffer, out stagingBufferMemory);
 
-            var data = GraphicsDevice.MapMemory(stagingBufferMemory, 0, TotalSize, 0);
-            unsafe
-            {
-                System.Buffer.MemoryCopy(dataPointer.Pointer.ToPointer(), data.ToPointer(), (long)TotalSize, (long)TotalSize);
-            }
-
-            GraphicsDevice.UnmapMemory(stagingBufferMemory);
-
+            UpdateBufferContent(stagingBufferMemory, dataPointer);
             CreateBuffer(TotalSize, BufferUsageFlags.TransferDst | Usage, MemoryFlags, out VulkanBuffer, out BufferMemory);
             CopyBuffer(stagingBuffer, VulkanBuffer, TotalSize);
 
             stagingBuffer.Destroy(GraphicsDevice);
             stagingBufferMemory.FreeMemory(GraphicsDevice);
+        }
+
+        private void UpdateBufferContent(DeviceMemory bufferMemory, DataPointer dataPointer, ulong offset = 0)
+        {
+            var data = GraphicsDevice.MapMemory(bufferMemory, offset, (ulong)TotalSize, 0);
+            unsafe
+            {
+                System.Buffer.MemoryCopy(dataPointer.Pointer.ToPointer(), data.ToPointer(), TotalSize, dataPointer.Size);
+            }
+            GraphicsDevice.UnmapMemory(bufferMemory);
         }
 
         /// <summary>
@@ -102,10 +105,10 @@ namespace Adamantium.Engine.Graphics
         //    return new Buffer(GraphicsDevice, stagingDesc, BufferUsageFlags, ViewFormat, IntPtr.Zero);
         //}
 
-        private void CreateBuffer(ulong size, BufferUsageFlags usage, MemoryPropertyFlags memoryProperties, out VulkanBuffer buffer, out DeviceMemory bufferMemory)
+        private void CreateBuffer(int size, BufferUsageFlags usage, MemoryPropertyFlags memoryProperties, out VulkanBuffer buffer, out DeviceMemory bufferMemory)
         {
             BufferCreateInfo bufferInfo = new BufferCreateInfo();
-            bufferInfo.Size = size;
+            bufferInfo.Size = (ulong)size;
             bufferInfo.Usage = (uint)usage;
             bufferInfo.SharingMode = SharingMode.Exclusive;
 
@@ -126,16 +129,231 @@ namespace Adamantium.Engine.Graphics
             }
         }
 
-        private void CopyBuffer(VulkanBuffer srcBuffer, VulkanBuffer dstBuffer, ulong size)
+        private void CopyBuffer(VulkanBuffer srcBuffer, VulkanBuffer dstBuffer, int size)
         {
             var commandBuffer = GraphicsDevice.BeginSingleTimeCommands();
 
             BufferCopy copyRegin = new BufferCopy();
-            copyRegin.Size = size;
+            copyRegin.Size = (ulong)size;
             var regions = new BufferCopy[1] { copyRegin };
             commandBuffer.CmdCopyBuffer(srcBuffer, dstBuffer, 1, regions);
 
             GraphicsDevice.EndSingleTimeCommands(commandBuffer);
+        }
+
+        /// <summary>
+        /// Gets the content of this buffer to an array of data.
+        /// </summary>
+        /// <typeparam name="TData">The type of the T data.</typeparam>
+        /// <remarks>
+        /// This method is only working when called from the main thread that is accessing the main <see cref="GraphicsDevice"/>.
+        /// This method creates internally a staging resource if this texture is not already a staging resource, copies to it and map it to memory. Use method with explicit staging resource
+        /// for optimal performances.</remarks>
+        /// <msdn-id>ff476457</msdn-id>	
+        /// <unmanaged>HRESULT ID3D11DeviceContext::Map([In] ID3D11Resource* pResource,[In] unsigned int Subresource,[In] D3D11_MAP MapType,[In] D3D11_MAP_FLAG MapFlags,[Out] D3D11_MAPPED_SUBRESOURCE* pMappedResource)</unmanaged>	
+        /// <unmanaged-short>ID3D11DeviceContext::Map</unmanaged-short>	
+        public TData[] GetData<TData>() where TData : struct
+        {
+            var toData = new TData[TotalSize / Utilities.SizeOf<TData>()];
+            GetData(toData);
+            return toData;
+        }
+
+        /// <summary>
+        /// Copies the content of this buffer from GPU memory to an array of data on CPU memory using a specific staging resource.
+        /// </summary>
+        /// <typeparam name="TData">The type of the T data.</typeparam>
+        /// <param name="stagingTexture">The staging buffer used to transfer the buffer.</param>
+        /// <param name="toData">To data.</param>
+        /// <exception cref="System.ArgumentException">When strides is different from optimal strides, and TData is not the same size as the pixel format, or Width * Height != toData.Length</exception>
+        /// <remarks>
+        /// This method is only working when called from the main thread that is accessing the main <see cref="GraphicsDevice"/>.
+        /// </remarks>
+        /// <msdn-id>ff476457</msdn-id>	
+        /// <unmanaged>HRESULT ID3D11DeviceContext::Map([In] ID3D11Resource* pResource,[In] unsigned int Subresource,[In] D3D11_MAP MapType,[In] D3D11_MAP_FLAG MapFlags,[Out] D3D11_MAPPED_SUBRESOURCE* pMappedResource)</unmanaged>	
+        /// <unmanaged-short>ID3D11DeviceContext::Map</unmanaged-short>	
+        public void GetData<TData>(ref TData toData) where TData : struct
+        {
+            GCHandle handle = GCHandle.Alloc(toData, GCHandleType.Pinned);
+            GetData(new DataPointer(handle.AddrOfPinnedObject(), Utilities.SizeOf<TData>()));
+            handle.Free();
+        }
+
+        /// <summary>
+        /// Copies the content of this buffer from GPU memory to an array of data on CPU memory using a specific staging resource.
+        /// </summary>
+        /// <typeparam name="TData">The type of the T data.</typeparam>
+        /// <param name="stagingTexture">The staging buffer used to transfer the buffer.</param>
+        /// <param name="toData">To data.</param>
+        /// <exception cref="System.ArgumentException">When strides is different from optimal strides, and TData is not the same size as the pixel format, or Width * Height != toData.Length</exception>
+        /// <remarks>
+        /// This method is only working when called from the main thread that is accessing the main <see cref="GraphicsDevice"/>.
+        /// </remarks>
+        /// <msdn-id>ff476457</msdn-id>	
+        /// <unmanaged>HRESULT ID3D11DeviceContext::Map([In] ID3D11Resource* pResource,[In] unsigned int Subresource,[In] D3D11_MAP MapType,[In] D3D11_MAP_FLAG MapFlags,[Out] D3D11_MAPPED_SUBRESOURCE* pMappedResource)</unmanaged>	
+        /// <unmanaged-short>ID3D11DeviceContext::Map</unmanaged-short>	
+        public void GetData<TData>(TData[] toData) where TData : struct
+        {
+            GCHandle handle = GCHandle.Alloc(toData, GCHandleType.Pinned);
+            GetData(new DataPointer(handle.AddrOfPinnedObject(), toData.Length * Utilities.SizeOf<TData>()));
+            handle.Free();
+        }
+
+        /// <summary>
+        /// Copies the content of this buffer from GPU memory to a CPU memory using a specific staging resource.
+        /// </summary>
+        /// <param name="stagingTexture">The staging buffer used to transfer the buffer.</param>
+        /// <param name="toData">To data pointer.</param>
+        /// <exception cref="System.ArgumentException">When strides is different from optimal strides, and TData is not the same size as the pixel format, or Width * Height != toData.Length</exception>
+        /// <remarks>
+        /// This method is only working when called from the main thread that is accessing the main <see cref="GraphicsDevice"/>.
+        /// </remarks>
+        /// <msdn-id>ff476457</msdn-id>	
+        /// <unmanaged>HRESULT ID3D11DeviceContext::Map([In] ID3D11Resource* pResource,[In] unsigned int Subresource,[In] D3D11_MAP MapType,[In] D3D11_MAP_FLAG MapFlags,[Out] D3D11_MAPPED_SUBRESOURCE* pMappedResource)</unmanaged>	
+        /// <unmanaged-short>ID3D11DeviceContext::Map</unmanaged-short>	
+        public void GetData(DataPointer toData)
+        {
+            // Check size validity of data to copy to
+            if (toData.Size > TotalSize)
+                throw new ArgumentException("Length of TData is larger than size of buffer");
+
+            var data = GraphicsDevice.MapMemory(BufferMemory, 0, (ulong)toData.Size, 0);
+            unsafe
+            {
+                System.Buffer.MemoryCopy(data.ToPointer(), toData.Pointer.ToPointer(), toData.Size, toData.Size);
+            }
+            GraphicsDevice.UnmapMemory(BufferMemory);
+        }
+
+        /// <summary>
+        /// Copies the content of a single structure data from CPU memory to this buffer into GPU memory.
+        /// </summary>
+        /// <typeparam name="TData">The type of the T data.</typeparam>
+        /// <param name="fromData">The data to copy from.</param>
+        /// <param name="offsetInBytes">The offset in bytes to write to.</param>
+        /// <param name="options">Data writing behavior</param>
+        /// <exception cref="System.ArgumentException"></exception>
+        /// <remarks>
+        /// This method is only working when called from the main thread that is accessing the main <see cref="GraphicsDevice"/>. See the unmanaged documentation about Map/UnMap for usage and restrictions.
+        /// </remarks>
+        /// <msdn-id>ff476457</msdn-id>
+        /// <unmanaged>HRESULT ID3D11DeviceContext::Map([In] ID3D11Resource* pResource,[In] unsigned int Subresource,[In] D3D11_MAP MapType,[In] D3D11_MAP_FLAG MapFlags,[Out] D3D11_MAPPED_SUBRESOURCE* pMappedResource)</unmanaged>
+        /// <unmanaged-short>ID3D11DeviceContext::Map</unmanaged-short>
+        public void SetData<TData>(ref TData fromData, uint offsetInBytes = 0) where TData : struct
+        {
+            SetData(GraphicsDevice, ref fromData, offsetInBytes);
+        }
+
+        /// <summary>
+        /// Copies the content an array of data from CPU memory to this buffer into GPU memory.
+        /// </summary>
+        /// <typeparam name="TData">The type of the T data.</typeparam>
+        /// <param name="fromData">The data to copy from.</param>
+        /// <param name="startIndex">Index to begin setting data from.</param>
+        /// <param name="elementCount">The number of elements to set.</param>
+        /// <param name="offsetInBytes">The offset in bytes to write to.</param>
+        /// <param name="options">Buffer data behavior.</param>
+        /// <exception cref="System.ArgumentException"></exception>
+        /// <remarks>
+        /// This method is only working when called from the main thread that is accessing the main <see cref="GraphicsDevice"/>. See the unmanaged documentation about Map/UnMap for usage and restrictions.
+        /// </remarks>
+        /// <msdn-id>ff476457</msdn-id>
+        /// <unmanaged>HRESULT ID3D11DeviceContext::Map([In] ID3D11Resource* pResource,[In] unsigned int Subresource,[In] D3D11_MAP MapType,[In] D3D11_MAP_FLAG MapFlags,[Out] D3D11_MAPPED_SUBRESOURCE* pMappedResource)</unmanaged>
+        /// <unmanaged-short>ID3D11DeviceContext::Map</unmanaged-short>
+        public void SetData<TData>(TData[] fromData, uint startIndex = 0, uint elementCount = 0, uint offsetInBytes = 0) where TData : struct
+        {
+            SetData(GraphicsDevice, fromData, startIndex, elementCount, offsetInBytes);
+        }
+
+        /// <summary>
+        /// Copies the content an array of data on CPU memory to this buffer into GPU memory.
+        /// </summary>
+        /// <param name="fromData">A data pointer.</param>
+        /// <param name="offsetInBytes">The offset in bytes to write to.</param>
+        /// <param name="options">Buffer data behavior</param>
+        /// <exception cref="System.ArgumentException"></exception>
+        /// <msdn-id>ff476457</msdn-id>
+        ///   <unmanaged>HRESULT ID3D11DeviceContext::Map([In] ID3D11Resource* pResource,[In] unsigned int Subresource,[In] D3D11_MAP MapType,[In] D3D11_MAP_FLAG MapFlags,[Out] D3D11_MAPPED_SUBRESOURCE* pMappedResource)</unmanaged>
+        ///   <unmanaged-short>ID3D11DeviceContext::Map</unmanaged-short>
+        /// <remarks>
+        /// This method is only working when called from the main thread that is accessing the main <see cref="GraphicsDevice"/>. See the unmanaged documentation about Map/UnMap for usage and restrictions.
+        /// </remarks>
+        public void SetData(DataPointer fromData, uint offsetInBytes = 0)
+        {
+            SetData(GraphicsDevice, fromData, offsetInBytes);
+        }
+
+        /// <summary>
+        /// Copies the content an array of data on CPU memory to this buffer into GPU memory.
+        /// </summary>
+        /// <typeparam name="TData">The type of the T data.</typeparam>
+        /// <param name="device">The <see cref="GraphicsDevice"/>.</param>
+        /// <param name="fromData">The data to copy from.</param>
+        /// <param name="offsetInBytes">The offset in bytes to write to.</param>
+        /// <param name="options">Buffer data behavior</param>
+        /// <exception cref="System.ArgumentException"></exception>
+        /// <remarks>
+        /// See the unmanaged documentation about Map/UnMap for usage and restrictions.
+        /// </remarks>
+        /// <msdn-id>ff476457</msdn-id>
+        /// <unmanaged>HRESULT ID3D11DeviceContext::Map([In] ID3D11Resource* pResource,[In] unsigned int Subresource,[In] D3D11_MAP MapType,[In] D3D11_MAP_FLAG MapFlags,[Out] D3D11_MAPPED_SUBRESOURCE* pMappedResource)</unmanaged>
+        /// <unmanaged-short>ID3D11DeviceContext::Map</unmanaged-short>
+        public void SetData<TData>(GraphicsDevice device, ref TData fromData, uint offsetInBytes = 0) where TData : struct
+        {
+            GCHandle handle = GCHandle.Alloc(fromData, GCHandleType.Pinned);
+            SetData(device, new DataPointer(handle.AddrOfPinnedObject(), Utilities.SizeOf<TData>()), offsetInBytes);
+            handle.Free();
+        }
+
+        /// <summary>
+        /// Copies the content an array of data on CPU memory to this buffer into GPU memory.
+        /// </summary>
+        /// <typeparam name="TData">The type of the T data.</typeparam>
+        /// <param name="device">The <see cref="GraphicsDevice"/>.</param>
+        /// <param name="fromData">The data to copy from.</param>
+        /// <param name="startIndex">The starting index to begin setting data from.</param>
+        /// <param name="elementCount">The number of elements to set.</param>
+        /// <param name="offsetInBytes">The offset in bytes to write to.</param>
+        /// <param name="options">Buffer data behavior.</param>
+        /// <exception cref="System.ArgumentException"></exception>
+        /// <remarks>
+        /// See the unmanaged documentation about Map/UnMap for usage and restrictions.
+        /// </remarks>
+        /// <msdn-id>ff476457</msdn-id>
+        /// <unmanaged>HRESULT ID3D11DeviceContext::Map([In] ID3D11Resource* pResource,[In] unsigned int Subresource,[In] D3D11_MAP MapType,[In] D3D11_MAP_FLAG MapFlags,[Out] D3D11_MAPPED_SUBRESOURCE* pMappedResource)</unmanaged>
+        /// <unmanaged-short>ID3D11DeviceContext::Map</unmanaged-short>
+        public unsafe void SetData<TData>(GraphicsDevice device, TData[] fromData, uint startIndex = 0, uint elementCount = 0, uint offsetInBytes = 0) where TData : struct
+        {
+            GCHandle handle = GCHandle.Alloc(fromData, GCHandleType.Pinned);
+            byte* bytePtr = (byte*)handle.AddrOfPinnedObject();
+            var sizeOfT = Utilities.SizeOf<TData>();
+            var sourcePtr = (IntPtr)(bytePtr + startIndex * sizeOfT);
+            var sizeOfData = (elementCount == 0 ? (uint)fromData.Length : elementCount) * sizeOfT;
+            SetData(device, new DataPointer(sourcePtr, (int)sizeOfData), offsetInBytes);
+            handle.Free();
+        }
+
+        /// <summary>
+        /// Copies the content an array of data on CPU memory to this buffer into GPU memory.
+        /// </summary>
+        /// <param name="device">The <see cref="GraphicsDevice"/>.</param>
+        /// <param name="fromData">A data pointer.</param>
+        /// <param name="offsetInBytes">The offset in bytes to write to.</param>
+        /// <param name="options">Buffer data behavior.</param>
+        /// <exception cref="System.ArgumentException"></exception>
+        /// <msdn-id>ff476457</msdn-id>
+        ///   <unmanaged>HRESULT ID3D11DeviceContext::Map([In] ID3D11Resource* pResource,[In] unsigned int Subresource,[In] D3D11_MAP MapType,[In] D3D11_MAP_FLAG MapFlags,[Out] D3D11_MAPPED_SUBRESOURCE* pMappedResource)</unmanaged>
+        ///   <unmanaged-short>ID3D11DeviceContext::Map</unmanaged-short>
+        /// <remarks>
+        /// See the unmanaged documentation about Map/UnMap for usage and restrictions.
+        /// </remarks>
+        public unsafe void SetData(GraphicsDevice device, DataPointer fromData, uint offsetInBytes = 0)
+        {
+            // Check size validity of data to copy to
+            if ((fromData.Size + offsetInBytes) > TotalSize)
+                throw new ArgumentException("Size of data to upload + offset is larger than size of buffer");
+
+            UpdateBufferContent(BufferMemory, fromData, offsetInBytes);
         }
 
         /// <summary>
@@ -416,10 +634,10 @@ namespace Adamantium.Engine.Graphics
         /// <remarks>This method is only working when called from the main thread that is accessing the main <see cref="GraphicsDevice" />.
         /// This method creates internally a staging resource if this texture is not already a staging resource, copies to it and map it to memory. Use method with explicit staging resource
         /// for optimal performances.</remarks>
-        //public T[] GetData()
-        //{
-        //    return GetData<T>();
-        //}
+        public T[] GetData()
+        {
+            return GetData<T>();
+        }
 
         /// <summary>
         /// Copies the content of a single structure data from CPU memory to this buffer into GPU memory.
@@ -434,10 +652,10 @@ namespace Adamantium.Engine.Graphics
         /// <msdn-id>ff476457</msdn-id>
         /// <unmanaged>HRESULT ID3D11DeviceContext::Map([In] ID3D11Resource* pResource,[In] unsigned int Subresource,[In] D3D11_MAP MapType,[In] D3D11_MAP_FLAG MapFlags,[Out] D3D11_MAPPED_SUBRESOURCE* pMappedResource)</unmanaged>
         /// <unmanaged-short>ID3D11DeviceContext::Map</unmanaged-short>
-        //public void SetData(ref T fromData, int offsetInBytes = 0, SetDataOptions options = SetDataOptions.Discard)
-        //{
-        //    base.SetData(ref fromData, offsetInBytes, options);
-        //}
+        public void SetData(ref T fromData, uint offsetInBytes = 0)
+        {
+            base.SetData(ref fromData, offsetInBytes);
+        }
 
         /// <summary>
         /// Copies the content an array of data from CPU memory to this buffer into GPU memory.
@@ -453,10 +671,10 @@ namespace Adamantium.Engine.Graphics
         /// <msdn-id>ff476457</msdn-id>
         /// <unmanaged>HRESULT ID3D11DeviceContext::Map([In] ID3D11Resource* pResource,[In] unsigned int Subresource,[In] D3D11_MAP MapType,[In] D3D11_MAP_FLAG MapFlags,[Out] D3D11_MAPPED_SUBRESOURCE* pMappedResource)</unmanaged>
         /// <unmanaged-short>ID3D11DeviceContext::Map</unmanaged-short>
-        //public void SetData(T[] fromData, int startIndex = 0, int elementCount = 0, int offsetInBytes = 0, SetDataOptions options = SetDataOptions.Discard)
-        //{
-        //    base.SetData(fromData, startIndex, elementCount, offsetInBytes, options);
-        //}
+        public void SetData(T[] fromData, uint startIndex = 0, uint elementCount = 0, uint offsetInBytes = 0)
+        {
+            base.SetData(fromData, startIndex, elementCount, offsetInBytes);
+        }
 
         /// <summary>
         /// Copies the content of a single structure data from CPU memory to this buffer into GPU memory.
@@ -472,10 +690,10 @@ namespace Adamantium.Engine.Graphics
         /// <msdn-id>ff476457</msdn-id>
         /// <unmanaged>HRESULT ID3D11DeviceContext::Map([In] ID3D11Resource* pResource,[In] unsigned int Subresource,[In] D3D11_MAP MapType,[In] D3D11_MAP_FLAG MapFlags,[Out] D3D11_MAPPED_SUBRESOURCE* pMappedResource)</unmanaged>
         /// <unmanaged-short>ID3D11DeviceContext::Map</unmanaged-short>
-        //public void SetData(GraphicsDevice device, ref T fromData, int offsetInBytes = 0, SetDataOptions options = SetDataOptions.Discard)
-        //{
-        //    base.SetData(device, ref fromData, offsetInBytes, options);
-        //}
+        public void SetData(GraphicsDevice device, ref T fromData, uint offsetInBytes = 0)
+        {
+            base.SetData(device, ref fromData, offsetInBytes);
+        }
 
         /// <summary>
         /// Copies the content an array of data from CPU memory to this buffer into GPU memory.
@@ -492,9 +710,9 @@ namespace Adamantium.Engine.Graphics
         /// <msdn-id>ff476457</msdn-id>
         /// <unmanaged>HRESULT ID3D11DeviceContext::Map([In] ID3D11Resource* pResource,[In] unsigned int Subresource,[In] D3D11_MAP MapType,[In] D3D11_MAP_FLAG MapFlags,[Out] D3D11_MAPPED_SUBRESOURCE* pMappedResource)</unmanaged>
         /// <unmanaged-short>ID3D11DeviceContext::Map</unmanaged-short>
-        //public void SetData(GraphicsDevice device, T[] fromData, int startIndex = 0, int elementCount = 0, int offsetInBytes = 0, SetDataOptions options = SetDataOptions.Discard)
-        //{
-        //    base.SetData(device, fromData, startIndex, elementCount, offsetInBytes, options);
-        //}
+        public void SetData(GraphicsDevice device, T[] fromData, uint startIndex = 0, uint elementCount = 0, uint offsetInBytes = 0)
+        {
+            base.SetData(device, fromData, startIndex, elementCount, offsetInBytes);
+        }
     }
 }

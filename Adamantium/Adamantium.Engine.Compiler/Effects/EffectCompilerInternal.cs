@@ -48,7 +48,7 @@ namespace Adamantium.Engine.Compiler.Effects
         private EffectData.Technique technique;
         private int nextSubPassCount;
 
-        private StreamOutputElement[] currentStreamOutputElements;
+        //private StreamOutputElement[] currentStreamOutputElements;
 
         private FileDependencyList dependencyList;
 

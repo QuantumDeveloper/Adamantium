@@ -19,7 +19,7 @@ namespace Adamantium.Engine.Core.Effects
          /// <summary>
          /// The stream output elements only valid for a geometry shader, can be null.
          /// </summary>
-         public StreamOutputElement[] StreamOutputElements;
+         //public StreamOutputElement[] StreamOutputElements;
 
          /// <summary>
          /// Initializes a new instance of the <see cref="ShaderLink" /> class.
