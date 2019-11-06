@@ -1,4 +1,5 @@
 ﻿using System;
+using Adamantium.Core;
 
 namespace Adamantium.Engine.Core.Effects
 {

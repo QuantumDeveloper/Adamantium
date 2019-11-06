@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using AdamantiumVulkan.Shaders;
-using SharpDX;
-using SharpDX.D3DCompiler;
 
 namespace Adamantium.Engine.Compiler.Effects
 {

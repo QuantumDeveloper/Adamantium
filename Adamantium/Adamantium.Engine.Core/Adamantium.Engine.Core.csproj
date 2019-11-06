@@ -7,8 +7,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.Core\AdamantiumVulkan.Core.csproj" />
-    <ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" />
     <ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
+    <ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" />
   </ItemGroup>
 
 </Project>
