@@ -14,6 +14,8 @@ namespace Adamantium.Engine.Graphics
 
         public PresentationParameters Description { get; private set; }
 
+        public uint BuffersCount => Description.BuffersCount;
+
         public uint Width => Description.Width;
 
         public uint Height => Description.Height;
@@ -47,17 +49,6 @@ namespace Adamantium.Engine.Graphics
 
         public Texture[] BackBuffers { get; protected set; }
 
-        //public PresentFlags PresentFlags
-        //{
-        //   get { return presentFlags; }
-        //   set
-        //   {
-        //      presentFlags = value;
-        //      RaisePropertyChanged();
-        //   }
-        //}
-
-
         protected GraphicsPresenter(GraphicsDevice graphicsDevice, PresentationParameters description, String name = "")
         {
             Name = name;
@@ -69,16 +60,24 @@ namespace Adamantium.Engine.Graphics
 
         protected void CreateDepthBuffer()
         {
-            depthBuffer = ToDispose(DepthStencilBuffer.New(GraphicsDevice, Description.Width, Description.Height, Description.DepthFormat, Description.MSAALevel, ImageAspectFlagBits.DepthBit));
+            depthBuffer = ToDispose(DepthStencilBuffer.New(GraphicsDevice, Width, Height, DepthFormat, MSAALevel));
         }
 
         private void CreateViewPort()
         {
             Viewport = new ViewportF(0, 0, Description.Width, Description.Height, 0.0f, 1.0f);
         }
+        
+        /// <summary>
+        /// Resize graphics presenter backbuffer according to width and height
+        /// </summary>
+        public bool Resize(uint width = 0, uint height = 0)
+        {
+            return Resize(width, height, BuffersCount, Description.ImageFormat, DepthFormat);
+        }
 
         /// <summary>
-        /// Resize graphics presenter bacbuffer according to width and height
+        /// Resize graphics presenter backbuffer according to width and height
         /// </summary>
         /// <param name="width"></param>
         /// <param name="height"></param>
@@ -121,7 +120,7 @@ namespace Adamantium.Engine.Graphics
         /// <summary>
         /// Present rendered image on screen
         /// </summary>
-        public abstract void Present();
+        public abstract Result Present();
 
         /// <summary>
         /// Takes screenshot from current backbuffer frame
