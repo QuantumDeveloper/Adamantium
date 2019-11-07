@@ -199,9 +199,9 @@ namespace Adamantium.Engine.Graphics
         /// <summary>
         /// Present rendered image on screen
         /// </summary>
-        public override void Present()
+        public override Result Present()
         {
-            Semaphore[] waitSemaphores = new[] { GraphicsDevice.GetRenderFinishedSemaphoreForCurrentFrame() };
+            Semaphore[] waitSemaphores = { GraphicsDevice.GetRenderFinishedSemaphoreForCurrentFrame() };
             var presentInfo = new PresentInfoKHR();
 
             presentInfo.WaitSemaphoreCount = 1;
@@ -212,16 +212,13 @@ namespace Adamantium.Engine.Graphics
             presentInfo.PImageIndices = new uint[] { GraphicsDevice.ImageIndex };
 
             var result = presentQueue.QueuePresentKHR(presentInfo);
-            if (result == Result.ErrorOutOfDateKhr || result == Result.SuboptimalKhr)
-            {
-                //Console.WriteLine(result);
-                RecreateSwapchain();
-            }
-            else if (result != Result.Success)
+            if (result != Result.Success)
             {
                 MessageBox.Show("Failed to present swap chain image");
                 throw new Exception();
             }
+
+            return result;
         }
 
 

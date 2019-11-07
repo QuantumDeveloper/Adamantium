@@ -8,6 +8,7 @@ using Adamantium.Imaging;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Media;
+using AdamantiumVulkan.Core;
 
 namespace Adamantium.UI.Processors
 {
@@ -94,7 +95,7 @@ namespace Adamantium.UI.Processors
             var c = Color.FromBgra(0xFF6495ED);
             if (!GraphicsDevice.BeginDraw(Colors.CornflowerBlue, 1.0f, 0))
             {
-                GraphicsDevice.ResizeBuffers((uint)window.ClientWidth, (uint)window.ClientHeight, buffersCount, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
+                GraphicsDevice.ResizePresenter((uint)window.ClientWidth, (uint)window.ClientHeight, buffersCount, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
                 return false;
             }
 
@@ -119,16 +120,15 @@ namespace Adamantium.UI.Processors
 
             //mainDevice.CopyResource(_backBuffer, Presenter.BackBuffer);
 
-            GraphicsDevice.Draw(3,1,0,0);
+            GraphicsDevice.Draw(3,1);
             GraphicsDevice.EndDraw();
             GraphicsDevice.Present();
             
-            if (isWindowResized)
-            {
-                isWindowResized = false;
-                GraphicsDevice.ResizeBuffers((uint)window.ClientWidth, (uint)window.ClientHeight, buffersCount, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
-                //return;
-            }
+//            if (isWindowResized)
+//            {
+//                isWindowResized = false;
+//                GraphicsDevice.ResizePresenter((uint)window.ClientWidth, (uint)window.ClientHeight, buffersCount, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
+//            }
         }
 
         //public void TraverseByLayer(IVisual visualElement, Action<IVisual> action)

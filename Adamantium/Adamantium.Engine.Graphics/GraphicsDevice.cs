@@ -585,7 +585,7 @@ namespace Adamantium.Engine.Graphics
             commandBuffer.CmdBindVertexBuffers(0, 1, vertexBuffer, ref offset);
         }
 
-        public void Draw(uint vertexCount, uint instanceCount, uint firstVertex, uint firstInstance)
+        public void Draw(uint vertexCount, uint instanceCount, uint firstVertex = 0, uint firstInstance = 0)
         {
             var commandBuffer = commandBuffers[ImageIndex];
             //commandBuffer.CmdBindDescriptorSets(PipelineBindPoint.Graphics, pipelineLayout, 0, 1, descriptorSets[CurrentImageIndex], 0, 0);
@@ -626,12 +626,23 @@ namespace Adamantium.Engine.Graphics
             LogicalDevice.UnmapMemory(memory);
         }
 
-        public bool ResizeBuffers(uint width, uint height, uint buffersCount, SurfaceFormat surfaceFormat, DepthFormat depthFormat)
+        public bool ResizePresenter(uint width = 0, uint height = 0)
         {
-            Console.WriteLine("Resize buffers called");
+            bool ResizeFunc() => Presenter.Resize(width, height);
+            return ResizePresenter(ResizeFunc);
+        }
+
+        public bool ResizePresenter(uint width, uint height, uint buffersCount, SurfaceFormat surfaceFormat, DepthFormat depthFormat)
+        {
+            bool ResizeFunc() => Presenter.Resize(width, height, buffersCount, surfaceFormat, depthFormat);
+            return ResizePresenter(ResizeFunc);
+        }
+
+        private bool ResizePresenter(Func<bool> resizeAction)
+        {
             var result = LogicalDevice.DeviceWaitIdle();
             DestroyFramebuffers();
-            var resizeResult = Presenter.Resize(width, height, buffersCount, surfaceFormat, depthFormat);
+            var resizeResult = resizeAction();
             if (!resizeResult)
             {
                 return false;
@@ -644,7 +655,12 @@ namespace Adamantium.Engine.Graphics
 
         public void Present()
         {
-            Presenter.Present();
+            var presentResult = Presenter.Present();
+            if (presentResult == Result.SuboptimalKhr || presentResult == Result.ErrorOutOfDateKhr)
+            {
+                ResizePresenter();
+            }
+            
             UpdateCurrentFrameNumber();
         }
 
