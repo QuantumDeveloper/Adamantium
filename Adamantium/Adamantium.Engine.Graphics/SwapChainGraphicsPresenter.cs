@@ -2,6 +2,7 @@
 using Adamantium.Win32;
 using AdamantiumVulkan.Core;
 using System;
+using System.Diagnostics;
 using VulkanImage = AdamantiumVulkan.Core.Image;
 
 namespace Adamantium.Engine.Graphics
@@ -214,8 +215,9 @@ namespace Adamantium.Engine.Graphics
             var result = presentQueue.QueuePresentKHR(presentInfo);
             if (result != Result.Success)
             {
-                MessageBox.Show("Failed to present swap chain image");
-                throw new Exception();
+                //MessageBox.Show("Failed to present swap chain image");
+                //throw new Exception();
+                Debug.WriteLine("Failed to present swap chain image");
             }
 
             return result;
