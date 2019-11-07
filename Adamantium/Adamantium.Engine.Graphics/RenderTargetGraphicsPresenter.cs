@@ -1,5 +1,6 @@
 ﻿using Adamantium.Imaging;
 using System;
+using AdamantiumVulkan.Core;
 
 namespace Adamantium.Engine.Graphics
 {
@@ -84,8 +85,9 @@ namespace Adamantium.Engine.Graphics
       /// <summary>
       /// Present rendered image on screen
       /// </summary>
-      public override void Present()
+      public override Result Present()
       {
+         return Result.Success;
          //if (isShared)
          //{
          //   GraphicsDevice.ResolveSubresource(backbuffer, 0, sharedTexture, 0, Description.PixelFormat);

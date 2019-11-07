@@ -17,7 +17,7 @@ namespace Adamantium.Engine.Graphics
             uint height, 
             DepthFormat format, 
             MSAALevel msaa,
-            ImageAspectFlagBits imageAspect)
+            ImageAspectFlagBits imageAspect = ImageAspectFlagBits.DepthBit)
         {
             if (imageAspect.HasFlag(ImageAspectFlagBits.DepthBit))
             {
