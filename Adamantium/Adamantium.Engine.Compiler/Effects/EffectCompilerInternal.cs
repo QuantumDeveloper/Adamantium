@@ -10,6 +10,7 @@ using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Effects;
 using Adamantium.Mathematics;
 using AdamantiumVulkan.Shaders;
+using AdamantiumVulkan.SPIRV.Reflection;
 
 namespace Adamantium.Engine.Compiler.Effects
 {
@@ -376,21 +377,17 @@ namespace Adamantium.Engine.Compiler.Effects
                 case "Export":
                     HandleExport(expression.Value);
                     break;
-
                 case EffectData.PropertyKeys.Blending:
                 case EffectData.PropertyKeys.DepthStencil:
                 case EffectData.PropertyKeys.Rasterizer:
                     HandleAttribute<string>(expression);
                     break;
-
                 case EffectData.PropertyKeys.BlendingColor:
                     HandleAttribute<Vector4F>(expression);
                     break;
-
                 case EffectData.PropertyKeys.BlendingSampleMask:
                     HandleAttribute<uint>(expression);
                     break;
-
                 case EffectData.PropertyKeys.DepthStencilReference:
                     HandleAttribute<int>(expression);
                     break;
@@ -406,13 +403,16 @@ namespace Adamantium.Engine.Compiler.Effects
                 case "Preprocessor":
                     HandlePreprocessor(expression.Value);
                     break;
+                case "Language":
+                    HandleLanguage(expression.Value);
+                    break;
                 case "Profile":
                     HandleProfile(expression.Value);
                     break;
                 case "VertexShader":
                     CompileShader(EffectShaderType.Vertex, expression.Value);
                     break;
-                case "PixelShader":
+                case "FragmentShader":
                     CompileShader(EffectShaderType.Fragment, expression.Value);
                     break;
                 case "GeometryShader":
@@ -820,11 +820,29 @@ namespace Adamantium.Engine.Compiler.Effects
 
             return converter.ConvertFullItem(this, values);
         }
+        
+        private void HandleLanguage(Ast.Expression expression)
+        {
+            if (expression is Ast.LiteralExpression)
+            {
+                var literalValue = (string)((Ast.LiteralExpression)expression).Value.Value;
+                try
+                {
+                    var rawLevel = (int)(Convert.ToSingle(literalValue, CultureInfo.InvariantCulture) * 10);
+                }
+                catch (Exception)
+                {
+                    // ignored
+                }
+
+                if (string.IsNullOrEmpty(literalValue))
+                    logger.Error("Unexpected assignement for [Profile] attribute: expecting only [identifier (fx_4_0, fx_4_1... etc.), or number (9.3, 10.0, 11.0... etc.)]", expression.Span);
+            }
+        }
 
         private void HandleProfile(Ast.Expression expression)
         {
-            var identifierExpression = expression as Ast.IdentifierExpression;
-            if (identifierExpression != null)
+            if (expression is Ast.IdentifierExpression identifierExpression)
             {
                 var profile = identifierExpression.Name.Text;
             }
@@ -837,11 +855,12 @@ namespace Adamantium.Engine.Compiler.Effects
                 }
                 catch (Exception)
                 {
+                    // ignored
                 }
-            }
 
-            if (string.IsNullOrEmpty(literalValue))
-                logger.Error("Unexpected assignement for [Profile] attribute: expecting only [identifier (fx_4_0, fx_4_1... etc.), or number (9.3, 10.0, 11.0... etc.)]", expression.Span);
+                if (string.IsNullOrEmpty(literalValue))
+                    logger.Error("Unexpected assignement for [Profile] attribute: expecting only [identifier (fx_4_0, fx_4_1... etc.), or number (9.3, 10.0, 11.0... etc.)]", expression.Span);
+            }
         }
 
         private string ExtractShaderName(EffectShaderType effectShaderType, Ast.Expression expression)
@@ -1005,14 +1024,21 @@ namespace Adamantium.Engine.Compiler.Effects
             var sourcecode = sourcecodeBuilder.ToString();
 
             var filePath = replaceBackSlash.Replace(parserResult.SourceFileName, @"\");
-            var result = ShaderBytecode.Compile(sourcecode,
-                                                shaderName,
-                                                profile,
-                                                (ShaderFlags)compilerFlags,
-                                                EffectFlags.None,
-                                                null,
-                                                includeHandler,
-                                                filePath);
+
+            var opts = CompileOptions.New();
+            opts.EnableHlslFunctionality = true;
+            opts.UseHlslIoMapping = true;
+            opts.UseHlslOffsets = true;
+            opts.SetAutoBindUniforms = true;
+            opts.SourceLanguage = ShadercSourceLanguage.Hlsl;
+            opts.SetHlslRegisterSetAndBinding(,);
+
+            var result = SpirvReflection.CompileToSpirvBinary(
+                sourcecode,
+                ,
+                Path.GetFileName(filePath),
+                shaderName,
+                opts);
             return result;
         }
 
@@ -1030,7 +1056,7 @@ namespace Adamantium.Engine.Compiler.Effects
                 OutputSignature = new EffectData.Signature()
             };
 
-            using (var reflect = new ShaderReflection(shader.Bytecode))
+            using (var reflect = new SpirvReflection(shader.Bytecode))
             {
                 BuiltSemanticInputAndOutput(shader, reflect);
                 BuildParameters(shader, reflect);
@@ -1146,16 +1172,16 @@ namespace Adamantium.Engine.Compiler.Effects
             return profile;
         }
 
-        private static EffectShaderType VersionToShaderType(ShaderVersion stageText)
+        private static EffectShaderType VersionToShaderType(ShadercShaderKind stageText)
         {
             switch (stageText)
             {
-                case ShaderVersion.VertexShader: return EffectShaderType.Vertex;
-                case ShaderVersion.DomainShader: return EffectShaderType.Domain;
-                case ShaderVersion.HullShader: return EffectShaderType.Hull;
-                case ShaderVersion.GeometryShader: return EffectShaderType.Geometry;
-                case ShaderVersion.PixelShader: return EffectShaderType.Fragment;
-                case ShaderVersion.ComputeShader: return EffectShaderType.Compute;
+                case ShadercShaderKind.VertexShader: return EffectShaderType.Vertex;
+                case ShadercShaderKind.TessEvaluationShader: return EffectShaderType.Domain;
+                case ShadercShaderKind.TessControlShader: return EffectShaderType.Hull;
+                case ShadercShaderKind.GeometryShader: return EffectShaderType.Geometry;
+                case ShadercShaderKind.FragmentShader: return EffectShaderType.Fragment;
+                case ShadercShaderKind.ComputeShader: return EffectShaderType.Compute;
             }
 
             throw new ArgumentException("Unknown shader stage type: " + stageText);

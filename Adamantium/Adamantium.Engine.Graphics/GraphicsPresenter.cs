@@ -104,7 +104,6 @@ namespace Adamantium.Engine.Graphics
             Description.Width = width;
             Description.Height = height;
             Description.ImageFormat = pixelFormat;
-            Console.WriteLine($"Base Extent = {width} : {height}");
 
             if (updateDepthStencil)
             {
@@ -112,7 +111,7 @@ namespace Adamantium.Engine.Graphics
                 //CreateDepthBuffer();
             }
 
-            CreateViewPort();
+            //CreateViewPort();
 
             return true;
         }

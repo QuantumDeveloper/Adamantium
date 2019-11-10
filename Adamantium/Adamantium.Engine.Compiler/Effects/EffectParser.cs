@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 using Adamantium.Engine.Core.Effects;
+using AdamantiumVulkan.SPIRV.Reflection;
 
 namespace Adamantium.Engine.Compiler.Effects
 {
@@ -93,7 +94,7 @@ namespace Adamantium.Engine.Compiler.Effects
          localResult.IncludeHandler.FileResolved.Add(fileName, new FileIncludeHandler.FileItem(fileName, filePath, File.GetLastWriteTime(filePath)));
 
          string compilationErrors = null;
-         var preprocessedInput = ShaderBytecode.Preprocess(input, Macros.ToArray(), localResult.IncludeHandler, out compilationErrors, filePath);
+         var preprocessedInput = SpirvReflection.CompileIntoPreprocessedText(input, Macros.ToArray(), localResult.IncludeHandler, out compilationErrors, filePath);
          localResult.PreprocessedSource = preprocessedInput;
 
          localResult.DependencyList = CalculateDependencies(localResult);
@@ -234,7 +235,6 @@ namespace Adamantium.Engine.Compiler.Effects
 
          return isBracketOk;
       }
-
 
       private void BeginPreviewToken()
       {
