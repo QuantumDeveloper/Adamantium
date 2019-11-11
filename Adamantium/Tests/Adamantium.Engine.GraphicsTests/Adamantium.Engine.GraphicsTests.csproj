@@ -16,4 +16,8 @@
     <ProjectReference Include="..\..\Adamantium.Imaging\Adamantium.Imaging.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Remove="EffectsData\UIEffect.fx" />
+  </ItemGroup>
+
 </Project>

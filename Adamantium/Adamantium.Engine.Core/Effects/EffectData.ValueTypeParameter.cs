@@ -10,12 +10,12 @@ namespace Adamantium.Engine.Core.Effects
          /// <summary>
          /// Offset in bytes into the <see cref="ConstantBuffer"/>.
          /// </summary>
-         public int Offset;
+         public uint Offset;
 
          /// <summary>
          /// Number of elements.
          /// </summary>
-         public int Count;
+         public uint Count;
 
          /// <summary>
          /// Size in bytes in the <see cref="ConstantBuffer"/>.
@@ -62,8 +62,8 @@ namespace Adamantium.Engine.Core.Effects
             unchecked
             {
                int hashCode = base.GetHashCode();
-               hashCode = (hashCode * 397) ^ Offset;
-               hashCode = (hashCode * 397) ^ Count;
+               hashCode = (hashCode * 397) ^ (int)Offset;
+               hashCode = (hashCode * 397) ^ (int)Count;
                hashCode = (hashCode * 397) ^ Size;
                hashCode = (hashCode * 397) ^ RowCount.GetHashCode();
                hashCode = (hashCode * 397) ^ ColumnCount.GetHashCode();

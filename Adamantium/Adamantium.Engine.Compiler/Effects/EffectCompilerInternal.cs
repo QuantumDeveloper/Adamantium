@@ -10,6 +10,7 @@ using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Effects;
 using Adamantium.Mathematics;
 using AdamantiumVulkan.Shaders;
+using AdamantiumVulkan.SPIRV.Cross;
 using AdamantiumVulkan.SPIRV.Reflection;
 
 namespace Adamantium.Engine.Compiler.Effects
@@ -40,7 +41,7 @@ namespace Adamantium.Engine.Compiler.Effects
 
         private List<string> includeDirectoryList;
         public IncludeFileDelegate IncludeFileDelegate;
-        private Include includeHandler;
+        //private Include includeHandler;
         private EffectCompilerLogger logger;
         private List<EffectData.ShaderMacro> macros;
         private EffectParserResult parserResult;
@@ -48,6 +49,7 @@ namespace Adamantium.Engine.Compiler.Effects
         private string preprocessorText;
         private EffectData.Technique technique;
         private int nextSubPassCount;
+        private uint profile;
 
         //private StreamOutputElement[] currentStreamOutputElements;
 
@@ -71,11 +73,16 @@ namespace Adamantium.Engine.Compiler.Effects
             result.Source_name_length = (ulong)result.Source_name.Length;
             return result.ToInternal();
         }
-        ///<summary>
-        /// An includer callback type for destroying an include result.
-        ///</summary>
-        private void ShadercIncludeResultReleaseFn([In, Out] System.IntPtr user_data, [In] AdamantiumVulkan.Shaders.Interop.ShadercIncludeResult include_result)
+        
+
+        private IntPtr IncludeResolver(IntPtr userData, string requestedSource, int type, string requesting_source, ulong includeDepth)
         {
+            return IntPtr.Zero;
+        }
+
+        private void IncludeResultRelease(IntPtr userData, AdamantiumVulkan.Shaders.Interop.ShadercIncludeResult includeResult)
+        {
+            
         }
 
         public EffectCompilerInternal()
@@ -168,12 +175,12 @@ namespace Adamantium.Engine.Compiler.Effects
         /// </summary>
         /// <param name="shader">The shader.</param>
         /// <returns>A string containing asm code decoded from HLSL bytecode.</returns>
-        public string DisassembleShader(EffectData.Shader shader)
+        public SpirvReflectionResult DisassembleShader(EffectData.Shader shader)
         {
-            return new ShaderBytecode(shader.Bytecode).Disassemble(DisassemblyFlags.EnableColorCode | DisassemblyFlags.EnableInstructionNumbering);
+            return new SpirvReflection(shader.Bytecode).Disassemble();
         }
 
-        public EffectData Build(params ShaderBytecode[] bytecodes)
+        public EffectData Build(params CompilationResult[] bytecodes)
         {
             if (bytecodes == null || bytecodes.Length == 0)
                 throw new ArgumentException("Expected at least one bytecode", "bytecodes");
@@ -193,15 +200,15 @@ namespace Adamantium.Engine.Compiler.Effects
             return effectData;
         }
 
-        private void ProcessShader(ShaderBytecode shaderBytecode)
+        private void ProcessShader(CompilationResult shaderBytecode)
         {
-            var shaderProfile = shaderBytecode.GetVersion();
-            var shaderVersionText = shaderProfile.ToString();
-            var typePrefix = shaderProfile.GetTypePrefix();
+//            var shaderProfile = shaderBytecode.GetVersion();
+//            var shaderVersionText = shaderProfile.ToString();
+//            var typePrefix = shaderProfile.GetTypePrefix();
 
-            var shaderType = VersionToShaderType(shaderProfile.Version);
+            var shaderType = VersionToShaderType(shaderBytecode.ShaderStage);
 
-            var shader = CreateEffectShader(shaderType, typePrefix, shaderBytecode);
+            var shader = CreateEffectShader(shaderType, shaderBytecode.Name, shaderBytecode);
             ProcessShaderData(shaderType, shaderBytecode, shader);
         }
 
@@ -222,7 +229,7 @@ namespace Adamantium.Engine.Compiler.Effects
             if (logger.HasErrors) return;
 
             // Get back include handler.
-            includeHandler = parserResult.IncludeHandler;
+            //includeHandler = parserResult.IncludeHandler;
 
             SetupEffectData(Path.GetFileNameWithoutExtension(fileName));
 
@@ -341,7 +348,7 @@ namespace Adamantium.Engine.Compiler.Effects
         {
             // Check pass consistency (mainly for the GS)
             var gsLink = pass.Pipeline[EffectShaderType.Geometry];
-            if (gsLink != null && gsLink.IsNullShader && (gsLink.StreamOutputRasterizedStream >= 0 || gsLink.StreamOutputElements != null))
+            if (gsLink != null && gsLink.IsNullShader && (gsLink.StreamOutputRasterizedStream >= 0 /*|| gsLink.StreamOutputElements != null*/))
             {
                 if (pass.Pipeline[EffectShaderType.Vertex] == null || pass.Pipeline[EffectShaderType.Vertex].IsNullShader)
                     logger.Error("Cannot specify StreamOutput for null geometry shader / vertex shader", span);
@@ -461,136 +468,136 @@ namespace Adamantium.Engine.Compiler.Effects
 
         private void HandleStreamOutput(Ast.Expression expression)
         {
-            var values = ExtractStringOrArrayOfStrings(expression);
-            if (values == null) return;
-
-            if (values.Count == 0 || values.Count > 4)
-            {
-                logger.Error("Invalid number [{0}] of stream output declarations. Maximum allowed is 4", expression.Span, values.Count);
-                return;
-            }
-
-            var elements = new List<StreamOutputElement>();
-
-            int streamIndex = 0;
-            foreach (var soDeclarationTexts in values)
-            {
-                if (string.IsNullOrEmpty(soDeclarationTexts))
-                {
-                    logger.Error("StreamOutput declaration cannot be null or empty", expression.Span);
-                    return;
-                }
-
-                // Parse a single string "[<slot> :] <semantic>[<index>][.<mask>]; [[<slot> :] <semantic>[<index>][.<mask>][;]]"
-                var text = soDeclarationTexts.Trim(' ', '\t', ';');
-                var declarationTextItems = splitSODeclartionRegex.Split(text);
-                foreach (var soDeclarationText in declarationTextItems)
-                {
-                    StreamOutputElement element;
-                    if (!ParseStreamOutputElement(soDeclarationText, expression.Span, out element))
-                    {
-                        return;
-                    }
-
-                    element.Stream = streamIndex;
-                    elements.Add(element);
-                }
-
-                streamIndex++;
-            }
-
-            if (elements.Count == 0)
-            {
-                logger.Error("Invalid number [0] of stream output declarations. Expected > 0", expression.Span);
-                return;
-            }
-
-            if (pass.Pipeline[EffectShaderType.Geometry] == null)
-            {
-                pass.Pipeline[EffectShaderType.Geometry] = new EffectData.ShaderLink();
-            }
-
-            pass.Pipeline[EffectShaderType.Geometry].StreamOutputElements = elements.ToArray();
+//            var values = ExtractStringOrArrayOfStrings(expression);
+//            if (values == null) return;
+//
+//            if (values.Count == 0 || values.Count > 4)
+//            {
+//                logger.Error("Invalid number [{0}] of stream output declarations. Maximum allowed is 4", expression.Span, values.Count);
+//                return;
+//            }
+//
+//            var elements = new List<StreamOutputElement>();
+//
+//            int streamIndex = 0;
+//            foreach (var soDeclarationTexts in values)
+//            {
+//                if (string.IsNullOrEmpty(soDeclarationTexts))
+//                {
+//                    logger.Error("StreamOutput declaration cannot be null or empty", expression.Span);
+//                    return;
+//                }
+//
+//                // Parse a single string "[<slot> :] <semantic>[<index>][.<mask>]; [[<slot> :] <semantic>[<index>][.<mask>][;]]"
+//                var text = soDeclarationTexts.Trim(' ', '\t', ';');
+//                var declarationTextItems = splitSODeclartionRegex.Split(text);
+//                foreach (var soDeclarationText in declarationTextItems)
+//                {
+//                    StreamOutputElement element;
+//                    if (!ParseStreamOutputElement(soDeclarationText, expression.Span, out element))
+//                    {
+//                        return;
+//                    }
+//
+//                    element.Stream = streamIndex;
+//                    elements.Add(element);
+//                }
+//
+//                streamIndex++;
+//            }
+//
+//            if (elements.Count == 0)
+//            {
+//                logger.Error("Invalid number [0] of stream output declarations. Expected > 0", expression.Span);
+//                return;
+//            }
+//
+//            if (pass.Pipeline[EffectShaderType.Geometry] == null)
+//            {
+//                pass.Pipeline[EffectShaderType.Geometry] = new EffectData.ShaderLink();
+//            }
+//
+//            pass.Pipeline[EffectShaderType.Geometry].StreamOutputElements = elements.ToArray();
         }
 
-        private bool ParseStreamOutputElement(string text, SourceSpan span, out StreamOutputElement streamOutputElement)
-        {
-            streamOutputElement = new StreamOutputElement();
-
-            var match = soDeclarationItemRegex.Match(text);
-
-            if (!match.Success)
-            {
-                logger.Error("Invalid StreamOutput declaration [{0}]. Must be of the form [<slot> :] <semantic>[<index>][.<mask>]", span, text);
-                return false;
-            }
-
-            // Parse slot if any
-            var slot = match.Groups[1].Value;
-            int slotIndex = 0;
-            if (!string.IsNullOrEmpty(slot))
-            {
-                int.TryParse(slot, out slotIndex);
-                streamOutputElement.OutputSlot = (byte)slotIndex;
-            }
-
-            // Parse semantic index if any
-            var semanticAndIndex = match.Groups[2].Value;
-            var matchSemanticAndIndex = soSemanticIndex.Match(semanticAndIndex);
-            streamOutputElement.SemanticName = matchSemanticAndIndex.Groups[1].Value;
-            var semanticIndexText = matchSemanticAndIndex.Groups[2].Value;
-            int semanticIndex = 0;
-            if (!string.IsNullOrEmpty(semanticIndexText))
-            {
-                int.TryParse(semanticIndexText, out semanticIndex);
-                streamOutputElement.SemanticIndex = (byte)semanticIndex;
-            }
-
-            // Parse the mask
-            var mask = match.Groups[3].Value;
-            int startComponent = -1;
-            int currentIndex = 0;
-            int countComponent = 1;
-            if (!string.IsNullOrEmpty(mask))
-            {
-                mask = mask.Substring(1);
-                foreach (var maskItem in mask.ToCharArray())
-                {
-                    var nextIndex = xyzwrgbaComponents.IndexOf(maskItem);
-                    if (startComponent < 0)
-                    {
-                        startComponent = nextIndex;
-                    }
-                    else if (nextIndex != (currentIndex + 1))
-                    {
-                        logger.Error("Invalid mask [{0}]. Must be of the form [xyzw] or [rgba] with increasing consecutive component and no duplicate", span, mask);
-                        return false;
-                    }
-                    else
-                    {
-                        countComponent++;
-                    }
-
-                    currentIndex = nextIndex;
-                }
-
-                // If rgba components?
-                if (startComponent > 3)
-                {
-                    startComponent -= 4;
-                }
-            }
-            else
-            {
-                startComponent = 0;
-                countComponent = 4;
-            }
-
-            streamOutputElement.StartComponent = (byte)startComponent;
-            streamOutputElement.ComponentCount = (byte)countComponent;
-
-            return true;
-        }
+//        private bool ParseStreamOutputElement(string text, SourceSpan span, out StreamOutputElement streamOutputElement)
+//        {
+//            streamOutputElement = new StreamOutputElement();
+//
+//            var match = soDeclarationItemRegex.Match(text);
+//
+//            if (!match.Success)
+//            {
+//                logger.Error("Invalid StreamOutput declaration [{0}]. Must be of the form [<slot> :] <semantic>[<index>][.<mask>]", span, text);
+//                return false;
+//            }
+//
+//            // Parse slot if any
+//            var slot = match.Groups[1].Value;
+//            int slotIndex = 0;
+//            if (!string.IsNullOrEmpty(slot))
+//            {
+//                int.TryParse(slot, out slotIndex);
+//                streamOutputElement.OutputSlot = (byte)slotIndex;
+//            }
+//
+//            // Parse semantic index if any
+//            var semanticAndIndex = match.Groups[2].Value;
+//            var matchSemanticAndIndex = soSemanticIndex.Match(semanticAndIndex);
+//            streamOutputElement.SemanticName = matchSemanticAndIndex.Groups[1].Value;
+//            var semanticIndexText = matchSemanticAndIndex.Groups[2].Value;
+//            int semanticIndex = 0;
+//            if (!string.IsNullOrEmpty(semanticIndexText))
+//            {
+//                int.TryParse(semanticIndexText, out semanticIndex);
+//                streamOutputElement.SemanticIndex = (byte)semanticIndex;
+//            }
+//
+//            // Parse the mask
+//            var mask = match.Groups[3].Value;
+//            int startComponent = -1;
+//            int currentIndex = 0;
+//            int countComponent = 1;
+//            if (!string.IsNullOrEmpty(mask))
+//            {
+//                mask = mask.Substring(1);
+//                foreach (var maskItem in mask.ToCharArray())
+//                {
+//                    var nextIndex = xyzwrgbaComponents.IndexOf(maskItem);
+//                    if (startComponent < 0)
+//                    {
+//                        startComponent = nextIndex;
+//                    }
+//                    else if (nextIndex != (currentIndex + 1))
+//                    {
+//                        logger.Error("Invalid mask [{0}]. Must be of the form [xyzw] or [rgba] with increasing consecutive component and no duplicate", span, mask);
+//                        return false;
+//                    }
+//                    else
+//                    {
+//                        countComponent++;
+//                    }
+//
+//                    currentIndex = nextIndex;
+//                }
+//
+//                // If rgba components?
+//                if (startComponent > 3)
+//                {
+//                    startComponent -= 4;
+//                }
+//            }
+//            else
+//            {
+//                startComponent = 0;
+//                countComponent = 4;
+//            }
+//
+//            streamOutputElement.StartComponent = (byte)startComponent;
+//            streamOutputElement.ComponentCount = (byte)countComponent;
+//
+//            return true;
+//        }
 
         private void HandleExport(Ast.Expression expression)
         {
@@ -844,14 +851,14 @@ namespace Adamantium.Engine.Compiler.Effects
         {
             if (expression is Ast.IdentifierExpression identifierExpression)
             {
-                var profile = identifierExpression.Name.Text;
+                profile = (uint)(Convert.ToSingle(identifierExpression.Name.Text, CultureInfo.InvariantCulture) * 10);
             }
             else if (expression is Ast.LiteralExpression)
             {
                 var literalValue = (string)((Ast.LiteralExpression)expression).Value.Value;
                 try
                 {
-                    var rawLevel = (int)(Convert.ToSingle(literalValue, CultureInfo.InvariantCulture) * 10);
+                    profile = (uint)(Convert.ToSingle(literalValue, CultureInfo.InvariantCulture) * 10);
                 }
                 catch (Exception)
                 {
@@ -917,8 +924,7 @@ namespace Adamantium.Engine.Compiler.Effects
                     }
 
                     // Extract level (11.0 10.0) from profile name (
-                    object profileName;
-                    if (!ExtractValue(compileExpression.Arguments[0], out profileName))
+                    if (!ExtractValue(compileExpression.Arguments[0], out var profileName))
                         return null;
 
                     if (!(profileName is string))
@@ -939,6 +945,8 @@ namespace Adamantium.Engine.Compiler.Effects
                         logger.Error("Default arguments for shader methods are not supported", shaderMethod.Span);
                         return null;
                     }
+                    
+                    
 
                     shaderName = shaderMethod.Name.Text;
                 }
@@ -959,7 +967,6 @@ namespace Adamantium.Engine.Compiler.Effects
 
         private void CompileShader(EffectShaderType type, string shaderName, SourceSpan span)
         {
-            var level = this.level;
             if (shaderName == null)
             {
                 pass.Pipeline[type] = EffectData.ShaderLink.NullShader;
@@ -967,19 +974,19 @@ namespace Adamantium.Engine.Compiler.Effects
             }
 
             // If the level is not setup, return an error
-            if (level == 0)
+            if (this.profile == 0)
             {
                 logger.Error("Expecting setup of [Profile = fx_4_0/fx_5_0...etc.] before compiling a shader.", span);
                 return;
             }
 
-            var profile = GetShaderProfile(type);
+            //var profile = GetShaderProfile(type);
 
             try
             {
                 var result = CompileParsedShader(shaderName, profile);
 
-                var compilerMessages = result.Message;
+                var compilerMessages = result.Messages;
                 if (result.HasErrors || result.Bytecode == null)
                 {
                     logger.LogMessage(new LogMessageRaw(LogMessageType.Error, compilerMessages));
@@ -1001,12 +1008,12 @@ namespace Adamantium.Engine.Compiler.Effects
                         shaderName = null;
                     }
 
-                    var shader = CreateEffectShader(type, shaderName, result.Bytecode);
+                    var shader = CreateEffectShader(type, shaderName, result);
 
                     if (logger.HasErrors)
                         return;
 
-                    ProcessShaderData(type, result.Bytecode, shader);
+                    ProcessShaderData(type, result, shader);
                 }
             }
             finally
@@ -1014,7 +1021,7 @@ namespace Adamantium.Engine.Compiler.Effects
             }
         }
 
-        private CompilationResult CompileParsedShader(string shaderName, string profile)
+        private CompilationResult CompileParsedShader(string shaderName, uint profile)
         {
             var sourcecodeBuilder = new StringBuilder();
             if (!string.IsNullOrEmpty(preprocessorText))
@@ -1031,23 +1038,24 @@ namespace Adamantium.Engine.Compiler.Effects
             opts.UseHlslOffsets = true;
             opts.SetAutoBindUniforms = true;
             opts.SourceLanguage = ShadercSourceLanguage.Hlsl;
-            opts.SetHlslRegisterSetAndBinding(,);
+            //opts.SetIncludeCallbacks(,);
 
-            var result = SpirvReflection.CompileToSpirvBinary(
-                sourcecode,
-                ,
-                Path.GetFileName(filePath),
-                shaderName,
-                opts);
-            return result;
+//            var result = SpirvReflection.CompileToSpirvBinary(
+//                sourcecode,
+//                ,
+//                Path.GetFileName(filePath),
+//                shaderName,
+//                opts);
+//            return result;
+            return null;
         }
 
-        private EffectData.Shader CreateEffectShader(EffectShaderType type, string shaderName, ShaderBytecode bytecode)
+        private EffectData.Shader CreateEffectShader(EffectShaderType type, string shaderName, CompilationResult bytecode)
         {
             var shader = new EffectData.Shader()
             {
                 Name = shaderName,
-                Level = level,
+                //Level = level,
                 Bytecode = bytecode,
                 Type = type,
                 ConstantBuffers = new List<EffectData.ConstantBuffer>(),
@@ -1058,24 +1066,25 @@ namespace Adamantium.Engine.Compiler.Effects
 
             using (var reflect = new SpirvReflection(shader.Bytecode))
             {
-                BuiltSemanticInputAndOutput(shader, reflect);
-                BuildParameters(shader, reflect);
+                var result = reflect.Disassemble();
+                //BuiltSemanticInputAndOutput(shader, reflect);
+                BuildParameters(shader, result);
             }
 
             return shader;
         }
 
-        private void ProcessShaderData(EffectShaderType type, ShaderBytecode bytecode, EffectData.Shader shader)
+        private void ProcessShaderData(EffectShaderType type, CompilationResult bytecode, EffectData.Shader shader)
         {
             // Strip reflection data, as we are storing it in the toolkit format.
-            var byteCodeNoDebugReflection = bytecode.Strip(StripFlags.CompilerStripReflectionData | StripFlags.CompilerStripDebugInformation);
+            //var byteCodeNoDebugReflection = bytecode.Strip(StripFlags.CompilerStripReflectionData | StripFlags.CompilerStripDebugInformation);
 
             // Compute Hashcode
-            shader.Hashcode = Utilities.ComputeHashFNVModified(byteCodeNoDebugReflection);
+            //shader.Hashcode = Utilities.ComputeHashFNVModified(byteCodeNoDebugReflection);
 
             // if No debug is required, take the bytecode without any debug/reflection info.
             if ((compilerFlags & EffectCompilerFlags.Debug) == 0)
-                shader.Bytecode = byteCodeNoDebugReflection;
+                shader.Bytecode = bytecode;
 
             // Check that this shader was not already generated
             int shaderIndex;
@@ -1095,8 +1104,8 @@ namespace Adamantium.Engine.Compiler.Effects
                 if (shader.Type == EffectShaderType.Vertex)
                 {
                     // Gets the signature from the stripped bytecode and compute the hashcode.
-                    shader.InputSignature.Bytecode = ShaderSignature.GetInputSignature(byteCodeNoDebugReflection);
-                    shader.InputSignature.Hashcode = Utilities.ComputeHashFNVModified(shader.InputSignature.Bytecode);
+//                    shader.InputSignature.Bytecode = ShaderSignature.GetInputSignature(byteCodeNoDebugReflection);
+//                    shader.InputSignature.Hashcode = Utilities.ComputeHashFNVModified(shader.InputSignature.Bytecode);
                 }
 
                 effectData.Shaders.Add(shader);
@@ -1187,65 +1196,60 @@ namespace Adamantium.Engine.Compiler.Effects
             throw new ArgumentException("Unknown shader stage type: " + stageText);
         }
 
-        private void BuiltSemanticInputAndOutput(EffectData.Shader shader, ShaderReflection reflect)
-        {
-            var description = reflect.Description;
-            shader.InputSignature.Semantics = new EffectData.Semantic[description.InputParameters];
-            for (int i = 0; i < description.InputParameters; i++)
-                shader.InputSignature.Semantics[i] = ConvertToSemantic(reflect.GetInputParameterDescription(i));
+//        private void BuiltSemanticInputAndOutput(EffectData.Shader shader, SpirvReflectionResult reflect)
+//        {
+//            var description = reflect.Description;
+//            shader.InputSignature.Semantics = new EffectData.Semantic[description.InputParameters];
+//            for (int i = 0; i < description.InputParameters; i++)
+//                shader.InputSignature.Semantics[i] = ConvertToSemantic(reflect.GetInputParameterDescription(i));
+//
+//            shader.OutputSignature.Semantics = new EffectData.Semantic[description.OutputParameters];
+//            for (int i = 0; i < description.OutputParameters; i++)
+//                shader.OutputSignature.Semantics[i] = ConvertToSemantic(reflect.GetOutputParameterDescription(i));
+//        }
 
-            shader.OutputSignature.Semantics = new EffectData.Semantic[description.OutputParameters];
-            for (int i = 0; i < description.OutputParameters; i++)
-                shader.OutputSignature.Semantics[i] = ConvertToSemantic(reflect.GetOutputParameterDescription(i));
-        }
-
-        private EffectData.Semantic ConvertToSemantic(ShaderParameterDescription shaderParameterDescription)
-        {
-            return new EffectData.Semantic(
-                shaderParameterDescription.SemanticName,
-                (byte)shaderParameterDescription.SemanticIndex,
-                (byte)shaderParameterDescription.Register,
-                (byte)shaderParameterDescription.SystemValueType,
-                (byte)shaderParameterDescription.ComponentType,
-                (byte)shaderParameterDescription.UsageMask,
-                (byte)shaderParameterDescription.ReadWriteMask,
-                (byte)shaderParameterDescription.Stream
-                );
-        }
+//        private EffectData.Semantic ConvertToSemantic(ShaderReflectionVariable shaderParameterDescription)
+//        {
+//            return new EffectData.Semantic(
+//                shaderParameterDescription.SemanticName,
+//                (byte)shaderParameterDescription.SemanticIndex,
+//                (byte)shaderParameterDescription.Register,
+//                (byte)shaderParameterDescription.SystemValueType,
+//                (byte)shaderParameterDescription.ComponentType,
+//                (byte)shaderParameterDescription.UsageMask,
+//                (byte)shaderParameterDescription.ReadWriteMask,
+//                (byte)shaderParameterDescription.Stream
+//                );
+//        }
 
         /// <summary>
         ///   Builds the parameters for a particular shader.
         /// </summary>
         /// <param name="shader"> The shader to build parameters. </param>
-        /// <param name="reflect"> A shader-reflection interface accesses shader information.</param>
-        private void BuildParameters(EffectData.Shader shader, ShaderReflection reflect)
+        /// <param name="reflectionResult"> A shader-reflection interface accesses shader information.</param>
+        private void BuildParameters(EffectData.Shader shader, SpirvReflectionResult reflectionResult)
         {
-            var description = reflect.Description;
+            //var description = reflect.Description;
 
 
             // Iterate on all Constant buffers used by this shader
             // Build all ParameterBuffers
-            for (int i = 0; i < description.ConstantBuffers; i++)
+            for (int i = 0; i < reflectionResult.UniformBuffers.Count; i++)
             {
-                var reflectConstantBuffer = reflect.GetConstantBuffer(i);
-                var reflectConstantBufferDescription = reflectConstantBuffer.Description;
-
-                // Skip non pure constant-buffers and texture buffers
-                if (reflectConstantBufferDescription.Type != ConstantBufferType.ConstantBuffer
-                    && reflectConstantBufferDescription.Type != ConstantBufferType.TextureBuffer)
-                    continue;
+                var reflectConstantBuffer = reflectionResult.UniformBuffers[i];
+                var description = reflectConstantBuffer.Description;
 
                 // Create the buffer
                 var parameterBuffer = new EffectData.ConstantBuffer()
                 {
-                    Name = reflectConstantBufferDescription.Name,
-                    Size = reflectConstantBufferDescription.Size,
+                    Name = description.Name,
+                    Size = (int)description.Size,
                     Parameters = new List<EffectData.ValueTypeParameter>(),
                 };
                 shader.ConstantBuffers.Add(parameterBuffer);
 
                 // Iterate on each variable declared inside this buffer
-                for (int j = 0; j < reflectConstantBufferDescription.VariableCount; j++)
+                for (uint j = 0; j < reflectConstantBuffer.VariablesCount; j++)
                 {
                     var variableBuffer = reflectConstantBuffer.GetVariable(j);
 
@@ -1262,9 +1266,9 @@ namespace Adamantium.Engine.Compiler.Effects
 
             // Iterate on all resources bound in order to resolve resource dependencies for this shader.
             // If the shader is dependent from an object variable, then create this variable as well.
-            for (int i = 0; i < description.BoundResources; i++)
+            foreach (var resource in reflectionResult.AllResources)
             {
-                var bindingDescription = reflect.GetResourceBindingDescription(i);
+                var bindingDescription = resource.Description;
                 string name = bindingDescription.Name;
 
                 // Handle special case for indexable variable in SM5.0 that is different from SM4.0
@@ -1280,11 +1284,11 @@ namespace Adamantium.Engine.Compiler.Effects
                     name = matchResult.Groups[1].Value;
                     int arrayIndex = int.Parse(matchResult.Groups[2].Value);
 
-                    if (bindingDescription.BindCount != 1)
-                    {
-                        logger.Error("Unexpected BindCount ({0}) instead of 1 for indexable variable '{1}'", new SourceSpan(), bindingDescription.BindCount, name);
-                        return;
-                    }
+//                    if (bindingDescription.BindCount != 1)
+//                    {
+//                        logger.Error("Unexpected BindCount ({0}) instead of 1 for indexable variable '{1}'", new SourceSpan(), bindingDescription.BindCount, name);
+//                        return;
+//                    }
 
                     List<IndexedInputBindingDescription> indices;
                     if (!indicesUsedByName.TryGetValue(name, out indices))
@@ -1336,7 +1340,7 @@ namespace Adamantium.Engine.Compiler.Effects
 
                             if (minBindingIndex < 0)
                             {
-                                minBindingIndex = indexedBinding.Description.BindPoint;
+                                minBindingIndex = (int)indexedBinding.Description.SlotIndex;
                             }
 
                             if (indexedBinding.Index > maxIndex)
@@ -1352,7 +1356,7 @@ namespace Adamantium.Engine.Compiler.Effects
                                     return;
                                 }
 
-                                if ((indexedBinding.Description.BindPoint - previousBindingIndex) != 1)
+                                if ((indexedBinding.Description.SlotIndex - previousBindingIndex) != 1)
                                 {
                                     logger.Error("Unexpected sparse index for indexable variable '{0}'", new SourceSpan(), name);
                                     return;
@@ -1360,7 +1364,7 @@ namespace Adamantium.Engine.Compiler.Effects
                             }
 
                             previousIndex = indexedBinding.Index;
-                            previousBindingIndex = indexedBinding.Description.BindPoint;
+                            previousBindingIndex = (int)indexedBinding.Description.SlotIndex;
                         }
 
                         // Fix the slot and count
@@ -1377,27 +1381,16 @@ namespace Adamantium.Engine.Compiler.Effects
         /// <returns> an EffectParameter, null if not handled </returns>
         private EffectData.ValueTypeParameter BuildConstantBufferParameter(ShaderReflectionVariable variable)
         {
-            var variableType = variable.GetVariableType();
-            var variableDescription = variable.Description;
-            var variableTypeDescription = variableType.Description;
-
             var parameter = new EffectData.ValueTypeParameter()
             {
-                Name = variableDescription.Name,
-                Offset = variableDescription.StartOffset,
-                Size = variableDescription.Size,
-                Count = variableTypeDescription.ElementCount,
-                Class = (EffectParameterClass)variableTypeDescription.Class,
-                Type = (EffectParameterType)variableTypeDescription.Type,
-                RowCount = (byte)variableTypeDescription.RowCount,
-                ColumnCount = (byte)variableTypeDescription.ColumnCount,
+                Name = variable.Name,
+                Offset = variable.Offset,
+                Size = (int)variable.Size,
+                Count = variable.ElementCount,
+                Class = (EffectParameterClass)variable.Class,
+                Type = (EffectParameterType)variable.Type,
+                RowCount = (byte)variable.RowCount,
             };
-
-            if (variableDescription.DefaultValue != IntPtr.Zero)
-            {
-                parameter.DefaultValue = new byte[variableDescription.Size];
-                Utilities.Read(variableDescription.DefaultValue, parameter.DefaultValue, 0, parameter.DefaultValue.Length);
-            }
 
             return parameter;
         }
@@ -1406,104 +1399,62 @@ namespace Adamantium.Engine.Compiler.Effects
         ///   Builds an effect parameter from a reflection variable.
         /// </summary>
         /// <returns> an EffectParameter, null if not handled </returns>
-        private static EffectData.ResourceParameter BuildResourceParameter(string name, InputBindingDescription variableBinding)
+        private static EffectData.ResourceParameter BuildResourceParameter(string name, ShaderReflectionVariable variableBinding)
         {
             var parameter = new EffectData.ResourceParameter()
             {
                 Name = name,
                 Class = EffectParameterClass.Object,
-                Slot = (byte)variableBinding.BindPoint,
-                Count = (byte)variableBinding.BindCount,
+                Slot = (byte)variableBinding.SlotIndex,
+                Count = (byte)variableBinding.ElementCount,
             };
 
-            switch (variableBinding.Type)
+            switch (variableBinding.Class)
             {
-                case ShaderInputType.TextureBuffer:
-                    parameter.Type = EffectParameterType.TextureBuffer;
-                    break;
-                case ShaderInputType.ConstantBuffer:
+                case SpvcResourceType.UniformBuffer:
                     parameter.Type = EffectParameterType.ConstantBuffer;
                     break;
-                case ShaderInputType.Texture:
+                case SpvcResourceType.SeparateImage:
                     switch (variableBinding.Dimension)
                     {
-                        case ShaderResourceViewDimension.Buffer:
+                        case ShaderResourceDimension.Buffer:
                             parameter.Type = EffectParameterType.Buffer;
                             break;
-                        case ShaderResourceViewDimension.Texture1D:
+                        case ShaderResourceDimension.Texture1D:
                             parameter.Type = EffectParameterType.Texture1D;
                             break;
-                        case ShaderResourceViewDimension.Texture1DArray:
-                            parameter.Type = EffectParameterType.Texture1DArray;
-                            break;
-                        case ShaderResourceViewDimension.Texture2D:
+                        case ShaderResourceDimension.Texture2D:
                             parameter.Type = EffectParameterType.Texture2D;
                             break;
-                        case ShaderResourceViewDimension.Texture2DArray:
-                            parameter.Type = EffectParameterType.Texture2DArray;
-                            break;
-                        case ShaderResourceViewDimension.Texture2DMultisampled:
-                            parameter.Type = EffectParameterType.Texture2DMultisampled;
-                            break;
-                        case ShaderResourceViewDimension.Texture2DMultisampledArray:
-                            parameter.Type = EffectParameterType.Texture2DMultisampledArray;
-                            break;
-                        case ShaderResourceViewDimension.Texture3D:
+                        case ShaderResourceDimension.Texture3D:
                             parameter.Type = EffectParameterType.Texture3D;
                             break;
-                        case ShaderResourceViewDimension.TextureCube:
+                        case ShaderResourceDimension.TextureCube:
                             parameter.Type = EffectParameterType.TextureCube;
-                            break;
-                        case ShaderResourceViewDimension.TextureCubeArray:
-                            parameter.Type = EffectParameterType.TextureCubeArray;
                             break;
                     }
                     break;
-                case ShaderInputType.Structured:
-                    parameter.Type = EffectParameterType.StructuredBuffer;
+                case SpvcResourceType.StorageBuffer:
+                    parameter.Type = EffectParameterType.StorageBuffer;
                     break;
-                case ShaderInputType.ByteAddress:
-                    parameter.Type = EffectParameterType.ByteAddressBuffer;
-                    break;
-                case ShaderInputType.UnorderedAccessViewRWTyped:
+                case SpvcResourceType.StorageImage:
                     switch (variableBinding.Dimension)
                     {
-                        case ShaderResourceViewDimension.Buffer:
-                            parameter.Type = EffectParameterType.RWBuffer;
+                        case ShaderResourceDimension.Buffer:
+                            parameter.Type = EffectParameterType.StorageImage;
                             break;
-                        case ShaderResourceViewDimension.Texture1D:
+                        case ShaderResourceDimension.Texture1D:
                             parameter.Type = EffectParameterType.RWTexture1D;
                             break;
-                        case ShaderResourceViewDimension.Texture1DArray:
-                            parameter.Type = EffectParameterType.RWTexture1DArray;
-                            break;
-                        case ShaderResourceViewDimension.Texture2D:
+                        case ShaderResourceDimension.Texture2D:
                             parameter.Type = EffectParameterType.RWTexture2D;
                             break;
-                        case ShaderResourceViewDimension.Texture2DArray:
-                            parameter.Type = EffectParameterType.RWTexture2DArray;
-                            break;
-                        case ShaderResourceViewDimension.Texture3D:
+                        case ShaderResourceDimension.Texture3D:
                             parameter.Type = EffectParameterType.RWTexture3D;
                             break;
                     }
                     break;
-                case ShaderInputType.UnorderedAccessViewRWStructured:
-                    parameter.Type = EffectParameterType.RWStructuredBuffer;
-                    break;
-                case ShaderInputType.UnorderedAccessViewRWByteAddress:
-                    parameter.Type = EffectParameterType.RWByteAddressBuffer;
-                    break;
-                case ShaderInputType.UnorderedAccessViewAppendStructured:
-                    parameter.Type = EffectParameterType.AppendStructuredBuffer;
-                    break;
-                case ShaderInputType.UnorderedAccessViewConsumeStructured:
-                    parameter.Type = EffectParameterType.ConsumeStructuredBuffer;
-                    break;
-                case ShaderInputType.UnorderedAccessViewRWStructuredWithCounter:
-                    parameter.Type = EffectParameterType.RWStructuredBuffer;
-                    break;
-                case ShaderInputType.Sampler:
+                case SpvcResourceType.SeparateSamplers:
                     parameter.Type = EffectParameterType.Sampler;
                     break;
             }
@@ -1527,7 +1478,7 @@ namespace Adamantium.Engine.Compiler.Effects
 
         private class IndexedInputBindingDescription
         {
-            public IndexedInputBindingDescription(int index, InputBindingDescription description)
+            public IndexedInputBindingDescription(int index, ShaderReflectionVariable description)
             {
                 Index = index;
                 Description = description;
@@ -1535,7 +1486,7 @@ namespace Adamantium.Engine.Compiler.Effects
 
             public int Index;
 
-            public InputBindingDescription Description;
+            public ShaderReflectionVariable Description;
         }
 
         #endregion

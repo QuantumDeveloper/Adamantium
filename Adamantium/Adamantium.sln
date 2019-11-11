@@ -57,6 +57,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdamantiumVulkan.SPIRV", ".
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdamantiumVulkan.SPIRV.Reflection", "..\..\AdamantiumVulkan\AdamantiumVulkan.SPIRV.Reflection\AdamantiumVulkan.SPIRV.Reflection.csproj", "{78FC7188-F75F-4802-BB45-816CE219FAB5}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.Engine.CompilerTests", "Tests\Adamantium.Engine.CompilerTests\Adamantium.Engine.CompilerTests.csproj", "{CF68DBD7-6464-4A32-88AF-F2BB3540E470}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -273,12 +275,21 @@ Global
 		{78FC7188-F75F-4802-BB45-816CE219FAB5}.Release|Any CPU.Build.0 = Release|Any CPU
 		{78FC7188-F75F-4802-BB45-816CE219FAB5}.Release|x64.ActiveCfg = Release|Any CPU
 		{78FC7188-F75F-4802-BB45-816CE219FAB5}.Release|x64.Build.0 = Release|Any CPU
+		{CF68DBD7-6464-4A32-88AF-F2BB3540E470}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CF68DBD7-6464-4A32-88AF-F2BB3540E470}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CF68DBD7-6464-4A32-88AF-F2BB3540E470}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{CF68DBD7-6464-4A32-88AF-F2BB3540E470}.Debug|x64.Build.0 = Debug|Any CPU
+		{CF68DBD7-6464-4A32-88AF-F2BB3540E470}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CF68DBD7-6464-4A32-88AF-F2BB3540E470}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CF68DBD7-6464-4A32-88AF-F2BB3540E470}.Release|x64.ActiveCfg = Release|Any CPU
+		{CF68DBD7-6464-4A32-88AF-F2BB3540E470}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{E598A6F2-DE2C-4591-966C-D6BB39D667B3} = {3A783815-220B-420E-80CE-4CD4805A0834}
+		{CF68DBD7-6464-4A32-88AF-F2BB3540E470} = {3A783815-220B-420E-80CE-4CD4805A0834}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {DC88E606-C87C-4FA7-8A47-4A2BD89517F9}

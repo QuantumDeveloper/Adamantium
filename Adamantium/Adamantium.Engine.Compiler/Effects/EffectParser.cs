@@ -61,10 +61,7 @@ namespace Adamantium.Engine.Compiler.Effects
       /// Gets the include directory list.
       /// </summary>
       /// <value>The include directory list.</value>
-      public List<string> IncludeDirectoryList
-      {
-         get { return includeDirectoryList; }
-      }
+      public List<string> IncludeDirectoryList => includeDirectoryList;
 
       /// <summary>
       /// Gets or sets the logger.
@@ -94,8 +91,8 @@ namespace Adamantium.Engine.Compiler.Effects
          localResult.IncludeHandler.FileResolved.Add(fileName, new FileIncludeHandler.FileItem(fileName, filePath, File.GetLastWriteTime(filePath)));
 
          string compilationErrors = null;
-         var preprocessedInput = SpirvReflection.CompileIntoPreprocessedText(input, Macros.ToArray(), localResult.IncludeHandler, out compilationErrors, filePath);
-         localResult.PreprocessedSource = preprocessedInput;
+         //var preprocessedInput = SpirvReflection.CompileIntoPreprocessedText(input, Macros.ToArray(), localResult.IncludeHandler, out compilationErrors, filePath);
+         //localResult.PreprocessedSource = preprocessedInput;
 
          localResult.DependencyList = CalculateDependencies(localResult);
 

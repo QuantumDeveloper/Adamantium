@@ -2,6 +2,8 @@
 using System.IO;
 using System.Text;
 using Adamantium.Engine.Core.Effects;
+using AdamantiumVulkan.Shaders;
+using AdamantiumVulkan.SPIRV.Reflection;
 
 namespace Adamantium.Engine.Compiler.Effects
 {
@@ -69,7 +71,7 @@ namespace Adamantium.Engine.Compiler.Effects
       /// </summary>
       /// <param name="shader">The shader.</param>
       /// <returns>A string containing asm code decoded from HLSL bytecode.</returns>
-      public static string DisassembleShader(EffectData.Shader shader)
+      public static SpirvReflectionResult DisassembleShader(EffectData.Shader shader)
       {
          var compiler = new EffectCompilerInternal();
          return compiler.DisassembleShader(shader);
@@ -80,7 +82,7 @@ namespace Adamantium.Engine.Compiler.Effects
       /// </summary>
       /// <param name="shaderSource">The bytecode list to for the provided effect.</param>
       /// <returns>Built effect data.</returns>
-      public static EffectData Compile(params ShaderBytecode[] shaderSource)
+      public static EffectData Compile(params CompilationResult[] shaderSource)
       {
          var compiler = new EffectCompilerInternal();
          return compiler.Build(shaderSource);

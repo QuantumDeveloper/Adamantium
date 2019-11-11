@@ -33,7 +33,7 @@ namespace Adamantium.Engine.Effects
          RowCount = parameterDescription.RowCount;
          ColumnCount = parameterDescription.ColumnCount;
          ElementCount = parameterDescription.Count;
-         Offset = parameterDescription.Offset;
+         Offset = (int)parameterDescription.Offset;
          Size = parameterDescription.Size;
 
          // If the expecting Matrix4x4F is column_major or the expected size is != from Matrix4x4F, than we need to remap SharpDX.Matrix4x4F to it.
@@ -111,7 +111,7 @@ namespace Adamantium.Engine.Effects
       /// <summary>
       /// Gets the collection of effect parameters.
       /// </summary>
-      public readonly int ElementCount;
+      public readonly uint ElementCount;
 
       /// <summary>
       /// Size in bytes of the element, only valid for value types.
@@ -432,10 +432,10 @@ namespace Adamantium.Engine.Effects
       /// Sets a shader resource for the associated parameter.
       /// </summary>
       /// <param name="resourceView">The resource.</param>
-      public void SetResource(UnorderedAccessView resourceView)
-      {
-         resourceLinker.SetResource((EffectData.ResourceParameter)ParameterDescription, ResourceType, resourceView);
-      }
+//      public void SetResource(UnorderedAccessView resourceView)
+//      {
+//         resourceLinker.SetResource((EffectData.ResourceParameter)ParameterDescription, ResourceType, resourceView);
+//      }
 
       /// <summary>
       /// Sets a an array of shader resource views for the associated parameter.
@@ -452,10 +452,10 @@ namespace Adamantium.Engine.Effects
       /// </summary>
       /// <param name="resourceViewArray">The resource view array.</param>
       /// <param name="uavCounts">Sets the initial uavCount</param>
-      public void SetResource(UnorderedAccessView[] resourceViewArray, int[] uavCounts)
-      {
-         resourceLinker.SetResource((EffectData.ResourceParameter)ParameterDescription, ResourceType, resourceViewArray, uavCounts);
-      }
+//      public void SetResource(UnorderedAccessView[] resourceViewArray, int[] uavCounts)
+//      {
+//         resourceLinker.SetResource((EffectData.ResourceParameter)ParameterDescription, ResourceType, resourceViewArray, uavCounts);
+//      }
 
       /// <summary>
       /// Sets a shader resource at the specified index for the associated parameter.
@@ -485,10 +485,10 @@ namespace Adamantium.Engine.Effects
       /// <param name="index">Index to start to set the resource views</param>
       /// <param name="resourceViewArray">The resource view array.</param>
       /// <param name="uavCount">Sets the initial uavCount</param>
-      public void SetResource(int index, UnorderedAccessView[] resourceViewArray, int[] uavCount)
-      {
-         resourceLinker.SetResource((EffectData.ResourceParameter)ParameterDescription, ResourceType, resourceViewArray, uavCount);
-      }
+//      public void SetResource(int index, UnorderedAccessView[] resourceViewArray, int[] uavCount)
+//      {
+//         resourceLinker.SetResource((EffectData.ResourceParameter)ParameterDescription, ResourceType, resourceViewArray, uavCount);
+//      }
 
       internal void SetDefaultValue()
       {

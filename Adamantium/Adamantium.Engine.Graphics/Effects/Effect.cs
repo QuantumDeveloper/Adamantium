@@ -239,13 +239,13 @@ namespace Adamantium.Engine.Effects
             });
 
             // Prelink constant buffers
-            int resourceIndex = 0;
+            uint resourceIndex = 0;
             foreach (var parameter in Parameters)
             {
                 // Recalculate parameter resource index
                 if (!parameter.IsValueType)
                 {
-                    parameter.Offset = resourceIndex;
+                    parameter.Offset = (int)resourceIndex;
                     resourceIndex += parameter.ElementCount;
                 }
 

@@ -378,54 +378,14 @@
       /// <msdn-id>ff728735</msdn-id>	
       /// <unmanaged>D3D_SVT_RWBUFFER</unmanaged>	
       /// <unmanaged-short>D3D_SVT_RWBUFFER</unmanaged-short>	
-      RWBuffer = unchecked((int)45),
+      StorageImage = unchecked((int)45),
 
       /// <summary>	
-      /// <dd> <p>The variable is a byte-address buffer.</p> </dd>	
-      /// </summary>	
-      /// <msdn-id>ff728735</msdn-id>	
-      /// <unmanaged>D3D_SVT_BYTEADDRESS_BUFFER</unmanaged>	
-      /// <unmanaged-short>D3D_SVT_BYTEADDRESS_BUFFER</unmanaged-short>	
-      ByteAddressBuffer = unchecked((int)46),
-
-      /// <summary>	
-      /// <dd> <p>The variable is a read-and-write byte-address buffer.</p> </dd>	
-      /// </summary>	
-      /// <msdn-id>ff728735</msdn-id>	
-      /// <unmanaged>D3D_SVT_RWBYTEADDRESS_BUFFER</unmanaged>	
-      /// <unmanaged-short>D3D_SVT_RWBYTEADDRESS_BUFFER</unmanaged-short>	
-      RWByteAddressBuffer = unchecked((int)47),
-
-      /// <summary>	
-      /// <dd> <p>The variable is a structured buffer. </p> <p>For more information about structured buffer, see the <strong>Remarks</strong> section.</p> </dd>	
+      /// <dd> <p>The variable is a storage (structured) buffer. </p> <p>For more information about structured buffer, see the <strong>Remarks</strong> section.</p> </dd>	
       /// </summary>	
       /// <msdn-id>ff728735</msdn-id>	
       /// <unmanaged>D3D_SVT_STRUCTURED_BUFFER</unmanaged>	
       /// <unmanaged-short>D3D_SVT_STRUCTURED_BUFFER</unmanaged-short>	
-      StructuredBuffer = unchecked((int)48),
-
-      /// <summary>	
-      /// <dd> <p>The variable is a read-and-write structured buffer.</p> </dd>	
-      /// </summary>	
-      /// <msdn-id>ff728735</msdn-id>	
-      /// <unmanaged>D3D_SVT_RWSTRUCTURED_BUFFER</unmanaged>	
-      /// <unmanaged-short>D3D_SVT_RWSTRUCTURED_BUFFER</unmanaged-short>	
-      RWStructuredBuffer = unchecked((int)49),
-
-      /// <summary>	
-      /// <dd> <p>The variable is an append structured buffer.</p> </dd>	
-      /// </summary>	
-      /// <msdn-id>ff728735</msdn-id>	
-      /// <unmanaged>D3D_SVT_APPEND_STRUCTURED_BUFFER</unmanaged>	
-      /// <unmanaged-short>D3D_SVT_APPEND_STRUCTURED_BUFFER</unmanaged-short>	
-      AppendStructuredBuffer = unchecked((int)50),
-
-      /// <summary>	
-      /// <dd> <p>The variable is a consume structured buffer.</p> </dd>	
-      /// </summary>	
-      /// <msdn-id>ff728735</msdn-id>	
-      /// <unmanaged>D3D_SVT_CONSUME_STRUCTURED_BUFFER</unmanaged>	
-      /// <unmanaged-short>D3D_SVT_CONSUME_STRUCTURED_BUFFER</unmanaged-short>	
-      ConsumeStructuredBuffer = unchecked((int)51),
+      StorageBuffer = unchecked((int)48),
    }
 }

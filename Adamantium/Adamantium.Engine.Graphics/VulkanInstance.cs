@@ -88,7 +88,7 @@ namespace Adamantium.Engine.Graphics
             DebugUtilsMessengerCreateInfoEXT debugInfo = new DebugUtilsMessengerCreateInfoEXT();
             debugInfo.MessageSeverity = (uint)(DebugUtilsMessageSeverityFlagBitsEXT.VerboseBitExt | DebugUtilsMessageSeverityFlagBitsEXT.WarningBitExt | DebugUtilsMessageSeverityFlagBitsEXT.ErrorBitExt);
             debugInfo.MessageType = (uint)(DebugUtilsMessageTypeFlagBitsEXT.GeneralBitExt | DebugUtilsMessageTypeFlagBitsEXT.ValidationBitExt | DebugUtilsMessageTypeFlagBitsEXT.PerformanceBitExt);
-            debugInfo.PfnUserCallback = debugCallback;
+            debugInfo.PfnUserCallback = Marshal.GetFunctionPointerForDelegate(debugCallback);
 
             var createInfo = new InstanceCreateInfo();
             createInfo.PApplicationInfo = appInfo;
