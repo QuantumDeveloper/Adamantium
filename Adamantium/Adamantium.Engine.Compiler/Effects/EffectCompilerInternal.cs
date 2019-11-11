@@ -49,7 +49,7 @@ namespace Adamantium.Engine.Compiler.Effects
         private string preprocessorText;
         private EffectData.Technique technique;
         private int nextSubPassCount;
-        private uint profile;
+        private int profile;
 
         //private StreamOutputElement[] currentStreamOutputElements;
 
@@ -851,14 +851,14 @@ namespace Adamantium.Engine.Compiler.Effects
         {
             if (expression is Ast.IdentifierExpression identifierExpression)
             {
-                profile = (uint)(Convert.ToSingle(identifierExpression.Name.Text, CultureInfo.InvariantCulture) * 10);
+                profile = (int)(Convert.ToSingle(identifierExpression.Name.Text, CultureInfo.InvariantCulture) * 10);
             }
             else if (expression is Ast.LiteralExpression)
             {
                 var literalValue = (string)((Ast.LiteralExpression)expression).Value.Value;
                 try
                 {
-                    profile = (uint)(Convert.ToSingle(literalValue, CultureInfo.InvariantCulture) * 10);
+                    profile = (int)(Convert.ToSingle(literalValue, CultureInfo.InvariantCulture) * 10);
                 }
                 catch (Exception)
                 {
@@ -965,9 +965,9 @@ namespace Adamantium.Engine.Compiler.Effects
             CompileShader(type, ExtractShaderName(type, assignValue), assignValue.Span);
         }
 
-        private void CompileShader(EffectShaderType type, string shaderName, SourceSpan span)
+        private void CompileShader(EffectShaderType type, string entryPoint, SourceSpan span)
         {
-            if (shaderName == null)
+            if (entryPoint == null)
             {
                 pass.Pipeline[type] = EffectData.ShaderLink.NullShader;
                 return;
@@ -984,7 +984,7 @@ namespace Adamantium.Engine.Compiler.Effects
 
             try
             {
-                var result = CompileParsedShader(shaderName, profile);
+                var result = CompileParsedShader(type, entryPoint, profile);
 
                 var compilerMessages = result.Messages;
                 if (result.HasErrors || result.Bytecode == null)
@@ -997,18 +997,18 @@ namespace Adamantium.Engine.Compiler.Effects
                         logger.LogMessage(new LogMessageRaw(LogMessageType.Warning, compilerMessages));
 
                     // Check if this shader is exported
-                    if (currentExports.Contains(shaderName))
+                    if (currentExports.Contains(entryPoint))
                     {
                         // the exported name is EffectName::ShaderName
-                        shaderName = effect.Name + "::" + shaderName;
+                        entryPoint = effect.Name + "::" + entryPoint;
                     }
                     else
                     {
                         // If the shader is not exported, set the name to null
-                        shaderName = null;
+                        entryPoint = null;
                     }
 
-                    var shader = CreateEffectShader(type, shaderName, result);
+                    var shader = CreateEffectShader(type, entryPoint, result);
 
                     if (logger.HasErrors)
                         return;
@@ -1021,7 +1021,7 @@ namespace Adamantium.Engine.Compiler.Effects
             }
         }
 
-        private CompilationResult CompileParsedShader(string shaderName, uint profile)
+        private CompilationResult CompileParsedShader(EffectShaderType shaderKind, string entryPoint, int profile)
         {
             var sourcecodeBuilder = new StringBuilder();
             if (!string.IsNullOrEmpty(preprocessorText))
@@ -1038,16 +1038,31 @@ namespace Adamantium.Engine.Compiler.Effects
             opts.UseHlslOffsets = true;
             opts.SetAutoBindUniforms = true;
             opts.SourceLanguage = ShadercSourceLanguage.Hlsl;
+            opts.SetForcedVersionProfile(profile, ShadercProfile.Core);
             //opts.SetIncludeCallbacks(,);
 
-//            var result = SpirvReflection.CompileToSpirvBinary(
-//                sourcecode,
-//                ,
-//                Path.GetFileName(filePath),
-//                shaderName,
-//                opts);
-//            return result;
-            return null;
+            var result = SpirvReflection.CompileToSpirvBinary(
+                sourcecode,
+                GetShadercType(shaderKind),
+                Path.GetFileName(filePath),
+                entryPoint,
+                opts);
+            return result;
+        }
+
+        private ShadercShaderKind GetShadercType(EffectShaderType type)
+        {
+            switch(type)
+            {
+                case EffectShaderType.Vertex: return ShadercShaderKind.VertexShader;
+                case EffectShaderType.Hull: return ShadercShaderKind.TessControlShader;
+                case EffectShaderType.Domain: return ShadercShaderKind.TessEvaluationShader;
+                case EffectShaderType.Geometry: return ShadercShaderKind.GeometryShader;
+                case EffectShaderType.Fragment: return ShadercShaderKind.FragmentShader;
+                case EffectShaderType.Compute: return ShadercShaderKind.ComputeShader;
+                default:
+                    throw new ArgumentOutOfRangeException($"Shader type {type} could not be converted to any ShadercShaderKind type");
+            }
         }
 
         private EffectData.Shader CreateEffectShader(EffectShaderType type, string shaderName, CompilationResult bytecode)

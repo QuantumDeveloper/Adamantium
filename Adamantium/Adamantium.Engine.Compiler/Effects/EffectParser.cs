@@ -89,10 +89,7 @@ namespace Adamantium.Engine.Compiler.Effects
          localResult.IncludeHandler.IncludeDirectories.AddRange(IncludeDirectoryList);
          localResult.IncludeHandler.IncludeFileCallback = IncludeFileCallback;
          localResult.IncludeHandler.FileResolved.Add(fileName, new FileIncludeHandler.FileItem(fileName, filePath, File.GetLastWriteTime(filePath)));
-
-         string compilationErrors = null;
-         //var preprocessedInput = SpirvReflection.CompileIntoPreprocessedText(input, Macros.ToArray(), localResult.IncludeHandler, out compilationErrors, filePath);
-         //localResult.PreprocessedSource = preprocessedInput;
+         localResult.PreprocessedSource = input;
 
          localResult.DependencyList = CalculateDependencies(localResult);
 
@@ -104,7 +101,7 @@ namespace Adamantium.Engine.Compiler.Effects
       /// </summary>
       /// <param name="previousParsing">The previous parsing.</param>
       /// <returns>EffectParserResult.</returns>
-      private EffectParserResult ContinueParsing(EffectParserResult previousParsing)
+      private EffectParserResult ParseInput(EffectParserResult previousParsing)
       {
          // Reset count
          parentCount = 0;
@@ -125,7 +122,7 @@ namespace Adamantium.Engine.Compiler.Effects
             switch (token.Type)
             {
                case TokenType.Identifier:
-                  if ((token.EqualString("technique") || token.EqualString("technique10") || token.EqualString("technique11")) && curlyBraceCount == 0)
+                  if ((token.EqualString("technique") || token.EqualString("technique10") || token.EqualString("technique11") || token.EqualString("technique12")) && curlyBraceCount == 0)
                      ParseTechnique();
                   break;
             }
@@ -162,7 +159,7 @@ namespace Adamantium.Engine.Compiler.Effects
       /// <returns>Result of parsing</returns>
       public EffectParserResult Parse(string input, string fileName)
       {
-         return ContinueParsing(PrepareParsing(input, fileName));
+         return ParseInput(PrepareParsing(input, fileName));
       }
 
       private bool CheckAllBracketsClosed()
@@ -292,7 +289,7 @@ namespace Adamantium.Engine.Compiler.Effects
 
          // Set correct location for current token
          currentToken.Span.Line = currentLine;
-         currentToken.Span.Column = token.Span.Index - currentLineAbsolutePos + 1;
+         currentToken.Span.Column = token.Span.StartIndex - currentLineAbsolutePos + 1;
          currentToken.Span.FilePath = currentFile;
 
          return currentToken;
@@ -318,12 +315,12 @@ namespace Adamantium.Engine.Compiler.Effects
             if (currentToken.Type == TokenType.Newline)
             {
                currentLine++;
-               currentLineAbsolutePos = currentToken.Span.Index + currentToken.Span.Length;
+               currentLineAbsolutePos = currentToken.Span.StartIndex + currentToken.Span.Length;
             }
             else
             {
                currentToken.Span.Line = currentLine;
-               currentToken.Span.Column = currentToken.Span.Index - currentLineAbsolutePos + 1;
+               currentToken.Span.Column = currentToken.Span.StartIndex - currentLineAbsolutePos + 1;
                currentToken.Span.FilePath = currentFile;
 
                HandleBrackets(currentToken);
@@ -402,6 +399,7 @@ namespace Adamantium.Engine.Compiler.Effects
                case TokenType.RightCurlyBrace:
                   isParseOk = true;
                   continueParsingTecnhique = false;
+                  technique.Span.EndIndex = currentToken.Span.EndIndex;
                   break;
 
                default:

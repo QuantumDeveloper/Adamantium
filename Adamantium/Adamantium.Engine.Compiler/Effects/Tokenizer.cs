@@ -47,7 +47,7 @@ namespace Adamantium.Engine.Compiler.Effects
                // Skip whitespaces
                if (group.Success && i > 1)
                {
-                  yield return new Token { Type = (TokenType)(i - 2), Value = matchValue, Span = { Index = @group.Index, Length = @group.Length } };
+                  yield return new Token { Type = (TokenType)(i - 2), Value = matchValue, Span = { StartIndex = @group.Index, Length = @group.Length } };
                }
                i++;
             }
