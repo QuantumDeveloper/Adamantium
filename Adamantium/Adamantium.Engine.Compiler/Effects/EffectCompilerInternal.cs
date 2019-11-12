@@ -137,7 +137,7 @@ namespace Adamantium.Engine.Compiler.Effects
             }
 
             compilerFlags = flags;
-            this.macros = nativeMacros;
+            macros = nativeMacros;
             this.includeDirectoryList = includeDirectoryList ?? new List<string>();
 
             InternalCompile(sourceCode, filePath);
@@ -306,8 +306,7 @@ namespace Adamantium.Engine.Compiler.Effects
             // Process all statements inside this pass.
             foreach (var statement in passAst.Statements)
             {
-                var expressionStatement = statement as Ast.ExpressionStatement;
-                if (expressionStatement == null)
+                if (!(statement is Ast.ExpressionStatement expressionStatement))
                     continue;
                 HandleExpression(expressionStatement.Expression);
             }
@@ -611,19 +610,17 @@ namespace Adamantium.Engine.Compiler.Effects
         private List<string> ExtractStringOrArrayOfStrings(Ast.Expression expression)
         {
             // TODO implement this method using generics
-            object value;
-            if (!ExtractValue(expression, out value))
+            if (!ExtractValue(expression, out var value))
                 return null;
 
             var values = new List<string>();
 
-            if (value is string)
+            if (value is string str)
             {
-                values.Add((string)value);
+                values.Add(str);
             }
-            else if (value is object[])
+            else if (value is object[] arrayValue)
             {
-                var arrayValue = (object[])value;
                 foreach (var exportItem in arrayValue)
                 {
                     if (!(exportItem is string))
@@ -644,8 +641,7 @@ namespace Adamantium.Engine.Compiler.Effects
 
         private void HandleShareConstantBuffers(Ast.Expression expression)
         {
-            object value;
-            if (!ExtractValue(expression, out value))
+            if (!ExtractValue(expression, out var value))
                 return;
 
             if (!(value is bool))
@@ -660,8 +656,7 @@ namespace Adamantium.Engine.Compiler.Effects
 
         private void HandleEffectName(Ast.Expression expression)
         {
-            object value;
-            if (!ExtractValue(expression, out value))
+            if (!ExtractValue(expression, out var value))
                 return;
 
             if (!(value is string))
@@ -702,13 +697,12 @@ namespace Adamantium.Engine.Compiler.Effects
 
             // Else parse preprocessor directive
             var builder = new StringBuilder();
-            if (value is string)
+            if (value is string str)
             {
-                builder.AppendLine((string)value);
+                builder.AppendLine(str);
             }
-            else if (value is object[])
+            else if (value is object[] arrayValue)
             {
-                var arrayValue = (object[])value;
                 foreach (var stringItem in arrayValue)
                 {
                     if (!(stringItem is string))
@@ -724,8 +718,7 @@ namespace Adamantium.Engine.Compiler.Effects
         private void HandleAttribute(Ast.AssignExpression expression)
         {
             // Extract the value and store it in the attribute
-            object value;
-            if (ExtractValue(expression.Value, out value))
+            if (ExtractValue(expression.Value, out var value))
             {
                 pass.Properties[expression.Name.Text] = value;
             }
@@ -734,12 +727,11 @@ namespace Adamantium.Engine.Compiler.Effects
         private void HandleAttribute<T>(Ast.AssignExpression expression)
         {
             // Extract the value and store it in the attribute
-            object value;
-            if (ExtractValue(expression.Value, out value))
+            if (ExtractValue(expression.Value, out var value))
             {
-                if (typeof(T) == typeof(uint) && value is int)
+                if (typeof(T) == typeof(uint) && value is int i)
                 {
-                    value = unchecked((uint)(int)value);
+                    value = unchecked((uint)i);
                 }
                 else
                 {
@@ -974,7 +966,7 @@ namespace Adamantium.Engine.Compiler.Effects
             }
 
             // If the level is not setup, return an error
-            if (this.profile == 0)
+            if (profile == 0)
             {
                 logger.Error("Expecting setup of [Profile = fx_4_0/fx_5_0...etc.] before compiling a shader.", span);
                 return;

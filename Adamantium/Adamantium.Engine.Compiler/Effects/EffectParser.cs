@@ -146,6 +146,13 @@ namespace Adamantium.Engine.Compiler.Effects
             }
          }
 
+         // Replace technique in string with spaces because Vulkan shader compiler is not allowing technique block to be present in file
+         StringBuilder stringBuilder = new StringBuilder();
+         foreach (var technique in result.Shader.Techniques)
+         {
+            
+         }
+
          result.PreprocessedSource = newPreprocessedSource;
 
          return result;
