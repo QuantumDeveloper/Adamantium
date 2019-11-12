@@ -847,7 +847,7 @@ namespace Adamantium.Engine.Compiler.Effects
             }
             else if (expression is Ast.LiteralExpression)
             {
-                var literalValue = (string)((Ast.LiteralExpression)expression).Value.Value;
+                var literalValue = ((Ast.LiteralExpression)expression).Value.Value.ToString();
                 try
                 {
                     profile = (int)(Convert.ToSingle(literalValue, CultureInfo.InvariantCulture) * 10);
@@ -1277,6 +1277,9 @@ namespace Adamantium.Engine.Compiler.Effects
             {
                 var bindingDescription = resource.Description;
                 string name = bindingDescription.Name;
+
+                if (bindingDescription.Class == SpvcResourceType.UniformBuffer) 
+                    continue;
 
                 // Handle special case for indexable variable in SM5.0 that is different from SM4.0
                 // In SM4.0, reflection on a texture array declared as "Texture2D textureArray[4];" will

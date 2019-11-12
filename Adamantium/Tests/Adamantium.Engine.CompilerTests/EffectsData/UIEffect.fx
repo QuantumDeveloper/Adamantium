@@ -30,26 +30,26 @@ cbuffer PerlinParams : register(b0)
 
 struct VertexInputType
 {
-   float4 position : SV_POSITION;
-   float4 color: COLOR;
+	float4 position : SV_POSITION;
+	float4 color: COLOR;
 };
 
 struct PixelInputType
 {
-   float4 position : SV_POSITION;
-   float4 color: COLOR;
+	float4 position : SV_POSITION;
+	float4 color: COLOR;
 };
 
 struct TexturedVertexInputType
 {
-   float4 position : SV_POSITION;
-   float2 texcoord: TEXCOORD;
+	float4 position : SV_POSITION;
+	float2 texcoord: TEXCOORD;
 };
 
 struct TexturedPixelInputType
 {
-   float4 position : SV_POSITION;
-   float2 texcoord: TEXCOORD;
+	float4 position : SV_POSITION;
+	float2 texcoord: TEXCOORD;
 };
 
 
@@ -58,40 +58,40 @@ struct TexturedPixelInputType
 ////////////////////////////////////////////////////////////////////////////////
 PixelInputType LightVertexShader(VertexInputType input)
 {
-   PixelInputType output;
-   output.color = float4(0, 0, 0, 0);
-   output.position = float4(0, 0, 0, 0);
+	PixelInputType output;
+	output.color = float4(0, 0, 0, 0);
+	output.position = float4(0, 0, 0, 0);
 
 
-   // Change the position vector to be 4 units for proper matrix calculations.
-   input.position.w = 1.0f;
+	// Change the position vector to be 4 units for proper matrix calculations.
+	input.position.w = 1.0f;
 
-   // Calculate the position of the vertex against the world, view, and projection matrices.
+	// Calculate the position of the vertex against the world, view, and projection matrices.
 
-   output.position = mul(input.position, wvp);
-   
-   //output.position.z = log(zNear*output.position.z + 1) / log(zNear*zFar + 1) * output.position.w;
+	output.position = mul(input.position, wvp);
 
-   output.color = input.color;
+	//output.position.z = log(zNear*output.position.z + 1) / log(zNear*zFar + 1) * output.position.w;
 
-   return output;
+	output.color = input.color;
+
+	return output;
 }
 
 TexturedPixelInputType TexturedVertexShader(TexturedVertexInputType input)
 {
-   TexturedPixelInputType output;
-   output.position = float4(0, 0, 0, 0);
+	TexturedPixelInputType output;
+	output.position = float4(0, 0, 0, 0);
 
 
-   // Change the position vector to be 4 units for proper matrix calculations.
-   input.position.w = 1.0f;
+	// Change the position vector to be 4 units for proper matrix calculations.
+	input.position.w = 1.0f;
 
-   // Calculate the position of the vertex against the world, view, and projection matrices.
+	// Calculate the position of the vertex against the world, view, and projection matrices.
 
-   output.position = mul(input.position, wvp);
-   
-   output.texcoord = input.texcoord;
-   return output;
+	output.position = mul(input.position, wvp);
+
+	output.texcoord = input.texcoord;
+	return output;
 }
 
 float4 LightPixelShader(PixelInputType input) : SV_TARGET
@@ -111,7 +111,7 @@ float4 TexturedPixelShader(TexturedPixelInputType input) : SV_TARGET
 {
    float4 result = fillColor;
    result.a *= transparency;
-   float4 color = shaderTexture.Sample(sampleType, input.texcoord)* result;
+   float4 color = shaderTexture.Sample(sampleType, input.texcoord) * result;
    color = shaderTexture2.Sample(sampleType2, input.texcoord) * color;
    return color;
 }
@@ -119,21 +119,22 @@ float4 TexturedPixelShader(TexturedPixelInputType input) : SV_TARGET
 
 technique10 Render
 {
-   pass Debug
-   {
-      SetVertexShader(CompileShader(vs_4_0, LightVertexShader()));
-      SetPixelShader(CompileShader(ps_4_0, LightPixelShader()));
-   }
+	pass Debug
+	{
+		Profile = 5.0;
+		SetVertexShader(CompileShader(vs_4_0, LightVertexShader()));
+		SetPixelShader(CompileShader(ps_4_0, LightPixelShader()));
+	}
 
-   pass SolidColor
-   {
-      SetVertexShader(CompileShader(vs_4_0, TexturedVertexShader()));
-      SetPixelShader(CompileShader(ps_4_0, SolidColorPixelShader()));
-   }
+	pass SolidColor
+	{
+		SetVertexShader(CompileShader(vs_4_0, TexturedVertexShader()));
+		SetPixelShader(CompileShader(ps_4_0, SolidColorPixelShader()));
+	}
 
-   pass Textured
-   {
-      SetVertexShader(CompileShader(vs_4_0, TexturedVertexShader()));
-      SetPixelShader(CompileShader(ps_4_0, TexturedPixelShader()));
-   }
+	pass Textured
+	{
+		SetVertexShader(CompileShader(vs_4_0, TexturedVertexShader()));
+		SetPixelShader(CompileShader(ps_4_0, TexturedPixelShader()));
+	}
 }
