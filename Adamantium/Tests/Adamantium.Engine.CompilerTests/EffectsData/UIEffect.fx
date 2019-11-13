@@ -128,12 +128,14 @@ technique10 Render
 
 	pass SolidColor
 	{
+		Profile = 6.0;
 		SetVertexShader(CompileShader(vs_4_0, TexturedVertexShader()));
 		SetPixelShader(CompileShader(ps_4_0, SolidColorPixelShader()));
-	}
+	}	
 
 	pass Textured
 	{
+		Profile = 5.1;
 		SetVertexShader(CompileShader(vs_4_0, TexturedVertexShader()));
 		SetPixelShader(CompileShader(ps_4_0, TexturedPixelShader()));
 	}

@@ -41,6 +41,7 @@ namespace Adamantium.Engine.Compiler.Effects
 
         private List<string> includeDirectoryList;
         public IncludeFileDelegate IncludeFileDelegate;
+        private ShaderLanguage language;
         //private Include includeHandler;
         private EffectCompilerLogger logger;
         private List<EffectData.ShaderMacro> macros;
@@ -73,7 +74,6 @@ namespace Adamantium.Engine.Compiler.Effects
             result.Source_name_length = (ulong)result.Source_name.Length;
             return result.ToInternal();
         }
-        
 
         private IntPtr IncludeResolver(IntPtr userData, string requestedSource, int type, string requesting_source, ulong includeDepth)
         {
@@ -968,11 +968,9 @@ namespace Adamantium.Engine.Compiler.Effects
             // If the level is not setup, return an error
             if (profile == 0)
             {
-                logger.Error("Expecting setup of [Profile = fx_4_0/fx_5_0...etc.] before compiling a shader.", span);
+                logger.Error("Expecting setup of [Profile = 5_0/5_1/6_0...etc.] before compiling a shader.", span);
                 return;
             }
-
-            //var profile = GetShaderProfile(type);
 
             try
             {
@@ -1062,7 +1060,8 @@ namespace Adamantium.Engine.Compiler.Effects
             var shader = new EffectData.Shader()
             {
                 Name = shaderName,
-                //Level = level,
+                Level = GetShaderModelFromProfile(profile),
+                Language = language,
                 Bytecode = bytecode,
                 Type = type,
                 ConstantBuffers = new List<EffectData.ConstantBuffer>(),
@@ -1079,6 +1078,34 @@ namespace Adamantium.Engine.Compiler.Effects
             }
 
             return shader;
+        }
+
+        private ShaderModel GetShaderModelFromProfile(int profile)
+        {
+            switch (language)
+            {
+                case ShaderLanguage.HLSL:
+                    switch (profile)
+                    {
+                        case 50:
+                            return ShaderModel.HLSL_5_0;
+                        case 51:
+                            return ShaderModel.HLSL_5_1;
+                        case 60:
+                            return ShaderModel.HLSL_6_0;
+                    }
+                    break;
+                case ShaderLanguage.GLSL:
+                    switch(profile)
+                    {
+                        case 450:
+                            return ShaderModel.GLSL_450;
+                        case 460:
+                            return ShaderModel.GLSL_460;
+                    }
+                    break;
+            }
+            return ShaderModel.Unknown;
         }
 
         private void ProcessShaderData(EffectShaderType type, CompilationResult bytecode, EffectData.Shader shader)
@@ -1251,6 +1278,7 @@ namespace Adamantium.Engine.Compiler.Effects
                 {
                     Name = description.Name,
                     Size = (int)description.Size,
+                    Slot = description.SlotIndex,
                     Parameters = new List<EffectData.ValueTypeParameter>(),
                 };
                 shader.ConstantBuffers.Add(parameterBuffer);
@@ -1288,27 +1316,27 @@ namespace Adamantium.Engine.Compiler.Effects
                 // indices depending on the usage. Fortunately, it seems that in SM5.0, there is no hole
                 // so we can rebuilt a SM4.0 like description for SM5.0.
                 // This is the purpose of this code.
-                var matchResult = MatchVariableArray.Match(name);
-                if (matchResult.Success)
-                {
-                    name = matchResult.Groups[1].Value;
-                    int arrayIndex = int.Parse(matchResult.Groups[2].Value);
+//                var matchResult = MatchVariableArray.Match(name);
+//                if (matchResult.Success)
+//                {
+//                    name = matchResult.Groups[1].Value;
+//                    int arrayIndex = int.Parse(matchResult.Groups[2].Value);
 
-//                    if (bindingDescription.BindCount != 1)
+////                    if (bindingDescription.BindCount != 1)
+////                    {
+////                        logger.Error("Unexpected BindCount ({0}) instead of 1 for indexable variable '{1}'", new SourceSpan(), bindingDescription.BindCount, name);
+////                        return;
+////                    }
+
+//                    List<IndexedInputBindingDescription> indices;
+//                    if (!indicesUsedByName.TryGetValue(name, out indices))
 //                    {
-//                        logger.Error("Unexpected BindCount ({0}) instead of 1 for indexable variable '{1}'", new SourceSpan(), bindingDescription.BindCount, name);
-//                        return;
+//                        indices = new List<IndexedInputBindingDescription>();
+//                        indicesUsedByName.Add(name, indices);
 //                    }
 
-                    List<IndexedInputBindingDescription> indices;
-                    if (!indicesUsedByName.TryGetValue(name, out indices))
-                    {
-                        indices = new List<IndexedInputBindingDescription>();
-                        indicesUsedByName.Add(name, indices);
-                    }
-
-                    indices.Add(new IndexedInputBindingDescription(arrayIndex, bindingDescription));
-                }
+//                    indices.Add(new IndexedInputBindingDescription(arrayIndex, bindingDescription));
+//                }
 
                 // In the case of SM5.0 and texture array, there can be several input binding descriptions, so we ignore them
                 // here, as we are going to recover them outside this loop.
@@ -1322,67 +1350,67 @@ namespace Adamantium.Engine.Compiler.Effects
             }
 
             // Do we have any SM5.0 Indexable array to fix?
-            if (indicesUsedByName.Count > 0)
-            {
-                foreach (var resourceParameter in resourceParameters)
-                {
-                    var name = resourceParameter.Key;
-                    List<IndexedInputBindingDescription> indexedBindings;
-                    if (indicesUsedByName.TryGetValue(name, out indexedBindings))
-                    {
-                        // Just make sure to sort the list in index ascending order
-                        indexedBindings.Sort((left, right) => left.Index.CompareTo(right.Index));
-                        int minIndex = -1;
-                        int maxIndex = -1;
-                        int previousIndex = -1;
+            //if (indicesUsedByName.Count > 0)
+            //{
+            //    foreach (var resourceParameter in resourceParameters)
+            //    {
+            //        var name = resourceParameter.Key;
+            //        List<IndexedInputBindingDescription> indexedBindings;
+            //        if (indicesUsedByName.TryGetValue(name, out indexedBindings))
+            //        {
+            //            // Just make sure to sort the list in index ascending order
+            //            indexedBindings.Sort((left, right) => left.Index.CompareTo(right.Index));
+            //            int minIndex = -1;
+            //            int maxIndex = -1;
+            //            int previousIndex = -1;
 
-                        int minBindingIndex = -1;
-                        int previousBindingIndex = -1;
+            //            int minBindingIndex = -1;
+            //            int previousBindingIndex = -1;
 
 
-                        // Check that indices have only a delta of 1
-                        foreach (var indexedBinding in indexedBindings)
-                        {
-                            if (minIndex < 0)
-                            {
-                                minIndex = indexedBinding.Index;
-                            }
+            //            // Check that indices have only a delta of 1
+            //            foreach (var indexedBinding in indexedBindings)
+            //            {
+            //                if (minIndex < 0)
+            //                {
+            //                    minIndex = indexedBinding.Index;
+            //                }
 
-                            if (minBindingIndex < 0)
-                            {
-                                minBindingIndex = (int)indexedBinding.Description.SlotIndex;
-                            }
+            //                if (minBindingIndex < 0)
+            //                {
+            //                    minBindingIndex = (int)indexedBinding.Description.SlotIndex;
+            //                }
 
-                            if (indexedBinding.Index > maxIndex)
-                            {
-                                maxIndex = indexedBinding.Index;
-                            }
+            //                if (indexedBinding.Index > maxIndex)
+            //                {
+            //                    maxIndex = indexedBinding.Index;
+            //                }
 
-                            if (previousIndex >= 0)
-                            {
-                                if ((indexedBinding.Index - previousIndex) != 1)
-                                {
-                                    logger.Error("Unexpected sparse index for indexable variable '{0}'", new SourceSpan(), name);
-                                    return;
-                                }
+            //                if (previousIndex >= 0)
+            //                {
+            //                    if ((indexedBinding.Index - previousIndex) != 1)
+            //                    {
+            //                        logger.Error("Unexpected sparse index for indexable variable '{0}'", new SourceSpan(), name);
+            //                        return;
+            //                    }
 
-                                if ((indexedBinding.Description.SlotIndex - previousBindingIndex) != 1)
-                                {
-                                    logger.Error("Unexpected sparse index for indexable variable '{0}'", new SourceSpan(), name);
-                                    return;
-                                }
-                            }
+            //                    if ((indexedBinding.Description.SlotIndex - previousBindingIndex) != 1)
+            //                    {
+            //                        logger.Error("Unexpected sparse index for indexable variable '{0}'", new SourceSpan(), name);
+            //                        return;
+            //                    }
+            //                }
 
-                            previousIndex = indexedBinding.Index;
-                            previousBindingIndex = (int)indexedBinding.Description.SlotIndex;
-                        }
+            //                previousIndex = indexedBinding.Index;
+            //                previousBindingIndex = (int)indexedBinding.Description.SlotIndex;
+            //            }
 
-                        // Fix the slot and count
-                        resourceParameter.Value.Slot = (byte)(minBindingIndex - minIndex);
-                        resourceParameter.Value.Count = (byte)(maxIndex + 1);
-                    }
-                }
-            }
+            //            // Fix the slot and count
+            //            resourceParameter.Value.Slot = (byte)(minBindingIndex - minIndex);
+            //            resourceParameter.Value.Count = (byte)(maxIndex + 1);
+            //        }
+            //    }
+            //}
         }
 
         /// <summary>
