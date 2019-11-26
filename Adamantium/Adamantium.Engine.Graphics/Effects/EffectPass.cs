@@ -111,6 +111,9 @@ namespace Adamantium.Engine.Effects
             // Sets the current pass on the graphics device
             //graphicsDevice.CurrentPass = this;
 
+            //TODO: here we need to setup graphics/compute pipeline for current EffectPass before rendering begins
+            //and then update all descriptors for each stage
+
             // ----------------------------------------------
             // Iterate on each stage to setup all inputs
             // ----------------------------------------------
