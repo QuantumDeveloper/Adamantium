@@ -3,7 +3,7 @@ matrix wvp;
 float4 fillColor;
 sampler sampleType;// : register(s2);
 Texture2D shaderTexture;// : register(t4);
-sampler sampleType23;// : register(s5);
+sampler sampleType2;// : register(s5);
 Texture2D shaderTexture2;// : register(t5);
 
 float zNear;

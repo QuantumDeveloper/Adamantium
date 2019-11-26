@@ -47,12 +47,6 @@ namespace Adamantium.Engine.Compiler.Effects
         }
 
         /// <summary>
-        /// Gets or sets the include file callback.
-        /// </summary>
-        /// <value>The include file callback.</value>
-        public IncludeFileDelegate IncludeFileCallback { get; set; }
-
-        /// <summary>
         /// Gets the macros.
         /// </summary>
         /// <value>The macros.</value>
@@ -88,7 +82,6 @@ namespace Adamantium.Engine.Compiler.Effects
             };
             localResult.IncludeHandler.CurrentDirectory.Push(Path.GetDirectoryName(localResult.SourceFileName));
             localResult.IncludeHandler.IncludeDirectories.AddRange(IncludeDirectoryList);
-            localResult.IncludeHandler.IncludeFileCallback = IncludeFileCallback;
             localResult.IncludeHandler.FileResolved.Add(fileName, new FileIncludeHandler.FileItem(fileName, filePath, File.GetLastWriteTime(filePath)));
             localResult.PreprocessedSource = input;
 

@@ -1,8 +1,6 @@
 ﻿using Adamantium.Core;
-using Adamantium.Imaging;
 using AdamantiumVulkan.Core;
 using System;
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using VulkanBuffer = AdamantiumVulkan.Core.Buffer;
 

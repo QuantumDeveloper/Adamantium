@@ -320,6 +320,7 @@ namespace Adamantium.Core
             bool hasRightNext;
             while (true)
             {
+
                 hasLeftNext = leftIt.MoveNext();
                 hasRightNext = rightIt.MoveNext();
                 if (!hasLeftNext || !hasRightNext)
@@ -371,6 +372,26 @@ namespace Adamantium.Core
         public static bool IsTypeInheritFrom(Type type, string baseType)
         {
             throw new NotImplementedException();
+        }
+
+        /// <summary>
+        /// Compute a FNV1-modified improved hash version.
+        /// </summary>
+        /// <param name="data">Data to compute the hash from.</param>
+        /// <returns>A hash value.</returns>
+        public static int ComputeHashFNV1Modified(byte[] data)
+        {
+            const uint prime = 16777619;
+            uint hash = 2166136261;
+            foreach (byte b in data)
+                hash = (hash ^ b) * prime;
+
+            hash += hash << 13;
+            hash ^= hash >> 7;
+            hash += hash << 3;
+            hash ^= hash >> 17;
+            hash += hash << 5;
+            return unchecked((int)hash);
         }
     }
 }

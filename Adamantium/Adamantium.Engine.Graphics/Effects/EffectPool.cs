@@ -48,7 +48,7 @@ namespace Adamantium.Engine.Effects
                 compiledShadersGroup[i] = new List<ShaderModule>(256);
             }
 
-            registered = new Dictionary<EffectData, EffectData.Effect>(new IdentityEqualityComparer<EffectData>());
+            registered = new Dictionary<EffectData, EffectData.Effect>();
             effects = new List<Effect>();
             graphicsDevice = device;
             constantBufferAllocator = DefaultConstantBufferAllocator;
@@ -97,9 +97,6 @@ namespace Adamantium.Engine.Effects
 
                 if (!registered.TryGetValue(data, out effect))
                 {
-                    // Pre-cache all input signatures
-                    CacheInputSignature(data);
-
                     effect = RegisterInternal(data);
                     registered.Add(data, effect);
 
@@ -114,20 +111,6 @@ namespace Adamantium.Engine.Effects
                 }
 
                 return effect;
-            }
-        }
-
-        private void CacheInputSignature(EffectData effectData)
-        {
-            // Iterate on all vertex shaders and make unique the bytecode
-            // for faster comparison when creating input layout.
-            foreach (var shader in effectData.Shaders)
-            {
-                if (shader.Type == EffectShaderType.Vertex && shader.InputSignature.Bytecode != null)
-                {
-                    var inputSignature = graphicsDevice.GetOrCreateInputSignatureManager(shader.InputSignature.Bytecode, shader.InputSignature.Hashcode);
-                    shader.InputSignature.Bytecode = inputSignature.Bytecode;
-                }
             }
         }
 
@@ -173,7 +156,7 @@ namespace Adamantium.Engine.Effects
             OnEffectRemoved(new EffectPoolEventArgs(effect));
         }
 
-        internal ShaderModule GetOrCompileShader(EffectShaderType shaderType, int index, int soRasterizedStream, StreamOutputElement[] soElements, out string profileError)
+        internal ShaderModule GetOrCompileShader(EffectShaderType shaderType, int index, out string profileError)
         {
             ShaderModule shader = null;
             profileError = null;
@@ -182,53 +165,9 @@ namespace Adamantium.Engine.Effects
                 shader = compiledShadersGroup[(int)shaderType][index];
                 if (shader == null)
                 {
-                    if (RegisteredShaders[index].Level > graphicsDevice.Features.Level)
-                    {
-                        profileError = $"{RegisteredShaders[index].Level}";
-                        return null;
-                    }
-
                     var bytecodeRaw = RegisteredShaders[index].Bytecode;
-                    switch (shaderType)
-                    {
-                        case EffectShaderType.Vertex:
-                            shader = new VertexShader(graphicsDevice, bytecodeRaw);
-                            break;
-                        case EffectShaderType.Domain:
-                            shader = new DomainShader(graphicsDevice, bytecodeRaw);
-                            break;
-                        case EffectShaderType.Hull:
-                            shader = new HullShader(graphicsDevice, bytecodeRaw);
-                            break;
-                        case EffectShaderType.Geometry:
-                            if (soElements != null)
-                            {
-                                // Calculate the strides
-                                var soStrides = new List<int>();
-                                foreach (var streamOutputElement in soElements)
-                                {
-                                    for (int i = soStrides.Count; i < (streamOutputElement.Stream + 1); i++)
-                                    {
-                                        soStrides.Add(0);
-                                    }
-
-                                    soStrides[streamOutputElement.Stream] += streamOutputElement.ComponentCount * sizeof(float);
-                                }
-                                shader = new GeometryShader(graphicsDevice, bytecodeRaw, soElements, soStrides.ToArray(), soRasterizedStream);
-                            }
-                            else
-                            {
-                                shader = new GeometryShader(graphicsDevice, bytecodeRaw);
-                            }
-                            break;
-                        case EffectShaderType.Fragment:
-                            shader = new PixelShader(graphicsDevice, bytecodeRaw);
-                            break;
-                        case EffectShaderType.Compute:
-                            shader = new ComputeShader(graphicsDevice, bytecodeRaw);
-                            break;
-                    }
-                    compiledShadersGroup[(int)shaderType][index] = ToDispose(shader);
+                    shader = graphicsDevice.CreateShaderModule(bytecodeRaw);
+                    compiledShadersGroup[(int)shaderType][index] = shader;
                 }
             }
             return shader;
@@ -398,10 +337,12 @@ namespace Adamantium.Engine.Effects
                                 }
 
                                 shaderLink.Index = shaderIndex;
+                                shaderLink.EntryPoint = shader.EntryPoint;
                             }
                             else
                             {
                                 shaderLink.Index = RegisteredShaders.Count;
+                                shaderLink.EntryPoint = shader.EntryPoint;
                                 RegisteredShaders.Add(shader);
                             }
                         }

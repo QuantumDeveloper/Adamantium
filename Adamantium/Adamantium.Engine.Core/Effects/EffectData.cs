@@ -77,8 +77,8 @@ namespace Adamantium.Engine.Core.Effects
         /// <returns>An <see cref="EffectData"/> </returns>
         public static EffectData Load(string fileName)
         {
-            var path = fileName.Replace('/', '\\');
-            using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read))
+            //var path = fileName.Replace('/', '\\');
+            using (var stream = new FileStream(fileName, FileMode.Open, FileAccess.Read))
                 return Load(stream);
         }
 

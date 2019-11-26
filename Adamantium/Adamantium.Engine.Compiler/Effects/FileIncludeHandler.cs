@@ -1,112 +1,84 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using AdamantiumVulkan.Shaders;
+using System.Runtime.InteropServices;
+using AdamantiumVulkan;
+using AdamantiumVulkan.Shaders.Interop;
+using ShadercIncludeResult = AdamantiumVulkan.Shaders.ShadercIncludeResult;
 
 namespace Adamantium.Engine.Compiler.Effects
 {
-   internal class FileIncludeHandler
-   {
-      public readonly Stack<string> CurrentDirectory;
+    internal class FileIncludeHandler
+    {
+        public readonly Stack<string> CurrentDirectory;
 
-      public readonly Dictionary<string, FileItem> FileResolved;
-      public readonly List<string> IncludeDirectories;
-      public SourceSpan CurrentSpan;
-      public IncludeFileDelegate IncludeFileCallback;
-      public EffectCompilerLogger Logger;
+        public readonly Dictionary<string, FileItem> FileResolved;
+        public readonly List<string> IncludeDirectories;
+        public ShadercIncludeResolveFn IncludeResolverCallback { get; }
+        public ShadercIncludeResultReleaseFn IncludeReleaseCallback { get; }
+        public EffectCompilerLogger Logger;
+        private IntPtr resultPtr;
 
-      public FileIncludeHandler()
-      {
-         IncludeDirectories = new List<string>();
-         CurrentDirectory = new Stack<string>();
-         FileResolved = new Dictionary<string, FileItem>();
-      }
+        public FileIncludeHandler()
+        {
+            IncludeDirectories = new List<string>();
+            CurrentDirectory = new Stack<string>();
+            FileResolved = new Dictionary<string, FileItem>();
+            IncludeResolverCallback = IncludeResolver;
+            IncludeReleaseCallback = IncludeReleaser;
+        }
 
-      #region Include Members
+        #region Include Members
 
-      public Stream Open(ShadercIncludeType type, string fileName, Stream parentStream)
-      {
-         var currentDirectory = CurrentDirectory.Peek();
-         if (currentDirectory == null)
-            currentDirectory = Environment.CurrentDirectory;
-
-         var filePath = fileName;
-
-         if (!Path.IsPathRooted(filePath))
-         {
-            var directoryToSearch = new List<string> { currentDirectory };
-            directoryToSearch.AddRange(IncludeDirectories);
-            foreach (var dirPath in directoryToSearch)
+        private IntPtr IncludeResolver(IntPtr userData, string requestedSource, int type, string requestingSource, ulong includeDepth)
+        {
+            var currentDirectory = CurrentDirectory.Peek();
+            var finalPath = Path.Combine(currentDirectory, requestedSource);
+            if (!File.Exists(finalPath))
             {
-               var selectedFile = Path.Combine(dirPath, fileName);
-               if (File.Exists(selectedFile))
-               {
-                  filePath = selectedFile;
-                  break;
-               }
-            }
-         }
-
-         Stream stream = null;
-
-         // Make sure that this file is not in the resolved list
-         FileResolved.Remove(fileName);
-
-         if (filePath == null || !File.Exists(filePath))
-         {
-            // Else try to use the include file callback
-            if (IncludeFileCallback != null)
-            {
-               stream = IncludeFileCallback(type == ShadercIncludeType.Standard, fileName);
-               if (stream != null)
-               {
-                  FileResolved.Add(fileName, new FileItem(fileName, CleanPath(fileName), DateTime.Now));
-                  return stream;
-               }
+                Logger.Error($"Unable to find file [{finalPath}]");
             }
 
-            Logger.Error("Unable to find file [{0}]", CurrentSpan, filePath ?? fileName);
-            return null;
-         }
+            var content = File.ReadAllText(finalPath);
 
-         stream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
-         CurrentDirectory.Push(Path.GetDirectoryName(Path.GetFullPath(filePath)));
-         var fullPath = Path.GetFullPath(filePath);
-         FileResolved.Add(fileName, new FileItem(fileName, CleanPath(fullPath), File.GetLastWriteTime(fullPath)));
-         return stream;
-      }
+            var shaderResult = new ShadercIncludeResult();
+            shaderResult.Content = content;
+            shaderResult.Content_length = (ulong)shaderResult.Content.Length;
+            shaderResult.Source_name = requestedSource;
+            shaderResult.Source_name_length = (ulong)shaderResult.Source_name.Length;
+            var innerStruct = shaderResult.ToInternal();
 
-      public void Close(Stream stream)
-      {
-         stream.Close();
-         CurrentDirectory.Pop();
-      }
+            resultPtr = MarshalUtils.MarshalStructToPtr(innerStruct);
+            return resultPtr;
+        }
+        ///<summary>
+        /// An includer callback type for destroying an include result.
+        ///</summary>
+        private void IncludeReleaser(IntPtr userData, AdamantiumVulkan.Shaders.Interop.ShadercIncludeResult includeResult)
+        {
+            Marshal.FreeHGlobal(resultPtr);
+        }
 
-      private static string CleanPath(string path)
-      {
-         return path.Replace(@"\\", @"\");
-      }
+        #endregion
 
-      #endregion
+        #region Nested type: Tuple
 
-      #region Nested type: Tuple
+        internal class FileItem
+        {
+            public FileItem(string fileName, string filePath, DateTime modifiedTime)
+            {
+                FileName = fileName;
+                FilePath = filePath;
+                ModifiedTime = modifiedTime;
+            }
 
-      internal class FileItem
-      {
-         public FileItem(string fileName, string filePath, DateTime modifiedTime)
-         {
-            FileName = fileName;
-            FilePath = filePath;
-            ModifiedTime = modifiedTime;
-         }
+            public string FileName;
 
-         public string FileName;
+            public string FilePath;
 
-         public string FilePath;
+            public DateTime ModifiedTime;
+        }
 
-         public DateTime ModifiedTime;
-      }
-
-      #endregion
-   }
+        #endregion
+    }
 }

@@ -8,9 +8,14 @@ namespace Adamantium.Engine.Core.Effects
         public sealed class Shader
         {
             /// <summary>
-            /// Name of this shader, only valid for public shaders, else null.
+            /// Name of this shader.
             /// </summary>
             public string Name;
+
+            /// <summary>
+            /// Entry point of this shader.
+            /// </summary>
+            public string EntryPoint;
 
             /// <summary>
             /// Type of this shader.
@@ -44,16 +49,6 @@ namespace Adamantium.Engine.Core.Effects
             /// Shaders with same bytecode with have same hashcode.
             /// </remarks>
             public int Hashcode;
-
-            /// <summary>
-            /// Description of the input <see cref="Signature"/>.
-            /// </summary>
-            public Signature InputSignature;
-
-            /// <summary>
-            /// Description of the output <see cref="Signature"/>.
-            /// </summary>
-            public Signature OutputSignature;
 
             /// <summary>
             /// List of constant buffers used by this shader.
@@ -94,7 +89,7 @@ namespace Adamantium.Engine.Core.Effects
                 if (ReferenceEquals(null, other)) return false;
                 if (ReferenceEquals(this, other)) return true;
 
-                if (!(Hashcode == other.Hashcode && Type.Equals(other.Type) && CompilerFlags.Equals(other.CompilerFlags) && Level.Equals(other.Level) && InputSignature.Equals(other.InputSignature) && OutputSignature.Equals(other.OutputSignature)))
+                if (!(Hashcode == other.Hashcode && Type.Equals(other.Type) && CompilerFlags.Equals(other.CompilerFlags) && Level.Equals(other.Level)))
                     return false;
 
                 if (!Utilities.Compare(Bytecode, other.Bytecode))

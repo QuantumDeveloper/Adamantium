@@ -2,7 +2,11 @@
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Effects;
 using Adamantium.Engine.Graphics;
+using AdamantiumVulkan.Core;
+using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Runtime.InteropServices;
 
 namespace Adamantium.Engine.Effects
 {
@@ -12,12 +16,6 @@ namespace Adamantium.Engine.Effects
     public sealed class EffectPass : NamedObject
     {
         private const int StageCount = 6;
-
-        internal const int MaximumResourceCountPerStage =
-           CommonShaderStage.ConstantBufferApiSlotCount + // Constant buffer
-           CommonShaderStage.InputResourceSlotCount + // ShaderResourceView 
-           ComputeShaderStage.UnorderedAccessViewSlotCount + // UnorderedAccessView
-           CommonShaderStage.SamplerSlotCount; // SamplerStates;
 
         /// <summary>
         ///   Gets the attributes associated with this pass.
@@ -35,27 +33,11 @@ namespace Adamantium.Engine.Effects
 
         private PipelineBlock pipeline;
 
-        private BlendState blendState;
-        private bool hasBlendState;
-        private Color4 blendStateColor;
-        private bool hasBlendStateColor;
-        private uint blendStateSampleMask;
-
-        private DepthStencilState depthStencilState;
-        private bool hasDepthStencilState;
-        private int depthStencilReference;
-        private bool hasDepthStencilReference;
-
-        private bool hasRasterizerState;
-        private RasterizerState rasterizerState;
-
-        private InputSignatureManager inputSignatureManager;
-        private InputLayoutPair currentInputLayoutPair;
-
         internal EffectTechnique Technique;
 
-        private readonly Dictionary<VertexInputLayout, InputLayoutPair> localInputLayoutCache =
-           new Dictionary<VertexInputLayout, InputLayoutPair>();
+        private List<PipelineShaderStageCreateInfo> shaderStages;
+
+        public ReadOnlyCollection<PipelineShaderStageCreateInfo> ShaderStages => shaderStages.AsReadOnly();
 
         /// <summary>
         ///   Initializes a new instance of the <see cref="EffectPass" /> class.
@@ -77,6 +59,7 @@ namespace Adamantium.Engine.Effects
                 Stages = new StageBlock[StageCount],
             };
 
+            shaderStages = new List<PipelineShaderStageCreateInfo>();
             Properties = PrepareProperties(logger, pass.Properties);
             IsSubPass = pass.IsSubPass;
 
@@ -99,86 +82,6 @@ namespace Adamantium.Engine.Effects
         public readonly bool IsSubPass;
 
         /// <summary>
-        ///   Gets or sets the state of the blend.
-        /// </summary>
-        /// <value> The state of the blend. </value>
-        public BlendState BlendState
-        {
-            get => blendState;
-            set
-            {
-                blendState = value;
-                hasBlendState = true;
-            }
-        }
-
-        /// <summary>
-        ///   Gets or sets the color of the blend state.
-        /// </summary>
-        /// <value> The color of the blend state. </value>
-        public Color4 BlendStateColor
-        {
-            get => blendStateColor;
-            set
-            {
-                blendStateColor = value;
-                hasBlendStateColor = true;
-            }
-        }
-
-        /// <summary>
-        ///   Gets or sets the blend state sample mask.
-        /// </summary>
-        /// <value> The blend state sample mask. </value>
-        public uint BlendStateSampleMask
-        {
-            get { return blendStateSampleMask; }
-            set { blendStateSampleMask = value; }
-        }
-
-        /// <summary>
-        ///   Gets or sets the state of the depth stencil.
-        /// </summary>
-        /// <value> The state of the depth stencil. </value>
-        public DepthStencilState DepthStencilState
-        {
-            get { return depthStencilState; }
-            set
-            {
-                depthStencilState = value;
-                hasDepthStencilState = true;
-            }
-        }
-
-        /// <summary>
-        ///   Gets or sets the depth stencil reference.
-        /// </summary>
-        /// <value> The depth stencil reference. </value>
-        public int DepthStencilReference
-        {
-            get { return depthStencilReference; }
-            set
-            {
-                depthStencilReference = value;
-                hasDepthStencilReference = true;
-            }
-        }
-
-        /// <summary>
-        ///   Gets or sets the state of the rasterizer.
-        /// </summary>
-        /// <value> The state of the rasterizer. </value>
-        public RasterizerState RasterizerState
-        {
-            get { return rasterizerState; }
-            set
-            {
-                rasterizerState = value;
-                hasRasterizerState = true;
-            }
-        }
-
-        /// <summary>
         ///   Applies this pass to the device pipeline.
         /// </summary>
         /// <remarks>
@@ -195,12 +98,6 @@ namespace Adamantium.Engine.Effects
             // change the pass and use for example a subpass).
             var realPass = Effect.OnApply(this);
             realPass.ApplyInternal();
-
-            // Applies global state if we have applied a subpass (that will eventually override states setup by realPass)
-            if (realPass != this)
-            {
-                ApplyStates();
-            }
         }
 
         /// <summary>
@@ -212,7 +109,7 @@ namespace Adamantium.Engine.Effects
             Effect.CurrentTechnique = Technique;
 
             // Sets the current pass on the graphics device
-            graphicsDevice.CurrentPass = this;
+            //graphicsDevice.CurrentPass = this;
 
             // ----------------------------------------------
             // Iterate on each stage to setup all inputs
@@ -225,6 +122,7 @@ namespace Adamantium.Engine.Effects
                     continue;
                 }
 
+                /*
                 var shaderStage = stageBlock.ShaderStage;
                 // If Shader is a null shader, then skip further processing
                 if (stageBlock.Index < 0)
@@ -296,51 +194,7 @@ namespace Adamantium.Engine.Effects
                         }
                         break;
                 }
-            }
-
-            ApplyStates();
-        }
-
-        private void ApplyStates()
-        {
-            // ----------------------------------------------
-            // Set the blend state
-            // ----------------------------------------------
-            if (hasBlendState)
-            {
-                if (hasBlendStateColor)
-                {
-                    graphicsDevice.BlendState = blendState;
-                    graphicsDevice.BlendFactor = BlendStateColor;
-                    graphicsDevice.BlendSampleMask = (int)blendStateSampleMask;
-                }
-                else
-                {
-                    graphicsDevice.BlendState = blendState;
-                }
-            }
-
-            // ----------------------------------------------
-            // Set the depth stencil state
-            // ----------------------------------------------
-            if (hasDepthStencilState)
-            {
-                if (hasDepthStencilReference)
-                {
-                    graphicsDevice.DepthStencilState = depthStencilState;
-                }
-                else
-                {
-                    graphicsDevice.DepthStencilState = depthStencilState;
-                }
-            }
-
-            // ----------------------------------------------
-            // Set the rasterizer state
-            // ----------------------------------------------
-            if (hasRasterizerState)
-            {
-                graphicsDevice.RasterizerState = rasterizerState;
+                */
             }
         }
 
@@ -351,6 +205,7 @@ namespace Adamantium.Engine.Effects
         /// <param name="fullUnApply">if set to <c>true</c> this will unbind all resources; otherwise <c>false</c> will unbind only ShaderResourceView and UnorderedAccessView. Default is false.</param>
         public void UnApply(bool fullUnApply = false)
         {
+            /*
             // If nothing to clear, return immediately
             if (graphicsDevice.CurrentPass == null)
             {
@@ -442,33 +297,7 @@ namespace Adamantium.Engine.Effects
                     }
                 }
             }
-
-            if (fullUnApply)
-            {
-                // ----------------------------------------------
-                // Set the blend state
-                // ----------------------------------------------
-                if (hasBlendState)
-                {
-                    graphicsDevice.BlendState = null;
-                }
-
-                // ----------------------------------------------
-                // Set the depth stencil state
-                // ----------------------------------------------
-                if (hasDepthStencilState)
-                {
-                    graphicsDevice.DepthStencilState = null;
-                }
-
-                // ----------------------------------------------
-                // Set the rasterizer state
-                // ----------------------------------------------
-                if (hasRasterizerState)
-                {
-                    graphicsDevice.RasterizerState = null;
-                }
-            }
+            */
         }
 
         /// <summary>
@@ -478,9 +307,6 @@ namespace Adamantium.Engine.Effects
         /// <exception cref="System.InvalidOperationException"></exception>
         internal void Initialize(Logger logger)
         {
-            // Gets the output merger stage.
-            pipeline.OutputMergerStage = ((DeviceContext)Effect.GraphicsDevice).OutputMerger;
-
             for (int i = 0; i < StageCount; i++)
             {
                 var shaderType = (EffectShaderType)i;
@@ -496,11 +322,10 @@ namespace Adamantium.Engine.Effects
 
                 var stageBlock = new StageBlock(shaderType);
                 pipeline.Stages[i] = stageBlock;
+                //stageBlock.EntryPoint = 
 
                 stageBlock.Index = link.Index;
-                stageBlock.ShaderStage = Effect.GraphicsDevice.ShaderStages[i];
-                stageBlock.StreamOutputElements = link.StreamOutputElements;
-                stageBlock.StreamOutputRasterizedStream = link.StreamOutputRasterizedStream;
+                stageBlock.EntryPoint = link.EntryPoint;
 
                 InitStageBlock(stageBlock, logger);
             }
@@ -524,32 +349,28 @@ namespace Adamantium.Engine.Effects
             stageBlock.Shader = Effect.Pool.GetOrCompileShader(
                stageBlock.Type,
                shaderIndex,
-               stageBlock.StreamOutputRasterizedStream,
-               stageBlock.StreamOutputElements,
                out errorProfile);
 
             if (stageBlock.Shader == null)
             {
                 logger.Error(
-                   "Unsupported shader profile [{0} / {1}] on current GraphicsDevice [{2}] in (effect [{3}] Technique [{4}] Pass: [{5}])",
+                   "Unsupported shader profile [{0} / {1}] on current GraphicsDevice in (effect [{2}] Technique [{3}] Pass: [{4}])",
                    stageBlock.Type,
                    errorProfile,
-                   graphicsDevice.Features.Level,
                    Effect.Name,
                    Technique.Name,
                    Name);
                 return;
             }
 
-            var shaderRaw = Effect.Pool.RegisteredShaders[shaderIndex];
+            var shaderStageInfo = new PipelineShaderStageCreateInfo();
+            shaderStageInfo.Stage = EffectShaderTypeToShaderStage(stageBlock.Type);
+            shaderStageInfo.Module = stageBlock.Shader;
+            shaderStageInfo.PName = stageBlock.EntryPoint;
 
-            // Cache the input signature
-            if (shaderRaw.Type == EffectShaderType.Vertex)
-            {
-                inputSignatureManager = graphicsDevice.GetOrCreateInputSignatureManager(
-                   shaderRaw.InputSignature.Bytecode,
-                   shaderRaw.InputSignature.Hashcode);
-            }
+            shaderStages.Add(shaderStageInfo);
+
+            var shaderRaw = Effect.Pool.RegisteredShaders[shaderIndex];
 
             for (int i = 0; i < shaderRaw.ConstantBuffers.Count; i++)
             {
@@ -661,6 +482,27 @@ namespace Adamantium.Engine.Effects
 
         }
 
+        private ShaderStageFlagBits EffectShaderTypeToShaderStage(EffectShaderType type)
+        {
+            switch (type)
+            {
+                case EffectShaderType.Vertex:
+                    return ShaderStageFlagBits.VertexBit;
+                case EffectShaderType.Hull:
+                    return ShaderStageFlagBits.TessellationControlBit;
+                case EffectShaderType.Domain:
+                    return ShaderStageFlagBits.TessellationEvaluationBit;
+                case EffectShaderType.Geometry:
+                    return ShaderStageFlagBits.GeometryBit;
+                case EffectShaderType.Fragment:
+                    return ShaderStageFlagBits.FragmentBit;
+                case EffectShaderType.Compute:
+                    return ShaderStageFlagBits.ComputeBit;
+                default:
+                    throw new ArgumentOutOfRangeException($"Effect type {type} currently has no equivalent for ShaderStageFlagBits");
+            }
+        }
+
         internal void ComputeSlotLinks()
         {
             foreach (var stageBlockVar in pipeline.Stages)
@@ -715,32 +557,32 @@ namespace Adamantium.Engine.Effects
             {
                 switch (property.Key)
                 {
-                    case EffectData.PropertyKeys.Blending:
-                        BlendState = graphicsDevice.BlendStates[(string)property.Value];
-                        if (BlendState == null)
-                            logger.Error("Unable to find registered BlendState [{0}]", (string)property.Value);
-                        break;
-                    case EffectData.PropertyKeys.BlendingColor:
-                        BlendStateColor = (Color4)(Vector4F)property.Value;
-                        break;
-                    case EffectData.PropertyKeys.BlendingSampleMask:
-                        BlendStateSampleMask = (uint)property.Value;
-                        break;
+                    //case EffectData.PropertyKeys.Blending:
+                    //    BlendState = graphicsDevice.BlendStates[(string)property.Value];
+                    //    if (BlendState == null)
+                    //        logger.Error("Unable to find registered BlendState [{0}]", (string)property.Value);
+                    //    break;
+                    //case EffectData.PropertyKeys.BlendingColor:
+                    //    BlendStateColor = (Color4)(Vector4F)property.Value;
+                    //    break;
+                    //case EffectData.PropertyKeys.BlendingSampleMask:
+                    //    BlendStateSampleMask = (uint)property.Value;
+                    //    break;
 
-                    case EffectData.PropertyKeys.DepthStencil:
-                        DepthStencilState = graphicsDevice.DepthStencilStates[(string)property.Value];
-                        if (DepthStencilState == null)
-                            logger.Error("Unable to find registered DepthStencilState [{0}]", (string)property.Value);
-                        break;
-                    case EffectData.PropertyKeys.DepthStencilReference:
-                        DepthStencilReference = (int)property.Value;
-                        break;
+                    //case EffectData.PropertyKeys.DepthStencil:
+                    //    DepthStencilState = graphicsDevice.DepthStencilStates[(string)property.Value];
+                    //    if (DepthStencilState == null)
+                    //        logger.Error("Unable to find registered DepthStencilState [{0}]", (string)property.Value);
+                    //    break;
+                    //case EffectData.PropertyKeys.DepthStencilReference:
+                    //    DepthStencilReference = (int)property.Value;
+                    //    break;
 
-                    case EffectData.PropertyKeys.Rasterizer:
-                        RasterizerState = graphicsDevice.RasterizerStates[(string)property.Value];
-                        if (RasterizerState == null)
-                            logger.Error("Unable to find registered RasterizerState [{0}]", (string)property.Value);
-                        break;
+                    //case EffectData.PropertyKeys.Rasterizer:
+                    //    RasterizerState = graphicsDevice.RasterizerStates[(string)property.Value];
+                    //    if (RasterizerState == null)
+                    //        logger.Error("Unable to find registered RasterizerState [{0}]", (string)property.Value);
+                    //    break;
                     default:
                         passProperties[new PropertyKey(property.Key)] = property.Value;
                         break;
@@ -750,29 +592,10 @@ namespace Adamantium.Engine.Effects
             return passProperties;
         }
 
-
-        internal InputLayout GetInputLayout(VertexInputLayout layout)
-        {
-            if (layout == null)
-                return null;
-
-            if (!ReferenceEquals(currentInputLayoutPair.VertexInputLayout, layout))
-            {
-                // Use a local cache to speed up retrieval
-                if (!localInputLayoutCache.TryGetValue(layout, out currentInputLayoutPair))
-                {
-                    inputSignatureManager.GetOrCreate(layout, out currentInputLayoutPair);
-                    localInputLayoutCache.Add(layout, currentInputLayoutPair);
-                }
-            }
-            return currentInputLayoutPair.InputLayout;
-        }
-
         #region Nested type: PipelineBlock
 
         private struct PipelineBlock
         {
-            public OutputMergerStage OutputMergerStage;
             public StageBlock[] Stages;
         }
 
@@ -822,12 +645,11 @@ namespace Adamantium.Engine.Effects
             public ConstantBufferLink[] ConstantBufferLinks;
             public int Index;
 
-            public DeviceChild Shader;
+            public ShaderModule Shader;
 
-            public CommonShaderStage ShaderStage;
+            public string EntryPoint;
+
             public readonly EffectShaderType Type;
-
-            public StreamOutputElement[] StreamOutputElements;
 
             public int StreamOutputRasterizedStream;
 

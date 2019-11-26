@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using Adamantium.Engine.Core;
+using Adamantium.Engine.Effects;
 using Adamantium.Engine.Graphics;
 using Adamantium.EntityFramework;
 using Adamantium.UI.Controls;
@@ -95,6 +97,8 @@ namespace Adamantium.UI
             };
             @params.OutputHandle = window.SurfaceHandle;
             var device = GraphicsDevice.CreateRenderDevice(@params);
+            var effect = Effect.CompileFromFile(Path.Combine("Effects", "UIEffect.fx"), device);
+
             windowToDevices[window] = device;
 
             var transformProcessor = new UITransformProcessor(entityWorld);

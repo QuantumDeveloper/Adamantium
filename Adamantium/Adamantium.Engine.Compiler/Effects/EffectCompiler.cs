@@ -7,8 +7,6 @@ using AdamantiumVulkan.SPIRV.Reflection;
 
 namespace Adamantium.Engine.Compiler.Effects
 {
-   public delegate Stream IncludeFileDelegate(bool isSystemInclude, string file);
-
    /// <summary>
    /// Main class used to compile a Toolkit FX file.
    /// </summary>

@@ -6,6 +6,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="EffectsData\UIEffect.fx" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="EffectsData\UIEffect.fx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.0.1" />
     <PackageReference Include="NUnit" Version="3.11.0" />
     <PackageReference Include="NUnit3TestAdapter" Version="3.13.0" />
@@ -13,11 +23,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Adamantium.Engine.Core\Adamantium.Engine.Core.csproj" />
+    <ProjectReference Include="..\..\Adamantium.Engine.Graphics\Adamantium.Engine.Graphics.csproj" />
     <ProjectReference Include="..\..\Adamantium.Imaging\Adamantium.Imaging.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Remove="EffectsData\UIEffect.fx" />
   </ItemGroup>
 
 </Project>

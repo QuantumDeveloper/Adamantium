@@ -13,11 +13,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Effects\UIEffect.fx" />
     <None Remove="Shaders\frag.spv" />
     <None Remove="Shaders\vert.spv" />
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="Effects\UIEffect.fx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="Shaders\frag.spv">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

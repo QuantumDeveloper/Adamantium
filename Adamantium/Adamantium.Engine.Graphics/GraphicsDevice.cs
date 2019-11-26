@@ -41,7 +41,11 @@ namespace Adamantium.Engine.Graphics
 
         public readonly uint MaxFramesInFlight;
 
-        public List<EffectPool> EffectPools { get; }
+        public Pipeline CurrentGraphicsPipeline { get; internal set; }
+
+        public List<EffectPool> EffectPools { get; private set; }
+
+        public EffectPool DefaultEffectPool { get; private set; }
 
 
         private SubmitInfo[] submitInfos = new SubmitInfo[1];
@@ -51,7 +55,6 @@ namespace Adamantium.Engine.Graphics
         {
             VulkanInstance = instance;
             PhysicalDevice = physicalDevice;
-            //CreateMainDevice();
         }
 
         private GraphicsDevice(GraphicsDevice main, PresentationParameters presentationParameters)
@@ -142,6 +145,9 @@ namespace Adamantium.Engine.Graphics
             }
 
             LogicalDevice = PhysicalDevice.CreateDevice(createInfo);
+
+            EffectPools = new List<EffectPool>();
+            DefaultEffectPool = EffectPool.New(this);
 
             createInfo.Dispose();
 
@@ -382,13 +388,14 @@ namespace Adamantium.Engine.Graphics
 
             var pipelines = LogicalDevice.CreateGraphicsPipelines(null, 1, pipelineInfo);
             graphicsPipeline = pipelines[0];
+            CurrentGraphicsPipeline = graphicsPipeline;
 
             pipelineInfo.Dispose();
             LogicalDevice.DestroyShaderModule(vertexShaderModule);
             LogicalDevice.DestroyShaderModule(fragmentShaderModule);
         }
 
-        ShaderModule CreateShaderModule(byte[] code)
+        public ShaderModule CreateShaderModule(byte[] code)
         {
             ShaderModuleCreateInfo createInfo = new ShaderModuleCreateInfo();
             createInfo.CodeSize = (ulong)code.Length;

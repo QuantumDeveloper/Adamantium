@@ -1,4 +1,5 @@
 ﻿using Adamantium.Core;
+using Adamantium.Engine.Compiler.Effects;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Content;
 using Adamantium.Engine.Core.Effects;
@@ -116,7 +117,7 @@ namespace Adamantium.Engine.Effects
             Parameters = new EffectParameterCollection();
             Techniques = new EffectTechniqueCollection();
 
-            //Pool = effectPool ?? device.DefaultEffectPool;
+            Pool = effectPool ?? device.DefaultEffectPool;
 
             // Sets the effect name
             Name = effectData.Description.Name;
@@ -405,6 +406,14 @@ namespace Adamantium.Engine.Effects
         {
             var effectData = EffectData.Load(data);
             return new Effect(device, effectData);
+        }
+
+        public static Effect CompileFromFile(string path, GraphicsDevice device)
+        {
+            var result = EffectCompiler.CompileFromFile(path);
+            if (result.HasErrors) return null;
+
+            return new Effect(device, result.EffectData);
         }
     }
 }

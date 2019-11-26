@@ -39,10 +39,9 @@ namespace Adamantium.Engine.Graphics
             deviceExt.Add(AdamantiumVulkan.Core.Constants.VK_KHR_SWAPCHAIN_EXTENSION_NAME);
             DeviceExtensions = new ReadOnlyCollection<string>(deviceExt);
             var validationLayers = new List<string>();
-            validationLayers.Add("VK_LAYER_LUNARG_core_validation");
             validationLayers.Add("VK_LAYER_LUNARG_standard_validation");
             //validationLayers.Add("VK_LAYER_LUNARG_parameter_validation");
-            validationLayers.Add("VK_LAYER_LUNARG_monitor");
+            //validationLayers.Add("VK_LAYER_LUNARG_monitor");
             ValidationLayers = new ReadOnlyCollection<string>(validationLayers);
         }
 
@@ -95,10 +94,10 @@ namespace Adamantium.Engine.Graphics
 
             var layersAvailable = Instance.EnumerateInstanceLayerProperties();
             var extensions = Instance.EnumerateInstanceExtensionProperties();
-            
-//            var ext = new string[] {"VK_MVK_macos_surface", "VK_KHR_surface", "VK_KHR_swapchain"};
-//            createInfo.EnabledExtensionCount = (uint)ext.Length;
-//            createInfo.PpEnabledExtensionNames = ext.ToArray();
+
+            //var ext = new string[] { "VK_MVK_macos_surface", "VK_KHR_surface", "VK_KHR_swapchain" };
+            //createInfo.EnabledExtensionCount = (uint)ext.Length;
+            //createInfo.PpEnabledExtensionNames = ext.ToArray();
 
             createInfo.EnabledExtensionCount = (uint)extensions.Length;
             createInfo.PpEnabledExtensionNames = extensions.Select(x => x.ExtensionName).ToArray();
