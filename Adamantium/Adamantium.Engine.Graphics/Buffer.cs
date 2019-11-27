@@ -395,7 +395,7 @@ namespace Adamantium.Engine.Graphics
         /// <msdn-id>ff476501</msdn-id>
         /// <unmanaged>HRESULT ID3D11Device::CreateBuffer([In] const D3D11_BUFFER_DESC* pDesc,[In, Optional] const D3D11_SUBRESOURCE_DATA* pInitialData,[Out, Fast] ID3D11Buffer** ppBuffer)</unmanaged>
         /// <unmanaged-short>ID3D11Device::CreateBuffer</unmanaged-short>
-        public static Buffer<T> New<T>(GraphicsDevice device, uint elementCount, BufferUsageFlags bufferFlags, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal) where T : struct
+        public static Buffer<T> New<T>(GraphicsDevice device, uint elementCount, BufferUsageFlags bufferFlags, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal, SharingMode sharingMode = SharingMode.Exclusive) where T : struct
         {
             int elementSize = Utilities.SizeOf<T>();
             var bufferSize = elementSize * elementCount;

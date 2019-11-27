@@ -239,7 +239,7 @@ namespace Adamantium.Engine.Graphics
             descriptorPool = LogicalDevice.CreateDescriptorPool(poolInfo);
         }
 
-        private void CreateDescriptorSetLayout()
+        private void CreateDefaultDescriptorSetLayout()
         {
             var bindings = new List<DescriptorSetLayoutBinding>();
 
@@ -263,7 +263,12 @@ namespace Adamantium.Engine.Graphics
             layoutInfo.BindingCount = 1;
             layoutInfo.PBindings = bindings.ToArray();
 
-            descriptorSetLayout = LogicalDevice.CreateDescriptorSetLayout(layoutInfo, null);
+            descriptorSetLayout = LogicalDevice.CreateDescriptorSetLayout(layoutInfo);
+        }
+
+        public DescriptorSetLayout CreateDescriptorSetLayout(DescriptorSetLayoutCreateInfo layoutCreateInfo)
+        {
+            return LogicalDevice.CreateDescriptorSetLayout(layoutCreateInfo);
         }
 
         private void CreatePipelineLayout()

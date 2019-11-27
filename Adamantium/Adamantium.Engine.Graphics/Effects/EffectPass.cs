@@ -37,6 +37,10 @@ namespace Adamantium.Engine.Effects
 
         private List<PipelineShaderStageCreateInfo> shaderStages;
 
+        private List<DescriptorSetLayoutBinding> layoutBindings;
+
+        private DescriptorSetLayout descriptorLayout;
+
         public ReadOnlyCollection<PipelineShaderStageCreateInfo> ShaderStages => shaderStages.AsReadOnly();
 
         /// <summary>
@@ -60,6 +64,7 @@ namespace Adamantium.Engine.Effects
             };
 
             shaderStages = new List<PipelineShaderStageCreateInfo>();
+            layoutBindings = new List<DescriptorSetLayoutBinding>();
             Properties = PrepareProperties(logger, pass.Properties);
             IsSubPass = pass.IsSubPass;
 
@@ -325,13 +330,14 @@ namespace Adamantium.Engine.Effects
 
                 var stageBlock = new StageBlock(shaderType);
                 pipeline.Stages[i] = stageBlock;
-                //stageBlock.EntryPoint = 
 
                 stageBlock.Index = link.Index;
                 stageBlock.EntryPoint = link.EntryPoint;
 
                 InitStageBlock(stageBlock, logger);
             }
+
+            CreateDescriptorSetLayout();
         }
 
         /// <summary>
@@ -393,6 +399,8 @@ namespace Adamantium.Engine.Effects
                     continue;
                 }
 
+                CreateAndAddLayoutBinding(constantBuffer.Description.Slot, DescriptorType.UniformBuffer, (uint)EffectShaderTypeToShaderStage(stageBlock.Type));
+
                 // Test if this constant buffer is not already part of the effect
                 if (Effect.ConstantBuffers[constantBufferRaw.Name] == null)
                 {
@@ -451,6 +459,8 @@ namespace Adamantium.Engine.Effects
                     Effect.Parameters.Add(parameter);
 
                     Effect.ResourceLinker.Count += parameterRaw.Count;
+
+                    CreateAndAddLayoutBinding(parameterRaw.Slot, ConvertFromEffectParameterType(parameterRaw.Type), (uint)EffectShaderTypeToShaderStage(stageBlock.Type));
                 }
                 else
                 {
@@ -485,6 +495,26 @@ namespace Adamantium.Engine.Effects
 
         }
 
+        private void CreateAndAddLayoutBinding(uint slot, DescriptorType descriptorType, uint stageFlags)
+        {
+            var resourceBinding = new DescriptorSetLayoutBinding();
+            resourceBinding.Binding = slot;
+            resourceBinding.DescriptorCount = 1;
+            resourceBinding.DescriptorType = descriptorType;
+            resourceBinding.StageFlags = stageFlags;
+
+            layoutBindings.Add(resourceBinding);
+        }
+
+        private void CreateDescriptorSetLayout()
+        {
+            var layoutInfo = new DescriptorSetLayoutCreateInfo();
+            layoutInfo.BindingCount = (uint)layoutBindings.Count;
+            layoutInfo.PBindings = layoutBindings.ToArray();
+
+            descriptorLayout = graphicsDevice.CreateDescriptorSetLayout(layoutInfo);
+        }
+
         private ShaderStageFlagBits EffectShaderTypeToShaderStage(EffectShaderType type)
         {
             switch (type)
@@ -503,6 +533,42 @@ namespace Adamantium.Engine.Effects
                     return ShaderStageFlagBits.ComputeBit;
                 default:
                     throw new ArgumentOutOfRangeException($"Effect type {type} currently has no equivalent for ShaderStageFlagBits");
+            }
+        }
+
+        private DescriptorType ConvertFromEffectParameterType(EffectParameterType type)
+        {
+            switch (type)
+            {
+                case EffectParameterType.Sampler:
+                case EffectParameterType.Sampler1D:
+                case EffectParameterType.Sampler2D:
+                case EffectParameterType.Sampler3D:
+                case EffectParameterType.SamplerCube:
+                    return DescriptorType.Sampler;
+                case EffectParameterType.Texture:
+                case EffectParameterType.Texture1D:
+                case EffectParameterType.Texture1DArray:
+                case EffectParameterType.Texture2D:
+                case EffectParameterType.Texture2DArray:
+                case EffectParameterType.Texture2DMultisampled:
+                case EffectParameterType.Texture2DMultisampledArray:
+                case EffectParameterType.Texture3D:
+                case EffectParameterType.TextureCube:
+                case EffectParameterType.TextureCubeArray:
+                    return DescriptorType.SampledImage;
+                case EffectParameterType.RWTexture1D:
+                case EffectParameterType.RWTexture1DArray:
+                case EffectParameterType.RWTexture2D:
+                case EffectParameterType.RWTexture2DArray:
+                case EffectParameterType.RWTexture3D:
+                    return DescriptorType.StorageTexelBuffer;
+                case EffectParameterType.StorageBuffer:
+                    return DescriptorType.StorageBuffer;
+                case EffectParameterType.StorageImage:
+                    return DescriptorType.StorageImage;
+                default:
+                    throw new ArgumentOutOfRangeException($"Cannot convert parameter {type} to corresponding DescriptorType");
             }
         }
 
