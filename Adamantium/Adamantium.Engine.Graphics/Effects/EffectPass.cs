@@ -6,6 +6,7 @@ using AdamantiumVulkan.Core;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace Adamantium.Engine.Effects
@@ -39,7 +40,7 @@ namespace Adamantium.Engine.Effects
 
         private List<DescriptorSetLayoutBinding> layoutBindings;
 
-        private DescriptorSetLayout descriptorLayout;
+        private DescriptorSetLayout descriptorSetLayout;
 
         public ReadOnlyCollection<PipelineShaderStageCreateInfo> ShaderStages => shaderStages.AsReadOnly();
 
@@ -497,13 +498,22 @@ namespace Adamantium.Engine.Effects
 
         private void CreateAndAddLayoutBinding(uint slot, DescriptorType descriptorType, uint stageFlags)
         {
-            var resourceBinding = new DescriptorSetLayoutBinding();
-            resourceBinding.Binding = slot;
-            resourceBinding.DescriptorCount = 1;
-            resourceBinding.DescriptorType = descriptorType;
-            resourceBinding.StageFlags = stageFlags;
+            var binding = layoutBindings.FirstOrDefault(x=>x.Binding == slot);
 
-            layoutBindings.Add(resourceBinding);
+            if (binding != null)
+            {
+                binding.StageFlags |= stageFlags;
+            }
+            else
+            {
+                var resourceBinding = new DescriptorSetLayoutBinding();
+                resourceBinding.Binding = slot;
+                resourceBinding.DescriptorCount = 1;
+                resourceBinding.DescriptorType = descriptorType;
+                resourceBinding.StageFlags = stageFlags;
+
+                layoutBindings.Add(resourceBinding);
+            }
         }
 
         private void CreateDescriptorSetLayout()
@@ -512,7 +522,7 @@ namespace Adamantium.Engine.Effects
             layoutInfo.BindingCount = (uint)layoutBindings.Count;
             layoutInfo.PBindings = layoutBindings.ToArray();
 
-            descriptorLayout = graphicsDevice.CreateDescriptorSetLayout(layoutInfo);
+            descriptorSetLayout = graphicsDevice.CreateDescriptorSetLayout(layoutInfo);
         }
 
         private ShaderStageFlagBits EffectShaderTypeToShaderStage(EffectShaderType type)

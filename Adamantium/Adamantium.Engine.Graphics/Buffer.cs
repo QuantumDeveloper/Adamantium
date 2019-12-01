@@ -381,7 +381,7 @@ namespace Adamantium.Engine.Graphics
         /// <unmanaged-short>ID3D11Device::CreateBuffer</unmanaged-short>
         public static Buffer New(GraphicsDevice device, int bufferSize, BufferUsageFlags bufferFlags, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal)
         {
-            return New(device, bufferSize, 0, bufferFlags, memoryFlags, SharingMode.Exclusive);
+            return New(device, bufferSize, bufferSize, bufferFlags, memoryFlags, SharingMode.Exclusive);
         }
 
         /// <summary>
@@ -399,7 +399,7 @@ namespace Adamantium.Engine.Graphics
         {
             int elementSize = Utilities.SizeOf<T>();
             var bufferSize = elementSize * elementCount;
-            BufferCreateInfo info = new BufferCreateInfo();
+            var info = new BufferCreateInfo();
             info.SharingMode = SharingMode.Exclusive;
             info.Size = (ulong)bufferSize;
             info.Usage = (uint)bufferFlags;
@@ -421,7 +421,9 @@ namespace Adamantium.Engine.Graphics
         /// <unmanaged-short>ID3D11Device::CreateBuffer</unmanaged-short>
         public static Buffer New(GraphicsDevice device, int bufferSize, int elementSize, BufferUsageFlags bufferFlags, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal, SharingMode sharingMode = SharingMode.Exclusive)
         {
-            return New(device, bufferSize, elementSize, bufferFlags, memoryFlags, sharingMode);
+            uint count = (uint)(bufferSize / elementSize);
+
+            return new Buffer(device, bufferFlags, bufferSize, count, memoryFlags, sharingMode);
         }
 
         /// <summary>
@@ -449,30 +451,13 @@ namespace Adamantium.Engine.Graphics
         /// <typeparam name="T">Type of the buffer, to get the sizeof from.</typeparam>
         /// <param name="value">The initial value of this buffer.</param>
         /// <param name="bufferFlags">The buffer flags to specify the type of buffer.</param>
-        /// <param name="memoryFlags">The memoryFlags.</param>
-        /// <returns>An instance of a new <see cref="Buffer" /></returns>
-        /// <msdn-id>ff476501</msdn-id>
-        /// <unmanaged>HRESULT ID3D11Device::CreateBuffer([In] const D3D11_BUFFER_DESC* pDesc,[In, Optional] const D3D11_SUBRESOURCE_DATA* pInitialData,[Out, Fast] ID3D11Buffer** ppBuffer)</unmanaged>
-        /// <unmanaged-short>ID3D11Device::CreateBuffer</unmanaged-short>
-        public static Buffer<T> New<T>(GraphicsDevice device, ref T value, BufferUsageFlags bufferFlags, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal) where T : struct
-        {
-            return New(device, ref value, bufferFlags, memoryFlags);
-        }
-
-        /// <summary>
-        /// Creates a new <see cref="Buffer" /> instance.
-        /// </summary>
-        /// <param name="device">The <see cref="GraphicsDevice"/>.</param>
-        /// <typeparam name="T">Type of the buffer, to get the sizeof from.</typeparam>
-        /// <param name="value">The initial value of this buffer.</param>
-        /// <param name="bufferFlags">The buffer flags to specify the type of buffer.</param>
         /// <param name="viewFormat">The view format must be specified if the buffer is declared as a shared resource view.</param>
         /// <param name="memoryFlags">The memoryFlags.</param>
         /// <returns>An instance of a new <see cref="Buffer" /></returns>
         /// <msdn-id>ff476501</msdn-id>
         /// <unmanaged>HRESULT ID3D11Device::CreateBuffer([In] const D3D11_BUFFER_DESC* pDesc,[In, Optional] const D3D11_SUBRESOURCE_DATA* pInitialData,[Out, Fast] ID3D11Buffer** ppBuffer)</unmanaged>
         /// <unmanaged-short>ID3D11Device::CreateBuffer</unmanaged-short>
-        public static Buffer<T> New<T>(GraphicsDevice device, ref T value, BufferUsageFlags bufferFlags, Format viewFormat, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal) where T : struct
+        public static Buffer<T> New<T>(GraphicsDevice device, ref T value, BufferUsageFlags bufferFlags, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal) where T : struct
         {
             GCHandle handle = GCHandle.Alloc(value, GCHandleType.Pinned);
             try

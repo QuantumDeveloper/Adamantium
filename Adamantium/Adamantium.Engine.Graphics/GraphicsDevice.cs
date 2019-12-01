@@ -271,6 +271,11 @@ namespace Adamantium.Engine.Graphics
             return LogicalDevice.CreateDescriptorSetLayout(layoutCreateInfo);
         }
 
+        public void CreateGraphicsPipelineForEffectPass(EffectPass effectPass, DescriptorSetLayout descriptorSetLayout, PipelineShaderStageCreateInfo[] shaderStages)
+        {
+
+        }
+
         private void CreatePipelineLayout()
         {
             var pipelineLayoutInfo = new PipelineLayoutCreateInfo();
@@ -278,7 +283,6 @@ namespace Adamantium.Engine.Graphics
             //pipelineLayoutInfo.PSetLayouts = new DescriptorSetLayout[] { descriptorSetLayout };
             pipelineLayoutInfo.SetLayoutCount = 0;
             pipelineLayoutInfo.PushConstantRangeCount = 0;
-            //pipelineLayoutInfo.PSetLayouts = new DescriptorSetLayout[] { descriptorSetLayout };
 
             pipelineLayout = LogicalDevice.CreatePipelineLayout(pipelineLayoutInfo);
         }
@@ -322,14 +326,14 @@ namespace Adamantium.Engine.Graphics
             var viewport = new Viewport();
             viewport.X = 0.0f;
             viewport.Y = 0.0f;
-            viewport.Width = Presenter.Description.Width;
-            viewport.Height = Presenter.Description.Height;
+            viewport.Width = Presenter.Width;
+            viewport.Height = Presenter.Height;
             viewport.MinDepth = 0.0f;
             viewport.MaxDepth = 1.0f;
 
             Rect2D scissor = new Rect2D();
             scissor.Offset = new Offset2D();
-            scissor.Extent = new Extent2D() { Width = Presenter.Description.Width, Height = Presenter.Description.Height };
+            scissor.Extent = new Extent2D() { Width = Presenter.Width, Height = Presenter.Height };
 
             var viewportState = new PipelineViewportStateCreateInfo();
             viewportState.ViewportCount = 1;
@@ -461,15 +465,14 @@ namespace Adamantium.Engine.Graphics
                 var swapchainPresenter = (SwapChainGraphicsPresenter)Presenter;
                 framebufferInfo.PAttachments = new [] { Presenter.RenderTarget, Presenter.DepthBuffer, swapchainPresenter.swapchainImageViews[i] };
                 framebufferInfo.AttachmentCount = (uint)framebufferInfo.PAttachments.Length;
-                framebufferInfo.Width = Presenter.Description.Width;
-                framebufferInfo.Height = Presenter.Description.Height;
+                framebufferInfo.Width = Presenter.Width;
+                framebufferInfo.Height = Presenter.Height;
                 framebufferInfo.Layers = 1;
 
                 defaultFramebuffers[i] = LogicalDevice.CreateFramebuffer(framebufferInfo);
 
                 framebufferInfo.Dispose();
             }
-            createCount++;
         }
 
         public Queue GetDeviceQueue(uint queueFamilyIndex, uint queueIndex)
@@ -653,11 +656,11 @@ namespace Adamantium.Engine.Graphics
             return ResizePresenter(ResizeFunc);
         }
 
-        private bool ResizePresenter(Func<bool> resizeAction)
+        private bool ResizePresenter(Func<bool> resizeFunc)
         {
             var result = LogicalDevice.DeviceWaitIdle();
             DestroyFramebuffers();
-            var resizeResult = resizeAction();
+            var resizeResult = resizeFunc();
             if (!resizeResult)
             {
                 return false;
@@ -698,15 +701,13 @@ namespace Adamantium.Engine.Graphics
         {
             return device.LogicalDevice;
         }
-        static int destroyCount = 0;
-        static int createCount = 0;
+
         private void DestroyFramebuffers()
         {
             for (int i = 0; i< defaultFramebuffers.Length; ++i)
             {
                 defaultFramebuffers[i].Destroy(LogicalDevice);
             }
-            destroyCount++;
         }
 
 
