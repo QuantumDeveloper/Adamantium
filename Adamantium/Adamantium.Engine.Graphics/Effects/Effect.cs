@@ -1,14 +1,13 @@
-﻿using Adamantium.Core;
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using Adamantium.Core;
 using Adamantium.Engine.Compiler.Effects;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Content;
 using Adamantium.Engine.Core.Effects;
-using Adamantium.Engine.Graphics;
-using System;
-using System.Collections.Generic;
-using System.IO;
 
-namespace Adamantium.Engine.Effects
+namespace Adamantium.Engine.Graphics.Effects
 {
     /// <summary>
     /// Effect class. Representing a wrapper over the shaders to make work with shaders easier

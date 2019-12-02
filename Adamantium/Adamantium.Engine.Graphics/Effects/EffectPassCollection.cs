@@ -1,4 +1,4 @@
-﻿namespace Adamantium.Engine.Effects
+﻿namespace Adamantium.Engine.Graphics.Effects
 {
     /// <summary>
     /// A collection of <see cref="EffectPass"/>.

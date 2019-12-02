@@ -1,6 +1,6 @@
 ﻿using Adamantium.Core;
 
-namespace Adamantium.Engine.Effects
+namespace Adamantium.Engine.Graphics.Effects
 {
    /// <summary>
    /// Represents an effect technique. 

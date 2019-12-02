@@ -7,7 +7,7 @@ using Adamantium.Core;
 using Adamantium.Mathematics;
 using AdamantiumVulkan.Core;
 
-namespace Adamantium.Engine.Core
+namespace Adamantium.Engine.Graphics
 {
    public struct VertexInputElement : IEquatable<VertexInputElement>
    {

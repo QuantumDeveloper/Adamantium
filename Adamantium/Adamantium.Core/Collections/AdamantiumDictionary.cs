@@ -40,7 +40,7 @@ namespace Adamantium.Core.Collections
       public AdamantiumDictionary(Int32 capacity, bool enableNotifications = true)
       {
          EnableNotifications = enableNotifications;
-         innerDictionary = new System.Collections.Generic.Dictionary<TKey, TValue>(capacity);
+         innerDictionary = new Dictionary<TKey, TValue>(capacity);
       }
 
       /// <summary>
@@ -51,7 +51,7 @@ namespace Adamantium.Core.Collections
       public AdamantiumDictionary(IDictionary<TKey, TValue> dict, bool enableNotifications = true)
       {
          EnableNotifications = enableNotifications;
-         innerDictionary = new System.Collections.Generic.Dictionary<TKey, TValue>();
+         innerDictionary = new Dictionary<TKey, TValue>();
          if (dict != null)
          {
             foreach (var pair in dict)
@@ -69,7 +69,7 @@ namespace Adamantium.Core.Collections
       public AdamantiumDictionary(IEqualityComparer<TKey> comparer, bool enableNotifications = true)
       {
          EnableNotifications = enableNotifications;
-         innerDictionary = new System.Collections.Generic.Dictionary<TKey, TValue>(comparer);
+         innerDictionary = new Dictionary<TKey, TValue>(comparer);
       }
 
       /// <summary>
@@ -81,7 +81,7 @@ namespace Adamantium.Core.Collections
       public AdamantiumDictionary(IDictionary<TKey, TValue> dict, IEqualityComparer<TKey> comparer, bool enableNotifications = true)
       {
          EnableNotifications = enableNotifications;
-         innerDictionary = new System.Collections.Generic.Dictionary<TKey, TValue>(comparer);
+         innerDictionary = new Dictionary<TKey, TValue>(comparer);
          foreach (var pair in dict)
          {
             Add(pair);
@@ -453,7 +453,7 @@ namespace Adamantium.Core.Collections
       /// <summary>
       /// Keys collection
       /// </summary>
-      public System.Collections.Generic.Dictionary<TKey, TValue>.KeyCollection Keys
+      public Dictionary<TKey, TValue>.KeyCollection Keys
       {
          get
          {
@@ -467,7 +467,7 @@ namespace Adamantium.Core.Collections
       /// <summary>
       /// Values collection
       /// </summary>
-      public System.Collections.Generic.Dictionary<TKey, TValue>.ValueCollection Values
+      public Dictionary<TKey, TValue>.ValueCollection Values
       {
          get
          {

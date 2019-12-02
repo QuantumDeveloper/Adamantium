@@ -1,14 +1,12 @@
-﻿using Adamantium.Core;
-using Adamantium.Engine.Core;
-using Adamantium.Engine.Core.Effects;
-using Adamantium.Engine.Graphics;
-using AdamantiumVulkan.Core;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using Buffer = Adamantium.Engine.Graphics.Buffer;
+using Adamantium.Core;
+using Adamantium.Engine.Core;
+using Adamantium.Engine.Core.Effects;
+using AdamantiumVulkan.Core;
 
-namespace Adamantium.Engine.Effects
+namespace Adamantium.Engine.Graphics.Effects
 {
     /// <summary>
     /// This class manages a pool of <see cref="Effect"/>.

@@ -12,7 +12,7 @@ namespace Adamantium.Engine.Graphics
     {
         public GraphicsDevice GraphicsDevice { get; private set; }
 
-        public PresentationParameters Description { get; private set; }
+        internal PresentationParameters Description { get; set; }
 
         public uint BuffersCount => Description.BuffersCount;
 

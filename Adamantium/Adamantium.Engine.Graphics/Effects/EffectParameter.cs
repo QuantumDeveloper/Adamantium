@@ -2,7 +2,7 @@
 using Adamantium.Engine.Core.Effects;
 using Adamantium.Mathematics;
 
-namespace Adamantium.Engine.Effects
+namespace Adamantium.Engine.Graphics.Effects
 {
    /// <summary>
    /// Contains information about effect parameter

@@ -15,7 +15,7 @@ namespace Adamantium.Core.Collections
     public class AdamantiumCollection<T> : IList<T>, IReadOnlyCollection<T>
     {
         private T[] items;
-        private int currentIndex = 0;
+        private int currentIndex;
         private readonly int defaultCapacity = 5;
         private readonly object syncObject = new object();
 

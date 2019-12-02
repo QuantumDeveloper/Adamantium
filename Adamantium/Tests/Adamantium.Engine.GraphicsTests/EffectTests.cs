@@ -2,9 +2,9 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
-using Adamantium.Engine.Effects;
 using System.IO;
 using Adamantium.Engine.Graphics;
+using Adamantium.Engine.Graphics.Effects;
 
 namespace Adamantium.Engine.GraphicsTests
 {

@@ -22,7 +22,7 @@ namespace Adamantium.Engine.Graphics
             CreateSwapchain();
             CreateRenderTarget();
             CreateImageViews();
-            BackBuffers = new Texture[Description.BuffersCount];
+            BackBuffers = new Texture[BuffersCount];
             var indices = GraphicsDevice.VulkanInstance.CurrentDevice.FindQueueFamilies(surface);
             presentQueue = graphicsDevice.GetDeviceQueue(indices.presentFamily.Value, 0);
         }
@@ -246,6 +246,7 @@ namespace Adamantium.Engine.Graphics
             }
             catch(Exception ex)
             {
+                Console.WriteLine($"Exception during GraphicsPresenter resizing: {ex}");
                 return false;
             }
 

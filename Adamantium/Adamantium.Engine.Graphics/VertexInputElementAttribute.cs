@@ -1,7 +1,7 @@
-﻿using AdamantiumVulkan.Core;
-using System;
+﻿using System;
+using AdamantiumVulkan.Core;
 
-namespace Adamantium.Engine.Core
+namespace Adamantium.Engine.Graphics
 {
    /// <summary>	
    /// An attribute to use on a field in a structure, to describe a single vertex element for the input-assembler stage.

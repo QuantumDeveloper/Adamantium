@@ -6,7 +6,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using Adamantium.Core;
 using Adamantium.Engine.Core;
-using Adamantium.Engine.Effects;
+using Adamantium.Engine.Graphics.Effects;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
 using AdamantiumVulkan.Core;
@@ -353,7 +353,7 @@ namespace Adamantium.Engine.Graphics
             var multisampling = new PipelineMultisampleStateCreateInfo();
             multisampling.SampleShadingEnable = true;
             multisampling.MinSampleShading = 0.8f;
-            multisampling.RasterizationSamples = (SampleCountFlagBits)Presenter.Description.MSAALevel;
+            multisampling.RasterizationSamples = (SampleCountFlagBits)Presenter.MSAALevel;
 
             var colorBlendAttachment = new PipelineColorBlendAttachmentState();
             colorBlendAttachment.ColorWriteMask = (uint)(ColorComponentFlagBits.RBit | ColorComponentFlagBits.GBit | ColorComponentFlagBits.BBit | ColorComponentFlagBits.ABit);

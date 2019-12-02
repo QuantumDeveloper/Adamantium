@@ -1,10 +1,9 @@
-﻿using Adamantium.Engine.Core.Effects;
-using Adamantium.Engine.Graphics;
+﻿using System.Collections.Generic;
+using Adamantium.Engine.Core.Effects;
 using AdamantiumVulkan.Core;
-using System.Collections.Generic;
 using VulkanBuffer = AdamantiumVulkan.Core.Buffer;
 
-namespace Adamantium.Engine.Effects
+namespace Adamantium.Engine.Graphics.Effects
 {
     internal class EffectResourceLinker
     {
