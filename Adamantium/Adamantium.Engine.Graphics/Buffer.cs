@@ -134,7 +134,7 @@ namespace Adamantium.Engine.Graphics
             BufferCopy copyRegin = new BufferCopy();
             copyRegin.Size = (ulong)size;
             var regions = new BufferCopy[1] { copyRegin };
-            commandBuffer.CmdCopyBuffer(srcBuffer, dstBuffer, 1, regions);
+            commandBuffer.CopyBuffer(srcBuffer, dstBuffer, 1, regions);
 
             GraphicsDevice.EndSingleTimeCommands(commandBuffer);
         }

@@ -321,7 +321,7 @@ namespace Adamantium.Engine.Graphics
 
             var inputAssembly = new PipelineInputAssemblyStateCreateInfo();
             inputAssembly.Topology = PrimitiveTopology.TriangleList;
-            inputAssembly.PrimitiveRestartEnable = false;
+            inputAssembly.PrimitiveRestartEnable = true;
             
             var viewport = new Viewport();
             viewport.X = 0.0f;
@@ -339,7 +339,7 @@ namespace Adamantium.Engine.Graphics
             viewportState.ViewportCount = 1;
             viewportState.PViewports = viewport;
             viewportState.ScissorCount = 1;
-            viewportState.PScissors = scissor;
+            viewportState.PScissors = new Rect2D[] { scissor };
 
             var rasterizer = new PipelineRasterizationStateCreateInfo();
             rasterizer.DepthClampEnable = false;
@@ -543,9 +543,9 @@ namespace Adamantium.Engine.Graphics
             renderPassInfo.PClearValues = new [] {clearColorValue, clearDepthValue, clearColorValueResolve };
             renderPassInfo.ClearValueCount = (uint)renderPassInfo.PClearValues.Length;
 
-            commandBuffer.CmdBeginRenderPass(renderPassInfo, SubpassContents.Inline);
+            commandBuffer.BeginRenderPass(renderPassInfo, SubpassContents.Inline);
 
-            commandBuffer.CmdBindPipeline(PipelineBindPoint.Graphics, graphicsPipeline);
+            commandBuffer.BindPipeline(PipelineBindPoint.Graphics, graphicsPipeline);
 
             return true;
         }
@@ -554,7 +554,7 @@ namespace Adamantium.Engine.Graphics
         {
             var commandBuffer = commandBuffers[ImageIndex];
 
-            commandBuffer.CmdEndRenderPass();
+            commandBuffer.EndRenderPass();
 
             var result = commandBuffer.EndCommandBuffer();
             if (result != Result.Success)
@@ -600,7 +600,7 @@ namespace Adamantium.Engine.Graphics
         {
             ulong offset = 0;
             var commandBuffer = commandBuffers[ImageIndex];
-            commandBuffer.CmdBindVertexBuffers(0, 1, vertexBuffer, ref offset);
+            commandBuffer.BindVertexBuffers(0, 1, vertexBuffer, ref offset);
         }
 
         public void Draw(uint vertexCount, uint instanceCount, uint firstVertex = 0, uint firstInstance = 0)
@@ -608,20 +608,20 @@ namespace Adamantium.Engine.Graphics
             var commandBuffer = commandBuffers[ImageIndex];
             //commandBuffer.CmdBindDescriptorSets(PipelineBindPoint.Graphics, pipelineLayout, 0, 1, descriptorSets[CurrentImageIndex], 0, 0);
 
-            commandBuffer.CmdDraw(vertexCount, instanceCount, firstVertex, firstInstance);
+            commandBuffer.Draw(vertexCount, instanceCount, firstVertex, firstInstance);
         }
 
         public void DrawIndexed(Buffer vertexBuffer, Buffer indexBuffer)
         {
             ulong offset = 0;
             var commandBuffer = commandBuffers[ImageIndex];
-            commandBuffer.CmdBindVertexBuffers(0, 1, vertexBuffer, ref offset);
+            commandBuffer.BindVertexBuffers(0, 1, vertexBuffer, ref offset);
 
-            commandBuffer.CmdBindIndexBuffer(indexBuffer, 0, IndexType.Uint32);
+            commandBuffer.BindIndexBuffer(indexBuffer, 0, IndexType.Uint32);
 
             //commandBuffer.CmdBindDescriptorSets(PipelineBindPoint.Graphics, pipelineLayout, 0, 1, descriptorSets[CurrentImageIndex], 0, 0);
 
-            commandBuffer.CmdDrawIndexed(indexBuffer.ElementCount, 1, 0, 0, 0);
+            commandBuffer.DrawIndexed(indexBuffer.ElementCount, 1, 0, 0, 0);
         }
 
         public CommandBuffer BeginSingleTimeCommands()

@@ -189,7 +189,7 @@ namespace Adamantium.Engine.Graphics
                     $"Transition from {ImageLayout} to {newLayout} is not supported");
             }
 
-            commandBuffer.CmdPipelineBarrier(
+            commandBuffer.PipelineBarrier(
                 (uint) sourceStage, 
                 (uint) destinationStage, 
                 0, 
