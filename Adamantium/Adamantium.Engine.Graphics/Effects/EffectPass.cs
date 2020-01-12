@@ -86,6 +86,8 @@ namespace Adamantium.Engine.Graphics.Effects
         /// </summary>
         public readonly bool IsSubPass;
 
+        public PipelineLayout PipelineLayout { get; private set; }
+
         /// <summary>
         ///   Applies this pass to the device pipeline.
         /// </summary>
@@ -337,7 +339,9 @@ namespace Adamantium.Engine.Graphics.Effects
                 InitStageBlock(stageBlock, logger);
             }
 
-            CreateDescriptorSetLayout();
+            descriptorSetLayout = CreateDescriptorSetLayout(layoutBindings);
+            PipelineLayout = CreatePipelineLayout(descriptorSetLayout);
+
         }
 
         /// <summary>
@@ -515,13 +519,22 @@ namespace Adamantium.Engine.Graphics.Effects
             }
         }
 
-        private void CreateDescriptorSetLayout()
+        private DescriptorSetLayout CreateDescriptorSetLayout(List<DescriptorSetLayoutBinding> bindings)
         {
             var layoutInfo = new DescriptorSetLayoutCreateInfo();
-            layoutInfo.BindingCount = (uint)layoutBindings.Count;
-            layoutInfo.PBindings = layoutBindings.ToArray();
+            layoutInfo.BindingCount = (uint)bindings.Count;
+            layoutInfo.PBindings = bindings.ToArray();
 
-            descriptorSetLayout = graphicsDevice.CreateDescriptorSetLayout(layoutInfo);
+            return graphicsDevice.CreateDescriptorSetLayout(layoutInfo);
+        }
+
+        private PipelineLayout CreatePipelineLayout(DescriptorSetLayout setLayout)
+        {
+            var pipelineLayoutInfo = new PipelineLayoutCreateInfo();
+            pipelineLayoutInfo.SetLayoutCount = 1;
+            pipelineLayoutInfo.PSetLayouts = new DescriptorSetLayout[] { setLayout };
+
+            return graphicsDevice.CreatePipelineLayout(pipelineLayoutInfo);
         }
 
         private ShaderStageFlagBits EffectShaderTypeToShaderStage(EffectShaderType type)

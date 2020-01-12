@@ -4,11 +4,11 @@ using System.ComponentModel;
 
 namespace Adamantium.Core.Collections
 {
-    public class ReadonlyTrackingCollection<T> : ReadOnlyCollection<T>, INotifyCollectionChanged, INotifyPropertyChanged
+    public class ReadOnlyTrackingCollection<T> : ReadOnlyCollection<T>, INotifyCollectionChanged, INotifyPropertyChanged
     {
         private TrackingCollection<T> _localCollection;
 
-        public ReadonlyTrackingCollection(TrackingCollection<T> collection) : base(collection)
+        public ReadOnlyTrackingCollection(TrackingCollection<T> collection) : base(collection)
         {
             _localCollection = collection;
             _localCollection.CollectionChanged += TrackingCollectionChanged;

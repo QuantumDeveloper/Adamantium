@@ -271,7 +271,17 @@ namespace Adamantium.Engine.Graphics
             return LogicalDevice.CreateDescriptorSetLayout(layoutCreateInfo);
         }
 
-        public void CreateGraphicsPipelineForEffectPass(EffectPass effectPass, DescriptorSetLayout descriptorSetLayout, PipelineShaderStageCreateInfo[] shaderStages)
+        public PipelineLayout CreatePipelineLayout(PipelineLayoutCreateInfo createInfo)
+        {
+            return LogicalDevice.CreatePipelineLayout(createInfo);
+        }
+
+        public Pipeline CreateGraphicsPipeline(GraphicsPipelineCreateInfo info)
+        {
+            return LogicalDevice.CreateGraphicsPipelines(null, 1, info)[0];
+        }
+
+        public void CreateGraphicsPipelineForEffectPass(EffectPass effectPass)
         {
 
         }
@@ -307,8 +317,8 @@ namespace Adamantium.Engine.Graphics
 
             PipelineShaderStageCreateInfo[] shaderStages = new[] { vertShaderStageInfo, fragShaderStageInfo };
 
-            var bindingDescr = GetBindingDescription<MeshVertex>();
-            var attributesDescriptions = GetVertexAttributeDescription<MeshVertex>();
+            var bindingDescr = VertexUtils.GetBindingDescription<MeshVertex>();
+            var attributesDescriptions = VertexUtils.GetVertexAttributeDescription<MeshVertex>();
 
             var vertexInputInfo = new PipelineVertexInputStateCreateInfo();
             vertexInputInfo.VertexBindingDescriptionCount = 0;
@@ -321,7 +331,7 @@ namespace Adamantium.Engine.Graphics
 
             var inputAssembly = new PipelineInputAssemblyStateCreateInfo();
             inputAssembly.Topology = PrimitiveTopology.TriangleList;
-            inputAssembly.PrimitiveRestartEnable = true;
+            inputAssembly.PrimitiveRestartEnable = false;
             
             var viewport = new Viewport();
             viewport.X = 0.0f;
@@ -337,7 +347,7 @@ namespace Adamantium.Engine.Graphics
 
             var viewportState = new PipelineViewportStateCreateInfo();
             viewportState.ViewportCount = 1;
-            viewportState.PViewports = viewport;
+            viewportState.PViewports = new Viewport[] { viewport };
             viewportState.ScissorCount = 1;
             viewportState.PScissors = new Rect2D[] { scissor };
 
@@ -355,10 +365,6 @@ namespace Adamantium.Engine.Graphics
             multisampling.MinSampleShading = 0.8f;
             multisampling.RasterizationSamples = (SampleCountFlagBits)Presenter.MSAALevel;
 
-            var colorBlendAttachment = new PipelineColorBlendAttachmentState();
-            colorBlendAttachment.ColorWriteMask = (uint)(ColorComponentFlagBits.RBit | ColorComponentFlagBits.GBit | ColorComponentFlagBits.BBit | ColorComponentFlagBits.ABit);
-            colorBlendAttachment.BlendEnable = false;
-            
             var depthStencil = new PipelineDepthStencilStateCreateInfo();
             depthStencil.DepthTestEnable = false;
             depthStencil.DepthWriteEnable = true;
@@ -366,15 +372,19 @@ namespace Adamantium.Engine.Graphics
             depthStencil.DepthBoundsTestEnable = false;
             depthStencil.MinDepthBounds = 0.0f;
             depthStencil.MaxDepthBounds = 1.0f;
-//            depthStencil.StencilTestEnable = true;
-//            depthStencil.Front = new StencilOpState();
-//            depthStencil.Back = new StencilOpState();
+            depthStencil.StencilTestEnable = true;
+            depthStencil.Front = new StencilOpState() { CompareOp = CompareOp.Always, DepthFailOp = StencilOp.Keep, FailOp = StencilOp.Keep, PassOp = StencilOp.Keep };
+            depthStencil.Back = new StencilOpState() { CompareOp = CompareOp.Always, DepthFailOp = StencilOp.Keep, FailOp = StencilOp.Keep, PassOp = StencilOp.Keep };
+
+            var colorBlendAttachment = new PipelineColorBlendAttachmentState();
+            colorBlendAttachment.ColorWriteMask = (uint)(ColorComponentFlagBits.RBit | ColorComponentFlagBits.GBit | ColorComponentFlagBits.BBit | ColorComponentFlagBits.ABit);
+            colorBlendAttachment.BlendEnable = false;
 
             var colorBlending = new PipelineColorBlendStateCreateInfo();
             colorBlending.LogicOpEnable = false;
             colorBlending.LogicOp = LogicOp.Copy;
             colorBlending.AttachmentCount = 1;
-            colorBlending.PAttachments = colorBlendAttachment;
+            colorBlending.PAttachments = new PipelineColorBlendAttachmentState[] { colorBlendAttachment };
             colorBlending.BlendConstants = new float[4];
             colorBlending.BlendConstants[0] = 0.0f;
             colorBlending.BlendConstants[1] = 0.0f;
@@ -489,8 +499,7 @@ namespace Adamantium.Engine.Graphics
         {
             var renderFence = InFlightFences[CurrentFrame];
             var result = LogicalDevice.WaitForFences(1, renderFence, true, ulong.MaxValue);
-            result = LogicalDevice.AcquireNextImageKHR((SwapChainGraphicsPresenter) Presenter, ulong.MaxValue,
-                ImageAvailableSemaphores[CurrentFrame], null, ref imageIndex);
+            result = LogicalDevice.AcquireNextImageKHR((SwapChainGraphicsPresenter) Presenter, ulong.MaxValue, ImageAvailableSemaphores[CurrentFrame], null, ref imageIndex);
 
             if (result == Result.ErrorOutOfDateKhr)
             {
@@ -606,7 +615,7 @@ namespace Adamantium.Engine.Graphics
         public void Draw(uint vertexCount, uint instanceCount, uint firstVertex = 0, uint firstInstance = 0)
         {
             var commandBuffer = commandBuffers[ImageIndex];
-            //commandBuffer.CmdBindDescriptorSets(PipelineBindPoint.Graphics, pipelineLayout, 0, 1, descriptorSets[CurrentImageIndex], 0, 0);
+            //commandBuffer.BindDescriptorSets(PipelineBindPoint.Graphics, pipelineLayout, 0, 1, descriptorSets[CurrentImageIndex], 0, 0);
 
             commandBuffer.Draw(vertexCount, instanceCount, firstVertex, firstInstance);
         }
@@ -619,7 +628,7 @@ namespace Adamantium.Engine.Graphics
 
             commandBuffer.BindIndexBuffer(indexBuffer, 0, IndexType.Uint32);
 
-            //commandBuffer.CmdBindDescriptorSets(PipelineBindPoint.Graphics, pipelineLayout, 0, 1, descriptorSets[CurrentImageIndex], 0, 0);
+            //commandBuffer.BindDescriptorSets(PipelineBindPoint.Graphics, pipelineLayout, 0, 1, descriptorSets[CurrentImageIndex], 0, 0);
 
             commandBuffer.DrawIndexed(indexBuffer.ElementCount, 1, 0, 0, 0);
         }
@@ -707,58 +716,6 @@ namespace Adamantium.Engine.Graphics
             for (int i = 0; i< defaultFramebuffers.Length; ++i)
             {
                 defaultFramebuffers[i].Destroy(LogicalDevice);
-            }
-        }
-
-
-        private VertexInputBindingDescription GetBindingDescription<T>() where T : struct
-        {
-            var decr = new VertexInputBindingDescription();
-            decr.Binding = 0;
-            decr.Stride = (uint)Marshal.SizeOf<T>();
-            decr.InputRate = VertexInputRate.Vertex;
-
-            return decr;
-        }
-
-        private VertexInputAttributeDescription[] GetVertexAttributeDescription<T>()
-        {
-            var fields = typeof(T).GetFields();
-
-            var attributes = new List<VertexInputAttributeDescription>();
-            uint location = 0;
-
-            foreach (var field in fields)
-            {
-                if (field.IsInitOnly) continue;
-
-                var desc = new VertexInputAttributeDescription();
-                desc.Binding = 0;
-                desc.Location = location;
-                desc.Format = GetFormat(Marshal.SizeOf(field.FieldType));
-                desc.Offset = (uint)Marshal.OffsetOf<T>(field.Name).ToInt32();
-                location++;
-                attributes.Add(desc);
-            }
-
-            return attributes.ToArray();
-        }
-
-        private Format GetFormat(int size)
-        {
-            switch (size)
-            {
-                case 4:
-                    return Format.R32_SFLOAT;
-                case 8:
-                    return Format.R32G32_SFLOAT;
-                case 12:
-                    return Format.R32G32B32_SFLOAT;
-                case 16:
-                    return Format.R32G32B32A32_SFLOAT;
-
-                default:
-                    throw new Exception($"size {size} is not supported");
             }
         }
     }

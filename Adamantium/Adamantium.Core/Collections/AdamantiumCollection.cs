@@ -323,6 +323,8 @@ namespace Adamantium.Core.Collections
 
         public bool IsReadOnly => false;
 
+        public bool IsEmpty => Count == 0;
+
         /// <summary>
         /// Determines the index of a specific item in the <see cref="AdamantiumCollection{T}"/>.
         /// </summary>
