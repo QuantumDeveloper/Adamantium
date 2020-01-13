@@ -8,6 +8,12 @@ namespace Adamantium.Engine.Graphics
     /// </summary>
     public class BlendStatesCollection : StateCollectionBase<BlendState>
     {
+        private const ColorComponentFlagBits DefaultColorWriteMask =
+            ColorComponentFlagBits.RBit | 
+            ColorComponentFlagBits.GBit | 
+            ColorComponentFlagBits.BBit |
+            ColorComponentFlagBits.ABit;
+        
         /// <summary>
         /// A built-in state object with settings for additive blend, that is adding the destination data to the source data without using alpha.
         /// </summary>
@@ -45,32 +51,13 @@ namespace Adamantium.Engine.Graphics
 
         internal BlendStatesCollection()
         {
-            Additive = Add(CreateBlendState("Additive", BlendOption.SourceAlpha, BlendOption.One));
-            LightMap = Add(CreateBlendState("LightMap", BlendOption.One, BlendOption.One));
-            AlphaBlend = Add(CreateBlendState("AlphaBlend", BlendOption.One, BlendOption.InverseSourceAlpha));
-            NonPremultiplied = Add(CreateBlendState("NonPremultiplied", BlendOption.SourceAlpha, BlendOption.InverseSourceAlpha));
-            Opaque = Add(CreateBlendState("Opaque", BlendOption.One, BlendOption.Zero));
-            Default = Add(CreateBlendState("Default", BlendStateDescription.Default()));
-            DoNotWriteToColorChannels = Add(CreateBlendState("DoNotWriteToColorChannels", BlendOption.One, BlendOption.Zero, 0));
-        }
-
-        private BlendState CreateBlendState(String name, BlendOption sourceBlend, BlendOption destinationBlend, ColorWriteMaskFlags colorWriteMask = ColorWriteMaskFlags.All)
-        {
-            var description = PipelineColorBlendStateCreateInfo.Default();
-
-            description.RenderTarget[0].IsBlendEnabled = true;
-            description.RenderTarget[0].SourceBlend = sourceBlend;
-            description.RenderTarget[0].DestinationBlend = destinationBlend;
-            description.RenderTarget[0].SourceAlphaBlend = sourceBlend;
-            description.RenderTarget[0].DestinationAlphaBlend = destinationBlend;
-            description.RenderTarget[0].RenderTargetWriteMask = colorWriteMask;
-
-            return BlendState.New(name, description);
-        }
-
-        private BlendState CreateBlendState(string name, PipelineColorBlendStateCreateInfo description)
-        {
-            return BlendState.New(name, description);
+            Additive = Add(BlendState.New(nameof(Additive), true, BlendFactor.SrcAlpha, BlendFactor.One, BlendOp.Add, DefaultColorWriteMask));
+            LightMap = Add(BlendState.New(nameof(LightMap), true, BlendFactor.One, BlendFactor.One, BlendOp.Add, DefaultColorWriteMask));
+            AlphaBlend = Add(BlendState.New(nameof(AlphaBlend), true, BlendFactor.One, BlendFactor.OneMinusSrcAlpha, BlendOp.Add, DefaultColorWriteMask));
+            NonPremultiplied = Add(BlendState.New(nameof(NonPremultiplied), true, BlendFactor.SrcAlpha, BlendFactor.OneMinusSrcAlpha, BlendOp.Add, DefaultColorWriteMask));
+            Opaque = Add(BlendState.New(nameof(Opaque), false, BlendFactor.One, BlendFactor.Zero, BlendOp.Add, ColorComponentFlagBits.ABit));
+            Default = Add(BlendState.New(nameof(Default), PipelineColorBlendStateCreateInfo.Default()));
+            //DoNotWriteToColorChannels = Add(BlendState.New(nameof(DoNotWriteToColorChannels), false, BlendFactor.One, BlendFactor.Zero, BlendOp.Add, DefaultColorWriteMask));
         }
     }
 }

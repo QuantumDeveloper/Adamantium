@@ -53,5 +53,27 @@ namespace Adamantium.Engine.Graphics
         {
             return new BlendState(name, info);
         }
+        
+        public static BlendState New(
+            String name, 
+            bool blendEnable, 
+            BlendFactor sourceBlend, 
+            BlendFactor destinationBlend, 
+            BlendOp colorBlendOp, 
+            ColorComponentFlagBits colorWriteMask)
+        {
+            var state = PipelineColorBlendStateCreateInfo.Default();
+            var colorAttachment = state.PAttachments[0];
+            colorAttachment.BlendEnable = blendEnable;
+            colorAttachment.SrcColorBlendFactor = sourceBlend;
+            colorAttachment.SrcAlphaBlendFactor = sourceBlend;
+            colorAttachment.DstColorBlendFactor = destinationBlend;
+            colorAttachment.DstAlphaBlendFactor = destinationBlend;
+            colorAttachment.ColorBlendOp = colorBlendOp;
+            colorAttachment.AlphaBlendOp = colorBlendOp;
+            colorAttachment.ColorWriteMask = (uint)colorWriteMask;
+            
+            return new BlendState(name, state);
+        }
     }
 }
