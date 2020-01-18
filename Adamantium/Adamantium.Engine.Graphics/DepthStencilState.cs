@@ -22,7 +22,11 @@ namespace Adamantium.Engine.Graphics
             Back = this.info.Back;
             MinDepthBounds = info.MinDepthBounds;
             MaxDepthBounds = info.MaxDepthBounds;
+
+            hashCode = CalculateHashCode();
         }
+
+        private readonly int hashCode;
 
         public bool DepthTestEnable { get; }
         public bool DepthWriteEnable { get; }
@@ -34,18 +38,23 @@ namespace Adamantium.Engine.Graphics
         public float MinDepthBounds { get; }
         public float MaxDepthBounds { get; }
 
+        private int CalculateHashCode()
+        {
+            int hash = DepthTestEnable.GetHashCode();
+            hash = (hash * 397) ^ DepthWriteEnable.GetHashCode();
+            hash = (hash * 397) ^ DepthCompareOp.GetHashCode();
+            hash = (hash * 397) ^ DepthBoundsTestEnable.GetHashCode();
+            hash = (hash * 397) ^ StencilTestEnable.GetHashCode();
+            hash = (hash * 397) ^ Front.GetHashCode();
+            hash = (hash * 397) ^ Back.GetHashCode();
+            hash = (hash * 397) ^ MinDepthBounds.GetHashCode();
+            hash = (hash * 397) ^ MaxDepthBounds.GetHashCode();
+
+            return hash;
+        }
+        
         public override int GetHashCode()
         {
-            int hashCode = DepthTestEnable.GetHashCode();
-            hashCode = (hashCode * 397) ^ DepthWriteEnable.GetHashCode();
-            hashCode = (hashCode * 397) ^ DepthCompareOp.GetHashCode();
-            hashCode = (hashCode * 397) ^ DepthBoundsTestEnable.GetHashCode();
-            hashCode = (hashCode * 397) ^ StencilTestEnable.GetHashCode();
-            hashCode = (hashCode * 397) ^ Front.GetHashCode();
-            hashCode = (hashCode * 397) ^ Back.GetHashCode();
-            hashCode = (hashCode * 397) ^ MinDepthBounds.GetHashCode();
-            hashCode = (hashCode * 397) ^ MaxDepthBounds.GetHashCode();
-
             return hashCode;
         }
 

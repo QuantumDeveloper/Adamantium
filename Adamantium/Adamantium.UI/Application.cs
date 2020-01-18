@@ -13,6 +13,7 @@ using Adamantium.UI.OSX;
 using Adamantium.UI.Processors;
 using Adamantium.UI.Windows;
 using AdamantiumVulkan;
+using AdamantiumVulkan.Core;
 
 namespace Adamantium.UI
 {
@@ -91,12 +92,13 @@ namespace Adamantium.UI
             {
                 Width = (uint)window.ClientWidth,
                 Height = (uint)window.ClientHeight,
-                BuffersCount = 2,
+                BuffersCount = 3,
                 MSAALevel = MSAALevel.X4,
                 HInstanceHandle = Process.GetCurrentProcess().Handle
             };
             @params.OutputHandle = window.SurfaceHandle;
             var device = GraphicsDevice.CreateRenderDevice(@params);
+            device.AddDynamicStates(DynamicState.Viewport, DynamicState.Scissor);
             var effect = Effect.CompileFromFile(Path.Combine("Effects", "UIEffect.fx"), device);
 
             windowToDevices[window] = device;

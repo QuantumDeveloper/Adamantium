@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using Adamantium.Core;
+using Adamantium.Core.Collections;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics.Effects;
 using Adamantium.Imaging;
@@ -16,41 +17,40 @@ namespace Adamantium.Engine.Graphics
     public class GraphicsDevice : DisposableObject
     {
         private static PhysicalDevice PhysicalDevice { get; set; }
-        internal Device LogicalDevice { get; private set; }
+        
         private Queue graphicsQueue;
-        private RenderPass renderPass;
         private SurfaceKHR surface;
-        private DescriptorSetLayout descriptorSetLayout;
-
-        private DescriptorPool descriptorPool;
         private Pipeline graphicsPipeline;
-        private Framebuffer[] defaultFramebuffers;
-
-        private PipelineLayout pipelineLayout;
-
         private CommandBuffer[] commandBuffers;
-        public CommandPool CommandPool { get; private set; }
-
-        internal Semaphore[] ImageAvailableSemaphores { get; private set; }
-        internal Semaphore[] RenderFinishedSemaphores { get; private set; }
-        internal Fence[] InFlightFences { get; private set; }
-
-        public uint CurrentFrame { get; private set; }
-
-        public uint ImageIndex => imageIndex;
-
-        public readonly uint MaxFramesInFlight;
-
-        public Pipeline CurrentGraphicsPipeline { get; internal set; }
-
-        public List<EffectPool> EffectPools { get; private set; }
-
-        public EffectPool DefaultEffectPool { get; private set; }
-
-
+        
         private SubmitInfo[] submitInfos = new SubmitInfo[1];
         private uint imageIndex;
-
+        private BlendState blendState;
+        private RasterizerState rasterizerState;
+        private DepthStencilState depthStencilState;
+        
+        private RenderPass renderPass;
+        private Type vertexType;
+        private PrimitiveTopology primitiveTopology;
+        private EffectPass currentEffectPass;
+        
+        private TrackingCollection<Viewport> viewports;
+        private TrackingCollection<Rect2D> scissors;
+        private TrackingCollection<DynamicState> dynamicStates;
+        
+        private PipelineManager pipelineManager;
+        
+        internal Device LogicalDevice { get; private set; }
+        
+        internal bool ShouldChangeGraphicsPipeline { get; private set; }
+        
+        static GraphicsDevice()
+        {
+            BlendStates = new BlendStatesCollection();
+            RasterizerStates = new RasterizerStateCollection();
+            DepthStencilStates = new DepthStencilStatesCollection();
+        }
+        
         private GraphicsDevice(VulkanInstance instance, PhysicalDevice physicalDevice)
         {
             VulkanInstance = instance;
@@ -64,13 +64,42 @@ namespace Adamantium.Engine.Graphics
             {
                 CreateMainDevice();
                 main.MainDevice = this;
-                main.LogicalDevice = this.LogicalDevice;
+                main.LogicalDevice = LogicalDevice;
             }
             MaxFramesInFlight = presentationParameters.BuffersCount;
             MainDevice = main.MainDevice;
             LogicalDevice = main.LogicalDevice;
             InitializeRenderDevice(presentationParameters);
+            dynamicStates = new TrackingCollection<DynamicState>();
+            viewports = new TrackingCollection<Viewport>();
+            scissors = new TrackingCollection<Rect2D>();
+
+            BlendState = BlendStates.Default;
+            RasterizerState = RasterizerStates.Default;
+            DepthStencilState = DepthStencilStates.Default;
+
+            pipelineManager = new PipelineManager(this);
+            
+            BasicEffect = Effect.CompileFromFile(Path.Combine("Effects", "UIEffect.fx"), this);
         }
+        
+        public CommandPool CommandPool { get; private set; }
+
+        internal Semaphore[] ImageAvailableSemaphores { get; private set; }
+        internal Semaphore[] RenderFinishedSemaphores { get; private set; }
+        internal Fence[] InFlightFences { get; private set; }
+
+        public uint CurrentFrame { get; private set; }
+
+        public uint ImageIndex => imageIndex;
+
+        public readonly uint MaxFramesInFlight;
+
+        public GraphicsPipeline CurrentGraphicsPipeline { get; private set; }
+
+        public List<EffectPool> EffectPools { get; private set; }
+
+        public EffectPool DefaultEffectPool { get; private set; }
 
         public static VulkanInstance VulkanInstance { get; private set; }
 
@@ -79,19 +108,181 @@ namespace Adamantium.Engine.Graphics
         public GraphicsDevice MainDevice { get; private set; }
 
         public bool IsMain { get; private set; }
+        
+        public static BlendStatesCollection BlendStates { get; }
+        
+        public static RasterizerStateCollection RasterizerStates { get; }
+        
+        public static DepthStencilStatesCollection DepthStencilStates { get; }
+        
+        public Effect BasicEffect { get; private set; }
+
+        public BlendState BlendState
+        {
+            get => blendState;
+            set
+            {
+                if (SetProperty(ref blendState, value))
+                {
+                    blendState = value;
+                    ShouldChangeGraphicsPipeline = true;
+                }
+            }
+        }
+
+        public RasterizerState RasterizerState
+        {
+            get => rasterizerState;
+            set
+            {
+                if (SetProperty(ref rasterizerState, value))
+                {
+                    rasterizerState = value;
+                    ShouldChangeGraphicsPipeline = true;
+                }
+            }
+        }
+
+        public DepthStencilState DepthStencilState
+        {
+            get => depthStencilState;
+            set
+            {
+                if (SetProperty(ref depthStencilState, value))
+                {
+                    depthStencilState = value;
+                    ShouldChangeGraphicsPipeline = true;
+                }
+            }
+        }
+
+        public RenderPass RenderPass
+        {
+            get => renderPass;
+            set
+            {
+                if (SetProperty(ref renderPass, value))
+                {
+                    Presenter.RenderPass = value;
+                    ShouldChangeGraphicsPipeline = true;
+                }
+            }
+        }
+
+        public Type VertexType
+        {
+            get => vertexType;
+            set
+            {
+                if (SetProperty(ref vertexType, value))
+                {
+                    vertexType = value;
+                    ShouldChangeGraphicsPipeline = true;
+                }
+            } 
+        }
+
+        public PrimitiveTopology PrimitiveTopology
+        {
+            get => primitiveTopology;
+            set
+            {
+                if (SetProperty(ref primitiveTopology, value))
+                {
+                    primitiveTopology = value;
+                    ShouldChangeGraphicsPipeline = true;
+                }
+            }
+        }
+
+        public EffectPass CurrentEffectPass
+        {
+            get => currentEffectPass;
+            set
+            {
+                if (SetProperty(ref currentEffectPass, value))
+                {
+                    currentEffectPass = value;
+                    ShouldChangeGraphicsPipeline = true;
+                }
+            }
+        }
+
+        public ReadOnlyCollection<Viewport> Viewports => viewports.AsReadOnly();
+
+        public ReadOnlyCollection<Rect2D> Scissors => scissors.AsReadOnly();
+
+        public bool IsDynamic => dynamicStates.Count > 0;
+
+        public void ApplyViewports(params Viewport[] viewports)
+        {
+            this.viewports.Clear();
+            this.viewports.AddRange(viewports);
+            
+            if (viewports == null) return;
+
+            if (!IsDynamic || !dynamicStates.Contains(DynamicState.Viewport))
+            {
+                ShouldChangeGraphicsPipeline = true;
+            }
+        }
+
+        public void ApplyScissors(params Rect2D[] scissors)
+        {
+            this.scissors.Clear();
+            this.scissors.AddRange(scissors);
+            
+            if (!IsDynamic || !dynamicStates.Contains(DynamicState.Viewport))
+            {
+                ShouldChangeGraphicsPipeline = true;
+            }
+        }
+
+        public void AddDynamicStates(params DynamicState[] states)
+        {
+            foreach (var state in states)
+            {
+                if (!dynamicStates.Contains(state))
+                {
+                    dynamicStates.Add(state);
+                }
+            }
+        }
+
+        public void RemoveDynamicStates(params DynamicState[] states)
+        {
+            foreach (var state in states)
+            {
+                dynamicStates.Remove(state);
+            }
+        }
+
+        public void ClearDynamicStates()
+        {
+            dynamicStates.Clear();
+        }
+
+        public DynamicState[] DynamicStates => dynamicStates.ToArray();
+        
+        public CommandBuffer CurrentCommandBuffer => commandBuffers[ImageIndex]; 
 
         private void InitializeRenderDevice(PresentationParameters presentationParameters)
         {
             CreateCommandPool();
             CreateGraphicsPresenter(presentationParameters);
-            CreateRenderPass();
-            CreateDefaultFramebuffers();
             CreateCommandBuffers();
-            CreateDescriptorPool();
-            //CreateDescriptorSetLayout();
-            CreatePipelineLayout();
-            CreateGraphicsPipeline();
+            //CreateGraphicsPipeline();
             CreateSyncObjects();
+        }
+
+        public RenderPass CreateRenderPass(RenderPassCreateInfo createInfo)
+        {
+            return LogicalDevice.CreateRenderPass(createInfo);
+        }
+
+        public DescriptorPool CreateDescriptorPool(DescriptorPoolCreateInfo info)
+        {
+            return LogicalDevice.CreateDescriptorPool(info);
         }
 
         public static GraphicsDevice Create(VulkanInstance instance, PhysicalDevice physicalDevice)
@@ -154,90 +345,9 @@ namespace Adamantium.Engine.Graphics
             graphicsQueue = LogicalDevice.GetDeviceQueue(indices.graphicsFamily.Value, 0);
         }
 
-        private void CreateRenderPass()
-        {
-            var colorAttachment = new AttachmentDescription();
-            colorAttachment.Format = Presenter.Description.ImageFormat;
-            colorAttachment.Samples = (SampleCountFlagBits)Presenter.Description.MSAALevel;
-            colorAttachment.LoadOp = AttachmentLoadOp.Clear;
-            colorAttachment.StoreOp = AttachmentStoreOp.Store;
-            colorAttachment.StencilLoadOp = AttachmentLoadOp.DontCare;
-            colorAttachment.StencilStoreOp = AttachmentStoreOp.DontCare;
-            colorAttachment.InitialLayout = ImageLayout.Undefined;
-            colorAttachment.FinalLayout = ImageLayout.ColorAttachmentOptimal;
+        
 
-            var depthAttachment = new AttachmentDescription();
-            depthAttachment.Format = (Format)Presenter.Description.DepthFormat;
-            depthAttachment.Samples = (SampleCountFlagBits)Presenter.Description.MSAALevel;
-            depthAttachment.LoadOp = AttachmentLoadOp.Clear;
-            depthAttachment.StoreOp = AttachmentStoreOp.Store;
-            depthAttachment.StencilLoadOp = AttachmentLoadOp.DontCare;
-            depthAttachment.StencilStoreOp = AttachmentStoreOp.DontCare;
-            depthAttachment.InitialLayout = ImageLayout.Undefined;
-            depthAttachment.FinalLayout = Presenter.DepthBuffer.ImageLayout;
-
-            var colorAttachmentResolve = new AttachmentDescription();
-            colorAttachmentResolve.Format = Presenter.Description.ImageFormat;
-            colorAttachmentResolve.Samples = SampleCountFlagBits._1Bit;
-            colorAttachmentResolve.LoadOp = AttachmentLoadOp.Clear;
-            colorAttachmentResolve.StoreOp = AttachmentStoreOp.Store;
-            colorAttachmentResolve.StencilLoadOp = AttachmentLoadOp.DontCare;
-            colorAttachmentResolve.StencilStoreOp = AttachmentStoreOp.DontCare;
-            colorAttachmentResolve.InitialLayout = ImageLayout.Undefined;
-            colorAttachmentResolve.FinalLayout = ImageLayout.PresentSrcKhr;
-
-            var colorAttachmentRef = new AttachmentReference();
-            colorAttachmentRef.Attachment = 0;
-            colorAttachmentRef.Layout = ImageLayout.ColorAttachmentOptimal;
-
-            var depthAttachmentRef = new AttachmentReference();
-            depthAttachmentRef.Attachment = 1;
-            depthAttachmentRef.Layout = Presenter.DepthBuffer.ImageLayout;
-
-            var colorAttachmentResolveRef = new AttachmentReference();
-            colorAttachmentResolveRef.Attachment = 2;
-            colorAttachmentResolveRef.Layout = ImageLayout.ColorAttachmentOptimal;
-
-            var subpass = new SubpassDescription();
-            subpass.PipelineBindPoint = PipelineBindPoint.Graphics;
-            subpass.ColorAttachmentCount = 1;
-            subpass.PColorAttachments = new[] { colorAttachmentRef };
-            subpass.PDepthStencilAttachment = depthAttachmentRef;
-            subpass.PResolveAttachments = new[] { colorAttachmentResolveRef };
-            
-            SubpassDependency subpassDependency = new SubpassDependency();
-            subpassDependency.SrcSubpass = Constants.VK_SUBPASS_EXTERNAL;
-            subpassDependency.DstSubpass = 0;
-            subpassDependency.SrcStageMask = (uint)PipelineStageFlagBits.ColorAttachmentOutputBit;
-            subpassDependency.SrcAccessMask = 0;
-            subpassDependency.DstStageMask = (uint) PipelineStageFlagBits.ColorAttachmentOutputBit;
-            subpassDependency.DstAccessMask = (uint)(AccessFlagBits.ColorAttachmentReadBit | AccessFlagBits.ColorAttachmentWriteBit);
-
-            var attachments = new [] { colorAttachment, depthAttachment, colorAttachmentResolve}; 
-            var renderPassInfo = new RenderPassCreateInfo();
-            renderPassInfo.AttachmentCount = (uint)attachments.Length;
-            renderPassInfo.PAttachments = attachments;
-            renderPassInfo.SubpassCount = 1;
-            renderPassInfo.PSubpasses = new[] {subpass};
-            renderPassInfo.DependencyCount = 1;
-            renderPassInfo.PDependencies = new[] {subpassDependency};
-
-            renderPass = LogicalDevice.CreateRenderPass(renderPassInfo);
-        }
-
-        private void CreateDescriptorPool()
-        {
-            DescriptorPoolSize poolSize = new DescriptorPoolSize();
-            poolSize.Type = DescriptorType.CombinedImageSampler;
-            poolSize.DescriptorCount = Presenter.Description.BuffersCount;
-
-            DescriptorPoolCreateInfo poolInfo = new DescriptorPoolCreateInfo();
-            poolInfo.PoolSizeCount = 1;
-            poolInfo.PPoolSizes = poolSize;
-            poolInfo.MaxSets = Presenter.Description.BuffersCount;
-
-            descriptorPool = LogicalDevice.CreateDescriptorPool(poolInfo);
-        }
+        
 
         private void CreateDefaultDescriptorSetLayout()
         {
@@ -263,7 +373,7 @@ namespace Adamantium.Engine.Graphics
             layoutInfo.BindingCount = 1;
             layoutInfo.PBindings = bindings.ToArray();
 
-            descriptorSetLayout = LogicalDevice.CreateDescriptorSetLayout(layoutInfo);
+            //descriptorSetLayout = LogicalDevice.CreateDescriptorSetLayout(layoutInfo);
         }
 
         public DescriptorSetLayout CreateDescriptorSetLayout(DescriptorSetLayoutCreateInfo layoutCreateInfo)
@@ -286,15 +396,9 @@ namespace Adamantium.Engine.Graphics
 
         }
 
-        private void CreatePipelineLayout()
+        public Result AllocateDescriptorSets(in DescriptorSetAllocateInfo pAllocateInfo, AdamantiumVulkan.Core.DescriptorSet[] descriptorSets)
         {
-            var pipelineLayoutInfo = new PipelineLayoutCreateInfo();
-            //pipelineLayoutInfo.SetLayoutCount = 1;
-            //pipelineLayoutInfo.PSetLayouts = new DescriptorSetLayout[] { descriptorSetLayout };
-            pipelineLayoutInfo.SetLayoutCount = 0;
-            pipelineLayoutInfo.PushConstantRangeCount = 0;
-
-            pipelineLayout = LogicalDevice.CreatePipelineLayout(pipelineLayoutInfo);
+            return LogicalDevice.AllocateDescriptorSets(pAllocateInfo, descriptorSets);
         }
 
         private void CreateGraphicsPipeline()
@@ -400,14 +504,14 @@ namespace Adamantium.Engine.Graphics
             pipelineInfo.PRasterizationState = rasterizer;
             pipelineInfo.PMultisampleState = multisampling;
             pipelineInfo.PColorBlendState = colorBlending;
-            pipelineInfo.Layout = pipelineLayout;
+            //pipelineInfo.Layout = pipelineLayout;
             pipelineInfo.RenderPass = renderPass;
             pipelineInfo.PDepthStencilState = depthStencil;
             pipelineInfo.Subpass = 0;
 
             var pipelines = LogicalDevice.CreateGraphicsPipelines(null, 1, pipelineInfo);
             graphicsPipeline = pipelines[0];
-            CurrentGraphicsPipeline = graphicsPipeline;
+            //CurrentGraphicsPipeline = graphicsPipeline;
 
             pipelineInfo.Dispose();
             LogicalDevice.DestroyShaderModule(vertexShaderModule);
@@ -438,16 +542,19 @@ namespace Adamantium.Engine.Graphics
         private void CreateGraphicsPresenter(PresentationParameters parameters)
         {
             Presenter = GraphicsPresenter.Create(this, parameters);
+            RenderPass = Presenter.RenderPass;
         }
 
         private void CreateCommandBuffers()
         {
-            commandBuffers = new CommandBuffer[defaultFramebuffers.Length];
+            var buffersCount = Presenter.BuffersCount;
+            
+            commandBuffers = new CommandBuffer[buffersCount];
 
             var allocInfo = new CommandBufferAllocateInfo();
             allocInfo.CommandPool = CommandPool;
             allocInfo.Level = CommandBufferLevel.Primary;
-            allocInfo.CommandBufferCount = (uint)defaultFramebuffers.Length;
+            allocInfo.CommandBufferCount = buffersCount;
 
             commandBuffers = LogicalDevice.AllocateCommandBuffers(allocInfo);
         }
@@ -464,27 +571,6 @@ namespace Adamantium.Engine.Graphics
             InFlightFences = LogicalDevice.CreateFences(fenceInfo, MaxFramesInFlight);
         }
 
-        private void CreateDefaultFramebuffers()
-        {
-            defaultFramebuffers = new Framebuffer[Presenter.Description.BuffersCount];
-
-            for (int i = 0; i < defaultFramebuffers.Length; i++)
-            {
-                FramebufferCreateInfo framebufferInfo = new FramebufferCreateInfo();
-                framebufferInfo.RenderPass = renderPass;
-                var swapchainPresenter = (SwapChainGraphicsPresenter)Presenter;
-                framebufferInfo.PAttachments = new [] { Presenter.RenderTarget, Presenter.DepthBuffer, swapchainPresenter.swapchainImageViews[i] };
-                framebufferInfo.AttachmentCount = (uint)framebufferInfo.PAttachments.Length;
-                framebufferInfo.Width = Presenter.Width;
-                framebufferInfo.Height = Presenter.Height;
-                framebufferInfo.Layers = 1;
-
-                defaultFramebuffers[i] = LogicalDevice.CreateFramebuffer(framebufferInfo);
-
-                framebufferInfo.Dispose();
-            }
-        }
-
         public Queue GetDeviceQueue(uint queueFamilyIndex, uint queueIndex)
         {
             return LogicalDevice.GetDeviceQueue(queueFamilyIndex, queueIndex);
@@ -493,6 +579,11 @@ namespace Adamantium.Engine.Graphics
         public Result DeviceWaitIdle()
         {
             return LogicalDevice.DeviceWaitIdle();
+        }
+
+        public Framebuffer CreateFramebuffer(FramebufferCreateInfo info)
+        {
+            return LogicalDevice.CreateFramebuffer(info);
         }
 
         public bool BeginDraw(Color clearColor, float depth = 1.0f, uint stencil = 0)
@@ -530,7 +621,7 @@ namespace Adamantium.Engine.Graphics
 
             var renderPassInfo = new RenderPassBeginInfo();
             renderPassInfo.RenderPass = renderPass;
-            renderPassInfo.Framebuffer = defaultFramebuffers[ImageIndex];
+            renderPassInfo.Framebuffer = Presenter.GetFramebuffer(ImageIndex);
             renderPassInfo.RenderArea = new Rect2D();
             renderPassInfo.RenderArea.Offset = new Offset2D();
             renderPassInfo.RenderArea.Extent = new Extent2D()
@@ -554,7 +645,7 @@ namespace Adamantium.Engine.Graphics
 
             commandBuffer.BeginRenderPass(renderPassInfo, SubpassContents.Inline);
 
-            commandBuffer.BindPipeline(PipelineBindPoint.Graphics, graphicsPipeline);
+            //commandBuffer.BindPipeline(PipelineBindPoint.Graphics, graphicsPipeline);
 
             return true;
         }
@@ -605,6 +696,20 @@ namespace Adamantium.Engine.Graphics
             CurrentFrame = (CurrentFrame + 1) % MaxFramesInFlight;
         }
 
+        public void SetViewports(params Viewport[] viewports)
+        {
+            if (viewports == null || viewports.Length == 0) return;
+            
+            CurrentCommandBuffer.SetViewport(0, (uint)viewports.Length, viewports);
+        }
+        
+        public void SetScissors(params Rect2D[] scissors)
+        {
+            if (scissors == null || scissors.Length == 0) return;
+            
+            CurrentCommandBuffer.SetScissor(0, (uint)scissors.Length, scissors);
+        }
+
         public void SetVertexBuffer(Buffer vertexBuffer)
         {
             ulong offset = 0;
@@ -614,8 +719,22 @@ namespace Adamantium.Engine.Graphics
 
         public void Draw(uint vertexCount, uint instanceCount, uint firstVertex = 0, uint firstInstance = 0)
         {
+            if (CurrentEffectPass == null)
+            {
+                throw new ArgumentNullException("Effect pass should be applied before executiong draw");
+            }
+            
             var commandBuffer = commandBuffers[ImageIndex];
-            //commandBuffer.BindDescriptorSets(PipelineBindPoint.Graphics, pipelineLayout, 0, 1, descriptorSets[CurrentImageIndex], 0, 0);
+            var pipeline = pipelineManager.GetOrCreateGraphicsPipeline(this);
+            commandBuffer.BindPipeline(pipeline.BindPoint, pipeline);
+            commandBuffer.BindDescriptorSets(
+                PipelineBindPoint.Graphics, 
+                CurrentEffectPass.PipelineLayout, 
+                0, 
+                1, 
+                CurrentEffectPass.DescriptorSets[(int) ImageIndex], 
+                0, 
+                0);
 
             commandBuffer.Draw(vertexCount, instanceCount, firstVertex, firstInstance);
         }
@@ -668,7 +787,6 @@ namespace Adamantium.Engine.Graphics
         private bool ResizePresenter(Func<bool> resizeFunc)
         {
             var result = LogicalDevice.DeviceWaitIdle();
-            DestroyFramebuffers();
             var resizeResult = resizeFunc();
             if (!resizeResult)
             {
@@ -676,7 +794,7 @@ namespace Adamantium.Engine.Graphics
             }
             graphicsPipeline?.Destroy(LogicalDevice);
             CreateGraphicsPipeline();
-            CreateDefaultFramebuffers();
+            OnSurfaceSizeChanged();
             return true;
         }
 
@@ -703,7 +821,7 @@ namespace Adamantium.Engine.Graphics
 
         public static implicit operator PhysicalDevice (GraphicsDevice device)
         {
-            return GraphicsDevice.PhysicalDevice;
+            return PhysicalDevice;
         }
 
         public static implicit operator Device(GraphicsDevice device)
@@ -711,12 +829,11 @@ namespace Adamantium.Engine.Graphics
             return device.LogicalDevice;
         }
 
-        private void DestroyFramebuffers()
+        public event EventHandler SurfaceSizeChanged;
+
+        protected void OnSurfaceSizeChanged()
         {
-            for (int i = 0; i< defaultFramebuffers.Length; ++i)
-            {
-                defaultFramebuffers[i].Destroy(LogicalDevice);
-            }
+            SurfaceSizeChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 }

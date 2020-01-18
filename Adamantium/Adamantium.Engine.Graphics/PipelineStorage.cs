@@ -1,10 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Text;
 using Adamantium.Core;
-using Adamantium.Core.Collections;
 using Adamantium.Engine.Graphics.Effects;
 using AdamantiumVulkan.Core;
 
@@ -17,8 +14,6 @@ namespace Adamantium.Engine.Graphics
         private DescriptorSetLayout descriptorSetLayout;
         private EffectPass effectPass;
 
-        protected PipelineLayout PipelineLayout { get; set; }
-
         protected PipelineBase(GraphicsDevice graphicsDevice)
         {
             GraphicsDevice = graphicsDevice;
@@ -27,6 +22,8 @@ namespace Adamantium.Engine.Graphics
         public GraphicsDevice GraphicsDevice { get; }
 
         public abstract PipelineBindPoint BindPoint { get; }
+        
+        public int HashCode { get; private protected set; }
 
         public RenderPass RenderPass
         {
@@ -55,6 +52,7 @@ namespace Adamantium.Engine.Graphics
         public virtual bool IsDirty { get; protected set; }
 
         public virtual bool IsDynamic { get; }
+        
         protected Pipeline Pipeline { get => pipeline; set => pipeline = value; }
 
         public static implicit operator Pipeline(PipelineBase pipelineBase)
@@ -63,6 +61,8 @@ namespace Adamantium.Engine.Graphics
         }
 
         protected abstract void CreateOrUpdatePipeline();
+
+        protected abstract int ComputeHash();
     }
 
     public class GraphicsPipeline : PipelineBase
@@ -73,31 +73,33 @@ namespace Adamantium.Engine.Graphics
         private BlendState colorBlendState;
         private PipelineVertexInputStateCreateInfo vertexInputInfo;
 
-        public GraphicsPipeline(
+        protected GraphicsPipeline(
             GraphicsDevice graphicsDevice, 
             Type vertexType, 
             EffectPass effectPass,
             RenderPass renderPass,
             PrimitiveTopology primitiveTopology, 
-            RasterizerState rasterizer, 
+            RasterizerState rasterizerState, 
             BlendState blendState,
-            DepthStencilState depthStencil,
-            params DynamicState[] dynamicStates) : base(graphicsDevice)
+            DepthStencilState depthStencilState,
+            Viewport[] viewports,
+            Rect2D[] scissors,
+            params DynamicState[] dynamicStates
+            ) : base(graphicsDevice)
         {
             VertexType = vertexType;
             EffectPass = effectPass;
             RenderPass = renderPass;
             PrimitiveTopology = primitiveTopology;
-            RasterizerState = rasterizer;
-            ColorBlendState = blendState;
-            DepthStencilState = depthStencil;
-            Viewports = new TrackingCollection<Viewport>();
-            Scissors = new TrackingCollection<Rect2D>();
-            DynamicStates = new TrackingCollection<DynamicState>(dynamicStates);
-            Viewports.CollectionChanged += ViewportsCollectionChanged;
-            Scissors.CollectionChanged += ScissorsCollectionChanged;
-            DynamicStates.CollectionChanged += DynamicStatesCollectionChanged;
+            RasterizerState = rasterizerState;
+            BlendState = blendState;
+            DepthStencilState = depthStencilState;
+            Viewports = new ReadOnlyCollection<Viewport>(viewports);
+            Scissors = new ReadOnlyCollection<Rect2D>(scissors);
+            DynamicStates = new ReadOnlyCollection<DynamicState>(dynamicStates);
 
+            HashCode = ComputeHash();
+            
             CreateVertexInputInfo();
             CreateOrUpdatePipeline();
         }
@@ -128,7 +130,7 @@ namespace Adamantium.Engine.Graphics
             }
         }
 
-        public BlendState ColorBlendState
+        public BlendState BlendState
         {
             get => colorBlendState;
             private set
@@ -150,36 +152,15 @@ namespace Adamantium.Engine.Graphics
             }
         }
 
-        public TrackingCollection<Viewport> Viewports { get; }
+        public ReadOnlyCollection<Viewport> Viewports { get; }
 
-        public TrackingCollection<Rect2D> Scissors { get; }
+        public ReadOnlyCollection<Rect2D> Scissors { get; }
 
-        public TrackingCollection<DynamicState> DynamicStates { get; }
+        public ReadOnlyCollection<DynamicState> DynamicStates { get; }
 
-        public override bool IsDynamic => DynamicStates.IsEmpty;
+        public override bool IsDynamic => DynamicStates.Count > 0;
 
         public override PipelineBindPoint BindPoint => PipelineBindPoint.Graphics;
-
-        private void ScissorsCollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
-        {
-            if (!DynamicStates.Contains(DynamicState.Scissor))
-            {
-                IsDirty = true;
-            }
-        }
-
-        private void ViewportsCollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
-        {
-            if (!DynamicStates.Contains(DynamicState.Viewport))
-            {
-                IsDirty = true;
-            }
-        }
-
-        private void DynamicStatesCollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
-        {
-            IsDirty = true;
-        }
 
         private void CreateVertexInputInfo()
         {
@@ -189,7 +170,7 @@ namespace Adamantium.Engine.Graphics
             vertexInputInfo = new PipelineVertexInputStateCreateInfo();
             vertexInputInfo.VertexBindingDescriptionCount = 1;
             vertexInputInfo.VertexAttributeDescriptionCount = (uint)vertexAttributesDescriptions.Length;
-            vertexInputInfo.PVertexBindingDescriptions = new VertexInputBindingDescription[] { vertexBindingDescription };
+            vertexInputInfo.PVertexBindingDescriptions = new [] { vertexBindingDescription };
             vertexInputInfo.PVertexAttributeDescriptions = vertexAttributesDescriptions;
         }
 
@@ -224,8 +205,8 @@ namespace Adamantium.Engine.Graphics
             pipelineInfo.PViewportState = viewportState;
             pipelineInfo.PRasterizationState = RasterizerState;
             pipelineInfo.PMultisampleState = multisampling;
-            pipelineInfo.PColorBlendState = ColorBlendState;
-            pipelineInfo.Layout = PipelineLayout;
+            pipelineInfo.PColorBlendState = BlendState;
+            pipelineInfo.Layout = EffectPass.PipelineLayout;
             pipelineInfo.RenderPass = RenderPass;
             pipelineInfo.PDepthStencilState = DepthStencilState;
             pipelineInfo.Subpass = 0;
@@ -242,35 +223,91 @@ namespace Adamantium.Engine.Graphics
             IsDirty = false;
         }
 
+        protected override int ComputeHash()
+        {
+            var hashCode = VertexType.GetHashCode();
+            hashCode = (hashCode * 397) ^ EffectPass.GetHashCode();
+            hashCode = (hashCode * 397) ^ RenderPass.GetHashCode();
+            hashCode = (hashCode * 397) ^ PrimitiveTopology.GetHashCode();
+            hashCode = (hashCode * 397) ^ RasterizerState.GetHashCode();
+            hashCode = (hashCode * 397) ^ BlendState.GetHashCode();
+            hashCode = (hashCode * 397) ^ DepthStencilState.GetHashCode();
+
+            if (!IsDynamic || !DynamicStates.Contains(DynamicState.Viewport))
+            {
+                foreach (var viewport in Viewports)
+                {
+                    hashCode = (hashCode * 397) ^ viewport.GetHashCode();
+                }
+            }
+            
+            if (!IsDynamic || !DynamicStates.Contains(DynamicState.Scissor))
+            {
+                foreach (var scissor in Scissors)
+                {
+                    hashCode = (hashCode * 397) ^ scissor.GetHashCode();
+                }
+            }
+
+            return hashCode;
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode;
+        }
+        
+        public static GraphicsPipeline New(
+            GraphicsDevice graphicsDevice,
+            Type vertexType,
+            EffectPass effectPass,
+            RenderPass renderPass,
+            PrimitiveTopology primitiveTopology,
+            RasterizerState rasterizerState,
+            BlendState blendState,
+            DepthStencilState depthStencilState,
+            Viewport[] viewports,
+            Rect2D[] scissors,
+            params DynamicState[] dynamicStates)
+        {
+            return new GraphicsPipeline(
+                graphicsDevice, 
+                vertexType,
+                effectPass,
+                renderPass,
+                primitiveTopology,
+                rasterizerState,
+                blendState,
+                depthStencilState,
+                viewports,
+                scissors,
+                dynamicStates);
+        }
+
         public static GraphicsPipeline New<T>(
             GraphicsDevice graphicsDevice, 
             EffectPass effectPass,
             RenderPass renderPass,
             PrimitiveTopology primitiveTopology,
-            RasterizerState rasterizer,
+            RasterizerState rasterizerState,
             BlendState blendState,
-            DepthStencilState depthStencil, 
+            DepthStencilState depthStencilState,
+            Viewport[] viewports,
+            Rect2D[] scissors,
             params DynamicState[] dynamicStates) where T : struct
         {
-            return new GraphicsPipeline(
+            return GraphicsPipeline.New(
                 graphicsDevice, 
-                typeof(T),
-                effectPass,
-                renderPass,
-                primitiveTopology,
-                rasterizer,
-                blendState,
-                depthStencil,
+                typeof(T), 
+                effectPass, 
+                renderPass, 
+                primitiveTopology, 
+                rasterizerState, 
+                blendState, 
+                depthStencilState, 
+                viewports, 
+                scissors, 
                 dynamicStates);
-        }
-
-        protected override void Dispose(bool disposeManagedResources)
-        {
-            Viewports.CollectionChanged -= ViewportsCollectionChanged;
-            Scissors.CollectionChanged -= ScissorsCollectionChanged;
-            DynamicStates.CollectionChanged -= DynamicStatesCollectionChanged;
-
-            base.Dispose(disposeManagedResources);
         }
     }
 
@@ -286,6 +323,11 @@ namespace Adamantium.Engine.Graphics
         protected override void CreateOrUpdatePipeline()
         {
             
+        }
+
+        protected override int ComputeHash()
+        {
+            return 0;
         }
 
         public static ComputePipeline New(GraphicsDevice graphicsDevice)

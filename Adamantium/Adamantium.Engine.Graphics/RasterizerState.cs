@@ -21,9 +21,13 @@ namespace Adamantium.Engine.Graphics
             DepthBiasClamp = info.DepthBiasClamp;
             DepthBiasSlopeFactor = info.DepthBiasSlopeFactor;
             LineWidth = info.LineWidth;
+
+            hashCode = CalculateHashCode();
         }
 
         private PipelineRasterizationStateCreateInfo info;
+
+        private readonly int hashCode;
 
         public bool DepthClampEnable { get; }
         public bool RasterizerDiscardEnable { get; }
@@ -35,6 +39,27 @@ namespace Adamantium.Engine.Graphics
         public float DepthBiasClamp { get; }
         public float DepthBiasSlopeFactor { get; }
         public float LineWidth { get; }
+
+        private int CalculateHashCode()
+        {
+            int hash = DepthClampEnable.GetHashCode();
+            hash = (hash * 397) ^ RasterizerDiscardEnable.GetHashCode();
+            hash = (hash * 397) ^ PolygonMode.GetHashCode();
+            hash = (hash * 397) ^ CullMode.GetHashCode();
+            hash = (hash * 397) ^ FrontFace.GetHashCode();
+            hash = (hash * 397) ^ DepthBiasEnable.GetHashCode();
+            hash = (hash * 397) ^ DepthBiasConstantFactor.GetHashCode();
+            hash = (hash * 397) ^ DepthBiasClamp.GetHashCode();
+            hash = (hash * 397) ^ DepthBiasSlopeFactor.GetHashCode();
+            hash = (hash * 397) ^ LineWidth.GetHashCode();
+
+            return hash;
+        }
+
+        public override int GetHashCode()
+        {
+            return hashCode;
+        }
 
 
         public static implicit operator PipelineRasterizationStateCreateInfo (RasterizerState state)

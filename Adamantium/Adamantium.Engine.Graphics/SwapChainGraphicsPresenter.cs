@@ -11,8 +11,9 @@ namespace Adamantium.Engine.Graphics
     {
         private SwapchainKHR swapchain;
         private SurfaceKHR surface;
-        private VulkanImage[] swapchainImages;
-        internal ImageView[] swapchainImageViews;
+        private VulkanImage[] images;
+        private ImageView[] imageViews;
+        private Framebuffer[] framebuffers;
         private Queue presentQueue;
         
 
@@ -22,6 +23,7 @@ namespace Adamantium.Engine.Graphics
             CreateSwapchain();
             CreateRenderTarget();
             CreateImageViews();
+            CreateFramebuffers();
             BackBuffers = new Texture[BuffersCount];
             var indices = GraphicsDevice.VulkanInstance.CurrentDevice.FindQueueFamilies(surface);
             presentQueue = graphicsDevice.GetDeviceQueue(indices.presentFamily.Value, 0);
@@ -58,11 +60,9 @@ namespace Adamantium.Engine.Graphics
             PhysicalDevice physicalDevice = GraphicsDevice;
             Device logicalDevice = GraphicsDevice;
             var swapChainSupport = QuerySwapChainSupport(physicalDevice);
-            Console.WriteLine($"Extent1 = {Description.Width} : {Description.Height}");
             SurfaceFormatKHR surfaceFormat = ChooseSwapSurfaceFormat(swapChainSupport.Formats);
             PresentModeKHR presentMode = ChooseSwapPresentMode(swapChainSupport.PresentModes);
             Extent2D extent = ChooseSwapExtent(swapChainSupport.Capabilities);
-            Console.WriteLine($"Extent2 = {extent.Width} : {extent.Height}");
             uint imageCount = swapChainSupport.Capabilities.MinImageCount;
             if (imageCount < Description.BuffersCount)
             {
@@ -85,7 +85,7 @@ namespace Adamantium.Engine.Graphics
             createInfo.ImageUsage = (uint)ImageUsageFlagBits.ColorAttachmentBit;
 
             QueueFamilyIndices indices = physicalDevice.FindQueueFamilies(surface);
-            var queueFamilyIndices = new uint[] { indices.graphicsFamily.Value, indices.presentFamily.Value };
+            var queueFamilyIndices = new [] { indices.graphicsFamily.Value, indices.presentFamily.Value };
 
             if (indices.graphicsFamily != indices.presentFamily)
             {
@@ -110,19 +110,19 @@ namespace Adamantium.Engine.Graphics
 
             createInfo.Dispose();
 
-            swapchainImages = logicalDevice.GetSwapchainImagesKHR(swapchain);
+            images = logicalDevice.GetSwapchainImagesKHR(swapchain);
         }
 
 
         private void CreateImageViews()
         {
             Device logicalDevice = GraphicsDevice;
-            swapchainImageViews = new ImageView[swapchainImages.Length];
+            imageViews = new ImageView[images.Length];
 
-            for (int i = 0; i < swapchainImages.Length; i++)
+            for (int i = 0; i < images.Length; i++)
             {
                 var createInfo = new ImageViewCreateInfo();
-                createInfo.Image = swapchainImages[i];
+                createInfo.Image = images[i];
                 createInfo.ViewType = ImageViewType._2d;
                 createInfo.Format = Description.ImageFormat;
                 ComponentMapping componentMapping = new ComponentMapping();
@@ -139,7 +139,27 @@ namespace Adamantium.Engine.Graphics
                 subresourceRange.LayerCount = 1;
                 createInfo.SubresourceRange = subresourceRange;
 
-                swapchainImageViews[i] = logicalDevice.CreateImageView(createInfo);
+                imageViews[i] = logicalDevice.CreateImageView(createInfo);
+            }
+        }
+        
+        private void CreateFramebuffers()
+        {
+            framebuffers = new Framebuffer[BuffersCount];
+
+            for (int i = 0; i < framebuffers.Length; i++)
+            {
+                FramebufferCreateInfo framebufferInfo = new FramebufferCreateInfo();
+                framebufferInfo.RenderPass = GraphicsDevice.RenderPass;
+                framebufferInfo.PAttachments = new [] { renderTarget, depthBuffer, imageViews[i] };
+                framebufferInfo.AttachmentCount = (uint)framebufferInfo.PAttachments.Length;
+                framebufferInfo.Width = Width;
+                framebufferInfo.Height = Height;
+                framebufferInfo.Layers = 1;
+
+                framebuffers[i] = GraphicsDevice.CreateFramebuffer(framebufferInfo);
+
+                framebufferInfo.Dispose();
             }
         }
 
@@ -252,6 +272,11 @@ namespace Adamantium.Engine.Graphics
 
             return true;
         }
+        
+        public override Framebuffer GetFramebuffer(uint index)
+        {
+            return framebuffers[index];
+        }
 
         private void RecreateSwapchain()
         {
@@ -260,12 +285,18 @@ namespace Adamantium.Engine.Graphics
             CreateSwapchain();
             CreateRenderTarget();
             CreateImageViews();
+            CreateFramebuffers();
             CreateDepthBuffer();
         }
 
         private void CleanupSwapChain()
         {
-            foreach (var view in swapchainImageViews)
+            foreach (var framebuffer in framebuffers)
+            {
+                framebuffer.Destroy(GraphicsDevice);
+            }
+            
+            foreach (var view in imageViews)
             {
                 view.Destroy(GraphicsDevice);
             }

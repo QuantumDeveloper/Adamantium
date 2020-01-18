@@ -57,35 +57,39 @@ namespace Adamantium.Engine.Graphics
         public readonly DepthStencilState DepthDisable;
 
         /// <summary>
-        /// A built-in state object with settings for enabling a read-only depth stencil buffer and comparison fuction = GreaterEqual.
+        /// A built-in state object with settings for enabling a read-only depth stencil buffer and comparison function = GreaterEqual.
         /// </summary>
         public readonly DepthStencilState DepthReadGreaterEqual;
 
         /// <summary>
-        /// A built-in state object with settings for enabling a read-only depth stencil buffer and comparison fuction = LessEqual.
+        /// A built-in state object with settings for enabling a read-only depth stencil buffer and comparison function = LessEqual.
         /// </summary>
         public readonly DepthStencilState DepthReadLessEqual;
 
         /// <summary>
-        /// A built-in state object with settings for enabling a read-only depth stencil buffer and comparison fuction = Greater.
+        /// A built-in state object with settings for enabling a read-only depth stencil buffer and comparison function = Greater.
         /// </summary>
         public readonly DepthStencilState DepthReadGreater;
 
         /// <summary>
-        /// A built-in state object with settings for enabling a read-only depth stencil buffer and comparison fuction = Less.
+        /// A built-in state object with settings for enabling a read-only depth stencil buffer and comparison function = Less.
         /// </summary>
         public readonly DepthStencilState DepthReadLess;
 
         /// <summary>
-        /// A built-in state object with settings for enabling a read-only depth stencil buffer and comparison fuction = Equal.
+        /// A built-in state object with settings for enabling a read-only depth stencil buffer and comparison function = Equal.
         /// </summary>
         public readonly DepthStencilState DepthReadEqual;
-
-
+        
         /// <summary>
-        /// A built-in state object with settings for enabling a read-only depth stencil buffer and comparison fuction = Always.
+        /// A built-in state object with settings for enabling a read-only depth stencil buffer and comparison function = Always.
         /// </summary>
         public readonly DepthStencilState DepthReadAlways;
+
+        /// <summary>
+        /// A built-in state object with settings for enabling a depth stencil buffer and comparison function = Always.
+        /// </summary>
+        public readonly DepthStencilState Default;
 
 
         internal DepthStencilStatesCollection()
@@ -104,6 +108,7 @@ namespace Adamantium.Engine.Graphics
             DepthReadLess = Add(DepthStencilState.New(nameof(DepthReadLess), true, false));
             DepthReadEqual = Add(DepthStencilState.New(nameof(DepthReadEqual), true, false, true, CompareOp.Equal));
             DepthReadAlways = Add(DepthStencilState.New(nameof(DepthReadAlways), true, false, true, CompareOp.Always));
+            Default = Add(DepthStencilState.New(nameof(Default), PipelineDepthStencilStateCreateInfo.Default()));
         }
     }
 }

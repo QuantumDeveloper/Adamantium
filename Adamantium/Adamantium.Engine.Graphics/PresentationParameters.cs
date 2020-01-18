@@ -13,7 +13,7 @@ namespace Adamantium.Engine.Graphics
             MSAALevel = MSAALevel.None;
             ImageFormat = Format.R8G8B8A8_UNORM;
             DepthFormat = DepthFormat.Depth32Stencil8X24;
-            BuffersCount = 2;
+            BuffersCount = 3;
             CompositeAlpha = AlphaMode.Opaque;
         }
 

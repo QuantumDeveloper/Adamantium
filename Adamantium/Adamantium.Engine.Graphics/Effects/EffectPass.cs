@@ -13,7 +13,7 @@ namespace Adamantium.Engine.Graphics.Effects
     /// <summary>
     /// Contains rendering state for drawing with an effect;  updates constant buffers and directly sets all needed resources for each <see cref="CommonShaderStage"/>
     /// </summary>
-    public sealed class EffectPass : NamedObject
+    public sealed class EffectPass : DisposableObject
     {
         private const int StageCount = 6;
 
@@ -40,6 +40,7 @@ namespace Adamantium.Engine.Graphics.Effects
         private List<DescriptorSetLayoutBinding> layoutBindings;
 
         private DescriptorSetLayout descriptorSetLayout;
+        private List<DescriptorSet> descriptorSets;
 
         public ReadOnlyCollection<PipelineShaderStageCreateInfo> ShaderStages => shaderStages.AsReadOnly();
 
@@ -65,6 +66,7 @@ namespace Adamantium.Engine.Graphics.Effects
 
             shaderStages = new List<PipelineShaderStageCreateInfo>();
             layoutBindings = new List<DescriptorSetLayoutBinding>();
+            descriptorSets = new List<DescriptorSet>();
             Properties = PrepareProperties(logger, pass.Properties);
             IsSubPass = pass.IsSubPass;
 
@@ -87,6 +89,10 @@ namespace Adamantium.Engine.Graphics.Effects
         public readonly bool IsSubPass;
 
         public PipelineLayout PipelineLayout { get; private set; }
+
+        public ReadOnlyCollection<DescriptorSet> DescriptorSets => descriptorSets.AsReadOnly();
+        
+        public DescriptorPool DescriptorPool { get; private set; }
 
         /// <summary>
         ///   Applies this pass to the device pipeline.
@@ -114,6 +120,8 @@ namespace Adamantium.Engine.Graphics.Effects
         {
             // By default, we set the Current technique 
             Effect.CurrentTechnique = Technique;
+
+            graphicsDevice.CurrentEffectPass = this;
 
             // Sets the current pass on the graphics device
             //graphicsDevice.CurrentPass = this;
@@ -339,9 +347,10 @@ namespace Adamantium.Engine.Graphics.Effects
                 InitStageBlock(stageBlock, logger);
             }
 
-            descriptorSetLayout = CreateDescriptorSetLayout(layoutBindings);
-            PipelineLayout = CreatePipelineLayout(descriptorSetLayout);
-
+            CreateDescriptorSetLayout(layoutBindings);
+            CreatePipelineLayout(descriptorSetLayout);
+            CreateDescriptorPool();
+            CreateDescriptorSets();
         }
 
         /// <summary>
@@ -519,22 +528,83 @@ namespace Adamantium.Engine.Graphics.Effects
             }
         }
 
-        private DescriptorSetLayout CreateDescriptorSetLayout(List<DescriptorSetLayoutBinding> bindings)
+        private void CreateDescriptorSetLayout(List<DescriptorSetLayoutBinding> bindings)
         {
             var layoutInfo = new DescriptorSetLayoutCreateInfo();
             layoutInfo.BindingCount = (uint)bindings.Count;
             layoutInfo.PBindings = bindings.ToArray();
 
-            return graphicsDevice.CreateDescriptorSetLayout(layoutInfo);
+            descriptorSetLayout = graphicsDevice.CreateDescriptorSetLayout(layoutInfo);
         }
 
-        private PipelineLayout CreatePipelineLayout(DescriptorSetLayout setLayout)
+        private void CreatePipelineLayout(DescriptorSetLayout setLayout)
         {
             var pipelineLayoutInfo = new PipelineLayoutCreateInfo();
             pipelineLayoutInfo.SetLayoutCount = 1;
             pipelineLayoutInfo.PSetLayouts = new DescriptorSetLayout[] { setLayout };
 
-            return graphicsDevice.CreatePipelineLayout(pipelineLayoutInfo);
+            PipelineLayout = graphicsDevice.CreatePipelineLayout(pipelineLayoutInfo);
+        }
+        
+        private void CreateDescriptorPool()
+        {
+            var buffersCount = graphicsDevice.Presenter.Description.BuffersCount;
+            DescriptorPoolSize poolSize = new DescriptorPoolSize();
+            poolSize.Type = DescriptorType.CombinedImageSampler;
+            poolSize.DescriptorCount = buffersCount;
+
+            DescriptorPoolCreateInfo poolInfo = new DescriptorPoolCreateInfo();
+            poolInfo.PoolSizeCount = 1;
+            poolInfo.PPoolSizes = poolSize;
+            poolInfo.MaxSets = buffersCount;
+
+            DescriptorPool = graphicsDevice.CreateDescriptorPool(poolInfo);
+        }
+        
+        private void CreateDescriptorSets()
+        {
+            var buffersCount = graphicsDevice.Presenter.BuffersCount;
+            var layouts = new List<DescriptorSetLayout>();
+            for (var index = 0; index < buffersCount; ++index)
+            {
+                layouts.Add(descriptorSetLayout);
+            }
+
+            DescriptorSetAllocateInfo allocInfo = new DescriptorSetAllocateInfo();
+            allocInfo.DescriptorPool = DescriptorPool;
+            allocInfo.DescriptorSetCount = buffersCount;
+            allocInfo.PSetLayouts = layouts.ToArray();
+
+            var descriptors = new DescriptorSet[layouts.Count];
+            if (graphicsDevice.AllocateDescriptorSets(allocInfo, descriptors) != Result.Success)
+            {
+                throw new Exception("failed to allocate descriptor sets!");
+            }
+            
+            descriptorSets.Clear();
+            descriptorSets.AddRange(descriptors);
+        }
+
+        private void CreateWriteDescriptions()
+        {
+            var buffersCount = graphicsDevice.Presenter.BuffersCount;
+            // for (int i = 0; i < buffersCount; ++i)
+            // {
+            //     DescriptorImageInfo imageInfo = new DescriptorImageInfo();
+            //     imageInfo.ImageLayout = ImageLayout.ShaderReadOnlyOptimal;
+            //     imageInfo.ImageView = textureImageView;
+            //     imageInfo.Sampler = textureSampler;
+            //
+            //     WriteDescriptorSet descriptorWriter = new WriteDescriptorSet();
+            //     descriptorWriter.DstSet = descriptorSets[i];
+            //     descriptorWriter.DstBinding = 0;
+            //     descriptorWriter.DstArrayElement = 0;
+            //     descriptorWriter.DescriptorType = DescriptorType.CombinedImageSampler;
+            //     descriptorWriter.DescriptorCount = 1;
+            //     descriptorWriter.PImageInfo = imageInfo;
+            //
+            //     logicalDevice.UpdateDescriptorSets(1, descriptorWriter, 0, out var copies);
+            // }
         }
 
         private ShaderStageFlagBits EffectShaderTypeToShaderStage(EffectShaderType type)
@@ -683,6 +753,21 @@ namespace Adamantium.Engine.Graphics.Effects
             return passProperties;
         }
 
+        public override int GetHashCode()
+        {
+            int hashCode = 0;
+
+            foreach (var stage in pipeline.Stages)
+            {
+                if (stage == null) continue;
+                
+                hashCode = stage.Type.GetHashCode();
+                hashCode = (hashCode * 397) ^ stage.EntryPoint.GetHashCode();
+            }
+
+            return hashCode;
+        }
+
         #region Nested type: PipelineBlock
 
         private struct PipelineBlock
@@ -701,6 +786,17 @@ namespace Adamantium.Engine.Graphics.Effects
             public readonly EffectParameter Parameter;
 
             public readonly int Slot;
+        }
+
+        protected override void Dispose(bool disposeManagedResources)
+        {
+            foreach (var binding in layoutBindings)
+            {
+                binding?.Dispose();
+            }
+            descriptorSetLayout?.Destroy(graphicsDevice);
+            PipelineLayout?.Destroy(graphicsDevice);
+            base.Dispose(disposeManagedResources);
         }
 
         #endregion

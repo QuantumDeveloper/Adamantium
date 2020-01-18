@@ -21,7 +21,7 @@ namespace Adamantium.Core.Collections
 
         public int Capacity
         {
-            get { return items.Length; }
+            get => items.Length;
             set
             {
                 if (value != items.Length)
@@ -281,13 +281,13 @@ namespace Adamantium.Core.Collections
         {
             if (range == null)
             {
-                throw new ArgumentNullException(nameof(range));
+                return;
             }
 
             lock (SyncRoot)
             {
                 var itemsToAdd = range.ToArray();
-                for (int i = 0; i < itemsToAdd.Length; ++i)
+                for (var i = 0; i < itemsToAdd.Length; ++i)
                 {
                     Insert(currentIndex, itemsToAdd[i]);
                 }

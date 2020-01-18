@@ -41,6 +41,9 @@ namespace Adamantium.UI.Processors
             window.ClientSizeChanged += Window_ClientSizeChanged;
             GraphicsDevice = device;
             isWindowResized = true;
+            viewport = new Viewport();
+            viewport.MaxDepth = 1;
+            
             //_vertexLayout = VertexInputLayout.FromType<VertexPositionTexture>();
 
             //_uiEffect = ToDispose(Effect.Load(@"Content\Effects\UIEffect.fx.compiled", _graphicsDevice));
@@ -72,9 +75,12 @@ namespace Adamantium.UI.Processors
         //    projection = Matrix4x4F.OrthoOffCenterLH(0, _window.ClientWidth, _window.ClientHeight, 0, 1000.0f, 1f);
         //}
 
+        private Viewport viewport;
         private void Window_ClientSizeChanged(object sender, SizeChangedEventArgs e)
         {
             isWindowResized = true;
+            viewport.Width = (uint)e.NewSize.Width;
+            viewport.Height = (uint)e.NewSize.Height;
         }
 
         public bool Prepare()
@@ -119,7 +125,12 @@ namespace Adamantium.UI.Processors
             //d2D1Device.EndDraw();
 
             //mainDevice.CopyResource(_backBuffer, Presenter.BackBuffer);
+            GraphicsDevice.VertexType = typeof(MeshVertex);
+            GraphicsDevice.PrimitiveTopology = PrimitiveTopology.TriangleList;
+            GraphicsDevice.SetViewports(viewport);
+            
 
+            GraphicsDevice.BasicEffect.Techniques[0].Passes[0].Apply();
             GraphicsDevice.Draw(3,1);
             GraphicsDevice.EndDraw();
             GraphicsDevice.Present();

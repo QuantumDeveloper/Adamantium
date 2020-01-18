@@ -18,29 +18,37 @@ namespace Adamantium.Engine.Graphics
             AttachmentCount = info.AttachmentCount;
             PAttachments = this.info.PAttachments;
             BlendConstants = this.info.BlendConstants;
+
+            hashCode = CalculateHashCode();
         }
 
-        public bool LogicOpEnable { get; set; }
-        public LogicOp LogicOp { get; set; }
-        public uint AttachmentCount { get; set; }
-        public PipelineColorBlendAttachmentState[] PAttachments { get; set; }
-        public float[] BlendConstants { get; set; }
+        private readonly int hashCode;
+        public bool LogicOpEnable { get; }
+        public LogicOp LogicOp { get; }
+        public uint AttachmentCount { get; }
+        public PipelineColorBlendAttachmentState[] PAttachments { get; }
+        public float[] BlendConstants { get; }
 
-        public override int GetHashCode()
+        private int CalculateHashCode()
         {
-            int hashCode = LogicOpEnable.GetHashCode();
-            hashCode = (hashCode * 397) ^ LogicOp.GetHashCode();
-            hashCode = (hashCode * 397) ^ AttachmentCount.GetHashCode();
+            int hash = LogicOpEnable.GetHashCode();
+            hash = (hash * 397) ^ LogicOp.GetHashCode();
+            hash = (hash * 397) ^ AttachmentCount.GetHashCode();
             foreach(var attachment in PAttachments)
             {
-                hashCode = (hashCode * 397) ^ attachment.GetHashCode();
+                hash = (hash * 397) ^ attachment.GetHashCode();
             }
 
             foreach (var constant in BlendConstants)
             {
-                hashCode = (hashCode * 397) ^ constant.GetHashCode();
+                hash = (hash * 397) ^ constant.GetHashCode();
             }
 
+            return hash;
+        }
+
+        public override int GetHashCode()
+        {
             return hashCode;
         }
 

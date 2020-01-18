@@ -1,20 +1,38 @@
 ﻿using AdamantiumVulkan.Core;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace Adamantium.Engine.Graphics
 {
     public static class VertexUtils
     {
+        private static Dictionary<Type, VertexInputBindingDescription> vertexInputDescriptions;
+        private static Dictionary<Type, VertexInputAttributeDescription[]> vertexInputAttributeDescriptions;
+
+        static VertexUtils()
+        {
+            vertexInputDescriptions = new Dictionary<Type, VertexInputBindingDescription>();
+            vertexInputAttributeDescriptions = new Dictionary<Type, VertexInputAttributeDescription[]>();
+        }
+        
         public static VertexInputBindingDescription GetBindingDescription(Type vertexType)
         {
-            var decr = new VertexInputBindingDescription();
-            decr.Binding = 0;
-            decr.Stride = (uint)Marshal.SizeOf(vertexType);
-            decr.InputRate = VertexInputRate.Vertex;
+            if (vertexInputDescriptions.ContainsKey(vertexType))
+            {
+                return vertexInputDescriptions[vertexType];
+            }
+            
+            var desc = new VertexInputBindingDescription
+            {
+                Binding = 0, 
+                Stride = (uint) Marshal.SizeOf(vertexType), 
+                InputRate = VertexInputRate.Vertex
+            };
 
-            return decr;
+            vertexInputDescriptions.Add(vertexType, desc);
+            return desc;
         }
 
         public static VertexInputBindingDescription GetBindingDescription<T>() where T : struct
@@ -24,6 +42,11 @@ namespace Adamantium.Engine.Graphics
 
         public static VertexInputAttributeDescription[] GetVertexAttributeDescription(Type vertexType)
         {
+            if (vertexInputAttributeDescriptions.ContainsKey(vertexType))
+            {
+                return vertexInputAttributeDescriptions[vertexType];
+            }
+            
             var fields = vertexType.GetFields();
 
             var attributes = new List<VertexInputAttributeDescription>();
