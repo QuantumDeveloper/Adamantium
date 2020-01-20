@@ -741,14 +741,14 @@ namespace Adamantium.Engine.Graphics
             ShouldChangeGraphicsPipeline = false;
 
             commandBuffer.BindPipeline(pipeline.BindPoint, pipeline);
-            //commandBuffer.BindDescriptorSets(
-            //    PipelineBindPoint.Graphics, 
-            //    CurrentEffectPass.PipelineLayout, 
-            //    0, 
-            //    1, 
-            //    CurrentEffectPass.DescriptorSets[(int) ImageIndex], 
-            //    0, 
-            //    0);
+            commandBuffer.BindDescriptorSets(
+                PipelineBindPoint.Graphics, 
+                CurrentEffectPass.PipelineLayout, 
+                0, 
+                1, 
+                CurrentEffectPass.DescriptorSets[(int) ImageIndex], 
+                0, 
+                0);
 
             commandBuffer.Draw(vertexCount, instanceCount, firstVertex, firstInstance);
         }
@@ -777,6 +777,12 @@ namespace Adamantium.Engine.Graphics
             commandBuffer.BindIndexBuffer(indexBuffer, 0, IndexType.Uint32);
 
             commandBuffer.DrawIndexed(indexBuffer.ElementCount, 1, 0, 0, 0);
+        }
+
+        public void UpdateDescriptorSets(params WriteDescriptorSet[] writeDescriptorSets)
+        {
+            if (writeDescriptorSets == null || writeDescriptorSets.Length == 0) return;
+            LogicalDevice.UpdateDescriptorSets((uint)writeDescriptorSets.Length, writeDescriptorSets, 0, out var copySets);
         }
 
         public CommandBuffer BeginSingleTimeCommands()

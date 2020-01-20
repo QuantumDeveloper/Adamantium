@@ -7,6 +7,7 @@ using Adamantium.Core;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Effects;
 using AdamantiumVulkan.Core;
+using AdamantiumVulkan.Core.Interop;
 
 namespace Adamantium.Engine.Graphics.Effects
 {
@@ -40,6 +41,7 @@ namespace Adamantium.Engine.Graphics.Effects
         private List<DescriptorSetLayoutBinding> layoutBindings;
 
         private DescriptorSetLayout descriptorSetLayout;
+        
         private List<DescriptorSet> descriptorSets;
 
         public ReadOnlyCollection<PipelineShaderStageCreateInfo> ShaderStages => shaderStages.AsReadOnly();
@@ -351,6 +353,7 @@ namespace Adamantium.Engine.Graphics.Effects
             CreatePipelineLayout();
             CreateDescriptorPool();
             CreateDescriptorSets();
+            CreateWriteDescriptions();
         }
 
         /// <summary>
@@ -433,7 +436,7 @@ namespace Adamantium.Engine.Graphics.Effects
                                   constantBuffer));
                         }
                         else if (parameter.ParameterDescription != previousParameter.ParameterDescription ||
-                                 parameter.buffer != previousParameter.buffer)
+                                 parameter.Buffer != previousParameter.Buffer)
                         {
                             // If registered parameters is different
                             logger.Error(
@@ -596,7 +599,25 @@ namespace Adamantium.Engine.Graphics.Effects
         private void CreateWriteDescriptions()
         {
             var buffersCount = graphicsDevice.Presenter.BuffersCount;
-            // for (int i = 0; i < buffersCount; ++i)
+            var descriptorWrites = new List<WriteDescriptorSet>();
+            var buffers = Effect.Parameters.Where(x => x.Buffer != null).Select(x => x.Buffer).Distinct().ToArray();
+            DescriptorBufferInfo bufferInfo = new DescriptorBufferInfo();
+            bufferInfo.Buffer = buffers[0];
+            bufferInfo.Range = (ulong)Marshal.SizeOf<VkDescriptorBufferInfo>();
+            
+            for (int i = 0; i < layoutBindings.Count; ++i)
+            {
+                var writeDescriptor = new WriteDescriptorSet();
+                writeDescriptor.DescriptorCount = 1;
+                writeDescriptor.DescriptorType = layoutBindings[i].DescriptorType;
+                writeDescriptor.DstBinding = layoutBindings[i].Binding;
+                writeDescriptor.DstSet = descriptorSets[0];
+                writeDescriptor.PBufferInfo = bufferInfo;
+                descriptorWrites.Add(writeDescriptor);
+            }
+            
+            graphicsDevice.UpdateDescriptorSets(descriptorWrites.ToArray());
+            
             // {
             //     DescriptorImageInfo imageInfo = new DescriptorImageInfo();
             //     imageInfo.ImageLayout = ImageLayout.ShaderReadOnlyOptimal;

@@ -11,10 +11,11 @@ namespace Adamantium.Engine.Graphics
             PresenterType = presenterType;
 
             MSAALevel = MSAALevel.None;
-            ImageFormat = Format.R8G8B8A8_UNORM;
+            ImageFormat = Format.B8G8R8A8_UNORM;
             DepthFormat = DepthFormat.Depth32Stencil8X24;
             BuffersCount = 3;
             CompositeAlpha = AlphaMode.Opaque;
+            ImageColorSpace = ColorSpace.SRGBNonlinear;
         }
 
         public PresentationParameters(PresentationParameters parameters)
