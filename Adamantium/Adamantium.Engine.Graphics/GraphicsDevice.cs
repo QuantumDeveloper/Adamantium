@@ -717,6 +717,17 @@ namespace Adamantium.Engine.Graphics
             commandBuffer.BindVertexBuffers(0, 1, vertexBuffer, ref offset);
         }
 
+        public void SetVertexBuffers(params Buffer[] vertexBuffers)
+        {
+            if (vertexBuffers == null || vertexBuffers.Length == 0) return;
+
+            ulong[] offset = new ulong[vertexBuffers.Length];
+            var commandBuffer = commandBuffers[ImageIndex];
+            var buffers = vertexBuffers.Cast<AdamantiumVulkan.Core.Buffer>().ToArray();
+            commandBuffer.BindVertexBuffers(0, (uint)buffers.Length, buffers, offset);
+        }
+
+
         public void Draw(uint vertexCount, uint instanceCount, uint firstVertex = 0, uint firstInstance = 0)
         {
             if (CurrentEffectPass == null)
@@ -726,15 +737,18 @@ namespace Adamantium.Engine.Graphics
             
             var commandBuffer = commandBuffers[ImageIndex];
             var pipeline = pipelineManager.GetOrCreateGraphicsPipeline(this);
+
+            ShouldChangeGraphicsPipeline = false;
+
             commandBuffer.BindPipeline(pipeline.BindPoint, pipeline);
-            commandBuffer.BindDescriptorSets(
-                PipelineBindPoint.Graphics, 
-                CurrentEffectPass.PipelineLayout, 
-                0, 
-                1, 
-                CurrentEffectPass.DescriptorSets[(int) ImageIndex], 
-                0, 
-                0);
+            //commandBuffer.BindDescriptorSets(
+            //    PipelineBindPoint.Graphics, 
+            //    CurrentEffectPass.PipelineLayout, 
+            //    0, 
+            //    1, 
+            //    CurrentEffectPass.DescriptorSets[(int) ImageIndex], 
+            //    0, 
+            //    0);
 
             commandBuffer.Draw(vertexCount, instanceCount, firstVertex, firstInstance);
         }
@@ -743,11 +757,24 @@ namespace Adamantium.Engine.Graphics
         {
             ulong offset = 0;
             var commandBuffer = commandBuffers[ImageIndex];
+
+            var pipeline = pipelineManager.GetOrCreateGraphicsPipeline(this);
+
+            ShouldChangeGraphicsPipeline = false;
+
+            commandBuffer.BindPipeline(pipeline.BindPoint, pipeline);
+            commandBuffer.BindDescriptorSets(
+                PipelineBindPoint.Graphics,
+                CurrentEffectPass.PipelineLayout,
+                0,
+                1,
+                CurrentEffectPass.DescriptorSets[(int)ImageIndex],
+                0,
+                0);
+
             commandBuffer.BindVertexBuffers(0, 1, vertexBuffer, ref offset);
 
             commandBuffer.BindIndexBuffer(indexBuffer, 0, IndexType.Uint32);
-
-            //commandBuffer.BindDescriptorSets(PipelineBindPoint.Graphics, pipelineLayout, 0, 1, descriptorSets[CurrentImageIndex], 0, 0);
 
             commandBuffer.DrawIndexed(indexBuffer.ElementCount, 1, 0, 0, 0);
         }
@@ -786,15 +813,15 @@ namespace Adamantium.Engine.Graphics
 
         private bool ResizePresenter(Func<bool> resizeFunc)
         {
-            var result = LogicalDevice.DeviceWaitIdle();
-            var resizeResult = resizeFunc();
-            if (!resizeResult)
-            {
-                return false;
-            }
-            graphicsPipeline?.Destroy(LogicalDevice);
-            CreateGraphicsPipeline();
-            OnSurfaceSizeChanged();
+            //var result = LogicalDevice.DeviceWaitIdle();
+            //var resizeResult = resizeFunc();
+            //if (!resizeResult)
+            //{
+            //    return false;
+            //}
+            //graphicsPipeline?.Destroy(LogicalDevice);
+            //CreateGraphicsPipeline();
+            //OnSurfaceSizeChanged();
             return true;
         }
 
@@ -803,7 +830,7 @@ namespace Adamantium.Engine.Graphics
             var presentResult = Presenter.Present();
             if (presentResult == Result.SuboptimalKhr || presentResult == Result.ErrorOutOfDateKhr)
             {
-                ResizePresenter();
+                //ResizePresenter();
             }
             
             UpdateCurrentFrameNumber();

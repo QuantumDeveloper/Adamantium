@@ -1,38 +1,12 @@
 matrix wvp;
 
 float4 fillColor;
-sampler sampleType;// : register(s2);
-Texture2D shaderTexture;// : register(t4);
-sampler sampleType2;// : register(s5);
-Texture2D shaderTexture2;// : register(t5);
+sampler sampleType;
+Texture2D shaderTexture;
 
 float zNear;
 float zFar;
 float transparency = 1;
-float transparency2 = 1;
-
-
-const int permutationTableSize = 1024;
-const int gradientSetSize = 26;
-
-cbuffer PerlinParams : register(b0)
-{
-	//pseudorandom hash modifiers
-	int mX;
-	int mY;
-	int mZ;
-
-	//permutation table
-	int permutationTable[permutationTableSize];
-	//gradients' set
-	float3 gradientSet[gradientSetSize];
-};
-
-struct VertexInputType
-{
-	float4 position : SV_POSITION;
-	float4 color: COLOR;
-};
 
 struct PixelInputType
 {
@@ -40,9 +14,15 @@ struct PixelInputType
 	float4 color: COLOR;
 };
 
+struct VertexInputType
+{
+	float4 position : SV_POSITION;
+};
+
 struct TexturedVertexInputType
 {
 	float4 position : SV_POSITION;
+	float4 color: COLOR;
 	float2 texcoord: TEXCOORD;
 };
 
@@ -51,7 +31,6 @@ struct TexturedPixelInputType
 	float4 position : SV_POSITION;
 	float2 texcoord: TEXCOORD;
 };
-
 
 ////////////////////////////////////////////////////////////////////////////////
 // Vertex Shader
@@ -68,11 +47,12 @@ PixelInputType LightVertexShader(VertexInputType input)
 
 	// Calculate the position of the vertex against the world, view, and projection matrices.
 
-	output.position = mul(input.position, wvp);
+	output.position.xyz = input.position.xyz;
+	//output.position = mul(input.position, wvp);
 
 	//output.position.z = log(zNear*output.position.z + 1) / log(zNear*zFar + 1) * output.position.w;
 
-	output.color = input.color;
+	//output.color = input.color;
 
 	return output;
 }
@@ -112,19 +92,30 @@ float4 TexturedPixelShader(TexturedPixelInputType input) : SV_TARGET
    float4 result = fillColor;
    result.a *= transparency;
    float4 color = shaderTexture.Sample(sampleType, input.texcoord) * result;
-   color = shaderTexture2.Sample(sampleType2, input.texcoord) * color;
    return color;
 }
 
 
 technique10 Render
 {
-	
+	pass Debug
+	{
+		Profile = 5.1;
+		VertexShader = LightVertexShader;
+		PixelShader = LightPixelShader;
+	}
+
+	pass SolidColor
+	{
+		Profile = 5.1;
+		VertexShader = TexturedVertexShader;
+		PixelShader = SolidColorPixelShader;
+	}
 
 	pass Textured
 	{
 		Profile = 5.1;
-		SetVertexShader(CompileShader(vs_4_0, TexturedVertexShader()));
-		SetPixelShader(CompileShader(ps_4_0, TexturedPixelShader()));
+		VertexShader = TexturedVertexShader;
+		PixelShader = TexturedPixelShader;
 	}
 }

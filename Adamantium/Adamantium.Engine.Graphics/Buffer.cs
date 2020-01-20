@@ -70,7 +70,7 @@ namespace Adamantium.Engine.Graphics
         {
             VulkanBuffer stagingBuffer;
             DeviceMemory stagingBufferMemory;
-            CreateBuffer(TotalSize, BufferUsageFlags.TransferSrc, MemoryPropertyFlags.HostCached | MemoryPropertyFlags.HostCoherent, out stagingBuffer, out stagingBufferMemory);
+            CreateBuffer(TotalSize, BufferUsageFlags.TransferSrc, MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent, out stagingBuffer, out stagingBufferMemory);
 
             UpdateBufferContent(stagingBufferMemory, dataPointer);
             CreateBuffer(TotalSize, BufferUsageFlags.TransferDst | Usage, MemoryFlags, out VulkanBuffer, out BufferMemory);
@@ -80,13 +80,10 @@ namespace Adamantium.Engine.Graphics
             stagingBufferMemory.FreeMemory(GraphicsDevice);
         }
 
-        private void UpdateBufferContent(DeviceMemory bufferMemory, DataPointer dataPointer, ulong offset = 0)
+        private unsafe void UpdateBufferContent(DeviceMemory bufferMemory, DataPointer dataPointer, ulong offset = 0)
         {
             var data = GraphicsDevice.MapMemory(bufferMemory, offset, (ulong)TotalSize, 0);
-            unsafe
-            {
-                System.Buffer.MemoryCopy(dataPointer.Pointer.ToPointer(), data.ToPointer(), TotalSize, dataPointer.Size);
-            }
+            System.Buffer.MemoryCopy(dataPointer.Pointer.ToPointer(), data.ToPointer(), TotalSize, dataPointer.Size);
             GraphicsDevice.UnmapMemory(bufferMemory);
         }
 
@@ -488,7 +485,7 @@ namespace Adamantium.Engine.Graphics
         /// <unmanaged-short>ID3D11Device::CreateBuffer</unmanaged-short>
         public static Buffer<T> New<T>(GraphicsDevice device, T[] initialValue, BufferUsageFlags bufferFlags, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal) where T : struct
         {
-            return New(device, initialValue, bufferFlags, memoryFlags);
+            return New(device, initialValue, bufferFlags, memoryFlags, SharingMode.Exclusive);
         }
 
         /// <summary>
@@ -511,7 +508,7 @@ namespace Adamantium.Engine.Graphics
             {
                 int elementSize = Utilities.SizeOf<T>();
                 int bufferSize = elementSize * initialValue.Length;
-                var data = new DataPointer(handle.AddrOfPinnedObject(), initialValue.Length, (uint)elementSize);
+                var data = new DataPointer(handle.AddrOfPinnedObject(), bufferSize, (uint)initialValue.Length);
 
                 return new Buffer<T>(device, bufferFlags, data, memoryFlags, sharingMode);
             }
@@ -540,7 +537,7 @@ namespace Adamantium.Engine.Graphics
             try
             {
                 int bufferSize = initialValue.Length;
-                var data = new DataPointer(handle.AddrOfPinnedObject(), initialValue.Length, (uint)(initialValue.Length / elementSize));
+                var data = new DataPointer(handle.AddrOfPinnedObject(), bufferSize, (uint)initialValue.Length);
 
                 return new Buffer(device, bufferFlags, data, memoryFlags, SharingMode.Exclusive);
             }

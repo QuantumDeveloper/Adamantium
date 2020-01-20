@@ -99,7 +99,6 @@ namespace Adamantium.UI
             @params.OutputHandle = window.SurfaceHandle;
             var device = GraphicsDevice.CreateRenderDevice(@params);
             device.AddDynamicStates(DynamicState.Viewport, DynamicState.Scissor);
-            var effect = Effect.CompileFromFile(Path.Combine("Effects", "UIEffect.fx"), device);
 
             windowToDevices[window] = device;
 

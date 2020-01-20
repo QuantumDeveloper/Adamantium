@@ -348,7 +348,7 @@ namespace Adamantium.Engine.Graphics.Effects
             }
 
             CreateDescriptorSetLayout(layoutBindings);
-            CreatePipelineLayout(descriptorSetLayout);
+            CreatePipelineLayout();
             CreateDescriptorPool();
             CreateDescriptorSets();
         }
@@ -537,11 +537,13 @@ namespace Adamantium.Engine.Graphics.Effects
             descriptorSetLayout = graphicsDevice.CreateDescriptorSetLayout(layoutInfo);
         }
 
-        private void CreatePipelineLayout(DescriptorSetLayout setLayout)
+        private void CreatePipelineLayout()
         {
             var pipelineLayoutInfo = new PipelineLayoutCreateInfo();
             pipelineLayoutInfo.SetLayoutCount = 1;
-            pipelineLayoutInfo.PSetLayouts = new DescriptorSetLayout[] { setLayout };
+            pipelineLayoutInfo.PSetLayouts = new DescriptorSetLayout[] { descriptorSetLayout };
+            //pipelineLayoutInfo.SetLayoutCount = 0;
+
 
             PipelineLayout = graphicsDevice.CreatePipelineLayout(pipelineLayoutInfo);
         }
@@ -549,13 +551,19 @@ namespace Adamantium.Engine.Graphics.Effects
         private void CreateDescriptorPool()
         {
             var buffersCount = graphicsDevice.Presenter.Description.BuffersCount;
-            DescriptorPoolSize poolSize = new DescriptorPoolSize();
-            poolSize.Type = DescriptorType.CombinedImageSampler;
-            poolSize.DescriptorCount = buffersCount;
+            var poolSizes = new List<DescriptorPoolSize>();
+            var bindingGroups = layoutBindings.GroupBy(x => x.DescriptorType).SelectMany(g=>g).ToList();
+            foreach (var binding in bindingGroups)
+            {
+                var poolSize = new DescriptorPoolSize();
+                poolSize.Type = binding.DescriptorType;
+                poolSize.DescriptorCount = buffersCount * (uint)layoutBindings.Where(x => x.DescriptorType == binding.DescriptorType).ToArray().Length;
+                poolSizes.Add(poolSize);
+            }
 
             DescriptorPoolCreateInfo poolInfo = new DescriptorPoolCreateInfo();
-            poolInfo.PoolSizeCount = 1;
-            poolInfo.PPoolSizes = poolSize;
+            poolInfo.PoolSizeCount = (uint)poolSizes.Count;
+            poolInfo.PPoolSizes = poolSizes.ToArray();
             poolInfo.MaxSets = buffersCount;
 
             DescriptorPool = graphicsDevice.CreateDescriptorPool(poolInfo);

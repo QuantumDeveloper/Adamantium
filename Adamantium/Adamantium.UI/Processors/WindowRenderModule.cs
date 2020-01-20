@@ -9,6 +9,7 @@ using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Media;
 using AdamantiumVulkan.Core;
+using Buffer = Adamantium.Engine.Graphics.Buffer;
 
 namespace Adamantium.UI.Processors
 {
@@ -26,7 +27,9 @@ namespace Adamantium.UI.Processors
         //private DepthStencilBuffer _depthBuffer;
         //private MSAALevel _msaaLevel;
         private bool isWindowResized;
-        private uint buffersCount = 2; 
+        private uint buffersCount = 2;
+        private Buffer vertexBuffer;
+        private Buffer indexBuffer;
 
         public WindowRenderModule(IWindow window, GraphicsDevice device, MSAALevel msaaLevel)
         {
@@ -43,7 +46,13 @@ namespace Adamantium.UI.Processors
             isWindowResized = true;
             viewport = new Viewport();
             viewport.MaxDepth = 1;
-            
+            viewport.Width = window.ClientWidth;
+            viewport.Height = window.ClientHeight;
+
+            var vertices = GetVertexArray();
+            var indices = new UInt32[] { 0, 1, 2, 0, 2, 3 };
+            vertexBuffer = Buffer.Vertex.New(device, vertices);
+            indexBuffer = Buffer.Index.New(device, indices);
             //_vertexLayout = VertexInputLayout.FromType<VertexPositionTexture>();
 
             //_uiEffect = ToDispose(Effect.Load(@"Content\Effects\UIEffect.fx.compiled", _graphicsDevice));
@@ -98,10 +107,9 @@ namespace Adamantium.UI.Processors
             //                return false;
             //            }
 
-            var c = Color.FromBgra(0xFF6495ED);
             if (!GraphicsDevice.BeginDraw(Colors.CornflowerBlue, 1.0f, 0))
             {
-                GraphicsDevice.ResizePresenter((uint)window.ClientWidth, (uint)window.ClientHeight, buffersCount, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
+                //GraphicsDevice.ResizePresenter((uint)window.ClientWidth, (uint)window.ClientHeight, buffersCount, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
                 return false;
             }
 
@@ -112,6 +120,19 @@ namespace Adamantium.UI.Processors
             //TraverseByLayer(_window, ProcessControl);
 
             return true;
+        }
+
+        private VertexPositionColorTexture[] GetVertexArray()
+        {
+            var v = new VertexPositionColorTexture[]
+            {
+                new VertexPositionColorTexture(){Position = new Vector3F(-0.5f, -0.5f), Color = new Color4F(0.0f, 0.0f, 1.0f, 1.0f), UV = new Vector2F(0.0f, 0.0f)},
+                new VertexPositionColorTexture(){Position = new Vector3F(0.5f, -0.5f), Color = new Color4F(1.0f, 1.0f, 1.0f, 1.0f), UV = new Vector2F(1.0f, 0.0f)},
+                new VertexPositionColorTexture(){Position = new Vector3F(0.5f, 0.5f), Color = new Color4F(0.0f, 1.0f, 0.0f, 1.0f), UV = new Vector2F(1.0f, 1.0f)},
+                new VertexPositionColorTexture(){Position = new Vector3F(-0.5f, 0.5f), Color = new Color4F(1.0f, 0.0f, 1.0f, 1.0f), UV = new Vector2F(0.0f, 1.0f)},
+            };
+
+            return v;
         }
 
         public void Render(IGameTime gameTime)
@@ -125,13 +146,14 @@ namespace Adamantium.UI.Processors
             //d2D1Device.EndDraw();
 
             //mainDevice.CopyResource(_backBuffer, Presenter.BackBuffer);
-            GraphicsDevice.VertexType = typeof(MeshVertex);
+            GraphicsDevice.VertexType = typeof(VertexPositionColorTexture);
             GraphicsDevice.PrimitiveTopology = PrimitiveTopology.TriangleList;
+            //GraphicsDevice.ApplyViewports(viewport);
             GraphicsDevice.SetViewports(viewport);
-            
+            GraphicsDevice.SetVertexBuffer(vertexBuffer);
 
             GraphicsDevice.BasicEffect.Techniques[0].Passes[0].Apply();
-            GraphicsDevice.Draw(3,1);
+            GraphicsDevice.DrawIndexed(vertexBuffer, indexBuffer);
             GraphicsDevice.EndDraw();
             GraphicsDevice.Present();
             

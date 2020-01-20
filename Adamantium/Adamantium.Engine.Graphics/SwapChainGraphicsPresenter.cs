@@ -150,7 +150,7 @@ namespace Adamantium.Engine.Graphics
             for (int i = 0; i < framebuffers.Length; i++)
             {
                 FramebufferCreateInfo framebufferInfo = new FramebufferCreateInfo();
-                framebufferInfo.RenderPass = GraphicsDevice.RenderPass;
+                framebufferInfo.RenderPass = RenderPass;
                 framebufferInfo.PAttachments = new [] { renderTarget, depthBuffer, imageViews[i] };
                 framebufferInfo.AttachmentCount = (uint)framebufferInfo.PAttachments.Length;
                 framebufferInfo.Width = Width;
@@ -284,9 +284,10 @@ namespace Adamantium.Engine.Graphics
 
             CreateSwapchain();
             CreateRenderTarget();
+            CreateDepthBuffer();
             CreateImageViews();
             CreateFramebuffers();
-            CreateDepthBuffer();
+            
         }
 
         private void CleanupSwapChain()

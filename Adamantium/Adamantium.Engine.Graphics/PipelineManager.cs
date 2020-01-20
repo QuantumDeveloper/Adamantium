@@ -13,6 +13,8 @@ namespace Adamantium.Engine.Graphics
 
         private GraphicsDevice graphicsDevice;
 
+        private GraphicsPipeline currentGraphicsPipeline;
+
         public PipelineManager(GraphicsDevice graphicsDevice)
         {
             this.graphicsDevice = graphicsDevice;
@@ -30,10 +32,10 @@ namespace Adamantium.Engine.Graphics
         {
             if (!graphicsDevice.ShouldChangeGraphicsPipeline)
             {
-                return graphicsDevice.CurrentGraphicsPipeline;
+                return currentGraphicsPipeline;
             }
             
-            return GetOrCreateGraphicsPipeline(graphicsDevice,
+            currentGraphicsPipeline = GetOrCreateGraphicsPipeline(graphicsDevice,
                 graphicsDevice.VertexType,
                 graphicsDevice.CurrentEffectPass,
                 graphicsDevice.RenderPass,
@@ -44,6 +46,8 @@ namespace Adamantium.Engine.Graphics
                 graphicsDevice.Viewports.ToArray(),
                 graphicsDevice.Scissors.ToArray(),
                 graphicsDevice.DynamicStates);
+
+            return currentGraphicsPipeline;
         }
 
         public GraphicsPipeline GetOrCreateGraphicsPipeline(
@@ -93,7 +97,7 @@ namespace Adamantium.Engine.Graphics
             return pipeline;
 
         }
-        
+
         protected int ComputeHash(
             Type vertexType, 
             EffectPass effectPass,

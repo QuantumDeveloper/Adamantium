@@ -410,6 +410,7 @@ namespace Adamantium.Engine.Compiler.Effects
                 case "VertexShader":
                     CompileShader(EffectShaderType.Vertex, expression.Value);
                     break;
+                case "PixelShader":
                 case "FragmentShader":
                     CompileShader(EffectShaderType.Fragment, expression.Value);
                     break;
