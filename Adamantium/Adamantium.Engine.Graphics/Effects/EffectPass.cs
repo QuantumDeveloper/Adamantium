@@ -131,6 +131,8 @@ namespace Adamantium.Engine.Graphics.Effects
             //TODO: here we need to setup graphics/compute pipeline for current EffectPass before rendering begins
             //and then update all descriptors for each stage
 
+            CreateWriteDescriptions();
+
             // ----------------------------------------------
             // Iterate on each stage to setup all inputs
             // ----------------------------------------------
@@ -353,7 +355,6 @@ namespace Adamantium.Engine.Graphics.Effects
             CreatePipelineLayout();
             CreateDescriptorPool();
             CreateDescriptorSets();
-            CreateWriteDescriptions();
         }
 
         /// <summary>
@@ -543,9 +544,8 @@ namespace Adamantium.Engine.Graphics.Effects
         private void CreatePipelineLayout()
         {
             var pipelineLayoutInfo = new PipelineLayoutCreateInfo();
-            pipelineLayoutInfo.SetLayoutCount = 1;
-            pipelineLayoutInfo.PSetLayouts = new DescriptorSetLayout[] { descriptorSetLayout };
-            //pipelineLayoutInfo.SetLayoutCount = 0;
+            //pipelineLayoutInfo.SetLayoutCount = 1;
+            //pipelineLayoutInfo.PSetLayouts = new DescriptorSetLayout[] { descriptorSetLayout };
 
 
             PipelineLayout = graphicsDevice.CreatePipelineLayout(pipelineLayoutInfo);
@@ -604,19 +604,22 @@ namespace Adamantium.Engine.Graphics.Effects
             DescriptorBufferInfo bufferInfo = new DescriptorBufferInfo();
             bufferInfo.Buffer = buffers[0];
             bufferInfo.Range = (ulong)Marshal.SizeOf<VkDescriptorBufferInfo>();
-            
-            for (int i = 0; i < layoutBindings.Count; ++i)
+
+            for (int k = 0; k < buffersCount; ++k)
             {
-                var writeDescriptor = new WriteDescriptorSet();
-                writeDescriptor.DescriptorCount = 1;
-                writeDescriptor.DescriptorType = layoutBindings[i].DescriptorType;
-                writeDescriptor.DstBinding = layoutBindings[i].Binding;
-                writeDescriptor.DstSet = descriptorSets[0];
-                writeDescriptor.PBufferInfo = bufferInfo;
-                descriptorWrites.Add(writeDescriptor);
+                for (int i = 0; i < layoutBindings.Count; ++i)
+                {
+                    var writeDescriptor = new WriteDescriptorSet();
+                    writeDescriptor.DescriptorCount = 1;
+                    writeDescriptor.DescriptorType = layoutBindings[i].DescriptorType;
+                    writeDescriptor.DstBinding = layoutBindings[i].Binding;
+                    writeDescriptor.DstSet = descriptorSets[0];
+                    writeDescriptor.PBufferInfo = bufferInfo;
+                    descriptorWrites.Add(writeDescriptor);
+                }
+
+                graphicsDevice.UpdateDescriptorSets(descriptorWrites.ToArray());
             }
-            
-            graphicsDevice.UpdateDescriptorSets(descriptorWrites.ToArray());
             
             // {
             //     DescriptorImageInfo imageInfo = new DescriptorImageInfo();

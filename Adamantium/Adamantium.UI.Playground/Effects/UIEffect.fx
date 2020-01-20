@@ -76,23 +76,24 @@ TexturedPixelInputType TexturedVertexShader(TexturedVertexInputType input)
 
 float4 LightPixelShader(PixelInputType input) : SV_TARGET
 {
-   input.color.a = transparency;
+   //input.color.a = transparency;
    return input.color;
 }
 
 float4 SolidColorPixelShader(TexturedPixelInputType input) : SV_TARGET
 {
    float4 result = fillColor;
-   result.a *= transparency;
+   //result.a *= transparency;
    return result;
 }
 
 float4 TexturedPixelShader(TexturedPixelInputType input) : SV_TARGET
 {
-   float4 result = fillColor;
-   result.a *= transparency;
-   float4 color = shaderTexture.Sample(sampleType, input.texcoord) * result;
-   return color;
+   //float4 result = fillColor;
+   //result.a *= transparency;
+   //float4 color = shaderTexture.Sample(sampleType, input.texcoord) * result;
+   //return color;
+   return float4(1,0,0,0);
 }
 
 

@@ -63,7 +63,7 @@ namespace Adamantium.Engine.Graphics
             ElementSize = (uint)size / count;
             ElementCount = count;
 
-            CreateBuffer(size, BufferUsageFlags.TransferDst | Usage, MemoryFlags, out VulkanBuffer, out BufferMemory);
+            CreateBuffer(size, BufferUsageFlags.TransferDst | Usage, MemoryFlags | MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent, out VulkanBuffer, out BufferMemory);
         }
 
         private void Initialize(DataPointer dataPointer)
@@ -73,7 +73,7 @@ namespace Adamantium.Engine.Graphics
             CreateBuffer(TotalSize, BufferUsageFlags.TransferSrc, MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent, out stagingBuffer, out stagingBufferMemory);
 
             UpdateBufferContent(stagingBufferMemory, dataPointer);
-            CreateBuffer(TotalSize, BufferUsageFlags.TransferDst | Usage, MemoryFlags, out VulkanBuffer, out BufferMemory);
+            CreateBuffer(TotalSize, BufferUsageFlags.TransferDst | Usage, MemoryFlags | MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent, out VulkanBuffer, out BufferMemory);
             CopyBuffer(stagingBuffer, VulkanBuffer, TotalSize);
 
             stagingBuffer.Destroy(GraphicsDevice);

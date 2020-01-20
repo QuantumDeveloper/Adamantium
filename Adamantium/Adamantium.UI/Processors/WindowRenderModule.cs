@@ -150,7 +150,8 @@ namespace Adamantium.UI.Processors
             GraphicsDevice.PrimitiveTopology = PrimitiveTopology.TriangleList;
             //GraphicsDevice.ApplyViewports(viewport);
             GraphicsDevice.SetViewports(viewport);
-            GraphicsDevice.SetVertexBuffer(vertexBuffer);
+            //GraphicsDevice.SetVertexBuffer(vertexBuffer);
+            //GraphicsDevice.SetIndexBuffer(indexBuffer);
 
             GraphicsDevice.BasicEffect.Techniques[0].Passes[0].Apply();
             GraphicsDevice.DrawIndexed(vertexBuffer, indexBuffer);
