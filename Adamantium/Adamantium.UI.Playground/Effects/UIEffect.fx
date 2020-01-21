@@ -35,24 +35,11 @@ struct TexturedPixelInputType
 ////////////////////////////////////////////////////////////////////////////////
 // Vertex Shader
 ////////////////////////////////////////////////////////////////////////////////
-PixelInputType LightVertexShader(VertexInputType input)
+PixelInputType LightVertexShader(TexturedVertexInputType input)
 {
 	PixelInputType output;
-	output.color = float4(0, 0, 0, 0);
-	output.position = float4(0, 0, 0, 0);
-
-
-	// Change the position vector to be 4 units for proper matrix calculations.
-	input.position.w = 1.0f;
-
-	// Calculate the position of the vertex against the world, view, and projection matrices.
-
-	output.position.xyz = input.position.xyz;
-	//output.position = mul(input.position, wvp);
-
-	//output.position.z = log(zNear*output.position.z + 1) / log(zNear*zFar + 1) * output.position.w;
-
-	//output.color = input.color;
+	output.color = input.color;
+	output.position = float4(input.position.xyz, 1);
 
 	return output;
 }
@@ -64,7 +51,7 @@ TexturedPixelInputType TexturedVertexShader(TexturedVertexInputType input)
 
 
 	// Change the position vector to be 4 units for proper matrix calculations.
-	input.position.w = 1.0f;
+	//input.position.w = 1.0f;
 
 	// Calculate the position of the vertex against the world, view, and projection matrices.
 

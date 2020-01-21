@@ -70,7 +70,9 @@ namespace Adamantium.Engine.Graphics
         {
             VulkanBuffer stagingBuffer;
             DeviceMemory stagingBufferMemory;
-            CreateBuffer(TotalSize, BufferUsageFlags.TransferSrc, MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent, out stagingBuffer, out stagingBufferMemory);
+            //var stagingMemoryFlags = (MemoryPropertyFlags)15;
+            var stagingMemoryFlags = MemoryPropertyFlags.DeviceLocal| MemoryPropertyFlags.HostVisible| MemoryPropertyFlags.HostCoherent| MemoryPropertyFlags.HostCached;
+            CreateBuffer(TotalSize, BufferUsageFlags.TransferSrc, stagingMemoryFlags, out stagingBuffer, out stagingBufferMemory);
 
             UpdateBufferContent(stagingBufferMemory, dataPointer);
             CreateBuffer(TotalSize, BufferUsageFlags.TransferDst | Usage, MemoryFlags | MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent, out VulkanBuffer, out BufferMemory);

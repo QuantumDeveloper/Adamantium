@@ -596,7 +596,7 @@ namespace Adamantium.Engine.Graphics
             {
                 return false;
             }
-
+            
             if (result != Result.Success && result != Result.SuboptimalKhr)
             {
                 throw new ArgumentException("Failed to acquire swap chain image!");
@@ -827,15 +827,15 @@ namespace Adamantium.Engine.Graphics
 
         private bool ResizePresenter(Func<bool> resizeFunc)
         {
-            //var result = LogicalDevice.DeviceWaitIdle();
-            //var resizeResult = resizeFunc();
-            //if (!resizeResult)
-            //{
-            //    return false;
-            //}
-            //graphicsPipeline?.Destroy(LogicalDevice);
-            //CreateGraphicsPipeline();
-            //OnSurfaceSizeChanged();
+            var result = LogicalDevice.DeviceWaitIdle();
+            var resizeResult = resizeFunc();
+            if (!resizeResult)
+            {
+                return false;
+            }
+            // graphicsPipeline?.Destroy(LogicalDevice);
+            // CreateGraphicsPipeline();
+            OnSurfaceSizeChanged();
             return true;
         }
 

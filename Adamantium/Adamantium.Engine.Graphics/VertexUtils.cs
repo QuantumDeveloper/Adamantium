@@ -75,6 +75,7 @@ namespace Adamantium.Engine.Graphics
 
         private static Format GetFormat(int size)
         {
+            //TODO: change this implementation to correct use of attributes
             switch (size)
             {
                 case 4:
@@ -82,7 +83,7 @@ namespace Adamantium.Engine.Graphics
                 case 8:
                     return Format.R32G32_SFLOAT;
                 case 12:
-                    return Format.R32G32B32_SFLOAT;
+                    //return Format.R32G32B32_SFLOAT;
                 case 16:
                     return Format.R32G32B32A32_SFLOAT;
 

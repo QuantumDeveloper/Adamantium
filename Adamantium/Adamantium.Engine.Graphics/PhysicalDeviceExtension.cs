@@ -49,8 +49,9 @@ namespace Adamantium.Engine.Graphics
             var memProperties = physicalDevice.GetPhysicalDeviceMemoryProperties();
             for (uint i = 0; i < memProperties.MemoryTypeCount; i++)
             {
-                if (((memoryTypeBits >> (int)i) & 1) == 1
-                    && memProperties.MemoryTypes[i].PropertyFlags == (uint)propertyFlags)
+                if (((memoryTypeBits >> (int)i) & 1) == 1 &&
+                    // memProperties.MemoryTypes[i].PropertyFlags == (uint)propertyFlags)
+                    ((MemoryPropertyFlags)memProperties.MemoryTypes[i].PropertyFlags).HasFlag(propertyFlags))
                 {
                     return i;
                 }

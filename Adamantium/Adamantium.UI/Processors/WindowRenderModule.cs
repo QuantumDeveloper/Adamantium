@@ -109,7 +109,7 @@ namespace Adamantium.UI.Processors
 
             if (!GraphicsDevice.BeginDraw(Colors.CornflowerBlue, 1.0f, 0))
             {
-                //GraphicsDevice.ResizePresenter((uint)window.ClientWidth, (uint)window.ClientHeight, buffersCount, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
+                GraphicsDevice.ResizePresenter((uint)window.ClientWidth, (uint)window.ClientHeight, buffersCount, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
                 return false;
             }
 
