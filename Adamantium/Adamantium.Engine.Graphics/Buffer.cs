@@ -70,8 +70,13 @@ namespace Adamantium.Engine.Graphics
         {
             VulkanBuffer stagingBuffer;
             DeviceMemory stagingBufferMemory;
-            //var stagingMemoryFlags = (MemoryPropertyFlags)15;
-            var stagingMemoryFlags = MemoryPropertyFlags.DeviceLocal| MemoryPropertyFlags.HostVisible| MemoryPropertyFlags.HostCoherent| MemoryPropertyFlags.HostCached;
+
+            var stagingMemoryFlags = MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent; // Windows
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                stagingMemoryFlags = MemoryPropertyFlags.DeviceLocal | MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent | MemoryPropertyFlags.HostCached; // MacOS
+            }
+
             CreateBuffer(TotalSize, BufferUsageFlags.TransferSrc, stagingMemoryFlags, out stagingBuffer, out stagingBufferMemory);
 
             UpdateBufferContent(stagingBufferMemory, dataPointer);
