@@ -49,7 +49,7 @@ namespace Adamantium.Engine.Graphics
        /// <summary>
         /// XYZ position.
         /// </summary>
-        [VertexInputElement("SV_Position")] public Vector3F Position;
+        [VertexInputElement("SV_POSITION")] public Vector3F Position;
 
         /// <summary>
         /// The vertex color.

@@ -30,7 +30,7 @@ namespace Adamantium.Engine.Graphics
       /// The vertex color.
       /// </summary>
       [VertexInputElement("COLOR")]
-      public Color4F Color;
+      public Color Color;
 
       /// <summary>
       /// UV texture coordinates.

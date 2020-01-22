@@ -126,10 +126,15 @@ namespace Adamantium.UI.Processors
         {
             var v = new VertexPositionColorTexture[]
             {
-                new VertexPositionColorTexture(){Position = new Vector3F(-0.5f, -0.5f), Color = new Color4F(0.0f, 0.0f, 1.0f, 1.0f), UV = new Vector2F(0.0f, 0.0f)},
-                new VertexPositionColorTexture(){Position = new Vector3F(0.5f, -0.5f), Color = new Color4F(1.0f, 1.0f, 1.0f, 1.0f), UV = new Vector2F(1.0f, 0.0f)},
-                new VertexPositionColorTexture(){Position = new Vector3F(0.5f, 0.5f), Color = new Color4F(0.0f, 1.0f, 0.0f, 1.0f), UV = new Vector2F(1.0f, 1.0f)},
-                new VertexPositionColorTexture(){Position = new Vector3F(-0.5f, 0.5f), Color = new Color4F(1.0f, 0.0f, 1.0f, 1.0f), UV = new Vector2F(0.0f, 1.0f)},
+                // new VertexPositionColorTexture(){Position = new Vector3F(-0.5f, -0.5f), Color = new Color4F(0.0f, 0.0f, 1.0f, 1.0f), UV = new Vector2F(0.0f, 0.0f)},
+                // new VertexPositionColorTexture(){Position = new Vector3F(0.5f, -0.5f), Color = new Color4F(1.0f, 1.0f, 1.0f, 1.0f), UV = new Vector2F(1.0f, 0.0f)},
+                // new VertexPositionColorTexture(){Position = new Vector3F(0.5f, 0.5f), Color = new Color4F(0.0f, 1.0f, 0.0f, 1.0f), UV = new Vector2F(1.0f, 1.0f)},
+                // new VertexPositionColorTexture(){Position = new Vector3F(-0.5f, 0.5f), Color = new Color4F(1.0f, 0.0f, 1.0f, 1.0f), UV = new Vector2F(0.0f, 1.0f)},
+                
+                new VertexPositionColorTexture(){Position = new Vector3F(-0.5f, -0.5f), Color = Colors.Red, UV = new Vector2F(0.0f, 0.0f)},
+                new VertexPositionColorTexture(){Position = new Vector3F(0.5f, -0.5f), Color = Colors.Green, UV = new Vector2F(1.0f, 0.0f)},
+                new VertexPositionColorTexture(){Position = new Vector3F(0.5f, 0.5f), Color = Colors.Blue, UV = new Vector2F(1.0f, 1.0f)},
+                new VertexPositionColorTexture(){Position = new Vector3F(-0.5f, 0.5f), Color = Colors.Green, UV = new Vector2F(0.0f, 1.0f)},
             };
 
             return v;
