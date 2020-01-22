@@ -124,7 +124,7 @@ namespace Adamantium.Engine.Graphics
                 var createInfo = new ImageViewCreateInfo();
                 createInfo.Image = images[i];
                 createInfo.ViewType = ImageViewType._2d;
-                createInfo.Format = Description.ImageFormat;
+                createInfo.Format = ImageFormat;
                 ComponentMapping componentMapping = new ComponentMapping();
                 componentMapping.R = ComponentSwizzle.Identity;
                 componentMapping.G = ComponentSwizzle.Identity;
@@ -276,6 +276,11 @@ namespace Adamantium.Engine.Graphics
         public override Framebuffer GetFramebuffer(uint index)
         {
             return framebuffers[index];
+        }
+
+        public VulkanImage GetImage(uint index)
+        {
+            return images[index];
         }
 
         private void RecreateSwapchain()

@@ -605,7 +605,7 @@ namespace Adamantium.Engine.Graphics
             var commandBuffer = commandBuffers[ImageIndex];
 
             var beginInfo = new CommandBufferBeginInfo();
-            beginInfo.Flags = (uint) CommandBufferUsageFlagBits.SimultaneousUseBit;
+            beginInfo.Flags = (uint)CommandBufferUsageFlagBits.SimultaneousUseBit;
 
             result = commandBuffer.ResetCommandBuffer(0);
             if (result != Result.Success)
@@ -619,18 +619,24 @@ namespace Adamantium.Engine.Graphics
                 throw new Exception("failed to begin recording command buffer!");
             }
 
+            //var backbuffer = ((SwapChainGraphicsPresenter)Presenter).GetImage(ImageIndex);
+            //var clearColorValue = new ClearColorValue();
+            //clearColorValue.Float32 = clearColor.ToFloatArray();
+
+            //commandBuffer.ClearColorImage(backbuffer, ImageLayout.ColorAttachmentOptimal, clearColorValue, 0, null);
+
             var renderPassInfo = new RenderPassBeginInfo();
             renderPassInfo.RenderPass = renderPass;
             renderPassInfo.Framebuffer = Presenter.GetFramebuffer(ImageIndex);
             renderPassInfo.RenderArea = new Rect2D();
             renderPassInfo.RenderArea.Offset = new Offset2D();
             renderPassInfo.RenderArea.Extent = new Extent2D()
-                {Width = Presenter.Description.Width, Height = Presenter.Description.Height};
+            { Width = Presenter.Width, Height = Presenter.Height };
 
             ClearValue clearColorValue = new ClearValue();
             clearColorValue.Color = new ClearColorValue();
             clearColorValue.Color.Float32 = clearColor.ToFloatArray();
-            
+
             ClearValue clearDepthValue = new ClearValue();
             clearDepthValue.DepthStencil = new ClearDepthStencilValue();
             clearDepthValue.DepthStencil.Depth = depth;
@@ -640,11 +646,14 @@ namespace Adamantium.Engine.Graphics
             clearColorValueResolve.Color = new ClearColorValue();
             clearColorValueResolve.Color.Float32 = clearColor.ToFloatArray();
 
-            renderPassInfo.PClearValues = new [] {clearColorValue, clearDepthValue, clearColorValueResolve };
+            renderPassInfo.PClearValues = new[] { clearColorValue, clearDepthValue, clearColorValueResolve };
             renderPassInfo.ClearValueCount = (uint)renderPassInfo.PClearValues.Length;
 
             commandBuffer.BeginRenderPass(renderPassInfo, SubpassContents.Inline);
 
+            
+            
+            
             //commandBuffer.BindPipeline(PipelineBindPoint.Graphics, graphicsPipeline);
 
             return true;
@@ -769,15 +778,14 @@ namespace Adamantium.Engine.Graphics
             ShouldChangeGraphicsPipeline = false;
 
             commandBuffer.BindPipeline(pipeline.BindPoint, pipeline);
-            //commandBuffer.BindDescriptorSets(
-            //    PipelineBindPoint.Graphics,
-            //    CurrentEffectPass.PipelineLayout,
-            //    0,
-            //    1,
-            //    CurrentEffectPass.DescriptorSets[(int)ImageIndex],
-            //    0,
-            //    0);
-            
+            commandBuffer.BindDescriptorSets(
+                PipelineBindPoint.Graphics,
+                CurrentEffectPass.PipelineLayout,
+                0,
+                1,
+                CurrentEffectPass.DescriptorSets[(int)ImageIndex],
+                0,
+                0);
 
             commandBuffer.BindVertexBuffers(0, 1, vertexBuffer, ref offset);
 

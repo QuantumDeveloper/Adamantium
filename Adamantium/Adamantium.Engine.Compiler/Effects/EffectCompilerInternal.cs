@@ -1260,9 +1260,6 @@ namespace Adamantium.Engine.Compiler.Effects
                 var bindingDescription = resource.Description;
                 string name = bindingDescription.Name;
 
-                if (bindingDescription.Class == SpvcResourceType.UniformBuffer) 
-                    continue;
-
                 // In the case of SM5.0 and texture array, there can be several input binding descriptions, so we ignore them
                 // here, as we are going to recover them outside this loop.
                 if (!resourceParameters.ContainsKey(name))

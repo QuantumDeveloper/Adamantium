@@ -10,13 +10,6 @@ namespace Adamantium.Engine.Graphics
 {
     public static class VertexUtils
     {
-        private const string positionElement = "SV_POSITION";
-        private const string normalElement = "NORMAL";
-        private const string colorElement = "COLOR";
-        private const string texCoordElement = "TEXCOORD";
-        private const string tangentElement = "TANGENT";
-        private const string binormalElement = "BINORMAL";
-
         private static Dictionary<Type, VertexInputBindingDescription> vertexInputDescriptions;
         private static Dictionary<Type, VertexInputAttributeDescription[]> vertexInputAttributeDescriptions;
 
@@ -96,24 +89,6 @@ namespace Adamantium.Engine.Graphics
             }
 
             return VertexInputElement.GetFormatFromType(field.FieldType);
-
-            switch (attr.SemanticName)
-            {
-                case positionElement:
-                    return Format.R32G32B32A32_SFLOAT;
-                case normalElement:
-                    return Format.R32G32B32_SFLOAT;
-                case colorElement:
-                    return Format.R8G8B8A8_UNORM;
-                case texCoordElement:
-                    return Format.R32G32_SFLOAT;
-                case tangentElement:
-                    return Format.R32G32B32A32_SFLOAT;
-                case binormalElement:
-                    return Format.R32G32B32_SFLOAT;
-                default:
-                    throw new ArgumentOutOfRangeException($"Semantic name: {attr.SemanticName} could not be converted to Vulkan Format");
-            }
         }
         
     }

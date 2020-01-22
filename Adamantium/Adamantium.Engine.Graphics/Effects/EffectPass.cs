@@ -44,6 +44,8 @@ namespace Adamantium.Engine.Graphics.Effects
         
         private List<DescriptorSet> descriptorSets;
 
+        private List<WriteDescriptorSet> writeDescriptorSets;
+
         public ReadOnlyCollection<PipelineShaderStageCreateInfo> ShaderStages => shaderStages.AsReadOnly();
 
         /// <summary>
@@ -69,6 +71,7 @@ namespace Adamantium.Engine.Graphics.Effects
             shaderStages = new List<PipelineShaderStageCreateInfo>();
             layoutBindings = new List<DescriptorSetLayoutBinding>();
             descriptorSets = new List<DescriptorSet>();
+            writeDescriptorSets = new List<WriteDescriptorSet>();
             Properties = PrepareProperties(logger, pass.Properties);
             IsSubPass = pass.IsSubPass;
 
@@ -130,93 +133,92 @@ namespace Adamantium.Engine.Graphics.Effects
 
             //TODO: here we need to setup graphics/compute pipeline for current EffectPass before rendering begins
             //and then update all descriptors for each stage
-
-            CreateWriteDescriptions();
-
-            // ----------------------------------------------
-            // Iterate on each stage to setup all inputs
-            // ----------------------------------------------
-            for (int stageIndex = 0; stageIndex < pipeline.Stages.Length; stageIndex++)
+            writeDescriptorSets.Clear();
+            for (int index = 0; index < graphicsDevice.Presenter.BuffersCount; ++index)
             {
-                var stageBlock = pipeline.Stages[stageIndex];
-                if (stageBlock == null)
+                // ----------------------------------------------
+                // Iterate on each stage to setup all inputs
+                // ----------------------------------------------
+                for (int stageIndex = 0; stageIndex < pipeline.Stages.Length; stageIndex++)
                 {
-                    continue;
+                    var stageBlock = pipeline.Stages[stageIndex];
+                    if (stageBlock == null)
+                    {
+                        continue;
+                    }
+
+                    // If Shader is a null shader, then skip further processing
+                    if (stageBlock.Index < 0)
+                    {
+                        continue;
+                    }
+
+                    // Upload all constant buffers to the GPU if they have been modified.
+                    // ----------------------------------------------
+                    // Setup Constant buffers
+                    // ----------------------------------------------
+                    for (int i = 0; i < stageBlock.ConstantBufferLinks.Length; ++i)
+                    {
+                        var link = stageBlock.ConstantBufferLinks[i];
+                        link.ConstantBuffer.Update();
+
+                        var descriptor = CreateConstantBufferWriteDescriptor(link.ConstantBuffer.NativeBuffer, link.ConstantBuffer.Description.Slot, index);
+
+                        writeDescriptorSets.Add(descriptor);
+                    }
+
+                    graphicsDevice.UpdateDescriptorSets(writeDescriptorSets.ToArray());
+
+                    /*
+
+                    // ----------------------------------------------
+                    // Setup ShaderResourceView
+                    // ----------------------------------------------
+                    var localLinks = stageBlock.ShaderResourceViewSlotLinks;
+                    for (int i = 0; i < localLinks.Count; ++i)
+                    {
+                        var links = localLinks[i];
+                        var resources = Effect.ResourceLinker.GetShaderResources(localLinks[i].ResourceParamDescription);
+                        shaderStage.SetShaderResources(links.SlotIndex, resources);
+                    }
+
+                    // ----------------------------------------------
+                    // Setup SamplerStates
+                    // ----------------------------------------------
+                    localLinks = stageBlock.SamplerStateSlotLinks;
+                    for (int i = 0; i < localLinks.Count; ++i)
+                    {
+                        var links = localLinks[i];
+                        var resources = Effect.ResourceLinker.GetSamplers(links.ResourceParamDescription);
+                        shaderStage.SetSamplers(links.SlotIndex, resources);
+                    }
+
+                    // ----------------------------------------------
+                    // Setup UnorderedAccessView
+                    // ----------------------------------------------
+                    localLinks = stageBlock.UnorderedAccessViewSlotLinks;
+                    switch (stageBlock.Type)
+                    {
+                        case EffectShaderType.Compute:
+                            var computeStage = ((ComputeShaderStage)shaderStage);
+                            for (int i = 0; i < localLinks.Count; ++i)
+                            {
+                                var link = localLinks[i];
+                                var resources = Effect.ResourceLinker.GetUAVs(link.ResourceParamDescription);
+                                computeStage.SetUnorderedAccessViews(link.SlotIndex, resources);
+                            }
+                            break;
+                        default:
+                            for (int i = 0; i < localLinks.Count; ++i)
+                            {
+                                var link = localLinks[i];
+                                var resources = Effect.ResourceLinker.GetUAVs(link.ResourceParamDescription);
+                                mergerStage.SetUnorderedAccessViews(link.SlotIndex, resources);
+                            }
+                            break;
+                    }
+                    */
                 }
-
-                /*
-                var shaderStage = stageBlock.ShaderStage;
-                // If Shader is a null shader, then skip further processing
-                if (stageBlock.Index < 0)
-                {
-                    continue;
-                }
-
-                // ----------------------------------------------
-                // Setup the shader for this stage.
-                // ----------------------------------------------               
-                shaderStage.SetShader(stageBlock.Shader, null, 0);
-
-                var mergerStage = pipeline.OutputMergerStage;
-
-                // Upload all constant buffers to the GPU if they have been modified.
-                // ----------------------------------------------
-                // Setup Constant buffers
-                // ----------------------------------------------
-                for (int i = 0; i < stageBlock.ConstantBufferLinks.Length; ++i)
-                {
-                    var link = stageBlock.ConstantBufferLinks[i];
-                    link.ConstantBuffer.Update();
-                    shaderStage.SetConstantBuffer(link.Parameter.SlotIndex, link.ConstantBuffer.NativeBuffer);
-                }
-
-                // ----------------------------------------------
-                // Setup ShaderResourceView
-                // ----------------------------------------------
-                var localLinks = stageBlock.ShaderResourceViewSlotLinks;
-                for (int i = 0; i < localLinks.Count; ++i)
-                {
-                    var links = localLinks[i];
-                    var resources = Effect.ResourceLinker.GetShaderResources(localLinks[i].ResourceParamDescription);
-                    shaderStage.SetShaderResources(links.SlotIndex, resources);
-                }
-
-                // ----------------------------------------------
-                // Setup SamplerStates
-                // ----------------------------------------------
-                localLinks = stageBlock.SamplerStateSlotLinks;
-                for (int i = 0; i < localLinks.Count; ++i)
-                {
-                    var links = localLinks[i];
-                    var resources = Effect.ResourceLinker.GetSamplers(links.ResourceParamDescription);
-                    shaderStage.SetSamplers(links.SlotIndex, resources);
-                }
-
-                // ----------------------------------------------
-                // Setup UnorderedAccessView
-                // ----------------------------------------------
-                localLinks = stageBlock.UnorderedAccessViewSlotLinks;
-                switch (stageBlock.Type)
-                {
-                    case EffectShaderType.Compute:
-                        var computeStage = ((ComputeShaderStage)shaderStage);
-                        for (int i = 0; i < localLinks.Count; ++i)
-                        {
-                            var link = localLinks[i];
-                            var resources = Effect.ResourceLinker.GetUAVs(link.ResourceParamDescription);
-                            computeStage.SetUnorderedAccessViews(link.SlotIndex, resources);
-                        }
-                        break;
-                    default:
-                        for (int i = 0; i < localLinks.Count; ++i)
-                        {
-                            var link = localLinks[i];
-                            var resources = Effect.ResourceLinker.GetUAVs(link.ResourceParamDescription);
-                            mergerStage.SetUnorderedAccessViews(link.SlotIndex, resources);
-                        }
-                        break;
-                }
-                */
             }
         }
 
@@ -450,6 +452,7 @@ namespace Adamantium.Engine.Graphics.Effects
                 }
             }
 
+
             var constantBufferLinks = new List<ConstantBufferLink>();
 
             // Declare all resource parameters at the effect level.
@@ -544,9 +547,8 @@ namespace Adamantium.Engine.Graphics.Effects
         private void CreatePipelineLayout()
         {
             var pipelineLayoutInfo = new PipelineLayoutCreateInfo();
-            //pipelineLayoutInfo.SetLayoutCount = 1;
-            //pipelineLayoutInfo.PSetLayouts = new DescriptorSetLayout[] { descriptorSetLayout };
-
+            pipelineLayoutInfo.SetLayoutCount = 1;
+            pipelineLayoutInfo.PSetLayouts = new DescriptorSetLayout[] { descriptorSetLayout };
 
             PipelineLayout = graphicsDevice.CreatePipelineLayout(pipelineLayoutInfo);
         }
@@ -571,7 +573,7 @@ namespace Adamantium.Engine.Graphics.Effects
 
             DescriptorPool = graphicsDevice.CreateDescriptorPool(poolInfo);
         }
-        
+
         private void CreateDescriptorSets()
         {
             var buffersCount = graphicsDevice.Presenter.BuffersCount;
@@ -596,12 +598,28 @@ namespace Adamantium.Engine.Graphics.Effects
             descriptorSets.AddRange(descriptors);
         }
 
+        private WriteDescriptorSet CreateConstantBufferWriteDescriptor(Buffer buffer, uint bindingIndex, int descriptorSetIndex)
+        {
+            var bufferInfo = new DescriptorBufferInfo();
+            bufferInfo.Buffer = buffer;
+            bufferInfo.Range = (ulong)Marshal.SizeOf<VkDescriptorBufferInfo>();
+
+            var writeDescriptor = new WriteDescriptorSet();
+            writeDescriptor.DescriptorCount = 1;
+            writeDescriptor.DescriptorType = DescriptorType.UniformBuffer;
+            writeDescriptor.DstBinding = bindingIndex;
+            writeDescriptor.DstSet = descriptorSets[descriptorSetIndex];
+            writeDescriptor.PBufferInfo = bufferInfo;
+
+            return writeDescriptor;
+        }
+
         private void CreateWriteDescriptions()
         {
             var buffersCount = graphicsDevice.Presenter.BuffersCount;
             var descriptorWrites = new List<WriteDescriptorSet>();
             var buffers = Effect.Parameters.Where(x => x.Buffer != null).Select(x => x.Buffer).Distinct().ToArray();
-            DescriptorBufferInfo bufferInfo = new DescriptorBufferInfo();
+            var bufferInfo = new DescriptorBufferInfo();
             bufferInfo.Buffer = buffers[0];
             bufferInfo.Range = (ulong)Marshal.SizeOf<VkDescriptorBufferInfo>();
 
@@ -613,7 +631,7 @@ namespace Adamantium.Engine.Graphics.Effects
                     writeDescriptor.DescriptorCount = 1;
                     writeDescriptor.DescriptorType = layoutBindings[i].DescriptorType;
                     writeDescriptor.DstBinding = layoutBindings[i].Binding;
-                    writeDescriptor.DstSet = descriptorSets[0];
+                    writeDescriptor.DstSet = descriptorSets[k];
                     writeDescriptor.PBufferInfo = bufferInfo;
                     descriptorWrites.Add(writeDescriptor);
                 }
@@ -664,6 +682,8 @@ namespace Adamantium.Engine.Graphics.Effects
         {
             switch (type)
             {
+                case EffectParameterType.ConstantBuffer:
+                    return DescriptorType.UniformBuffer;
                 case EffectParameterType.Sampler:
                 case EffectParameterType.Sampler1D:
                 case EffectParameterType.Sampler2D:
