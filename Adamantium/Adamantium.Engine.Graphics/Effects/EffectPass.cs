@@ -126,99 +126,91 @@ namespace Adamantium.Engine.Graphics.Effects
             // By default, we set the Current technique 
             Effect.CurrentTechnique = Technique;
 
-            graphicsDevice.CurrentEffectPass = this;
-
             // Sets the current pass on the graphics device
-            //graphicsDevice.CurrentPass = this;
+            graphicsDevice.CurrentEffectPass = this;
 
             //TODO: here we need to setup graphics/compute pipeline for current EffectPass before rendering begins
             //and then update all descriptors for each stage
             writeDescriptorSets.Clear();
-            for (int index = 0; index < graphicsDevice.Presenter.BuffersCount; ++index)
+
+            // ----------------------------------------------
+            // Iterate on each stage to setup all inputs
+            // ----------------------------------------------
+            for (int stageIndex = 0; stageIndex < pipeline.Stages.Length; stageIndex++)
             {
-                // ----------------------------------------------
-                // Iterate on each stage to setup all inputs
-                // ----------------------------------------------
-                for (int stageIndex = 0; stageIndex < pipeline.Stages.Length; stageIndex++)
+                var stageBlock = pipeline.Stages[stageIndex];
+                if (stageBlock == null)
                 {
-                    var stageBlock = pipeline.Stages[stageIndex];
-                    if (stageBlock == null)
-                    {
-                        continue;
-                    }
+                    continue;
+                }
 
-                    // If Shader is a null shader, then skip further processing
-                    if (stageBlock.Index < 0)
-                    {
-                        continue;
-                    }
+                // If Shader is a null shader, then skip further processing
+                if (stageBlock.Index < 0)
+                {
+                    continue;
+                }
 
-                    // Upload all constant buffers to the GPU if they have been modified.
-                    // ----------------------------------------------
-                    // Setup Constant buffers
-                    // ----------------------------------------------
-                    for (int i = 0; i < stageBlock.ConstantBufferLinks.Length; ++i)
+                // var renderFence = graphicsDevice.InFlightFences[graphicsDevice.CurrentFrame];
+                // var result = graphicsDevice.LogicalDevice.WaitForFences(1, renderFence, true, ulong.MaxValue);
+
+                // Upload all constant buffers to the GPU if they have been modified.
+                // ----------------------------------------------
+                // Setup Constant buffers
+                // ----------------------------------------------
+                for (int i = 0; i < stageBlock.ConstantBufferLinks.Length; ++i)
+                {
+                    var link = stageBlock.ConstantBufferLinks[i];
+                    if (link.ConstantBuffer.IsDirty)
                     {
-                        var link = stageBlock.ConstantBufferLinks[i];
                         link.ConstantBuffer.Update();
 
-                        var descriptor = CreateConstantBufferWriteDescriptor(link.ConstantBuffer.NativeBuffer, link.ConstantBuffer.Description.Slot, index);
+                        var descriptor = CreateConstantBufferWriteDescriptor(link.ConstantBuffer.NativeBuffer,
+                            link.ConstantBuffer.Description.Slot, (int) graphicsDevice.ImageIndex);
 
                         writeDescriptorSets.Add(descriptor);
                     }
-
-                    graphicsDevice.UpdateDescriptorSets(writeDescriptorSets.ToArray());
-
-                    /*
-
-                    // ----------------------------------------------
-                    // Setup ShaderResourceView
-                    // ----------------------------------------------
-                    var localLinks = stageBlock.ShaderResourceViewSlotLinks;
-                    for (int i = 0; i < localLinks.Count; ++i)
-                    {
-                        var links = localLinks[i];
-                        var resources = Effect.ResourceLinker.GetShaderResources(localLinks[i].ResourceParamDescription);
-                        shaderStage.SetShaderResources(links.SlotIndex, resources);
-                    }
-
-                    // ----------------------------------------------
-                    // Setup SamplerStates
-                    // ----------------------------------------------
-                    localLinks = stageBlock.SamplerStateSlotLinks;
-                    for (int i = 0; i < localLinks.Count; ++i)
-                    {
-                        var links = localLinks[i];
-                        var resources = Effect.ResourceLinker.GetSamplers(links.ResourceParamDescription);
-                        shaderStage.SetSamplers(links.SlotIndex, resources);
-                    }
-
-                    // ----------------------------------------------
-                    // Setup UnorderedAccessView
-                    // ----------------------------------------------
-                    localLinks = stageBlock.UnorderedAccessViewSlotLinks;
-                    switch (stageBlock.Type)
-                    {
-                        case EffectShaderType.Compute:
-                            var computeStage = ((ComputeShaderStage)shaderStage);
-                            for (int i = 0; i < localLinks.Count; ++i)
-                            {
-                                var link = localLinks[i];
-                                var resources = Effect.ResourceLinker.GetUAVs(link.ResourceParamDescription);
-                                computeStage.SetUnorderedAccessViews(link.SlotIndex, resources);
-                            }
-                            break;
-                        default:
-                            for (int i = 0; i < localLinks.Count; ++i)
-                            {
-                                var link = localLinks[i];
-                                var resources = Effect.ResourceLinker.GetUAVs(link.ResourceParamDescription);
-                                mergerStage.SetUnorderedAccessViews(link.SlotIndex, resources);
-                            }
-                            break;
-                    }
-                    */
                 }
+
+                // ----------------------------------------------
+                // Setup ShaderResourceView
+                // ----------------------------------------------
+                var localLinks = stageBlock.ShaderResourceViewSlotLinks;
+                for (int i = 0; i < localLinks.Count; ++i)
+                {
+                    var links = localLinks[i];
+                    var resources = Effect.ResourceLinker.GetShaderResources(localLinks[i].ResourceParamDescription);
+                    var descriptor = CreateImageViewWriteDescriptor(resources, links.SlotIndex, (int) graphicsDevice.ImageIndex);
+                    
+                    writeDescriptorSets.Add(descriptor);
+                }
+
+                // ----------------------------------------------
+                // Setup SamplerStates
+                // ----------------------------------------------
+                localLinks = stageBlock.SamplerStateSlotLinks;
+                for (int i = 0; i < localLinks.Count; ++i)
+                {
+                    var links = localLinks[i];
+                    var resources = Effect.ResourceLinker.GetSamplers(links.ResourceParamDescription);
+                    var descriptor = CreateSamplerWriteDescriptor(resources, links.SlotIndex, (int) graphicsDevice.ImageIndex);
+                    
+                    writeDescriptorSets.Add(descriptor);
+                } 
+                
+                // ----------------------------------------------
+                // Setup UnorderedAccessView
+                // ----------------------------------------------
+                localLinks = stageBlock.UnorderedAccessViewSlotLinks;
+                for (int i = 0; i < localLinks.Count; ++i)
+                {
+                    var links = localLinks[i];
+                    var resources = Effect.ResourceLinker.GetUAVs(links.ResourceParamDescription);
+                    var descriptor = CreateUAVWriteDescriptor(resources, links.SlotIndex, (int) graphicsDevice.ImageIndex);
+                    
+                    writeDescriptorSets.Add(descriptor);
+                } 
+                
+                graphicsDevice.UpdateDescriptorSets(writeDescriptorSets.ToArray());
             }
         }
 
@@ -548,7 +540,7 @@ namespace Adamantium.Engine.Graphics.Effects
         {
             var pipelineLayoutInfo = new PipelineLayoutCreateInfo();
             pipelineLayoutInfo.SetLayoutCount = 1;
-            pipelineLayoutInfo.PSetLayouts = new DescriptorSetLayout[] { descriptorSetLayout };
+            pipelineLayoutInfo.PSetLayouts = new [] { descriptorSetLayout };
 
             PipelineLayout = graphicsDevice.CreatePipelineLayout(pipelineLayoutInfo);
         }
@@ -609,53 +601,66 @@ namespace Adamantium.Engine.Graphics.Effects
             writeDescriptor.DescriptorType = DescriptorType.UniformBuffer;
             writeDescriptor.DstBinding = bindingIndex;
             writeDescriptor.DstSet = descriptorSets[descriptorSetIndex];
-            writeDescriptor.PBufferInfo = bufferInfo;
+            writeDescriptor.PBufferInfo = new [] { bufferInfo };
+
+            return writeDescriptor;
+        }
+        
+        private WriteDescriptorSet CreateImageViewWriteDescriptor(Texture[] images, uint bindingIndex, int descriptorSetIndex)
+        {
+            var infoList = new DescriptorImageInfo[images.Length];
+
+            for (int i = 0; i < images.Length; i++)
+            {
+                var imageInfo = new DescriptorImageInfo();
+                imageInfo.ImageView = images[i];
+                imageInfo.ImageLayout = images[i].ImageLayout;
+                
+                infoList[i] = imageInfo;
+            }
+
+            var writeDescriptor = new WriteDescriptorSet();
+            writeDescriptor.DescriptorCount = (uint)infoList.Length;
+            writeDescriptor.DescriptorType = DescriptorType.SampledImage;
+            writeDescriptor.DstBinding = bindingIndex;
+            writeDescriptor.DstSet = descriptorSets[descriptorSetIndex];
+            writeDescriptor.PImageInfo = infoList;
+
+            return writeDescriptor;
+        }
+        
+        private WriteDescriptorSet CreateSamplerWriteDescriptor(Sampler[] samplers, uint bindingIndex, int descriptorSetIndex)
+        {
+            var infoList = new DescriptorImageInfo[samplers.Length];
+            for (int i = 0; i < samplers.Length; i++)
+            {
+                var imageInfo = new DescriptorImageInfo();
+                imageInfo.Sampler = samplers[i];
+                infoList[i] = imageInfo;
+            }
+            
+            var writeDescriptor = new WriteDescriptorSet();
+            writeDescriptor.DescriptorCount = (uint)infoList.Length;
+            writeDescriptor.DescriptorType = DescriptorType.Sampler;
+            writeDescriptor.DstBinding = bindingIndex;
+            writeDescriptor.DstSet = descriptorSets[descriptorSetIndex];
+            writeDescriptor.PImageInfo = infoList;
+
+            return writeDescriptor;
+        }
+        
+        private WriteDescriptorSet CreateUAVWriteDescriptor(BufferView[] texelBuffers, uint bindingIndex, int descriptorSetIndex)
+        {
+            var writeDescriptor = new WriteDescriptorSet();
+            writeDescriptor.DescriptorCount = (uint)texelBuffers.Length;
+            writeDescriptor.DescriptorType = DescriptorType.UniformTexelBuffer;
+            writeDescriptor.DstBinding = bindingIndex;
+            writeDescriptor.DstSet = descriptorSets[descriptorSetIndex];
+            writeDescriptor.PTexelBufferView = texelBuffers;
 
             return writeDescriptor;
         }
 
-        private void CreateWriteDescriptions()
-        {
-            var buffersCount = graphicsDevice.Presenter.BuffersCount;
-            var descriptorWrites = new List<WriteDescriptorSet>();
-            var buffers = Effect.Parameters.Where(x => x.Buffer != null).Select(x => x.Buffer).Distinct().ToArray();
-            var bufferInfo = new DescriptorBufferInfo();
-            bufferInfo.Buffer = buffers[0];
-            bufferInfo.Range = (ulong)Marshal.SizeOf<VkDescriptorBufferInfo>();
-
-            for (int k = 0; k < buffersCount; ++k)
-            {
-                for (int i = 0; i < layoutBindings.Count; ++i)
-                {
-                    var writeDescriptor = new WriteDescriptorSet();
-                    writeDescriptor.DescriptorCount = 1;
-                    writeDescriptor.DescriptorType = layoutBindings[i].DescriptorType;
-                    writeDescriptor.DstBinding = layoutBindings[i].Binding;
-                    writeDescriptor.DstSet = descriptorSets[k];
-                    writeDescriptor.PBufferInfo = bufferInfo;
-                    descriptorWrites.Add(writeDescriptor);
-                }
-
-                graphicsDevice.UpdateDescriptorSets(descriptorWrites.ToArray());
-            }
-            
-            // {
-            //     DescriptorImageInfo imageInfo = new DescriptorImageInfo();
-            //     imageInfo.ImageLayout = ImageLayout.ShaderReadOnlyOptimal;
-            //     imageInfo.ImageView = textureImageView;
-            //     imageInfo.Sampler = textureSampler;
-            //
-            //     WriteDescriptorSet descriptorWriter = new WriteDescriptorSet();
-            //     descriptorWriter.DstSet = descriptorSets[i];
-            //     descriptorWriter.DstBinding = 0;
-            //     descriptorWriter.DstArrayElement = 0;
-            //     descriptorWriter.DescriptorType = DescriptorType.CombinedImageSampler;
-            //     descriptorWriter.DescriptorCount = 1;
-            //     descriptorWriter.PImageInfo = imageInfo;
-            //
-            //     logicalDevice.UpdateDescriptorSets(1, descriptorWriter, 0, out var copies);
-            // }
-        }
 
         private ShaderStageFlagBits EffectShaderTypeToShaderStage(EffectShaderType type)
         {
@@ -742,15 +747,15 @@ namespace Adamantium.Engine.Graphics.Effects
                 switch (resourceType)
                 {
                     case EffectResourceType.ShaderResourceView:
-                        link = new SlotLink(parameter.Parameter.SlotIndex, parameter.Parameter.ParameterDescription);
+                        link = new SlotLink((uint)parameter.Parameter.SlotIndex, parameter.Parameter.ParameterDescription);
                         stageBlock.ShaderResourceViewSlotLinks.Add(link);
                         break;
                     case EffectResourceType.SamplerState:
-                        link = new SlotLink(parameter.Parameter.SlotIndex, parameter.Parameter.ParameterDescription);
+                        link = new SlotLink((uint)parameter.Parameter.SlotIndex, parameter.Parameter.ParameterDescription);
                         stageBlock.SamplerStateSlotLinks.Add(link);
                         break;
                     case EffectResourceType.UnorderedAccessView:
-                        link = new SlotLink(parameter.Parameter.SlotIndex, parameter.Parameter.ParameterDescription);
+                        link = new SlotLink((uint)parameter.Parameter.SlotIndex, parameter.Parameter.ParameterDescription);
                         stageBlock.UnorderedAccessViewSlotLinks.Add(link);
                         break;
                 }
@@ -858,7 +863,7 @@ namespace Adamantium.Engine.Graphics.Effects
         [StructLayout(LayoutKind.Sequential)]
         private struct SlotLink
         {
-            public SlotLink(int slotIndex, EffectData.Parameter paramDescription)
+            public SlotLink(uint slotIndex, EffectData.Parameter paramDescription)
             {
                 ResourceParamDescription = paramDescription;
                 SlotIndex = slotIndex;
@@ -866,7 +871,7 @@ namespace Adamantium.Engine.Graphics.Effects
 
             public readonly EffectData.Parameter ResourceParamDescription;
 
-            public readonly int SlotIndex;
+            public readonly uint SlotIndex;
 
         }
 

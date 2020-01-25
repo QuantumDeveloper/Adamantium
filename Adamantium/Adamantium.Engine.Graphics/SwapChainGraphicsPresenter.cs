@@ -206,15 +206,13 @@ namespace Adamantium.Engine.Graphics
             {
                 return capabilities.CurrentExtent;
             }
-            else
-            {
-                Extent2D actualExtent = new Extent2D() { Width = Description.Width, Height = Description.Height };
 
-                actualExtent.Width = Math.Max(capabilities.MinImageExtent.Width, Math.Min(capabilities.MaxImageExtent.Width, actualExtent.Width));
-                actualExtent.Height = Math.Max(capabilities.MinImageExtent.Height, Math.Min(capabilities.MaxImageExtent.Height, actualExtent.Height));
+            Extent2D actualExtent = new Extent2D() { Width = Description.Width, Height = Description.Height };
 
-                return actualExtent;
-            }
+            actualExtent.Width = Math.Max(capabilities.MinImageExtent.Width, Math.Min(capabilities.MaxImageExtent.Width, actualExtent.Width));
+            actualExtent.Height = Math.Max(capabilities.MinImageExtent.Height, Math.Min(capabilities.MaxImageExtent.Height, actualExtent.Height));
+
+            return actualExtent;
         }
 
         /// <summary>

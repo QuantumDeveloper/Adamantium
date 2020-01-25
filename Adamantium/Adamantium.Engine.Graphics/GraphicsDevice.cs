@@ -680,9 +680,9 @@ namespace Adamantium.Engine.Graphics
             submitInfo.PWaitDstStageMask = waitStages;
 
             submitInfo.CommandBufferCount = 1;
-            submitInfo.PCommandBuffers = new CommandBuffer[] { commandBuffer };
+            submitInfo.PCommandBuffers = new [] { commandBuffer };
 
-            Semaphore[] signalSemaphores = new[] { RenderFinishedSemaphores[CurrentFrame] };
+            Semaphore[] signalSemaphores = new [] { RenderFinishedSemaphores[CurrentFrame] };
 
             submitInfo.SignalSemaphoreCount = 1;
             submitInfo.PSignalSemaphores = signalSemaphores;
@@ -797,6 +797,9 @@ namespace Adamantium.Engine.Graphics
         public void UpdateDescriptorSets(params WriteDescriptorSet[] writeDescriptorSets)
         {
             if (writeDescriptorSets == null || writeDescriptorSets.Length == 0) return;
+            
+            var renderFence = InFlightFences[CurrentFrame];
+            var result = LogicalDevice.WaitForFences(1, renderFence, true, ulong.MaxValue);
            
             LogicalDevice.UpdateDescriptorSets((uint)writeDescriptorSets.Length, writeDescriptorSets, 0, out var copySets);
         }
@@ -819,6 +822,16 @@ namespace Adamantium.Engine.Graphics
         public void UnmapMemory(DeviceMemory memory)
         {
             LogicalDevice.UnmapMemory(memory);
+        }
+
+        public Sampler CreateSampler(SamplerCreateInfo samplerInfo)
+        {
+            if (LogicalDevice.CreateSampler(samplerInfo, null, out var sampler) != Result.Success)
+            {
+                throw new Exception("failed to create texture sampler!");
+            }
+
+            return sampler;
         }
 
         public bool ResizePresenter(uint width = 0, uint height = 0)

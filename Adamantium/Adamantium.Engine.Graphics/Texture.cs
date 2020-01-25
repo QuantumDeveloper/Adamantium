@@ -4,6 +4,7 @@ using System.Text;
 using Adamantium.Imaging;
 using Adamantium.Core;
 using System.IO;
+using System.Runtime.InteropServices;
 using Adamantium.Win32;
 using VulkanImage = AdamantiumVulkan.Core.Image;
 using AdamantiumVulkan.Core;
@@ -13,15 +14,16 @@ namespace Adamantium.Engine.Graphics
 {
     public class Texture : DisposableBase
     {
-        private VulkanImage image;
-        private DeviceMemory imageMemory;
-        private TextureDescription description;
+        private VulkanImage vulkanImage;
+        private DeviceMemory vulkanImageMemory;
+        
+        public TextureDescription Description;
 
-        public uint Width => description.Width;
+        public uint Width => Description.Width;
 
-        public uint Height => description.Height;
+        public uint Height => Description.Height;
 
-        public SurfaceFormat SurfaceFormat => description.Format;
+        public SurfaceFormat SurfaceFormat => Description.Format;
 
         public ImageLayout ImageLayout { get; private set; }
 
@@ -29,37 +31,91 @@ namespace Adamantium.Engine.Graphics
 
         public GraphicsDevice GraphicsDevice { get; private set; }
 
-        protected VulkanImage Image { get => image; set => image = value; }
-        protected DeviceMemory ImageMemory { get => imageMemory; set => imageMemory = value; }
+        protected VulkanImage VulkanImage { get => vulkanImage; set => vulkanImage = value; }
+        protected DeviceMemory ImageMemory { get => vulkanImageMemory; set => vulkanImageMemory = value; }
         protected ImageView ImageView { get; set; }
 
         protected Texture(GraphicsDevice device, TextureDescription description)
         {
             GraphicsDevice = device;
-            this.description = description;
+            Description = description;
             Initialize();
-            TransitionImageLayout(description.DesiredImageLayout);
+            TransitionImageLayout(VulkanImage, description.InitialLayout, description.DesiredImageLayout);
         }
 
         protected Texture(GraphicsDevice device, Image img, ImageUsageFlagBits usage, ImageLayout desiredLayout)
         {
             GraphicsDevice = device;
+            Description = img.Description;
+            Description.Usage |= ImageUsageFlagBits.TransferDstBit | usage;
+            Description.DesiredImageLayout = desiredLayout;
 
+            var stagingDescription = Description;
+            stagingDescription.Usage = ImageUsageFlagBits.TransferSrcBit;
+            var stagingMemoryFlags = GetStagingMemoryFlags();
+
+            CreateImage(stagingDescription, stagingMemoryFlags, out var stagingImage, out var stagingMemory);
+            UpdateImageContent(stagingMemory, img.DataPointer, img.TotalSizeInBytes);
+            CreateImage(Description, MemoryPropertyFlags.DeviceLocal, out vulkanImage, out vulkanImageMemory);
+            
+            TransitionImageLayout(stagingImage, ImageLayout.Preinitialized,ImageLayout.TransferSrcOptimal);
+            TransitionImageLayout(vulkanImage, ImageLayout.Undefined,ImageLayout.TransferDstOptimal);
+            CopyImageToImage(stagingImage, vulkanImage, Description);
+            TransitionImageLayout(vulkanImage, ImageLayout.TransferDstOptimal,Description.DesiredImageLayout);
+            CreateImageView(Description);
+            
+            stagingImage.Destroy(GraphicsDevice);
+            stagingMemory.FreeMemory(GraphicsDevice);
         }
-
+        
         protected Texture(GraphicsDevice device, Image[] img, ImageUsageFlagBits usage, ImageLayout desiredLayout)
         {
             GraphicsDevice = device;
 
         }
 
-        protected void Initialize()
+        private void UpdateImageContent(DeviceMemory imgMemory, IntPtr srcPtr, long size)
         {
-            CreateImage(description);
-            CreateImageView(description);
+            var data = GraphicsDevice.MapMemory(imgMemory, 0, (ulong)size, 0);
+            Utilities.CopyMemory(data, srcPtr, size);
+            GraphicsDevice.UnmapMemory(imgMemory);
         }
 
-        protected void CreateImage(TextureDescription description)
+        private void CopyImageToImage(VulkanImage source, VulkanImage destination, TextureDescription description)
+        {
+            var commandBuffer = GraphicsDevice.BeginSingleTimeCommands();
+            ImageCopy region = new ImageCopy();
+            region.SrcOffset = new Offset3D();
+            region.DstOffset = new Offset3D();
+            region.SrcSubresource = new ImageSubresourceLayers();
+            region.DstSubresource = new ImageSubresourceLayers();
+            region.SrcSubresource.LayerCount = 1;
+            region.SrcSubresource.AspectMask = (uint)ImageAspectFlagBits.ColorBit;
+            region.DstSubresource.LayerCount = 1;
+            region.DstSubresource.AspectMask = (uint)ImageAspectFlagBits.ColorBit;
+            region.Extent = new Extent3D() { Width = description.Width, Height = description.Height, Depth = description.Depth };
+            commandBuffer.CopyImage(source, ImageLayout.TransferSrcOptimal, destination, ImageLayout.TransferDstOptimal, 1, region);
+            GraphicsDevice.EndSingleTimeCommands(commandBuffer);  
+        }
+
+        private MemoryPropertyFlags GetStagingMemoryFlags()
+        {
+            var stagingMemoryFlags = MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent; // Windows
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                stagingMemoryFlags = MemoryPropertyFlags.DeviceLocal | MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent | MemoryPropertyFlags.HostCached; // MacOS
+            }
+
+            return stagingMemoryFlags;
+        }
+
+        protected void Initialize()
+        {
+            CreateImage(Description, MemoryPropertyFlags.DeviceLocal, out vulkanImage, out vulkanImageMemory);
+            CreateImageView(Description);
+        }
+
+        protected void CreateImage(TextureDescription description, MemoryPropertyFlags memoryProperties, out VulkanImage image, out DeviceMemory imageMemory)
         {
             var device = (Device)GraphicsDevice;
             var imageInfo = description.ToImageCreateInfo();
@@ -74,8 +130,7 @@ namespace Adamantium.Engine.Graphics
             {
                 AllocationSize = memRequirements.Size,
                 MemoryTypeIndex =
-                    GraphicsDevice.VulkanInstance.CurrentDevice.FindCorrespondingMemoryType(memRequirements.MemoryTypeBits,
-                        MemoryPropertyFlagBits.DeviceLocalBit)
+                    GraphicsDevice.VulkanInstance.CurrentDevice.FindMemoryIndex(memRequirements.MemoryTypeBits, memoryProperties)
             };
 
             if (device.AllocateMemory(allocInfo, null, out imageMemory) != Result.Success)
@@ -90,7 +145,7 @@ namespace Adamantium.Engine.Graphics
         protected void CreateImageView(TextureDescription description)
         {
             var createInfo = new ImageViewCreateInfo();
-            createInfo.Image = Image;
+            createInfo.Image = VulkanImage;
             createInfo.ViewType = (ImageViewType)description.Dimension;
             createInfo.Format = SurfaceFormat;
             ComponentMapping componentMapping = new ComponentMapping
@@ -114,13 +169,13 @@ namespace Adamantium.Engine.Graphics
             ImageView = GraphicsDevice.LogicalDevice.CreateImageView(createInfo);
         }
 
-        public void TransitionImageLayout(ImageLayout newLayout)
+        public void TransitionImageLayout(VulkanImage image, ImageLayout oldLayout, ImageLayout newLayout)
         {
             var commandBuffer = GraphicsDevice.BeginSingleTimeCommands();
 
             var barrier = new ImageMemoryBarrier
             {
-                OldLayout = ImageLayout,
+                OldLayout = oldLayout,
                 NewLayout = newLayout,
                 SrcQueueFamilyIndex = Constants.VK_QUEUE_FAMILY_IGNORED,
                 DstQueueFamilyIndex = Constants.VK_QUEUE_FAMILY_IGNORED,
@@ -150,8 +205,8 @@ namespace Adamantium.Engine.Graphics
             PipelineStageFlagBits sourceStage;
             PipelineStageFlagBits destinationStage;
 
-            if ((ImageLayout == ImageLayout.Undefined || ImageLayout == ImageLayout.Preinitialized) &&
-                newLayout == ImageLayout.TransferDstOptimal)
+            if ((oldLayout == ImageLayout.Undefined || oldLayout == ImageLayout.Preinitialized) &&
+                (newLayout == ImageLayout.TransferDstOptimal || newLayout == ImageLayout.TransferSrcOptimal))
             {
                 barrier.SrcAccessMask = 0;
                 barrier.DstAccessMask = (uint)AccessFlagBits.TransferWriteBit;
@@ -159,7 +214,8 @@ namespace Adamantium.Engine.Graphics
                 sourceStage = PipelineStageFlagBits.TopOfPipeBit;
                 destinationStage = PipelineStageFlagBits.TransferBit;
             }
-            else if (ImageLayout == ImageLayout.TransferSrcOptimal && newLayout == ImageLayout.ShaderReadOnlyOptimal)
+            else if ((oldLayout == ImageLayout.TransferSrcOptimal || oldLayout == ImageLayout.TransferDstOptimal) 
+                     && newLayout == ImageLayout.ShaderReadOnlyOptimal)
             {
                 barrier.SrcAccessMask = (uint)AccessFlagBits.TransferWriteBit;
                 barrier.DstAccessMask = (uint) AccessFlagBits.ShaderReadBit;
@@ -167,7 +223,7 @@ namespace Adamantium.Engine.Graphics
                 sourceStage = PipelineStageFlagBits.TransferBit;
                 destinationStage = PipelineStageFlagBits.FragmentShaderBit;
             }
-            else if (ImageLayout == ImageLayout.Undefined && newLayout == ImageLayout.DepthStencilAttachmentOptimal)
+            else if (oldLayout == ImageLayout.Undefined && newLayout == ImageLayout.DepthStencilAttachmentOptimal)
             {
                 barrier.SrcAccessMask = 0;
                 barrier.DstAccessMask = (uint)(AccessFlagBits.DepthStencilAttachmentReadBit |
@@ -176,7 +232,7 @@ namespace Adamantium.Engine.Graphics
                 sourceStage = PipelineStageFlagBits.TopOfPipeBit;
                 destinationStage = PipelineStageFlagBits.EarlyFragmentTestsBit;
             }
-            else if (ImageLayout == ImageLayout.Undefined && newLayout == ImageLayout.ColorAttachmentOptimal)
+            else if (oldLayout == ImageLayout.Undefined && newLayout == ImageLayout.ColorAttachmentOptimal)
             {
                 barrier.SrcAccessMask = 0;
                 barrier.DstAccessMask = (uint)(AccessFlagBits.ColorAttachmentReadBit| AccessFlagBits.ColorAttachmentWriteBit);
@@ -386,7 +442,7 @@ namespace Adamantium.Engine.Graphics
 
         public static implicit operator VulkanImage (Texture texture)
         {
-            return texture.Image;
+            return texture.VulkanImage;
         }
 
         public static implicit operator ImageView(Texture texture)
@@ -396,8 +452,7 @@ namespace Adamantium.Engine.Graphics
 
         protected override void Dispose(bool disposeManaged)
         {
-            Console.WriteLine("Called Dispose on Texture");
-            Image?.Destroy(GraphicsDevice);
+            VulkanImage?.Destroy(GraphicsDevice);
             ImageView?.Destroy(GraphicsDevice);
             ImageMemory?.FreeMemory(GraphicsDevice);
         }

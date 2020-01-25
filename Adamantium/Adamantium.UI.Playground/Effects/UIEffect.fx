@@ -46,18 +46,24 @@ PixelInputType LightVertexShader(TexturedVertexInputType input)
 
 TexturedPixelInputType TexturedVertexShader(TexturedVertexInputType input)
 {
-	TexturedPixelInputType output;
-	output.position = float4(0, 0, 0, 0);
+//	TexturedPixelInputType output;
+//	output.position = float4(0, 0, 0, 0);
+//
+//
+//	// Change the position vector to be 4 units for proper matrix calculations.
+//	//input.position.w = 1.0f;
+//
+//	// Calculate the position of the vertex against the world, view, and projection matrices.
+//
+//	output.position = mul(input.position, wvp);
+//
+//	output.texcoord = input.texcoord;
+//	return output;
 
-
-	// Change the position vector to be 4 units for proper matrix calculations.
-	//input.position.w = 1.0f;
-
-	// Calculate the position of the vertex against the world, view, and projection matrices.
-
-	output.position = mul(input.position, wvp);
-
+    TexturedPixelInputType output;
 	output.texcoord = input.texcoord;
+	output.position = float4(input.position.xyz, 1);
+
 	return output;
 }
 
@@ -77,11 +83,10 @@ float4 SolidColorPixelShader(TexturedPixelInputType input) : SV_TARGET
 
 float4 TexturedPixelShader(TexturedPixelInputType input) : SV_TARGET
 {
-   //float4 result = fillColor;
-   //result.a *= transparency;
-   //float4 color = shaderTexture.Sample(sampleType, input.texcoord) * result;
-   //return color;
-   return float4(1,0,0,0);
+   float4 result = fillColor;
+   result.a *= transparency;
+   float4 color = shaderTexture.Sample(sampleType, input.texcoord) * result;
+   return color;
 }
 
 

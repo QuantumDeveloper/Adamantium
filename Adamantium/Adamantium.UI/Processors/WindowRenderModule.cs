@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using Adamantium.Core;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
@@ -27,9 +28,11 @@ namespace Adamantium.UI.Processors
         //private DepthStencilBuffer _depthBuffer;
         //private MSAALevel _msaaLevel;
         private bool isWindowResized;
-        private uint buffersCount = 2;
+        private uint buffersCount = 3;
         private Buffer vertexBuffer;
         private Buffer indexBuffer;
+        private Texture texture;
+        private Sampler sampler;
 
         public WindowRenderModule(IWindow window, GraphicsDevice device, MSAALevel msaaLevel)
         {
@@ -53,6 +56,8 @@ namespace Adamantium.UI.Processors
             var indices = new UInt32[] { 0, 1, 2, 0, 2, 3 };
             vertexBuffer = Buffer.Vertex.New(device, vertices);
             indexBuffer = Buffer.Index.New(device, indices);
+            texture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "texture.png"));
+            sampler = CreateTextureSampler();
             //_vertexLayout = VertexInputLayout.FromType<VertexPositionTexture>();
 
             //_uiEffect = ToDispose(Effect.Load(@"Content\Effects\UIEffect.fx.compiled", _graphicsDevice));
@@ -91,6 +96,25 @@ namespace Adamantium.UI.Processors
             viewport.Width = (uint)e.NewSize.Width;
             viewport.Height = (uint)e.NewSize.Height;
         }
+        
+        Sampler CreateTextureSampler()
+        {
+            SamplerCreateInfo samplerInfo = new SamplerCreateInfo();
+            samplerInfo.MagFilter = Filter.Linear;
+            samplerInfo.MinFilter = Filter.Linear;
+            samplerInfo.AddressModeU = SamplerAddressMode.Repeat;
+            samplerInfo.AddressModeV = SamplerAddressMode.Repeat;
+            samplerInfo.AddressModeW = SamplerAddressMode.Repeat;
+            samplerInfo.AnisotropyEnable = true;
+            samplerInfo.MaxAnisotropy = 16;
+            samplerInfo.BorderColor = BorderColor.IntOpaqueBlack;
+            samplerInfo.UnnormalizedCoordinates = false;
+            samplerInfo.CompareEnable = false;
+            samplerInfo.CompareOp = CompareOp.Always;
+            samplerInfo.MipmapMode = SamplerMipmapMode.Linear;
+
+            return GraphicsDevice.CreateSampler(samplerInfo);
+        }
 
         public bool Prepare()
         {
@@ -99,17 +123,18 @@ namespace Adamantium.UI.Processors
                 return false;
             }
 
-            //            if (isWindowResized)
-            //            {
-            //                isWindowResized = false;
-            //                //InitializeResources();
-            //                GraphicsDevice.ResizeBuffers((uint)window.ClientWidth, (uint)window.ClientHeight, 2, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
-            //                return false;
-            //            }
+            // if (isWindowResized)
+            // {
+            //     isWindowResized = false;
+            //     //InitializeResources();
+            //     GraphicsDevice.ResizeBuffers((uint)window.ClientWidth, (uint)window.ClientHeight, 2, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
+            //     return false;
+            // }
 
-            if (!GraphicsDevice.BeginDraw(Colors.CornflowerBlue, 1.0f, 0))
+            if (isWindowResized || !GraphicsDevice.BeginDraw(Colors.CornflowerBlue, 1.0f, 0))
             {
                 GraphicsDevice.ResizePresenter((uint)window.ClientWidth, (uint)window.ClientHeight, buffersCount, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
+                isWindowResized = false;
                 return false;
             }
 
@@ -157,17 +182,20 @@ namespace Adamantium.UI.Processors
             GraphicsDevice.SetViewports(viewport);
             //GraphicsDevice.SetVertexBuffer(vertexBuffer);
             //GraphicsDevice.SetIndexBuffer(indexBuffer);
+            GraphicsDevice.BasicEffect.Parameters["fillColor"].SetValue(Colors.Green.ToVector4());
+            GraphicsDevice.BasicEffect.Parameters["sampleType"].SetResource(sampler);
+            GraphicsDevice.BasicEffect.Parameters["shaderTexture"].SetResource(texture);
 
-            GraphicsDevice.BasicEffect.Techniques[0].Passes[0].Apply();
+            GraphicsDevice.BasicEffect.Techniques[0].Passes["Textured"].Apply();
             GraphicsDevice.DrawIndexed(vertexBuffer, indexBuffer);
             GraphicsDevice.EndDraw();
             GraphicsDevice.Present();
             
-//            if (isWindowResized)
-//            {
-//                isWindowResized = false;
-//                GraphicsDevice.ResizePresenter((uint)window.ClientWidth, (uint)window.ClientHeight, buffersCount, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
-//            }
+            if (isWindowResized)
+            {
+                isWindowResized = false;
+                GraphicsDevice.ResizePresenter((uint)window.ClientWidth, (uint)window.ClientHeight, buffersCount, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
+            }
         }
 
         //public void TraverseByLayer(IVisual visualElement, Action<IVisual> action)

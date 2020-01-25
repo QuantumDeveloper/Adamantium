@@ -18,13 +18,13 @@ namespace Adamantium.Engine.Graphics.Effects
         public int Count;
 
         public Dictionary<EffectData.Parameter, Sampler[]> SamplerStates;
-        public Dictionary<EffectData.Parameter, ImageView[]> ShaderResourceViews;
-        public Dictionary<EffectData.Parameter, VulkanBuffer[]> UnorderedAccessViews;
+        public Dictionary<EffectData.Parameter, Texture[]> ShaderResourceViews;
+        public Dictionary<EffectData.Parameter, BufferView[]> UnorderedAccessViews;
         public Dictionary<EffectData.Parameter, object> BoundResources;
 
         private static Sampler[] EmptySamplers = new Sampler[0];
-        private static ImageView[] EmptyResourceViews = new ImageView[0];
-        private static VulkanBuffer[] EmptyUAVs = new VulkanBuffer[0];
+        private static Texture[] EmptyResourceViews = new Texture[0];
+        private static BufferView[] EmptyUAVs = new BufferView[0];
 
         /// <summary>
         /// Initializes this instance.
@@ -34,8 +34,8 @@ namespace Adamantium.Engine.Graphics.Effects
             ConstantBuffers = new Dictionary<EffectData.Parameter, EffectConstantBuffer>();
 
             SamplerStates = new Dictionary<EffectData.Parameter, Sampler[]>();
-            ShaderResourceViews = new Dictionary<EffectData.Parameter, ImageView[]>();
-            UnorderedAccessViews = new Dictionary<EffectData.Parameter, VulkanBuffer[]>();
+            ShaderResourceViews = new Dictionary<EffectData.Parameter, Texture[]>();
+            UnorderedAccessViews = new Dictionary<EffectData.Parameter, BufferView[]>();
             BoundResources = new Dictionary<EffectData.Parameter, object>();
         }
 
@@ -53,10 +53,9 @@ namespace Adamantium.Engine.Graphics.Effects
             return (T[])res;
         }
 
-        public ImageView[] GetShaderResources(EffectData.Parameter resourceName)
+        public Texture[] GetShaderResources(EffectData.Parameter resourceName)
         {
-            ImageView[] views;
-            if (ShaderResourceViews.TryGetValue(resourceName, out views))
+            if (ShaderResourceViews.TryGetValue(resourceName, out var views))
             {
                 return views;
             }
@@ -73,10 +72,9 @@ namespace Adamantium.Engine.Graphics.Effects
             return EmptySamplers;
         }
 
-        public VulkanBuffer[] GetUAVs(EffectData.Parameter resourceName)
+        public BufferView[] GetUAVs(EffectData.Parameter resourceName)
         {
-            VulkanBuffer[] uavs;
-            if (UnorderedAccessViews.TryGetValue(resourceName, out uavs))
+            if (UnorderedAccessViews.TryGetValue(resourceName, out var uavs))
             {
                 return uavs;
             }
@@ -170,48 +168,34 @@ namespace Adamantium.Engine.Graphics.Effects
                     break;
                 case EffectResourceType.ShaderResourceView:
                     {
-                        ImageView[] views = null;
-                        if (!ShaderResourceViews.TryGetValue(parameter, out views))
+                        if (!ShaderResourceViews.TryGetValue(parameter, out var views))
                         {
-                            views = new ImageView[parameter.Count];
+                            views = new Texture[parameter.Count];
                             ShaderResourceViews.Add(parameter, views);
                             BoundResources.Add(parameter, views);
                         }
-
-                        ImageView view = null;
-                        if (value is ImageView)
+                        
+                        if (value is Texture)
                         {
-                            view = value as ImageView;
+                            views[index] = (Texture)value;
                         }
-                        else if (value is Texture)
-                        {
-                            view = value as Texture;
-                        }
-                        views[index] = view;
                     }
                     break;
                 case EffectResourceType.UnorderedAccessView:
                     {
-                        VulkanBuffer[] uavs = null;
-
-                        if (!UnorderedAccessViews.TryGetValue(parameter, out uavs))
+                        if (!UnorderedAccessViews.TryGetValue(parameter, out var uavs))
                         {
-                            uavs = new VulkanBuffer[parameter.Count];
+                            uavs = new BufferView[parameter.Count];
                             UnorderedAccessViews.Add(parameter, uavs);
                             BoundResources.Add(parameter, uavs);
                         }
 
-                        VulkanBuffer view = null;
-                        if (value is VulkanBuffer)
+                        BufferView view = null;
+                        if (value is BufferView)
                         {
-                            view = value as VulkanBuffer;
+                            view = value as BufferView;
+                            uavs[index] = view;
                         }
-                        else if (value is Graphics.Buffer)
-                        {
-                            view = value as VulkanBuffer;
-                        }
-
-                        uavs[index] = view;
                     }
                     break;
             }

@@ -95,7 +95,7 @@ namespace Adamantium.Core
             return array == null ? 0 : array.Length * SizeOf<T>();
         }
 
-        public static unsafe void CopyMemory(IntPtr destination, IntPtr source, int sizeInBytesToCopy)
+        public static unsafe void CopyMemory(IntPtr destination, IntPtr source, long sizeInBytesToCopy)
         {
             Buffer.MemoryCopy(source.ToPointer(), destination.ToPointer(), sizeInBytesToCopy, sizeInBytesToCopy);
         }
@@ -103,8 +103,8 @@ namespace Adamantium.Core
         public static void Write<T>(IntPtr destination, ref T value) where T : struct
         {
             var size = SizeOf<T>();
-            IntPtr source = IntPtr.Zero;
-            Marshal.StructureToPtr<T>(value, source, false);
+            IntPtr source = AllocateMemory(SizeOf<T>());
+            Marshal.StructureToPtr(value, source, false);
             CopyMemory(destination, source, size);
         }
 
