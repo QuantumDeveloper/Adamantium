@@ -55,7 +55,7 @@ namespace Adamantium.UI.Processors
             var indices = new UInt32[] { 0, 1, 2, 0, 2, 3 };
             vertexBuffer = Buffer.Vertex.New(device, vertices);
             indexBuffer = Buffer.Index.New(device, indices);
-            texture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "texture.png"));
+            texture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "texture.jpg"));
             sampler = CreateTextureSampler();
             //_vertexLayout = VertexInputLayout.FromType<VertexPositionTexture>();
 
@@ -181,7 +181,7 @@ namespace Adamantium.UI.Processors
             GraphicsDevice.SetViewports(viewport);
             //GraphicsDevice.SetVertexBuffer(vertexBuffer);
             //GraphicsDevice.SetIndexBuffer(indexBuffer);
-            GraphicsDevice.BasicEffect.Parameters["fillColor"].SetValue(Colors.Red.ToVector4());
+            GraphicsDevice.BasicEffect.Parameters["fillColor"].SetValue(Colors.Fuchsia.ToVector4());
             GraphicsDevice.BasicEffect.Parameters["sampleType"].SetResource(sampler);
             GraphicsDevice.BasicEffect.Parameters["shaderTexture"].SetResource(texture);
 

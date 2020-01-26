@@ -45,6 +45,8 @@ namespace Adamantium.Engine.Graphics
 
         protected Texture(GraphicsDevice device, Image img, ImageUsageFlagBits usage, ImageLayout desiredLayout)
         {
+            //var formats = GraphicsDevice.VulkanInstance.CurrentDevice.GetPhysicalDeviceFormatProperties()
+            
             GraphicsDevice = device;
             Description = img.Description;
             Description.Usage |= ImageUsageFlagBits.TransferDstBit | usage;
@@ -52,6 +54,7 @@ namespace Adamantium.Engine.Graphics
 
             var stagingDescription = Description;
             stagingDescription.Usage = ImageUsageFlagBits.TransferSrcBit;
+            stagingDescription.ImageTiling = ImageTiling.Linear;
             var stagingMemoryFlags = GetStagingMemoryFlags();
 
             CreateImage(stagingDescription, stagingMemoryFlags, out var stagingImage, out var stagingMemory);
@@ -74,10 +77,10 @@ namespace Adamantium.Engine.Graphics
 
         }
 
-        private void UpdateImageContent(DeviceMemory imgMemory, IntPtr srcPtr, long size)
+        private void UpdateImageContent(DeviceMemory imgMemory, IntPtr source, long size)
         {
             var data = GraphicsDevice.MapMemory(imgMemory, 0, (ulong)size, 0);
-            Utilities.CopyMemory(data, srcPtr, size);
+            Utilities.CopyMemory(data, source, size);
             GraphicsDevice.UnmapMemory(imgMemory);
         }
 
@@ -103,7 +106,10 @@ namespace Adamantium.Engine.Graphics
             var stagingMemoryFlags = MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent; // Windows
             if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
-                stagingMemoryFlags = MemoryPropertyFlags.DeviceLocal | MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent | MemoryPropertyFlags.HostCached; // MacOS
+                stagingMemoryFlags = MemoryPropertyFlags.DeviceLocal | 
+                                     MemoryPropertyFlags.HostVisible | 
+                                     MemoryPropertyFlags.HostCoherent | 
+                                     MemoryPropertyFlags.HostCached; // MacOS
             }
 
             return stagingMemoryFlags;

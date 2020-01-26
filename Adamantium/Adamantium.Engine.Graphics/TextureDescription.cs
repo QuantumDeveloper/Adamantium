@@ -273,7 +273,7 @@ namespace Adamantium.Engine.Graphics
                 Format = description.Format,
                 Samples = MSAALevel.None,
                 Usage = ImageUsageFlagBits.SampledBit,
-                ImageTiling = ImageTiling.Linear,
+                ImageTiling = ImageTiling.Optimal,
                 SharingMode = SharingMode.Exclusive,
                 ImageType = ConvertToImageType(description.Dimension),
                 InitialLayout = ImageLayout.Preinitialized,
