@@ -594,7 +594,8 @@ namespace Adamantium.Engine.Graphics.Effects
         {
             var bufferInfo = new DescriptorBufferInfo();
             bufferInfo.Buffer = buffer;
-            bufferInfo.Range = (ulong)Marshal.SizeOf<VkDescriptorBufferInfo>();
+            //bufferInfo.Range = (ulong)Marshal.SizeOf<VkDescriptorBufferInfo>();
+            bufferInfo.Range = (ulong)buffer.TotalSize;
 
             var writeDescriptor = new WriteDescriptorSet();
             writeDescriptor.DescriptorCount = 1;

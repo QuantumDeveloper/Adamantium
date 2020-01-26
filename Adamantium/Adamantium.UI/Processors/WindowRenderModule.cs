@@ -28,7 +28,6 @@ namespace Adamantium.UI.Processors
         //private DepthStencilBuffer _depthBuffer;
         //private MSAALevel _msaaLevel;
         private bool isWindowResized;
-        private uint buffersCount = 3;
         private Buffer vertexBuffer;
         private Buffer indexBuffer;
         private Texture texture;
@@ -133,7 +132,7 @@ namespace Adamantium.UI.Processors
 
             if (isWindowResized || !GraphicsDevice.BeginDraw(Colors.CornflowerBlue, 1.0f, 0))
             {
-                GraphicsDevice.ResizePresenter((uint)window.ClientWidth, (uint)window.ClientHeight, buffersCount, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
+                GraphicsDevice.ResizePresenter((uint)window.ClientWidth, (uint)window.ClientHeight);
                 isWindowResized = false;
                 return false;
             }
@@ -182,10 +181,11 @@ namespace Adamantium.UI.Processors
             GraphicsDevice.SetViewports(viewport);
             //GraphicsDevice.SetVertexBuffer(vertexBuffer);
             //GraphicsDevice.SetIndexBuffer(indexBuffer);
-            GraphicsDevice.BasicEffect.Parameters["fillColor"].SetValue(Colors.Green.ToVector4());
+            GraphicsDevice.BasicEffect.Parameters["fillColor"].SetValue(Colors.Red.ToVector4());
             GraphicsDevice.BasicEffect.Parameters["sampleType"].SetResource(sampler);
             GraphicsDevice.BasicEffect.Parameters["shaderTexture"].SetResource(texture);
 
+            //GraphicsDevice.BasicEffect.Techniques[0].Passes["Debug"].Apply();
             GraphicsDevice.BasicEffect.Techniques[0].Passes["Textured"].Apply();
             GraphicsDevice.DrawIndexed(vertexBuffer, indexBuffer);
             GraphicsDevice.EndDraw();
@@ -194,7 +194,7 @@ namespace Adamantium.UI.Processors
             if (isWindowResized)
             {
                 isWindowResized = false;
-                GraphicsDevice.ResizePresenter((uint)window.ClientWidth, (uint)window.ClientHeight, buffersCount, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
+                GraphicsDevice.ResizePresenter((uint)window.ClientWidth, (uint)window.ClientHeight);
             }
         }
 
