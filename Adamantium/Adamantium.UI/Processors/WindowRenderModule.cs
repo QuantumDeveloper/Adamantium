@@ -101,12 +101,12 @@ namespace Adamantium.UI.Processors
             SamplerCreateInfo samplerInfo = new SamplerCreateInfo();
             samplerInfo.MagFilter = Filter.Linear;
             samplerInfo.MinFilter = Filter.Linear;
-            samplerInfo.AddressModeU = SamplerAddressMode.Repeat;
+            samplerInfo.AddressModeU = SamplerAddressMode.ClampToBorder;
             samplerInfo.AddressModeV = SamplerAddressMode.Repeat;
             samplerInfo.AddressModeW = SamplerAddressMode.Repeat;
             samplerInfo.AnisotropyEnable = true;
             samplerInfo.MaxAnisotropy = 16;
-            samplerInfo.BorderColor = BorderColor.IntOpaqueBlack;
+            samplerInfo.BorderColor = BorderColor.IntOpaqueWhite;
             samplerInfo.UnnormalizedCoordinates = false;
             samplerInfo.CompareEnable = false;
             samplerInfo.CompareOp = CompareOp.Always;
@@ -156,9 +156,9 @@ namespace Adamantium.UI.Processors
                 // new VertexPositionColorTexture(){Position = new Vector3F(-0.5f, 0.5f), Color = new Color4F(1.0f, 0.0f, 1.0f, 1.0f), UV = new Vector2F(0.0f, 1.0f)},
                 
                 new VertexPositionColorTexture(){Position = new Vector3F(-0.5f, -0.5f), Color = Colors.Red, UV = new Vector2F(0.0f, 0.0f)},
-                new VertexPositionColorTexture(){Position = new Vector3F(0.5f, -0.5f), Color = Colors.Green, UV = new Vector2F(1.0f, 0.0f)},
-                new VertexPositionColorTexture(){Position = new Vector3F(0.5f, 0.5f), Color = Colors.Blue, UV = new Vector2F(1.0f, 1.0f)},
-                new VertexPositionColorTexture(){Position = new Vector3F(-0.5f, 0.5f), Color = Colors.Green, UV = new Vector2F(0.0f, 1.0f)},
+                new VertexPositionColorTexture(){Position = new Vector3F(0.5f, -0.5f), Color = Colors.Green, UV = new Vector2F(1.5f, 0.0f)},
+                new VertexPositionColorTexture(){Position = new Vector3F(0.5f, 0.5f), Color = Colors.Blue, UV = new Vector2F(1.5f, 1.5f)},
+                new VertexPositionColorTexture(){Position = new Vector3F(-0.5f, 0.5f), Color = Colors.Green, UV = new Vector2F(0.0f, 1.5f)},
             };
 
             return v;
@@ -181,7 +181,7 @@ namespace Adamantium.UI.Processors
             GraphicsDevice.SetViewports(viewport);
             //GraphicsDevice.SetVertexBuffer(vertexBuffer);
             //GraphicsDevice.SetIndexBuffer(indexBuffer);
-            GraphicsDevice.BasicEffect.Parameters["fillColor"].SetValue(Colors.Fuchsia.ToVector4());
+            GraphicsDevice.BasicEffect.Parameters["fillColor"].SetValue(Colors.White.ToVector4());
             GraphicsDevice.BasicEffect.Parameters["sampleType"].SetResource(sampler);
             GraphicsDevice.BasicEffect.Parameters["shaderTexture"].SetResource(texture);
 
