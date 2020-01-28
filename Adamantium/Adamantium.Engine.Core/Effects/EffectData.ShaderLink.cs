@@ -8,9 +8,6 @@ namespace Adamantium.Engine.Core.Effects
         {
             public static readonly ShaderLink NullShader = new ShaderLink();
 
-            private int index;
-            private string importName;
-
             /// <summary>
             /// The stream output rasterized stream (-1 if no rasterized stream).
             /// </summary>
@@ -26,7 +23,7 @@ namespace Adamantium.Engine.Core.Effects
             /// </summary>
             public ShaderLink()
             {
-                index = -1;
+                Index = -1;
                 StreamOutputRasterizedStream = -1;
             }
 
@@ -37,7 +34,7 @@ namespace Adamantium.Engine.Core.Effects
             /// <remarks>
             /// When this is an import, the <see cref="Index"/> is not valid. Only <see cref="ImportName"/> is valid.
             /// </remarks>
-            public bool IsImport => importName != null;
+            public bool IsImport => !String.IsNullOrEmpty(ImportName);
 
             /// <summary>
             /// Gets or sets the index in the shader pool.
@@ -46,11 +43,7 @@ namespace Adamantium.Engine.Core.Effects
             /// <remarks>
             /// This index is a direct reference to the shader in <see cref="EffectData.Shaders"/>.
             /// </remarks>
-            public int Index
-            {
-                get { return index; }
-                set { index = value; }
-            }
+            public int Index { get; set; }
 
             /// <summary>
             /// Gets or sets the entrypoint shader name for further usage.
@@ -64,11 +57,7 @@ namespace Adamantium.Engine.Core.Effects
             /// <remarks>
             /// This property is not null when there is no shader compiled and this is an import.
             /// </remarks>
-            public string ImportName
-            {
-                get { return importName; }
-                set { importName = value; }
-            }
+            public string ImportName { get; set; }
 
             public EffectShaderType ShaderType;
 
@@ -76,7 +65,7 @@ namespace Adamantium.Engine.Core.Effects
             /// Gets a value indicating whether this instance is a null shader.
             /// </summary>
             /// <value><c>true</c> if this instance is null shader; otherwise, <c>false</c>.</value>
-            public bool IsNullShader => index < 0;
+            public bool IsNullShader => Index < 0;
 
             public ShaderLink Clone()
             {
@@ -89,7 +78,7 @@ namespace Adamantium.Engine.Core.Effects
                     return false;
                 if (ReferenceEquals(this, other))
                     return true;
-                return this.index == other.index && string.Equals(this.EntryPoint, other.EntryPoint);
+                return this.Index == other.Index && string.Equals(this.EntryPoint, other.EntryPoint);
             }
 
             public override bool Equals(object obj)
@@ -105,7 +94,7 @@ namespace Adamantium.Engine.Core.Effects
             {
                 unchecked
                 {
-                    return (this.index * 397) ^ (EntryPoint != null ? EntryPoint.GetHashCode() : 0);
+                    return (this.Index * 397) ^ (EntryPoint != null ? EntryPoint.GetHashCode() : 0);
                 }
             }
 

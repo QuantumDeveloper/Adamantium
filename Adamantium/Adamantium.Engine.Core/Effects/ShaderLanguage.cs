@@ -2,7 +2,7 @@
 {
     public enum ShaderLanguage
     {
-        GLSL = 0,
-        HLSL = 1,
+        HLSL = 0,
+        GLSL = 1,
     }
 }
