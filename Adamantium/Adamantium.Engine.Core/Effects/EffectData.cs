@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using ProtoBuf.Meta;
+using System.Collections.Generic;
 using System.IO;
 
 namespace Adamantium.Engine.Core.Effects
@@ -7,12 +8,43 @@ namespace Adamantium.Engine.Core.Effects
     {
         public static readonly string CompiledExtension = "fx.compiled";
 
-        //private static readonly RuntimeTypeModel Scheme;
+        private static readonly RuntimeTypeModel Scheme;
 
         static EffectData()
         {
-            //Scheme = TypeModel.Create();
-            //Scheme.AutoAddMissingTypes = true;
+            Scheme = RuntimeTypeModel.Create();
+            Scheme.AutoAddMissingTypes = true;
+        }
+
+        private static void Configure()
+        {
+            var compilerArgs = Scheme.Add<CompilerArguments>();
+            compilerArgs.AddField(0, "FilePath");
+            compilerArgs.AddField(1, "DependencyFilePath");
+            compilerArgs.AddField(2, "CompilerFlags");
+            compilerArgs.AddField(3, "Macros");
+            compilerArgs.AddField(4, "IncludeDirectoryList");
+
+            var technique = Scheme.Add<Technique>();
+            technique.AddField(0, "Name");
+            technique.AddField(1, "Passes");
+            technique.AddField(2, "IsSubPass");
+            technique.AddField(3, "Properties");
+            technique.AddField(4, "Pipeline");
+
+            var pipeline = Scheme.Add<Pipeline>();
+            pipeline.AddField(0, "Links");
+
+            var pass = Scheme.Add<Pass>();
+            pass.AddField(0, "Name");
+            pass.AddField(1, "IsSubPass");
+
+
+            var effect = Scheme.Add<EffectData.Effect>();
+            effect.AddField(0, "Name");
+            effect.AddField(1, "ShareConstantBuffers");
+            effect.AddField(2, "Techniques");
+            effect.AddField(3, "Arguments");
         }
 
         public EffectData() { }
@@ -33,7 +65,7 @@ namespace Adamantium.Engine.Core.Effects
         /// <param name="stream">The stream.</param>
         public void Save(Stream stream)
         {
-            //Scheme.Serialize(stream, this);
+            Scheme.Serialize(stream, this);
         }
 
         /// <summary>
@@ -55,9 +87,8 @@ namespace Adamantium.Engine.Core.Effects
         /// </remarks>
         public static EffectData Load(Stream stream)
         {
-            //EffectData effect = (EffectData)Scheme.Deserialize(stream, null, typeof(EffectData));
-            //return effect;
-            return null;
+            var effect = (EffectData)Scheme.Deserialize(stream, null, typeof(EffectData));
+            return effect;
         }
 
         /// <summary>
