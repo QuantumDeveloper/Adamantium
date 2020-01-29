@@ -25,7 +25,7 @@ namespace Adamantium.Engine.CompilerTests
                         }
                         else
                         {
-                            pass.Pipeline.Links[i] = new EffectData.ShaderLink();
+                            //pass.Pipeline.Links[i] = new EffectData.ShaderLink();
                         }
                     }
                 }

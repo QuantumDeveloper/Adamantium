@@ -64,8 +64,8 @@ namespace Adamantium.Engine.Core.Effects
             technique.AddField(1, "Name");
             technique.AddField(2, "Passes");
 
-            //var pipeline = Scheme.Add<Pipeline>(false);
-            var pipeline = Scheme.Add(typeof(Pipeline), false);
+            var pipeline = Scheme.Add<Pipeline>();
+            //var pipeline = Scheme.Add(typeof(Pipeline), false);
             //pipeline.AddField(1, "Links");
             pipeline.AddField(1, "Links2");
             pipeline.IgnoreListHandling = true;
