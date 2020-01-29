@@ -1124,6 +1124,7 @@ namespace Adamantium.Engine.Compiler.Effects
                 pass.Pipeline[type] = new EffectData.ShaderLink();
 
             pass.Pipeline[type].Index = shaderIndex;
+            pass.Pipeline[type].EntryPoint = shader.EntryPoint;
         }
 
         private void HandleMethodExpression(Ast.MethodExpression expression)
