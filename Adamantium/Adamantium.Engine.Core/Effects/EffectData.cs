@@ -66,8 +66,7 @@ namespace Adamantium.Engine.Core.Effects
 
             var pipeline = Scheme.Add<Pipeline>();
             //var pipeline = Scheme.Add(typeof(Pipeline), false);
-            //pipeline.AddField(1, "Links");
-            pipeline.AddField(1, "Links2");
+            pipeline.AddField(1, "Links");
             pipeline.IgnoreListHandling = true;
 
             //var shaderLink = Scheme.Add<ShaderLink>(false);

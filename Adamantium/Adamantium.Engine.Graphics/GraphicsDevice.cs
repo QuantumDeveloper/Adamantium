@@ -391,11 +391,6 @@ namespace Adamantium.Engine.Graphics
             return LogicalDevice.CreateGraphicsPipelines(null, 1, info)[0];
         }
 
-        public void CreateGraphicsPipelineForEffectPass(EffectPass effectPass)
-        {
-
-        }
-
         public Result AllocateDescriptorSets(in DescriptorSetAllocateInfo pAllocateInfo, AdamantiumVulkan.Core.DescriptorSet[] descriptorSets)
         {
             return LogicalDevice.AllocateDescriptorSets(pAllocateInfo, descriptorSets);

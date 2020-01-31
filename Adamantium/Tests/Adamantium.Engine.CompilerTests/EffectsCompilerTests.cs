@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using Adamantium.Engine.Compiler.Effects;
 using Adamantium.Engine.Core.Effects;
@@ -11,27 +12,19 @@ namespace Adamantium.Engine.CompilerTests
         [Test]
         public void EffectParsingTest()
         {
-            var path = Path.Combine("EffectsData", "UIEffect.fx");
-            var result = EffectCompiler.CompileFromFile(path);
-            foreach (var tech in result.EffectData.Description.Techniques)
+            try
             {
-                foreach(var pass in tech.Passes)
-                {
-                    for (int i = 0; i< pass.Pipeline.Links.Length; ++i)
-                    {
-                        if (pass.Pipeline.Links[i] != null)
-                        {
-                            pass.Pipeline.Links2.Add(pass.Pipeline.Links[i]);
-                        }
-                        else
-                        {
-                            //pass.Pipeline.Links[i] = new EffectData.ShaderLink();
-                        }
-                    }
-                }
+                var path = Path.Combine("EffectsData", "UIEffect.fx");
+                var result = EffectCompiler.CompileFromFile(path);
+            
+                result.EffectData.Save("UIEffect.fx.compiled");
+                var restored = EffectData.Load("UIEffect.fx.compiled");
             }
-            result.EffectData.Save("UIEffect");
-            var restored = EffectData.Load("UIEffect");
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                throw;
+            }
         }
     }
 }

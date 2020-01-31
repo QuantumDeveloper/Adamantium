@@ -16,8 +16,6 @@ namespace Adamantium.Engine.Graphics.Effects
     /// </summary>
     public sealed class EffectPass : DisposableObject
     {
-        private const int StageCount = 6;
-
         /// <summary>
         ///   Gets the attributes associated with this pass.
         /// </summary>
@@ -31,8 +29,8 @@ namespace Adamantium.Engine.Graphics.Effects
 
         private readonly EffectData.Pass pass;
         private readonly GraphicsDevice graphicsDevice;
-
-        private PipelineBlock pipeline;
+        
+        private List<StageBlock> pipelineStages;
 
         internal EffectTechnique Technique;
 
@@ -63,10 +61,7 @@ namespace Adamantium.Engine.Graphics.Effects
             this.pass = pass;
             Effect = effect;
             graphicsDevice = effect.GraphicsDevice;
-            pipeline = new PipelineBlock()
-            {
-                Stages = new StageBlock[StageCount],
-            };
+            pipelineStages = new List<StageBlock>();
 
             shaderStages = new List<PipelineShaderStageCreateInfo>();
             layoutBindings = new List<DescriptorSetLayoutBinding>();
@@ -136,9 +131,9 @@ namespace Adamantium.Engine.Graphics.Effects
             // ----------------------------------------------
             // Iterate on each stage to setup all inputs
             // ----------------------------------------------
-            for (int stageIndex = 0; stageIndex < pipeline.Stages.Length; stageIndex++)
+            for (int stageIndex = 0; stageIndex < pipelineStages.Count; stageIndex++)
             {
-                var stageBlock = pipeline.Stages[stageIndex];
+                var stageBlock = pipelineStages[stageIndex];
                 if (stageBlock == null)
                 {
                     continue;
@@ -323,21 +318,16 @@ namespace Adamantium.Engine.Graphics.Effects
         /// <exception cref="System.InvalidOperationException"></exception>
         internal void Initialize(Logger logger)
         {
-            for (int i = 0; i < StageCount; i++)
+            foreach (var link in pass.Pipeline)
             {
-                var shaderType = (EffectShaderType)i;
-                var link = pass.Pipeline[shaderType];
-                if (link == null)
-                    continue;
-
                 if (link.IsImport)
                 {
                     throw new InvalidOperationException(
-                       $"Unable to resolve imported shader [{link.ImportName}] for stage [{shaderType}]");
+                       $"Unable to resolve imported shader [{link.ImportName}] for stage [{link.ShaderType}]");
                 }
 
-                var stageBlock = new StageBlock(shaderType);
-                pipeline.Stages[i] = stageBlock;
+                var stageBlock = new StageBlock(link.ShaderType);
+                pipelineStages.Add(stageBlock);
 
                 stageBlock.Index = link.Index;
                 stageBlock.EntryPoint = link.EntryPoint;
@@ -365,11 +355,10 @@ namespace Adamantium.Engine.Graphics.Effects
                 return;
             }
 
-            string errorProfile;
             stageBlock.Shader = Effect.Pool.GetOrCompileShader(
                stageBlock.Type,
                shaderIndex,
-               out errorProfile);
+               out var errorProfile);
 
             if (stageBlock.Shader == null)
             {
@@ -724,7 +713,7 @@ namespace Adamantium.Engine.Graphics.Effects
 
         internal void ComputeSlotLinks()
         {
-            foreach (var stageBlockVar in pipeline.Stages)
+            foreach (var stageBlockVar in pipelineStages)
             {
                 var stageBlock = stageBlockVar;
 
@@ -815,7 +804,7 @@ namespace Adamantium.Engine.Graphics.Effects
         {
             int hashCode = 0;
 
-            foreach (var stage in pipeline.Stages)
+            foreach (var stage in pipelineStages)
             {
                 if (stage == null) continue;
                 
@@ -830,7 +819,7 @@ namespace Adamantium.Engine.Graphics.Effects
 
         private struct PipelineBlock
         {
-            public StageBlock[] Stages;
+            
         }
 
         private struct ParameterBinding

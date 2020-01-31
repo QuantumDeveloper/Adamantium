@@ -58,10 +58,10 @@ namespace Adamantium.Engine.Graphics.Effects
         /// Initializes a new instance of the <see cref="Effect"/> class with the specified bytecode effect. See remarks.
         /// </summary>
         /// <param name="device">The device.</param>
-        /// <param name="bytecode">The bytecode to add to <see cref="D3DGraphicsDevice.DefaultEffectPool"/>. This bytecode must contain only one effect.</param>
+        /// <param name="bytecode">The bytecode to add to <see cref="GraphicsDevice.DefaultEffectPool"/>. This bytecode must contain only one effect.</param>
         /// <exception cref="ArgumentException">If the bytecode doesn't contain a single effect.</exception>
         /// <remarks>
-        /// The effect bytecode must contain only a single effect and will be registered into the <see cref="D3DGraphicsDevice.DefaultEffectPool"/>.
+        /// The effect bytecode must contain only a single effect and will be registered into the <see cref="GraphicsDevice.DefaultEffectPool"/>.
         /// </remarks>
         public Effect(GraphicsDevice device, byte[] bytecode)
            : this(device, EffectData.Load(bytecode))
@@ -74,9 +74,9 @@ namespace Adamantium.Engine.Graphics.Effects
         /// </summary>
         /// <param name="device">The device.</param>
         /// <param name="effectData">The bytecode to add to the Effect Pool. This bytecode must contain only one effect.</param>
-        /// <param name="effectPool">The effect pool used to register the bytecode. Default is <see cref="D3DGraphicsDevice.DefaultEffectPool"/>.</param>
+        /// <param name="effectPool">The effect pool used to register the bytecode. Default is <see cref="GraphicsDevice.DefaultEffectPool"/>.</param>
         /// <exception cref="ArgumentException">If the bytecode doesn't contain a single effect.</exception>
-        /// <remarks>The effect bytecode must contain only a single effect and will be registered into the <see cref="D3DGraphicsDevice.DefaultEffectPool"/>.</remarks>
+        /// <remarks>The effect bytecode must contain only a single effect and will be registered into the <see cref="GraphicsDevice.DefaultEffectPool"/>.</remarks>
         public Effect(GraphicsDevice device, EffectData effectData, EffectPool effectPool = null)
            : base(device)
         {
@@ -328,8 +328,8 @@ namespace Adamantium.Engine.Graphics.Effects
 
         internal new DisposeCollector DisposeCollector
         {
-            get { return base.DisposeCollector; }
-            private set { base.DisposeCollector = value; }
+            get => base.DisposeCollector;
+            private set => base.DisposeCollector = value;
         }
 
         protected internal virtual EffectPass OnApply(EffectPass pass)

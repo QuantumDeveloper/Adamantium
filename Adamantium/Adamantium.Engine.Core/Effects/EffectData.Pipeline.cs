@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Adamantium.Engine.Core.Effects
 {
@@ -7,19 +8,17 @@ namespace Adamantium.Engine.Core.Effects
     {
         public sealed class Pipeline : IEnumerable<ShaderLink>
         {
-            private const int ShaderLinkCount = 6;
+            //public ShaderLink[] Links;
 
-            public ShaderLink[] Links;
-
-            public List<ShaderLink> Links2;
+            public Dictionary<EffectShaderType, ShaderLink> Links;
 
             /// <summary>
             /// Initializes a new instance of the <see cref="Pipeline" /> class.
             /// </summary>
             public Pipeline()
             {
-                Links = new ShaderLink[ShaderLinkCount];
-                Links2 = new List<ShaderLink>();
+                //Links = new ShaderLink[ShaderLinkCount];
+                Links = new Dictionary<EffectShaderType, ShaderLink>();
             }
 
             /// <summary>
@@ -29,26 +28,12 @@ namespace Adamantium.Engine.Core.Effects
             public Pipeline Clone()
             {
                 var pipeline = (Pipeline)MemberwiseClone();
-                pipeline.Links = new ShaderLink[Links.Length];
-                for (int i = 0; i < Links.Length; i++)
+                pipeline.Links = new Dictionary<EffectShaderType, ShaderLink>();
+                foreach (var link in Links)
                 {
-                    var link = Links[i];
-                    if (link != null)
-                    {
-                        pipeline.Links[i] = link.Clone();
-                    }
+                    pipeline.Links[link.Key] = link.Value.Clone();
                 }
                 return pipeline;
-            }
-
-            private void OnDeserializationCallback()
-            {
-                var temp = Links;
-                Links = new ShaderLink[ShaderLinkCount];
-                for (int i = 0; i < temp.Length; i++)
-                {
-                    Links[(int)temp[i].ShaderType] = temp[i];
-                }
             }
 
             /// <summary>
@@ -61,24 +46,28 @@ namespace Adamantium.Engine.Core.Effects
             /// </remarks>
             public ShaderLink this[EffectShaderType effectShaderType]
             {
-                get { return Links[(int)effectShaderType]; }
+                get
+                {
+                    if (Links.ContainsKey(effectShaderType))
+                    {
+                        return Links[effectShaderType]; 
+                    }
+
+                    return null;
+                }
                 set
                 {
-                    if (value != null)
-                    {
-                        //Added this for 2 reasons:
-                        //1 - know which typw of shader is in Links array
-                        //2 - restore Links[] at their position after deserialization (protobuf-net does not support writing nulls by default )
-                        value.ShaderType = effectShaderType;
-                    }
-                    Links[(int)effectShaderType] = value;
+                    if (value == null) return;
+
+                    value.ShaderType = effectShaderType;
+                    Links[effectShaderType] = value;
                 }
             }
 
             public IEnumerator<ShaderLink> GetEnumerator()
             {
                 foreach (var shaderLink in Links)
-                    yield return shaderLink;
+                    yield return shaderLink.Value;
             }
 
             IEnumerator IEnumerable.GetEnumerator()

@@ -21,8 +21,7 @@ namespace Adamantium.Engine.Graphics.Effects
         public delegate Buffer ConstantBufferAllocatorDelegate(GraphicsDevice device, EffectPool pool, EffectConstantBuffer constantBuffer);
 
         #endregion
-
-
+        
         internal readonly List<EffectData.Shader> RegisteredShaders;
         private readonly List<ShaderModule>[] compiledShadersGroup;
         private readonly GraphicsDevice graphicsDevice;
@@ -203,8 +202,7 @@ namespace Adamantium.Engine.Graphics.Effects
                 // 3) Get an existing constant buffer having the same name/size/layout/parameters
                 // ----------------------------------------------------------------------------
                 var bufferKey = new EffectConstantBufferKey(bufferRaw);
-                EffectConstantBuffer buffer;
-                if (!bufferSet.TryGetValue(bufferKey, out buffer))
+                if (!bufferSet.TryGetValue(bufferKey, out var buffer))
                 {
                     // 4) If this buffer doesn't exist, create a new one and register it.
                     buffer = new EffectConstantBuffer(graphicsDevice, bufferRaw);
@@ -335,12 +333,10 @@ namespace Adamantium.Engine.Graphics.Effects
                                 }
 
                                 shaderLink.Index = shaderIndex;
-                                shaderLink.EntryPoint = shader.EntryPoint;
                             }
                             else
                             {
                                 shaderLink.Index = RegisteredShaders.Count;
-                                shaderLink.EntryPoint = shader.EntryPoint;
                                 RegisteredShaders.Add(shader);
                             }
                         }
@@ -382,14 +378,12 @@ namespace Adamantium.Engine.Graphics.Effects
 
         private void OnEffectAdded(EffectPoolEventArgs e)
         {
-            EventHandler<EffectPoolEventArgs> handler = EffectAdded;
-            handler?.Invoke(this, e);
+            EffectAdded?.Invoke(this, e);
         }
 
         private void OnEffectRemoved(EffectPoolEventArgs e)
         {
-            EventHandler<EffectPoolEventArgs> handler = EffectRemoved;
-            handler?.Invoke(this, e);
+            EffectRemoved?.Invoke(this, e);
         }
     }
 }
