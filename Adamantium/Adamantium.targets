@@ -65,7 +65,7 @@
       </ItemGroup>
 
    </Target>
-   <Target Name="EngineCompileTarget">
+   <Target Name="EngineCompileTarget" BeforeTargets="Build">
       <EffectCompilerTask
           ProjectDirectory="$(ProjectDir)"
           IntermediateDirectory="$(IntermediateOutputPath)"
