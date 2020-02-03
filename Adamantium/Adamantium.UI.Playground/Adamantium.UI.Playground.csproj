@@ -13,21 +13,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="Effects\UIEffect.fx" />
-    <None Remove="Shaders\frag.spv" />
-    <None Remove="Shaders\vert.spv" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Content Include="Effects\UIEffect.fx">
+    <Effect Include="Effects\UIEffect.fx">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Shaders\frag.spv">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Shaders\vert.spv">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
+    </Effect>
     <Content Include="Textures\texture.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -38,7 +26,19 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Bcl.Build" Version="1.0.21" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Adamantium.UI\Adamantium.UI.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Effects\UIEffect.fx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <Import Project="$(SolutionDir)Adamantium.targets" />
 
 </Project>
