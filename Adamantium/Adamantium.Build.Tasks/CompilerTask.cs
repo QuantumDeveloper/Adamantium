@@ -52,9 +52,7 @@ namespace Adamantium.Build.Tasks
 
             try
             {
-                Debugger.Launch();
                 Initialize();
-
                 var contentFiles = new List<ITaskItem>();
                 var compileFiles = new List<ITaskItem>();
                 Stopwatch timer = Stopwatch.StartNew();

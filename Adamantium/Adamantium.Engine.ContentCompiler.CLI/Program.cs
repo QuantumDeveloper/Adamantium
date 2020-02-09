@@ -13,7 +13,7 @@ namespace Adamantium.Engine.ContentCompiler.CLI
     {
         static void Main(string[] args)
         {
-
+            Debugger.Launch();
             var item = JsonConvert.DeserializeObject<EngineItem>(args[0]);
 
             //item.OutputLink = Path.ChangeExtension(item.LinkName, EffectData.CompiledExtension);
@@ -28,7 +28,7 @@ namespace Adamantium.Engine.ContentCompiler.CLI
             //{
             //    compilerFlags |= (EffectCompilerFlags)Enum.Parse(typeof(EffectCompilerFlags), CompilerFlags);
             //}
-
+            
             EffectCompilerTool.CompileEffect(item);
         }
     }

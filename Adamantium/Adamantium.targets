@@ -42,7 +42,7 @@
       <GenerateCsFileFromFont>false</GenerateCsFileFromFont>
       <GenerateBinaryFromFont>true</GenerateBinaryFromFont>
       <CompileFontBitmaps>false</CompileFontBitmaps>
-     <EffectToolPath>C:\Source\Repos\Adamantium\Adamantium\Adamantium.Engine.ContentCompiler.CLI\bin\Debug\netcoreapp3.1\Adamantium.Engine.ContentCompiler.CLI.exe</EffectToolPath>
+     <EffectToolPath>C:\Source\Repos\Adamantium\Adamantium\Adamantium.Engine.ContentCompiler.CLI\bin\x64\Debug\netcoreapp3.1\Adamantium.Engine.ContentCompiler.CLI.exe</EffectToolPath>
       
    </PropertyGroup>
 <!-- Target used to calculate dependency output -->
@@ -53,6 +53,7 @@
          Debug="$(EngineEffectDebugOption)"
          Files="@(Effect)"
          RootNamespace="$(RootNamespace)"
+         ToolPath="$(EffectToolPath)"
          >
          
       </CompilerTask>
@@ -68,7 +69,7 @@
    </Target>
    <Target Name="EngineCompileTarget" BeforeTargets="Build">
       <EffectCompilerTask
-          ToolPath=""
+          ToolPath="$(EffectToolPath)"
           ProjectDirectory="$(ProjectDir)"
           IntermediateDirectory="$(IntermediateOutputPath)"
           DynamicCompiling="$(EffectDynamicCompilingOption)"

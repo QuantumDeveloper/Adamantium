@@ -29,9 +29,11 @@ namespace Adamantium.Build.Tasks
             var startInfo = new ProcessStartInfo();
             startInfo.RedirectStandardOutput = true;
             startInfo.FileName = ToolPath;
+            startInfo.UseShellExecute = false;
             startInfo.Arguments = JsonConvert.SerializeObject(item);
 
             var process = Process.Start(startInfo);
+            process.WaitForExit();
 
             var output = process.StandardOutput.ReadToEnd();
 
