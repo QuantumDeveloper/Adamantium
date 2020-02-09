@@ -6,9 +6,9 @@
    </ItemGroup>
     
    <!-- In Project A -->  
-  <UsingTask Architecture="*" TaskName="Adamantium.Engine.CompilerTask.EffectCompilerTask"     AssemblyFile="$(SolutionDir)Adamantium.Engine.CompilerTask\bin\Debug\netcoreapp3.1\Adamantium.Engine.CompilerTask.dll"/>
+  <UsingTask Architecture="*" TaskName="Adamantium.Build.Tasks.EffectCompilerTask" AssemblyFile="$(SolutionDir)Adamantium.Build.Tasks\bin\Debug\netstandard2.0\Adamantium.Build.Tasks.dll"/>
    <!--<UsingTask Architecture="*" TaskName="Adamantium.Engine.CompilerTask.FontCompilerTask"     AssemblyFile="$(SolutionDir)Adamantium.Engine.CompilerTask\bin\Debug\Adamantium.Engine.CompilerTask.dll"/>-->
-   <UsingTask Architecture="*" TaskName="Adamantium.Engine.CompilerTask.CompilerDependencyTask" AssemblyFile="$(SolutionDir)Adamantium.Engine.CompilerTask\bin\Debug\netcoreapp3.1\Adamantium.Engine.CompilerTask.dll"/>
+   <UsingTask Architecture="*" TaskName="Adamantium.Build.Tasks.CompilerTask" AssemblyFile="$(SolutionDir)Adamantium.Build.Tasks\bin\Debug\netstandard2.0\Adamantium.Build.Tasks.dll"/>
 
   
     <!-- 1st PART : When Project A is built, It will generate effectively the files -->
@@ -42,11 +42,12 @@
       <GenerateCsFileFromFont>false</GenerateCsFileFromFont>
       <GenerateBinaryFromFont>true</GenerateBinaryFromFont>
       <CompileFontBitmaps>false</CompileFontBitmaps>
+     <EffectToolPath>C:\Source\Repos\Adamantium\Adamantium\Adamantium.Engine.ContentCompiler.CLI\bin\Debug\netcoreapp3.1\Adamantium.Engine.ContentCompiler.CLI.exe</EffectToolPath>
       
    </PropertyGroup>
 <!-- Target used to calculate dependency output -->
-   <Target Name="EngineContentAndCompileTarget" >
-      <CompilerDependencyTask
+   <Target Name="EngineContentAndCompileTarget" BeforeTargets="Build">
+      <CompilerTask
          ProjectDirectory="$(ProjectDir)"
          IntermediateDirectory="$(IntermediateOutputPath)"
          Debug="$(EngineEffectDebugOption)"
@@ -54,7 +55,7 @@
          RootNamespace="$(RootNamespace)"
          >
          
-      </CompilerDependencyTask>
+      </CompilerTask>
 
       <ItemGroup>
          <!--List Of fx compiled file-->
@@ -67,6 +68,7 @@
    </Target>
    <Target Name="EngineCompileTarget" BeforeTargets="Build">
       <EffectCompilerTask
+          ToolPath=""
           ProjectDirectory="$(ProjectDir)"
           IntermediateDirectory="$(IntermediateOutputPath)"
           DynamicCompiling="$(EffectDynamicCompilingOption)"

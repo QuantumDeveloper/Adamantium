@@ -1,4 +1,6 @@
-﻿namespace Adamantium.Engine.Core.Effects
+﻿using Adamantium.Core;
+
+namespace Adamantium.Engine.Core.Effects
 {
    public sealed class EffectCompilerResult
    {

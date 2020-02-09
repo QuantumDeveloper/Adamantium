@@ -17,13 +17,21 @@ namespace Adamantium.Core
             Marshal.FreeHGlobal(((IntPtr*)pointer)[-1]);
         }
 
-        public static void ClearMemory(IntPtr dest, byte value, int sizeInBytesToClear)
+        public unsafe static void ClearMemory(ref IntPtr dest, byte value, int sizeInBytesToClear)
         {
-            unsafe
+            fixed (void* addr = &dest)
             {
-                Span<byte> bytes = new Span<byte>(dest.ToPointer(), sizeInBytesToClear);
-                bytes.Fill(value);
+                var dataPtr = (byte*)addr;
+                for (int i = 0; i < sizeInBytesToClear; ++i)
+                {
+                    (*(dataPtr)) = value;
+                    dataPtr++;
+                }
             }
+            
+            //Should be restored when version of csproj will be updated at least to netstandard2.1 or netcore3.1
+            //Span<byte> bytes = new Span<byte>(dest.ToPointer(), sizeInBytesToClear);
+            //bytes.Fill(value);
         }
 
         public static bool IsEnum<T>(T type)
@@ -167,7 +175,7 @@ namespace Adamantium.Core
 
         public static ushort ToLittleEndian(byte left, byte right)
         {
-            var res = BitConverter.ToUInt16(new byte[] { right, left });
+            var res = BitConverter.ToUInt16(new byte[] { right, left }, 0);
             var result = (ushort)(right | left << 8);
             return result;
         }

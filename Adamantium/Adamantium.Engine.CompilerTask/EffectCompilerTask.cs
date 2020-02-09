@@ -4,7 +4,7 @@ using System.IO;
 using System.Text;
 using Adamantium.Engine.Core.Effects;
 using Adamantium.Engine.Compiler.Effects;
-using Logger = Adamantium.Engine.Core.Logger;
+using Logger = Adamantium.Core.Logger;
 
 namespace Adamantium.Engine.CompilerTask
 {

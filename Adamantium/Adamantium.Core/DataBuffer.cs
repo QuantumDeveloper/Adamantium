@@ -156,7 +156,8 @@ namespace Adamantium.Core
         /// </summary>
         public unsafe void Clear(byte value = 0)
         {
-            Utilities.ClearMemory((IntPtr)_buffer, value, Size);
+            var buf = (IntPtr)_buffer;
+            Utilities.ClearMemory(ref buf, value, Size);
         }
 
         /// <summary>

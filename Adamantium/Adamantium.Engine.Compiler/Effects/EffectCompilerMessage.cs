@@ -1,8 +1,9 @@
-﻿using Adamantium.Engine.Core;
+﻿using Adamantium.Core;
+using Adamantium.Engine.Core;
 
 namespace Adamantium.Engine.Compiler.Effects
 {
-   class EffectCompilerMessage:LogMessage
+    class EffectCompilerMessage:LogMessage
    {
       public readonly SourceSpan Span;
 

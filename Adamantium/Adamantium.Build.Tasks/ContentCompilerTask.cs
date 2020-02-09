@@ -2,14 +2,14 @@
 using System.Diagnostics;
 using System.IO;
 using System.Text.RegularExpressions;
+using Adamantium.Build.Core;
 using Adamantium.Core;
-using Adamantium.Engine.Compiler;
-using Adamantium.Engine.Core;
 using Microsoft.Build.Framework;
+using Logger = Adamantium.Core.Logger;
 
-namespace Adamantium.Engine.CompilerTask
+namespace Adamantium.Build.Tasks
 {
-    public abstract class ContentCompilerTask : CompilerDependencyTask
+    public abstract class ContentCompilerTask : CompilerTask
     {
         private static readonly Regex parseMessage = new Regex(@"(.*)\s*\(\s*(\d+)\s*,\s*([^ \)]+)\)\s*:\s*(\w+)\s+(\w+)\s*:\s*(.*)");
         private static readonly Regex matchNumberRange = new Regex(@"(\d+)-(\d+)");
@@ -21,9 +21,11 @@ namespace Adamantium.Engine.CompilerTask
 
             try
             {
-                var dependencyFilePath = Path.Combine(Path.Combine(ProjectDirectory.ItemSpec, IntermediateDirectory.ItemSpec),
-                                                      FileDependencyList.GetDependencyFileNameFromSourcePath(item.LinkName));
-                //Debugger.Launch();
+                //var dependencyFilePath = Path.Combine(Path.Combine(ProjectDirectory.ItemSpec, IntermediateDirectory.ItemSpec),
+                //                                      FileDependencyList.GetDependencyFileNameFromSourcePath(item.LinkName));
+                var dependencyFilePath = Path.Combine(Path.Combine(ProjectDirectory.ItemSpec, IntermediateDirectory.ItemSpec));
+                                                      
+                Debugger.Launch();
                 CreateDirectoryIfNotExists(dependencyFilePath);
                 Log.LogMessage(MessageImportance.Low, "Check Engine file to compile {0} with dependency file {1}", inputFilePath, dependencyFilePath);
                 if (IsInputFileWasModified(item.InputFilePath, Path.Combine(item.BinaryOutputFilePath, item.OutputLink)) || !File.Exists(item.BinaryOutputFilePath))
