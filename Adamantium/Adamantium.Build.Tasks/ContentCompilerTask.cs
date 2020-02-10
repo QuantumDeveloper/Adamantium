@@ -25,7 +25,7 @@ namespace Adamantium.Build.Tasks
                 //                                      FileDependencyList.GetDependencyFileNameFromSourcePath(item.LinkName));
                 var dependencyFilePath = Path.Combine(Path.Combine(ProjectDirectory.ItemSpec, IntermediateDirectory.ItemSpec));
                                                       
-                Debugger.Launch();
+                
                 CreateDirectoryIfNotExists(dependencyFilePath);
                 Log.LogMessage(MessageImportance.Low, "Check Engine file to compile {0} with dependency file {1}", inputFilePath, dependencyFilePath);
                 if (IsInputFileWasModified(item.InputFilePath, Path.Combine(item.BinaryOutputFilePath, item.OutputLink)) || !File.Exists(item.BinaryOutputFilePath))
@@ -148,7 +148,16 @@ namespace Adamantium.Build.Tasks
                 }
                 else
                 {
-                    Log.LogWarning(line);
+                    switch(message.Type)
+                    {
+                        case LogMessageType.Error:
+                            Log.LogError(line);
+                            break;
+                        case LogMessageType.Warning:
+                            Log.LogWarning(line);
+                            break;
+                    }
+                    
                 }
             }
         }

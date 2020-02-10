@@ -13,21 +13,8 @@ namespace Adamantium.Engine.ContentCompiler.CLI
     {
         static void Main(string[] args)
         {
-            Debugger.Launch();
-            var item = JsonConvert.DeserializeObject<EngineItem>(args[0]);
-
-            //item.OutputLink = Path.ChangeExtension(item.LinkName, EffectData.CompiledExtension);
-            //item.BinaryOutputFilePath = Path.Combine(IntermediateDirectory.ItemSpec, item.OutputLink);
-
-            //// Full path to the input file
-            //item.InputFilePath = Path.Combine(ProjectDirectory.ItemSpec, item.Name);
-
-            //var compilerFlags = Debug ? EffectCompilerFlags.Debug : EffectCompilerFlags.None;
-            //compilerFlags |= EffectCompilerFlags.OptimizationLevel3;
-            //if (!string.IsNullOrEmpty(CompilerFlags))
-            //{
-            //    compilerFlags |= (EffectCompilerFlags)Enum.Parse(typeof(EffectCompilerFlags), CompilerFlags);
-            //}
+            //Debugger.Launch();
+            var item = JsonConvert.DeserializeObject<EngineItem>(Encoding.UTF8.GetString(Convert.FromBase64String(args[0])));
             
             EffectCompilerTool.CompileEffect(item);
         }
