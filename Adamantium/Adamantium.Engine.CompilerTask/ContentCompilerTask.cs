@@ -1,10 +1,8 @@
 ﻿using System;
-using System.Diagnostics;
 using System.IO;
 using System.Text.RegularExpressions;
 using Adamantium.Core;
 using Adamantium.Engine.Compiler;
-using Adamantium.Engine.Core;
 using Microsoft.Build.Framework;
 
 namespace Adamantium.Engine.CompilerTask

@@ -100,7 +100,7 @@ namespace Adamantium.Engine.CompilerTask
 
             try
             {
-                Debugger.Launch();
+                //Debugger.Launch();
                 Initialize();
 
                 var contentFiles = new List<ITaskItem>();

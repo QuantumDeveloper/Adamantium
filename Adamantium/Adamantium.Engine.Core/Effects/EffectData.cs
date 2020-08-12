@@ -1,5 +1,6 @@
 ﻿using ProtoBuf.Meta;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 
 namespace Adamantium.Engine.Core.Effects

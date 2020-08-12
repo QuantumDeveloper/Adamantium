@@ -11,7 +11,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Adamantium.Build.Core\Adamantium.Build.Core.csproj" />
     <ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" />
     <ProjectReference Include="..\Adamantium.Engine.Compiler\Adamantium.Engine.Compiler.csproj" />
   </ItemGroup>

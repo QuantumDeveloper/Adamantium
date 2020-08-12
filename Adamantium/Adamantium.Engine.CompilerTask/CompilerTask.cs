@@ -2,19 +2,14 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using Adamantium.Build.Core;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
 
-namespace Adamantium.Build.Tasks
+namespace Adamantium.Engine.CompilerTask
 {
     [Serializable]
     public class CompilerTask : Task
     {
-
-        [Required]
-        public string ToolPath { get; set; }
-
         [Required]
         public ITaskItem ProjectDirectory { get; set; }
 

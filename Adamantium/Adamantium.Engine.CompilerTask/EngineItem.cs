@@ -1,9 +1,7 @@
-﻿using Microsoft.Build.Utilities;
-using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System;
+using Microsoft.Build.Utilities;
 
-namespace Adamantium.Build.Core
+namespace Adamantium.Engine.CompilerTask
 {
     [Serializable]
     public class EngineItem

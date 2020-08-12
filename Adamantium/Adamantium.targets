@@ -6,9 +6,9 @@
    </ItemGroup>
     
    <!-- In Project A -->  
-  <UsingTask Architecture="*" TaskName="Adamantium.Build.Tasks.EffectCompilerTask" AssemblyFile="$(SolutionDir)Adamantium.Build.Tasks\bin\Debug\netstandard2.0\Adamantium.Build.Tasks.dll"/>
+  <UsingTask Architecture="*" TaskName="EffectCompilerTask" AssemblyFile="$(SolutionDir)Adamantium.Engine.CompilerTask\bin\Debug\net5.0\publish\Adamantium.Engine.CompilerTask.dll"/>
    <!--<UsingTask Architecture="*" TaskName="Adamantium.Engine.CompilerTask.FontCompilerTask"     AssemblyFile="$(SolutionDir)Adamantium.Engine.CompilerTask\bin\Debug\Adamantium.Engine.CompilerTask.dll"/>-->
-   <UsingTask Architecture="*" TaskName="Adamantium.Build.Tasks.CompilerTask" AssemblyFile="$(SolutionDir)Adamantium.Build.Tasks\bin\Debug\netstandard2.0\Adamantium.Build.Tasks.dll"/>
+   <UsingTask Architecture="*" TaskName="CompilerTask" AssemblyFile="$(SolutionDir)Adamantium.Engine.CompilerTask\bin\Debug\net5.0\publish\Adamantium.Engine.CompilerTask.dll"/>
 
   
     <!-- 1st PART : When Project A is built, It will generate effectively the files -->
@@ -42,7 +42,6 @@
       <GenerateCsFileFromFont>false</GenerateCsFileFromFont>
       <GenerateBinaryFromFont>true</GenerateBinaryFromFont>
       <CompileFontBitmaps>false</CompileFontBitmaps>
-     <EffectToolPath>C:\Source\Repos\Adamantium\Adamantium\Adamantium.Engine.ContentCompiler.CLI\bin\x64\Debug\netcoreapp3.1\Adamantium.Engine.ContentCompiler.CLI.exe</EffectToolPath>
       
    </PropertyGroup>
 <!-- Target used to calculate dependency output -->
@@ -53,7 +52,6 @@
          Debug="$(EngineEffectDebugOption)"
          Files="@(Effect)"
          RootNamespace="$(RootNamespace)"
-         ToolPath="$(EffectToolPath)"
          >
          
       </CompilerTask>
@@ -69,7 +67,6 @@
    </Target>
    <Target Name="EngineCompileTarget" BeforeTargets="Build">
       <EffectCompilerTask
-          ToolPath="$(EffectToolPath)"
           ProjectDirectory="$(ProjectDir)"
           IntermediateDirectory="$(IntermediateOutputPath)"
           DynamicCompiling="$(EffectDynamicCompilingOption)"
