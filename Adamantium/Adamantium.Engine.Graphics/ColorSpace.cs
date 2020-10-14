@@ -2,35 +2,21 @@
 {
     public enum ColorSpace
     {
-        ColorSpaceSRGBNonlinear = 0,
-
-        ColorSpaceDisplayP3NonlinearExt = 1000104001,
-
-        ColorSpaceExtendedSRGBLinearExt = 1000104002,
-
-        ColorSpaceDciP3LinearExt = 1000104003,
-
-        ColorSpaceDciP3NonlinearExt = 1000104004,
-
-        ColorSpaceBt709LinearExt = 1000104005,
-
-        ColorSpaceBt709NonlinearExt = 1000104006,
-
-        ColorSpaceBt2020LinearExt = 1000104007,
-
-        ColorSpaceHdr10St2084Ext = 1000104008,
-
-        ColorSpaceDolbyvisionExt = 1000104009,
-
-        ColorSpaceHdr10HlgExt = 1000104010,
-
-        ColorSpaceAdobeRGBLinearExt = 1000104011,
-
-        ColorSpaceAdobeRGBNonlinearExt = 1000104012,
-
-        ColorSpacePassThroughExt = 1000104013,
-
-        ColorSpaceExtendedSRGBNonlinearExt = 1000104014,
+        SRGBNonlinear = 0,
+        DisplayP3NonlinearExt = 1000104001,
+        ExtendedSRGBLinearExt = 1000104002,
+        DciP3LinearExt = 1000104003,
+        DciP3NonlinearExt = 1000104004,
+        Bt709LinearExt = 1000104005,
+        Bt709NonlinearExt = 1000104006,
+        Bt2020LinearExt = 1000104007,
+        Hdr10St2084Ext = 1000104008,
+        DolbyvisionExt = 1000104009,
+        Hdr10HlgExt = 1000104010,
+        AdobeRGBLinearExt = 1000104011,
+        AdobeRGBNonlinearExt = 1000104012,
+        PassThroughExt = 1000104013,
+        ExtendedSRGBNonlinearExt = 1000104014,
     }
 
 

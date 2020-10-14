@@ -7,6 +7,7 @@ using Adamantium.Engine.Graphics;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
 using Adamantium.Win32;
+using AdamantiumVulkan.Core;
 using MouseEventArgs = Adamantium.UI.Input.MouseEventArgs;
 
 namespace Adamantium.Engine
@@ -85,7 +86,7 @@ namespace Adamantium.Engine
 
         //public DepthStencilBuffer DepthBuffer => Presenter.DepthBuffer;
 
-        public ViewportF Viewport => Presenter.Viewport;
+        public Viewport Viewport => Presenter.Viewport;
 
 
         internal void DisposePresenter()

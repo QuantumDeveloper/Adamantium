@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using Adamantium.Core;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
@@ -9,6 +10,7 @@ using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Media;
 using AdamantiumVulkan.Core;
+using Buffer = Adamantium.Engine.Graphics.Buffer;
 
 namespace Adamantium.UI.Processors
 {
@@ -26,7 +28,12 @@ namespace Adamantium.UI.Processors
         //private DepthStencilBuffer _depthBuffer;
         //private MSAALevel _msaaLevel;
         private bool isWindowResized;
-        private uint buffersCount = 2; 
+        private Buffer vertexBuffer;
+        private Buffer indexBuffer;
+        private Texture texture;
+        private Sampler sampler;
+        private Matrix4x4F view;
+        private Matrix4x4F proj;
 
         public WindowRenderModule(IWindow window, GraphicsDevice device, MSAALevel msaaLevel)
         {
@@ -41,11 +48,39 @@ namespace Adamantium.UI.Processors
             window.ClientSizeChanged += Window_ClientSizeChanged;
             GraphicsDevice = device;
             isWindowResized = true;
+            viewport = new Viewport();
+            viewport.MaxDepth = 1;
+            viewport.Width = window.ClientWidth;
+            viewport.Height = window.ClientHeight;
+            
+            scissor = new Rect2D();
+            scissor.Extent = new Extent2D();
+            scissor.Extent.Width = (uint)window.ClientWidth;;
+            scissor.Extent.Height = (uint)window.ClientHeight;
+
+            var vertices = GetVertexArray();
+            var indices = new UInt32[] { 0, 1, 2, 0, 2, 3 };
+            vertexBuffer = Buffer.Vertex.New(device, vertices);
+            indexBuffer = Buffer.Index.New(device, indices);
+            texture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "texture.jpg"));
+            sampler = CreateTextureSampler();
+            view = Matrix4x4F.LookAtRH(new Vector3F(0, 0, -3), Vector3F.Zero, Vector3F.Up);
+            CalculateProjectionMatrix();
             //_vertexLayout = VertexInputLayout.FromType<VertexPositionTexture>();
 
             //_uiEffect = ToDispose(Effect.Load(@"Content\Effects\UIEffect.fx.compiled", _graphicsDevice));
             //InitializeResources();
         }
+
+        private void CalculateProjectionMatrix()
+        {
+            proj = Matrix4x4F.PerspectiveFovRH(MathHelper.DegreesToRadians(45),
+                (float)window.ClientWidth / window.ClientHeight, 0.1f, 1000f);
+            proj.M11 *= -1;
+            //proj = Matrix4x4F.OrthoRH(window.ClientWidth / 1000.0f, window.ClientHeight / 100.0f, 0.1f, 1000f);
+           
+        }
+        
 
         //private void InitializeResources()
         //{
@@ -72,9 +107,39 @@ namespace Adamantium.UI.Processors
         //    projection = Matrix4x4F.OrthoOffCenterLH(0, _window.ClientWidth, _window.ClientHeight, 0, 1000.0f, 1f);
         //}
 
+        private Viewport viewport;
+        private Rect2D scissor;
         private void Window_ClientSizeChanged(object sender, SizeChangedEventArgs e)
         {
             isWindowResized = true;
+            viewport.Width = (uint)e.NewSize.Width;
+            viewport.Height = (uint)e.NewSize.Height;
+            
+            scissor.Extent = new Extent2D();
+            scissor.Extent.Width = (uint)e.NewSize.Width;
+            scissor.Extent.Height = (uint)e.NewSize.Height;
+            scissor.Offset = new Offset2D();
+
+            CalculateProjectionMatrix();
+        }
+        
+        Sampler CreateTextureSampler()
+        {
+            SamplerCreateInfo samplerInfo = new SamplerCreateInfo();
+            samplerInfo.MagFilter = Filter.Linear;
+            samplerInfo.MinFilter = Filter.Linear;
+            samplerInfo.AddressModeU = SamplerAddressMode.Repeat;
+            samplerInfo.AddressModeV = SamplerAddressMode.Repeat;
+            samplerInfo.AddressModeW = SamplerAddressMode.Repeat;
+            samplerInfo.AnisotropyEnable = true;
+            samplerInfo.MaxAnisotropy = 16;
+            samplerInfo.BorderColor = BorderColor.IntOpaqueWhite;
+            samplerInfo.UnnormalizedCoordinates = false;
+            samplerInfo.CompareEnable = false;
+            samplerInfo.CompareOp = CompareOp.Always;
+            samplerInfo.MipmapMode = SamplerMipmapMode.Linear;
+
+            return GraphicsDevice.CreateSampler(samplerInfo);
         }
 
         public bool Prepare()
@@ -84,18 +149,18 @@ namespace Adamantium.UI.Processors
                 return false;
             }
 
-            //            if (isWindowResized)
-            //            {
-            //                isWindowResized = false;
-            //                //InitializeResources();
-            //                GraphicsDevice.ResizeBuffers((uint)window.ClientWidth, (uint)window.ClientHeight, 2, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
-            //                return false;
-            //            }
+            // if (isWindowResized)
+            // {
+            //     isWindowResized = false;
+            //     //InitializeResources();
+            //     GraphicsDevice.ResizeBuffers((uint)window.ClientWidth, (uint)window.ClientHeight, 2, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
+            //     return false;
+            // }
 
-            var c = Color.FromBgra(0xFF6495ED);
-            if (!GraphicsDevice.BeginDraw(Colors.CornflowerBlue, 1.0f, 0))
+            if (isWindowResized || !GraphicsDevice.BeginDraw(Colors.CornflowerBlue, 1.0f, 0))
             {
-                GraphicsDevice.ResizePresenter((uint)window.ClientWidth, (uint)window.ClientHeight, buffersCount, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
+                GraphicsDevice.ResizePresenter((uint)window.ClientWidth, (uint)window.ClientHeight);
+                isWindowResized = false;
                 return false;
             }
 
@@ -108,6 +173,37 @@ namespace Adamantium.UI.Processors
             return true;
         }
 
+        private VertexPositionColorTexture[] GetVertexArray()
+        {
+            var v = new VertexPositionColorTexture[]
+            {
+                // new VertexPositionColorTexture(){Position = new Vector3F(-0.5f, -0.5f), Color = new Color4F(0.0f, 0.0f, 1.0f, 1.0f), UV = new Vector2F(0.0f, 0.0f)},
+                // new VertexPositionColorTexture(){Position = new Vector3F(0.5f, -0.5f), Color = new Color4F(1.0f, 1.0f, 1.0f, 1.0f), UV = new Vector2F(1.0f, 0.0f)},
+                // new VertexPositionColorTexture(){Position = new Vector3F(0.5f, 0.5f), Color = new Color4F(0.0f, 1.0f, 0.0f, 1.0f), UV = new Vector2F(1.0f, 1.0f)},
+                // new VertexPositionColorTexture(){Position = new Vector3F(-0.5f, 0.5f), Color = new Color4F(1.0f, 0.0f, 1.0f, 1.0f), UV = new Vector2F(0.0f, 1.0f)},
+                
+                new VertexPositionColorTexture(){Position = new Vector3F(-0.5f, -0.5f), Color = Colors.Red, UV = new Vector2F(0.0f, 0.0f)},
+                new VertexPositionColorTexture(){Position = new Vector3F(0.5f, -0.5f), Color = Colors.Green, UV = new Vector2F(1.0f, 0.0f)},
+                new VertexPositionColorTexture(){Position = new Vector3F(0.5f, 0.5f), Color = Colors.Blue, UV = new Vector2F(1.0f, 1.0f)},
+                new VertexPositionColorTexture(){Position = new Vector3F(-0.5f, 0.5f), Color = Colors.Green, UV = new Vector2F(0.0f, 1.0f)},
+            };
+
+            // var angle = MathHelper.DegreesToRadians(45);
+            //
+            // for (int i = 0; i < v.Length; ++i)
+            // {
+            //     var vertex = v[i];
+            //     var x = vertex.Position.X * (float)Math.Cos(angle) - vertex.Position.Y * (float)Math.Sin(angle);
+            //     var y = vertex.Position.X * (float)Math.Sin(angle) + vertex.Position.Y * (float)Math.Cos(angle);
+            //     vertex.Position.X = x;
+            //     vertex.Position.Y = y;
+            //     v[i] = vertex;
+            //
+            // }
+
+            return v;
+        }
+        
         public void Render(IGameTime gameTime)
         {
             //var commandList = _graphicsDevice.FinishCommandList(true);
@@ -119,16 +215,34 @@ namespace Adamantium.UI.Processors
             //d2D1Device.EndDraw();
 
             //mainDevice.CopyResource(_backBuffer, Presenter.BackBuffer);
+            GraphicsDevice.VertexType = typeof(VertexPositionColorTexture);
+            GraphicsDevice.PrimitiveTopology = PrimitiveTopology.TriangleList;
+            //GraphicsDevice.ApplyViewports(viewport);
+            GraphicsDevice.SetViewports(viewport);
+            GraphicsDevice.SetScissors(scissor);
+            //GraphicsDevice.SetVertexBuffer(vertexBuffer);
+            //GraphicsDevice.SetIndexBuffer(indexBuffer);
 
-            GraphicsDevice.Draw(3,1);
+            //GraphicsDevice.BasicEffect.Parameters["wvp"].SetValue(Matrix4x4F.RotationZ((float)gameTime.FrameTime * MathHelper.DegreesToRadians(10)));
+            var rot = QuaternionF.RotationAxis(Vector3F.ForwardLH, MathHelper.DegreesToRadians(gameTime.TotalTime.TotalSeconds * 20));
+            var world = Matrix4x4F.RotationQuaternion(rot);
+            var wvp = world * view * proj;
+            GraphicsDevice.BasicEffect.Parameters["wvp"].SetValue(wvp);
+            //GraphicsDevice.BasicEffect.Parameters["fillColor"].SetValue(Colors.White.ToVector4());
+            GraphicsDevice.BasicEffect.Parameters["sampleType"].SetResource(sampler);
+            GraphicsDevice.BasicEffect.Parameters["shaderTexture"].SetResource(texture);
+
+            //GraphicsDevice.BasicEffect.Techniques[0].Passes["Debug"].Apply();
+            GraphicsDevice.BasicEffect.Techniques[0].Passes["Textured"].Apply();
+            GraphicsDevice.DrawIndexed(vertexBuffer, indexBuffer);
             GraphicsDevice.EndDraw();
             GraphicsDevice.Present();
             
-//            if (isWindowResized)
-//            {
-//                isWindowResized = false;
-//                GraphicsDevice.ResizePresenter((uint)window.ClientWidth, (uint)window.ClientHeight, buffersCount, SurfaceFormat.R8G8B8A8.UNorm, DepthFormat.Depth32Stencil8X24);
-//            }
+            if (isWindowResized)
+            {
+                isWindowResized = false;
+                GraphicsDevice.ResizePresenter((uint)window.ClientWidth, (uint)window.ClientHeight);
+            }
         }
 
         //public void TraverseByLayer(IVisual visualElement, Action<IVisual> action)

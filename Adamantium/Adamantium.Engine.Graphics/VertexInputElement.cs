@@ -7,7 +7,7 @@ using Adamantium.Core;
 using Adamantium.Mathematics;
 using AdamantiumVulkan.Core;
 
-namespace Adamantium.Engine.Core
+namespace Adamantium.Engine.Graphics
 {
    public struct VertexInputElement : IEquatable<VertexInputElement>
    {
@@ -486,7 +486,7 @@ namespace Adamantium.Engine.Core
             {
                var fieldFormat = vertexElementAttribute.Format;
                if (fieldFormat == Format.UNDEFINED)
-                  fieldFormat = ConvertTypeToFormat(field.FieldType);
+                  fieldFormat = GetFormatFromType(field.FieldType);
 
                var offset = vertexElementAttribute.BytesOffset;
                if (offset < 0)
@@ -505,7 +505,7 @@ namespace Adamantium.Engine.Core
 
       private static Format ConvertTypeToFormat<T>() where T : struct
       {
-         return ConvertTypeToFormat(typeof(T));
+         return GetFormatFromType(typeof(T));
       }
 
       /// <summary>
@@ -514,7 +514,7 @@ namespace Adamantium.Engine.Core
       /// <param name="typeT">The type T.</param>
       /// <returns>The equivalent Format.</returns>
       /// <exception cref="System.NotSupportedException">If the convertion for this type is not supported.</exception>
-      private static Format ConvertTypeToFormat(Type typeT)
+      public static Format GetFormatFromType(Type typeT)
       {
          if (typeof(Vector4F) == typeT || typeof(Color4F) == typeT || typeof(RectangleF) == typeT)
             return Format.R32G32B32A32_SFLOAT;

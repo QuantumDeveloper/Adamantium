@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
+using Adamantium.Engine.Graphics.Effects;
 using Adamantium.EntityFramework;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Input;
@@ -11,6 +13,7 @@ using Adamantium.UI.OSX;
 using Adamantium.UI.Processors;
 using Adamantium.UI.Windows;
 using AdamantiumVulkan;
+using AdamantiumVulkan.Core;
 
 namespace Adamantium.UI
 {
@@ -89,12 +92,14 @@ namespace Adamantium.UI
             {
                 Width = (uint)window.ClientWidth,
                 Height = (uint)window.ClientHeight,
-                BuffersCount = 2,
+                BuffersCount = 3,
                 MSAALevel = MSAALevel.X4,
                 HInstanceHandle = Process.GetCurrentProcess().Handle
             };
             @params.OutputHandle = window.SurfaceHandle;
             var device = GraphicsDevice.CreateRenderDevice(@params);
+            device.AddDynamicStates(DynamicState.Viewport, DynamicState.Scissor);
+
             windowToDevices[window] = device;
 
             var transformProcessor = new UITransformProcessor(entityWorld);
