@@ -228,7 +228,7 @@ namespace Adamantium.Engine.Graphics
             SwapchainKHR[] swapchains = { swapchain };
             presentInfo.SwapchainCount = 1;
             presentInfo.PSwapchains = swapchains;
-            presentInfo.PImageIndices = new uint[] { GraphicsDevice.ImageIndex };
+            presentInfo.PImageIndices = new [] { GraphicsDevice.ImageIndex };
 
             var result = presentQueue.QueuePresentKHR(presentInfo);
             if (result != Result.Success)

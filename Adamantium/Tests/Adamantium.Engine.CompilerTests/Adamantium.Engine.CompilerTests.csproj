@@ -9,10 +9,6 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <None Remove="EffectsData\UIEffect.fx" />
-    </ItemGroup>
-
-    <ItemGroup>
       <Content Include="EffectsData\UIEffect.fx">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
@@ -26,6 +22,12 @@
 
     <ItemGroup>
       <ProjectReference Include="..\..\Adamantium.Engine.Compiler\Adamantium.Engine.Compiler.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Effect Include="EffectsData\BasicEffect.fx">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Effect>
     </ItemGroup>
 
 </Project>

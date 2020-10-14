@@ -41,8 +41,8 @@ namespace Adamantium.Engine.CompilerTask
             var item = new TaskItem(BinaryOutputFilePath);
 
             // For fx.compiled we output Link used by <Content> Item
-            item.SetMetadata("CopyToOutputDirectory", "PreserveNewest");
-            item.SetMetadata("Link", OutputLink);
+            //item.SetMetadata("CopyToOutputDirectory", "PreserveNewest");
+            //item.SetMetadata("Link", OutputLink);
 
             return item;
         }

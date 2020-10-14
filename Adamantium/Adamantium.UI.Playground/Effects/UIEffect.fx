@@ -1,5 +1,4 @@
-matrix wvp;
-
+float4x4 wvp;
 float4 fillColor;
 sampler sampleType;
 Texture2D shaderTexture;
@@ -46,23 +45,12 @@ PixelInputType LightVertexShader(TexturedVertexInputType input)
 
 TexturedPixelInputType TexturedVertexShader(TexturedVertexInputType input)
 {
-//	TexturedPixelInputType output;
-//	output.position = float4(0, 0, 0, 0);
-//
-//
-//	// Change the position vector to be 4 units for proper matrix calculations.
-//	//input.position.w = 1.0f;
-//
-//	// Calculate the position of the vertex against the world, view, and projection matrices.
-//
-//	output.position = mul(input.position, wvp);
-//
-//	output.texcoord = input.texcoord;
-//	return output;
-
     TexturedPixelInputType output;
+    // Change the position vector to be 4 units for proper matrix calculations.
+    output.position = float4(input.position.xyz, 1);
+    // Calculate the position of the vertex against the world, view, and projection matrices.
+	output.position = mul(output.position, wvp);
 	output.texcoord = input.texcoord;
-	output.position = float4(input.position.xyz, 1);
 
 	return output;
 }

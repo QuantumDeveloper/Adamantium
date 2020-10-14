@@ -15,10 +15,15 @@ namespace Adamantium.Engine.CompilerTests
             try
             {
                 var path = Path.Combine("EffectsData", "UIEffect.fx");
-                var result = EffectCompiler.CompileFromFile(path);
+                if (File.Exists(path))
+                {
+                    var text = File.ReadAllText(path);
+                    var result = EffectCompiler.CompileFromFile(path);
             
-                result.EffectData.Save("UIEffect.fx.compiled");
-                var restored = EffectData.Load("UIEffect.fx.compiled");
+                    result.EffectData.Save("UIEffect.fx.compiled");
+                    var restored = EffectData.Load("UIEffect.fx.compiled");
+                }
+                
             }
             catch (Exception e)
             {

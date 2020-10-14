@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 using Adamantium.Engine.Core.Effects;
@@ -14,15 +15,15 @@ namespace Adamantium.Engine.CompilerTask
         protected override void Initialize()
         {
             parseLogMessages = true;
-            currentExtension = "." + EffectData.CompiledExtension;
             base.Initialize();
         }
 
         protected override Logger ProcessFileAndGetLogResults(string inputFilePath, string dependencyFilePath, EngineItem item)
         {
+            //Debugger.Launch();
             //Generate binary fx file in all cases
             item.OutputLink = Path.ChangeExtension(item.LinkName, EffectData.CompiledExtension);
-            item.BinaryOutputFilePath = Path.Combine(IntermediateDirectory.ItemSpec, item.OutputLink);
+            item.OutputFilePath = Path.Combine(OutputDirectory.ItemSpec, item.OutputLink);
 
             // Full path to the input file
             item.InputFilePath = Path.Combine(ProjectDirectory.ItemSpec, item.Name);
@@ -40,6 +41,8 @@ namespace Adamantium.Engine.CompilerTask
                                                               null,
                                                               item.DynamicCompiling,
                                                               dependencyFilePath);
+
+            //Debugger.Launch();
             if (!compilerResult.HasErrors && compilerResult.EffectData != null)
             {
                 if (item.OutputCs)
@@ -59,7 +62,7 @@ namespace Adamantium.Engine.CompilerTask
 
                 if (item.GenerateBinary)
                 {
-                    var outputPath = item.BinaryOutputFilePath;
+                    var outputPath = item.OutputFilePath;
                     CreateDirectoryIfNotExists(outputPath);
                     compilerResult.EffectData.Save(outputPath);
                 }

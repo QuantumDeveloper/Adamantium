@@ -217,6 +217,11 @@ namespace Adamantium.Engine.Graphics
                 dynamicStateInfo.PDynamicStates = DynamicStates.ToArray();
                 dynamicStateInfo.DynamicStateCount = (uint)DynamicStates.Count;
                 pipelineInfo.PDynamicState = dynamicStateInfo;
+
+                viewportState.ViewportCount = 1;
+                viewportState.PViewports = new Viewport[]{new Viewport() {}};
+                viewportState.ScissorCount = 1;
+                viewportState.PScissors = new Rect2D[]{new Rect2D() };
             }
 
             Pipeline = GraphicsDevice.CreateGraphicsPipeline(pipelineInfo);

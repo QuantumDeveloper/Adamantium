@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using Adamantium.Core;
 using Adamantium.Core.Collections;
 using Adamantium.Engine.Core;
+using Adamantium.Engine.Core.Effects;
 using Adamantium.Engine.Graphics.Effects;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
@@ -80,7 +81,8 @@ namespace Adamantium.Engine.Graphics
 
             pipelineManager = new PipelineManager(this);
             
-            BasicEffect = Effect.CompileFromFile(Path.Combine("Effects", "UIEffect.fx"), this);
+            //BasicEffect = Effect.CompileFromFile(Path.Combine("Effects", "UIEffect.fx"), this);
+            BasicEffect = Effect.Load(Path.Combine("Effects", "BasicEffect.fx.compiled"), this);
         }
         
         public CommandPool CommandPool { get; private set; }

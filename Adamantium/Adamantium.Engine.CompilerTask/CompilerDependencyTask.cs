@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using Adamantium.Engine.Core.Effects;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
 
@@ -19,15 +20,13 @@ namespace Adamantium.Engine.CompilerTask
 
             public string InputFilePath;
 
-            public string BinaryOutputFilePath;
+            public string OutputFilePath;
 
             public string CompiledOutputFilePath;
 
             public string OutputLink;
 
             public bool GenerateBinary;
-
-            public string OutputBinaryFile;
 
             public bool DynamicCompiling;
 
@@ -45,11 +44,11 @@ namespace Adamantium.Engine.CompilerTask
 
             public TaskItem ToTaskItem()
             {
-                var item = new TaskItem(BinaryOutputFilePath);
+                var item = new TaskItem(OutputFilePath);
 
                 // For fx.compiled we output Link used by <Content> Item
-                item.SetMetadata("CopyToOutputDirectory", "PreserveNewest");
-                item.SetMetadata("Link", OutputLink);
+                //item.SetMetadata("CopyToOutputDirectory", "PreserveNewest");
+                //item.SetMetadata("Link", OutputLink);
 
                 return item;
             }
@@ -58,7 +57,7 @@ namespace Adamantium.Engine.CompilerTask
             {
                 return
                    $"Name: {Name}, DynamicCompiling: {DynamicCompiling}, LinkName: {LinkName}, " +
-                   $"InputFilePath: {InputFilePath}, OutputFilePath: {BinaryOutputFilePath}, OutputCsFile: {OutputCsFile}, " +
+                   $"InputFilePath: {InputFilePath}, OutputFilePath: {OutputFilePath}, OutputCsFile: {OutputCsFile}, " +
                    $"OutputNamespace: {OutputNamespace}, OutputClassName: {OutputClassName}, OutputFieldName: {OutputFieldName}, OutputCs: {OutputCs}";
             }
         }
@@ -68,6 +67,9 @@ namespace Adamantium.Engine.CompilerTask
 
         [Required]
         public ITaskItem IntermediateDirectory { get; set; }
+        
+        [Required]
+        public ITaskItem OutputDirectory { get; set; }
 
         [Required]
         public ITaskItem[] Files { get; set; }
@@ -88,8 +90,6 @@ namespace Adamantium.Engine.CompilerTask
 
         public bool DynamicCompiling { get; set; }
 
-        protected string currentExtension = String.Empty;
-
         protected bool parseLogMessages;
 
         protected virtual void Initialize() { }
@@ -106,7 +106,7 @@ namespace Adamantium.Engine.CompilerTask
                 var contentFiles = new List<ITaskItem>();
                 var compileFiles = new List<ITaskItem>();
                 Stopwatch timer = Stopwatch.StartNew();
-                foreach (ITaskItem file in Files)
+                foreach (var file in Files)
                 {
                     var item = GetEngineItem(file);
                     Log.LogMessage(MessageImportance.Low, "Process item {0}", item);
@@ -159,14 +159,15 @@ namespace Adamantium.Engine.CompilerTask
 
             data.OutputClassName = item.GetMetadata("OutputClassName", Path.GetFileNameWithoutExtension(data.LinkName));
             data.OutputCsFile = item.GetMetadata("OutputCsFileName", Path.GetFileNameWithoutExtension(data.LinkName) + ".Generated.cs");
-            data.OutputBinaryFile = item.GetMetadata("OutputBinaryFileName",
-               Path.GetFileNameWithoutExtension(data.LinkName) + currentExtension);
+            
             var outputCsFile = item.GetMetadata<string>("LastGenOutput", null);
 
             if (outputCsFile != null && outputCsFile.EndsWith(".cs", StringComparison.InvariantCultureIgnoreCase))
             {
                 data.OutputCsFile = outputCsFile;
             }
+
+            //Debugger.Launch();
 
             // Full path to the generated Output FilePath either 
             // For fx.compiled: $(ProjectDir)/obj/Debug/XXX/YYY.fx.compiled 
@@ -175,10 +176,14 @@ namespace Adamantium.Engine.CompilerTask
             {
                 data.CompiledOutputFilePath = Path.Combine(IntermediateDirectory.ItemSpec, Path.Combine(Path.GetDirectoryName(data.Name) ?? string.Empty, data.OutputCsFile));
             }
-
-            //Generate binary fx file in all cases
-            data.OutputLink = Path.ChangeExtension(data.LinkName, currentExtension);
-            data.BinaryOutputFilePath = Path.Combine(IntermediateDirectory.ItemSpec, data.OutputLink);
+            else
+            {
+                //Generate binary fx file in all cases
+                data.OutputLink = Path.ChangeExtension(data.LinkName, EffectData.CompiledExtension);
+                data.OutputFilePath = Path.Combine(OutputDirectory.ItemSpec, data.OutputLink);
+            }
+            
+            data.OutputFilePath = Path.Combine(OutputDirectory.ItemSpec, data.OutputLink);
 
             // Full path to the input file
             data.InputFilePath = Path.Combine(ProjectDirectory.ItemSpec, data.Name);

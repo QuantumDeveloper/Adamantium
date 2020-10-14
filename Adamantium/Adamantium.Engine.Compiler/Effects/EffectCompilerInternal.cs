@@ -50,6 +50,7 @@ namespace Adamantium.Engine.Compiler.Effects
         private EffectData.Technique technique;
         private int nextSubPassCount;
         private int profile;
+        private List<ResourceBindingKey> resourceKeys = new List<ResourceBindingKey>();
 
         //private StreamOutputElement[] currentStreamOutputElements;
 
@@ -176,7 +177,7 @@ namespace Adamantium.Engine.Compiler.Effects
         /// <returns>A string containing asm code decoded from HLSL bytecode.</returns>
         public SpirvReflectionResult DisassembleShader(EffectData.Shader shader)
         {
-            return new SpirvReflection(shader.Bytecode).Disassemble();
+            return new SpirvReflection(shader.Bytecode).Disassemble(resourceKeys);
         }
 
         public EffectData Build(params CompilationResult[] bytecodes)
@@ -252,7 +253,7 @@ namespace Adamantium.Engine.Compiler.Effects
         private void HandleTechnique(Ast.Technique techniqueAst)
         {
             SetupTechnique(techniqueAst.Name, techniqueAst.Span);
-
+            
             // Process passes for this technique
             foreach (var passAst in techniqueAst.Passes)
             {
@@ -287,6 +288,7 @@ namespace Adamantium.Engine.Compiler.Effects
 
         private void HandlePass(Ast.Pass passAst)
         {
+            resourceKeys.Clear();
             SetupPass(passAst.Name, passAst.Span);
 
             if (nextSubPassCount > 0)
@@ -985,6 +987,10 @@ namespace Adamantium.Engine.Compiler.Effects
                     ProcessShaderData(type, result, shader);
                 }
             }
+            catch (Exception ex)
+            {
+                
+            }
             finally
             {
             }
@@ -1010,9 +1016,11 @@ namespace Adamantium.Engine.Compiler.Effects
 
             var opts = CompileOptions.New();
             opts.EnableHlslFunctionality = true;
-            opts.UseHlslIoMapping = true;
-            opts.UseHlslOffsets = true;
-            opts.SetAutoBindUniforms = true;
+            //opts.UseHlslIoMapping = true;
+            //opts.UseHlslOffsets = true;
+            //opts.SetAutoBindUniforms = true;
+            opts.TargetSpirv = ShadercSpirvVersion._5;
+            opts.SetTargetEnv(ShadercTargetEnv.Vulkan, 1 << 22 | 2 << 12);
             opts.SourceLanguage = (ShadercSourceLanguage)language;
             opts.SetForcedVersionProfile(profile, ShadercProfile.Core);
             opts.SetIncludeCallbacks(includeResolverPtr, includeReleasePtr, ref zeroPtr);
@@ -1024,6 +1032,16 @@ namespace Adamantium.Engine.Compiler.Effects
                 entryPoint,
                 opts);
 
+            if (result.Status != ShadercCompilationStatus.Success)
+            {
+                throw new ApplicationException($"Shader {entryPoint} compilation finished with {result.Status}");
+            }
+
+            var result2 = SpirvReflection.CompileToSpirvAssembly(sourcecode, GetShadercType(shaderKind), entryPoint,
+               entryPoint, opts);
+
+            var text = Encoding.ASCII.GetString(result2.Bytecode);
+            
             opts.Dispose();
 
             return result;
@@ -1061,7 +1079,8 @@ namespace Adamantium.Engine.Compiler.Effects
 
             using (var reflect = new SpirvReflection(shader.Bytecode))
             {
-                var result = reflect.Disassemble();
+                var result = reflect.Disassemble(resourceKeys);
+                shader.Bytecode = reflect.GetByteCode();
                 //BuiltSemanticInputAndOutput(shader, reflect);
                 BuildParameters(shader, result);
             }
@@ -1285,9 +1304,10 @@ namespace Adamantium.Engine.Compiler.Effects
                 Offset = variable.Offset,
                 Size = (int)variable.Size,
                 Count = variable.ElementCount,
-                Class = (EffectParameterClass)variable.Class,
+                Class = (EffectParameterClass)variable.VariableType,
                 Type = (EffectParameterType)variable.Type,
                 RowCount = (byte)variable.RowCount,
+                ColumnCount = (byte)variable.ColumnCount,
             };
 
             return parameter;

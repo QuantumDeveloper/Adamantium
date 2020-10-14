@@ -41,20 +41,36 @@ namespace Adamantium.Engine.Graphics.Effects
                 ParameterClass == EffectParameterClass.MatrixColumns)
             {
                 var isMatrixToMap = RowCount != 4 || ColumnCount != 4 ||
-                                    ParameterClass == EffectParameterClass.MatrixColumns;
+                                    ParameterClass == EffectParameterClass.MatrixRows;
                 matrixSize = (ParameterClass == EffectParameterClass.MatrixColumns ? ColumnCount : RowCount) * 4 *
                              sizeof(float);
+
+                if (ParameterClass == EffectParameterClass.MatrixRows)
+                {
+                    CopyMatrix = CopyMatrixColumnMajor;
+                    GetMatrixImpl = GetMatrixColumnMajorFrom;
+                }
+                else
+                {
+                    CopyMatrix = CopyMatrixDirect;
+                    GetMatrixImpl = GetMatrixDirectFrom;
+                }
+                
                 // Use the correct function for this parameter
-                CopyMatrix = isMatrixToMap
-                    ? (ParameterClass == EffectParameterClass.MatrixRows) ? new CopyMatrixDelegate(CopyMatrixRowMajor) :
-                    CopyMatrixColumnMajor
-                    : CopyMatrixDirect;
-                GetMatrixImpl = isMatrixToMap
-                    ? (ParameterClass == EffectParameterClass.MatrixRows)
-                        ?
-                        new GetMatrixDelegate(GetMatrixRowMajorFrom)
-                        : GetMatrixColumnMajorFrom
-                    : GetMatrixDirectFrom;
+                // if (isMatrixToMap)
+                //     CopyMatrix = (ParameterClass == EffectParameterClass.MatrixRows)
+                //         ? CopyMatrixColumnMajor 
+                //         : new CopyMatrixDelegate(CopyMatrixRowMajor);
+                // else
+                // {
+                //     CopyMatrix = CopyMatrixDirect;
+                //     if (isMatrixToMap)
+                //         GetMatrixImpl = (ParameterClass == EffectParameterClass.MatrixRows)
+                //             ? new GetMatrixDelegate(GetMatrixRowMajorFrom)
+                //             : GetMatrixColumnMajorFrom;
+                //     else
+                //         GetMatrixImpl = GetMatrixDirectFrom;
+                // }
             }
         }
 

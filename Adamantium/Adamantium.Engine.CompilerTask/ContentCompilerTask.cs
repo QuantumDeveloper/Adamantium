@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.IO;
 using System.Text.RegularExpressions;
 using Adamantium.Core;
@@ -24,7 +25,7 @@ namespace Adamantium.Engine.CompilerTask
                 //Debugger.Launch();
                 CreateDirectoryIfNotExists(dependencyFilePath);
                 Log.LogMessage(MessageImportance.Low, "Check Engine file to compile {0} with dependency file {1}", inputFilePath, dependencyFilePath);
-                if (IsInputFileWasModified(item.InputFilePath, Path.Combine(item.BinaryOutputFilePath, item.OutputLink)) || !File.Exists(item.BinaryOutputFilePath))
+                if (IsInputFileWasModified(item.InputFilePath, Path.Combine(item.OutputFilePath, item.OutputLink)) || !File.Exists(item.OutputFilePath))
                 {
                     Log.LogMessage(MessageImportance.Low, "Starting compilation of {0}", inputFilePath);
 
@@ -35,10 +36,24 @@ namespace Adamantium.Engine.CompilerTask
                     if (logger.HasErrors)
                     {
                         hasErrors = true;
+
+                        foreach (var message in logger.Messages)
+                        {
+                            switch (message.Type)
+                            {
+                                case LogMessageType.Error:
+                                    Log.LogError(message.Text);
+                                    break;
+                                case LogMessageType.Warning:
+                                    Log.LogWarning(message.Text);
+                                    break;
+                            }
+                            Log.LogError(message.Text);
+                        }
                     }
                     else
                     {
-                        Log.LogMessage(MessageImportance.High, "Compilation successful of {0} to {1}", inputFilePath, item.BinaryOutputFilePath);
+                        Log.LogMessage(MessageImportance.High, "Compilation successful of {0} to {1}", inputFilePath, item.OutputFilePath);
                     }
                 }
 
@@ -59,8 +74,7 @@ namespace Adamantium.Engine.CompilerTask
         protected void CreateDirectoryIfNotExists(string filePath)
         {
             var dependencyDirectoryPath = Path.GetDirectoryName(filePath);
-            if (!Directory.Exists(dependencyDirectoryPath))
-                Directory.CreateDirectory(dependencyDirectoryPath);
+            Directory.CreateDirectory(dependencyDirectoryPath);
         }
 
         private void LogLogger(Logger logs)

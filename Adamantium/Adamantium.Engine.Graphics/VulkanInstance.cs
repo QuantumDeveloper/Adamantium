@@ -40,8 +40,7 @@ namespace Adamantium.Engine.Graphics
             DeviceExtensions = new ReadOnlyCollection<string>(deviceExt);
             var validationLayers = new List<string>();
             
-            validationLayers.Add("VK_LAYER_LUNARG_standard_validation");
-            //validationLayers.Add("VK_LAYER_KHRONOS_validation");
+            validationLayers.Add("VK_LAYER_KHRONOS_validation");
             //validationLayers.Add("VK_LAYER_LUNARG_monitor");
             ValidationLayers = new ReadOnlyCollection<string>(validationLayers);
         }
@@ -83,7 +82,7 @@ namespace Adamantium.Engine.Graphics
             appInfo.ApplicationVersion = AdamantiumVulkan.Core.Constants.VK_MAKE_VERSION(1, 0, 0);
             appInfo.PEngineName = EngineName;
             appInfo.EngineVersion = AdamantiumVulkan.Core.Constants.VK_MAKE_VERSION(1, 0, 0);
-            appInfo.ApiVersion = AdamantiumVulkan.Core.Constants.VK_MAKE_VERSION(1, 0, 0);
+            appInfo.ApiVersion = AdamantiumVulkan.Core.Constants.VK_MAKE_VERSION(1, 2, 148);
 
             DebugUtilsMessengerCreateInfoEXT debugInfo = new DebugUtilsMessengerCreateInfoEXT();
             debugInfo.MessageSeverity = (uint)(DebugUtilsMessageSeverityFlagBitsEXT.VerboseBitExt | DebugUtilsMessageSeverityFlagBitsEXT.WarningBitExt | DebugUtilsMessageSeverityFlagBitsEXT.ErrorBitExt);
@@ -100,8 +99,8 @@ namespace Adamantium.Engine.Graphics
             //createInfo.EnabledExtensionCount = (uint)ext.Length;
             //createInfo.PpEnabledExtensionNames = ext.ToArray();
 
-            createInfo.EnabledExtensionCount = (uint)extensions.Length;
-            createInfo.PpEnabledExtensionNames = extensions.Select(x => x.ExtensionName).ToArray();
+            createInfo.PpEnabledExtensionNames = extensions.Select(x => x.ExtensionName).ToArray();//.Except(new []{"VK_KHR_surface_protected_capabilities"}).ToArray();
+            createInfo.EnabledExtensionCount = (uint)createInfo.PpEnabledExtensionNames.Length;
 
             if (enableDebug)
             {
@@ -110,17 +109,6 @@ namespace Adamantium.Engine.Graphics
             }
 
             instance = Instance.Create(createInfo);
-            
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                //var config = instance.GetMoltenVKConfigurationMVK();
-
-                //config.presentWithCommandBuffer = false;
-                //config.synchronousQueueSubmits = false;
-                //config.debugMode = true;
-                //config.displayWatermark = true;
-                //instance.SetMoltenVKConfigurationMVK(config);
-            }
 
             createInfo.Dispose();
         }
@@ -155,7 +143,8 @@ namespace Adamantium.Engine.Graphics
 
                 return surface;
             }
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
                 var surfaceInfo = new MacOSSurfaceCreateInfoMVK();
                 surfaceInfo.PView = parameters.OutputHandle;

@@ -6,9 +6,9 @@
    </ItemGroup>
     
    <!-- In Project A -->  
-  <UsingTask Architecture="*" TaskName="EffectCompilerTask" AssemblyFile="$(SolutionDir)Adamantium.Engine.CompilerTask\bin\Debug\net5.0\publish\Adamantium.Engine.CompilerTask.dll"/>
-   <!--<UsingTask Architecture="*" TaskName="Adamantium.Engine.CompilerTask.FontCompilerTask"     AssemblyFile="$(SolutionDir)Adamantium.Engine.CompilerTask\bin\Debug\Adamantium.Engine.CompilerTask.dll"/>-->
-   <UsingTask Architecture="*" TaskName="CompilerTask" AssemblyFile="$(SolutionDir)Adamantium.Engine.CompilerTask\bin\Debug\net5.0\publish\Adamantium.Engine.CompilerTask.dll"/>
+   <UsingTask Architecture="*" TaskName="EffectCompilerTask" AssemblyFile="$(SolutionDir)Adamantium.Engine.CompilerTask\bin\Debug\net5.0\Adamantium.Engine.CompilerTask.dll"/>
+   <!--<UsingTask Architecture="*" TaskName="Adamantium.Engine.CompilerTask.FontCompilerTask" AssemblyFile="$(SolutionDir)Adamantium.Engine.CompilerTask\bin\Debug\Adamantium.Engine.CompilerTask.dll"/>-->
+   <UsingTask Architecture="*" TaskName="CompilerDependencyTask" AssemblyFile="$(SolutionDir)Adamantium.Engine.CompilerTask\bin\Debug\net5.0\Adamantium.Engine.CompilerTask.dll"/>
 
   
     <!-- 1st PART : When Project A is built, It will generate effectively the files -->
@@ -18,17 +18,6 @@
          EngineCompileTarget;
          $(BuildDependsOn);
       </BuildDependsOn>
-
-
-      <!-- 2nd PART : When Project B is built, It will call GetCopyToOutputDirectoryItems on ProjectA so we need to generate this list when it is called  -->
-      <!-- For this we need to override AssignTargetPathsDependsOn in order to generate the list of files -->
-      <!-- as GetCopyToOutputDirectoryItems  ultimately depends on AssignTargetPathsDependsOn -->
-      <!-- Content need to be generated before AssignTargets, because AssignTargets will prepare all files to be copied later by GetCopyToOutputDirectoryItems -->
-      <!-- This part is also called from ProjectA when target 'PrepareResources' is called -->
-      <AssignTargetPathsDependsOn>
-         $(AssignTargetPathsDependsOn);
-         EngineContentAndCompileTarget;
-      </AssignTargetPathsDependsOn>
 
       <IsBuildInDebug>true</IsBuildInDebug>
 
@@ -46,19 +35,21 @@
    </PropertyGroup>
 <!-- Target used to calculate dependency output -->
    <Target Name="EngineContentAndCompileTarget" BeforeTargets="Build">
-      <CompilerTask
+      <CompilerDependencyTask
          ProjectDirectory="$(ProjectDir)"
          IntermediateDirectory="$(IntermediateOutputPath)"
+         OutputDirectory="$(IntermediateOutputPath)"
          Debug="$(EngineEffectDebugOption)"
          Files="@(Effect)"
          RootNamespace="$(RootNamespace)"
          >
-         
-      </CompilerTask>
+         <Output ItemName="EngineContent" TaskParameter="ContentFiles" />
+         <Output ItemName="EngineCompile" TaskParameter="CompiledFiles"/>
+      </CompilerDependencyTask>
 
       <ItemGroup>
          <!--List Of fx compiled file-->
-         <Content Include="@(EngineContent)" KeepMetadata="Link;CopyToOutputDirectory"/>
+         <Content Include="@(EngineContent)" KeepMetadata="CopyToOutputDirectory"/>
 
          <!--List of cs compiled file-->
          <Compile Include="@(EngineCompile)"/>
@@ -68,17 +59,16 @@
    <Target Name="EngineCompileTarget" BeforeTargets="Build">
       <EffectCompilerTask
           ProjectDirectory="$(ProjectDir)"
-          IntermediateDirectory="$(IntermediateOutputPath)"
+          IntermediateDirectory="$(OutDir)"
+          OutputDirectory="$(OutDir)"
           DynamicCompiling="$(EffectDynamicCompilingOption)"
           Debug="$(IsBuildInDebug)"
           Files="@(Effect)"
           RootNamespace="$(RootNamespace)"
-          CompileInCS ="$(GenerateCsFileFromEffect)"
-          GenerateBinary = "$(GenerateBinaryFromEffect)"
-        >
-         <Output TaskParameter="ContentFiles" ItemName="EngineContent"/>
-         <Output TaskParameter="CompiledFiles" ItemName="EngineCompile"/>
-         </EffectCompilerTask>
+          CompileInCS="$(GenerateCsFileFromEffect)"
+          GenerateBinary="$(GenerateBinaryFromEffect)"
+      >
+      </EffectCompilerTask>
       
       <!--<FontCompilerTask
           ProjectDirectory="$(ProjectDir)"
