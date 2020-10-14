@@ -15,13 +15,13 @@ namespace Adamantium.Core.Collections
     public class AdamantiumCollection<T> : IList<T>, IReadOnlyCollection<T>
     {
         private T[] items;
-        private int currentIndex = 0;
+        private int currentIndex;
         private readonly int defaultCapacity = 5;
         private readonly object syncObject = new object();
 
         public int Capacity
         {
-            get { return items.Length; }
+            get => items.Length;
             set
             {
                 if (value != items.Length)
@@ -281,13 +281,13 @@ namespace Adamantium.Core.Collections
         {
             if (range == null)
             {
-                throw new ArgumentNullException(nameof(range));
+                return;
             }
 
             lock (SyncRoot)
             {
                 var itemsToAdd = range.ToArray();
-                for (int i = 0; i < itemsToAdd.Length; ++i)
+                for (var i = 0; i < itemsToAdd.Length; ++i)
                 {
                     Insert(currentIndex, itemsToAdd[i]);
                 }
@@ -322,6 +322,8 @@ namespace Adamantium.Core.Collections
         public bool IsSynchronized => true;
 
         public bool IsReadOnly => false;
+
+        public bool IsEmpty => Count == 0;
 
         /// <summary>
         /// Determines the index of a specific item in the <see cref="AdamantiumCollection{T}"/>.

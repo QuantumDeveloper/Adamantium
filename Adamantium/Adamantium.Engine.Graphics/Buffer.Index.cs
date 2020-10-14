@@ -13,6 +13,8 @@ namespace Adamantium.Engine.Graphics
         /// </summary>
         public static class Index
         {
+            private static BufferUsageFlags BufferUsage = BufferUsageFlags.TransferDst | BufferUsageFlags.IndexBuffer;
+
             /// <summary>
             /// Creates a new index buffer with <see cref="MemoryPropertyFlags.Default"/> memoryFlags by default.
             /// </summary>
@@ -22,7 +24,7 @@ namespace Adamantium.Engine.Graphics
             /// <returns>A index buffer</returns>
             public static Buffer New(GraphicsDevice device, int size, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal)
             {
-                return Buffer.New(device, size, BufferUsageFlags.IndexBuffer, memoryFlags);
+                return Buffer.New(device, size, BufferUsage, memoryFlags);
             }
 
             /// <summary>
@@ -35,7 +37,7 @@ namespace Adamantium.Engine.Graphics
             /// <returns>A index buffer</returns>
             public static Buffer<T> New<T>(GraphicsDevice device, uint indexCount, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal) where T : struct
             {
-                return Buffer.New<T>(device, indexCount, BufferUsageFlags.IndexBuffer, memoryFlags);
+                return Buffer.New<T>(device, indexCount, BufferUsage, memoryFlags);
             }
 
             /// <summary>
@@ -46,9 +48,9 @@ namespace Adamantium.Engine.Graphics
             /// <param name="value">The value to initialize the index buffer.</param>
             /// <param name="memoryFlags">The memoryFlags of this resource.</param>
             /// <returns>A index buffer</returns>
-            public static Buffer<T> New<T>(GraphicsDevice device, ref T value, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.Protected) where T : struct
+            public static Buffer<T> New<T>(GraphicsDevice device, ref T value, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal) where T : struct
             {
-                return Buffer.New(device, ref value, BufferUsageFlags.IndexBuffer, memoryFlags);
+                return Buffer.New(device, ref value, BufferUsage, memoryFlags);
             }
 
             /// <summary>
@@ -59,9 +61,9 @@ namespace Adamantium.Engine.Graphics
             /// <param name="value">The value to initialize the index buffer.</param>
             /// <param name="memoryFlags">The memoryFlags of this resource.</param>
             /// <returns>A index buffer</returns>
-            public static Buffer<T> New<T>(GraphicsDevice device, T[] value, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.Protected) where T : struct
+            public static Buffer<T> New<T>(GraphicsDevice device, T[] value, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal) where T : struct
             {
-                return Buffer.New(device, value, BufferUsageFlags.IndexBuffer, memoryFlags);
+                return Buffer.New(device, value, BufferUsage, memoryFlags);
             }
 
             /// <summary>
@@ -72,9 +74,9 @@ namespace Adamantium.Engine.Graphics
             /// <param name="is32BitIndex">Set to true if the buffer is using a 32 bit index or false for 16 bit index.</param>
             /// <param name="memoryFlags">The memoryFlags of this resource.</param>
             /// <returns>A index buffer</returns>
-            public static Buffer New(GraphicsDevice device, byte[] value, bool is32BitIndex, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.Protected)
+            public static Buffer New(GraphicsDevice device, byte[] value, bool is32BitIndex, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal)
             {
-                return Buffer.New(device, value, is32BitIndex ? 4 : 2, BufferUsageFlags.IndexBuffer, memoryFlags);
+                return Buffer.New(device, value, is32BitIndex ? 4 : 2, BufferUsage, memoryFlags);
             }
 
             /// <summary>
@@ -84,9 +86,9 @@ namespace Adamantium.Engine.Graphics
             /// <param name="value">The value to initialize the index buffer.</param>
             /// <param name="memoryFlags">The memoryFlags of this resource.</param>
             /// <returns>A index buffer</returns>
-            public static Buffer New(GraphicsDevice device, DataPointer value, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.Protected)
+            public static Buffer New(GraphicsDevice device, DataPointer value, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal)
             {
-                return Buffer.New(device, value, BufferUsageFlags.IndexBuffer, memoryFlags);
+                return Buffer.New(device, value, BufferUsage, memoryFlags);
             }
         }
     }

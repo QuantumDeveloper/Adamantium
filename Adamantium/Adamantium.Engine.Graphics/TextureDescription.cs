@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+﻿using System;
+using System.Runtime.InteropServices;
 using Adamantium.Imaging;
 using AdamantiumVulkan.Core;
 
@@ -104,8 +105,10 @@ namespace Adamantium.Engine.Graphics
         public ImageTiling ImageTiling;
 
         public ImageCreateFlagBits Flags;
-
+        
         public ImageType ImageType;
+
+        public ImageLayout InitialLayout;
 
         public ImageLayout DesiredImageLayout;
 
@@ -228,7 +231,7 @@ namespace Adamantium.Engine.Graphics
                 Usage = (uint)Usage,
                 SharingMode = SharingMode,
                 Tiling = ImageTiling,
-                InitialLayout = ImageLayout.Undefined,
+                InitialLayout = InitialLayout,
                 Flags = (uint)Flags,
             };
         }
@@ -272,7 +275,26 @@ namespace Adamantium.Engine.Graphics
                 Usage = ImageUsageFlagBits.SampledBit,
                 ImageTiling = ImageTiling.Optimal,
                 SharingMode = SharingMode.Exclusive,
+                ImageType = ConvertToImageType(description.Dimension),
+                InitialLayout = ImageLayout.Preinitialized,
+                ImageAspect = ImageAspectFlagBits.ColorBit
             };
+        }
+
+        private static ImageType ConvertToImageType(TextureDimension dimension)
+        {
+            switch (dimension)
+            {
+                case TextureDimension.Texture1D:
+                    return ImageType._1d;
+                case TextureDimension.Texture2D:
+                case TextureDimension.TextureCube:
+                    return ImageType._2d;
+                case TextureDimension.Texture3D:
+                    return ImageType._3d;
+                default:
+                    throw new ArgumentOutOfRangeException($"cannot convert {dimension} to a valid ImageType");
+            }
         }
     }
 }

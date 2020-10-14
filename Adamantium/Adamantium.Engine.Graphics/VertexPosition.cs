@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Runtime.InteropServices;
-using Adamantium.Engine.Core;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Engine.Graphics
@@ -24,7 +23,7 @@ namespace Adamantium.Engine.Graphics
       /// XYZ position.
       /// </summary>
       [VertexInputElement("SV_Position")]
-      public Vector3F position;
+      public Vector3F Position;
 
       /// <summary>
       /// Defines structure byte size.
@@ -64,12 +63,6 @@ namespace Adamantium.Engine.Graphics
       public override string ToString()
       {
          return $"Position: {Position}";
-      }
-
-      public Vector3F Position
-      {
-         get { return position; }
-         set { position = value; }
       }
    }
 }

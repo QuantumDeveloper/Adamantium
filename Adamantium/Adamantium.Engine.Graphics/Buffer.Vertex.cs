@@ -12,6 +12,8 @@ namespace Adamantium.Engine.Graphics
         /// </summary>
         public static class Vertex
         {
+            private static BufferUsageFlags BufferUsage = BufferUsageFlags.TransferDst | BufferUsageFlags.VertexBuffer;
+
             /// <summary>
             /// Creates a new Vertex buffer with <see cref="MemoryPropertyFlags.Default"/> memoryFlags by default.
             /// </summary>
@@ -21,7 +23,7 @@ namespace Adamantium.Engine.Graphics
             /// <returns>A Vertex buffer</returns>
             public static Buffer New(GraphicsDevice device, int size, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal)
             {
-                return Buffer.New(device, size, BufferUsageFlags.VertexBuffer, memoryFlags);
+                return Buffer.New(device, size, BufferUsage, memoryFlags);
             }
 
             /// <summary>
@@ -34,7 +36,7 @@ namespace Adamantium.Engine.Graphics
             /// <returns>A Vertex buffer</returns>
             public static Buffer<T> New<T>(GraphicsDevice device, uint vertexBufferCount, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal) where T : struct
             {
-                return Buffer.New<T>(device, vertexBufferCount, BufferUsageFlags.VertexBuffer, memoryFlags);
+                return Buffer.New<T>(device, vertexBufferCount, BufferUsage, memoryFlags);
             }
 
             /// <summary>
@@ -45,9 +47,9 @@ namespace Adamantium.Engine.Graphics
             /// <param name="value">The value to initialize the Vertex buffer.</param>
             /// <param name="memoryFlags">The memoryFlags of this resource.</param>
             /// <returns>A Vertex buffer</returns>
-            public static Buffer<T> New<T>(GraphicsDevice device, T[] value, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.Protected) where T : struct
+            public static Buffer<T> New<T>(GraphicsDevice device, T[] value, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal) where T : struct
             {
-                return Buffer.New(device, value, BufferUsageFlags.VertexBuffer, memoryFlags);
+                return Buffer.New(device, value, BufferUsage, memoryFlags);
             }
 
             /// <summary>
@@ -57,9 +59,9 @@ namespace Adamantium.Engine.Graphics
             /// <param name="value">The value to initialize the Vertex buffer.</param>
             /// <param name="memoryFlags">The memoryFlags of this resource.</param>
             /// <returns>A Vertex buffer</returns>
-            public static Buffer New(GraphicsDevice device, DataPointer value, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.Protected)
+            public static Buffer New(GraphicsDevice device, DataPointer value, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal)
             {
-                return Buffer.New(device, value, BufferUsageFlags.VertexBuffer, memoryFlags);
+                return Buffer.New(device, value, BufferUsage, memoryFlags);
             }
         }
     }

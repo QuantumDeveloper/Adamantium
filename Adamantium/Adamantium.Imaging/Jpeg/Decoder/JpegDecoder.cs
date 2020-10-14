@@ -473,12 +473,12 @@ namespace Adamantium.Imaging.Jpeg.Decoder
                         description.Dimension = TextureDimension.Texture2D;
                         description.ArraySize = 1;
                         description.MipLevels = 1;
-                        description.Format = frame.ComponentCount == 3 ? Format.R8G8B8_UNORM : Format.R8_UNORM;
+                        description.Format = Format.R8G8B8A8_UNORM;
 
                         image = Image.New(description);
 
                         // Only one frame here
-                        byte[][,] raster = ComponentsBuffer.CreateRaster(frame.Width, frame.Height, frame.ComponentCount);
+                        byte[][,] raster = ComponentsBuffer.CreateRaster(frame.Width, frame.Height, 4);
 
                         var components = frame.Scan.Components;
                         int totalSteps = components.Count * 3; // Three steps per loop
@@ -536,7 +536,7 @@ namespace Adamantium.Imaging.Jpeg.Decoder
 
                         componentsBuffer.ChangeColorSpace(ColorSpace.RGB);
 
-                        componentsBuffer.CopyPixels(image.DataPointer, frame.SizeInBytes);
+                        componentsBuffer.CopyPixels(image.DataPointer, frame.Width * frame.Height * 4);
 
                         break;
 

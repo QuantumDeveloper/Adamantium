@@ -24,7 +24,7 @@ namespace Adamantium.EntityFramework
         public Entity(Entity owner = null, String name = "")
         {
             dependencies = new TrackingCollection<Entity>();
-            dependenciesReadOnly = new ReadonlyTrackingCollection<Entity>(dependencies);
+            dependenciesReadOnly = new ReadOnlyTrackingCollection<Entity>(dependencies);
             uid = UidGenerator.Generate();
             Owner = owner;
             IsEnabled = true;
@@ -33,7 +33,7 @@ namespace Adamantium.EntityFramework
             Transform = new Transform();
             componentCollection = new EntityComponentCollection(this);
             componentCollection.Add(Transform);
-            readOnlyComponents = new ReadonlyTrackingCollection<IComponent>(componentCollection);
+            readOnlyComponents = new ReadOnlyTrackingCollection<IComponent>(componentCollection);
         }
 
         private Entity owner;
@@ -42,9 +42,9 @@ namespace Adamantium.EntityFramework
         private bool isSelected;
         private string name;
         private readonly TrackingCollection<Entity> dependencies;
-        private readonly ReadonlyTrackingCollection<Entity> dependenciesReadOnly;
+        private readonly ReadOnlyTrackingCollection<Entity> dependenciesReadOnly;
         private EntityComponentCollection componentCollection;
-        private ReadonlyTrackingCollection<IComponent> readOnlyComponents;
+        private ReadOnlyTrackingCollection<IComponent> readOnlyComponents;
         private List<IInitializable> pendingComponents = new List<IInitializable>();
 
         public Transform Transform { get; internal set; }
@@ -106,7 +106,7 @@ namespace Adamantium.EntityFramework
 
         public event EventHandler<OwnerChangedEventArgs> OwnerChanged;
 
-        public ReadonlyTrackingCollection<Entity> Dependencies => dependenciesReadOnly;
+        public ReadOnlyTrackingCollection<Entity> Dependencies => dependenciesReadOnly;
 
         public EntityComponentCollection Components => componentCollection;
 

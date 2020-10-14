@@ -575,8 +575,8 @@ namespace Adamantium.Imaging.Dds
             *(uint*)(pDestination) = MagicHeader;
 
             var header = (Header*)((byte*)(pDestination) + sizeof (int));
-
-            Utilities.ClearMemory((IntPtr)header, 0, Utilities.SizeOf<Header>());
+            var headerPtr = (IntPtr)header;
+            Utilities.ClearMemory(ref headerPtr, 0, Utilities.SizeOf<Header>());
             header->Size = Utilities.SizeOf<Header>();
             header->Flags = HeaderFlags.Texture;
             header->SurfaceFlags = SurfaceFlags.Texture;
@@ -641,8 +641,8 @@ namespace Adamantium.Imaging.Dds
                 header->PixelFormat = PixelFormat.DX10;
 
                 var ext = (HeaderDXT10*)((byte*)(header) + Utilities.SizeOf<Header>());
-
-                Utilities.ClearMemory((IntPtr) ext, 0, Utilities.SizeOf<HeaderDXT10>());
+                var extPtr = (IntPtr)ext;
+                Utilities.ClearMemory(ref extPtr, 0, Utilities.SizeOf<HeaderDXT10>());
 
                 ext->DXGIFormat = dxgiFormat;
                 switch (description.Dimension)

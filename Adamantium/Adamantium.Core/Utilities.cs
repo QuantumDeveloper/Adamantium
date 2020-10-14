@@ -1,9 +1,11 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace Adamantium.Core
 {
@@ -15,13 +17,10 @@ namespace Adamantium.Core
             Marshal.FreeHGlobal(((IntPtr*)pointer)[-1]);
         }
 
-        public static void ClearMemory(IntPtr dest, byte value, int sizeInBytesToClear)
+        public static unsafe void ClearMemory(ref IntPtr dest, byte value, int sizeInBytesToClear)
         {
-            unsafe
-            {
-                Span<byte> bytes = new Span<byte>(dest.ToPointer(), sizeInBytesToClear);
-                bytes.Fill(value);
-            }
+            Span<byte> bytes = new Span<byte>(dest.ToPointer(), sizeInBytesToClear);
+            bytes.Fill(value);
         }
 
         public static bool IsEnum<T>(T type)
@@ -88,7 +87,12 @@ namespace Adamantium.Core
             return Marshal.SizeOf<T>();
         }
 
-        public static unsafe void CopyMemory(IntPtr destination, IntPtr source, int sizeInBytesToCopy)
+        public static int SizeOf<T>(T[] array) where T : struct
+        {
+            return array == null ? 0 : array.Length * SizeOf<T>();
+        }
+
+        public static unsafe void CopyMemory(IntPtr destination, IntPtr source, long sizeInBytesToCopy)
         {
             Buffer.MemoryCopy(source.ToPointer(), destination.ToPointer(), sizeInBytesToCopy, sizeInBytesToCopy);
         }
@@ -96,14 +100,14 @@ namespace Adamantium.Core
         public static void Write<T>(IntPtr destination, ref T value) where T : struct
         {
             var size = SizeOf<T>();
-            IntPtr source = IntPtr.Zero;
-            Marshal.StructureToPtr<T>(value, source, false);
+            IntPtr source = AllocateMemory(SizeOf<T>());
+            Marshal.StructureToPtr(value, source, false);
             CopyMemory(destination, source, size);
         }
 
         public static IntPtr Write<T>(IntPtr destination, T[] data, int offset, int count) where T : struct
         {
-            var size = Marshal.SizeOf(typeof(T));
+            var size = SizeOf<T>();
             var startPos = IntPtr.Add(destination, offset);
             var source = GCHandle.Alloc(data, GCHandleType.Pinned);
             CopyMemory(destination, source.AddrOfPinnedObject(), size * data.Length);
@@ -115,6 +119,11 @@ namespace Adamantium.Core
         public static T Read<T>(IntPtr source) where T : struct
         {
             return Marshal.PtrToStructure<T>(source);
+        }
+
+        public static void Read<T>(IntPtr source, ref T data) where T : struct
+        {
+            data = Marshal.PtrToStructure<T>(source);
         }
 
         /// <summary>
@@ -155,7 +164,7 @@ namespace Adamantium.Core
 
         public static ushort ToLittleEndian(byte left, byte right)
         {
-            var res = BitConverter.ToUInt16(new byte[] { right, left });
+            var res = BitConverter.ToUInt16(new byte[] { right, left }, 0);
             var result = (ushort)(right | left << 8);
             return result;
         }
@@ -233,9 +242,153 @@ namespace Adamantium.Core
             return result;
         }
 
+        /// <summary>
+        /// String helper join method to display an array of object as a single string.
+        /// </summary>
+        /// <param name="separator">The separator.</param>
+        /// <param name="array">The array.</param>
+        /// <returns>A string with array elements separated by the separator.</returns>
+        public static string Join<T>(string separator, T[] array)
+        {
+            var text = new StringBuilder();
+            if (array != null)
+            {
+                for (int i = 0; i < array.Length; i++)
+                {
+                    if (i > 0) text.Append(separator);
+                    text.Append(array[i]);
+                }
+            }
+            return text.ToString();
+        }
+
+        /// <summary>
+        /// String helper join method to display an enumerable of object as a single string.
+        /// </summary>
+        /// <param name="separator">The separator.</param>
+        /// <param name="elements">The enumerable.</param>
+        /// <returns>A string with array elements separated by the separator.</returns>
+        public static string Join(string separator, IEnumerable elements)
+        {
+            var elementList = new List<string>();
+            foreach (var element in elements)
+                elementList.Add(element.ToString());
+
+            var text = new StringBuilder();
+            for (int i = 0; i < elementList.Count; i++)
+            {
+                var element = elementList[i];
+                if (i > 0) text.Append(separator);
+                text.Append(element);
+            }
+            return text.ToString();
+        }
+
+        /// <summary>
+        /// Compares two collection, element by elements.
+        /// </summary>
+        /// <param name="left">A "from" enumerator.</param>
+        /// <param name="right">A "to" enumerator.</param>
+        /// <returns><c>true</c> if lists are identical, <c>false</c> otherwise.</returns>
+        public static bool Compare(IEnumerable left, IEnumerable right)
+        {
+            if (ReferenceEquals(left, right))
+                return true;
+            if (ReferenceEquals(left, null) || ReferenceEquals(right, null))
+                return false;
+
+            return Compare(left.GetEnumerator(), right.GetEnumerator());
+        }
+
+        /// <summary>
+        /// Compares two collection, element by elements.
+        /// </summary>
+        /// <param name="leftIt">A "from" enumerator.</param>
+        /// <param name="rightIt">A "to" enumerator.</param>
+        /// <returns><c>true</c> if lists are identical; otherwise, <c>false</c>.</returns>
+        public static bool Compare(IEnumerator leftIt, IEnumerator rightIt)
+        {
+            if (ReferenceEquals(leftIt, rightIt))
+                return true;
+            if (ReferenceEquals(leftIt, null) || ReferenceEquals(rightIt, null))
+                return false;
+
+            bool hasLeftNext;
+            bool hasRightNext;
+            while (true)
+            {
+
+                hasLeftNext = leftIt.MoveNext();
+                hasRightNext = rightIt.MoveNext();
+                if (!hasLeftNext || !hasRightNext)
+                    break;
+
+                if (!Equals(leftIt.Current, rightIt.Current))
+                    return false;
+            }
+
+            // If there is any left element
+            if (hasLeftNext != hasRightNext)
+                return false;
+
+            return true;
+        }
+
+        /// <summary>
+        /// Compares two collection, element by elements.
+        /// </summary>
+        /// <param name="left">The collection to compare from.</param>
+        /// <param name="right">The collection to compare to.</param>
+        /// <returns><c>true</c> if lists are identical (but not necessarily of the same time); otherwise , <c>false</c>.</returns>
+        public static bool Compare(ICollection left, ICollection right)
+        {
+            if (ReferenceEquals(left, right))
+                return true;
+            if (ReferenceEquals(left, null) || ReferenceEquals(right, null))
+                return false;
+
+            if (left.Count != right.Count)
+                return false;
+
+            int count = 0;
+            var leftIt = left.GetEnumerator();
+            var rightIt = right.GetEnumerator();
+            while (leftIt.MoveNext() && rightIt.MoveNext())
+            {
+                if (!Equals(leftIt.Current, rightIt.Current))
+                    return false;
+                count++;
+            }
+
+            if (count != left.Count)
+                return false;
+
+            return true;
+        }
+
         public static bool IsTypeInheritFrom(Type type, string baseType)
         {
             throw new NotImplementedException();
+        }
+
+        /// <summary>
+        /// Compute a FNV1-modified improved hash version.
+        /// </summary>
+        /// <param name="data">Data to compute the hash from.</param>
+        /// <returns>A hash value.</returns>
+        public static int ComputeHashFNV1Modified(byte[] data)
+        {
+            const uint prime = 16777619;
+            uint hash = 2166136261;
+            foreach (byte b in data)
+                hash = (hash ^ b) * prime;
+
+            hash += hash << 13;
+            hash ^= hash >> 7;
+            hash += hash << 3;
+            hash ^= hash >> 17;
+            hash += hash << 5;
+            return unchecked((int)hash);
         }
     }
 }

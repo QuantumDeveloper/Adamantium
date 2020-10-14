@@ -1,8 +1,8 @@
-﻿using AdamantiumVulkan.Core;
-using System;
+﻿using System;
 using System.Collections.ObjectModel;
+using AdamantiumVulkan.Core;
 
-namespace Adamantium.Engine.Core
+namespace Adamantium.Engine.Graphics
 {
    /// <summary>	
    /// A description of a vertex elements for particular slot for the input-assembler stage. 

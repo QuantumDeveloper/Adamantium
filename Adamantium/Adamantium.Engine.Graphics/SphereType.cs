@@ -1,4 +1,4 @@
-﻿namespace Adamantium.Engine
+﻿namespace Adamantium.Engine.Graphics
 {
     public enum SphereType
     {

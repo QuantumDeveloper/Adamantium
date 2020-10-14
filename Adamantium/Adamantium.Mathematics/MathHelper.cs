@@ -351,6 +351,11 @@ namespace Adamantium.Mathematics
         {
             return degree * (Pi / 180.0f);
         }
+        
+        public static float DegreesToRadians(double degree)
+        {
+            return (float)(degree * (Pi / 180.0f));
+        }
 
         /// <summary>
         /// Converts radians to degrees.

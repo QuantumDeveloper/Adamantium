@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net5.0</TargetFramework>
+    <Platforms>AnyCPU;x64</Platforms>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies> <!-- This will copy all nuget references for this project to output and will let it correctly work when using from .targets files -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="16.6.0" />
+    <PackageReference Include="protobuf-net" Version="3.0.52" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Adamantium.Engine.Compiler\Adamantium.Engine.Compiler.csproj" />
+    <ProjectReference Include="..\Adamantium.Engine.Core\Adamantium.Engine.Core.csproj" />
+  </ItemGroup>
+
+</Project>

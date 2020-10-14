@@ -1,0 +1,91 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+   <ItemGroup>
+      <AvailableItemName Include="Effect"/>
+      <!--<AvailableItemName Include="Font"/>-->
+   </ItemGroup>
+    
+   <!-- In Project A -->  
+   <UsingTask Architecture="*" TaskName="EffectCompilerTask" AssemblyFile="$(SolutionDir)Adamantium.Engine.CompilerTask\bin\Debug\net5.0\Adamantium.Engine.CompilerTask.dll"/>
+   <!--<UsingTask Architecture="*" TaskName="Adamantium.Engine.CompilerTask.FontCompilerTask" AssemblyFile="$(SolutionDir)Adamantium.Engine.CompilerTask\bin\Debug\Adamantium.Engine.CompilerTask.dll"/>-->
+   <UsingTask Architecture="*" TaskName="CompilerDependencyTask" AssemblyFile="$(SolutionDir)Adamantium.Engine.CompilerTask\bin\Debug\net5.0\Adamantium.Engine.CompilerTask.dll"/>
+
+  
+    <!-- 1st PART : When Project A is built, It will generate effectively the files -->
+   <!-- Plugs all dependency listing in AssignTargetPathsDependsOn - in order to support generated output to be copied as part of the build  -->
+   <PropertyGroup >
+      <BuildDependsOn>
+         EngineCompileTarget;
+         $(BuildDependsOn);
+      </BuildDependsOn>
+
+      <IsBuildInDebug>true</IsBuildInDebug>
+
+      <!--By default turn-on debugging on fx files when compiling in debug (no optimize)-->
+      <EngineEffectDebugOption Condition="'$(EngineEffectDebugOption)' == ''">$(IsBuildInDebug)</EngineEffectDebugOption>
+
+      <EffectDynamicCompilingOption Condition="'$(EffectDynamicCompilingOption)' == ''">$(IsBuildInDebug)</EffectDynamicCompilingOption>
+
+      <GenerateCsFileFromEffect>false</GenerateCsFileFromEffect>
+      <GenerateBinaryFromEffect>true</GenerateBinaryFromEffect>
+      <GenerateCsFileFromFont>false</GenerateCsFileFromFont>
+      <GenerateBinaryFromFont>true</GenerateBinaryFromFont>
+      <CompileFontBitmaps>false</CompileFontBitmaps>
+      
+   </PropertyGroup>
+<!-- Target used to calculate dependency output -->
+   <Target Name="EngineContentAndCompileTarget" BeforeTargets="Build">
+      <CompilerDependencyTask
+         ProjectDirectory="$(ProjectDir)"
+         IntermediateDirectory="$(IntermediateOutputPath)"
+         OutputDirectory="$(IntermediateOutputPath)"
+         Debug="$(EngineEffectDebugOption)"
+         Files="@(Effect)"
+         RootNamespace="$(RootNamespace)"
+         >
+         <Output ItemName="EngineContent" TaskParameter="ContentFiles" />
+         <Output ItemName="EngineCompile" TaskParameter="CompiledFiles"/>
+      </CompilerDependencyTask>
+
+      <ItemGroup>
+         <!--List Of fx compiled file-->
+         <Content Include="@(EngineContent)" KeepMetadata="CopyToOutputDirectory"/>
+
+         <!--List of cs compiled file-->
+         <Compile Include="@(EngineCompile)"/>
+      </ItemGroup>
+
+   </Target>
+   <Target Name="EngineCompileTarget" BeforeTargets="Build">
+      <EffectCompilerTask
+          ProjectDirectory="$(ProjectDir)"
+          IntermediateDirectory="$(OutDir)"
+          OutputDirectory="$(OutDir)"
+          DynamicCompiling="$(EffectDynamicCompilingOption)"
+          Debug="$(IsBuildInDebug)"
+          Files="@(Effect)"
+          RootNamespace="$(RootNamespace)"
+          CompileInCS="$(GenerateCsFileFromEffect)"
+          GenerateBinary="$(GenerateBinaryFromEffect)"
+      >
+      </EffectCompilerTask>
+      
+      <!--<FontCompilerTask
+          ProjectDirectory="$(ProjectDir)"
+          IntermediateDirectory="$(IntermediateOutputPath)"
+          DynamicCompiling="$(EffectDynamicCompilingOption)"
+          Debug="$(IsBuildInDebug)"
+          Files="@(Font)"
+          RootNamespace="$(RootNamespace)"
+          CompileInCS ="$(GenerateCsFileFromEffect)"
+          GenerateBinary = "$(GenerateBinaryFromFont)"
+          CompileFontBitmaps="$(CompileFontBitmaps)"
+        >
+         <Output TaskParameter="ContentFiles" ItemName="EngineContent"/>
+         <Output TaskParameter="CompiledFiles" ItemName="EngineCompile"/>
+         </FontCompilerTask>-->
+         
+      <Message Text="Hello from EngineCompileTarget" Importance="High"></Message>
+   </Target>
+
+</Project>

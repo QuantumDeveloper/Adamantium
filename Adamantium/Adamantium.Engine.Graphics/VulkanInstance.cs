@@ -39,10 +39,9 @@ namespace Adamantium.Engine.Graphics
             deviceExt.Add(AdamantiumVulkan.Core.Constants.VK_KHR_SWAPCHAIN_EXTENSION_NAME);
             DeviceExtensions = new ReadOnlyCollection<string>(deviceExt);
             var validationLayers = new List<string>();
-            validationLayers.Add("VK_LAYER_LUNARG_core_validation");
-            validationLayers.Add("VK_LAYER_LUNARG_standard_validation");
-            //validationLayers.Add("VK_LAYER_LUNARG_parameter_validation");
-            validationLayers.Add("VK_LAYER_LUNARG_monitor");
+            
+            validationLayers.Add("VK_LAYER_KHRONOS_validation");
+            //validationLayers.Add("VK_LAYER_LUNARG_monitor");
             ValidationLayers = new ReadOnlyCollection<string>(validationLayers);
         }
 
@@ -83,25 +82,25 @@ namespace Adamantium.Engine.Graphics
             appInfo.ApplicationVersion = AdamantiumVulkan.Core.Constants.VK_MAKE_VERSION(1, 0, 0);
             appInfo.PEngineName = EngineName;
             appInfo.EngineVersion = AdamantiumVulkan.Core.Constants.VK_MAKE_VERSION(1, 0, 0);
-            appInfo.ApiVersion = AdamantiumVulkan.Core.Constants.VK_MAKE_VERSION(1, 0, 0);
+            appInfo.ApiVersion = AdamantiumVulkan.Core.Constants.VK_MAKE_VERSION(1, 2, 148);
 
             DebugUtilsMessengerCreateInfoEXT debugInfo = new DebugUtilsMessengerCreateInfoEXT();
             debugInfo.MessageSeverity = (uint)(DebugUtilsMessageSeverityFlagBitsEXT.VerboseBitExt | DebugUtilsMessageSeverityFlagBitsEXT.WarningBitExt | DebugUtilsMessageSeverityFlagBitsEXT.ErrorBitExt);
             debugInfo.MessageType = (uint)(DebugUtilsMessageTypeFlagBitsEXT.GeneralBitExt | DebugUtilsMessageTypeFlagBitsEXT.ValidationBitExt | DebugUtilsMessageTypeFlagBitsEXT.PerformanceBitExt);
-            debugInfo.PfnUserCallback = debugCallback;
+            debugInfo.PfnUserCallback = Marshal.GetFunctionPointerForDelegate(debugCallback);
 
             var createInfo = new InstanceCreateInfo();
             createInfo.PApplicationInfo = appInfo;
 
             var layersAvailable = Instance.EnumerateInstanceLayerProperties();
             var extensions = Instance.EnumerateInstanceExtensionProperties();
-            
-//            var ext = new string[] {"VK_MVK_macos_surface", "VK_KHR_surface", "VK_KHR_swapchain"};
-//            createInfo.EnabledExtensionCount = (uint)ext.Length;
-//            createInfo.PpEnabledExtensionNames = ext.ToArray();
 
-            createInfo.EnabledExtensionCount = (uint)extensions.Length;
-            createInfo.PpEnabledExtensionNames = extensions.Select(x => x.ExtensionName).ToArray();
+            //var ext = new string[] { "VK_MVK_macos_surface", "VK_KHR_surface", "VK_KHR_swapchain" };
+            //createInfo.EnabledExtensionCount = (uint)ext.Length;
+            //createInfo.PpEnabledExtensionNames = ext.ToArray();
+
+            createInfo.PpEnabledExtensionNames = extensions.Select(x => x.ExtensionName).ToArray();//.Except(new []{"VK_KHR_surface_protected_capabilities"}).ToArray();
+            createInfo.EnabledExtensionCount = (uint)createInfo.PpEnabledExtensionNames.Length;
 
             if (enableDebug)
             {
@@ -110,17 +109,6 @@ namespace Adamantium.Engine.Graphics
             }
 
             instance = Instance.Create(createInfo);
-            
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                //var config = instance.GetMoltenVKConfigurationMVK();
-
-                //config.presentWithCommandBuffer = false;
-                //config.synchronousQueueSubmits = false;
-                //config.debugMode = true;
-                //config.displayWatermark = true;
-                //instance.SetMoltenVKConfigurationMVK(config);
-            }
 
             createInfo.Dispose();
         }
@@ -155,7 +143,8 @@ namespace Adamantium.Engine.Graphics
 
                 return surface;
             }
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
                 var surfaceInfo = new MacOSSurfaceCreateInfoMVK();
                 surfaceInfo.PView = parameters.OutputHandle;

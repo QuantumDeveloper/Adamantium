@@ -12,7 +12,7 @@ namespace Adamantium.Engine.Graphics
     {
         public GraphicsDevice GraphicsDevice { get; private set; }
 
-        public PresentationParameters Description { get; private set; }
+        internal PresentationParameters Description { get; set; }
 
         public uint BuffersCount => Description.BuffersCount;
 
@@ -30,12 +30,17 @@ namespace Adamantium.Engine.Graphics
 
         public DepthStencilBuffer DepthBuffer => depthBuffer;
 
-        public ViewportF Viewport { get; protected set; }
+        public RenderPass RenderPass {
+            get => renderPass;
+            internal set => renderPass = value;
+        }
+
+        public Viewport Viewport { get; protected set; }
 
         protected RenderTarget renderTarget = null;
         protected DepthStencilBuffer depthBuffer;
+        protected RenderPass renderPass;
         private PresentInterval presentInterval = 0;
-        //private PresentFlags presentFlags = PresentFlags.None;
 
         public PresentInterval PresentInterval
         {
@@ -55,6 +60,7 @@ namespace Adamantium.Engine.Graphics
             GraphicsDevice = graphicsDevice;
             Description = description.Clone();
             CreateDepthBuffer();
+            CreateRenderPass();
             CreateViewPort();
         }
 
@@ -65,13 +71,21 @@ namespace Adamantium.Engine.Graphics
 
         private void CreateViewPort()
         {
-            Viewport = new ViewportF(0, 0, Description.Width, Description.Height, 0.0f, 1.0f);
+            Viewport = new Viewport
+            {
+                X = 0,
+                Y = 0,
+                Width = Description.Width,
+                Height = Description.Height,
+                MinDepth = 0.0f,
+                MaxDepth = 1.0f
+            };
         }
         
         /// <summary>
-        /// Resize graphics presenter backbuffer according to width and height
+        /// Resize graphics presenter backBuffer according to width and height
         /// </summary>
-        public bool Resize(uint width = 0, uint height = 0)
+        public bool Resize(UInt32 width = 0, UInt32 height = 0)
         {
             return Resize(width, height, BuffersCount, Description.ImageFormat, DepthFormat);
         }
@@ -84,8 +98,7 @@ namespace Adamantium.Engine.Graphics
         /// <param name="buffersCount"></param>
         /// <param name="pixelFormat"></param>
         /// <param name="depthFormat"></param>
-        /// <param name="flags"></param>
-        public virtual bool Resize(UInt32 width, UInt32 height, uint buffersCount, SurfaceFormat pixelFormat, DepthFormat depthFormat/*, SwapChainFlags flags = SwapChainFlags.None*/)
+        public virtual bool Resize(UInt32 width, UInt32 height, uint buffersCount, SurfaceFormat pixelFormat, DepthFormat depthFormat)
         {
             bool updateDepthStencil = false;
             if (Description.DepthFormat != depthFormat || (Description.Width != width || Description.Height != height))
@@ -104,7 +117,7 @@ namespace Adamantium.Engine.Graphics
             Description.Width = width;
             Description.Height = height;
             Description.ImageFormat = pixelFormat;
-            Console.WriteLine($"Base Extent = {width} : {height}");
+            Description.BuffersCount = buffersCount;
 
             if (updateDepthStencil)
             {
@@ -115,6 +128,82 @@ namespace Adamantium.Engine.Graphics
             CreateViewPort();
 
             return true;
+        }
+        
+        protected void CreateRenderPass()
+        {
+            var colorAttachment = new AttachmentDescription();
+            colorAttachment.Format = ImageFormat;
+            colorAttachment.Samples = (SampleCountFlagBits)MSAALevel;
+            colorAttachment.LoadOp = AttachmentLoadOp.Clear;
+            colorAttachment.StoreOp = AttachmentStoreOp.Store;
+            colorAttachment.StencilLoadOp = AttachmentLoadOp.DontCare;
+            colorAttachment.StencilStoreOp = AttachmentStoreOp.DontCare;
+            colorAttachment.InitialLayout = ImageLayout.Undefined;
+            colorAttachment.FinalLayout = ImageLayout.ColorAttachmentOptimal;
+
+            var depthAttachment = new AttachmentDescription();
+            depthAttachment.Format = (Format)DepthFormat;
+            depthAttachment.Samples = (SampleCountFlagBits)MSAALevel;
+            depthAttachment.LoadOp = AttachmentLoadOp.Clear;
+            depthAttachment.StoreOp = AttachmentStoreOp.Store;
+            depthAttachment.StencilLoadOp = AttachmentLoadOp.DontCare;
+            depthAttachment.StencilStoreOp = AttachmentStoreOp.DontCare;
+            depthAttachment.InitialLayout = ImageLayout.Undefined;
+            depthAttachment.FinalLayout = DepthBuffer.ImageLayout;
+
+            var colorAttachmentResolve = new AttachmentDescription();
+            colorAttachmentResolve.Format = ImageFormat;
+            colorAttachmentResolve.Samples = SampleCountFlagBits._1Bit;
+            colorAttachmentResolve.LoadOp = AttachmentLoadOp.Clear;
+            colorAttachmentResolve.StoreOp = AttachmentStoreOp.Store;
+            colorAttachmentResolve.StencilLoadOp = AttachmentLoadOp.DontCare;
+            colorAttachmentResolve.StencilStoreOp = AttachmentStoreOp.DontCare;
+            colorAttachmentResolve.InitialLayout = ImageLayout.Undefined;
+            colorAttachmentResolve.FinalLayout = ImageLayout.PresentSrcKhr;
+
+            var colorAttachmentRef = new AttachmentReference();
+            colorAttachmentRef.Attachment = 0;
+            colorAttachmentRef.Layout = ImageLayout.ColorAttachmentOptimal;
+
+            var depthAttachmentRef = new AttachmentReference();
+            depthAttachmentRef.Attachment = 1;
+            depthAttachmentRef.Layout = DepthBuffer.ImageLayout;
+
+            var colorAttachmentResolveRef = new AttachmentReference();
+            colorAttachmentResolveRef.Attachment = 2;
+            colorAttachmentResolveRef.Layout = ImageLayout.ColorAttachmentOptimal;
+
+            var subpass = new SubpassDescription();
+            subpass.PipelineBindPoint = PipelineBindPoint.Graphics;
+            subpass.ColorAttachmentCount = 1;
+            subpass.PColorAttachments = new[] { colorAttachmentRef };
+            subpass.PDepthStencilAttachment = depthAttachmentRef;
+            subpass.PResolveAttachments = new[] { colorAttachmentResolveRef };
+            
+            SubpassDependency subpassDependency = new SubpassDependency();
+            subpassDependency.SrcSubpass = Constants.VK_SUBPASS_EXTERNAL;
+            subpassDependency.DstSubpass = 0;
+            subpassDependency.SrcStageMask = (uint)PipelineStageFlagBits.ColorAttachmentOutputBit;
+            subpassDependency.SrcAccessMask = 0;
+            subpassDependency.DstStageMask = (uint) PipelineStageFlagBits.ColorAttachmentOutputBit;
+            subpassDependency.DstAccessMask = (uint)(AccessFlagBits.ColorAttachmentReadBit | AccessFlagBits.ColorAttachmentWriteBit);
+
+            var attachments = new [] { colorAttachment, depthAttachment, colorAttachmentResolve}; 
+            var renderPassInfo = new RenderPassCreateInfo();
+            renderPassInfo.AttachmentCount = (uint)attachments.Length;
+            renderPassInfo.PAttachments = attachments;
+            renderPassInfo.SubpassCount = 1;
+            renderPassInfo.PSubpasses = new[] {subpass};
+            renderPassInfo.DependencyCount = 1;
+            renderPassInfo.PDependencies = new[] {subpassDependency};
+
+            renderPass = GraphicsDevice.CreateRenderPass(renderPassInfo);
+        }
+
+        public virtual Framebuffer GetFramebuffer(uint index)
+        {
+            return null;
         }
 
         /// <summary>
@@ -131,10 +220,10 @@ namespace Adamantium.Engine.Graphics
         {
             Task.Factory.StartNew(() =>
             {
-//                using (var image = backbuffer.GetDataAsImage())
-//                {
-//                    image.Save(fileName, fileType);
-//                }
+                // using (var image = backbuffer.GetDataAsImage())
+                // {
+                //     image.Save(fileName, fileType);
+                // }
             }, TaskCreationOptions.LongRunning);
         }
 

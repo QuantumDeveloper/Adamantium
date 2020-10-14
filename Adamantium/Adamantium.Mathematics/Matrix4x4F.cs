@@ -316,7 +316,7 @@ namespace Adamantium.Mathematics
         /// </summary>
         public Vector4F Row1
         {
-            get { return new Vector4F(M11, M12, M13, M14); }
+            get => new Vector4F(M11, M12, M13, M14);
             set { M11 = value.X; M12 = value.Y; M13 = value.Z; M14 = value.W; }
         }
 
@@ -325,7 +325,7 @@ namespace Adamantium.Mathematics
         /// </summary>
         public Vector4F Row2
         {
-            get { return new Vector4F(M21, M22, M23, M24); }
+            get => new Vector4F(M21, M22, M23, M24);
             set { M21 = value.X; M22 = value.Y; M23 = value.Z; M24 = value.W; }
         }
 
@@ -407,10 +407,7 @@ namespace Adamantium.Mathematics
         /// <value>
         /// <c>true</c> if this instance is an identity matrix; otherwise, <c>false</c>.
         /// </value>
-        public bool IsIdentity
-        {
-            get { return this.Equals(Identity); }
-        }
+        public bool IsIdentity => this.Equals(Identity);
 
         /// <summary>
         /// Gets or sets the component at the specified index.
