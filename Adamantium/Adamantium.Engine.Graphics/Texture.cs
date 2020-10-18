@@ -104,13 +104,13 @@ namespace Adamantium.Engine.Graphics
         private MemoryPropertyFlags GetStagingMemoryFlags()
         {
             var stagingMemoryFlags = MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent; // Windows
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                stagingMemoryFlags = MemoryPropertyFlags.DeviceLocal | 
-                                     MemoryPropertyFlags.HostVisible | 
-                                     MemoryPropertyFlags.HostCoherent | 
-                                     MemoryPropertyFlags.HostCached; // MacOS
-            }
+            // if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            // {
+            //     stagingMemoryFlags = MemoryPropertyFlags.DeviceLocal | 
+            //                          MemoryPropertyFlags.HostVisible | 
+            //                          MemoryPropertyFlags.HostCoherent | 
+            //                          MemoryPropertyFlags.HostCached; // MacOS
+            // }
 
             return stagingMemoryFlags;
         }
@@ -383,14 +383,14 @@ namespace Adamantium.Engine.Graphics
         /// <returns>A <see cref="Texture"/></returns>
         public static Texture Load(GraphicsDevice device, String filePath, ImageUsageFlagBits flags = ImageUsageFlagBits.SampledBit, ImageLayout layout = ImageLayout.ShaderReadOnlyOptimal)
         {
-            var image = Adamantium.Imaging.Image.Load(filePath);
+            var image = Image.Load(filePath);
             try
             {
                 return GetTextureFromImage(image, device, flags, layout);
             }
             catch (Exception exception)
             {
-                MessageBox.Show(exception.Message + exception.StackTrace + exception.TargetSite);
+                Console.WriteLine(exception);
             }
             finally
             {

@@ -989,7 +989,7 @@ namespace Adamantium.Engine.Compiler.Effects
             }
             catch (Exception ex)
             {
-                
+                Console.WriteLine(ex);
             }
             finally
             {
@@ -1020,6 +1020,12 @@ namespace Adamantium.Engine.Compiler.Effects
             //opts.UseHlslOffsets = true;
             //opts.SetAutoBindUniforms = true;
             opts.TargetSpirv = ShadercSpirvVersion._5;
+            
+            //TODO: Remove this condition when MoltenVK will be the same version as version for Windows
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                opts.TargetSpirv = ShadercSpirvVersion._3;
+            }
             opts.SetTargetEnv(ShadercTargetEnv.Vulkan, 1 << 22 | 2 << 12);
             opts.SourceLanguage = (ShadercSourceLanguage)language;
             opts.SetForcedVersionProfile(profile, ShadercProfile.Core);

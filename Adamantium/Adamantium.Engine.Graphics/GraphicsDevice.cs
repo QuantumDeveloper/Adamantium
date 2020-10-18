@@ -80,8 +80,8 @@ namespace Adamantium.Engine.Graphics
             DepthStencilState = DepthStencilStates.Default;
 
             pipelineManager = new PipelineManager(this);
-            
-            //BasicEffect = Effect.CompileFromFile(Path.Combine("Effects", "UIEffect.fx"), this);
+
+            //BasicEffect = Effect.CompileFromFile(Path.Combine("Effects", "BasicEffect.fx"), this);
             BasicEffect = Effect.Load(Path.Combine("Effects", "BasicEffect.fx.compiled"), this);
         }
         

@@ -72,10 +72,10 @@ namespace Adamantium.Engine.Graphics
             DeviceMemory stagingBufferMemory;
 
             var stagingMemoryFlags = MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent; // Windows
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                stagingMemoryFlags = MemoryPropertyFlags.DeviceLocal | MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent | MemoryPropertyFlags.HostCached; // MacOS
-            }
+            // if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            // {
+            //     stagingMemoryFlags = MemoryPropertyFlags.DeviceLocal | MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent | MemoryPropertyFlags.HostCached; // MacOS
+            // }
 
             CreateBuffer(TotalSize, BufferUsageFlags.TransferSrc, stagingMemoryFlags, out stagingBuffer, out stagingBufferMemory);
 
