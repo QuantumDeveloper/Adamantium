@@ -1,14 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using Adamantium.Core;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
-using Adamantium.Imaging;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
-using Adamantium.UI.Media;
 using AdamantiumVulkan.Core;
 using Buffer = Adamantium.Engine.Graphics.Buffer;
 
@@ -37,14 +33,9 @@ namespace Adamantium.UI.Processors
 
         public WindowRenderModule(IWindow window, GraphicsDevice device, MSAALevel msaaLevel)
         {
-            if (window == null)
-            {
-                throw new ArgumentException(nameof(window));
-            }
-
             //_msaaLevel = msaaLevel;
             //_mainGraphicsDevice = mainDevice;
-            this.window = window;
+            this.window = window ?? throw new ArgumentException(nameof(window));
             window.ClientSizeChanged += Window_ClientSizeChanged;
             GraphicsDevice = device;
             isWindowResized = true;
@@ -62,7 +53,7 @@ namespace Adamantium.UI.Processors
             var indices = new UInt32[] { 0, 1, 2, 0, 2, 3 };
             vertexBuffer = Buffer.Vertex.New(device, vertices);
             indexBuffer = Buffer.Index.New(device, indices);
-            texture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "texture.jpg"));
+            texture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "texture.png"));
             sampler = CreateTextureSampler();
             view = Matrix4x4F.LookAtRH(new Vector3F(0, 0, -3), Vector3F.Zero, Vector3F.Up);
             CalculateProjectionMatrix();
@@ -74,12 +65,14 @@ namespace Adamantium.UI.Processors
 
         private void CalculateProjectionMatrix()
         {
-            proj = Matrix4x4F.PerspectiveFovRH(MathHelper.DegreesToRadians(45),
+            proj = Matrix4x4F.PerspectiveFov(MathHelper.DegreesToRadians(45),
                 (float) window.ClientWidth / window.ClientHeight, 0.1f, 1000f);
-            proj.M11 *= -1;
-            //proj = Matrix4x4F.OrthoRH(window.ClientWidth / 1000.0f, window.ClientHeight / 100.0f, 0.1f, 1000f);
-            proj = Matrix4x4F.OrthoOffCenterLH(0, window.ClientWidth, window.ClientHeight, 0, 0.1f,
-                1000f);
+            //proj = Matrix4x4F.OrthoRH(window.ClientWidth / 500.0f, window.ClientHeight / 500.0f, 0.1f, 1000f);
+            // proj = Matrix4x4F.OrthoOffCenter(0, window.ClientWidth, 0, window.ClientHeight, 0.01f,
+            //      100000f);
+            
+            // proj = Matrix4x4F.PerspectiveOffCenterLH(0, window.ClientWidth, 0, window.ClientHeight, 0.01f,
+            //     1000f);
         }
 
 
@@ -183,15 +176,15 @@ namespace Adamantium.UI.Processors
                 // new VertexPositionColorTexture(){Position = new Vector3F(0.5f, 0.5f), Color = new Color4F(0.0f, 1.0f, 0.0f, 1.0f), UV = new Vector2F(1.0f, 1.0f)},
                 // new VertexPositionColorTexture(){Position = new Vector3F(-0.5f, 0.5f), Color = new Color4F(1.0f, 0.0f, 1.0f, 1.0f), UV = new Vector2F(0.0f, 1.0f)},
                 
-                // new VertexPositionColorTexture(){Position = new Vector3F(-0.5f, -0.5f), Color = Colors.Red, UV = new Vector2F(0.0f, 0.0f)},
-                // new VertexPositionColorTexture(){Position = new Vector3F(0.5f, -0.5f), Color = Colors.Green, UV = new Vector2F(1.0f, 0.0f)},
-                // new VertexPositionColorTexture(){Position = new Vector3F(0.5f, 0.5f), Color = Colors.Blue, UV = new Vector2F(1.0f, 1.0f)},
-                // new VertexPositionColorTexture(){Position = new Vector3F(-0.5f, 0.5f), Color = Colors.Green, UV = new Vector2F(0.0f, 1.0f)},
+                new VertexPositionColorTexture(){Position = new Vector3F(-0.5f, -0.5f), Color = Colors.Red, UV = new Vector2F(0.0f, 0.0f)},
+                new VertexPositionColorTexture(){Position = new Vector3F(0.5f, -0.5f), Color = Colors.Green, UV = new Vector2F(1.0f, 0.0f)},
+                new VertexPositionColorTexture(){Position = new Vector3F(0.5f, 0.5f), Color = Colors.Blue, UV = new Vector2F(1.0f, 1.0f)},
+                new VertexPositionColorTexture(){Position = new Vector3F(-0.5f, 0.5f), Color = Colors.Green, UV = new Vector2F(0.0f, 1.0f)},
                 
-                new VertexPositionColorTexture(){Position = new Vector3F(0f, 0f, 5f), Color = Colors.Red, UV = new Vector2F(0.0f, 0.0f)}, 
-                new VertexPositionColorTexture(){Position = new Vector3F(100f, 0f, 5f), Color = Colors.Green, UV = new Vector2F(1.0f, 0.0f)},
-                new VertexPositionColorTexture(){Position = new Vector3F(100f, 100f, 5f), Color = Colors.Green, UV = new Vector2F(1.0f, 1.0f)},
-                new VertexPositionColorTexture(){Position = new Vector3F(0f, 100f, 5f), Color = Colors.Blue, UV = new Vector2F(0.0f, 1.0f)},
+                // new VertexPositionColorTexture(){Position = new Vector3F(0f, 0f), Color = Colors.Red, UV = new Vector2F(0.0f, 0.0f)}, 
+                // new VertexPositionColorTexture(){Position = new Vector3F(500f, 0f), Color = Colors.Green, UV = new Vector2F(1.0f, 0.0f)},
+                // new VertexPositionColorTexture(){Position = new Vector3F(500f, 500f), Color = Colors.Green, UV = new Vector2F(1.0f, 1.0f)},
+                // new VertexPositionColorTexture(){Position = new Vector3F(0f, 500f), Color = Colors.Blue, UV = new Vector2F(0.0f, 1.0f)},
             };
 
             // var angle = MathHelper.DegreesToRadians(45);
@@ -230,11 +223,12 @@ namespace Adamantium.UI.Processors
             //GraphicsDevice.SetIndexBuffer(indexBuffer);
 
             //GraphicsDevice.BasicEffect.Parameters["wvp"].SetValue(Matrix4x4F.RotationZ((float)gameTime.FrameTime * MathHelper.DegreesToRadians(10)));
-            var rot = QuaternionF.RotationAxis(Vector3F.ForwardLH, MathHelper.DegreesToRadians(gameTime.TotalTime.TotalSeconds * 20));
-            //var world = Matrix4x4F.RotationQuaternion(rot);
-            var world = Matrix4x4F.Translation(0, 0, 10f);
-            //var wvp = world * view * proj;
-            var wvp = world * proj;
+            var rot = QuaternionF.RotationAxis(Vector3F.Down, MathHelper.DegreesToRadians(gameTime.TotalTime.TotalSeconds * 50));
+            var world = Matrix4x4F.RotationQuaternion(rot);
+            //var world = /*Matrix4x4F.Translation(-250, 0, 10000.05f) */ Matrix4x4F.RotationQuaternion(rot) * Matrix4x4F.Translation(250, 0, 10000.05f); //* Matrix4x4F.Translation(250, 0, 1000.05f);
+            //var world = Matrix4x4F.Translation(-250, 0, 0f) * Matrix4x4F.RotationQuaternion(rot) * Matrix4x4F.Translation(250, 0, 10000.05f);
+            var wvp = world * view * proj;
+            //var wvp = world * proj;
             GraphicsDevice.BasicEffect.Parameters["wvp"].SetValue(wvp);
             //GraphicsDevice.BasicEffect.Parameters["fillColor"].SetValue(Colors.White.ToVector4());
             GraphicsDevice.BasicEffect.Parameters["sampleType"].SetResource(sampler);
