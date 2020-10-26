@@ -2166,6 +2166,21 @@ namespace Adamantium.Mathematics
             result.M42 = (top + bottom) / (bottom - top);
             result.M43 = -znear * zRange;
         }
+        
+        public static Matrix4x4F OrthoOffCenter(float left, float right,  float top, float bottom, float znear, float zfar)
+        {
+            float zRange = 1.0f / (zfar - znear);
+
+            var result = Matrix4x4F.Identity;
+            result.M11 = 2.0f / (right - left);
+            result.M22 = 2.0f / (bottom - top);
+            result.M33 = zRange;
+            result.M41 = (left + right) / (left - right);
+            result.M42 = (top + bottom) / (top - bottom);
+            result.M43 = -znear * zRange;
+
+            return result;
+        }
 
         /// <summary>
         /// Creates a left-handed, customized orthographic projection matrix.
@@ -2350,6 +2365,29 @@ namespace Adamantium.Mathematics
         {
             Matrix4x4F result;
             PerspectiveFovRH(fov, aspect, znear, zfar, out result);
+            return result;
+        }
+        
+        /// <summary>
+        /// Creates a right-handed, perspective projection matrix based on a field of view.
+        /// </summary>
+        /// <param name="fov">Field of view in the y direction, in radians.</param>
+        /// <param name="aspect">Aspect ratio, defined as view space width divided by height.</param>
+        /// <param name="znear">Minimum z-value of the viewing volume.</param>
+        /// <param name="zfar">Maximum z-value of the viewing volume.</param>
+        /// <returns>The created projection matrix.</returns>
+        public static Matrix4x4F PerspectiveFov(float fov, float aspect, float znear, float zfar)
+        {
+            Matrix4x4F result;
+            float yScale = (float)(1.0f / Math.Tan(fov * 0.5f));
+            float q = zfar / (znear - zfar);
+
+            result = new Matrix4x4F();
+            result.M11 = -yScale / aspect;
+            result.M22 = yScale;
+            result.M33 = q;
+            result.M34 = -1.0f;
+            result.M43 = q * znear;
             return result;
         }
 
