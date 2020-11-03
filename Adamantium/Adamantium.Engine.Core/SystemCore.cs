@@ -18,21 +18,21 @@ namespace Adamantium.Engine.Core
         private ExecutionType drawExecutionType;
         private readonly DisposeCollector contentCollector = new DisposeCollector();
         protected SystemManager SystemManager { get; }
-        protected readonly IService RunningService;
+        protected readonly IService AppService;
 
         /// <summary>
-        /// Constaructs <see cref="ISystem"/>
+        /// Constructs <see cref="ISystem"/>
         /// </summary>
-        /// <param name="storage"><see cref="IServiceStorage"/> instance. Could be null</param>
-        protected SystemCore(IDependencyContainer storage)
+        /// <param name="container"><see cref="IDependencyContainer"/> instance. Could be null</param>
+        protected SystemCore(IDependencyContainer container)
         {
-            Services = storage;
-            RunningService = Services.Resolve<IService>();
-            RunningService.Initialized += OnRunningServiceInitialized;
+            Services = container;
+            AppService = Services.Resolve<IService>();
+            AppService.Initialized += OnRunningServiceInitialized;
             isEnabled = true;
             isVisible = true;
             Uid = UidGenerator.Generate();
-            SystemManager = storage.Resolve<SystemManager>();
+            SystemManager = container.Resolve<SystemManager>();
         }
 
         protected virtual void OnRunningServiceInitialized(object sender, EventArgs eventArgs)

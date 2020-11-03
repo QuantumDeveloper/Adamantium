@@ -18,7 +18,7 @@ namespace Adamantium.UI
             Current = this;
         }
         
-        public static Application Current { get; internal set; }
+        public static Application Current { get; private set; }
         
         public Uri StartupUri { get; set; }
 
@@ -51,8 +51,11 @@ namespace Adamantium.UI
 
         public void Run(IWindow window)
         {
+            if (window == null) throw new ArgumentNullException($"{nameof(window)}");
+            
             MainWindow = window;
             MainWindow.Show();
+            Run();
         }
 
         public void Run(object context)
@@ -74,11 +77,11 @@ namespace Adamantium.UI
         {
             app.Resume();
         }
-        
-        public WindowCollection Windows { get; private set; }
-        
-        internal virtual MouseDevice MouseDevice { get; }
-        internal virtual KeyboardDevice KeyboardDevice { get; }
+
+        public WindowCollection Windows => app.Windows;
+
+        internal MouseDevice MouseDevice => app.MouseDevice;
+        internal KeyboardDevice KeyboardDevice => app.KeyboardDevice;
 
         protected virtual void OnInitialized()
         {
