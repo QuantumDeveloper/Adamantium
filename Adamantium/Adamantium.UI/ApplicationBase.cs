@@ -74,7 +74,8 @@ namespace Adamantium.UI
             appTime = new ApplicationTime();
             preciseTimer = new PreciseTimer();
             Services = new DependencyContainer();
-            Services.RegisterInstance<ApplicationSystemManager>(systemManager);
+            Services.RegisterInstance<IService>(this);
+            Services.RegisterInstance<SystemManager>(systemManager);
             entityWorld = new EntityWorld(Services);
             Initialize();
         }

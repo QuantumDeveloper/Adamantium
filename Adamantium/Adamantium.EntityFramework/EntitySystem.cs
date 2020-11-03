@@ -228,7 +228,7 @@ namespace Adamantium.EntityFramework
             {
                 activeProcessors.Add(processor.Uid, processor);
                 availables.Add(processor);
-                if (RunningService.IsRunning)
+                if (AppService.IsRunning)
                 {
                     processor.Initialize();
                     processor.LoadContent();

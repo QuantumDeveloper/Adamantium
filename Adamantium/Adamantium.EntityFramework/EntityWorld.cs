@@ -16,13 +16,15 @@ namespace Adamantium.EntityFramework
         private readonly Dictionary<Int64, Entity> availableEntities;
         private readonly Dictionary<String, EntityGroup> entitiesByGroup;
 
-        public EntityWorld(IDependencyContainer serviceStorage)
+        public EntityWorld(IDependencyContainer container)
         {
+            if (container == null) throw new ArgumentNullException($"{nameof(container)} should not be null");
+            
             rootEntities = new List<Entity>();
             availableEntities = new Dictionary<long, Entity>();
             entitiesByGroup = new Dictionary<String, EntityGroup>();
 
-            Services = serviceStorage;
+            Services = container;
             System = new EntitySystem(this);
             SystemManager = Services.Resolve<SystemManager>();
             SystemManager.AddSystem(System);
