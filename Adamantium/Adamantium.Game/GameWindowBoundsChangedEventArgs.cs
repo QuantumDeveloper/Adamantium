@@ -1,7 +1,7 @@
 ﻿using System;
 using Adamantium.Mathematics;
 
-namespace Adamantium.Engine
+namespace Adamantium.Game
 {
     public class GameWindowBoundsChangedEventArgs : EventArgs
     {

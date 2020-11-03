@@ -1,6 +1,6 @@
 ﻿using Adamantium.Engine.Graphics;
 
-namespace Adamantium.Engine
+namespace Adamantium.Game
 {
    /// <summary>
    /// Interface containing stubs to control <see cref="GraphicsDevice"/> lifecycle inside <see cref="GameBase"/> class

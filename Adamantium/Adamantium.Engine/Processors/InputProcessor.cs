@@ -2,10 +2,11 @@
 using System.Globalization;
 using Adamantium.Engine;
 using Adamantium.Engine.Core;
-using Adamantium.Engine.GameInput;
 using Adamantium.Engine.Graphics;
 using Adamantium.Engine.Services;
 using Adamantium.EntityFramework.Extensions;
+using Adamantium.Game;
+using Adamantium.Game.GameInput;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
 
@@ -314,11 +315,11 @@ namespace Adamantium.EntityFramework.Processors
                 foreach (var window in gamePlatform.Windows)
                 {
                     var filename = $"Screenshot_{window.Name}" + DateTime.Now.ToString("dd_MM_yyyy hh_mm_ss_ffff", CultureInfo.InvariantCulture) + ".jpg";
-                    window?.TakeScreenShot(filename, ImageFileType.Jpg);
+                    window?.TakeScreenshot(filename, ImageFileType.Jpg);
                     filename = $"Screenshot_{window.Name}" + DateTime.Now.ToString("dd_MM_yyyy hh_mm_ss_ffff", CultureInfo.InvariantCulture) + ".tga";
-                    window?.TakeScreenShot(filename, ImageFileType.Tga);
+                    window?.TakeScreenshot(filename, ImageFileType.Tga);
                     filename = $"Screenshot_{window.Name}" + DateTime.Now.ToString("dd_MM_yyyy hh_mm_ss_ffff", CultureInfo.InvariantCulture) + ".bmp";
-                    window?.TakeScreenShot(filename, ImageFileType.Bmp);
+                    window?.TakeScreenshot(filename, ImageFileType.Bmp);
 //                    filename = $"Screenshot_{window.Name}" + DateTime.Now.ToString("dd_MM_yyyy hh_mm_ss_ffff", CultureInfo.InvariantCulture) + ".tiff";
 //                    window?.TakeScreenShot(filename, ImageFileType.Tiff);
                 }

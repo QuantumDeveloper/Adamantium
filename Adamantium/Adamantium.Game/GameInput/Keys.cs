@@ -1,4 +1,4 @@
-﻿namespace Adamantium.Engine.GameInput
+﻿namespace Adamantium.Game.GameInput
 {
    /// <summary>
    /// Supported Keys enum for Adamantium engine

@@ -1,11 +1,11 @@
 ﻿using Adamantium.XInput;
 
-namespace Adamantium.Engine.GameInput
+namespace Adamantium.Game.GameInput
 {
     internal class XBoxGamepad : Gamepad
     {
         private XBoxController _controller;
-        private GamepadState _state;
+        private GamepadState state;
         
         public XBoxGamepad(XBoxController controller)
         {
@@ -14,18 +14,18 @@ namespace Adamantium.Engine.GameInput
 
         public override GamepadState GetState()
         {
-            _state = new GamepadState();
-            _state.IsConnected = _controller.IsConnected;
+            state = new GamepadState();
+            state.IsConnected = _controller.IsConnected;
             var currentState = _controller.GetState();
-            _state.Buttons = currentState.Gamepad.Buttons;
-            _state.LeftThumb.X = currentState.Gamepad.LeftThumbX;
-            _state.LeftThumb.Y = currentState.Gamepad.LeftThumbY;
-            _state.RightThumb.X = currentState.Gamepad.RightThumbX;
-            _state.RightThumb.Y = currentState.Gamepad.RightThumbY;
+            state.Buttons = currentState.Gamepad.Buttons;
+            state.LeftThumb.X = currentState.Gamepad.LeftThumbX;
+            state.LeftThumb.Y = currentState.Gamepad.LeftThumbY;
+            state.RightThumb.X = currentState.Gamepad.RightThumbX;
+            state.RightThumb.Y = currentState.Gamepad.RightThumbY;
 
-            _state.LeftTrigger = currentState.Gamepad.LeftTrigger;
-            _state.RightTrigger = currentState.Gamepad.RightTrigger;
-            return _state;
+            state.LeftTrigger = currentState.Gamepad.LeftTrigger;
+            state.RightTrigger = currentState.Gamepad.RightTrigger;
+            return state;
         }
 
     }

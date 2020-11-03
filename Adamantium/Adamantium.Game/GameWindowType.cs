@@ -1,4 +1,4 @@
-﻿namespace Adamantium.Engine
+﻿namespace Adamantium.Game
 {
     /// <summary>
     /// Describes possible <see cref="GameWindow"/> types

@@ -8,13 +8,11 @@ namespace Adamantium.UI.Playground
     {
         static void Main(string[] args)
         {
-            var app = Application.New();
+            var app = new App();
             var mainWindow = Window.New();
             mainWindow.Width = 1280;
             mainWindow.Height = 720;
-            app.MainWindow = mainWindow;
-            mainWindow.Show();
-            app.Run();
+            app.Run(mainWindow);
         }
     }
 }

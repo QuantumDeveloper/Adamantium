@@ -4,6 +4,7 @@ using Adamantium.Engine;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.EntityFramework.Components;
+using Adamantium.Game;
 using Adamantium.Mathematics;
 //using Texture2D = Adamantium.Engine.Graphics.Texture2D;
 

@@ -22,7 +22,7 @@ namespace Adamantium.Engine.Core
         private Dictionary<long, ISystem> systemUids;
         private List<ISystem> pendingSystems;
 
-        private IRunningService runningService;
+        private IService runningService;
 
         List<Task> updateTasks = new List<Task>();
         List<Task> drawTasks = new List<Task>();
@@ -33,7 +33,7 @@ namespace Adamantium.Engine.Core
         /// Initializes instance of <see cref="SystemManager"/>
         /// </summary>
         /// <param name="runningService"></param>
-        protected SystemManager(IRunningService runningService)
+        protected SystemManager(IService runningService)
         {
             this.runningService = runningService;
 

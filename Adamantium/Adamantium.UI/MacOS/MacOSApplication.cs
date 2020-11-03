@@ -1,15 +1,11 @@
 ﻿using System;
-using System.Diagnostics;
-using System.Runtime.InteropServices;
 using System.Threading;
 using Adamantium.MacOS;
-using Adamantium.Mathematics;
 using Adamantium.UI.Input;
-using AdamantiumVulkan;
 
-namespace Adamantium.UI.OSX
+namespace Adamantium.UI.MacOS
 {
-    public class OSXApplication : Application
+    public class MacOSApplication : ApplicationBase
     {
         internal override MouseDevice MouseDevice { get; }
         internal override KeyboardDevice KeyboardDevice { get; }
@@ -18,7 +14,7 @@ namespace Adamantium.UI.OSX
         private IntPtr app;
         private Thread renderThread;
 
-        public OSXApplication()
+        public MacOSApplication()
         {
             Windows.WindowAdded += OnWindowAdded;
             Windows.WindowRemoved -= OnWindowRemoved;

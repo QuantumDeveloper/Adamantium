@@ -1,7 +1,7 @@
-﻿using Adamantium.Engine.GameInput;
-using Adamantium.Engine.Services;
+﻿using Adamantium.Engine.Services;
 using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
+using Adamantium.Game.GameInput;
 
 namespace Adamantium.Engine.Tools
 {

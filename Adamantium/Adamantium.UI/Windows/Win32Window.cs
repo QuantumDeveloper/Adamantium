@@ -5,7 +5,7 @@ using Adamantium.Win32;
 
 namespace Adamantium.UI.Windows
 {
-    public class Win32Window : Window, IWindow
+    public class Win32Window : Window
     {
         internal static string DefaultClassName { get; private set; } = "Adamantium Window";
         public override IntPtr Handle { get; internal set; }
@@ -14,7 +14,7 @@ namespace Adamantium.UI.Windows
         public override int ClientHeight { get; set; }
 
         public override bool IsClosed { get; protected set; }
-        internal bool IsLocked = false;
+        internal bool IsLocked;
 
 
         private WindowWorker windowWorker;

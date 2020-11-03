@@ -1,4 +1,4 @@
-﻿namespace Adamantium.Engine.GameInput
+﻿namespace Adamantium.Game.GameInput
 {
     public enum GamepadType
     {

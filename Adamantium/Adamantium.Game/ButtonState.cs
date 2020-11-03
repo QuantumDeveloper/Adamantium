@@ -1,4 +1,4 @@
-﻿namespace Adamantium.Engine
+﻿namespace Adamantium.Game
 {
     public enum ButtonState
     {

@@ -1,15 +1,15 @@
 ﻿using System.Collections.Generic;
 using System.Diagnostics;
-using Adamantium.Engine.GameInput;
 using Adamantium.Engine.Graphics;
+using Adamantium.Game.GameInput;
+using Adamantium.Imaging;
 using Adamantium.UI;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Input;
 using Rectangle = Adamantium.Mathematics.Rectangle;
 using AUIKeys = Adamantium.UI.Input.Key;
-using Adamantium.Imaging;
 
-namespace Adamantium.Engine
+namespace Adamantium.Game
 {
     /// <summary>
     /// Represents <see cref="GameWindow"/> based on <see cref="Window"/> 

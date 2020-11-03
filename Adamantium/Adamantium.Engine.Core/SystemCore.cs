@@ -17,7 +17,7 @@ namespace Adamantium.Engine.Core
         private ExecutionType drawExecutionType;
         private readonly DisposeCollector contentCollector = new DisposeCollector();
         protected SystemManager SystemManager { get; }
-        protected readonly IRunningService RunningService;
+        protected readonly IService RunningService;
 
         /// <summary>
         /// Constaructs <see cref="ISystem"/>
@@ -26,7 +26,7 @@ namespace Adamantium.Engine.Core
         protected SystemCore(IServiceStorage storage)
         {
             Services = storage;
-            RunningService = Services.Get<IRunningService>();
+            RunningService = Services.Get<IService>();
             RunningService.Initialized += OnRunningServiceInitialized;
             isEnabled = true;
             isVisible = true;

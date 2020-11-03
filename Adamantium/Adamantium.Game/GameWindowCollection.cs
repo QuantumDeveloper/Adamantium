@@ -1,6 +1,6 @@
 ﻿using Adamantium.Core.Collections;
 
-namespace Adamantium.Engine
+namespace Adamantium.Game
 {
    /// <summary>
    /// Collection wrapper for holding <see cref="GameWindow"/> instances

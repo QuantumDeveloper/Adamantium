@@ -7,7 +7,7 @@ using Adamantium.Win32;
 
 namespace Adamantium.UI.Windows
 {
-    public class WindowsApplication : Application
+    public class WindowsApplication : ApplicationBase
     {
         Thread renderThread;
         public WindowsApplication()
@@ -41,7 +41,7 @@ namespace Adamantium.UI.Windows
                     Messages.TranslateMessage(ref msg);
                     Messages.DispatchMessage(ref msg);
                 }
-
+            
                 //CheckExitConditions();
             }
         }

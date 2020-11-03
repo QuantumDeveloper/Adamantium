@@ -1,9 +1,8 @@
 ﻿using System;
-using System.Threading;
 using Adamantium.Core;
 using Adamantium.Engine.Graphics;
 
-namespace Adamantium.Engine
+namespace Adamantium.Game
 {
     public sealed class GraphicsDeviceManager : IGraphicsDeviceManager, IGraphicsDeviceService, IDisposable
     {

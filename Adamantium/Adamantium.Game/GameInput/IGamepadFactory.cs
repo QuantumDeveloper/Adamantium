@@ -1,6 +1,4 @@
-﻿using Adamantium.XInput;
-
-namespace Adamantium.Engine.GameInput
+﻿namespace Adamantium.Game.GameInput
 {
     internal interface IGamepadFactory
     {

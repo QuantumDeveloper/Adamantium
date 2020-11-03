@@ -1,4 +1,4 @@
-﻿namespace Adamantium.Engine
+﻿namespace Adamantium.Game
 {
    /// <summary>
    /// Determines on which condition Game loop will be exited

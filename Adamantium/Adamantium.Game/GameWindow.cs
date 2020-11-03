@@ -1,16 +1,11 @@
 ﻿using System;
-using System.Diagnostics;
-using System.Windows.Input;
 using Adamantium.Core;
-using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
-using Adamantium.Win32;
 using AdamantiumVulkan.Core;
-using MouseEventArgs = Adamantium.UI.Input.MouseEventArgs;
 
-namespace Adamantium.Engine
+namespace Adamantium.Game
 {
     /// <summary>
     /// Abstract class representing encapsulated rendering surface (control) with <see cref="GraphicsPresenter"/>
@@ -156,7 +151,7 @@ namespace Adamantium.Engine
             throw new NotSupportedException(gameContext.ContextType + " game context is not currently supported");
         }
 
-        public virtual void TakeScreenShot(string path, ImageFileType fileType)
+        public virtual void TakeScreenshot(string path, ImageFileType fileType)
         {
             Presenter?.TakeScreenshot(path, fileType);
         }

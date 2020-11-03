@@ -1,7 +1,7 @@
 ﻿using Adamantium.Mathematics;
 using Adamantium.XInput;
 
-namespace Adamantium.Engine.GameInput
+namespace Adamantium.Game.GameInput
 {
     public struct GamepadState
     {

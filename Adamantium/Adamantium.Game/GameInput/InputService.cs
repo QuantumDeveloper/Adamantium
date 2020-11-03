@@ -1,12 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using Adamantium.Engine.Core;
 using Adamantium.Mathematics;
 using Adamantium.Win32;
 using Adamantium.XInput;
 
-namespace Adamantium.Engine.GameInput
+namespace Adamantium.Game.GameInput
 {
     public class InputService : GameSystem
     {

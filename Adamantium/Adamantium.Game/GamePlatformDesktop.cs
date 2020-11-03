@@ -1,7 +1,7 @@
 ﻿using System;
 using System.IO;
 
-namespace Adamantium.Engine
+namespace Adamantium.Game
 {
    internal class GamePlatformDesktop:GamePlatform
    {

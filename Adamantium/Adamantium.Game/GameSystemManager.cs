@@ -1,6 +1,6 @@
 ﻿using Adamantium.Engine.Core;
 
-namespace Adamantium.Engine
+namespace Adamantium.Game
 {
    public class GameSystemManager:SystemManager
    {

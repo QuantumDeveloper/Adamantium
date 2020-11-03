@@ -1,6 +1,6 @@
 ﻿using Adamantium.Engine.Graphics;
 
-namespace Adamantium.Engine
+namespace Adamantium.Game
 {
    /// <summary>
    /// Describes reason of <see cref="GraphicsPresenter"/> parameters change reason

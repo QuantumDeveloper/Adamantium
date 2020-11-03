@@ -2,10 +2,9 @@
 using Adamantium.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.Imaging;
-using Adamantium.Imaging.Dds;
 using AdamantiumVulkan.Core;
 
-namespace Adamantium.Engine
+namespace Adamantium.Game
 {
     public class GameWindowDescription : PropertyChangedBase
     {

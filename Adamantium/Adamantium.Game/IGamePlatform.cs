@@ -2,7 +2,7 @@
 using Adamantium.Engine.Graphics;
 using Adamantium.Imaging;
 
-namespace Adamantium.Engine
+namespace Adamantium.Game
 {
     public interface IGamePlatform
     {
