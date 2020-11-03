@@ -1,4 +1,5 @@
-﻿using Adamantium.Engine.Core;
+﻿using Adamantium.Core.DependencyInjection;
+using Adamantium.Engine.Core;
 
 namespace Adamantium.Game
 {
@@ -6,8 +7,8 @@ namespace Adamantium.Game
     {
         protected GameBase Game { get; private set; }
 
-        protected GameSystem(GameBase game, IServiceStorage storage)
-            : base(storage)
+        protected GameSystem(GameBase game, IDependencyContainer container)
+            : base(container)
         {
             Game = game;
         }

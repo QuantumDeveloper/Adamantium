@@ -1,5 +1,6 @@
 ﻿using System;
 using Adamantium.Core;
+using Adamantium.Core.DependencyInjection;
 using Adamantium.Engine.Core.Content;
 
 namespace Adamantium.Engine.Core
@@ -23,15 +24,15 @@ namespace Adamantium.Engine.Core
         /// Constaructs <see cref="ISystem"/>
         /// </summary>
         /// <param name="storage"><see cref="IServiceStorage"/> instance. Could be null</param>
-        protected SystemCore(IServiceStorage storage)
+        protected SystemCore(IDependencyContainer storage)
         {
             Services = storage;
-            RunningService = Services.Get<IService>();
+            RunningService = Services.Resolve<IService>();
             RunningService.Initialized += OnRunningServiceInitialized;
             isEnabled = true;
             isVisible = true;
             Uid = UidGenerator.Generate();
-            SystemManager = storage.Get<SystemManager>();
+            SystemManager = storage.Resolve<SystemManager>();
         }
 
         protected virtual void OnRunningServiceInitialized(object sender, EventArgs eventArgs)
@@ -42,7 +43,7 @@ namespace Adamantium.Engine.Core
         /// <summary>
         /// A service registry that provides methods to register and unregister services.
         /// </summary>
-        public IServiceStorage Services { get; }
+        public IDependencyContainer Services { get; }
 
         /// <summary>
         /// Gets the name of this component.

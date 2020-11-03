@@ -4,6 +4,6 @@ namespace Adamantium.CoreTests.Services
 {
     public interface IContactsService
     {
-        public List<string> Contancts { get; set; }
+        public List<string> Contacts { get; set; }
     }
 }

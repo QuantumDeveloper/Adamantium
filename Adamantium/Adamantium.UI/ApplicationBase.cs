@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using Adamantium.Core.DependencyInjection;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.Engine.Graphics.Effects;
@@ -40,7 +41,7 @@ namespace Adamantium.UI
         public ShutDownMode ShutDownMode { get; set; }
 
         protected GraphicsDevice GraphicsDevice;
-        internal ServiceStorage Services { get; set; }
+        internal IDependencyContainer Services { get; set; }
 
         private EntityWorld entityWorld;
         private Dictionary<IWindow, UIRenderProcessor> windowToSystem;
@@ -72,8 +73,8 @@ namespace Adamantium.UI
             Windows.WindowRemoved += WindowRemoved;
             appTime = new ApplicationTime();
             preciseTimer = new PreciseTimer();
-            Services = new ServiceStorage();
-            Services.Add(systemManager);
+            Services = new DependencyContainer();
+            Services.RegisterInstance<ApplicationSystemManager>(systemManager);
             entityWorld = new EntityWorld(Services);
             Initialize();
         }
@@ -283,7 +284,7 @@ namespace Adamantium.UI
             //GraphicsDevice.BlendState = GraphicsDevice.BlendStates.AlphaBlend;
             //GraphicsDevice.RasterizerState = GraphicsDevice.RasterizerStates.CullNoneClipEnabled;
             //GraphicsDevice.DepthStencilState = GraphicsDevice.DepthStencilStates.DepthEnableGreaterEqual;
-            Services.Add(GraphicsDevice);
+            Services.RegisterInstance<GraphicsDevice>(GraphicsDevice);
 
             IsRunning = true;
             Initialized?.Invoke(this, EventArgs.Empty);

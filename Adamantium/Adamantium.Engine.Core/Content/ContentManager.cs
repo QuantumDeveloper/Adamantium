@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
+using Adamantium.Core.DependencyInjection;
 
 namespace Adamantium.Engine.Core.Content
 {
@@ -12,7 +13,7 @@ namespace Adamantium.Engine.Core.Content
         private readonly Dictionary<AssetKey, object> assetLockers;
         protected readonly Dictionary<AssetKey, object> LoadedAssets;
 
-        public ContentManager(IServiceStorage serviceProvider)
+        public ContentManager(IDependencyContainer serviceProvider)
         {
             ServiceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
             RootDirectory = String.Empty;
@@ -26,7 +27,7 @@ namespace Adamantium.Engine.Core.Content
         /// Gets the service provider associated with the ContentManager.
         /// </summary>
         /// <value>The service provider.</value>
-        public IServiceStorage ServiceProvider { get; protected set; }
+        public IDependencyContainer ServiceProvider { get; protected set; }
 
         public String RootDirectory { get; set; }
 

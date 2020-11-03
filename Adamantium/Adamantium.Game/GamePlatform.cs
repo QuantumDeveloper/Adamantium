@@ -67,8 +67,8 @@ namespace Adamantium.Game
 
         private void Initialized(object sender, EventArgs e)
         {
-            GraphicsDeviceManager = gameBase.Services.Get<IGraphicsDeviceManager>();
-            GraphicsDeviceService = gameBase.Services.Get<IGraphicsDeviceService>();
+            GraphicsDeviceManager = gameBase.Services.Resolve<IGraphicsDeviceManager>();
+            GraphicsDeviceService = gameBase.Services.Resolve<IGraphicsDeviceService>();
             GraphicsDeviceService.DeviceChangeEnd += DeviceChangeEnd;
         }
 

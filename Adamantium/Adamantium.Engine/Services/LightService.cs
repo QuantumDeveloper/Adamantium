@@ -59,7 +59,7 @@ namespace Adamantium.Engine.Services
         public LightService(Game game)
         {
             _game = game;
-            _game.Services.Add(this);
+            _game.Services.RegisterInstance<LightService>(this);
             //depthWriter = game.Content.Load<Effect>("Effects/DeferredShading/DepthWriter");
             lights = new List<Light>();
             _lights = new ReadOnlyCollection<Light>(lights);

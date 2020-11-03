@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Adamantium.Core;
+using Adamantium.Core.DependencyInjection;
 using Adamantium.Engine.Core;
 using Adamantium.EntityFramework.Templates;
 
@@ -15,7 +16,7 @@ namespace Adamantium.EntityFramework
         private readonly Dictionary<Int64, Entity> availableEntities;
         private readonly Dictionary<String, EntityGroup> entitiesByGroup;
 
-        public EntityWorld(IServiceStorage serviceStorage)
+        public EntityWorld(IDependencyContainer serviceStorage)
         {
             rootEntities = new List<Entity>();
             availableEntities = new Dictionary<long, Entity>();
@@ -23,13 +24,13 @@ namespace Adamantium.EntityFramework
 
             Services = serviceStorage;
             System = new EntitySystem(this);
-            SystemManager = Services.Get<SystemManager>();
+            SystemManager = Services.Resolve<SystemManager>();
             SystemManager.AddSystem(System);
         }
 
         public Entity[] RootEntities => rootEntities.ToArray();
 
-        public IServiceStorage Services { get; }
+        public IDependencyContainer Services { get; }
 
         private readonly EntitySystem System;
         private readonly SystemManager SystemManager;

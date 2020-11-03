@@ -22,8 +22,8 @@ namespace Adamantium.EntityFramework.Processors
 
         public override void Initialize()
         {
-            tools = EntityWorld.Services.Get<ToolsService>();
-            lightService = EntityWorld.Services.Get<LightService>();
+            tools = EntityWorld.Services.Resolve<ToolsService>();
+            lightService = EntityWorld.Services.Resolve<LightService>();
         }
 
         private CameraService cameraController;
@@ -62,7 +62,7 @@ namespace Adamantium.EntityFramework.Processors
 
         public override void Update(IGameTime gameTime)
         {
-            cameraController = EntityWorld.Services.Get<CameraService>();
+            cameraController = EntityWorld.Services.Resolve<CameraService>();
             var entities = Entities;
             try
             {

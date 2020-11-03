@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
+using Adamantium.Core.DependencyInjection;
 
 namespace Adamantium.Engine.Core.Content
 {
@@ -13,7 +14,7 @@ namespace Adamantium.Engine.Core.Content
       /// The service provider can be used by some <see cref="IContentReader"/> when for example a <see cref="Adamantium.Engine.Graphics.GraphicsDevice"/> needs to be 
       /// used to instantiate a content.
       /// </remarks>
-      IServiceStorage ServiceProvider { get; }
+      IDependencyContainer ServiceProvider { get; }
       
       /// <summary>
       /// Checks if the specified assets exists.

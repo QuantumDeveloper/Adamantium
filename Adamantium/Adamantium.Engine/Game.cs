@@ -26,7 +26,7 @@ namespace Adamantium.Engine
         {
             GraphicsDeviceManager = new GraphicsDeviceManager(this);
             EntityWorld = new EntityWorld(Services);
-            Services.Add(EntityWorld);
+            Services.RegisterInstance<EntityWorld>(EntityWorld);
             Content.Readers.Add(typeof(Entity), new ModelContentReader());
             InputService = new InputService(this, Services);
             GamePlayManager = new GamePlayManager(Services);

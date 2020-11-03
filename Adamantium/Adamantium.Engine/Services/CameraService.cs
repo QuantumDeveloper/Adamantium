@@ -62,7 +62,7 @@ namespace Adamantium.Engine.Services
         ///</summary>
         public CameraService(Game game)
         {
-            game.Services.Add(this);
+            game.Services.RegisterInstance<CameraService>(this);
             windowToCameras = new System.Collections.Generic.Dictionary<GameWindow, List<Camera>>();
             cameraToWindow = new System.Collections.Generic.Dictionary<Camera, GameWindow>();
             activeCameras = new System.Collections.Generic.Dictionary<GameWindow, Camera>();

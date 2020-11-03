@@ -1,4 +1,4 @@
-﻿using Adamantium.Engine.Core;
+﻿using Adamantium.Core.DependencyInjection;
 using Adamantium.EntityFramework;
 
 namespace Adamantium.Engine
@@ -9,9 +9,9 @@ namespace Adamantium.Engine
 
       public Entity SelectedEntity { get; set; }
 
-      public GamePlayManager(IServiceStorage storage)
+      public GamePlayManager(IDependencyContainer container)
       {
-         storage.Add(this);
+         container.RegisterInstance<GamePlayManager>(this);
       }
 
       public void SetUserControlled(Entity entity)

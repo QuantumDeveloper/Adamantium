@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Adamantium.Core;
+using Adamantium.Core.DependencyInjection;
 using Adamantium.Engine.Compiler.Converter;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Content;
@@ -65,7 +66,7 @@ namespace Adamantium.Game
         /// </summary>
         protected GameBase()
         {
-            Services = new ServiceStorage();
+            Services = new DependencyContainer();
             GameTime = new GameTime();
             gameTimer = new PreciseTimer();
             contextsMapping = new Dictionary<Object, GameContext>();
@@ -87,11 +88,11 @@ namespace Adamantium.Game
             gamePlatform.WindowParametersChanging += OnWindowParametersChanging;
             gamePlatform.WindowParametersChanged += OnWindowParametersChanged;
 
-            Services.Add(ModelConverter);
-            Services.Add<IContentManager>(Content);
-            Services.Add<SystemManager>(SystemManager);
-            Services.Add<IGamePlatform>(gamePlatform);
-            Services.Add<IService>(this);
+            Services.RegisterInstance<ModelConverter>(ModelConverter);
+            Services.RegisterInstance<IContentManager>(Content);
+            Services.RegisterInstance<SystemManager>(SystemManager);
+            Services.RegisterInstance<IGamePlatform>(gamePlatform);
+            Services.RegisterInstance<IService>(this);
         }
 
         /// <summary>
@@ -163,7 +164,7 @@ namespace Adamantium.Game
         /// <summary>
         /// Game services which could be added to the game
         /// </summary>
-        public IServiceStorage Services { get; }
+        public IDependencyContainer Services { get; }
 
         /// <summary>
         /// Enables or disables fixed framerate
@@ -341,7 +342,7 @@ namespace Adamantium.Game
         private void RunInternal()
         {
             continueRendering = true;
-            InitializeBeforRun();
+            InitializeBeforeRun();
             OnInitialized();
             Task.Factory.StartNew(StartGameLoop, TaskCreationOptions.LongRunning);
         }
@@ -536,10 +537,10 @@ namespace Adamantium.Game
             }
         }
 
-        private void InitializeBeforRun()
+        private void InitializeBeforeRun()
         {
-            graphicsDeviceService = Services.Get<IGraphicsDeviceService>();
-            graphicsDeviceManager = Services.Get<IGraphicsDeviceManager>();
+            graphicsDeviceService = Services.Resolve<IGraphicsDeviceService>();
+            graphicsDeviceManager = Services.Resolve<IGraphicsDeviceManager>();
             graphicsDeviceManager.CreateDevice();
 
             InitializeCore();
