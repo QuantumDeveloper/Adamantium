@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Adamantium.Engine.GameInput
+namespace Adamantium.Game.GameInput
 {
    /// <summary>
    /// Describes possible button states

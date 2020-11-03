@@ -1,10 +1,10 @@
 ﻿using System;
-using Adamantium.Engine.GameInput;
 using Adamantium.Engine.Templates.Tools;
 using Adamantium.Engine.Tools;
 using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
 using Adamantium.EntityFramework.Extensions;
+using Adamantium.Game.GameInput;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Engine.Services

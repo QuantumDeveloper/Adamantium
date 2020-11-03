@@ -1,21 +1,20 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Threading.Tasks;
+using Adamantium.Core;
+using Adamantium.Engine.Compiler.Converter;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Content;
-using Adamantium.Engine.Compiler.Converter;
 using Adamantium.Engine.Graphics;
 using Adamantium.Imaging;
 using Adamantium.Win32;
-using Adamantium.Core;
 
-namespace Adamantium.Engine
+namespace Adamantium.Game
 {
     /// <summary>
     /// Represent base class for game execution
     /// </summary>
-    public abstract class GameBase : NamedObject, IRunningService
+    public abstract class GameBase : NamedObject, IService
     {
         private bool continueRendering;
         private DisposeCollector unloadContentCollector;
@@ -92,7 +91,7 @@ namespace Adamantium.Engine
             Services.Add<IContentManager>(Content);
             Services.Add<SystemManager>(SystemManager);
             Services.Add<IGamePlatform>(gamePlatform);
-            Services.Add<IRunningService>(this);
+            Services.Add<IService>(this);
         }
 
         /// <summary>

@@ -1,7 +1,7 @@
 ﻿using System;
-using Adamantium.Engine.GameInput;
+using Adamantium.Game.GameInput;
 
-namespace Adamantium.Engine
+namespace Adamantium.Game
 {
     public class MouseInputEventArgs : EventArgs
     {

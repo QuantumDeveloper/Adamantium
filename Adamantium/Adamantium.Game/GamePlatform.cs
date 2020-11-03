@@ -5,9 +5,10 @@ using Adamantium.Engine.Graphics;
 using Adamantium.Imaging;
 using Adamantium.UI;
 using Adamantium.UI.Controls;
+
 //using Control = System.Windows.Forms.Control;
 
-namespace Adamantium.Engine
+namespace Adamantium.Game
 {
     /// <summary>
     /// Abstract class for different game platforms

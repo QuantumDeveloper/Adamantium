@@ -1,13 +1,11 @@
 using System;
-using System.Collections.ObjectModel;
 using Adamantium.MacOS;
 using Adamantium.Mathematics;
-using Adamantium.UI.Controls;
-using Adamantium.UI.Media;
+using Adamantium.UI.Windows;
 
-namespace Adamantium.UI.Windows
+namespace Adamantium.UI.MacOS
 {
-    public class OSXWindow : Window
+    public class MacOSWindow : Window
     {
         public override IntPtr Handle { get; internal set; }
 
@@ -21,11 +19,11 @@ namespace Adamantium.UI.Windows
         public override event EventHandler<WindowClosingEventArgs> Closing;
         public override event EventHandler<EventArgs> Closed;
         
-        internal OSXWindowWorker WindowWorker { get; }
+        internal MacOSWindowWorker WindowWorker { get; }
 
-        public OSXWindow()
+        public MacOSWindow()
         {
-            WindowWorker = new OSXWindowWorker();
+            WindowWorker = new MacOSWindowWorker();
         }
 
         public override void Close()

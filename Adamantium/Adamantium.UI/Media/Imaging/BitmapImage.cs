@@ -13,20 +13,20 @@ namespace Adamantium.UI.Media.Imaging
          var o = adamantiumObject as BitmapImage;
          if (o != null)
          {
-            var device = Application.Current.Services.Get<GraphicsDevice>();
-            if (device != null)
-            {
-               var source = (Uri) e.NewValue;
-               o.DXTexture?.Dispose();
-               try
-               {
-                  //o.DXTexture = Texture.Load(device, source.IsAbsoluteUri ? source.AbsolutePath : source.OriginalString);
-               }
-               catch (Exception exception)
-               {
-                  o.DecodeFailed?.Invoke(o, new ExceptionEventArgs(exception));
-               }
-            }
+            // var device = Application.Current.Services.Get<GraphicsDevice>();
+            // if (device != null)
+            // {
+            //    var source = (Uri) e.NewValue;
+            //    o.DXTexture?.Dispose();
+            //    try
+            //    {
+            //       //o.DXTexture = Texture.Load(device, source.IsAbsoluteUri ? source.AbsolutePath : source.OriginalString);
+            //    }
+            //    catch (Exception exception)
+            //    {
+            //       o.DecodeFailed?.Invoke(o, new ExceptionEventArgs(exception));
+            //    }
+            // }
          }
       }
 
@@ -38,15 +38,15 @@ namespace Adamantium.UI.Media.Imaging
 
       public BitmapImage(Uri source)
       {
-         var device = Application.Current.Services.Get<GraphicsDevice>();
-         try
-         {
-            //DXTexture = Texture.Load(device, source.IsAbsoluteUri ? source.AbsolutePath : source.OriginalString);
-         }
-         catch (Exception exception)
-         {
-            DecodeFailed?.Invoke(this, new ExceptionEventArgs(exception));
-         }
+         // var device = Application.Current.Services.Get<GraphicsDevice>();
+         // try
+         // {
+         //    //DXTexture = Texture.Load(device, source.IsAbsoluteUri ? source.AbsolutePath : source.OriginalString);
+         // }
+         // catch (Exception exception)
+         // {
+         //    DecodeFailed?.Invoke(this, new ExceptionEventArgs(exception));
+         // }
       }
 
       public event EventHandler<ExceptionEventArgs> DecodeFailed;

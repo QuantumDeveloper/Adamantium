@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using Adamantium.Engine.GameInput;
 using Adamantium.Engine.Services;
 using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Processors;
+using Adamantium.Game;
+using Adamantium.Game.GameInput;
 
 namespace Adamantium.Engine
 {
@@ -25,7 +26,7 @@ namespace Adamantium.Engine
         {
             GraphicsDeviceManager = new GraphicsDeviceManager(this);
             EntityWorld = new EntityWorld(Services);
-            Services.Add<EntityWorld>(EntityWorld);
+            Services.Add(EntityWorld);
             Content.Readers.Add(typeof(Entity), new ModelContentReader());
             InputService = new InputService(this, Services);
             GamePlayManager = new GamePlayManager(Services);

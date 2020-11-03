@@ -2,13 +2,14 @@
 using Adamantium.Engine;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Content;
-using Adamantium.Engine.GameInput;
 using Adamantium.Engine.Graphics;
 using Adamantium.Engine.Services;
 using Adamantium.EntityFramework.Components;
+using Adamantium.Game;
+using Adamantium.Game.GameInput;
 using Adamantium.Mathematics;
 using Adamantium.Win32;
-using Keys = Adamantium.Engine.GameInput.Keys;
+using Keys = Adamantium.Game.GameInput.Keys;
 
 namespace Adamantium.EntityFramework.Processors
 {

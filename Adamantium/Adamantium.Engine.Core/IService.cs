@@ -3,9 +3,9 @@
 namespace Adamantium.Engine.Core
 {
     /// <summary>
-    /// Desribes service that could be initialized, started and stopped
+    /// Describes service that could be initialized, started and stopped
     /// </summary>
-    public interface IRunningService
+    public interface IService
     {
         /// <summary>
         /// Gets value indicating is service is currently running

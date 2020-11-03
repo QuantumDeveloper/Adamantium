@@ -4,13 +4,13 @@ using System.Linq;
 using System.Threading.Tasks;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Models;
-using Adamantium.Engine.GameInput;
 using Adamantium.Engine.Graphics;
 using Adamantium.Engine.Templates.Lights;
 using Adamantium.Engine.Tools;
 using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
 using Adamantium.EntityFramework.Extensions;
+using Adamantium.Game.GameInput;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Engine.Services

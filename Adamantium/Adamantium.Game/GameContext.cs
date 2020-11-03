@@ -1,7 +1,7 @@
 ﻿using System;
 using Adamantium.Core;
 
-namespace Adamantium.Engine
+namespace Adamantium.Game
 {
    /// <summary>
    /// Contains width, height, hwnd and Control itself, to which D3D will render its content

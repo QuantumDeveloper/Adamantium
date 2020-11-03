@@ -1,7 +1,7 @@
-﻿using Adamantium.UI;
-using System;
+﻿using System;
+using Adamantium.UI;
 
-namespace Adamantium.Engine
+namespace Adamantium.Game
 {
    public class GameWindowSizeChangedEventArgs:EventArgs
    {

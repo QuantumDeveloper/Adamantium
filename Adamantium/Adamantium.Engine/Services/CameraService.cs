@@ -8,6 +8,7 @@ using Adamantium.Engine.Templates.Camera;
 using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
 using Adamantium.EntityFramework.Extensions;
+using Adamantium.Game;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Engine.Services

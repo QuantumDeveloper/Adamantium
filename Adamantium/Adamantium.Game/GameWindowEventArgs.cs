@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Adamantium.Engine
+namespace Adamantium.Game
 {
    public class GameWindowEventArgs:EventArgs
    {

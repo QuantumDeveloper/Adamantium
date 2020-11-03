@@ -1,4 +1,4 @@
-﻿namespace Adamantium.Engine
+﻿namespace Adamantium.Game
 {
    /// <summary>
    /// Options used when using <see cref="RawInputDevice.RegisterDevice"/>

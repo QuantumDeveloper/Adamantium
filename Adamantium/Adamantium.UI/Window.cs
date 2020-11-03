@@ -2,6 +2,7 @@ using System;
 using System.Runtime.InteropServices;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
+using Adamantium.UI.MacOS;
 using Adamantium.UI.Windows;
 
 namespace Adamantium.UI
@@ -16,7 +17,7 @@ namespace Adamantium.UI
             }
             else if (RuntimeInformation.IsOSPlatform((OSPlatform.OSX)))
             {
-                return new OSXWindow();
+                return new MacOSWindow();
             }
             
             throw new NotSupportedException($"Window for {RuntimeInformation.OSArchitecture} is not yet supported");

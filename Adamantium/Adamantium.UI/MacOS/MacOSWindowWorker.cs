@@ -1,26 +1,25 @@
 using System;
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Adamantium.MacOS;
 using Adamantium.Mathematics;
 
-namespace Adamantium.UI.Windows
+namespace Adamantium.UI.MacOS
 {
-    public class OSXWindowWorker : DependencyComponent
+    public class MacOSWindowWorker : DependencyComponent
     {
-        private OSXWindow window;
+        private MacOSWindow window;
         private IntPtr windowDelegate;
         
         private MacOSInterop.OnWindowWillResize willResizeDelegate;
         private MacOSInterop.OnWindowDidResize didResizeDelegate;
 
-        public OSXWindowWorker()
+        public MacOSWindowWorker()
         {
             willResizeDelegate = OnWindowWillResize;
             didResizeDelegate = OnWindowDidResize;
         }
 
-        public void SetWindow(OSXWindow window)
+        public void SetWindow(MacOSWindow window)
         {
             this.window = window;
             var wndStyle = OSXWindowStyle.Borderless | OSXWindowStyle.Resizable |
@@ -80,7 +79,7 @@ namespace Adamantium.UI.Windows
 
         }
 
-        public static implicit operator IntPtr(OSXWindowWorker worker)
+        public static implicit operator IntPtr(MacOSWindowWorker worker)
         {
             return worker.windowDelegate;
         }

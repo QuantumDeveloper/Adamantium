@@ -4,7 +4,7 @@ namespace Adamantium.UI
 {
     public class ApplicationSystemManager : SystemManager
     {
-        public ApplicationSystemManager(IRunningService runningService)
+        public ApplicationSystemManager(IService runningService)
             : base(runningService)
         {
         }

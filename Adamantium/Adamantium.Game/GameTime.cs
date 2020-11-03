@@ -1,7 +1,7 @@
 ﻿using System;
 using Adamantium.Engine.Core;
 
-namespace Adamantium.Engine
+namespace Adamantium.Game
 {
    /// <summary>
    /// Contains game frame time, total time and FPS

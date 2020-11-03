@@ -1,4 +1,4 @@
-﻿namespace Adamantium.Engine
+﻿namespace Adamantium.Game
 {
    /// <summary>
    /// Defines cursor, which will be set as <see cref="GameWindow"/> cursor

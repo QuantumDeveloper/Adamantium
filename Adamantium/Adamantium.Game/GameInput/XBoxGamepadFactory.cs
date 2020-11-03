@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using Adamantium.XInput;
 
-namespace Adamantium.Engine.GameInput
+namespace Adamantium.Game.GameInput
 {
     internal class XBoxGamepadFactory : IGamepadFactory
     {

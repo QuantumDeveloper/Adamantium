@@ -1,11 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Adamantium.Engine.Core;
+﻿using Adamantium.Engine.Core;
 
-namespace Adamantium.Engine
+namespace Adamantium.Game
 {
     public abstract class GameSystem : SystemCore
     {

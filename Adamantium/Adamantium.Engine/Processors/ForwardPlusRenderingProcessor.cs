@@ -3,6 +3,7 @@ using Adamantium.Engine;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.EntityFramework.Components;
+using Adamantium.Game;
 using Adamantium.Imaging;
 using Adamantium.Imaging.Dds;
 using Adamantium.Mathematics;
