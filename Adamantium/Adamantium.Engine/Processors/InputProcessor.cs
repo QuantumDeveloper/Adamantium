@@ -27,12 +27,12 @@ namespace Adamantium.EntityFramework.Processors
 
         public InputProcessor(EntityWorld world) : base(world)
         {
-            gamePlayManager = Services.Get<GamePlayManager>();
-            toolsService = Services.Get<ToolsService>();
+            gamePlayManager = Services.Resolve<GamePlayManager>();
+            toolsService = Services.Resolve<ToolsService>();
             EntityWorld.EntityRemoved += EntityManagerEntityRemoved;
-            inputService = Services.Get<InputService>();
+            inputService = Services.Resolve<InputService>();
             //audioManager = new AudioManager();
-            gamePlatform = world.Services.Get<IGamePlatform>();
+            gamePlatform = world.Services.Resolve<IGamePlatform>();
         }
 
         public override void UnloadContent()
@@ -44,7 +44,7 @@ namespace Adamantium.EntityFramework.Processors
         {
             //userControlledEntity = gamePlayManager.SelectedEntity;
             userControlledEntity = toolsService.SelectedEntity;
-            var cameraController = Services.Get<CameraService>();
+            var cameraController = Services.Resolve<CameraService>();
 
             var currentCamera = cameraController?.UserControlledCamera;
             if (currentCamera == null)
@@ -340,7 +340,7 @@ namespace Adamantium.EntityFramework.Processors
 
         private void EntityManagerEntityRemoved(object sender, EntityEventArgs e)
         {
-            var cameraController = Services.Get<CameraService>();
+            var cameraController = Services.Resolve<CameraService>();
             if (e.Entity == cameraController.UserControlledCamera.Owner)
             {
                 cameraController.UserControlledCamera.Type = CameraType.Free;

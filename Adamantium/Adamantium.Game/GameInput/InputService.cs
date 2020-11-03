@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Adamantium.Core.DependencyInjection;
 using Adamantium.Engine.Core;
 using Adamantium.Mathematics;
 using Adamantium.Win32;
@@ -43,8 +44,8 @@ namespace Adamantium.Game.GameInput
         private int _virtualPositionMultiplierX = 0;
         private int _virtualPositionMultiplierY = 0;
 
-        public InputService(GameBase game, IServiceStorage storage)
-            : base(game, storage)
+        public InputService(GameBase game, IDependencyContainer container)
+            : base(game, container)
         {
             downKeys = new HashSet<Keys>();
             pressedKeys = new HashSet<Keys>();
@@ -68,12 +69,12 @@ namespace Adamantium.Game.GameInput
             MouseInputs = new List<MouseInput>();
 
             Enabled = true;
-            Services.Add<InputService>(this);
+            Services.RegisterInstance<InputService>(this);
             SystemManager.AddSystem(this);
 
             _mouseButtons = new ButtonState[5];
 
-            _gamePlatform = storage.Get<IGamePlatform>();
+            _gamePlatform = container.Resolve<IGamePlatform>();
             _gamePlatform.WindowRemoved += GamePlatformWindowRemoved;
             _gamePlatform.WindowDeactivated += GamePlatformWindowDeactivated;
             _gamePlatform.WindowActivated += GamePlatformWindowActivated;

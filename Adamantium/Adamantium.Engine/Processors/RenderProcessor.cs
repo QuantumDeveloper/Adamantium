@@ -39,18 +39,18 @@ namespace Adamantium.EntityFramework.Processors
 
         public RenderProcessor(EntityWorld world, GameWindow window) : base(world)
         {
-            GraphicsDeviceManager = world.Services.Get<IGraphicsDeviceManager>();
-            GraphicsDeviceService = world.Services.Get<IGraphicsDeviceService>();
+            GraphicsDeviceManager = world.Services.Resolve<IGraphicsDeviceManager>();
+            GraphicsDeviceService = world.Services.Resolve<IGraphicsDeviceService>();
             GraphicsDeviceService.DeviceChangeBegin += DeviceChangeBegin;
             GraphicsDeviceService.DeviceChangeEnd += DeviceChangeEnd;
-            Content = world.Services.Get<IContentManager>();
+            Content = world.Services.Resolve<IContentManager>();
             Window = window;
             Window.ParametersChanging += Window_ParametersChanging;
             Window.ParametersChanged += Window_ParametersChanged;
-            LightService = world.Services.Get<LightService>();
-            InputService = world.Services.Get<InputService>();
-            CameraService = EntityWorld.Services.Get<CameraService>();
-            ToolsService = EntityWorld.Services.Get<ToolsService>();
+            LightService = world.Services.Resolve<LightService>();
+            InputService = world.Services.Resolve<InputService>();
+            CameraService = EntityWorld.Services.Resolve<CameraService>();
+            ToolsService = EntityWorld.Services.Resolve<ToolsService>();
 //            BasicEffect = Effect.Load(@"Content\Effects\BasicEffect.fx.compiled", GraphicsDevice);
 //            DeferredDevice = GraphicsDevice;
 //            SpriteBatch = new SpriteBatch(DeferredDevice, 25000);

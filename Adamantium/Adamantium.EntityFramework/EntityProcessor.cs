@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Adamantium.Core;
+using Adamantium.Core.DependencyInjection;
 using Adamantium.Engine.Core;
 
 namespace Adamantium.EntityFramework
@@ -19,7 +20,7 @@ namespace Adamantium.EntityFramework
 
         protected EntityWorld EntityWorld { get; private set; }
         protected IGameTime GameTime { get; set; }
-        protected IServiceStorage Services { get; }
+        protected IDependencyContainer Services { get; }
 
         protected EntityProcessor(EntityWorld world)
         {

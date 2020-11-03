@@ -133,6 +133,10 @@ namespace Adamantium.Core.DependencyInjection
                         throw new ArgumentException($"you should mark corresponding constructor for {implementation.Name}");                        
                     }
                 }
+                else
+                {
+                    item.Ctor = constructors.FirstOrDefault();
+                }
             }
             DependencyItems.Add(item);
         }

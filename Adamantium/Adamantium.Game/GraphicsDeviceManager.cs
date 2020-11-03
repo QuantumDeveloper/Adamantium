@@ -22,8 +22,8 @@ namespace Adamantium.Game
         public GraphicsDeviceManager(GameBase gameBase)
         {
             this.gameBase = gameBase;
-            this.gameBase.Services.Add(typeof(IGraphicsDeviceManager), this);
-            this.gameBase.Services.Add(typeof(IGraphicsDeviceService), this);
+            this.gameBase.Services.RegisterInstance<IGraphicsDeviceManager>(this);
+            this.gameBase.Services.RegisterInstance<IGraphicsDeviceService>(this);
             graphicsDeviceParameters = new GraphicsDeviceParameters();
             //Adapter = GraphicsAdapter.Default;
             //D2DSupportEnabled = true;

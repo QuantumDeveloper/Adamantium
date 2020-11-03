@@ -50,7 +50,7 @@ namespace Adamantium.Engine.Services
         public ToolsService(Game game)
         {
             _game = game;
-            game.Services.Add(this);
+            game.Services.RegisterInstance<ToolsService>(this);
             lightService = game.LightService;
             CameraDragTool = new CameraDragTool(nameof(CameraDragTool));
             MoveTool = new MoveTool(false, 1.0f, new Vector3F(2));
@@ -62,7 +62,7 @@ namespace Adamantium.Engine.Services
 
             PlaneGridTool = new PlaneGridToolTemplate(20, 20, new Vector3F(1), 20).BuildEntity(null, "PlaneGrid");
 
-            InputService = game.Services.Get<InputService>();
+            InputService = game.Services.Resolve<InputService>();
             game.EntityWorld.AddToGroup(MoveTool.Tool, "Tools");
             game.EntityWorld.AddToGroup(PivotTool.Tool, "Tools");
             game.EntityWorld.AddToGroup(RotationTool.Tool, "Tools");

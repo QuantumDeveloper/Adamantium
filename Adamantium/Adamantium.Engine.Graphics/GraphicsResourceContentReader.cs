@@ -9,7 +9,7 @@ namespace Adamantium.Engine.Graphics
     {
         public async Task<object> ReadContentAsync(IContentManager contentManager, ContentReaderParameters parameters)
         {
-            var service = contentManager.ServiceProvider.Get<IGraphicsDeviceService>();
+            var service = contentManager.ServiceProvider.Resolve<IGraphicsDeviceService>();
             if (service == null)
                 throw new InvalidOperationException("Unable to retrieve a IGraphicsDeviceService service provider");
 
