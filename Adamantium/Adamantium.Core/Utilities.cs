@@ -366,9 +366,10 @@ namespace Adamantium.Core
             return true;
         }
 
-        public static bool IsTypeInheritFrom(Type type, string baseType)
+        public static bool IsTypeInheritFrom(Type type, Type baseType)
         {
-            throw new NotImplementedException();
+            //var baseType = Type.GetType(baseTypeString);
+            return baseType is not null && baseType.IsAssignableFrom(type);
         }
 
         /// <summary>

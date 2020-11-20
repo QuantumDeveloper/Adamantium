@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
@@ -58,6 +59,7 @@ namespace Adamantium.UI
         private List<IWindow> addedWindows;
         private List<IWindow> closedWindows;
         private bool firstWindowAdded;
+        private Thread renderThread;
 
         protected ApplicationBase()
         {
@@ -78,6 +80,15 @@ namespace Adamantium.UI
             Services.RegisterInstance<SystemManager>(systemManager);
             entityWorld = new EntityWorld(Services);
             Initialize();
+            renderThread = new Thread(RenderThread);
+        }
+        
+        private void RenderThread()
+        {
+            while(IsRunning)
+            {
+                RunUpdateDrawBlock();
+            }
         }
 
         public bool IsRunning { get; private set; }
@@ -85,15 +96,17 @@ namespace Adamantium.UI
 
         protected void OnWindowAdded(IWindow window)
         {
-            var @params = new PresentationParameters(PresenterType.Swapchain)
+            var @params = new PresentationParameters(
+                PresenterType.Swapchain,
+                (uint)window.ClientWidth,
+                (uint)window.ClientHeight,
+                window.SurfaceHandle,
+                MSAALevel.X4
+                )
             {
-                Width = (uint)window.ClientWidth,
-                Height = (uint)window.ClientHeight,
-                BuffersCount = 3,
-                MSAALevel = MSAALevel.X4,
                 HInstanceHandle = Process.GetCurrentProcess().Handle
             };
-            @params.OutputHandle = window.SurfaceHandle;
+            
             var device = GraphicsDevice.CreateRenderDevice(@params);
             device.AddDynamicStates(DynamicState.Viewport, DynamicState.Scissor);
 
@@ -132,9 +145,9 @@ namespace Adamantium.UI
             }
         }
 
-        internal abstract MouseDevice MouseDevice { get; }
+        internal virtual MouseDevice MouseDevice => MouseDevice.CurrentDevice;
 
-        internal abstract KeyboardDevice KeyboardDevice { get; }
+        internal virtual KeyboardDevice KeyboardDevice => KeyboardDevice.CurrentDevice;
 
         private void MainWindow_Closed(object sender, EventArgs e)
         {
@@ -158,7 +171,25 @@ namespace Adamantium.UI
             }
         }
 
-        public abstract void Run();
+        public virtual void Run()
+        {
+            IsRunning = true;
+            renderThread.Start();
+            Dispatcher.Run();
+        }
+        
+        public void Run(IWindow window)
+        {
+            if (IsRunning) return;
+
+            if (window == null) throw new ArgumentNullException($"{nameof(window)}");
+
+            MainWindow = window;
+            MainWindow.Show();
+            Windows.Add(window);
+            
+            Run();
+        }
 
         protected void RunUpdateDrawBlock()
         {
@@ -286,8 +317,6 @@ namespace Adamantium.UI
             //GraphicsDevice.RasterizerState = GraphicsDevice.RasterizerStates.CullNoneClipEnabled;
             //GraphicsDevice.DepthStencilState = GraphicsDevice.DepthStencilStates.DepthEnableGreaterEqual;
             Services.RegisterInstance<GraphicsDevice>(GraphicsDevice);
-
-            IsRunning = true;
             Initialized?.Invoke(this, EventArgs.Empty);
         }
 

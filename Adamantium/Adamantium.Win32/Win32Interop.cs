@@ -26,7 +26,7 @@ namespace Adamantium.Win32
             IntPtr lpParam
         );
 
-        public delegate IntPtr WndProc(IntPtr hWnd, WindowMessages msg, IntPtr wParam, IntPtr lParam);
+        public delegate IntPtr WndProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
         [DllImport("user32.dll")]
         public static extern IntPtr CallWindowProc(
@@ -40,7 +40,12 @@ namespace Adamantium.Win32
         public static extern IntPtr ShowWindow(IntPtr hwnd, WindowShowStyle count);
 
         [DllImport("user32.dll", SetLastError = true, EntryPoint = "DefWindowProcW")]
-        public static extern IntPtr DefWindowProcW(IntPtr hWnd, WindowMessages msg, IntPtr wParam, IntPtr lParam);
+        public static extern IntPtr DefWindowProcW(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+        public static IntPtr DefWindowProc(IntPtr hWnd, WindowMessages msg, IntPtr wParam, IntPtr lParam)
+        {
+            return DefWindowProcW(hWnd, (uint)msg, wParam, lParam);
+        }
 
         [DllImport("user32.dll", SetLastError = true)]
         public static extern bool DestroyWindow(IntPtr hWnd);

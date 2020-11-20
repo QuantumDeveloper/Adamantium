@@ -2,6 +2,6 @@
 {
    public interface ISetter
    {
-      void Apply(FrameworkElement control);
+      void Apply(FrameworkComponent control);
    }
 }

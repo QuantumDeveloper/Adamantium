@@ -14,7 +14,6 @@ namespace Adamantium.Engine.Graphics
             ImageFormat = Format.B8G8R8A8_UNORM;
             DepthFormat = DepthFormat.Depth32Stencil8X24;
             BuffersCount = 3;
-            CompositeAlpha = AlphaMode.Opaque;
             ImageColorSpace = ColorSpace.SRGBNonlinear;
         }
 
@@ -28,9 +27,18 @@ namespace Adamantium.Engine.Graphics
             ImageFormat = parameters.ImageFormat;
             DepthFormat = parameters.DepthFormat;
             MSAALevel = parameters.MSAALevel;
+            BuffersCount = parameters.BuffersCount;
         }
 
-        public PresentationParameters(PresenterType presenterType, UInt32 width, UInt32 height, IntPtr handle, MSAALevel msaaLevel = MSAALevel.None)
+        public PresentationParameters(
+            PresenterType presenterType, 
+            UInt32 width, 
+            UInt32 height, 
+            IntPtr handle, 
+            MSAALevel msaaLevel = MSAALevel.None,
+            Format imageFormat = Format.B8G8R8A8_UNORM,
+            DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24,
+            UInt32 buffersCount = 3)
         {
             PresenterType = presenterType;
 
@@ -39,8 +47,9 @@ namespace Adamantium.Engine.Graphics
             OutputHandle = handle;
 
             MSAALevel = msaaLevel;
-            ImageFormat = Format.R8G8B8A8_UNORM;
-            DepthFormat = DepthFormat.Depth32Stencil8X24;
+            ImageFormat = imageFormat;
+            DepthFormat = depthFormat;
+            BuffersCount = buffersCount;
         }
 
         public PresenterType PresenterType { get; }
@@ -52,16 +61,17 @@ namespace Adamantium.Engine.Graphics
         public DepthFormat DepthFormat { get; set; }
         public MSAALevel MSAALevel { get; set; }
         public UInt32 BuffersCount { get; set; }
+        
         public SwapchainCreateFlags Flags { get; set; }
+        
         public uint MinImageCount { get; set; }
         public ColorSpace ImageColorSpace { get; set; }
 
-        //Should be 1 for monoscopic and 2 for stereoscopic swapchain
+        // Should be 1 for monoscopic and 2 for stereoscopic swapchain
         public uint ImageArrayLayers { get; set; }
         public ImageUsage ImageUsage { get; set; }
         public SharingMode ImageSharingMode { get; set; }
         public SurfaceTransform PreTransform { get; set; }
-        public AlphaMode CompositeAlpha { get; set; }
         public PresentMode PresentMode { get; set; }
         public bool Clipped { get; set; }
 

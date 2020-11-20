@@ -2,7 +2,7 @@
 
 namespace Adamantium.UI.Controls
 {
-   public class Control:FrameworkElement
+   public class Control:FrameworkComponent
    {
       public static readonly AdamantiumProperty BackgroundProperty = AdamantiumProperty.Register(nameof(Background),
          typeof (Brush), typeof (Control),

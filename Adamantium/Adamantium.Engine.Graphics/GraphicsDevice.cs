@@ -273,7 +273,6 @@ namespace Adamantium.Engine.Graphics
             CreateCommandPool();
             CreateGraphicsPresenter(presentationParameters);
             CreateCommandBuffers();
-            //CreateGraphicsPipeline();
             CreateSyncObjects();
         }
 

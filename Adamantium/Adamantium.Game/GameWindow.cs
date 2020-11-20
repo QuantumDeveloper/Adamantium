@@ -16,11 +16,6 @@ namespace Adamantium.Game
 
         internal GraphicsPresenter Presenter { get; set; }
 
-        //public Texture2DDescription GetDescription()
-        //{
-        //    return Description.ToTexture2DDescription();
-        //}
-
         /// <summary>
         /// Contains <see cref="GameWindow"/> description
         /// </summary>
@@ -31,12 +26,11 @@ namespace Adamantium.Game
         public GameContext GameContext { get; internal set; }
 
         public static GameWindowCursor DefaultCursor = GameWindowCursor.Arrow;
-
-
+        
         /// <summary>
         /// Bounds of the <see cref="GameWindow"/> starting always from (0,0)
         /// </summary>
-        public abstract Rectangle ClientBounds { get; }
+        public Rectangle ClientBounds { get; protected set; }
 
         /// <summary>
         /// Cursor type that will be displayed when mouse cursor will enter <see cref="GameWindow"/> 
@@ -51,7 +45,7 @@ namespace Adamantium.Game
         /// <summary>
         /// Defines is <see cref="GameWindow"/> currently displayed
         /// </summary>
-        public abstract Boolean IsVisible { get; set; }
+        public abstract Boolean IsVisible { get; }
 
         internal abstract bool CanHandle(GameContext gameContext);
 
@@ -66,8 +60,7 @@ namespace Adamantium.Game
         {
             GenerateWindowName();
         }
-
-
+        
         /// <summary>
         /// Initialize 
         /// </summary>
@@ -77,9 +70,9 @@ namespace Adamantium.Game
         protected abstract void Initialize(GameContext context, SurfaceFormat pixelFormat,
            DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24, MSAALevel msaaLevel = MSAALevel.X4);
 
-        //public RenderTarget2D BackBuffer => Presenter.BackBuffer;
+        public RenderTarget RenderTarget => Presenter.RenderTarget;
 
-        //public DepthStencilBuffer DepthBuffer => Presenter.DepthBuffer;
+        public DepthStencilBuffer DepthBuffer => Presenter.DepthBuffer;
 
         public Viewport Viewport => Presenter.Viewport;
 
@@ -108,10 +101,7 @@ namespace Adamantium.Game
             Name = $"Window_{GamePlatform.WindowId++}";
         }
 
-        internal virtual GraphicsPresenter CreatePresenter(GraphicsDevice device)
-        {
-            return null;
-        }
+        internal abstract GraphicsPresenter CreatePresenter(GraphicsDevice device);
 
         internal Boolean ResizeRequested { get; set; }
 
@@ -129,14 +119,28 @@ namespace Adamantium.Game
             UpdateRequested = false;
         }
 
-        internal virtual void Show()
-        { }
+        public virtual void Show()
+        {
+        }
+
+        public virtual void Close()
+        {
+        }
+        
+        internal static GameWindow NewDefault(uint width = 1280, uint height = 720)
+        {
+            return new AdamantiumGameWindow(width, height);
+        }
 
         internal static GameWindow New(GameContext gameContext)
         {
             if (gameContext.ContextType == GameContextType.RenderTargetPanel)
             {
-                return new GameWindowAdamantium(gameContext);
+                return new RenderTargetGameWindow(gameContext);
+            }
+            else if (gameContext.ContextType == GameContextType.Window)
+            {
+                return new AdamantiumGameWindow();
             }
             throw new NotSupportedException(gameContext.ContextType + " game context is not currently supported");
         }
@@ -146,7 +150,7 @@ namespace Adamantium.Game
         {
             if (gameContext.ContextType == GameContextType.RenderTargetPanel)
             {
-                return new GameWindowAdamantium(gameContext, pixelFormat, depthFormat, msaaLevel);
+                return new RenderTargetGameWindow(gameContext, pixelFormat, depthFormat, msaaLevel);
             }
             throw new NotSupportedException(gameContext.ContextType + " game context is not currently supported");
         }
@@ -328,7 +332,7 @@ namespace Adamantium.Game
         public virtual UInt32 Width
         {
             get => Description.Width;
-            protected set
+            set
             {
                 if (Description.Width != value)
                 {
@@ -342,7 +346,7 @@ namespace Adamantium.Game
         public virtual UInt32 Height
         {
             get => Description.Height;
-            protected set
+            set
             {
                 if (Description.Height != value)
                 {
@@ -369,7 +373,7 @@ namespace Adamantium.Game
 
         public virtual SurfaceFormat PixelFormat
         {
-            get { return Description.PixelFormat; }
+            get => Description.PixelFormat;
             set
             {
                 if (Description.PixelFormat != value)
@@ -383,7 +387,7 @@ namespace Adamantium.Game
 
         public virtual DepthFormat DepthFormat
         {
-            get { return Description.DepthFormat; }
+            get => Description.DepthFormat;
             set
             {
                 if (Description.DepthFormat != value)
@@ -397,56 +401,21 @@ namespace Adamantium.Game
 
         public virtual MSAALevel MSAALevel
         {
-            get { return Description.MSAALevel; }
+            get => Description.MsaaLevel;
             set
             {
-                if (Description.MSAALevel != value)
+                if (Description.MsaaLevel != value)
                 {
-                    Description.MSAALevel = value;
+                    Description.MsaaLevel = value;
                     UpdateRequested = true;
                     RaisePropertyChanged();
                 }
             }
         }
 
-        public virtual Boolean IsWindowed
-        {
-            get { return Description.IsWindowed; }
-            set
-            {
-                if (Description.IsWindowed != value)
-                {
-                    Description.IsWindowed = value;
-                    if (Description.PresenterType == PresenterType.Swapchain)
-                    {
-                        UpdateRequested = true;
-                    }
-                    RaisePropertyChanged();
-                }
-            }
-        }
-
-
-        //public virtual Rational RefreshRate
-        //{
-        //    get { return Description.RefreshRate; }
-        //    set
-        //    {
-        //        if (Description.RefreshRate != value)
-        //        {
-        //            Description.RefreshRate = value;
-        //            if (Description.PresenterType == PresenterType.Swapchain)
-        //            {
-        //                UpdateRequested = true;
-        //            }
-        //            RaisePropertyChanged();
-        //        }
-        //    }
-        //}
-
         public virtual UInt32 BuffersCount
         {
-            get { return Description.BuffersCount; }
+            get => Description.BuffersCount;
             set
             {
                 if (Description.BuffersCount != value)
@@ -461,99 +430,10 @@ namespace Adamantium.Game
             }
         }
 
-        //public virtual SwapEffect SwapEffect
-        //{
-        //    get { return Description.SwapEffect; }
-        //    set
-        //    {
-        //        if (Description.SwapEffect != value)
-        //        {
-        //            Description.SwapEffect = value;
-        //            if (Description.PresenterType == PresenterType.Swapchain)
-        //            {
-        //                UpdateRequested = true;
-        //            }
-        //            RaisePropertyChanged();
-        //        }
-        //    }
-        //}
-
-        //public virtual Usage Usage
-        //{
-        //    get { return Description.Usage; }
-        //    set
-        //    {
-        //        if (Description.Usage != value)
-        //        {
-        //            Description.Usage = value;
-        //            if (Description.PresenterType == PresenterType.Swapchain)
-        //            {
-        //                UpdateRequested = true;
-        //            }
-        //            RaisePropertyChanged();
-        //        }
-        //    }
-        //}
-
-        //public virtual Scaling Scaling
-        //{
-        //    get { return Description.Scaling; }
-        //    set
-        //    {
-        //        if (Description.Scaling != value)
-        //        {
-        //            Description.Scaling = value;
-        //            if (Description.PresenterType == PresenterType.Swapchain)
-        //            {
-        //                UpdateRequested = true;
-        //            }
-        //            RaisePropertyChanged();
-        //        }
-        //    }
-        //}
-
-        //public virtual AlphaMode AlphaMode
-        //{
-        //    get => Description.AlphaMode;
-        //    set
-        //    {
-        //        if (SetProperty(Description.AlphaMode, value))
-        //        {
-        //            if (Description.PresenterType == PresenterType.Swapchain)
-        //            {
-        //                UpdateRequested = true;
-        //            }
-        //        }
-        //    }
-        //}
-
-        //public virtual SwapChainFlags Flags
-        //{
-        //    get { return Description.Flags; }
-        //    set
-        //    {
-        //        if (Description.Flags != value)
-        //        {
-        //            Description.Flags = value;
-        //            if (Description.PresenterType == PresenterType.Swapchain)
-        //            {
-        //                ResizeRequested = true;
-        //            }
-        //            RaisePropertyChanged();
-        //        }
-        //    }
-        //}
-
         public virtual PresentInterval PresentInterval
         {
-            get { return Description.PresentInterval; }
-            set { Description.PresentInterval = value; }
+            get => Description.PresentInterval;
+            set => Description.PresentInterval = value;
         }
-
-        //public virtual PresentFlags PresentFlags
-        //{
-        //    get { return Description.PresentFlags; }
-        //    set { Description.PresentFlags = value; }
-        //}
     }
 }

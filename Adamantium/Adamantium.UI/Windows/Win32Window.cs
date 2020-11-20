@@ -7,7 +7,6 @@ namespace Adamantium.UI.Windows
 {
     public class Win32Window : Window
     {
-        internal static string DefaultClassName { get; private set; } = "Adamantium Window";
         public override IntPtr Handle { get; internal set; }
 
         public override int ClientWidth { get; set; }

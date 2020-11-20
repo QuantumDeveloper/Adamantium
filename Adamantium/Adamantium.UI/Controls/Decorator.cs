@@ -1,6 +1,6 @@
 ﻿namespace Adamantium.UI.Controls
 {
-   public abstract class Decorator:FrameworkElement
+   public abstract class Decorator:FrameworkComponent
    {
       public static readonly AdamantiumProperty PaddingProperty = AdamantiumProperty.Register(nameof(Padding),
          typeof (Thickness), typeof (Decorator),
@@ -19,13 +19,13 @@
          {
             if (e.OldValue != null && e.OldValue != AdamantiumProperty.UnsetValue)
             {
-               o.LogicalChildren.Remove((FrameworkElement)e.OldValue);
+               o.LogicalChildren.Remove((FrameworkComponent)e.OldValue);
                o.VisualChildren.Remove((UIComponent)e.OldValue);
             }
 
             if (e.NewValue != null)
             {
-               o.LogicalChildren.Add((FrameworkElement)e.NewValue);
+               o.LogicalChildren.Add((FrameworkComponent)e.NewValue);
                o.VisualChildren.Add((UIComponent)e.NewValue);
             }
          }

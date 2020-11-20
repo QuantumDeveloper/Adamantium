@@ -354,7 +354,7 @@ namespace Adamantium.UI
          var e = new AdamantiumPropertyChangedEventArgs(property, values[property], value);
          values[property] = value;
          metadata.PropertyChangedCallback?.Invoke(this, e);
-         var element = this as FrameworkElement;
+         var element = this as FrameworkComponent;
          if (metadata.AffectsMeasure)
          {
             element?.InvalidateMeasure();

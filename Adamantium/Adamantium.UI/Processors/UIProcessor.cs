@@ -24,7 +24,7 @@ namespace Adamantium.UI.Processors
 
                 foreach (var visual in control.GetVisualDescends())
                 {
-                    stack.Push(visual as FrameworkElement);
+                    stack.Push(visual as FrameworkComponent);
                 }
             }
         }

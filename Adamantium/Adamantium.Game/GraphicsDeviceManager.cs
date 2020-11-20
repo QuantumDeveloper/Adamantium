@@ -4,19 +4,21 @@ using Adamantium.Engine.Graphics;
 
 namespace Adamantium.Game
 {
-    public sealed class GraphicsDeviceManager : IGraphicsDeviceManager, IGraphicsDeviceService, IDisposable
+    public sealed class GraphicsDeviceManager : PropertyChangedBase, IGraphicsDeviceManager, IGraphicsDeviceService, IDisposable
     {
         private GameBase gameBase;
         private GraphicsDevice graphicsDevice;
-
-        private GraphicsDeviceParameters graphicsDeviceParameters;
+        private VulkanInstance vulkanInstance;
+        
         private Boolean deviceUpdateNeeded;
         private Boolean applyChanges;
 
+        private bool enableDebugMode;
+
         public GraphicsDevice GraphicsDevice
         {
-            get { return graphicsDevice; }
-            internal set { graphicsDevice = value; }
+            get => graphicsDevice;
+            internal set => graphicsDevice = value;
         }
 
         public GraphicsDeviceManager(GameBase gameBase)
@@ -24,16 +26,12 @@ namespace Adamantium.Game
             this.gameBase = gameBase;
             this.gameBase.Services.RegisterInstance<IGraphicsDeviceManager>(this);
             this.gameBase.Services.RegisterInstance<IGraphicsDeviceService>(this);
-            graphicsDeviceParameters = new GraphicsDeviceParameters();
-            //Adapter = GraphicsAdapter.Default;
-            //D2DSupportEnabled = true;
-            //VideoSupportEnabled = false;
-            //DebugModeEnabled = true;
+            EnableDebugMode = true;
         }
 
         void IGraphicsDeviceManager.CreateDevice()
         {
-            CreateDevice(graphicsDeviceParameters);
+            CreateDevice(EnableDebugMode);
             deviceUpdateNeeded = false;
             DeviceCreated?.Invoke(this, EventArgs.Empty);
         }
@@ -102,7 +100,7 @@ namespace Adamantium.Game
             if (deviceUpdateNeeded || forceUpdate)
             {
                 OnDeviceChangeBegin();
-                CreateDevice(graphicsDeviceParameters);
+                CreateDevice(EnableDebugMode);
                 deviceUpdateNeeded = false;
                 OnDeviceChangeEnd();
             }
@@ -138,61 +136,39 @@ namespace Adamantium.Game
             handler?.Invoke(sender, args);
         }
 
-        //public bool D2DSupportEnabled
-        //{
-        //   get { return graphicsDeviceParameters.D2DSupportEnabled; }
-        //   set
-        //   {
-        //      if (value != graphicsDeviceParameters.D2DSupportEnabled)
-        //      {
-        //         graphicsDeviceParameters.D2DSupportEnabled = value;
-        //         deviceUpdateNeeded = true;
-        //      }
-        //   }
-        //}
+        public bool EnableDebugMode
+        {
+            get => enableDebugMode;
+            set
+            {
+                if (SetProperty(ref enableDebugMode, value))
+                {
+                    deviceUpdateNeeded = true;
+                }
+            }
+        }
 
-        //public bool VideoSupportEnabled
-        //{
-        //   get { return graphicsDeviceParameters.VideoSupportEnabled; }
-        //   set
-        //   {
-        //      if (value != graphicsDeviceParameters.VideoSupportEnabled)
-        //      {
-        //         graphicsDeviceParameters.VideoSupportEnabled = value;
-        //         deviceUpdateNeeded = true;
-        //      }
-        //   }
-        //}
+        internal void CreateDevice(bool debugEnabled)
+        {
+            Utilities.Dispose(ref graphicsDevice);
+            vulkanInstance = VulkanInstance.Create(gameBase.Name, debugEnabled);
+            GraphicsDevice = GraphicsDevice.Create(vulkanInstance, vulkanInstance.CurrentDevice);
 
-        //public bool DebugModeEnabled
-        //{
-        //    get { return graphicsDeviceParameters.DebugModeEnabled; }
-        //    set
-        //    {
-        //        if (value != graphicsDeviceParameters.DebugModeEnabled)
-        //        {
-        //            graphicsDeviceParameters.DebugModeEnabled = value;
-        //            deviceUpdateNeeded = true;
-        //        }
-        //    }
-        //}
+            GraphicsDevice.Disposing += GraphicsDeviceDisposing;
+            OnDeviceCreated();
+        }
 
-        //public GraphicsAdapter Adapter
-        //{
-        //   get
-        //   {
-        //      return graphicsDeviceParameters.Adapter;
-        //   }
-        //   set
-        //   {
-        //      if (graphicsDeviceParameters.Adapter?.Description.Luid != value?.Description.Luid)
-        //      {
-        //         graphicsDeviceParameters.Adapter = value;
-        //         deviceUpdateNeeded = true;
-        //      }
-        //   }
-        //}
+        private void GraphicsDeviceDisposing(object sender, EventArgs e)
+        {
+            GraphicsDevice = null;
+            OnDeviceDisposing();
+        }
 
+        public void Dispose()
+        {
+            Utilities.Dispose(ref graphicsDevice);
+        }
+        
         #region Events
 
         public event EventHandler<EventArgs> DeviceCreated;
@@ -206,25 +182,5 @@ namespace Adamantium.Game
         public event EventHandler<EventArgs> DeviceDisposing;
 
         #endregion
-
-        internal void CreateDevice(GraphicsDeviceParameters parameters)
-        {
-            //Utilities.Dispose(ref graphicsDevice);
-            //GraphicsDevice = Graphics.GraphicsDevice.Create(parameters);
-
-            //GraphicsDevice.Disposing += GraphicsDeviceDisposing;
-            //OnDeviceCreated();
-        }
-
-        private void GraphicsDeviceDisposing(object sender, EventArgs e)
-        {
-            GraphicsDevice = null;
-            OnDeviceDisposing();
-        }
-
-        public void Dispose()
-        {
-            Utilities.Dispose(ref graphicsDevice);
-        }
     }
 }

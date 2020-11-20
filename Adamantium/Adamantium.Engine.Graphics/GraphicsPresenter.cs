@@ -30,17 +30,20 @@ namespace Adamantium.Engine.Graphics
 
         public DepthStencilBuffer DepthBuffer => depthBuffer;
 
-        public RenderPass RenderPass {
+        public RenderPass RenderPass 
+        {
             get => renderPass;
             internal set => renderPass = value;
         }
 
         public Viewport Viewport { get; protected set; }
 
-        protected RenderTarget renderTarget = null;
+        protected RenderTarget renderTarget;
         protected DepthStencilBuffer depthBuffer;
         protected RenderPass renderPass;
-        private PresentInterval presentInterval = 0;
+        
+        
+        private PresentInterval presentInterval;
 
         public PresentInterval PresentInterval
         {
@@ -198,7 +201,7 @@ namespace Adamantium.Engine.Graphics
             renderPassInfo.DependencyCount = 1;
             renderPassInfo.PDependencies = new[] {subpassDependency};
 
-            renderPass = GraphicsDevice.CreateRenderPass(renderPassInfo);
+            RenderPass = GraphicsDevice.CreateRenderPass(renderPassInfo);
         }
 
         public virtual Framebuffer GetFramebuffer(uint index)
@@ -220,10 +223,7 @@ namespace Adamantium.Engine.Graphics
         {
             Task.Factory.StartNew(() =>
             {
-                // using (var image = backbuffer.GetDataAsImage())
-                // {
-                //     image.Save(fileName, fileType);
-                // }
+                RenderTarget.Save(fileName, fileType);
             }, TaskCreationOptions.LongRunning);
         }
 

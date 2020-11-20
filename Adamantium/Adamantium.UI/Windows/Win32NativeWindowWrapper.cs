@@ -6,11 +6,11 @@ using System.Text;
 
 namespace Adamantium.UI.Windows
 {
-    public class WindowNativeSource
+    public class Win32NativeWindowWrapper : DispatcherComponent, IDisposable
     {
         private const int ERROR_CLASS_ALREADY_EXISTS = 1410;
 
-        public WindowNativeSource(
+        public Win32NativeWindowWrapper(
             WindowClassStyle classStyle, 
             WindowStyleEx wndStyleEx,
             WindowStyle wndStyle,
@@ -19,7 +19,7 @@ namespace Adamantium.UI.Windows
             Int32 width,
             Int32 height,
             IntPtr parent) : this(
-                Win32Window.DefaultClassName,
+                Guid.NewGuid().ToString(),
                 classStyle,
                 wndStyleEx,
                 wndStyle,
@@ -31,7 +31,7 @@ namespace Adamantium.UI.Windows
         {
         }
 
-        public WindowNativeSource(
+        public Win32NativeWindowWrapper(
             string className,
             WindowClassStyle classStyle,
             WindowStyleEx wndStyleEx,
@@ -56,7 +56,7 @@ namespace Adamantium.UI.Windows
                 parent);
         }
 
-        private WindowNativeSource(IntPtr handle)
+        private Win32NativeWindowWrapper(IntPtr handle)
         {
             hooks = new List<WndProcHook>();
             wndProcDelegate = WndProc;
@@ -72,7 +72,7 @@ namespace Adamantium.UI.Windows
         {
             if (!hooks.Contains(hook))
             {
-                hooks.Add(hook);
+                hooks.Insert(0, hook);
             }
         }
 
@@ -81,18 +81,21 @@ namespace Adamantium.UI.Windows
             hooks.Remove(hook);
         }
 
-        private IntPtr WndProc(IntPtr hWnd, WindowMessages msg, IntPtr wParam, IntPtr lParam)
+        private IntPtr WndProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam)
         {
+            IntPtr result = IntPtr.Zero;
             bool handled = false;
             for (int i = 0; i< hooks.Count; ++i)
             {
                 var wndProc = hooks[i];
-                wndProc(hWnd, msg, wParam, lParam, ref handled);
+                result = wndProc(hWnd, msg, wParam, lParam, ref handled);
+                
+                if (handled) break;
             }
 
             if (handled)
             {
-                return IntPtr.Zero;
+                return result;
             }
 
             return Win32Interop.DefWindowProcW(hWnd, msg, wParam, lParam);
@@ -155,9 +158,33 @@ namespace Adamantium.UI.Windows
             Handle = IntPtr.Zero;
         }
 
-        public static WindowNativeSource FromHwnd(IntPtr handle)
+        public static Win32NativeWindowWrapper FromHwnd(IntPtr handle)
         {
-            return new WindowNativeSource(handle);
+            return new Win32NativeWindowWrapper(handle);
+        }
+
+        private void ReleaseUnmanagedResources()
+        {
+            Destroy();
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            ReleaseUnmanagedResources();
+            if (disposing)
+            {
+            }
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        ~Win32NativeWindowWrapper()
+        {
+            Dispose(false);
         }
     }
 }

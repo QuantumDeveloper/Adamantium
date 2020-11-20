@@ -38,7 +38,7 @@ namespace Adamantium.UI.Input
 
       static Keyboard()
       {
-         PrimaryDevice = Application.Current.KeyboardDevice;
+         PrimaryDevice = KeyboardDevice.CurrentDevice;
          timer = new Stopwatch();
          timer.Start();
       }

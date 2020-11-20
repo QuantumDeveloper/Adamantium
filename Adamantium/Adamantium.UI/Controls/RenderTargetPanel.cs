@@ -105,9 +105,9 @@ namespace Adamantium.UI.Controls
          }
       }
 
-      private bool isInitialized = false;
-      
-      public event EventHandler<RenderTargetEventArgs> OnRenderEvent;
+      private bool isInitialized;
+
+        public event EventHandler<RenderTargetEventArgs> OnRenderEvent;
 
       public event EventHandler<RenderTargetEventArgs> RenderTargetChanged;
 

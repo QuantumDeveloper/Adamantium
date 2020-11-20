@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Adamantium.UI.Controls
 {
-    public interface IWindow : IRootVisual, IComponent
+    public interface IWindow : IRootVisual, IFrameworkComponent
     {
         void Show();
         void Close();

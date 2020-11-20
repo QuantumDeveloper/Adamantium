@@ -4,7 +4,7 @@ using Adamantium.UI.Media;
 
 namespace Adamantium.UI.Controls
 {
-   public abstract class Shape : FrameworkElement
+   public abstract class Shape : FrameworkComponent
    {
       protected Shape()
       {
