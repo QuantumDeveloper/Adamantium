@@ -311,7 +311,13 @@ namespace Adamantium.Game
         /// </summary>
         public void Run()
         {
-
+            if (!IsRunning)
+            {
+                var wnd = GameWindow.NewDefault();
+                wnd.Show();
+                gamePlatform.AddWindow(wnd);
+                RunInternal();
+            }
         }
 
         /// <summary>
@@ -335,6 +341,7 @@ namespace Adamantium.Game
         {
             if (!IsRunning)
             {
+                gamePlatform.AddWindow(window);
                 RunInternal();
             }
         }
@@ -344,7 +351,8 @@ namespace Adamantium.Game
             continueRendering = true;
             InitializeBeforeRun();
             OnInitialized();
-            Task.Factory.StartNew(StartGameLoop, TaskCreationOptions.LongRunning);
+            //Task.Factory.StartNew(StartGameLoop, TaskCreationOptions.LongRunning);
+            StartGameLoop();
         }
 
         internal void OnInitialized()
@@ -380,7 +388,7 @@ namespace Adamantium.Game
         /// <summary>
         /// Create new game window from context and add it to the list of game windows
         /// </summary>
-        /// <param name="context">Window, in which DX xontent will be rendered</param>
+        /// <param name="context">Window, in which Vulkan content will be rendered</param>
         /// <param name="surfaceFormat">Surface format</param>
         /// <param name="depthFormat">Depth buffer format</param>
         /// <param name="msaaLevel">MSAA level</param>
@@ -569,13 +577,13 @@ namespace Adamantium.Game
 
         private void GraphicsDeviceDisposing(object sender, EventArgs e)
         {
-            //unsubscribe from Disposing event to reduce possibility of cyclic dependency and
-            //as a result StackOverFlow execption
+            // unsubscribe from Disposing event to reduce possibility of cyclic dependency and
+            // as a result StackOverFlow exception
             graphicsDeviceService.DeviceDisposing -= GraphicsDeviceDisposing;
             unloadContentCollector.DisposeAndClear();
             ContentUnloading?.Invoke(this, e);
             UnloadContent();
-            //After finish ContentUnloading event, subscribe back to DeviceDisposing event
+            // After finish ContentUnloading event, subscribe back to DeviceDisposing event
             graphicsDeviceService.DeviceDisposing += GraphicsDeviceDisposing;
         }
 

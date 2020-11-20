@@ -6,7 +6,7 @@ using Adamantium.UI.Media;
 
 namespace Adamantium.UI
 {
-    public class UIComponent : VisualComponent, IInputElement
+    public class UIComponent : VisualComponent, IInputElement, IUIComponent
     {
         #region Adamantium properties
 
@@ -52,7 +52,7 @@ namespace Adamantium.UI
            typeof(String), typeof(UIComponent), new PropertyMetadata(String.Empty));
 
         public static readonly AdamantiumProperty UseLayoutRoundingProperty = AdamantiumProperty.Register(nameof(UseLayoutRounding),
-           typeof(Boolean), typeof(FrameworkElement), new PropertyMetadata(false, PropertyMetadataOptions.AffectsArrange));
+           typeof(Boolean), typeof(FrameworkComponent), new PropertyMetadata(false, PropertyMetadataOptions.AffectsArrange));
 
         public static readonly AdamantiumProperty CursorProperty = AdamantiumProperty.Register(nameof(Cursor), typeof(Cursor), typeof(UIComponent), new PropertyMetadata(Cursor.Default));
 
@@ -166,291 +166,291 @@ namespace Adamantium.UI
 
         public event MouseButtonEventHandler RawMouseDown
         {
-            add { AddHandler(Mouse.RawMouseDownEvent, value); }
-            remove { RemoveHandler(Mouse.RawMouseDownEvent, value); }
+            add => AddHandler(Mouse.RawMouseDownEvent, value);
+            remove => RemoveHandler(Mouse.RawMouseDownEvent, value);
         }
 
         public event MouseButtonEventHandler RawMouseUp
         {
-            add { AddHandler(Mouse.RawMouseUpEvent, value); }
-            remove { RemoveHandler(Mouse.RawMouseUpEvent, value); }
+            add => AddHandler(Mouse.RawMouseUpEvent, value);
+            remove => RemoveHandler(Mouse.RawMouseUpEvent, value);
         }
 
         public event MouseButtonEventHandler RawMouseLeftButtonDown
         {
-            add { AddHandler(RawMouseLeftButtonDownEvent, value); }
-            remove { RemoveHandler(RawMouseLeftButtonDownEvent, value); }
+            add => AddHandler(RawMouseLeftButtonDownEvent, value);
+            remove => RemoveHandler(RawMouseLeftButtonDownEvent, value);
         }
 
         public event MouseButtonEventHandler RawMouseLeftButtonUp
         {
-            add { AddHandler(RawMouseLeftButtonUpEvent, value); }
-            remove { RemoveHandler(RawMouseLeftButtonUpEvent, value); }
+            add => AddHandler(RawMouseLeftButtonUpEvent, value);
+            remove => RemoveHandler(RawMouseLeftButtonUpEvent, value);
         }
 
         public event MouseButtonEventHandler RawMouseRightButtonDown
         {
-            add { AddHandler(RawMouseRightButtonDownEvent, value); }
-            remove { RemoveHandler(RawMouseRightButtonDownEvent, value); }
+            add => AddHandler(RawMouseRightButtonDownEvent, value);
+            remove => RemoveHandler(RawMouseRightButtonDownEvent, value);
         }
 
         public event MouseButtonEventHandler RawMouseRightButtonUp
         {
-            add { AddHandler(RawMouseRightButtonUpEvent, value); }
-            remove { RemoveHandler(RawMouseRightButtonUpEvent, value); }
+            add => AddHandler(RawMouseRightButtonUpEvent, value);
+            remove => RemoveHandler(RawMouseRightButtonUpEvent, value);
         }
 
         public event MouseButtonEventHandler RawMouseMiddleButtonDown
         {
-            add { AddHandler(RawMouseMiddleButtonDownEvent, value); }
-            remove { RemoveHandler(RawMouseMiddleButtonDownEvent, value); }
+            add => AddHandler(RawMouseMiddleButtonDownEvent, value);
+            remove => RemoveHandler(RawMouseMiddleButtonDownEvent, value);
         }
 
         public event MouseButtonEventHandler RawMouseMiddleButtonUp
         {
-            add { AddHandler(RawMouseMiddleButtonUpEvent, value); }
-            remove { RemoveHandler(RawMouseMiddleButtonUpEvent, value); }
+            add => AddHandler(RawMouseMiddleButtonUpEvent, value);
+            remove => RemoveHandler(RawMouseMiddleButtonUpEvent, value);
         }
 
         public event SizeChangedEventHandler SizeChanged
         {
-            add { AddHandler(FrameworkElement.SizeChangedEvent, value); }
-            remove { RemoveHandler(FrameworkElement.SizeChangedEvent, value); }
+            add => AddHandler(FrameworkComponent.SizeChangedEvent, value);
+            remove => RemoveHandler(FrameworkComponent.SizeChangedEvent, value);
         }
 
         public event MouseButtonEventHandler MouseDoubleClick
         {
-            add { AddHandler(Mouse.MouseDoubleClickEvent, value); }
-            remove { RemoveHandler(Mouse.MouseDoubleClickEvent, value); }
+            add => AddHandler(Mouse.MouseDoubleClickEvent, value);
+            remove => RemoveHandler(Mouse.MouseDoubleClickEvent, value);
         }
 
         public event MouseButtonEventHandler MouseMiddleButtonDown
         {
-            add { AddHandler(MouseMiddleButtonDownEvent, value); }
-            remove { RemoveHandler(MouseMiddleButtonDownEvent, value); }
+            add => AddHandler(MouseMiddleButtonDownEvent, value);
+            remove => RemoveHandler(MouseMiddleButtonDownEvent, value);
         }
 
         public event MouseButtonEventHandler MouseMiddleButtonUp
         {
-            add { AddHandler(MouseMiddleButtonUpEvent, value); }
-            remove { RemoveHandler(MouseMiddleButtonUpEvent, value); }
+            add => AddHandler(MouseMiddleButtonUpEvent, value);
+            remove => RemoveHandler(MouseMiddleButtonUpEvent, value);
         }
 
         public event RoutedEventHandler GotFocus
         {
-            add { AddHandler(FocusManager.GotFocusEvent, value); }
-            remove { RemoveHandler(FocusManager.GotFocusEvent, value); }
+            add => AddHandler(FocusManager.GotFocusEvent, value);
+            remove => RemoveHandler(FocusManager.GotFocusEvent, value);
         }
 
         public event RoutedEventHandler LostFocus
         {
-            add { AddHandler(FocusManager.LostFocusEvent, value); }
-            remove { RemoveHandler(FocusManager.LostFocusEvent, value); }
+            add => AddHandler(FocusManager.LostFocusEvent, value);
+            remove => RemoveHandler(FocusManager.LostFocusEvent, value);
         }
 
         public event KeyEventHandler KeyDown
         {
-            add { AddHandler(Keyboard.KeyDownEvent, value); }
-            remove { RemoveHandler(Keyboard.KeyDownEvent, value); }
+            add => AddHandler(Keyboard.KeyDownEvent, value);
+            remove => RemoveHandler(Keyboard.KeyDownEvent, value);
         }
 
         public event KeyEventHandler KeyUp
         {
-            add { AddHandler(Keyboard.KeyUpEvent, value); }
-            remove { RemoveHandler(Keyboard.KeyUpEvent, value); }
+            add => AddHandler(Keyboard.KeyUpEvent, value);
+            remove => RemoveHandler(Keyboard.KeyUpEvent, value);
         }
 
         public event KeyboardGotFocusEventHandler GotKeyboardFocus
         {
-            add { AddHandler(Keyboard.GotKeyboardFocusEvent, value); }
-            remove { RemoveHandler(Keyboard.GotKeyboardFocusEvent, value); }
+            add => AddHandler(Keyboard.GotKeyboardFocusEvent, value);
+            remove => RemoveHandler(Keyboard.GotKeyboardFocusEvent, value);
         }
 
         public event KeyboardFocusChangedEventHandler LostKeyboardFocus
         {
-            add { AddHandler(Keyboard.LostKeyboardFocusEvent, value); }
-            remove { RemoveHandler(Keyboard.LostKeyboardFocusEvent, value); }
+            add => AddHandler(Keyboard.LostKeyboardFocusEvent, value);
+            remove => RemoveHandler(Keyboard.LostKeyboardFocusEvent, value);
         }
 
         public event MouseEventHandler GotMouseCapture
         {
-            add { AddHandler(Mouse.GotMouseCaptureEvent, value); }
-            remove { RemoveHandler(Mouse.GotMouseCaptureEvent, value); }
+            add => AddHandler(Mouse.GotMouseCaptureEvent, value);
+            remove => RemoveHandler(Mouse.GotMouseCaptureEvent, value);
         }
 
         public event MouseEventHandler LostMouseCapture
         {
-            add { AddHandler(Mouse.LostMouseCaptureEvent, value); }
-            remove { RemoveHandler(Mouse.LostMouseCaptureEvent, value); }
+            add => AddHandler(Mouse.LostMouseCaptureEvent, value);
+            remove => RemoveHandler(Mouse.LostMouseCaptureEvent, value);
         }
 
         public event MouseEventHandler MouseEnter
         {
-            add { AddHandler(Mouse.MouseEnterEvent, value); }
-            remove { RemoveHandler(Mouse.MouseEnterEvent, value); }
+            add => AddHandler(Mouse.MouseEnterEvent, value);
+            remove => RemoveHandler(Mouse.MouseEnterEvent, value);
         }
 
         public event MouseEventHandler MouseLeave
         {
-            add { AddHandler(Mouse.MouseLeaveEvent, value); }
-            remove { RemoveHandler(Mouse.MouseLeaveEvent, value); }
+            add => AddHandler(Mouse.MouseLeaveEvent, value);
+            remove => RemoveHandler(Mouse.MouseLeaveEvent, value);
         }
 
         public event MouseEventHandler MouseMove
         {
-            add { AddHandler(Mouse.MouseMoveEvent, value); }
-            remove { AddHandler(Mouse.MouseMoveEvent, value); }
+            add => AddHandler(Mouse.MouseMoveEvent, value);
+            remove => AddHandler(Mouse.MouseMoveEvent, value);
         }
 
         public event MouseWheelEventHandler MouseWheel
         {
-            add { AddHandler(Mouse.MouseWheelEvent, value); }
-            remove { AddHandler(Mouse.MouseWheelEvent, value); }
+            add => AddHandler(Mouse.MouseWheelEvent, value);
+            remove => AddHandler(Mouse.MouseWheelEvent, value);
         }
 
         public event MouseButtonEventHandler MouseDown
         {
-            add { AddHandler(Mouse.MouseDownEvent, value); }
-            remove { RemoveHandler(Mouse.MouseDownEvent, value); }
+            add => AddHandler(Mouse.MouseDownEvent, value);
+            remove => RemoveHandler(Mouse.MouseDownEvent, value);
         }
 
         public event MouseButtonEventHandler MouseUp
         {
-            add { AddHandler(Mouse.MouseUpEvent, value); }
-            remove { RemoveHandler(Mouse.MouseUpEvent, value); }
+            add => AddHandler(Mouse.MouseUpEvent, value);
+            remove => RemoveHandler(Mouse.MouseUpEvent, value);
         }
 
         public event MouseButtonEventHandler MouseLeftButtonDown
         {
-            add { AddHandler(MouseLeftButtonDownEvent, value); }
-            remove { RemoveHandler(MouseLeftButtonDownEvent, value); }
+            add => AddHandler(MouseLeftButtonDownEvent, value);
+            remove => RemoveHandler(MouseLeftButtonDownEvent, value);
         }
 
         public event MouseButtonEventHandler MouseLeftButtonUp
         {
-            add { AddHandler(MouseLeftButtonUpEvent, value); }
-            remove { RemoveHandler(MouseLeftButtonUpEvent, value); }
+            add => AddHandler(MouseLeftButtonUpEvent, value);
+            remove => RemoveHandler(MouseLeftButtonUpEvent, value);
         }
 
         public event MouseButtonEventHandler MouseRightButtonDown
         {
-            add { AddHandler(MouseRightButtonDownEvent, value); }
-            remove { RemoveHandler(MouseRightButtonDownEvent, value); }
+            add => AddHandler(MouseRightButtonDownEvent, value);
+            remove => RemoveHandler(MouseRightButtonDownEvent, value);
         }
 
         public event MouseButtonEventHandler MouseRightButtonUp
         {
-            add { AddHandler(MouseRightButtonUpEvent, value); }
-            remove { RemoveHandler(MouseRightButtonUpEvent, value); }
+            add => AddHandler(MouseRightButtonUpEvent, value);
+            remove => RemoveHandler(MouseRightButtonUpEvent, value);
         }
 
         public event TextInputEventHandler TextInput
         {
-            add { AddHandler(TextInputEvent, value); }
-            remove { RemoveHandler(TextInputEvent, value); }
+            add => AddHandler(TextInputEvent, value);
+            remove => RemoveHandler(TextInputEvent, value);
         }
 
 
         public event KeyEventHandler PreviewKeyDown
         {
-            add { AddHandler(Keyboard.PreviewKeyDownEvent, value); }
-            remove { RemoveHandler(Keyboard.PreviewKeyDownEvent, value); }
+            add => AddHandler(Keyboard.PreviewKeyDownEvent, value);
+            remove => RemoveHandler(Keyboard.PreviewKeyDownEvent, value);
         }
 
         public event KeyEventHandler PreviewKeyUp
         {
-            add { AddHandler(Keyboard.PreviewKeyUpEvent, value); }
-            remove { RemoveHandler(Keyboard.PreviewKeyUpEvent, value); }
+            add => AddHandler(Keyboard.PreviewKeyUpEvent, value);
+            remove => RemoveHandler(Keyboard.PreviewKeyUpEvent, value);
         }
 
         public event KeyboardGotFocusEventHandler PreviewGotKeyboardFocus
         {
-            add { AddHandler(Keyboard.PreviewGotKeyboardFocusEvent, value); }
-            remove { RemoveHandler(Keyboard.PreviewGotKeyboardFocusEvent, value); }
+            add => AddHandler(Keyboard.PreviewGotKeyboardFocusEvent, value);
+            remove => RemoveHandler(Keyboard.PreviewGotKeyboardFocusEvent, value);
         }
 
         public event KeyboardFocusChangedEventHandler PreviewLostKeyboardFocus
         {
-            add { AddHandler(Keyboard.PreviewLostKeyboardFocusEvent, value); }
-            remove { RemoveHandler(Keyboard.PreviewLostKeyboardFocusEvent, value); }
+            add => AddHandler(Keyboard.PreviewLostKeyboardFocusEvent, value);
+            remove => RemoveHandler(Keyboard.PreviewLostKeyboardFocusEvent, value);
         }
 
         public event MouseButtonEventHandler PreviewMouseDoubcleClick
         {
-            add { AddHandler(PreviewMouseDoubcleClickEvent, value); }
-            remove { RemoveHandler(PreviewMouseDoubcleClickEvent, value); }
+            add => AddHandler(PreviewMouseDoubcleClickEvent, value);
+            remove => RemoveHandler(PreviewMouseDoubcleClickEvent, value);
         }
 
         public event MouseEventHandler PreviewGotMouseCapture
         {
-            add { AddHandler(Mouse.PreviewGotMouseCaptureEvent, value); }
-            remove { RemoveHandler(Mouse.PreviewGotMouseCaptureEvent, value); }
+            add => AddHandler(Mouse.PreviewGotMouseCaptureEvent, value);
+            remove => RemoveHandler(Mouse.PreviewGotMouseCaptureEvent, value);
         }
 
         public event MouseEventHandler PreviewLostMouseCapture
         {
-            add { AddHandler(Mouse.PreviewLostMouseCaptureEvent, value); }
-            remove { RemoveHandler(Mouse.PreviewLostMouseCaptureEvent, value); }
+            add => AddHandler(Mouse.PreviewLostMouseCaptureEvent, value);
+            remove => RemoveHandler(Mouse.PreviewLostMouseCaptureEvent, value);
         }
 
         public event MouseButtonEventHandler PreviewMouseDown
         {
-            add { AddHandler(Mouse.PreviewMouseDownEvent, value); }
-            remove { RemoveHandler(Mouse.PreviewMouseDownEvent, value); }
+            add => AddHandler(Mouse.PreviewMouseDownEvent, value);
+            remove => RemoveHandler(Mouse.PreviewMouseDownEvent, value);
         }
 
         public event MouseButtonEventHandler PreviewMouseUp
         {
-            add { AddHandler(Mouse.PreviewMouseUpEvent, value); }
-            remove { RemoveHandler(Mouse.PreviewMouseUpEvent, value); }
+            add => AddHandler(Mouse.PreviewMouseUpEvent, value);
+            remove => RemoveHandler(Mouse.PreviewMouseUpEvent, value);
         }
 
         public event MouseButtonEventHandler PreviewMouseLeftButtonDown
         {
-            add { AddHandler(PreviewMouseLeftButtonDownEvent, value); }
-            remove { RemoveHandler(PreviewMouseLeftButtonDownEvent, value); }
+            add => AddHandler(PreviewMouseLeftButtonDownEvent, value);
+            remove => RemoveHandler(PreviewMouseLeftButtonDownEvent, value);
         }
 
         public event MouseButtonEventHandler PreviewMouseLeftButtonUp
         {
-            add { AddHandler(PreviewMouseLeftButtonUpEvent, value); }
-            remove { RemoveHandler(PreviewMouseLeftButtonUpEvent, value); }
+            add => AddHandler(PreviewMouseLeftButtonUpEvent, value);
+            remove => RemoveHandler(PreviewMouseLeftButtonUpEvent, value);
         }
 
         public event MouseButtonEventHandler PreviewMouseRightButtonDown
         {
-            add { AddHandler(PreviewMouseRightButtonDownEvent, value); }
-            remove { RemoveHandler(PreviewMouseRightButtonDownEvent, value); }
+            add => AddHandler(PreviewMouseRightButtonDownEvent, value);
+            remove => RemoveHandler(PreviewMouseRightButtonDownEvent, value);
         }
 
         public event MouseButtonEventHandler PreviewMouseRightButtonUp
         {
-            add { AddHandler(PreviewMouseRightButtonUpEvent, value); }
-            remove { RemoveHandler(PreviewMouseRightButtonUpEvent, value); }
+            add => AddHandler(PreviewMouseRightButtonUpEvent, value);
+            remove => RemoveHandler(PreviewMouseRightButtonUpEvent, value);
         }
 
         public event MouseWheelEventHandler PreviewMouseWheel
         {
-            add { AddHandler(Mouse.PreviewMouseWheelEvent, value); }
-            remove { RemoveHandler(Mouse.PreviewMouseWheelEvent, value); }
+            add => AddHandler(Mouse.PreviewMouseWheelEvent, value);
+            remove => RemoveHandler(Mouse.PreviewMouseWheelEvent, value);
         }
 
         public event MouseEventHandler PreviewMouseMove
         {
-            add { AddHandler(Mouse.PreviewMouseMoveEvent, value); }
-            remove { RemoveHandler(Mouse.PreviewMouseMoveEvent, value); }
+            add => AddHandler(Mouse.PreviewMouseMoveEvent, value);
+            remove => RemoveHandler(Mouse.PreviewMouseMoveEvent, value);
         }
 
         public event TextInputEventHandler PreviewTextInput
         {
-            add { AddHandler(PreviewTextInputEvent, value); }
-            remove { RemoveHandler(PreviewTextInputEvent, value); }
+            add => AddHandler(PreviewTextInputEvent, value);
+            remove => RemoveHandler(PreviewTextInputEvent, value);
         }
 
         public event MouseButtonEventHandler PreviewMouseDoubleClick
         {
-            add { AddHandler(Mouse.PreviewMouseDoubleClickEvent, value); }
-            remove { RemoveHandler(Mouse.PreviewMouseDoubleClickEvent, value); }
+            add => AddHandler(Mouse.PreviewMouseDoubleClickEvent, value);
+            remove => RemoveHandler(Mouse.PreviewMouseDoubleClickEvent, value);
         }
 
         #endregion
@@ -460,80 +460,80 @@ namespace Adamantium.UI
 
         public Cursor Cursor
         {
-            get { return GetValue<Cursor>(CursorProperty); }
-            set { SetValue(CursorProperty, value); }
+            get => GetValue<Cursor>(CursorProperty);
+            set => SetValue(CursorProperty, value);
         }
 
         public Boolean ClipToBounds
         {
-            get { return GetValue<Boolean>(ClipToBoundsProperty); }
-            set { SetValue(ClipToBoundsProperty, value); }
+            get => GetValue<Boolean>(ClipToBoundsProperty);
+            set => SetValue(ClipToBoundsProperty, value);
         }
 
         public Double Opacity
         {
-            get { return GetValue<Double>(OpacityProperty); }
-            set { SetValue(OpacityProperty, value); }
+            get => GetValue<Double>(OpacityProperty);
+            set => SetValue(OpacityProperty, value);
         }
 
         public bool IsEnabled
         {
-            get { return GetValue<Boolean>(IsEnabledProperty); }
-            set { SetValue(IsEnabledProperty, value); }
+            get => GetValue<Boolean>(IsEnabledProperty);
+            set => SetValue(IsEnabledProperty, value);
         }
 
         public Boolean AllowDrop
         {
-            get { return GetValue<Boolean>(AllowDropProperty); }
-            set { SetValue(AllowDropProperty, value); }
+            get => GetValue<Boolean>(AllowDropProperty);
+            set => SetValue(AllowDropProperty, value);
         }
 
         public Boolean Focusable
         {
-            get { return GetValue<Boolean>(FocusableProperty); }
-            set { SetValue(FocusableProperty, value); }
+            get => GetValue<Boolean>(FocusableProperty);
+            set => SetValue(FocusableProperty, value);
         }
 
         public bool IsMouseOver
         {
-            get { return GetValue<bool>(IsMouseOverProperty); }
-            private set { SetValue(IsMouseOverProperty, value); }
+            get => GetValue<bool>(IsMouseOverProperty);
+            private set => SetValue(IsMouseOverProperty, value);
         }
 
         public bool IsMouseDirectlyOver
         {
-            get { return GetValue<bool>(IsMouseDirectlyOverProperty); }
-            private set { SetValue(IsMouseDirectlyOverProperty, value); }
+            get => GetValue<bool>(IsMouseDirectlyOverProperty);
+            private set => SetValue(IsMouseDirectlyOverProperty, value);
         }
 
         public bool IsKeyboardFocused
         {
-            get { return GetValue<bool>(IsMouseDirectlyOverProperty); }
-            private set { SetValue(IsMouseDirectlyOverProperty, value); }
+            get => GetValue<bool>(IsMouseDirectlyOverProperty);
+            private set => SetValue(IsMouseDirectlyOverProperty, value);
         }
 
         public String Uid
         {
-            get { return GetValue<String>(UidProperty); }
-            private set { SetValue(UidProperty, value); }
+            get => GetValue<String>(UidProperty);
+            private set => SetValue(UidProperty, value);
         }
 
         public Boolean IsFocused
         {
-            get { return GetValue<Boolean>(IsFocusedProperty); }
-            private set { SetValue(IsFocusedProperty, value); }
+            get => GetValue<Boolean>(IsFocusedProperty);
+            private set => SetValue(IsFocusedProperty, value);
         }
 
         public Boolean IsHitTestVisible
         {
-            get { return GetValue<Boolean>(IsHitTestVisibleProperty); }
-            set { SetValue(IsHitTestVisibleProperty, value); }
+            get => GetValue<Boolean>(IsHitTestVisibleProperty);
+            set => SetValue(IsHitTestVisibleProperty, value);
         }
 
         public bool UseLayoutRounding
         {
-            get { return GetValue<bool>(UseLayoutRoundingProperty); }
-            set { SetValue(UseLayoutRoundingProperty, value); }
+            get => GetValue<bool>(UseLayoutRoundingProperty);
+            set => SetValue(UseLayoutRoundingProperty, value);
         }
 
         #endregion
@@ -584,7 +584,7 @@ namespace Adamantium.UI
             RawMouseMiddleButtonUpEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(RawMouseMiddleButtonUpHandler));
 
 
-            FrameworkElement.SizeChangedEvent.RegisterClassHandler<UIComponent>(new SizeChangedEventHandler(SizeChangedHandler));
+            FrameworkComponent.SizeChangedEvent.RegisterClassHandler<UIComponent>(new SizeChangedEventHandler(SizeChangedHandler));
         }
 
         private static void SizeChangedHandler(object sender, SizeChangedEventArgs e)
@@ -607,8 +607,7 @@ namespace Adamantium.UI
 
         private static void MouseEnterHandler(object sender, MouseEventArgs e)
         {
-            var ui = sender as UIComponent;
-            if (ui != null && !ui.IsMouseOver)
+            if (sender is UIComponent ui && !ui.IsMouseOver)
             {
                 ui.OnMouseEnter(e);
             }
@@ -616,8 +615,7 @@ namespace Adamantium.UI
 
         private static void MouseLeaveHandler(object sender, MouseEventArgs e)
         {
-            var ui = sender as UIComponent;
-            if (ui != null && ui.IsMouseOver)
+            if (sender is UIComponent ui && ui.IsMouseOver)
             {
                 ui.OnMouseLeave(e);
             }
@@ -625,8 +623,7 @@ namespace Adamantium.UI
 
         private static void PreviewMouseDownHandler(object sender, MouseButtonEventArgs e)
         {
-            var ui = sender as UIComponent;
-            if (ui != null)
+            if (sender is UIComponent ui)
             {
                 MouseButtonEventArgs args = new MouseButtonEventArgs(e.MouseDevice, e.ChangedButton, e.ButtonState, e.Modifiers, e.Timestamp);
                 if (e.ChangedButton == MouseButtons.Left)
@@ -647,8 +644,7 @@ namespace Adamantium.UI
 
         private static void PreviewMouseUpHandler(object sender, MouseButtonEventArgs e)
         {
-            var ui = sender as UIComponent;
-            if (ui != null)
+            if (sender is UIComponent ui)
             {
                 MouseButtonEventArgs args = new MouseButtonEventArgs(e.MouseDevice, e.ChangedButton, e.ButtonState, e.Modifiers, e.Timestamp);
                 if (e.ChangedButton == MouseButtons.Left)
@@ -669,8 +665,7 @@ namespace Adamantium.UI
 
         private static void MouseDownHandler(object sender, MouseButtonEventArgs e)
         {
-            var ui = sender as UIComponent;
-            if (ui != null)
+            if (sender is UIComponent ui)
             {
                 MouseButtonEventArgs args = new MouseButtonEventArgs(e.MouseDevice, e.ChangedButton, e.ButtonState, e.Modifiers, e.Timestamp);
                 if (e.ChangedButton == MouseButtons.Left)
@@ -692,8 +687,7 @@ namespace Adamantium.UI
 
         private static void MouseUpHandler(object sender, MouseButtonEventArgs e)
         {
-            var ui = sender as UIComponent;
-            if (ui != null)
+            if (sender is UIComponent ui)
             {
                 MouseButtonEventArgs args = new MouseButtonEventArgs(e.MouseDevice, e.ChangedButton, e.ButtonState, e.Modifiers, e.Timestamp);
                 if (e.ChangedButton == MouseButtons.Left)
@@ -715,8 +709,7 @@ namespace Adamantium.UI
 
         private static void RawMouseDownHandler(object sender, MouseButtonEventArgs e)
         {
-            var ui = sender as UIComponent;
-            if (ui != null)
+            if (sender is UIComponent ui)
             {
                 MouseButtonEventArgs args = new MouseButtonEventArgs(e.MouseDevice, e.ChangedButton, e.ButtonState, e.Modifiers, e.Timestamp);
                 if (e.ChangedButton == MouseButtons.Left)
@@ -741,8 +734,7 @@ namespace Adamantium.UI
 
         private static void RawMouseUpHandler(object sender, MouseButtonEventArgs e)
         {
-            var ui = sender as UIComponent;
-            if (ui != null)
+            if (sender is UIComponent ui)
             {
                 MouseButtonEventArgs args = new MouseButtonEventArgs(e.MouseDevice, e.ChangedButton, e.ButtonState, e.Modifiers, e.Timestamp);
                 if (e.ChangedButton == MouseButtons.Left)
@@ -1023,10 +1015,7 @@ namespace Adamantium.UI
 
         public Size RenderSize
         {
-            get
-            {
-                return Visibility == Visibility.Collapsed ? Size.Zero : renderSize;
-            }
+            get => Visibility == Visibility.Collapsed ? Size.Zero : renderSize;
             set
             {
                 if (renderSize != value)
@@ -1080,7 +1069,7 @@ namespace Adamantium.UI
         /// </summary>
         /// <param name="control">The control.</param>
         /// <returns>True if the control's size can change; otherwise false.</returns>
-        private static bool IsResizable(FrameworkElement control)
+        private static bool IsResizable(FrameworkComponent control)
         {
             return Double.IsNaN(control.Width) || Double.IsNaN(control.Height);
         }

@@ -32,7 +32,7 @@ namespace Adamantium.Game
         public GameWindow MainWindow { get; protected set; }
 
         /// <summary>
-        /// Current focued <see cref="GameWindow"/>
+        /// Current focused <see cref="GameWindow"/>
         /// </summary>
         public GameWindow ActiveWindow { get; private set; }
 
@@ -88,48 +88,29 @@ namespace Adamantium.Game
         }
 
         /// <summary>
-        /// Creates <see cref="GameWindow"/> from <see cref="GameContext"/>
-        /// </summary>
-        /// <param name="context">Context (Control) from which <see cref="GameWindow"/> will be created</param>
-        /// <returns>new <see cref="GameWindow"/></returns>
-        public virtual GameWindow CreateWindow(GameContext context)
-        {
-            if (context == null)
-            {
-                return null;
-            }
-
-            var wnd = GameWindow.New(context);
-            windowsToAdd.Add(wnd);
-            return wnd;
-        }
-
-        /// <summary>
         /// Switches drawing context from old control to new control. After this old control could be safely removed
         /// </summary>
         /// <param name="oldContext">Old control for drawing</param>
         /// <param name="newContext">New control for drawing</param>
         public void SwitchContext(GameContext oldContext, GameContext newContext)
         {
-            GameWindow wnd = null;
-            if (contextToWindow.TryGetValue(oldContext, out wnd))
+            if (contextToWindow.TryGetValue(oldContext, out var wnd))
             {
                 wnd.SwitchContext(newContext);
             }
         }
 
-
         internal static GameContextType GetContextType(object context)
         {
-            if (context is Control)
+            if (context is IWindow)
             {
-                return GameContextType.WinForms;
+                return GameContextType.Window;
             }
             if (context is RenderTargetPanel)
             {
                 return GameContextType.RenderTargetPanel;
             }
-            throw new NotSupportedException("this context type is not supported");
+            throw new NotSupportedException("this context type currently is not supported");
         }
 
         private void AddWindowsInternal()
@@ -220,7 +201,7 @@ namespace Adamantium.Game
             lock (syncObject)
             {
                 AddWindowsInternal();
-                foreach (GameWindow wnd in windows)
+                foreach (var wnd in windows)
                 {
                     if (graphicsDeviceChanged || wnd.UpdateRequested)
                     {
@@ -307,7 +288,6 @@ namespace Adamantium.Game
             WindowSizeChanged?.Invoke(this,
                new GameWindowSizeChangedEventArgs(wnd, new Size(wnd.Width, wnd.Height)));
         }
-
 
         private void OnWindowBoundsChanged(GameWindowBoundsChangedEventArgs args)
         {
@@ -438,6 +418,36 @@ namespace Adamantium.Game
                 contextToWindow.Clear();
             }
         }
+        
+        /// <summary>
+        /// Creates <see cref="GameWindow"/> with <see cref="AdamantiumGameWindow"/> inside
+        /// </summary>
+        /// <param name="width">Window width</param>
+        /// <param name="height">Window height</param>
+        /// <returns>new <see cref="GameWindow"/></returns>
+        public GameWindow CreateWindow(uint width = 1280, uint height = 720)
+        {
+            var wnd = GameWindow.NewDefault(width, height);
+            windowsToAdd.Add(wnd);
+            return wnd;
+        }
+        
+        /// <summary>
+        /// Creates <see cref="GameWindow"/> from <see cref="GameContext"/>
+        /// </summary>
+        /// <param name="context">Context (Control) from which <see cref="GameWindow"/> will be created</param>
+        /// <returns>new <see cref="GameWindow"/></returns>
+        public virtual GameWindow CreateWindow(GameContext context)
+        {
+            if (context == null)
+            {
+                return null;
+            }
+
+            var wnd = GameWindow.New(context);
+            windowsToAdd.Add(wnd);
+            return wnd;
+        }
 
         /// <summary>
         /// Creates <see cref="GameWindow"/> from <see cref="object"/>
@@ -453,7 +463,7 @@ namespace Adamantium.Game
         /// <summary>
         /// Create new game window from context (if no windows has been created already using this context) and add it to the list of game windows
         /// </summary>
-        /// <param name="context">Window, in which DX xontent will be rendered</param>
+        /// <param name="context">Window, in which Vulkan content will be rendered</param>
         /// <param name="surfaceFormat">Surface format</param>
         /// <param name="depthFormat">Depth buffer format</param>
         /// <param name="msaaLevel">MSAA level</param>
@@ -468,6 +478,21 @@ namespace Adamantium.Game
                 return wnd;
             }
             return contextToWindow[gameContext];
+        }
+
+        /// <summary>
+        /// Adds <see cref="GameWindow"/> to the windows collection
+        /// </summary>
+        /// <param name="window">window to add to the windows collection</param>
+        public void AddWindow(GameWindow window)
+        {
+            if (windows.Contains(window)) return;
+
+            if (!contextToWindow.ContainsKey(window.GameContext))
+            {
+                contextToWindow.Add(window.GameContext, window);
+                windowsToAdd.Add(window);
+            }
         }
 
         /// <summary>

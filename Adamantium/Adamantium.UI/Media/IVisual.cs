@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Collections.ObjectModel;
+using Adamantium.EntityFramework.ComponentsBasics;
 using Adamantium.Mathematics;
 
 namespace Adamantium.UI.Media
 {
-   public interface IVisual
+   public interface IVisual : IComponent
    {
       bool IsAttachedToVisualTree { get; }
 

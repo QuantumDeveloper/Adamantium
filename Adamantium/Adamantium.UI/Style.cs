@@ -26,7 +26,7 @@ namespace Adamantium.UI
 
       public TriggerCollection Triggers { get; }
 
-      public void Attach(FrameworkElement control)
+      public void Attach(FrameworkComponent control)
       {
          if (control != null)
          {

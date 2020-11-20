@@ -32,18 +32,19 @@ namespace Adamantium.UI.Windows
 
         public override void Run()
         {
-            Message msg;
-
-            while (IsRunning)
-            {
-                while (Messages.PeekMessage(out msg, IntPtr.Zero, 0, 0, PeekMessageFlag.Remove))
-                {
-                    Messages.TranslateMessage(ref msg);
-                    Messages.DispatchMessage(ref msg);
-                }
-            
-                //CheckExitConditions();
-            }
+            Dispatcher.Run();
+            // Message msg;
+            //
+            // while (IsRunning)
+            // {
+            //     while (Messages.PeekMessage(out msg, IntPtr.Zero, 0, 0, PeekMessageFlag.Remove))
+            //     {
+            //         Messages.TranslateMessage(ref msg);
+            //         Messages.DispatchMessage(ref msg);
+            //     }
+            //
+            //     //CheckExitConditions();
+            // }
         }
 
         private void RenderThread()

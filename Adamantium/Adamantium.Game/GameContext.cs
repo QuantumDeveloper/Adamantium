@@ -1,5 +1,7 @@
 ﻿using System;
 using Adamantium.Core;
+using Adamantium.Engine.Graphics;
+using Adamantium.UI.Controls;
 
 namespace Adamantium.Game
 {
@@ -9,18 +11,18 @@ namespace Adamantium.Game
    public class GameContext:IEquatable<GameContext>
    {
       /// <summary>
-      /// Constaructs GameContext
+      /// Constructs GameContext
       /// </summary>
       /// <param name="context">Object that represents surface on which Graphics content will be drawn</param>
       /// <exception cref="NotSupportedException"></exception>
       public GameContext(Object context)
       {
          var type = context.GetType();
-         if (Utilities.IsTypeInheritFrom(type, "System.Windows.Forms.Control"))
+         if (Utilities.IsTypeInheritFrom(type, typeof(IWindow)))
          {
-            ContextType = GameContextType.WinForms;
+            ContextType = GameContextType.Window;
          }
-         else if (Utilities.IsTypeInheritFrom(type, "Adamantium.UI.Controls.RenderTargetPanel"))
+         else if (Utilities.IsTypeInheritFrom(type, typeof(RenderTarget)))
          {
             ContextType = GameContextType.RenderTargetPanel;
          }

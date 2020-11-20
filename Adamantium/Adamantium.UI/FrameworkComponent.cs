@@ -6,172 +6,172 @@ using Adamantium.Core.Collections;
 
 namespace Adamantium.UI
 {
-    public class FrameworkElement : UIComponent, IName
+    public class FrameworkComponent : UIComponent, IName, IFrameworkComponent
     {
-        public FrameworkElement()
+        public FrameworkComponent()
         { }
 
         public static readonly AdamantiumProperty TagProperty = AdamantiumProperty.Register(nameof(Tag),
-           typeof(object), typeof(FrameworkElement), new PropertyMetadata(null));
+           typeof(object), typeof(FrameworkComponent), new PropertyMetadata(null));
 
         public static readonly AdamantiumProperty NameProperty = AdamantiumProperty.Register(nameof(Name),
-           typeof(String), typeof(FrameworkElement), new PropertyMetadata(String.Empty));
+           typeof(String), typeof(FrameworkComponent), new PropertyMetadata(String.Empty));
 
         public static readonly AdamantiumProperty WidthProperty = AdamantiumProperty.Register(nameof(Width),
-           typeof(Double), typeof(FrameworkElement),
+           typeof(Double), typeof(FrameworkComponent),
            new PropertyMetadata(Double.NaN, PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender));
 
         public static readonly AdamantiumProperty HeightProperty = AdamantiumProperty.Register(nameof(Height),
-           typeof(Double), typeof(FrameworkElement),
+           typeof(Double), typeof(FrameworkComponent),
            new PropertyMetadata(Double.NaN, PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender));
 
         public static readonly AdamantiumProperty MinWidthProperty = AdamantiumProperty.Register(nameof(MinWidth),
-           typeof(Double), typeof(FrameworkElement),
+           typeof(Double), typeof(FrameworkComponent),
            new PropertyMetadata((Double)0, PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender));
 
         public static readonly AdamantiumProperty MinHeightProperty = AdamantiumProperty.Register(nameof(MinHeight),
-           typeof(Double), typeof(FrameworkElement),
+           typeof(Double), typeof(FrameworkComponent),
            new PropertyMetadata((Double)0, PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender));
 
         public static readonly AdamantiumProperty ActualWidthProperty = AdamantiumProperty.RegisterReadOnly(nameof(ActualWidth),
-           typeof(Double), typeof(FrameworkElement),
+           typeof(Double), typeof(FrameworkComponent),
            new PropertyMetadata((Double)0));
 
         public static readonly AdamantiumProperty ActualHeightProperty = AdamantiumProperty.RegisterReadOnly(nameof(ActualHeight),
-           typeof(Double), typeof(FrameworkElement),
+           typeof(Double), typeof(FrameworkComponent),
            new PropertyMetadata((Double)0));
 
         public static readonly AdamantiumProperty MaxWidthProperty = AdamantiumProperty.Register(nameof(MaxWidth),
-           typeof(Double), typeof(FrameworkElement),
+           typeof(Double), typeof(FrameworkComponent),
            new PropertyMetadata(Double.PositiveInfinity, PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender));
 
         public static readonly AdamantiumProperty MaxHeightProperty = AdamantiumProperty.Register(nameof(MaxHeight),
-           typeof(Double), typeof(FrameworkElement),
+           typeof(Double), typeof(FrameworkComponent),
            new PropertyMetadata(Double.PositiveInfinity, PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender));
 
         public static readonly AdamantiumProperty HorizontalAlignmentProperty = AdamantiumProperty.Register(nameof(HorizontalAlignment),
-           typeof(HorizontalAlignment), typeof(FrameworkElement), new PropertyMetadata(HorizontalAlignment.Stretch, PropertyMetadataOptions.AffectsArrange));
+           typeof(HorizontalAlignment), typeof(FrameworkComponent), new PropertyMetadata(HorizontalAlignment.Stretch, PropertyMetadataOptions.AffectsArrange));
 
         public static readonly AdamantiumProperty VerticalAlignmentProperty = AdamantiumProperty.Register(nameof(VerticalAlignment),
-           typeof(VerticalAlignment), typeof(FrameworkElement), new PropertyMetadata(VerticalAlignment.Stretch, PropertyMetadataOptions.AffectsArrange));
+           typeof(VerticalAlignment), typeof(FrameworkComponent), new PropertyMetadata(VerticalAlignment.Stretch, PropertyMetadataOptions.AffectsArrange));
 
         public static readonly AdamantiumProperty MarginProperty = AdamantiumProperty.Register(nameof(Margin),
-           typeof(Thickness), typeof(FrameworkElement), new PropertyMetadata(default(Thickness), PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange));
+           typeof(Thickness), typeof(FrameworkComponent), new PropertyMetadata(default(Thickness), PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange));
 
         public static readonly AdamantiumProperty DataContextProperty = AdamantiumProperty.Register(nameof(DataContext),
-           typeof(object), typeof(FrameworkElement),
+           typeof(object), typeof(FrameworkComponent),
            new PropertyMetadata(null, PropertyMetadataOptions.Inherits, DataContextChangedCallBack));
 
         public static readonly RoutedEvent SizeChangedEvent = EventManager.RegisterRoutedEvent("SizeChanged",
-           RoutingStrategy.Direct, typeof(SizeChangedEventHandler), typeof(FrameworkElement));
+           RoutingStrategy.Direct, typeof(SizeChangedEventHandler), typeof(FrameworkComponent));
 
         private static void DataContextChangedCallBack(DependencyComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
         {
-            var o = adamantiumObject as FrameworkElement;
+            var o = adamantiumObject as FrameworkComponent;
             o?.DataContextChanged?.Invoke(o, e);
         }
 
 
         public object DataContext
         {
-            get { return GetValue(DataContextProperty); }
-            set { SetValue(DataContextProperty, value); }
+            get => GetValue(DataContextProperty);
+            set => SetValue(DataContextProperty, value);
         }
 
         public Double Width
         {
-            get { return GetValue<Double>(WidthProperty); }
-            set { SetValue(WidthProperty, value); }
+            get => GetValue<Double>(WidthProperty);
+            set => SetValue(WidthProperty, value);
         }
 
         public Double Height
         {
-            get { return GetValue<Double>(HeightProperty); }
-            set { SetValue(HeightProperty, value); }
+            get => GetValue<Double>(HeightProperty);
+            set => SetValue(HeightProperty, value);
         }
 
         public Double ActualWidth
         {
-            get { return GetValue<Double>(ActualWidthProperty); }
-            private set { SetValue(ActualWidthProperty, value); }
+            get => GetValue<Double>(ActualWidthProperty);
+            private set => SetValue(ActualWidthProperty, value);
         }
 
         public Double ActualHeight
         {
-            get { return GetValue<Double>(ActualHeightProperty); }
-            private set { SetValue(ActualHeightProperty, value); }
+            get => GetValue<Double>(ActualHeightProperty);
+            private set => SetValue(ActualHeightProperty, value);
         }
 
         public Double MinWidth
         {
-            get { return GetValue<Double>(MinWidthProperty); }
-            set { SetValue(MinWidthProperty, value); }
+            get => GetValue<Double>(MinWidthProperty);
+            set => SetValue(MinWidthProperty, value);
         }
 
         public Double MinHeight
         {
-            get { return GetValue<Double>(MinHeightProperty); }
-            set { SetValue(MinHeightProperty, value); }
+            get => GetValue<Double>(MinHeightProperty);
+            set => SetValue(MinHeightProperty, value);
         }
 
         public Double MaxWidth
         {
-            get { return GetValue<Double>(MaxWidthProperty); }
-            set { SetValue(MaxWidthProperty, value); }
+            get => GetValue<Double>(MaxWidthProperty);
+            set => SetValue(MaxWidthProperty, value);
         }
 
         public Double MaxHeight
         {
-            get { return GetValue<Double>(MaxHeightProperty); }
-            set { SetValue(MaxHeightProperty, value); }
+            get => GetValue<Double>(MaxHeightProperty);
+            set => SetValue(MaxHeightProperty, value);
         }
 
         public Thickness Margin
         {
-            get { return GetValue<Thickness>(MarginProperty); }
-            set { SetValue(MarginProperty, value); }
+            get => GetValue<Thickness>(MarginProperty);
+            set => SetValue(MarginProperty, value);
         }
 
         public VerticalAlignment VerticalAlignment
         {
-            get { return GetValue<VerticalAlignment>(VerticalAlignmentProperty); }
-            set { SetValue(VerticalAlignmentProperty, value); }
+            get => GetValue<VerticalAlignment>(VerticalAlignmentProperty);
+            set => SetValue(VerticalAlignmentProperty, value);
         }
 
         public HorizontalAlignment HorizontalAlignment
         {
-            get { return GetValue<HorizontalAlignment>(HorizontalAlignmentProperty); }
-            set { SetValue(HorizontalAlignmentProperty, value); }
+            get => GetValue<HorizontalAlignment>(HorizontalAlignmentProperty);
+            set => SetValue(HorizontalAlignmentProperty, value);
         }
 
         public String Name
         {
-            get { return GetValue<String>(NameProperty); }
-            set { SetValue(NameProperty, value); }
+            get => GetValue<String>(NameProperty);
+            set => SetValue(NameProperty, value);
         }
 
         public object Tag
         {
-            get { return GetValue(TagProperty); }
-            set { SetValue(TagProperty, value); }
+            get => GetValue(TagProperty);
+            set => SetValue(TagProperty, value);
         }
 
         public event AdamantiumPropertyChangedEventHandler DataContextChanged;
 
-        private FrameworkElement _parent;
-        private TrackingCollection<FrameworkElement> logicalChildren;
+        private FrameworkComponent _parent;
+        private TrackingCollection<FrameworkComponent> logicalChildren;
 
-        public FrameworkElement Parent => _parent;
-        public IReadOnlyCollection<FrameworkElement> LogicalChildrenCollection => LogicalChildren.AsReadOnly();
+        public FrameworkComponent Parent => _parent;
+        public IReadOnlyCollection<FrameworkComponent> LogicalChildrenCollection => LogicalChildren.AsReadOnly();
 
 
-        protected TrackingCollection<FrameworkElement> LogicalChildren
+        protected TrackingCollection<FrameworkComponent> LogicalChildren
         {
             get
             {
                 if (logicalChildren == null)
                 {
-                    var list = new TrackingCollection<FrameworkElement>();
+                    var list = new TrackingCollection<FrameworkComponent>();
                     LogicalChildren = list;
                 }
                 return logicalChildren;
@@ -201,16 +201,16 @@ namespace Adamantium.UI
             switch (e.Action)
             {
                 case NotifyCollectionChangedAction.Add:
-                    SetLogicalParent(e.NewItems.Cast<FrameworkElement>());
+                    SetLogicalParent(e.NewItems.Cast<FrameworkComponent>());
                     break;
 
                 case NotifyCollectionChangedAction.Remove:
-                    ClearLogicalParent(e.OldItems.Cast<FrameworkElement>());
+                    ClearLogicalParent(e.OldItems.Cast<FrameworkComponent>());
                     break;
 
                 case NotifyCollectionChangedAction.Replace:
-                    ClearLogicalParent(e.OldItems.Cast<FrameworkElement>());
-                    SetLogicalParent(e.NewItems.Cast<FrameworkElement>());
+                    ClearLogicalParent(e.OldItems.Cast<FrameworkComponent>());
+                    SetLogicalParent(e.NewItems.Cast<FrameworkComponent>());
                     break;
 
                 case NotifyCollectionChangedAction.Reset:
@@ -218,7 +218,7 @@ namespace Adamantium.UI
             }
         }
 
-        private void SetLogicalParent(IEnumerable<FrameworkElement> children)
+        private void SetLogicalParent(IEnumerable<FrameworkComponent> children)
         {
             foreach (var element in children)
             {
@@ -226,7 +226,7 @@ namespace Adamantium.UI
             }
         }
 
-        private void ClearLogicalParent(IEnumerable<FrameworkElement> children)
+        private void ClearLogicalParent(IEnumerable<FrameworkComponent> children)
         {
             foreach (var element in children)
             {
@@ -241,7 +241,7 @@ namespace Adamantium.UI
         /// Sets the control's logical parent.
         /// </summary>
         /// <param name="parent">The parent.</param>
-        private void SetParent(FrameworkElement parent)
+        private void SetParent(FrameworkComponent parent)
         {
             var old = Parent;
 
@@ -481,15 +481,15 @@ namespace Adamantium.UI
     public static class LayoutHelper
     {
         /// <summary>
-        /// Calculates a control's size based on its <see cref="FrameworkElement.Width"/>,
-        /// <see cref="FrameworkElement.Height"/>, <see cref="FrameworkElement.MinWidth"/>,
-        /// <see cref="FrameworkElement.MaxWidth"/>, <see cref="FrameworkElement.MinHeight"/> and
-        /// <see cref="FrameworkElement.MaxHeight"/>.
+        /// Calculates a control's size based on its <see cref="FrameworkComponent.Width"/>,
+        /// <see cref="FrameworkComponent.Height"/>, <see cref="FrameworkComponent.MinWidth"/>,
+        /// <see cref="FrameworkComponent.MaxWidth"/>, <see cref="FrameworkComponent.MinHeight"/> and
+        /// <see cref="FrameworkComponent.MaxHeight"/>.
         /// </summary>
         /// <param name="element">The control.</param>
         /// <param name="constraints">The space available for the control.</param>
         /// <returns>The control's size.</returns>
-        public static Size ApplyLayoutConstraints(this FrameworkElement element, Size constraints)
+        public static Size ApplyLayoutConstraints(this FrameworkComponent element, Size constraints)
         {
             double width = (element.Width > 0) ? element.Width : constraints.Width;
             double height = (element.Height > 0) ? element.Height : constraints.Height;

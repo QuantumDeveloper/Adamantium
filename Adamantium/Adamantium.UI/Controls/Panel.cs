@@ -4,7 +4,7 @@ using Adamantium.UI.Media;
 
 namespace Adamantium.UI.Controls
 {
-   public abstract class Panel:FrameworkElement
+   public abstract class Panel:FrameworkComponent
    {
       public static readonly AdamantiumProperty BackgroundProperty = AdamantiumProperty.Register(nameof(Background), typeof(Brush), typeof(Panel), new PropertyMetadata(Brushes.Transparent, PropertyMetadataOptions.AffectsRender));
 
@@ -30,19 +30,19 @@ namespace Adamantium.UI.Controls
          switch (e.Action)
          {
             case NotifyCollectionChangedAction.Add:
-               var controls = e.NewItems.OfType<FrameworkElement>();
+               var controls = e.NewItems.OfType<FrameworkComponent>();
                LogicalChildren.InsertRange(e.NewStartingIndex, controls);
                VisualChildren.AddRange(e.NewItems.OfType<IVisual>());
                break;
             case NotifyCollectionChangedAction.Remove:
-               LogicalChildren.Remove(e.OldItems.OfType<FrameworkElement>());
+               LogicalChildren.Remove(e.OldItems.OfType<FrameworkComponent>());
                VisualChildren.Remove(e.OldItems.OfType<IVisual>());
                break;
             case NotifyCollectionChangedAction.Replace:
                for (var i = 0; i < e.OldItems.Count; ++i)
                {
-                  var index = LogicalChildren.IndexOf((FrameworkElement)e.OldItems[i]);
-                  var child = (FrameworkElement)e.NewItems[i];
+                  var index = LogicalChildren.IndexOf((FrameworkComponent)e.OldItems[i]);
+                  var child = (FrameworkComponent)e.NewItems[i];
                   LogicalChildren[index] = child;
                   VisualChildren[index] = child;
                }

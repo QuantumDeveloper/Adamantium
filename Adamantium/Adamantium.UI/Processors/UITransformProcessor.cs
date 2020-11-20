@@ -27,7 +27,7 @@ namespace Adamantium.UI.Processors
 
         private void ProcessControl(IVisual element)
         {
-            var control = (FrameworkElement)element;
+            var control = (FrameworkComponent)element;
             if (!control.IsMeasureValid)
             {
                 if (!Double.IsNaN(control.Width) && !Double.IsNaN(control.Height))

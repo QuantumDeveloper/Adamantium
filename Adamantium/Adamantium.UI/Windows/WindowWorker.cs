@@ -13,49 +13,47 @@ namespace Adamantium.UI.Windows
     internal class WindowWorker : DependencyComponent
     {
         private Win32Window window;
-        private Dictionary<WindowMessages, HandleMessage> messageTable;
+        private Dictionary<uint, HandleMessage> messageTable;
 
         private bool isOverSizeFrame;
         private bool trackMouse;
         private InputModifiers lastRawMouseModifiers;
-        private WindowNativeSource source;
+        private Win32NativeWindowWrapper source;
 
         public WindowWorker()
         {
-            messageTable = new Dictionary<WindowMessages, HandleMessage>();
-            messageTable[WindowMessages.Activate] = HandleActivate;
-            messageTable[WindowMessages.Syscommand] = HandleSysCommand;
-            //messageTable[WindowMessages.Nclbuttondown] = HandleNcButtonDown;
-            messageTable[WindowMessages.Nchittest] = HandleNcHittest;
-            //messageTable[WindowMessages.Nccalcsize] = HandleNcCalcSize;
-            messageTable[WindowMessages.Size] = HandleResize;
-            messageTable[WindowMessages.Keydown] = HandleKeyDown;
-            messageTable[WindowMessages.Syskeydown] = HandleKeyDown;
-            messageTable[WindowMessages.Keyup] = HandleKeyUp;
-            messageTable[WindowMessages.Syskeyup] = HandleKeyUp;
-            messageTable[WindowMessages.Char] = HandleChar;
-            messageTable[WindowMessages.Mousemove] = HandleMouseMove;
-            messageTable[WindowMessages.Mouseleave] = HandleMouseLeave;
-            messageTable[WindowMessages.LeftButtondown] = HandleMouseLeftButtonDown;
-            messageTable[WindowMessages.RightButtondown] = HandleMouseLeftButtonDown;
-            messageTable[WindowMessages.MiddleButtondown] = HandleMouseLeftButtonDown;
-            messageTable[WindowMessages.Xbuttondown] = HandleMouseLeftButtonDown;
+            messageTable = new Dictionary<uint, HandleMessage>();
+            messageTable[(uint)WindowMessages.Activate] = HandleActivate;
+            messageTable[(uint)WindowMessages.Syscommand] = HandleSysCommand;
+            //messageTable[(uint)WindowMessages.Nclbuttondown] = HandleNcButtonDown;
+            messageTable[(uint)WindowMessages.Nchittest] = HandleNcHittest;
+            //messageTable[(uint)WindowMessages.Nccalcsize] = HandleNcCalcSize;
+            messageTable[(uint)WindowMessages.Size] = HandleResize;
+            messageTable[(uint)WindowMessages.Keydown] = HandleKeyDown;
+            messageTable[(uint)WindowMessages.Syskeydown] = HandleKeyDown;
+            messageTable[(uint)WindowMessages.Keyup] = HandleKeyUp;
+            messageTable[(uint)WindowMessages.Syskeyup] = HandleKeyUp;
+            messageTable[(uint)WindowMessages.Char] = HandleChar;
+            messageTable[(uint)WindowMessages.Mousemove] = HandleMouseMove;
+            messageTable[(uint)WindowMessages.Mouseleave] = HandleMouseLeave;
+            messageTable[(uint)WindowMessages.LeftButtondown] = HandleMouseLeftButtonDown;
+            messageTable[(uint)WindowMessages.RightButtondown] = HandleMouseLeftButtonDown;
+            messageTable[(uint)WindowMessages.MiddleButtondown] = HandleMouseLeftButtonDown;
+            messageTable[(uint)WindowMessages.Xbuttondown] = HandleMouseLeftButtonDown;
 
-            messageTable[WindowMessages.LeftButtonup] = HandleMouseLeftButtonDown;
-            messageTable[WindowMessages.RightButtonup] = HandleMouseLeftButtonDown;
-            messageTable[WindowMessages.MiddleButtonup] = HandleMouseLeftButtonDown;
-            messageTable[WindowMessages.Xbuttonup] = HandleMouseLeftButtonDown;
+            messageTable[(uint)WindowMessages.LeftButtonup] = HandleMouseLeftButtonDown;
+            messageTable[(uint)WindowMessages.RightButtonup] = HandleMouseLeftButtonDown;
+            messageTable[(uint)WindowMessages.MiddleButtonup] = HandleMouseLeftButtonDown;
+            messageTable[(uint)WindowMessages.Xbuttonup] = HandleMouseLeftButtonDown;
 
-            messageTable[WindowMessages.LeftButtondblclk] = HandleMouseLeftButtonDown;
-            messageTable[WindowMessages.RightButtondblclk] = HandleMouseLeftButtonDown;
-            messageTable[WindowMessages.MiddleButtondblclk] = HandleMouseLeftButtonDown;
-            messageTable[WindowMessages.Xbuttondblclk] = HandleMouseLeftButtonDown;
+            messageTable[(uint)WindowMessages.LeftButtondblclk] = HandleMouseLeftButtonDown;
+            messageTable[(uint)WindowMessages.RightButtondblclk] = HandleMouseLeftButtonDown;
+            messageTable[(uint)WindowMessages.MiddleButtondblclk] = HandleMouseLeftButtonDown;
+            messageTable[(uint)WindowMessages.Xbuttondblclk] = HandleMouseLeftButtonDown;
 
-            messageTable[WindowMessages.MouseWheel] = HandleMouseWheel;
-
-            messageTable[WindowMessages.Input] = HandleRawInput;
-
-            messageTable[WindowMessages.Setcursor] = HandleSetCursor;
+            messageTable[(uint)WindowMessages.MouseWheel] = HandleMouseWheel;
+            messageTable[(uint)WindowMessages.Input] = HandleRawInput;
+            messageTable[(uint)WindowMessages.Setcursor] = HandleSetCursor;
         }
 
         public void SetWindow(Win32Window window)
@@ -65,7 +63,7 @@ namespace Adamantium.UI.Windows
             var classStyle = WindowClassStyle.OwnDC | WindowClassStyle.DoubleClicks | WindowClassStyle.VerticalRedraw | WindowClassStyle.HorizontalRedraw;
             var wndStyleEx = WindowStyleEx.Appwindow | WindowStyleEx.Acceptfiles;
             var wndStyle = /*WindowStyle.Popup |*/ WindowStyle.Overlappedwindow | WindowStyle.Maximizebox | WindowStyle.Minimizebox | WindowStyle.Clipsiblings | WindowStyle.Clipchildren | WindowStyle.Sizeframe;
-            source = new WindowNativeSource(classStyle, wndStyleEx, wndStyle, (int)window.Location.X, (int)window.Location.Y, (int)window.Width, (int)window.Height, IntPtr.Zero);
+            source = new Win32NativeWindowWrapper(classStyle, wndStyleEx, wndStyle, (int)window.Location.X, (int)window.Location.Y, (int)window.Width, (int)window.Height, IntPtr.Zero);
             this.window.Handle = source.Handle;
             if (source.Handle != IntPtr.Zero)
             {
@@ -76,7 +74,7 @@ namespace Adamantium.UI.Windows
                 this.window.ClientHeight = client.Height;
 
                 this.window.ApplyTemplate();
-                Application.Current.Windows.Add(this.window);
+                Application.Current?.Windows.Add(this.window);
                 this.window.OnSourceInitialized();
                 Win32Interop.ShowWindow(source.Handle, WindowShowStyle.ShowNormal);
             }
@@ -91,16 +89,17 @@ namespace Adamantium.UI.Windows
         /// <summary>
         /// Window Procedure
         /// </summary>
-        /// <param name="hWnd">windows hendler</param>
-        /// <param name="msg">window message (one of window mesages)<see cref="WindowMessages"/>"/></param>
+        /// <param name="hWnd">windows handler</param>
+        /// <param name="msg">window message (one of window messages)<see cref="WindowMessages"/>"/></param>
         /// <param name="wParam"></param>
         /// <param name="lParam"></param>
+        /// <param name="handled"></param>
         /// <returns></returns>
-        private IntPtr CustomWndProc(IntPtr hWnd, WindowMessages msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        private IntPtr CustomWndProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
             if (messageTable.TryGetValue(msg, out var handler))
             {
-                return handler(msg, wParam, lParam, out handled);
+                return handler((WindowMessages)msg, wParam, lParam, out handled);
             }
 
             return IntPtr.Zero;
@@ -134,12 +133,12 @@ namespace Adamantium.UI.Windows
                 window.Close();
             }
             handled = false;
-            return Win32Interop.DefWindowProcW(window.Handle, windowMessage, wParam, lParam);
+            return Win32Interop.DefWindowProc(window.Handle, windowMessage, wParam, lParam);
         }
 
         private IntPtr HandleNcHittest(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
         {
-            var uHitTest = Win32Interop.DefWindowProcW(window.Handle, WindowMessages.Nchittest, wParam, lParam);
+            var uHitTest = Win32Interop.DefWindowProc(window.Handle, WindowMessages.Nchittest, wParam, lParam);
             var result = (NcHitTest)(Environment.Is64BitProcess ? uHitTest.ToInt64() : uHitTest.ToInt32());
             if (result != NcHitTest.Client)
             {
@@ -150,7 +149,7 @@ namespace Adamantium.UI.Windows
                 isOverSizeFrame = false;
             }
             handled = false;
-            return Win32Interop.DefWindowProcW(window.Handle, windowMessage, wParam, lParam);
+            return Win32Interop.DefWindowProc(window.Handle, windowMessage, wParam, lParam);
         }
 
         private IntPtr HandleNcCalcSize(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
@@ -183,7 +182,7 @@ namespace Adamantium.UI.Windows
                 handled = true;
                 return IntPtr.Zero;
             }
-            return Win32Interop.DefWindowProcW(window.Handle, windowMessage, wParam, lParam);
+            return Win32Interop.DefWindowProc(window.Handle, windowMessage, wParam, lParam);
         }
 
         private IntPtr HandleSysCommand(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
@@ -205,7 +204,7 @@ namespace Adamantium.UI.Windows
                        (int)window.Height, SetWindowPosFlags.Asyncwindowpos | SetWindowPosFlags.Nosize);
                     break;
                 default:
-                    Win32Interop.DefWindowProcW(window.Handle, windowMessage, wParam, lParam);
+                    Win32Interop.DefWindowProc(window.Handle, windowMessage, wParam, lParam);
                     break;
             }
 
@@ -328,7 +327,7 @@ namespace Adamantium.UI.Windows
             if (outSize == -1)
             {
                 handled = false;
-                return Win32Interop.DefWindowProcW(window.Handle, windowMessage, wParam, lParam);
+                return Win32Interop.DefWindowProc(window.Handle, windowMessage, wParam, lParam);
             }
 
             if (inputData.Header.DeviceType == DeviceType.Mouse)
@@ -390,7 +389,7 @@ namespace Adamantium.UI.Windows
             Win32Interop.SetCursor(Mouse.Cursor.CursorHandle);
             if (isOverSizeFrame)
             {
-                return Win32Interop.DefWindowProcW(window.Handle, windowMessage, wParam, lParam);
+                return Win32Interop.DefWindowProc(window.Handle, windowMessage, wParam, lParam);
             }
             else
             {

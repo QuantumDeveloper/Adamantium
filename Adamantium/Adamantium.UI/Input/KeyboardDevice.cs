@@ -13,7 +13,25 @@ namespace Adamantium.UI.Input
       private const int KEY_TOGGLED = 0x1;
 
       private byte[] keyCodes = new byte[256];
-      private Dictionary<Key, KeyParameters> keyStates = new Dictionary<Key, KeyParameters>(); 
+      private Dictionary<Key, KeyParameters> keyStates = new Dictionary<Key, KeyParameters>();
+
+      private static KeyboardDevice currentDevice;
+
+      public static KeyboardDevice CurrentDevice
+      {
+         get
+         {
+            if (currentDevice == null)
+            {
+               if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+               {
+                  currentDevice = WindowsKeyboardDevice.Instance;
+               }
+            }
+
+            return currentDevice;
+         }
+      }
 
       public InputModifiers Modifiers
       {
@@ -100,7 +118,7 @@ namespace Adamantium.UI.Input
       }
 
       /// <summary>
-      /// Ckecks is key generally pressed
+      /// Checks is key generally pressed
       /// </summary>
       /// <param name="key"></param>
       /// <returns></returns>
@@ -110,7 +128,7 @@ namespace Adamantium.UI.Input
       }
 
       /// <summary>
-      /// Ckecks is key generally up
+      /// Checks is key generally up
       /// </summary>
       /// <param name="key"></param>
       /// <returns></returns>
@@ -164,17 +182,16 @@ namespace Adamantium.UI.Input
          if (FocusedElement != null)
          {
             UpdateKeyStates();
-            if (eventArgs is RawKeyboardEventArgs)
+            if (eventArgs is RawKeyboardEventArgs e)
             {
-               RawKeyboardEventArgs e = eventArgs as RawKeyboardEventArgs;
                switch (e?.EventType)
                {
                   case RawKeyboardEventType.KeyDown:
                   case RawKeyboardEventType.KeyUp:
                      var parameters = Messages.GetKeyParameters(e.LParam);
-                     parameters.PressTime = eventArgs.Timestamp;
-                     KeyEventArgs args = new KeyEventArgs(this, e.ChangedKey, eventArgs.InputModifiers,
-                        eventArgs.Timestamp);
+                     parameters.PressTime = e.Timestamp;
+                     KeyEventArgs args = new KeyEventArgs(this, e.ChangedKey, e.InputModifiers,
+                        e.Timestamp);
                      if (e.EventType == RawKeyboardEventType.KeyDown)
                      {
                         parameters.CurrentState = KeyStates.Down;

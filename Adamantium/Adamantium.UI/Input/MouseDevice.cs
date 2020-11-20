@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.InteropServices;
 using Adamantium.Mathematics;
 using Adamantium.UI.Input.Raw;
 using Adamantium.UI.Media;
@@ -28,6 +29,24 @@ namespace Adamantium.UI.Input
         public Cursor OverrideCursor { get; set; }
 
         private Point Position;
+
+        private static MouseDevice currentDeice;
+        
+        public static MouseDevice CurrentDevice
+        {
+            get
+            {
+                if (currentDeice == null)
+                {
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    {
+                        currentDeice = WindowsMouseDevice.Instance;
+                    }
+                }
+
+                return currentDeice;
+            } 
+        }
 
         public bool Capture(IInputElement element)
         {

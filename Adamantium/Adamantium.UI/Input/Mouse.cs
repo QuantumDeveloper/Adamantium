@@ -71,7 +71,7 @@ namespace Adamantium.UI.Input
 
       static Mouse()
       {
-         PrimaryDevice = Application.Current.MouseDevice;
+         PrimaryDevice = MouseDevice.CurrentDevice;
       }
 
       public static MouseDevice PrimaryDevice { get; }

@@ -163,7 +163,7 @@ namespace Adamantium.UI.Input
 
          if (Scope == scope)
          {
-            Application.Current.KeyboardDevice.SetFocusedElement(element, navigationMethod, modifiers);
+            KeyboardDevice.CurrentDevice.SetFocusedElement(element, navigationMethod, modifiers);
          }
       }
    }

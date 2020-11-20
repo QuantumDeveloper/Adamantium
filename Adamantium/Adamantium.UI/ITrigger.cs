@@ -3,6 +3,6 @@
    public interface ITrigger
    {
       SetterCollection Setters { get; set; }
-      void Apply(FrameworkElement control);
+      void Apply(FrameworkComponent control);
    }
 }

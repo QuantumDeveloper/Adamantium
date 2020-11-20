@@ -15,6 +15,14 @@ namespace Adamantium.Game
         GameWindow[] Windows { get; }
 
         /// <summary>
+        /// Creates <see cref="GameWindow"/> with <see cref="AdamantiumGameWindow"/> inside
+        /// </summary>
+        /// <param name="width">Window width</param>
+        /// <param name="height">Window height</param>
+        /// <returns>new <see cref="GameWindow"/></returns>
+        GameWindow CreateWindow(uint width = 1280, uint height = 720);
+
+        /// <summary>
         /// Creates <see cref="GameWindow"/> from <see cref="GameContext"/>
         /// </summary>
         /// <param name="context">Context (Control) from which <see cref="GameWindow"/> will be created</param>
@@ -44,6 +52,12 @@ namespace Adamantium.Game
         /// <param name="newContext">New control for drawing</param>
         void SwitchContext(GameContext oldContext, GameContext newContext);
 
+        /// <summary>
+        /// Adds <see cref="GameWindow"/> to the windows collection
+        /// </summary>
+        /// <param name="window">window to add to the windows collection</param>
+        void AddWindow(GameWindow window);
+        
         /// <summary>
         /// Removes <see cref="GameWindow"/> from <see cref="GameWindow"/>
         /// </summary>

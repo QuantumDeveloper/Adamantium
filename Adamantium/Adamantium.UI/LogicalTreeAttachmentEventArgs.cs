@@ -4,9 +4,9 @@ namespace Adamantium.UI
 {
    public class LogicalTreeAttachmentEventArgs:EventArgs
    {
-      public FrameworkElement LogicalRoot { get; }
+      public FrameworkComponent LogicalRoot { get; }
 
-      public LogicalTreeAttachmentEventArgs(FrameworkElement logicalRoot)
+      public LogicalTreeAttachmentEventArgs(FrameworkComponent logicalRoot)
       {
          LogicalRoot = logicalRoot;
       }
