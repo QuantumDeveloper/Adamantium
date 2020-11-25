@@ -66,7 +66,7 @@ namespace Adamantium.Game
         /// </summary>
         protected GameBase()
         {
-            Services = new DependencyContainer();
+            Services = new AdamantiumServiceLocator();
             GameTime = new GameTime();
             gameTimer = new PreciseTimer();
             contextsMapping = new Dictionary<Object, GameContext>();
@@ -164,7 +164,7 @@ namespace Adamantium.Game
         /// <summary>
         /// Game services which could be added to the game
         /// </summary>
-        public IDependencyContainer Services { get; }
+        public IDependencyResolver Services { get; }
 
         /// <summary>
         /// Enables or disables fixed framerate

@@ -3,11 +3,18 @@ using System.Collections.Generic;
 
 namespace Adamantium.Core.DependencyInjection
 {
-    public class DependencyContainer : IDependencyContainer
+    public class AdamantiumServiceLocator : IDependencyResolver
     {
         private Dictionary<Type, DependencyInjectionDetails> mappings;
+        
+        public static AdamantiumServiceLocator Current { get; }
 
-        public DependencyContainer()
+        static AdamantiumServiceLocator()
+        {
+            Current = new AdamantiumServiceLocator();
+        }
+
+        public AdamantiumServiceLocator()
         {
             mappings = new Dictionary<Type, DependencyInjectionDetails>();
         }
@@ -22,39 +29,46 @@ namespace Adamantium.Core.DependencyInjection
             return mappings.ContainsKey(type);
         }
         
-        public void Register<TService, TImplementation>()
+        public IDependencyResolver Register<TService, TImplementation>()
         {
             Register(typeof(TService), typeof(TImplementation));
+            return this;
         }
 
-        public void Register(Type service, Type implementation)
+        public IDependencyResolver Register(Type service, Type implementation)
         {
             Register(LifeTimeVariant.Transient, service, implementation);
+            return this;
         }
 
-        public void RegisterSingleton<T>()
+        public IDependencyResolver RegisterSingleton<T>()
         {
             RegisterSingleton(typeof(T), typeof(T));
+            return this;
         }
 
-        public void RegisterSingleton<TService, TImplementation>()
+        public IDependencyResolver RegisterSingleton<TService, TImplementation>()
         {
             RegisterSingleton(typeof(TService), typeof(TImplementation));
+            return this;
         }
 
-        public void RegisterSingleton(Type service, Type implementation)
+        public IDependencyResolver RegisterSingleton(Type service, Type implementation)
         {
             Register(LifeTimeVariant.Singleton, service, implementation);
+            return this;
         }
 
-        public void RegisterInstance<TService>(object instance, string name = "")
+        public IDependencyResolver RegisterInstance<TService>(object instance, string name = "")
         {
             RegisterInstance(typeof(TService), instance, name);
+            return this;
         }
 
-        public void RegisterInstance(Type source, object instance, string name = "")
+        public IDependencyResolver RegisterInstance(Type source, object instance, string name = "")
         {
             Register(LifeTimeVariant.Singleton, source, instance.GetType(), instance, name);
+            return this;
         }
 
         public T Resolve<T>(string name = "")

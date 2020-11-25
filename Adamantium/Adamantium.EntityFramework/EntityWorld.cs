@@ -16,7 +16,7 @@ namespace Adamantium.EntityFramework
         private readonly Dictionary<Int64, Entity> availableEntities;
         private readonly Dictionary<String, EntityGroup> entitiesByGroup;
 
-        public EntityWorld(IDependencyContainer container)
+        public EntityWorld(IDependencyResolver container)
         {
             if (container == null) throw new ArgumentNullException($"{nameof(container)} should not be null");
             
@@ -32,7 +32,7 @@ namespace Adamantium.EntityFramework
 
         public Entity[] RootEntities => rootEntities.ToArray();
 
-        public IDependencyContainer Services { get; }
+        public IDependencyResolver Services { get; }
 
         private readonly EntitySystem System;
         private readonly SystemManager SystemManager;

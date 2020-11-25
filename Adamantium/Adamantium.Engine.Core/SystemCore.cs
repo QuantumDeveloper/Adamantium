@@ -23,8 +23,8 @@ namespace Adamantium.Engine.Core
         /// <summary>
         /// Constructs <see cref="ISystem"/>
         /// </summary>
-        /// <param name="container"><see cref="IDependencyContainer"/> instance. Could be null</param>
-        protected SystemCore(IDependencyContainer container)
+        /// <param name="container"><see cref="IDependencyResolver"/> instance. Could be null</param>
+        protected SystemCore(IDependencyResolver container)
         {
             Services = container;
             AppService = Services.Resolve<IService>();
@@ -43,7 +43,7 @@ namespace Adamantium.Engine.Core
         /// <summary>
         /// A service registry that provides methods to register and unregister services.
         /// </summary>
-        public IDependencyContainer Services { get; }
+        public IDependencyResolver Services { get; }
 
         /// <summary>
         /// Gets the name of this component.

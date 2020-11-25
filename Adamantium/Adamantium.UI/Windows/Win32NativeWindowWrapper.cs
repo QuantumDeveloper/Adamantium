@@ -9,6 +9,7 @@ namespace Adamantium.UI.Windows
     public class Win32NativeWindowWrapper : DispatcherComponent, IDisposable
     {
         private const int ERROR_CLASS_ALREADY_EXISTS = 1410;
+        private const string windowName = "AdamantiumWindow";
 
         public Win32NativeWindowWrapper(
             WindowClassStyle classStyle, 
@@ -19,7 +20,7 @@ namespace Adamantium.UI.Windows
             Int32 width,
             Int32 height,
             IntPtr parent) : this(
-                Guid.NewGuid().ToString(),
+                $"{windowName} {Guid.NewGuid()}",
                 classStyle,
                 wndStyleEx,
                 wndStyle,

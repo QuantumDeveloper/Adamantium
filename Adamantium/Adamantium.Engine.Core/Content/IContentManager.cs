@@ -14,7 +14,7 @@ namespace Adamantium.Engine.Core.Content
       /// The service provider can be used by some <see cref="IContentReader"/> when for example a <see cref="Adamantium.Engine.Graphics.GraphicsDevice"/> needs to be 
       /// used to instantiate a content.
       /// </remarks>
-      IDependencyContainer ServiceProvider { get; }
+      IDependencyResolver ServiceProvider { get; }
       
       /// <summary>
       /// Checks if the specified assets exists.
