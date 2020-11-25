@@ -9,7 +9,7 @@ namespace Adamantium.Engine
 
       public Entity SelectedEntity { get; set; }
 
-      public GamePlayManager(IDependencyContainer container)
+      public GamePlayManager(IDependencyResolver container)
       {
          container.RegisterInstance<GamePlayManager>(this);
       }

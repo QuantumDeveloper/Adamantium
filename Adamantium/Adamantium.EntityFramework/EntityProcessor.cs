@@ -20,7 +20,7 @@ namespace Adamantium.EntityFramework
 
         protected EntityWorld EntityWorld { get; private set; }
         protected IGameTime GameTime { get; set; }
-        protected IDependencyContainer Services { get; }
+        protected IDependencyResolver Services { get; }
 
         protected EntityProcessor(EntityWorld world)
         {

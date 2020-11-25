@@ -55,7 +55,7 @@ namespace Adamantium.Core.DependencyInjection
             DependencyItems.Add(item);
         }
 
-        public object GetDependency(DependencyContainer container, Type type, string name = "")
+        public object GetDependency(AdamantiumServiceLocator container, Type type, string name = "")
         {
             var service = type;
             DependencyItem item = DependencyItems.FirstOrDefault(x => x.RegistryName == name);

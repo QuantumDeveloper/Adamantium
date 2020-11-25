@@ -44,7 +44,7 @@ namespace Adamantium.Game.GameInput
         private int _virtualPositionMultiplierX = 0;
         private int _virtualPositionMultiplierY = 0;
 
-        public InputService(GameBase game, IDependencyContainer container)
+        public InputService(GameBase game, IDependencyResolver container)
             : base(game, container)
         {
             downKeys = new HashSet<Keys>();

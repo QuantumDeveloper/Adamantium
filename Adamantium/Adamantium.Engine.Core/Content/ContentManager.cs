@@ -13,7 +13,7 @@ namespace Adamantium.Engine.Core.Content
         private readonly Dictionary<AssetKey, object> assetLockers;
         protected readonly Dictionary<AssetKey, object> LoadedAssets;
 
-        public ContentManager(IDependencyContainer serviceProvider)
+        public ContentManager(IDependencyResolver serviceProvider)
         {
             ServiceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
             RootDirectory = String.Empty;
@@ -27,7 +27,7 @@ namespace Adamantium.Engine.Core.Content
         /// Gets the service provider associated with the ContentManager.
         /// </summary>
         /// <value>The service provider.</value>
-        public IDependencyContainer ServiceProvider { get; protected set; }
+        public IDependencyResolver ServiceProvider { get; protected set; }
 
         public String RootDirectory { get; set; }
 

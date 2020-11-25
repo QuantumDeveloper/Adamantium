@@ -28,6 +28,9 @@ namespace Adamantium.UI
         
         public static readonly AdamantiumProperty TopProperty = AdamantiumProperty.Register(nameof(Top),
             typeof(Double), typeof(Window), new PropertyMetadata(0d));
+        
+        public static readonly AdamantiumProperty TitleProperty = AdamantiumProperty.Register(nameof(Title),
+            typeof(String), typeof(Window));
 
         public Double Left
         {
@@ -41,16 +44,26 @@ namespace Adamantium.UI
             set => SetValue(TopProperty, value);
         }
         
+        public string Title
+        {
+            get => GetValue<string>(TitleProperty);
+            set => SetValue(TitleProperty, value);
+        }
+        
+        // Pointer to the surface for rendering on this window
+        public abstract IntPtr SurfaceHandle { get; }
+        
+        public abstract IntPtr Handle { get; internal set; }
+        public abstract bool IsClosed { get; protected set; }
+        public abstract int ClientWidth { get; set; }
+        public abstract int ClientHeight { get; set; }
+        
         public abstract Point PointToClient(Point point);
         public abstract Point PointToScreen(Point point);
         public abstract void Show();
         public abstract void Close();
         public abstract void Hide();
-        public abstract IntPtr Handle { get; internal set; }
-        public abstract bool IsClosed { get; protected set; }
-        public abstract int ClientWidth { get; set; }
-        public abstract int ClientHeight { get; set; }
-        public abstract IntPtr SurfaceHandle { get; }
+        
         public event EventHandler<SizeChangedEventArgs> ClientSizeChanged;
         public abstract event EventHandler<WindowClosingEventArgs> Closing;
         public abstract event EventHandler<EventArgs> Closed;

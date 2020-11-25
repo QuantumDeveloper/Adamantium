@@ -1,7 +1,9 @@
 using System;
 using System.Runtime.InteropServices;
+using Adamantium.Core.DependencyInjection;
 using Adamantium.MacOS;
 using Adamantium.Mathematics;
+using Adamantium.UI.Threading;
 
 namespace Adamantium.UI.MacOS
 {
@@ -12,28 +14,33 @@ namespace Adamantium.UI.MacOS
         
         private MacOSInterop.OnWindowWillResize willResizeDelegate;
         private MacOSInterop.OnWindowDidResize didResizeDelegate;
+        private MacOSPlatform macOsApp;
 
         public MacOSWindowWorker()
         {
             willResizeDelegate = OnWindowWillResize;
             didResizeDelegate = OnWindowDidResize;
+            macOsApp = AdamantiumServiceLocator.Current.Resolve<IApplicationPlatform>() as MacOSPlatform;
         }
 
         public void SetWindow(MacOSWindow window)
         {
             this.window = window;
-            var wndStyle = OSXWindowStyle.Borderless | OSXWindowStyle.Resizable |
+            var wndStyle = OSXWindowStyle.Borderless | 
+                           OSXWindowStyle.Resizable |
                            OSXWindowStyle.Titled |
-                           OSXWindowStyle.Miniaturizable | OSXWindowStyle.Closable;
-            this.window.Handle = MacOSInterop.CreateWindow(new Rectangle((int)window.Left, 0, (int)window.Width, (int)window.Height),  (uint)wndStyle, "Adamantium engine");
+                           OSXWindowStyle.Miniaturizable | 
+                           OSXWindowStyle.Closable;
+            this.window.Handle = MacOSInterop.CreateWindow(
+                new Rectangle((int)window.Left, 0, (int)window.Width, (int)window.Height),  
+                (uint)wndStyle, 
+                window.Title);
             windowDelegate = MacOSInterop.CreateWindowDelegate();
             MacOSInterop.SetWindowDelegate(window.Handle, windowDelegate);
+            macOsApp.AddWindow(window);
 
             window.ClientWidth = (int) window.Width;
             window.ClientHeight = (int) window.Height;
-
-//            MacOSInterop.AddWindowWillResizeResizeCallback(windowDelegate,
-//                Marshal.GetFunctionPointerForDelegate(willResizeDelegate));
 
             MacOSInterop.AddWindowDidResizeCallback(windowDelegate,
                 Marshal.GetFunctionPointerForDelegate(didResizeDelegate));

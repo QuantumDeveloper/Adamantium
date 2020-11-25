@@ -7,7 +7,7 @@ namespace Adamantium.Game
     {
         protected GameBase Game { get; private set; }
 
-        protected GameSystem(GameBase game, IDependencyContainer container)
+        protected GameSystem(GameBase game, IDependencyResolver container)
             : base(container)
         {
             Game = game;
