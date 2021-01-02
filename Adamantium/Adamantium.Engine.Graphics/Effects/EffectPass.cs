@@ -7,12 +7,11 @@ using Adamantium.Core;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Effects;
 using AdamantiumVulkan.Core;
-using AdamantiumVulkan.Core.Interop;
 
 namespace Adamantium.Engine.Graphics.Effects
 {
     /// <summary>
-    /// Contains rendering state for drawing with an effect;  updates constant buffers and directly sets all needed resources for each <see cref="CommonShaderStage"/>
+    /// Contains rendering state for drawing with an effect; updates constant buffers and directly sets all needed resources for each shader stage/>
     /// </summary>
     public sealed class EffectPass : DisposableObject
     {
@@ -39,10 +38,14 @@ namespace Adamantium.Engine.Graphics.Effects
         private List<DescriptorSetLayoutBinding> layoutBindings;
 
         private DescriptorSetLayout descriptorSetLayout;
-        
-        private List<DescriptorSet> descriptorSets;
 
         private List<WriteDescriptorSet> writeDescriptorSets;
+
+        private uint appliesCounter;
+
+        private uint poolCountMultiplier = 1000;
+
+        private List<DescriptorEntrySet> descriptorEntrySets;
 
         public ReadOnlyCollection<PipelineShaderStageCreateInfo> ShaderStages => shaderStages.AsReadOnly();
 
@@ -65,14 +68,41 @@ namespace Adamantium.Engine.Graphics.Effects
 
             shaderStages = new List<PipelineShaderStageCreateInfo>();
             layoutBindings = new List<DescriptorSetLayoutBinding>();
-            descriptorSets = new List<DescriptorSet>();
             writeDescriptorSets = new List<WriteDescriptorSet>();
             Properties = PrepareProperties(logger, pass.Properties);
             IsSubPass = pass.IsSubPass;
+            graphicsDevice.FrameFinished += GraphicsDeviceOnFrameFinished;
+            
+            descriptorEntrySets = new List<DescriptorEntrySet>();
 
             // Don't create SubPasses collection for subpass.
             if (!IsSubPass)
                 SubPasses = new EffectPassCollection();
+        }
+
+        private void GraphicsDeviceOnFrameFinished()
+        {
+            appliesCounter = 0;
+        }
+
+        internal void ClearDescriptorsCache()
+        {
+            foreach (var entrySet in descriptorEntrySets)
+            {
+                entrySet?.Dispose();
+            }
+            
+            descriptorEntrySets.Clear();
+        }
+
+        internal void ClearLayoutBindings()
+        {
+            foreach (var binding in layoutBindings)
+            {
+                binding?.Dispose();
+            }
+            
+            layoutBindings.Clear();
         }
 
         /// <summary>
@@ -90,7 +120,7 @@ namespace Adamantium.Engine.Graphics.Effects
 
         public PipelineLayout PipelineLayout { get; private set; }
 
-        public ReadOnlyCollection<DescriptorSet> DescriptorSets => descriptorSets.AsReadOnly();
+        public DescriptorSet[] CurrentDescriptors { get; private set; }
         
         public DescriptorPool DescriptorPool { get; private set; }
 
@@ -123,6 +153,25 @@ namespace Adamantium.Engine.Graphics.Effects
 
             // Sets the current pass on the graphics device
             graphicsDevice.CurrentEffectPass = this;
+            
+            DescriptorEntrySet descriptorEntry;
+            
+            if (descriptorEntrySets.Count > appliesCounter)
+            {
+                descriptorEntry = descriptorEntrySets[(int)appliesCounter];
+            }
+            else
+            {
+                descriptorEntry = new DescriptorEntrySet();
+                descriptorEntrySets.Add(descriptorEntry);
+            }
+
+            if (descriptorEntry.Descriptors == null)
+            {
+                descriptorEntry.Descriptors = CreateDescriptorSets();
+            }
+
+            CurrentDescriptors = descriptorEntry.Descriptors;
 
             //TODO: here we need to setup graphics/compute pipeline for current EffectPass before rendering begins
             //and then update all descriptors for each stage
@@ -145,9 +194,6 @@ namespace Adamantium.Engine.Graphics.Effects
                     continue;
                 }
 
-                // var renderFence = graphicsDevice.InFlightFences[graphicsDevice.CurrentFrame];
-                // var result = graphicsDevice.LogicalDevice.WaitForFences(1, renderFence, true, ulong.MaxValue);
-
                 // Upload all constant buffers to the GPU if they have been modified.
                 // ----------------------------------------------
                 // Setup Constant buffers
@@ -157,9 +203,17 @@ namespace Adamantium.Engine.Graphics.Effects
                     var link = stageBlock.ConstantBufferLinks[i];
                     if (link.ConstantBuffer.IsDirty)
                     {
-                        link.ConstantBuffer.Update();
+                        if (!descriptorEntry.TryGetConstantBuffer(link.ResourceIndex, out var entry))
+                        {
+                            var nativeBuffer = ToDispose(Buffer.Uniform.New(graphicsDevice,
+                                link.ConstantBuffer.NativeBuffer.TotalSize));
+                            entry = new BufferEntry {ConstantBuffer = nativeBuffer, ResourceIndex = link.ResourceIndex};
+                            descriptorEntry.ConstantBufferEntries.Add(entry);
+                        }
 
-                        var descriptor = CreateConstantBufferWriteDescriptor(link.ConstantBuffer.NativeBuffer,
+                        link.ConstantBuffer.CopyTo(entry.ConstantBuffer);
+
+                        var descriptor = CreateConstantBufferWriteDescriptor(entry.ConstantBuffer,
                             link.ConstantBuffer.Description.Slot, (int) graphicsDevice.ImageIndex);
 
                         writeDescriptorSets.Add(descriptor);
@@ -207,6 +261,8 @@ namespace Adamantium.Engine.Graphics.Effects
                 
                 graphicsDevice.UpdateDescriptorSets(writeDescriptorSets.ToArray());
             }
+            
+            appliesCounter++;
         }
 
         /// <summary>
@@ -338,7 +394,6 @@ namespace Adamantium.Engine.Graphics.Effects
             CreateDescriptorSetLayout(layoutBindings);
             CreatePipelineLayout();
             CreateDescriptorPool();
-            CreateDescriptorSets();
         }
 
         /// <summary>
@@ -460,8 +515,6 @@ namespace Adamantium.Engine.Graphics.Effects
                     Effect.Parameters.Add(parameter);
 
                     Effect.ResourceLinker.Count += parameterRaw.Count;
-
-                    CreateAndAddLayoutBinding(parameterRaw.Slot, ConvertFromEffectParameterType(parameterRaw.Type), (uint)EffectShaderTypeToShaderStage(stageBlock.Type));
                 }
                 else
                 {
@@ -477,6 +530,9 @@ namespace Adamantium.Engine.Graphics.Effects
                     }
                     parameter = previousParameter;
                 }
+
+                CreateAndAddLayoutBinding(parameterRaw.Slot, ConvertFromEffectParameterType(parameterRaw.Type),
+                    (uint) EffectShaderTypeToShaderStage(stageBlock.Type));
 
                 // For constant buffers, we need to store explicit link
                 if (parameter.ResourceType == EffectResourceType.ConstantBuffer)
@@ -550,12 +606,12 @@ namespace Adamantium.Engine.Graphics.Effects
             DescriptorPoolCreateInfo poolInfo = new DescriptorPoolCreateInfo();
             poolInfo.PoolSizeCount = (uint)poolSizes.Count;
             poolInfo.PPoolSizes = poolSizes.ToArray();
-            poolInfo.MaxSets = buffersCount;
+            poolInfo.MaxSets = buffersCount * poolCountMultiplier;
 
             DescriptorPool = graphicsDevice.CreateDescriptorPool(poolInfo);
         }
 
-        private void CreateDescriptorSets()
+        private DescriptorSet[] CreateDescriptorSets()
         {
             var buffersCount = graphicsDevice.Presenter.BuffersCount;
             var layouts = new List<DescriptorSetLayout>();
@@ -574,23 +630,21 @@ namespace Adamantium.Engine.Graphics.Effects
             {
                 throw new Exception("failed to allocate descriptor sets!");
             }
-            
-            descriptorSets.Clear();
-            descriptorSets.AddRange(descriptors);
+
+            return descriptors;
         }
 
         private WriteDescriptorSet CreateConstantBufferWriteDescriptor(Buffer buffer, uint bindingIndex, int descriptorSetIndex)
         {
             var bufferInfo = new DescriptorBufferInfo();
             bufferInfo.Buffer = buffer;
-            //bufferInfo.Range = (ulong)Marshal.SizeOf<VkDescriptorBufferInfo>();
             bufferInfo.Range = (ulong)buffer.TotalSize;
 
             var writeDescriptor = new WriteDescriptorSet();
             writeDescriptor.DescriptorCount = 1;
             writeDescriptor.DescriptorType = DescriptorType.UniformBuffer;
             writeDescriptor.DstBinding = bindingIndex;
-            writeDescriptor.DstSet = descriptorSets[descriptorSetIndex];
+            writeDescriptor.DstSet = CurrentDescriptors[descriptorSetIndex];
             writeDescriptor.PBufferInfo = new [] { bufferInfo };
 
             return writeDescriptor;
@@ -613,7 +667,7 @@ namespace Adamantium.Engine.Graphics.Effects
             writeDescriptor.DescriptorCount = (uint)infoList.Length;
             writeDescriptor.DescriptorType = DescriptorType.SampledImage;
             writeDescriptor.DstBinding = bindingIndex;
-            writeDescriptor.DstSet = descriptorSets[descriptorSetIndex];
+            writeDescriptor.DstSet = CurrentDescriptors[descriptorSetIndex];
             writeDescriptor.PImageInfo = infoList;
 
             return writeDescriptor;
@@ -633,7 +687,7 @@ namespace Adamantium.Engine.Graphics.Effects
             writeDescriptor.DescriptorCount = (uint)infoList.Length;
             writeDescriptor.DescriptorType = DescriptorType.Sampler;
             writeDescriptor.DstBinding = bindingIndex;
-            writeDescriptor.DstSet = descriptorSets[descriptorSetIndex];
+            writeDescriptor.DstSet = CurrentDescriptors[descriptorSetIndex];
             writeDescriptor.PImageInfo = infoList;
 
             return writeDescriptor;
@@ -645,7 +699,7 @@ namespace Adamantium.Engine.Graphics.Effects
             writeDescriptor.DescriptorCount = (uint)texelBuffers.Length;
             writeDescriptor.DescriptorType = DescriptorType.UniformTexelBuffer;
             writeDescriptor.DstBinding = bindingIndex;
-            writeDescriptor.DstSet = descriptorSets[descriptorSetIndex];
+            writeDescriptor.DstSet = CurrentDescriptors[descriptorSetIndex];
             writeDescriptor.PTexelBufferView = texelBuffers;
 
             return writeDescriptor;
@@ -837,12 +891,10 @@ namespace Adamantium.Engine.Graphics.Effects
 
         protected override void Dispose(bool disposeManagedResources)
         {
-            foreach (var binding in layoutBindings)
-            {
-                binding?.Dispose();
-            }
+            ClearLayoutBindings();
             descriptorSetLayout?.Destroy(graphicsDevice);
             PipelineLayout?.Destroy(graphicsDevice);
+            ClearDescriptorsCache();
             base.Dispose(disposeManagedResources);
         }
 
@@ -911,6 +963,58 @@ namespace Adamantium.Engine.Graphics.Effects
 
             public int ResourceIndex;
         }
+        
+        #endregion
+        
+        #region Nested Type: DescriptorEntrySet
+        
+        private class BufferEntry
+        {
+            public Buffer ConstantBuffer;
+
+            public int ResourceIndex;
+        }
+
+        private class DescriptorEntrySet : DisposableObject
+        {
+            public DescriptorEntrySet()
+            {
+                ConstantBufferEntries = new List<BufferEntry>();
+            }
+            
+            public DescriptorSet[] Descriptors;
+
+            public List<BufferEntry> ConstantBufferEntries;
+
+            public bool TryGetConstantBuffer(int resourceId, out BufferEntry entry)
+            {
+                entry = null;
+                for (int i = 0; i < ConstantBufferEntries.Count; i++)
+                {
+                    if (ConstantBufferEntries[i].ResourceIndex == resourceId)
+                    {
+                        entry = ConstantBufferEntries[i];
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            protected override void Dispose(bool disposeManagedResources)
+            {
+                if (disposeManagedResources)
+                {
+                    foreach (var entry in ConstantBufferEntries)
+                    {
+                        entry.ConstantBuffer?.Dispose();
+                    }
+                }
+                base.Dispose(disposeManagedResources);
+            }
+        }
+        
+        
 
         #endregion
     }

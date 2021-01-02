@@ -12,18 +12,15 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
     {
         protected int Tessellation { get; }
         protected Matrix4x4F? Transform { get; }
-        protected bool ToRightHanded { get; }
         protected GeometryType GeometryType { get; }
 
         protected PrimitiveTemplate(
             GeometryType geometryType,
             int tessellation,
-            Matrix4x4F? transform = null,
-            bool toRightHanded = false)
+            Matrix4x4F? transform = null)
         {
             Tessellation = tessellation;
             Transform = transform;
-            ToRightHanded = toRightHanded;
             GeometryType = geometryType;
         }
 

@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using Adamantium.Mathematics;
 using System;
+using System.Diagnostics;
 
 namespace Adamantium.Engine.Core.Models
 {
@@ -11,7 +12,7 @@ namespace Adamantium.Engine.Core.Models
         public Mesh()
         {
             MeshTopology = PrimitiveType.TriangleList;
-            UpAxis = UpAxis.Y_UP_LH;
+            UpAxis = UpAxis.Y_DOWN_RH;
 
             Positions = new Vector3F[0];
             Colors = new Color[0];
@@ -65,18 +66,41 @@ namespace Adamantium.Engine.Core.Models
 
         public UpAxis UpAxis { get; set; }
 
+        public bool IsNormalsPresent => Semantic.HasFlag(VertexSemantic.Normal);
+        
+        public bool IsUv0Present => Semantic.HasFlag(VertexSemantic.UV0);
+        
+        public bool IsUv1Present => Semantic.HasFlag(VertexSemantic.UV1);
+        
+        public bool IsUv2Present => Semantic.HasFlag(VertexSemantic.UV2);
+        
+        public bool IsUv3Present => Semantic.HasFlag(VertexSemantic.UV3);
+        
+        public bool IsColorPresent => Semantic.HasFlag(VertexSemantic.Color);
+
+        public bool IsTangetBinormalsPresent => Semantic.HasFlag(VertexSemantic.TangentBiNormal);
+
+        public bool IsAnimationPresent => Semantic.HasFlag(VertexSemantic.JointIndices) &&
+                                          Semantic.HasFlag(VertexSemantic.JointWeights);
+
         public void AcceptChanges()
         {
             IsModified = false;
         }
 
-        public bool HasIndiced => Indices.Length > 0;
+        public bool HasIndices => Indices.Length > 0;
 
-        public void SetPositions(List<Vector3F> inPositions, bool updateBoundingBox = true)
+        public Mesh SetTopology(PrimitiveType topology)
+        {
+            MeshTopology = topology;
+            return this;
+        }
+
+        public Mesh SetPositions(List<Vector3F> inPositions, bool updateBoundingBox = true)
         {
             if (inPositions == null || inPositions.Count == 0)
             {
-                return;
+                return this;
             }
 
             Positions = inPositions.ToArray();
@@ -86,13 +110,15 @@ namespace Adamantium.Engine.Core.Models
             }
             Semantic |= VertexSemantic.Position;
             IsModified = true;
+
+            return this;
         }
 
-        public void SetPositions(Vector3F[] inPositions, bool updateBoundingBox = true)
+        public Mesh SetPositions(Vector3F[] inPositions, bool updateBoundingBox = true)
         {
             if (inPositions == null || inPositions.Length == 0)
             {
-                return;
+                return this;
             }
 
             Positions = new Vector3F[inPositions.Length];
@@ -103,110 +129,91 @@ namespace Adamantium.Engine.Core.Models
             }
             Semantic |= VertexSemantic.Position;
             IsModified = true;
+
+            return this;
         }
 
-        public void SetIndices(List<int> indices)
+        public Mesh SetIndices(List<int> indices)
         {
             if (indices == null || indices.Count == 0)
             {
-                return;
+                return this;
             }
 
             Indices = indices.ToArray();
             IsModified = true;
+
+            return this;
         }
 
-        public void SetIndices(int[] indices)
+        public Mesh SetIndices(int[] indices)
         {
             if (indices == null || indices.Length == 0)
             {
-                return;
+                return this;
             }
 
             Indices = new int[indices.Length];
             indices.CopyTo(Indices, 0);
             IsModified = true;
+
+            return this;
         }
 
-        public void SetNormals(List<Vector3F> inNormals)
+        public Mesh SetNormals(List<Vector3F> inNormals)
         {
             if (inNormals == null || inNormals.Count == 0)
             {
-                return;
+                return this;
             }
 
-            Normals = inNormals.ToArray();
-            Semantic |= VertexSemantic.Normal;
-            IsModified = true;
+            return SetNormals(inNormals.ToArray());
         }
 
-        public void SetNormals(Vector3F[] inNormals)
+        public Mesh SetNormals(Vector3F[] inNormals)
         {
             if (inNormals == null || inNormals.Length == 0)
             {
-                return;
+                return this;
             }
 
             Normals = new Vector3F[inNormals.Length];
             inNormals.CopyTo(Normals, 0);
             Semantic |= VertexSemantic.Normal;
             IsModified = true;
+
+            return this;
         }
 
-        public void SetMeshTopology(PrimitiveType primitiveType)
-        {
-            MeshTopology = primitiveType;
-        }
-
-        public void SetColors(List<Color> inColors)
+        public Mesh SetColors(List<Color> inColors)
         {
             if (inColors == null || inColors.Count == 0)
             {
-                return;
+                return this;
             }
 
             Colors = inColors.ToArray();
             Semantic |= VertexSemantic.Color;
             IsModified = true;
+
+            return this;
         }
 
-        public void SetUVs(int channel, List<Vector2F> uvs)
+        public Mesh SetUVs(int channel, List<Vector2F> uvs)
         {
             if (uvs == null || uvs.Count == 0)
             {
-                return;
+                return this;
             }
 
-            switch (channel)
-            {
-                case 0:
-                    UV0 = uvs.ToArray();
-                    IsModified = true;
-                    Semantic |= VertexSemantic.UV0;
-                    break;
-                case 1:
-                    UV1 = uvs.ToArray();
-                    IsModified = true;
-                    Semantic |= VertexSemantic.UV1;
-                    break;
-                case 2:
-                    UV2 = uvs.ToArray();
-                    IsModified = true;
-                    Semantic |= VertexSemantic.UV2;
-                    break;
-                case 3:
-                    UV3 = uvs.ToArray();
-                    IsModified = true;
-                    Semantic |= VertexSemantic.UV3;
-                    break;
-            }
+            return SetUVs(channel, uvs.ToArray());
         }
 
-        public void SetUVs(int channel, Vector2F[] uvs)
+        public Mesh SetUVs(int channel, Vector2F[] uvs)
         {
             if (uvs == null || uvs.Length == 0)
             {
-                return;
+                return this;
             }
 
             switch (channel)
@@ -236,6 +243,8 @@ namespace Adamantium.Engine.Core.Models
                     Semantic |= VertexSemantic.UV3;
                     break;
             }
+
+            return this;
         }
 
         public void SetTangents(List<Vector4F> inTangents)
@@ -250,31 +259,35 @@ namespace Adamantium.Engine.Core.Models
             IsModified = true;
         }
 
-        public void SetBoneIndices(List<Vector4F> inBoneIndices)
+        public Mesh SetBoneIndices(List<Vector4F> inBoneIndices)
         {
             if (inBoneIndices == null || inBoneIndices.Count == 0)
             {
-                return;
+                return this;
             }
 
             BoneIndices = inBoneIndices.ToArray();
             Semantic |= VertexSemantic.JointIndices;
             IsModified = true;
+
+            return this;
         }
 
-        public void SetBoneWeights(List<Vector4F> inBoneWeights)
+        public Mesh SetBoneWeights(List<Vector4F> inBoneWeights)
         {
             if (inBoneWeights == null || inBoneWeights.Count == 0)
             {
-                return;
+                return this;
             }
 
             BoneWeights = inBoneWeights.ToArray();
             Semantic |= VertexSemantic.JointWeights;
             IsModified = true;
+
+            return this;
         }
 
-        public void ClearUVs(int channel)
+        public Mesh ClearUVs(int channel)
         {
             switch (channel)
             {
@@ -299,39 +312,45 @@ namespace Adamantium.Engine.Core.Models
                     IsModified = true;
                     break;
             }
+
+            return this;
         }
 
-        public void ClearBones()
+        public Mesh ClearBones()
         {
             BoneIndices = null;
             BoneWeights = null;
             Semantic &= ~VertexSemantic.JointIndices & ~VertexSemantic.JointWeights;
+
+            return this;
         }
 
-        public void ClearColors()
+        public Mesh ClearColors()
         {
             Colors = null;
             Semantic &= ~VertexSemantic.Color;
+
+            return this;
         }
 
-        public void Merge(Mesh mesh)
+        public Mesh Merge(Mesh mesh)
         {
-            Merge(new []{new MergeInstance(mesh, Matrix4x4F.Identity, false)});
+            return Merge(new []{new MergeInstance(mesh, Matrix4x4F.Identity, false)});
         }
 
-        public void Merge(params Mesh[] meshes)
+        public Mesh Merge(params Mesh[] meshes)
         {
             MergeInstance[] instances = new MergeInstance[meshes.Length];
             for (var i = 0; i < meshes.Length; i++)
             {
                 var mesh = meshes[i];
-                var mergeInstace = new MergeInstance(mesh, Matrix4x4F.Identity, false);
-                instances[i] = mergeInstace;
+                var mergeInstance = new MergeInstance(mesh, Matrix4x4F.Identity, false);
+                instances[i] = mergeInstance;
             }
-            Merge(instances);
+            return Merge(instances);
         }
 
-        public void Merge(MergeInstance[] instances, bool forceOptimization = false)
+        public Mesh Merge(MergeInstance[] instances, bool forceOptimization = false)
         {
             List<Vector3F> positions = new List<Vector3F>(Positions);
             List<Vector2F> uv0 = new List<Vector2F>(UV0);
@@ -355,7 +374,7 @@ namespace Adamantium.Engine.Core.Models
                     transformed = ApplyTransform(transformed, instance.Transform);
                 }
 
-                if (!instance.Mesh.HasIndiced)
+                if (!instance.Mesh.HasIndices)
                 {
                     instance.Mesh.GenerateBasicIndices();
                 }
@@ -381,6 +400,8 @@ namespace Adamantium.Engine.Core.Models
             {
                 Optimize();
             }
+
+            return this;
         }
 
         private void ShiftIndices(List<int> indices, int startIndex, int shiftValue)
@@ -407,24 +428,29 @@ namespace Adamantium.Engine.Core.Models
             return transformed;
         }
 
-        public void ApplyTransform(Matrix4x4F transform)
+        public Mesh ApplyTransform(Matrix4x4F? transform)
         {
-            if (transform.IsIdentity)
+            if (!transform.HasValue || transform.Value.IsIdentity)
             {
-                return;
+                return this;
             }
+
+            var transformMatrix = transform.Value;
 
             for (int i = 0; i < Positions.Length; i++)
             {
                 var position = Positions[i];
-                Vector3F.TransformCoordinate(ref position, ref transform, out position);
+                Vector3F.TransformCoordinate(ref position, ref transformMatrix, out position);
                 Positions[i] = position;
             }
+            
             CalculateNormals();
             CalculateTangentsAndBinormals();
             CalculateBoundingVolumes();
 
             IsModified = true;
+
+            return this;
         }
 
         public Mesh Clone()
@@ -490,16 +516,16 @@ namespace Adamantium.Engine.Core.Models
             return clonedMesh;
         }
 
-        public void Optimize(bool recalculateNormals = true, bool recalculateTangents = true)
+        public Mesh Optimize(bool recalculateNormals = true, bool recalculateTangents = true)
         {
             if (!Semantic.HasFlag(VertexSemantic.Position) 
                 || MeshTopology == PrimitiveType.LineStrip 
                 || MeshTopology == PrimitiveType.TriangleStrip)
             {
-                return;
+                return this;
             }
 
-            if (!HasIndiced)
+            if (!HasIndices)
             {
                 GenerateBasicIndices();
             }
@@ -527,13 +553,13 @@ namespace Adamantium.Engine.Core.Models
                 }
 
                 var position = Positions[index];
-                Vector2F uv0 = UV0 != null && UV0.Length - 1 >= i ? UV0[index] : Vector2F.Zero;
-                Vector2F uv1 = UV1 != null && UV1.Length - 1 >= i ? UV1[index] : Vector2F.Zero;
-                Vector2F uv2 = UV2 != null && UV2.Length - 1 >= i ? UV2[index] : Vector2F.Zero;
-                Vector2F uv3 = UV3 != null && UV3.Length - 1 >= i ? UV3[index] : Vector2F.Zero;
-                Color color = Colors != null && Colors.Length - 1 >= i ? Colors[index] : Mathematics.Colors.White;
-                Vector4F jointIndex = BoneIndices != null && BoneIndices.Length - 1 >= i ? BoneIndices[index] : Vector4F.Zero;
-                Vector4F jointWeight = BoneWeights != null && BoneWeights.Length - 1 >= i ? BoneWeights[index] : Vector4F.Zero;
+                Vector2F uv0 = UV0 != null && UV0.Length - 1 >= index ? UV0[index] : Vector2F.Zero;
+                Vector2F uv1 = UV1 != null && UV1.Length - 1 >= index ? UV1[index] : Vector2F.Zero;
+                Vector2F uv2 = UV2 != null && UV2.Length - 1 >= index ? UV2[index] : Vector2F.Zero;
+                Vector2F uv3 = UV3 != null && UV3.Length - 1 >= index ? UV3[index] : Vector2F.Zero;
+                Color color = Colors != null && Colors.Length - 1 >= index ? Colors[index] : Mathematics.Colors.White;
+                Vector4F jointIndex = BoneIndices != null && BoneIndices.Length - 1 >= index ? BoneIndices[index] : Vector4F.Zero;
+                Vector4F jointWeight = BoneWeights != null && BoneWeights.Length - 1 >= index ? BoneWeights[index] : Vector4F.Zero;
                 var vertex = new Vertex(position, uv0, uv1, uv2, uv3, color, jointIndex, jointWeight);
                 
                 if (!vertexDict.ContainsKey(vertex))
@@ -623,48 +649,54 @@ namespace Adamantium.Engine.Core.Models
             {
                 CalculateTangentsAndBinormals();
             }
+
+            return this;
         }
 
-        public void CalculateBoundingVolumes()
+        public Mesh CalculateBoundingVolumes()
         {
             Bounds = Bounds.FromPoints(Positions);
+
+            return this;
         }
 
-        public void CalculateNormals(bool smoothNormals = true)
+        public Mesh CalculateNormals(bool smoothNormals = true)
         {
-            if (MeshTopology == PrimitiveType.TriangleList && Positions.Length >= 3 && Indices.Length % 3 == 0)
+            if (MeshTopology != PrimitiveType.TriangleList || Positions.Length < 3 || Indices.Length % 3 != 0)
+                return this;
+            
+            Vector3F[] normalsNew = new Vector3F[Positions.Length];
+            for (int i = 0; i < Indices.Length; i += 3)
             {
-                Vector3F[] normalsNew = new Vector3F[Positions.Length];
-                for (int i = 0; i < Indices.Length; i += 3)
+                var v0 = Positions[Indices[i + 1]] - Positions[Indices[i]];
+                var v1 = Positions[Indices[i + 2]] - Positions[Indices[i]];
+                var n = Vector3F.Cross(v0, v1);
+                if (smoothNormals)
                 {
-                    var v0 = Positions[Indices[i + 1]] - Positions[Indices[i]];
-                    var v1 = Positions[Indices[i + 2]] - Positions[Indices[i]];
-                    var n = Vector3F.Cross(v0, v1);
-                    if (smoothNormals)
-                    {
-                        normalsNew[Indices[i]] += n;
-                        normalsNew[Indices[i + 1]] += n;
-                        normalsNew[Indices[i + 2]] += n;
-                    }
-                    else
-                    {
-                        normalsNew[Indices[i]] = n;
-                        normalsNew[Indices[i + 1]] = n;
-                        normalsNew[Indices[i + 2]] = n;
-                    }
+                    normalsNew[Indices[i]] += n;
+                    normalsNew[Indices[i + 1]] += n;
+                    normalsNew[Indices[i + 2]] += n;
                 }
-
-                Normals = new Vector3F[normalsNew.Length];
-                for (int i = 0; i < normalsNew.Length; ++i)
+                else
                 {
-                    Normals[i] = Vector3F.Normalize(normalsNew[i]);
+                    normalsNew[Indices[i]] = n;
+                    normalsNew[Indices[i + 1]] = n;
+                    normalsNew[Indices[i + 2]] = n;
                 }
-
-                Semantic |= VertexSemantic.Normal;
             }
+
+            Normals = new Vector3F[normalsNew.Length];
+            for (int i = 0; i < normalsNew.Length; ++i)
+            {
+                Normals[i] = Vector3F.Normalize(normalsNew[i]);
+            }
+
+            Semantic |= VertexSemantic.Normal;
+
+            return this;
         }
 
-        public void CalculateTangentsAndBinormals(int uvChannel = 0)
+        public Mesh CalculateTangentsAndBinormals(int uvChannel = 0)
         {
             if (MeshTopology == PrimitiveType.TriangleList && Semantic.HasFlag(VertexSemantic.UV0) && Semantic.HasFlag(VertexSemantic.Position))
             {
@@ -725,13 +757,15 @@ namespace Adamantium.Engine.Core.Models
                 BiTangents = bitangentArray;
                 Semantic |= VertexSemantic.TangentBiNormal;
             }
+
+            return this;
         }
 
-        public void AssemblePositions(List<int> positionIndices)
+        public Mesh AssemblePositions(List<int> positionIndices)
         {
             if (positionIndices == null || positionIndices.Count == 0 && Semantic.HasFlag(VertexSemantic.Position))
             {
-                return;
+                return this;
             }
 
             var assembledPositions = new List<Vector3F>();
@@ -742,13 +776,15 @@ namespace Adamantium.Engine.Core.Models
 
             Positions = assembledPositions.ToArray();
             IsModified = true;
+            
+            return this;
         }
 
-        public void AssembleUVs(List<int> uvIndices, int channel)
+        public Mesh AssembleUVs(List<int> uvIndices, int channel)
         {
             if (uvIndices == null || uvIndices.Count == 0)
             {
-                return;
+                return this;
             }
 
             var assembledUvs = new List<Vector2F>();
@@ -783,7 +819,7 @@ namespace Adamantium.Engine.Core.Models
 
             if (uv == null)
             {
-                return;
+                return this;
             }
 
             for (int i = 0; i < uvIndices.Count; i++)
@@ -810,13 +846,15 @@ namespace Adamantium.Engine.Core.Models
                     IsModified = true;
                     break;
             }
+            
+            return this;
         }
 
-        public void AssembleBones(List<int> positionIndices)
+        public Mesh AssembleBones(List<int> positionIndices)
         {
             if (positionIndices == null || positionIndices.Count == 0 && Semantic.HasFlag(VertexSemantic.JointIndices) && Semantic.HasFlag(VertexSemantic.JointWeights))
             {
-                return;
+                return this;
             }
 
             var assembledBoneIndices = new List<Vector4F>();
@@ -830,13 +868,15 @@ namespace Adamantium.Engine.Core.Models
             BoneIndices = assembledBoneIndices.ToArray();
             BoneWeights = assembledBoneWeights.ToArray();
             IsModified = true;
+            
+            return this;
         }
 
-        public void AssembleColors(List<int> colorIndices)
+        public Mesh AssembleColors(List<int> colorIndices)
         {
             if (colorIndices == null || colorIndices.Count == 0 && Semantic.HasFlag(VertexSemantic.Color))
             {
-                return;
+                return this;
             }
 
             var assembledColors = new List<Color>();
@@ -847,19 +887,21 @@ namespace Adamantium.Engine.Core.Models
 
             Colors = assembledColors.ToArray();
             IsModified = true;
+
+            return this;
         }
 
-        public void GenerateBasicIndices()
+        public Mesh GenerateBasicIndices()
         {
             if (!Semantic.HasFlag(VertexSemantic.Position))
             {
-                return;
+                return this;
             }
 
             int indicesCount = Positions.Length;
             if (MeshTopology == PrimitiveType.LineStrip || MeshTopology == PrimitiveType.TriangleStrip)
             {
-                indicesCount ++;
+                indicesCount++;
             }
 
             Indices = new int[indicesCount];
@@ -868,13 +910,10 @@ namespace Adamantium.Engine.Core.Models
                 Indices[i] = i;
             }
 
-            if (MeshTopology == PrimitiveType.LineStrip || MeshTopology == PrimitiveType.TriangleStrip)
-            {
-                Indices[indicesCount-1] = -1;
-            }
+            return this;
         }
 
-        public void ReverseWinding()
+        public Mesh ReverseWinding()
         {
             Vector3F temp = new Vector3F();
             if (MeshTopology == PrimitiveType.TriangleList)
@@ -887,14 +926,16 @@ namespace Adamantium.Engine.Core.Models
                     Indices[i + 2] = (int)temp.Y;
                 }
             }
+
+            return this;
         }
 
-        public void ChangeCoordinateSystem(UpAxis destinationUpAxis)
+        public Mesh ChangeCoordinateSystem(UpAxis destinationUpAxis)
         {
             Vector3F position;
             if (UpAxis == destinationUpAxis)
             {
-                return;
+                return this;
             }
 
             switch (UpAxis)
@@ -953,9 +994,11 @@ namespace Adamantium.Engine.Core.Models
                     }
                     break;
             }
+
+            return this;
         }
 
-        private void ConvertUVs(int index)
+        private Mesh ConvertUVs(int index)
         {
             Vector2F uv;
             if (Semantic.HasFlag(VertexSemantic.UV0))
@@ -985,6 +1028,8 @@ namespace Adamantium.Engine.Core.Models
                 uv.Y = 1.0f - uv.Y;
                 UV3[index] = uv;
             }
+
+            return this;
         }
 
     }

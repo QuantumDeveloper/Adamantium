@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Adamantium.Core;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Models;
 using Adamantium.Mathematics;
@@ -10,8 +11,6 @@ namespace Adamantium.Engine.Graphics
     {
         public class Teapot
         {
-            public static readonly PrimitiveType Topology = PrimitiveType.TriangleList;
-
             // The teapot model consists of 10 bezier patches. Each patch has 16 control
             // points, plus a flag indicating whether it should be mirrored in the Z axis
             // as well as in X (all of the teapot is symmetrical from left to right, but
@@ -188,8 +187,15 @@ namespace Adamantium.Engine.Graphics
 
 
             // Tessellates the specified bezier patch.
-            private static void TessellatePatch(List<Vector3F> vertices, List<Vector2F> uvs, List<int> indices, ref TeapotPatch patch, int tessellation, Vector3F scale,
-                                                bool isMirrored)
+            private static void TessellatePatch(
+                GeometryType geometryType,
+                List<Vector3F> vertices, 
+                List<Vector2F> uvs, 
+                List<int> indices, 
+                ref TeapotPatch patch, 
+                int tessellation, 
+                Vector3F scale, 
+                bool isMirrored)
             {
                 // Look up the 16 control points for this patch.
                 var controlPoints = new Vector3F[16];
@@ -201,7 +207,15 @@ namespace Adamantium.Engine.Graphics
 
                 // Create the index data.
                 int vbase = vertices.Count;
-                indices.AddRange(CreatePatchIndices(tessellation, isMirrored, vbase));
+                if (geometryType == GeometryType.Solid)
+                {
+                    indices.AddRange(CreateSolidPatchIndices(tessellation, isMirrored, vbase));
+                }
+                else
+                {
+                    indices.AddRange(CreateOutlinePatchIndices(tessellation, isMirrored, vbase));
+                }
+
                 CreatePatchVertices(controlPoints, tessellation, isMirrored, vertices, uvs);
             }
 
@@ -209,18 +223,28 @@ namespace Adamantium.Engine.Graphics
             /// Creates a teapot primitive.
             /// </summary>
             /// <param name="device">The device.</param>
+            /// <param name="geometryType"></param>
             /// <param name="size">The size.</param>
             /// <param name="tessellation">The tessellation.</param>
-            /// <param name="toRightHanded">if set to <c>true</c> vertices and indices will be transformed to left handed. Default is true.</param>
+            /// <param name="transform">Transform matrix to apply</param>
             /// <returns>GeometricPrimitive.</returns>
             /// <exception cref="System.ArgumentOutOfRangeException">tessellation;tessellation must be > 0</exception>
-            public static Shape New(GraphicsDevice device, float size = 1.0f, int tessellation = 8, Matrix4x4F? transform = null, bool toRightHanded = false)
+            public static Shape New(
+                GraphicsDevice device, 
+                GeometryType geometryType, 
+                float size = 1.0f, 
+                int tessellation = 8, 
+                Matrix4x4F? transform = null)
             {
-                var geometry = GenerateGeometry(size, tessellation, transform, toRightHanded);
+                var geometry = GenerateGeometry(geometryType, size, tessellation, transform);
                 return new Shape(device, geometry);
             }
 
-            public static Mesh GenerateGeometry(float size = 1.0f, int tessellation = 8, Matrix4x4F? transform = null, bool toRightHanded = false)
+            public static Mesh GenerateGeometry(
+                GeometryType geometryType, 
+                float size = 1.0f, 
+                int tessellation = 8, 
+                Matrix4x4F? transform = null)
             {
                 var vertices = new List<Vector3F>();
                 var uvs = new List<Vector2F>();
@@ -242,35 +266,30 @@ namespace Adamantium.Engine.Graphics
 
                     // Because the teapot is symmetrical from left to right, we only store
                     // data for one side, then tessellate each patch twice, mirroring in X.
-                    TessellatePatch(vertices, uvs, indices, ref patch, tessellation, scaleVector, false);
-                    TessellatePatch(vertices, uvs, indices, ref patch, tessellation, scaleNegateX, true);
+                    TessellatePatch(geometryType, vertices, uvs, indices, ref patch, tessellation, scaleVector, false);
+                    TessellatePatch(geometryType, vertices, uvs, indices, ref patch, tessellation, scaleNegateX, true);
 
                     if (patch.mirrorZ)
                     {
                         // Some parts of the teapot (the body, lid, and rim, but not the
                         // handle or spout) are also symmetrical from front to back, so
                         // we tessellate them four times, mirroring in Z as well as X.
-                        TessellatePatch(vertices, uvs, indices, ref patch, tessellation, scaleNegateZ, true);
-                        TessellatePatch(vertices, uvs, indices, ref patch, tessellation, scaleNegateXZ, false);
+                        TessellatePatch(geometryType, vertices, uvs, indices, ref patch, tessellation, scaleNegateZ, true);
+                        TessellatePatch(geometryType, vertices, uvs, indices, ref patch, tessellation, scaleNegateXZ, false);
                     }
                 }
 
                 var mesh = new Mesh();
-                mesh.MeshTopology = Topology;
-                mesh.SetPositions(vertices);
-                mesh.SetUVs(0, uvs);
-                mesh.SetIndices(indices);
-                if (toRightHanded)
+                mesh.MeshTopology = PrimitiveType.TriangleList;
+                if (geometryType == GeometryType.Outlined)
                 {
-                    mesh.ReverseWinding();
+                    mesh.MeshTopology = PrimitiveType.LineStrip;
                 }
-
-                if (transform.HasValue)
-                {
-                    mesh.ApplyTransform(transform.Value);
-                }
-
-                mesh.CalculateNormals();
+                mesh.SetPositions(vertices).
+                    SetUVs(0, uvs).
+                    SetIndices(indices).
+                    CalculateNormals().
+                    ApplyTransform(transform);
 
                 return mesh;
             }
@@ -368,7 +387,7 @@ namespace Adamantium.Engine.Graphics
                         }
 
                         // Compute the texture coordinate.
-                        float mirroredU = isMirrored ? u : 1.0f - u;
+                        float mirroredU = isMirrored ? 1.0f - u : u;
 
                         var textureCoordinate = new Vector2F(mirroredU, v);
 
@@ -381,7 +400,7 @@ namespace Adamantium.Engine.Graphics
 
             // Creates indices for a patch that is tessellated at the specified level.
             // Calls the specified outputIndex function for each generated index value.
-            private static IEnumerable<int> CreatePatchIndices(int tessellation, bool isMirrored, int baseIndex)
+            private static IEnumerable<int> CreateSolidPatchIndices(int tessellation, bool isMirrored, int baseIndex)
             {
                 int stride = tessellation + 1;
                 // Make a list of six index values (two triangles).
@@ -392,16 +411,51 @@ namespace Adamantium.Engine.Graphics
                     for (int j = 0; j < tessellation; j++)
                     {
                         indices[0] = baseIndex + i * stride + j;
-                        indices[1] = baseIndex + (i + 1) * stride + j + 1;
-                        indices[2] = baseIndex + (i + 1) * stride + j;
+                        indices[1] = baseIndex + (i + 1) * stride + j;
+                        indices[2] = baseIndex + (i + 1) * stride + j + 1;
+                        
                         indices[3] = baseIndex + i * stride + j;
-                        indices[4] = baseIndex + i * stride + j + 1;
-                        indices[5] = baseIndex + (i + 1) * stride + j + 1;
+                        indices[4] = baseIndex + (i + 1) * stride + j + 1;
+                        indices[5] = baseIndex + i * stride + j + 1;
 
                         // If this patch is mirrored, reverse indices to fix the winding order.
                         if (isMirrored)
                         {
                             Array.Reverse(indices);
+                        }
+
+                        foreach (var index in indices)
+                        {
+                            yield return index;
+                        }
+                    }
+                }
+            }
+            
+            // Creates indices for a patch that is tessellated at the specified level.
+            // Calls the specified outputIndex function for each generated index value.
+            private static IEnumerable<int> CreateOutlinePatchIndices(int tessellation, bool isMirrored, int baseIndex)
+            {
+                int stride = tessellation + 1;
+                // Make a list of six index values (two triangles).
+                var indices = new int[5];
+
+                for (int i = 0; i < tessellation; i++)
+                {
+                    for (int j = 0; j < tessellation; j++)
+                    {
+                        indices[0] = baseIndex + i * stride + j;
+                        indices[1] = baseIndex + (i + 1) * stride + j;
+                        indices[2] = baseIndex + (i + 1) * stride + j + 1;
+                        
+                        indices[3] = baseIndex + i * stride + j + 1;
+                        indices[4] = Shape.PrimitiveRestartValue;
+                        
+                        // If this patch is mirrored, reverse indices to fix the winding order.
+                        if (isMirrored)
+                        {
+                            Array.Reverse(indices);
+                            Utilities.Swap(ref indices[4], ref indices[0]);
                         }
 
                         foreach (var index in indices)

@@ -14,8 +14,7 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
             GeometryType geometryType,
             Vector2F diameter,
             int tessellation,
-            Matrix4x4F? transform = null,
-            bool toRightHanded = false) : base(geometryType, tessellation, transform, toRightHanded)
+            Matrix4x4F? transform = null) : base(geometryType, tessellation, transform)
         {
             this.diameter = diameter;
         }
@@ -32,7 +31,7 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
 
         public override Task<Entity> BuildEntity(Entity owner)
         {
-            var primitive = Shapes.Polygon.GenerateGeometry(GeometryType, diameter, Tessellation, Transform, ToRightHanded);
+            var primitive = Shapes.Polygon.GenerateGeometry(GeometryType, diameter, Tessellation, Transform);
             return Task.FromResult(BuildEntityFromPrimitive(owner, primitive));
         }
     }

@@ -44,7 +44,6 @@ namespace Adamantium.Engine.Graphics
                     var sideOffset = normal * radius;
 
                     var uv = new Vector2F((float)i / tessellation, 0);
-                    uv.X = 1.0f - uv.X;
 
                     vertices.Add(sideOffset + topOffset);
                     uvs.Add(uv);
@@ -56,26 +55,28 @@ namespace Adamantium.Engine.Graphics
                     {
                         indices.Add(i * 2 + vbase);
                         index = (i * 2 + 2) % (stride * 2);
-                        indices.Add(index + vbase);
                         indices.Add(i * 2 + 1 + vbase);
+                        indices.Add(index + vbase);
 
                         indices.Add(i * 2 + 1 + vbase);
-                        index = (i * 2 + 2) % (stride * 2);
-                        indices.Add(index + vbase);
                         index = (i * 2 + 3) % (stride * 2);
+                        indices.Add(index + vbase);
+                        index = (i * 2 + 2) % (stride * 2);
                         indices.Add(index + vbase);
                     }
                     else
                     {
                         indices.Add(i * 2 + vbase);
-                        indices.Add(i * 2 + 1 + vbase);
                         index = (i * 2 + 2) % (stride * 2);
                         indices.Add(index + vbase);
+                        indices.Add(i * 2 + 1 + vbase);
 
                         indices.Add(i * 2 + 1 + vbase);
-                        index = (i * 2 + 3) % (stride * 2);
-                        indices.Add(index + vbase);
+                        
                         index = (i * 2 + 2) % (stride * 2);
+                        indices.Add(index + vbase);
+                        
+                        index = (i * 2 + 3) % (stride * 2);
                         indices.Add(index + vbase);
                     }
                 }
@@ -132,26 +133,26 @@ namespace Adamantium.Engine.Graphics
                     {
                         indices.Add(i * 2 + vbase);
                         index = (i * 2 + 2) % (stride * 2);
-                        indices.Add(index + vbase);
                         indices.Add(i * 2 + 1 + vbase);
+                        indices.Add(index + vbase);
 
                         indices.Add(i * 2 + 1 + vbase);
-                        index = (i * 2 + 2) % (stride * 2);
-                        indices.Add(index + vbase);
                         index = (i * 2 + 3) % (stride * 2);
+                        indices.Add(index + vbase);
+                        index = (i * 2 + 2) % (stride * 2);
                         indices.Add(index + vbase);
                     }
                     else
                     {
                         indices.Add(i * 2 + vbase);
-                        indices.Add(i * 2 + 1 + vbase);
                         index = (i * 2 + 2) % (stride * 2);
                         indices.Add(index + vbase);
+                        indices.Add(i * 2 + 1 + vbase);
 
                         indices.Add(i * 2 + 1 + vbase);
-                        index = (i * 2 + 3) % (stride * 2);
-                        indices.Add(index + vbase);
                         index = (i * 2 + 2) % (stride * 2);
+                        indices.Add(index + vbase);
+                        index = (i * 2 + 3) % (stride * 2);
                         indices.Add(index + vbase);
                     }
                 }
@@ -163,8 +164,7 @@ namespace Adamantium.Engine.Graphics
                 float height,
                 float thickness,
                 int tessellation = 36,
-                Matrix4x4F? transform = null,
-                bool toRightHanded = false)
+                Matrix4x4F? transform = null)
             {
                 if (tessellation < 3)
                 {
@@ -174,17 +174,14 @@ namespace Adamantium.Engine.Graphics
                 Mesh mesh;
                 if (geometryType == GeometryType.Solid)
                 {
-                    mesh = GenerateSolidGeometry(diameter, height, thickness, tessellation, toRightHanded);
+                    mesh = GenerateSolidGeometry(diameter, height, thickness, tessellation);
                 }
                 else
                 {
                     mesh = GenerateOutlinedGeometry(diameter, height, thickness, tessellation);
                 }
 
-                if (transform.HasValue)
-                {
-                    mesh.ApplyTransform(transform.Value);
-                }
+                mesh.ApplyTransform(transform);
 
                 return mesh;
             }
@@ -193,8 +190,7 @@ namespace Adamantium.Engine.Graphics
                 float diameter,
                 float height,
                 float thickness,
-                int tessellation = 40,
-                bool toRightHanded = false)
+                int tessellation = 40)
             {
                 PrimitiveType primitiveType = PrimitiveType.TriangleList;
 
@@ -215,10 +211,6 @@ namespace Adamantium.Engine.Graphics
                 mesh.SetPositions(vertices);
                 mesh.SetIndices(indices);
                 mesh.SetUVs(0, uvs);
-                if (toRightHanded)
-                {
-                    mesh.ReverseWinding();
-                }
                 mesh.CalculateNormals();
 
                 return mesh;
@@ -241,9 +233,9 @@ namespace Adamantium.Engine.Graphics
                 GenerateOutlinedCaps(vertices, indices, radius, height, thickness, tessellation, false);
 
                 var mesh = new Mesh();
-                mesh.MeshTopology =  PrimitiveType.LineStrip;
-                mesh.SetPositions(vertices);
-                mesh.SetIndices(indices);
+                mesh.SetTopology(PrimitiveType.LineStrip).
+                    SetPositions(vertices).
+                    SetIndices(indices);
 
                 return mesh;
             }
@@ -267,7 +259,7 @@ namespace Adamantium.Engine.Graphics
                     indices.Add(lastIndex++);
                 }
 
-                indices.Add(Shape.StripSeparatorValue);
+                indices.Add(Shape.PrimitiveRestartValue);
 
                 for (int i = 0; i <= tessellation; ++i)
                 {
@@ -277,7 +269,7 @@ namespace Adamantium.Engine.Graphics
                     indices.Add(lastIndex++);
                 }
 
-                indices.Add(Shape.StripSeparatorValue);
+                indices.Add(Shape.PrimitiveRestartValue);
 
                 for (int i = 0; i <= tessellation; ++i)
                 {
@@ -287,7 +279,7 @@ namespace Adamantium.Engine.Graphics
                     vertices.Add(sideOffset + topOffset);
                     indices.Add(lastIndex++);
                     indices.Add(lastIndex++);
-                    indices.Add(Shape.StripSeparatorValue);
+                    indices.Add(Shape.PrimitiveRestartValue);
                 }
             }
 
@@ -320,7 +312,7 @@ namespace Adamantium.Engine.Graphics
                     vertices.Add(position);
                     indices.Add(lastIndex++);
 
-                    indices.Add(Shape.StripSeparatorValue);
+                    indices.Add(Shape.PrimitiveRestartValue);
                 }
             }
 
@@ -330,24 +322,22 @@ namespace Adamantium.Engine.Graphics
             /// <param name="device">The device.</param>
             /// <param name="geometryType"></param>
             /// <param name="height">The height.</param>
-            /// <param name="topDiameter">Diameter of the top side</param>
-            /// <param name="bottomDiameter">Diameter of the bottom side</param>
+            /// <param name="diameter">Diameter of the top side</param>
+            /// <param name="thickness">Thickness of the tube</param>
             /// <param name="tessellation">The tessellation.</param>
             /// <param name="transform"></param>
-            /// <param name="toRightHanded">if set to <c>true</c> vertices and indices will be transformed to right handed. Default is false.</param>
             /// <returns>A tube primitive.</returns>
             /// <exception cref="ArgumentOutOfRangeException">tessellation;tessellation must be &gt;= 3</exception>
             public static Shape New(
                 GraphicsDevice device,
                 GeometryType geometryType,
-                float height = 1.0f,
-                float topDiameter = 0.05f,
-                float bottomDiameter = 1f,
-                int tessellation = 32,
-                Matrix4x4F? transform = null,
-                bool toRightHanded = false)
+                float diameter,
+                float height,
+                float thickness,
+                int tessellation = 36,
+                Matrix4x4F? transform = null)
             {
-                var geometry = GenerateGeometry(geometryType, height, topDiameter, bottomDiameter, tessellation, transform, toRightHanded);
+                var geometry = GenerateGeometry(geometryType, diameter, height, thickness, tessellation, transform);
                 // Create the primitive object.
                 return new Shape(device, geometry);
             }

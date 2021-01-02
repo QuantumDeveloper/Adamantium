@@ -312,7 +312,7 @@ namespace Adamantium.EntityFramework.Processors
 
             if (inputService.IsKeyPressed(Keys.F12))
             {
-                foreach (var window in gamePlatform.Windows)
+                foreach (var window in gamePlatform.Outputs)
                 {
                     var filename = $"Screenshot_{window.Name}" + DateTime.Now.ToString("dd_MM_yyyy hh_mm_ss_ffff", CultureInfo.InvariantCulture) + ".jpg";
                     window?.TakeScreenshot(filename, ImageFileType.Jpg);

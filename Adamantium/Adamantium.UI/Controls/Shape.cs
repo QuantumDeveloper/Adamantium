@@ -88,12 +88,12 @@ namespace Adamantium.UI.Controls
       public virtual Geometry RenderGeometry { get; private set; }
 
 
-      private static void PropertyChangedCallback(DependencyComponent adamantiumObject, AdamantiumPropertyChangedEventArgs adamantiumPropertyChangedEventArgs)
+      private static void PropertyChangedCallback(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs adamantiumPropertyChangedEventArgs)
       {
 
       }
 
-      private static object CoerceStrokeThickness(DependencyComponent adamantiumObject, object baseValue)
+      private static object CoerceStrokeThickness(AdamantiumComponent adamantiumObject, object baseValue)
       {
          Double value = (Double) baseValue;
          if (value < 0)

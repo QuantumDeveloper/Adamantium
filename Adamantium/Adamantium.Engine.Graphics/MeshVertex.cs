@@ -36,7 +36,7 @@ namespace Adamantium.Engine.Graphics
           : this()
        {
           Position = position;
-          Color = color;
+          Color = color.ToVector4();
           Normal = normal;
           UV0 = uv0;
           UV1 = uv1;
@@ -54,7 +54,7 @@ namespace Adamantium.Engine.Graphics
         /// <summary>
         /// The vertex color.
         /// </summary>
-        [VertexInputElement("COLOR")] public Color Color;
+        [VertexInputElement("COLOR")] public Vector4F Color;
 
         /// <summary>
         /// The vertex normal.

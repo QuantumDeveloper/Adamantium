@@ -76,7 +76,7 @@ namespace Adamantium.Engine.Graphics
             scissors = new TrackingCollection<Rect2D>();
 
             BlendState = BlendStates.Default;
-            RasterizerState = RasterizerStates.Default;
+            RasterizerState = RasterizerStates.CullBackClipDisabled;
             DepthStencilState = DepthStencilStates.Default;
 
             pipelineManager = new PipelineManager(this);
@@ -90,6 +90,8 @@ namespace Adamantium.Engine.Graphics
         internal Semaphore[] ImageAvailableSemaphores { get; private set; }
         internal Semaphore[] RenderFinishedSemaphores { get; private set; }
         internal Fence[] InFlightFences { get; private set; }
+
+        public event Action FrameFinished;
 
         public uint CurrentFrame { get; private set; }
 
@@ -529,9 +531,8 @@ namespace Adamantium.Engine.Graphics
             renderPassInfo.ClearValueCount = (uint)renderPassInfo.PClearValues.Length;
 
             commandBuffer.BeginRenderPass(renderPassInfo, SubpassContents.Inline);
-
             
-            
+            ShouldChangeGraphicsPipeline = true;
             
             //commandBuffer.BindPipeline(PipelineBindPoint.Graphics, graphicsPipeline);
 
@@ -577,6 +578,8 @@ namespace Adamantium.Engine.Graphics
             {
                 throw new Exception($"failed to submit draw command buffer! Result was {result}");
             }
+
+            FrameFinished?.Invoke();
         }
 
         private void UpdateCurrentFrameNumber()
@@ -626,7 +629,7 @@ namespace Adamantium.Engine.Graphics
         {
             if (CurrentEffectPass == null)
             {
-                throw new ArgumentNullException("Effect pass should be applied before executiong draw");
+                throw new ArgumentNullException("Effect pass should be applied before executing draw");
             }
             
             var commandBuffer = commandBuffers[ImageIndex];
@@ -640,7 +643,7 @@ namespace Adamantium.Engine.Graphics
                 CurrentEffectPass.PipelineLayout, 
                 0, 
                 1, 
-                CurrentEffectPass.DescriptorSets[(int) ImageIndex], 
+                CurrentEffectPass.CurrentDescriptors[(int) ImageIndex], 
                 0, 
                 0);
 
@@ -657,12 +660,13 @@ namespace Adamantium.Engine.Graphics
             ShouldChangeGraphicsPipeline = false;
 
             commandBuffer.BindPipeline(pipeline.BindPoint, pipeline);
+            
             commandBuffer.BindDescriptorSets(
                 PipelineBindPoint.Graphics,
                 CurrentEffectPass.PipelineLayout,
                 0,
                 1,
-                CurrentEffectPass.DescriptorSets[(int)ImageIndex],
+                CurrentEffectPass.CurrentDescriptors[(int) ImageIndex],
                 0,
                 0);
 

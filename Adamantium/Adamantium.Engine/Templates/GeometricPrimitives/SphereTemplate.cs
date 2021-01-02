@@ -16,8 +16,7 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
             SphereType sphereType,
             float diameter,
             int tessellation = 3,
-            Matrix4x4F? transform = null,
-            bool toRightHanded = false) : base(geometryType, tessellation, transform, toRightHanded)
+            Matrix4x4F? transform = null) : base(geometryType, tessellation, transform)
         {
             this.diameter = diameter;
             this.sphereType = sphereType;
@@ -34,7 +33,7 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
 
         public override Task<Entity> BuildEntity(Entity owner)
         {
-            var primitive3D = Shapes.Sphere.GenerateGeometry(GeometryType, sphereType, diameter, Tessellation, Transform, ToRightHanded);
+            var primitive3D = Shapes.Sphere.GenerateGeometry(GeometryType, sphereType, diameter, Tessellation, Transform);
             return Task.FromResult(BuildEntityFromPrimitive(owner, primitive3D, BoundingVolume.Sphere));
         }
     }

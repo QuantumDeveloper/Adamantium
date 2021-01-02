@@ -19,7 +19,6 @@ namespace Adamantium.Engine.Graphics
             /// <param name="diameter">The diameter.</param>
             /// <param name="tessellation">The tessellation.</param>
             /// <param name="transform">Transform matrix</param>
-            /// <param name="toRightHanded">if set to <c>true</c> vertices and indices will be transformed to left handed. Default is true.</param>
             /// <returns>A cylinder primitive.</returns>
             /// <exception cref="System.ArgumentOutOfRangeException">tessellation;tessellation must be &gt;= 3</exception>
             public static Shape New(
@@ -27,11 +26,10 @@ namespace Adamantium.Engine.Graphics
                 GeometryType geometryType,
                 float height = 1.0f,
                 float diameter = 1.0f,
-                int tessellation = 32,
-                Matrix4x4F? transform = null,
-                bool toRightHanded = false)
+                int tessellation = 16,
+                Matrix4x4F? transform = null)
             {
-                var geometry = GenerateGeometry(geometryType, height, diameter, tessellation, transform, toRightHanded);
+                var geometry = GenerateGeometry(geometryType, height, diameter, tessellation, transform);
                 return new Shape(device, geometry);
             }
 
@@ -40,8 +38,7 @@ namespace Adamantium.Engine.Graphics
                 float height,
                 float diameter,
                 int tessellation = 40,
-                Matrix4x4F? transform = null,
-                bool toRightHanded = false)
+                Matrix4x4F? transform = null)
             {
                 if (tessellation < 8)
                 {
@@ -51,17 +48,14 @@ namespace Adamantium.Engine.Graphics
                 Mesh mesh;
                 if (geometryType == GeometryType.Solid)
                 {
-                    mesh = GenerateSolidGeometry(height, radius, tessellation, toRightHanded);
+                    mesh = GenerateSolidGeometry(height, radius, tessellation);
                 }
                 else
                 {
                     mesh = GenerateOutlinedGeometry(height, radius, tessellation);
                 }
-
-                if (transform.HasValue)
-                {
-                    mesh.ApplyTransform(transform.Value);
-                }
+                
+                mesh.ApplyTransform(transform);
 
                 return mesh;
             }
@@ -69,8 +63,7 @@ namespace Adamantium.Engine.Graphics
             private static Mesh GenerateSolidGeometry(
                 float height,
                 float radius,
-                int tessellation = 40,
-                bool toRightHanded = false)
+                int tessellation = 40)
             {
                 PrimitiveType primitiveType = PrimitiveType.TriangleList;
                 List<Vector3F> vertices = new List<Vector3F>();
@@ -121,7 +114,7 @@ namespace Adamantium.Engine.Graphics
                         dz *= dxz;
 
                         var normal = new Vector3F(dx, dy, dz);
-                        var uv = new Vector2F(u * uScale, v * vScale);
+                        var uv = new Vector2F(1.0f - (u * uScale), 1.0f - (v * vScale));
                         var position = radius * normal + new Vector3F(0, deltaY, 0);
                         vertices.Add(position);
                         uvs.Add(uv);
@@ -139,26 +132,21 @@ namespace Adamantium.Engine.Graphics
                         int nextJ = (j + 1) % stride;
 
                         indices.Add(i * stride + j);
-                        indices.Add(i * stride + nextJ);
                         indices.Add(nextI * stride + j);
+                        indices.Add(i * stride + nextJ);
 
                         indices.Add(i * stride + nextJ);
-                        indices.Add(nextI * stride + nextJ);
                         indices.Add(nextI * stride + j);
+                        indices.Add(nextI * stride + nextJ);
                     }
                 }
 
                 var mesh = new Mesh();
-                mesh.MeshTopology = primitiveType;
-                mesh.SetPositions(vertices);
-                mesh.SetUVs(0, uvs);
-                mesh.SetIndices(indices);
-                mesh.Optimize();
-
-                if (toRightHanded)
-                {
-                    mesh.ReverseWinding();
-                }
+                mesh.SetTopology(primitiveType).
+                    SetPositions(vertices).
+                    SetUVs(0, uvs).
+                    SetIndices(indices).
+                    Optimize();
 
                 return mesh;
             }
@@ -198,7 +186,7 @@ namespace Adamantium.Engine.Graphics
                 }
 
                 indices.Add(0);
-                indices.Add(Shape.StripSeparatorValue);
+                indices.Add(Shape.PrimitiveRestartValue);
                 var startPos = vertices.Count;
 
                 QuaternionF rot = QuaternionF.RotationAxis(Vector3F.UnitY, MathHelper.DegreesToRadians(90));
@@ -214,7 +202,7 @@ namespace Adamantium.Engine.Graphics
                 vertices.AddRange(secondPart);
 
                 indices.Add(startPos);
-                indices.Add(Shape.StripSeparatorValue);
+                indices.Add(Shape.PrimitiveRestartValue);
 
 
                 for (int i = 0; i <= tessellation; ++i)
@@ -228,7 +216,7 @@ namespace Adamantium.Engine.Graphics
                     indices.Add(lastIndex++);
                 }
 
-                indices.Add(Shape.StripSeparatorValue);
+                indices.Add(Shape.PrimitiveRestartValue);
 
                 for (int i = 0; i <= tessellation; ++i)
                 {
@@ -242,9 +230,9 @@ namespace Adamantium.Engine.Graphics
                 }
 
                 var mesh = new Mesh();
-                mesh.MeshTopology = primitiveType;
-                mesh.SetPositions(vertices);
-                mesh.SetIndices(indices);
+                mesh.SetTopology(primitiveType).
+                    SetPositions(vertices).
+                    SetIndices(indices);
 
                 return mesh;
             }

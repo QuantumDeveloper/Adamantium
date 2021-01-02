@@ -21,7 +21,7 @@ namespace Adamantium.UI.Controls
                PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange,
                ResizeBehaviorChanged));
 
-      private static void ResizeSchemenChanged(DependencyComponent adamantiumObject, AdamantiumPropertyChangedEventArgs adamantiumPropertyChangedEventArgs)
+      private static void ResizeSchemenChanged(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs adamantiumPropertyChangedEventArgs)
       {
          var splitter = adamantiumObject as GridSplitter;
          if (splitter != null && splitter.grid != null)
@@ -55,7 +55,7 @@ namespace Adamantium.UI.Controls
       public GridSplitter()
       { }
 
-      private static void ResizeDirectionChanged(DependencyComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
+      private static void ResizeDirectionChanged(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
       {
          var splitter = adamantiumObject as GridSplitter;
          if (splitter != null && splitter.IsAttachedToVisualTree)
@@ -64,7 +64,7 @@ namespace Adamantium.UI.Controls
          }
       }
 
-      private static void ResizeBehaviorChanged(DependencyComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
+      private static void ResizeBehaviorChanged(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
       {
          var splitter = adamantiumObject as GridSplitter;
          if (splitter != null && splitter.IsAttachedToVisualTree)

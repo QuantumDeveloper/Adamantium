@@ -8,21 +8,20 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
 {
     public class LineTemplate : PrimitiveTemplate
     {
-        private float _thickness;
-        private Vector3F _startPoint;
-        private Vector3F _endPoint;
+        private float thickness;
+        private Vector3F startPoint;
+        private Vector3F endPoint;
 
         public LineTemplate(
             GeometryType geometryType,
             Vector3F startPoint,
             Vector3F endPoint,
             float thickness,
-            Matrix4x4F? transform = null,
-            bool toRightHanded = false) : base(geometryType, 1, transform, toRightHanded)
+            Matrix4x4F? transform = null) : base(geometryType, 1, transform)
         {
-            _startPoint = startPoint;
-            _endPoint = endPoint;
-           _thickness = thickness;
+           this. startPoint = startPoint;
+           this. endPoint = endPoint;
+           this.thickness = thickness;
         }
 
         protected override void FillMetadata(
@@ -30,13 +29,13 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
         {
             metadata.GeometryType = GeometryType;
             metadata.ShapeType = ShapeType.Ellipse;
-            metadata.Thickness = _thickness;
+            metadata.Thickness = thickness;
             metadata.TessellationFactor = Tessellation;
         }
 
         public override Task<Entity> BuildEntity(Entity owner)
         {
-            var primitive3D = Shapes.Line.GenerateGeometry(GeometryType.Solid, _startPoint, _endPoint, _thickness);
+            var primitive3D = Shapes.Line.GenerateGeometry(GeometryType.Solid, startPoint, endPoint, thickness);
             return Task.FromResult(BuildEntityFromPrimitive(owner, primitive3D));
         }
     }

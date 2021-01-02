@@ -13,12 +13,23 @@ namespace Adamantium.Engine.Graphics
         {
             public static readonly PrimitiveType PrimitiveType = PrimitiveType.TriangleList;
 
-            public static Mesh GenerateGeometry(GeometryType geometryType, float width, float length, int tessellation = 1, Matrix4x4F? transform = null, bool toRightHanded = false)
+            public static Mesh GenerateGeometry(
+                GeometryType geometryType, 
+                float width, 
+                float length, 
+                int tessellation = 1, 
+                Matrix4x4F? transform = null)
             {
-                return GenerateGeometry(geometryType, width, length, tessellation, Vector2F.One, transform, toRightHanded);
+                return GenerateGeometry(geometryType, width, length, tessellation, Vector2F.One, transform);
             }
 
-            public static Mesh GenerateGeometry(GeometryType geometryType, float width, float length, int tessellation, Vector2F uvFactor, Matrix4x4F? transform = null, bool toRightHanded = false)
+            public static Mesh GenerateGeometry(
+                GeometryType geometryType, 
+                float width, 
+                float length, 
+                int tessellation, 
+                Vector2F uvFactor, 
+                Matrix4x4F? transform = null)
             {
                 if (width <= 0)
                 {
@@ -38,17 +49,14 @@ namespace Adamantium.Engine.Graphics
                 Mesh mesh;
                 if (geometryType == GeometryType.Solid)
                 {
-                    mesh = GenerateSolidGeometry(width, length, tessellation, uvFactor, toRightHanded);
+                    mesh = GenerateSolidGeometry(width, length, tessellation, uvFactor);
                 }
                 else
                 {
                     mesh = GenerateOutlinedGeometry(width, length);
                 }
 
-                if (transform.HasValue)
-                {
-                    mesh.ApplyTransform(transform.Value);
-                }
+                mesh.ApplyTransform(transform);
 
                 return mesh;
             }
@@ -57,8 +65,7 @@ namespace Adamantium.Engine.Graphics
                 float width,
                 float length,
                 int tessellation,
-                Vector2F uvFactor,
-                bool toRightHanded = false)
+                Vector2F uvFactor)
             {
                 var lineWidth = tessellation + 1;
                 var vertices = new Vector3F[lineWidth * lineWidth];
@@ -112,16 +119,11 @@ namespace Adamantium.Engine.Graphics
                 }
 
                 var mesh = new Mesh();
-                mesh.MeshTopology = PrimitiveType;
-                mesh.SetPositions(vertices);
-                mesh.SetUVs(0, uvs);
-                mesh.SetIndices(indices);
-                if (toRightHanded)
-                {
-                    mesh.ReverseWinding();
-                }
-
-                mesh.CalculateNormals();
+                mesh.SetTopology(PrimitiveType).
+                    SetPositions(vertices).
+                    SetUVs(0, uvs).
+                    SetIndices(indices).
+                    CalculateNormals();
 
                 return mesh;
             }
@@ -133,22 +135,30 @@ namespace Adamantium.Engine.Graphics
                 var startPositionX = width / 2;
                 var startPositionY = length / 2;
 
-                var verticies = new List<Vector3F>();
-                verticies.Add(new Vector3F(-startPositionX, -startPositionY, 0));
-                verticies.Add(new Vector3F(-startPositionX, startPositionY, 0));
-                verticies.Add(new Vector3F(startPositionX, startPositionY, 0));
-                verticies.Add(new Vector3F(startPositionX, -startPositionY, 0));
+                var vertices = new List<Vector3F>();
+                vertices.Add(new Vector3F(-startPositionX, -startPositionY, 0));
+                vertices.Add(new Vector3F(startPositionX, -startPositionY, 0));
+                vertices.Add(new Vector3F(startPositionX, startPositionY, 0));
+                vertices.Add(new Vector3F(-startPositionX, startPositionY, 0));
 
                 var mesh = new Mesh();
-                mesh.SetPositions(verticies);
-                mesh.MeshTopology = PrimitiveType.LineStrip;
-
+                mesh.SetTopology(PrimitiveType.LineStrip).
+                    SetPositions(vertices).
+                    GenerateBasicIndices();
+                
                 return mesh;
             }
 
-            public static Shape New(GraphicsDevice device, GeometryType geometryType, float width, float length, int tessellation, Vector2F uvFactor, Matrix4x4F? transform = null, bool rightHanded = false)
+            public static Shape New(
+                GraphicsDevice device, 
+                GeometryType geometryType, 
+                float width, 
+                float length, 
+                int tessellation, 
+                Vector2F uvFactor, 
+                Matrix4x4F? transform = null)
             {
-                var geometry = GenerateGeometry(geometryType, width, length, tessellation, uvFactor, transform, rightHanded);
+                var geometry = GenerateGeometry(geometryType, width, length, tessellation, uvFactor, transform);
                 return new Shape(device, geometry);
             }
 

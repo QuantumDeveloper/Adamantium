@@ -10,7 +10,31 @@ namespace Adamantium.Engine.Graphics
     {
         public class Arc
         {
-            public static Mesh GenerateGeometry(
+            public static Shape New(
+                GraphicsDevice graphicsDevice,
+                GeometryType shapeType,
+                Vector2F diameter,
+                float thickness,
+                float startAngle = 0,
+                float stopAngle = 360,
+                bool isClockWise = true,
+                int tessellation = 36,
+                Matrix4x4F? transform = null)
+            {
+                var mesh = GenerateGeometry(
+                    shapeType, 
+                    diameter, 
+                    thickness, 
+                    startAngle, 
+                    stopAngle, 
+                    isClockWise,
+                    tessellation, 
+                    transform);
+                
+                return new Shape(graphicsDevice, mesh);
+            }
+
+        public static Mesh GenerateGeometry(
                GeometryType shapeType,
                Vector2F diameter,
                float thickness,
@@ -18,8 +42,7 @@ namespace Adamantium.Engine.Graphics
                float stopAngle = 360,
                bool isClockWise = true,
                int tessellation = 36,
-               Matrix4x4F? transform = null,
-               bool toRightHanded = false)
+               Matrix4x4F? transform = null)
             {
                 if (Math.Abs(stopAngle - startAngle) > 360)
                 {
@@ -73,25 +96,20 @@ namespace Adamantium.Engine.Graphics
                         angle += angleItem;
                     }
 
-                    mesh.SetPositions(vertices);
-                    mesh.GenerateBasicIndices();
-                    mesh.Optimize();
+                    mesh.SetPositions(vertices).
+                        GenerateBasicIndices().
+                        Optimize();
 
                     for (int i = 0; i < mesh.Positions.Length; ++i)
                     {
                         var position = mesh.Positions[i];
-                        var uv2 = new Vector2D(
+                        var uv = new Vector2D(
                            0.5f + (position.X - center.X) / (2 * radiusX),
                            0.5f - (position.Y - center.Y) / (2 * radiusY));
-                        uvs.Add(uv2);
+                        uvs.Add(uv);
                     }
 
                     mesh.SetUVs(0, uvs);
-
-                    if (toRightHanded)
-                    {
-                        mesh.ReverseWinding();
-                    }
                 }
                 else
                 {
@@ -114,7 +132,7 @@ namespace Adamantium.Engine.Graphics
                     }
                     else
                     {
-                        indices.Add(Shape.StripSeparatorValue);
+                        indices.Add(Shape.PrimitiveRestartValue);
                     }
 
                     for (int i = tessellation; i >= 0; --i)
@@ -130,8 +148,8 @@ namespace Adamantium.Engine.Graphics
                         indices.Add(0);
                     }
 
-                    mesh.SetPositions(vertices);
-                    mesh.SetIndices(indices);
+                    mesh.SetPositions(vertices).
+                        SetIndices(indices);
                 }
 
                 if (transform.HasValue)

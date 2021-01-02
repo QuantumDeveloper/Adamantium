@@ -23,13 +23,13 @@ namespace Adamantium.Engine.Graphics.Effects
         /// </summary>
         public readonly DataBuffer BackingBuffer;
 
-        internal EffectData.ConstantBuffer Description;
+        public EffectData.ConstantBuffer Description;
 
         private GraphicsDevice device;
         private readonly int hashCode;
         private DataPointer pointer;
 
-        internal EffectConstantBuffer(GraphicsDevice device, EffectData.ConstantBuffer description)
+        public EffectConstantBuffer(GraphicsDevice device, EffectData.ConstantBuffer description)
         {
             BackingBuffer = new DataBuffer(description.Size);
             this.device = device;
@@ -107,6 +107,17 @@ namespace Adamantium.Engine.Graphics.Effects
                 pointer.Pointer = BackingBuffer.DataPointer;
                 pointer.Size = BackingBuffer.Size;
                 NativeBuffer.SetData(graphicsDevice, pointer);
+                IsDirty = false;
+            }
+        }
+
+        public void CopyTo(Buffer buffer)
+        {
+            if (IsDirty)
+            {
+                pointer.Pointer = BackingBuffer.DataPointer;
+                pointer.Size = BackingBuffer.Size;
+                buffer.SetData(device, pointer);
                 IsDirty = false;
             }
         }

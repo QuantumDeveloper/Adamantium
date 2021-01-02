@@ -1,4 +1,6 @@
 ﻿float4x4 wvp;
+float3 meshColor;
+float transparency;
 //[[vk::binding(1)]] 
 sampler sampleType;
 //[[vk::binding(2)]] 
@@ -17,6 +19,27 @@ struct TexturedPixelInputType
 	float2 texcoord: TEXCOORD;
 	float4 color: COLOR;
 };
+
+struct MESH_VERTEX
+{
+    float4 position : SV_POSITION;
+    float4 color : COLOR;
+    float3 normal : NORMAL;
+    float2 uv0 : TEXCOORD0;
+    float2 uv1 : TEXCOORD1;
+    float2 uv2 : TEXCOORD2;
+    float2 uv3 : TEXCOORD3;
+    float4 tan : TANGENT;
+    float3 biTangent : BINORMAL0;
+};
+
+struct PS_OUTPUT_BASIC
+{
+    float4 position : SV_POSITION;
+    float2 uv : TEXCOORD0;
+    float4 color : COLOR0;
+};
+
 
 TexturedPixelInputType TexturedVertexShader(TexturedVertexInputType input)
 {
@@ -37,6 +60,25 @@ float4 TexturedPixelShader(TexturedPixelInputType input) : SV_TARGET
    return color;
 }
 
+
+PS_OUTPUT_BASIC Basic_VS(MESH_VERTEX input)
+{
+    PS_OUTPUT_BASIC output;
+   
+    input.position.w = 1.0f;
+    output.position = mul(input.position, wvp);
+    output.uv = input.uv0;
+    output.color = input.color;
+    return output;
+}
+
+float4 BasicColored_PS(PS_OUTPUT_BASIC input) : SV_TARGET
+{
+    float4 color = float4(meshColor, 1);
+    color.a = transparency;
+    return color;
+}
+
 technique10 Render
 {
 	pass Textured
@@ -45,4 +87,14 @@ technique10 Render
 		VertexShader = TexturedVertexShader;
 		PixelShader = TexturedPixelShader;
 	}
+}
+
+technique10 Basic
+{
+    pass Default
+    {
+        Profile = 5.1;
+        VertexShader = Basic_VS;
+        PixelShader = BasicColored_PS;
+    }
 }

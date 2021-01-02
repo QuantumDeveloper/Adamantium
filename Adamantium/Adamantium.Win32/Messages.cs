@@ -21,8 +21,15 @@ namespace Adamantium.Win32
       [DllImport("user32.dll")]
       public static extern IntPtr DispatchMessage([In] ref Message lpmsg);
 
-      [DllImport("user32.dll", CharSet = CharSet.Auto)]
+      [DllImport("user32.dll")]
       public static extern IntPtr SendMessage(IntPtr hWnd, UInt32 msg, IntPtr wParam, IntPtr lParam);
+
+      [DllImport("user32.dll")]
+      [return: MarshalAs(UnmanagedType.Bool)]
+      public static extern bool PostMessage(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+      [DllImport("user32.dll")]
+      public static extern uint RegisterWindowMessage(string message);
 
 
       public static Point PointFromLParam(IntPtr lParam)

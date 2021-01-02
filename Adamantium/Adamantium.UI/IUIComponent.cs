@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Adamantium.Mathematics;
+using Adamantium.UI.Controls;
 using Adamantium.UI.Input;
 using Adamantium.UI.Media;
 
@@ -92,7 +93,7 @@ namespace Adamantium.UI
         /// <value>
         /// The inheritance parent.
         /// </value>
-        DependencyComponent InheritanceParent { get; set; }
+        AdamantiumComponent InheritanceParent { get; set; }
 
         void InvalidateMeasure();
         void InvalidateArrange();

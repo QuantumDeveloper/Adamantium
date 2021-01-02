@@ -4,14 +4,14 @@ using Adamantium.UI.Media;
 
 namespace Adamantium.UI.Controls
 {
-   public abstract class Panel:FrameworkComponent
+   public abstract class Panel: FrameworkComponent
    {
       public static readonly AdamantiumProperty BackgroundProperty = AdamantiumProperty.Register(nameof(Background), typeof(Brush), typeof(Panel), new PropertyMetadata(Brushes.Transparent, PropertyMetadataOptions.AffectsRender));
 
       public Brush Background
       {
-         get { return GetValue<Brush>(BackgroundProperty); }
-         set { SetValue(BackgroundProperty, value);}
+         get => GetValue<Brush>(BackgroundProperty);
+         set => SetValue(BackgroundProperty, value);
       }
 
       private readonly UIElementCollection childern;

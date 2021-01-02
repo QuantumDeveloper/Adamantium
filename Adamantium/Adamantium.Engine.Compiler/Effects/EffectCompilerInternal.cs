@@ -1038,15 +1038,10 @@ namespace Adamantium.Engine.Compiler.Effects
                 entryPoint,
                 opts);
 
-            if (result.Status != ShadercCompilationStatus.Success)
-            {
-                throw new ApplicationException($"Shader {entryPoint} compilation finished with {result.Status}");
-            }
-
-            var result2 = SpirvReflection.CompileToSpirvAssembly(sourcecode, GetShadercType(shaderKind), entryPoint,
-               entryPoint, opts);
-
-            var text = Encoding.ASCII.GetString(result2.Bytecode);
+            // var result2 = SpirvReflection.CompileToSpirvAssembly(sourcecode, GetShadercType(shaderKind), entryPoint,
+            //    entryPoint, opts);
+            //
+            // var text = Encoding.ASCII.GetString(result2.Bytecode);
             
             opts.Dispose();
 

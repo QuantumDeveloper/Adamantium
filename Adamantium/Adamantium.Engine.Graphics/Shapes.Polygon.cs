@@ -15,10 +15,9 @@ namespace Adamantium.Engine.Graphics
                 GeometryType geometryType,
                 Vector2F diameter,
                 int tessellation = 36,
-                Matrix4x4F? transform = null,
-                bool toRightHanded = false)
+                Matrix4x4F? transform = null)
             {
-                var geometry = GenerateGeometry(geometryType, diameter, tessellation, transform, toRightHanded);
+                var geometry = GenerateGeometry(geometryType, diameter, tessellation, transform);
                 return new Shape(device, geometry);
             }
 
@@ -26,8 +25,7 @@ namespace Adamantium.Engine.Graphics
                 GeometryType geometryType,
                 Vector2F diameter,
                 int tessellation = 40,
-                Matrix4x4F? transform = null,
-                bool toRightHanded = false)
+                Matrix4x4F? transform = null)
             {
                 if (tessellation < 3)
                 {
@@ -37,22 +35,19 @@ namespace Adamantium.Engine.Graphics
                 Mesh mesh;
                 if (geometryType == GeometryType.Solid)
                 {
-                    mesh = GenerateSolidGeometry(diameter, tessellation, toRightHanded);
+                    mesh = GenerateSolidGeometry(diameter, tessellation);
                 }
                 else
                 {
                     mesh = GenerateOutlinedGeometry(diameter, tessellation);
                 }
 
-                if (transform.HasValue)
-                {
-                    mesh.ApplyTransform(transform.Value);
-                }
+                mesh.ApplyTransform(transform);
 
                 return mesh;
             }
 
-            private static Mesh GenerateSolidGeometry(Vector2F diameter, int tessellation = 36, bool toRightHanded = false)
+            private static Mesh GenerateSolidGeometry(Vector2F diameter, int tessellation = 36)
             {
                 List<Vector3F> vertices = new List<Vector3F>();
                 List<Vector2F> uvs = new List<Vector2F>();
@@ -67,8 +62,8 @@ namespace Adamantium.Engine.Graphics
                     float y = center.Y + diameter.Y * (float)Math.Sin(angle);
                     vertices.Add(new Vector3F(x, y, 0));
                     var uv = new Vector2F(
-                       0.5f - (center.X - x) / (2 * diameter.X),
-                       0.5f - (center.Y - y) / (2 * diameter.Y));
+                       0.5f + (center.X - x) / (2 * diameter.X),
+                       0.5f + (center.Y - y) / (2 * diameter.Y));
                     uvs.Add(uv);
                 }
 
@@ -82,17 +77,11 @@ namespace Adamantium.Engine.Graphics
                 }
 
                 var mesh = new Mesh();
-                mesh.MeshTopology = PrimitiveType.TriangleList;
-                mesh.SetPositions(vertices);
-                mesh.SetUVs(0, uvs);
-                mesh.SetIndices(indices);
-
-                if (toRightHanded)
-                {
-                    mesh.ReverseWinding();
-                }
-
-                mesh.CalculateNormals();
+                mesh.SetTopology(PrimitiveType.TriangleList).
+                    SetPositions(vertices).
+                    SetUVs(0, uvs).
+                    SetIndices(indices).
+                    CalculateNormals();
 
                 return mesh;
             }
@@ -118,9 +107,9 @@ namespace Adamantium.Engine.Graphics
                 }
 
                 var mesh = new Mesh();
-                mesh.MeshTopology = PrimitiveType.LineStrip;
-                mesh.SetPositions(vertices);
-                mesh.SetIndices(indices);
+                mesh.SetTopology(PrimitiveType.LineStrip).
+                    SetPositions(vertices).
+                    SetIndices(indices);
 
                 return mesh;
             }

@@ -24,7 +24,7 @@ namespace Adamantium.EntityFramework.Processors
 {
     public class ForwardRenderingProcessor : RenderProcessor
     {
-        public ForwardRenderingProcessor(EntityWorld world, GameWindow window) : base(world, window)
+        public ForwardRenderingProcessor(EntityWorld world, GameOutput window) : base(world, window)
         {
             //DeferredDevice = GraphicsDevice.CreateDeferred();
             //DeferredDevice = GraphicsDeviceService.GraphicsDevice;

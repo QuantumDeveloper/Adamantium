@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
 using Adamantium.Core.Collections;
+using Adamantium.UI.Controls;
 
 namespace Adamantium.UI
 {
@@ -65,7 +66,7 @@ namespace Adamantium.UI
         public static readonly RoutedEvent SizeChangedEvent = EventManager.RegisterRoutedEvent("SizeChanged",
            RoutingStrategy.Direct, typeof(SizeChangedEventHandler), typeof(FrameworkComponent));
 
-        private static void DataContextChangedCallBack(DependencyComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
+        private static void DataContextChangedCallBack(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
         {
             var o = adamantiumObject as FrameworkComponent;
             o?.DataContextChanged?.Invoke(o, e);

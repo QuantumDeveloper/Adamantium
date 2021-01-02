@@ -2,7 +2,7 @@
 
 namespace Adamantium.UI.Controls
 {
-   public class ColumnDefinition:DefinitionBase
+   public class ColumnDefinition: DefinitionBase
    {
       public static readonly AdamantiumProperty MaxWidthProperty = AdamantiumProperty.Register(nameof(MaxWidth),
          typeof(Double), typeof(ColumnDefinition), new PropertyMetadata(Double.PositiveInfinity));

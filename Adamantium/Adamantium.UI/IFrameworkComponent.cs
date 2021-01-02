@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Adamantium.Mathematics;
+using Adamantium.UI.Controls;
 
 namespace Adamantium.UI
 {
@@ -31,7 +32,7 @@ namespace Adamantium.UI
         /// <value>
         /// The inheritance parent.
         /// </value>
-        DependencyComponent InheritanceParent { get; set; }
+        AdamantiumComponent InheritanceParent { get; set; }
 
         event AdamantiumPropertyChangedEventHandler DataContextChanged;
 

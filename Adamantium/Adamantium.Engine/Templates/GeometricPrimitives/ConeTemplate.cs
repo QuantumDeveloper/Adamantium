@@ -18,8 +18,7 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
             float bottomDiameter,
             float height,
             int tessellation = 3,
-            Matrix4x4F? transform = null,
-            bool toRightHanded = false) : base(geometryType, tessellation, transform, toRightHanded)
+            Matrix4x4F? transform = null) : base(geometryType, tessellation, transform)
         {
             this.topDiameter = topDiameter;
             this.bottomDiameter = bottomDiameter;
@@ -39,7 +38,13 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
 
         public override Task<Entity> BuildEntity(Entity owner)
         {
-            var geometry = Shapes.Cone.GenerateGeometry(GeometryType, height, topDiameter, bottomDiameter, Tessellation, Transform, ToRightHanded);
+            var geometry = Shapes.Cone.GenerateGeometry(
+                GeometryType, 
+                height, 
+                topDiameter, 
+                bottomDiameter, 
+                Tessellation,
+                Transform);
             return Task.FromResult(BuildEntityFromPrimitive(owner, geometry));
         }
     }

@@ -25,15 +25,15 @@ namespace Adamantium.Engine.Services
         ///<summary>
         ///Collection of all cameras.
         ///</summary>
-        private readonly System.Collections.Generic.Dictionary<GameWindow, List<Camera>> windowToCameras;
-        private readonly System.Collections.Generic.Dictionary<Camera, GameWindow> cameraToWindow;
+        private readonly System.Collections.Generic.Dictionary<GameOutput, List<Camera>> windowToCameras;
+        private readonly System.Collections.Generic.Dictionary<Camera, GameOutput> cameraToWindow;
 
         private readonly AdamantiumCollection<Camera> windowToCamerasCollection;
 
         ///<summary>
         ///Collection of active cameras.
         ///</summary>
-        private readonly System.Collections.Generic.Dictionary<GameWindow, Camera> activeCameras;
+        private readonly System.Collections.Generic.Dictionary<GameOutput, Camera> activeCameras;
 
         private readonly AdamantiumCollection<Camera> activeCamerasCollection;
 
@@ -63,15 +63,15 @@ namespace Adamantium.Engine.Services
         public CameraService(Game game)
         {
             game.Services.RegisterInstance<CameraService>(this);
-            windowToCameras = new System.Collections.Generic.Dictionary<GameWindow, List<Camera>>();
-            cameraToWindow = new System.Collections.Generic.Dictionary<Camera, GameWindow>();
-            activeCameras = new System.Collections.Generic.Dictionary<GameWindow, Camera>();
+            windowToCameras = new System.Collections.Generic.Dictionary<GameOutput, List<Camera>>();
+            cameraToWindow = new System.Collections.Generic.Dictionary<Camera, GameOutput>();
+            activeCameras = new System.Collections.Generic.Dictionary<GameOutput, Camera>();
             windowToCamerasCollection = new AdamantiumCollection<Camera>();
             activeCamerasCollection = new AdamantiumCollection<Camera>();
             _game = game;
             cameraGroup = _game.EntityWorld.CreateGroup("Cameras");
 
-            foreach (var window in _game.Windows)
+            foreach (var window in _game.Outputs)
             {
                 CreateCameraForWindowInternal(window);
             }
@@ -138,7 +138,7 @@ namespace Adamantium.Engine.Services
         public void CreateCamera(string name)
         {
 
-            foreach (var window in _game.Windows)
+            foreach (var window in _game.Outputs)
             {
                 if (string.IsNullOrEmpty(name))
                 {
@@ -149,23 +149,23 @@ namespace Adamantium.Engine.Services
             }
         }
 
-        private void CreateCameraForWindowInternal(GameWindow window)
+        private void CreateCameraForWindowInternal(GameOutput window)
         {
             var camera = CreateCamera(window.Width, window.Height, $"Main camera for {window.Name}");
             camera.Owner.Transform.Position = new Vector3D(0,0,-20);
             AddCamera(window, camera);
-            if (_game.ActiveWindow != null)
+            if (_game.ActiveOutput != null)
             {
                 UserControlledCamera = camera;
             }
         }
 
 
-        public Camera CreateCameraForWindow(GameWindow window, string name)
+        public Camera CreateCameraForWindow(GameOutput window, string name)
         {
             var camera = CreateCamera(window.Width, window.Height, name);
             AddCamera(window, camera);
-            if (_game.ActiveWindow != null)
+            if (_game.ActiveOutput != null)
             {
                 UserControlledCamera = camera;
             }
@@ -196,7 +196,7 @@ namespace Adamantium.Engine.Services
         ///<remarks>
         ///Sets added camera as Active and User Controlled.
         ///</remarks>
-        public void AddCamera(GameWindow window, Camera camera)
+        public void AddCamera(GameOutput window, Camera camera)
         {
             lock (syncRoot)
             {
@@ -234,7 +234,7 @@ namespace Adamantium.Engine.Services
             }
         }
 
-        public void UpdateDimensions(GameWindow handle, UInt32 width, UInt32 height)
+        public void UpdateDimensions(GameOutput handle, UInt32 width, UInt32 height)
         {
             lock (syncRoot)
             {
@@ -302,7 +302,7 @@ namespace Adamantium.Engine.Services
         ///<summary>
         ///Deletes camera from collection.
         ///</summary>
-        public void RemoveCamera(GameWindow bindingContext)
+        public void RemoveCamera(GameOutput bindingContext)
         {
             lock (syncRoot)
             {
@@ -325,7 +325,7 @@ namespace Adamantium.Engine.Services
         ///<summary>
         ///Adds group of cameras to collection.
         ///</summary>
-        public void AddCameras(GameWindow bindTarget, params Camera[] cameraGroup)
+        public void AddCameras(GameOutput bindTarget, params Camera[] cameraGroup)
         {
             lock (syncRoot)
             {
@@ -352,7 +352,7 @@ namespace Adamantium.Engine.Services
         ///<summary>
         ///Sets camera as Active.
         ///</summary>
-        public void SetActive(Camera camera, GameWindow window)
+        public void SetActive(Camera camera, GameOutput window)
         {
             lock (syncRoot)
             {
@@ -378,7 +378,7 @@ namespace Adamantium.Engine.Services
             }
         }
 
-        public Camera GetActive(GameWindow window)
+        public Camera GetActive(GameOutput window)
         {
             lock (syncRoot)
             {
@@ -500,7 +500,7 @@ namespace Adamantium.Engine.Services
 //        }
 
         //Индексатор для ключа
-        public List<Camera> this[GameWindow key]
+        public List<Camera> this[GameOutput key]
         {
             get
             {
@@ -522,7 +522,7 @@ namespace Adamantium.Engine.Services
         }
 
         //Индексатор для значения
-        public GameWindow this[Camera value]
+        public GameOutput this[Camera value]
         {
             get
             {

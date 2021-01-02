@@ -5,17 +5,17 @@ namespace Adamantium.UI.Threading
 {
     public class DispatcherOperation : IDispatcherOperation
     {
+        private readonly TaskCompletionSource<object> taskCompletionSource;
         public DispatcherOperation(Action action, DispatcherPriority priority)
         {
             Action = action;
             Priority = priority;
-            Task = new TaskCompletionSource<object>().Task;
+            taskCompletionSource = new TaskCompletionSource<object>();
         }
         
         public Action Action { get; }
         public DispatcherPriority Priority { get; }
         
-        private readonly TaskCompletionSource<object> taskCompletionSource;
         public void Run()
         {
             try
@@ -29,8 +29,8 @@ namespace Adamantium.UI.Threading
             }
         }
 
-        public Task Task { get; }
+        public Task Task => taskCompletionSource.Task;
 
-        
+
     }
 }

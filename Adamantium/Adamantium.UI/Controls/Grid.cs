@@ -43,42 +43,42 @@ namespace Adamantium.UI.Controls
          set { SetValue(ShowGridLinesProperty, value); }
       }
 
-      public static Int32 GetColumn(DependencyComponent element)
+      public static Int32 GetColumn(AdamantiumComponent element)
       {
          return element.GetValue<Int32>(ColumnProperty);
       }
 
-      public static Int32 GetRow(DependencyComponent element)
+      public static Int32 GetRow(AdamantiumComponent element)
       {
          return element.GetValue<Int32>(RowProperty);
       }
 
-      public static void SetColumn(DependencyComponent element, Int32 value)
+      public static void SetColumn(AdamantiumComponent element, Int32 value)
       {
          element.SetValue(ColumnProperty, value);
       }
 
-      public static void SetRow(DependencyComponent element, Int32 value)
+      public static void SetRow(AdamantiumComponent element, Int32 value)
       {
          element.SetValue(RowProperty, value);
       }
 
-      public static Int32 GetColumnSpan(DependencyComponent element)
+      public static Int32 GetColumnSpan(AdamantiumComponent element)
       {
          return element.GetValue<Int32>(ColumnSpanProperty);
       }
 
-      public static Int32 GetRowSpan(DependencyComponent element)
+      public static Int32 GetRowSpan(AdamantiumComponent element)
       {
          return element.GetValue<Int32>(RowSpanProperty);
       }
 
-      public static void SetColumnSpan(DependencyComponent element, Int32 value)
+      public static void SetColumnSpan(AdamantiumComponent element, Int32 value)
       {
          element.SetValue(ColumnSpanProperty, value);
       }
 
-      public static void SetRowSpan(DependencyComponent element, Int32 value)
+      public static void SetRowSpan(AdamantiumComponent element, Int32 value)
       {
          element.SetValue(RowSpanProperty, value);
       }

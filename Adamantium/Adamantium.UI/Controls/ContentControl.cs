@@ -12,7 +12,7 @@
       }
 
 
-      private static void ContentChangedCallback(DependencyComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
+      private static void ContentChangedCallback(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
       {
          var o = adamantiumObject as ContentControl;
          if (o != null)

@@ -147,10 +147,7 @@ namespace Adamantium.UI
 
       public CoerceValueCallback CoerceValueCallback
       {
-         get
-         {
-            return coerceValueCallback;
-         }
+         get => coerceValueCallback;
          set
          {
             if (!IsSealed)

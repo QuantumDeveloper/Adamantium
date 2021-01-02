@@ -1,4 +1,6 @@
-﻿namespace Adamantium.UI
+﻿using Adamantium.UI.Controls;
+
+namespace Adamantium.UI
 {
-   public delegate object CoerceValueCallback(DependencyComponent a, object baseValue);
+   public delegate object CoerceValueCallback(AdamantiumComponent a, object baseValue);
 }

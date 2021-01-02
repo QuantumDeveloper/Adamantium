@@ -36,7 +36,7 @@ namespace Adamantium.Game.GameInput
         private Vector2F _acceleratedMouseDelta;
         private Vector2F _lockMousePosition;
         private bool _isLockedToCenter;
-        private GameWindow _window;
+        private GameOutput _window;
         private GameWindowCursor _currentCursor;
         private XBoxGamepadFactory _gamepadFactory;
         private Gamepad[] _gamepads;

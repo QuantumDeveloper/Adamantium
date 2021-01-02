@@ -3,12 +3,12 @@
    /// <summary>
    /// Interface for getting/setting <see cref="AdamantiumProperty"/> values on an object.
    /// </summary>
-   public interface IAdamantiumObject
+   public interface IAdamantiumComponent
    {
       /// <summary>
       /// The parent object that inherited values are inherited from.
       /// </summary>
-      IAdamantiumObject InheritanceParent { get; }
+      IAdamantiumComponent InheritanceParent { get; }
 
 
       /// <summary>

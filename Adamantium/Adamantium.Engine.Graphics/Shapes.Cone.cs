@@ -46,8 +46,8 @@ namespace Adamantium.Engine.Graphics
 
                     int vbase = positions.Count;
                     indices.Add(vbase);
-                    indices.Add(vbase + i2);
                     indices.Add(vbase + i1);
+                    indices.Add(vbase + i2);
                 }
 
                 // Which end of the cylinder is this?
@@ -59,15 +59,16 @@ namespace Adamantium.Engine.Graphics
                     normal = -normal;
                     textureScale.X = -textureScale.X;
                 }
-
+                
+                Vector2F diameter = new Vector2F(radius * 2);
                 // Create cap vertices.
                 for (int i = 0; i < tessellation; i++)
                 {
                     var circleVector = GetCircleVector(i, tessellation);
                     var position = (circleVector * radius) + (normal * height);
                     var uv = new Vector2F(
-                        1.0f - (circleVector.X * textureScale.X + 0.5f),
-                        circleVector.Z * textureScale.Y + 0.5f);
+                        0.5f + position.X / diameter.X,
+                        0.5f - position.Z / diameter.Y);
 
                     positions.Add(position);
                     uvs.Add(uv);
@@ -80,8 +81,7 @@ namespace Adamantium.Engine.Graphics
                 float topDiameter = 0.0f,
                 float bottomDiameter = 1f,
                 int tessellation = 40,
-                Matrix4x4F? transform = null,
-                bool toRightHanded = false)
+                Matrix4x4F? transform = null)
             {
                 if (tessellation < 3)
                 {
@@ -91,17 +91,14 @@ namespace Adamantium.Engine.Graphics
                 Mesh mesh;
                 if (geometryType == GeometryType.Solid)
                 {
-                    mesh = GenerateSolidGeometry(height, topDiameter, bottomDiameter, tessellation, toRightHanded);
+                    mesh = GenerateSolidGeometry(height, topDiameter, bottomDiameter, tessellation);
                 }
                 else
                 {
                     mesh = GenerateOutlinedGeometry(height, bottomDiameter, tessellation);
                 }
 
-                if (transform.HasValue)
-                {
-                    mesh.ApplyTransform(transform.Value);
-                }
+                mesh.ApplyTransform(transform);
 
                 return mesh;
             }
@@ -110,8 +107,7 @@ namespace Adamantium.Engine.Graphics
                 float height = 1.0f,
                 float topDiameter = 0.0f,
                 float bottomDiameter = 1f,
-                int tessellation = 32,
-                bool toRightHanded = false)
+                int tessellation = 32)
             {
                 PrimitiveType primitiveType = PrimitiveType.TriangleList;
 
@@ -136,8 +132,7 @@ namespace Adamantium.Engine.Graphics
                     var sideOffsetTop = normal * topRadius;
                     var sideOffsetBottom = normal * bottomRadius;
 
-                    var uv = new Vector2F((float) i / tessellation, 0);
-                    uv.X = 1.0f - uv.X;
+                    var uv = new Vector2F(i / (float)tessellation, 0);
 
                     positions.Add(sideOffsetTop + topOffset);
                     uvs.Add(uv);
@@ -145,12 +140,12 @@ namespace Adamantium.Engine.Graphics
                     uvs.Add(uv + Vector2F.UnitY);
 
                     indices.Add(i * 2);
-                    indices.Add(i * 2 + 1);
                     indices.Add((i * 2 + 2) % (stride * 2));
+                    indices.Add(i * 2 + 1);
 
                     indices.Add(i * 2 + 1);
-                    indices.Add((i * 2 + 3) % (stride * 2));
                     indices.Add((i * 2 + 2) % (stride * 2));
+                    indices.Add((i * 2 + 3) % (stride * 2));
                 }
 
                 // Create flat triangle fan caps to seal the top and bottom.
@@ -158,17 +153,12 @@ namespace Adamantium.Engine.Graphics
                 CreateConeCap(positions, uvs, indices, tessellation, height, bottomRadius, false);
 
                 var mesh = new Mesh();
-                mesh.MeshTopology = primitiveType;
-                mesh.SetPositions(positions);
-                mesh.SetIndices(indices);
-                if (toRightHanded)
-                {
-                    mesh.ReverseWinding();
-                }
-
-                mesh.SetUVs(0, uvs);
-                mesh.Optimize();
-                mesh.CalculateNormals();
+                mesh.SetTopology(primitiveType).
+                    SetPositions(positions).
+                    SetIndices(indices).
+                    SetUVs(0, uvs).
+                    Optimize().
+                    CalculateNormals();
 
                 return mesh;
             }
@@ -186,7 +176,6 @@ namespace Adamantium.Engine.Graphics
                 int lastIndex = 0;
                 float bottomRadius = bottomDiameter / 2;
                 var topOffset = Vector3F.UnitY * height / 2;
-
                 for (int i = 0; i <= tessellation; ++i)
                 {
                     float angle = (float) Math.PI * 2 / tessellation * i;
@@ -203,7 +192,7 @@ namespace Adamantium.Engine.Graphics
 
                 var vertexCount = tessellation + 1;
                 var indexQuantity = indices.Count - 1;
-                var quaterIndex = vertexCount / 4;
+                var quarterIndex = vertexCount / 4;
                 var halfIndex = vertexCount / 2;
 
                 //Add index for top position
@@ -211,15 +200,15 @@ namespace Adamantium.Engine.Graphics
 
                 //Add index for left position
                 indices.Add(indices[halfIndex]);
-                indices.Add(Shape.StripSeparatorValue);
-                indices.Add(indices[quaterIndex]);
+                indices.Add(Shape.PrimitiveRestartValue);
+                indices.Add(indices[quarterIndex]);
                 indices.Add(lastIndex);
-                indices.Add(indices[quaterIndex + halfIndex]);
+                indices.Add(indices[quarterIndex + halfIndex]);
 
                 var mesh = new Mesh();
-                mesh.SetPositions(vertices);
-                mesh.SetIndices(indices);
-                mesh.MeshTopology = primitiveType;
+                mesh.SetPositions(vertices).
+                    SetIndices(indices).
+                    SetTopology(primitiveType);
 
                 return mesh;
             }
@@ -228,11 +217,12 @@ namespace Adamantium.Engine.Graphics
             /// Creates a cylinder primitive.
             /// </summary>
             /// <param name="device">The device.</param>
+            /// <param name="geometryType">Defines geometry type (solid or outline)</param>
             /// <param name="height">The height.</param>
             /// <param name="topDiameter">Diameter of the top side</param>
             /// <param name="bottomDiameter">Diameter of the bottom side</param>
             /// <param name="tessellation">The tessellation.</param>
-            /// <param name="toRightHanded">if set to <c>true</c> vertices and indices will be transformed to right handed. Default is false.</param>
+            /// <param name="transform">Transform matrix</param>
             /// <returns>A cone/cylinder/frustum/pyramid primitive.</returns>
             /// <remarks>Cone: top diameter == 0.05f, bottom diameter > top diameter </remarks>
             /// <remarks>Frustum: top diameter > 0.05f, bottom diameter > top diameter </remarks>
@@ -246,10 +236,9 @@ namespace Adamantium.Engine.Graphics
                 float topDiameter = 0.05f,
                 float bottomDiameter = 1f,
                 int tessellation = 32,
-                Matrix4x4F? transform = null,
-                bool toRightHanded = false)
+                Matrix4x4F? transform = null)
             {
-                var geometry = GenerateGeometry(geometryType, height, topDiameter, bottomDiameter, tessellation, transform, toRightHanded);
+                var geometry = GenerateGeometry(geometryType, height, topDiameter, bottomDiameter, tessellation, transform);
                 // Create the primitive object.
                 return new Shape(device, geometry);
             }

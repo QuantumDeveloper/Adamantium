@@ -10,7 +10,7 @@ namespace Adamantium.Engine
 {
     public class Game : GameBase
     {
-        private Dictionary<GameWindow, EntityProcessor> drawSystems;
+        private Dictionary<GameOutput, EntityProcessor> drawSystems;
 
         public EntityWorld EntityWorld { get; }
 
@@ -32,7 +32,7 @@ namespace Adamantium.Engine
             GamePlayManager = new GamePlayManager(Services);
             WindowRemoved += Game_WindowRemoved;
             Stopped += Game_Stopped;
-            drawSystems = new Dictionary<GameWindow, EntityProcessor>();
+            drawSystems = new Dictionary<GameOutput, EntityProcessor>();
         }
 
         private void Game_Stopped(object sender, EventArgs e)
@@ -45,7 +45,7 @@ namespace Adamantium.Engine
             RemoveRenderProcessor(e.Window);
         }
 
-        private void RemoveRenderProcessor(GameWindow window)
+        private void RemoveRenderProcessor(GameOutput window)
         {
             lock (drawSystems)
             {
@@ -57,7 +57,7 @@ namespace Adamantium.Engine
             }
         }
 
-        public T CreateRenderProcessor<T>(GameWindow window) where T : RenderProcessor
+        public T CreateRenderProcessor<T>(GameOutput window) where T : RenderProcessor
         {
             var system = EntityWorld.CreateProcessor<T>(new object[] { EntityWorld, window });
             lock (drawSystems)

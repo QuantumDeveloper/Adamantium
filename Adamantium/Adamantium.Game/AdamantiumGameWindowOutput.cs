@@ -7,7 +7,7 @@ using Adamantium.UI.Input;
 
 namespace Adamantium.Game
 {
-    public abstract class AdamantiumGameWindowBase : GameWindow
+    public abstract class AdamantiumGameOutputBase : GameOutput
     {
         private GameWindowCursor cursor;
 
@@ -15,7 +15,7 @@ namespace Adamantium.Game
 
         private static readonly Dictionary<Key, Keys> translationKeys;
 
-        static AdamantiumGameWindowBase()
+        static AdamantiumGameOutputBase()
         {
             translationKeys = new Dictionary<Key, Keys>();
             translationKeys[Key.None] = Keys.None;
@@ -178,7 +178,7 @@ namespace Adamantium.Game
             translationKeys[Key.Alt] = Keys.Alt;
         }
 
-        protected AdamantiumGameWindowBase()
+        protected AdamantiumGameOutputBase()
         {
             
         }
@@ -209,14 +209,14 @@ namespace Adamantium.Game
         }
         
         /// <summary>
-        /// Contains <see cref="GameWindow"/> description
+        /// Contains <see cref="GameOutput"/> description
         /// </summary>
         protected override GameWindowDescription Description { get; set; }
 
         public override object NativeWindow => GameContext.Context;
 
         /// <summary>
-        /// Cursor type that will be displayed when mouse cursor will enter <see cref="GameWindow"/> 
+        /// Cursor type that will be displayed when mouse cursor will enter <see cref="GameOutput"/> 
         /// </summary>
         public override GameWindowCursor Cursor
         {
@@ -276,7 +276,7 @@ namespace Adamantium.Game
         }
         
         /// <summary>
-        /// Defines is <see cref="GameWindow"/> currently displayed
+        /// Defines is <see cref="GameOutput"/> currently displayed
         /// </summary>
         public override bool IsVisible => UIComponent.Visibility == Visibility.Visible;
 

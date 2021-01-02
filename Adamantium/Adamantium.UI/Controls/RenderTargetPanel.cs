@@ -8,17 +8,20 @@ using Adamantium.Win32;
 
 namespace Adamantium.UI.Controls
 {
-   public class RenderTargetPanel:Grid
+   public class RenderTargetPanel: Grid
    {
       public RenderTargetPanel() { }
 
       static RenderTargetPanel()
       {
-         UseLayoutRoundingProperty.OverrideMetadata(typeof(RenderTargetPanel), new PropertyMetadata(true, PropertyMetadataOptions.AffectsMeasure));
+         UseLayoutRoundingProperty.OverrideMetadata(typeof(RenderTargetPanel),
+            new PropertyMetadata(true, PropertyMetadataOptions.AffectsMeasure));
       }
 
       public static readonly AdamantiumProperty PixelFormatProperty = AdamantiumProperty.Register(nameof(PixelFormat),
-         typeof (SurfaceFormat), typeof (RenderTargetPanel), new PropertyMetadata(SurfaceFormat.R8G8B8A8.UNorm, PropertyMetadataOptions.AffectsRender, RenderTargetParametersChanged));
+         typeof(SurfaceFormat), typeof(RenderTargetPanel),
+         new PropertyMetadata(SurfaceFormat.R8G8B8A8.UNorm, PropertyMetadataOptions.AffectsRender,
+            RenderTargetParametersChanged));
 
       public static readonly AdamantiumProperty HandleProperty = AdamantiumProperty.RegisterReadOnly(nameof(Handle),
          typeof (IntPtr), typeof (RenderTargetPanel),
@@ -50,7 +53,7 @@ namespace Adamantium.UI.Controls
          set { SetValue(PixelHeightProperty, value); }
       }
 
-      private static void RenderTargetParametersChanged(DependencyComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
+      private static void RenderTargetParametersChanged(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
       {
          var image = adamantiumObject as RenderTargetPanel;
          image?.UpdateOrCreateRenderTarget();

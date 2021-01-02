@@ -25,7 +25,7 @@ namespace Adamantium.EntityFramework.Processors
         protected IGraphicsDeviceService GraphicsDeviceService;
         protected GraphicsDevice GraphicsDevice => GraphicsDeviceService.GraphicsDevice;
         protected IContentManager Content { get; }
-        protected GameWindow Window { get; }
+        protected GameOutput Window { get; }
 
         protected LightService LightService { get; }
         protected InputService InputService { get; }
@@ -37,7 +37,7 @@ namespace Adamantium.EntityFramework.Processors
         protected Camera ActiveCamera { get; set; }
         protected bool ShowDebugOutput { get; set; }
 
-        public RenderProcessor(EntityWorld world, GameWindow window) : base(world)
+        public RenderProcessor(EntityWorld world, GameOutput window) : base(world)
         {
             GraphicsDeviceManager = world.Services.Resolve<IGraphicsDeviceManager>();
             GraphicsDeviceService = world.Services.Resolve<IGraphicsDeviceService>();

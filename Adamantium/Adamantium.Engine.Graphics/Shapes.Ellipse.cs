@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Models;
 using Adamantium.Mathematics;
@@ -18,8 +19,7 @@ namespace Adamantium.Engine.Graphics
                float stopAngle = 360,
                bool isClockWise = true,
                int tessellation = 36,
-               Matrix4x4F? transform = null,
-               bool toRightHanded = false)
+               Matrix4x4F? transform = null)
             {
                 if (Math.Abs(stopAngle - startAngle) > 360)
                 {
@@ -30,17 +30,14 @@ namespace Adamantium.Engine.Graphics
 
                 if (geometryType == GeometryType.Solid)
                 {
-                    mesh = GenerateSolidGeometry(ellipseType, diameter, startAngle, stopAngle, isClockWise, tessellation, toRightHanded);
+                    mesh = GenerateSolidGeometry(ellipseType, diameter, startAngle, stopAngle, isClockWise, tessellation);
                 }
                 else
                 {
                     mesh = GenerateOutlinedGeometry(ellipseType, diameter, startAngle, stopAngle, isClockWise, tessellation);
                 }
 
-                if (transform.HasValue)
-                {
-                    mesh.ApplyTransform(transform.Value);
-                }
+                mesh.ApplyTransform(transform);
 
                 return mesh;
 
@@ -52,11 +49,12 @@ namespace Adamantium.Engine.Graphics
                 float startAngle = 0,
                 float stopAngle = 360,
                 bool isClockWise = true,
-                int tessellation = 36,
-                bool toRightHanded = false)
+                int tessellation = 36)
             {
+                if (startAngle < 0) startAngle = 0;
+                if (stopAngle > 360) stopAngle = 360;
+                
                 List<Vector3F> vertices = new List<Vector3F>();
-                List<int> indices = new List<int>();
                 List<Vector2F> uvs = new List<Vector2F>();
                 Vector3F center = Vector3F.Zero;
                 float radiusX = diameter.X / 2;
@@ -64,92 +62,61 @@ namespace Adamantium.Engine.Graphics
 
                 float range = stopAngle - startAngle;
                 float angle = range / (tessellation - 1);
-
-                float sign = 1;
+                
+                float sign = -1;
                 if (isClockWise)
                 {
-                    sign = -1;
+                    sign = 1;
                 }
-
-                float angleItem = MathHelper.DegreesToRadians(angle) * sign;
+                
                 startAngle = MathHelper.DegreesToRadians(startAngle);
-                angle = startAngle * sign;
+                float currentAngle = startAngle;
 
-               if (ellipseType == EllipseType.Sector)
-               {
-                   float x1 = center.X + (radiusX * (float)Math.Cos(startAngle));
-                   float y1 = center.Y + (radiusY * (float)Math.Sin(startAngle));
-                    for (int i = 0; i < tessellation; ++i)
-                    {
-                        float x2 = center.X + (radiusX * (float)Math.Cos(angle));
-                        float y2 = center.Y + (radiusY * (float)Math.Sin(angle));
-                        
-                        var vertex1 = new Vector3F(x1, y1, 0);
-                        var vertex2 = new Vector3F(x2, y2, 0);
-
-                        vertices.Add(Vector3F.Zero);
-                        vertices.Add(vertex1);
-                        vertices.Add(vertex2);
-
-                        var uv1 = new Vector2D(0.5f + (x1 - center.X) / diameter.X, 0.5f - (y1 - center.Y) / diameter.Y);
-                        var uv2 = new Vector2D(0.5f + (x2 - center.X) / diameter.X, 0.5f - (y2 - center.Y) / diameter.Y);
-
-                        uvs.Add(new Vector2F(0.5f, 0.5f));
-                        uvs.Add(uv1);
-                        uvs.Add(uv2);
-
-                        angle += angleItem;
-
-                        x1 = x2;
-                        y1 = y2;
-                    }
-                }
-                else
+                if (ellipseType == EllipseType.Sector && range < 360)
                 {
-                    for (int i = 0; i <= tessellation; ++i)
-                    {
-                        float x = center.X + (radiusX * (float)Math.Cos(angle));
-                        float y = center.Y + (radiusY * (float)Math.Sin(angle));
+                    vertices.Add(Vector3F.Zero);
+                }
+
+                for (int i = 0; i < tessellation; ++i)
+                {
+                    var angleItem = MathHelper.DegreesToRadians(currentAngle * sign);
+                    float x = center.X + (radiusX * (float)Math.Cos(angleItem));
+                    float y = center.Y + (radiusY * (float)Math.Sin(angleItem));
+                    var vertex = new Vector3F(x, y, 0);
                         
-                        var vertex = new Vector3F(x, y, 0);
-                        vertices.Add(vertex);
+                    vertices.Add(vertex);
 
-                        var uv = new Vector2F(
-                            0.5f - (center.X - x) / (2 * diameter.X),
-                            0.5f - (center.Y - y) / (2 * diameter.Y));
-                        uvs.Add(uv);
-
-                        angle += angleItem;
-                    }
-
-                    int basicIndex = 0;
-
-                    for (int i = 0; i < tessellation - 2; i++)
+                    currentAngle += angle;
+                    if (currentAngle > stopAngle)
                     {
-                        indices.Add(basicIndex);
-                        indices.Add(i + 1);
-                        indices.Add(i + 2);
+                        currentAngle = stopAngle;
+
+                        if (currentAngle == 360)
+                        {
+                            currentAngle = 0;
+                        }
                     }
                 }
 
+                var polygon = new Mathematics.Polygon();
+                polygon.Polygons.Add(new PolygonItem(vertices));
+                var points = polygon.Fill();
+
+                for (int i = 0; i < points.Count; ++i)
+                {
+                    var point = points[i];
+                    var uv = new Vector2F(
+                        1.0f - (0.5f + (point.X - center.X) / diameter.X),
+                        1.0f - (0.5f + (point.Y - center.Y) / diameter.Y));
+                    uvs.Add(uv);
+                }
+                
                 var mesh = new Mesh();
-                mesh.MeshTopology = PrimitiveType.TriangleList;
-                mesh.SetPositions(vertices);
-                mesh.SetUVs(0, uvs);
-                if (indices.Count > 0)
-                {
-                    mesh.SetIndices(indices);
-                }
-                else
-                {
-                    mesh.Optimize();
-                }
-
-                if (toRightHanded)
-                {
-                    mesh.ReverseWinding();
-                }
-
+                mesh.SetTopology(PrimitiveType.TriangleList).
+                    SetPositions(points).
+                    SetUVs(0, uvs).
+                    Optimize();
+                
                 return mesh;
             }
 
@@ -183,6 +150,7 @@ namespace Adamantium.Engine.Graphics
                 {
                     vertices.Add(center);
                 }
+                
                 for (int i = 0; i <= tessellation; ++i)
                 {
                     float x = center.X + (radiusX * (float)Math.Cos(angle));
@@ -199,9 +167,9 @@ namespace Adamantium.Engine.Graphics
                 }
 
                 Mesh mesh = new Mesh();
-                mesh.MeshTopology = PrimitiveType.LineStrip;
-                mesh.SetPositions(vertices);
-                mesh.GenerateBasicIndices();
+                mesh.SetTopology(PrimitiveType.LineStrip).
+                    SetPositions(vertices).
+                    GenerateBasicIndices();
                 return mesh;
             }
 
@@ -214,10 +182,9 @@ namespace Adamantium.Engine.Graphics
                 float stopAngle = 360,
                 bool isClockWise = true,
                 int tessellation = 36,
-                Matrix4x4F? transform = null,
-                bool toRightHanded = false)
+                Matrix4x4F? transform = null)
             {
-                var mesh = GenerateGeometry(geometryType, ellipseType, diameter, startAngle, stopAngle, isClockWise, tessellation, transform, toRightHanded);
+                var mesh = GenerateGeometry(geometryType, ellipseType, diameter, startAngle, stopAngle, isClockWise, tessellation, transform);
                 return new Shape(graphicsDevice, mesh);
             }
         }

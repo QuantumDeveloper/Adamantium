@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading;
 using Adamantium.Core.DependencyInjection;
+using Adamantium.Engine.Core;
 using Adamantium.UI.Windows;
 using Adamantium.Win32;
 
@@ -10,11 +11,15 @@ namespace Adamantium.UI.Threading
     {
         private Thread uiThread;
         private DispatcherWin32NativeSourceWrapper window;
+        private uint dispatchMessage;
+        private IService appService;
 
         public WindowsPlatform()
         {
             uiThread = Thread.CurrentThread;
             window = new DispatcherWin32NativeSourceWrapper();
+            window.AddHook(WndProc);
+            dispatchMessage = Messages.RegisterWindowMessage("DispatcherProcessingMessage");
         }
 
         public void Run(CancellationToken token)
@@ -36,11 +41,21 @@ namespace Adamantium.UI.Threading
             {
                 
             }
+            else if (msg == dispatchMessage)
+            {
+                Signaled?.Invoke();
+            }
             
             return IntPtr.Zero;
         }
 
         public bool IsOnUIThread => uiThread == Thread.CurrentThread;
+        public void Signal()
+        {
+            Messages.PostMessage(window.Handle, dispatchMessage, IntPtr.Zero, IntPtr.Zero);
+        }
+
+        public event Action Signaled;
 
         public static void Initialize()
         {

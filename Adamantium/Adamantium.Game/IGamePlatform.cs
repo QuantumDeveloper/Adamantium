@@ -8,33 +8,33 @@ namespace Adamantium.Game
     {
         String DefaultAppDirectory { get; }
 
-        GameWindow MainWindow { get; }
+        GameOutput MainWindow { get; }
 
-        GameWindow ActiveWindow { get; }
+        GameOutput ActiveWindow { get; }
 
-        GameWindow[] Windows { get; }
+        GameOutput[] Outputs { get; }
 
         /// <summary>
-        /// Creates <see cref="GameWindow"/> with <see cref="AdamantiumGameWindow"/> inside
+        /// Creates <see cref="GameOutput"/> with <see cref="AdamantiumGameOutput"/> inside
         /// </summary>
         /// <param name="width">Window width</param>
         /// <param name="height">Window height</param>
-        /// <returns>new <see cref="GameWindow"/></returns>
-        GameWindow CreateWindow(uint width = 1280, uint height = 720);
+        /// <returns>new <see cref="GameOutput"/></returns>
+        GameOutput CreateOutput(uint width = 1280, uint height = 720);
 
         /// <summary>
-        /// Creates <see cref="GameWindow"/> from <see cref="GameContext"/>
+        /// Creates <see cref="GameOutput"/> from <see cref="GameContext"/>
         /// </summary>
-        /// <param name="context">Context (Control) from which <see cref="GameWindow"/> will be created</param>
-        /// <returns>new <see cref="GameWindow"/></returns>
-        GameWindow CreateWindow(GameContext context);
+        /// <param name="context">Context (Control) from which <see cref="GameOutput"/> will be created</param>
+        /// <returns>new <see cref="GameOutput"/></returns>
+        GameOutput CreateOutput(GameContext context);
 
         /// <summary>
-        /// Creates <see cref="GameWindow"/> from <see cref="object"/>
+        /// Creates <see cref="GameOutput"/> from <see cref="object"/>
         /// </summary>
-        /// <param name="context">Context (Control) from which <see cref="GameWindow"/> will be created</param>
-        /// <returns>new <see cref="GameWindow"/></returns>
-        GameWindow CreateWindow(Object context);
+        /// <param name="context">Context (Control) from which <see cref="GameOutput"/> will be created</param>
+        /// <returns>new <see cref="GameOutput"/></returns>
+        GameOutput CreateOutput(Object context);
 
         /// <summary>
         /// Create new game window from context (if no windows has been created already using this context) and add it to the list of game windows
@@ -43,7 +43,7 @@ namespace Adamantium.Game
         /// <param name="surfaceFormat">Surface format</param>
         /// <param name="depthFormat">Depth buffer format</param>
         /// <param name="msaaLevel">MSAA level</param>
-        GameWindow CreateWindow(Object context, SurfaceFormat surfaceFormat, DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24, MSAALevel msaaLevel = MSAALevel.None);
+        GameOutput CreateOutput(Object context, SurfaceFormat surfaceFormat, DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24, MSAALevel msaaLevel = MSAALevel.None);
 
         /// <summary>
         /// Switches drawing context from old control to new control. After this old control could be safely removed
@@ -53,22 +53,22 @@ namespace Adamantium.Game
         void SwitchContext(GameContext oldContext, GameContext newContext);
 
         /// <summary>
-        /// Adds <see cref="GameWindow"/> to the windows collection
+        /// Adds <see cref="GameOutput"/> to the windows collection
         /// </summary>
         /// <param name="window">window to add to the windows collection</param>
-        void AddWindow(GameWindow window);
+        void AddOutput(GameOutput window);
         
         /// <summary>
-        /// Removes <see cref="GameWindow"/> from <see cref="GameWindow"/>
+        /// Removes <see cref="GameOutput"/> from <see cref="GameOutput"/>
         /// </summary>
-        /// <param name="context">Context (Control) by which <see cref="GameWindow"/> will be removed</param>
-        void RemoveWindow(GameContext context);
+        /// <param name="context">Context (Control) by which <see cref="GameOutput"/> will be removed</param>
+        void RemoveOutput(GameContext context);
 
         /// <summary>
-        /// Remove <see cref="GameWindow"/>
+        /// Remove <see cref="GameOutput"/>
         /// </summary>
-        /// <param name="context">UI Control for which <see cref="GameWindow"/> will be removed</param>
-        void RemoveWindow(Object context);
+        /// <param name="context">UI Control for which <see cref="GameOutput"/> will be removed</param>
+        void RemoveOutput(Object context);
 
         /// <summary>
         /// Occurs when Game context switches to another control

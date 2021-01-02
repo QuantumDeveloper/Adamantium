@@ -2,7 +2,7 @@
 
 namespace Adamantium.UI.Controls
 {
-   public abstract class DefinitionBase:DependencyComponent
+   public abstract class DefinitionBase: AdamantiumComponent
    {
       public static readonly AdamantiumProperty SharedSizeGroupProperty =
          AdamantiumProperty.Register(nameof(SharedSizeGroup), typeof (String), typeof (DefinitionBase),

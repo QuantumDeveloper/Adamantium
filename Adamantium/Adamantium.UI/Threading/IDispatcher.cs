@@ -7,8 +7,7 @@ namespace Adamantium.UI.Threading
     public interface IDispatcher
     {
         bool IsRunning { get; }
-        void Run();
-        void Shutdown();
+        void Run(CancellationToken token);
         bool CheckAccess();
         void VerifyAccess();
         Thread MainThread { get; }

@@ -17,7 +17,7 @@ namespace Adamantium.Game
     {
         internal static int WindowId = 1;
 
-        private AdamantiumCollection<GameWindow> windows;
+        private AdamantiumCollection<GameOutput> outputs;
 
         private object syncObject = new object();
 
@@ -27,26 +27,26 @@ namespace Adamantium.Game
         public abstract string DefaultAppDirectory { get; }
 
         /// <summary>
-        /// Main <see cref="GameWindow"/>
+        /// Main <see cref="GameOutput"/>
         /// </summary>
-        public GameWindow MainWindow { get; protected set; }
+        public GameOutput MainWindow { get; protected set; }
 
         /// <summary>
-        /// Current focused <see cref="GameWindow"/>
+        /// Current focused <see cref="GameOutput"/>
         /// </summary>
-        public GameWindow ActiveWindow { get; private set; }
+        public GameOutput ActiveWindow { get; private set; }
 
         /// <summary>
-        /// Read only collection of <see cref="GameWindow"/>s
+        /// Read only collection of <see cref="GameOutput"/>s
         /// </summary>
-        public GameWindow[] Windows => windows.ToArray();
+        public GameOutput[] Outputs => outputs.ToArray();
 
         protected GameBase gameBase;
-        private List<GameWindow> windowsToAdd;
-        private List<GameWindow> windowsToRemove;
+        private List<GameOutput> windowsToAdd;
+        private List<GameOutput> windowsToRemove;
         internal IGraphicsDeviceManager GraphicsDeviceManager { get; private set; }
         internal IGraphicsDeviceService GraphicsDeviceService { get; private set; }
-        private System.Collections.Generic.Dictionary<GameContext, GameWindow> contextToWindow;
+        private System.Collections.Generic.Dictionary<GameContext, GameOutput> contextToWindow;
 
         private bool graphicsDeviceChanged;
 
@@ -59,10 +59,10 @@ namespace Adamantium.Game
             this.gameBase = gameBase;
             gameBase.Initialized += Initialized;
 
-            windows = new AdamantiumCollection<GameWindow>();
-            windowsToAdd = new List<GameWindow>();
-            windowsToRemove = new List<GameWindow>();
-            contextToWindow = new System.Collections.Generic.Dictionary<GameContext, GameWindow>();
+            outputs = new AdamantiumCollection<GameOutput>();
+            windowsToAdd = new List<GameOutput>();
+            windowsToRemove = new List<GameOutput>();
+            contextToWindow = new System.Collections.Generic.Dictionary<GameContext, GameOutput>();
         }
 
         private void Initialized(object sender, EventArgs e)
@@ -127,9 +127,9 @@ namespace Adamantium.Game
 
                     wnd.Closed += Wnd_Closed;
 
-                    windows.Add(wnd);
+                    outputs.Add(wnd);
 
-                    if (windows.Count == 1)
+                    if (outputs.Count == 1)
                     {
                         MainWindow = wnd;
                     }
@@ -143,7 +143,7 @@ namespace Adamantium.Game
 
         private void Wnd_Closed(object sender, EventArgs e)
         {
-            windowsToRemove.Add((GameWindow)sender);
+            windowsToRemove.Add((GameOutput)sender);
         }
 
         internal void RemoveWindowsInternal()
@@ -153,7 +153,7 @@ namespace Adamantium.Game
                 for (int i = 0; i < windowsToRemove.Count; i++)
                 {
                     var wnd = windowsToRemove[i];
-                    windows.Remove(wnd);
+                    outputs.Remove(wnd);
                     UnsubscribeFromEvents(wnd);
 
                     WindowId--;
@@ -163,7 +163,7 @@ namespace Adamantium.Game
             }
         }
 
-        private void SubscribeToEvents(GameWindow wnd)
+        private void SubscribeToEvents(GameOutput wnd)
         {
             wnd.Activated += Window_Activated;
             wnd.Deactivated += Window_Deactivated;
@@ -176,7 +176,7 @@ namespace Adamantium.Game
             wnd.KeyUp += Wnd_KeyUp;
         }
 
-        private void UnsubscribeFromEvents(GameWindow wnd)
+        private void UnsubscribeFromEvents(GameOutput wnd)
         {
             wnd.Activated -= Window_Activated;
             wnd.Deactivated -= Window_Deactivated;
@@ -201,7 +201,7 @@ namespace Adamantium.Game
             lock (syncObject)
             {
                 AddWindowsInternal();
-                foreach (var wnd in windows)
+                foreach (var wnd in outputs)
                 {
                     if (graphicsDeviceChanged || wnd.UpdateRequested)
                     {
@@ -230,14 +230,14 @@ namespace Adamantium.Game
             }
         }
 
-        private void OnWindowParametersChanging(GameWindow window, ChangeReason reason)
+        private void OnWindowParametersChanging(GameOutput window, ChangeReason reason)
         {
             window.OnWindowParametersChanging(reason);
 
             WindowParametersChanging?.Invoke(this, new GameWindowParametersEventArgs(window, reason));
         }
 
-        private void OnWindowParametersChanged(GameWindow window, ChangeReason reason)
+        private void OnWindowParametersChanged(GameOutput window, ChangeReason reason)
         {
             window.OnWindowParametersChanged(reason);
 
@@ -246,13 +246,13 @@ namespace Adamantium.Game
 
         private void Window_Deactivated(object sender, EventArgs e)
         {
-            OnDeactivated((GameWindow)sender);
+            OnDeactivated((GameOutput)sender);
             ActiveWindow = null;
         }
 
         private void Window_Activated(object sender, EventArgs e)
         {
-            ActiveWindow = (GameWindow)sender;
+            ActiveWindow = (GameOutput)sender;
             OnActivated(ActiveWindow);
         }
 
@@ -261,27 +261,27 @@ namespace Adamantium.Game
             OnWindowBoundsChanged(e);
         }
 
-        public void RemoveWindow(GameContext context)
+        public void RemoveOutput(GameContext context)
         {
             if (contextToWindow.ContainsKey(context))
             {
                 var window = contextToWindow[context];
                 contextToWindow.Remove(context);
-                windows.Remove(window);
+                outputs.Remove(window);
             }
         }
 
-        private void OnActivated(GameWindow wnd)
+        private void OnActivated(GameOutput wnd)
         {
             WindowActivated?.Invoke(this, new GameWindowEventArgs(wnd));
         }
 
-        private void OnDeactivated(GameWindow wnd)
+        private void OnDeactivated(GameOutput wnd)
         {
             WindowDeactivated?.Invoke(this, new GameWindowEventArgs(wnd));
         }
 
-        private void OnWindowSizeChanged(GameWindow wnd)
+        private void OnWindowSizeChanged(GameOutput wnd)
         {
             wnd.OnWindowSizeChanged();
 
@@ -408,11 +408,11 @@ namespace Adamantium.Game
         {
             lock (this)
             {
-                for (int i = 0; i < Windows.Length; i++)
+                for (int i = 0; i < Outputs.Length; i++)
                 {
-                    Windows[i].Dispose();
+                    Outputs[i].Dispose();
                 }
-                windows.Clear();
+                outputs.Clear();
                 MainWindow = null;
                 ActiveWindow = null;
                 contextToWindow.Clear();
@@ -420,44 +420,44 @@ namespace Adamantium.Game
         }
         
         /// <summary>
-        /// Creates <see cref="GameWindow"/> with <see cref="AdamantiumGameWindow"/> inside
+        /// Creates <see cref="GameOutput"/> with <see cref="AdamantiumGameOutput"/> inside
         /// </summary>
         /// <param name="width">Window width</param>
         /// <param name="height">Window height</param>
-        /// <returns>new <see cref="GameWindow"/></returns>
-        public GameWindow CreateWindow(uint width = 1280, uint height = 720)
+        /// <returns>new <see cref="GameOutput"/></returns>
+        public GameOutput CreateOutput(uint width = 1280, uint height = 720)
         {
-            var wnd = GameWindow.NewDefault(width, height);
+            var wnd = GameOutput.NewDefault(width, height);
             windowsToAdd.Add(wnd);
             return wnd;
         }
         
         /// <summary>
-        /// Creates <see cref="GameWindow"/> from <see cref="GameContext"/>
+        /// Creates <see cref="GameOutput"/> from <see cref="GameContext"/>
         /// </summary>
-        /// <param name="context">Context (Control) from which <see cref="GameWindow"/> will be created</param>
-        /// <returns>new <see cref="GameWindow"/></returns>
-        public virtual GameWindow CreateWindow(GameContext context)
+        /// <param name="context">Context (Control) from which <see cref="GameOutput"/> will be created</param>
+        /// <returns>new <see cref="GameOutput"/></returns>
+        public virtual GameOutput CreateOutput(GameContext context)
         {
             if (context == null)
             {
                 return null;
             }
 
-            var wnd = GameWindow.New(context);
+            var wnd = GameOutput.New(context);
             windowsToAdd.Add(wnd);
             return wnd;
         }
 
         /// <summary>
-        /// Creates <see cref="GameWindow"/> from <see cref="object"/>
+        /// Creates <see cref="GameOutput"/> from <see cref="object"/>
         /// </summary>
-        /// <param name="context">Context (Control) from which <see cref="GameWindow"/> will be created</param>
-        /// <returns>new <see cref="GameWindow"/></returns>
-        public GameWindow CreateWindow(object context)
+        /// <param name="context">Context (Control) from which <see cref="GameOutput"/> will be created</param>
+        /// <returns>new <see cref="GameOutput"/></returns>
+        public GameOutput CreateOutput(object context)
         {
             var gameContext = new GameContext(context);
-            return CreateWindow(gameContext);
+            return CreateOutput(gameContext);
         }
 
         /// <summary>
@@ -467,12 +467,12 @@ namespace Adamantium.Game
         /// <param name="surfaceFormat">Surface format</param>
         /// <param name="depthFormat">Depth buffer format</param>
         /// <param name="msaaLevel">MSAA level</param>
-        public GameWindow CreateWindow(object context, SurfaceFormat surfaceFormat, DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24, MSAALevel msaaLevel = MSAALevel.None)
+        public GameOutput CreateOutput(object context, SurfaceFormat surfaceFormat, DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24, MSAALevel msaaLevel = MSAALevel.None)
         {
             var gameContext = new GameContext(context);
             if (!contextToWindow.ContainsKey(gameContext))
             {
-                var wnd = GameWindow.New(gameContext, surfaceFormat, depthFormat, msaaLevel);
+                var wnd = GameOutput.New(gameContext, surfaceFormat, depthFormat, msaaLevel);
                 contextToWindow.Add(gameContext, wnd);
                 windowsToAdd.Add(wnd);
                 return wnd;
@@ -481,12 +481,12 @@ namespace Adamantium.Game
         }
 
         /// <summary>
-        /// Adds <see cref="GameWindow"/> to the windows collection
+        /// Adds <see cref="GameOutput"/> to the windows collection
         /// </summary>
         /// <param name="window">window to add to the windows collection</param>
-        public void AddWindow(GameWindow window)
+        public void AddOutput(GameOutput window)
         {
-            if (windows.Contains(window)) return;
+            if (outputs.Contains(window)) return;
 
             if (!contextToWindow.ContainsKey(window.GameContext))
             {
@@ -496,13 +496,13 @@ namespace Adamantium.Game
         }
 
         /// <summary>
-        /// Remove <see cref="GameWindow"/>
+        /// Remove <see cref="GameOutput"/>
         /// </summary>
-        /// <param name="context">UI Control for which <see cref="GameWindow"/> will be removed</param>
-        public void RemoveWindow(object context)
+        /// <param name="context">UI Control for which <see cref="GameOutput"/> will be removed</param>
+        public void RemoveOutput(object context)
         {
             var gameContext = new GameContext(context);
-            RemoveWindow(gameContext);
+            RemoveOutput(gameContext);
         }
     }
 }
