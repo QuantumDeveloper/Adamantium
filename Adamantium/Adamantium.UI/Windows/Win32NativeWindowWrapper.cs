@@ -3,10 +3,11 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
+using Adamantium.UI.Controls;
 
 namespace Adamantium.UI.Windows
 {
-    public class Win32NativeWindowWrapper : DispatcherComponent, IDisposable
+    public class Win32NativeWindowWrapper : AdamantiumComponent, IDisposable
     {
         private const int ERROR_CLASS_ALREADY_EXISTS = 1410;
         private const string windowName = "AdamantiumWindow";

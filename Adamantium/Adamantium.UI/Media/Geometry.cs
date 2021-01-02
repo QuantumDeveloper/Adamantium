@@ -3,10 +3,11 @@ using System.Collections.Generic;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.Mathematics;
+using Adamantium.UI.Controls;
 
 namespace Adamantium.UI.Media
 {
-   public abstract class Geometry:DependencyComponent
+   public abstract class Geometry : AdamantiumComponent
    {
       internal List<VertexPositionTexture> VertexArray { get; set; }
       internal List<Int32> IndicesArray { get; set; }

@@ -7,13 +7,13 @@ using Rectangle = Adamantium.Mathematics.Rectangle;
 
 namespace Adamantium.Game
 {
-    public class AdamantiumGameWindow : AdamantiumGameWindowBase
+    public class AdamantiumGameOutput : AdamantiumGameOutputBase
     {
         protected override GameWindowDescription Description { get; set; }
 
         private IWindow window;
 
-        public AdamantiumGameWindow(uint width = 1280, uint height = 720)
+        public AdamantiumGameOutput(uint width = 1280, uint height = 720)
         {
             var wnd = Window.New();
             wnd.Width = width;
@@ -21,7 +21,7 @@ namespace Adamantium.Game
             Initialize(new GameContext(wnd));
         }
 
-        public AdamantiumGameWindow(
+        public AdamantiumGameOutput(
             IWindow window, 
             SurfaceFormat pixelFormat, 
             DepthFormat depthFormat, 
@@ -30,7 +30,7 @@ namespace Adamantium.Game
             Initialize(new GameContext(window));
         }
 
-        public AdamantiumGameWindow(GameContext gameContext)
+        public AdamantiumGameOutput(GameContext gameContext)
         {
             Initialize(gameContext);
         }

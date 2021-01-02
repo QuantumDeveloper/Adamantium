@@ -47,7 +47,7 @@ namespace Adamantium.EntityFramework.Processors
 //        private RenderTarget2D _albedoBufferRT;
 //        private RenderTarget2D _normalsBufferRT;
 
-        public DeferredRenderingProcessor(EntityWorld world, GameWindow window) : base(world, window)
+        public DeferredRenderingProcessor(EntityWorld world, GameOutput window) : base(world, window)
         {
             //DeferredDevice = GraphicsDevice;
         }

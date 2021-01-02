@@ -7,10 +7,11 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
+using Adamantium.UI.Controls;
 
 namespace Adamantium.UI.Windows
 {
-    internal class WindowWorker : DependencyComponent
+    internal class WindowWorker : AdamantiumComponent
     {
         private Win32Window window;
         private Dictionary<uint, HandleMessage> messageTable;

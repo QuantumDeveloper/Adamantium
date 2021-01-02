@@ -29,4 +29,10 @@
     <ProjectReference Include="..\Adamantium.Win32\Adamantium.Win32.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Effect Include="HLSL\BasicEffect.fx" />
+  </ItemGroup>
+
+  <Import Project="$(SolutionDir)Adamantium.targets" />
+
 </Project>

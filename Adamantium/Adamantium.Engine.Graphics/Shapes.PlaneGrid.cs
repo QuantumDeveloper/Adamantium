@@ -42,13 +42,9 @@ namespace Adamantium.Engine.Graphics
                 }
 
                 Mesh mesh = new Mesh();
-                mesh.SetPositions(lineList);
-                mesh.MeshTopology = primitiveType;
+                mesh.SetTopology(primitiveType).SetPositions(lineList);
 
-                if (transform.HasValue)
-                {
-                    mesh.ApplyTransform(transform.Value);
-                }
+                mesh.ApplyTransform(transform);
 
                 return mesh;
             }

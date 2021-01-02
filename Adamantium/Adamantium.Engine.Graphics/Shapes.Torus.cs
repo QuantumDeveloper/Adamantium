@@ -17,8 +17,7 @@ namespace Adamantium.Engine.Graphics
                 float diameter = 1.0f,
                 float thickness = 0.33333f,
                 int tessellation = 32,
-                Matrix4x4F? transform = null,
-                bool toRightHanded = false)
+                Matrix4x4F? transform = null)
             {
                 if (tessellation < 3)
                 {
@@ -28,7 +27,7 @@ namespace Adamantium.Engine.Graphics
                 Mesh mesh;
                 if (geometryType == GeometryType.Solid)
                 {
-                    mesh = GenerateSolidGeometry(diameter, thickness, tessellation, toRightHanded);
+                    mesh = GenerateSolidGeometry(diameter, thickness, tessellation);
                 }
                 else
                 {
@@ -47,8 +46,7 @@ namespace Adamantium.Engine.Graphics
             private static Mesh GenerateSolidGeometry(
                 float diameter = 1.0f,
                 float thickness = 0.33333f,
-                int tessellation = 32,
-                bool toRightHanded = false)
+                int tessellation = 32)
             {
                 var vertices = new List<Vector3F>();
                 var uvs = new List<Vector2F>();
@@ -64,24 +62,24 @@ namespace Adamantium.Engine.Graphics
                     float outerAngle = i * MathHelper.TwoPi / tessellation - MathHelper.PiOverTwo;
 
                     //Create a transform matrix that will align geometry to
-                    //slice perperndicularly though the current ring position
-                    var matrix = Matrix4x4F.Translation(diameter / 2, 0, 0) * Matrix4x4F.RotationY(outerAngle);
+                    //slice perpendicularly though the current ring position
+                    var transformMatrix = Matrix4x4F.Translation(diameter / 2, 0, 0) * Matrix4x4F.RotationY(outerAngle);
 
+                    // Now we loop along the other axis, around the side of the tube.
                     for (int j = 0; j <= tessellation; j++)
                     {
-                        float v = 1 - (float)j / tessellation;
+                        float v = (float) j / tessellation;
 
                         float innerAngle = j * MathHelper.TwoPi / tessellation + MathHelper.Pi;
-                        float dx = (float)Math.Cos(innerAngle),
-                            dy = (float)Math.Sin(innerAngle);
+                        float dx = (float) Math.Cos(innerAngle);
+                        float dy = (float) Math.Sin(innerAngle);
 
                         //Create a vertex
                         var normal = new Vector3F(dx, dy, 0);
                         var position = normal * thickness / 2;
-                        var uv = new Vector2F(u, 1.0f - v);
+                        var uv = new Vector2F(u, v);
 
-                        Vector3F.TransformCoordinate(ref position, ref matrix, out position);
-                        //Vector3F.TransformNormal(ref normal, ref matrix, out normal);
+                        Vector3F.TransformCoordinate(ref position, ref transformMatrix, out position);
 
                         vertices.Add(position);
                         uvs.Add(uv);
@@ -91,13 +89,12 @@ namespace Adamantium.Engine.Graphics
                         int nextJ = (j + 1) % stride;
 
                         indices.Add(i * stride + j);
-                        indices.Add(nextI * stride + j);
-                        indices.Add(i * stride + nextJ);
-
                         indices.Add(i * stride + nextJ);
                         indices.Add(nextI * stride + j);
+                        
+                        indices.Add(i * stride + nextJ);
                         indices.Add(nextI * stride + nextJ);
-
+                        indices.Add(nextI * stride + j);
                     }
                 }
 
@@ -106,10 +103,6 @@ namespace Adamantium.Engine.Graphics
                 mesh.SetPositions(vertices);
                 mesh.SetUVs(0, uvs);
                 mesh.SetIndices(indices);
-                if (toRightHanded)
-                {
-                    mesh.ReverseWinding();
-                }
                 mesh.CalculateNormals();
 
                 return mesh;
@@ -120,7 +113,6 @@ namespace Adamantium.Engine.Graphics
                 float thickness = 0.33333f,
                 int tessellation = 32)
             {
-                //var vertices = new List<Vector3F>();
                 var radius = diameter / 2;
                 var meshes = new List<Mesh>();
                 for (int i = 0; i <= tessellation; i++)
@@ -143,11 +135,10 @@ namespace Adamantium.Engine.Graphics
                         vertices.Add(meshes[j].Positions[i]);
                         indices.Add(lastIndex++);
                     }
-                    indices.Add(Shape.StripSeparatorValue);
+                    indices.Add(Shape.PrimitiveRestartValue);
                 }
                 var m = new Mesh();
-                m.SetPositions(vertices);
-                m.SetIndices(indices);
+                m.SetPositions(vertices).SetIndices(indices);
                 meshes.Add(m);
 
                 var mesh = new Mesh();
@@ -176,10 +167,9 @@ namespace Adamantium.Engine.Graphics
                 float diameter = 1.0f,
                 float thickness = 0.33333f,
                 int tessellation = 32,
-                Matrix4x4F? transform = null,
-                bool toRightHanded = false)
+                Matrix4x4F? transform = null)
             {
-                var geometry = GenerateGeometry(geometryType, diameter, thickness, tessellation, transform, toRightHanded);
+                var geometry = GenerateGeometry(geometryType, diameter, thickness, tessellation, transform);
                 return new Shape(device, geometry);
             }
         }

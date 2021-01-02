@@ -1,4 +1,6 @@
-﻿namespace Adamantium.UI.Data
+﻿using Adamantium.UI.Controls;
+
+namespace Adamantium.UI.Data
 {
    public abstract class BindingExpressionBase
    {
@@ -12,7 +14,7 @@
 
       public BindingStatus Status { get; internal set; }
 
-      public DependencyComponent Target { get; set; }
+      public AdamantiumComponent Target { get; set; }
 
       public AdamantiumProperty TargetProperty { get; set; }
 

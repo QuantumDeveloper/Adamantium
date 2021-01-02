@@ -1,8 +1,9 @@
 ﻿using System;
+using Adamantium.UI.Controls;
 
 namespace Adamantium.UI.Media
 {
-   public abstract class Brush:DependencyComponent
+   public abstract class Brush: AdamantiumComponent
    {
       public static readonly AdamantiumProperty OpacityProperty = AdamantiumProperty.Register(nameof(Opacity),
          typeof (Double), typeof (Brush), new PropertyMetadata(1.0));

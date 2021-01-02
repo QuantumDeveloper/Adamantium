@@ -25,9 +25,9 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Effect Include="EffectsData\BasicEffect.fx">
+      <Content Include="EffectsData\BasicEffect.fx">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </Effect>
+      </Content>
     </ItemGroup>
 
 </Project>

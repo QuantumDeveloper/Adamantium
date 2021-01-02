@@ -6,7 +6,7 @@ using Point = Adamantium.Mathematics.Point;
 
 namespace Adamantium.UI.Media
 {
-   public sealed class EllipseGeometry:Geometry
+   public sealed class EllipseGeometry : Geometry
    {
       public static readonly AdamantiumProperty RadiusXProperty = AdamantiumProperty.Register(nameof(RadiusX),
          typeof(Double), typeof(EllipseGeometry), new PropertyMetadata((Double)0));

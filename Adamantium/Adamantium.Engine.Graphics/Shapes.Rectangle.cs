@@ -12,6 +12,28 @@ namespace Adamantium.Engine.Graphics
         {
             private const float rectSector = 90;
 
+            public static Shape New(
+                GraphicsDevice device,
+                GeometryType type,
+                float width,
+                float height,
+                float radiusX = 0,
+                float radiusY = 0,
+                int tessellation = 20,
+                Matrix4x4F? transform = null
+            )
+            {
+                var geometry = GenerateGeometry(
+                    type,
+                    width,
+                    height,
+                    radiusX,
+                    radiusY,
+                    tessellation,
+                    transform);
+                return new Shape(device, geometry);
+            }
+
             public static Mesh GenerateGeometry(
                 GeometryType type,
                 float width,
@@ -19,8 +41,7 @@ namespace Adamantium.Engine.Graphics
                 float radiusX = 0,
                 float radiusY = 0,
                 int tessellation = 20,
-                Matrix4x4F? transform = null,
-                bool toRightHanded = false)
+                Matrix4x4F? transform = null)
             {
                 var primitiveType = PrimitiveType.TriangleList;
                 if (type == GeometryType.Outlined)
@@ -78,16 +99,16 @@ namespace Adamantium.Engine.Graphics
                 else
                 {
                     vertices.Add(new Vector3F(-halfWidth, -halfHeight));
-                    vertices.Add(new Vector3F(-halfWidth, halfHeight));
-                    vertices.Add(new Vector3F(halfWidth, halfHeight));
                     vertices.Add(new Vector3F(halfWidth, -halfHeight));
+                    vertices.Add(new Vector3F(halfWidth, halfHeight));
+                    vertices.Add(new Vector3F(-halfWidth, halfHeight));
                     if (type == GeometryType.Outlined)
                     {
                         vertices.Add(new Vector3F(-halfWidth, -halfHeight));
                     }
                 }
 
-                Mathematics.Polygon polygon = new Mathematics.Polygon();
+                var polygon = new Mathematics.Polygon();
                 polygon.Polygons.Add(new PolygonItem(vertices));
                 var points = polygon.Fill();
 
@@ -101,12 +122,17 @@ namespace Adamantium.Engine.Graphics
                 {
                     mesh.SetPositions(vertices);
                 }
-                mesh.GenerateBasicIndices();
-                mesh.Optimize();
-                if (transform.HasValue)
+                mesh.GenerateBasicIndices().Optimize();
+
+                var uvs = new List<Vector2F>();
+                foreach (var vertex in mesh.Positions)
                 {
-                    mesh.ApplyTransform(transform.Value);
+                    var u = vertex.X / width;
+                    var v = vertex.Y / height;
+                    uvs.Add(new Vector2F(u, v));
                 }
+                
+                mesh.SetUVs(0, uvs).ApplyTransform(transform);
 
                 return mesh;
             }

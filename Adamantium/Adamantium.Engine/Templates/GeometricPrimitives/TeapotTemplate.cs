@@ -13,8 +13,7 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
         public TeapotTemplate(
             float size,
             int tessellation = 1,
-            Matrix4x4F? transform = null,
-            bool toRightHanded = false) : base(GeometryType.Solid, tessellation, transform, toRightHanded)
+            Matrix4x4F? transform = null) : base(GeometryType.Solid, tessellation, transform)
         {
             this.size = size;
         }
@@ -30,7 +29,7 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
 
         public override Task<Entity> BuildEntity(Entity owner)
         {
-            var primitive3D = Shapes.Teapot.GenerateGeometry(size, Tessellation, Transform, ToRightHanded);
+            var primitive3D = Shapes.Teapot.GenerateGeometry(GeometryType, size, Tessellation, Transform);
             return Task.FromResult(BuildEntityFromPrimitive(owner, primitive3D));
         }
     }

@@ -2081,6 +2081,27 @@ namespace Adamantium.Mathematics
             LookAtRH(ref eye, ref lookDirection, ref up, out result);
             return result;
         }
+        
+        /// <summary>
+        /// Creates a right-handed, orthographic projection matrix for Vulkan coordinate system.
+        /// </summary>
+        /// <param name="width">Width of the viewing volume.</param>
+        /// <param name="height">Height of the viewing volume.</param>
+        /// <param name="znear">Minimum z-value of the viewing volume.</param>
+        /// <param name="zfar">Maximum z-value of the viewing volume.</param>
+        /// <returns>
+        /// When the method completes, contains the created projection matrix.
+        /// </returns>
+        public static Matrix4x4F Ortho(float width, float height, float znear, float zfar)
+        {
+            float halfWidth = width * 0.5f;
+            float halfHeight = height * 0.5f;
+            
+            var result = OrthoOffCenter(-halfWidth, halfWidth, -halfHeight, halfHeight, znear, zfar);
+            result.M33 *= -1;
+
+            return result;
+        }
 
         /// <summary>
         /// Creates a left-handed, orthographic projection matrix.
@@ -2143,6 +2164,30 @@ namespace Adamantium.Mathematics
             OrthoRH(width, height, znear, zfar, out result);
             return result;
         }
+        
+        /// <summary>
+        /// Creates a right-handed, customized orthographic projection matrix for Vulkan coordinate system.
+        /// </summary>
+        /// <param name="left">Minimum x-value of the viewing volume.</param>
+        /// <param name="right">Maximum x-value of the viewing volume.</param>
+        /// <param name="bottom">Minimum y-value of the viewing volume.</param>
+        /// <param name="top">Maximum y-value of the viewing volume.</param>
+        /// <param name="znear">Minimum z-value of the viewing volume.</param>
+        /// <param name="zfar">Maximum z-value of the viewing volume.</param>
+        public static Matrix4x4F OrthoOffCenter(float left, float right,  float top, float bottom, float znear, float zfar)
+        {
+            float zRange = 1.0f / (zfar - znear);
+
+            var result = Matrix4x4F.Identity;
+            result.M11 = 2.0f / (right - left);
+            result.M22 = 2.0f / (bottom - top);
+            result.M33 = zRange;
+            result.M41 = (left + right) / (left - right);
+            result.M42 = (top + bottom) / (top - bottom);
+            result.M43 = -znear * zRange;
+
+            return result;
+        }
 
         /// <summary>
         /// Creates a left-handed, customized orthographic projection matrix.
@@ -2165,21 +2210,6 @@ namespace Adamantium.Mathematics
             result.M41 = (left + right) / (left - right);
             result.M42 = (top + bottom) / (bottom - top);
             result.M43 = -znear * zRange;
-        }
-        
-        public static Matrix4x4F OrthoOffCenter(float left, float right,  float top, float bottom, float znear, float zfar)
-        {
-            float zRange = 1.0f / (zfar - znear);
-
-            var result = Matrix4x4F.Identity;
-            result.M11 = 2.0f / (right - left);
-            result.M22 = 2.0f / (bottom - top);
-            result.M33 = zRange;
-            result.M41 = (left + right) / (left - right);
-            result.M42 = (top + bottom) / (top - bottom);
-            result.M43 = -znear * zRange;
-
-            return result;
         }
 
         /// <summary>
@@ -2315,8 +2345,6 @@ namespace Adamantium.Mathematics
             result.M43 = -q * znear;
         }
 
-
-
         /// <summary>
         /// Creates a left-handed, perspective projection matrix based on a field of view.
         /// </summary>
@@ -2369,7 +2397,7 @@ namespace Adamantium.Mathematics
         }
         
         /// <summary>
-        /// Creates a right-handed, perspective projection matrix based on a field of view.
+        /// Creates a right-handed, perspective projection matrix for Vulkan based on a field of view.
         /// </summary>
         /// <param name="fov">Field of view in the y direction, in radians.</param>
         /// <param name="aspect">Aspect ratio, defined as view space width divided by height.</param>
@@ -2388,6 +2416,32 @@ namespace Adamantium.Mathematics
             result.M33 = q;
             result.M34 = -1.0f;
             result.M43 = q * znear;
+            return result;
+        }
+        
+        /// <summary>
+        /// Creates a right-handed, customized perspective projection matrix for Vulkan coordinate system.
+        /// </summary>
+        /// <param name="left">Minimum x-value of the viewing volume.</param>
+        /// <param name="right">Maximum x-value of the viewing volume.</param>
+        /// <param name="bottom">Minimum y-value of the viewing volume.</param>
+        /// <param name="top">Maximum y-value of the viewing volume.</param>
+        /// <param name="znear">Minimum z-value of the viewing volume.</param>
+        /// <param name="zfar">Maximum z-value of the viewing volume.</param>
+        /// <returns>When the method completes, contains the created projection matrix.</returns>
+        public static Matrix4x4F PerspectiveOffCenter(float left, float right, float top, float bottom, float znear, float zfar)
+        {
+            float zRange = zfar / (zfar - znear);
+
+            var result = new Matrix4x4F();
+            result.M11 = 2.0f * znear / (right - left);
+            result.M22 = 2.0f * znear / (bottom - top);
+            result.M31 = (left + right) / (left - right);
+            result.M32 = (top + bottom) / (top - bottom);
+            result.M33 = zRange;
+            result.M34 = 1.0f;
+            result.M43 = -znear * zRange;
+
             return result;
         }
 

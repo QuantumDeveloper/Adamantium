@@ -4,10 +4,11 @@ using System.Collections.Specialized;
 using System.Linq;
 using Adamantium.Core.Collections;
 using Adamantium.Mathematics;
+using Adamantium.UI.Controls;
 
 namespace Adamantium.UI.Media
 {
-   public class VisualComponent: DependencyComponent, IVisual
+   public class VisualComponent: AdamantiumComponent, IVisual
    {
       public static readonly AdamantiumProperty PositionProperty = AdamantiumProperty.Register(nameof(Location),
          typeof (Point), typeof (VisualComponent), new PropertyMetadata(Point.Zero));

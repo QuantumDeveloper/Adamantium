@@ -1,17 +1,18 @@
 ﻿using System;
 using System.Collections.Generic;
+using Adamantium.UI.Controls;
 
 namespace Adamantium.UI.Data
 {
    public static class BindingOperations
    {
-      private static Dictionary<DependencyComponent, List<AdamantiumProperty>> objectToProperty =
-         new Dictionary<DependencyComponent, List<AdamantiumProperty>>();
+      private static Dictionary<AdamantiumComponent, List<AdamantiumProperty>> objectToProperty =
+         new Dictionary<AdamantiumComponent, List<AdamantiumProperty>>();
 
-      private static Dictionary<DependencyComponent, List<BindingExpressionBase>> objectToExpression =
-         new Dictionary<DependencyComponent, List<BindingExpressionBase>>();
+      private static Dictionary<AdamantiumComponent, List<BindingExpressionBase>> objectToExpression =
+         new Dictionary<AdamantiumComponent, List<BindingExpressionBase>>();
 
-      public static BindingExpressionBase SetBinding(DependencyComponent o, AdamantiumProperty property,
+      public static BindingExpressionBase SetBinding(AdamantiumComponent o, AdamantiumProperty property,
          BindingBase binding)
       {
          if (o == null)

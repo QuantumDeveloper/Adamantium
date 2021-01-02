@@ -5,6 +5,7 @@
       X_UP = 0,
       Y_UP_RH = 1,
       Z_UP = 2,
-      Y_UP_LH = 3
+      Y_UP_LH = 3,
+      Y_DOWN_RH = 4
    }
 }

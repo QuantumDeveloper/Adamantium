@@ -20,7 +20,7 @@ using AdamantiumVulkan.Core;
 
 namespace Adamantium.UI
 {
-    public abstract class Application : DependencyComponent, IService
+    public abstract class Application : AdamantiumComponent, IService
     {
         public IWindow MainWindow
         {
@@ -61,6 +61,7 @@ namespace Adamantium.UI
         private List<IWindow> closedWindows;
         private bool firstWindowAdded;
         private Thread renderThread;
+        private CancellationTokenSource cancellationTokenSource;
 
         static Application()
         {
@@ -101,7 +102,16 @@ namespace Adamantium.UI
         private void RenderThread()
         {
             Dispatcher.CurrentDispatcher.UIThread = Thread.CurrentThread;
-            while(IsRunning)
+            // Dispatcher.CurrentDispatcher.InvokeAsync(() =>
+            // {
+            //     var wnd = Window.New();
+            //     wnd.Width = 1280;
+            //     wnd.Height = 720;
+            //     Windows.Add(wnd);
+            //     wnd.Show();
+            // });
+            
+            while(!cancellationTokenSource.IsCancellationRequested)
             {
                 RunUpdateDrawBlock();
             }
@@ -109,7 +119,7 @@ namespace Adamantium.UI
         
         public static Application Current { get; private set; }
 
-        public bool IsRunning { get; private set; }
+        public bool IsRunning => !(cancellationTokenSource?.IsCancellationRequested == true);
         public bool IsPaused { get; private set; }
 
         protected void OnWindowAdded(IWindow window)
@@ -191,14 +201,14 @@ namespace Adamantium.UI
 
         public virtual void Run()
         {
-            IsRunning = true;
+            cancellationTokenSource = new CancellationTokenSource();
             renderThread.Start();
-            Dispatcher.Run();
+            Dispatcher.CurrentDispatcher.Run(cancellationTokenSource.Token);
         }
         
         public void Run(IWindow window)
         {
-            if (IsRunning) return;
+            if (cancellationTokenSource != null) return;
 
             if (window == null) throw new ArgumentNullException($"{nameof(window)}");
 
@@ -214,6 +224,7 @@ namespace Adamantium.UI
             try
             {
                 var frameTime = preciseTimer.GetElapsedTime();
+                ProcessPendingWindows();
                 Update(appTime);
                 BeginScene();
                 Draw(appTime);
@@ -221,8 +232,7 @@ namespace Adamantium.UI
 
                 UpdateGameTime(frameTime);
                 CalculateFps(frameTime);
-
-                ProcessPendingWindows();
+                
                 CheckExitConditions();
             }
             catch (Exception ex)
@@ -256,11 +266,11 @@ namespace Adamantium.UI
 
             if (ShutDownMode == ShutDownMode.OnMainWindowClosed && MainWindow == null)
             {
-                IsRunning = false;
+                ShutDown();
             }
             else if (ShutDownMode == ShutDownMode.OnLastWindowClosed && Windows.Count == 0)
             {
-                IsRunning = false;
+                ShutDown();
             }
         }
 
@@ -340,7 +350,7 @@ namespace Adamantium.UI
 
         public void ShutDown()
         {
-            IsRunning = false;
+            cancellationTokenSource.Cancel();
             ContentUnloading?.Invoke(this, EventArgs.Empty);
 
             GraphicsDevice.DeviceWaitIdle();

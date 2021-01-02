@@ -16,8 +16,7 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
             float diameter,
             float height,
             int tessellation,
-            Matrix4x4F? transform = null,
-            bool toRightHanded = false) : base(geometryType, tessellation, transform, toRightHanded)
+            Matrix4x4F? transform = null) : base(geometryType, tessellation, transform)
         {
             this.height = height;
             this.diameter = diameter;
@@ -35,7 +34,7 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
         public override Task<Entity> BuildEntity(
             Entity owner)
         {
-            var primitive3D = Shapes.Capsule.GenerateGeometry(GeometryType, height, diameter, Tessellation, Transform, ToRightHanded);
+            var primitive3D = Shapes.Capsule.GenerateGeometry(GeometryType, height, diameter, Tessellation, Transform);
             return Task.FromResult(BuildEntityFromPrimitive(owner, primitive3D));
         }
     }

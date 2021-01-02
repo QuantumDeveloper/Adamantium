@@ -1,6 +1,8 @@
-﻿namespace Adamantium.UI
+﻿using Adamantium.UI.Controls;
+
+namespace Adamantium.UI
 {
-    public abstract class PresentationSource : DispatcherComponent
+    public abstract class PresentationSource : AdamantiumComponent
     {
         
     }

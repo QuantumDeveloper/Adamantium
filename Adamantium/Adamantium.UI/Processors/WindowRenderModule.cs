@@ -1,12 +1,17 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using Adamantium.Core;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
+using Adamantium.Engine.Graphics.Effects;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Media;
 using AdamantiumVulkan.Core;
 using Buffer = Adamantium.Engine.Graphics.Buffer;
+using Shape = Adamantium.Engine.Graphics.Shape;
+using Shapes = Adamantium.Engine.Graphics.Shapes;
 
 namespace Adamantium.UI.Processors
 {
@@ -16,7 +21,7 @@ namespace Adamantium.UI.Processors
         //private D2DGraphicDevice d2D1Device;
         //private VertexInputLayout _vertexLayout;
         //private Effect _uiEffect;
-        //private DrawingContext _context;
+        private DrawingContext _context;
         //private bool windowSizeChanged = false;
         private IWindow window;
         //private Matrix4x4F projection;
@@ -26,10 +31,13 @@ namespace Adamantium.UI.Processors
         private bool isWindowResized;
         private Buffer vertexBuffer;
         private Buffer indexBuffer;
+
         private Texture texture;
+        private Texture texture2;
         private Sampler sampler;
         private Matrix4x4F view;
         private Matrix4x4F proj;
+        private Shape shape;
 
         public WindowRenderModule(IWindow window, GraphicsDevice device, MSAALevel msaaLevel)
         {
@@ -43,7 +51,26 @@ namespace Adamantium.UI.Processors
             viewport.MaxDepth = 1;
             viewport.Width = window.ClientWidth;
             viewport.Height = window.ClientHeight;
-            
+            // shape = Shapes.Rectangle.New(GraphicsDevice, GeometryType.Outlined, 400, 100, 10, 10, 20,
+            //      Matrix4x4F.Translation(200, 50, 0));
+            //shape = Shapes.Ellipse.New(GraphicsDevice, GeometryType.Solid, EllipseType.EdgeToEdge, new Vector2F(3.0f), 0, 360, true, 80);
+            var rot = QuaternionF.RotationAxis(Vector3F.Right, MathHelper.DegreesToRadians(-90));
+            //shape = Shapes.Rectangle.New(GraphicsDevice, GeometryType.Solid, 1000, 500, 20, 20, 20, Matrix4x4F.Translation(500, 250, 0));
+            //shape = Shapes.Ellipse.New(GraphicsDevice, GeometryType.Solid, EllipseType.Sector, new Vector2F(1), 0, 360, true, 40);
+            //shape = Shapes.Arc.New(GraphicsDevice, GeometryType.Solid, new Vector2F(300), 30, 0, 360, true, 80);
+            //shape = Shapes.Sphere.New(GraphicsDevice, GeometryType.Solid, SphereType.UVSphere, 1);
+            //shape = Shapes.Cone.New(GraphicsDevice, GeometryType.Solid, 1, 0f, 1);
+            //shape = Shapes.Cylinder.New(GraphicsDevice, GeometryType.Solid, 1, 1.0f);
+            //shape = Shapes.Cube.New(GraphicsDevice, GeometryType.Solid, 1, 1, 1, 10);
+            //shape = Shapes.Sphere.New(GraphicsDevice, GeometryType.Solid, SphereType.UVSphere, 1, 18);
+            //shape = Shapes.Capsule.New(GraphicsDevice, GeometryType.Solid, 1, 0.5f);
+            //shape = Shapes.Tube.New(GraphicsDevice, GeometryType.Solid, 0.5f, 1, 0.05f);
+            //shape = Shapes.Torus.New(GraphicsDevice, GeometryType.Solid, 1, 0.33f, 32);
+            //shape = Shapes.Teapot.New(GraphicsDevice, GeometryType.Outlined);
+            //shape = Shapes.Polygon.New(GraphicsDevice, GeometryType.Solid, Vector2F.One);
+            //shape = Shapes.Polyline.New(GraphicsDevice, GeometryType.Solid, )
+            shape = Shapes.Line.New(GraphicsDevice, GeometryType.Outlined, new Vector3F(-0.5f, 0, 0), new Vector3F(0.5f, 0, 0), 0.1f);
+
             scissor = new Rect2D();
             scissor.Extent = new Extent2D();
             scissor.Extent.Width = (uint)window.ClientWidth;;
@@ -53,10 +80,13 @@ namespace Adamantium.UI.Processors
             var indices = new UInt32[] { 0, 1, 2, 0, 2, 3 };
             vertexBuffer = Buffer.Vertex.New(device, vertices);
             indexBuffer = Buffer.Index.New(device, indices);
+
             texture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "texture.png"));
+            texture2 = Texture.Load(GraphicsDevice, Path.Combine("Textures", "texture2.jpg"));
             sampler = CreateTextureSampler();
             view = Matrix4x4F.LookAtRH(new Vector3F(0, 0, -3), Vector3F.Zero, Vector3F.Up);
             CalculateProjectionMatrix();
+            
             //_vertexLayout = VertexInputLayout.FromType<VertexPositionTexture>();
 
             //_uiEffect = ToDispose(Effect.Load(@"Content\Effects\UIEffect.fx.compiled", _graphicsDevice));
@@ -67,12 +97,14 @@ namespace Adamantium.UI.Processors
         {
             proj = Matrix4x4F.PerspectiveFov(MathHelper.DegreesToRadians(45),
                 (float) window.ClientWidth / window.ClientHeight, 0.1f, 1000f);
-            //proj = Matrix4x4F.OrthoRH(window.ClientWidth / 500.0f, window.ClientHeight / 500.0f, 0.1f, 1000f);
+            // proj = Matrix4x4F.Ortho(window.ClientWidth/500.0f, window.ClientHeight/500.0f, 0.1f, 1000f);
             // proj = Matrix4x4F.OrthoOffCenter(0, window.ClientWidth, 0, window.ClientHeight, 0.01f,
             //      100000f);
-            
-            // proj = Matrix4x4F.PerspectiveOffCenterLH(0, window.ClientWidth, 0, window.ClientHeight, 0.01f,
-            //     1000f);
+            //
+            // proj = Matrix4x4F.PerspectiveOffCenter(0, window.ClientWidth, 0, window.ClientHeight, 1.0f,
+            //     1000000.1f);
+            // proj = Matrix4x4F.PerspectiveLH(window.ClientWidth, window.ClientHeight, 1f,
+            //     1000000.1f);
         }
 
 
@@ -202,7 +234,7 @@ namespace Adamantium.UI.Processors
 
             return v;
         }
-        
+
         public void Render(IGameTime gameTime)
         {
             //var commandList = _graphicsDevice.FinishCommandList(true);
@@ -223,27 +255,54 @@ namespace Adamantium.UI.Processors
             //GraphicsDevice.SetIndexBuffer(indexBuffer);
 
             //GraphicsDevice.BasicEffect.Parameters["wvp"].SetValue(Matrix4x4F.RotationZ((float)gameTime.FrameTime * MathHelper.DegreesToRadians(10)));
-            var rot = QuaternionF.RotationAxis(Vector3F.Down, MathHelper.DegreesToRadians(gameTime.TotalTime.TotalSeconds * 50));
-            var world = Matrix4x4F.RotationQuaternion(rot);
+            var rot = QuaternionF.RotationAxis(Vector3F.Down,
+                MathHelper.DegreesToRadians(gameTime.TotalTime.TotalSeconds * 0));
+            var rotX = QuaternionF.RotationAxis(Vector3F.Right,
+                MathHelper.DegreesToRadians(gameTime.TotalTime.TotalSeconds * 0));
+            //var world = Matrix4x4F.RotationQuaternion(rot);
             //var world = /*Matrix4x4F.Translation(-250, 0, 10000.05f) */ Matrix4x4F.RotationQuaternion(rot) * Matrix4x4F.Translation(250, 0, 10000.05f); //* Matrix4x4F.Translation(250, 0, 1000.05f);
-            //var world = Matrix4x4F.Translation(-250, 0, 0f) * Matrix4x4F.RotationQuaternion(rot) * Matrix4x4F.Translation(250, 0, 10000.05f);
-            var wvp = world * view * proj;
-            //var wvp = world * proj;
+            var world = Matrix4x4F.Translation(0, 0, 10);
+            var fovPrj = Matrix4x4F.PerspectiveFov(MathHelper.DegreesToRadians(-45),
+                (float) window.ClientWidth / window.ClientHeight, 0.1f, 1000f);
+            var wvp = world * view * fovPrj;
+            // var world = Matrix4x4F.Translation(-250, 0, 0f) * Matrix4x4F.RotationQuaternion(rot) * Matrix4x4F.Translation(250, 0, 10000.05f);
+            // var wvp = world * proj;
+            // var rot2 = QuaternionF.RotationAxis(Vector3F.Right,
+            //     MathHelper.DegreesToRadians(0.05));
+            // var wvp = Matrix4x4F.Translation(-250, 0, 0) *
+            //           Matrix4x4F.RotationQuaternion(rot2) * 
+            //           Matrix4x4F.Translation(250, 0, 1.0f) * proj;
+            
             GraphicsDevice.BasicEffect.Parameters["wvp"].SetValue(wvp);
             //GraphicsDevice.BasicEffect.Parameters["fillColor"].SetValue(Colors.White.ToVector4());
             GraphicsDevice.BasicEffect.Parameters["sampleType"].SetResource(sampler);
             GraphicsDevice.BasicEffect.Parameters["shaderTexture"].SetResource(texture);
-
-            //GraphicsDevice.BasicEffect.Techniques[0].Passes["Debug"].Apply();
             GraphicsDevice.BasicEffect.Techniques[0].Passes["Textured"].Apply();
             GraphicsDevice.DrawIndexed(vertexBuffer, indexBuffer);
+
+            var orthoProj = proj = Matrix4x4F.OrthoOffCenter(0, window.ClientWidth, 0, window.ClientHeight, 1f, 100000f);
+
+            world = /*Matrix4x4F.Scaling(1.0f, 1.0f, 1) * */Matrix4x4F.RotationQuaternion(rot) * 
+                Matrix4x4F.RotationQuaternion(rotX) * Matrix4x4F.Translation(0, 0f, -2.2f); //* Matrix4x4F.Scaling(0, 1.1f, 0);
+            wvp = world * view * fovPrj;
+            
+            // world = Matrix4x4F.Translation(200, 200, 1);
+            // wvp = world * orthoProj;
+             GraphicsDevice.BasicEffect.Parameters["wvp"].SetValue(wvp);
+             GraphicsDevice.BasicEffect.Parameters["meshColor"].SetValue(Colors.Crimson.ToVector3());
+             GraphicsDevice.BasicEffect.Parameters["transparency"].SetValue(1f);
+             // GraphicsDevice.BasicEffect.Parameters["sampleType"].SetResource(sampler);
+             // GraphicsDevice.BasicEffect.Parameters["shaderTexture"].SetResource(texture);
+            GraphicsDevice.BasicEffect.Techniques[1].Passes["Textured"].Apply();
+            shape.Draw();
+
             GraphicsDevice.EndDraw();
             GraphicsDevice.Present();
-            
+
             if (isWindowResized)
             {
                 isWindowResized = false;
-                GraphicsDevice.ResizePresenter((uint)window.ClientWidth, (uint)window.ClientHeight);
+                GraphicsDevice.ResizePresenter((uint) window.ClientWidth, (uint) window.ClientHeight);
             }
         }
 

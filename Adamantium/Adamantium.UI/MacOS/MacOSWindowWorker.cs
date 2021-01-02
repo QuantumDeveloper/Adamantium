@@ -3,11 +3,13 @@ using System.Runtime.InteropServices;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.MacOS;
 using Adamantium.Mathematics;
+using Adamantium.UI.Controls;
 using Adamantium.UI.Threading;
+using Rectangle = Adamantium.Mathematics.Rectangle;
 
 namespace Adamantium.UI.MacOS
 {
-    public class MacOSWindowWorker : DependencyComponent
+    public class MacOSWindowWorker : AdamantiumComponent
     {
         private MacOSWindow window;
         private IntPtr windowDelegate;

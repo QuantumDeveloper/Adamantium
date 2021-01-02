@@ -27,6 +27,7 @@ namespace Adamantium.UI.Windows
         {
             if (Handle == IntPtr.Zero)
             {
+                VerifyAccess();
                 windowWorker.SetWindow(this);
             }
         }

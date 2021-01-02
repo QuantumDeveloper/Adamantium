@@ -10,7 +10,7 @@ namespace Adamantium.Engine.Graphics.Effects
     public sealed class EffectParameter : NamedObject
     {
         internal readonly EffectData.Parameter ParameterDescription;
-        internal readonly EffectConstantBuffer Buffer;
+        public readonly EffectConstantBuffer Buffer;
         private readonly EffectResourceLinker resourceLinker;
         private readonly GetMatrixDelegate GetMatrixImpl;
         private readonly CopyMatrixDelegate CopyMatrix;

@@ -17,8 +17,7 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
             float height = 1,
             float depth = 1,
             int tessellation = 1,
-            Matrix4x4F? transform = null,
-            bool toRightHanded = false) : base(geometryType, tessellation, transform, toRightHanded)
+            Matrix4x4F? transform = null) : base(geometryType, tessellation, transform)
         {
             this.width = width;
             this.height = height;

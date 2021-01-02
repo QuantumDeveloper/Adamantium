@@ -3,7 +3,7 @@ using Adamantium.Imaging;
 
 namespace Adamantium.UI.Media.Imaging
 {
-   public abstract class BitmapSource:ImageSource
+   public abstract class BitmapSource : ImageSource
    {
       public virtual UInt32 PixelWidth => DXTexture.Width;
 

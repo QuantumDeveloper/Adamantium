@@ -1,7 +1,7 @@
 ﻿namespace Adamantium.Game
 {
    /// <summary>
-   /// Defines cursor, which will be set as <see cref="GameWindow"/> cursor
+   /// Defines cursor, which will be set as <see cref="GameOutput"/> cursor
    /// </summary>
    public enum GameWindowCursor
    {

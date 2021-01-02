@@ -42,19 +42,19 @@ namespace Adamantium.Game
         private Dictionary<Object, GameContext> contextsMapping;
 
         /// <summary>
-        /// Read only collection of <see cref="GameWindow"/>s
+        /// Read only collection of <see cref="GameOutput"/>s
         /// </summary>
-        public GameWindow[] Windows => gamePlatform.Windows;
+        public GameOutput[] Outputs => gamePlatform.Outputs;
 
         /// <summary>
-        /// Current focused <see cref="GameWindow"/>
+        /// Current focused <see cref="GameOutput"/>
         /// </summary>
-        public GameWindow ActiveWindow => gamePlatform.ActiveWindow;
+        public GameOutput ActiveOutput => gamePlatform.ActiveWindow;
 
         /// <summary>
-        /// Main <see cref="GameWindow"/>
+        /// Main <see cref="GameOutput"/>
         /// </summary>
-        public GameWindow MainWindow => gamePlatform.MainWindow;
+        public GameOutput MainOutput => gamePlatform.MainWindow;
 
         /// <summary>
         /// Condition on which game loop will be exited
@@ -135,7 +135,7 @@ namespace Adamantium.Game
         private void OnWindowRemoved(object sender, GameWindowEventArgs e)
         {
             WindowRemoved?.Invoke(this, e);
-            if (gamePlatform.Windows.Length == 0 && ShutDownMode == ShutDownMode.OnLastWindowClosed)
+            if (gamePlatform.Outputs.Length == 0 && ShutDownMode == ShutDownMode.OnLastWindowClosed)
             {
                 ShutDown();
             }
@@ -313,9 +313,9 @@ namespace Adamantium.Game
         {
             if (!IsRunning)
             {
-                var wnd = GameWindow.NewDefault();
+                var wnd = GameOutput.NewDefault();
                 wnd.Show();
-                gamePlatform.AddWindow(wnd);
+                gamePlatform.AddOutput(wnd);
                 RunInternal();
             }
         }
@@ -323,7 +323,7 @@ namespace Adamantium.Game
         /// <summary>
         /// Run game loop on the selected control
         /// </summary>
-        /// <param name="context">Control which will be used for creating corresponding <see cref="GameWindow"/> and further rendering</param>
+        /// <param name="context">Control which will be used for creating corresponding <see cref="GameOutput"/> and further rendering</param>
         public void Run(Object context)
         {
             if (!IsRunning)
@@ -336,12 +336,12 @@ namespace Adamantium.Game
         /// <summary>
         /// Run game loop on the selected control
         /// </summary>
-        /// <param name="window"><see cref="GameWindow"/> which will be used for rendering</param>
-        public void Run(GameWindow window)
+        /// <param name="window"><see cref="GameOutput"/> which will be used for rendering</param>
+        public void Run(GameOutput window)
         {
             if (!IsRunning)
             {
-                gamePlatform.AddWindow(window);
+                gamePlatform.AddOutput(window);
                 RunInternal();
             }
         }
@@ -374,13 +374,13 @@ namespace Adamantium.Game
         /// Create new game window from context and add it to the list of game windows
         /// </summary>
         /// <param name="context">Window, in which DX xontent will be rendered</param>
-        public GameWindow CreateWindowFromContext(object context)
+        public GameOutput CreateWindowFromContext(object context)
         {
             if (!contextsMapping.ContainsKey(context))
             {
                 var gameContext = new GameContext(context);
                 contextsMapping.Add(context, gameContext);
-                return gamePlatform.CreateWindow(gameContext);
+                return gamePlatform.CreateOutput(gameContext);
             }
             throw new ArgumentException("There are already game window created on the current context");
         }
@@ -392,11 +392,11 @@ namespace Adamantium.Game
         /// <param name="surfaceFormat">Surface format</param>
         /// <param name="depthFormat">Depth buffer format</param>
         /// <param name="msaaLevel">MSAA level</param>
-        public GameWindow CreateWindowFromContext(object context, SurfaceFormat surfaceFormat, DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24, MSAALevel msaaLevel = MSAALevel.None)
+        public GameOutput CreateWindowFromContext(object context, SurfaceFormat surfaceFormat, DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24, MSAALevel msaaLevel = MSAALevel.None)
         {
             if (!contextsMapping.ContainsKey(context))
             {
-                var window = gamePlatform.CreateWindow(context, surfaceFormat, depthFormat, msaaLevel);
+                var window = gamePlatform.CreateOutput(context, surfaceFormat, depthFormat, msaaLevel);
                 return window;
             }
             throw new ArgumentException("There are already game window created on the current context");
@@ -408,7 +408,7 @@ namespace Adamantium.Game
         /// <param name="context">Game window to remove</param>
         public void RemoveWindowByContext(object context)
         {
-            gamePlatform.RemoveWindow(context);
+            gamePlatform.RemoveOutput(context);
         }
 
         /// <summary>
@@ -431,7 +431,7 @@ namespace Adamantium.Game
             GameContext gameContext;
             if (contextsMapping.TryGetValue(oldContext, out gameContext))
             {
-                gamePlatform.RemoveWindow(gameContext);
+                gamePlatform.RemoveOutput(gameContext);
             }
             var context = new GameContext(newContext);
             gamePlatform.SwitchContext(gameContext, context);
@@ -631,7 +631,7 @@ namespace Adamantium.Game
         /// <summary>
         /// Method for updating game logic
         /// </summary>
-        /// <param name="gameTime">GameTime conatins elapsed time, total time and FPS</param>
+        /// <param name="gameTime">GameTime contains elapsed time, total time and FPS</param>
         protected virtual void Update(GameTime gameTime)
         { }
 
@@ -662,9 +662,9 @@ namespace Adamantium.Game
         protected virtual void EndScene()
         {
             //Parallel.ForEach(gamePlatform.Windows, window => window.DisplayContent());
-            for (int i = 0; i < gamePlatform.Windows.Length; i++)
+            for (int i = 0; i < gamePlatform.Outputs.Length; i++)
             {
-                gamePlatform.Windows[i].DisplayContent();
+                gamePlatform.Outputs[i].DisplayContent();
             }
         }
 

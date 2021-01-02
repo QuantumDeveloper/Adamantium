@@ -9,6 +9,9 @@ namespace Adamantium.Mathematics
         /// </summary>
         public const float ZeroToleranceF = 1e-6f;
 
+        /// <summary>
+        /// The value for which all absolute numbers smaller than are considered equal to zero.
+        /// </summary>
         public static double ZeroToleranceD = 1e-9;
 
         /// <summary>

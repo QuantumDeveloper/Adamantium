@@ -12,7 +12,7 @@
          new PropertyMetadata(null,
             PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange, ChildChanged));
 
-      private static void ChildChanged(DependencyComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
+      private static void ChildChanged(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
       {
          var o = adamantiumObject as Decorator;
          if (o != null)

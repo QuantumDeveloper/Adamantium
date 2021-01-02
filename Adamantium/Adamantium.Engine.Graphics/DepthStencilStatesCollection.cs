@@ -108,7 +108,7 @@ namespace Adamantium.Engine.Graphics
             DepthReadLess = Add(DepthStencilState.New(nameof(DepthReadLess), true, false));
             DepthReadEqual = Add(DepthStencilState.New(nameof(DepthReadEqual), true, false, true, CompareOp.Equal));
             DepthReadAlways = Add(DepthStencilState.New(nameof(DepthReadAlways), true, false, true, CompareOp.Always));
-            Default = Add(DepthStencilState.New(nameof(Default), PipelineDepthStencilStateCreateInfo.Default()));
+            Default = DepthEnableLess;
         }
     }
 }

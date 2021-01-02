@@ -22,8 +22,7 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
             float stopAngle = 360,
             bool isClockwise = true,
             int tessellation = 40,
-            Matrix4x4F? transform = null,
-            bool toRightHanded = false) : base(geometryType, tessellation, transform, toRightHanded)
+            Matrix4x4F? transform = null) : base(geometryType, tessellation, transform)
         {
             this.diameter = diameter;
             this.thickness = thickness;
@@ -48,7 +47,15 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
 
         public override Task<Entity> BuildEntity(Entity owner)
         {
-            var geometry = Shapes.Arc.GenerateGeometry(GeometryType, diameter, thickness, startAngle, stopAngle, isClockwise, Tessellation, Transform, ToRightHanded);
+            var geometry = Shapes.Arc.GenerateGeometry(
+                GeometryType, 
+                diameter, 
+                thickness, 
+                startAngle, 
+                stopAngle,
+                isClockwise, 
+                Tessellation, 
+                Transform);
             return Task.FromResult(BuildEntityFromPrimitive(owner, geometry));
         }
     }

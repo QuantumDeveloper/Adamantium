@@ -3,9 +3,9 @@
 namespace Adamantium.Game
 {
    /// <summary>
-   /// Collection wrapper for holding <see cref="GameWindow"/> instances
+   /// Collection wrapper for holding <see cref="GameOutput"/> instances
    /// </summary>
-   public class GameWindowCollection:AdamantiumCollection<GameWindow>
+   public class GameWindowCollection:AdamantiumCollection<GameOutput>
    {
    }
 }

@@ -12,18 +12,18 @@ using Rectangle = Adamantium.Mathematics.Rectangle;
 namespace Adamantium.Game
 {
     /// <summary>
-    /// Represents <see cref="GameWindow"/> based on <see cref="Window"/> 
+    /// Represents <see cref="GameOutput"/> based on <see cref="Window"/> 
     /// </summary>
-    public class RenderTargetGameWindow : AdamantiumGameWindowBase
+    public class RenderTargetGameOutput : AdamantiumGameOutputBase
     {
         private RenderTargetPanel nativeWindow;
 
-        internal RenderTargetGameWindow(GameContext context)
+        internal RenderTargetGameOutput(GameContext context)
         {
             Initialize(context);
         }
 
-        internal RenderTargetGameWindow(
+        internal RenderTargetGameOutput(
             GameContext context, 
             SurfaceFormat pixelFormat, 
             DepthFormat depthFormat, 

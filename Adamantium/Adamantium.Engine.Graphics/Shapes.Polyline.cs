@@ -7,9 +7,22 @@ namespace Adamantium.Engine.Graphics
 {
     public partial class Shapes
     {
+        // TODO: this class should be improved to make seamless transitions between points
         public class Polyline
         {
-            public static Mesh GenerateGeometry(Vector2F[] points, float length, float thickness, Matrix4x4F? transform = null)
+            public static Shape New(
+                GraphicsDevice device,
+                GeometryType geometryType,
+                Vector2F[] points,
+                float thickness,
+                Matrix4x4F? transform = null
+            )
+            {
+                var mesh = GenerateGeometry(points, thickness, transform);
+                return new Shape(device, mesh);
+            }
+            
+            public static Mesh GenerateGeometry(Vector2F[] points, float thickness, Matrix4x4F? transform = null)
             {
                 PrimitiveType primitiveType = PrimitiveType.TriangleStrip;
                 var vertexArray = new List<Vector3F>();
@@ -27,8 +40,8 @@ namespace Adamantium.Engine.Graphics
                     var direction = endPoint - startPoint;
                     var normal = new Vector2F(-direction.Y, direction.X);
                     normal.Normalize();
-                    // if p0 = point 1 - normal, then rectangle will be drawn above the line
-                    //else if p0 = point 1 + normal, then rectangle will be drawn under the line
+                    // if p0 = point1 - normal, then rectangle will be drawn above the line
+                    //else if p0 = point1 + normal, then rectangle will be drawn under the line
                     var p0 = startPoint - normal * thickness;
                     var p1 = endPoint - normal * thickness;
 
@@ -41,8 +54,9 @@ namespace Adamantium.Engine.Graphics
                     //Bottom right corner
                     vertexArray.Add(new Vector3F(p1, 0));
 
-                    uvs.Add(Vector2F.Zero);
                     uvs.Add(Vector2F.UnitX);
+                    uvs.Add(Vector2F.Zero);
+                    
                     uvs.Add(Vector2F.UnitY);
                     uvs.Add(Vector2F.One);
 
@@ -55,15 +69,11 @@ namespace Adamantium.Engine.Graphics
                 }
 
                 var mesh = new Mesh();
-                mesh.MeshTopology = primitiveType;
-                mesh.SetPositions(vertexArray);
-                mesh.SetUVs(0, uvs);
-                mesh.SetIndices(indicesArray);
-
-                if (transform.HasValue)
-                {
-                    mesh.ApplyTransform(transform.Value);
-                }
+                mesh.SetTopology(primitiveType).
+                    SetPositions(vertexArray).
+                    SetUVs(0, uvs).
+                    SetIndices(indicesArray).
+                    ApplyTransform(transform);
 
                 return mesh;
 

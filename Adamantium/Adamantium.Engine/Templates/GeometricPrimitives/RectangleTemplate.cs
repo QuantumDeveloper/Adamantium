@@ -20,8 +20,7 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
             float radiusX = 0,
             float radiusY = 0,
             int tessellation = 20,
-            Matrix4x4F? transform = null,
-            bool toRightHanded = false) : base(geometryType, tessellation, transform, toRightHanded)
+            Matrix4x4F? transform = null) : base(geometryType, tessellation, transform)
         {
             this.width = width;
             this.height = height;
@@ -43,7 +42,14 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
 
         public override Task<Entity> BuildEntity(Entity owner)
         {
-            var geometry = Shapes.Rectangle.GenerateGeometry(GeometryType, width,  height, radiusX, radiusY, Tessellation, Transform, ToRightHanded);
+            var geometry = Shapes.Rectangle.GenerateGeometry(
+                GeometryType, 
+                width, 
+                height, 
+                radiusX, 
+                radiusY,
+                Tessellation, 
+                Transform);
             return Task.FromResult(BuildEntityFromPrimitive(owner, geometry));
         }
     }

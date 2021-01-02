@@ -15,7 +15,7 @@ namespace Adamantium.EntityFramework.Processors
 {
     public class ForwardPlusRenderingProcessor : RenderProcessor
     {
-        public ForwardPlusRenderingProcessor(EntityWorld world, GameWindow window) : base(world, window)
+        public ForwardPlusRenderingProcessor(EntityWorld world, GameOutput window) : base(world, window)
         {
         }
 

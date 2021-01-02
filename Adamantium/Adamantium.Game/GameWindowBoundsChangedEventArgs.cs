@@ -7,9 +7,9 @@ namespace Adamantium.Game
     {
         public Rectangle Bounds { get; }
 
-        public GameWindow Window { get; }
+        public GameOutput Window { get; }
 
-        public GameWindowBoundsChangedEventArgs(GameWindow window, Rectangle bounds)
+        public GameWindowBoundsChangedEventArgs(GameOutput window, Rectangle bounds)
         {
             Window = window;
             Bounds = bounds;

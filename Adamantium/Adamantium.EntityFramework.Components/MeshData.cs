@@ -92,7 +92,7 @@ namespace Adamantium.EntityFramework.Components
                         shape = Shapes.Polygon.GenerateGeometry(Metadata.GeometryType, new Vector2F(Metadata.Width, Metadata.Height), Metadata.TessellationFactor);
                         break;
                     case ShapeType.Teapot:
-                        shape = Shapes.Teapot.GenerateGeometry(Metadata.Width, Metadata.TessellationFactor);
+                        shape = Shapes.Teapot.GenerateGeometry(Metadata.GeometryType, Metadata.Width, Metadata.TessellationFactor);
                         break;
                     case ShapeType.Ellipse:
                         shape = Shapes.Ellipse.GenerateGeometry(Metadata.GeometryType, Metadata.EllipseType, new Vector2F(Metadata.Width, Metadata.Height), Metadata.StartAngle, Metadata.StopAngle, Metadata.IsClockwise, Metadata.TessellationFactor);

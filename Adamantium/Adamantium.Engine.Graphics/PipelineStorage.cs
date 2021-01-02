@@ -184,7 +184,11 @@ namespace Adamantium.Engine.Graphics
 
             var inputAssembly = new PipelineInputAssemblyStateCreateInfo();
             inputAssembly.Topology = PrimitiveTopology;
-            inputAssembly.PrimitiveRestartEnable = false;
+            if (PrimitiveTopology == PrimitiveTopology.LineStrip ||
+                PrimitiveTopology == PrimitiveTopology.TriangleStrip)
+            {
+                inputAssembly.PrimitiveRestartEnable = true;
+            }
 
             var viewportState = new PipelineViewportStateCreateInfo();
             viewportState.PViewports = Viewports.ToArray();

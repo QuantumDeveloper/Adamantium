@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using Adamantium.UI.Controls;
 
 namespace Adamantium.UI
 {
@@ -50,7 +51,7 @@ namespace Adamantium.UI
       /// <param name="o"></param>
       /// <returns></returns>
       /// <exception cref="ArgumentNullException"></exception>
-      public static IEnumerable<AdamantiumProperty> GetRegistered(DependencyComponent o)
+      public static IEnumerable<AdamantiumProperty> GetRegistered(AdamantiumComponent o)
       {
          if (o == null)
          {

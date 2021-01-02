@@ -2,6 +2,8 @@
 {
     public enum DispatcherPriority : int
     {
+        MinValue = 1,
+        
         /// <summary>
         ///     Operations at this priority are processed when the application
         ///     is idle.

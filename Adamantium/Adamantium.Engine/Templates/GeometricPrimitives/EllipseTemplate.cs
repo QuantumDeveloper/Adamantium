@@ -10,8 +10,8 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
     {
         private EllipseType ellipseType;
         private Vector2F diameter;
-        private float startAngle,
-            stopAngle;
+        private float startAngle;
+        private float stopAngle;
 
         private bool isClockwise;
 
@@ -23,8 +23,7 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
             float stopAngle = 360,
             bool isClockwise = true,
             int tessellation = 40,
-            Matrix4x4F? transform = null,
-            bool toRightHanded = false) : base(geometryType, tessellation, transform, toRightHanded)
+            Matrix4x4F? transform = null) : base(geometryType, tessellation, transform)
         {
             this.diameter = diameter;
             this.ellipseType = ellipseType;
@@ -49,7 +48,15 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
 
         public override Task<Entity> BuildEntity(Entity owner)
         {
-            var geometry = Shapes.Ellipse.GenerateGeometry(GeometryType, ellipseType, diameter, startAngle, stopAngle, isClockwise, Tessellation, Transform, ToRightHanded);
+            var geometry = Shapes.Ellipse.GenerateGeometry(
+                GeometryType, 
+                ellipseType, 
+                diameter, 
+                startAngle, 
+                stopAngle, 
+                isClockwise, 
+                Tessellation, 
+                Transform);
             return Task.FromResult(BuildEntityFromPrimitive(owner, geometry));
         }
     }

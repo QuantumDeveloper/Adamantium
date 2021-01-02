@@ -18,42 +18,42 @@ namespace Adamantium.UI.Controls
          typeof(Double), typeof(UIComponent), new PropertyMetadata(Double.NaN, PropertyMetadataOptions.AffectsArrange));
 
 
-      public static Double GetLeft(DependencyComponent element)
+      public static Double GetLeft(AdamantiumComponent element)
       {
          return element.GetValue<Double>(LeftProperty);
       }
 
-      public static void SetLeft(DependencyComponent element, Double value)
+      public static void SetLeft(AdamantiumComponent element, Double value)
       {
          element.SetValue(LeftProperty, value);
       }
 
-      public static Double GetTop(DependencyComponent element)
+      public static Double GetTop(AdamantiumComponent element)
       {
          return element.GetValue<Double>(TopProperty);
       }
 
-      public static void SetTop(DependencyComponent element, Double value)
+      public static void SetTop(AdamantiumComponent element, Double value)
       {
          element.SetValue(TopProperty, value);
       }
 
-      public static Double GetRight(DependencyComponent element)
+      public static Double GetRight(AdamantiumComponent element)
       {
          return element.GetValue<Double>(RightProperty);
       }
 
-      public static void SetRight(DependencyComponent element, Double value)
+      public static void SetRight(AdamantiumComponent element, Double value)
       {
          element.SetValue(RightProperty, value);
       }
 
-      public static Double GetBottom(DependencyComponent element)
+      public static Double GetBottom(AdamantiumComponent element)
       {
          return element.GetValue<Double>(BottomProperty);
       }
 
-      public static void SetBottom(DependencyComponent element, Double value)
+      public static void SetBottom(AdamantiumComponent element, Double value)
       {
          element.SetValue(BottomProperty, value);
       }

@@ -8,19 +8,18 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
 {
     public class CylinderTemplate : PrimitiveTemplate
     {
-        private float _diameter,
-            _height;
+        private float diameter;
+        private float height;
 
         public CylinderTemplate(
             GeometryType geometryType,
             float diameter,
             float height,
             int tessellation = 3,
-            Matrix4x4F? transform = null,
-            bool toRightHanded = false) : base(geometryType, tessellation, transform, toRightHanded)
+            Matrix4x4F? transform = null) : base(geometryType, tessellation, transform)
         {
-            this._diameter = diameter;
-            this._height = height;
+            this.diameter = diameter;
+            this.height = height;
         }
 
         protected override void FillMetadata(
@@ -28,14 +27,14 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
         {
             metadata.GeometryType = GeometryType;
             metadata.ShapeType = ShapeType.Cylinder;
-            metadata.Diameter = _diameter;
-            metadata.Height = _height;
+            metadata.Diameter = diameter;
+            metadata.Height = height;
             metadata.TessellationFactor = Tessellation;
         }
 
         public override Task<Entity> BuildEntity(Entity owner)
         {
-            var primitive3D = Shapes.Cylinder.GenerateGeometry(GeometryType, _height, _diameter, Tessellation, Transform, ToRightHanded);
+            var primitive3D = Shapes.Cylinder.GenerateGeometry(GeometryType, height, diameter, Tessellation, Transform);
             return Task.FromResult(BuildEntityFromPrimitive(owner, primitive3D));
         }
     }

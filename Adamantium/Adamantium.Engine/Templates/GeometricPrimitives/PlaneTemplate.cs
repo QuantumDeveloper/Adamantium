@@ -8,19 +8,18 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
 {
     public class PlaneTemplate : PrimitiveTemplate
     {
-        private float _width;
-        private float _length;
+        private float width;
+        private float length;
 
         public PlaneTemplate(
             GeometryType geometryType,
             float width,
             float length,
             int tessellation = 1,
-            Matrix4x4F? transform = null,
-            bool toRightHanded = false) : base(geometryType, tessellation, transform, toRightHanded)
+            Matrix4x4F? transform = null) : base(geometryType, tessellation, transform)
         {
-            this._width = width;
-            this._length = length;
+            this.width = width;
+            this.length = length;
         }
 
         protected override void FillMetadata(
@@ -28,14 +27,14 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
         {
             metadata.GeometryType = GeometryType;
             metadata.ShapeType = ShapeType.Plane;
-            metadata.Width = _width;
-            metadata.Depth = _length;
+            metadata.Width = width;
+            metadata.Depth = length;
             metadata.TessellationFactor = Tessellation;
         }
 
         public override Task<Entity> BuildEntity(Entity owner)
         {
-            var primitive3D = Shapes.Plane.GenerateGeometry(GeometryType, _width, _length, Tessellation);
+            var primitive3D = Shapes.Plane.GenerateGeometry(GeometryType, width, length, Tessellation);
             return Task.FromResult(BuildEntityFromPrimitive(owner, primitive3D));
         }
     }

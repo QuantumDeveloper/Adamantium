@@ -1,4 +1,5 @@
-﻿using System.Threading;
+﻿using System;
+using System.Threading;
 
 namespace Adamantium.UI.Threading
 {
@@ -7,6 +8,9 @@ namespace Adamantium.UI.Threading
         void Run(CancellationToken token);
         
         bool IsOnUIThread { get; }
-        
+
+        void Signal();
+
+        event Action Signaled;
     }
 }

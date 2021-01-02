@@ -22,7 +22,7 @@ namespace Adamantium.UI.Controls
          new PropertyMetadata((Double) 360,
             PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsRender, PropertyChangedCallback, StopAngleValueCallback));
 
-      private static object StopAngleValueCallback(DependencyComponent adamantiumObject, object baseValue)
+      private static object StopAngleValueCallback(AdamantiumComponent adamantiumObject, object baseValue)
       {
          var ellipse = adamantiumObject as Ellipse;
          if (ellipse != null)
@@ -40,7 +40,7 @@ namespace Adamantium.UI.Controls
          return baseValue;
       }
 
-      private static object StartAngleValueCallback(DependencyComponent adamantiumObject, object baseValue)
+      private static object StartAngleValueCallback(AdamantiumComponent adamantiumObject, object baseValue)
       {
          var ellipse = adamantiumObject as Ellipse;
          if (ellipse != null)
@@ -58,7 +58,7 @@ namespace Adamantium.UI.Controls
          return baseValue;
       }
 
-      private static void PropertyChangedCallback(DependencyComponent a, AdamantiumPropertyChangedEventArgs e)
+      private static void PropertyChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
       {
          
       }

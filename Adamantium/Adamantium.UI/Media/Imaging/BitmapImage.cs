@@ -1,14 +1,15 @@
 ﻿using System;
 using Adamantium.Engine.Graphics;
+using Adamantium.UI.Controls;
 
 namespace Adamantium.UI.Media.Imaging
 {
-   public sealed class BitmapImage:BitmapSource
+   public sealed class BitmapImage : BitmapSource
    {
       public static readonly AdamantiumProperty UriSourceProperty = AdamantiumProperty.Register(nameof(UriSource),
          typeof (Uri), typeof (BitmapImage), new PropertyMetadata(null, UriChanged));
 
-      private static void UriChanged(DependencyComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
+      private static void UriChanged(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
       {
          var o = adamantiumObject as BitmapImage;
          if (o != null)

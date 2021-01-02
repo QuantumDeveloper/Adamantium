@@ -456,7 +456,7 @@ namespace Adamantium.Mathematics
         public List<Vector3D> SortVertices()
         {
             var sortedList = new List<Vector3D>(MergedPoints);
-            sortedList.Sort(VertexComparer.Default);
+            sortedList.Sort(VerticalVertexComparer.Default);
             return sortedList;
         }
 
@@ -473,7 +473,8 @@ namespace Adamantium.Mathematics
                     Vector3D.Min(ref minimum, ref point, out minimum);
                     Vector3D.Max(ref maximum, ref point, out maximum);
                 }
-                HighestPoint = new Vector3D(minimum.X, maximum.Y, 0);
+                //HighestPoint = new Vector3D(minimum.X, maximum.Y, 0);
+                HighestPoint = new Vector3D(minimum.X, minimum.Y, 0);
             }
         }
 
@@ -687,29 +688,29 @@ namespace Adamantium.Mathematics
         /// <returns>Collection of segments if at least 2 points present in collection, otherwise null</returns>
         public static List<LineSegment> SplitOnSegments(List<Vector3D> points)
         {
-            if (points.Count > 1)
+            if (points.Count <= 1) return new List<LineSegment>();
+            
+            List<LineSegment> segments = new List<LineSegment>();
+            for (int i = 0; i < points.Count - 1; i++)
             {
-                List<LineSegment> segments = new List<LineSegment>();
-                for (int i = 0; i < points.Count - 1; i++)
+                var segment = new LineSegment(points[i], points[i + 1]);
+                if (!IsSameStartEnd(ref segment))
                 {
-                    var segment = new LineSegment(points[i], points[i + 1]);
-                    if (!IsSameStartEnd(ref segment))
-                    {
-                        segments.Add(segment);
-                    }
+                    segments.Add(segment);
                 }
-                var seg = new LineSegment(points[points.Count - 1], points[0]);
-                if (!segments.Contains(seg))
-                {
-                    //Add last segment
-                    if (!IsSameStartEnd(ref seg))
-                    {
-                        segments.Add(seg);
-                    }
-                }
-                return segments;
             }
-            return null;
+
+            var seg = new LineSegment(points[^1], points[0]);
+                
+            if (!segments.Contains(seg))
+            {
+                //Add last segment
+                if (!IsSameStartEnd(ref seg))
+                {
+                    segments.Add(seg);
+                }
+            }
+            return segments;
         }
 
         /// <summary>
@@ -855,9 +856,9 @@ namespace Adamantium.Mathematics
         /// <summary>
         /// Comparer here is for sorting vectors by its X component from smallest to biggest value
         /// </summary>
-        private class VertexComparer : IComparer<Vector3D>
+        private class HorizontalVertexComparer : IComparer<Vector3D>
         {
-            public static VertexComparer Default => new VertexComparer();
+            public static HorizontalVertexComparer Default => new HorizontalVertexComparer();
 
             public int Compare(Vector3D x, Vector3D y)
             {
@@ -866,6 +867,24 @@ namespace Adamantium.Mathematics
                     return 0;
                 }
                 if (x.X < y.X)
+                {
+                    return -1;
+                }
+                return 1;
+            }
+        }
+        
+        private class VerticalVertexComparer : IComparer<Vector3D>
+        {
+            public static VerticalVertexComparer Default => new VerticalVertexComparer();
+
+            public int Compare(Vector3D x, Vector3D y)
+            {
+                if (MathHelper.WithinEpsilon(x.X, y.X, Epsilon))
+                {
+                    return 0;
+                }
+                if (x.Y < y.Y)
                 {
                     return -1;
                 }

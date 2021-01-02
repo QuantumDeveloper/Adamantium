@@ -30,6 +30,12 @@ namespace Adamantium.UI.Threading
         }
 
         public bool IsOnUIThread { get; }
+        public void Signal()
+        {
+            throw new NotImplementedException();
+        }
+
+        public event Action Signaled;
 
         public static void Initialize()
         {

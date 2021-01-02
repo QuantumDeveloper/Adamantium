@@ -10,14 +10,14 @@ namespace Adamantium.Game
     /// <summary>
     /// Abstract class representing encapsulated rendering surface (control) with <see cref="GraphicsPresenter"/>
     /// </summary>
-    public abstract class GameWindow : DisposableObject
+    public abstract class GameOutput : DisposableObject
     {
-        internal int WindowId = 1;
+        internal int OutputId = 1;
 
         internal GraphicsPresenter Presenter { get; set; }
 
         /// <summary>
-        /// Contains <see cref="GameWindow"/> description
+        /// Contains <see cref="GameOutput"/> description
         /// </summary>
         protected abstract GameWindowDescription Description { get; set; }
 
@@ -28,12 +28,12 @@ namespace Adamantium.Game
         public static GameWindowCursor DefaultCursor = GameWindowCursor.Arrow;
         
         /// <summary>
-        /// Bounds of the <see cref="GameWindow"/> starting always from (0,0)
+        /// Bounds of the <see cref="GameOutput"/> starting always from (0,0)
         /// </summary>
         public Rectangle ClientBounds { get; protected set; }
 
         /// <summary>
-        /// Cursor type that will be displayed when mouse cursor will enter <see cref="GameWindow"/> 
+        /// Cursor type that will be displayed when mouse cursor will enter <see cref="GameOutput"/> 
         /// </summary>
         public abstract GameWindowCursor Cursor { get; set; }
 
@@ -43,7 +43,7 @@ namespace Adamantium.Game
         public abstract object NativeWindow { get; }
 
         /// <summary>
-        /// Defines is <see cref="GameWindow"/> currently displayed
+        /// Defines is <see cref="GameOutput"/> currently displayed
         /// </summary>
         public abstract Boolean IsVisible { get; }
 
@@ -54,9 +54,9 @@ namespace Adamantium.Game
         internal abstract void SwitchContext(GameContext context);
 
         /// <summary>
-        /// Initializes <see cref="GameWindow"/>
+        /// Initializes <see cref="GameOutput"/>
         /// </summary>
-        protected GameWindow()
+        protected GameOutput()
         {
             GenerateWindowName();
         }
@@ -85,7 +85,7 @@ namespace Adamantium.Game
 
         protected String GeneratePresenterName()
         {
-            return "Presenter " + WindowId;
+            return "Presenter " + OutputId;
         }
 
         public void DisplayContent()
@@ -127,30 +127,30 @@ namespace Adamantium.Game
         {
         }
         
-        internal static GameWindow NewDefault(uint width = 1280, uint height = 720)
+        internal static GameOutput NewDefault(uint width = 1280, uint height = 720)
         {
-            return new AdamantiumGameWindow(width, height);
+            return new AdamantiumGameOutput(width, height);
         }
 
-        internal static GameWindow New(GameContext gameContext)
+        internal static GameOutput New(GameContext gameContext)
         {
             if (gameContext.ContextType == GameContextType.RenderTargetPanel)
             {
-                return new RenderTargetGameWindow(gameContext);
+                return new RenderTargetGameOutput(gameContext);
             }
             else if (gameContext.ContextType == GameContextType.Window)
             {
-                return new AdamantiumGameWindow();
+                return new AdamantiumGameOutput();
             }
             throw new NotSupportedException(gameContext.ContextType + " game context is not currently supported");
         }
 
 
-        internal static GameWindow New(GameContext gameContext, SurfaceFormat pixelFormat, DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24, MSAALevel msaaLevel = MSAALevel.X4)
+        internal static GameOutput New(GameContext gameContext, SurfaceFormat pixelFormat, DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24, MSAALevel msaaLevel = MSAALevel.X4)
         {
             if (gameContext.ContextType == GameContextType.RenderTargetPanel)
             {
-                return new RenderTargetGameWindow(gameContext, pixelFormat, depthFormat, msaaLevel);
+                return new RenderTargetGameOutput(gameContext, pixelFormat, depthFormat, msaaLevel);
             }
             throw new NotSupportedException(gameContext.ContextType + " game context is not currently supported");
         }

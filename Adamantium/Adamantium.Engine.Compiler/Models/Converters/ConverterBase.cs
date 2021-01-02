@@ -86,7 +86,7 @@ namespace Adamantium.Engine.Compiler.Converter.Converters
                for (int i = 0; i < currentModel.Meshes.Count; i++)
                {
                   //Оптимизация меша
-                   if (!currentModel.Meshes[i].HasIndiced)
+                   if (!currentModel.Meshes[i].HasIndices)
                    {
                        currentModel.Meshes[i].GenerateBasicIndices();
                    }

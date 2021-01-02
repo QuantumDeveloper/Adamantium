@@ -4,9 +4,9 @@ namespace Adamantium.Game
 {
    public class GameWindowEventArgs:EventArgs
    {
-      public GameWindow Window { get; }
+      public GameOutput Window { get; }
 
-      public GameWindowEventArgs(GameWindow window)
+      public GameWindowEventArgs(GameOutput window)
       {
          Window = window;
       }

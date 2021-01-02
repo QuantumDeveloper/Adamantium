@@ -10,7 +10,7 @@ namespace Adamantium.Engine.CompilerTests
     public class EffectsCompilerTests
     {
         [Test]
-        public void EffectParsingTest()
+        public void UIEffectParsingTest()
         {
             try
             {
@@ -30,6 +30,31 @@ namespace Adamantium.Engine.CompilerTests
                 Console.WriteLine(e);
                 throw;
             }
+            
+        }
+        
+        [Test]
+        public void BasicEffectParsingTest()
+        {
+            try
+            {
+                var path = Path.Combine("EffectsData", "BasicEffect.fx");
+                if (File.Exists(path))
+                {
+                    var text = File.ReadAllText(path);
+                    var result = EffectCompiler.CompileFromFile(path);
+            
+                    result.EffectData.Save("BasicEffect.fx.compiled");
+                    var restored = EffectData.Load("BasicEffect.fx.compiled");
+                }
+                
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                throw;
+            }
+            
         }
     }
 }

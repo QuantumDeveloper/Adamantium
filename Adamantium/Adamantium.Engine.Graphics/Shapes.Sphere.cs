@@ -15,8 +15,7 @@ namespace Adamantium.Engine.Graphics
             {
                 public static Mesh GenerateGeometry(
                     float diameter = 1.0f,
-                    int tessellation = 40,
-                    bool toRightHanded = false)
+                    int tessellation = 40)
                 {
 
                     int verticalSegments = tessellation;
@@ -51,7 +50,7 @@ namespace Adamantium.Engine.Graphics
                             dz *= dxz;
 
                             var normal = new Vector3F(dx, dy, dz);
-                            var textureCoordinate = new Vector2F(1.0f - u, v);
+                            var textureCoordinate = new Vector2F(1.0f - u, 1.0f - v);
 
                             vertices[vertexCount] = normal * radius;
                             uvs[vertexCount++] = textureCoordinate;
@@ -70,25 +69,21 @@ namespace Adamantium.Engine.Graphics
                             int nextJ = (j + 1) % stride;
 
                             indices[indexCount++] = (i * stride + j);
-                            indices[indexCount++] = (i * stride + nextJ);
                             indices[indexCount++] = (nextI * stride + j);
+                            indices[indexCount++] = (i * stride + nextJ);
 
                             indices[indexCount++] = (i * stride + nextJ);
-                            indices[indexCount++] = (nextI * stride + nextJ);
                             indices[indexCount++] = (nextI * stride + j);
+                            indices[indexCount++] = (nextI * stride + nextJ);
                         }
                     }
 
                     var mesh = new Mesh();
-                    mesh.MeshTopology = PrimitiveType.TriangleList;
-                    mesh.SetPositions(vertices);
-                    mesh.SetUVs(0, uvs);
-                    mesh.SetIndices(indices);
-                    if (toRightHanded)
-                    {
-                        mesh.ReverseWinding();
-                    }
-                    mesh.CalculateNormals();
+                    mesh.SetTopology(PrimitiveType.TriangleList).
+                        SetPositions(vertices).
+                        SetUVs(0, uvs).
+                        SetIndices(indices).
+                        CalculateNormals();
 
                     return mesh;
                 }
@@ -144,15 +139,13 @@ namespace Adamantium.Engine.Graphics
                 /// </summary>
                 /// <param name="diameter">The diameter.</param>
                 /// <param name="tessellation">The tessellation.</param>
-                /// <param name="toRightHanded">if set to <c>true</c> vertices and indices will be transformed to left handed. Default is true.</param>
                 /// <returns>A <see cref="Mesh"/> containing all necesseray info in raw format.</returns>
                 public static Mesh GenerateGeometry(
                     float diameter = 1.0f,
-                    int tessellation = 3,
-                    bool toRightHanded = false)
+                    int tessellation = 3)
                 {
                     var sphere = new GeoSphere();
-                    return sphere.GenerateSphere(diameter, tessellation, toRightHanded);
+                    return sphere.GenerateSphere(diameter, tessellation);
                 }
 
                 /// <summary>
@@ -160,12 +153,10 @@ namespace Adamantium.Engine.Graphics
                 /// </summary>
                 /// <param name="diameter">The diameter.</param>
                 /// <param name="tessellation">The tessellation.</param>
-                /// <param name="toRightHanded">if set to <c>true</c> vertices and indices will be transformed to left handed. Default is true.</param>
                 /// <returns>A Geodesic sphere.</returns>
                 private unsafe Mesh GenerateSphere(
                     float diameter = 1.0f,
-                    int tessellation = 3,
-                    bool toRightHanded = false)
+                    int tessellation = 3)
                 {
                     subdividedEdges = new Dictionary<UndirectedEdge, int>();
 
@@ -223,23 +214,23 @@ namespace Adamantium.Engine.Graphics
 
                             // a
                             newIndices.Add(iv0);
-                            newIndices.Add(iv20);
                             newIndices.Add(iv01);
+                            newIndices.Add(iv20);
 
                             // b
                             newIndices.Add(iv20);
-                            newIndices.Add(iv2);
                             newIndices.Add(iv12);
+                            newIndices.Add(iv2);
 
                             // d
                             newIndices.Add(iv20);
-                            newIndices.Add(iv12);
                             newIndices.Add(iv01);
+                            newIndices.Add(iv12);
 
                             // d
                             newIndices.Add(iv01);
-                            newIndices.Add(iv12);
                             newIndices.Add(iv1);
+                            newIndices.Add(iv12);
                         }
 
                         indexList.Clear();
@@ -264,7 +255,7 @@ namespace Adamantium.Engine.Graphics
                         float u = (float) (longitude / (Math.PI * 2.0) + 0.5);
                         float v = (float) (latitude / Math.PI);
 
-                        var texcoord = new Vector2F(u, v);
+                        var texcoord = new Vector2F(u, 1.0f - v);
                         vertices.Add(pos);
                         uvs.Add(texcoord);
                     }
@@ -281,6 +272,7 @@ namespace Adamantium.Engine.Graphics
                     // completed sphere. If you imagine the vertices along that edge, they circumscribe a semicircular arc starting at
                     // y=1 and ending at y=-1, and sweeping across the range of z=0 to z=1. x stays zero. It's along this edge that we
                     // need to duplicate our vertices - and provide the correct texture coordinates.
+                    /*
                     int preCount = vertices.Count;
                     var indicesArray = indexList.ToArray();
                     fixed (void* pIndices = indicesArray)
@@ -305,36 +297,52 @@ namespace Adamantium.Engine.Graphics
                                 // Now find all the triangles which contain this vertex and update them if necessary
                                 for (int j = 0; j < indexList.Count; j += 3)
                                 {
-                                    var triIndex0 = &indices[j + 0];
-                                    var triIndex1 = &indices[j + 1];
-                                    var triIndex2 = &indices[j + 2];
+                                    try
+                                    {
+                                        var triIndex0 = &indices[j + 0];
+                                        var triIndex1 = &indices[j + 1];
+                                        var triIndex2 = &indices[j + 2];
 
-                                    if (*triIndex0 == i)
-                                    {
-                                        // nothing; just keep going
-                                    }
-                                    else if (*triIndex1 == i)
-                                    {
-                                        Utilities.Swap(ref *triIndex0, ref *triIndex1);
-                                        Utilities.Swap(ref *triIndex1, ref *triIndex2);
-                                    }
-                                    else if (*triIndex2 == i)
-                                    {
-                                        Utilities.Swap(ref *triIndex0, ref *triIndex2);
-                                        Utilities.Swap(ref *triIndex1, ref *triIndex2);
-                                    }
-                                    else
-                                    {
-                                        // this triangle doesn't use the vertex we're interested in
-                                        continue;
-                                    }
+                                        if (*triIndex0 == i)
+                                        {
+                                            // nothing; just keep going
+                                        }
+                                        else if (*triIndex1 == i)
+                                        {
+                                            Utilities.Swap(ref *triIndex0, ref *triIndex1);
+                                            Utilities.Swap(ref *triIndex1, ref *triIndex2);
+                                        }
+                                        else if (*triIndex2 == i)
+                                        {
+                                            Utilities.Swap(ref *triIndex0, ref *triIndex2);
+                                            Utilities.Swap(ref *triIndex1, ref *triIndex2);
+                                        }
+                                        else
+                                        {
+                                            // this triangle doesn't use the vertex we're interested in
+                                            continue;
+                                        }
 
-                                    // check the other two vertices to see if we might need to fix this triangle
-                                    if (Math.Abs(uvs[*triIndex0].X - uvs[*triIndex1].X) > 0.5f ||
-                                        Math.Abs(uvs[*triIndex0].X - uvs[*triIndex2].X) > 0.5f)
+                                        // check the other two vertices to see if we might need to fix this triangle
+                                        try
+                                        {
+                                            if (Math.Abs(uvs[*triIndex0].X - uvs[*triIndex1].X) > 0.5f ||
+                                                Math.Abs(uvs[*triIndex0].X - uvs[*triIndex2].X) > 0.5f)
+                                            {
+                                                // yep; replace the specified index to point to the new, corrected vertex
+                                                indices[j + 0] = newIndex;
+                                            }
+                                        }
+                                        catch (Exception e)
+                                        {
+                                            Console.WriteLine(e);
+                                            throw;
+                                        }
+                                    }
+                                    catch (Exception e)
                                     {
-                                        // yep; replace the specified index to point to the new, corrected vertex
-                                        indices[j + 0] = newIndex;
+                                        Console.WriteLine(e);
+                                        throw;
                                     }
                                 }
                             }
@@ -346,72 +354,84 @@ namespace Adamantium.Engine.Graphics
                         // Clear indices as it will not be accessible outside the fixed statement
                         indices = (int*) 0;
                     }
+                    */
+                    
+                    FixPole(northPoleIndex);
+                    FixPole(southPoleIndex);
 
                     var mesh = new Mesh();
-                    mesh.MeshTopology = PrimitiveType;
-                    mesh.SetPositions(vertices);
-                    mesh.SetUVs(0, uvs);
-                    mesh.SetIndices(indicesArray);
-                    if (toRightHanded)
-                    {
-                        mesh.ReverseWinding();
-                    }
-                    mesh.CalculateNormals();
+                    mesh.SetTopology(PrimitiveType).
+                        SetPositions(vertices).
+                        SetUVs(0, uvs).
+                        SetIndices(indexList.ToArray()).
+                        CalculateNormals();
 
                     return mesh;
                 }
 
-                private unsafe void FixPole(
-                    int poleIndex)
+                private unsafe void FixPole(int poleIndex)
                 {
-                    var poleUV = uvs[poleIndex];
-                    bool overwrittenPoleVertex = false; // overwriting the original pole vertex saves us one vertex
-
-                    for (ushort i = 0; i < indexList.Count; i += 3)
+                    var indicesArray = indexList.ToArray();
+                    fixed (void* pIndices = indicesArray)
                     {
-                        // These pointers point to the three indices which make up this triangle. pPoleIndex is the pointer to the
-                        // entry in the index array which represents the pole index, and the other two pointers point to the other
-                        // two indices making up this triangle.
-                        int* pPoleIndex;
-                        int* pOtherIndex0;
-                        int* pOtherIndex1;
-                        if (indices[i + 0] == poleIndex)
-                        {
-                            pPoleIndex = &indices[i + 0];
-                            pOtherIndex0 = &indices[i + 1];
-                            pOtherIndex1 = &indices[i + 2];
-                        }
-                        else if (indices[i + 1] == poleIndex)
-                        {
-                            pPoleIndex = &indices[i + 1];
-                            pOtherIndex0 = &indices[i + 2];
-                            pOtherIndex1 = &indices[i + 0];
-                        }
-                        else if (indices[i + 2] == poleIndex)
-                        {
-                            pPoleIndex = &indices[i + 2];
-                            pOtherIndex0 = &indices[i + 0];
-                            pOtherIndex1 = &indices[i + 1];
-                        }
-                        else
-                        {
-                            continue;
-                        }
+                        indices = (int*) pIndices;
+                        var poleUV = uvs[poleIndex];
+                        bool overwrittenPoleVertex = false; // overwriting the original pole vertex saves us one vertex
 
-                        // Calculate the texcoords for the new pole vertex, add it to the vertices and update the index
-                        var newPoleUV = poleUV;
-                        newPoleUV.X = (vertices[*pOtherIndex0].X + vertices[*pOtherIndex1].X) * 0.5f;
-                        newPoleUV.Y = poleUV.Y;
+                        for (var i = 0; i < indexList.Count; i += 3)
+                        {
+                            // These pointers point to the three indices which make up this triangle. pPoleIndex is the pointer to the
+                            // entry in the index array which represents the pole index, and the other two pointers point to the other
+                            // two indices making up this triangle.
+                            try
+                            {
+                                int* pPoleIndex;
+                                int* pOtherIndex0;
+                                int* pOtherIndex1;
+                                if (indices[i + 0] == poleIndex)
+                                {
+                                    pPoleIndex = &indices[i + 0];
+                                    pOtherIndex0 = &indices[i + 1];
+                                    pOtherIndex1 = &indices[i + 2];
+                                }
+                                else if (indices[i + 1] == poleIndex)
+                                {
+                                    pPoleIndex = &indices[i + 1];
+                                    pOtherIndex0 = &indices[i + 2];
+                                    pOtherIndex1 = &indices[i + 0];
+                                }
+                                else if (indices[i + 2] == poleIndex)
+                                {
+                                    pPoleIndex = &indices[i + 2];
+                                    pOtherIndex0 = &indices[i + 0];
+                                    pOtherIndex1 = &indices[i + 1];
+                                }
+                                else
+                                {
+                                    continue;
+                                }
 
-                        if (!overwrittenPoleVertex)
-                        {
-                            uvs[poleIndex] = newPoleUV;
-                            overwrittenPoleVertex = true;
-                        }
-                        else
-                        {
-                            *pPoleIndex = vertices.Count;
-                            uvs.Add(newPoleUV);
+                                // Calculate the texcoords for the new pole vertex, add it to the vertices and update the index
+                                var newPoleUV = poleUV;
+                                newPoleUV.X = (vertices[*pOtherIndex0].X + vertices[*pOtherIndex1].X) * 0.5f;
+                                newPoleUV.Y = poleUV.Y;
+
+                                if (!overwrittenPoleVertex)
+                                {
+                                    uvs[poleIndex] = newPoleUV;
+                                    overwrittenPoleVertex = true;
+                                }
+                                else
+                                {
+                                    *pPoleIndex = vertices.Count;
+                                    uvs.Add(newPoleUV);
+                                }
+                            }
+                            catch (Exception e)
+                            {
+                                Console.WriteLine(e);
+                                throw;
+                            }
                         }
                     }
                 }
@@ -503,15 +523,14 @@ namespace Adamantium.Engine.Graphics
             {
                 public static Mesh GenerateGeometry(
                     float diameter,
-                    int tessellation = 3,
-                    bool toRightHanded = false)
+                    int tessellation = 3)
                 {
                     if (diameter <= 0)
                     {
                         throw new ArgumentOutOfRangeException(nameof(diameter), "diameter parameter must be more than 0");
                     }
 
-                    var mesh = Cube.GenerateGeometry(GeometryType.Solid, diameter, diameter, diameter, tessellation, null, toRightHanded);
+                    var mesh = Cube.GenerateGeometry(GeometryType.Solid, diameter, diameter, diameter, tessellation, null);
 
                     var vertices = mesh.Positions;
                     var radius = diameter / 2;
@@ -551,8 +570,8 @@ namespace Adamantium.Engine.Graphics
                         vertices[i] = position;
                     }
 
-                    mesh.SetPositions(vertices);
-                    mesh.CalculateNormals();
+                    mesh.SetPositions(vertices).
+                        CalculateNormals();
 
                     return mesh;
                 }
@@ -560,8 +579,7 @@ namespace Adamantium.Engine.Graphics
 
             public static Mesh GenerateOutlinedGeometry(
                 float diameter = 1.0f,
-                int tessellation = 40,
-                bool toRightHanded = false)
+                int tessellation = 40)
             {
                 PrimitiveType primitiveType = PrimitiveType.LineStrip;
 
@@ -580,7 +598,7 @@ namespace Adamantium.Engine.Graphics
                     vertices.Add(new Vector3F(x, 0, y));
                     indices.Add(lastIndex++);
                 }
-                indices.Add(Shape.StripSeparatorValue);
+                indices.Add(Shape.PrimitiveRestartValue);
 
                 for (int i = 0; i <= tessellation; ++i)
                 {
@@ -592,7 +610,7 @@ namespace Adamantium.Engine.Graphics
                     indices.Add(lastIndex++);
                 }
 
-                indices.Add(Shape.StripSeparatorValue);
+                indices.Add(Shape.PrimitiveRestartValue);
 
                 for (int i = 0; i <= tessellation; ++i)
                 {
@@ -661,28 +679,25 @@ namespace Adamantium.Engine.Graphics
                 Mesh mesh;
                 if (geometryType == GeometryType.Outlined)
                 {
-                    mesh = GenerateOutlinedGeometry(diameter, tessellation, toRightHanded);
+                    mesh = GenerateOutlinedGeometry(diameter, tessellation);
                 }
                 else
                 {
                     switch (sphereType)
                     {
                         case SphereType.GeoSphere:
-                            mesh = GeoSphere.GenerateGeometry(diameter, tessellation, toRightHanded);
+                            mesh = GeoSphere.GenerateGeometry(diameter, tessellation);
                             break;
                         case SphereType.CubeSphere:
-                            mesh = CubeSphere.GenerateGeometry(diameter, tessellation, toRightHanded);
+                            mesh = CubeSphere.GenerateGeometry(diameter, tessellation);
                             break;
                         default:
-                            mesh = UVSphere.GenerateGeometry(diameter, tessellation, toRightHanded);
+                            mesh = UVSphere.GenerateGeometry(diameter, tessellation);
                             break;
                     }
                 }
-
-                if (transform.HasValue)
-                {
-                    mesh.ApplyTransform(transform.Value);
-                }
+                
+                mesh.ApplyTransform(transform);
 
                 return mesh;
             }

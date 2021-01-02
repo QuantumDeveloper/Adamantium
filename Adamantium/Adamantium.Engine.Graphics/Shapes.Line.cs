@@ -9,27 +9,29 @@ namespace Adamantium.Engine.Graphics
     {
         public class Line
         {
-            public static Mesh GenerateGeometry(GeometryType geometryType, Vector3F startPoint, Vector3F endPoint, float thickness, Matrix4x4F? transform = null, bool toRightHanded = false)
+            public static Mesh GenerateGeometry(
+                GeometryType geometryType, 
+                Vector3F startPoint, 
+                Vector3F endPoint, 
+                float thickness, 
+                Matrix4x4F? transform = null)
             {
                 Mesh mesh;
                 if (geometryType == GeometryType.Solid)
                 {
-                    mesh = GenerateSolidGeometry(startPoint, endPoint, thickness, toRightHanded);
+                    mesh = GenerateSolidGeometry(startPoint, endPoint, thickness);
                 }
                 else
                 {
                     mesh = GenerateOutlinedGeometry(startPoint, endPoint);
                 }
 
-                if (transform.HasValue)
-                {
-                    mesh.ApplyTransform(transform.Value);
-                }
+                mesh.ApplyTransform(transform);
 
                 return mesh;
             }
 
-            public static Mesh GenerateSolidGeometry(Vector3F startPoint, Vector3F endPoint, float thickness, bool toRightHanded = false)
+            public static Mesh GenerateSolidGeometry(Vector3F startPoint, Vector3F endPoint, float thickness)
             {
                 PrimitiveType primitiveType = PrimitiveType.TriangleStrip;
 
@@ -56,11 +58,11 @@ namespace Adamantium.Engine.Graphics
                 vertexArray.Add(p3);
 
                 List<Vector2F> uvs = new List<Vector2F>();
-                uvs.Add(Vector2F.Zero);
-                uvs.Add(Vector2F.UnitX);
-                uvs.Add(Vector2F.UnitY);
                 uvs.Add(Vector2F.One);
-
+                uvs.Add(Vector2F.UnitY);
+                uvs.Add(Vector2F.UnitX);
+                uvs.Add(Vector2F.Zero);
+                
                 indicesArray.Add(lastIndex++);
                 indicesArray.Add(lastIndex++);
                 indicesArray.Add(lastIndex++);
@@ -68,11 +70,11 @@ namespace Adamantium.Engine.Graphics
                 indicesArray.Add(interrupt);
 
                 var mesh = new Mesh();
-                mesh.MeshTopology = primitiveType;
-                mesh.SetPositions(vertexArray);
-                mesh.SetUVs(0, uvs);
-                mesh.SetIndices(indicesArray);
-                mesh.CalculateNormals();
+                mesh.SetTopology(primitiveType).
+                    SetPositions(vertexArray).
+                    SetUVs(0, uvs).
+                    SetIndices(indicesArray).
+                    CalculateNormals();
 
                 return mesh;
             }
@@ -85,9 +87,10 @@ namespace Adamantium.Engine.Graphics
                 positions[0] = startPoint;
                 positions[1] = endPoint;
 
+                int[] indices = {0, 1};
+
                 Mesh mesh = new Mesh();
-                mesh.MeshTopology = primitiveType;
-                mesh.SetPositions(positions);
+                mesh.SetTopology(primitiveType).SetPositions(positions).SetIndices(indices);
 
                 return mesh;
             }
@@ -98,10 +101,9 @@ namespace Adamantium.Engine.Graphics
                 Vector3F startPoint,
                 Vector3F endPoint,
                 float thickness,
-                Matrix4x4F? transform = null,
-                bool toRightHanded = false)
+                Matrix4x4F? transform = null)
             {
-                var geometry = GenerateGeometry(geometryType, startPoint, endPoint, thickness, transform, toRightHanded);
+                var geometry = GenerateGeometry(geometryType, startPoint, endPoint, thickness, transform);
                 return new Shape(device, geometry);
             }
         }

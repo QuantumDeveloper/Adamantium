@@ -7,9 +7,9 @@ namespace Adamantium.Game
    {
       public Size Size { get; }
 
-      public GameWindow Window { get; }
+      public GameOutput Window { get; }
 
-      public GameWindowSizeChangedEventArgs(GameWindow window, Size size)
+      public GameWindowSizeChangedEventArgs(GameOutput window, Size size)
       {
          Size = size;
          Window = window;
