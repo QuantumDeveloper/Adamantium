@@ -3,7 +3,7 @@ using System.IO;
 
 namespace Adamantium.Game
 {
-   internal class GamePlatformDesktop:GamePlatform
+   public abstract class GamePlatformDesktop : GamePlatform
    {
       public GamePlatformDesktop(GameBase gameBase) : base(gameBase)
       {

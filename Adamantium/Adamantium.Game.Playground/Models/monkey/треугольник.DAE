@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<COLLADA xmlns="http://www.collada.org/2005/11/COLLADASchema" version="1.4.1">
+  <asset><contributor><author></author><authoring_tool>FBX COLLADA exporter</authoring_tool><comments></comments></contributor><created>2015-10-22T17:13:05Z</created><keywords></keywords><modified>2015-10-22T17:13:05Z</modified><revision></revision><subject></subject><title></title><unit meter="0.025400" name="centimeter"></unit><up_axis>Y_UP</up_axis></asset>
+  <library_geometries>
+    <geometry id="NGon001-lib" name="NGon001Mesh">
+      <mesh>
+        <source id="NGon001-POSITION">
+          <float_array id="NGon001-POSITION-array" count="18">
+22.108934 0.000000 0.000000
+-11.054468 19.146898 0.000000
+-11.054465 -19.146900 0.000000
+22.108934 0.000000 0.000000
+-11.054468 19.146898 0.000000
+-11.054465 -19.146900 0.000000
+</float_array>
+          <technique_common>
+            <accessor source="#NGon001-POSITION-array" count="6" stride="3">
+              <param name="X" type="float"/>
+              <param name="Y" type="float"/>
+              <param name="Z" type="float"/>
+            </accessor>
+          </technique_common>
+        </source>
+        <source id="NGon001-Normal0">
+          <float_array id="NGon001-Normal0-array" count="72">
+1.000000 0.000000 0.000000
+1.000000 0.000000 0.000000
+1.000000 0.000000 0.000000
+1.000000 0.000000 0.000000
+1.000000 0.000000 0.000000
+1.000000 0.000000 0.000000
+1.000000 0.000000 0.000000
+1.000000 0.000000 0.000000
+1.000000 0.000000 0.000000
+1.000000 0.000000 0.000000
+1.000000 0.000000 0.000000
+1.000000 0.000000 0.000000
+1.000000 0.000000 0.000000
+1.000000 0.000000 0.000000
+1.000000 0.000000 0.000000
+1.000000 0.000000 0.000000
+1.000000 0.000000 0.000000
+1.000000 0.000000 0.000000
+0.000000 0.000000 -1.000000
+0.000000 0.000000 -1.000000
+0.000000 0.000000 -1.000000
+0.000000 0.000000 1.000000
+0.000000 0.000000 1.000000
+0.000000 0.000000 1.000000
+</float_array>
+          <technique_common>
+            <accessor source="#NGon001-Normal0-array" count="24" stride="3">
+              <param name="X" type="float"/>
+              <param name="Y" type="float"/>
+              <param name="Z" type="float"/>
+            </accessor>
+          </technique_common>
+        </source>
+        <vertices id="NGon001-VERTEX">
+          <input semantic="POSITION" source="#NGon001-POSITION"/>
+        </vertices>
+        <triangles count="8">
+		<input semantic="VERTEX" offset="0" source="#NGon001-VERTEX"/>
+		<input semantic="NORMAL" offset="1" source="#NGon001-Normal0"/>
+		<p> 0 0 1 1 4 2 0 3 4 4 3 5 1 6 2 7 5 8 1 9 5 10 4 11 2 12 0 13 3 14 2 15 3 16 5 17 0 18 2 19 1 20 3 21 4 22 5 23</p>
+		</triangles>
+      </mesh>
+    </geometry>
+  </library_geometries>
+  <library_visual_scenes>
+    <visual_scene id="треугольник" name="треугольник">
+      <node name="NGon001" id="NGon001" sid="NGon001"><matrix sid="matrix">0.000000 -0.000000 -1.000000 0.000000 1.000000 0.000000 0.000000 0.000000 0.000000 -1.000000 0.000000 0.000000 0.000000 0.000000 0.000000 1.000000</matrix><instance_geometry url="#NGon001-lib"/><extra><technique profile="FCOLLADA"><visibility>1.000000</visibility></technique></extra></node>
+      <extra><technique profile="MAX3D"><frame_rate>30.000000</frame_rate></technique><technique profile="FCOLLADA"><start_time>0.000000</start_time><end_time>3.333333</end_time></technique></extra>
+    </visual_scene>
+  </library_visual_scenes>
+  <scene>
+    <instance_visual_scene url="#треугольник"></instance_visual_scene>
+  </scene>
+</COLLADA>

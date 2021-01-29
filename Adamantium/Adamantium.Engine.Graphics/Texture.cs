@@ -5,6 +5,7 @@ using Adamantium.Imaging;
 using Adamantium.Core;
 using System.IO;
 using System.Runtime.InteropServices;
+using Adamantium.Engine.Core.Content;
 using Adamantium.Win32;
 using VulkanImage = AdamantiumVulkan.Core.Image;
 using AdamantiumVulkan.Core;
@@ -12,6 +13,7 @@ using Image = Adamantium.Imaging.Image;
 
 namespace Adamantium.Engine.Graphics
 {
+    [ContentReader(typeof(TextureContentReader))]
     public class Texture : DisposableBase
     {
         private VulkanImage vulkanImage;
@@ -28,6 +30,8 @@ namespace Adamantium.Engine.Graphics
         public ImageLayout ImageLayout { get; private set; }
 
         public IntPtr NativePointer { get; }
+        
+        public string Name { get; set; }
 
         public GraphicsDevice GraphicsDevice { get; private set; }
 
@@ -391,13 +395,12 @@ namespace Adamantium.Engine.Graphics
             catch (Exception exception)
             {
                 Console.WriteLine(exception);
+                throw;
             }
             finally
             {
                 image?.Dispose();
             }
-
-            throw new InvalidOperationException("Dimension not supported");
         }
 
         /// <summary>

@@ -212,7 +212,10 @@ namespace Adamantium.Core.Collections
         {
             lock (SyncRoot)
             {
-                items.CopyTo(array, arrayIndex);
+                for (int i = arrayIndex; i < array.Length; ++i)
+                {
+                    array[i] = items[i];
+                }
             }
         }
 

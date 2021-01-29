@@ -57,7 +57,7 @@ namespace Adamantium.Engine.Graphics
 
         private void CreateSwapchain()
         {
-            PhysicalDevice physicalDevice = GraphicsDevice;
+            PhysicalDevice physicalDevice = GraphicsDevice.MainDevice;
             Device logicalDevice = GraphicsDevice;
             var swapChainSupport = QuerySwapChainSupport(physicalDevice);
             SurfaceFormatKHR surfaceFormat = ChooseSwapSurfaceFormat(swapChainSupport.Formats);
@@ -293,7 +293,7 @@ namespace Adamantium.Engine.Graphics
             
         }
 
-        private void CleanupSwapChain()
+        protected override void CleanupSwapChain()
         {
             foreach (var framebuffer in framebuffers)
             {

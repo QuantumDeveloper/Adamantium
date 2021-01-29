@@ -2,13 +2,16 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using Adamantium.Core.Collections;
+using Adamantium.Core.Events;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
+using Adamantium.Engine.Graphics.Effects;
 using Adamantium.Engine.Templates.Camera;
 using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
-using Adamantium.EntityFramework.Extensions;
+using Adamantium.EntityFramework.Components.Extensions;
 using Adamantium.Game;
+using Adamantium.Game.Events;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Engine.Services
@@ -25,15 +28,15 @@ namespace Adamantium.Engine.Services
         ///<summary>
         ///Collection of all cameras.
         ///</summary>
-        private readonly System.Collections.Generic.Dictionary<GameOutput, List<Camera>> windowToCameras;
-        private readonly System.Collections.Generic.Dictionary<Camera, GameOutput> cameraToWindow;
+        private readonly Dictionary<GameOutput, List<Camera>> windowToCameras;
+        private readonly Dictionary<Camera, GameOutput> cameraToWindow;
 
         private readonly AdamantiumCollection<Camera> windowToCamerasCollection;
 
         ///<summary>
         ///Collection of active cameras.
         ///</summary>
-        private readonly System.Collections.Generic.Dictionary<GameOutput, Camera> activeCameras;
+        private readonly Dictionary<GameOutput, Camera> activeCameras;
 
         private readonly AdamantiumCollection<Camera> activeCamerasCollection;
 
@@ -41,7 +44,7 @@ namespace Adamantium.Engine.Services
 
         public ReadOnlyCollection<Camera> Cameras => windowToCamerasCollection.AsReadOnly();
 
-        private readonly Game _game;
+        private readonly Game game;
 
         ///<summary>
         ///The camera that currently controlled by user.
@@ -51,6 +54,7 @@ namespace Adamantium.Engine.Services
         private Entity CameraIcon;
         private Entity CameraVisual;
         private RenderableComponent cameraIconRenderer;
+        private IEventAggregator eventAggregator;
 
         private Entity SelectedCamera;
 
@@ -63,24 +67,25 @@ namespace Adamantium.Engine.Services
         public CameraService(Game game)
         {
             game.Services.RegisterInstance<CameraService>(this);
-            windowToCameras = new System.Collections.Generic.Dictionary<GameOutput, List<Camera>>();
-            cameraToWindow = new System.Collections.Generic.Dictionary<Camera, GameOutput>();
-            activeCameras = new System.Collections.Generic.Dictionary<GameOutput, Camera>();
+            windowToCameras = new Dictionary<GameOutput, List<Camera>>();
+            cameraToWindow = new Dictionary<Camera, GameOutput>();
+            activeCameras = new Dictionary<GameOutput, Camera>();
             windowToCamerasCollection = new AdamantiumCollection<Camera>();
             activeCamerasCollection = new AdamantiumCollection<Camera>();
-            _game = game;
-            cameraGroup = _game.EntityWorld.CreateGroup("Cameras");
+            this.game = game;
+            eventAggregator = game.Services.Resolve<IEventAggregator>();
+            cameraGroup = this.game.EntityWorld.CreateGroup("Cameras");
 
-            foreach (var window in _game.Outputs)
+            foreach (var window in this.game.Outputs)
             {
                 CreateCameraForWindowInternal(window);
             }
 
-            _game.WindowCreated += GameBaseWindowCreated;
-            _game.WindowRemoved += GameBaseWindowRemoved;
-            _game.WindowSizeChanged += WindowSizeChanged;
-            _game.WindowActivated += GameBaseWindowActivated;
-            _game.WindowDeactivated += GameBaseWindowDeactivated;
+            eventAggregator.GetEvent<GameOutputCreatedEvent>().Subscribe(GameBaseWindowCreated);
+            eventAggregator.GetEvent<GameOutputRemovedEvent>().Subscribe(GameBaseWindowRemoved);
+            eventAggregator.GetEvent<GameOutputActivatedEvent>().Subscribe(GameBaseWindowActivated);
+            eventAggregator.GetEvent<GameOutputDeactivatedEvent>().Subscribe(GameBaseWindowDeactivated);
+            eventAggregator.GetEvent<GameOutputSizeChanged>().Subscribe(WindowSizeChanged);
 
             CreateCameraIcon();
             CreateCameraVisual();
@@ -97,7 +102,7 @@ namespace Adamantium.Engine.Services
             CameraVisual = new CameraVisualTemplate().BuildEntity(null, "Camera Debug");
         }
 
-        private void GameBaseWindowDeactivated(object sender, GameWindowEventArgs e)
+        private void GameBaseWindowDeactivated(GameOutput output)
         {
             //UserControlledCamera = null;
         }
@@ -112,33 +117,33 @@ namespace Adamantium.Engine.Services
             SelectedCamera = camera;
         }
 
-        private void GameBaseWindowActivated(object sender, GameWindowEventArgs e)
+        private void GameBaseWindowActivated(GameOutput output)
         {
-            if (activeCameras.ContainsKey(e.Window))
+            if (activeCameras.ContainsKey(output))
             {
-                UserControlledCamera = activeCameras[e.Window];
+                UserControlledCamera = activeCameras[output];
             }
         }
 
-        private void WindowSizeChanged(object sender, GameWindowSizeChangedEventArgs e)
+        private void WindowSizeChanged(GameOutputSizeChangedPayload e)
         {
-            UpdateDimensions(e.Window, e.Window.Width, e.Window.Height);
+            UpdateDimensions(e.Output, e.Output.Width, e.Output.Height);
         }
 
-        private void GameBaseWindowRemoved(object sender, GameWindowEventArgs e)
+        private void GameBaseWindowRemoved(GameOutput output)
         {
-            RemoveCamera(e.Window);
+            RemoveCamera(output);
         }
 
-        private void GameBaseWindowCreated(object sender, GameWindowEventArgs e)
+        private void GameBaseWindowCreated(GameOutput output)
         {
-            CreateCameraForWindowInternal(e.Window);
+            CreateCameraForWindowInternal(output);
         }
 
         public void CreateCamera(string name)
         {
 
-            foreach (var window in _game.Outputs)
+            foreach (var window in game.Outputs)
             {
                 if (string.IsNullOrEmpty(name))
                 {
@@ -154,7 +159,7 @@ namespace Adamantium.Engine.Services
             var camera = CreateCamera(window.Width, window.Height, $"Main camera for {window.Name}");
             camera.Owner.Transform.Position = new Vector3D(0,0,-20);
             AddCamera(window, camera);
-            if (_game.ActiveOutput != null)
+            //if (window.IsActive)
             {
                 UserControlledCamera = camera;
             }
@@ -165,7 +170,7 @@ namespace Adamantium.Engine.Services
         {
             var camera = CreateCamera(window.Width, window.Height, name);
             AddCamera(window, camera);
-            if (_game.ActiveOutput != null)
+            if (game.ActiveOutput != null)
             {
                 UserControlledCamera = camera;
             }
@@ -229,7 +234,7 @@ namespace Adamantium.Engine.Services
                 if (!cameraGroup.Contains(camera.Owner))
                 {
                     cameraGroup.Add(camera.Owner);
-                    _game.EntityWorld.AddEntity(camera.Owner);
+                    game.EntityWorld.AddEntity(camera.Owner);
                 }
             }
         }
@@ -428,76 +433,76 @@ namespace Adamantium.Engine.Services
             }
         }
 
-//        public void DrawCameraIcons(Effect effect, Camera camera, GraphicsDevice drawingContext, IGameTime gameTime)
-//        {
-//            lock (syncRoot)
-//            {
-//                var view = camera.ViewMatrix;
-//                var proj = camera.ProjectionMatrix;
-//                effect.Parameters["viewMatrix"].SetValue(view);
-//                effect.Parameters["projectionMatrix"].SetValue(proj);
-//
-//                foreach (var currentCamera in Cameras)
-//                {
-//                    if (currentCamera == camera || !currentCamera.Owner.IsEnabled)
-//                    {
-//                        continue;
-//                    }
-//
-//                    var transform = currentCamera.Owner.Transform.GetMetadata(camera);
-//                    if (transform.RelativePosition.Length() < CameraIcon.GetDiameter())
-//                    {
-//                        continue;
-//                    }
-//
-//                    var transparency = 1 - (1 / transform.RelativePosition.Length());
-//
-//                    var billboard = Matrix4x4F.BillboardRH(transform.RelativePosition, Vector3F.Zero, camera.Up, camera.Forward);
-//                    var rotation = MathHelper.GetRotationFromMatrix(billboard);
-//                    var world = Matrix4x4F.RotationQuaternion(rotation) * Matrix4x4F.Translation(transform.RelativePosition);
-//
-//                    effect.Parameters["transparency"].SetValue(transparency);
-//                    effect.Parameters["worldMatrix"].SetValue(world);
-//                    effect.Parameters["wvp"].SetValue(world * view * proj);
-//                    effect.Parameters["meshColor"].SetValue(Colors.White.ToVector3());
-//                    effect.Techniques["MeshVertex"].Passes["NoLight"].Apply();
-//                    cameraIconRenderer.Draw(drawingContext, gameTime);
-//                }
-//            }
-//
-//            effect.Techniques["MeshVertex"].Passes["NoLight"].UnApply();
-//        }
+        public void DrawCameraIcons(Effect effect, Camera camera, GraphicsDevice drawingContext, IGameTime gameTime)
+        {
+            lock (syncRoot)
+            {
+                var view = camera.ViewMatrix;
+                var proj = camera.ProjectionMatrix;
+                effect.Parameters["viewMatrix"].SetValue(view);
+                effect.Parameters["projectionMatrix"].SetValue(proj);
 
-//        public void DrawDebugCamera(Effect effect, Camera camera, GraphicsDevice drawingContext, IGameTime gametime)
-//        {
-//            if (SelectedCamera == null || !SelectedCamera.IsEnabled)
-//                return;
-//
-//            var cameraRender = CameraVisual.GetComponent<RenderableComponent>();
-//            lock (syncRoot)
-//            {
-//                var view = camera.ViewMatrix;
-//                var proj = camera.ProjectionMatrix;
-//                effect.Parameters["viewMatrix"].SetValue(view);
-//                effect.Parameters["projectionMatrix"].SetValue(proj);
-//
-//                if (SelectedCamera == camera.Owner)
-//                {
-//                    return;
-//                }
-//
-//                var transform = SelectedCamera.Transform.GetMetadata(camera);
-//                var world = Matrix4x4F.RotationQuaternion(camera.Rotation) * transform.WorldMatrix;
-//                effect.Parameters["transparency"].SetValue(1.0f);
-//                effect.Parameters["worldMatrix"].SetValue(world);
-//                effect.Parameters["wvp"].SetValue(world * view * proj);
-//                effect.Parameters["meshColor"].SetValue(Colors.Beige.ToVector3());
-//                effect.Techniques["MeshVertex"].Passes["NoLight"].Apply();
-//                cameraRender.Draw(drawingContext, gametime);
-//            }
-//
-//            effect.Techniques["MeshVertex"].Passes["NoLight"].UnApply();
-//        }
+                foreach (var currentCamera in Cameras)
+                {
+                    if (currentCamera == camera || !currentCamera.Owner.IsEnabled)
+                    {
+                        continue;
+                    }
+
+                    var transform = currentCamera.Owner.Transform.GetMetadata(camera);
+                    if (transform.RelativePosition.Length() < CameraIcon.GetDiameter())
+                    {
+                        continue;
+                    }
+
+                    var transparency = 1 - (1 / transform.RelativePosition.Length());
+
+                    var billboard = Matrix4x4F.BillboardRH(transform.RelativePosition, Vector3F.Zero, camera.Up, camera.Forward);
+                    var rotation = MathHelper.GetRotationFromMatrix(billboard);
+                    var world = Matrix4x4F.RotationQuaternion(rotation) * Matrix4x4F.Translation(transform.RelativePosition);
+
+                    effect.Parameters["transparency"].SetValue(transparency);
+                    effect.Parameters["worldMatrix"].SetValue(world);
+                    effect.Parameters["wvp"].SetValue(world * view * proj);
+                    effect.Parameters["meshColor"].SetValue(Colors.White.ToVector3());
+                    effect.Techniques["MeshVertex"].Passes["NoLight"].Apply();
+                    cameraIconRenderer.Draw(drawingContext, gameTime);
+                }
+            }
+
+            effect.Techniques["MeshVertex"].Passes["NoLight"].UnApply();
+        }
+
+        public void DrawDebugCamera(Effect effect, Camera camera, GraphicsDevice drawingContext, IGameTime gametime)
+        {
+            if (SelectedCamera == null || !SelectedCamera.IsEnabled)
+                return;
+
+            var cameraRender = CameraVisual.GetComponent<RenderableComponent>();
+            lock (syncRoot)
+            {
+                var view = camera.ViewMatrix;
+                var proj = camera.ProjectionMatrix;
+                effect.Parameters["viewMatrix"].SetValue(view);
+                effect.Parameters["projectionMatrix"].SetValue(proj);
+
+                if (SelectedCamera == camera.Owner)
+                {
+                    return;
+                }
+
+                var transform = SelectedCamera.Transform.GetMetadata(camera);
+                var world = Matrix4x4F.RotationQuaternion(camera.Rotation) * transform.WorldMatrix;
+                effect.Parameters["transparency"].SetValue(1.0f);
+                effect.Parameters["worldMatrix"].SetValue(world);
+                effect.Parameters["wvp"].SetValue(world * view * proj);
+                effect.Parameters["meshColor"].SetValue(Colors.Beige.ToVector3());
+                effect.Techniques["MeshVertex"].Passes["NoLight"].Apply();
+                cameraRender.Draw(drawingContext, gametime);
+            }
+
+            effect.Techniques["MeshVertex"].Passes["NoLight"].UnApply();
+        }
 
         //Индексатор для ключа
         public List<Camera> this[GameOutput key]

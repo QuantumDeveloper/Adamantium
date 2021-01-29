@@ -1,4 +1,5 @@
 ﻿using Adamantium.Mathematics;
+using Adamantium.UI.Windows.Input;
 using Adamantium.Win32;
 
 namespace Adamantium.UI.Input
@@ -9,64 +10,64 @@ namespace Adamantium.UI.Input
    public static class Mouse
    {
       public static readonly RoutedEvent MouseMoveEvent = EventManager.RegisterRoutedEvent("MouseMove",
-         RoutingStrategy.Bubble, typeof(MouseEventHandler), typeof(UIComponent));
+         RoutingStrategy.Bubble, typeof(MouseEventHandler), typeof(Mouse));
 
       public static readonly RoutedEvent MouseEnterEvent = EventManager.RegisterRoutedEvent("MouseEnter",
-         RoutingStrategy.Direct, typeof(MouseEventHandler), typeof(UIComponent));
+         RoutingStrategy.Direct, typeof(MouseEventHandler), typeof(Mouse));
 
       public static readonly RoutedEvent MouseLeaveEvent = EventManager.RegisterRoutedEvent("MouseLeave",
-         RoutingStrategy.Direct, typeof(MouseEventHandler), typeof(UIComponent));
+         RoutingStrategy.Direct, typeof(MouseEventHandler), typeof(Mouse));
 
       public static readonly RoutedEvent MouseWheelEvent = EventManager.RegisterRoutedEvent("MouseWheel",
-         RoutingStrategy.Bubble, typeof(MouseWheelEventHandler), typeof(UIComponent));
+         RoutingStrategy.Bubble, typeof(MouseWheelEventHandler), typeof(Mouse));
 
       public static readonly RoutedEvent MouseDownEvent = EventManager.RegisterRoutedEvent("MouseDown",
-         RoutingStrategy.Bubble, typeof(MouseButtonEventHandler), typeof(UIComponent));
+         RoutingStrategy.Bubble, typeof(MouseButtonEventHandler), typeof(Mouse));
 
       public static readonly RoutedEvent MouseUpEvent = EventManager.RegisterRoutedEvent("MouseUp",
-         RoutingStrategy.Bubble, typeof(MouseButtonEventHandler), typeof(UIComponent));
+         RoutingStrategy.Bubble, typeof(MouseButtonEventHandler), typeof(Mouse));
 
       public static readonly RoutedEvent GotMouseCaptureEvent = EventManager.RegisterRoutedEvent("GotMouseCapture",
-         RoutingStrategy.Bubble, typeof(MouseEventHandler), typeof(UIComponent));
+         RoutingStrategy.Bubble, typeof(MouseEventHandler), typeof(Mouse));
 
       public static readonly RoutedEvent LostMouseCaptureEvent = EventManager.RegisterRoutedEvent("LostMouseCapture",
-         RoutingStrategy.Bubble, typeof(MouseEventHandler), typeof(UIComponent));
+         RoutingStrategy.Bubble, typeof(MouseEventHandler), typeof(Mouse));
 
       //TODO: deside leave it as bubble or make it direct event
-      //public static readonly RoutedEvent RawMouseMoveEvent = EventManager.RegisterRoutedEvent("RawMouseMove",
-      //   RoutingStrategy.Direct, typeof (RawMouseEventHandler), typeof (UIComponent));
+      public static readonly RoutedEvent RawMouseMoveEvent = EventManager.RegisterRoutedEvent("RawMouseMove",
+         RoutingStrategy.Direct, typeof (RawMouseEventHandler), typeof (UIComponent));
 
       public static readonly RoutedEvent RawMouseDownEvent = EventManager.RegisterRoutedEvent("RawMouseDown",
-         RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UIComponent));
+         RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(Mouse));
 
       public static readonly RoutedEvent RawMouseUpEvent = EventManager.RegisterRoutedEvent("RawMouseUp",
-         RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UIComponent));
+         RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(Mouse));
 
 
       public static readonly RoutedEvent PreviewMouseMoveEvent = EventManager.RegisterRoutedEvent("PreviewMouseMove",
-         RoutingStrategy.Tunnel, typeof(MouseEventHandler), typeof(UIComponent));
+         RoutingStrategy.Tunnel, typeof(MouseEventHandler), typeof(Mouse));
 
       public static readonly RoutedEvent PreviewMouseWheelEvent = EventManager.RegisterRoutedEvent("PreviewMouseWheel",
-         RoutingStrategy.Tunnel, typeof(MouseWheelEventHandler), typeof(UIComponent));
+         RoutingStrategy.Tunnel, typeof(MouseWheelEventHandler), typeof(Mouse));
 
       public static readonly RoutedEvent PreviewMouseDownEvent = EventManager.RegisterRoutedEvent("PreviewMouseDown",
-         RoutingStrategy.Tunnel, typeof(MouseButtonEventHandler), typeof(UIComponent));
+         RoutingStrategy.Tunnel, typeof(MouseButtonEventHandler), typeof(Mouse));
 
       public static readonly RoutedEvent PreviewMouseUpEvent = EventManager.RegisterRoutedEvent("PreviewMouseUp",
-         RoutingStrategy.Tunnel, typeof(MouseButtonEventHandler), typeof(UIComponent));
+         RoutingStrategy.Tunnel, typeof(MouseButtonEventHandler), typeof(Mouse));
 
       public static readonly RoutedEvent PreviewGotMouseCaptureEvent = EventManager.RegisterRoutedEvent("PreviewGotMouseCapture",
-         RoutingStrategy.Tunnel, typeof(MouseEventHandler), typeof(UIComponent));
+         RoutingStrategy.Tunnel, typeof(MouseEventHandler), typeof(Mouse));
 
       public static readonly RoutedEvent PreviewLostMouseCaptureEvent = EventManager.RegisterRoutedEvent("PreviewLostMouseCapture",
-         RoutingStrategy.Tunnel, typeof(MouseEventHandler), typeof(UIComponent));
+         RoutingStrategy.Tunnel, typeof(MouseEventHandler), typeof(Mouse));
 
 
       public static readonly RoutedEvent MouseDoubleClickEvent = EventManager.RegisterRoutedEvent("MouseDoubleClick",
-         RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UIComponent));
+         RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(Mouse));
 
       public static readonly RoutedEvent PreviewMouseDoubleClickEvent = EventManager.RegisterRoutedEvent("PreviewMouseDoubleClick",
-         RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UIComponent));
+         RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(Mouse));
 
 
       static Mouse()
@@ -103,10 +104,7 @@ namespace Adamantium.UI.Input
 
       public static Cursor Cursor
       {
-         get
-         {
-            return _cursor;
-         }
+         get => _cursor;
          set
          {
             _cursor = value;

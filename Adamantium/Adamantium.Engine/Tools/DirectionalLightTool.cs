@@ -1,7 +1,7 @@
 ﻿using Adamantium.Engine.Services;
 using Adamantium.Engine.Templates.Lights;
 using Adamantium.EntityFramework;
-using Adamantium.EntityFramework.Extensions;
+using Adamantium.EntityFramework.Components.Extensions;
 using Adamantium.Game.GameInput;
 
 namespace Adamantium.Engine.Tools

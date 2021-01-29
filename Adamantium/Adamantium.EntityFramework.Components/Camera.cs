@@ -1,7 +1,7 @@
 ﻿using System;
 using Adamantium.Engine.Core;
+using Adamantium.EntityFramework.Components.Extensions;
 using Adamantium.EntityFramework.ComponentsBasics;
-using Adamantium.EntityFramework.Extensions;
 using Adamantium.Mathematics;
 
 namespace Adamantium.EntityFramework.Components
@@ -44,11 +44,11 @@ namespace Adamantium.EntityFramework.Components
         /// <remarks>If <paramref name="inverseDepth"/> is true, then znear and zfar will be swap when creating projection matrix</remarks>
         public Camera(Single fov, UInt32 width, UInt32 height, Single znear, Single zfar, bool inverseDepth = true)
         {
-            IsDepthInversed = inverseDepth;
+            IsDepthInversed = !inverseDepth;
             Rotation = QuaternionF.Identity;
 
             LookAt = Vector3F.ForwardLH;
-            Up = Vector3F.UnitY;
+            Up = -Vector3F.UnitY;
             Velocity = 1;
             CurrentVelocity = 0;
             WheelVelocity = 1;
@@ -144,11 +144,11 @@ namespace Adamantium.EntityFramework.Components
         {
             float znear = ZNear;
             float zfar = ZFar;
-            if (IsDepthInversed)
-            {
-                znear = ZFar;
-                zfar = ZNear;
-            }
+            // if (IsDepthInversed)
+            // {
+            //     znear = ZFar;
+            //     zfar = ZNear;
+            // }
 
             if (Width > Height)
             {
@@ -169,11 +169,11 @@ namespace Adamantium.EntityFramework.Components
         {
             float znear = ZNear;
             float zfar = ZFar;
-            if (IsDepthInversed)
-            {
-                znear = ZFar;
-                zfar = ZNear;
-            }
+            // if (IsDepthInversed)
+            // {
+            //     znear = ZFar;
+            //     zfar = ZNear;
+            // }
             OrthoProjection = Matrix4x4F.OrthoLH(Width / OrthoScaleFactor, Height / OrthoScaleFactor, zfar, znear);
             UiProjection = Matrix4x4F.OrthoOffCenterLH(0, Width, Height, 0, zfar, znear);
         }
@@ -186,13 +186,10 @@ namespace Adamantium.EntityFramework.Components
             float fovX = 2.0f * (float)Math.Atan(aspectInv / e);
             float xScale = 1.0f / (float)Math.Tan(0.5f * fovX);
             float yScale = xScale / aspectInv;
-            var fovY = (float)(2 * Math.Atan(Math.Tan(Fov / 2.0f) * ((float)Height / Width)));
-            FovY = MathHelper.RadiansToDegrees(fovY);
-            TanFov = (float)Math.Tan(MathHelper.DegreesToRadians(Fov));
             PerspectiveProjection = new Matrix4x4F
             {
                 M11 = xScale,
-                M22 = yScale,
+                M22 = -yScale,
                 M33 = zFar / (zFar - zNear),
                 M34 = 1.0f,
                 M43 = -zNear * zFar / (zFar - zNear),
@@ -201,7 +198,7 @@ namespace Adamantium.EntityFramework.Components
 
         private void BuildPerspectiveFovY(float zNear, float zFar)
         {
-            PerspectiveProjection = Matrix4x4F.PerspectiveFovLH(Fov, (float)Width / Height, zNear,
+            PerspectiveProjection = Matrix4x4F.PerspectiveFov(Fov, (float)Width / Height, zNear,
                 zFar);
         }
 
@@ -283,6 +280,8 @@ namespace Adamantium.EntityFramework.Components
             if (Type == CameraType.Free)
             {
                 ViewMatrix = Matrix4x4F.RotationQuaternion(Rotation);
+                //ViewMatrix =  Matrix4x4F.LookAtRH(new Vector3F(0, 0, 0), Vector3F.Zero, Vector3F.Up);
+                //ViewMatrix.Transpose();
             }
             else if (Type == CameraType.FirstPerson)
             {
@@ -323,14 +322,14 @@ namespace Adamantium.EntityFramework.Components
 
                 if (LookAt != null)
                 {
-                    ViewMatrix = Matrix4x4F.LookAtLH(
+                    ViewMatrix = Matrix4x4F.LookAtRH(
                         Vector3F.Zero,
                         (Vector3D) LookAt - Owner.Transform.Position,
                         new Vector3F(rotMatrix.M12, rotMatrix.M22, rotMatrix.M32));
                 }
                 else
                 {
-                    ViewMatrix = Matrix4x4F.LookAtLH(
+                    ViewMatrix = Matrix4x4F.LookAtRH(
                         Vector3F.Zero,
                         center1 - Owner.Transform.Position,
                         new Vector3F(rotMatrix.M12, rotMatrix.M22, rotMatrix.M32));

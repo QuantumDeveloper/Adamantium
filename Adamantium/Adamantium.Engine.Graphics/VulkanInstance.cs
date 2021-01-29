@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Runtime.InteropServices;
+using Adamantium.Core;
 using AdamantiumVulkan;
 using AdamantiumVulkan.MacOS.Interop;
 using Constants = AdamantiumVulkan.Core.Constants;
@@ -15,12 +16,13 @@ using DisposableObject = Adamantium.Core.DisposableObject;
 
 namespace Adamantium.Engine.Graphics
 {
-    public class VulkanInstance : DisposableObject
+    public class VulkanInstance : DisposableBase
     {
         private const string EngineName = "AdamantiumEngine";
 
         private Instance instance;
         private PFN_vkDebugUtilsMessengerCallbackEXT debugCallback;
+        private DebugUtilsMessengerEXT debugMessenger;
 
         public string ApplicationName { get; set; }
 
@@ -85,7 +87,7 @@ namespace Adamantium.Engine.Graphics
             appInfo.ApiVersion = AdamantiumVulkan.Core.Constants.VK_MAKE_VERSION(1, 2, 148);
 
             DebugUtilsMessengerCreateInfoEXT debugInfo = new DebugUtilsMessengerCreateInfoEXT();
-            debugInfo.MessageSeverity = (uint)(DebugUtilsMessageSeverityFlagBitsEXT.VerboseBitExt | DebugUtilsMessageSeverityFlagBitsEXT.WarningBitExt | DebugUtilsMessageSeverityFlagBitsEXT.ErrorBitExt);
+            debugInfo.MessageSeverity = (uint)(DebugUtilsMessageSeverityFlagBitsEXT.InfoBitExt | DebugUtilsMessageSeverityFlagBitsEXT.WarningBitExt | DebugUtilsMessageSeverityFlagBitsEXT.ErrorBitExt);
             debugInfo.MessageType = (uint)(DebugUtilsMessageTypeFlagBitsEXT.GeneralBitExt | DebugUtilsMessageTypeFlagBitsEXT.ValidationBitExt | DebugUtilsMessageTypeFlagBitsEXT.PerformanceBitExt);
             debugInfo.PfnUserCallback = Marshal.GetFunctionPointerForDelegate(debugCallback);
 
@@ -111,6 +113,12 @@ namespace Adamantium.Engine.Graphics
             instance = Instance.Create(createInfo);
 
             createInfo.Dispose();
+
+            if (enableDebug)
+            {
+                CreateDebugUtilsMessenger(debugInfo, out debugMessenger);
+            }
+
         }
 
         public void EnumerateDevices()
@@ -157,16 +165,54 @@ namespace Adamantium.Engine.Graphics
 
             throw new NotSupportedException("Current platform is not supported yet for Surface creation");
         }
+        
+        Result CreateDebugUtilsMessenger(DebugUtilsMessengerCreateInfoEXT pCreateInfo, out DebugUtilsMessengerEXT pDebugMessenger)
+        {
+            pDebugMessenger = null;
+            var ptr = instance.GetInstanceProcAddr("vkCreateDebugUtilsMessengerEXT");
+            var func = Marshal.GetDelegateForFunctionPointer<PFN_vkCreateDebugUtilsMessengerEXT>(ptr);
+            if (func != null)
+            {
+                var result = func(instance, pCreateInfo.ToInternal(), IntPtr.Zero, out var pDebugMessenger_t);
+                pCreateInfo.Dispose();
+                pDebugMessenger = pDebugMessenger_t;
+                return result;
+            }
+            
+            return Result.ErrorExtensionNotPresent;
+        }
+
+        void DestroyDebugUtilsMessenger(DebugUtilsMessengerEXT debugMessenger)
+        {
+            var ptr = instance.GetInstanceProcAddr("vkDestroyDebugUtilsMessengerEXT");
+            var func = Marshal.GetDelegateForFunctionPointer<PFN_vkDestroyDebugUtilsMessengerEXT>(ptr);
+            func?.Invoke(instance, debugMessenger, IntPtr.Zero);
+        }
 
         private uint DebugCallback(DebugUtilsMessageSeverityFlagBitsEXT messageSeverity, uint messageTypes, AdamantiumVulkan.Core.Interop.VkDebugUtilsMessengerCallbackDataEXT pCallbackData, IntPtr pUserData)
         {
             Console.WriteLine(Marshal.PtrToStringAnsi(pCallbackData.pMessage));
-            return 1;
+            return 0;
         }
 
         public static implicit operator Instance(VulkanInstance vkInstance)
         {
             return vkInstance.instance;
+        }
+
+        protected override void Dispose(bool disposeManaged)
+        {
+            foreach (var surface in availableSurfaces)
+            {
+                instance?.DestroySurfaceKHR(surface.Value);
+            }
+
+            if (IsInDebugMode)
+            {
+                DestroyDebugUtilsMessenger(debugMessenger);
+            }
+            
+            instance?.DestroyInstance();
         }
     }
 }

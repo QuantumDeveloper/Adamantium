@@ -33,7 +33,7 @@ namespace Adamantium.UI.Threading
 
         private DispatcherContext CreateContext()
         {
-            return new DispatcherContext(appPlatform, MainThread);
+            return new(appPlatform, MainThread);
         }
 
         private static void AddToDict(Dispatcher dispatcher)

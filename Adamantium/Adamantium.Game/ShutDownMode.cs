@@ -1,17 +1,22 @@
 ﻿namespace Adamantium.Game
 {
    /// <summary>
-   /// Determines on which condition Game loop will be exited
+   /// Determines on which condition Run loop will be exited
    /// </summary>
    public enum ShutDownMode
    {
       /// <summary>
-      /// When Last window was closed
+      /// When Main window is closed
+      /// </summary>
+      OnMainWindowClosed,
+      
+      /// <summary>
+      /// When Last window is closed
       /// </summary>
       OnLastWindowClosed,
       
       /// <summary>
-      /// When ShutDown() method was called explicitly
+      /// When ShutDown() method is called explicitly
       /// </summary>
       OnExplicitShutDown
    }

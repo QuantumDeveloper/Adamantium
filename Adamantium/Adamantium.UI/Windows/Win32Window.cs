@@ -9,9 +9,6 @@ namespace Adamantium.UI.Windows
     {
         public override IntPtr Handle { get; internal set; }
 
-        public override int ClientWidth { get; set; }
-        public override int ClientHeight { get; set; }
-
         public override bool IsClosed { get; protected set; }
         internal bool IsLocked;
 
@@ -53,7 +50,7 @@ namespace Adamantium.UI.Windows
         public override event EventHandler<WindowClosingEventArgs> Closing;
         public override event EventHandler<EventArgs> Closed;
 
-        public bool IsActive { get; internal set; }
+        public override bool IsActive { get; internal set; }
 
         public override  Point PointToClient(Point point)
         {

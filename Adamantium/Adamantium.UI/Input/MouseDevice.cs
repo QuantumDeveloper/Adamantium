@@ -266,9 +266,9 @@ namespace Adamantium.UI.Input
         {
             if (FocusManager.Focused != null)
             {
-                //UnboundMouseEventArgs args = new UnboundMouseEventArgs(this, delta, modifiers, timestamp)
-                //{ RoutedEvent = Mouse.RawMouseMoveEvent };
-                //FocusManager.Focused.RaiseEvent(args);
+                UnboundMouseEventArgs args = new UnboundMouseEventArgs(this, delta, modifiers, timestamp)
+                { RoutedEvent = Mouse.RawMouseMoveEvent };
+                FocusManager.Focused.RaiseEvent(args);
             }
         }
 

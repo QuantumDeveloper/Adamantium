@@ -4,10 +4,11 @@ using System.IO;
 using System.Threading.Tasks;
 using Adamantium.Engine.Core.Content;
 using Adamantium.Engine.Core.Models;
+using Adamantium.Engine.Graphics;
 using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
+using Adamantium.EntityFramework.Components.Extensions;
 using Adamantium.EntityFramework.ComponentsBasics;
-using Adamantium.EntityFramework.Extensions;
 using Adamantium.EntityFramework.Templates;
 using Adamantium.Mathematics;
 using Adamantium.Win32;
@@ -18,13 +19,23 @@ namespace Adamantium.Engine.Templates
     {
         private SceneData sceneData;
         private IContentManager contentManager;
-        private EntityFramework.Components.Camera _camera;
+
+        private Vector3F initialPosition;
+        //private EntityFramework.Components.Camera camera;
 
         public EntityImportTemplate(SceneData sceneData, IContentManager manager, EntityFramework.Components.Camera camera)
         {
             this.sceneData = sceneData;
             contentManager = manager;
-            _camera = camera;
+            //this.camera = camera;
+        }
+        
+        public EntityImportTemplate(SceneData sceneData, IContentManager manager, Vector3F initialPosition)
+        {
+            this.sceneData = sceneData;
+            contentManager = manager;
+            this.initialPosition = initialPosition;
+            //this.camera = camera;
         }
 
         public Task<Entity> BuildEntity(Entity owner)
@@ -114,7 +125,8 @@ namespace Adamantium.Engine.Templates
 
                 CalculateBoundBoxes(owner);
                 var collider = owner.GetComponent<Collider>();
-                owner.Transform.SetPosition(owner.GetPositionForNewObject(_camera, Vector3F.Max(collider.Bounds.Size)));
+                //owner.Transform.SetPosition(owner.GetPositionForNewObject(camera, Vector3F.Max(collider.Bounds.Size)));
+                owner.Transform.SetPosition(initialPosition);
                 return Task.FromResult(owner);
             }
             catch (Exception exception)
@@ -218,7 +230,7 @@ namespace Adamantium.Engine.Templates
                                 AllowDuplication = false,
                                 IgnoreRootDirectory = true
                             };
-//                            material.Texture = contentManager.Load<Texture2D>(material.TexturePath, options);
+                            material.Texture = contentManager.Load<Texture>(material.TexturePath, options);
                         }
                     }
                     entity.AddComponent(material);

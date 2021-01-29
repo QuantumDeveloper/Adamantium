@@ -11,9 +11,6 @@ namespace Adamantium.UI.MacOS
 
         public override bool IsClosed { get; protected set; }
 
-        public override int ClientWidth { get; set; }
-        public override int ClientHeight { get; set; }
-
         public override IntPtr SurfaceHandle => MacOSInterop.GetViewPtr(Handle);
         //public event EventHandler<SizeChangedEventArgs> ClientSizeChanged;
         public override event EventHandler<WindowClosingEventArgs> Closing;
@@ -35,6 +32,8 @@ namespace Adamantium.UI.MacOS
         {
             
         }
+
+        public override bool IsActive { get; internal set; }
 
         public override Point PointToClient(Point point)
         {

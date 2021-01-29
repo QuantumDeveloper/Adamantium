@@ -1,17 +1,11 @@
-﻿using System;
-using Adamantium.Engine;
-using Adamantium.Engine.Core;
-using Adamantium.Engine.Graphics;
+﻿using Adamantium.Engine.Core;
+using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
 using Adamantium.Game;
-using Adamantium.Imaging;
-using Adamantium.Imaging.Dds;
-using Adamantium.Mathematics;
-using AdamantiumVulkan.Core;
 
 //using Texture2D = Adamantium.Engine.Graphics.Texture2D;
 
-namespace Adamantium.EntityFramework.Processors
+namespace Adamantium.Engine.Processors
 {
     public class ForwardPlusRenderingProcessor : RenderProcessor
     {

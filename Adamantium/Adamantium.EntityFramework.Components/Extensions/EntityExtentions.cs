@@ -1,10 +1,9 @@
 ﻿using System;
 using Adamantium.Engine.Core;
-using Adamantium.EntityFramework.Components;
 using Adamantium.EntityFramework.ComponentsBasics;
 using Adamantium.Mathematics;
 
-namespace Adamantium.EntityFramework.Extensions
+namespace Adamantium.EntityFramework.Components.Extensions
 {
     public static class EntityExtentions
     {

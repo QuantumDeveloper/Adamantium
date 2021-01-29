@@ -349,7 +349,7 @@ namespace Adamantium.Engine.Graphics
         /// <remarks>
         /// See the unmanaged documentation about Map/UnMap for usage and restrictions.
         /// </remarks>
-        public unsafe void SetData(GraphicsDevice device, DataPointer fromData, uint offsetInBytes = 0)
+        public void SetData(GraphicsDevice device, DataPointer fromData, uint offsetInBytes = 0)
         {
             // Check size validity of data to copy to
             if ((fromData.Size + offsetInBytes) > TotalSize)

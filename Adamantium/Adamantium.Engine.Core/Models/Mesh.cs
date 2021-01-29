@@ -973,6 +973,21 @@ namespace Adamantium.Engine.Core.Models
                             }
                             ReverseWinding();
                             break;
+                        case UpAxis.Y_DOWN_RH:
+                            for (int i = 0; i < Positions.Length; i++)
+                            {
+                                position = Positions[i];
+                                //Меняем позиции вершин
+                                
+                                var z = position.Y;
+                                position.Y = position.Z;
+                                position.Z = z;
+                                Positions[i] = position;
+                                
+                                ConvertUVs(i);
+                            }
+                            ReverseWinding();
+                            break;
                     }
                     break;
 
@@ -990,6 +1005,17 @@ namespace Adamantium.Engine.Core.Models
                                 ConvertUVs(i);
                             }
                             ReverseWinding();
+                            break;
+                        case UpAxis.Y_DOWN_RH:
+                            for (int i = 0; i < Positions.Length; i++)
+                            {
+                                // position = Positions[i];
+                                // //Меняем позиции вершин
+                                // position.Z = -position.Z;
+                                // Positions[i] = position;
+
+                                ConvertUVs(i);
+                            }
                             break;
                     }
                     break;

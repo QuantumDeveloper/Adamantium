@@ -2,10 +2,11 @@
 using System.Collections.Generic;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Input;
 
 namespace Adamantium.UI
 {
-    public interface IFrameworkComponent : IUIComponent
+    public interface IFrameworkComponent : IUIComponent, IInputElement
     {
         object DataContext { get; set; }
         Double Width { get; set; }

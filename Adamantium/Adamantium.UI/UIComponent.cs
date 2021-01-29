@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Adamantium.UI.Input;
 using Adamantium.UI.Media;
+using Adamantium.UI.Windows.Input;
 
 namespace Adamantium.UI
 {
@@ -70,14 +71,17 @@ namespace Adamantium.UI
         public static readonly RoutedEvent TextInputEvent = EventManager.RegisterRoutedEvent("TextInput",
          RoutingStrategy.Bubble, typeof(TextInputEventHandler), typeof(UIComponent));
 
-        public static readonly RoutedEvent PreviewMouseDoubcleClickEvent = EventManager.RegisterRoutedEvent(
-           "PreviewMouseDoubcleClick",
+        public static readonly RoutedEvent PreviewMouseDoubleClickEvent = EventManager.RegisterRoutedEvent(
+           "PreviewMouseDoubleClick",
            RoutingStrategy.Tunnel, typeof(MouseButtonEventHandler), typeof(UIComponent));
 
-        public static readonly RoutedEvent PreviewTextInputEvent = EventManager.RegisterRoutedEvent("PreviewTextInput",
+        public static readonly RoutedEvent PreviewTextInputEvent = 
+            EventManager.RegisterRoutedEvent("PreviewTextInput",
            RoutingStrategy.Tunnel, typeof(TextInputEventHandler), typeof(UIComponent));
-
-
+        
+        public static readonly RoutedEvent SizeChangedEvent = 
+            EventManager.RegisterRoutedEvent("SizeChangedEvent",
+                RoutingStrategy.Bubble, typeof(TextInputEventHandler), typeof(UIComponent));
 
         public static readonly RoutedEvent MouseLeftButtonDownEvent =
            EventManager.RegisterRoutedEvent("MouseLeftButtonDown",
@@ -107,7 +111,8 @@ namespace Adamantium.UI
            EventManager.RegisterRoutedEvent("RawMouseMiddleButtonUpEvent",
               RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UIComponent));
 
-        public static readonly RoutedEvent MouseLeftButtonUpEvent = EventManager.RegisterRoutedEvent("MouseLeftButtonUp",
+        public static readonly RoutedEvent MouseLeftButtonUpEvent = 
+            EventManager.RegisterRoutedEvent("MouseLeftButtonUp",
            RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UIComponent));
 
         public static readonly RoutedEvent MouseRightButtonDownEvent =
@@ -158,11 +163,11 @@ namespace Adamantium.UI
 
         #region Events
 
-        //public event RawMouseEventHandler RawMouseMove
-        //{
-        //   add { AddHandler(Mouse.RawMouseMoveEvent, value);}
-        //   remove { RemoveHandler(Mouse.RawMouseMoveEvent, value);}
-        //}
+        public event RawMouseEventHandler RawMouseMove
+        {
+           add => AddHandler(Mouse.RawMouseMoveEvent, value);
+           remove => RemoveHandler(Mouse.RawMouseMoveEvent, value);
+        }
 
         public event MouseButtonEventHandler RawMouseDown
         {
@@ -377,8 +382,8 @@ namespace Adamantium.UI
 
         public event MouseButtonEventHandler PreviewMouseDoubcleClick
         {
-            add => AddHandler(PreviewMouseDoubcleClickEvent, value);
-            remove => RemoveHandler(PreviewMouseDoubcleClickEvent, value);
+            add => AddHandler(PreviewMouseDoubleClickEvent, value);
+            remove => RemoveHandler(PreviewMouseDoubleClickEvent, value);
         }
 
         public event MouseEventHandler PreviewGotMouseCapture
@@ -559,7 +564,7 @@ namespace Adamantium.UI
             Mouse.RawMouseDownEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(RawMouseDownHandler));
             Mouse.RawMouseUpEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(RawMouseUpHandler));
             Mouse.MouseMoveEvent.RegisterClassHandler<UIComponent>(new MouseEventHandler(MouseMoveHandler));
-            //Mouse.RawMouseMoveEvent.RegisterClassHandler<UIComponent>(new RawMouseEventHandler(RawMouseMoveHandler));
+            Mouse.RawMouseMoveEvent.RegisterClassHandler<UIComponent>(new RawMouseEventHandler(RawMouseMoveHandler));
 
             PreviewMouseLeftButtonDownEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(PreviewMouseLeftButtonDownHandler));
             PreviewMouseLeftButtonUpEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(PreviewMouseLeftButtonUpHandler));
@@ -584,7 +589,7 @@ namespace Adamantium.UI
             RawMouseMiddleButtonUpEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(RawMouseMiddleButtonUpHandler));
 
 
-            FrameworkComponent.SizeChangedEvent.RegisterClassHandler<UIComponent>(new SizeChangedEventHandler(SizeChangedHandler));
+            SizeChangedEvent.RegisterClassHandler<UIComponent>(new SizeChangedEventHandler(SizeChangedHandler));
         }
 
         private static void SizeChangedHandler(object sender, SizeChangedEventArgs e)
@@ -841,7 +846,6 @@ namespace Adamantium.UI
             ui?.OnMouseMiddleButtonUp(ui, e);
         }
 
-
         private static void RawMouseLeftButtonDownHandler(object sender, MouseButtonEventArgs e)
         {
             var ui = sender as UIComponent;
@@ -981,7 +985,7 @@ namespace Adamantium.UI
 
         protected virtual void OnSizeChanged(SizeChangedEventArgs e)
         {
-
+            
         }
 
         protected virtual void OnGotFocus(RoutedEventArgs e)

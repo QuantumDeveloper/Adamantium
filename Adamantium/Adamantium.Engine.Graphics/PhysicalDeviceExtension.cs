@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using AdamantiumVulkan.Windows;
 
 namespace Adamantium.Engine.Graphics
 {
@@ -26,7 +27,15 @@ namespace Adamantium.Engine.Graphics
                 }
 
                 bool presentSupport = false;
-                device.GetPhysicalDeviceSurfaceSupportKHR(i, surface, ref presentSupport);
+                //presentSupport = device.GetPhysicalDeviceWin32PresentationSupportKHR(i);
+                if (surface != null)
+                {
+                    device.GetPhysicalDeviceSurfaceSupportKHR(i, surface, ref presentSupport);
+                }
+                else
+                {
+                    presentSupport = true;
+                }
 
                 if (queueFamily.QueueCount > 0 && presentSupport)
                 {

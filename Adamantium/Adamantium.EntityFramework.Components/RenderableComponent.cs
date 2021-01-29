@@ -1,15 +1,17 @@
-﻿using Adamantium.Engine.Core;
+﻿using System;
+using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Models;
 using Adamantium.Engine.Graphics;
 using Adamantium.EntityFramework.ComponentsBasics;
+using Buffer = Adamantium.Engine.Graphics.Buffer;
 
 namespace Adamantium.EntityFramework.Components
 {
     public abstract class RenderableComponent: ActivatableComponent
     {
-        //protected VertexInputLayout InputLayout { get; set; }
+        protected Type VertexType { get; set; }
 
-        //protected Buffer<int> IndexBuffer { get; set; }
+        protected Buffer IndexBuffer { get; set; }
 
         protected MeshVertex[] ToMeshVertices(Mesh mesh)
         {

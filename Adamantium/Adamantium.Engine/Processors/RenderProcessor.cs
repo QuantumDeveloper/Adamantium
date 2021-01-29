@@ -1,29 +1,28 @@
 ﻿using System;
-using Adamantium.Engine;
+using System.Linq;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Content;
 using Adamantium.Engine.Graphics;
 using Adamantium.Engine.Services;
+using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
 using Adamantium.Game;
+using Adamantium.Game.Events;
 using Adamantium.Game.GameInput;
 using Adamantium.Mathematics;
 using Adamantium.Win32;
 using Keys = Adamantium.Game.GameInput.Keys;
 
-namespace Adamantium.EntityFramework.Processors
+namespace Adamantium.Engine.Processors
 {
     public class RenderProcessor : EntityProcessor
     {
-//        protected CommandList CommandList;
-//        protected GraphicsDevice DeferredDevice;
-//        protected D2DGraphicDevice D2dDevice;
-//        protected SpriteBatch SpriteBatch;
+        
+        // protected SpriteBatch SpriteBatch;
         public String Text;
-
-        protected IGraphicsDeviceManager GraphicsDeviceManager;
+        
         protected IGraphicsDeviceService GraphicsDeviceService;
-        protected GraphicsDevice GraphicsDevice => GraphicsDeviceService.GraphicsDevice;
+        protected GraphicsDevice GraphicsDevice => Window.GraphicsDevice;
         protected IContentManager Content { get; }
         protected GameOutput Window { get; }
 
@@ -39,7 +38,6 @@ namespace Adamantium.EntityFramework.Processors
 
         public RenderProcessor(EntityWorld world, GameOutput window) : base(world)
         {
-            GraphicsDeviceManager = world.Services.Resolve<IGraphicsDeviceManager>();
             GraphicsDeviceService = world.Services.Resolve<IGraphicsDeviceService>();
             GraphicsDeviceService.DeviceChangeBegin += DeviceChangeBegin;
             GraphicsDeviceService.DeviceChangeEnd += DeviceChangeEnd;
@@ -52,18 +50,17 @@ namespace Adamantium.EntityFramework.Processors
             CameraService = EntityWorld.Services.Resolve<CameraService>();
             ToolsService = EntityWorld.Services.Resolve<ToolsService>();
 //            BasicEffect = Effect.Load(@"Content\Effects\BasicEffect.fx.compiled", GraphicsDevice);
-//            DeferredDevice = GraphicsDevice;
 //            SpriteBatch = new SpriteBatch(DeferredDevice, 25000);
         }
 
-        private void Window_ParametersChanged(object sender, GameWindowParametersEventArgs e)
+        private void Window_ParametersChanged(GameOutputParametersPayload payload)
         {
-            OnWindowParametersChanged(e.Reason);
+            OnWindowParametersChanged(payload.Reason);
         }
 
-        private void Window_ParametersChanging(object sender, GameWindowParametersEventArgs e)
+        private void Window_ParametersChanging(GameOutputParametersPayload payload)
         {
-            OnWindowParametersChanging(e.Reason);
+            OnWindowParametersChanging(payload.Reason);
         }
 
 
@@ -95,13 +92,6 @@ namespace Adamantium.EntityFramework.Processors
 
         public virtual void CreateSystemResources()
         { }
-
-        public override bool BeginDraw()
-        {
-//            GraphicsDevice.SetViewport(Window.Viewport);
-//            return base.BeginDraw();
-            return false;
-        }
 
         public override void Draw(IGameTime gameTime)
         {
@@ -312,19 +302,7 @@ namespace Adamantium.EntityFramework.Processors
         public override void EndDraw()
         {
             base.EndDraw();
-
-//            if (GraphicsDevice.IsD2dSupportEnabled)
-//            {
-//                D2dDevice.BeginDraw();
-//                D2dDevice.DrawText(Text);
-//                D2dDevice.EndDraw();
-//            }
-
-            //if (Final.Description.Width == Window.Width &&
-            //    Final.Description.Height == Window.Height)
-            //{
-            //    DeferredDevice.MainDevice.CopyResource(Final, Window.BackBuffer);
-            //}
+            
         }
     }
 }

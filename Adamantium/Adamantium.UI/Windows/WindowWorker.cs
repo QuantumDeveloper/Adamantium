@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 using Adamantium.UI.Controls;
+using InputDevice = Adamantium.Win32.RawInput.InputDevice;
 
 namespace Adamantium.UI.Windows
 {
@@ -20,6 +21,11 @@ namespace Adamantium.UI.Windows
         private bool trackMouse;
         private InputModifiers lastRawMouseModifiers;
         private Win32NativeWindowWrapper source;
+
+        static WindowWorker()
+        {
+            RawInputDevice.RegisterDevice(HIDUsagePage.Generic, HIDUsageId.Mouse, InputDeviceFlags.None);
+        }
 
         public WindowWorker()
         {
@@ -71,11 +77,11 @@ namespace Adamantium.UI.Windows
                 source.AddHook(CustomWndProc);
 
                 Win32Interop.GetClientRect(window.Handle, out var client);
-                this.window.ClientWidth = client.Width;
-                this.window.ClientHeight = client.Height;
+                this.window.ClientWidth = (uint)client.Width;
+                this.window.ClientHeight = (uint)client.Height;
 
                 this.window.ApplyTemplate();
-                Application.Current?.Windows.Add(this.window);
+                //Application.Current?.Windows.Add(this.window);
                 this.window.OnSourceInitialized();
                 Win32Interop.ShowWindow(source.Handle, WindowShowStyle.ShowNormal);
             }
@@ -84,7 +90,7 @@ namespace Adamantium.UI.Windows
         private void OnWindowClosed(object sender, EventArgs e)
         {
             source.RemoveHook(CustomWndProc);
-            Application.Current.Windows.Remove(this.window);
+            //Application.Current.Windows.Remove(this.window);
         }
 
         /// <summary>
@@ -218,16 +224,10 @@ namespace Adamantium.UI.Windows
             Win32Interop.GetWindowRect(window.Handle, out var rect);
             window.Width = rect.Width;
             window.Height = rect.Height;
-
+            
             Win32Interop.GetClientRect(window.Handle, out var client);
-            var oldClientSize = new Size(window.ClientWidth, window.ClientHeight);
-            window.ClientWidth = client.Width;
-            window.ClientHeight = client.Height;
-
-            if (window.ClientWidth != 0 && window.ClientHeight != 0)
-            {
-                window.OnClientSizeChanged(new SizeChangedEventArgs(new Size(window.ClientWidth, window.ClientHeight), oldClientSize, true, true));
-            }
+            window.ClientWidth = (uint)client.Width;
+            window.ClientHeight = (uint)client.Height;
 
             handled = true;
             return IntPtr.Zero;

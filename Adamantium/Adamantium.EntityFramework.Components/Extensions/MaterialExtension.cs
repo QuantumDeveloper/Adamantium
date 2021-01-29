@@ -1,6 +1,4 @@
-﻿using Adamantium.EntityFramework.Components;
-
-namespace Adamantium.EntityFramework.Extensions
+﻿namespace Adamantium.EntityFramework.Components.Extensions
 {
    public static class MaterialExtension
    {

@@ -1,12 +1,122 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <OutputType>WinExe</OutputType>
+        <OutputType>Exe</OutputType>
         <TargetFramework>net5.0</TargetFramework>
     </PropertyGroup>
 
     <ItemGroup>
       <ProjectReference Include="..\Adamantium.Engine\Adamantium.Engine.csproj" />
     </ItemGroup>
+
+    <ItemGroup>
+      <Effect Include="Effects\BasicEffect.fx" />
+      <Effect Include="Effects\UIEffect.fx" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Content Include="Models\swordman.dae">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <Content Include="Textures\texture.jpg">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <Content Include="Textures\texture.png">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <Content Include="Textures\texture2.jpg">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Models\F-15C_Eagle\F-15C_Eagle.aemf" />
+      <Content Include="Models\F-15C_Eagle\F-15C_Eagle.aemf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Models\F15C\F-15C_Eagle.dae" />
+      <Content Include="Models\F15C\F-15C_Eagle.dae">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Models\F15C\F-15C_Eagle.3ds" />
+      <Content Include="Models\F15C\F-15C_Eagle.3ds">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Models\F15C\F-15C_Eagle.obj" />
+      <Content Include="Models\F15C\F-15C_Eagle.obj">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Models\F15C\Body 1.png" />
+      <Content Include="Models\F15C\Body 1.png">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Models\F15C\Body 2.png" />
+      <Content Include="Models\F15C\Body 2.png">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Models\F15C\Body 3.png" />
+      <Content Include="Models\F15C\Body 3.png">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Models\F15C\Body 4.png" />
+      <Content Include="Models\F15C\Body 4.png">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Models\F15C\Body 5.png" />
+      <Content Include="Models\F15C\Body 5.png">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Models\F15C\Body 6.png" />
+      <Content Include="Models\F15C\Body 6.png">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Models\F15C\Parts 1.png" />
+      <Content Include="Models\F15C\Parts 1.png">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Models\F15C\panel.png" />
+      <Content Include="Models\F15C\panel.png">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Models\F15C\panel1.png" />
+      <Content Include="Models\F15C\panel1.png">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Models\F15C\pilot.png" />
+      <Content Include="Models\F15C\pilot.png">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Models\monkey\monkey.dae" />
+      <Content Include="Models\monkey\monkey.dae">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Models\monkey\monkey_diffuse.png" />
+      <Content Include="Models\monkey\monkey_diffuse.png">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Models\monkey\monkey_height.png" />
+      <Content Include="Models\monkey\monkey_height.png">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Models\monkey\monkey_metallic.png" />
+      <Content Include="Models\monkey\monkey_metallic.png">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Models\monkey\monkey_normals.png" />
+      <Content Include="Models\monkey\monkey_normals.png">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Models\monkey\monkey_roughness.png" />
+      <Content Include="Models\monkey\monkey_roughness.png">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Models\F15C\Glass.png" />
+      <Content Include="Models\F15C\Glass.png">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Models\F15C\weapons.png" />
+      <Content Include="Models\F15C\weapons.png">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+    </ItemGroup>
+
+    <Import Project="$(SolutionDir)Adamantium.targets" />
 
 </Project>

@@ -592,7 +592,7 @@ namespace Adamantium.Engine.Graphics.Effects
         
         private void CreateDescriptorPool()
         {
-            var buffersCount = graphicsDevice.Presenter.Description.BuffersCount;
+            var buffersCount = graphicsDevice.Presenter.Description.BuffersCount * poolCountMultiplier;
             var poolSizes = new List<DescriptorPoolSize>();
             var bindingGroups = layoutBindings.GroupBy(x => x.DescriptorType).SelectMany(g=>g).ToList();
             foreach (var binding in bindingGroups)
@@ -626,9 +626,12 @@ namespace Adamantium.Engine.Graphics.Effects
             allocInfo.PSetLayouts = layouts.ToArray();
 
             var descriptors = new DescriptorSet[layouts.Count];
-            if (graphicsDevice.AllocateDescriptorSets(allocInfo, descriptors) != Result.Success)
+            var result = graphicsDevice.AllocateDescriptorSets(allocInfo, descriptors);
+            
+            if (result != Result.Success)
             {
-                throw new Exception("failed to allocate descriptor sets!");
+                Console.WriteLine($"Failed to allocate descriptor sets! Result is {result}");
+                throw new Exception($"Failed to allocate descriptor sets! Result is {result}");
             }
 
             return descriptors;

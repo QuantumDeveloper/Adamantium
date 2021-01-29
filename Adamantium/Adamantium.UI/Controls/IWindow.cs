@@ -10,17 +10,19 @@ namespace Adamantium.UI.Controls
         void Show();
         void Close();
         void Hide();
+        
+        bool IsActive { get; }
 
         IntPtr Handle { get; }
         bool IsClosed { get; }
 
-        int ClientWidth { get; set; }
+        Double ClientWidth { get; set; }
 
-        int ClientHeight { get; set; }
+        Double ClientHeight { get; set; }
 
         IntPtr SurfaceHandle { get; }
 
-        event EventHandler<SizeChangedEventArgs> ClientSizeChanged;
+        event SizeChangedEventHandler ClientSizeChanged;
         event EventHandler<WindowClosingEventArgs> Closing;
         event EventHandler<EventArgs> Closed;
     }

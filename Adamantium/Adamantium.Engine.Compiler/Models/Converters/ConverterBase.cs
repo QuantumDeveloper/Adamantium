@@ -100,7 +100,7 @@ namespace Adamantium.Engine.Compiler.Converter.Converters
                //Преобразовываем расположение вершин, нормалей и текс. координат таким образом, 
                //чтобы их положение соответствовало системе координат в движке
                //Ковертация меша из правосторонней в левостороннюю и смена осей
-               UpAxis destinationUpAxis = UpAxis.Y_UP_LH;
+               UpAxis destinationUpAxis = UpAxis.Y_DOWN_RH;
                if (Config.ConvertToRHDirectX || Config.ConvertToOGL)
                {
                   destinationUpAxis = UpAxis.Y_UP_RH;

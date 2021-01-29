@@ -34,6 +34,7 @@ namespace Adamantium.Engine.Compiler.Converter.Configs
       private bool convertToLhDX;
       private bool convertToRhDX;
       private bool convertToOGL;
+      private bool convertToVulkan;
       private bool configChanged;
       private bool calculateNormalsIfNotPresent;
       private bool calculateTangentsBitangentsIfNotPresent;
@@ -162,6 +163,12 @@ namespace Adamantium.Engine.Compiler.Converter.Configs
             RaisePropertyChanged();
             ConfigChanged = true;
          }
+      }
+
+      public bool ConvertToVulkan
+      {
+         get => convertToVulkan;
+         set => convertToVulkan = value;
       }
 
       public bool IsClockWise

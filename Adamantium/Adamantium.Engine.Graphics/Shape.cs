@@ -73,8 +73,8 @@ namespace Adamantium.Engine.Graphics
                 vertices[i] = vertex;
             }
 
-            VertexBuffer = ToDispose(Buffer.Vertex.New(device.MainDevice, vertices));
-            IndexBuffer = ToDispose(Buffer.Index.New(device.MainDevice, mesh.Indices));
+            VertexBuffer = ToDispose(Buffer.Vertex.New(device, vertices));
+            IndexBuffer = ToDispose(Buffer.Index.New(device, mesh.Indices));
 
             PrimitiveType = mesh.MeshTopology;
         }

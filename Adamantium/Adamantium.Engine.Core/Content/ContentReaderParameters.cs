@@ -4,6 +4,7 @@ namespace Adamantium.Engine.Core.Content
 {
    public struct ContentReaderParameters
    {
+      public String DeviceId;  
       /// <summary>
       /// Name of the asset currently loaded when using <see cref="IContentManager.Load{T}"/>.
       /// </summary>

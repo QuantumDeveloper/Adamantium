@@ -1,4 +1,4 @@
-﻿namespace Adamantium.EntityFramework.Extensions
+﻿namespace Adamantium.EntityFramework.Components.Extensions
 {
     /// <summary>
     /// Collision mode for checking entity collisions

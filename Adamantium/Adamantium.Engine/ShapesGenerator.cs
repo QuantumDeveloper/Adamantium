@@ -3,12 +3,12 @@ using Adamantium.Engine.Graphics;
 using Adamantium.Engine.Templates.GeometricPrimitives;
 using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
-using Adamantium.EntityFramework.Extensions;
+using Adamantium.EntityFramework.Components.Extensions;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Engine
 {
-    public static class GeometricPrimitivesGenerator
+    public static class ShapesGenerator
     {
         /// <summary>
         /// Create primitive using default parameters

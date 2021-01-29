@@ -154,6 +154,7 @@ namespace Adamantium.Engine.Core.Content
                 parameters.OutputPath = OutputDirectory;
 
                 result = Task.Run(()=>LoadAsset(parameters)).Result;
+                //result = LoadAsset(parameters);
             }
 
             if (loadOptions?.AllowDuplication == false)

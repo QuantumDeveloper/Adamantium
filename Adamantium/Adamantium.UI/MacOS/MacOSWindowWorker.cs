@@ -41,8 +41,8 @@ namespace Adamantium.UI.MacOS
             MacOSInterop.SetWindowDelegate(window.Handle, windowDelegate);
             macOsApp.AddWindow(window);
 
-            window.ClientWidth = (int) window.Width;
-            window.ClientHeight = (int) window.Height;
+            window.ClientWidth = (uint) window.Width;
+            window.ClientHeight = (uint) window.Height;
 
             MacOSInterop.AddWindowDidResizeCallback(windowDelegate,
                 Marshal.GetFunctionPointerForDelegate(didResizeDelegate));
@@ -59,14 +59,8 @@ namespace Adamantium.UI.MacOS
             window.Height = (int)future.Height;
 
             var size = MacOSInterop.GetViewSize(window.Handle);
-            window.ClientWidth = (int)size.Width;
-            window.ClientHeight = (int) size.Height;
-
-            if (window.ClientWidth != 0 && window.ClientHeight != 0)
-            {
-                var oldSize = new Size(current.Width, current.Height); 
-                window.OnClientSizeChanged(new SizeChangedEventArgs(new Size(window.ClientWidth, window.ClientHeight), oldSize, true, true));
-            }
+            window.ClientWidth = (uint)size.Width;
+            window.ClientHeight = (uint) size.Height;
 
         }
         
@@ -77,15 +71,8 @@ namespace Adamantium.UI.MacOS
             window.Height = (int)current.Height;
 
             var size = MacOSInterop.GetViewSize(window.Handle);
-            window.ClientWidth = (int)size.Width;
-            window.ClientHeight = (int) size.Height;
-
-            if (window.ClientWidth != 0 && window.ClientHeight != 0)
-            {
-                var oldSize = new Size(current.Width, current.Height); 
-                window.OnClientSizeChanged(new SizeChangedEventArgs(new Size(window.ClientWidth, window.ClientHeight), oldSize, true, true));
-            }
-
+            window.ClientWidth = (uint)size.Width;
+            window.ClientHeight = (uint) size.Height;
         }
 
         public static implicit operator IntPtr(MacOSWindowWorker worker)

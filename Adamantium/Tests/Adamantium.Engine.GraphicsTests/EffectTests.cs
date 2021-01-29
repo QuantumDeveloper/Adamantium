@@ -14,8 +14,8 @@ namespace Adamantium.Engine.GraphicsTests
         [Test]
         public void EffectLoadingTest()
         {
-            var instance = VulkanInstance.Create("TestApp", true);
-            var device = GraphicsDevice.Create(instance, instance.CurrentDevice);
+            var main = MainGraphicsDevice.Create("TestApp", true);
+            var device = main.CreateRenderDevice(new PresentationParameters(PresenterType.RenderTarget, 100, 100, IntPtr.Zero));
             var effect = Effect.CompileFromFile(Path.Combine("EffectsData", "UIEffect.fx"), device);
         }
     }
