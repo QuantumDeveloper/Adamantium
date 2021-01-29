@@ -9,7 +9,7 @@ namespace Adamantium.UI
       public Boolean WidthChanged { get; private set; }
       public Boolean HeightChanged { get; private set; }
 
-      public SizeChangedEventArgs(Size newSize, Size oldSize, bool widthChanged, bool heightChanged)
+      public SizeChangedEventArgs(Size oldSize, Size newSize, bool widthChanged, bool heightChanged)
       {
          NewSize = newSize;
          OldSize = oldSize;

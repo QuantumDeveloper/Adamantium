@@ -184,7 +184,7 @@ namespace Adamantium.EntityFramework
             }
         }
 
-        public T CreateProcessor<T>(object[] args) where T : EntityProcessor
+        public T CreateProcessor<T>(params object[] args) where T : EntityProcessor
         {
             var processor = (T)Activator.CreateInstance(typeof(T), args);
             AddProcessor(processor);

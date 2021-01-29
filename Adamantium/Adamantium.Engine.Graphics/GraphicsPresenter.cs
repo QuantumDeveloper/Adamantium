@@ -139,7 +139,7 @@ namespace Adamantium.Engine.Graphics
             colorAttachment.Format = ImageFormat;
             colorAttachment.Samples = (SampleCountFlagBits)MSAALevel;
             colorAttachment.LoadOp = AttachmentLoadOp.Clear;
-            colorAttachment.StoreOp = AttachmentStoreOp.Store;
+            colorAttachment.StoreOp = MSAALevel > MSAALevel.None ? AttachmentStoreOp.Store : AttachmentStoreOp.DontCare;
             colorAttachment.StencilLoadOp = AttachmentLoadOp.DontCare;
             colorAttachment.StencilStoreOp = AttachmentStoreOp.DontCare;
             colorAttachment.InitialLayout = ImageLayout.Undefined;
@@ -149,7 +149,7 @@ namespace Adamantium.Engine.Graphics
             depthAttachment.Format = (Format)DepthFormat;
             depthAttachment.Samples = (SampleCountFlagBits)MSAALevel;
             depthAttachment.LoadOp = AttachmentLoadOp.Clear;
-            depthAttachment.StoreOp = AttachmentStoreOp.Store;
+            depthAttachment.StoreOp = MSAALevel > MSAALevel.None ? AttachmentStoreOp.Store : AttachmentStoreOp.DontCare;
             depthAttachment.StencilLoadOp = AttachmentLoadOp.DontCare;
             depthAttachment.StencilStoreOp = AttachmentStoreOp.DontCare;
             depthAttachment.InitialLayout = ImageLayout.Undefined;
@@ -182,8 +182,11 @@ namespace Adamantium.Engine.Graphics
             subpass.ColorAttachmentCount = 1;
             subpass.PColorAttachments = new[] { colorAttachmentRef };
             subpass.PDepthStencilAttachment = depthAttachmentRef;
-            subpass.PResolveAttachments = new[] { colorAttachmentResolveRef };
-            
+            if (MSAALevel > MSAALevel.None)
+            {
+                subpass.PResolveAttachments = new[] {colorAttachmentResolveRef};
+            }
+
             SubpassDependency subpassDependency = new SubpassDependency();
             subpassDependency.SrcSubpass = Constants.VK_SUBPASS_EXTERNAL;
             subpassDependency.DstSubpass = 0;
@@ -246,6 +249,17 @@ namespace Adamantium.Engine.Graphics
                 default:
                     throw new NotSupportedException($"Presenter type: {parameters.PresenterType} is not supported");
             }
+        }
+
+        protected virtual void CleanupSwapChain()
+        {
+            
+        }
+
+        protected override void Dispose(bool disposeManagedResources)
+        {
+            base.Dispose(disposeManagedResources);
+            CleanupSwapChain();
         }
     }
 }

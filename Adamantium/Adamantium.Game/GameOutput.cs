@@ -1,8 +1,12 @@
 ﻿using System;
+using System.Collections.ObjectModel;
 using Adamantium.Core;
 using Adamantium.Engine.Graphics;
+using Adamantium.Game.Events;
+using Adamantium.Game.GameInput;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
+using Adamantium.UI;
 using AdamantiumVulkan.Core;
 
 namespace Adamantium.Game
@@ -14,12 +18,12 @@ namespace Adamantium.Game
     {
         internal int OutputId = 1;
 
-        internal GraphicsPresenter Presenter { get; set; }
+        public GraphicsDevice GraphicsDevice { get; private set; }
 
         /// <summary>
         /// Contains <see cref="GameOutput"/> description
         /// </summary>
-        protected abstract GameWindowDescription Description { get; set; }
+        public abstract GameWindowDescription Description { get; protected set; }
 
         public GameWindowType Type => (GameWindowType)Description.PresenterType;
 
@@ -46,18 +50,28 @@ namespace Adamantium.Game
         /// Defines is <see cref="GameOutput"/> currently displayed
         /// </summary>
         public abstract Boolean IsVisible { get; }
+        
+        public abstract bool IsActive { get; } 
 
         internal abstract bool CanHandle(GameContext gameContext);
 
-        internal abstract void Resize(int width, int height);
+        internal abstract void Resize(uint width, uint height);
 
         internal abstract void SwitchContext(GameContext context);
+        
+        private void GenerateWindowName()
+        {
+            Name = $"Window_{GamePlatform.WindowId++}";
+        }
 
         /// <summary>
         /// Initializes <see cref="GameOutput"/>
         /// </summary>
         protected GameOutput()
         {
+            Viewport = new Viewport();
+            Viewport.MaxDepth = 1.0f;
+            Scissor = new Rect2D();
             GenerateWindowName();
         }
         
@@ -67,41 +81,29 @@ namespace Adamantium.Game
         /// <param name="context"></param>
         protected abstract void Initialize(GameContext context);
 
-        protected abstract void Initialize(GameContext context, SurfaceFormat pixelFormat,
-           DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24, MSAALevel msaaLevel = MSAALevel.X4);
+        protected abstract void Initialize(
+            GameContext context, 
+            SurfaceFormat pixelFormat, 
+            DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24, 
+            MSAALevel msaaLevel = MSAALevel.X4);
 
-        public RenderTarget RenderTarget => Presenter.RenderTarget;
+        public Rect2D Scissor { get; protected set; }
 
-        public DepthStencilBuffer DepthBuffer => Presenter.DepthBuffer;
-
-        public Viewport Viewport => Presenter.Viewport;
-
-
-        internal void DisposePresenter()
-        {
-            Presenter?.Dispose();
-            Presenter = null;
-        }
-
-        protected String GeneratePresenterName()
-        {
-            return "Presenter " + OutputId;
-        }
+        public Viewport Viewport { get; protected set; }
 
         public void DisplayContent()
         {
             if (IsUpToDate())
             {
-                Presenter.Present();
+                GraphicsDevice.Present();
             }
         }
 
-        private void GenerateWindowName()
+        public void SetGraphicsDevice(GraphicsDevice graphicsDevice)
         {
-            Name = $"Window_{GamePlatform.WindowId++}";
+            GraphicsDevice = graphicsDevice;
+            ClearState();
         }
-
-        internal abstract GraphicsPresenter CreatePresenter(GraphicsDevice device);
 
         internal Boolean ResizeRequested { get; set; }
 
@@ -126,11 +128,6 @@ namespace Adamantium.Game
         public virtual void Close()
         {
         }
-        
-        internal static GameOutput NewDefault(uint width = 1280, uint height = 720)
-        {
-            return new AdamantiumGameOutput(width, height);
-        }
 
         internal static GameOutput New(GameContext gameContext)
         {
@@ -140,13 +137,25 @@ namespace Adamantium.Game
             }
             else if (gameContext.ContextType == GameContextType.Window)
             {
-                return new AdamantiumGameOutput();
+                return new AdamantiumGameOutput(gameContext);
             }
             throw new NotSupportedException(gameContext.ContextType + " game context is not currently supported");
         }
 
+        internal static GameOutput NewWindow(uint width, uint height)
+        {
+            var wnd = Window.New();
+            wnd.Width = width;
+            wnd.Height = height;
+            return new AdamantiumGameOutput(new GameContext(wnd));
+        }
 
-        internal static GameOutput New(GameContext gameContext, SurfaceFormat pixelFormat, DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24, MSAALevel msaaLevel = MSAALevel.X4)
+
+        internal static GameOutput New(
+            GameContext gameContext, 
+            SurfaceFormat pixelFormat, 
+            DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24, 
+            MSAALevel msaaLevel = MSAALevel.X4)
         {
             if (gameContext.ContextType == GameContextType.RenderTargetPanel)
             {
@@ -157,80 +166,65 @@ namespace Adamantium.Game
 
         public virtual void TakeScreenshot(string path, ImageFileType fileType)
         {
-            Presenter?.TakeScreenshot(path, fileType);
+            GraphicsDevice?.TakeScreenshot(path, fileType);
+        }
+
+        public void UpdatePresenter()
+        {
+            ResizePresenter();
+            ClearState();
         }
 
         internal void ResizePresenter()
         {
-            Presenter?.Resize(Description.Width, Description.Height, Description.BuffersCount, Description.PixelFormat,
-               Description.DepthFormat/*, Description.Flags*/);
+            GraphicsDevice.ResizePresenter(
+                Description.Width, 
+                Description.Height, 
+                Description.BuffersCount,
+                Description.PixelFormat,
+                Description.DepthFormat);
         }
 
         internal void SetPresentOptions()
         {
-            Presenter.PresentInterval = Description.PresentInterval;
+            //Presenter.PresentInterval = Description.PresentInterval;
             //Presenter.PresentFlags = Description.PresentFlags;
         }
 
         /// <summary>
         /// Occurs when window got focus
         /// </summary>
-        public event EventHandler<EventArgs> Activated;
+        public event Action<GameOutput> Activated;
 
         /// <summary>
         /// Occurs when window lost focus
         /// </summary>
-        public event EventHandler<EventArgs> Deactivated;
+        public event Action<GameOutput> Deactivated;
 
         /// <summary>
         /// Occurs when window size has changed
         /// </summary>
-        public event EventHandler<EventArgs> SizeChanged;
-
-        /// <summary>
-        /// Occurs when window size or position has changed
-        /// </summary>
-        public event EventHandler<GameWindowBoundsChangedEventArgs> BoundsChanged;
+        public event Action<GameOutputSizeChangedPayload> SizeChanged;
 
         /// <summary>
         /// Occurs after GraphicsPresenter finish updating (recreated or resized)
         /// </summary>
-        public event EventHandler<GameWindowParametersEventArgs> ParametersChanged;
+        public event Action<GameOutputParametersPayload> ParametersChanged;
 
         /// <summary>
         /// Occurs before GraphicsPresenter updated (recreated or resized)
         /// </summary>
-        public event EventHandler<GameWindowParametersEventArgs> ParametersChanging;
+        public event Action<GameOutputParametersPayload> ParametersChanging;
 
         /// <summary>
         /// Occurs when key was pressed
         /// </summary>
-        public event EventHandler<KeyboardInputEventArgs> KeyDown;
-
-        /// <summary>
-        /// Occurs when key was released
-        /// </summary>
-        public event EventHandler<KeyboardInputEventArgs> KeyUp;
-
-        /// <summary>
-        /// Occurs when mouse button was pressed
-        /// </summary>
-        public event EventHandler<MouseInputEventArgs> MouseDown;
+        public Action<KeyboardInput> KeyInput;
 
         /// <summary>
         /// Occurs when mouse button was released
         /// </summary>
-        public event EventHandler<MouseInputEventArgs> MouseUp;
-
-        /// <summary>
-        /// Occurs when mouse wheel was scrolled
-        /// </summary>
-        public event EventHandler<MouseInputEventArgs> MouseWheel;
-
-        /// <summary>
-        /// Occurs when physical mouse position changed
-        /// </summary>
-        public event EventHandler<MouseInputEventArgs> MouseDelta;
+        public Action<MouseInput> MouseInput;
 
         /// <summary>
         /// Occurs when window is closed
@@ -248,7 +242,7 @@ namespace Adamantium.Game
         /// <param name="reason"></param>
         internal void OnWindowParametersChanging(ChangeReason reason)
         {
-            ParametersChanging?.Invoke(this, new GameWindowParametersEventArgs(this, reason));
+            ParametersChanging?.Invoke(new GameOutputParametersPayload(this, reason));
         }
 
         /// <summary>
@@ -257,7 +251,7 @@ namespace Adamantium.Game
         /// <param name="reason"></param>
         internal void OnWindowParametersChanged(ChangeReason reason)
         {
-            ParametersChanged?.Invoke(this, new GameWindowParametersEventArgs(this, reason));
+            ParametersChanged?.Invoke(new GameOutputParametersPayload(this, reason));
         }
 
         /// <summary>
@@ -265,55 +259,38 @@ namespace Adamantium.Game
         /// </summary>
         internal void OnWindowSizeChanged()
         {
-            SizeChanged?.Invoke(this, EventArgs.Empty);
+            SizeChanged?.Invoke(new GameOutputSizeChangedPayload(this, new Size(Width, Height)));
         }
 
-        /// <summary>
-        /// Called after GraphicsPresenter has been resized
-        /// </summary>
-        internal void OnWindowBoundsChanged()
+        internal void OnKeyInput(KeyboardInput args)
         {
-            BoundsChanged?.Invoke(this, new GameWindowBoundsChangedEventArgs(this, ClientBounds));
+            KeyInput?.Invoke(args);
         }
 
-        internal void OnKeyDown(KeyboardInputEventArgs args)
+        internal void OnMouseInput(MouseInput args)
         {
-            KeyDown?.Invoke(this, args);
-        }
-
-        internal void OnKeyUp(KeyboardInputEventArgs args)
-        {
-            KeyUp?.Invoke(this, args);
-        }
-
-        internal void OnMouseDown(MouseInputEventArgs args)
-        {
-            MouseDown?.Invoke(this, args);
-        }
-
-        internal void OnMouseUp(MouseInputEventArgs args)
-        {
-            MouseUp?.Invoke(this, args);
-        }
-
-        internal void OnMouseWheel(MouseInputEventArgs args)
-        {
-            MouseWheel?.Invoke(this, args);
-        }
-
-        internal void OnMouseDelta(MouseInputEventArgs delta)
-        {
-            MouseDelta?.Invoke(this, delta);
+            MouseInput?.Invoke(args);
         }
 
         internal void OnActivated()
         {
-            Activated?.Invoke(this, EventArgs.Empty);
+            Activated?.Invoke(this);
         }
 
         internal void OnDeactivated()
         {
-            Deactivated?.Invoke(this, EventArgs.Empty);
+            Deactivated?.Invoke(this);
+        }
+        
+        protected void UpdateViewportAndScissor(uint width, uint height)
+        {
+            Viewport.Width = width;
+            Viewport.Height = height;
+            
+            Scissor.Extent = new Extent2D();
+            Scissor.Extent.Width = width;
+            Scissor.Extent.Height = height;
+            Scissor.Offset = new Offset2D();
         }
 
         /// <summary>
@@ -323,8 +300,7 @@ namespace Adamantium.Game
         /// disposed of in addition to unmanaged resources.</param>
         protected override void Dispose(bool disposeManagedResources)
         {
-            Presenter?.Dispose();
-            Presenter = null;
+            GraphicsDevice?.Dispose();
             base.Dispose(disposeManagedResources);
         }
 

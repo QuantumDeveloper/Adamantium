@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using Adamantium.Core.Events;
+using Adamantium.Engine.Processors;
 using Adamantium.Engine.Services;
 using Adamantium.EntityFramework;
-using Adamantium.EntityFramework.Processors;
 using Adamantium.Game;
+using Adamantium.Game.Events;
 using Adamantium.Game.GameInput;
 
 namespace Adamantium.Engine
@@ -20,17 +22,20 @@ namespace Adamantium.Engine
         public LightService LightService { get; private set; }
         public CameraService CameraService { get; private set; }
         public GamePlayManager GamePlayManager { get; private set; }
-        public GraphicsDeviceManager GraphicsDeviceManager { get; set; }
+        public GraphicsDeviceService GraphicsDeviceService { get; set; }
+        
+        protected IEventAggregator EventAggregator { get; }
 
-        public Game()
+        public Game(GameMode mode) : base(mode)
         {
-            GraphicsDeviceManager = new GraphicsDeviceManager(this);
+            EventAggregator = Services.Resolve<IEventAggregator>();
+            GraphicsDeviceService = new GraphicsDeviceService(this);
             EntityWorld = new EntityWorld(Services);
             Services.RegisterInstance<EntityWorld>(EntityWorld);
             Content.Readers.Add(typeof(Entity), new ModelContentReader());
             InputService = new InputService(this, Services);
             GamePlayManager = new GamePlayManager(Services);
-            WindowRemoved += Game_WindowRemoved;
+            EventAggregator.GetEvent<GameOutputRemovedEvent>().Subscribe(OnGameOutputRemoved);
             Stopped += Game_Stopped;
             drawSystems = new Dictionary<GameOutput, EntityProcessor>();
         }
@@ -40,9 +45,9 @@ namespace Adamantium.Engine
             EntityWorld.Reset();
         }
 
-        private void Game_WindowRemoved(object sender, GameWindowEventArgs e)
+        private void OnGameOutputRemoved(GameOutput output)
         {
-            RemoveRenderProcessor(e.Window);
+            RemoveRenderProcessor(output);
         }
 
         private void RemoveRenderProcessor(GameOutput window)

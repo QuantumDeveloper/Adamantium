@@ -3,7 +3,7 @@ using Adamantium.Engine.Templates.Tools;
 using Adamantium.Engine.Tools;
 using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
-using Adamantium.EntityFramework.Extensions;
+using Adamantium.EntityFramework.Components.Extensions;
 using Adamantium.Game.GameInput;
 using Adamantium.Mathematics;
 
@@ -180,7 +180,7 @@ namespace Adamantium.Engine.Services
                 CurrentTool.SetStandby();
             }
 
-            if (!CurrentTool.IsLocked && !_lightProcessingResult)
+            if (!CurrentTool.IsLocked && !_lightProcessingResult && camera != null)
             {
                 result = CheckEntityIntersection(entities, camera, InputService.RelativePosition, collisionMode);
                 var lightResult = lightService.Intersects(camera, InputService.RelativePosition, collisionMode);

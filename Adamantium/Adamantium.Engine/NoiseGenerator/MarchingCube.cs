@@ -31,7 +31,7 @@ namespace Adamantium.Engine.NoiseGenerator
 
       public MarchingCube(GraphicsDevice device, EntityWorld entityWorld)
       {
-//         graphicsDevice = device.MainDevice;
+//         graphicsDevice = device.Device;
 //         this.entityWorld = entityWorld;
 //         PerlinNoise.SetSeed(455);
 //         noise = new OpenSimplexNoise(455);

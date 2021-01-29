@@ -1,25 +1,17 @@
 ﻿using System;
 using Adamantium.Engine.Graphics;
+using Adamantium.Game.GameInput;
 using Adamantium.Imaging;
 using Adamantium.UI;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Input;
 using Rectangle = Adamantium.Mathematics.Rectangle;
 
 namespace Adamantium.Game
 {
     public class AdamantiumGameOutput : AdamantiumGameOutputBase
     {
-        protected override GameWindowDescription Description { get; set; }
-
         private IWindow window;
-
-        public AdamantiumGameOutput(uint width = 1280, uint height = 720)
-        {
-            var wnd = Window.New();
-            wnd.Width = width;
-            wnd.Height = height;
-            Initialize(new GameContext(wnd));
-        }
 
         public AdamantiumGameOutput(
             IWindow window, 
@@ -35,65 +27,62 @@ namespace Adamantium.Game
             Initialize(gameContext);
         }
 
+        public override bool IsActive => window.IsActive;
+
         internal override bool CanHandle(GameContext gameContext)
         {
             return gameContext.ContextType == GameContextType.Window && window != null;
         }
 
-        internal override void Resize(int width, int height)
-        {
-            window.Width = width;
-            window.Height = height;
-        }
-        
         protected override void InitializeInternal(GameContext context)
         {
-            if (GameContext.Context == null || !(GameContext.Context is IWindow))
-            {
-                throw new ArgumentException($"{nameof(context.Context)} should be of type RenderTargetPanel");
-            }
-            
             GameContext = context;
-            window = (IWindow)GameContext.Context;
+            window = GameContext.Context as IWindow ?? throw new ArgumentException($"{nameof(context.Context)} should be of type RenderTargetPanel");
             UIComponent = window as FrameworkComponent;
-            window.SizeChanged += WindowOnSizeChanged;
-            //window.GotFocus += NativeWindow_GotFocus;
-            //window.LostFocus += NativeWindow_LostFocus;
+            window.ClientSizeChanged += WindowOnClientSizeChanged;
+            
             Description = new GameWindowDescription(PresenterType.Swapchain);
             Width = (uint)window.Width;
             Height = (uint)window.Height;
             Handle = window.Handle;
             ClientBounds = new Rectangle(0, 0, (int)Description.Width, (int)Description.Height);
-        }
-
-        private void WindowOnSizeChanged(object sender, SizeChangedEventArgs e)
-        {
+            UpdateViewportAndScissor((uint)ClientBounds.Width, (uint)ClientBounds.Height);
             
+            base.InitializeInternal(context);
+        }
+        
+        private void WindowOnClientSizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            Resize((uint)e.NewSize.Width, (uint)e.NewSize.Height);
+            ResizeRequested = true;
+            window.Measure(Size.Infinity);
+            window.Arrange(new Rect(window.DesiredSize));
         }
 
         internal override void SwitchContext(GameContext context)
         {
             if (!CanHandle(context)) return;
             
-            
             Initialize(context);
-        }
-
-        internal override GraphicsPresenter CreatePresenter(GraphicsDevice device)
-        {
-            return new SwapChainGraphicsPresenter(device, Description);
         }
 
         public override void Show()
         {
             base.Show();
-            window.Show();
+            window?.Show();
+            Description.Handle = window.Handle;
         }
 
         public override void Close()
         {
             base.Close();
-            window.Close();
+            window?.Close();
+        }
+
+        protected override void Dispose(bool disposeManagedResources)
+        {
+            base.Dispose(disposeManagedResources);
+            Close();
         }
     }
 }

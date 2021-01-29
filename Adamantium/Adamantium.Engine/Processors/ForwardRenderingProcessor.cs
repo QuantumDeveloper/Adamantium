@@ -1,29 +1,29 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
+using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
-using Adamantium.Engine;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.Engine.NoiseGenerator;
+using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
-using Adamantium.EntityFramework.Extensions;
 using Adamantium.Game;
 using Adamantium.Game.GameInput;
 using Adamantium.Mathematics;
 using Adamantium.Win32;
-using Noise;
+using AdamantiumVulkan.Core;
+
 //using Buffer = Adamantium.Engine.Graphics.Buffer;
-using ContainmentType = Adamantium.Mathematics.ContainmentType;
 //using Texture2D = Adamantium.Engine.Graphics.Texture2D;
 //using Texture3D = Adamantium.Engine.Graphics.Texture3D;
-using ViewportF = Adamantium.Mathematics.ViewportF;
 
-namespace Adamantium.EntityFramework.Processors
+namespace Adamantium.Engine.Processors
 {
     public class ForwardRenderingProcessor : RenderProcessor
     {
+        private Sampler textureSampler;
+        private Texture defaultTexture;
+        
         public ForwardRenderingProcessor(EntityWorld world, GameOutput window) : base(world, window)
         {
             //DeferredDevice = GraphicsDevice.CreateDeferred();
@@ -166,7 +166,7 @@ namespace Adamantium.EntityFramework.Processors
                 }
             }
 
-            //vertex = Buffer.Vertex.New(DeferredDevice.MainDevice, positions.ToArray(), ResourceUsage.Dynamic);
+            //vertex = Buffer.Vertex.New(DeferredDevice.Device, positions.ToArray(), ResourceUsage.Dynamic);
         }
 
         private void CreateVertexGrid(float chunkSize, int voxelsInChunk)
@@ -199,8 +199,8 @@ namespace Adamantium.EntityFramework.Processors
 //            //positions.Add(new Vector3F(-1, -1, 10));
 //            //positions.Add(new Vector3F(1, -1, 10));
 //
-//            vertex = Buffer.Vertex.New(DeferredDevice.MainDevice, positions.ToArray(), ResourceUsage.Dynamic);
-//            //streamOut = Buffer.New<Vector3F>(DeferredDevice.MainDevice, positions.Count *15, BufferFlags.StreamOutput);
+//            vertex = Buffer.Vertex.New(DeferredDevice.Device, positions.ToArray(), ResourceUsage.Dynamic);
+//            //streamOut = Buffer.New<Vector3F>(DeferredDevice.Device, positions.Count *15, BufferFlags.StreamOutput);
 //            FillDecals(voxelSize);
         }
 
@@ -240,13 +240,34 @@ namespace Adamantium.EntityFramework.Processors
             decals[6] = new Vector3F(voxelSize, voxelSize, 0);
             decals[7] = new Vector3F(0, voxelSize, 0);
         }
+        
+        Sampler CreateTextureSampler()
+        {
+            SamplerCreateInfo samplerInfo = new SamplerCreateInfo();
+            samplerInfo.MagFilter = Filter.Linear;
+            samplerInfo.MinFilter = Filter.Linear;
+            samplerInfo.AddressModeU = SamplerAddressMode.Repeat;
+            samplerInfo.AddressModeV = SamplerAddressMode.Repeat;
+            samplerInfo.AddressModeW = SamplerAddressMode.Repeat;
+            samplerInfo.AnisotropyEnable = true;
+            samplerInfo.MaxAnisotropy = 16;
+            samplerInfo.BorderColor = BorderColor.IntOpaqueWhite;
+            samplerInfo.UnnormalizedCoordinates = false;
+            samplerInfo.CompareEnable = false;
+            samplerInfo.CompareOp = CompareOp.Always;
+            samplerInfo.MipmapMode = SamplerMipmapMode.Linear;
+
+            return GraphicsDevice.CreateSampler(samplerInfo);
+        }
 
         private void CreateResources()
         {
-//            DeferredDevice.SetTargets(null);
+            textureSampler = CreateTextureSampler();
+            defaultTexture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "texture.png"));
+            //DeferredDevice.SetTargets(null);
 
             //var vbFlags = BufferFlags.VertexBuffer | BufferFlags.StreamOutput;
-            //normalsStreamOutBuffer = Buffer.New<Vector4F>(DeferredDevice.MainDevice, 1000000, vbFlags);
+            //normalsStreamOutBuffer = Buffer.New<Vector4F>(DeferredDevice.Device, 1000000, vbFlags);
             //cambriaTrueTypeData = Content.Load<SpriteFontData>("Font/cambria.aefnt");
             //cambriaBMFontData = Content.Load<SpriteFontData>("Font/BM_Cambria/cambria_bm.aefnt");
 
@@ -255,7 +276,7 @@ namespace Adamantium.EntityFramework.Processors
 
             //CreateProtoPlainGrid(10.0f, 10);
             //streamOutStatisticsQuery = new StreamOutStatisticsQuery(DeferredDevice);
-            //protoPlainStreamOut = Buffer.New<VertexPositionNormalTexture>(DeferredDevice.MainDevice,
+            //protoPlainStreamOut = Buffer.New<VertexPositionNormalTexture>(DeferredDevice.Device,
             //                  vertex.ElementCount * 6,
             //                  BufferFlags.StreamOutput | BufferFlags.VertexBuffer);
 
@@ -299,7 +320,7 @@ namespace Adamantium.EntityFramework.Processors
             //fractalEffect = new Effect(DeferredDevice, result);
             //result = EffectData.Load(@"Content\Effects\SkyboxEffect.fx.compiled");
             //skybox = new Effect(DeferredDevice, result);
-            //skyCube = GeometricPrimitivesGenerator.CreateCubeSphere(DeferredDevice.MainDevice, entityWorld, 1, 30);
+            //skyCube = ShapesGenerator.CreateCubeSphere(DeferredDevice.Device, entityWorld, 1, 30);
             //skyCube.IsVisible = false;
             //var move = new MoveToolTemplate(DeferredDevice, 10,0.1f,Vector3F.One, true);
             //move.BuildEntity(EntityWorld, null, "");
@@ -316,7 +337,7 @@ namespace Adamantium.EntityFramework.Processors
             //MarchingCubesEffect = new Effect(DeferredDevice, fx);
 
             //var proto_fx = EffectData.Load(@"Content\Effects\TerrainGenShaders\Prototype.fx.compiled");
-            //ProtoEffect = new Effect(DeferredDevice.MainDevice, proto_fx);
+            //ProtoEffect = new Effect(DeferredDevice.Device, proto_fx);
         }
 
         private void CreateWindowResources()
@@ -361,25 +382,158 @@ namespace Adamantium.EntityFramework.Processors
 
         public override bool BeginDraw()
         {
-//            DeferredDevice.SetRenderTargets(depthBuffer, renderTarget);
-//            DeferredDevice.ClearTargets(Colors.Gray, depthBuffer, renderTarget);
-//            DeferredDevice.SetViewport(viewPort);
-            return base.BeginDraw();
+            if (!Window.IsUpToDate()) return false;
+
+            if (base.BeginDraw())
+            {
+                if (GraphicsDevice.BeginDraw(Colors.CornflowerBlue, 1.0f, 0))
+                {
+                    GraphicsDevice.SetViewports(Window.Viewport);
+                    GraphicsDevice.SetScissors(Window.Scissor);
+                    return true;
+                }
+
+                return false;
+            }
+
+            return false;
         }
 
         public override void Draw(IGameTime gameTime)
         {
             base.Draw(gameTime);
+            GraphicsDevice.SetViewports(Window.Viewport);
+            GraphicsDevice.SetScissors(Window.Scissor);
+            //GraphicsDevice.RasterizerState = GraphicsDevice.RasterizerStates.CullNoneClipDisabled;
             if (ActiveCamera == null)
             {
                 return;
+            }
+            
+            foreach (var entity in Entities)
+            {
+                try
+                {
+                    entity.TraverseInDepth(
+                        current =>
+                        {
+                            if (!current.Visible)
+                            {
+                                return;
+                            }
+
+                            
+                            ContainmentType intersects = ContainmentType.Contains;
+                            var collision = current.GetComponent<Collider>();
+                            if (collision != null)
+                            {
+                                if (collision.ContainsDataFor(ActiveCamera))
+                                {
+                                    //var transform = current.Transform.GetMetadata(ActiveCamera);
+                                    //intersects = collision.IsInsideCameraFrustum(ActiveCamera);
+                                    //var wvp = transform.WorldMatrix * ActiveCamera.ViewMatrix * ActiveCamera.ProjectionMatrix;
+                                    // BasicEffect.Parameters["worldMatrix"].SetValue(transform.WorldMatrix);
+                                    // BasicEffect.Parameters["wvp"].SetValue(wvp);
+                                    // BasicEffect.Parameters["worldInverseTransposeMatrix"].SetValue(Matrix4x4F.Transpose(Matrix4x4F.Invert(transform.WorldMatrix)));
+                                    // BasicEffect.Parameters["meshColor"].SetValue(Colors.White.ToVector3());
+                                    //BasicEffect.Techniques["MeshVertex"].Passes["NoLight"].Apply();
+                                    //collision.Draw(DeferredDevice, ActiveCamera);
+                                    //BasicEffect.Techniques["MeshVertex"].Passes["NoLight"].UnApply();
+                                }
+                            }
+
+                            //if (intersects != ContainmentType.Disjoint)
+                            {
+                                var controller = current.GetComponent<AnimationController>();
+                                if (controller != null && controller.FinalMatrices.Count > 0)
+                                {
+                                    var arr = controller.FinalMatrices.Values.ToArray();
+                                    //BasicEffect.Parameters["Bones"].SetValue(arr);
+                                }
+
+                                var renderers = current.GetComponents<MeshRendererBase>();
+
+                                var transformation = current.Transform.GetMetadata(ActiveCamera);
+                                if (!transformation.Enabled)
+                                {
+                                    return;
+                                }
+
+                                if (renderers.Length > 0)
+                                {
+                                    foreach (var component in renderers)
+                                    {
+                                        var material = current.GetComponent<Material>();
+                                        var wvp = transformation.WorldMatrix *ActiveCamera.ViewMatrix * ActiveCamera.ProjectionMatrix;
+                                        GraphicsDevice.BasicEffect.Parameters["wvp"].SetValue(wvp);
+                                        //GraphicsDevice.BasicEffect.Parameters["worldMatrix"].SetValue(transformation.WorldMatrix);
+                                        //GraphicsDevice.BasicEffec.SetValue(Matrix4x4F.Transpose(Matrix4x4F.Invert(transformation.WorldMatrix)));
+                                        
+                                        //DeferredDevice.RasterizerState = DeferredDevice.RasterizerStates.Default;
+                                        //DeferredDevice.SetRasterizerState(DeferredDevice.RasterizerStates.CullBackClipDisabled);
+                                        
+                                        GraphicsDevice.BasicEffect.Parameters["sampleType"].SetResource(textureSampler);
+
+                                        if (material?.Texture != null)
+                                        {
+                                            GraphicsDevice.BasicEffect.Parameters["shaderTexture"].SetResource(material.Texture);
+                                        }
+                                        else
+                                        {
+                                            GraphicsDevice.BasicEffect.Parameters["shaderTexture"].SetResource(defaultTexture);
+                                        }
+
+                                        if (component is SkinnedMeshRenderer)
+                                        {
+                                            GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Skinned"].Apply();
+                                            component.Draw(GraphicsDevice, gameTime);
+                                        }
+
+                                        if (component is MeshRenderer)
+                                        {
+                                            GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Textured"].Apply();
+
+                                            //BasicEffect.Techniques["MeshVertex"].Passes["DirectionalLight"].Apply();
+                                            component.Draw(GraphicsDevice, gameTime);
+                                            //BasicEffect.Techniques["MeshVertex"].Passes["DirectionalLight"].UnApply(true);
+                                        }
+
+                                        //drawingCounts++;
+
+
+                                        /*
+                                        DeferredDevice.RasterizerState = DeferredDevice.RasterizerStates.CullNoneClipDisabled;
+                                        //DeferredDevice.SetBlendState(DeferredDevice.BlendStates.NonPremultiplied);
+
+                                        
+                                        solidWIreframeEffect.Parameters["World"].SetValue(transformation.WorldMatrix);
+                                        solidWIreframeEffect.Parameters["View"].SetValue(ActiveCamera.ViewMatrix);
+                                        solidWIreframeEffect.Parameters["Projection"].SetValue(ActiveCamera.ProjectionMatrix);
+                                        solidWIreframeEffect.Parameters["WorldView"].SetValue(transformation.WorldMatrix * ActiveCamera.ViewMatrix);
+                                        solidWIreframeEffect.Parameters["WorldViewProjection"].SetValue(transformation.WorldMatrix * ActiveCamera.ViewMatrix * ActiveCamera.ProjectionMatrix);
+                                        solidWIreframeEffect.Parameters["Viewport"].SetValue(new Vector4F(Window.Viewport.Width, Window.Viewport.Height, Window.Viewport.X, Window.Viewport.Y));
+                                        solidWIreframeEffect.Parameters["PatternPeriod"].SetValue(patternPeriod);
+                                        solidWIreframeEffect.Parameters["LineWidth"].SetValue(wireframeWidthValue);
+
+                                        solidWIreframeEffect.Techniques[0].Passes["SolidWirePattern"].Apply();
+                                        component.Draw(GraphicsDevice, gameTime);
+                                        solidWIreframeEffect.Techniques[0].Passes["SolidWirePattern"].UnApply(true);
+                                        */
+                                    }
+                                }
+                            }
+                        });
+                }
+                catch (Exception exception)
+                {
+                    MessageBox.Show(exception.Message + exception.StackTrace);
+                }
             }
 
 //            DeferredDevice.DepthStencilState = DeferredDevice.DepthStencilStates.DepthEnableGreaterEqual;
 //            DeferredDevice.BlendState = DeferredDevice.BlendStates.NonPremultiplied;
 //            DeferredDevice.RasterizerState = DeferredDevice.RasterizerStates.CullNoneClipDisabled;
 
-            Text = "FPS: " + GameTime.FpsCount + "\n";
             /*
             Text += "Camera view direction = " + ActiveCamera.Forward + "\n";
             Text += "Offset: " + ActiveCamera.GetOwnerPosition() + "\n";
@@ -598,7 +752,7 @@ namespace Adamantium.EntityFramework.Processors
                         {
 
                             Buffer<VertexPositionNormalTexture> streamOut =
-                               Buffer.New<VertexPositionNormalTexture>(DeferredDevice.MainDevice,
+                               Buffer.New<VertexPositionNormalTexture>(DeferredDevice.Device,
                                   voxelsQuantity * voxelsQuantity * voxelsQuantity * 15,
                                   BufferFlags.StreamOutput | BufferFlags.VertexBuffer);
                             DeferredDevice.SetVertexBuffer(vertex);
@@ -642,7 +796,7 @@ namespace Adamantium.EntityFramework.Processors
                             //      Position = data[i]
                             //   };
                             //}
-                            //Buffer<SkinnedVertex> skinned = Buffer.Vertex.New(DeferredDevice.MainDevice, mesh);
+                            //Buffer<SkinnedVertex> skinned = Buffer.Vertex.New(DeferredDevice.Device, mesh);
                             //var skinnedGeom = new SkinnedGeometry(skinned, null, PrimitiveType.TriangleList);
                             //entity.AddComponent(skinnedGeom);
                             //entity.AddComponent(new Collision(data));
@@ -679,7 +833,7 @@ namespace Adamantium.EntityFramework.Processors
                       vertexArray[i].Normal = Vector3F.Normalize(vertexArray[i].Position);
                    }
 
-                   Buffer<SkinnedVertex> vertexBuf = Buffer.Vertex.New(DeferredDevice.MainDevice, vertexArray);
+                   Buffer<SkinnedVertex> vertexBuf = Buffer.Vertex.New(DeferredDevice.Device, vertexArray);
 
                    Entity marchingCubesEntity = EntityWorld.CreateEntity(null, "Marching Cube");
                    marchingCubesEntity.AddComponent(new SkinnedGeometry(vertexBuf, null, PrimitiveType.TriangleList));
@@ -700,13 +854,13 @@ namespace Adamantium.EntityFramework.Processors
                         for (int j = 0; j < 3; ++j)
                         {
                             Buffer<VertexPositionNormalTexture> streamOut =
-                               Buffer.New<VertexPositionNormalTexture>(DeferredDevice.MainDevice,
+                               Buffer.New<VertexPositionNormalTexture>(DeferredDevice.Device,
                                   voxelsQuantity * voxelsQuantity * voxelsQuantity * 15,
                                   BufferFlags.StreamOutput | BufferFlags.VertexBuffer);
 
-                            DeferredDevice.MainDevice.SetVertexBuffer(vertex);
-                            DeferredDevice.MainDevice.SetVertexInputLayout(MCLayout);
-                            DeferredDevice.MainDevice.SetStreamOutputTarget(streamOut, 0);
+                            DeferredDevice.Device.SetVertexBuffer(vertex);
+                            DeferredDevice.Device.SetVertexInputLayout(MCLayout);
+                            DeferredDevice.Device.SetStreamOutputTarget(streamOut, 0);
 
                             //Open simplex params
                             MarchingCubesEffect.Parameters["perm"].SetValue(noise.perm);
@@ -723,7 +877,7 @@ namespace Adamantium.EntityFramework.Processors
 
                             Stopwatch timer = Stopwatch.StartNew();
                             MarchingCubesEffect.Techniques[1].Passes[0].Apply();
-                            DeferredDevice.MainDevice.Draw(PrimitiveType.PointList, vertex.ElementCount);
+                            DeferredDevice.Device.Draw(PrimitiveType.PointList, vertex.ElementCount);
                             MarchingCubesEffect.Techniques[1].Passes[0].UnApply(true);
                             timer.Stop();
                             var ms = timer.ElapsedMilliseconds;
@@ -739,7 +893,7 @@ namespace Adamantium.EntityFramework.Processors
                             //      Position = data[i]
                             //   };
                             //}
-                            //Buffer<SkinnedVertex> skinned = Buffer.Vertex.New(DeferredDevice.MainDevice, mesh);
+                            //Buffer<SkinnedVertex> skinned = Buffer.Vertex.New(DeferredDevice.Device, mesh);
                             //var skinnedGeom = new SkinnedGeometry(skinned, null, PrimitiveType.TriangleList);
                             //entity.AddComponent(skinnedGeom);
                             //entity.AddComponent(new Collision(data));
@@ -897,19 +1051,7 @@ namespace Adamantium.EntityFramework.Processors
         public override void EndDraw()
         {
             base.EndDraw();
-
-//            if (DeferredDevice.IsD2dSupportEnabled)
-//            {
-//                D2dDevice.BeginDraw();
-//                D2dDevice.DrawText(Text);
-//                D2dDevice.EndDraw();
-//            }
-//
-//            if (renderTarget.Description.Width == Window.Width &&
-//                renderTarget.Description.Height == Window.Height)
-//            {
-//                DeferredDevice.MainDevice.CopyResource(renderTarget, Window.BackBuffer);
-//            }
+            GraphicsDevice.EndDraw();
         }
     }
 }

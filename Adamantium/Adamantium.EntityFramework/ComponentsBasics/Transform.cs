@@ -706,12 +706,12 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             
             Matrix4x4F.Transformation(ref scalingCenter, ref pivotRotation, ref scaling, ref finalPivot, ref rotation, ref relativePosition, out matrix);
 
-            var metada = GetMetadata(camera);
-            metada.RelativePosition = relativePosition;
-            metada.Pivot = finalPivot;
-            metada.WorldMatrix = matrix;
-            metada.Rotation = Rotation;
-            metada.Scale = Scale;
+            var metadata = GetMetadata(camera);
+            metadata.RelativePosition = relativePosition;
+            metadata.Pivot = finalPivot;
+            metadata.WorldMatrix = matrix;
+            metadata.Rotation = Rotation;
+            metadata.Scale = Scale;
             return matrix;
         }
 

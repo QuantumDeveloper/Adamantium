@@ -1,16 +1,18 @@
 ﻿using System;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Services;
+using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
-using Adamantium.EntityFramework.Extensions;
+using Adamantium.EntityFramework.Components.Extensions;
 using Adamantium.Win32;
 
-namespace Adamantium.EntityFramework.Processors
+namespace Adamantium.Engine.Processors
 {
     public class TransformProcessor : EntityProcessor
     {
         private ToolsService tools;
         private LightService lightService;
+        private CameraService cameraService;
 
         public Boolean IsPaused { get; set; }
 
@@ -26,19 +28,36 @@ namespace Adamantium.EntityFramework.Processors
             lightService = EntityWorld.Services.Resolve<LightService>();
         }
 
-        private CameraService cameraController;
-
+        public override void Update(IGameTime gameTime)
+        {
+            cameraService = EntityWorld.Services.Resolve<CameraService>();
+            var entities = Entities;
+            try
+            {
+                foreach (var entity in entities)
+                {
+                    Transform(entity, gameTime);
+                }
+                tools.Update(entities, cameraService);
+                lightService.Update();
+            }
+            catch (Exception e)
+            {
+                MessageBox.Show(e.Message + e.StackTrace);
+            }
+        }
+        
         private void Transform(Entity entity, IGameTime gameTime)
         {
             var generalCenter = entity.GetLocalCenter();
             entity.TraverseInDepth(current =>
             {
                 var colliders = current.GetComponents<Collider>();
-                foreach (var camera in cameraController.ActiveCameras)
+                foreach (var camera in cameraService.ActiveCameras)
                 {
                     if (camera.Owner == current)
                     {
-                        continue;
+                        //continue;
                     }
 
                     current.Transform.CalculateFinalTransform(camera, generalCenter);
@@ -58,25 +77,6 @@ namespace Adamantium.EntityFramework.Processors
                 animation?.Update(gameTime);
                 controller?.Update(gameTime);
             });
-        }
-
-        public override void Update(IGameTime gameTime)
-        {
-            cameraController = EntityWorld.Services.Resolve<CameraService>();
-            var entities = Entities;
-            try
-            {
-                foreach (var entity in entities)
-                {
-                    Transform(entity, gameTime);
-                }
-                tools.Update(entities, cameraController);
-                lightService.Update();
-            }
-            catch (Exception e)
-            {
-                MessageBox.Show(e.Message + e.StackTrace);
-            }
         }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Adamantium.Core.Events;
 
 namespace Adamantium.Core.DependencyInjection
 {
@@ -17,6 +18,7 @@ namespace Adamantium.Core.DependencyInjection
         public AdamantiumServiceLocator()
         {
             mappings = new Dictionary<Type, DependencyInjectionDetails>();
+            RegisterSingleton<IEventAggregator, EventAggregator>();
         }
 
         public bool IsRegistered<T>()

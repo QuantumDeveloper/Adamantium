@@ -7,7 +7,7 @@ using Adamantium.Win32;
 
 namespace Adamantium.UI.Threading
 {
-    internal class WindowsPlatform : IApplicationPlatform
+    public class WindowsPlatform : IApplicationPlatform
     {
         private Thread uiThread;
         private DispatcherWin32NativeSourceWrapper window;

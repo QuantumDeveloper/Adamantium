@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Threading;
-using System.Threading.Tasks;
-using Adamantium.Engine.Compiler.Converter.Configs;
 using Adamantium.Core;
+using Adamantium.Engine.Compiler.Converter;
+using Adamantium.Engine.Compiler.Converter.Configs;
 using Adamantium.Engine.Core.Models;
 
-namespace Adamantium.Engine.Compiler.Converter
+namespace Adamantium.Engine.Compiler.Models
 {
     public class ModelConverter : PropertyChangedBase
     {
@@ -27,7 +27,7 @@ namespace Adamantium.Engine.Compiler.Converter
 
         public Boolean ConvertationInProgress
         {
-            get { return convertationInProgress; }
+            get => convertationInProgress;
             set
             {
                 convertationInProgress = value;
@@ -37,7 +37,7 @@ namespace Adamantium.Engine.Compiler.Converter
 
         public Boolean ConvertationFinished
         {
-            get { return convertationFinished; }
+            get => convertationFinished;
             set
             {
                 convertationFinished = value;
@@ -47,7 +47,7 @@ namespace Adamantium.Engine.Compiler.Converter
 
         public Int32 CurrentParsingProgressValue
         {
-            get { return currentParsingProgress; }
+            get => currentParsingProgress;
             set
             {
                 currentParsingProgress = value;
@@ -57,7 +57,7 @@ namespace Adamantium.Engine.Compiler.Converter
 
         public Int32 MaximumParsingProgressValue
         {
-            get { return maximumParsingProgress; }
+            get => maximumParsingProgress;
             set
             {
                 maximumParsingProgress = value;
@@ -67,7 +67,7 @@ namespace Adamantium.Engine.Compiler.Converter
 
         public Boolean IndeterminateLoadingState
         {
-            get { return indeterminateLoadingState; }
+            get => indeterminateLoadingState;
             set
             {
                 indeterminateLoadingState = value;

@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using Adamantium.Core.DependencyInjection;
+using Adamantium.Core.Events;
 using Adamantium.Engine.Core;
+using Adamantium.Game.Events;
 using Adamantium.Mathematics;
 using Adamantium.Win32;
 using Adamantium.XInput;
@@ -18,31 +20,32 @@ namespace Adamantium.Game.GameInput
         private readonly HashSet<Keys> downKeys;
         private readonly HashSet<Keys> pressedKeys;
         private readonly HashSet<Keys> releasedKeys;
-        private readonly ButtonState[] _mouseButtons;
+        private readonly ButtonState[] mouseButtons;
         private readonly HashSet<GamepadButton>[] downGamepadButtons;
         private readonly HashSet<GamepadButton>[] pressedGamepadButtons;
         private readonly HashSet<GamepadButton>[] releasedGamepadButtons;
         private readonly HashSet<GamepadButton>[] currentGamepadButtons;
 
         private readonly HashSet<GamepadButton> supportedGamepadButtons;
-
-        private IGamePlatform _gamePlatform;
+        
+        private IEventAggregator eventAggregator;
+        
         protected Rectangle Bounds { get; private set; }
-        private Vector2F _absolutePosition;
-        private Vector2F _absolutePositionPrevious;
-        private Vector2F _virtualPosition;
-        private Vector2F _mouseDelta;
+        private Vector2F absolutePosition;
+        private Vector2F absolutePositionPrevious;
+        private Vector2F virtualPosition;
+        private Vector2F mouseDelta;
         private IntPtr Handle;
-        private Vector2F _acceleratedMouseDelta;
-        private Vector2F _lockMousePosition;
-        private bool _isLockedToCenter;
-        private GameOutput _window;
-        private GameWindowCursor _currentCursor;
-        private XBoxGamepadFactory _gamepadFactory;
-        private Gamepad[] _gamepads;
-        private GamepadState[] _gamepadStates;
-        private int _virtualPositionMultiplierX = 0;
-        private int _virtualPositionMultiplierY = 0;
+        private Vector2F acceleratedMouseDelta;
+        private Vector2F lockMousePosition;
+        private bool isLockedToCenter;
+        private GameOutput window;
+        private GameWindowCursor currentCursor;
+        private XBoxGamepadFactory gamepadFactory;
+        private Gamepad[] gamepads;
+        private GamepadState[] gamepadStates;
+        private int virtualPositionMultiplierX = 0;
+        private int virtualPositionMultiplierY = 0;
 
         public InputService(GameBase game, IDependencyResolver container)
             : base(game, container)
@@ -72,23 +75,19 @@ namespace Adamantium.Game.GameInput
             Services.RegisterInstance<InputService>(this);
             SystemManager.AddSystem(this);
 
-            _mouseButtons = new ButtonState[5];
+            mouseButtons = new ButtonState[5];
 
-            _gamePlatform = container.Resolve<IGamePlatform>();
-            _gamePlatform.WindowRemoved += GamePlatformWindowRemoved;
-            _gamePlatform.WindowDeactivated += GamePlatformWindowDeactivated;
-            _gamePlatform.WindowActivated += GamePlatformWindowActivated;
-            _gamePlatform.WindowBoundsChanged += GamePlatformWindowBoundsChanged;
-            _gamePlatform.MouseUp += GamePlatformMouseStateChanged;
-            _gamePlatform.MouseDown += GamePlatformMouseStateChanged;
-            _gamePlatform.MouseWheel += GamePlatformMouseStateChanged;
-            _gamePlatform.MouseDelta += GamePlatformMouseStateChanged;
-            _gamePlatform.KeyUp += GamePlatformKeyboardStateChanged;
-            _gamePlatform.KeyDown += GamePlatformKeyboardStateChanged;
+            eventAggregator = container.Resolve<IEventAggregator>();
+            eventAggregator.GetEvent<GameOutputRemovedEvent>().Subscribe(GamePlatformWindowRemoved);
+            eventAggregator.GetEvent<GameOutputActivatedEvent>().Subscribe(GamePlatformWindowActivated);
+            eventAggregator.GetEvent<GameOutputDeactivatedEvent>().Subscribe(GamePlatformWindowDeactivated);
+            eventAggregator.GetEvent<GameOutputBoundsChangedEvent>().Subscribe(GamePlatformWindowBoundsChanged);
+            eventAggregator.GetEvent<MouseInputEvent>().Subscribe(GamePlatformMouseStateChanged);
+            eventAggregator.GetEvent<KeyboardInputEvent>().Subscribe(GamePlatformKeyboardStateChanged);
 
-            _gamepadFactory = new XBoxGamepadFactory();
-            _gamepads = _gamepadFactory.GetConnectedGamepads();
-            _gamepadStates = new GamepadState[MaxGamepadsCount];
+            gamepadFactory = new XBoxGamepadFactory();
+            gamepads = gamepadFactory.GetConnectedGamepads();
+            gamepadStates = new GamepadState[MaxGamepadsCount];
 
             supportedGamepadButtons = new HashSet<GamepadButton>();
             supportedGamepadButtons.Add(GamepadButton.A);
@@ -106,45 +105,45 @@ namespace Adamantium.Game.GameInput
             supportedGamepadButtons.Add(GamepadButton.DpadUp);
             supportedGamepadButtons.Add(GamepadButton.DpadDown);
 
-            LockCursorToWindowBounds();
+            //LockCursorToWindowBounds();
         }
 
-        private void GamePlatformKeyboardStateChanged(object sender, KeyboardInputEventArgs e)
+        private void GamePlatformKeyboardStateChanged(KeyboardInput e)
         {
             lock (KeyboadInputs)
             {
-                KeyboadInputs.Add(e.KeyboardInput);
+                KeyboadInputs.Add(e);
             }
         }
 
-        private void GamePlatformMouseStateChanged(object sender, MouseInputEventArgs e)
+        private void GamePlatformMouseStateChanged(MouseInput e)
         {
             lock (MouseInputs)
             {
-                MouseInputs.Add(e.MouseInput);
+                MouseInputs.Add(e);
             }
         }
 
-        private void GamePlatformWindowBoundsChanged(object sender, GameWindowBoundsChangedEventArgs e)
+        private void GamePlatformWindowBoundsChanged(GameOutputBoundsChangedPayload payload)
         {
-            Bounds = e.Bounds;
+            Bounds = payload.Bounds;
         }
 
-        private void GamePlatformWindowActivated(object sender, GameWindowEventArgs e)
+        private void GamePlatformWindowActivated(GameOutput output)
         {
             IsWindowFocused = true;
             IsWindowAvailable = true;
-            Bounds = e.Window.ClientBounds;
-            Handle = e.Window.Handle;
-            _window = e.Window;
+            Bounds = output.ClientBounds;
+            Handle = output.Handle;
+            window = output;
         }
 
-        private void GamePlatformWindowDeactivated(object sender, GameWindowEventArgs e)
+        private void GamePlatformWindowDeactivated(GameOutput output)
         {
             IsWindowFocused = false;
         }
 
-        private void GamePlatformWindowRemoved(object sender, GameWindowEventArgs e)
+        private void GamePlatformWindowRemoved(GameOutput output)
         {
             IsWindowAvailable = false;
         }
@@ -167,8 +166,8 @@ namespace Adamantium.Game.GameInput
 
         public Vector2F AcceleratedMouseDelta
         {
-            get { return _acceleratedMouseDelta; }
-            private set { _acceleratedMouseDelta = value; }
+            get { return acceleratedMouseDelta; }
+            private set { acceleratedMouseDelta = value; }
         }
 
         public bool IsKeyDown(Keys key)
@@ -193,7 +192,7 @@ namespace Adamantium.Game.GameInput
                 return false;
             }
 
-            return _mouseButtons[(int) button].IsDown;
+            return mouseButtons[(int) button].IsDown;
         }
 
         public bool IsMouseButtonPressed(MouseButton button)
@@ -203,7 +202,7 @@ namespace Adamantium.Game.GameInput
                 return false;
             }
 
-            return _mouseButtons[(int) button].IsPressed;
+            return mouseButtons[(int) button].IsPressed;
         }
 
         public bool IsMouseButtonReleased(MouseButton button)
@@ -213,18 +212,18 @@ namespace Adamantium.Game.GameInput
                 return false;
             }
 
-            return _mouseButtons[(int)button].IsReleased;
+            return mouseButtons[(int)button].IsReleased;
         }
 
         public int MouseWheelDelta { get; private set; }
 
-        public Vector2F AbsolutePosition => _absolutePosition;
+        public Vector2F AbsolutePosition => absolutePosition;
 
         public Vector2F RelativePosition
         {
             get
             {
-                NativePoint point = new NativePoint((int)_absolutePosition.X, (int)_absolutePosition.Y);
+                NativePoint point = new NativePoint((int)absolutePosition.X, (int)absolutePosition.Y);
                 Win32Interop.ScreenToClient(Handle, ref point);
                 return new Vector2F(point.X, point.Y);
             }
@@ -236,7 +235,7 @@ namespace Adamantium.Game.GameInput
             {
                 if (IsMouseButtonDown(MouseButton.Left) && IsLockedToWindowBounds)
                 {
-                    return _virtualPosition;
+                    return virtualPosition;
                 }
 
                 return RelativePosition;
@@ -260,23 +259,23 @@ namespace Adamantium.Game.GameInput
         protected virtual void LockMousePosition(bool lockToCenter = true)
         {
             IsMousePositionLocked = true;
-            _isLockedToCenter = lockToCenter;
+            isLockedToCenter = lockToCenter;
             Win32Interop.GetCursorPos(out var point);
-            _lockMousePosition = new Vector2F(point.X, point.Y);
+            lockMousePosition = new Vector2F(point.X, point.Y);
             SetLockedMousePosition();
-            if (_window != null)
+            if (window != null)
             {
-                _currentCursor = _window.Cursor;
-                _window.Cursor = GameWindowCursor.None;
+                currentCursor = window.Cursor;
+                window.Cursor = GameWindowCursor.None;
             }
         }
 
         protected virtual void UnlockMousePosition()
         {
             IsMousePositionLocked = false;
-            if (_window != null)
+            if (window != null)
             {
-                _window.Cursor = _currentCursor;
+                window.Cursor = currentCursor;
             }
         }
 
@@ -307,14 +306,14 @@ namespace Adamantium.Game.GameInput
 
         public GamepadState GetGamepadState(int gamepadIndex)
         {
-            return _gamepadStates[gamepadIndex];
+            return gamepadStates[gamepadIndex];
         }
 
         public override void Update(IGameTime gameTime)
         {
             if (!IsWindowFocused)
             {
-                return;
+                //return;
             }
 
             UpdateKeyboard();
@@ -359,7 +358,7 @@ namespace Adamantium.Game.GameInput
             if (!IsMousePositionLocked)
             {
                 Win32Interop.GetCursorPos(out NativePoint np);
-                _absolutePosition = new Vector2F(np.X, np.Y);
+                absolutePosition = new Vector2F(np.X, np.Y);
             }
             else
             {
@@ -369,9 +368,9 @@ namespace Adamantium.Game.GameInput
             RawMouseDelta = Vector2F.Zero;
             AcceleratedMouseDelta = Vector2F.Zero;
 
-            for (int i = 0; i < _mouseButtons.Length; ++i)
+            for (int i = 0; i < mouseButtons.Length; ++i)
             {
-                _mouseButtons[i].Reset();
+                mouseButtons[i].Reset();
             }
 
             lock (MouseInputs)
@@ -382,14 +381,14 @@ namespace Adamantium.Game.GameInput
                     switch (mouseInput.InputType)
                     {
                         case InputType.Up:
-                            state = _mouseButtons[(int)mouseInput.Button];
+                            state = mouseButtons[(int)mouseInput.Button];
                             HandleButtonState(ref state, false);
-                            _mouseButtons[(int)mouseInput.Button] = state;
+                            mouseButtons[(int)mouseInput.Button] = state;
                             break;
                         case InputType.Down:
-                            state = _mouseButtons[(int)mouseInput.Button];
+                            state = mouseButtons[(int)mouseInput.Button];
                             HandleButtonState(ref state, true);
-                            _mouseButtons[(int)mouseInput.Button] = state;
+                            mouseButtons[(int)mouseInput.Button] = state;
                             break;
                         case InputType.Wheel:
                             MouseWheelDelta += mouseInput.WheelDelta;
@@ -404,75 +403,75 @@ namespace Adamantium.Game.GameInput
 
             if (IsMouseButtonPressed(MouseButton.Left) && IsLockedToWindowBounds)
             {
-                _virtualPosition = RelativePosition;
+                virtualPosition = RelativePosition;
                 //_window.Cursor = GameWindowCursor.None;
             }
 
             if (IsMouseButtonReleased(MouseButton.Left))
             {
-                _virtualPosition = RelativePosition;
-                _virtualPositionMultiplierX = 0;
-                _virtualPositionMultiplierY = 0;
+                virtualPosition = RelativePosition;
+                virtualPositionMultiplierX = 0;
+                virtualPositionMultiplierY = 0;
                 //_window.Cursor = GameWindowCursor.Arrow;
             }
 
-            if (IsMouseButtonDown(MouseButton.Left) && (IsLockedToWindowBounds && RawMouseDelta != Vector2F.Zero))
+            if (IsMouseButtonDown(MouseButton.Left) && (IsMousePositionLocked && RawMouseDelta != Vector2F.Zero))
             {
                 CalculateMousePosition();
                 if (!IsMousePositionLocked)
                 {
-                    if (_virtualPositionMultiplierX == 0)
+                    if (virtualPositionMultiplierX == 0)
                     {
-                        _virtualPosition.X = RelativePosition.X;
+                        virtualPosition.X = RelativePosition.X;
                     }
                     else
                     {
-                        _virtualPosition.X = Bounds.Width * _virtualPositionMultiplierX +RelativePosition.X;
+                        virtualPosition.X = Bounds.Width * virtualPositionMultiplierX +RelativePosition.X;
                     }
-
-                    if (_virtualPositionMultiplierY == 0)
+                
+                    if (virtualPositionMultiplierY == 0)
                     {
-                        _virtualPosition.Y = RelativePosition.Y;
+                        virtualPosition.Y = RelativePosition.Y;
                     }
                     else
                     {
-                        _virtualPosition.Y = Bounds.Height * _virtualPositionMultiplierY + RelativePosition.Y;
+                        virtualPosition.Y = Bounds.Height * virtualPositionMultiplierY + RelativePosition.Y;
                     }
                 }
             }
-            _absolutePositionPrevious = _absolutePosition;
+            absolutePositionPrevious = absolutePosition;
         }
 
         private void UpdateGamepads()
         {
-            lock (_gamepadStates)
+            lock (gamepadStates)
             {
                 for (int i = 0; i < MaxGamepadsCount; i++)
                 {
                     pressedGamepadButtons[i].Clear();
                     releasedGamepadButtons[i].Clear();
                     currentGamepadButtons[i].Clear();
-                    _gamepadStates[i].IsConnected = false;
+                    gamepadStates[i].IsConnected = false;
                 }
 
-                for (var i = 0; i < _gamepads.Length; i++)
+                for (var i = 0; i < gamepads.Length; i++)
                 {
-                    var gamepad = _gamepads[i];
+                    var gamepad = gamepads[i];
                     var state = gamepad.GetState();
                     ClampDeadZone(ref state);
-                    _gamepadStates[i] = state;
+                    gamepadStates[i] = state;
                 }
 
-                for (int i = 0; i < _gamepadStates.Length; ++i) 
+                for (int i = 0; i < gamepadStates.Length; ++i) 
                 {
                     foreach (var supportedGamepadButton in supportedGamepadButtons)
                     {
-                        if (!_gamepadStates[i].IsConnected)
+                        if (!gamepadStates[i].IsConnected)
                         {
                             continue;
                         }
 
-                        var state = _gamepadStates[i];
+                        var state = gamepadStates[i];
                         if (state.Buttons.HasFlag(supportedGamepadButton))
                         {
                             if (!downGamepadButtons[i].Contains(supportedGamepadButton))
@@ -559,60 +558,60 @@ namespace Adamantium.Game.GameInput
             {
                 if (AbsolutePosition.X >= Bounds.Right)
                 {
-                    _absolutePosition.X = Bounds.Left;
-                    _virtualPositionMultiplierX++;
+                    absolutePosition.X = Bounds.Left;
+                    virtualPositionMultiplierX++;
                 }
                 else if (AbsolutePosition.X <= Bounds.Left)
                 {
-                    _absolutePosition.X = Bounds.Right;
-                    _virtualPositionMultiplierX--;
+                    absolutePosition.X = Bounds.Right;
+                    virtualPositionMultiplierX--;
                 }
-                Win32Interop.SetCursorPos((int)_absolutePosition.X, (int)_absolutePosition.Y);
+                Win32Interop.SetCursorPos((int)absolutePosition.X, (int)absolutePosition.Y);
             }
 
             if (IsOutsideYBounds())
             {
                 if (AbsolutePosition.Y >= Bounds.Bottom)
                 {
-                    _absolutePosition.Y = Bounds.Top;
-                    _virtualPositionMultiplierY++;
+                    absolutePosition.Y = Bounds.Top;
+                    virtualPositionMultiplierY++;
                 }
                 else if (AbsolutePosition.Y <= Bounds.Top)
                 {
-                    _absolutePosition.Y = Bounds.Bottom;
-                    _virtualPositionMultiplierY--;
+                    absolutePosition.Y = Bounds.Bottom;
+                    virtualPositionMultiplierY--;
                 }
-                Win32Interop.SetCursorPos((int)_absolutePosition.X, (int)_absolutePosition.Y);
+                Win32Interop.SetCursorPos((int)absolutePosition.X, (int)absolutePosition.Y);
             }
 
-            if (_absolutePosition.X == _absolutePositionPrevious.X && RawMouseDelta.X != 0)
+            if (absolutePosition.X == absolutePositionPrevious.X && RawMouseDelta.X != 0)
             {
                 if (AbsolutePosition.X >= SystemParameters.VirtualScreenWidth - 1)
                 {
-                    _absolutePosition.X = Bounds.Left;
-                    _virtualPositionMultiplierX++;
+                    absolutePosition.X = Bounds.Left;
+                    virtualPositionMultiplierX++;
                 }
                 else if (AbsolutePosition.X <= 0)
                 {
-                    _absolutePosition.X = Bounds.Right;
-                    _virtualPositionMultiplierX--;
+                    absolutePosition.X = Bounds.Right;
+                    virtualPositionMultiplierX--;
                 }
-                Win32Interop.SetCursorPos((int)_absolutePosition.X, (int)_absolutePosition.Y);
+                Win32Interop.SetCursorPos((int)absolutePosition.X, (int)absolutePosition.Y);
             }
 
-            if (_absolutePosition.Y == _absolutePositionPrevious.Y && RawMouseDelta.Y != 0)
+            if (absolutePosition.Y == absolutePositionPrevious.Y && RawMouseDelta.Y != 0)
             {
                 if (AbsolutePosition.Y >= SystemParameters.VirtualScreenHeight - 1)
                 {
-                    _absolutePosition.Y = Bounds.Top;
-                    _virtualPositionMultiplierY++;
+                    absolutePosition.Y = Bounds.Top;
+                    virtualPositionMultiplierY++;
                 }
                 else if (AbsolutePosition.Y <= 0)
                 {
-                    _absolutePosition.Y = Bounds.Bottom;
-                    _virtualPositionMultiplierY--;
+                    absolutePosition.Y = Bounds.Bottom;
+                    virtualPositionMultiplierY--;
                 }
-                Win32Interop.SetCursorPos((int)_absolutePosition.X, (int)_absolutePosition.Y);
+                Win32Interop.SetCursorPos((int)absolutePosition.X, (int)absolutePosition.Y);
             }
         }
 
@@ -638,9 +637,9 @@ namespace Adamantium.Game.GameInput
 
         private void SetLockedMousePosition()
         {
-            if (!_isLockedToCenter)
+            if (!isLockedToCenter)
             {
-                Win32Interop.SetCursorPos((int)_lockMousePosition.X, (int)_lockMousePosition.Y);
+                Win32Interop.SetCursorPos((int)lockMousePosition.X, (int)lockMousePosition.Y);
             }
             else
             {
@@ -667,54 +666,4 @@ namespace Adamantium.Game.GameInput
             }
         }
     }
-
-    public struct KeyboardInput : IEquatable<KeyboardInput>
-    {
-        public Keys Key;
-
-        public InputType InputType;
-
-        public bool Equals(KeyboardInput other)
-        {
-            return Key == other.Key && InputType == other.InputType;
-        }
-
-        public override bool Equals(object obj)
-        {
-            if (ReferenceEquals(null, obj)) return false;
-            return obj is ButtonState && Equals((ButtonState)obj);
-        }
-    }
-
-
-    public struct MouseInput : IEquatable<MouseInput>
-    {
-        public MouseButton Button;
-
-        public InputType InputType;
-
-        public int WheelDelta;
-
-        public Vector2F Delta;
-
-        public bool Equals(MouseInput other)
-        {
-            return Button == other.Button && InputType == other.InputType;
-        }
-
-        public override bool Equals(object obj)
-        {
-            if (ReferenceEquals(null, obj)) return false;
-            return obj is MouseButton && Equals((MouseButton)obj);
-        }
-    }
-
-    public enum InputType
-    {
-        Up,
-        Down,
-        Wheel,
-        RawDelta,
-    }
-
 }

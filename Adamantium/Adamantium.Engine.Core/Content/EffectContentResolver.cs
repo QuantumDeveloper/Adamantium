@@ -3,7 +3,7 @@ using System.IO;
 
 namespace Adamantium.Engine.Core.Content
 {
-   public class EffectContentResolver:IContentResolver
+   public class EffectContentResolver : IContentResolver
    {
         public static readonly string DefaultExtension = "fx";
       //public static readonly string DefaultExtension = "."+EffectData.CompiledExtension;

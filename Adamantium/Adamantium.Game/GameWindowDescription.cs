@@ -13,7 +13,7 @@ namespace Adamantium.Game
             PresenterType = presenterType;
 
             MsaaLevel = MSAALevel.None;
-            PixelFormat = Format.R8G8B8A8_UNORM;
+            PixelFormat = Format.B8G8R8A8_SNORM;
             DepthFormat = DepthFormat.Depth32Stencil8X24;
             BuffersCount = 3;
         }

@@ -1,6 +1,6 @@
 ﻿using System;
+using System.Linq;
 using System.Threading.Tasks;
-using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Content;
 
 namespace Adamantium.Engine.Graphics
@@ -13,10 +13,11 @@ namespace Adamantium.Engine.Graphics
             if (service == null)
                 throw new InvalidOperationException("Unable to retrieve a IGraphicsDeviceService service provider");
 
-            if (service.GraphicsDevice == null)
-                throw new InvalidOperationException("GraphicsDevice is not initialized");
+            if (service.MainGraphicsDevice == null)
+                throw new InvalidOperationException("Main graphics device is not initialized");
 
-            return await ReadContentAsync(contentManager, service.GraphicsDevice, parameters);
+            var device = service.ResourceLoaderDevice;
+            return await ReadContentAsync(contentManager, device, parameters);
         }
 
         protected abstract Task<T> ReadContentAsync(IContentManager contentManager, GraphicsDevice graphicsDevice, ContentReaderParameters parameters);

@@ -20,11 +20,11 @@ namespace Adamantium.UI
 
         public static readonly AdamantiumProperty WidthProperty = AdamantiumProperty.Register(nameof(Width),
            typeof(Double), typeof(FrameworkComponent),
-           new PropertyMetadata(Double.NaN, PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender));
+           new PropertyMetadata(Double.NaN, PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender, WidthChangedCallBack));
 
         public static readonly AdamantiumProperty HeightProperty = AdamantiumProperty.Register(nameof(Height),
            typeof(Double), typeof(FrameworkComponent),
-           new PropertyMetadata(Double.NaN, PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender));
+           new PropertyMetadata(Double.NaN, PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender, HeightChangedCallBack));
 
         public static readonly AdamantiumProperty MinWidthProperty = AdamantiumProperty.Register(nameof(MinWidth),
            typeof(Double), typeof(FrameworkComponent),
@@ -63,8 +63,34 @@ namespace Adamantium.UI
            typeof(object), typeof(FrameworkComponent),
            new PropertyMetadata(null, PropertyMetadataOptions.Inherits, DataContextChangedCallBack));
 
-        public static readonly RoutedEvent SizeChangedEvent = EventManager.RegisterRoutedEvent("SizeChanged",
-           RoutingStrategy.Direct, typeof(SizeChangedEventHandler), typeof(FrameworkComponent));
+        private static void WidthChangedCallBack(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
+        {
+            if (!(adamantiumObject is FrameworkComponent o)) return;
+            Size old = default;
+            if (e.OldValue == AdamantiumProperty.UnsetValue)
+                return;
+            
+            old.Width = (double) e.OldValue;
+            old.Height = o.Height;
+            
+            var newSize = new Size((double)e.NewValue, o.Height);
+            var args = new SizeChangedEventArgs(old, newSize, true, false);
+            args.RoutedEvent = SizeChangedEvent;
+            o.RaiseEvent(args);
+        }
+        
+        private static void HeightChangedCallBack(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
+        {
+            if (!(adamantiumObject is FrameworkComponent o)) return;
+            if (e.OldValue == AdamantiumProperty.UnsetValue)
+                return;
+            
+            var old = new Size(o.Width, (double)e.OldValue);
+            var newSize = new Size(o.Width, (double)e.NewValue);
+            var args = new SizeChangedEventArgs(old, newSize, false, true);
+            args.RoutedEvent = SizeChangedEvent;
+            o?.RaiseEvent(args);
+        }
 
         private static void DataContextChangedCallBack(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
         {
@@ -458,7 +484,7 @@ namespace Adamantium.UI
                     }
                     if (widthChanged || heightChanged)
                     {
-                        SizeChangedEventArgs args = new SizeChangedEventArgs(Bounds.Size, previousRenderSize, widthChanged,
+                        SizeChangedEventArgs args = new SizeChangedEventArgs(previousRenderSize, Bounds.Size, widthChanged,
                            heightChanged);
                         previousRenderSize = Bounds.Size;
                         args.RoutedEvent = SizeChangedEvent;

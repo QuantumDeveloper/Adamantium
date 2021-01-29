@@ -1107,7 +1107,7 @@ namespace Adamantium.Engine.Compiler.Converter.ConversionUtils
 
         private void FindMaterialsBinding(SceneData sceneData, node node)
         {
-            if (node.node1 != null && node.type != NodeType.JOINT)
+            if (node != null && node.type != NodeType.JOINT)
             {
                 Stack<node> stack = new Stack<node>();
                 stack.Push(node);

@@ -1,6 +1,6 @@
 ﻿using Adamantium.Mathematics;
 
-namespace Adamantium.EntityFramework.Extensions
+namespace Adamantium.EntityFramework.Components.Extensions
 {
     public enum CompareOrder
     {

@@ -1,16 +1,15 @@
 ﻿using System;
 using System.Globalization;
-using Adamantium.Engine;
 using Adamantium.Engine.Core;
-using Adamantium.Engine.Graphics;
 using Adamantium.Engine.Services;
-using Adamantium.EntityFramework.Extensions;
+using Adamantium.EntityFramework;
+using Adamantium.EntityFramework.Components.Extensions;
 using Adamantium.Game;
 using Adamantium.Game.GameInput;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
 
-namespace Adamantium.EntityFramework.Processors
+namespace Adamantium.Engine.Processors
 {
     public class InputProcessor : EntityProcessor
     {
@@ -51,6 +50,8 @@ namespace Adamantium.EntityFramework.Processors
             {
                 return;
             }
+            
+            //currentCamera.Velocity = 1000;
 
             //if (currentCamera.Type == CameraType.Free || currentCamera.Type == CameraType.Special)
             //{
@@ -149,7 +150,8 @@ namespace Adamantium.EntityFramework.Processors
             {
                 currentCamera.TranslateRight(gamepadState.LeftThumb.X * cameraMovementSpeed);
             }
-             /******************************************************************/
+            
+            /******************************************************************/
 
             /**********************************************************************
                            Controls the rotation/move of the camera
@@ -340,10 +342,10 @@ namespace Adamantium.EntityFramework.Processors
 
         private void EntityManagerEntityRemoved(object sender, EntityEventArgs e)
         {
-            var cameraController = Services.Resolve<CameraService>();
-            if (e.Entity == cameraController.UserControlledCamera.Owner)
+            var cameraService = Services.Resolve<CameraService>();
+            if (e.Entity == cameraService.UserControlledCamera.Owner)
             {
-                cameraController.UserControlledCamera.Type = CameraType.Free;
+                cameraService.UserControlledCamera.Type = CameraType.Free;
             }
         }
     }

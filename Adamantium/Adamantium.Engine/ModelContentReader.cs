@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Linq;
+using System.Numerics;
 using System.Threading.Tasks;
 using Adamantium.Engine.Core.Content;
 using Adamantium.Engine.Compiler.Converter;
+using Adamantium.Engine.Compiler.Models;
 using Adamantium.Engine.Graphics;
 using Adamantium.Engine.Services;
 using Adamantium.Engine.Templates;
@@ -23,7 +26,8 @@ namespace Adamantium.Engine
          var entityWorld = contentManager.ServiceProvider.Resolve<EntityWorld>();
          if (entityWorld == null)
             throw new InvalidOperationException("Unable to retrieve EntityWorld service provider");
-         var camera = contentManager.ServiceProvider.Resolve<CameraService>().UserControlledCamera;
+         //var camera = contentManager.ServiceProvider.Resolve<CameraService>().UserControlledCamera;
+         var camera = contentManager.ServiceProvider.Resolve<CameraService>().Cameras.FirstOrDefault();
          if (parameters.AssetName.EndsWith(".aemf"))
          {
             return await entityWorld.CreateEntityFromTemplate(new EntityLoadTemplate(parameters.AssetPath, contentManager, graphicsDevice, Vector3D.Zero));
@@ -34,7 +38,8 @@ namespace Adamantium.Engine
             var scene = converter.ImportFileAsync(parameters.AssetPath);
             timer.Stop();
             //MessageBox.Show("Time: "+timer.Elapsed);
-            return await entityWorld.CreateEntityFromTemplate(new EntityImportTemplate(scene, contentManager, camera));
+            var initialPosition = Vector3F.Zero;
+            return await entityWorld.CreateEntityFromTemplate(new EntityImportTemplate(scene, contentManager, initialPosition));
          }
       }
    }

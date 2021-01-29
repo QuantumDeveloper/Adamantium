@@ -2,6 +2,8 @@
 using System.IO;
 using System.Linq;
 using Adamantium.Core;
+using Adamantium.Engine.Compiler.Converter;
+using Adamantium.Engine.Compiler.Models;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.Engine.Graphics.Effects;
@@ -42,15 +44,15 @@ namespace Adamantium.UI.Processors
         public WindowRenderModule(IWindow window, GraphicsDevice device, MSAALevel msaaLevel)
         {
             //_msaaLevel = msaaLevel;
-            //_mainGraphicsDevice = mainDevice;
+            //_mainGraphicsDevice = device;
             this.window = window ?? throw new ArgumentException(nameof(window));
             window.ClientSizeChanged += Window_ClientSizeChanged;
             GraphicsDevice = device;
             isWindowResized = true;
             viewport = new Viewport();
             viewport.MaxDepth = 1;
-            viewport.Width = window.ClientWidth;
-            viewport.Height = window.ClientHeight;
+            viewport.Width = (float)window.ClientWidth;
+            viewport.Height = (float)window.ClientHeight;
             // shape = Shapes.Rectangle.New(GraphicsDevice, GeometryType.Outlined, 400, 100, 10, 10, 20,
             //      Matrix4x4F.Translation(200, 50, 0));
             //shape = Shapes.Ellipse.New(GraphicsDevice, GeometryType.Solid, EllipseType.EdgeToEdge, new Vector2F(3.0f), 0, 360, true, 80);
@@ -66,10 +68,12 @@ namespace Adamantium.UI.Processors
             //shape = Shapes.Capsule.New(GraphicsDevice, GeometryType.Solid, 1, 0.5f);
             //shape = Shapes.Tube.New(GraphicsDevice, GeometryType.Solid, 0.5f, 1, 0.05f);
             //shape = Shapes.Torus.New(GraphicsDevice, GeometryType.Solid, 1, 0.33f, 32);
-            //shape = Shapes.Teapot.New(GraphicsDevice, GeometryType.Outlined);
+            shape = Shapes.Teapot.New(GraphicsDevice, GeometryType.Solid);
             //shape = Shapes.Polygon.New(GraphicsDevice, GeometryType.Solid, Vector2F.One);
             //shape = Shapes.Polyline.New(GraphicsDevice, GeometryType.Solid, )
-            shape = Shapes.Line.New(GraphicsDevice, GeometryType.Outlined, new Vector3F(-0.5f, 0, 0), new Vector3F(0.5f, 0, 0), 0.1f);
+            //shape = Shapes.Line.New(GraphicsDevice, GeometryType.Outlined, new Vector3F(-0.5f, 0, 0), new Vector3F(0.5f, 0, 0), 0.1f);
+            //var converter = new ModelConverter();
+            //var mesh = converter.ImportFileAsync(@"Models\swordman.dae");
 
             scissor = new Rect2D();
             scissor.Extent = new Extent2D();
@@ -96,7 +100,7 @@ namespace Adamantium.UI.Processors
         private void CalculateProjectionMatrix()
         {
             proj = Matrix4x4F.PerspectiveFov(MathHelper.DegreesToRadians(45),
-                (float) window.ClientWidth / window.ClientHeight, 0.1f, 1000f);
+                (float) (window.ClientWidth / window.ClientHeight), 0.1f, 1000f);
             // proj = Matrix4x4F.Ortho(window.ClientWidth/500.0f, window.ClientHeight/500.0f, 0.1f, 1000f);
             // proj = Matrix4x4F.OrthoOffCenter(0, window.ClientWidth, 0, window.ClientHeight, 0.01f,
             //      100000f);
@@ -238,14 +242,14 @@ namespace Adamantium.UI.Processors
         public void Render(IGameTime gameTime)
         {
             //var commandList = _graphicsDevice.FinishCommandList(true);
-            //mainDevice.ExecuteCommandList(commandList);
+            //device.ExecuteCommandList(commandList);
             //commandList.Dispose();
 
             //d2D1Device.BeginDraw();
             //d2D1Device.DrawText("FPS: " + gameTime.FpsCount);
             //d2D1Device.EndDraw();
 
-            //mainDevice.CopyResource(_backBuffer, Presenter.BackBuffer);
+            //device.CopyResource(_backBuffer, Presenter.BackBuffer);
             GraphicsDevice.VertexType = typeof(VertexPositionColorTexture);
             GraphicsDevice.PrimitiveTopology = PrimitiveTopology.TriangleList;
             //GraphicsDevice.ApplyViewports(viewport);
@@ -256,14 +260,14 @@ namespace Adamantium.UI.Processors
 
             //GraphicsDevice.BasicEffect.Parameters["wvp"].SetValue(Matrix4x4F.RotationZ((float)gameTime.FrameTime * MathHelper.DegreesToRadians(10)));
             var rot = QuaternionF.RotationAxis(Vector3F.Down,
-                MathHelper.DegreesToRadians(gameTime.TotalTime.TotalSeconds * 0));
+                MathHelper.DegreesToRadians(gameTime.TotalTime.TotalSeconds * 10));
             var rotX = QuaternionF.RotationAxis(Vector3F.Right,
-                MathHelper.DegreesToRadians(gameTime.TotalTime.TotalSeconds * 0));
+                MathHelper.DegreesToRadians(gameTime.TotalTime.TotalSeconds * 20));
             //var world = Matrix4x4F.RotationQuaternion(rot);
             //var world = /*Matrix4x4F.Translation(-250, 0, 10000.05f) */ Matrix4x4F.RotationQuaternion(rot) * Matrix4x4F.Translation(250, 0, 10000.05f); //* Matrix4x4F.Translation(250, 0, 1000.05f);
             var world = Matrix4x4F.Translation(0, 0, 10);
             var fovPrj = Matrix4x4F.PerspectiveFov(MathHelper.DegreesToRadians(-45),
-                (float) window.ClientWidth / window.ClientHeight, 0.1f, 1000f);
+                (float) (window.ClientWidth / window.ClientHeight), 0.1f, 1000f);
             var wvp = world * view * fovPrj;
             // var world = Matrix4x4F.Translation(-250, 0, 0f) * Matrix4x4F.RotationQuaternion(rot) * Matrix4x4F.Translation(250, 0, 10000.05f);
             // var wvp = world * proj;
@@ -280,10 +284,10 @@ namespace Adamantium.UI.Processors
             GraphicsDevice.BasicEffect.Techniques[0].Passes["Textured"].Apply();
             GraphicsDevice.DrawIndexed(vertexBuffer, indexBuffer);
 
-            var orthoProj = proj = Matrix4x4F.OrthoOffCenter(0, window.ClientWidth, 0, window.ClientHeight, 1f, 100000f);
+            var orthoProj = proj = Matrix4x4F.OrthoOffCenter(0, (float)window.ClientWidth, 0, (float)window.ClientHeight, 1f, 100000f);
 
             world = /*Matrix4x4F.Scaling(1.0f, 1.0f, 1) * */Matrix4x4F.RotationQuaternion(rot) * 
-                Matrix4x4F.RotationQuaternion(rotX) * Matrix4x4F.Translation(0, 0f, -2.2f); //* Matrix4x4F.Scaling(0, 1.1f, 0);
+                Matrix4x4F.RotationQuaternion(rotX) * Matrix4x4F.Translation(0, 0f, -0.2f); //* Matrix4x4F.Scaling(0, 1.1f, 0);
             wvp = world * view * fovPrj;
             
             // world = Matrix4x4F.Translation(200, 200, 1);

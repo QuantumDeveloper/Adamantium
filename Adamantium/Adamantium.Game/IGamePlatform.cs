@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using Adamantium.Engine.Graphics;
 using Adamantium.Imaging;
 
@@ -13,13 +14,16 @@ namespace Adamantium.Game
         GameOutput ActiveWindow { get; }
 
         GameOutput[] Outputs { get; }
+        
+        bool HasOutputs { get; }
 
+        void Run(CancellationToken token);
+        
         /// <summary>
-        /// Creates <see cref="GameOutput"/> with <see cref="AdamantiumGameOutput"/> inside
-        /// </summary>
+        /// Creates <see cref="GameOutput"/> window from width and height
         /// <param name="width">Window width</param>
         /// <param name="height">Window height</param>
-        /// <returns>new <see cref="GameOutput"/></returns>
+        /// </summary>
         GameOutput CreateOutput(uint width = 1280, uint height = 720);
 
         /// <summary>
@@ -69,76 +73,5 @@ namespace Adamantium.Game
         /// </summary>
         /// <param name="context">UI Control for which <see cref="GameOutput"/> will be removed</param>
         void RemoveOutput(Object context);
-
-        /// <summary>
-        /// Occurs when Game context switches to another control
-        /// </summary>
-        event EventHandler<GameWindowEventArgs> WindowActivated;
-
-        /// <summary>
-        /// Occurs when Game context got focus
-        /// </summary>
-        event EventHandler<GameWindowEventArgs> WindowDeactivated;
-
-        /// <summary>
-        /// Occurs when new Game context added to the list
-        /// </summary>
-        event EventHandler<GameWindowEventArgs> WindowCreated;
-
-
-        /// <summary>
-        /// Occurs when one of the Game contexts removed from the list
-        /// </summary>
-        event EventHandler<GameWindowEventArgs> WindowRemoved;
-
-        /// <summary>
-        /// Occurs when one of the Game contexts removed from the list
-        /// </summary>
-        event EventHandler<GameWindowParametersEventArgs> WindowParametersChanging;
-
-        /// <summary>
-        /// Occurs when one of the Game contexts removed from the list
-        /// </summary>
-        event EventHandler<GameWindowParametersEventArgs> WindowParametersChanged;
-
-        /// <summary>
-        /// Occurs when Game window client size changed
-        /// </summary>
-        event EventHandler<GameWindowSizeChangedEventArgs> WindowSizeChanged;
-
-        /// <summary>
-        /// Occurs when Game window position or client size changed
-        /// </summary>
-        event EventHandler<GameWindowBoundsChangedEventArgs> WindowBoundsChanged;
-
-        /// <summary>
-        /// Occurs when key was pressed
-        /// </summary>
-        event EventHandler<KeyboardInputEventArgs> KeyDown;
-
-        /// <summary>
-        /// Occurs when key was released
-        /// </summary>
-        event EventHandler<KeyboardInputEventArgs> KeyUp;
-
-        /// <summary>
-        /// Occurs when mouse button was pressed
-        /// </summary>
-        event EventHandler<MouseInputEventArgs> MouseDown;
-
-        /// <summary>
-        /// Occurs when mouse button was pressed
-        /// </summary>
-        event EventHandler<MouseInputEventArgs> MouseWheel;
-
-        /// <summary>
-        /// Occurs when mouse button was released
-        /// </summary>
-        event EventHandler<MouseInputEventArgs> MouseUp;
-
-        /// <summary>
-        /// Occurs when physical mouse position changed
-        /// </summary>
-        event EventHandler<MouseInputEventArgs> MouseDelta;
     }
 }

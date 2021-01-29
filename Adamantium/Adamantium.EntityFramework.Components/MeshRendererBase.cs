@@ -2,25 +2,25 @@
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.EntityFramework.ComponentsBasics;
-//using Buffer = Adamantium.Engine.Graphics.Buffer;
-//using RasterizerState = Adamantium.Engine.Graphics.RasterizerState;
+using Buffer = Adamantium.Engine.Graphics.Buffer;
 
 namespace Adamantium.EntityFramework.Components
 {
     [RequiredComponets(typeof(MeshData))]
     public abstract class MeshRendererBase : RenderableComponent
     {
-        private bool _isWireFrame;
+        private bool isWireFrame;
 
-        //protected Buffer VertexBuffer { get; set; }
+        protected Buffer VertexBuffer { get; set; }
+
         protected MeshData MeshData { get; set; }
 
         protected bool MeshDataChanged { get; set; }
 
         public bool IsWireFrame
         {
-            get => _isWireFrame;
-            set => SetProperty(ref _isWireFrame, value);
+            get => isWireFrame;
+            set => SetProperty(ref isWireFrame, value);
         }
 
         public override void Initialize()
@@ -59,40 +59,68 @@ namespace Adamantium.EntityFramework.Components
 
             UpdateCore(graphicsContext);
 
-            //if (VertexBuffer == null || VertexBuffer.IsDisposed)
-            //{
-            //    return;
-            //}
+            if (VertexBuffer == null || VertexBuffer.IsDisposed)
+            {
+                return;
+            }
 
-            //graphicsContext.SetVertexBuffer(VertexBuffer);
-            //graphicsContext.VertexInputLayout = InputLayout;
+            graphicsContext.SetVertexBuffer(VertexBuffer);
+            graphicsContext.VertexType = VertexType;
+            graphicsContext.PrimitiveTopology = MeshData.Mesh.MeshTopology;
 
-            //if (MeshData.Mesh.Indices.Length > 0)
-            //{
-            //    graphicsContext.SetIndexBuffer(IndexBuffer);
-            //}
+            if (MeshData.Mesh.HasIndices)
+            {
+                graphicsContext.SetIndexBuffer(IndexBuffer);
+            }
 
-            //RasterizerState prevRasterState = null;
+            RasterizerState prevRasterState = null;
 
-            //if (IsWireFrame)
-            //{
-            //    prevRasterState = graphicsContext.RasterizerState;
-            //    graphicsContext.RasterizerState = graphicsContext.RasterizerStates.WireFrameCullNoneClipEnabled;
-            //}
+            if (IsWireFrame)
+            {
+                prevRasterState = graphicsContext.RasterizerState;
+                graphicsContext.RasterizerState = GraphicsDevice.RasterizerStates.WireFrameCullNoneClipEnabled;
+            }
 
-            //if (MeshData.Mesh.Indices.Length > 0)
-            //{
-            //    graphicsContext.DrawIndexed(MeshData.Mesh.MeshTopology, MeshData.Mesh.Indices.Length);
-            //}
-            //else
-            //{
-            //    graphicsContext.Draw(MeshData.Mesh.MeshTopology, MeshData.Mesh.Positions.Length);
-            //}
+            if (MeshData.Mesh.HasIndices)
+            {
+                graphicsContext.DrawIndexed(VertexBuffer, IndexBuffer);
+            }
+            else
+            {
+                graphicsContext.Draw(VertexBuffer.ElementCount, 1);
+            }
 
-            //if (prevRasterState != null)
-            //{
-            //    graphicsContext.RasterizerState = prevRasterState;
-            //}
+            if (prevRasterState != null)
+            {
+                graphicsContext.RasterizerState = prevRasterState;
+            }
+        }
+        
+        protected bool UpdateBuffers<T>(GraphicsDevice graphicsContext, T[] vertices) where T : struct
+        {
+            if (vertices == null)
+            {
+                return false;
+            }
+
+            if (VertexBuffer != null && vertices.Length <= VertexBuffer.ElementCount)
+            {
+                VertexBuffer.SetData(graphicsContext, vertices);
+            }
+            else
+            {
+                VertexBuffer?.Dispose();
+                VertexBuffer = ToDispose(Buffer.Vertex.New(graphicsContext, vertices));
+            }
+
+            if (MeshData.Mesh.HasIndices)
+            {
+                IndexBuffer?.Dispose();
+                IndexBuffer = ToDispose(Buffer.Index.New(graphicsContext, MeshData.Mesh.Indices));
+            }
+
+            MeshData.Mesh.AcceptChanges();
+            return true;
         }
     }
 }

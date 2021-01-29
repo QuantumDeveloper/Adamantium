@@ -26,7 +26,7 @@ namespace Adamantium.Win32.RawInput
       public static event EventHandler<RawHidInputEventArgs> HidInput;
 
         /// <summary>
-        /// Registeres <see cref="InputDevice"/> and returns instance of that devie
+        /// Registers <see cref="InputDevice"/> and returns instance of that devie
         /// </summary>
         /// <param name="usagePage">A HID usage page</param>
         /// <param name="usageId">A HID usage id</param>
@@ -38,7 +38,7 @@ namespace Adamantium.Win32.RawInput
       }
 
         /// <summary>
-        /// Registeres <see cref="InputDevice"/> and returns instance of that devie
+        /// Registers <see cref="InputDevice"/> and returns instance of that devie
         /// </summary>
         /// <param name="usagePage">A HID usage page</param>
         /// <param name="usageId">A HID usage id</param>

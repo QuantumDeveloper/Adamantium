@@ -50,12 +50,7 @@ namespace Adamantium.Game
             Height = (uint)nativeWindow.ActualHeight;
             Handle = nativeWindow.Handle;
             ClientBounds = new Rectangle(0, 0, (int)Description.Width, (int)Description.Height);
-        }
-        
-        internal override GraphicsPresenter CreatePresenter(GraphicsDevice device)
-        {
-            Presenter = new RenderTargetGraphicsPresenter(device, Description.ToPresentationParameters(), GeneratePresenterName());
-            return Presenter;
+            UpdateViewportAndScissor((uint)ClientBounds.Width, (uint)ClientBounds.Height);
         }
 
         private void NativeWindow_RenderTargetChanged(object sender, RenderTargetEventArgs e)
@@ -77,10 +72,14 @@ namespace Adamantium.Game
             OnActivated();
         }
 
+        public override GameWindowDescription Description { get; protected set; }
+
         /// <summary>
         /// Underlying control for rendering
         /// </summary>
         public override object NativeWindow => nativeWindow;
+
+        public override bool IsActive => UIComponent.IsFocused;
 
         internal override bool CanHandle(GameContext gameContext)
         {

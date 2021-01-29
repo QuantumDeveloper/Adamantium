@@ -42,7 +42,7 @@ namespace Adamantium.UI
 
         public ShutDownMode ShutDownMode { get; set; }
 
-        protected GraphicsDevice GraphicsDevice;
+        protected MainGraphicsDevice MainGraphicsDevice;
         internal IDependencyResolver Services { get; set; }
 
         private EntityWorld entityWorld;
@@ -90,13 +90,6 @@ namespace Adamantium.UI
             entityWorld = new EntityWorld(Services);
             Initialize();
             renderThread = new Thread(RenderThread);
-            
-            //InputDevice mouseDevice = new InputDevice();
-            //mouseDevice.WindowHandle = e.Window.Handle;
-            //mouseDevice.UsagePage = HIDUsagePage.Generic;
-            //mouseDevice.UsageId = HIDUsageId.Mouse;
-            //mouseDevice.Flags = InputDeviceFlags.None;
-            //Interop.RegisterRawInputDevices(new[] { mouseDevice }, 1, Marshal.SizeOf(mouseDevice));
         }
         
         private void RenderThread()
@@ -135,7 +128,7 @@ namespace Adamantium.UI
                 HInstanceHandle = Process.GetCurrentProcess().Handle
             };
             
-            var device = GraphicsDevice.CreateRenderDevice(@params);
+            var device = MainGraphicsDevice.CreateRenderDevice(@params);
             device.AddDynamicStates(DynamicState.Viewport, DynamicState.Scissor);
 
             windowToDevices[window] = device;
@@ -339,12 +332,11 @@ namespace Adamantium.UI
 
         protected void Initialize()
         {
-            var vulkanInstance = VulkanInstance.Create("Adamantium Engine", true);
-            GraphicsDevice = GraphicsDevice.Create(vulkanInstance, vulkanInstance.CurrentDevice);
+            MainGraphicsDevice = MainGraphicsDevice.Create("Adamantium Engine", true);
             //GraphicsDevice.BlendState = GraphicsDevice.BlendStates.AlphaBlend;
             //GraphicsDevice.RasterizerState = GraphicsDevice.RasterizerStates.CullNoneClipEnabled;
             //GraphicsDevice.DepthStencilState = GraphicsDevice.DepthStencilStates.DepthEnableGreaterEqual;
-            Services.RegisterInstance<GraphicsDevice>(GraphicsDevice);
+            Services.RegisterInstance<GraphicsDevice>(MainGraphicsDevice);
             Initialized?.Invoke(this, EventArgs.Empty);
         }
 
@@ -353,8 +345,8 @@ namespace Adamantium.UI
             cancellationTokenSource.Cancel();
             ContentUnloading?.Invoke(this, EventArgs.Empty);
 
-            GraphicsDevice.DeviceWaitIdle();
-            GraphicsDevice?.Dispose();
+            MainGraphicsDevice.DeviceWaitIdle();
+            MainGraphicsDevice?.Dispose();
         }
 
         /// <summary>
