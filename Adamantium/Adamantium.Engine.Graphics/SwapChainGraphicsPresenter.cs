@@ -25,8 +25,7 @@ namespace Adamantium.Engine.Graphics
             CreateImageViews();
             CreateFramebuffers();
             BackBuffers = new Texture[BuffersCount];
-            var indices = GraphicsDevice.VulkanInstance.CurrentDevice.FindQueueFamilies(surface);
-            presentQueue = graphicsDevice.GetDeviceQueue(indices.presentFamily.Value, 0);
+            presentQueue = graphicsDevice.GraphicsQueue;
         }
 
         class SwapChainSupportDetails

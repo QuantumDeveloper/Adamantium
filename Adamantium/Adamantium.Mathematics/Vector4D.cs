@@ -276,6 +276,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first vector to subtract.</param>
       /// <param name="right">The second vector to subtract.</param>
       /// <returns>The difference of the two vectors.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector4D Subtract(Vector4D left, Vector4D right)
       {
          return new Vector4D(left.X - right.X, left.Y - right.Y, left.Z - right.Z, left.W - right.W);

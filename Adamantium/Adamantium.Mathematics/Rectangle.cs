@@ -63,10 +63,7 @@ namespace Adamantium.Mathematics
       /// <value>The X position.</value>
       public int X
       {
-         get
-         {
-            return Left;
-         }
+         get => Left;
          set
          {
             Right = value + Width;
@@ -80,10 +77,7 @@ namespace Adamantium.Mathematics
       /// <value>The Y position.</value>
       public int Y
       {
-         get
-         {
-            return Top;
-         }
+         get => Top;
          set
          {
             Bottom = value + Height;
@@ -97,8 +91,8 @@ namespace Adamantium.Mathematics
       /// <value>The width.</value>
       public int Width
       {
-         get { return Right - Left; }
-         set { Right = Left + value; }
+         get => Right - Left;
+         set => Right = Left + value;
       }
 
       /// <summary>
@@ -107,8 +101,8 @@ namespace Adamantium.Mathematics
       /// <value>The height.</value>
       public int Height
       {
-         get { return Bottom - Top; }
-         set { Bottom = Top + value; }
+         get => Bottom - Top;
+         set => Bottom = Top + value;
       }
 
       /// <summary>
@@ -126,10 +120,7 @@ namespace Adamantium.Mathematics
       /// <value>The size of the rectangle.</value>
       public SizeF Size
       {
-         get
-         {
-            return new SizeF(Width, Height);
-         }
+         get => new SizeF(Width, Height);
          set
          {
             Width = (int)value.Width;

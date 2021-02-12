@@ -29,6 +29,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Adamantium.Fonts\Adamantium.Fonts.csproj" />
     <ProjectReference Include="..\Adamantium.UI\Adamantium.UI.csproj" />
   </ItemGroup>
 

@@ -20,7 +20,7 @@ namespace Adamantium.Engine.Graphics
         private SurfaceKHR surface;
         private Pipeline graphicsPipeline;
         private CommandBuffer[] commandBuffers;
-        private Queue graphicsQueue;
+        internal Queue GraphicsQueue { get; private set; }
         private Queue resourceQueue;
         private Queue computeQueue;
         
@@ -89,7 +89,8 @@ namespace Adamantium.Engine.Graphics
             scissors = new TrackingCollection<Rect2D>();
 
             BlendState = BlendStates.Default;
-            RasterizerState = RasterizerStates.CullBackClipDisabled;
+            //RasterizerState = RasterizerStates.CullBackClipDisabled;
+            RasterizerState = RasterizerStates.CullNoneClipDisabled;
             DepthStencilState = DepthStencilStates.Default;
 
             pipelineManager = new PipelineManager(this);
@@ -355,8 +356,10 @@ namespace Adamantium.Engine.Graphics
             poolInfo.Flags = (uint)CommandPoolCreateFlagBits.ResetCommandBufferBit;
             CommandPool = LogicalDevice.CreateCommandPool(poolInfo);
             
-            graphicsQueue = LogicalDevice.GetDeviceQueue(queueFamilyIndices.graphicsFamily.Value, 0);
-            resourceQueue = LogicalDevice.GetDeviceQueue(queueFamilyIndices.graphicsFamily.Value, 1);
+            GraphicsQueue = LogicalDevice.GetDeviceQueue(queueFamilyIndices.graphicsFamily.Value, 0);
+            uint queueIndex = MainDevice.AvailableQueuesCount > 1 ? 1 : 0;
+            resourceQueue = LogicalDevice.GetDeviceQueue(queueFamilyIndices.graphicsFamily.Value, queueIndex);
+            //resourceQueue = LogicalDevice.GetDeviceQueue(queueFamilyIndices.graphicsFamily.Value, 0);
         }
 
         private void CreateGraphicsPresenter(PresentationParameters parameters)
@@ -530,8 +533,8 @@ namespace Adamantium.Engine.Graphics
                 throw new Exception($"failed to reset fences. Result: {result}");
             }
             
-            result = graphicsQueue.QueueSubmit(1, submitInfos, renderFence);
-            graphicsQueue.QueueWaitIdle();
+            result = GraphicsQueue.QueueSubmit(1, submitInfos, renderFence);
+            GraphicsQueue.QueueWaitIdle();
 
             if (result != Result.Success)
             {

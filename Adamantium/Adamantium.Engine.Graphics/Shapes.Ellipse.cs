@@ -54,7 +54,7 @@ namespace Adamantium.Engine.Graphics
                 if (startAngle < 0) startAngle = 0;
                 if (stopAngle > 360) stopAngle = 360;
                 
-                List<Vector3F> vertices = new List<Vector3F>();
+                var vertices = new List<Vector2D>();
                 List<Vector2F> uvs = new List<Vector2F>();
                 Vector3F center = Vector3F.Zero;
                 float radiusX = diameter.X / 2;
@@ -74,7 +74,7 @@ namespace Adamantium.Engine.Graphics
 
                 if (ellipseType == EllipseType.Sector && range < 360)
                 {
-                    vertices.Add(Vector3F.Zero);
+                    vertices.Add(Vector2D.Zero);
                 }
 
                 for (int i = 0; i < tessellation; ++i)
@@ -82,7 +82,7 @@ namespace Adamantium.Engine.Graphics
                     var angleItem = MathHelper.DegreesToRadians(currentAngle * sign);
                     float x = center.X + (radiusX * (float)Math.Cos(angleItem));
                     float y = center.Y + (radiusY * (float)Math.Sin(angleItem));
-                    var vertex = new Vector3F(x, y, 0);
+                    var vertex = new Vector2D(x, y);
                         
                     vertices.Add(vertex);
 

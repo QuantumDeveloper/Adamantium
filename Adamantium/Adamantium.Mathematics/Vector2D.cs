@@ -1342,6 +1342,16 @@ namespace Adamantium.Mathematics
       {
          return new Vector3D(value, 0.0f);
       }
+      
+      /// <summary>
+      /// Performs an explicit conversion from <see cref="Vector2D"/> to <see cref="Vector3F"/>.
+      /// </summary>
+      /// <param name="value">The value.</param>
+      /// <returns>The result of the conversion.</returns>
+      public static explicit operator Vector3F(Vector2D value)
+      {
+         return new Vector3F(value, 0.0f);
+      }
 
       /// <summary>
       /// Performs an explicit conversion from <see cref="Vector2D"/> to <see cref="Vector4D"/>.

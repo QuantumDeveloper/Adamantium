@@ -1,0 +1,23 @@
+TTF apple doc:
+https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6.html
+
+TTF / OTF MS doc:
+https://docs.microsoft.com/en-us/typography/opentype/spec/cmap
+
+How Open Type works:
+https://simoncozens.github.io/fonts-and-layout/opentype.html#exploring-opentype-with-ttx
+
+OTF hex (inside format):
+https://pomax.github.io/CFF-glyphlet-fonts/
+
+Adobe otf doc:
+https://wwwimages2.adobe.com/content/dam/acom/en/devnet/font/pdfs/5176.CFF.pdf
+
+OTF Charstring Type 1:
+https://www.adobe.com/content/dam/acom/en/devnet/font/pdfs/T1_SPEC.pdf
+
+OTF Charstrong Type 2:
+https://wwwimages2.adobe.com/content/dam/acom/en/devnet/font/pdfs/5177.Type2.pdf
+
+Python implementation of commands:
+https://github.com/fonttools/fonttools/blob/master/Lib/fontTools/cffLib/specializer.py

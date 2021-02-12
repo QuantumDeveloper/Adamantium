@@ -24,12 +24,12 @@ namespace Adamantium.MathTests
         [Test]
         public void Concave2Test()
         {
-            List<Vector3D> points = new List<Vector3D>();
-            points.Add(new Vector3D(0, 0, 0));
-            points.Add(new Vector3D(0, 20, 0));
-            points.Add(new Vector3D(10, 10, 0));
-            points.Add(new Vector3D(20, 20, 0));
-            points.Add(new Vector3D(20, 0, 0));
+            var points = new List<Vector2D>();
+            points.Add(new Vector2D(0, 0));
+            points.Add(new Vector2D(0, 20));
+            points.Add(new Vector2D(10, 10));
+            points.Add(new Vector2D(20, 20));
+            points.Add(new Vector2D(20, 0));
 
             Polygon polygon = new Polygon();
             polygon.Polygons.Add(new PolygonItem(points));
@@ -58,13 +58,13 @@ namespace Adamantium.MathTests
         [Test]
         public void PolygonHasNoSelfIntersections()
         {
-            List<Vector3D> points = new List<Vector3D>();
-            points.Add(new Vector3D(0, 0, 0));
-            points.Add(new Vector3D(0, 20, 0));
-            points.Add(new Vector3D(10, 20, 0));
-            points.Add(new Vector3D(20, 20, 0));
-            points.Add(new Vector3D(20, 0, 0));
-            points.Add(new Vector3D(0, 0, 0));
+            var points = new List<Vector2D>();
+            points.Add(new Vector2D(0, 0));
+            points.Add(new Vector2D(0, 20));
+            points.Add(new Vector2D(10, 20));
+            points.Add(new Vector2D(20, 20));
+            points.Add(new Vector2D(20, 0));
+            points.Add(new Vector2D(0, 0));
             PolygonItem p = new PolygonItem(points);
             p.SplitOnSegments();
             var hasSelfIntersections = p.CheckForSelfIntersection(FillRule.NonZero);
@@ -74,12 +74,12 @@ namespace Adamantium.MathTests
         [Test]
         public void PolygonHasSelfIntersections()
         {
-            List<Vector3D> points = new List<Vector3D>();
-            points.Add(new Vector3D(-10, 0, 0));
-            points.Add(new Vector3D(0, 30, 0));
-            points.Add(new Vector3D(10, 0, 0));
-            points.Add(new Vector3D(-15, 15, 0));
-            points.Add(new Vector3D(15, 15, 0));
+            var points = new List<Vector2D>();
+            points.Add(new Vector2D(-10, 0));
+            points.Add(new Vector2D(0, 30));
+            points.Add(new Vector2D(10, 0));
+            points.Add(new Vector2D(-15, 15));
+            points.Add(new Vector2D(15, 15));
             PolygonItem p = new PolygonItem(points);
             p.SplitOnSegments();
             var hasSelfIntersections = p.CheckForSelfIntersection(FillRule.NonZero);
@@ -90,8 +90,8 @@ namespace Adamantium.MathTests
         [Test]
         public void IsPointOnLineTest()
         {
-            var segment = new LineSegment(new Vector3D(0, 0, 0), new Vector3D(10, 0, 0));
-            var point = new Vector3D(5, 0, 0);
+            var segment = new LineSegment(new Vector2D(0, 0), new Vector2D(10, 0));
+            var point = new Vector2D(5, 0);
             var isOnLine = Collision2D.IsPointOnSegment(ref segment, ref point);
             Assert.IsTrue(isOnLine, "point is not on the line");
         }
@@ -99,8 +99,8 @@ namespace Adamantium.MathTests
         [Test]
         public void IsPointOnLeftSegmentEdgeTest()
         {
-            var segment = new LineSegment(new Vector3D(0, 0, 0), new Vector3D(10, 0, 0));
-            var point = new Vector3D(0, 0, 0);
+            var segment = new LineSegment(new Vector2D(0, 0), new Vector2D(10, 0));
+            var point = new Vector2D(0, 0);
             var isOnLine = Collision2D.IsPointOnSegment(ref segment, ref point);
             Assert.IsTrue(isOnLine, "point is not on the line");
         }
@@ -108,8 +108,8 @@ namespace Adamantium.MathTests
         [Test]
         public void IsPointOnRightSegmentEdgeTest()
         {
-            var segment = new LineSegment(new Vector3D(0, 0, 0), new Vector3D(10, 0, 0));
-            var point = new Vector3D(10, 0, 0);
+            var segment = new LineSegment(new Vector2D(0, 0), new Vector2D(10, 0));
+            var point = new Vector2D(10, 0);
             var isOnLine = Collision2D.IsPointOnSegment(ref segment, ref point);
             Assert.IsTrue(isOnLine, "point is not on the line");
         }
@@ -117,8 +117,8 @@ namespace Adamantium.MathTests
         [Test]
         public void IsPointNotOnSegmentTest2()
         {
-            var segment = new LineSegment(new Vector3D(0, 0, 0), new Vector3D(10, 10, 0));
-            var point = new Vector3D(5, 5.01f, 0);
+            var segment = new LineSegment(new Vector2D(0, 0), new Vector2D(10, 10));
+            var point = new Vector2D(5, 5.01f);
             var isOnLine = Collision2D.IsPointOnSegment(ref segment, ref point);
             Assert.IsFalse(isOnLine, "point is on the line");
         }
@@ -126,8 +126,8 @@ namespace Adamantium.MathTests
         [Test]
         public void IsPointNotOnLineTest()
         {
-            var segment = new LineSegment(new Vector3D(0, 0, 0), new Vector3D(10, 0, 0));
-            var point = new Vector3D(11, 0, 0);
+            var segment = new LineSegment(new Vector2D(0, 0), new Vector2D(10, 0));
+            var point = new Vector2D(11, 0);
             var isOnLine = Collision2D.IsPointOnSegment(ref segment, ref point);
             Assert.IsFalse(isOnLine, "point is on the line");
         }
@@ -135,8 +135,8 @@ namespace Adamantium.MathTests
         [Test]
         public void IsPointNotOnSegmentTest()
         {
-            var segment = new LineSegment(new Vector3D(0, 0, 0), new Vector3D(0, 20, 0));
-            var point = new Vector3D(5, 0, 0);
+            var segment = new LineSegment(new Vector2D(0, 0), new Vector2D(0, 20));
+            var point = new Vector2D(5, 0);
             var isOnLine = Collision2D.IsPointOnSegment(ref segment, ref point);
             Assert.IsFalse(isOnLine, "point is on the line");
         }
@@ -144,11 +144,10 @@ namespace Adamantium.MathTests
         [Test]
         public void SegmentSegmentIntersectionTest()
         {
-            Vector3D intersectionPoint;
-            var segment1 = new LineSegment(new Vector3D(-10, 0, 0), new Vector3D(0, 30, 0));
-            var segment2 = new LineSegment(new Vector3D(-15, 15, 0), new Vector3D(15, 15, 0));
+            var segment1 = new LineSegment(new Vector2D(-10, 0), new Vector2D(0, 30));
+            var segment2 = new LineSegment(new Vector2D(-15, 15), new Vector2D(15, 15));
 
-            var isLineIntersects = Collision2D.SegmentSegmentIntersection(ref segment1, ref segment2, out intersectionPoint);
+            var isLineIntersects = Collision2D.SegmentSegmentIntersection(ref segment1, ref segment2, out var intersectionPoint);
             Assert.IsTrue(isLineIntersects, "lines is not intersecting");
             Assert.AreEqual(new Vector3D(-5, 15, 0), intersectionPoint);
         }
@@ -157,10 +156,9 @@ namespace Adamantium.MathTests
         [Test]
         public void RayLineIntersectionTest()
         {
-            Vector3D intersectionPoint;
-            LineSegment s = new LineSegment(new Vector3D(1, 1, 0), new Vector3D(10, 1, 0));
+            LineSegment s = new LineSegment(new Vector2D(1, 1), new Vector2D(10, 1));
             var ray = new Ray2D(new Vector2D(2, 10), new Vector2D(0, -1));
-            var isLineIntersects = Collision2D.RaySegmentIntersection(ref ray, ref s, out intersectionPoint);
+            var isLineIntersects = Collision2D.RaySegmentIntersection(ref ray, ref s, out var intersectionPoint);
             Assert.IsTrue(isLineIntersects, "lines is not intersecting");
             Assert.AreEqual(new Vector3D(2, 1, 0), intersectionPoint);
         }
@@ -168,10 +166,9 @@ namespace Adamantium.MathTests
         [Test]
         public void RayLineIntersectionTest2()
         {
-            Vector3D intersectionPoint;
-            LineSegment s = new LineSegment(new Vector3D(-20, 8, 0), new Vector3D(10, 1, 0));
+            LineSegment s = new LineSegment(new Vector2D(-20, 8), new Vector2D(10, 1));
             var ray = new Ray2D(new Vector2D(-2, 10), new Vector2D(0, -1));
-            var isLineIntersects = Collision2D.RaySegmentIntersection(ref ray, ref s, out intersectionPoint);
+            var isLineIntersects = Collision2D.RaySegmentIntersection(ref ray, ref s, out var intersectionPoint);
             Assert.IsTrue(isLineIntersects, "ray and line is not intersecting");
             Assert.AreEqual(new Vector3D(-2, 3.8f, 0), intersectionPoint);
         }
@@ -179,30 +176,27 @@ namespace Adamantium.MathTests
         [Test]
         public void CollinearRayLineIntersectionTest()
         {
-            Vector3D intersectionPoint;
-            LineSegment s = new LineSegment(new Vector3D(20, 0, 0), new Vector3D(30, 0, 0));
+            LineSegment s = new LineSegment(new Vector2D(20, 0), new Vector2D(30, 0));
             var ray = new Ray2D(new Vector2D(1, 0), new Vector2D(1, 0));
-            var isLineIntersects = Collision2D.RaySegmentIntersection(ref ray, ref s, out intersectionPoint);
+            var isLineIntersects = Collision2D.RaySegmentIntersection(ref ray, ref s, out var intersectionPoint);
             Assert.IsFalse(isLineIntersects, "ray and line is not collinear");
         }
 
         [Test]
         public void CollinearRayLineIntersectionTest2()
         {
-            Vector3D intersectionPoint;
-            LineSegment s = new LineSegment(new Vector3D(20, 0, 0), new Vector3D(10, 0, 0));
+            LineSegment s = new LineSegment(new Vector2D(20, 0), new Vector2D(10, 0));
             var ray = new Ray2D(new Vector2D(1, 0), new Vector2D(1, 0));
-            var isLineIntersects = Collision2D.RaySegmentIntersection(ref ray, ref s, out intersectionPoint);
+            var isLineIntersects = Collision2D.RaySegmentIntersection(ref ray, ref s, out var intersectionPoint);
             Assert.IsFalse(isLineIntersects, "ray and line is not collinear");
         }
 
         [Test]
         public void RayWithStartOfLineIntersection()
         {
-            Vector3D intersectionPoint;
-            LineSegment s = new LineSegment(new Vector3D(20, 0, 0), new Vector3D(30, 0, 0));
+            LineSegment s = new LineSegment(new Vector2D(20, 0), new Vector2D(30, 0));
             var ray = new Ray2D(new Vector2D(20, 10), new Vector2D(0, -1));
-            var isLineIntersects = Collision2D.RaySegmentIntersection(ref ray, ref s, out intersectionPoint);
+            var isLineIntersects = Collision2D.RaySegmentIntersection(ref ray, ref s, out var intersectionPoint);
             Assert.IsTrue(isLineIntersects, "ray and line is not intersecting");
             Assert.AreEqual(new Vector3D(20, 0, 0), intersectionPoint);
         }
@@ -210,10 +204,9 @@ namespace Adamantium.MathTests
         [Test]
         public void RayWithEndOfLineIntersection()
         {
-            Vector3D intersectionPoint;
-            LineSegment s = new LineSegment(new Vector3D(20, 0, 0), new Vector3D(30, 0, 0));
+            LineSegment s = new LineSegment(new Vector2D(20, 0), new Vector2D(30, 0));
             var ray = new Ray2D(new Vector2D(30, 10), new Vector2D(0, -1));
-            var isLineIntersects = Collision2D.RaySegmentIntersection(ref ray, ref s, out intersectionPoint);
+            var isLineIntersects = Collision2D.RaySegmentIntersection(ref ray, ref s, out var intersectionPoint);
             Assert.IsTrue(isLineIntersects, "ray and line is not intersecting");
             Assert.AreEqual(new Vector3D(30, 0, 0), intersectionPoint);
         }
@@ -222,7 +215,7 @@ namespace Adamantium.MathTests
         [Test]
         public void TriangulationTest()
         {
-            List<Vector3D> points = new List<Vector3D>();
+            var points = new List<Vector2D>();
             //points.Add(new Vector3D(0, 0, 0));
             //points.Add(new Vector3D(0, 20, 0));
             //points.Add(new Vector3D(10, 10, 0));
@@ -288,17 +281,17 @@ namespace Adamantium.MathTests
             polygon.Polygons.Add(new PolygonItem(points2));
             */
 
-            points.Add(new Vector3D(-10, 0, 0));
-            points.Add(new Vector3D(0, 30, 0));
-            points.Add(new Vector3D(10, 0, 0));
-            points.Add(new Vector3D(-15, 15, 0));
-            points.Add(new Vector3D(15, 15, 0));
+            points.Add(new Vector2D(-10, 0));
+            points.Add(new Vector2D(0, 30));
+            points.Add(new Vector2D(10, 0));
+            points.Add(new Vector2D(-15, 15));
+            points.Add(new Vector2D(15, 15));
 
-            points.Add(new Vector3D(-10, 0, 0));
-            points.Add(new Vector3D(0, -30, 0));
-            points.Add(new Vector3D(10, 0, 0));
-            points.Add(new Vector3D(-15, -15, 0));
-            points.Add(new Vector3D(15, -15, 0));
+            points.Add(new Vector2D(-10, 0));
+            points.Add(new Vector2D(0, -30));
+            points.Add(new Vector2D(10, 0));
+            points.Add(new Vector2D(-15, -15));
+            points.Add(new Vector2D(15, -15));
 
             polygon.Polygons.Add(new PolygonItem(points));
 
@@ -330,26 +323,26 @@ namespace Adamantium.MathTests
         [Test]
         public void IsClockwise3D()
         {
-            Assert.IsTrue(MathHelper.IsClockwise(new Vector3D(0, 0, 0), new Vector3D(0, 20, 0), new Vector3D(10, 10, 0), Vector3D.BackwardLH), "triangle is counter clockwise");
+            Assert.IsTrue(MathHelper.IsClockwise(new Vector2D(0, 0), new Vector2D(0, 20), new Vector2D(10, 10), Vector3D.BackwardLH), "triangle is counter clockwise");
         }
 
         [Test]
         public void IsClockwise3D2()
         {
-            Assert.IsTrue(MathHelper.IsClockwise(new Vector3D(0, 0, 0), new Vector3D(10, 0, 0), new Vector3D(10, -10, 0), Vector3D.BackwardLH), "triangle is counter clockwise");
+            Assert.IsTrue(MathHelper.IsClockwise(new Vector2D(0, 0), new Vector2D(10, 0), new Vector2D(10, -10), Vector3D.BackwardLH), "triangle is counter clockwise");
         }
 
 
         [Test]
         public void IsCounterClockwise3D()
         {
-            Assert.IsFalse(MathHelper.IsClockwise(new Vector3D(10, 20, 0), new Vector3D(10, 30, 0), new Vector3D(0, 20, 0), Vector3D.BackwardLH), "triangle is clockwise");
+            Assert.IsFalse(MathHelper.IsClockwise(new Vector2D(10, 20), new Vector2D(10, 30), new Vector2D(0, 20), Vector3D.BackwardLH), "triangle is clockwise");
         }
 
         [Test]
         public void IsCounterClockwise3D2()
         {
-            Assert.IsFalse(MathHelper.IsClockwise(new Vector3D(0, 0, 0), new Vector3D(10, 0, 0), new Vector3D(0, 20, 0), Vector3D.BackwardLH), "triangle is clockwise");
+            Assert.IsFalse(MathHelper.IsClockwise(new Vector2D(0, 0), new Vector2D(10, 0), new Vector2D(0, 20), Vector3D.BackwardLH), "triangle is clockwise");
         }
 
         [Test]

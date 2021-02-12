@@ -17,7 +17,7 @@ namespace Adamantium.Engine.Templates.Lights
             var tessellation = 60;
             float angle = range / tessellation;
 
-            var bulbPoints = new List<Vector3D>();
+            var bulbPoints = new List<Vector2D>();
 
             var angleItem = MathHelper.DegreesToRadians(angle);
             var startAngle = MathHelper.DegreesToRadians(0.0f);
@@ -27,15 +27,15 @@ namespace Adamantium.Engine.Templates.Lights
             var radiusY = 0.21;
             var triggerAngle1 = MathHelper.DegreesToRadians(315);
             var triggerAngle2 = MathHelper.DegreesToRadians(225);
-            Vector3D leftLineStart = Vector3D.Zero;
-            Vector3D rightLineStart = Vector3D.Zero;
+            Vector2D leftLineStart = Vector2D.Zero;
+            Vector2D rightLineStart = Vector2D.Zero;
 
             for (int i = 0; i <= tessellation; ++i)
             {
                 var x = center.X + (radiusX * Math.Cos(angle));
                 var y = center.Y + (radiusY * Math.Sin(angle));
 
-                var vertex = new Vector3D(x, y, 0);
+                var vertex = new Vector2D(x, y);
 
                 bulbPoints.Add(vertex);
 
@@ -51,27 +51,27 @@ namespace Adamantium.Engine.Templates.Lights
             var basePartSize = 0.05;
             var smallSize = 0.025;
             var bottomPartStartCoords = 0.25;
-            var bulbBasePoints1 = new List<Vector3D>();
+            var bulbBasePoints1 = new List<Vector2D>();
             bulbBasePoints1.Add(leftLineStart);
-            bulbBasePoints1.Add(new Vector3D(-basePartSize, -bottomPartStartCoords, 0));
-            bulbBasePoints1.Add(new Vector3D(basePartSize, -bottomPartStartCoords, 0));
+            bulbBasePoints1.Add(new Vector2D(-basePartSize, -bottomPartStartCoords));
+            bulbBasePoints1.Add(new Vector2D(basePartSize, -bottomPartStartCoords));
             bulbBasePoints1.Add(rightLineStart);
 
             bottomPartStartCoords = 0.29;
-            var bulbBasePoints2 = new List<Vector3D>();
-            bulbBasePoints2.Add(new Vector3D(basePartSize, -bottomPartStartCoords, 0));
-            bulbBasePoints2.Add(new Vector3D(basePartSize, -bottomPartStartCoords + smallSize, 0));
-            bulbBasePoints2.Add(new Vector3D(-basePartSize, -bottomPartStartCoords + smallSize, 0));
-            bulbBasePoints2.Add(new Vector3D(-basePartSize, -bottomPartStartCoords, 0));
+            var bulbBasePoints2 = new List<Vector2D>();
+            bulbBasePoints2.Add(new Vector2D(basePartSize, -bottomPartStartCoords));
+            bulbBasePoints2.Add(new Vector2D(basePartSize, -bottomPartStartCoords + smallSize));
+            bulbBasePoints2.Add(new Vector2D(-basePartSize, -bottomPartStartCoords + smallSize));
+            bulbBasePoints2.Add(new Vector2D(-basePartSize, -bottomPartStartCoords));
 
             bottomPartStartCoords = 0.33;
-            var bulbBasePoints3 = new List<Vector3D>();
-            bulbBasePoints3.Add(new Vector3D(basePartSize, -bottomPartStartCoords, 0));
-            bulbBasePoints3.Add(new Vector3D(basePartSize, -bottomPartStartCoords + smallSize, 0));
-            bulbBasePoints3.Add(new Vector3D(-basePartSize, -bottomPartStartCoords + smallSize, 0));
-            bulbBasePoints3.Add(new Vector3D(-basePartSize, -bottomPartStartCoords, 0));
+            var bulbBasePoints3 = new List<Vector2D>();
+            bulbBasePoints3.Add(new Vector2D(basePartSize, -bottomPartStartCoords));
+            bulbBasePoints3.Add(new Vector2D(basePartSize, -bottomPartStartCoords + smallSize));
+            bulbBasePoints3.Add(new Vector2D(-basePartSize, -bottomPartStartCoords + smallSize));
+            bulbBasePoints3.Add(new Vector2D(-basePartSize, -bottomPartStartCoords));
 
-            var bulbBasePoints4 = new List<Vector3D>();
+            var bulbBasePoints4 = new List<Vector2D>();
             var baseStartCoords = 0.35;
             range = 180;
             tessellation = 40;
@@ -89,7 +89,7 @@ namespace Adamantium.Engine.Templates.Lights
                 var x = center.X + (radiusX * Math.Cos(angle));
                 var y = center.Y + (radiusY * Math.Sin(angle));
 
-                var vertex = new Vector3D(x, y, 0);
+                var vertex = new Vector2D(x, y);
 
                 bulbBasePoints4.Add(vertex);
 

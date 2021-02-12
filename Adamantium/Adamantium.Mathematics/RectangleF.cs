@@ -59,6 +59,25 @@ namespace Adamantium.Mathematics
          };
       }
 
+      public static RectangleF FromPoints(Vector2D[] points)
+      {
+         if (points == null || points.Length == 0)
+            throw new ArgumentNullException(nameof(points));
+
+         var minimum = new Vector2D(float.MaxValue);
+         var maximum = new Vector2D(float.MinValue);
+
+         for (int i = 0; i < points.Length; ++i)
+         {
+            Vector2D.Min(ref minimum, ref points[i], out minimum);
+            Vector2D.Max(ref maximum, ref points[i], out maximum);
+         }
+
+         var rect = maximum - minimum;
+         return new RectangleF((float)minimum.X, (float)minimum.Y, (float)rect.X, (float)rect.Y);
+      }
+      
+
       /// <summary>
       /// Initializes a new instance of the <see cref="RectangleF"/> struct.
       /// </summary>
@@ -80,10 +99,7 @@ namespace Adamantium.Mathematics
       /// <value>The X position.</value>
       public float X
       {
-         get
-         {
-            return Left;
-         }
+         get => Left;
          set
          {
             Right = value + Width;
@@ -97,10 +113,7 @@ namespace Adamantium.Mathematics
       /// <value>The Y position.</value>
       public float Y
       {
-         get
-         {
-            return Top;
-         }
+         get => Top;
          set
          {
             Bottom = value + Height;
@@ -114,8 +127,8 @@ namespace Adamantium.Mathematics
       /// <value>The width.</value>
       public float Width
       {
-         get { return Right - Left; }
-         set { Right = Left + value; }
+         get => Right - Left;
+         set => Right = Left + value;
       }
 
       /// <summary>
@@ -124,8 +137,8 @@ namespace Adamantium.Mathematics
       /// <value>The height.</value>
       public float Height
       {
-         get { return Bottom - Top; }
-         set { Bottom = Top + value; }
+         get => Bottom - Top;
+         set => Bottom = Top + value;
       }
 
       /// <summary>
@@ -136,10 +149,7 @@ namespace Adamantium.Mathematics
       /// </value>
       public Vector2F Location
       {
-         get
-         {
-            return new Vector2F(X, Y);
-         }
+         get => new Vector2F(X, Y);
          set
          {
             X = value.X;
@@ -161,13 +171,7 @@ namespace Adamantium.Mathematics
       /// <value>
       ///   <c>true</c> if [is empty]; otherwise, <c>false</c>.
       /// </value>
-      public bool IsEmpty
-      {
-         get
-         {
-            return (Width == 0.0f) && (Height == 0.0f) && (X == 0.0f) && (Y == 0.0f);
-         }
-      }
+      public bool IsEmpty => (Width == 0.0f) && (Height == 0.0f) && (X == 0.0f) && (Y == 0.0f);
 
       /// <summary>
       /// Gets or sets the size of the rectangle.
@@ -175,10 +179,7 @@ namespace Adamantium.Mathematics
       /// <value>The size of the rectangle.</value>
       public Vector2F Size
       {
-         get
-         {
-            return new Vector2F(Width, Height);
-         }
+         get => new Vector2F(Width, Height);
          set
          {
             Width = value.X;
@@ -190,25 +191,25 @@ namespace Adamantium.Mathematics
       /// Gets the position of the top-left corner of the rectangle.
       /// </summary>
       /// <value>The top-left corner of the rectangle.</value>
-      public Vector2F TopLeft { get { return new Vector2F(Left, Top); } }
+      public Vector2F TopLeft => new Vector2F(Left, Top);
 
       /// <summary>
       /// Gets the position of the top-right corner of the rectangle.
       /// </summary>
       /// <value>The top-right corner of the rectangle.</value>
-      public Vector2F TopRight { get { return new Vector2F(Right, Top); } }
+      public Vector2F TopRight => new Vector2F(Right, Top);
 
       /// <summary>
       /// Gets the position of the bottom-left corner of the rectangle.
       /// </summary>
       /// <value>The bottom-left corner of the rectangle.</value>
-      public Vector2F BottomLeft { get { return new Vector2F(Left, Bottom); } }
+      public Vector2F BottomLeft => new Vector2F(Left, Bottom);
 
       /// <summary>
       /// Gets the position of the bottom-right corner of the rectangle.
       /// </summary>
       /// <value>The bottom-right corner of the rectangle.</value>
-      public Vector2F BottomRight { get { return new Vector2F(Right, Bottom); } }
+      public Vector2F BottomRight => new Vector2F(Right, Bottom);
 
       /// <summary>Changes the position of the rectangle.</summary>
       /// <param name="amount">The values to adjust the position of the rectangle by.</param>
@@ -254,7 +255,7 @@ namespace Adamantium.Mathematics
 
       /// <summary>Determines whether this rectangle entirely contains a specified rectangle.</summary>
       /// <param name="value">The rectangle to evaluate.</param>
-      public bool Contains(Rectangle value)
+      public bool Contains(RectangleF value)
       {
          return (X <= value.X) && (value.Right <= Right) && (Y <= value.Y) && (value.Bottom <= Bottom);
       }

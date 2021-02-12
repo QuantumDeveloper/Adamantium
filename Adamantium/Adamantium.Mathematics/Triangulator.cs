@@ -51,8 +51,8 @@ namespace Adamantium.Mathematics
         {
             var rays = new List<Ray2D>();
             var sortedX = new List<double>();
-            var rayIntersectionPoints = new List<Vector3D[]>();
-            List<Vector3D> interPoints = new List<Vector3D>();
+            var rayIntersectionPoints = new List<Vector2D[]>();
+            List<Vector2D> interPoints = new List<Vector2D>();
 
             var sortedList = polygon.SortVertices();
             var ray = new Ray2D(Vector2D.Zero, Vector2D.UnitX);
@@ -70,11 +70,11 @@ namespace Adamantium.Mathematics
                 ray.Origin = rayOrigin;
                 rays.Add(ray);
 
-                List<Vector3D> rayPoints = new List<Vector3D>();
+                List<Vector2D> rayPoints = new List<Vector2D>();
                 for (int j = 0; j < polygon.MergedSegments.Count; ++j)
                 {
                     var segment = polygon.MergedSegments[j];
-                    Vector3D interPoint;
+                    Vector2D interPoint;
                     if (Collision2D.RaySegmentIntersection(ref ray, ref segment, out interPoint))
                     {
                         // We need to filter points very close to each other to avoid producing incorrect results during generation of triangles
@@ -152,7 +152,7 @@ namespace Adamantium.Mathematics
             return false;
         }
 
-        private static bool IsSimilarTo(Vector3D point, List<Vector3D> lst)
+        private static bool IsSimilarTo(Vector2D point, List<Vector2D> lst)
         {
             for (int i = 0; i < lst.Count; ++i)
             {
@@ -167,7 +167,7 @@ namespace Adamantium.Mathematics
         /// <summary>
         /// Check if Y point differnse between aother in list is near <see cref="Polygon.Epsilon"/> value
         /// </summary>
-        private static bool IsXPointSimilarTo(Vector3D point, List<Vector3D> lst)
+        private static bool IsXPointSimilarTo(Vector2D point, List<Vector2D> lst)
         {
             for (int i = 0; i < lst.Count; ++i)
             {
@@ -189,28 +189,28 @@ namespace Adamantium.Mathematics
         {
             if (MathHelper.IsClockwise(startSegment.Start, endSegment.Start, endSegment.End, Vector3D.BackwardRH))
             {
-                trianglesList.Add(startSegment.Start);
-                trianglesList.Add(endSegment.Start);
-                trianglesList.Add(endSegment.End);
+                trianglesList.Add((Vector3F)startSegment.Start);
+                trianglesList.Add((Vector3F)endSegment.Start);
+                trianglesList.Add((Vector3F)endSegment.End);
             }
 
             if (MathHelper.IsClockwise(startSegment.Start, endSegment.End, startSegment.End, Vector3D.BackwardRH))
             {
                 //Second triangle
-                trianglesList.Add(startSegment.Start);
-                trianglesList.Add(endSegment.End);
-                trianglesList.Add(startSegment.End);
+                trianglesList.Add((Vector3F)startSegment.Start);
+                trianglesList.Add((Vector3F)endSegment.End);
+                trianglesList.Add((Vector3F)startSegment.End);
             }
         }
 
         /// <summary>
         /// Sort points vertically to form correct points sequence for triangulation 
         /// </summary>
-        private class VertexHorizontalComparer : IComparer<Vector3D>
+        private class VertexHorizontalComparer : IComparer<Vector2D>
         {
             public static VertexHorizontalComparer Defaut => new VertexHorizontalComparer();
 
-            public int Compare(Vector3D x, Vector3D y)
+            public int Compare(Vector2D x, Vector2D y)
             {
                 if (x.X < y.X)
                 {

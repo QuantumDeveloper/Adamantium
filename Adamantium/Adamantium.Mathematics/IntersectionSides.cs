@@ -3,7 +3,7 @@
 namespace Adamantium.Mathematics
 {
     [Flags]
-    internal enum IntersectionSides
+    public enum IntersectionSides
     {
         None = 0,
         Left = 1,

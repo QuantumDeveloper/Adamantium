@@ -34,19 +34,19 @@ namespace Adamantium.Mathematics
         internal List<PolygonItem> PolygonsCopy { get; private set; }
 
         /// <summary>
-        /// Colllection of points from all <see cref="PolygonItem"/>s in current <see cref="Polygon"/>
+        /// Collection of points from all <see cref="PolygonItem"/>s in current <see cref="Polygon"/>
         /// </summary>
-        public List<Vector3D> MergedPoints { get; private set; }
+        public List<Vector2D> MergedPoints { get; private set; }
 
         /// <summary>
-        /// Colllection of segments from all <see cref="PolygonItem"/>s in current <see cref="Polygon"/>
+        /// Collection of segments from all <see cref="PolygonItem"/>s in current <see cref="Polygon"/>
         /// </summary>
         public List<LineSegment> MergedSegments { get; private set; }
 
         /// <summary>
-        /// Colllection of self intersected points from all <see cref="PolygonItem"/>s in current <see cref="Polygon"/>
+        /// Collection of self intersected points from all <see cref="PolygonItem"/>s in current <see cref="Polygon"/>
         /// </summary>
-        public List<Vector3D> SelfIntersectedPoints;
+        public List<Vector2D> SelfIntersectedPoints;
 
         /// <summary>
         /// Defines presence of self intersection
@@ -61,7 +61,7 @@ namespace Adamantium.Mathematics
         /// <summary>
         /// Highest point in polygon 
         /// </summary>
-        public Vector3D HighestPoint;
+        public Vector2D HighestPoint;
 
         /// <summary>
         /// Triangulation rule (true - Even-Odd, false - Non-Zero)
@@ -77,9 +77,9 @@ namespace Adamantium.Mathematics
         public Polygon()
         {
             Polygons = new List<PolygonItem>();
-            MergedPoints = new List<Vector3D>();
+            MergedPoints = new List<Vector2D>();
             MergedSegments = new List<LineSegment>();
-            SelfIntersectedPoints = new List<Vector3D>();
+            SelfIntersectedPoints = new List<Vector2D>();
             SelfIntersectedSegments = new List<LineSegment>();
             checkedPolygons = new List<PolygonPair>();
             FillRule = FillRule.EvenOdd;
@@ -167,9 +167,9 @@ namespace Adamantium.Mathematics
 
                     var bb1 = polygon1.BoundingBox;
                     var bb2 = polygon2.BoundingBox;
-                    var containment1 = polygon1.BoundingBox.Contains(ref bb2);
-                    var containment2 = polygon2.BoundingBox.Contains(ref bb1);
-                    if (containment1 != ContainmentType.Disjoint || containment2 != ContainmentType.Disjoint)
+                    var containment1 = polygon1.BoundingBox.Contains(bb2);
+                    var containment2 = polygon2.BoundingBox.Contains(bb1);
+                    if (containment1 || containment2)
                     {
                         canAdd = false;
                         break;
@@ -251,7 +251,7 @@ namespace Adamantium.Mathematics
                 return;
             }
 
-            List<Vector3D> edgePoints = new List<Vector3D>();
+            var edgePoints = new List<Vector2D>();
             for (int i = 0; i < PolygonsCopy.Count; i++)
             {
                 var polygon1 = PolygonsCopy[i];
@@ -311,7 +311,7 @@ namespace Adamantium.Mathematics
             }
         }
 
-        internal void RemoveInternalSegments(List<Vector3D> interPoints)
+        internal void RemoveInternalSegments(List<Vector2D> interPoints)
         {
             //Remove all segments based on intersection points in case of Non-Zero rule
             if (FillRule == FillRule.NonZero && interPoints.Count > 0)
@@ -368,16 +368,16 @@ namespace Adamantium.Mathematics
             return false;
         }
 
-        private bool FindEdgeIntersectionPoints(PolygonItem polygon1, PolygonItem polygon2, out List<Vector3D> edgePoints)
+        private bool FindEdgeIntersectionPoints(PolygonItem polygon1, PolygonItem polygon2, out List<Vector2D> edgePoints)
         {
-            edgePoints = new List<Vector3D>();
+            edgePoints = new List<Vector2D>();
             for (int i = 0; i < polygon1.Segments.Count; i++)
             {
                 for (int j = 0; j < polygon2.Segments.Count; j++)
                 {
                     var segment1 = polygon1.Segments[i];
                     var segment2 = polygon2.Segments[j];
-                    Vector3D point;
+                    Vector2D point;
                     if (Collision2D.SegmentSegmentIntersection(ref segment1, ref segment2, out point))
                     {
                         if (!edgePoints.Contains(point))
@@ -401,9 +401,9 @@ namespace Adamantium.Mathematics
         /// <param name="edgePoints">intersection points between 2 polygons, which were found earlier on previous step</param>
         /// <returns>Collection of intersection points, including points, which is not lying on segments, but also inside polygons.</returns>
         /// <remarks>During running this method, it will remove all merged segments from <see cref="Polygon"/> if some of its segments contains both intersection points</remarks>
-        private List<Vector3D> FindAllPossibleIntersections(PolygonItem polygon1, PolygonItem polygon2, List<Vector3D> edgePoints)
+        private List<Vector2D> FindAllPossibleIntersections(PolygonItem polygon1, PolygonItem polygon2, List<Vector2D> edgePoints)
         {
-            var allIntersections = new List<Vector3D>(edgePoints);
+            var allIntersections = new List<Vector2D>(edgePoints);
 
             for (int i = 0; i < polygon1.Points.Count; i++)
             {
@@ -453,9 +453,9 @@ namespace Adamantium.Mathematics
         /// Sort points by its X component from smallest to largest
         /// </summary>
         /// <returns>New collection of </returns>
-        public List<Vector3D> SortVertices()
+        public List<Vector2D> SortVertices()
         {
-            var sortedList = new List<Vector3D>(MergedPoints);
+            var sortedList = new List<Vector2D>(MergedPoints);
             sortedList.Sort(VerticalVertexComparer.Default);
             return sortedList;
         }
@@ -464,17 +464,17 @@ namespace Adamantium.Mathematics
         {
             if (MergedPoints.Count > 0)
             {
-                Vector3D minimum = new Vector3D(double.MaxValue);
-                Vector3D maximum = new Vector3D(double.MinValue);
+                var minimum = new Vector2D(double.MaxValue);
+                var maximum = new Vector2D(double.MinValue);
 
                 for (int i = 0; i < MergedPoints.Count; ++i)
                 {
                     var point = MergedPoints[i];
-                    Vector3D.Min(ref minimum, ref point, out minimum);
-                    Vector3D.Max(ref maximum, ref point, out maximum);
+                    Vector2D.Min(ref minimum, ref point, out minimum);
+                    Vector2D.Max(ref maximum, ref point, out maximum);
                 }
-                //HighestPoint = new Vector3D(minimum.X, maximum.Y, 0);
-                HighestPoint = new Vector3D(minimum.X, minimum.Y, 0);
+                //HighestPoint = new Vector2D(minimum.X, maximum.Y);
+                HighestPoint = new Vector2D(minimum.X, minimum.Y);
             }
         }
 
@@ -484,16 +484,16 @@ namespace Adamantium.Mathematics
         /// <param name="point"></param>
         /// <param name="area"></param>
         /// <returns>True if point is completely inside polygon, otherwise false</returns>
-        internal static bool IsPointInsideArea(Vector3D point, List<LineSegment> area)
+        internal static bool IsPointInsideArea(Vector2D point, List<LineSegment> area)
         {
-            var rayLeft = new Ray2D((Vector2D)point, -Vector2D.UnitX);
-            var rayDown = new Ray2D((Vector2D)point, -Vector2D.UnitY);
-            var rayRight = new Ray2D((Vector2D)point, Vector2D.UnitX);
-            var rayUp = new Ray2D((Vector2D)point, Vector2D.UnitY);
+            var rayLeft = new Ray2D(point, -Vector2D.UnitX);
+            var rayDown = new Ray2D(point, -Vector2D.UnitY);
+            var rayRight = new Ray2D(point, Vector2D.UnitX);
+            var rayUp = new Ray2D(point, Vector2D.UnitY);
             IntersectionSides sides = IntersectionSides.None;
             for (int i = 0; i < area.Count; i++)
             {
-                Vector3D interPoint;
+                Vector2D interPoint;
                 var segment = area[i];
                 if (Collision2D.RaySegmentIntersection(ref rayLeft, ref segment, out interPoint))
                 {
@@ -527,7 +527,7 @@ namespace Adamantium.Mathematics
         /// Updates segments for polygons using selfintersection points
         /// </summary>
         /// <param name="selfIntersectionPoints">Selfintersection points</param>
-        private void UpdatePolygonUsingSelfPoints(List<Vector3D> selfIntersectionPoints)
+        private void UpdatePolygonUsingSelfPoints(List<Vector2D> selfIntersectionPoints)
         {
             if (selfIntersectionPoints.Count == 0)
             {
@@ -584,7 +584,7 @@ namespace Adamantium.Mathematics
         /// As a result, this method will create new additional segments nad update <see cref="MergedPoints"/> collection
         /// </summary>
         /// <param name="intersectionPoints">Collection of intersection points</param>
-        internal void UpdatePolygonUsingRayInterPoints(List<Vector3D> intersectionPoints)
+        internal void UpdatePolygonUsingRayInterPoints(List<Vector2D> intersectionPoints)
         {
             if (intersectionPoints.Count == 0)
             {
@@ -652,7 +652,7 @@ namespace Adamantium.Mathematics
         /// <param name="polygons">Collection of <see cref="PolygonItem"/></param>
         /// <param name="points">Array of points to check</param>
         /// <returns>True if all points are belongs to hole polygone, otherwise false</returns>
-        internal static bool PointsInHole(List<PolygonItem> polygons, params Vector3D[] points)
+        internal static bool PointsInHole(List<PolygonItem> polygons, params Vector2D[] points)
         {
             for (int i = 0; i < polygons.Count; ++i)
             {
@@ -686,7 +686,7 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="points"></param>
         /// <returns>Collection of segments if at least 2 points present in collection, otherwise null</returns>
-        public static List<LineSegment> SplitOnSegments(List<Vector3D> points)
+        public static List<LineSegment> SplitOnSegments(List<Vector2D> points)
         {
             if (points.Count <= 1) return new List<LineSegment>();
             
@@ -746,7 +746,7 @@ namespace Adamantium.Mathematics
         /// <param name="end">End segment point</param>
         /// <param name="segments">Collection of segments</param>
         /// <returns>True is points connected, otherwise false</returns>
-        public static bool IsConnected(Vector3D start, Vector3D end, List<LineSegment> segments)
+        public static bool IsConnected(Vector2D start, Vector2D end, List<LineSegment> segments)
         {
             LineSegment segment;
             return IsConnected(start, end, segments, out segment);
@@ -765,7 +765,7 @@ namespace Adamantium.Mathematics
         /// This method will also check for such cases and will check for segments very close to each other (less then <see cref="Epsilon"/>) 
         /// to 100% find correct segment
         /// </remarks>
-        public static bool IsConnected(Vector3D start, Vector3D end, List<LineSegment> segments, out LineSegment correctSegment)
+        public static bool IsConnected(Vector2D start, Vector2D end, List<LineSegment> segments, out LineSegment correctSegment)
         {
             LineSegment segment = new LineSegment(start, end);
             correctSegment = segment;
@@ -789,7 +789,7 @@ namespace Adamantium.Mathematics
         /// <param name="point">point in 2D</param>
         /// <param name="foundSegments">Collection of found segments</param>
         /// <returns>True if at least one segment was found, otherwise false</returns>
-        public static bool GetSegmentsFromPoint(List<LineSegment> segments, Vector3D point, out List<LineSegment> foundSegments)
+        public static bool GetSegmentsFromPoint(List<LineSegment> segments, Vector2D point, out List<LineSegment> foundSegments)
         {
             foundSegments = new List<LineSegment>();
             for (int i = 0; i < segments.Count; ++i)
@@ -843,7 +843,7 @@ namespace Adamantium.Mathematics
                 var vec0 = segments[i].DirectionNormalized;
                 var vec1 = segments[i + 1].DirectionNormalized;
 
-                var angle = MathHelper.AngleBetween(vec0, vec1);
+                var angle = MathHelper.AngleBetween((Vector3F)vec0, (Vector3F)vec1);
                 if (angle > 180)
                 {
                     return true;
@@ -874,11 +874,11 @@ namespace Adamantium.Mathematics
             }
         }
         
-        private class VerticalVertexComparer : IComparer<Vector3D>
+        private class VerticalVertexComparer : IComparer<Vector2D>
         {
             public static VerticalVertexComparer Default => new VerticalVertexComparer();
 
-            public int Compare(Vector3D x, Vector3D y)
+            public int Compare(Vector2D x, Vector2D y)
             {
                 if (MathHelper.WithinEpsilon(x.X, y.X, Epsilon))
                 {

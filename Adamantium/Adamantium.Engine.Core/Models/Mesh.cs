@@ -2,6 +2,7 @@
 using Adamantium.Mathematics;
 using System;
 using System.Diagnostics;
+using System.Linq;
 
 namespace Adamantium.Engine.Core.Models
 {
@@ -112,6 +113,16 @@ namespace Adamantium.Engine.Core.Models
             IsModified = true;
 
             return this;
+        }
+
+        public Mesh SetPositions(List<Vector2D> inPositions, bool updateBoundingBox = true)
+        {
+            var positions = new Vector3F[inPositions.Count];
+            for (int i = 0; i < inPositions.Count; ++i)
+            {
+                positions[i] = new Vector3F(inPositions[i]);
+            }
+            return SetPositions(positions, updateBoundingBox);
         }
 
         public Mesh SetPositions(Vector3F[] inPositions, bool updateBoundingBox = true)

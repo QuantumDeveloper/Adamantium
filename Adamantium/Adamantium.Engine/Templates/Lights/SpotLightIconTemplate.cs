@@ -13,11 +13,11 @@ namespace Adamantium.Engine.Templates.Lights
         public override Entity BuildEntity(Entity owner, string name)
         {
             float size = 0.2f;
-            var points = new List<Vector3F>();
-            points.Add(new Vector3F(-size, size, 0));
-            points.Add(new Vector3F(-size, 0, 0));
-            points.Add(new Vector3F(size, 0, 0));
-            points.Add(new Vector3F(size, .0f, 0));
+            var points = new List<Vector2D>();
+            points.Add(new Vector2D(-size, size));
+            points.Add(new Vector2D(-size, 0));
+            points.Add(new Vector2D(size, 0));
+            points.Add(new Vector2D(size, 0));
 
             float range = 180;
             int tessellation = 20;
@@ -34,7 +34,7 @@ namespace Adamantium.Engine.Templates.Lights
             {
                 float x = center.X + (radiusX * (float)Math.Cos(angle));
                 float y = center.Y + (radiusY * (float)Math.Sin(angle));
-                var vertex = new Vector3F(x, y, 0);
+                var vertex = new Vector2D(x, y);
 
                 points.Add(vertex);
 

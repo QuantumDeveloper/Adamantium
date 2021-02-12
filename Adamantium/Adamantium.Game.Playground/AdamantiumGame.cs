@@ -1,16 +1,20 @@
 ﻿using System;
 using System.Threading.Tasks;
+using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Content;
 using Adamantium.Engine.Core.Models;
 using Adamantium.Engine.Processors;
 using Adamantium.Engine.Templates;
 using Adamantium.EntityFramework;
+using Adamantium.EntityFramework.Components;
+using Adamantium.Fonts.TTF;
 using Adamantium.Game.Events;
 
 namespace Adamantium.Game.Playground
 {
     internal class AdamantiumGame : Engine.Game
     {
+        private TTFFontParser parser;
         public AdamantiumGame(GameMode gameMode) : base(gameMode)
         {
             EventAggregator.GetEvent<GameOutputCreatedEvent>().Subscribe(OnWindowCreated);
@@ -44,6 +48,7 @@ namespace Adamantium.Game.Playground
             {
                 //ImportModel(@"Models\monkey\monkey.dae");
                 ImportModel(@"Models\F15C\F-15C_Eagle.dae");
+                ImportFont();
             });
             
         }
@@ -69,6 +74,30 @@ namespace Adamantium.Game.Playground
         public Task<Entity> ImportModel(String pathToFile, ContentLoadOptions options = null)
         {
             return Task.Run(() => Content.Load<Entity>(pathToFile, options));
+        }
+
+        private void ImportFont()
+        {
+            try
+            {
+                parser = new TTFFontParser(@"PlayfairDisplay-Regular.ttf", 7);
+                var entity = new Entity(null, "PlayfairDisplay-Regular");
+                var ch = parser.FontData.GetGlyphForCharacter('A');
+                parser.GenerateGlyphTriangles(ch);
+                var mesh = new Mesh();
+                mesh.SetPositions(ch.Vertices);
+                var meshComponent = new MeshData();
+                meshComponent.Mesh = mesh;
+                var meshRenderer = new MeshRenderer();
+                entity.AddComponent(meshComponent);
+                entity.AddComponent(meshRenderer);
+                EntityWorld.AddEntity(entity);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                throw;
+            }
         }
     }
 }

@@ -245,7 +245,7 @@ namespace Adamantium.Mathematics
         /// </remarks>
         public double Length()
         {
-            return (double)Math.Sqrt((X * X) + (Y * Y) + (Z * Z));
+            return Math.Sqrt((X * X) + (Y * Y) + (Z * Z));
         }
 
         /// <summary>
@@ -357,6 +357,7 @@ namespace Adamantium.Mathematics
         /// <param name="left">The first vector to subtract.</param>
         /// <param name="right">The second vector to subtract.</param>
         /// <param name="result">When the method completes, contains the difference of the two vectors.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Subtract(ref Vector3D left, ref Vector3D right, out Vector3D result)
         {
             result = new Vector3D(left.X - right.X, left.Y - right.Y, left.Z - right.Z);
@@ -368,6 +369,7 @@ namespace Adamantium.Mathematics
         /// <param name="left">The first vector to subtract.</param>
         /// <param name="right">The second vector to subtract.</param>
         /// <returns>The difference of the two vectors.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Vector3D Subtract(Vector3D left, Vector3D right)
         {
             return new Vector3D(left.X - right.X, left.Y - right.Y, left.Z - right.Z);
@@ -379,6 +381,7 @@ namespace Adamantium.Mathematics
         /// <param name="left">The input vector</param>
         /// <param name="right">The scalar value to be subtraced from elements</param>
         /// <param name="result">The vector with subtracted scalar for each element.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Subtract(ref Vector3D left, ref double right, out Vector3D result)
         {
             result = new Vector3D(left.X - right, left.Y - right, left.Z - right);
@@ -390,6 +393,7 @@ namespace Adamantium.Mathematics
         /// <param name="left">The input vector</param>
         /// <param name="right">The scalar value to be subtraced from elements</param>
         /// <returns>The vector with subtracted scalar for each element.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Vector3D Subtract(Vector3D left, double right)
         {
             return new Vector3D(left.X - right, left.Y - right, left.Z - right);
@@ -401,6 +405,7 @@ namespace Adamantium.Mathematics
         /// <param name="left">The scalar value to be subtraced from elements</param>
         /// <param name="right">The input vector.</param>
         /// <param name="result">The vector with subtracted scalar for each element.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Subtract(ref double left, ref Vector3D right, out Vector3D result)
         {
             result = new Vector3D(left - right.X, left - right.Y, left - right.Z);
@@ -412,6 +417,7 @@ namespace Adamantium.Mathematics
         /// <param name="left">The scalar value to be subtraced from elements</param>
         /// <param name="right">The input vector.</param>
         /// <returns>The vector with subtracted scalar for each element.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Vector3D Subtract(double left, Vector3D right)
         {
             return new Vector3D(left - right.X, left - right.Y, left - right.Z);

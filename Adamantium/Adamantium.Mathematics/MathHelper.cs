@@ -176,6 +176,11 @@ namespace Adamantium.Mathematics
         {
             return WithinEpsilon(a.X, b.X, epsilon) && WithinEpsilon(a.Y, b.Y, epsilon) && WithinEpsilon(a.Z, b.Z, epsilon);
         }
+        
+        public static bool WithinEpsilon(Vector2D a, Vector2D b, double epsilon)
+        {
+            return WithinEpsilon(a.X, b.X, epsilon) && WithinEpsilon(a.Y, b.Y, epsilon);
+        }
 
         /// <summary>
         /// Interpolates between two values using a linear function by a given amount.
@@ -528,7 +533,7 @@ namespace Adamantium.Mathematics
             float angle = 0;
             if (is360Degrees)
             {
-                var dot = Vector3F.Dot(s1.DirectionNormalized, s2.DirectionNormalized);
+                var dot = Vector2D.Dot(s1.DirectionNormalized, s2.DirectionNormalized);
                 var determinant = Determinant(s1.DirectionNormalized, s2.DirectionNormalized);
                 angle = (float)Math.Atan2(determinant, dot);
                 angle = RadiansToDegrees(angle);
@@ -539,7 +544,7 @@ namespace Adamantium.Mathematics
             }
             else
             {
-                var dot = Vector3F.Dot(s1.DirectionNormalized, s2.DirectionNormalized);
+                var dot = Vector2D.Dot(s1.DirectionNormalized, s2.DirectionNormalized);
                 angle = (float)Math.Acos(dot);
             }
 
@@ -555,8 +560,12 @@ namespace Adamantium.Mathematics
         {
             return v1.X * v2.Y - v1.Y * v2.X;
         }
-
-
+        
+        public static double Determinant(Vector2D v1, Vector2D v2)
+        {
+            return v1.X * v2.Y - v1.Y * v2.X;
+        }
+        
         public static bool IsCollinear(Vector3F vector1, Vector3F vector2)
         {
             var deltaX = vector1.X / vector2.X;
@@ -591,6 +600,18 @@ namespace Adamantium.Mathematics
             return false;
 
         }
+        
+        public static bool IsCollinear(Vector2D vector1, Vector2D vector2)
+        {
+            var result = Vector2D.Dot(vector1, vector2);
+
+            if (result == 1 || result == -1)
+            {
+                return true;
+            }
+            return false;
+
+        }
 
         public static bool IsClockwise(Vector2F point0, Vector2F point1, Vector2F point2)
         {
@@ -603,12 +624,12 @@ namespace Adamantium.Mathematics
 
         }
 
-        public static bool IsClockwise(Vector3F point0, Vector3F point1, Vector3F point2, Vector3F viewVector)
+        public static bool IsClockwise(Vector2D point0, Vector2D point1, Vector2D point2, Vector3F viewVector)
         {
             var edge0 = point1 - point0;
             var edge1 = point2 - point0;
 
-            var n = Vector3F.Cross(edge0, edge1);
+            var n = Vector3F.Cross((Vector3F)edge0, (Vector3F)edge1);
             n.Normalize();
             var angle = Vector3F.Dot(n, viewVector);
 

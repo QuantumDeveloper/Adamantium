@@ -4,20 +4,20 @@ namespace Adamantium.Mathematics
 {
     public struct LineSegment : IEquatable<LineSegment>
     {
-        public Vector3D Start { get; set; }
+        public Vector2D Start { get; set; }
 
-        public Vector3D End { get; set; }
+        public Vector2D End { get; set; }
 
-        public Vector3D Direction { get; }
+        public Vector2D Direction { get; }
 
-        public Vector3D DirectionNormalized { get; }
+        public Vector2D DirectionNormalized { get; }
 
-        public LineSegment(Vector3D start, Vector3D end)
+        public LineSegment(Vector2D start, Vector2D end)
         {
             Start = start;
             End = end;
             Direction = end - start;
-            DirectionNormalized = Vector3D.Normalize(Direction);
+            DirectionNormalized = Vector2D.Normalize(Direction);
         }
 
         public bool Equals(LineSegment other)

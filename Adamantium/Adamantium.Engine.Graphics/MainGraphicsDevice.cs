@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Core;
 using Adamantium.Engine.Graphics.Effects;
@@ -13,6 +14,8 @@ namespace Adamantium.Engine.Graphics
         public PhysicalDevice PhysicalDevice { get; private set; }
         
         internal Device LogicalDevice { get; private set; }
+        
+        public uint AvailableQueuesCount { get; private set; }
         
         //internal Queue GraphicsQueue { get; private set; }
         
@@ -33,11 +36,26 @@ namespace Adamantium.Engine.Graphics
             var queueInfos = new List<DeviceQueueCreateInfo>();
             HashSet<uint> uniqueQueueFamilies = new HashSet<uint>() { indices.graphicsFamily.Value, indices.presentFamily.Value };
             float queuePriority = 1.0f;
+            var queueFamilies = PhysicalDevice.GetQueueFamilyProperties();
+
+            for (int i = 0; i < queueFamilies.Length; ++i)
+            {
+                Console.WriteLine($"Queue family {i}. Queue count: {queueFamilies[i].QueueCount}");
+            }
+            
+            AvailableQueuesCount = 2;
+
+            if (queueFamilies[0].QueueCount < 2)
+            {
+                Console.WriteLine($"There are only {queueFamilies[0].QueueCount} queues for queue family 0");
+                AvailableQueuesCount = 1;
+            }
+            
             foreach (var queueFamily in uniqueQueueFamilies)
             {
                 var queueCreateInfo = new DeviceQueueCreateInfo();
                 queueCreateInfo.QueueFamilyIndex = queueFamily;
-                queueCreateInfo.QueueCount = 2;
+                queueCreateInfo.QueueCount = AvailableQueuesCount;
                 queueCreateInfo.PQueuePriorities = queuePriority;
                 queueInfos.Add(queueCreateInfo);
             }
