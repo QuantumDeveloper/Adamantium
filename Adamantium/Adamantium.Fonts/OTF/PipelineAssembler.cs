@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using Adamantium.Fonts.Common;
+using System.Linq;
 
 namespace Adamantium.Fonts.OTF
 {
@@ -21,6 +22,11 @@ namespace Adamantium.Fonts.OTF
             commandList.Clear();
             commandList.Fill(stack);
 
+            if (commandList.commands.Last().@operator != OperatorsType.endchar)
+            {
+                throw new CommandException("Not ending with EndChar command");
+            }
+
             if (clearMainStack)
                 stack.Clear();
 
@@ -37,6 +43,8 @@ namespace Adamantium.Fonts.OTF
 
         public PipelineAssembler Sample(int rate)
         {
+            outlineList.Sample(rate);
+            
             return this;
         }
 

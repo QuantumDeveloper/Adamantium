@@ -5,12 +5,14 @@ namespace Adamantium.Fonts.OTF
     class OutlineList
     {
         private CommandInterpreter interpreter;
-        internal List<Outline> outlines;
+        internal List<Outline> originalOutlines;
+
+        public List<Outline> sampledOutlines;
 
         public OutlineList()
         {
             interpreter = new CommandInterpreter();
-            outlines = new List<Outline>();
+            originalOutlines = new List<Outline>();
         }
 
         public void Fill(List<Command> commands)
@@ -22,7 +24,7 @@ namespace Adamantium.Fonts.OTF
                 if (IsNewOutline(command))
                 {
                     outline = new Outline();
-                    outlines.Add(outline);
+                    originalOutlines.Add(outline);
                 }
 
                 var pts = interpreter.GetPoints(command);
@@ -30,9 +32,14 @@ namespace Adamantium.Fonts.OTF
             }
         }
 
+        public void Sample(int resolution)
+        {
+            BezierSampler.SampleOutlines(originalOutlines.ToArray(), resolution);
+        }
+
         public void Clear()
         {
-            outlines?.Clear();
+            originalOutlines?.Clear();
         }
 
         private bool IsNewOutline(Command command)

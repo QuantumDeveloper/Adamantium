@@ -41,9 +41,6 @@
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
       <None Remove="Models\F15C\F-15C_Eagle.obj" />
-      <Content Include="Models\F15C\F-15C_Eagle.obj">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </Content>
       <None Remove="Models\F15C\Body 1.png" />
       <Content Include="Models\F15C\Body 1.png">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
