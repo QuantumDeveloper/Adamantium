@@ -156,6 +156,18 @@ namespace Adamantium.Mathematics
       {
          return new[] { X, Y };
       }
+      
+      public bool IsCollinear(Vector2D vector)
+      {
+         var result = Dot(this, vector);
+
+         if (result == 1 || result == -1)
+         {
+            return true;
+         }
+         return false;
+
+      }
 
       /// <summary>
       /// Adds two vectors.

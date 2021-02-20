@@ -90,7 +90,7 @@ namespace Adamantium.MathTests
         [Test]
         public void IsPointOnLineTest()
         {
-            var segment = new LineSegment(new Vector2D(0, 0), new Vector2D(10, 0));
+            var segment = new LineSegment2D(new Vector2D(0, 0), new Vector2D(10, 0));
             var point = new Vector2D(5, 0);
             var isOnLine = Collision2D.IsPointOnSegment(ref segment, ref point);
             Assert.IsTrue(isOnLine, "point is not on the line");
@@ -99,7 +99,7 @@ namespace Adamantium.MathTests
         [Test]
         public void IsPointOnLeftSegmentEdgeTest()
         {
-            var segment = new LineSegment(new Vector2D(0, 0), new Vector2D(10, 0));
+            var segment = new LineSegment2D(new Vector2D(0, 0), new Vector2D(10, 0));
             var point = new Vector2D(0, 0);
             var isOnLine = Collision2D.IsPointOnSegment(ref segment, ref point);
             Assert.IsTrue(isOnLine, "point is not on the line");
@@ -108,7 +108,7 @@ namespace Adamantium.MathTests
         [Test]
         public void IsPointOnRightSegmentEdgeTest()
         {
-            var segment = new LineSegment(new Vector2D(0, 0), new Vector2D(10, 0));
+            var segment = new LineSegment2D(new Vector2D(0, 0), new Vector2D(10, 0));
             var point = new Vector2D(10, 0);
             var isOnLine = Collision2D.IsPointOnSegment(ref segment, ref point);
             Assert.IsTrue(isOnLine, "point is not on the line");
@@ -117,7 +117,7 @@ namespace Adamantium.MathTests
         [Test]
         public void IsPointNotOnSegmentTest2()
         {
-            var segment = new LineSegment(new Vector2D(0, 0), new Vector2D(10, 10));
+            var segment = new LineSegment2D(new Vector2D(0, 0), new Vector2D(10, 10));
             var point = new Vector2D(5, 5.01f);
             var isOnLine = Collision2D.IsPointOnSegment(ref segment, ref point);
             Assert.IsFalse(isOnLine, "point is on the line");
@@ -126,7 +126,7 @@ namespace Adamantium.MathTests
         [Test]
         public void IsPointNotOnLineTest()
         {
-            var segment = new LineSegment(new Vector2D(0, 0), new Vector2D(10, 0));
+            var segment = new LineSegment2D(new Vector2D(0, 0), new Vector2D(10, 0));
             var point = new Vector2D(11, 0);
             var isOnLine = Collision2D.IsPointOnSegment(ref segment, ref point);
             Assert.IsFalse(isOnLine, "point is on the line");
@@ -135,7 +135,7 @@ namespace Adamantium.MathTests
         [Test]
         public void IsPointNotOnSegmentTest()
         {
-            var segment = new LineSegment(new Vector2D(0, 0), new Vector2D(0, 20));
+            var segment = new LineSegment2D(new Vector2D(0, 0), new Vector2D(0, 20));
             var point = new Vector2D(5, 0);
             var isOnLine = Collision2D.IsPointOnSegment(ref segment, ref point);
             Assert.IsFalse(isOnLine, "point is on the line");
@@ -144,8 +144,8 @@ namespace Adamantium.MathTests
         [Test]
         public void SegmentSegmentIntersectionTest()
         {
-            var segment1 = new LineSegment(new Vector2D(-10, 0), new Vector2D(0, 30));
-            var segment2 = new LineSegment(new Vector2D(-15, 15), new Vector2D(15, 15));
+            var segment1 = new LineSegment2D(new Vector2D(-10, 0), new Vector2D(0, 30));
+            var segment2 = new LineSegment2D(new Vector2D(-15, 15), new Vector2D(15, 15));
 
             var isLineIntersects = Collision2D.SegmentSegmentIntersection(ref segment1, ref segment2, out var intersectionPoint);
             Assert.IsTrue(isLineIntersects, "lines is not intersecting");
@@ -156,7 +156,7 @@ namespace Adamantium.MathTests
         [Test]
         public void RayLineIntersectionTest()
         {
-            LineSegment s = new LineSegment(new Vector2D(1, 1), new Vector2D(10, 1));
+            LineSegment2D s = new LineSegment2D(new Vector2D(1, 1), new Vector2D(10, 1));
             var ray = new Ray2D(new Vector2D(2, 10), new Vector2D(0, -1));
             var isLineIntersects = Collision2D.RaySegmentIntersection(ref ray, ref s, out var intersectionPoint);
             Assert.IsTrue(isLineIntersects, "lines is not intersecting");
@@ -166,7 +166,7 @@ namespace Adamantium.MathTests
         [Test]
         public void RayLineIntersectionTest2()
         {
-            LineSegment s = new LineSegment(new Vector2D(-20, 8), new Vector2D(10, 1));
+            LineSegment2D s = new LineSegment2D(new Vector2D(-20, 8), new Vector2D(10, 1));
             var ray = new Ray2D(new Vector2D(-2, 10), new Vector2D(0, -1));
             var isLineIntersects = Collision2D.RaySegmentIntersection(ref ray, ref s, out var intersectionPoint);
             Assert.IsTrue(isLineIntersects, "ray and line is not intersecting");
@@ -176,7 +176,7 @@ namespace Adamantium.MathTests
         [Test]
         public void CollinearRayLineIntersectionTest()
         {
-            LineSegment s = new LineSegment(new Vector2D(20, 0), new Vector2D(30, 0));
+            LineSegment2D s = new LineSegment2D(new Vector2D(20, 0), new Vector2D(30, 0));
             var ray = new Ray2D(new Vector2D(1, 0), new Vector2D(1, 0));
             var isLineIntersects = Collision2D.RaySegmentIntersection(ref ray, ref s, out var intersectionPoint);
             Assert.IsFalse(isLineIntersects, "ray and line is not collinear");
@@ -185,7 +185,7 @@ namespace Adamantium.MathTests
         [Test]
         public void CollinearRayLineIntersectionTest2()
         {
-            LineSegment s = new LineSegment(new Vector2D(20, 0), new Vector2D(10, 0));
+            LineSegment2D s = new LineSegment2D(new Vector2D(20, 0), new Vector2D(10, 0));
             var ray = new Ray2D(new Vector2D(1, 0), new Vector2D(1, 0));
             var isLineIntersects = Collision2D.RaySegmentIntersection(ref ray, ref s, out var intersectionPoint);
             Assert.IsFalse(isLineIntersects, "ray and line is not collinear");
@@ -194,7 +194,7 @@ namespace Adamantium.MathTests
         [Test]
         public void RayWithStartOfLineIntersection()
         {
-            LineSegment s = new LineSegment(new Vector2D(20, 0), new Vector2D(30, 0));
+            LineSegment2D s = new LineSegment2D(new Vector2D(20, 0), new Vector2D(30, 0));
             var ray = new Ray2D(new Vector2D(20, 10), new Vector2D(0, -1));
             var isLineIntersects = Collision2D.RaySegmentIntersection(ref ray, ref s, out var intersectionPoint);
             Assert.IsTrue(isLineIntersects, "ray and line is not intersecting");
@@ -204,7 +204,7 @@ namespace Adamantium.MathTests
         [Test]
         public void RayWithEndOfLineIntersection()
         {
-            LineSegment s = new LineSegment(new Vector2D(20, 0), new Vector2D(30, 0));
+            LineSegment2D s = new LineSegment2D(new Vector2D(20, 0), new Vector2D(30, 0));
             var ray = new Ray2D(new Vector2D(30, 10), new Vector2D(0, -1));
             var isLineIntersects = Collision2D.RaySegmentIntersection(ref ray, ref s, out var intersectionPoint);
             Assert.IsTrue(isLineIntersects, "ray and line is not intersecting");

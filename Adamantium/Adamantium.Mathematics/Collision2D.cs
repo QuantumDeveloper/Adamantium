@@ -4,7 +4,7 @@ namespace Adamantium.Mathematics
 {
     public static class Collision2D
     {
-        public static bool IsPointOnSegment(ref LineSegment segment, ref Vector2D point)
+        public static bool IsPointOnSegment(ref LineSegment2D segment2D, ref Vector2D point)
         {
             //Find cross product for (v3-v1)-(v2-v1) to tell if points v1,v2 and v3 are aligned.
             //If it is so, then value should be near zero (less than Epsilon)
@@ -13,9 +13,9 @@ namespace Adamantium.Mathematics
             //if (MathHelper.IsZero(cross))
             //    return false;
 
-            var v1 = segment.DirectionNormalized;
-            var v2 = Vector2D.Normalize(point - segment.Start);
-            var v3 = point - segment.End;
+            var v1 = segment2D.DirectionNormalized;
+            var v2 = Vector2D.Normalize(point - segment2D.Start);
+            var v3 = point - segment2D.End;
 
             var v2v1 = Vector2D.Dot(v2, v1) - 1.0f;
             if (MathHelper.NearEqual(v2v1, Polygon.Epsilon) && Vector2D.Dot(v3, v1) < 0)
@@ -24,9 +24,9 @@ namespace Adamantium.Mathematics
             }
 
             //Second approach
-            var ab = segment.Direction.Length();
-            var ap = (point - segment.Start).Length();
-            var bp = (point - segment.End).Length();
+            var ab = segment2D.Direction.Length();
+            var ap = (point - segment2D.Start).Length();
+            var bp = (point - segment2D.End).Length();
             if (MathHelper.WithinEpsilon(ab, ap + bp, Polygon.Epsilon))
             {
                 return true;
@@ -35,7 +35,7 @@ namespace Adamantium.Mathematics
             return false;
         }
 
-        public static bool SegmentSegmentIntersection(ref LineSegment segment1, ref LineSegment segment2, out Vector2D point)
+        public static bool SegmentSegmentIntersection(ref LineSegment2D segment1, ref LineSegment2D segment2, out Vector2D point)
         {
             var p = segment1.Start;
             var q = segment2.Start;
@@ -69,13 +69,13 @@ namespace Adamantium.Mathematics
 
         public static bool RaySegmentIntersection(ref Ray2D ray, ref Vector2D start, ref Vector2D end, out Vector2D point)
         {
-            var segment = new LineSegment(start, end);
+            var segment = new LineSegment2D(start, end);
             return RaySegmentIntersection(ref ray, ref segment, out point);
         }
 
-        public static bool RaySegmentIntersection(ref Ray2D ray, ref LineSegment segment, out Vector2D point)
+        public static bool RaySegmentIntersection(ref Ray2D ray, ref LineSegment2D segment2D, out Vector2D point)
         {
-            var collinear = MathHelper.IsCollinear(ray.Direction, segment.Direction);
+            var collinear = ray.Direction.IsCollinear(segment2D.Direction);
             if (collinear)
             {
                 point = Vector2D.Zero;
@@ -84,8 +84,8 @@ namespace Adamantium.Mathematics
 
             var p = ray.Origin;
             var r = ray.Direction;
-            var q = segment.Start;
-            var s = segment.Direction;
+            var q = segment2D.Start;
+            var s = segment2D.Direction;
             // t = (q − p) × s / (r × s)
             // u = (q − p) × r / (r × s)
 
@@ -136,17 +136,17 @@ namespace Adamantium.Mathematics
         }
 
 
-        public static bool RaySegmentIntersection(ref Ray2D ray, ref LineSegment segment, out Vector2D point, out double distance)
+        public static bool RaySegmentIntersection(ref Ray2D ray, ref LineSegment2D segment2D, out Vector2D point, out double distance)
         {
-            bool collinear = MathHelper.IsCollinear(ray.Direction, (Vector2D)segment.DirectionNormalized);
+            bool collinear = ray.Direction.IsCollinear(segment2D.Direction);
             distance = float.PositiveInfinity;
             point = Vector2D.Zero;
             if (!collinear)
             {
                 var p = ray.Origin;
-                var q = segment.Start;
+                var q = segment2D.Start;
                 var r = ray.Direction;
-                var s = segment.Direction;
+                var s = segment2D.Direction;
                 // t = (q − p) × s / (r × s)
                 // u = (q − p) × r / (r × s)
 
@@ -168,8 +168,8 @@ namespace Adamantium.Mathematics
                 //If ray and line not intersecting, try to find out closest distance between them
                 //and if distance is less than Epsilon, then we can say that ray intersects line
                 //because distance is near zero
-                var a = Vector2D.Dot(segment.Start, segment.Direction);
-                var b = Vector2D.Dot(point, segment.Direction);
+                var a = Vector2D.Dot(segment2D.Start, segment2D.Direction);
+                var b = Vector2D.Dot(point, segment2D.Direction);
                 distance = Math.Abs(b - a);
 
                 if (t < 0 || t > 1 || u < 0 || u > 1)

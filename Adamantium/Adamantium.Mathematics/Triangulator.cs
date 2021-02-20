@@ -43,7 +43,7 @@ namespace Adamantium.Mathematics
         /// After that you need to cast rays on each point from the highest point in <see cref="Polygon"/> vertically down.
         /// This will produce a collection of trapezoids where each 4 points (2 from first ray and 2 from next) will create 2 triangles.
         /// Further according to triangulation rule you should fill <see cref="Polygon"/> with triangles.
-        /// Accroding to Even-Odd rule, when you first found an intersection, you enter in polygon, on the second time - you leave a polygon and should
+        /// According to Even-Odd rule, when you first found an intersection, you enter in polygon, on the second time - you leave a polygon and should
         /// fill it only between even and odd segment pairs (Zero is also even number)
         /// According to Non-Zero rule you should fill also self intersecting parts of polygon in addition to written above.
         /// </remarks>
@@ -74,8 +74,7 @@ namespace Adamantium.Mathematics
                 for (int j = 0; j < polygon.MergedSegments.Count; ++j)
                 {
                     var segment = polygon.MergedSegments[j];
-                    Vector2D interPoint;
-                    if (Collision2D.RaySegmentIntersection(ref ray, ref segment, out interPoint))
+                    if (Collision2D.RaySegmentIntersection(ref ray, ref segment, out var interPoint))
                     {
                         // We need to filter points very close to each other to avoid producing incorrect results during generation of triangles
                         if (!IsXPointSimilarTo(interPoint, rayPoints))
@@ -100,33 +99,28 @@ namespace Adamantium.Mathematics
             List<Vector3F> finalTriangles = new List<Vector3F>();
             for (int i = 0; i < rays.Count - 1; ++i)
             {
-                if (i == 5)
-                {
-                    int x = 0;
-                }
-                
                 var upperInterPoints = rayIntersectionPoints[i];
                 var lowerInterPoints = rayIntersectionPoints[i + 1];
 
                 //find all connected segments which will represent start and end of triangulation sequence
-                List<LineSegment> startEndSegmnets = new List<LineSegment>();
+                List<LineSegment2D> startEndSegments = new List<LineSegment2D>();
                 for (int j = 0; j < upperInterPoints.Length; j++)
                 {
                     for (int k = 0; k < lowerInterPoints.Length; k++)
                     {
                         if (Polygon.IsConnected(upperInterPoints[j], lowerInterPoints[k], polygon.MergedSegments))
                         {
-                            startEndSegmnets.Add(new LineSegment(upperInterPoints[j], lowerInterPoints[k]));
+                            startEndSegments.Add(new LineSegment2D(upperInterPoints[j], lowerInterPoints[k]));
                         }
                     }
                 }
 
-                if (startEndSegmnets.Count > 1)
+                if (startEndSegments.Count > 1)
                 {
-                    for (int x = 0; x < startEndSegmnets.Count - 1; x++)
+                    for (int x = 0; x < startEndSegments.Count - 1; x++)
                     {
-                        var startSegment = startEndSegmnets[x];
-                        var endSegment = startEndSegmnets[x + 1];
+                        var startSegment = startEndSegments[x];
+                        var endSegment = startEndSegments[x + 1];
 
                         if (x % 2 == 0)
                         {
@@ -165,7 +159,7 @@ namespace Adamantium.Mathematics
         }
 
         /// <summary>
-        /// Check if Y point differnse between aother in list is near <see cref="Polygon.Epsilon"/> value
+        /// Check if Y point difference between another in list is near <see cref="Polygon.Epsilon"/> value
         /// </summary>
         private static bool IsXPointSimilarTo(Vector2D point, List<Vector2D> lst)
         {
@@ -183,23 +177,23 @@ namespace Adamantium.Mathematics
         /// Add 3 points to collection if their order is clockwise.
         /// </summary>
         /// <param name="trianglesList"></param>
-        /// <param name="startSegment"></param>
-        /// <param name="endSegment"></param>
-        private static void CreateTriangles(List<Vector3F> trianglesList, LineSegment startSegment, LineSegment endSegment)
+        /// <param name="startSegment2D"></param>
+        /// <param name="endSegment2D"></param>
+        private static void CreateTriangles(List<Vector3F> trianglesList, LineSegment2D startSegment2D, LineSegment2D endSegment2D)
         {
-            if (MathHelper.IsClockwise(startSegment.Start, endSegment.Start, endSegment.End, Vector3D.BackwardRH))
+            if (MathHelper.IsClockwise(startSegment2D.Start, endSegment2D.Start, endSegment2D.End, Vector3D.BackwardRH))
             {
-                trianglesList.Add((Vector3F)startSegment.Start);
-                trianglesList.Add((Vector3F)endSegment.Start);
-                trianglesList.Add((Vector3F)endSegment.End);
+                trianglesList.Add((Vector3F)startSegment2D.Start);
+                trianglesList.Add((Vector3F)endSegment2D.Start);
+                trianglesList.Add((Vector3F)endSegment2D.End);
             }
 
-            if (MathHelper.IsClockwise(startSegment.Start, endSegment.End, startSegment.End, Vector3D.BackwardRH))
+            if (MathHelper.IsClockwise(startSegment2D.Start, endSegment2D.End, startSegment2D.End, Vector3D.BackwardRH))
             {
                 //Second triangle
-                trianglesList.Add((Vector3F)startSegment.Start);
-                trianglesList.Add((Vector3F)endSegment.End);
-                trianglesList.Add((Vector3F)startSegment.End);
+                trianglesList.Add((Vector3F)startSegment2D.Start);
+                trianglesList.Add((Vector3F)endSegment2D.End);
+                trianglesList.Add((Vector3F)startSegment2D.End);
             }
         }
 
@@ -216,14 +210,8 @@ namespace Adamantium.Mathematics
                 {
                     return -1;
                 }
-                else if (MathHelper.WithinEpsilon(x.X, y.X, Polygon.Epsilon))
-                {
-                    return 0;
-                }
-                else
-                {
-                    return 1;
-                }
+
+                return MathHelper.WithinEpsilon(x.X, y.X, Polygon.Epsilon) ? 0 : 1;
             }
         }
 

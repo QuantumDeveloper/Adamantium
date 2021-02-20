@@ -228,6 +228,29 @@ namespace Adamantium.Mathematics
         {
             return new float[] { X, Y, Z };
         }
+        
+        public bool IsCollinear(Vector3F vector)
+        {
+            var deltaX = X / vector.X;
+            var deltaY = Y / vector.Y;
+            if (Z == 0 || vector.Z == 0)
+            {
+                if (MathHelper.NearEqual(deltaX, deltaY))
+                {
+                    return true;
+                }
+            }
+            else
+            {
+                var deltaZ = Z / vector.Z;
+                if (MathHelper.NearEqual(deltaX, deltaY) && MathHelper.NearEqual(deltaY, deltaZ))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
 
         /// <summary>
         /// Adds two vectors.

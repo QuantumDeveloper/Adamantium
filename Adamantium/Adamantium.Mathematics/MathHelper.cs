@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 
 namespace Adamantium.Mathematics
 {
@@ -49,7 +50,7 @@ namespace Adamantium.Mathematics
         /// The code is using the technique described by Bruce Dawson in 
         /// <a href="http://randomascii.wordpress.com/2012/02/25/comparing-floating-point-numbers-2012-edition/">Comparing Floating point numbers 2012 edition</a>. 
         /// </remarks>
-        public static unsafe bool NearEqual(float a, float b)
+        public static bool NearEqual(float a, float b)
         {
             //// Check if the numbers are really close -- needed
             //// when comparing numbers near zero.
@@ -76,7 +77,7 @@ namespace Adamantium.Mathematics
             return WithinEpsilon(a, b, 1e-4f);
         }
 
-        public static unsafe bool NearEqual(double a, double b)
+        public static bool NearEqual(double a, double b)
         {
             // Check if the numbers are really close -- needed
             // when comparing numbers near zero.
@@ -113,6 +114,7 @@ namespace Adamantium.Mathematics
         /// <param name="b">The right value to compare.</param>
         /// <param name="epsilon">Epsilon value</param>
         /// <returns><c>true</c> if a almost equal to b within a float epsilon, <c>false</c> otherwise</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool WithinEpsilon(float a, float b, float epsilon)
         {
             float absA = Math.Abs(a);
@@ -143,6 +145,7 @@ namespace Adamantium.Mathematics
         /// <param name="b">The right value to compare.</param>
         /// <param name="epsilon">Epsilon value</param>
         /// <returns><c>true</c> if a almost equal to b within a float epsilon, <c>false</c> otherwise</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool WithinEpsilon(double a, double b, double epsilon)
         {
             double absA = Math.Abs(a);
@@ -528,7 +531,7 @@ namespace Adamantium.Mathematics
             return angle;
         }
 
-        public static float AngleBetween(LineSegment s1, LineSegment s2, bool is360Degrees = true)
+        public static float AngleBetween(LineSegment2D s1, LineSegment2D s2, bool is360Degrees = true)
         {
             float angle = 0;
             if (is360Degrees)
@@ -564,53 +567,6 @@ namespace Adamantium.Mathematics
         public static double Determinant(Vector2D v1, Vector2D v2)
         {
             return v1.X * v2.Y - v1.Y * v2.X;
-        }
-        
-        public static bool IsCollinear(Vector3F vector1, Vector3F vector2)
-        {
-            var deltaX = vector1.X / vector2.X;
-            var deltaY = vector1.Y / vector2.Y;
-            if (vector1.Z == 0 || vector2.Z == 0)
-            {
-                if (NearEqual(deltaX, deltaY))
-                {
-                    return true;
-                }
-            }
-            else
-            {
-                var deltaZ = vector1.Z / vector2.Z;
-                if (NearEqual(deltaX, deltaY) && NearEqual(deltaY, deltaZ))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        public static bool IsCollinear(Vector2F vector1, Vector2F vector2)
-        {
-            var result = Vector2F.Dot(vector1, vector2);
-
-            if (result == 1 || result == -1)
-            {
-                return true;
-            }
-            return false;
-
-        }
-        
-        public static bool IsCollinear(Vector2D vector1, Vector2D vector2)
-        {
-            var result = Vector2D.Dot(vector1, vector2);
-
-            if (result == 1 || result == -1)
-            {
-                return true;
-            }
-            return false;
-
         }
 
         public static bool IsClockwise(Vector2F point0, Vector2F point1, Vector2F point2)
