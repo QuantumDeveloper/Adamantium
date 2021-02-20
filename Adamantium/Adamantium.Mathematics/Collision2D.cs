@@ -13,26 +13,21 @@ namespace Adamantium.Mathematics
             //if (MathHelper.IsZero(cross))
             //    return false;
 
-            var v1 = segment2D.DirectionNormalized;
-            var v2 = Vector2D.Normalize(point - segment2D.Start);
-            var v3 = point - segment2D.End;
-
-            var v2v1 = Vector2D.Dot(v2, v1) - 1.0f;
-            if (MathHelper.NearEqual(v2v1, Polygon.Epsilon) && Vector2D.Dot(v3, v1) < 0)
-            {
-                return true;
-            }
+            // var v1 = segment2D.DirectionNormalized;
+            // var v2 = Vector2D.Normalize(point - segment2D.Start);
+            // var v3 = point - segment2D.End;
+            //
+            // var v2v1 = Vector2D.Dot(v2, v1) - 1.0f;
+            // if (MathHelper.NearEqual(v2v1, Polygon.Epsilon) && Vector2D.Dot(v3, v1) < 0)
+            // {
+            //     return true;
+            // }
 
             //Second approach
             var ab = segment2D.Direction.Length();
             var ap = (point - segment2D.Start).Length();
             var bp = (point - segment2D.End).Length();
-            if (MathHelper.WithinEpsilon(ab, ap + bp, Polygon.Epsilon))
-            {
-                return true;
-            }
-
-            return false;
+            return MathHelper.WithinEpsilon(ab, ap + bp, Polygon.Epsilon);
         }
 
         public static bool SegmentSegmentIntersection(ref LineSegment2D segment1, ref LineSegment2D segment2, out Vector2D point)

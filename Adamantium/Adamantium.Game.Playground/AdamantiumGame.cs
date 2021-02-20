@@ -47,7 +47,7 @@ namespace Adamantium.Game.Playground
             Task.Delay(2000).ContinueWith(task =>
             {
                 //ImportModel(@"Models\monkey\monkey.dae");
-                ImportModel(@"Models\F15C\F-15C_Eagle.dae");
+                //ImportModel(@"Models\F15C\F-15C_Eagle.dae");
                 ImportFont();
             });
             
@@ -82,7 +82,7 @@ namespace Adamantium.Game.Playground
             {
                 parser = new TTFFontParser(@"PlayfairDisplay-Regular.ttf", 7);
                 var entity = new Entity(null, "PlayfairDisplay-Regular");
-                var ch = parser.FontData.GetGlyphForCharacter('A');
+                var ch = parser.FontData.GetGlyphForCharacter('B');
                 parser.GenerateGlyphTriangles(ch);
                 var mesh = new Mesh();
                 mesh.SetPositions(ch.Vertices);

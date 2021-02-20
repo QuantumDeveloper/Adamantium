@@ -17,7 +17,7 @@ namespace Adamantium.Mathematics
         /// Seems Epsilon must be less than <see cref="MathHelper.ZeroToleranceD"/> on 1 magnitude to avoid floating point errors, but not less than 1e-8. 
         /// Current ZeroTolerance value = 1e-9
         /// </remarks>
-        public static double Epsilon = 1e-8;
+        public static double Epsilon = 1e-9;
         /// <summary>
         /// Polygon name
         /// </summary>
@@ -27,11 +27,6 @@ namespace Adamantium.Mathematics
         /// Collection of <see cref="PolygonItem"/>
         /// </summary>
         public List<PolygonItem> Polygons { get; private set; }
-
-        /// <summary>
-        /// Collection of <see cref="PolygonItem"/>
-        /// </summary>
-        //internal List<PolygonItem> PolygonsCopy { get; private set; }
 
         /// <summary>
         /// Collection of points from all <see cref="PolygonItem"/>s in current <see cref="Polygon"/>

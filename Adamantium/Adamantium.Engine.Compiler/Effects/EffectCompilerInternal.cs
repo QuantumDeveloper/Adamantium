@@ -1019,7 +1019,8 @@ namespace Adamantium.Engine.Compiler.Effects
             //opts.UseHlslIoMapping = true;
             //opts.UseHlslOffsets = true;
             //opts.SetAutoBindUniforms = true;
-            opts.TargetSpirv = ShadercSpirvVersion._5;
+            //opts.TargetSpirv = ShadercSpirvVersion._5;
+            opts.TargetSpirv = ShadercSpirvVersion._3;
             
             //TODO: Remove this condition when MoltenVK will be the same version as version for Windows
             if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
