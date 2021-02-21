@@ -532,9 +532,19 @@ namespace Adamantium.Engine.Graphics
             {
                 throw new Exception($"failed to reset fences. Result: {result}");
             }
+
+            if (MainDevice.AvailableQueuesCount == 1)
+            {
+                mutex.WaitOne();
+            }
             
             result = GraphicsQueue.QueueSubmit(1, submitInfos, renderFence);
             GraphicsQueue.QueueWaitIdle();
+            
+            if (MainDevice.AvailableQueuesCount == 1)
+            {
+                mutex.ReleaseMutex();
+            }
 
             if (result != Result.Success)
             {

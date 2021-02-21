@@ -847,41 +847,20 @@ namespace Adamantium.Mathematics
         }
 
         /// <summary>
-        /// Comparer here is for sorting vectors by its X component from smallest to biggest value
+        /// Comparer here is for sorting vectors by its Y component from smallest to biggest value
         /// </summary>
-        private class HorizontalVertexComparer : IComparer<Vector3D>
-        {
-            public static HorizontalVertexComparer Default => new HorizontalVertexComparer();
-
-            public int Compare(Vector3D x, Vector3D y)
-            {
-                if (MathHelper.WithinEpsilon(x.X, y.X, Epsilon))
-                {
-                    return 0;
-                }
-                if (x.X < y.X)
-                {
-                    return -1;
-                }
-                return 1;
-            }
-        }
-        
         private class VerticalVertexComparer : IComparer<Vector2D>
         {
             public static VerticalVertexComparer Default => new VerticalVertexComparer();
 
             public int Compare(Vector2D x, Vector2D y)
             {
-                if (MathHelper.WithinEpsilon(x.X, y.X, Epsilon))
+                if (MathHelper.WithinEpsilon(x.Y, y.Y, Epsilon))
                 {
                     return 0;
                 }
-                if (x.Y < y.Y)
-                {
-                    return -1;
-                }
-                return 1;
+
+                return x.Y < y.Y ? -1 : 1;
             }
         }
 

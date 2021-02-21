@@ -41,16 +41,11 @@ namespace Adamantium.Game.Playground
             LoadModels();
         }
 
-        private void LoadModels()
+        private async void LoadModels()
         {
-            
-            Task.Delay(2000).ContinueWith(task =>
-            {
-                //ImportModel(@"Models\monkey\monkey.dae");
-                //ImportModel(@"Models\F15C\F-15C_Eagle.dae");
-                ImportFont();
-            });
-            
+            ImportModel(@"Models\monkey\monkey.dae");
+            //await ImportModel(@"Models\F15C\F-15C_Eagle.dae");
+            ImportFont();
         }
 
         private void InitializeResources()
@@ -84,7 +79,9 @@ namespace Adamantium.Game.Playground
                 var entity = new Entity(null, "PlayfairDisplay-Regular");
                 var ch = parser.FontData.GetGlyphForCharacter('B');
                 parser.GenerateGlyphTriangles(ch);
+                //parser.GenerateDefaultGlyphTriangles(ch);
                 var mesh = new Mesh();
+                //mesh.MeshTopology = PrimitiveType.PointList;
                 mesh.SetPositions(ch.Vertices);
                 var meshComponent = new MeshData();
                 meshComponent.Mesh = mesh;

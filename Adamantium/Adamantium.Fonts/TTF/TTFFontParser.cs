@@ -1143,6 +1143,23 @@ namespace Adamantium.Fonts.TTF
             
             glyphData.Vertices = polygon.Fill();
         }
+        
+        public void GenerateDefaultGlyphTriangles(GlyphData glyphData)
+        {
+            var polygon = new Polygon();
+            var pointList2D = new List<Vector3F>();
+            
+            foreach (var contour in glyphData.BezierContours)
+            {
+                foreach (var point in contour.Points)
+                {
+                    var point2D = new Vector3F(point.X, point.Y);
+                    pointList2D.Add(point2D);
+                }
+            }
+            
+            glyphData.Vertices = pointList2D;
+        }
 
         private void FillCompositeGlyphGeometry(Glyph glyph, GlyphData glyphData)
         {

@@ -50,6 +50,7 @@ namespace Adamantium.Mathematics
         /// The code is using the technique described by Bruce Dawson in 
         /// <a href="http://randomascii.wordpress.com/2012/02/25/comparing-floating-point-numbers-2012-edition/">Comparing Floating point numbers 2012 edition</a>. 
         /// </remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool NearEqual(float a, float b)
         {
             //// Check if the numbers are really close -- needed
@@ -74,9 +75,10 @@ namespace Adamantium.Mathematics
             //return ulp <= maxUlp;
 
 
-            return WithinEpsilon(a, b, 1e-4f);
+            return WithinEpsilon(a, b, ZeroToleranceF);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool NearEqual(double a, double b)
         {
             // Check if the numbers are really close -- needed
@@ -99,9 +101,10 @@ namespace Adamantium.Mathematics
             //// according to http://code.google.com/p/googletest/source/browse/trunk/include/gtest/internal/gtest-internal.h
             //const int maxUlp = 4;
             //return ulp <= maxUlp;
-            return WithinEpsilon(a, b, 1e-8);
+            return WithinEpsilon(a, b, ZeroToleranceD);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool NearEqual(Vector3D a, Vector3D b)
         {
             return WithinEpsilon(a, b, ZeroToleranceD);

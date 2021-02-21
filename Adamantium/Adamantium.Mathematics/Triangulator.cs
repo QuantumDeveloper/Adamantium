@@ -50,49 +50,69 @@ namespace Adamantium.Mathematics
         public static List<Vector3F> Triangulate(Polygon polygon)
         {
             var rays = new List<Ray2D>();
-            var sortedX = new List<double>();
+            var sortedY = new List<double>();
             var rayIntersectionPoints = new List<Vector2D[]>();
             List<Vector2D> interPoints = new List<Vector2D>();
 
             var sortedList = polygon.SortVertices();
             var ray = new Ray2D(Vector2D.Zero, Vector2D.UnitX);
-            var highestPoint = polygon.HighestPoint.X;
+            var mostLeftPoint = polygon.HighestPoint.X;
             for (int i = 0; i < sortedList.Count; ++i)
             {
                 var point = sortedList[i];
-                if (sortedX.Contains(point.Y) || IsSimilarTo(point.Y, sortedX))
+                if (sortedY.Contains(point.Y) || IsSimilarTo(point.Y, sortedY))
                 {
                     continue;
                 }
 
-                sortedX.Add(point.Y);
-                Vector2D rayOrigin = new Vector2D(highestPoint, point.Y);
-                ray.Origin = rayOrigin;
+                if (i == 156)
+                {
+                    int x = 0;
+                }
+
+                sortedY.Add(point.Y);
+                ray.Origin = new Vector2D(mostLeftPoint, point.Y);
                 rays.Add(ray);
 
-                List<Vector2D> rayPoints = new List<Vector2D>();
+                var rayPoints = new List<Vector2D>();
                 for (int j = 0; j < polygon.MergedSegments.Count; ++j)
                 {
-                    var segment = polygon.MergedSegments[j];
-                    if (Collision2D.RaySegmentIntersection(ref ray, ref segment, out var interPoint))
+                    if (j == 126)
                     {
-                        // We need to filter points very close to each other to avoid producing incorrect results during generation of triangles
-                        if (!IsXPointSimilarTo(interPoint, rayPoints))
-                        {
-                            if (!IsSimilarTo(interPoint, interPoints) && !IsSimilarTo(interPoint, polygon.MergedPoints))
-                            {
-                                interPoints.Add(interPoint);
-                            }
-                            //Ray points should be added here because they needed for rayIntersectionPoints and if this collection will be empty
-                            //it will affect triangulation results
-                            rayPoints.Add(interPoint);
-                        }
+                        int x = 0;
                     }
+                    
+                    var segment = polygon.MergedSegments[j];
+                    if (!Collision2D.RaySegmentIntersection(ref ray, ref segment, out var interPoint)) continue;
+                    
+                    // We need to filter points very close to each other to avoid producing incorrect results during generation of triangles
+                    
+                    if (IsXPointSimilarTo(interPoint, rayPoints)) continue;
+                    
+                    if (!IsSimilarTo(interPoint, interPoints) && !IsSimilarTo(interPoint, polygon.MergedPoints))
+                    {
+                        interPoints.Add(interPoint);
+                    }
+                    //Ray points should be added here because they needed for rayIntersectionPoints and if this collection will be empty
+                    //it will affect triangulation results
+                    rayPoints.Add(interPoint);
                 }
 
                 rayPoints.Sort(VertexHorizontalComparer.Defaut);
                 rayIntersectionPoints.Add(rayPoints.ToArray());
             }
+            
+            Console.WriteLine("=====================================");
+            foreach (var raypoints in rayIntersectionPoints)
+            {
+                Console.WriteLine(string.Join(", ", raypoints));
+            }
+            Console.WriteLine("Segments");
+            foreach (var segment in polygon.MergedSegments)
+            {
+                Console.WriteLine(segment);
+            }
+            Console.WriteLine("=====================================");
 
             polygon.UpdatePolygonUsingRayInterPoints(interPoints);
 
@@ -206,12 +226,12 @@ namespace Adamantium.Mathematics
 
             public int Compare(Vector2D x, Vector2D y)
             {
-                if (x.X < y.X)
+                if (MathHelper.WithinEpsilon(x.X, y.X, Polygon.Epsilon))
                 {
-                    return -1;
+                    return 0;
                 }
 
-                return MathHelper.WithinEpsilon(x.X, y.X, Polygon.Epsilon) ? 0 : 1;
+                return x.X < y.X ? -1 : 1;
             }
         }
 

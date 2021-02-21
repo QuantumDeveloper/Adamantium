@@ -158,16 +158,10 @@ namespace Adamantium.Mathematics
          return new[] { X, Y };
       }
       
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public bool IsCollinear(Vector2D vector)
       {
-         var result = Dot(this, vector);
-
-         if (result == 1 || result == -1)
-         {
-            return true;
-         }
-         return false;
-
+         return MathHelper.NearEqual(X * vector.Y, Y * vector.X);
       }
 
       /// <summary>

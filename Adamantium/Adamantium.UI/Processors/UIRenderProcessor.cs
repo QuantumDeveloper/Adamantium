@@ -19,35 +19,25 @@ namespace Adamantium.UI.Processors
         {
             GraphicsDevice = graphicsDevice;
             msaaLevel = MSAALevel.X4;
+            EntityWorld.EntityAdded += EntityWorldOnEntityAdded;
+            EntityWorld.EntityRemoved += EntityWorldOnEntityRemoved;
         }
 
-        protected override void OnEntityAdded(Entity entity)
+        private void EntityWorldOnEntityAdded(object sender, EntityEventArgs e)
         {
-            TraverseByLayer(
-                entity,
-                current =>
-                {
-                    var window = entity.GetComponent<IWindow>();
-                    if (window != null)
-                    {
-                        windowRenderModule = new WindowRenderModule(window, GraphicsDevice, msaaLevel);
-                    }
-                });
+            var wnd = e.Entity.GetComponent<IWindow>();
+            if (wnd != null)
+            {
+                windowRenderModule = new WindowRenderModule(wnd, GraphicsDevice, msaaLevel);
+            }
         }
-
-        protected override void OnEntityRemoved(Entity entity)
+        
+        private void EntityWorldOnEntityRemoved(object sender, EntityEventArgs e)
         {
-            TraverseByLayer(
-                entity,
-                current =>
-                {
-                    var window = entity.GetComponent<IWindow>();
-                    if (window != null)
-                    {
-                        windowRenderModule?.Dispose();
-                        windowRenderModule = null;
-                    }
-                });
+            var wnd = e.Entity.GetComponent<IWindow>();
+            if (wnd == null) return;
+            windowRenderModule?.Dispose();
+            windowRenderModule = null;
         }
 
         public override void LoadContent()
