@@ -2,6 +2,7 @@
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
 
 namespace Adamantium.Mathematics
@@ -21,17 +22,17 @@ namespace Adamantium.Mathematics
       /// <summary>
       /// The X unit <see cref="Vector2D"/> (1, 0).
       /// </summary>
-      public static readonly Vector2D UnitX = new Vector2D(1.0f, 0.0f);
+      public static readonly Vector2D UnitX = new(1.0f, 0.0f);
 
       /// <summary>
       /// The Y unit <see cref="Vector2D"/> (0, 1).
       /// </summary>
-      public static readonly Vector2D UnitY = new Vector2D(0.0f, 1.0f);
+      public static readonly Vector2D UnitY = new(0.0f, 1.0f);
 
       /// <summary>
       /// A <see cref="Vector2D"/> with all of its components set to one.
       /// </summary>
-      public static readonly Vector2D One = new Vector2D(1.0f, 1.0f);
+      public static readonly Vector2D One = new(1.0f, 1.0f);
 
       public double X;
 
@@ -59,7 +60,7 @@ namespace Adamantium.Mathematics
          if (values == null)
             throw new ArgumentNullException(nameof(values));
          if (values.Length < 2)
-            throw new ArgumentOutOfRangeException("values", "There must be not less than two input values for Vector2D.");
+            throw new ArgumentOutOfRangeException(nameof(values), "There must be not less than two input values for Vector2D.");
 
          X = values[0];
          Y = values[1];
@@ -68,10 +69,7 @@ namespace Adamantium.Mathematics
       /// <summary>
       /// Gets a value indicting whether this instance is normalized.
       /// </summary>
-      public bool IsNormalized
-      {
-         get { return MathHelper.IsOne((X * X) + (Y * Y)); }
-      }
+      public bool IsNormalized => MathHelper.IsOne((X * X) + (Y * Y));
 
       /// <summary>
       /// Gets a value indicting whether this vector is zero
@@ -119,7 +117,7 @@ namespace Adamantium.Mathematics
       /// </remarks>
       public double Length()
       {
-         return (double)Math.Sqrt((X * X) + (Y * Y));
+         return Math.Sqrt((X * X) + (Y * Y));
       }
 
       /// <summary>
@@ -170,6 +168,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first vector to add.</param>
       /// <param name="right">The second vector to add.</param>
       /// <param name="result">When the method completes, contains the sum of the two vectors.</param>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void Add(ref Vector2D left, ref Vector2D right, out Vector2D result)
       {
          result = new Vector2D(left.X + right.X, left.Y + right.Y);
@@ -181,9 +180,10 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first vector to add.</param>
       /// <param name="right">The second vector to add.</param>
       /// <returns>The sum of the two vectors.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D Add(Vector2D left, Vector2D right)
       {
-         return new Vector2D(left.X + right.X, left.Y + right.Y);
+         return new(left.X + right.X, left.Y + right.Y);
       }
 
       /// <summary>
@@ -192,6 +192,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">The input vector</param>
       /// <param name="right">The scalar value to be added to elements</param>
       /// <param name="result">The vector with added scalar for each element.</param>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void Add(ref Vector2D left, ref double right, out Vector2D result)
       {
          result = new Vector2D(left.X + right, left.Y + right);
@@ -203,9 +204,10 @@ namespace Adamantium.Mathematics
       /// <param name="left">The input vector</param>
       /// <param name="right">The scalar value to be added to elements</param>
       /// <returns>The vector with added scalar for each element.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D Add(Vector2D left, double right)
       {
-         return new Vector2D(left.X + right, left.Y + right);
+         return new(left.X + right, left.Y + right);
       }
 
       /// <summary>
@@ -214,6 +216,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first vector to subtract.</param>
       /// <param name="right">The second vector to subtract.</param>
       /// <param name="result">When the method completes, contains the difference of the two vectors.</param>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void Subtract(ref Vector2D left, ref Vector2D right, out Vector2D result)
       {
          result = new Vector2D(left.X - right.X, left.Y - right.Y);
@@ -225,9 +228,10 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first vector to subtract.</param>
       /// <param name="right">The second vector to subtract.</param>
       /// <returns>The difference of the two vectors.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D Subtract(Vector2D left, Vector2D right)
       {
-         return new Vector2D(left.X - right.X, left.Y - right.Y);
+         return new(left.X - right.X, left.Y - right.Y);
       }
 
       /// <summary>
@@ -236,6 +240,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">The input vector</param>
       /// <param name="right">The scalar value to be subtraced from elements</param>
       /// <param name="result">The vector with subtracted scalar for each element.</param>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void Subtract(ref Vector2D left, ref double right, out Vector2D result)
       {
          result = new Vector2D(left.X - right, left.Y - right);
@@ -247,9 +252,10 @@ namespace Adamantium.Mathematics
       /// <param name="left">The input vector</param>
       /// <param name="right">The scalar value to be subtraced from elements</param>
       /// <returns>The vector with subtracted scalar for each element.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D Subtract(Vector2D left, double right)
       {
-         return new Vector2D(left.X - right, left.Y - right);
+         return new(left.X - right, left.Y - right);
       }
 
       /// <summary>
@@ -258,6 +264,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">The scalar value to be subtraced from elements</param>
       /// <param name="right">The input vector</param>
       /// <param name="result">The vector with subtracted scalar for each element.</param>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void Subtract(ref double left, ref Vector2D right, out Vector2D result)
       {
          result = new Vector2D(left - right.X, left - right.Y);
@@ -269,9 +276,10 @@ namespace Adamantium.Mathematics
       /// <param name="left">The scalar value to be subtraced from elements</param>
       /// <param name="right">The input vector</param>
       /// <returns>The vector with subtracted scalar for each element.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D Subtract(double left, Vector2D right)
       {
-         return new Vector2D(left - right.X, left - right.Y);
+         return new(left - right.X, left - right.Y);
       }
 
       /// <summary>
@@ -280,6 +288,7 @@ namespace Adamantium.Mathematics
       /// <param name="value">The vector to scale.</param>
       /// <param name="scale">The amount by which to scale the vector.</param>
       /// <param name="result">When the method completes, contains the scaled vector.</param>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void Multiply(ref Vector2D value, double scale, out Vector2D result)
       {
          result = new Vector2D(value.X * scale, value.Y * scale);
@@ -291,9 +300,10 @@ namespace Adamantium.Mathematics
       /// <param name="value">The vector to scale.</param>
       /// <param name="scale">The amount by which to scale the vector.</param>
       /// <returns>The scaled vector.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D Multiply(Vector2D value, double scale)
       {
-         return new Vector2D(value.X * scale, value.Y * scale);
+         return new(value.X * scale, value.Y * scale);
       }
 
       /// <summary>
@@ -302,6 +312,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first vector to multiply.</param>
       /// <param name="right">The second vector to multiply.</param>
       /// <param name="result">When the method completes, contains the multiplied vector.</param>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void Multiply(ref Vector2D left, ref Vector2D right, out Vector2D result)
       {
          result = new Vector2D(left.X * right.X, left.Y * right.Y);
@@ -313,9 +324,10 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first vector to multiply.</param>
       /// <param name="right">The second vector to multiply.</param>
       /// <returns>The multiplied vector.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D Multiply(Vector2D left, Vector2D right)
       {
-         return new Vector2D(left.X * right.X, left.Y * right.Y);
+         return new(left.X * right.X, left.Y * right.Y);
       }
 
       /// <summary>
@@ -324,6 +336,7 @@ namespace Adamantium.Mathematics
       /// <param name="value">The vector to scale.</param>
       /// <param name="scale">The amount by which to scale the vector.</param>
       /// <param name="result">When the method completes, contains the scaled vector.</param>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void Divide(ref Vector2D value, double scale, out Vector2D result)
       {
          result = new Vector2D(value.X / scale, value.Y / scale);
@@ -335,9 +348,10 @@ namespace Adamantium.Mathematics
       /// <param name="value">The vector to scale.</param>
       /// <param name="scale">The amount by which to scale the vector.</param>
       /// <returns>The scaled vector.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D Divide(Vector2D value, double scale)
       {
-         return new Vector2D(value.X / scale, value.Y / scale);
+         return new(value.X / scale, value.Y / scale);
       }
 
       /// <summary>
@@ -346,6 +360,7 @@ namespace Adamantium.Mathematics
       /// <param name="scale">The amount by which to scale the vector.</param>
       /// <param name="value">The vector to scale.</param>
       /// <param name="result">When the method completes, contains the scaled vector.</param>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void Divide(double scale, ref Vector2D value, out Vector2D result)
       {
          result = new Vector2D(scale / value.X, scale / value.Y);
@@ -357,9 +372,10 @@ namespace Adamantium.Mathematics
       /// <param name="value">The vector to scale.</param>
       /// <param name="scale">The amount by which to scale the vector.</param>
       /// <returns>The scaled vector.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D Divide(double scale, Vector2D value)
       {
-         return new Vector2D(scale / value.X, scale / value.Y);
+         return new(scale / value.X, scale / value.Y);
       }
 
       /// <summary>
@@ -367,6 +383,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The vector to negate.</param>
       /// <param name="result">When the method completes, contains a vector facing in the opposite direction.</param>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void Negate(ref Vector2D value, out Vector2D result)
       {
          result = new Vector2D(-value.X, -value.Y);
@@ -377,9 +394,10 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The vector to negate.</param>
       /// <returns>A vector facing in the opposite direction.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D Negate(Vector2D value)
       {
-         return new Vector2D(-value.X, -value.Y);
+         return new(-value.X, -value.Y);
       }
 
       /// <summary>
@@ -391,6 +409,7 @@ namespace Adamantium.Mathematics
       /// <param name="amount1">Barycentric coordinate b2, which expresses the weighting factor toward vertex 2 (specified in <paramref name="value2"/>).</param>
       /// <param name="amount2">Barycentric coordinate b3, which expresses the weighting factor toward vertex 3 (specified in <paramref name="value3"/>).</param>
       /// <param name="result">When the method completes, contains the 2D Cartesian coordinates of the specified point.</param>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void Barycentric(ref Vector2D value1, ref Vector2D value2, ref Vector2D value3, double amount1, double amount2, out Vector2D result)
       {
          result = new Vector2D((value1.X + (amount1 * (value2.X - value1.X))) + (amount2 * (value3.X - value1.X)),
@@ -406,10 +425,10 @@ namespace Adamantium.Mathematics
       /// <param name="amount1">Barycentric coordinate b2, which expresses the weighting factor toward vertex 2 (specified in <paramref name="value2"/>).</param>
       /// <param name="amount2">Barycentric coordinate b3, which expresses the weighting factor toward vertex 3 (specified in <paramref name="value3"/>).</param>
       /// <returns>A new <see cref="Vector2D"/> containing the 2D Cartesian coordinates of the specified point.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D Barycentric(Vector2D value1, Vector2D value2, Vector2D value3, double amount1, double amount2)
       {
-         Vector2D result;
-         Barycentric(ref value1, ref value2, ref value3, amount1, amount2, out result);
+         Barycentric(ref value1, ref value2, ref value3, amount1, amount2, out var result);
          return result;
       }
 
@@ -420,6 +439,7 @@ namespace Adamantium.Mathematics
       /// <param name="min">The minimum value.</param>
       /// <param name="max">The maximum value.</param>
       /// <param name="result">When the method completes, contains the clamped value.</param>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void Clamp(ref Vector2D value, ref Vector2D min, ref Vector2D max, out Vector2D result)
       {
          double x = value.X;
@@ -440,16 +460,17 @@ namespace Adamantium.Mathematics
       /// <param name="min">The minimum value.</param>
       /// <param name="max">The maximum value.</param>
       /// <returns>The clamped value.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D Clamp(Vector2D value, Vector2D min, Vector2D max)
       {
-         Vector2D result;
-         Clamp(ref value, ref min, ref max, out result);
+         Clamp(ref value, ref min, ref max, out var result);
          return result;
       }
 
       /// <summary>
       /// Saturates this instance in the range [0,1]
       /// </summary>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public void Saturate()
       {
          X = X < 0.0f ? 0.0f : X > 1.0f ? 1.0f : X;
@@ -466,12 +487,13 @@ namespace Adamantium.Mathematics
       /// <see cref="Vector2D.DistanceSquared(ref Vector2D, ref Vector2D, out double)"/> may be preferred when only the relative distance is needed
       /// and speed is of the essence.
       /// </remarks>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void Distance(ref Vector2D value1, ref Vector2D value2, out double result)
       {
          double x = value1.X - value2.X;
          double y = value1.Y - value2.Y;
 
-         result = (double)Math.Sqrt((x * x) + (y * y));
+         result = Math.Sqrt((x * x) + (y * y));
       }
 
       /// <summary>
@@ -484,12 +506,13 @@ namespace Adamantium.Mathematics
       /// <see cref="Vector2D.DistanceSquared(Vector2D, Vector2D)"/> may be preferred when only the relative distance is needed
       /// and speed is of the essence.
       /// </remarks>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static double Distance(Vector2D value1, Vector2D value2)
       {
          double x = value1.X - value2.X;
          double y = value1.Y - value2.Y;
 
-         return (double)Math.Sqrt((x * x) + (y * y));
+         return Math.Sqrt((x * x) + (y * y));
       }
 
       /// <summary>
@@ -505,6 +528,7 @@ namespace Adamantium.Mathematics
       /// involves two square roots, which are computationally expensive. However, using distance squared 
       /// provides the same information and avoids calculating two square roots.
       /// </remarks>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void DistanceSquared(ref Vector2D value1, ref Vector2D value2, out double result)
       {
          double x = value1.X - value2.X;
@@ -526,6 +550,7 @@ namespace Adamantium.Mathematics
       /// involves two square roots, which are computationally expensive. However, using distance squared 
       /// provides the same information and avoids calculating two square roots.
       /// </remarks>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static double DistanceSquared(Vector2D value1, Vector2D value2)
       {
          double x = value1.X - value2.X;
@@ -540,6 +565,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">First source vector.</param>
       /// <param name="right">Second source vector.</param>
       /// <param name="result">When the method completes, contains the dot product of the two vectors.</param>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void Dot(ref Vector2D left, ref Vector2D right, out double result)
       {
          result = (left.X * right.X) + (left.Y * right.Y);
@@ -551,6 +577,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">First source vector.</param>
       /// <param name="right">Second source vector.</param>
       /// <returns>The dot product of the two vectors.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static double Dot(Vector2D left, Vector2D right)
       {
          return (left.X * right.X) + (left.Y * right.Y);
@@ -561,6 +588,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The vector to normalize.</param>
       /// <param name="result">When the method completes, contains the normalized vector.</param>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void Normalize(ref Vector2D value, out Vector2D result)
       {
          result = value;
@@ -572,6 +600,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The vector to normalize.</param>
       /// <returns>The normalized vector.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D Normalize(Vector2D value)
       {
          value.Normalize();
@@ -588,6 +617,7 @@ namespace Adamantium.Mathematics
       /// <remarks>
       /// Passing <paramref name="amount"/> a value of 0 will cause <paramref name="start"/> to be returned; a value of 1 will cause <paramref name="end"/> to be returned. 
       /// </remarks>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void Lerp(ref Vector2D start, ref Vector2D end, double amount, out Vector2D result)
       {
          result.X = MathHelper.Lerp(start.X, end.X, amount);
@@ -604,10 +634,10 @@ namespace Adamantium.Mathematics
       /// <remarks>
       /// Passing <paramref name="amount"/> a value of 0 will cause <paramref name="start"/> to be returned; a value of 1 will cause <paramref name="end"/> to be returned. 
       /// </remarks>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D Lerp(Vector2D start, Vector2D end, double amount)
       {
-         Vector2D result;
-         Lerp(ref start, ref end, amount, out result);
+         Lerp(ref start, ref end, amount, out var result);
          return result;
       }
 
@@ -618,6 +648,7 @@ namespace Adamantium.Mathematics
       /// <param name="end">End vector.</param>
       /// <param name="amount">Value between 0 and 1 indicating the weight of <paramref name="end"/>.</param>
       /// <param name="result">When the method completes, contains the cubic interpolation of the two vectors.</param>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void SmoothStep(ref Vector2D start, ref Vector2D end, double amount, out Vector2D result)
       {
          amount = MathHelper.SmoothStep(amount);
@@ -631,10 +662,10 @@ namespace Adamantium.Mathematics
       /// <param name="end">End vector.</param>
       /// <param name="amount">Value between 0 and 1 indicating the weight of <paramref name="end"/>.</param>
       /// <returns>The cubic interpolation of the two vectors.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D SmoothStep(Vector2D start, Vector2D end, double amount)
       {
-         Vector2D result;
-         SmoothStep(ref start, ref end, amount, out result);
+         SmoothStep(ref start, ref end, amount, out var result);
          return result;
       }
 
@@ -647,6 +678,7 @@ namespace Adamantium.Mathematics
       /// <param name="tangent2">Second source tangent vector.</param>
       /// <param name="amount">Weighting factor.</param>
       /// <param name="result">When the method completes, contains the result of the Hermite spline interpolation.</param>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void Hermite(ref Vector2D value1, ref Vector2D tangent1, ref Vector2D value2, ref Vector2D tangent2, double amount, out Vector2D result)
       {
          double squared = amount * amount;
@@ -669,10 +701,10 @@ namespace Adamantium.Mathematics
       /// <param name="tangent2">Second source tangent vector.</param>
       /// <param name="amount">Weighting factor.</param>
       /// <returns>The result of the Hermite spline interpolation.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D Hermite(Vector2D value1, Vector2D tangent1, Vector2D value2, Vector2D tangent2, double amount)
       {
-         Vector2D result;
-         Hermite(ref value1, ref tangent1, ref value2, ref tangent2, amount, out result);
+         Hermite(ref value1, ref tangent1, ref value2, ref tangent2, amount, out var result);
          return result;
       }
 
@@ -685,6 +717,7 @@ namespace Adamantium.Mathematics
       /// <param name="value4">The fourth position in the interpolation.</param>
       /// <param name="amount">Weighting factor.</param>
       /// <param name="result">When the method completes, contains the result of the Catmull-Rom interpolation.</param>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void CatmullRom(ref Vector2D value1, ref Vector2D value2, ref Vector2D value3, ref Vector2D value4, double amount, out Vector2D result)
       {
          double squared = amount * amount;
@@ -708,10 +741,10 @@ namespace Adamantium.Mathematics
       /// <param name="value4">The fourth position in the interpolation.</param>
       /// <param name="amount">Weighting factor.</param>
       /// <returns>A vector that is the result of the Catmull-Rom interpolation.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D CatmullRom(Vector2D value1, Vector2D value2, Vector2D value3, Vector2D value4, double amount)
       {
-         Vector2D result;
-         CatmullRom(ref value1, ref value2, ref value3, ref value4, amount, out result);
+         CatmullRom(ref value1, ref value2, ref value3, ref value4, amount, out var result);
          return result;
       }
 
@@ -721,6 +754,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first source vector.</param>
       /// <param name="right">The second source vector.</param>
       /// <param name="result">When the method completes, contains an new vector composed of the largest components of the source vectors.</param>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void Max(ref Vector2D left, ref Vector2D right, out Vector2D result)
       {
          result.X = (left.X > right.X) ? left.X : right.X;
@@ -733,10 +767,10 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first source vector.</param>
       /// <param name="right">The second source vector.</param>
       /// <returns>A vector containing the largest components of the source vectors.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D Max(Vector2D left, Vector2D right)
       {
-         Vector2D result;
-         Max(ref left, ref right, out result);
+         Max(ref left, ref right, out var result);
          return result;
       }
 
@@ -746,6 +780,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first source vector.</param>
       /// <param name="right">The second source vector.</param>
       /// <param name="result">When the method completes, contains an new vector composed of the smallest components of the source vectors.</param>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void Min(ref Vector2D left, ref Vector2D right, out Vector2D result)
       {
          result.X = (left.X < right.X) ? left.X : right.X;
@@ -758,10 +793,10 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first source vector.</param>
       /// <param name="right">The second source vector.</param>
       /// <returns>A vector containing the smallest components of the source vectors.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)] 
       public static Vector2D Min(Vector2D left, Vector2D right)
       {
-         Vector2D result;
-         Min(ref left, ref right, out result);
+         Min(ref left, ref right, out var result);
          return result;
       }
 
@@ -773,6 +808,7 @@ namespace Adamantium.Mathematics
       /// <param name="result">When the method completes, contains the reflected vector.</param>
       /// <remarks>Reflect only gives the direction of a reflection off a surface, it does not determine 
       /// whether the original vector was close enough to the surface to hit it.</remarks>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void Reflect(ref Vector2D vector, ref Vector2D normal, out Vector2D result)
       {
          double dot = (vector.X * normal.X) + (vector.Y * normal.Y);
@@ -789,10 +825,10 @@ namespace Adamantium.Mathematics
       /// <returns>The reflected vector.</returns>
       /// <remarks>Reflect only gives the direction of a reflection off a surface, it does not determine 
       /// whether the original vector was close enough to the surface to hit it.</remarks>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D Reflect(Vector2D vector, Vector2D normal)
       {
-         Vector2D result;
-         Reflect(ref vector, ref normal, out result);
+         Reflect(ref vector, ref normal, out var result);
          return result;
       }
 
@@ -817,6 +853,7 @@ namespace Adamantium.Mathematics
       /// </remarks>
       /// <exception cref="ArgumentNullException">Thrown when <paramref name="source"/> or <paramref name="destination"/> is <c>null</c>.</exception>
       /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="destination"/> is shorter in length than <paramref name="source"/>.</exception>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void Orthogonalize(Vector2D[] destination, params Vector2D[] source)
       {
          //Uses the modified Gram-Schmidt process.
@@ -827,11 +864,11 @@ namespace Adamantium.Mathematics
          //q5 = ...
 
          if (source == null)
-            throw new ArgumentNullException("source");
+            throw new ArgumentNullException(nameof(source));
          if (destination == null)
-            throw new ArgumentNullException("destination");
+            throw new ArgumentNullException(nameof(destination));
          if (destination.Length < source.Length)
-            throw new ArgumentOutOfRangeException("destination", "The destination array must be of same length or larger length than the source array.");
+            throw new ArgumentOutOfRangeException(nameof(destination), "The destination array must be of same length or larger length than the source array.");
 
          for (int i = 0; i < source.Length; ++i)
          {
@@ -862,6 +899,7 @@ namespace Adamantium.Mathematics
       /// </remarks>
       /// <exception cref="ArgumentNullException">Thrown when <paramref name="source"/> or <paramref name="destination"/> is <c>null</c>.</exception>
       /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="destination"/> is shorter in length than <paramref name="source"/>.</exception>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void Orthonormalize(Vector2D[] destination, params Vector2D[] source)
       {
          //Uses the modified Gram-Schmidt process.
@@ -874,11 +912,11 @@ namespace Adamantium.Mathematics
          //q5 = ...
 
          if (source == null)
-            throw new ArgumentNullException("source");
+            throw new ArgumentNullException(nameof(source));
          if (destination == null)
-            throw new ArgumentNullException("destination");
+            throw new ArgumentNullException(nameof(destination));
          if (destination.Length < source.Length)
-            throw new ArgumentOutOfRangeException("destination", "The destination array must be of same length or larger length than the source array.");
+            throw new ArgumentOutOfRangeException(nameof(destination), "The destination array must be of same length or larger length than the source array.");
 
          for (int i = 0; i < source.Length; ++i)
          {
@@ -900,6 +938,7 @@ namespace Adamantium.Mathematics
       /// <param name="vector">The vector to rotate.</param>
       /// <param name="rotation">The <see cref="QuaternionF"/> rotation to apply.</param>
       /// <param name="result">When the method completes, contains the transformed <see cref="Vector4D"/>.</param>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void Transform(ref Vector2D vector, ref QuaternionF rotation, out Vector2D result)
       {
          double x = rotation.X + rotation.X;
@@ -920,10 +959,10 @@ namespace Adamantium.Mathematics
       /// <param name="vector">The vector to rotate.</param>
       /// <param name="rotation">The <see cref="QuaternionF"/> rotation to apply.</param>
       /// <returns>The transformed <see cref="Vector4D"/>.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D Transform(Vector2D vector, QuaternionF rotation)
       {
-         Vector2D result;
-         Transform(ref vector, ref rotation, out result);
+         Transform(ref vector, ref rotation, out var result);
          return result;
       }
 
@@ -936,6 +975,7 @@ namespace Adamantium.Mathematics
       /// This array may be the same array as <paramref name="source"/>.</param>
       /// <exception cref="ArgumentNullException">Thrown when <paramref name="source"/> or <paramref name="destination"/> is <c>null</c>.</exception>
       /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="destination"/> is shorter in length than <paramref name="source"/>.</exception>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void Transform(Vector2D[] source, ref QuaternionF rotation, Vector2D[] destination)
       {
          if (source == null)
@@ -973,6 +1013,7 @@ namespace Adamantium.Mathematics
       /// <param name="vector">The source vector.</param>
       /// <param name="transform">The transformation <see cref="Matrix4x4D"/>.</param>
       /// <param name="result">When the method completes, contains the transformed <see cref="Vector4D"/>.</param>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void Transform(ref Vector2D vector, ref Matrix4x4D transform, out Vector4D result)
       {
          result = new Vector4D(
@@ -988,10 +1029,10 @@ namespace Adamantium.Mathematics
       /// <param name="vector">The source vector.</param>
       /// <param name="transform">The transformation <see cref="Matrix4x4D"/>.</param>
       /// <returns>The transformed <see cref="Vector4D"/>.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector4D Transform(Vector2D vector, Matrix4x4D transform)
       {
-         Vector4D result;
-         Transform(ref vector, ref transform, out result);
+         Transform(ref vector, ref transform, out var result);
          return result;
       }
 
@@ -1003,14 +1044,15 @@ namespace Adamantium.Mathematics
       /// <param name="destination">The array for which the transformed vectors are stored.</param>
       /// <exception cref="ArgumentNullException">Thrown when <paramref name="source"/> or <paramref name="destination"/> is <c>null</c>.</exception>
       /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="destination"/> is shorter in length than <paramref name="source"/>.</exception>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void Transform(Vector2D[] source, ref Matrix4x4D transform, Vector4D[] destination)
       {
          if (source == null)
-            throw new ArgumentNullException("source");
+            throw new ArgumentNullException(nameof(source));
          if (destination == null)
-            throw new ArgumentNullException("destination");
+            throw new ArgumentNullException(nameof(destination));
          if (destination.Length < source.Length)
-            throw new ArgumentOutOfRangeException("destination", "The destination array must be of same length or larger length than the source array.");
+            throw new ArgumentOutOfRangeException(nameof(destination), "The destination array must be of same length or larger length than the source array.");
 
          for (int i = 0; i < source.Length; ++i)
          {
@@ -1031,6 +1073,7 @@ namespace Adamantium.Mathematics
       /// therefore makes the vector homogeneous. The homogeneous vector is often preferred when working
       /// with coordinates as the w component can safely be ignored.
       /// </remarks>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void TransformCoordinate(ref Vector2D coordinate, ref Matrix4x4D transform, out Vector2D result)
       {
          Vector4D vector = new Vector4D();
@@ -1055,10 +1098,10 @@ namespace Adamantium.Mathematics
       /// therefore makes the vector homogeneous. The homogeneous vector is often preferred when working
       /// with coordinates as the w component can safely be ignored.
       /// </remarks>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D TransformCoordinate(Vector2D coordinate, Matrix4x4D transform)
       {
-         Vector2D result;
-         TransformCoordinate(ref coordinate, ref transform, out result);
+         TransformCoordinate(ref coordinate, ref transform, out var result);
          return result;
       }
 
@@ -1078,14 +1121,15 @@ namespace Adamantium.Mathematics
       /// therefore makes the vector homogeneous. The homogeneous vector is often preferred when working
       /// with coordinates as the w component can safely be ignored.
       /// </remarks>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void TransformCoordinate(Vector2D[] source, ref Matrix4x4D transform, Vector2D[] destination)
       {
          if (source == null)
-            throw new ArgumentNullException("source");
+            throw new ArgumentNullException(nameof(source));
          if (destination == null)
-            throw new ArgumentNullException("destination");
+            throw new ArgumentNullException(nameof(destination));
          if (destination.Length < source.Length)
-            throw new ArgumentOutOfRangeException("destination", "The destination array must be of same length or larger length than the source array.");
+            throw new ArgumentOutOfRangeException(nameof(destination), "The destination array must be of same length or larger length than the source array.");
 
          for (int i = 0; i < source.Length; ++i)
          {
@@ -1106,6 +1150,7 @@ namespace Adamantium.Mathematics
       /// apply. This is often preferred for normal vectors as normals purely represent direction
       /// rather than location because normal vectors should not be translated.
       /// </remarks>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void TransformNormal(ref Vector2D normal, ref Matrix4x4D transform, out Vector2D result)
       {
          result = new Vector2D(
@@ -1126,10 +1171,10 @@ namespace Adamantium.Mathematics
       /// apply. This is often preferred for normal vectors as normals purely represent direction
       /// rather than location because normal vectors should not be translated.
       /// </remarks>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D TransformNormal(Vector2D normal, Matrix4x4D transform)
       {
-         Vector2D result;
-         TransformNormal(ref normal, ref transform, out result);
+         TransformNormal(ref normal, ref transform, out var result);
          return result;
       }
 
@@ -1149,14 +1194,15 @@ namespace Adamantium.Mathematics
       /// apply. This is often preferred for normal vectors as normals purely represent direction
       /// rather than location because normal vectors should not be translated.
       /// </remarks>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static void TransformNormal(Vector2D[] source, ref Matrix4x4D transform, Vector2D[] destination)
       {
          if (source == null)
-            throw new ArgumentNullException("source");
+            throw new ArgumentNullException(nameof(source));
          if (destination == null)
-            throw new ArgumentNullException("destination");
+            throw new ArgumentNullException(nameof(destination));
          if (destination.Length < source.Length)
-            throw new ArgumentOutOfRangeException("destination", "The destination array must be of same length or larger length than the source array.");
+            throw new ArgumentOutOfRangeException(nameof(destination), "The destination array must be of same length or larger length than the source array.");
 
          for (int i = 0; i < source.Length; ++i)
          {
@@ -1170,9 +1216,10 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first vector to add.</param>
       /// <param name="right">The second vector to add.</param>
       /// <returns>The sum of the two vectors.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D operator +(Vector2D left, Vector2D right)
       {
-         return new Vector2D(left.X + right.X, left.Y + right.Y);
+         return new(left.X + right.X, left.Y + right.Y);
       }
 
       /// <summary>
@@ -1181,9 +1228,10 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first vector to multiply.</param>
       /// <param name="right">The second vector to multiply.</param>
       /// <returns>The multiplication of the two vectors.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D operator *(Vector2D left, Vector2D right)
       {
-         return new Vector2D(left.X * right.X, left.Y * right.Y);
+         return new(left.X * right.X, left.Y * right.Y);
       }
 
       /// <summary>
@@ -1191,6 +1239,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The vector to assert (unchanged).</param>
       /// <returns>The asserted (unchanged) vector.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D operator +(Vector2D value)
       {
          return value;
@@ -1202,9 +1251,10 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first vector to subtract.</param>
       /// <param name="right">The second vector to subtract.</param>
       /// <returns>The difference of the two vectors.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D operator -(Vector2D left, Vector2D right)
       {
-         return new Vector2D(left.X - right.X, left.Y - right.Y);
+         return new(left.X - right.X, left.Y - right.Y);
       }
 
       /// <summary>
@@ -1212,9 +1262,10 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The vector to negate.</param>
       /// <returns>A vector facing in the opposite direction.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D operator -(Vector2D value)
       {
-         return new Vector2D(-value.X, -value.Y);
+         return new(-value.X, -value.Y);
       }
 
       /// <summary>
@@ -1223,9 +1274,10 @@ namespace Adamantium.Mathematics
       /// <param name="value">The vector to scale.</param>
       /// <param name="scale">The amount by which to scale the vector.</param>
       /// <returns>The scaled vector.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D operator *(double scale, Vector2D value)
       {
-         return new Vector2D(value.X * scale, value.Y * scale);
+         return new(value.X * scale, value.Y * scale);
       }
 
       /// <summary>
@@ -1234,9 +1286,10 @@ namespace Adamantium.Mathematics
       /// <param name="value">The vector to scale.</param>
       /// <param name="scale">The amount by which to scale the vector.</param>
       /// <returns>The scaled vector.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D operator *(Vector2D value, double scale)
       {
-         return new Vector2D(value.X * scale, value.Y * scale);
+         return new(value.X * scale, value.Y * scale);
       }
 
       /// <summary>
@@ -1245,9 +1298,10 @@ namespace Adamantium.Mathematics
       /// <param name="value">The vector to scale.</param>
       /// <param name="scale">The amount by which to scale the vector.</param>
       /// <returns>The scaled vector.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D operator /(Vector2D value, double scale)
       {
-         return new Vector2D(value.X / scale, value.Y / scale);
+         return new(value.X / scale, value.Y / scale);
       }
 
       /// <summary>
@@ -1256,9 +1310,10 @@ namespace Adamantium.Mathematics
       /// <param name="scale">The amount by which to scale the vector.</param>
       /// <param name="value">The vector to scale.</param>  
       /// <returns>The scaled vector.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D operator /(double scale, Vector2D value)
       {
-         return new Vector2D(scale / value.X, scale / value.Y);
+         return new(scale / value.X, scale / value.Y);
       }
 
       /// <summary>
@@ -1267,9 +1322,10 @@ namespace Adamantium.Mathematics
       /// <param name="value">The vector to scale.</param>
       /// <param name="scale">The amount by which to scale the vector.</param>
       /// <returns>The scaled vector.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D operator /(Vector2D value, Vector2D scale)
       {
-         return new Vector2D(value.X / scale.X, value.Y / scale.Y);
+         return new(value.X / scale.X, value.Y / scale.Y);
       }
 
       /// <summary>
@@ -1278,9 +1334,10 @@ namespace Adamantium.Mathematics
       /// <param name="value">The input vector.</param>
       /// <param name="scalar">The scalar value to be added on elements</param>
       /// <returns>The vector with added scalar for each element.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D operator +(Vector2D value, double scalar)
       {
-         return new Vector2D(value.X + scalar, value.Y + scalar);
+         return new(value.X + scalar, value.Y + scalar);
       }
 
       /// <summary>
@@ -1289,31 +1346,34 @@ namespace Adamantium.Mathematics
       /// <param name="value">The input vector.</param>
       /// <param name="scalar">The scalar value to be added on elements</param>
       /// <returns>The vector with added scalar for each element.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D operator +(double scalar, Vector2D value)
       {
-         return new Vector2D(scalar + value.X, scalar + value.Y);
+         return new(scalar + value.X, scalar + value.Y);
       }
 
       /// <summary>
       /// Perform a component-wise subtraction
       /// </summary>
       /// <param name="value">The input vector.</param>
-      /// <param name="scalar">The scalar value to be subtraced from elements</param>
-      /// <returns>The vector with subtraced scalar from each element.</returns>
+      /// <param name="scalar">The scalar value to be subtracted from elements</param>
+      /// <returns>The vector with subtracted scalar from each element.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D operator -(Vector2D value, double scalar)
       {
-         return new Vector2D(value.X - scalar, value.Y - scalar);
+         return new(value.X - scalar, value.Y - scalar);
       }
 
       /// <summary>
       /// Perform a component-wise subtraction
       /// </summary>
       /// <param name="value">The input vector.</param>
-      /// <param name="scalar">The scalar value to be subtraced from elements</param>
-      /// <returns>The vector with subtraced scalar from each element.</returns>
+      /// <param name="scalar">The scalar value to be subtracted from elements</param>
+      /// <returns>The vector with subtracted scalar from each element.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public static Vector2D operator -(double scalar, Vector2D value)
       {
-         return new Vector2D(scalar - value.X, scalar - value.Y);
+         return new(scalar - value.X, scalar - value.Y);
       }
 
       /// <summary>
@@ -1347,7 +1407,7 @@ namespace Adamantium.Mathematics
       /// <returns>The result of the conversion.</returns>
       public static explicit operator Vector3D(Vector2D value)
       {
-         return new Vector3D(value, 0.0f);
+         return new(value, 0.0f);
       }
       
       /// <summary>
@@ -1357,7 +1417,7 @@ namespace Adamantium.Mathematics
       /// <returns>The result of the conversion.</returns>
       public static explicit operator Vector3F(Vector2D value)
       {
-         return new Vector3F(value, 0.0f);
+         return new(value, 0.0f);
       }
 
       /// <summary>
@@ -1367,7 +1427,7 @@ namespace Adamantium.Mathematics
       /// <returns>The result of the conversion.</returns>
       public static explicit operator Vector4D(Vector2D value)
       {
-         return new Vector4D(value, 0.0f, 0.0f);
+         return new(value, 0.0f, 0.0f);
       }
 
       /// <summary>
@@ -1482,7 +1542,7 @@ namespace Adamantium.Mathematics
 
       public static implicit operator Vector2F(Vector2D value)
       {
-         return new Vector2F((float)value.X, (float)value.Y);
+         return new((float)value.X, (float)value.Y);
       }
 
    }

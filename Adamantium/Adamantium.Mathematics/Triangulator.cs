@@ -65,11 +65,6 @@ namespace Adamantium.Mathematics
                     continue;
                 }
 
-                if (i == 156)
-                {
-                    int x = 0;
-                }
-
                 sortedY.Add(point.Y);
                 ray.Origin = new Vector2D(mostLeftPoint, point.Y);
                 rays.Add(ray);
@@ -77,11 +72,6 @@ namespace Adamantium.Mathematics
                 var rayPoints = new List<Vector2D>();
                 for (int j = 0; j < polygon.MergedSegments.Count; ++j)
                 {
-                    if (j == 126)
-                    {
-                        int x = 0;
-                    }
-                    
                     var segment = polygon.MergedSegments[j];
                     if (!Collision2D.RaySegmentIntersection(ref ray, ref segment, out var interPoint)) continue;
                     
@@ -101,18 +91,6 @@ namespace Adamantium.Mathematics
                 rayPoints.Sort(VertexHorizontalComparer.Defaut);
                 rayIntersectionPoints.Add(rayPoints.ToArray());
             }
-            
-            Console.WriteLine("=====================================");
-            foreach (var raypoints in rayIntersectionPoints)
-            {
-                Console.WriteLine(string.Join(", ", raypoints));
-            }
-            Console.WriteLine("Segments");
-            foreach (var segment in polygon.MergedSegments)
-            {
-                Console.WriteLine(segment);
-            }
-            Console.WriteLine("=====================================");
 
             polygon.UpdatePolygonUsingRayInterPoints(interPoints);
 
