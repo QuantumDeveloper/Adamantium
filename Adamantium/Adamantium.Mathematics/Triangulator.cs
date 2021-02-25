@@ -52,12 +52,12 @@ namespace Adamantium.Mathematics
             var rays = new List<Ray2D>();
             var sortedY = new List<double>();
             var rayIntersectionPoints = new List<Vector2D[]>();
-            List<Vector2D> interPoints = new List<Vector2D>();
+            var interPoints = new List<Vector2D>();
 
             var sortedList = polygon.SortVertices();
             var ray = new Ray2D(Vector2D.Zero, Vector2D.UnitX);
             var mostLeftPoint = polygon.HighestPoint.X;
-            for (int i = 0; i < sortedList.Count; ++i)
+            for (var i = 0; i < sortedList.Count; ++i)
             {
                 var point = sortedList[i];
                 if (sortedY.Contains(point.Y) || IsSimilarTo(point.Y, sortedY))
@@ -70,7 +70,7 @@ namespace Adamantium.Mathematics
                 rays.Add(ray);
 
                 var rayPoints = new List<Vector2D>();
-                for (int j = 0; j < polygon.MergedSegments.Count; ++j)
+                for (var j = 0; j < polygon.MergedSegments.Count; ++j)
                 {
                     var segment = polygon.MergedSegments[j];
                     if (!Collision2D.RaySegmentIntersection(ref ray, ref segment, out var interPoint)) continue;
@@ -94,17 +94,17 @@ namespace Adamantium.Mathematics
 
             polygon.UpdatePolygonUsingRayInterPoints(interPoints);
 
-            List<Vector3F> finalTriangles = new List<Vector3F>();
-            for (int i = 0; i < rays.Count - 1; ++i)
+            var finalTriangles = new List<Vector3F>();
+            for (var i = 0; i < rays.Count - 1; ++i)
             {
                 var upperInterPoints = rayIntersectionPoints[i];
                 var lowerInterPoints = rayIntersectionPoints[i + 1];
 
                 //find all connected segments which will represent start and end of triangulation sequence
-                List<LineSegment2D> startEndSegments = new List<LineSegment2D>();
-                for (int j = 0; j < upperInterPoints.Length; j++)
+                var startEndSegments = new List<LineSegment2D>();
+                for (var j = 0; j < upperInterPoints.Length; j++)
                 {
-                    for (int k = 0; k < lowerInterPoints.Length; k++)
+                    for (var k = 0; k < lowerInterPoints.Length; k++)
                     {
                         if (Polygon.IsConnected(upperInterPoints[j], lowerInterPoints[k], polygon.MergedSegments))
                         {
@@ -113,17 +113,16 @@ namespace Adamantium.Mathematics
                     }
                 }
 
-                if (startEndSegments.Count > 1)
+                if (startEndSegments.Count <= 1) continue;
+                
+                for (var x = 0; x < startEndSegments.Count - 1; x++)
                 {
-                    for (int x = 0; x < startEndSegments.Count - 1; x++)
-                    {
-                        var startSegment = startEndSegments[x];
-                        var endSegment = startEndSegments[x + 1];
+                    var startSegment = startEndSegments[x];
+                    var endSegment = startEndSegments[x + 1];
 
-                        if (x % 2 == 0)
-                        {
-                            CreateTriangles(finalTriangles, startSegment, endSegment);
-                        }
+                    if (x % 2 == 0)
+                    {
+                        CreateTriangles(finalTriangles, startSegment, endSegment);
                     }
                 }
             }
@@ -134,7 +133,7 @@ namespace Adamantium.Mathematics
         //Check if such (or near) point is already present in list
         private static bool IsSimilarTo(double point, List<double> lst)
         {
-            for (int i = 0; i < lst.Count; ++i)
+            for (var i = 0; i < lst.Count; ++i)
             {
                 if (MathHelper.WithinEpsilon(point, lst[i], Polygon.Epsilon))
                 {
@@ -146,7 +145,7 @@ namespace Adamantium.Mathematics
 
         private static bool IsSimilarTo(Vector2D point, List<Vector2D> lst)
         {
-            for (int i = 0; i < lst.Count; ++i)
+            for (var i = 0; i < lst.Count; ++i)
             {
                 if (MathHelper.WithinEpsilon(point, lst[i], Polygon.Epsilon))
                 {
@@ -161,7 +160,7 @@ namespace Adamantium.Mathematics
         /// </summary>
         private static bool IsXPointSimilarTo(Vector2D point, List<Vector2D> lst)
         {
-            for (int i = 0; i < lst.Count; ++i)
+            for (var i = 0; i < lst.Count; ++i)
             {
                 if (MathHelper.WithinEpsilon(point.X, lst[i].X, Polygon.Epsilon))
                 {

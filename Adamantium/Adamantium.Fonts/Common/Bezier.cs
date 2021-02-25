@@ -1,15 +1,12 @@
 ﻿using System;
 using Adamantium.Fonts.DataOut;
+using Adamantium.Mathematics;
 
 namespace Adamantium.Fonts.Common
 {
-    static internal class GeometryGenerator
+    internal static class Bezier
     {
-        static GeometryGenerator()
-        {
-        }
-
-        static public GlyphContour GenerateContour(Contour contour, float step)
+        public static GlyphContour GenerateContour(Contour contour, float step)
         {
             // if TTF
             return GenerateQuadraticBezierCurves(contour, step);
@@ -17,7 +14,7 @@ namespace Adamantium.Fonts.Common
             // return GenerateCubicBezierCurves(contour, step);
         }
 
-        static private GlyphContour GenerateQuadraticBezierCurves(Contour contour, float step)
+        private static GlyphContour GenerateQuadraticBezierCurves(Contour contour, float step)
         {
             if (step <= 0 || step > 1)
             {
@@ -51,20 +48,29 @@ namespace Adamantium.Fonts.Common
             return glyphContour;
         }
 
-        static private GlyphContour GenerateCubicBezierCurves(Contour contour, float step)
+        private static GlyphContour GenerateCubicBezierCurves(Contour contour, float step)
         {
             throw new NotImplementedException();
         }
 
-        static private Point GetQuadraticCurvePoint(Point begin, Point control, Point end, float t)
+        private static Vector2D GetQuadraticCurvePoint(Vector2D begin, Vector2D control, Vector2D end, float t)
         {
-            float x = QuadraticEquation(begin.X, control.X, end.X, t);
-            float y = QuadraticEquation(begin.Y, control.Y, end.Y, t);
+            var x = QuadraticEquation(begin.X, control.X, end.X, t);
+            var y = QuadraticEquation(begin.Y, control.Y, end.Y, t);
 
-            return new Point(x, y);
+            return new Vector2D(x, y);
+        }
+        
+        private static double QuadraticEquation(double begin, double control, double end, double t)
+        {
+            var first = Math.Pow(1 - t, 2);
+            var second = 2 * t * (1 - t);
+            var third = Math.Pow(t, 2);
+
+            return first * begin + second * control + third * end;
         }
 
-        static private float QuadraticEquation(float begin, float control, float end, float t)
+        private static float QuadraticEquation(float begin, float control, float end, float t)
         {
             float first = (float)Math.Pow(1 - t, 2);
             float second = 2 * t * (1 - t);

@@ -115,6 +115,7 @@ namespace Adamantium.Mathematics
       /// <see cref="Vector2D.LengthSquared"/> may be preferred when only the relative length is needed
       /// and speed is of the essence.
       /// </remarks>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public double Length()
       {
          return Math.Sqrt((X * X) + (Y * Y));
@@ -128,6 +129,7 @@ namespace Adamantium.Mathematics
       /// This method may be preferred to <see cref="Vector2D.Length"/> when only a relative length is needed
       /// and speed is of the essence.
       /// </remarks>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public double LengthSquared()
       {
          return (X * X) + (Y * Y);
@@ -136,6 +138,7 @@ namespace Adamantium.Mathematics
       /// <summary>
       /// Converts the vector into a unit vector.
       /// </summary>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public void Normalize()
       {
          double length = Length();
@@ -151,6 +154,7 @@ namespace Adamantium.Mathematics
       /// Creates an array containing the elements of the vector.
       /// </summary>
       /// <returns>A two-element array containing the components of the vector.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
       public double[] ToArray()
       {
          return new[] { X, Y };

@@ -3,13 +3,11 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
-using System.Threading;
 using System.Threading.Tasks;
 using Adamantium.Fonts.Common;
 using Adamantium.Fonts.DataOut;
 using Adamantium.Mathematics;
 using StreamReader = Adamantium.Fonts.Common.StreamReader;
-using Point = Adamantium.Fonts.Common.Point;
 
 namespace Adamantium.Fonts.TTF
 {
@@ -726,7 +724,7 @@ namespace Adamantium.Fonts.TTF
                 ushort numberOfPointsProcessed = 0;
                 bool onCurveFound = false;
                 ContourSegment currentSegment = new ContourSegment();
-                Point currentPoint;
+                Vector2D currentPoint;
                 ushort firstOnCurvePointIndex = 0;
 
                 for (ushort p = startOfContour; numberOfPointsProcessed < glyphs[glyphIndex].SegmentedContours[c].NumberOfPoints; ++p)
@@ -748,9 +746,7 @@ namespace Adamantium.Fonts.TTF
 
                     if (onCurveFound)
                     {
-                        currentPoint = new Point();
-                        currentPoint.X = xCoords[p];
-                        currentPoint.Y = yCoords[p];
+                        currentPoint = new Vector2D {X = xCoords[p], Y = yCoords[p]};
 
                         if (flags[p].OnCurve)
                         {
@@ -765,9 +761,7 @@ namespace Adamantium.Fonts.TTF
 
                                 // also immediately add the same point as a start of new segment, because all segments share start points with end points of prevoius segments
                                 currentSegment = new ContourSegment();
-                                var nextPoint = new Point();
-                                nextPoint.X = currentPoint.X;
-                                nextPoint.Y = currentPoint.Y;
+                                var nextPoint = new Vector2D {X = currentPoint.X, Y = currentPoint.Y};
                                 currentSegment.Points.Add(nextPoint);
                             }
                         }
@@ -783,7 +777,7 @@ namespace Adamantium.Fonts.TTF
                             // else - current point is control point of the next segment, close current segment by creating "on curve" end point
                             else
                             {
-                                Point newOnCurvePoint = new Point();
+                                var newOnCurvePoint = new Vector2D();
 
                                 // left point + half the lenght between left and right points = middle point - no variable overload this way
                                 newOnCurvePoint.X = xCoords[prevPoint] + (xCoords[p] - xCoords[prevPoint]) / 2.0f;
@@ -794,9 +788,7 @@ namespace Adamantium.Fonts.TTF
 
                                 // immediately add newly created point as a start of new segment, because all segments share start points with end points of prevoius segments
                                 currentSegment = new ContourSegment();
-                                var nextPoint = new Point();
-                                nextPoint.X = newOnCurvePoint.X;
-                                nextPoint.Y = newOnCurvePoint.Y;
+                                var nextPoint = new Vector2D {X = newOnCurvePoint.X, Y = newOnCurvePoint.Y};
                                 currentSegment.Points.Add(nextPoint);
 
                                 // finally - add current processed point as control point of new segment
@@ -809,9 +801,7 @@ namespace Adamantium.Fonts.TTF
                 }
 
                 // add the first processed point as a last point of last segment - the contour is closed now
-                currentPoint = new Point();
-                currentPoint.X = xCoords[firstOnCurvePointIndex];
-                currentPoint.Y = yCoords[firstOnCurvePointIndex];
+                currentPoint = new Vector2D {X = xCoords[firstOnCurvePointIndex], Y = yCoords[firstOnCurvePointIndex]};
                 currentSegment.Points.Add(currentPoint);
                 glyphs[glyphIndex].SegmentedContours[c].Segments.Add(currentSegment);
             }
@@ -910,9 +900,13 @@ namespace Adamantium.Fonts.TTF
 
             foreach (var point in contour.Points)
             {
-                Point transformedPoint = new Point();
-                transformedPoint.X = point.X * transformationMatrix[0] + point.Y * transformationMatrix[1] + transformationMatrix[4];
-                transformedPoint.Y = point.X * transformationMatrix[2] + point.Y * transformationMatrix[3] + transformationMatrix[5];
+                var transformedPoint = new Vector2D
+                {
+                    X = point.X * transformationMatrix[0] + point.Y * transformationMatrix[1] +
+                        transformationMatrix[4],
+                    Y = point.X * transformationMatrix[2] + point.Y * transformationMatrix[3] +
+                        transformationMatrix[5]
+                };
                 transformedContour.Points.Add(transformedPoint);
             }
 
@@ -1119,7 +1113,7 @@ namespace Adamantium.Fonts.TTF
         {
             foreach (var contour in glyph.SegmentedContours)
             {
-                glyphData.BezierContours.Add(GeometryGenerator.GenerateContour(contour, 1.0f / bezierResolution));
+                glyphData.BezierContours.Add(Bezier.GenerateContour(contour, 1.0f / bezierResolution));
             }
         }
 
@@ -1129,36 +1123,11 @@ namespace Adamantium.Fonts.TTF
             
             foreach (var contour in glyphData.BezierContours)
             {
-                List<Vector2D> pointList2D = new List<Vector2D>();
-            
-                foreach (var point in contour.Points)
-                {
-                    var point2D = new Vector2D(point.X, point.Y);
-                    pointList2D.Add(point2D);
-                }
-            
-                var polygonItem = new PolygonItem(pointList2D);
+                var polygonItem = new PolygonItem(contour.Points);
                 polygon.Polygons.Add(polygonItem);
             }
             
             glyphData.Vertices = polygon.Fill();
-        }
-        
-        public void GenerateDefaultGlyphTriangles(GlyphData glyphData)
-        {
-            var polygon = new Polygon();
-            var pointList2D = new List<Vector3F>();
-            
-            foreach (var contour in glyphData.BezierContours)
-            {
-                foreach (var point in contour.Points)
-                {
-                    var point2D = new Vector3F(point.X, point.Y);
-                    pointList2D.Add(point2D);
-                }
-            }
-            
-            glyphData.Vertices = pointList2D;
         }
 
         private void FillCompositeGlyphGeometry(Glyph glyph, GlyphData glyphData)
@@ -1172,7 +1141,7 @@ namespace Adamantium.Fonts.TTF
             }
         }
 
-        static public UInt32 GenerateKerningKey(ushort leftIndex, ushort rightIndex)
+        public static UInt32 GenerateKerningKey(ushort leftIndex, ushort rightIndex)
         {
             UInt32 left = leftIndex;
             UInt32 right = rightIndex;

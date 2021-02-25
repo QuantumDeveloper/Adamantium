@@ -53,28 +53,6 @@ namespace Adamantium.Mathematics
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool NearEqual(float a, float b)
         {
-            //// Check if the numbers are really close -- needed
-            //// when comparing numbers near zero.
-            //if (IsZero(a - b))
-            //    return true;
-
-            //// Original from Bruce Dawson: http://randomascii.wordpress.com/2012/02/25/comparing-floating-point-numbers-2012-edition/
-            //int aInt = *(int*)&a;
-            //int bInt = *(int*)&b;
-
-            //// Different signs means they do not match.
-            //if ((aInt < 0) != (bInt < 0))
-            //    return false;
-
-            //// Find the difference in ULPs.
-            //int ulp = Math.Abs(aInt - bInt);
-
-            //// Choose of maxUlp = 4
-            //// according to http://code.google.com/p/googletest/source/browse/trunk/include/gtest/internal/gtest-internal.h
-            //const int maxUlp = 4;
-            //return ulp <= maxUlp;
-
-
             return WithinEpsilon(a, b, ZeroToleranceF);
         }
 
@@ -125,20 +103,20 @@ namespace Adamantium.Mathematics
             float diff = Math.Abs(a - b);
 
             if (a == b)
-            { // shortcut, handles infinities
+            { 
+                // shortcut, handles infinities
                 return true;
             }
-            else if (a == 0 || b == 0 || (absA + absB < FloatNormal))
+
+            if (a == 0 || b == 0 || (absA + absB < FloatNormal))
             {
                 // a or b is zero or both are extremely close to it
                 // relative error is less meaningful here
                 return diff < epsilon; //*FloatNormal;
             }
-            else
-            { 
-                // use relative error
-                return diff / Math.Min((absA + absB), Single.MaxValue) < epsilon;
-            }
+
+            // use relative error
+            return diff / Math.Min((absA + absB), Single.MaxValue) < epsilon;
         }
 
         /// <summary>
@@ -148,7 +126,7 @@ namespace Adamantium.Mathematics
         /// <param name="b">The right value to compare.</param>
         /// <param name="epsilon">Epsilon value</param>
         /// <returns><c>true</c> if a almost equal to b within a float epsilon, <c>false</c> otherwise</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining|MethodImplOptions.AggressiveOptimization)]
         public static bool WithinEpsilon(double a, double b, double epsilon)
         {
             double absA = Math.Abs(a);
@@ -156,21 +134,20 @@ namespace Adamantium.Mathematics
             double diff = Math.Abs(a - b);
 
             if (a == b)
-            { // shortcut, handles infinities
+            { 
+                // shortcut, handles infinities
                 return true;
             }
-            else if (a == 0 || b == 0 || (absA + absB < DoubleNormal))
+
+            if (a == 0 || b == 0 || (absA + absB < DoubleNormal))
             {
                 // a or b is zero or both are extremely close to it
                 // relative error is less meaningful here
                 return diff < epsilon;
-                //return diff < epsilon * DoubleNormal;
             }
-            else
-            { 
-                // use relative error
-                return diff / Math.Min((absA + absB), Double.MaxValue) < epsilon;
-            }
+
+            // use relative error
+            return diff / Math.Min((absA + absB), Double.MaxValue) < epsilon;
         }
 
         public static bool WithinEpsilon(Vector3F a, Vector3F b, float epsilon)
@@ -320,9 +297,9 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="a">The floating value.</param>
         /// <returns><c>true</c> if the specified value is close to zero (0.0f); otherwise, <c>false</c>.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsZero(float a)
         {
-            //return Math.Abs(a) < ZeroTolerance;
             return NearEqual(a, ZeroToleranceF);
         }
 
@@ -331,6 +308,7 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="a">The floating value.</param>
         /// <returns><c>true</c> if the specified value is close to zero (0.0f); otherwise, <c>false</c>.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsZero(double a)
         {
             return NearEqual(a, ZeroToleranceD);
@@ -341,6 +319,7 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="a">The floating value.</param>
         /// <returns><c>true</c> if the specified value is close to one (1.0f); otherwise, <c>false</c>.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsOne(float a)
         {
             return IsZero(a - 1.0f);
@@ -351,6 +330,7 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="a">The floating value.</param>
         /// <returns><c>true</c> if the specified value is close to one (1.0f); otherwise, <c>false</c>.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsOne(double a)
         {
             return IsZero(a - 1.0f);
