@@ -57,8 +57,10 @@ namespace Adamantium.Fonts.Common
         {
             var x = QuadraticEquation(begin.X, control.X, end.X, t);
             var y = QuadraticEquation(begin.Y, control.Y, end.Y, t);
-
-            return new Vector2D(x, y);
+            
+            // Round results because if its double, we will get a lot of digits after point and this will negatively influence on triangulation results
+            // 4 digits after point will be enough
+            return new Vector2D(Math.Round(x, 4, MidpointRounding.AwayFromZero), Math.Round(y, 4, MidpointRounding.AwayFromZero));
         }
         
         private static double QuadraticEquation(double begin, double control, double end, double t)

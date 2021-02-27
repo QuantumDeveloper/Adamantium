@@ -75,9 +75,9 @@ namespace Adamantium.Game.Playground
         {
             try
             {
-                parser = new TTFFontParser(@"PlayfairDisplay-Regular.ttf", 7);
+                parser = new TTFFontParser(@"PlayfairDisplay-Regular.ttf", 3);
                 var entity = new Entity(null, "PlayfairDisplay-Regular");
-                var ch = parser.FontData.GetGlyphForCharacter('B');
+                var ch = parser.FontData.GetGlyphForCharacter('@');
                 parser.GenerateGlyphTriangles(ch);
                 //parser.GenerateDefaultGlyphTriangles(ch);
                 var mesh = new Mesh();

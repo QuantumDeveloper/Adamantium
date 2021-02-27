@@ -35,7 +35,7 @@ namespace Adamantium.Mathematics
             return MathHelper.WithinEpsilon(Start, other.Start, Polygon.Epsilon) && MathHelper.WithinEpsilon(End, other.End, Polygon.Epsilon);
         }
 
-        public bool EqualsInvariant(LineSegment2D other)
+        public bool EqualsInvariant(ref LineSegment2D other)
         {
             return (Start == other.Start && End == other.End) ||
                    (Start == other.End && End == other.Start);

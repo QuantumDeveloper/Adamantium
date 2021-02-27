@@ -16,7 +16,7 @@ namespace Adamantium.Mathematics
         /// Seems Epsilon must be less than <see cref="MathHelper.ZeroToleranceD"/> on 1 magnitude to avoid floating point errors, but not less than 1e-8. 
         /// Current ZeroTolerance value = 1e-9
         /// </remarks>
-        public static double Epsilon = 1e-9;
+        public static double Epsilon = MathHelper.ZeroToleranceD;
         /// <summary>
         /// Polygon name
         /// </summary>
@@ -134,6 +134,7 @@ namespace Adamantium.Mathematics
             var itemCopy = item;
             var polygon = new Polygon
             {
+                Name = Name,
                 MergedPoints = itemCopy.Points,
                 MergedSegments = itemCopy.Segments,
                 SelfIntersectedPoints = itemCopy.SelfIntersectedPoints,
@@ -754,8 +755,7 @@ namespace Adamantium.Mathematics
             for (var i = 0; i < segments.Count; ++i)
             {
                 var currentSegment = segments[i];
-                if (Collision2D.IsPointOnSegment(ref currentSegment, ref start)
-                    && Collision2D.IsPointOnSegment(ref currentSegment, ref end))
+                if (currentSegment.EqualsInvariant(ref correctSegment2D))
                 {
                     correctSegment2D = currentSegment;
                     return true;
