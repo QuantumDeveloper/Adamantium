@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -65,6 +66,7 @@ namespace Adamantium.Fonts.OTF
         // Biases for subr indices
         private int globalSubrBias;
         private int localSubrBias;
+        private int charstringType;
 
         // Pipeline for constructing character
         PipelineAssembler pipelineAssembler;
@@ -299,6 +301,8 @@ namespace Adamantium.Fonts.OTF
             FillCffIndex(ref cffTopDictIndex);
 
             topDictParser = new TopDictParser(cffTopDictIndex.Data);
+            
+            charstringType = topDictParser.GetOperatorValue(TopDictOperatorsType.CharStringType).AsInt();
         }
 
         private void ReadStringIndex()
@@ -382,6 +386,8 @@ namespace Adamantium.Fonts.OTF
             FillCffIndex(ref cffCharStringsIndex);
 
             var mainStack = new Stack<byte>();
+            var glyphs = new List<Glyph>();
+            int exceptions = 0;
 
             // STEP 0. After filling the Index struct traverse the raw data array (ALL characters are here currently)
 
@@ -408,7 +414,25 @@ namespace Adamantium.Fonts.OTF
                 // VertexBuf vb = g.Triangulate();
 
                 //List<Glyph> ...
-                Glyph glyph = pipelineAssembler.GetCommandList(mainStack).GetOutlines().Sample(1).Build();
+                try
+                {
+                    if (i == 7)
+                    {
+                        int x = 0;
+                        foreach (var b in mainStack)
+                        {
+                            //Debug.WriteLine(b);
+                        }
+                        
+                    }
+                    Glyph glyph = pipelineAssembler.GetCommandList(mainStack, index: i).GetOutlines().Sample(1).Build();
+                    glyphs.Add(glyph);
+                    Debug.WriteLine($"Glyph {i} added");
+                }
+                catch (Exception e)
+                {
+                    exceptions++;
+                }
             }
         }
 
@@ -476,38 +500,40 @@ namespace Adamantium.Fonts.OTF
 
         private int CalculateSubrBias(uint subrCount)
         {
-            /*if (CharstringType == 1)
+            if (charstringType == 1)
             {
                 return 0;
             }
-            else */if (subrCount < 1240)
+
+            return subrCount switch
             {
-                return 107;
-            }
-            else if (subrCount < 33900)
-            {
-                return 1131;
-            }
-            else
-            {
-                return 32768;
-            }
+                < 1240 => 107,
+                < 33900 => 1131,
+                _ => 32768
+            };
         }
 
         public void UnpackSubrToStack(bool global, int subrNumber, Stack<byte> mainStack)
         {
-            CFFIndex subrIndex = (global ? cffGlobalSubroutineIndex : cffLocalSubroutineIndex);
-
-            subrNumber += (global ? globalSubrBias : localSubrBias);
-
-            if (subrNumber < 0)
+            try
             {
-                throw new ArgumentException($"subr number < 0 (subrNumber == {subrNumber})!");
+                CFFIndex subrIndex = (global ? cffGlobalSubroutineIndex : cffLocalSubroutineIndex);
+
+                subrNumber += (global ? globalSubrBias : localSubrBias);
+
+                if (subrNumber < 0)
+                {
+                    throw new ArgumentException($"subr number < 0 (subrNumber == {subrNumber})!");
+                }
+
+                for (var i = subrIndex.Offsets[subrNumber + 1] - 1; i >= subrIndex.Offsets[subrNumber]; --i)
+                {
+                    mainStack.Push(subrIndex.Data[i - 1]);
+                }
             }
-
-            for (var i = subrIndex.Offsets[subrNumber + 1] - 1; i >= subrIndex.Offsets[subrNumber]; --i)
+            catch (Exception e)
             {
-                mainStack.Push(subrIndex.Data[i - 1]);
+                Console.WriteLine(e);
             }
         }
     }

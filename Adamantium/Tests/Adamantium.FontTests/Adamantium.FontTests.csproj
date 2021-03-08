@@ -18,4 +18,31 @@
       <ProjectReference Include="..\..\Adamantium.Fonts\Adamantium.Fonts.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <None Remove="OTFFonts\customfont.otf" />
+      <Content Include="OTFFonts\customfont.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="OTFFonts\Glametrix-oj9A.otf" />
+      <Content Include="OTFFonts\Glametrix-oj9A.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="OTFFonts\GlametrixBold-4dW6.otf" />
+      <Content Include="OTFFonts\GlametrixBold-4dW6.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="OTFFonts\GlametrixLight-0zjo.otf" />
+      <Content Include="OTFFonts\GlametrixLight-0zjo.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="OTFFonts\GreatVibes-Regular.otf" />
+      <Content Include="OTFFonts\GreatVibes-Regular.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="OTFFonts\Poppins-Medium.otf" />
+      <Content Include="OTFFonts\Poppins-Medium.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+    </ItemGroup>
+
 </Project>

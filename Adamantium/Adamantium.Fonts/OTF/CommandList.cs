@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace Adamantium.Fonts.OTF
 {
@@ -66,7 +67,7 @@ namespace Adamantium.Fonts.OTF
             };
         }
 
-        public void Fill(Stack<byte> mainStack)
+        public void Fill(Stack<byte> mainStack, int index = 0)
         {
             List<double> operands = new List<double>();
             ushort token;
@@ -75,6 +76,11 @@ namespace Adamantium.Fonts.OTF
             while (mainStack.Count > 0)
             {
                 token = mainStack.Pop();
+
+                if (index == 7)
+                {
+                    //Debug.WriteLine(token);
+                }
 
                 if (token == 12) // escape byte found, it is a 2-byte operator
                 {
@@ -214,7 +220,7 @@ namespace Adamantium.Fonts.OTF
                             {
                                 throw new ArgumentException($"callgsubr operand count != 1 (count == {operands.Count})!");
                             }
-
+                            
                             otfParser.UnpackSubrToStack(true, (int)operands[0], mainStack);
                             break;
                         case (ushort)OperatorsType.callsubr:
@@ -222,8 +228,13 @@ namespace Adamantium.Fonts.OTF
                             {
                                 throw new ArgumentException($"callsubr operand count != 1 (count == {operands.Count})!");
                             }
-
-                            otfParser.UnpackSubrToStack(false, (int)operands[0], mainStack);
+                            
+                            if (index == 7 && operands[0] == -103)
+                            {
+                                Debug.WriteLine($"Operand: {operands[0]}");
+                            }
+                            
+                            otfParser.UnpackSubrToStack(false, (int) operands[0], mainStack);
                             break;
                         case (ushort)OperatorsType.@return:
                             break;

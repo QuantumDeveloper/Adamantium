@@ -17,10 +17,10 @@ namespace Adamantium.Fonts.OTF
 
         //Glyph g = CommandList(mainStack).OutlineList().BezierSampling(int sampleRate);
 
-        public PipelineAssembler GetCommandList(Stack<byte> stack, bool clearMainStack = true)
+        public PipelineAssembler GetCommandList(Stack<byte> stack, bool clearMainStack = true, int index = 0)
         {
             commandList.Clear();
-            commandList.Fill(stack);
+            commandList.Fill(stack, index);
 
             if (commandList.commands.Last().@operator != OperatorsType.endchar)
             {

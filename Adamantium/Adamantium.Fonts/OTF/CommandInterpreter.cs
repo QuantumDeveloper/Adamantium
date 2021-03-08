@@ -164,8 +164,18 @@ namespace Adamantium.Fonts.OTF
                             var points = Rrcurveto(new double[] {values[0], 0, values[1], values[2], 0, values[3]});
                             pointList.AddRange(points);
 
-                            points = Rrcurveto(new double[] {0, values[4], values[5], values[6], values[7], 0});
-                            pointList.AddRange(points);
+                            try
+                            {
+                                if (points.Length == 8)
+                                {
+                                    points = Rrcurveto(new double[] {0, values[4], values[5], values[6], values[7], 0});
+                                    pointList.AddRange(points);
+                                }
+                            }
+                            catch (Exception e)
+                            {
+                                Console.WriteLine(e);
+                            }
                         }
 
                         if (lastOperands.Length > 0)
@@ -210,8 +220,11 @@ namespace Adamantium.Fonts.OTF
                             var points = Rrcurveto(new double[] {0, values[0], values[1], values[2], values[3], 0});
                             pointList.AddRange(points);
 
-                            points = Rrcurveto(new double[] {values[4], 0, values[5], values[6], 0, values[7]});
-                            pointList.AddRange(points);
+                            if (points.Length == 8)
+                            {
+                                points = Rrcurveto(new double[] {values[4], 0, values[5], values[6], 0, values[7]});
+                                pointList.AddRange(points);
+                            }
                         }
 
                         if (lastOperands.Length > 0)

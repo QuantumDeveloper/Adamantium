@@ -89,6 +89,7 @@ namespace Adamantium.Fonts.OTF
                { TopDictOperatorsType.FontName               , Sid }
             };
 
+            FillDefaultValues();
             FillOperatorsRawValues(rawData);
         }
 
@@ -97,15 +98,21 @@ namespace Adamantium.Fonts.OTF
             return operatorsActions[opType].Invoke(operatorsRawValues[opType]);
         }
 
+        private void FillDefaultValues()
+        {
+            var defaultOperand = new List<GenericOperandResult>();
+            defaultOperand.Add(2);
+            operatorsRawValues[TopDictOperatorsType.CharStringType] = defaultOperand;
+        }
+
         private void FillOperatorsRawValues(byte[] rawData)
         {
-            List<byte> byteArray = new List<byte>(rawData);
-            List<GenericOperandResult> rawOperands = new List<GenericOperandResult>();
-            ushort token;
+            var byteArray = new List<byte>(rawData);
+            var rawOperands = new List<GenericOperandResult>();
 
             while (byteArray.Count > 0)
             {
-                token = byteArray[0];
+                ushort token = byteArray[0];
 
                 if (token == 12)
                 {

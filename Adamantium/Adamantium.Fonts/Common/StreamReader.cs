@@ -18,7 +18,7 @@ namespace Adamantium.Fonts.Common
             byte[] bytes = new byte[count];
             for (int i = 0; i < count; ++i)
             {
-                bytes[i] = (byte)ReadByte();
+                bytes[i] = ReadByte();
             }
 
             if (BitConverter.IsLittleEndian)
