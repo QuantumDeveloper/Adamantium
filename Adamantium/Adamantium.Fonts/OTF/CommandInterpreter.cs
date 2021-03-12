@@ -117,15 +117,27 @@ namespace Adamantium.Fonts.OTF
 
                     if ((command.operands.Count % 2) == 1)
                     {
-                        double[] values =
+                        try
                         {
-                            command.operands[0], command.operands[1], command.operands[2], command.operands[3], 0,
-                            command.operands[4]
-                        };
-                        var points = Rrcurveto(values);
-                        pointList.AddRange(points);
+                            double[] values =
+                            {
+                                command.operands[0], 
+                                command.operands[1], 
+                                command.operands[2], 
+                                command.operands[3], 
+                                0,
+                                command.operands[4]
+                            };
+                            var points = Rrcurveto(values);
+                            pointList.AddRange(points);
 
-                        i += 5;
+                            i += 5;
+                        }
+                        catch (Exception e)
+                        {
+                            Console.WriteLine(e);
+                            throw;
+                        }
                     }
 
                     for (; i < command.operands.Count; i += 4)

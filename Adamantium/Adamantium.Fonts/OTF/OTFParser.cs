@@ -416,13 +416,13 @@ namespace Adamantium.Fonts.OTF
                 //List<Glyph> ...
                 try
                 {
-                    if (i == 7)
+                    if (i == 12)
                     {
                         int x = 0;
-                        foreach (var b in mainStack)
-                        {
-                            //Debug.WriteLine(b);
-                        }
+                        // foreach (var b in mainStack)
+                        // {
+                        //     //Debug.WriteLine(b);
+                        // }
                         
                     }
                     Glyph glyph = pipelineAssembler.GetCommandList(mainStack, index: i).GetOutlines().Sample(1).Build();

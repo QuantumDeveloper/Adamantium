@@ -8,8 +8,8 @@ namespace Adamantium.FontTests
         [Test]
         public void LoadOTFFont()
         {
-            var fp = new OTFParser(@"OTFFonts\Glametrix-oj9A.otf");
-            //var fp = new OTFParser(@"OTFFonts\Poppins-Medium.otf");
+            //var fp = new OTFParser(@"OTFFonts\Glametrix-oj9A.otf");
+            var fp = new OTFParser(@"OTFFonts\Poppins-Medium.otf");
             //var fp = new OTFParser(@"OTFFonts\customfont.otf");
         }
     }

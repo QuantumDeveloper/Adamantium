@@ -14,23 +14,24 @@ namespace Adamantium.Fonts.OTF
 
                 return (b1 << 8) | b2;
             }
-            else if (b0 >= 32 && b0 <= 246)
+
+            if (b0 >= 32 && b0 <= 246)
             {
                 return b0 - 139;
             }
-            else if (b0 >= 247 && b0 <= 250)
+            if (b0 >= 247 && b0 <= 250)
             {
                 var b1 = mainStack.Pop();
 
                 return (b0 - 247) * 256 + b1 + 108;
             }
-            else if (b0 >= 251 && b0 <= 254)
+            if (b0 >= 251 && b0 <= 254)
             {
                 var b1 = mainStack.Pop();
 
                 return -(b0 - 251) * 256 - b1 - 108;
             }
-            else if (b0 == 255)
+            if (b0 == 255)
             {
                 var b1 = mainStack.Pop();
                 var b2 = mainStack.Pop();
@@ -41,10 +42,7 @@ namespace Adamantium.Fonts.OTF
 
                 return (fixedPointNumber / 65536.0);
             }
-            else
-            {
-                throw new ArgumentException($"'b0' = {b0} is out of range!");
-            }
+            throw new ArgumentException($"'b0' = {b0} is out of range!");
         }
     }
 }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 
 namespace Adamantium.Fonts.OTF
 {
@@ -72,55 +73,28 @@ namespace Adamantium.Fonts.OTF
             List<double> operands = new List<double>();
             ushort token;
             bool clearOperands;
+            int stemCount = 0;
+            int cntr = 0;
+
+            if (index == 12)
+            {
+                int t = 0;
+            }
 
             while (mainStack.Count > 0)
             {
                 token = mainStack.Pop();
+                cntr++;
 
-                if (index == 7)
+                if (commands.Count == 7 && index == 12)
                 {
-                    //Debug.WriteLine(token);
+                    int r = 0;
                 }
 
                 if (token == 12) // escape byte found, it is a 2-byte operator
                 {
                     token = (ushort)((12 << 8) | mainStack.Pop());
                 }
-
-                /*switch (token)
-                {
-                    case (ushort)OutlinesOperatorsType.abs:
-                    case (ushort)OutlinesOperatorsType.add:
-                    case (ushort)OutlinesOperatorsType.sub:
-                    case (ushort)OutlinesOperatorsType.div:
-                    case (ushort)OutlinesOperatorsType.neg:
-                    case (ushort)OutlinesOperatorsType.random:
-                    case (ushort)OutlinesOperatorsType.mul:
-                    case (ushort)OutlinesOperatorsType.sqrt:
-                    case (ushort)OutlinesOperatorsType.drop:
-                    case (ushort)OutlinesOperatorsType.index:
-                    case (ushort)OutlinesOperatorsType.roll:
-                    case (ushort)OutlinesOperatorsType.dup:
-                    case (ushort)OutlinesOperatorsType.put:
-                    case (ushort)OutlinesOperatorsType.get:
-                    case (ushort)OutlinesOperatorsType.and:
-                    case (ushort)OutlinesOperatorsType.or:
-                    case (ushort)OutlinesOperatorsType.not:
-                    case (ushort)OutlinesOperatorsType.eq:
-                    case (ushort)OutlinesOperatorsType.ifelse:
-                    case (ushort)OutlinesOperatorsType.callgsubr:
-                    case (ushort)OutlinesOperatorsType.callsubr:
-                    case (ushort)OutlinesOperatorsType.hintmask:
-                    case (ushort)OutlinesOperatorsType.cntrmask:
-                        break;
-                }
-
-                if (token == (ushort)OutlinesOperatorsType.hintmask ||
-                    token == (ushort)OutlinesOperatorsType.cntrmask)
-                {
-                    ++HintmaskCnt;
-                    break;
-                }*/
 
                 if (bytesToOperatorMap.ContainsKey(token)) // this is operator
                 {
@@ -215,30 +189,61 @@ namespace Adamantium.Fonts.OTF
 
                             operands[0] = -operands[0];
                             break;
-                        case (ushort)OperatorsType.callgsubr:
-                            if (operands.Count != 1)
+                        case (ushort)OperatorsType.hintmask:
+                        case (ushort)OperatorsType.cntrmask:
+                            stemCount += operands.Count / 2;
+                            
+                            if (stemCount == 0) stemCount = 1;
+                            var bytesToRead = Math.Ceiling((double) stemCount / 8);
+                            for (int i = 0; i < bytesToRead; ++i)
                             {
-                                throw new ArgumentException($"callgsubr operand count != 1 (count == {operands.Count})!");
+                                var maskByte = mainStack.Pop();
+                            }
+                            break;
+                        case (ushort)OperatorsType.callgsubr:
+                            if (operands.Count == 0)
+                            {
+                                throw new ArgumentException($"callgsubr operand count == 0!");
+                            }
+
+                            if (index == 5)
+                            {
+                                Debug.WriteLine($"Operand: {operands.Last()}");
                             }
                             
-                            otfParser.UnpackSubrToStack(true, (int)operands[0], mainStack);
+                            otfParser.UnpackSubrToStack(true, (int)operands.Last(), mainStack);
+                            operands.RemoveAt(operands.Count - 1);
+                            clearOperands = false;
                             break;
                         case (ushort)OperatorsType.callsubr:
-                            if (operands.Count != 1)
+                            if (operands.Count == 0)
                             {
-                                throw new ArgumentException($"callsubr operand count != 1 (count == {operands.Count})!");
+                                throw new ArgumentException($"callsubr operand count == 0!");
                             }
                             
-                            if (index == 7 && operands[0] == -103)
+                            if (index == 6)
                             {
                                 Debug.WriteLine($"Operand: {operands[0]}");
                             }
                             
-                            otfParser.UnpackSubrToStack(false, (int) operands[0], mainStack);
+                            otfParser.UnpackSubrToStack(false, (int) operands.Last(), mainStack);
+                            operands.RemoveAt(operands.Count - 1);
+                            clearOperands = false;
                             break;
                         case (ushort)OperatorsType.@return:
+                            clearOperands = false;
                             break;
                         default:
+                            switch (token)
+                            {
+                                case (ushort)OperatorsType.vstem:
+                                case (ushort)OperatorsType.hstem:
+                                case (ushort)OperatorsType.hstemhm:
+                                case (ushort)OperatorsType.vstemhm:
+                                    stemCount+=operands.Count/2;
+                                    break;
+                            }
+
                             var command = new Command();
 
                             command.@operator = bytesToOperatorMap[token];

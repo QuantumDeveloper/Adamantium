@@ -67,12 +67,12 @@
         // reserved         = 15,
         // reserved         = 16,
         // reserved         = 17,
-        hstemhm             = 18,
-        hintmask            = 19,
-        cntrmask            = 20,
+        hstemhm             = 18, /**/
+        hintmask            = 19, /**/
+        cntrmask            = 20, /**/
         rmoveto             = 21, /**/
         hmoveto             = 22, /**/
-        vstemhm             = 23,
+        vstemhm             = 23, /**/
         rcurveline          = 24, /**/
         rlinecurve          = 25, /**/
         vvcurveto           = 26, /**/
