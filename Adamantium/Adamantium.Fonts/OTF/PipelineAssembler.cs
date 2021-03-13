@@ -7,17 +7,21 @@ namespace Adamantium.Fonts.OTF
     class PipelineAssembler
     {
         private CommandList commandList;
-        private OutlineList outlineList;
+        private Glyph glyph;
 
         public PipelineAssembler(OTFParser parser)
         {
             commandList = new CommandList(parser);
-            outlineList = new OutlineList();
         }
 
-        //Glyph g = CommandList(mainStack).OutlineList().BezierSampling(int sampleRate);
+        public PipelineAssembler CreateGlyph(uint index)
+        {
+            glyph = new Glyph(index);
 
-        public PipelineAssembler GetCommandList(Stack<byte> stack, bool clearMainStack = true, int index = 0)
+            return this;
+        }
+        
+        public PipelineAssembler FillCommandList(Stack<byte> stack, bool clearMainStack = true, int index = 0)
         {
             commandList.Clear();
             commandList.Fill(stack, index);
@@ -33,24 +37,30 @@ namespace Adamantium.Fonts.OTF
             return this;
         }
 
-        public PipelineAssembler GetOutlines()
+        public PipelineAssembler FillOutlines()
         {
-            outlineList.Clear();
-            outlineList.Fill(commandList.commands);
+            glyph.OutlineList.Fill(commandList.commands);
 
             return this;
         }
 
-        public PipelineAssembler Sample(int rate)
+        public PipelineAssembler PrepareSegments()
         {
-            outlineList.Sample(rate);
+            glyph.OutlineList.SplitToSegments();
+
+            return this;
+        }
+        
+        public PipelineAssembler Sample(uint rate)
+        {
+            glyph.Sample(rate);
             
             return this;
         }
 
-        public Glyph Build()
+        public Glyph GetGlyph()
         {
-            return new Glyph();
+            return glyph;
         }
     }
 }

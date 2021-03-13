@@ -74,22 +74,10 @@ namespace Adamantium.Fonts.OTF
             ushort token;
             bool clearOperands;
             int stemCount = 0;
-            int cntr = 0;
-
-            if (index == 12)
-            {
-                int t = 0;
-            }
 
             while (mainStack.Count > 0)
             {
                 token = mainStack.Pop();
-                cntr++;
-
-                if (commands.Count == 7 && index == 12)
-                {
-                    int r = 0;
-                }
 
                 if (token == 12) // escape byte found, it is a 2-byte operator
                 {
@@ -205,11 +193,6 @@ namespace Adamantium.Fonts.OTF
                             {
                                 throw new ArgumentException($"callgsubr operand count == 0!");
                             }
-
-                            if (index == 5)
-                            {
-                                Debug.WriteLine($"Operand: {operands.Last()}");
-                            }
                             
                             otfParser.UnpackSubrToStack(true, (int)operands.Last(), mainStack);
                             operands.RemoveAt(operands.Count - 1);
@@ -220,12 +203,7 @@ namespace Adamantium.Fonts.OTF
                             {
                                 throw new ArgumentException($"callsubr operand count == 0!");
                             }
-                            
-                            if (index == 6)
-                            {
-                                Debug.WriteLine($"Operand: {operands[0]}");
-                            }
-                            
+
                             otfParser.UnpackSubrToStack(false, (int) operands.Last(), mainStack);
                             operands.RemoveAt(operands.Count - 1);
                             clearOperands = false;

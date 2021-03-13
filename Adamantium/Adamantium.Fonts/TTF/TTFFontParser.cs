@@ -42,7 +42,7 @@ namespace Adamantium.Fonts.TTF
          */
 
         // glyphs geometry
-        private Glyph[] glyphs;
+        private TTFGlyph[] glyphs;
 
         // TTF font file path (all data in Big-Endian)
         private readonly string filePath;
@@ -546,11 +546,11 @@ namespace Adamantium.Fonts.TTF
             }
 
             // process all glyphs
-            glyphs = new Glyph[maxp.NumGlyphs];
+            glyphs = new TTFGlyph[maxp.NumGlyphs];
 
             for (ushort i = 0; i < maxp.NumGlyphs; ++i)
             {
-                glyphs[i] = new Glyph();
+                glyphs[i] = new TTFGlyph();
             }
 
             for (ushort i = 0; i < maxp.NumGlyphs; ++i)
@@ -1070,8 +1070,8 @@ namespace Adamantium.Fonts.TTF
         static int count = 0;
         private void GenerateAllGeometry()
         {
-            Dictionary<UInt16, Glyph> simpleGlyphs = new Dictionary<ushort, Glyph>();
-            Dictionary<UInt16, Glyph> compositeGlyphs = new Dictionary<ushort, Glyph>();
+            Dictionary<UInt16, TTFGlyph> simpleGlyphs = new Dictionary<ushort, TTFGlyph>();
+            Dictionary<UInt16, TTFGlyph> compositeGlyphs = new Dictionary<ushort, TTFGlyph>();
 
             for (UInt16 i = 0; i < glyphs.Length; ++i)
             {
@@ -1109,9 +1109,9 @@ namespace Adamantium.Fonts.TTF
             Debug.WriteLine($"time elapsed: {perfTimer.ElapsedMilliseconds} ms");
         }
 
-        private void GenerateSimpleGlyphContours(Glyph glyph, GlyphData glyphData)
+        private void GenerateSimpleGlyphContours(TTFGlyph ttfGlyph, GlyphData glyphData)
         {
-            foreach (var contour in glyph.SegmentedContours)
+            foreach (var contour in ttfGlyph.SegmentedContours)
             {
                 glyphData.BezierContours.Add(Bezier.GenerateContour(contour, 1.0f / bezierResolution));
             }
@@ -1148,9 +1148,9 @@ namespace Adamantium.Fonts.TTF
             glyphData.Vertices = pointList2D;
         }
 
-        private void FillCompositeGlyphGeometry(Glyph glyph, GlyphData glyphData)
+        private void FillCompositeGlyphGeometry(TTFGlyph ttfGlyph, GlyphData glyphData)
         {
-            foreach (var component in glyph.CompositeGlyphComponents)
+            foreach (var component in ttfGlyph.CompositeGlyphComponents)
             {
                 foreach (var bezierContour in FontData.GlyphData[component.SimpleGlyphIndex].BezierContours)
                 {

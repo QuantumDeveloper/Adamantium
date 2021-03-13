@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Adamantium.Fonts.Common
 {
-    internal class Glyph
+    internal class TTFGlyph
     {
         public GlyphHeader Header { get; set; }
         public int Index { get; set; }
@@ -17,7 +17,7 @@ namespace Adamantium.Fonts.Common
         // for composite glyphs
         public List<CompositeGlyphComponent> CompositeGlyphComponents { get; set; } // simple glyphs indeces and transformations from which the composite ones consists       
 
-        public Glyph()
+        public TTFGlyph()
         {
             Header = new GlyphHeader();
             CompositeGlyphComponents = new List<CompositeGlyphComponent>();

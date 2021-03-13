@@ -399,13 +399,6 @@ namespace Adamantium.Fonts.OTF
                     mainStack.Push(cffCharStringsIndex.Data[j - 1]);
                 }
 
-                /*if (rawBytes[rawBytes.Count - 1] != (ushort)OutlinesOperatorsType.endchar  &&
-                    rawBytes[rawBytes.Count - 1] != (ushort)OutlinesOperatorsType.callsubr &&
-                    rawBytes[rawBytes.Count - 1] != (ushort)OutlinesOperatorsType.callgsubr)
-                {
-                    throw new ArgumentException("FINAL COMMAND NOT ENDCHAR || CALLSUBR || CALLGSUBR");
-                }*/
-
                 // STEP 3. Use fluent approach
                 // Byte Array --> Command List --> Outlines --> Bezier descretion
                 // Glyph g = CommandList(mainStack).OutlineList().BezierSampling(int sampleRate);
@@ -416,16 +409,7 @@ namespace Adamantium.Fonts.OTF
                 //List<Glyph> ...
                 try
                 {
-                    if (i == 12)
-                    {
-                        int x = 0;
-                        // foreach (var b in mainStack)
-                        // {
-                        //     //Debug.WriteLine(b);
-                        // }
-                        
-                    }
-                    Glyph glyph = pipelineAssembler.GetCommandList(mainStack, index: i).GetOutlines().Sample(1).Build();
+                    Glyph glyph = pipelineAssembler.CreateGlyph((uint)i - 1).FillCommandList(mainStack, index: i).FillOutlines().PrepareSegments().Sample(7).GetGlyph();
                     glyphs.Add(glyph);
                     Debug.WriteLine($"Glyph {i} added");
                 }
