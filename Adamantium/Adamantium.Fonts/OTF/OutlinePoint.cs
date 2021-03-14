@@ -12,5 +12,10 @@
             Y = y;
             IsControl = control;
         }
+
+        public override string ToString()
+        {
+            return $"X: {X}, Y: {Y}, IsControl: {IsControl}";
+        }
     }
 }

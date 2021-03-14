@@ -34,6 +34,14 @@
       <Content Include="Windsong.ttf">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
+      <None Remove="OTFFonts\Poppins-Medium.otf" />
+      <Content Include="OTFFonts\Poppins-Medium.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="OTFFonts\Glametrix-oj9A.otf" />
+      <Content Include="OTFFonts\Glametrix-oj9A.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
     </ItemGroup>
 
     <ItemGroup>

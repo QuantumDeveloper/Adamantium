@@ -16,8 +16,7 @@ namespace Adamantium.Fonts.OTF
                 
                 foreach (var segment in outline.Segments)
                 {
-                    var tmp = GeneralSegmentBezier(segment, rate); //                                                                                                                  (s2)
-                    tmp.RemoveAt(tmp.Count - 1); // remove each last point of sampled segment, because it will be overlapped with the start point of the next segment anyway (s1) ===== (e1) ===== (e2)
+                    var tmp = GeneralSegmentBezier(segment, rate);
                     sampledPoints.AddRange(tmp);
                 }
                 
@@ -39,7 +38,6 @@ namespace Adamantium.Fonts.OTF
 
             for (double d = 0; d <= 1; d += t)
             {
-
                 try
                 {
                     var bezierX = Math.Pow(1 - d, 3) * segment.Points[0].X +

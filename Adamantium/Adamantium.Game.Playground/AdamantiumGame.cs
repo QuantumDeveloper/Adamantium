@@ -7,6 +7,7 @@ using Adamantium.Engine.Processors;
 using Adamantium.Engine.Templates;
 using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
+using Adamantium.Fonts.OTF;
 using Adamantium.Fonts.TTF;
 using Adamantium.Game.Events;
 
@@ -45,7 +46,8 @@ namespace Adamantium.Game.Playground
         {
             ImportModel(@"Models\monkey\monkey.dae");
             //await ImportModel(@"Models\F15C\F-15C_Eagle.dae");
-            ImportFont();
+            //ImportFont();
+            ImportOTFFont();
         }
 
         private void InitializeResources()
@@ -83,6 +85,34 @@ namespace Adamantium.Game.Playground
                 var mesh = new Mesh();
                 //mesh.MeshTopology = PrimitiveType.PointList;
                 mesh.SetPositions(ch.Vertices);
+                var meshComponent = new MeshData();
+                meshComponent.Mesh = mesh;
+                var meshRenderer = new MeshRenderer();
+                entity.AddComponent(meshComponent);
+                entity.AddComponent(meshRenderer);
+                EntityWorld.AddEntity(entity);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                throw;
+            }
+        }
+
+        private void ImportOTFFont()
+        {
+            try
+            {
+                var otfParser = new OTFParser(@"OTFFonts/Poppins-Medium.otf", 3);
+                //var otfParser = new OTFParser(@"OTFFonts/Glametrix-oj9A.otf", 3);
+                var entity = new Entity(null, "Poppins-Medium");
+                var glyph = otfParser.GetGlyph(581);
+                var points = glyph.Triangulate(7);
+                //parser.GenerateGlyphTriangles(ch);
+                //parser.GenerateDefaultGlyphTriangles(ch);
+                var mesh = new Mesh();
+                //mesh.MeshTopology = PrimitiveType.LineStrip;
+                mesh.SetPositions(points);
                 var meshComponent = new MeshData();
                 meshComponent.Mesh = mesh;
                 var meshRenderer = new MeshRenderer();

@@ -74,6 +74,7 @@ namespace Adamantium.Fonts.OTF
             ushort token;
             bool clearOperands;
             int stemCount = 0;
+            int cnt = 0;
 
             while (mainStack.Count > 0)
             {
@@ -83,6 +84,13 @@ namespace Adamantium.Fonts.OTF
                 {
                     token = (ushort)((12 << 8) | mainStack.Pop());
                 }
+
+                if (index == 582 && cnt == 93)
+                {
+                    int x = 0;
+                }
+
+                cnt++;
 
                 if (bytesToOperatorMap.ContainsKey(token)) // this is operator
                 {

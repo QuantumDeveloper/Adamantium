@@ -27,6 +27,7 @@ namespace Adamantium.Fonts.OTF
     {
         // OTF font file path (all data in Big-Endian)
         private readonly string filePath;
+        private readonly uint resolution;
 
         // is font collection
         private bool IsFontCollection;
@@ -48,6 +49,7 @@ namespace Adamantium.Fonts.OTF
 
         // CFF table version (null if not OTF outlines format)
         private CFFVersion? CFFVersion;
+        List<Glyph> glyphs = new();
 
         // Top DICT Parser
         private TopDictParser topDictParser;
@@ -101,6 +103,7 @@ namespace Adamantium.Fonts.OTF
         public OTFParser(string filePath, UInt32 resolution = 0)
         {
             this.filePath = filePath;
+            this.resolution = resolution;
 
             pipelineAssembler = new PipelineAssembler(this);
 
@@ -386,7 +389,6 @@ namespace Adamantium.Fonts.OTF
             FillCffIndex(ref cffCharStringsIndex);
 
             var mainStack = new Stack<byte>();
-            var glyphs = new List<Glyph>();
             int exceptions = 0;
 
             // STEP 0. After filling the Index struct traverse the raw data array (ALL characters are here currently)
@@ -409,15 +411,26 @@ namespace Adamantium.Fonts.OTF
                 //List<Glyph> ...
                 try
                 {
-                    Glyph glyph = pipelineAssembler.CreateGlyph((uint)i - 1).FillCommandList(mainStack, index: i).FillOutlines().PrepareSegments().Sample(7).GetGlyph();
+                    Glyph glyph = pipelineAssembler
+                        .CreateGlyph((uint) i - 1)
+                        .FillCommandList(mainStack, index: i)
+                        .FillOutlines()
+                        .PrepareSegments()
+                        .Sample(resolution)
+                        .GetGlyph();
                     glyphs.Add(glyph);
-                    Debug.WriteLine($"Glyph {i} added");
+                    //Debug.WriteLine($"Glyph {i} added");
                 }
                 catch (Exception e)
                 {
                     exceptions++;
                 }
             }
+        }
+
+        public Glyph GetGlyph(int glyphIndex)
+        {
+            return glyphs[glyphIndex];
         }
 
         private void ReadCFF2Header()

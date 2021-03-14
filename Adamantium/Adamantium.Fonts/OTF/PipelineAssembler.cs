@@ -39,7 +39,7 @@ namespace Adamantium.Fonts.OTF
 
         public PipelineAssembler FillOutlines()
         {
-            glyph.OutlineList.Fill(commandList.commands);
+            glyph.OutlineList.Fill(commandList.commands, glyph.Index);
 
             return this;
         }

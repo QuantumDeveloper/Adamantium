@@ -15,7 +15,7 @@ namespace Adamantium.Fonts.OTF
             Outlines = new List<Outline>();
         }
 
-        public void Fill(List<Command> commands)
+        public void Fill(List<Command> commands, uint glyphIndex)
         {
             Outline outline = null;
 
@@ -27,7 +27,12 @@ namespace Adamantium.Fonts.OTF
                     Outlines.Add(outline);
                 }
 
-                var pts = interpreter.GetPoints(command);
+                if (glyphIndex == 581)
+                {
+                    int x = 0;
+                }
+
+                var pts = interpreter.GetOutlinePoints(command);
                 outline?.Points.AddRange(pts);
             }
         }
