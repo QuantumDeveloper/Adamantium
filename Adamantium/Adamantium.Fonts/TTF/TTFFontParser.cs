@@ -14,7 +14,7 @@ namespace Adamantium.Fonts.TTF
     public class TTFFontParser
     {
         // TTF font data - main output of parser class
-        public Font FontData { get; set; }
+        public Font FontData { get; }
 
         // mandatory tables
         private static List<string> mandatoryTables;
@@ -1067,7 +1067,6 @@ namespace Adamantium.Fonts.TTF
             kerningSubtable.Format = (byte)format;
         }
 
-        static int count = 0;
         private void GenerateAllGeometry()
         {
             Dictionary<UInt16, TTFGlyph> simpleGlyphs = new Dictionary<ushort, TTFGlyph>();
@@ -1120,7 +1119,6 @@ namespace Adamantium.Fonts.TTF
         public void GenerateGlyphTriangles(GlyphData glyphData)
         {
             var polygon = new Polygon();
-            polygon.Name = "Ё";
             
             foreach (var contour in glyphData.BezierContours)
             {

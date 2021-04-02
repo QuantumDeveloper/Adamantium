@@ -11,32 +11,20 @@ using StreamReader = Adamantium.Fonts.Common.StreamReader;
 
 namespace Adamantium.Fonts.OTF
 {
-    public enum OutlinesType
-    {
-        TrueType,
-        CompactFontFormat // CFF
-    }
-
-    public enum CFFVersion
-    {
-        CFF,
-        CFF2
-    }
-
-    public class OTFParser
+    internal class OTFParser
     {
         // OTF font file path (all data in Big-Endian)
         private readonly string filePath;
         private readonly uint resolution;
 
+        private TTCHeader ttcHeader;
+        private List<TableDirectory> tableDirectories;
+
         // is font collection
         private bool IsFontCollection;
 
         // OTF byte reader
-        private StreamReader otfReader;
-
-        // "tag-offset" mapping
-        private Dictionary<string, UInt32> tablesOffsets;
+        private OTFStreamReader otfReader;
 
         // list of common mandatory tables
         private static ReadOnlyCollection<string> commonMandatoryTables;
@@ -49,29 +37,13 @@ namespace Adamantium.Fonts.OTF
 
         // CFF table version (null if not OTF outlines format)
         private CFFVersion? CFFVersion;
-        List<Glyph> glyphs = new();
 
-        // Top DICT Parser
-        private TopDictParser topDictParser;
-        private PrivateDictParser privateDictParser;
+        private ICFFParser cffParser;
 
-        // TABLES
-        private OffsetTable offsetTable;
-        private CFFHeader cffHeader;
-        private CFFIndex cffNameIndex;
-        private CFFIndex cffTopDictIndex;
-        private CFFIndex cffStringIndex;
-        private CFFIndex cffGlobalSubroutineIndex;
-        private CFFIndex cffLocalSubroutineIndex;
-        private CFFIndex cffCharStringsIndex;
+        private CFFFontSet fontSet;
+        
+        public TypeFace TypeFace { get; }
 
-        // Biases for subr indices
-        private int globalSubrBias;
-        private int localSubrBias;
-        private int charstringType;
-
-        // Pipeline for constructing character
-        PipelineAssembler pipelineAssembler;
 
         static OTFParser()
         {
@@ -95,33 +67,33 @@ namespace Adamantium.Fonts.OTF
 
             cffMandatoryTables = new Dictionary<string, string>()
             {
-                { "CFF", "CFF " },
-                { "CFF2", "CFF2" }
+                {"CFF", "CFF "},
+                {"CFF2", "CFF2"}
             };
         }
 
         public OTFParser(string filePath, UInt32 resolution = 0)
         {
+            tableDirectories = new List<TableDirectory>();
             this.filePath = filePath;
             this.resolution = resolution;
 
-            pipelineAssembler = new PipelineAssembler(this);
-
-            //FontData = new Font();
+            TypeFace = new TypeFace();
 
             //bezierResolution = resolution > 0 ? resolution : 1;
 
-            OTFParseFont();
+            Parse();
         }
 
-        private unsafe void OTFParseFont()
+        private unsafe void Parse()
         {
             var bytes = File.ReadAllBytes(filePath);
             var memoryPtr = Marshal.AllocHGlobal(bytes.Length);
             var handle = GCHandle.Alloc(bytes, GCHandleType.Pinned);
-            Buffer.MemoryCopy(handle.AddrOfPinnedObject().ToPointer(), memoryPtr.ToPointer(), bytes.Length, bytes.Length);
+            Buffer.MemoryCopy(handle.AddrOfPinnedObject().ToPointer(), memoryPtr.ToPointer(), bytes.Length,
+                bytes.Length);
             handle.Free();
-            otfReader = new StreamReader((byte*)memoryPtr, bytes.Length);
+            otfReader = new OTFStreamReader((byte*) memoryPtr, bytes.Length);
 
             // 1st step - check if this is a single font or collection
             IsOTFCollection();
@@ -130,18 +102,27 @@ namespace Adamantium.Fonts.OTF
             otfReader.Position = 0;
 
             // 2nd step - read offset table (if single font)
-            ReadOffsetTable();
-
-            // 3rd step - read all table records
-            ReadTableRecords();
-
-            if (offsetTable.outlinesType == OutlinesType.CompactFontFormat)
+            if (!IsFontCollection)
             {
-                ParseCFFCommon();
+                ReadTableDirectory();
             }
-            else
+            else // read TTC Header
             {
-                // call TTF parser here
+                ReadTTCHeader();
+                ReadTableDirectories();
+            }
+
+            foreach (var tableDirectory in tableDirectories)
+            {
+                if (tableDirectory.OutlineType == OutlineType.CompactFontFormat)
+                {
+                    ParseCFF(tableDirectory);
+                }
+                else
+                {
+                    // call TTF parser here
+                }
+                ReadCmapTable(tableDirectory);
             }
         }
 
@@ -151,24 +132,54 @@ namespace Adamantium.Fonts.OTF
             IsFontCollection = (otfReader.ReadString(4) == "ttcf");
         }
 
-        private void ReadOffsetTable()
+        private void ReadTTCHeader()
         {
-            offsetTable = new OffsetTable();
+            otfReader.Position = 0;
+            ttcHeader = new TTCHeader();
+            ttcHeader.Tag = otfReader.ReadString(4);
+            ttcHeader.MajorVersion = otfReader.ReadUInt16();
+            ttcHeader.MinorVersion = otfReader.ReadUInt16();
+            ttcHeader.NumFonts = otfReader.ReadUInt32();
+            ttcHeader.TableDirectoryOffsets = new UInt32[ttcHeader.NumFonts];
+            for (int i = 0; i < ttcHeader.NumFonts; ++i)
+            {
+                ttcHeader.TableDirectoryOffsets[i] = otfReader.ReadUInt32();
+            }
+        }
 
-            offsetTable.SfntVersion = otfReader.ReadUInt32();
-            offsetTable.numTables = otfReader.ReadUInt16();
+        private void ReadTableDirectories()
+        {
+            foreach (var offset in  ttcHeader.TableDirectoryOffsets)
+            {
+                otfReader.Position = offset;
+                ReadTableDirectory();
+            }
+        }
 
-            offsetTable.outlinesType = (offsetTable.SfntVersion == 0x00010000 ? OutlinesType.TrueType : OutlinesType.CompactFontFormat);
+        private void ReadTableDirectory()
+        {
+            var tableDirectory = new TableDirectory();
+            tableDirectories.Add(tableDirectory);
+
+            tableDirectory.SfntVersion = otfReader.ReadUInt32();
+            tableDirectory.numTables = otfReader.ReadUInt16();
+
+            tableDirectory.OutlineType = (tableDirectory.SfntVersion == 0x00010000
+                ? OutlineType.TrueType
+                : OutlineType.CompactFontFormat);
 
             // skip other fields
             otfReader.Position += 6;
+            
+            // 3rd step - read all table records for current table directory
+            ReadTableRecords(tableDirectory);
         }
 
-        private void ReadTableRecords()
+        private void ReadTableRecords(TableDirectory tableDirectory)
         {
-            tablesOffsets = new Dictionary<string, uint>();
+            tableDirectory.TablesOffsets = new Dictionary<string, uint>();
 
-            for (int i = 0; i < offsetTable.numTables; ++i)
+            for (int i = 0; i < tableDirectory.numTables; ++i)
             {
                 string tag = otfReader.ReadString(4);
 
@@ -180,47 +191,51 @@ namespace Adamantium.Fonts.OTF
                 // skip length
                 otfReader.Position += 4;
 
-                tablesOffsets[tag] = offset;
+                tableDirectory.TablesOffsets[tag] = offset;
             }
 
-            CheckMandatoryTables();
+            CheckMandatoryTables(tableDirectory);
         }
 
-        private void CheckMandatoryTables()
+        private void CheckMandatoryTables(TableDirectory tableDirectory)
         {
             foreach (var table in commonMandatoryTables)
             {
-                if (!tablesOffsets.ContainsKey(table))
+                if (!tableDirectory.TablesOffsets.ContainsKey(table))
                 {
                     throw new ParserException($"Table {table} is not present in {filePath}");
                 }
             }
 
-            switch (offsetTable.outlinesType)
+            switch (tableDirectory.OutlineType)
             {
-                case OutlinesType.TrueType:
+                case OutlineType.TrueType:
                     foreach (var table in trueTypeMandatoryTables)
                     {
-                        if (!tablesOffsets.ContainsKey(table))
+                        if (!tableDirectory.TablesOffsets.ContainsKey(table))
                         {
                             throw new ParserException($"Table {table} is not present in {filePath}");
                         }
                     }
+
                     break;
-                case OutlinesType.CompactFontFormat:
-                    if (!tablesOffsets.ContainsKey(cffMandatoryTables["CFF"]) && !tablesOffsets.ContainsKey(cffMandatoryTables["CFF2"]))
+                case OutlineType.CompactFontFormat:
+                    if (!tableDirectory.TablesOffsets.ContainsKey(cffMandatoryTables["CFF"]) &&
+                        !tableDirectory.TablesOffsets.ContainsKey(cffMandatoryTables["CFF2"]))
                     {
-                        throw new ParserException($"Table either {cffMandatoryTables["CFF"]} or {cffMandatoryTables["CFF2"]} is not present in {filePath}");
+                        throw new ParserException(
+                            $"Table either {cffMandatoryTables["CFF"]} or {cffMandatoryTables["CFF2"]} is not present in {filePath}");
                     }
+
                     break;
             }
         }
 
-        private void DetermineCFFVersion()
+        private void DetermineCFFVersion(TableDirectory tableDirectory)
         {
-            if (offsetTable.outlinesType == OutlinesType.CompactFontFormat)
+            if (tableDirectory.OutlineType == OutlineType.CompactFontFormat)
             {
-                if (tablesOffsets.ContainsKey(cffMandatoryTables["CFF"]))
+                if (tableDirectory.TablesOffsets.ContainsKey(cffMandatoryTables["CFF"]))
                 {
                     CFFVersion = OTF.CFFVersion.CFF;
                 }
@@ -231,307 +246,96 @@ namespace Adamantium.Fonts.OTF
             }
         }
 
-        private void ParseCFFCommon()
+        private void ParseCFF(TableDirectory tableDirectory)
         {
-            DetermineCFFVersion();
+            DetermineCFFVersion(tableDirectory);
 
             if (CFFVersion == OTF.CFFVersion.CFF)
             {
-                ParseCFF();
+                cffParser = new CFFParser(tableDirectory.TablesOffsets[cffMandatoryTables["CFF"]], otfReader);
             }
             else if (CFFVersion == OTF.CFFVersion.CFF2)
             {
-                ParseCFF2();
+                cffParser = new CFFParser(tableDirectory.TablesOffsets[cffMandatoryTables["CFF2"]], otfReader);
             }
-
-        }
-
-        private void ParseCFF()
-        {
-            ReadCFFHeader();
-            ReadNameIndex();
-            ReadTopDictIndex();
-            ReadStringIndex();
-            ReadGlobalSubroutineIndex();
-            ReadLocalSubroutineIndex();
-            ReadCharStringsIndex();
-        }
-
-        private void ParseCFF2()
-        {
-            ReadCFF2Header();
-        }
-
-        private void ReadCFFHeader()
-        {
-            cffHeader = new CFFHeader();
-            otfReader.Position = tablesOffsets[cffMandatoryTables["CFF"]];
-
-            cffHeader.Major = otfReader.ReadByte();
-            cffHeader.Minor = otfReader.ReadByte();
-            cffHeader.HeaderSize = otfReader.ReadByte();
-            cffHeader.OffsetSize = otfReader.ReadByte();
-
-            // if there are 4 'magic' bytes - fill header size as 4 bytes
-            if (cffHeader.Major == 0x5F &&
-                cffHeader.Minor == 0x0F &&
-                cffHeader.HeaderSize == 0x3C &&
-                cffHeader.OffsetSize == 0xF5)
-            {
-                cffHeader.HeaderSize = 4;
-            }
-        }
-
-        private void ReadNameIndex()
-        {
-            // set position to the start of Name Index (it is start of CFF data + size of CFF header)
-            otfReader.Position = tablesOffsets[cffMandatoryTables["CFF"]];
-            otfReader.Position += cffHeader.HeaderSize;
-
-            FillCffIndex(ref cffNameIndex);
-
-            // for debug
-            string Name = Encoding.ASCII.GetString(cffNameIndex.Data);
-        }
-
-        private void ReadTopDictIndex()
-        {
-            // set position to the start of Top Dict Index (it is start of CFF data + size of CFF header + data in Name Index)
-            otfReader.Position = tablesOffsets[cffMandatoryTables["CFF"]];
-            otfReader.Position += cffHeader.HeaderSize;
-            otfReader.Position += GetIndexLength(cffNameIndex);
-
-            FillCffIndex(ref cffTopDictIndex);
-
-            topDictParser = new TopDictParser(cffTopDictIndex.Data);
             
-            charstringType = topDictParser.GetOperatorValue(TopDictOperatorsType.CharStringType).AsInt();
+            fontSet = cffParser.Parse();
         }
 
-        private void ReadStringIndex()
+        private void ReadCmapTable(TableDirectory tableDirectory)
         {
-            // set position to the start of String Dict Index (it is start of CFF data + size of CFF header + data in Name Index + data in Top Dict Index)
-            otfReader.Position = tablesOffsets[cffMandatoryTables["CFF"]];
-            otfReader.Position += cffHeader.HeaderSize;
-            otfReader.Position += GetIndexLength(cffNameIndex);
-            otfReader.Position += GetIndexLength(cffTopDictIndex);
-
-            FillCffIndex(ref cffStringIndex);
-
-            List<string> parsed = new List<string>();
-            List<byte> raw = new List<byte>();
-
-            for (int i = 0; i < cffStringIndex.Offsets.Count - 1; ++i)
+            CMapTable cmap = new CMapTable();
+            otfReader.Position = tableDirectory.TablesOffsets["cmap"];
+            cmap.Version = otfReader.ReadUInt16();
+            var numTables = otfReader.ReadUInt16();
+            var encodings = new EncodingRecord[numTables];
+            for (var index = 0; index < encodings.Length; index++)
             {
-                raw.Clear();
-
-                for (uint j = cffStringIndex.Offsets[i]; j < cffStringIndex.Offsets[i + 1]; ++j)
-                {
-                    raw.Add(cffStringIndex.Data[j - 1]);
-                }
-
-                parsed.Add(Encoding.ASCII.GetString(raw.ToArray()));
+                encodings[index] = ReadEncodingRecord();
             }
-        }
 
-        private void ReadGlobalSubroutineIndex()
-        {
-            // set position to the start of String Dict Index (it is start of CFF data + size of CFF header + data in Name Index + data in Top Dict Index + data in String Index)
-            otfReader.Position = tablesOffsets[cffMandatoryTables["CFF"]];
-            otfReader.Position += cffHeader.HeaderSize;
-            otfReader.Position += GetIndexLength(cffNameIndex);
-            otfReader.Position += GetIndexLength(cffTopDictIndex);
-            otfReader.Position += GetIndexLength(cffStringIndex);
+            cmap.CharacterMaps = new CharacterMap[numTables];
 
-            FillCffIndex(ref cffGlobalSubroutineIndex);
+            for (var index = 0; index < encodings.Length; index++)
+            {
+                var encoding = encodings[index];
+                otfReader.Position = tableDirectory.TablesOffsets["cmap"] + encoding.SubtableOffset;
+                var format = otfReader.ReadUInt16();
+                CharacterMap map = ReadCharacterMap(format);
+                map.PlatformId = encoding.PlatformId;
+                map.EncodingId = encoding.EncodingId;
 
-            globalSubrBias = CalculateSubrBias(cffGlobalSubroutineIndex.Count);
-        }
-
-        private void ReadLocalSubroutineIndex()
-        {
-            // set position to the start of Private DICT data (it is start of CFF data + offset to Private DICT data from Top DICT)
-            otfReader.Position = tablesOffsets[cffMandatoryTables["CFF"]];
-            var topDictPrivateEntry = topDictParser.GetOperatorValue(TopDictOperatorsType.Private).AsNumberNumber();
-            otfReader.Position += (int)topDictPrivateEntry.Number2;
-
-            // save the beginning of Private DICT data start for later use (e.g for local Subrs offset)
-            var privateDictDataStart = otfReader.Position;
-
-            List<byte> privateDictRawData = new List<byte>();
-
-            // read the whole Private DICT data
-            privateDictRawData.AddRange(otfReader.ReadBytes((int)topDictPrivateEntry.Number1));
-            privateDictRawData.Reverse();
-
-            privateDictParser = new PrivateDictParser(privateDictRawData.ToArray());
-
-            // get the offset to local subroutines
-            var localSubrOffset = privateDictParser.GetOperatorValue(PrivateDictOperatorsType.Subrs).AsInt();
-
-            // fill local subrs index structure
-            otfReader.Position = privateDictDataStart + localSubrOffset;
-
-            FillCffIndex(ref cffLocalSubroutineIndex);
-
-            localSubrBias = CalculateSubrBias(cffLocalSubroutineIndex.Count);
-        }
-
-        private void ReadCharStringsIndex()
-        {
-            // set position to the start of CharStrings (it is start of CFF data + offset to CharStrings from Top DICT)
-            otfReader.Position = tablesOffsets[cffMandatoryTables["CFF"]];
-            otfReader.Position += topDictParser.GetOperatorValue(TopDictOperatorsType.CharStrings).AsInt();
+                cmap.CharacterMaps[index] = map;
+            }
             
-            /* var charstringType = topDictParser.GetOperatorValue(TopDictOperatorsType.CharStringType).AsInt();
-            System.Diagnostics.Debug.WriteLine($"Char string Type = {charstringType}"); */
+            cmap.CollectUnicodeToGlyphMappings();
 
-            FillCffIndex(ref cffCharStringsIndex);
 
-            var mainStack = new Stack<byte>();
-            int exceptions = 0;
-
-            // STEP 0. After filling the Index struct traverse the raw data array (ALL characters are here currently)
-
-            for (var i = 1; i < cffCharStringsIndex.Offsets.Count; ++i)
+            foreach (var font in fontSet.Fonts)
             {
-                // STEP 1. Take offsets one by one and fill another byte array - this time it is only bytes relative to the current character
-                for (var j = cffCharStringsIndex.Offsets[i] - 1; j >= cffCharStringsIndex.Offsets[i - 1]; --j)
+                foreach (var glyph in font.Glyphs)
                 {
-                    mainStack.Push(cffCharStringsIndex.Data[j - 1]);
-                }
-
-                // STEP 3. Use fluent approach
-                // Byte Array --> Command List --> Outlines --> Bezier descretion
-                // Glyph g = CommandList(mainStack).OutlineList().BezierSampling(int sampleRate);
-                // g.charcode = 0;
-                // g.encoding = encode;
-                // VertexBuf vb = g.Triangulate();
-
-                //List<Glyph> ...
-                try
-                {
-                    Glyph glyph = pipelineAssembler
-                        .CreateGlyph((uint) i - 1)
-                        .FillCommandList(mainStack, index: i)
-                        .FillOutlines()
-                        .PrepareSegments()
-                        .Sample(resolution)
-                        .GetGlyph();
-                    glyphs.Add(glyph);
-                    //Debug.WriteLine($"Glyph {i} added");
-                }
-                catch (Exception e)
-                {
-                    exceptions++;
+                    glyph.Unicodes.AddRange(cmap.GetUnicodesByGlyphId(glyph.Index));
                 }
             }
+            
         }
 
-        public Glyph GetGlyph(int glyphIndex)
+        private CharacterMap ReadCharacterMap(ushort format)
         {
-            return glyphs[glyphIndex];
+            switch (format)
+            {
+                case 0:
+                    return otfReader.ReadCharacterMapFormat0();
+                case 2:
+                    return otfReader.ReadCharacterMapFormat2();
+                case 4:
+                    return otfReader.ReadCharacterMapFormat4();
+                case 6:
+                    return otfReader.ReadCharacterMapFormat6();
+                case 8:
+                    return otfReader.ReadCharacterMapFormat8();
+                case 10:
+                    return otfReader.ReadCharacterMapFormat10();
+                case 12:
+                    return otfReader.ReadCharacterMapFormat12();
+                case 13:
+                    return otfReader.ReadCharacterMapFormat13();
+                case 14:
+                    return otfReader.ReadCharacterMapFormat14();
+                default:
+                    throw new NotSupportedException($"Format {format} is not supported");
+            }
         }
 
-        private void ReadCFF2Header()
+        private EncodingRecord ReadEncodingRecord()
         {
-            cffHeader = new CFFHeader();
-            otfReader.Position = tablesOffsets[cffMandatoryTables["CFF2"]];
-
-            cffHeader.Major = otfReader.ReadByte();
-            cffHeader.Minor = otfReader.ReadByte();
-            cffHeader.HeaderSize = otfReader.ReadByte();
-            cffHeader.TopDictLength = otfReader.ReadUInt16();
+            var record = new EncodingRecord();
+            record.PlatformId = otfReader.ReadUInt16();
+            record.EncodingId = otfReader.ReadUInt16();
+            record.SubtableOffset = otfReader.ReadUInt32();
+            return record;
         }
 
-        private void FillCffIndex(ref CFFIndex cffIndex)
-        {
-            cffIndex = new CFFIndex();
-
-            cffIndex.Count = otfReader.ReadUInt16();
-
-            if (cffIndex.Count == 0)
-            {
-                return;
-            }
-
-            cffIndex.OffsetSize = otfReader.ReadByte();
-
-            cffIndex.Offsets = new List<uint>();
-
-            for (int i = 0; i <= cffIndex.Count; ++i)
-            {
-                switch (cffIndex.OffsetSize)
-                {
-                    case 1:
-                        cffIndex.Offsets.Add(otfReader.ReadByte());
-                        break;
-                    case 2:
-                        cffIndex.Offsets.Add(otfReader.ReadUInt16());
-                        break;
-                    case 3:
-                        var rawOffset = otfReader.ReadBytes(3).ToList();
-                        rawOffset.Insert(0, 0);
-                        cffIndex.Offsets.Add(BitConverter.ToUInt32(rawOffset.ToArray(), 0));
-                        break;
-                    case 4:
-                        cffIndex.Offsets.Add(otfReader.ReadUInt32());
-                        break;
-                }
-            }
-
-            cffIndex.Data = otfReader.ReadBytes((int)cffIndex.Offsets.Last() - 1).Reverse().ToArray();
-        }
-
-        private long GetIndexLength(CFFIndex cffIndex)
-        {
-            if (cffIndex.Count != 0)
-            {
-                return 3 + (cffIndex.Count + 1) * cffIndex.OffsetSize + (cffIndex.Offsets[cffIndex.Count] - 1);
-            }
-            else
-            {
-                return 2; // according to documents
-            }
-        }
-
-        private int CalculateSubrBias(uint subrCount)
-        {
-            if (charstringType == 1)
-            {
-                return 0;
-            }
-
-            return subrCount switch
-            {
-                < 1240 => 107,
-                < 33900 => 1131,
-                _ => 32768
-            };
-        }
-
-        public void UnpackSubrToStack(bool global, int subrNumber, Stack<byte> mainStack)
-        {
-            try
-            {
-                CFFIndex subrIndex = (global ? cffGlobalSubroutineIndex : cffLocalSubroutineIndex);
-
-                subrNumber += (global ? globalSubrBias : localSubrBias);
-
-                if (subrNumber < 0)
-                {
-                    throw new ArgumentException($"subr number < 0 (subrNumber == {subrNumber})!");
-                }
-
-                for (var i = subrIndex.Offsets[subrNumber + 1] - 1; i >= subrIndex.Offsets[subrNumber]; --i)
-                {
-                    mainStack.Push(subrIndex.Data[i - 1]);
-                }
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e);
-            }
-        }
     }
 }

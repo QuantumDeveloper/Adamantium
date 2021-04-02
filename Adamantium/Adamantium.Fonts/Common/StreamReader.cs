@@ -40,6 +40,12 @@ namespace Adamantium.Fonts.Common
             return BitConverter.ToUInt16(bytes, 0);
         }
 
+        public UInt32 ReadUint24()
+        {
+            byte highByte = ReadByte();
+            return (UInt32)(highByte << 16) | ReadUInt16();
+        }
+
         public UInt32 ReadUInt32()
         {
             var bytes = ReadBytes(Marshal.SizeOf<UInt32>());

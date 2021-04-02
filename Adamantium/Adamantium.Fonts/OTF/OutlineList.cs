@@ -7,7 +7,7 @@ namespace Adamantium.Fonts.OTF
     public class OutlineList
     {
         private CommandInterpreter interpreter;
-        internal List<Outline> Outlines { get; set; }
+        internal List<Outline> Outlines { get; }
 
         public OutlineList()
         {
@@ -25,11 +25,6 @@ namespace Adamantium.Fonts.OTF
                 {
                     outline = new Outline();
                     Outlines.Add(outline);
-                }
-
-                if (glyphIndex == 581)
-                {
-                    int x = 0;
                 }
 
                 var pts = interpreter.GetOutlinePoints(command);

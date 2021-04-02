@@ -1,140 +1,69 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace Adamantium.Fonts.OTF
 {
     public class TopDictParser : DictOperandParser
     {
-        private Dictionary<ushort, TopDictOperatorsType> byteToOperatorMap;
-        private Dictionary<TopDictOperatorsType, Func<List<GenericOperandResult>, GenericOperandResult>> operatorsActions;
-        private Dictionary<TopDictOperatorsType, List<GenericOperandResult>> operatorsRawValues;
-
-        public TopDictParser(byte[] rawData)
+        public TopDictParser(byte[] rawData) : base(rawData)
         {
-            operatorsRawValues = new Dictionary<TopDictOperatorsType, List<GenericOperandResult>>();
-
-            byteToOperatorMap = new Dictionary<ushort, TopDictOperatorsType>
-            {
-                { (ushort)TopDictOperatorsType.version              , TopDictOperatorsType.version              },
-                { (ushort)TopDictOperatorsType.Notice               , TopDictOperatorsType.Notice               },
-                { (ushort)TopDictOperatorsType.Copyright            , TopDictOperatorsType.Copyright            },
-                { (ushort)TopDictOperatorsType.FullName             , TopDictOperatorsType.FullName             },
-                { (ushort)TopDictOperatorsType.FamilyName           , TopDictOperatorsType.FamilyName           },
-                { (ushort)TopDictOperatorsType.Weight               , TopDictOperatorsType.Weight               },
-                { (ushort)TopDictOperatorsType.isFixedPitch         , TopDictOperatorsType.isFixedPitch         },
-                { (ushort)TopDictOperatorsType.ItalicAngle          , TopDictOperatorsType.ItalicAngle          },
-                { (ushort)TopDictOperatorsType.UnderlinePosition    , TopDictOperatorsType.UnderlinePosition    },
-                { (ushort)TopDictOperatorsType.UnderlineThickness   , TopDictOperatorsType.UnderlineThickness   },
-                { (ushort)TopDictOperatorsType.PaintType            , TopDictOperatorsType.PaintType            },
-                { (ushort)TopDictOperatorsType.CharStringType       , TopDictOperatorsType.CharStringType       },
-                { (ushort)TopDictOperatorsType.FontMatrix           , TopDictOperatorsType.FontMatrix           },
-                { (ushort)TopDictOperatorsType.UniqueID             , TopDictOperatorsType.UniqueID             },
-                { (ushort)TopDictOperatorsType.FontBBox             , TopDictOperatorsType.FontBBox             },
-                { (ushort)TopDictOperatorsType.StrokeWidth          , TopDictOperatorsType.StrokeWidth          },
-                { (ushort)TopDictOperatorsType.XUID                 , TopDictOperatorsType.XUID                 },
-                { (ushort)TopDictOperatorsType.charset              , TopDictOperatorsType.charset              },
-                { (ushort)TopDictOperatorsType.Encoding             , TopDictOperatorsType.Encoding             },
-                { (ushort)TopDictOperatorsType.CharStrings          , TopDictOperatorsType.CharStrings          },
-                { (ushort)TopDictOperatorsType.Private              , TopDictOperatorsType.Private              },
-                { (ushort)TopDictOperatorsType.SyntheticBase        , TopDictOperatorsType.SyntheticBase        },
-                { (ushort)TopDictOperatorsType.PostScript           , TopDictOperatorsType.PostScript           },
-                { (ushort)TopDictOperatorsType.BaseFontName         , TopDictOperatorsType.BaseFontName         },
-                { (ushort)TopDictOperatorsType.BaseFontBlend        , TopDictOperatorsType.BaseFontBlend        },
-                { (ushort)TopDictOperatorsType.ROS                  , TopDictOperatorsType.ROS                  },
-                { (ushort)TopDictOperatorsType.CIDFontVersion       , TopDictOperatorsType.CIDFontVersion       },
-                { (ushort)TopDictOperatorsType.CIDFontRevision      , TopDictOperatorsType.CIDFontRevision      },
-                { (ushort)TopDictOperatorsType.CIDFontType          , TopDictOperatorsType.CIDFontType          },
-                { (ushort)TopDictOperatorsType.CIDCount             , TopDictOperatorsType.CIDCount             },
-                { (ushort)TopDictOperatorsType.UIDBase              , TopDictOperatorsType.UIDBase              },
-                { (ushort)TopDictOperatorsType.FDArray              , TopDictOperatorsType.FDArray              },
-                { (ushort)TopDictOperatorsType.FDSelect             , TopDictOperatorsType.FDSelect             },
-                { (ushort)TopDictOperatorsType.FontName             , TopDictOperatorsType.FontName             }
-            };
-
-            operatorsActions = new Dictionary<TopDictOperatorsType, Func<List<GenericOperandResult>, GenericOperandResult>>
-            {
-               { TopDictOperatorsType.version                , Sid },
-               { TopDictOperatorsType.Notice                 , Sid },
-               { TopDictOperatorsType.Copyright              , Sid },
-               { TopDictOperatorsType.FullName               , Sid },
-               { TopDictOperatorsType.FamilyName             , Sid },
-               { TopDictOperatorsType.Weight                 , Sid },
-               { TopDictOperatorsType.isFixedPitch           , Boolean },
-               { TopDictOperatorsType.ItalicAngle            , Number },
-               { TopDictOperatorsType.UnderlinePosition      , Number },
-               { TopDictOperatorsType.UnderlineThickness     , Number },
-               { TopDictOperatorsType.PaintType              , Number },
-               { TopDictOperatorsType.CharStringType         , Number },
-               { TopDictOperatorsType.FontMatrix             , NumberArray },
-               { TopDictOperatorsType.UniqueID               , Number },
-               { TopDictOperatorsType.FontBBox               , NumberArray },
-               { TopDictOperatorsType.StrokeWidth            , Number },
-               { TopDictOperatorsType.XUID                   , NumberArray },
-               { TopDictOperatorsType.charset                , Number },
-               { TopDictOperatorsType.Encoding               , Number },
-               { TopDictOperatorsType.CharStrings            , Number },
-               { TopDictOperatorsType.Private                , NumberNumber },
-               { TopDictOperatorsType.SyntheticBase          , Number },
-               { TopDictOperatorsType.PostScript             , Sid },
-               { TopDictOperatorsType.BaseFontName           , Sid },
-               { TopDictOperatorsType.BaseFontBlend          , Delta },
-               { TopDictOperatorsType.ROS                    , SidSidNumber },
-               { TopDictOperatorsType.CIDFontVersion         , Number },
-               { TopDictOperatorsType.CIDFontRevision        , Number },
-               { TopDictOperatorsType.CIDFontType            , Number },
-               { TopDictOperatorsType.CIDCount               , Number },
-               { TopDictOperatorsType.UIDBase                , Number },
-               { TopDictOperatorsType.FDArray                , Number },
-               { TopDictOperatorsType.FDSelect               , Number },
-               { TopDictOperatorsType.FontName               , Sid }
-            };
-
-            FillDefaultValues();
-            FillOperatorsRawValues(rawData);
         }
 
-        public GenericOperandResult GetOperatorValue(TopDictOperatorsType opType)
+        protected override void FillDefaultValues()
         {
-            return operatorsActions[opType].Invoke(operatorsRawValues[opType]);
+            var isFixedPitchOperand = new List<GenericOperandResult>();
+            isFixedPitchOperand.Add(0);
+            OperatorsRawValues[DictOperatorsType.isFixedPitch] = isFixedPitchOperand;
+            
+            var italicAngleOperand = new List<GenericOperandResult>();
+            italicAngleOperand.Add(0);
+            OperatorsRawValues[DictOperatorsType.ItalicAngle] = italicAngleOperand;
+            
+            var underlinePositionOperand = new List<GenericOperandResult>();
+            underlinePositionOperand.Add(-100);
+            OperatorsRawValues[DictOperatorsType.UnderlinePosition] = underlinePositionOperand;
+            
+            var underlineThicknessOperand = new List<GenericOperandResult>();
+            underlineThicknessOperand.Add(50);
+            OperatorsRawValues[DictOperatorsType.UnderlineThickness] = underlineThicknessOperand;
+            
+            var paintTypeOperand = new List<GenericOperandResult>();
+            paintTypeOperand.Add(0);
+            OperatorsRawValues[DictOperatorsType.PaintType] = paintTypeOperand;
+            
+            var charStringTypeOperand = new List<GenericOperandResult>();
+            charStringTypeOperand.Add(2);
+            OperatorsRawValues[DictOperatorsType.CharStringType] = charStringTypeOperand;
+            
+            var fontMatrixOperand = new List<GenericOperandResult>();
+            fontMatrixOperand.Add(0.001);
+            fontMatrixOperand.Add(0);
+            fontMatrixOperand.Add(0);
+            fontMatrixOperand.Add(0.001);
+            fontMatrixOperand.Add(0);
+            fontMatrixOperand.Add(0);
+            OperatorsRawValues[DictOperatorsType.FontMatrix] = fontMatrixOperand;
+            
+            var fontBBoxOperand = new List<GenericOperandResult>();
+            fontBBoxOperand.Add(0);
+            fontBBoxOperand.Add(0);
+            fontBBoxOperand.Add(0);
+            fontBBoxOperand.Add(0);
+            OperatorsRawValues[DictOperatorsType.FontBBox] = fontBBoxOperand;
+            
+            var charsetOperand = new List<GenericOperandResult>();
+            charsetOperand.Add(0);
+            OperatorsRawValues[DictOperatorsType.charset] = charsetOperand;
+            
+            var encodingOperand = new List<GenericOperandResult>();
+            encodingOperand.Add(0);
+            OperatorsRawValues[DictOperatorsType.Encoding] = encodingOperand;
+            
+            var privateOperand = new List<GenericOperandResult>();
+            privateOperand.Add(0);
+            privateOperand.Add(0);
+            OperatorsRawValues[DictOperatorsType.Private] = privateOperand;
         }
 
-        private void FillDefaultValues()
-        {
-            var defaultOperand = new List<GenericOperandResult>();
-            defaultOperand.Add(2);
-            operatorsRawValues[TopDictOperatorsType.CharStringType] = defaultOperand;
-        }
-
-        private void FillOperatorsRawValues(byte[] rawData)
-        {
-            var byteArray = new List<byte>(rawData);
-            var rawOperands = new List<GenericOperandResult>();
-
-            while (byteArray.Count > 0)
-            {
-                ushort token = byteArray[0];
-
-                if (token == 12)
-                {
-                    token = (ushort)((12 << 8) | byteArray[1]);
-
-                    // remove additional byte beside from generic token case byte removal (see below)
-                    GetFirstByteAndRemove(byteArray);
-                }
-
-                if (byteToOperatorMap.ContainsKey(token))
-                {
-                    // this is token - remove this byte from byte stream
-                    GetFirstByteAndRemove(byteArray);
-
-                    operatorsRawValues[(TopDictOperatorsType)token] = rawOperands;
-                    rawOperands = new List<GenericOperandResult>();
-                }
-                else
-                {
-                    rawOperands.Add(Number(byteArray));
-                }
-            }
-        }
+        
     }
 }

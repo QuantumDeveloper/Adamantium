@@ -20,6 +20,9 @@
 
     <ItemGroup>
       <None Remove="OTFFonts\customfont.otf" />
+      <Content Include="OTFFonts\CFF2\AdobeVFPrototype.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
       <Content Include="OTFFonts\customfont.otf">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
@@ -41,6 +44,23 @@
       </Content>
       <None Remove="OTFFonts\Poppins-Medium.otf" />
       <Content Include="OTFFonts\Poppins-Medium.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="OTFFonts\CFF2\SourceSans3-Regular.otf" />
+      <Content Include="OTFFonts\CFF2\SourceSans3-Regular.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="OTFFonts\AdobeVFPrototype.otf" />
+      <None Remove="OTFFonts\FDArrayTest257.otf" />
+      <Content Include="OTFFonts\FDArrayTest257.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="OTFFonts\FontCollections\ASANA.TTC" />
+      <Content Include="OTFFonts\FontCollections\ASANA.TTC">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="OTFFonts\FontCollections\NotoSansCJK-Regular.ttc" />
+      <Content Include="OTFFonts\FontCollections\NotoSansCJK-Regular.ttc">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
     </ItemGroup>

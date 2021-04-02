@@ -106,7 +106,7 @@ namespace Adamantium.Game.Playground
                 var otfParser = new OTFParser(@"OTFFonts/Poppins-Medium.otf", 3);
                 //var otfParser = new OTFParser(@"OTFFonts/Glametrix-oj9A.otf", 3);
                 var entity = new Entity(null, "Poppins-Medium");
-                var glyph = otfParser.GetGlyph(581);
+                var glyph = otfParser.GetGlyph(665);
                 var points = glyph.Triangulate(7);
                 //parser.GenerateGlyphTriangles(ch);
                 //parser.GenerateDefaultGlyphTriangles(ch);

@@ -9,7 +9,7 @@ namespace Adamantium.Fonts.OTF
         private CommandList commandList;
         private Glyph glyph;
 
-        public PipelineAssembler(OTFParser parser)
+        public PipelineAssembler(ICFFParser parser)
         {
             commandList = new CommandList(parser);
         }
@@ -21,10 +21,10 @@ namespace Adamantium.Fonts.OTF
             return this;
         }
         
-        public PipelineAssembler FillCommandList(Stack<byte> stack, bool clearMainStack = true, int index = 0)
+        public PipelineAssembler FillCommandList(CFFFont font, Stack<byte> stack, FontDict fontDict, bool clearMainStack = true, int index = 0)
         {
             commandList.Clear();
-            commandList.Fill(stack, index);
+            commandList.Fill(font, stack, fontDict, index);
 
             if (commandList.commands.Last().@operator != OperatorsType.endchar)
             {
@@ -39,14 +39,14 @@ namespace Adamantium.Fonts.OTF
 
         public PipelineAssembler FillOutlines()
         {
-            glyph.OutlineList.Fill(commandList.commands, glyph.Index);
+            glyph.Outlines.Fill(commandList.commands, glyph.Index);
 
             return this;
         }
 
         public PipelineAssembler PrepareSegments()
         {
-            glyph.OutlineList.SplitToSegments();
+            glyph.Outlines.SplitToSegments();
 
             return this;
         }

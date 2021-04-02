@@ -11,6 +11,11 @@ namespace Adamantium.Fonts.OTF
         {
             return (int)result[0];
         }
+        
+        public uint AsUInt()
+        {
+            return (uint)result[0];
+        }
 
         public double AsDouble()
         {

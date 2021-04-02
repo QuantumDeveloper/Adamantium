@@ -4,8 +4,136 @@ using System.Globalization;
 
 namespace Adamantium.Fonts.OTF
 {
-    public abstract class DictOperandParser
+    public class DictOperandParser
     {
+        private Dictionary<ushort, DictOperatorsType> byteToOperatorMap;
+        private Dictionary<DictOperatorsType, Func<List<GenericOperandResult>, GenericOperandResult>> operatorsActions;
+        protected Dictionary<DictOperatorsType, List<GenericOperandResult>> OperatorsRawValues;
+        public DictOperandParser(byte[] rawData)
+        {
+            OperatorsRawValues = new Dictionary<DictOperatorsType, List<GenericOperandResult>>();
+
+            byteToOperatorMap = new Dictionary<ushort, DictOperatorsType>
+            {
+                { (ushort)DictOperatorsType.version              , DictOperatorsType.version              },
+                { (ushort)DictOperatorsType.Notice               , DictOperatorsType.Notice               },
+                { (ushort)DictOperatorsType.Copyright            , DictOperatorsType.Copyright            },
+                { (ushort)DictOperatorsType.FullName             , DictOperatorsType.FullName             },
+                { (ushort)DictOperatorsType.FamilyName           , DictOperatorsType.FamilyName           },
+                { (ushort)DictOperatorsType.Weight               , DictOperatorsType.Weight               },
+                { (ushort)DictOperatorsType.isFixedPitch         , DictOperatorsType.isFixedPitch         },
+                { (ushort)DictOperatorsType.ItalicAngle          , DictOperatorsType.ItalicAngle          },
+                { (ushort)DictOperatorsType.UnderlinePosition    , DictOperatorsType.UnderlinePosition    },
+                { (ushort)DictOperatorsType.UnderlineThickness   , DictOperatorsType.UnderlineThickness   },
+                { (ushort)DictOperatorsType.PaintType            , DictOperatorsType.PaintType            },
+                { (ushort)DictOperatorsType.CharStringType       , DictOperatorsType.CharStringType       },
+                { (ushort)DictOperatorsType.FontMatrix           , DictOperatorsType.FontMatrix           },
+                { (ushort)DictOperatorsType.UniqueID             , DictOperatorsType.UniqueID             },
+                { (ushort)DictOperatorsType.FontBBox             , DictOperatorsType.FontBBox             },
+                { (ushort)DictOperatorsType.StrokeWidth          , DictOperatorsType.StrokeWidth          },
+                { (ushort)DictOperatorsType.XUID                 , DictOperatorsType.XUID                 },
+                { (ushort)DictOperatorsType.charset              , DictOperatorsType.charset              },
+                { (ushort)DictOperatorsType.Encoding             , DictOperatorsType.Encoding             },
+                { (ushort)DictOperatorsType.CharStrings          , DictOperatorsType.CharStrings          },
+                { (ushort)DictOperatorsType.Private              , DictOperatorsType.Private              },
+                { (ushort)DictOperatorsType.SyntheticBase        , DictOperatorsType.SyntheticBase        },
+                { (ushort)DictOperatorsType.PostScript           , DictOperatorsType.PostScript           },
+                { (ushort)DictOperatorsType.BaseFontName         , DictOperatorsType.BaseFontName         },
+                { (ushort)DictOperatorsType.BaseFontBlend        , DictOperatorsType.BaseFontBlend        },
+                { (ushort)DictOperatorsType.ROS                  , DictOperatorsType.ROS                  },
+                { (ushort)DictOperatorsType.CIDFontVersion       , DictOperatorsType.CIDFontVersion       },
+                { (ushort)DictOperatorsType.CIDFontRevision      , DictOperatorsType.CIDFontRevision      },
+                { (ushort)DictOperatorsType.CIDFontType          , DictOperatorsType.CIDFontType          },
+                { (ushort)DictOperatorsType.CIDCount             , DictOperatorsType.CIDCount             },
+                { (ushort)DictOperatorsType.UIDBase              , DictOperatorsType.UIDBase              },
+                { (ushort)DictOperatorsType.FDArray              , DictOperatorsType.FDArray              },
+                { (ushort)DictOperatorsType.FDSelect             , DictOperatorsType.FDSelect             },
+                { (ushort)DictOperatorsType.FontName             , DictOperatorsType.FontName             },
+                
+                
+                // Private DICT
+                { (ushort)DictOperatorsType.BlueValues           , DictOperatorsType.BlueValues          },
+                { (ushort)DictOperatorsType.OtherBlues           , DictOperatorsType.OtherBlues          },
+                { (ushort)DictOperatorsType.FamilyBlues          , DictOperatorsType.FamilyBlues         },
+                { (ushort)DictOperatorsType.FamilyOtherBlues     , DictOperatorsType.FamilyOtherBlues    },
+                { (ushort)DictOperatorsType.BlueScale            , DictOperatorsType.BlueScale           },
+                { (ushort)DictOperatorsType.BlueShift            , DictOperatorsType.BlueShift           },
+                { (ushort)DictOperatorsType.BlueFuzz             , DictOperatorsType.BlueFuzz            },
+                { (ushort)DictOperatorsType.StdHW                , DictOperatorsType.StdHW               },
+                { (ushort)DictOperatorsType.StdVW                , DictOperatorsType.StdVW               },
+                { (ushort)DictOperatorsType.StemSnapH            , DictOperatorsType.StemSnapH           },
+                { (ushort)DictOperatorsType.StemSnapV            , DictOperatorsType.StemSnapV           },
+                { (ushort)DictOperatorsType.ForceBold            , DictOperatorsType.ForceBold           },
+                { (ushort)DictOperatorsType.LanguageGroup        , DictOperatorsType.LanguageGroup       },
+                { (ushort)DictOperatorsType.ExpansionFactor      , DictOperatorsType.ExpansionFactor     },
+                { (ushort)DictOperatorsType.InitialRandomSeed    , DictOperatorsType.InitialRandomSeed   },
+                { (ushort)DictOperatorsType.Subrs                , DictOperatorsType.Subrs               },
+                { (ushort)DictOperatorsType.DefaultWidthX        , DictOperatorsType.DefaultWidthX       },
+                { (ushort)DictOperatorsType.NominalWidthX        , DictOperatorsType.NominalWidthX       }
+            };
+
+            operatorsActions = new Dictionary<DictOperatorsType, Func<List<GenericOperandResult>, GenericOperandResult>>
+            {
+               { DictOperatorsType.version                , Sid },
+               { DictOperatorsType.Notice                 , Sid },
+               { DictOperatorsType.Copyright              , Sid },
+               { DictOperatorsType.FullName               , Sid },
+               { DictOperatorsType.FamilyName             , Sid },
+               { DictOperatorsType.Weight                 , Sid },
+               { DictOperatorsType.isFixedPitch           , Boolean },
+               { DictOperatorsType.ItalicAngle            , Number },
+               { DictOperatorsType.UnderlinePosition      , Number },
+               { DictOperatorsType.UnderlineThickness     , Number },
+               { DictOperatorsType.PaintType              , Number },
+               { DictOperatorsType.CharStringType         , Number },
+               { DictOperatorsType.FontMatrix             , NumberArray },
+               { DictOperatorsType.UniqueID               , Number },
+               { DictOperatorsType.FontBBox               , NumberArray },
+               { DictOperatorsType.StrokeWidth            , Number },
+               { DictOperatorsType.XUID                   , NumberArray },
+               { DictOperatorsType.charset                , Number },
+               { DictOperatorsType.Encoding               , Number },
+               { DictOperatorsType.CharStrings            , Number },
+               { DictOperatorsType.Private                , NumberNumber },
+               { DictOperatorsType.SyntheticBase          , Number },
+               { DictOperatorsType.PostScript             , Sid },
+               { DictOperatorsType.BaseFontName           , Sid },
+               { DictOperatorsType.BaseFontBlend          , Delta },
+               { DictOperatorsType.ROS                    , SidSidNumber },
+               { DictOperatorsType.CIDFontVersion         , Number },
+               { DictOperatorsType.CIDFontRevision        , Number },
+               { DictOperatorsType.CIDFontType            , Number },
+               { DictOperatorsType.CIDCount               , Number },
+               { DictOperatorsType.UIDBase                , Number },
+               { DictOperatorsType.FDArray                , Number },
+               { DictOperatorsType.FDSelect               , Number },
+               { DictOperatorsType.FontName               , Sid },
+               
+               // Private DICT part
+               { DictOperatorsType.BlueValues            , Delta },
+               { DictOperatorsType.OtherBlues            , Delta },
+               { DictOperatorsType.FamilyBlues           , Delta },
+               { DictOperatorsType.FamilyOtherBlues      , Delta },
+               { DictOperatorsType.BlueScale             , Number },
+               { DictOperatorsType.BlueShift             , Number },
+               { DictOperatorsType.BlueFuzz              , Number },
+               { DictOperatorsType.StdHW                 , Number },
+               { DictOperatorsType.StdVW                 , Number },
+               { DictOperatorsType.StemSnapH             , Delta },
+               { DictOperatorsType.StemSnapV             , Delta },
+               { DictOperatorsType.ForceBold             , Boolean },
+               { DictOperatorsType.LanguageGroup         , Number },
+               { DictOperatorsType.ExpansionFactor       , Number },
+               { DictOperatorsType.InitialRandomSeed     , Number },
+               { DictOperatorsType.Subrs                 , Number },
+               { DictOperatorsType.DefaultWidthX         , Number },
+               { DictOperatorsType.NominalWidthX         , Number }
+            };
+
+            FillDefaultValues();
+            FillOperatorsRawValues(rawData);
+        }
+        
         // convert raw byte stream to GenericOperandResult (will always produce Number)
         protected GenericOperandResult Number(List<byte> rawData)
         {
@@ -13,10 +141,9 @@ namespace Adamantium.Fonts.OTF
             {
                 return Double(rawData);
             }
-            else // it's integer
-            {
-                return Integer(rawData);
-            }
+
+            // it's integer
+            return Integer(rawData);
         }
 
         protected GenericOperandResult Integer(List<byte> rawData) // store int as double for compatibility between integer and real numbers in CFF
@@ -208,5 +335,65 @@ namespace Adamantium.Fonts.OTF
 
             return true;
         }
+        
+        private GenericOperandResult GetOperatorValue(DictOperatorsType opType)
+        {
+            return operatorsActions[opType].Invoke(OperatorsRawValues[opType]);
+        }
+
+        public GenericOperandResultSet GetAllAvailableOperands()
+        {
+            var dict = new Dictionary<DictOperatorsType, GenericOperandResult>();
+            
+            foreach (var kvp in OperatorsRawValues)
+            {
+                dict[kvp.Key] = operatorsActions[kvp.Key].Invoke(kvp.Value);
+            }
+
+            return new GenericOperandResultSet(dict);
+        }
+        
+        protected virtual void FillDefaultValues()
+        {
+        }
+        
+        private void FillOperatorsRawValues(byte[] rawData)
+        {
+            var byteArray = new List<byte>(rawData);
+            var rawOperands = new List<GenericOperandResult>();
+
+            while (byteArray.Count > 0)
+            {
+                ushort token = byteArray[0];
+
+                if (token == 12)
+                {
+                    token = (ushort)((12 << 8) | byteArray[1]);
+
+                    // remove additional byte beside from generic token case byte removal (see below)
+                    GetFirstByteAndRemove(byteArray);
+                }
+
+                if (byteToOperatorMap.ContainsKey(token))
+                {
+                    // this is token - remove this byte from byte stream
+                    GetFirstByteAndRemove(byteArray);
+
+                    OperatorsRawValues[(DictOperatorsType)token] = rawOperands;
+                    rawOperands = new List<GenericOperandResult>();
+                }
+                else
+                {
+                    rawOperands.Add(Number(byteArray));
+                }
+            }
+        }
+        
+        public bool IsOperatorAvailable(DictOperatorsType opType)
+        {
+            return OperatorsRawValues.ContainsKey(opType);
+        }
+
+        public GenericOperandResult this[DictOperatorsType op] => GetOperatorValue(op);
     }   
 }

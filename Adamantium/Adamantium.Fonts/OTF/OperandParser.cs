@@ -7,7 +7,7 @@ namespace Adamantium.Fonts.OTF
     {
         protected GenericOperandResult Number(byte b0, Stack<byte> mainStack)
         {
-            if (b0 == 28)
+            if (b0 == 28) // shortint operator. This value should be casted to short, otherwise it could be interpreted incorrectly 
             {
                 var b1 = mainStack.Pop();
                 var b2 = mainStack.Pop();

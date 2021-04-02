@@ -7,6 +7,16 @@ namespace Adamantium.Fonts.OTF
         public List<uint> Offsets; // offsets array, last offset is pointing to next table, not to data within current table!!!
         public ushort Count; // count of real objects in index table, but real offsets count is +1 because last offset points to next table
         public byte OffsetSize; // size of offset array entry (e.g 2 bytes per each offset)
-        public byte[] Data; // data from index table
+        public List<byte[]> DataByOffset; // array of data sorted by offsets
+        
+        public long GetLength()
+        {
+            if (Count != 0)
+            {
+                return 3 + (Count + 1) * OffsetSize + (Offsets[Count] - 1);
+            }
+
+            return 2; // according to documentation
+        }
     }
 }

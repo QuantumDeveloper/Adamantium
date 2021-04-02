@@ -1,19 +1,18 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 
 namespace Adamantium.Fonts.OTF
 {
-    public class CommandList : OperandParser
+    internal class CommandList : OperandParser
     {
         private Dictionary<ushort, OperatorsType> bytesToOperatorMap;
-        private OTFParser otfParser;
+        private ICFFParser cffParser;
         internal List<Command> commands;
 
-        public CommandList(OTFParser otfParser)
+        internal CommandList(ICFFParser cffParser)
         {
-            this.otfParser = otfParser;
+            this.cffParser = cffParser;
             commands = new List<Command>();
 
             bytesToOperatorMap = new Dictionary<ushort, OperatorsType>
@@ -68,13 +67,23 @@ namespace Adamantium.Fonts.OTF
             };
         }
 
-        public void Fill(Stack<byte> mainStack, int index = 0)
+        public void Fill(CFFFont font, Stack<byte> mainStack, FontDict fontDict, int index = 0)
         {
             List<double> operands = new List<double>();
             ushort token;
             bool clearOperands;
             int stemCount = 0;
-            int cnt = 0;
+
+            if (index == 2)
+            {
+                int x = 0;
+            }
+            
+            var fontDictBias = 0;
+            if (fontDict?.LocalSubr != null)
+            {
+                fontDictBias = cffParser.CalculateGlobalSubrBias((uint)fontDict.LocalSubr.Count);
+            }
 
             while (mainStack.Count > 0)
             {
@@ -84,13 +93,6 @@ namespace Adamantium.Fonts.OTF
                 {
                     token = (ushort)((12 << 8) | mainStack.Pop());
                 }
-
-                if (index == 582 && cnt == 93)
-                {
-                    int x = 0;
-                }
-
-                cnt++;
 
                 if (bytesToOperatorMap.ContainsKey(token)) // this is operator
                 {
@@ -201,8 +203,10 @@ namespace Adamantium.Fonts.OTF
                             {
                                 throw new ArgumentException($"callgsubr operand count == 0!");
                             }
-                            
-                            otfParser.UnpackSubrToStack(true, (int)operands.Last(), mainStack);
+
+                            var subrIndex = (int) operands.Last() + cffParser.GlobalSubrBias;
+                            var subrData = cffParser.GlobalSubroutineIndex.DataByOffset[subrIndex];
+                            cffParser.UnpackSubrToStack(subrData, mainStack);
                             operands.RemoveAt(operands.Count - 1);
                             clearOperands = false;
                             break;
@@ -212,7 +216,19 @@ namespace Adamantium.Fonts.OTF
                                 throw new ArgumentException($"callsubr operand count == 0!");
                             }
 
-                            otfParser.UnpackSubrToStack(false, (int) operands.Last(), mainStack);
+                            if (font.IsLocalSubroutineAvailable)
+                            {
+                                var localSubrIndex = (int) operands.Last() + font.LocalSubrBias;
+                                var localSubrData = font.LocalSubroutineIndex.DataByOffset[localSubrIndex];
+                                cffParser.UnpackSubrToStack(localSubrData, mainStack);
+                            }
+                            else if (fontDict != null) // get local subr from private dict
+                            {
+                                var localSubrIndex = (int) operands.Last() + fontDictBias;
+                                var localSubrData = fontDict.LocalSubr[localSubrIndex];
+                                cffParser.UnpackSubrToStack(localSubrData, mainStack);
+                            }
+
                             operands.RemoveAt(operands.Count - 1);
                             clearOperands = false;
                             break;
