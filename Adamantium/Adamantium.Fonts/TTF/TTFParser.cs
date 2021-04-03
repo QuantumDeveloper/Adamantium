@@ -6,15 +6,18 @@ using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Adamantium.Fonts.Common;
 using Adamantium.Fonts.DataOut;
+using Adamantium.Fonts.OTF;
 using Adamantium.Mathematics;
 using StreamReader = Adamantium.Fonts.Common.StreamReader;
 
 namespace Adamantium.Fonts.TTF
 {
-    public class TTFFontParser
+    public class TTFParser : IFontParser
     {
         // TTF font data - main output of parser class
-        public Font FontData { get; }
+        public TTFFont FontData { get; }
+        
+        public TypeFace TypeFace { get; }
 
         // mandatory tables
         private static List<string> mandatoryTables;
@@ -50,7 +53,7 @@ namespace Adamantium.Fonts.TTF
         // TTF byte reader
         private StreamReader ttfReader;
 
-        static TTFFontParser()
+        static TTFParser()
         {
             mandatoryTables = new List<string>();
             mandatoryTables.Add("head");
@@ -60,11 +63,11 @@ namespace Adamantium.Fonts.TTF
             mandatoryTables.Add("glyf");
         }
 
-        public TTFFontParser(string filePath, UInt32 resolution)
+        public TTFParser(string filePath, UInt32 resolution)
         {
             this.filePath = filePath;
 
-            FontData = new Font();
+            FontData = new TTFFont();
 
             bezierResolution = resolution > 0 ? resolution : 1;
 

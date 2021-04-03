@@ -11,7 +11,7 @@ namespace Adamantium.FontTests
         public void LoadTTFFont()
         {
             //TTFFontParser fp = new TTFFontParser(@"D:\Test.ttf", 7);
-            TTFFontParser parser = new TTFFontParser(@"PlayfairDisplay-Regular.ttf", 7);
+            TTFParser parser = new TTFParser(@"PlayfairDisplay-Regular.ttf", 7);
 
             char ch = 'i';
 
@@ -22,7 +22,7 @@ namespace Adamantium.FontTests
         public void TTFTriangulationTimeTest()
         {
             //TTFFontParser fp = new TTFFontParser(@"D:\Test.ttf", 7);
-            TTFFontParser parser = new TTFFontParser(@"PlayfairDisplay-Regular.ttf", 7);
+            TTFParser parser = new TTFParser(@"PlayfairDisplay-Regular.ttf", 7);
 
             foreach (var glyphData in parser.FontData.GlyphData)
             {
@@ -34,7 +34,7 @@ namespace Adamantium.FontTests
         public void TTFTriangulation2TimeTest()
         {
             //TTFFontParser fp = new TTFFontParser(@"D:\Test.ttf", 7);
-            TTFFontParser parser = new TTFFontParser(@"PlayfairDisplay-Regular.ttf", 7);
+            TTFParser parser = new TTFParser(@"PlayfairDisplay-Regular.ttf", 7);
 
             foreach (var glyphData in parser.FontData.GlyphData)
             {

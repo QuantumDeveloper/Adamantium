@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Adamantium.Fonts.OTF
 {
@@ -22,11 +23,11 @@ namespace Adamantium.Fonts.OTF
         public CFFIndex GlobalSubroutineIndex { get; }
         public int GlobalSubrBias { get; }
         
-        CFFFontSet ICFFParser.Parse()
+        CFFFont ICFFParser.Parse()
         {
             ReadHeader();
 
-            return fontSet;
+            return fontSet.Fonts.FirstOrDefault();
         }
 
         private void ReadHeader()

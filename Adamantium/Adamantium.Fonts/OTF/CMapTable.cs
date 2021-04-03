@@ -6,14 +6,14 @@ namespace Adamantium.Fonts.OTF
     internal class CMapTable
     {
         private readonly Dictionary<UInt32, UInt32> unicodeToGlyph;
-        private readonly Dictionary<UInt32, List<UInt32>> glyphToUnicode;
+        internal readonly Dictionary<UInt32, List<UInt32>> GlyphToUnicode;
         private readonly Dictionary<UInt32, UInt32> characterToGlyph;
         
         public CMapTable()
         {
             unicodeToGlyph = new Dictionary<uint, uint>();
             characterToGlyph = new Dictionary<uint, uint>();
-            glyphToUnicode = new Dictionary<uint, List<uint>>();
+            GlyphToUnicode = new Dictionary<uint, List<uint>>();
         }
         
         public UInt16 Version { get; set; }
@@ -32,10 +32,10 @@ namespace Adamantium.Fonts.OTF
             {
                 if (hashSet.Add(kvp.Value))
                 {
-                    glyphToUnicode[kvp.Value] = new List<uint>();
+                    GlyphToUnicode[kvp.Value] = new List<uint>();
                 }
 
-                glyphToUnicode[kvp.Value].Add(kvp.Key);
+                GlyphToUnicode[kvp.Value].Add(kvp.Key);
             }
 
         }
@@ -60,7 +60,7 @@ namespace Adamantium.Fonts.OTF
 
         public UInt32[] GetUnicodesByGlyphId(UInt32 glyphId)
         {
-            if (!glyphToUnicode.TryGetValue(glyphId, out var unicodes))
+            if (!GlyphToUnicode.TryGetValue(glyphId, out var unicodes))
             {
                 return new uint[0];
             }

@@ -4,10 +4,9 @@ using Adamantium.Fonts.TTF;
 
 namespace Adamantium.Fonts.DataOut
 {
-    public class Font
+    public class TTFFont
     {
         public string FontFullName { get; internal set; }
-
         public ushort UnitsPerEm { get; internal set; } 
         public ushort LowestRecPPEM { get; internal set; } // smallest readable size in pixels
         public Int32 LineSpace { get; internal set; } // space between base line and base line
@@ -17,9 +16,9 @@ namespace Adamantium.Fonts.DataOut
 
         public GlyphData[] GlyphData { get; internal set; }
 
-        public List<string> ErrorMessages { get; internal set; }
+        public List<string> ErrorMessages { get; }
 
-        internal Font()
+        internal TTFFont()
         {
             CharToGlyphIndexMapWindowsUnicode = new Dictionary<ushort, ushort>();
             ErrorMessages = new List<string>();
@@ -59,7 +58,7 @@ namespace Adamantium.Fonts.DataOut
 
             Int16 kerningValue = 0;
             
-            UInt32 key = TTFFontParser.GenerateKerningKey(leftIndex, rightIndex);
+            UInt32 key = TTFParser.GenerateKerningKey(leftIndex, rightIndex);
 
             if (KerningData.KerningValues.ContainsKey(key))
             {

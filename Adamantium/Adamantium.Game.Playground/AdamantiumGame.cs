@@ -7,6 +7,7 @@ using Adamantium.Engine.Processors;
 using Adamantium.Engine.Templates;
 using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
+using Adamantium.Fonts;
 using Adamantium.Fonts.OTF;
 using Adamantium.Fonts.TTF;
 using Adamantium.Game.Events;
@@ -15,7 +16,7 @@ namespace Adamantium.Game.Playground
 {
     internal class AdamantiumGame : Engine.Game
     {
-        private TTFFontParser parser;
+        private TTFParser parser;
         public AdamantiumGame(GameMode gameMode) : base(gameMode)
         {
             EventAggregator.GetEvent<GameOutputCreatedEvent>().Subscribe(OnWindowCreated);
@@ -77,7 +78,7 @@ namespace Adamantium.Game.Playground
         {
             try
             {
-                parser = new TTFFontParser(@"PlayfairDisplay-Regular.ttf", 3);
+                parser = new TTFParser(@"PlayfairDisplay-Regular.ttf", 3);
                 var entity = new Entity(null, "PlayfairDisplay-Regular");
                 var ch = parser.FontData.GetGlyphForCharacter('@');
                 parser.GenerateGlyphTriangles(ch);
@@ -103,10 +104,10 @@ namespace Adamantium.Game.Playground
         {
             try
             {
-                var otfParser = new OTFParser(@"OTFFonts/Poppins-Medium.otf", 3);
+                var typeface = TypeFace.LoadFont(@"OTFFonts/Poppins-Medium.otf", 3);
                 //var otfParser = new OTFParser(@"OTFFonts/Glametrix-oj9A.otf", 3);
                 var entity = new Entity(null, "Poppins-Medium");
-                var glyph = otfParser.GetGlyph(665);
+                var glyph = typeface.GetFont(0).GetGlyphByIndex(25);
                 var points = glyph.Triangulate(7);
                 //parser.GenerateGlyphTriangles(ch);
                 //parser.GenerateDefaultGlyphTriangles(ch);

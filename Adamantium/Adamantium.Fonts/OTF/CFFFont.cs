@@ -4,24 +4,19 @@ using System.Linq;
 
 namespace Adamantium.Fonts.OTF
 {
-    internal class CFFFont : IFont
+    internal class CFFFont
     {
         private TopDictParser topDictParser;
         private PrivateDictParser privateDictParser;
         private CFFFontSet fontSet;
 
         private List<Glyph> glyphs;
-        private List<UInt32> unicodes;
 
         private Dictionary<UInt32, Glyph> indexToGlyph;
         private Dictionary<UInt32, Glyph> unicodeToGlyph;
         private Dictionary<string, Glyph> nameToGlyph;
         
         public string Name { get; set; }
-        
-        public uint Unicode { get; }
-
-        public IReadOnlyCollection<uint> Unicodes => unicodes.AsReadOnly(); 
         
         public IReadOnlyCollection<Glyph> Glyphs => glyphs.AsReadOnly();
         
@@ -53,7 +48,6 @@ namespace Adamantium.Fonts.OTF
         
         public CFFFont(CFFFontSet fontSet)
         {
-            unicodes = new List<uint>();
             glyphs = new List<Glyph>();
             CIDFontInfo = new CIDFontInfo();
             this.fontSet = fontSet;

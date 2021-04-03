@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 
@@ -31,7 +32,7 @@ namespace Adamantium.Fonts.OTF
 
         public CFFIndex GlobalSubroutineIndex { get; private set; }
         public int GlobalSubrBias { get; private set; }
-        CFFFontSet ICFFParser.Parse()
+        CFFFont ICFFParser.Parse()
         {
             ReadCFFHeader();
             ReadNameIndex();
@@ -47,7 +48,12 @@ namespace Adamantium.Fonts.OTF
                 ReadCharsets(font);
             }
 
-            return fontSet;
+            if (fontSet.Fonts.Count > 1)
+            {
+                Debug.WriteLine($"Warning! File has more than one font");
+            }
+
+            return fontSet.Fonts.FirstOrDefault();
         }
 
         

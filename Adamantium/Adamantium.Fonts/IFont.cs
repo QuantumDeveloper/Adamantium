@@ -7,8 +7,6 @@ namespace Adamantium.Fonts
     {
         string Name { get; }
         
-        UInt32 Unicode { get; }
-        
         IReadOnlyCollection<UInt32> Unicodes { get; }
         
         IReadOnlyCollection<Glyph> Glyphs { get; }

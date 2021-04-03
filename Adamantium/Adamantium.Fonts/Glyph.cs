@@ -8,14 +8,19 @@ namespace Adamantium.Fonts
 {
     public class Glyph
     {
+        private HashSet<UInt32> uniqueUnicodes;
+        
         internal OutlineList Outlines { get; }
         private readonly Dictionary<uint, SampledOutline[]> sampledOutlinesCache;
         private readonly Dictionary<uint, Vector3F[]> triangulatedCache;
 
         public uint Index { get; }
-        public uint Unicode => Unicodes.FirstOrDefault();
+        public uint Unicode => unicodes.FirstOrDefault();
+
+        private List<UInt32> unicodes;
+
+        public IReadOnlyCollection<UInt32> Unicodes => unicodes.AsReadOnly();
         
-        public List<UInt32> Unicodes { get; }
         public string Name { get; internal set; }
         internal UInt32 SID { get; set; }
 
@@ -25,7 +30,8 @@ namespace Adamantium.Fonts
             Outlines = new OutlineList();
             sampledOutlinesCache = new Dictionary<uint, SampledOutline[]>();
             triangulatedCache = new Dictionary<uint, Vector3F[]>();
-            Unicodes = new List<uint>();
+            unicodes = new List<uint>();
+            uniqueUnicodes = new HashSet<uint>();
         }
         
         public SampledOutline[] Sample(uint rate)
@@ -57,6 +63,17 @@ namespace Adamantium.Fonts
             return points;
         }
 
+        internal void SetUnicodes(IEnumerable<UInt32> unicodeSet)
+        {
+            foreach (var unicode in unicodeSet)
+            {
+                if (uniqueUnicodes.Add(unicode))
+                {
+                    unicodes.Add(unicode);
+                }
+            }
+        }
+        
         public override string ToString()
         {
             return $"Name: {Name} Index: {Index}, SID: {SID} Unicodes: {string.Join(", ", Unicodes)}";

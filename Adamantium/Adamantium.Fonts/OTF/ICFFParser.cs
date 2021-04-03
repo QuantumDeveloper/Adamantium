@@ -5,6 +5,6 @@ namespace Adamantium.Fonts.OTF
         CFFIndex GlobalSubroutineIndex { get; }
         
         int GlobalSubrBias { get; }
-        CFFFontSet Parse();
+        CFFFont Parse();
     }
 }

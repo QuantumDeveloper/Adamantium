@@ -11,7 +11,7 @@ using StreamReader = Adamantium.Fonts.Common.StreamReader;
 
 namespace Adamantium.Fonts.OTF
 {
-    internal class OTFParser
+    internal class OTFParser : IFontParser
     {
         // OTF font file path (all data in Big-Endian)
         private readonly string filePath;
@@ -40,10 +40,11 @@ namespace Adamantium.Fonts.OTF
 
         private ICFFParser cffParser;
 
-        private CFFFontSet fontSet;
+        private CFFFont cffFont;
+
+        private readonly HashSet<UInt32> uniqueOffsets;
         
         public TypeFace TypeFace { get; }
-
 
         static OTFParser()
         {
@@ -77,6 +78,8 @@ namespace Adamantium.Fonts.OTF
             tableDirectories = new List<TableDirectory>();
             this.filePath = filePath;
             this.resolution = resolution;
+
+            uniqueOffsets = new HashSet<uint>();
 
             TypeFace = new TypeFace();
 
@@ -114,15 +117,20 @@ namespace Adamantium.Fonts.OTF
 
             foreach (var tableDirectory in tableDirectories)
             {
-                if (tableDirectory.OutlineType == OutlineType.CompactFontFormat)
+                var font = new Font();
+                TypeFace.AddFont(font);
+                switch (tableDirectory.OutlineType)
                 {
-                    ParseCFF(tableDirectory);
+                    case OutlineType.CompactFontFormat:
+                        ParseCFF(tableDirectory);
+                        break;
+                    default:
+                        // call TTF parser here
+                        break;
                 }
-                else
-                {
-                    // call TTF parser here
-                }
-                ReadCmapTable(tableDirectory);
+
+                ReadNameTable(tableDirectory, font);
+                ReadCmapTable(tableDirectory, font);
             }
         }
 
@@ -249,23 +257,40 @@ namespace Adamantium.Fonts.OTF
         private void ParseCFF(TableDirectory tableDirectory)
         {
             DetermineCFFVersion(tableDirectory);
+            bool shouldParse = true; 
 
             if (CFFVersion == OTF.CFFVersion.CFF)
             {
-                cffParser = new CFFParser(tableDirectory.TablesOffsets[cffMandatoryTables["CFF"]], otfReader);
+                var offset = tableDirectory.TablesOffsets[cffMandatoryTables["CFF"]];
+                shouldParse = uniqueOffsets.Add(offset);
+                cffParser = new CFFParser(offset, otfReader);
             }
             else if (CFFVersion == OTF.CFFVersion.CFF2)
             {
-                cffParser = new CFFParser(tableDirectory.TablesOffsets[cffMandatoryTables["CFF2"]], otfReader);
+                var offset = tableDirectory.TablesOffsets[cffMandatoryTables["CFF2"]];
+                shouldParse = uniqueOffsets.Add(offset);
+                cffParser = new CFFParser(offset, otfReader);
             }
             
-            fontSet = cffParser.Parse();
+            if (!shouldParse)
+                return;
+
+            cffFont = cffParser.Parse();
         }
 
-        private void ReadCmapTable(TableDirectory tableDirectory)
+        private void ReadNameTable(TableDirectory tableDirectory, Font font)
         {
+            var offset = tableDirectory.TablesOffsets["name"];
+        }
+
+        private void ReadCmapTable(TableDirectory tableDirectory, Font font)
+        {
+            var offset = tableDirectory.TablesOffsets["cmap"];
+
+            uniqueOffsets.Add(offset);
+            
             CMapTable cmap = new CMapTable();
-            otfReader.Position = tableDirectory.TablesOffsets["cmap"];
+            otfReader.Position = offset;
             cmap.Version = otfReader.ReadUInt16();
             var numTables = otfReader.ReadUInt16();
             var encodings = new EncodingRecord[numTables];
@@ -279,7 +304,7 @@ namespace Adamantium.Fonts.OTF
             for (var index = 0; index < encodings.Length; index++)
             {
                 var encoding = encodings[index];
-                otfReader.Position = tableDirectory.TablesOffsets["cmap"] + encoding.SubtableOffset;
+                otfReader.Position = offset + encoding.SubtableOffset;
                 var format = otfReader.ReadUInt16();
                 CharacterMap map = ReadCharacterMap(format);
                 map.PlatformId = encoding.PlatformId;
@@ -290,15 +315,20 @@ namespace Adamantium.Fonts.OTF
             
             cmap.CollectUnicodeToGlyphMappings();
 
-
-            foreach (var font in fontSet.Fonts)
+            var glyphList = new List<Glyph>();
+            foreach (var glyphPair in cmap.GlyphToUnicode)
             {
-                foreach (var glyph in font.Glyphs)
-                {
-                    glyph.Unicodes.AddRange(cmap.GetUnicodesByGlyphId(glyph.Index));
-                }
+                var glyph = cffFont.GetGlyphByIndex(glyphPair.Key);
+                glyph.SetUnicodes(glyphPair.Value);
+                glyphList.Add(glyph);
             }
             
+            font.SetGlyphs(glyphList);
+
+            // foreach (var glyph in font.Glyphs)
+            // {
+            //     glyph.Unicodes.AddRange(cmap.GetUnicodesByGlyphId(glyph.Index));
+            // }
         }
 
         private CharacterMap ReadCharacterMap(ushort format)
