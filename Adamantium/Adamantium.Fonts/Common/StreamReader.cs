@@ -87,5 +87,11 @@ namespace Adamantium.Fonts.Common
             var bytes = ReadBytes(length);
             return Encoding.ASCII.GetString(bytes.Reverse().ToArray(), 0, bytes.Length);
         }
+        
+        public String ReadString(int length, Encoding encoding)
+        {
+            var bytes = ReadBytes(length);
+            return encoding.GetString(bytes.Reverse().ToArray(), 0, bytes.Length);
+        }
     }
 }

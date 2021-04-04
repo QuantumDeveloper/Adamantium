@@ -7,7 +7,6 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using Adamantium.Fonts.Common;
-using StreamReader = Adamantium.Fonts.Common.StreamReader;
 
 namespace Adamantium.Fonts.OTF
 {
@@ -45,6 +44,8 @@ namespace Adamantium.Fonts.OTF
         private readonly HashSet<UInt32> uniqueOffsets;
         
         public TypeFace TypeFace { get; }
+        
+        private static List<string> standardGlyphNames;
 
         static OTFParser()
         {
@@ -70,6 +71,268 @@ namespace Adamantium.Fonts.OTF
             {
                 {"CFF", "CFF "},
                 {"CFF2", "CFF2"}
+            };
+
+            standardGlyphNames = new List<string>()
+            {
+                ".notdef",
+                ".null",
+                "nonmarkingreturn",
+                "space",
+                "exclam",
+                "quotedbl",
+                "numbersign",
+                "dollar",
+                "percent",
+                "ampersand",
+                "quotesingle",
+                "parenleft",
+                "parenright",
+                "asterisk",
+                "plus",
+                "comma",
+                "hyphen",
+                "period",
+                "slash",
+                "zero",
+                "one",
+                "two",
+                "three",
+                "four",
+                "five",
+                "six",
+                "seven",
+                "eight",
+                "nine",
+                "colon",
+                "semicolon",
+                "less",
+                "equal",
+                "greater",
+                "question",
+                "at",
+                "A",
+                "B",
+                "C",
+                "D",
+                "E",
+                "F",
+                "G",
+                "H",
+                "I",
+                "J",
+                "K",
+                "L",
+                "M",
+                "N",
+                "O",
+                "P",
+                "Q",
+                "R",
+                "S",
+                "T",
+                "U",
+                "V",
+                "W",
+                "X",
+                "Y",
+                "Z",
+                "bracketleft",
+                "backslash",
+                "bracketright",
+                "asciicircum",
+                "underscore",
+                "grave",
+                "a",
+                "b",
+                "c",
+                "d",
+                "e",
+                "f",
+                "g",
+                "h",
+                "i",
+                "j",
+                "k",
+                "l",
+                "m",
+                "n",
+                "o",
+                "p",
+                "q",
+                "r",
+                "s",
+                "t",
+                "u",
+                "v",
+                "w",
+                "x",
+                "y",
+                "z",
+                "braceleft",
+                "bar",
+                "braceright",
+                "asciitilde",
+                "Adieresis",
+                "Aring",
+                "Ccedilla",
+                "Eacute",
+                "Ntilde",
+                "Odieresis",
+                "Udieresis",
+                "aacute",
+                "agrave",
+                "acircumflex",
+                "adieresis",
+                "atilde",
+                "aring",
+                "ccedilla",
+                "eacute",
+                "egrave",
+                "ecircumflex",
+                "edieresis",
+                "iacute",
+                "igrave",
+                "icircumflex",
+                "idieresis",
+                "ntilde",
+                "oacute",
+                "ograve",
+                "ocircumflex",
+                "odieresis",
+                "otilde",
+                "uacute",
+                "ugrave",
+                "ucircumflex",
+                "udieresis",
+                "dagger",
+                "degree",
+                "cent",
+                "sterling",
+                "section",
+                "bullet",
+                "paragraph",
+                "germandbls",
+                "registered",
+                "copyright",
+                "trademark",
+                "acute",
+                "dieresis",
+                "notequal",
+                "AE",
+                "Oslash",
+                "infinity",
+                "plusminus",
+                "lessequal",
+                "greaterequal",
+                "yen",
+                "mu",
+                "partialdiff",
+                "summation",
+                "product",
+                "pi",
+                "integral",
+                "ordfeminine",
+                "ordmasculine",
+                "Omega",
+                "ae",
+                "oslash",
+                "questiondown",
+                "exclamdown",
+                "logicalnot",
+                "radical",
+                "florin",
+                "approxequal",
+                "Delta",
+                "guillemotleft",
+                "guillemotright",
+                "ellipsis",
+                "nonbreakingspace",
+                "Agrave",
+                "Atilde",
+                "Otilde",
+                "OE",
+                "oe",
+                "endash",
+                "emdash",
+                "quotedblleft",
+                "quotedblright",
+                "quoteleft",
+                "quoteright",
+                "divide",
+                "lozenge",
+                "ydieresis",
+                "Ydieresis",
+                "fraction",
+                "currency",
+                "guilsinglleft",
+                "guilsinglright",
+                "fi",
+                "fl",
+                "daggerdbl",
+                "periodcentered",
+                "quotesinglbase",
+                "quotedblbase",
+                "perthousand",
+                "Acircumflex",
+                "Ecircumflex",
+                "Aacute",
+                "Edieresis",
+                "Egrave",
+                "Iacute",
+                "Icircumflex",
+                "Idieresis",
+                "Igrave",
+                "Oacute",
+                "Ocircumflex",
+                "apple",
+                "Ograve",
+                "Uacute",
+                "Ucircumflex",
+                "Ugrave",
+                "dotlessi",
+                "circumflex",
+                "tilde",
+                "macron",
+                "breve",
+                "dotaccent",
+                "ring",
+                "cedilla",
+                "hungarumlaut",
+                "ogonek",
+                "caron",
+                "Lslash",
+                "lslash",
+                "Scaron",
+                "scaron",
+                "Zcaron",
+                "zcaron",
+                "brokenbar",
+                "Eth",
+                "eth",
+                "Yacute",
+                "yacute",
+                "Thorn",
+                "thorn",
+                "minus",
+                "multiply",
+                "onesuperior",
+                "twosuperior",
+                "threesuperior",
+                "onehalf",
+                "onequarter",
+                "threequarters",
+                "franc",
+                "Gbreve",
+                "gbreve",
+                "Idotaccent",
+                "Scedilla",
+                "scedilla",
+                "Cacute",
+                "cacute",
+                "Ccaron",
+                "ccaron",
+                "dcroat",
             };
         }
 
@@ -125,11 +388,12 @@ namespace Adamantium.Fonts.OTF
                         ParseCFF(tableDirectory);
                         break;
                     default:
-                        // call TTF parser here
+                        ParseTTF(tableDirectory);
                         break;
                 }
 
                 ReadNameTable(tableDirectory, font);
+                ReadPostTable(tableDirectory);
                 ReadCmapTable(tableDirectory, font);
             }
         }
@@ -254,6 +518,11 @@ namespace Adamantium.Fonts.OTF
             }
         }
 
+        private void ParseTTF(TableDirectory tableDirectory)
+        {
+            
+        }
+
         private void ParseCFF(TableDirectory tableDirectory)
         {
             DetermineCFFVersion(tableDirectory);
@@ -281,6 +550,171 @@ namespace Adamantium.Fonts.OTF
         private void ReadNameTable(TableDirectory tableDirectory, Font font)
         {
             var offset = tableDirectory.TablesOffsets["name"];
+            otfReader.Position = offset;
+            var nameTable = new NameTable();
+            nameTable.Version = otfReader.ReadUInt16();
+            nameTable.Count = otfReader.ReadUInt16();
+            nameTable.StorageOffset = otfReader.ReadUInt16();
+            nameTable.NameRecords = new NameRecord[nameTable.Count];
+            
+            for (int i = 0; i < nameTable.Count; ++i)
+            {
+                var record = new NameRecord();
+                record.PlatformId = otfReader.ReadUInt16();
+                record.EncodingId = otfReader.ReadUInt16();
+                record.LanguageId = otfReader.ReadUInt16();
+                record.NameId = otfReader.ReadUInt16();
+                record.Length = otfReader.ReadUInt16();
+                record.StringOffset = otfReader.ReadUInt16();
+                nameTable.NameRecords[i] = record;
+            }
+
+            if (nameTable.Version == 1)
+            {
+                nameTable.LangTagCount = otfReader.ReadUInt16();
+                nameTable.LangTagRecords = new LangTagRecord[nameTable.LangTagCount];
+
+                for (int i = 0; i < nameTable.LangTagCount; ++i)
+                {
+                    var langRecord = new LangTagRecord();
+                    langRecord.Length = otfReader.ReadUInt16();
+                    langRecord.LangTagOffset = otfReader.ReadUInt16();
+                }
+            }
+
+            foreach (var nameRecord in nameTable.NameRecords)
+            {
+                otfReader.Position = offset + nameTable.StorageOffset + nameRecord.StringOffset;
+                Encoding encoding;
+                if (nameRecord.EncodingId == 3 || nameRecord.EncodingId == 1)
+                {
+
+                    encoding = Encoding.BigEndianUnicode;
+                }
+                else
+                {
+                    encoding = Encoding.UTF8;
+                }
+
+                var str = otfReader.ReadString(nameRecord.Length, encoding);
+
+                switch ((NameIdKind)nameRecord.NameId)
+                {
+                    case NameIdKind.Copyright:
+                        font.Copyright = str;
+                        break;
+                    case NameIdKind.FontFamily:
+                        font.FontFamily = str;
+                        break;
+                    case NameIdKind.FontSubfamily:
+                        font.FontSubfamily = str;
+                        break;
+                    case NameIdKind.UniqueFontId:
+                        font.UniqueId = str;
+                        break;
+                    case NameIdKind.FullFontName:
+                        font.FullName = str;
+                        break;
+                    case NameIdKind.VersionString:
+                        font.Version = str;
+                        break;
+                    case NameIdKind.Trademark:
+                        font.Trademark = str;
+                        break;
+                    case NameIdKind.Manufacturer:
+                        font.Manufacturer = str;
+                        break;
+                    case NameIdKind.Designer:
+                        font.Designer = str;
+                        break;
+                    case NameIdKind.Description:
+                        font.Description = str;
+                        break;
+                    case NameIdKind.VendorUrl:
+                        font.VendorUrl = str;
+                        break;
+                    case NameIdKind.DesignerUrl:
+                        font.DesignerUrl = str;
+                        break;
+                    case NameIdKind.LicenseDescription:
+                        font.LicenseDescription = str;
+                        break;
+                    case NameIdKind.LicenseInfoUrl:
+                        font.LicenseInfoUrl = str;
+                        break;
+                    case NameIdKind.TypographicFamilyName:
+                        font.TypographicFamilyName = str;
+                        break;
+                    case NameIdKind.TypographicSubfamilyName:
+                        font.TypographicSubfamilyName = str;
+                        break;
+                    case NameIdKind.WwsFamilyName:
+                        font.WwsFamilyName = str;
+                        break;
+                    case NameIdKind.WwsSubfamilyName:
+                        font.WwsSubfamilyName = str;
+                        break;
+                    case NameIdKind.LightBackgroundPalette:
+                        font.LightBackgroundPalette = str;
+                        break;
+                    case NameIdKind.DarkBackgroundPalette:
+                        font.DarkBackgroundPalette = str;
+                        break;
+                }
+            }
+        }
+
+        private void ReadPostTable(TableDirectory tableDirectory)
+        {
+            var offset = tableDirectory.TablesOffsets["post"];
+            if (uniqueOffsets.Contains(offset))
+                return;
+
+            uniqueOffsets.Add(offset);
+            otfReader.Position = offset;
+
+            var version = otfReader.ReadUInt32();
+            var italicAngle = otfReader.ReadUInt32();
+            var underlinePosition = otfReader.ReadInt16();
+            var underlineThickness = otfReader.ReadInt16();
+            var isFixedPitch = otfReader.ReadUInt32(); // 0 is proportionally spaced, non-zero - font is monospaced
+
+            // skip next 4 fields
+            otfReader.Position += 16;
+
+            var post = new PostTable();
+
+            switch (version)
+            {
+                case 0x00010000:
+                    post.Version = 1;
+                    break;
+                case 0x00030000:
+                    post.Version = 3;
+                    break;
+                case 0x00020000:
+                    post.Version = 2;
+
+                    var glyphsNumber = otfReader.ReadUInt16();
+                    var glyphNameIndices = otfReader.ReadUInt16Array(glyphsNumber);
+
+                    var glyphNames = new Dictionary<UInt32, string>();
+                    for (uint i = 0; i < glyphsNumber; ++i)
+                    {
+                        var glyphNameIndex = glyphNameIndices[i];
+                        if (glyphNameIndex < 258)
+                        {
+                            glyphNames[i] = standardGlyphNames[glyphNameIndex];
+                        }
+                        else
+                        {
+                            var length = otfReader.ReadByte();
+                            var glyphName = otfReader.ReadString(length, Encoding.UTF8);
+                            glyphNames[i] = glyphName;
+                        }
+                    }
+                    break;
+            }
         }
 
         private void ReadCmapTable(TableDirectory tableDirectory, Font font)

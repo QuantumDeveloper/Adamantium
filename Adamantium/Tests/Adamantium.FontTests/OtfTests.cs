@@ -10,8 +10,8 @@ namespace Adamantium.FontTests
         [Test]
         public void LoadOtfCffFont()
         {
-            //var typeFace = TypeFace.LoadFont(Path.Combine("OTFFonts", "FontCollections", "ASANA.TTC"), 2);
-            var typeFace = TypeFace.LoadFont(Path.Combine("OTFFonts", "FontCollections", "NotoSansCJK-Regular.ttc"), 2);
+            var typeFace = TypeFace.LoadFont(Path.Combine("OTFFonts", "FontCollections", "ASANA.TTC"), 2);
+            //var typeFace = TypeFace.LoadFont(Path.Combine("OTFFonts", "FontCollections", "NotoSansCJK-Regular.ttc"), 2);
             //var fp = new OTFParser(@"OTFFonts\Glametrix-oj9A.otf");
             //var fp = new OTFParser(@"OTFFonts\FDArrayTest257.otf");
             //var fp = new OTFParser(@"OTFFonts\Poppins-Medium.otf");
