@@ -63,7 +63,9 @@ namespace Adamantium.Fonts.OTF
                 { (ushort)OperatorsType.hhcurveto           , OperatorsType.hhcurveto    },
                 { (ushort)OperatorsType.callgsubr           , OperatorsType.callgsubr    },
                 { (ushort)OperatorsType.vhcurveto           , OperatorsType.vhcurveto    },
-                { (ushort)OperatorsType.hvcurveto           , OperatorsType.hvcurveto    }
+                { (ushort)OperatorsType.hvcurveto           , OperatorsType.hvcurveto    },
+                { (ushort)OperatorsType.vsindex             , OperatorsType.vsindex      },
+                { (ushort)OperatorsType.blend               , OperatorsType.blend        },
             };
         }
 
@@ -82,7 +84,7 @@ namespace Adamantium.Fonts.OTF
             var fontDictBias = 0;
             if (fontDict?.LocalSubr != null)
             {
-                fontDictBias = cffParser.CalculateGlobalSubrBias((uint)fontDict.LocalSubr.Count);
+                fontDictBias = cffParser.CalculateSubrBias((uint)fontDict.LocalSubr.Count);
             }
 
             while (mainStack.Count > 0)
@@ -186,6 +188,9 @@ namespace Adamantium.Fonts.OTF
                             clearOperands = false;
 
                             operands[0] = -operands[0];
+                            break;
+                        case (ushort)OperatorsType.blend:
+                            clearOperands = false;
                             break;
                         case (ushort)OperatorsType.hintmask:
                         case (ushort)OperatorsType.cntrmask:

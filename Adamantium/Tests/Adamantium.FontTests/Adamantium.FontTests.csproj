@@ -19,6 +19,9 @@
     </ItemGroup>
 
     <ItemGroup>
+      <Content Include="OTFFonts\SourceSans3-Regular.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
       <None Remove="OTFFonts\customfont.otf" />
       <Content Include="OTFFonts\CFF2\AdobeVFPrototype.otf">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -47,9 +50,6 @@
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
       <None Remove="OTFFonts\CFF2\SourceSans3-Regular.otf" />
-      <Content Include="OTFFonts\CFF2\SourceSans3-Regular.otf">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </Content>
       <None Remove="OTFFonts\AdobeVFPrototype.otf" />
       <None Remove="OTFFonts\FDArrayTest257.otf" />
       <Content Include="OTFFonts\FDArrayTest257.otf">
@@ -61,6 +61,10 @@
       </Content>
       <None Remove="OTFFonts\FontCollections\NotoSansCJK-Regular.ttc" />
       <Content Include="OTFFonts\FontCollections\NotoSansCJK-Regular.ttc">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="OTFFonts\Crimson-Italic.otf" />
+      <Content Include="OTFFonts\Crimson-Italic.otf">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
     </ItemGroup>

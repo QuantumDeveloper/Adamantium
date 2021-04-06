@@ -28,6 +28,27 @@ namespace Adamantium.Fonts.Common
 
             return bytes;
         }
+        
+        public sbyte[] ReadSignedBytes(int count)
+        {
+            sbyte[] bytes = new sbyte[count];
+            for (int i = 0; i < count; ++i)
+            {
+                bytes[i] = ReadSignedByte();
+            }
+
+            if (BitConverter.IsLittleEndian)
+            {
+                bytes = bytes.Reverse().ToArray();
+            }
+
+            return bytes;
+        }
+
+        public sbyte ReadSignedByte()
+        {
+            return (sbyte)base.ReadByte();
+        }
 
         public new byte ReadByte()
         {

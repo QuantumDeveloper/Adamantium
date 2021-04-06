@@ -538,7 +538,7 @@ namespace Adamantium.Fonts.OTF
             {
                 var offset = tableDirectory.TablesOffsets[cffMandatoryTables["CFF2"]];
                 shouldParse = uniqueOffsets.Add(offset);
-                cffParser = new CFFParser(offset, otfReader);
+                cffParser = new CFF2Parser(offset, otfReader);
             }
             
             if (!shouldParse)

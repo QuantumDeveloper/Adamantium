@@ -844,16 +844,16 @@ namespace Adamantium.Fonts.TTF
                 {
                     Int16 xyScale = ttfReader.ReadInt16();
 
-                    compositeGlyphComponent.TransformationMatrix[0] = To2Point14Float(xyScale);
-                    compositeGlyphComponent.TransformationMatrix[3] = To2Point14Float(xyScale);
+                    compositeGlyphComponent.TransformationMatrix[0] = xyScale.ToF2Dot14();
+                    compositeGlyphComponent.TransformationMatrix[3] = xyScale.ToF2Dot14();
                 }
                 else if (compositeFlag.WeHaveAnXAndYScale)
                 {
                     Int16 xScale = ttfReader.ReadInt16();
                     Int16 yScale = ttfReader.ReadInt16();
 
-                    compositeGlyphComponent.TransformationMatrix[0] = To2Point14Float(xScale);
-                    compositeGlyphComponent.TransformationMatrix[3] = To2Point14Float(yScale);
+                    compositeGlyphComponent.TransformationMatrix[0] = xScale.ToF2Dot14();
+                    compositeGlyphComponent.TransformationMatrix[3] = yScale.ToF2Dot14();
                 }
                 else if (compositeFlag.WeHaveATwoByTwo)
                 {
@@ -862,10 +862,10 @@ namespace Adamantium.Fonts.TTF
                     Int16 scale10 = ttfReader.ReadInt16();
                     Int16 yScale = ttfReader.ReadInt16();
 
-                    compositeGlyphComponent.TransformationMatrix[0] = To2Point14Float(xScale);
-                    compositeGlyphComponent.TransformationMatrix[1] = To2Point14Float(scale01);
-                    compositeGlyphComponent.TransformationMatrix[2] = To2Point14Float(scale10);
-                    compositeGlyphComponent.TransformationMatrix[3] = To2Point14Float(yScale);
+                    compositeGlyphComponent.TransformationMatrix[0] = xScale.ToF2Dot14();
+                    compositeGlyphComponent.TransformationMatrix[1] = scale01.ToF2Dot14();
+                    compositeGlyphComponent.TransformationMatrix[2] = scale10.ToF2Dot14();
+                    compositeGlyphComponent.TransformationMatrix[3] = yScale.ToF2Dot14();
                 }
 
                 if (compositeFlag.ArgsAreXYValues) // matched points == false
@@ -914,11 +914,6 @@ namespace Adamantium.Fonts.TTF
             }
 
             return transformedContour;
-        }
-
-        private float To2Point14Float(short value)
-        {
-            return (value / 16384.0f);
         }
 
         private TTFGlyphCompositeFlag ReadTTFGlyphCompositeFlag()

@@ -50,7 +50,6 @@ namespace Adamantium.Fonts.OTF
                 { (ushort)DictOperatorsType.FDSelect             , DictOperatorsType.FDSelect             },
                 { (ushort)DictOperatorsType.FontName             , DictOperatorsType.FontName             },
                 
-                
                 // Private DICT
                 { (ushort)DictOperatorsType.BlueValues           , DictOperatorsType.BlueValues          },
                 { (ushort)DictOperatorsType.OtherBlues           , DictOperatorsType.OtherBlues          },
@@ -69,7 +68,12 @@ namespace Adamantium.Fonts.OTF
                 { (ushort)DictOperatorsType.InitialRandomSeed    , DictOperatorsType.InitialRandomSeed   },
                 { (ushort)DictOperatorsType.Subrs                , DictOperatorsType.Subrs               },
                 { (ushort)DictOperatorsType.DefaultWidthX        , DictOperatorsType.DefaultWidthX       },
-                { (ushort)DictOperatorsType.NominalWidthX        , DictOperatorsType.NominalWidthX       }
+                { (ushort)DictOperatorsType.NominalWidthX        , DictOperatorsType.NominalWidthX       },
+                
+                // CFF 2
+                { (ushort)DictOperatorsType.vsindex              , DictOperatorsType.vsindex             },
+                { (ushort)DictOperatorsType.blend                , DictOperatorsType.blend               },
+                { (ushort)DictOperatorsType.vstore               , DictOperatorsType.vstore              }
             };
 
             operatorsActions = new Dictionary<DictOperatorsType, Func<List<GenericOperandResult>, GenericOperandResult>>
@@ -127,7 +131,12 @@ namespace Adamantium.Fonts.OTF
                { DictOperatorsType.InitialRandomSeed     , Number },
                { DictOperatorsType.Subrs                 , Number },
                { DictOperatorsType.DefaultWidthX         , Number },
-               { DictOperatorsType.NominalWidthX         , Number }
+               { DictOperatorsType.NominalWidthX         , Number },
+               
+               // CFF 2
+               { DictOperatorsType.vsindex               , Number },
+               { DictOperatorsType.blend                 , Delta  },
+               { DictOperatorsType.vstore                , Number }
             };
 
             FillDefaultValues();

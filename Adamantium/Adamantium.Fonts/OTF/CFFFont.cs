@@ -44,7 +44,7 @@ namespace Adamantium.Fonts.OTF
 
         public bool IsCIDFont => IsCurrentFontCIDFont();
         
-        public bool IsLocalSubroutineAvailable { get; private set; }
+        public bool IsLocalSubroutineAvailable { get; internal set; }
         
         public CFFFont(CFFFontSet fontSet)
         {

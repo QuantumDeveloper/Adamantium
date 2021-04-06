@@ -83,7 +83,7 @@ namespace Adamantium.Fonts.OTF
             otfReader.Position = cffOffset;
             otfReader.Position += cffHeader.HeaderSize;
 
-            cffNameIndex = ReadCffIndex();
+            cffNameIndex = otfReader.ReadCffIndex();
 
             for (int i = 0; i < cffNameIndex.Count; ++i)
             {
@@ -101,7 +101,7 @@ namespace Adamantium.Fonts.OTF
             otfReader.Position += cffHeader.HeaderSize;
             otfReader.Position += cffNameIndex.GetLength();
 
-            cffTopDictIndex = ReadCffIndex();
+            cffTopDictIndex = otfReader.ReadCffIndex();
 
             if (cffTopDictIndex.Count > 1)
             {
@@ -122,7 +122,7 @@ namespace Adamantium.Fonts.OTF
             otfReader.Position += cffNameIndex.GetLength();
             otfReader.Position += cffTopDictIndex.GetLength();
 
-            cffStringIndex = ReadCffIndex();
+            cffStringIndex = otfReader.ReadCffIndex();
 
             var uniqueStrings = new List<string>();
 
@@ -143,9 +143,9 @@ namespace Adamantium.Fonts.OTF
             otfReader.Position += cffTopDictIndex.GetLength();
             otfReader.Position += cffStringIndex.GetLength();
 
-            GlobalSubroutineIndex = ReadCffIndex();
+            GlobalSubroutineIndex = otfReader.ReadCffIndex();
 
-            GlobalSubrBias = this.CalculateGlobalSubrBias(GlobalSubroutineIndex.Count);
+            GlobalSubrBias = this.CalculateSubrBias(GlobalSubroutineIndex.Count);
         }
 
         /// <summary>
@@ -183,7 +183,6 @@ namespace Adamantium.Fonts.OTF
                 default:
                     throw new NotSupportedException($"Format {format} is not supported in FDSelect");
             }
-
         }
 
         private void ReadFDArray(CFFFont font)
@@ -192,62 +191,7 @@ namespace Adamantium.Fonts.OTF
 
             otfReader.Position = cffOffset + font.CIDFontInfo.FDArray;
 
-            var fontDictIndex = ReadCffIndex();
-
-            var fontDicts = new List<FontDict>();
-            font.CidFontDicts = fontDicts;
-            
-            for (int i = 0; i < fontDictIndex.Count; i++)
-            {
-                var dictParser = new DictOperandParser(fontDictIndex.DataByOffset[i]);
-                var result = dictParser.GetAllAvailableOperands();
-
-                int name = 0;
-                int offset = 0;
-                int size = 0;
-
-                foreach (var operandResult in result.Results)
-                {
-                    switch (operandResult.Key)
-                    {
-                        case DictOperatorsType.FontName:
-                            name = operandResult.Value.AsInt();
-                            break;
-                        case DictOperatorsType.Private: // private DICT
-                            var lst = operandResult.Value.AsList();
-                            size = (int) lst[0];
-                            offset = (int) lst[1];
-                            break;
-                    }
-                }
-
-                var fontDict = new FontDict(size, offset);
-                fontDict.FontName = name;
-                fontDicts.Add(fontDict);
-            }
-
-            foreach (var fontDict in fontDicts)
-            {
-                otfReader.Position = cffOffset + fontDict.PrivateDictOffset;
-                var bytes = otfReader.ReadBytes(fontDict.PrivateDictSize).Reverse().ToArray();
-                var dictParser = new DictOperandParser(bytes);
-                var result = dictParser.GetAllAvailableOperands();
-
-                foreach (var operandResult in result.Results)
-                {
-                    switch (operandResult.Key)
-                    {
-                        case DictOperatorsType.Subrs:
-                            var localSubrsOffset = operandResult.Value.AsInt();
-                            otfReader.Position = cffOffset + fontDict.PrivateDictOffset + localSubrsOffset;
-                            var offsets = ReadCffIndex();
-                            fontDict.LocalSubr = offsets.DataByOffset;
-                            break;
-                    }
-                }
-            }
-
-            font.CIDFontDicts = fontDicts;
+            font.CIDFontDicts = otfReader.ReadFDArray(cffOffset, (uint)font.CIDFontInfo.FDArray);
         }
 
         private void ReadLocalSubroutineIndex(CFFFont font)
@@ -277,9 +221,9 @@ namespace Adamantium.Fonts.OTF
             // fill local subrs index structure
             otfReader.Position = privateDictDataStart + localSubrOffset;
 
-            font.LocalSubroutineIndex = ReadCffIndex();
+            font.LocalSubroutineIndex = otfReader.ReadCffIndex();
 
-            font.LocalSubrBias = this.CalculateLocalSubrBias(font.LocalSubroutineIndex.Count, font.CharstringType);
+            font.LocalSubrBias = this.CalculateSubrBias(font.LocalSubroutineIndex.Count);
         }
 
         private ushort ReadCharStringIndexCount(CFFFont font)
@@ -297,7 +241,7 @@ namespace Adamantium.Fonts.OTF
             otfReader.Position = cffOffset;
             otfReader.Position += font.GetDictOperatorValue(DictOperatorsType.CharStrings).AsInt();
             
-            font.CharStringsIndex = ReadCffIndex();
+            font.CharStringsIndex = otfReader.ReadCffIndex();
 
             var mainStack = new Stack<byte>();
             int exceptions = 0;
@@ -409,59 +353,5 @@ namespace Adamantium.Fonts.OTF
                 } while (count > 0);
             }
         }
-        
-        private CFFIndex ReadCffIndex()
-        {
-            var cffIndex = new CFFIndex();
-
-            cffIndex.Count = otfReader.ReadUInt16();
-
-            if (cffIndex.Count == 0)
-            {
-                return default;
-            }
-
-            cffIndex.OffsetSize = otfReader.ReadByte();
-
-            cffIndex.Offsets = new List<uint>();
-
-            for (int i = 0; i <= cffIndex.Count; ++i)
-            {
-                switch (cffIndex.OffsetSize)
-                {
-                    case 1:
-                        cffIndex.Offsets.Add(otfReader.ReadByte());
-                        break;
-                    case 2:
-                        cffIndex.Offsets.Add(otfReader.ReadUInt16());
-                        break;
-                    case 3:
-                        var rawOffset = otfReader.ReadBytes(3).ToList();
-                        rawOffset.Add(0);
-                        cffIndex.Offsets.Add(BitConverter.ToUInt32(rawOffset.ToArray(), 0));
-                        break;
-                    case 4:
-                        cffIndex.Offsets.Add(otfReader.ReadUInt32());
-                        break;
-                }
-            }
-
-            var data = otfReader.ReadBytes((int)cffIndex.Offsets.Last() - 1).Reverse().ToArray();
-            var dataByOffset = new List<byte[]>();
-
-            for (int i = 1; i < cffIndex.Offsets.Count; ++i)
-            {
-                var startIndex = cffIndex.Offsets[i - 1] - 1;
-                var endIndex = cffIndex.Offsets[i] - 1;
-                var bytes = data[(int)startIndex ..(int)endIndex];
-                dataByOffset.Add(bytes);
-            }
-
-            cffIndex.DataByOffset = dataByOffset;
-
-            return cffIndex;
-        }
-
-        
     }
 }

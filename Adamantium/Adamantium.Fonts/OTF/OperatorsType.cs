@@ -64,8 +64,8 @@
         // reserved         = 13,
         //hsbw              = 13,
         endchar             = 14, /**/
-        // reserved         = 15,
-        // reserved         = 16,
+        vsindex             = 15,
+        blend               = 16,
         // reserved         = 17,
         hstemhm             = 18, /**/
         hintmask            = 19, /**/
