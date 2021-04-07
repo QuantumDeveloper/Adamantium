@@ -8,10 +8,12 @@ namespace Adamantium.Fonts.OTF
     {
         private CommandList commandList;
         private Glyph glyph;
+        private CFFVersion cffVersion;
 
-        public PipelineAssembler(ICFFParser parser)
+        public PipelineAssembler(ICFFParser parser, CFFVersion cffVersion = CFFVersion.CFF)
         {
             commandList = new CommandList(parser);
+            this.cffVersion = cffVersion;
         }
 
         public PipelineAssembler CreateGlyph(uint index)
@@ -26,7 +28,14 @@ namespace Adamantium.Fonts.OTF
             commandList.Clear();
             commandList.Fill(font, stack, fontDict, index);
 
-            if (commandList.commands.Last().@operator != OperatorsType.endchar)
+            if (index == 5)
+            {
+                
+            }
+            
+            if (cffVersion == CFFVersion.CFF &&
+                commandList.commands.Count > 0 &&
+                commandList.commands.Last().@operator != OperatorsType.endchar)
             {
                 throw new CommandException("Not ending with EndChar command");
             }

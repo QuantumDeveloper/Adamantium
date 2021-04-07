@@ -13,6 +13,6 @@ namespace Adamantium.Fonts.OTF
 
         public int FdSelectFormat;
         public byte[] FdRanges0;
-        public FDRange3[] FdRanges3;
+        public FDRange[] FdRanges;
     }
 }

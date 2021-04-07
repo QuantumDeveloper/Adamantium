@@ -103,11 +103,6 @@ namespace Adamantium.Fonts.OTF
 
             cffTopDictIndex = otfReader.ReadCffIndex();
 
-            if (cffTopDictIndex.Count > 1)
-            {
-                int x = 0;
-            }
-
             for (int i = 0; i < cffTopDictIndex.Count; ++i)
             {
                 fontSet.Fonts[i].ParseTopDict(cffTopDictIndex.DataByOffset[i]);
@@ -161,28 +156,7 @@ namespace Adamantium.Fonts.OTF
             var charStringCount = ReadCharStringIndexCount(font);
 
             otfReader.Position = cffOffset + font.CIDFontInfo.FDSelect;
-            byte format = otfReader.ReadByte();
-            font.CIDFontInfo.FdSelectFormat = format;
-            switch (format)
-            {
-                case 0:
-                    font.CIDFontInfo.FdRanges0 = otfReader.ReadBytes(charStringCount);
-                    break;
-                case 3:
-                    var rangesCount = otfReader.ReadUInt16();
-                    font.CIDFontInfo.FdRanges3 = new FDRange3[rangesCount+1];
-                    for (int i = 0; i < rangesCount; i++)
-                    {
-                        var range = new FDRange3(otfReader.ReadUInt16(), otfReader.ReadByte());
-                        font.CIDFontInfo.FdRanges3[i] = range;
-                    }
-                    
-                    // sentinel
-                    font.CIDFontInfo.FdRanges3[rangesCount] = new FDRange3(otfReader.ReadUInt16(), 0);
-                    break;
-                default:
-                    throw new NotSupportedException($"Format {format} is not supported in FDSelect");
-            }
+            otfReader.ReadFDSelect(font, charStringCount);
         }
 
         private void ReadFDArray(CFFFont font)
@@ -198,7 +172,7 @@ namespace Adamantium.Fonts.OTF
         {
             // set position to the start of Private DICT data (it is start of CFF data + offset to Private DICT data from Top DICT)
             otfReader.Position = cffOffset;
-            var topDictPrivateEntry = font.GetDictOperatorValue(DictOperatorsType.Private).AsNumberNumber();
+            var topDictPrivateEntry = font.GetTopDictOperatorValue(DictOperatorsType.Private).AsNumberNumber();
             otfReader.Position += (int) topDictPrivateEntry.Number2;
 
             // save the beginning of Private DICT data start for later use (e.g for local Subrs offset)
@@ -216,7 +190,7 @@ namespace Adamantium.Fonts.OTF
                 return; // there is no local subroutines for this font
 
             // get the offset to local subroutines
-            var localSubrOffset = font.GetDictOperatorValue(DictOperatorsType.Subrs).AsInt();
+            var localSubrOffset = font.GetPrivateDictOperatorValue(DictOperatorsType.Subrs).AsInt();
 
             // fill local subrs index structure
             otfReader.Position = privateDictDataStart + localSubrOffset;
@@ -229,7 +203,7 @@ namespace Adamantium.Fonts.OTF
         private ushort ReadCharStringIndexCount(CFFFont font)
         {
             otfReader.Position = cffOffset;
-            otfReader.Position += font.GetDictOperatorValue(DictOperatorsType.CharStrings).AsInt();
+            otfReader.Position += font.GetTopDictOperatorValue(DictOperatorsType.CharStrings).AsInt();
             var count = otfReader.ReadUInt16();
 
             return count;
@@ -239,7 +213,7 @@ namespace Adamantium.Fonts.OTF
         {
             // set position to the start of CharStrings (it is start of CFF data + offset to CharStrings from Top DICT)
             otfReader.Position = cffOffset;
-            otfReader.Position += font.GetDictOperatorValue(DictOperatorsType.CharStrings).AsInt();
+            otfReader.Position += font.GetTopDictOperatorValue(DictOperatorsType.CharStrings).AsInt();
             
             font.CharStringsIndex = otfReader.ReadCffIndex();
 
@@ -299,7 +273,7 @@ namespace Adamantium.Fonts.OTF
         private void ReadCharsets(CFFFont font)
         {
             otfReader.Position = cffOffset;
-            otfReader.Position += font.GetDictOperatorValue(DictOperatorsType.charset).AsInt();
+            otfReader.Position += font.GetTopDictOperatorValue(DictOperatorsType.charset).AsInt();
 
             font.GetGlyphByIndex(0).Name = fontSet.GetStringBySid(0);
             var format = otfReader.ReadByte();

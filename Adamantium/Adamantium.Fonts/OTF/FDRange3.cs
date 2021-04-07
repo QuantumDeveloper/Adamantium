@@ -1,11 +1,13 @@
+using System;
+
 namespace Adamantium.Fonts.OTF
 {
-    internal readonly struct FDRange3
+    internal readonly struct FDRange
     {
-        public readonly ushort First;
+        public readonly UInt32 First;
         public readonly byte FontDictIndex;
 
-        public FDRange3(ushort first, byte fd)
+        public FDRange(UInt32 first, byte fd)
         {
             First = first;
             FontDictIndex = fd;

@@ -90,7 +90,7 @@ namespace Adamantium.Fonts.OTF
         {
             otfReader.Position = cffOffset + fdArrayOffset;
 
-            var fontDictIndex = otfReader.ReadCffIndex();
+            var fontDictIndex = otfReader.ReadCffIndex(version);
             var fontDicts = new List<FontDict>();
             
             for (int i = 0; i < fontDictIndex.Count; i++)
@@ -136,7 +136,7 @@ namespace Adamantium.Fonts.OTF
                         case DictOperatorsType.Subrs:
                             var localSubrsOffset = operandResult.Value.AsInt();
                             otfReader.Position = cffOffset + fontDict.PrivateDictOffset + localSubrsOffset;
-                            var offsets = otfReader.ReadCffIndex();
+                            var offsets = otfReader.ReadCffIndex(version);
                             fontDict.LocalSubr = offsets.DataByOffset;
                             break;
                     }
@@ -144,6 +144,35 @@ namespace Adamantium.Fonts.OTF
             }
 
             return fontDicts;
+        }
+        
+        public static void ReadFDSelect(this OTFStreamReader otfReader, CFFFont font, int charStringCount)
+        {
+            byte format = otfReader.ReadByte();
+            font.CIDFontInfo.FdSelectFormat = format;
+            switch (format)
+            {
+                case 0:
+                    font.CIDFontInfo.FdRanges0 = otfReader.ReadBytes(charStringCount);
+                    break;
+                case 3:
+                case 4:
+                    uint rangesCount = 0;
+                    rangesCount = format == 3 ? otfReader.ReadUInt16() : otfReader.ReadUInt32();
+                    font.CIDFontInfo.FdRanges = new FDRange[rangesCount+1];
+                    for (int i = 0; i < rangesCount; i++)
+                    {
+                        var range = new FDRange(otfReader.ReadUInt16(), otfReader.ReadByte());
+                        font.CIDFontInfo.FdRanges[i] = range;
+                    }
+
+                    uint first = format == 3 ? otfReader.ReadUInt16() : otfReader.ReadUInt32();
+                    // sentinel
+                    font.CIDFontInfo.FdRanges[rangesCount] = new FDRange(first, 0);
+                    break;
+                default:
+                    throw new NotSupportedException($"Format {format} is not supported in FDSelect");
+            }
         }
     }
 }

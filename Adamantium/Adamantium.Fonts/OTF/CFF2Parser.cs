@@ -11,14 +11,15 @@ namespace Adamantium.Fonts.OTF
         
         private CFFHeader cffHeader;
         private CFFFontSet fontSet;
-        PipelineAssembler pipelineAssembler;
+        private PipelineAssembler pipelineAssembler;
+        private VariationStore variationStore;
         
         public CFF2Parser(uint cffOffset, OTFStreamReader reader)
         {
             this.cffOffset = cffOffset;
             otfReader = reader;
             fontSet = new CFFFontSet();
-            pipelineAssembler = new PipelineAssembler(this);
+            pipelineAssembler = new PipelineAssembler(this, CFFVersion.CFF2);
         }
 
         public IReadOnlyCollection<Glyph> Glyphs { get; }
@@ -130,29 +131,34 @@ namespace Adamantium.Fonts.OTF
                 variationRegionList.VariationRegions[index] = region;
             }
 
+            var variationDataList = new List<ItemVariationDataSubtable>();
             for (int i = 0; i < itemVariationDataCount; ++i)
             {
                 otfReader.Position = variationOffset + itemVariationDataOffsets[i];
-                var itemVariationSubtable = new ItemVariationDataSubtable();
-                itemVariationSubtable.ItemCount = otfReader.ReadUInt16();
-                itemVariationSubtable.ShortDeltaCount = otfReader.ReadUInt16();
-                itemVariationSubtable.RegionIndexCount = otfReader.ReadUInt16();
-                itemVariationSubtable.RegionIndices = otfReader.ReadUInt16Array(itemVariationSubtable.RegionIndexCount);
-                itemVariationSubtable.DeltaSets = new DeltaSet[itemVariationSubtable.ItemCount];
-                if (itemVariationSubtable.ItemCount > 0)
+                var variationDataSubtable = new ItemVariationDataSubtable();
+                variationDataSubtable.ItemCount = otfReader.ReadUInt16();
+                variationDataSubtable.ShortDeltaCount = otfReader.ReadUInt16();
+                variationDataSubtable.RegionIndexCount = otfReader.ReadUInt16();
+                variationDataSubtable.RegionIndices = otfReader.ReadUInt16Array(variationDataSubtable.RegionIndexCount);
+                variationDataSubtable.DeltaSets = new DeltaSet[variationDataSubtable.ItemCount];
+                if (variationDataSubtable.ItemCount > 0)
                 {
-                    for (int k = 0; k < itemVariationSubtable.ItemCount; ++k)
+                    for (int k = 0; k < variationDataSubtable.ItemCount; ++k)
                     {
                         var deltaSet = new DeltaSet();
-                        deltaSet.ShortDeltaData = otfReader.ReadInt16Array(itemVariationSubtable.ShortDeltaCount);
-                        var deltaDataCount = itemVariationSubtable.RegionIndexCount -
-                                             itemVariationSubtable.ShortDeltaCount;
+                        deltaSet.ShortDeltaData = otfReader.ReadInt16Array(variationDataSubtable.ShortDeltaCount);
+                        var deltaDataCount = variationDataSubtable.RegionIndexCount -
+                                             variationDataSubtable.ShortDeltaCount;
                         deltaSet.DeltaData = otfReader.ReadSignedBytes(deltaDataCount);
 
-                        itemVariationSubtable.DeltaSets[k] = deltaSet;
+                        variationDataSubtable.DeltaSets[k] = deltaSet;
                     }
                 }
+                
+                variationDataList.Add(variationDataSubtable);
             }
+
+            variationStore = new VariationStore(variationRegionList, variationDataList.ToArray());
         }
 
         private void ReadFDArray()
@@ -165,9 +171,19 @@ namespace Adamantium.Fonts.OTF
 
         private void ReadFDSelect()
         {
-            if (cffFont.CIDFontDicts.Count <= 1 || fdSelectOffset == 0) return;
+            if (cffFont.CIDFontDicts.Count <= 1 && fdSelectOffset == 0) return;
 
+            var charStringCount = ReadCharStringIndexCount();
             otfReader.Position = cffOffset + fdSelectOffset;
+            otfReader.ReadFDSelect(cffFont, (int)charStringCount);
+        }
+
+        private UInt32 ReadCharStringIndexCount()
+        {
+            otfReader.Position = cffOffset + charstringOffset;
+            
+            var count = otfReader.ReadUInt32();
+            return count;
         }
 
         private void ReadCharstringIndex()

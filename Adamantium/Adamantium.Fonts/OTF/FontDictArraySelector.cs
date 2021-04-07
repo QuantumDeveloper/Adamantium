@@ -5,7 +5,7 @@ namespace Adamantium.Fonts.OTF
     internal class FontDictArraySelector
     {
         private CIDFontInfo info;
-        private FDRange3 currentRange;
+        private FDRange currentRange;
         private int currentRangeIndex = 0;
         private uint endGlyphIndex;
         
@@ -14,8 +14,8 @@ namespace Adamantium.Fonts.OTF
             this.info = info;
             if (info.FdSelectFormat == 3)
             {
-                currentRange = info.FdRanges3[0];
-                endGlyphIndex = info.FdRanges3[1].First;
+                currentRange = info.FdRanges[0];
+                endGlyphIndex = info.FdRanges[1].First;
             }
         }
 
@@ -41,15 +41,15 @@ namespace Adamantium.Fonts.OTF
         {
             if (IsGlyphIndexInCurrentRange(glyphIdx))
             {
-                return info.FdRanges3[currentRangeIndex].FontDictIndex;
+                return info.FdRanges[currentRangeIndex].FontDictIndex;
             }
 
             currentRangeIndex++;
-            currentRange = info.FdRanges3[currentRangeIndex];
-            endGlyphIndex = info.FdRanges3[currentRangeIndex + 1].First;
+            currentRange = info.FdRanges[currentRangeIndex];
+            endGlyphIndex = info.FdRanges[currentRangeIndex + 1].First;
             if (IsGlyphIndexInCurrentRange(glyphIdx))
             {
-                return info.FdRanges3[currentRangeIndex].FontDictIndex;
+                return info.FdRanges[currentRangeIndex].FontDictIndex;
             }
             else
             {

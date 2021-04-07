@@ -6,7 +6,7 @@ namespace Adamantium.Fonts.OTF
 {
     internal class CommandList : OperandParser
     {
-        private Dictionary<ushort, OperatorsType> bytesToOperatorMap;
+        private static Dictionary<ushort, OperatorsType> bytesToOperatorMap;
         private ICFFParser cffParser;
         internal List<Command> commands;
 
@@ -14,7 +14,10 @@ namespace Adamantium.Fonts.OTF
         {
             this.cffParser = cffParser;
             commands = new List<Command>();
+        }
 
+        static CommandList()
+        {
             bytesToOperatorMap = new Dictionary<ushort, OperatorsType>
             {
                 { (ushort)OperatorsType.hstem               , OperatorsType.hstem        },
@@ -75,12 +78,8 @@ namespace Adamantium.Fonts.OTF
             ushort token;
             bool clearOperands;
             int stemCount = 0;
+            OperatorsType? additionalOperator = null;
 
-            if (index == 2)
-            {
-                int x = 0;
-            }
-            
             var fontDictBias = 0;
             if (fontDict?.LocalSubr != null)
             {
@@ -191,6 +190,8 @@ namespace Adamantium.Fonts.OTF
                             break;
                         case (ushort)OperatorsType.blend:
                             clearOperands = false;
+                            // TODO: think how to correctly integrate blend operators in existing structure (commands, interpreter, dict parser)
+                            additionalOperator = OperatorsType.blend;
                             break;
                         case (ushort)OperatorsType.hintmask:
                         case (ushort)OperatorsType.cntrmask:
@@ -254,7 +255,10 @@ namespace Adamantium.Fonts.OTF
                             var command = new Command();
 
                             command.@operator = bytesToOperatorMap[token];
+                            command.additionalOperator = additionalOperator;
                             command.operands = operands;
+
+                            additionalOperator = null;
 
                             commands.Add(command);
                             break;

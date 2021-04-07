@@ -19,7 +19,19 @@
     </ItemGroup>
 
     <ItemGroup>
+      <Content Include="OTFFonts\CFF2\SourceHanSerifVFProtoJP.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <Content Include="OTFFonts\CFF\Glametrix-oj9A.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <Content Include="OTFFonts\CFF\Quicksand-Regular.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
       <Content Include="OTFFonts\SourceSans3-Regular.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <Content Include="OTFFonts\SourceSerif4Caption-Semibold.otf">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
       <None Remove="OTFFonts\customfont.otf" />
@@ -30,9 +42,6 @@
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
       <None Remove="OTFFonts\Glametrix-oj9A.otf" />
-      <Content Include="OTFFonts\Glametrix-oj9A.otf">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </Content>
       <None Remove="OTFFonts\GlametrixBold-4dW6.otf" />
       <Content Include="OTFFonts\GlametrixBold-4dW6.otf">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -67,6 +76,9 @@
       <Content Include="OTFFonts\Crimson-Italic.otf">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
+      <None Remove="OTFFonts\CFF2\SourceSerif4Caption-Semibold.otf" />
+      <None Remove="OTFFonts\FontCollections\SourceHanSerifVFProtoJP.otf" />
+      <None Remove="OTFFonts\Quicksand-Regular.otf" />
     </ItemGroup>
 
 </Project>

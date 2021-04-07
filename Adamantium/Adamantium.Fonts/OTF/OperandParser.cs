@@ -12,7 +12,7 @@ namespace Adamantium.Fonts.OTF
                 var b1 = mainStack.Pop();
                 var b2 = mainStack.Pop();
 
-                return (short)(b1 << 8) | b2;
+                return (short)((b1 << 8) | b2);
             }
 
             if (b0 >= 32 && b0 <= 246)

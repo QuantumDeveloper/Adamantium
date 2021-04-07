@@ -388,6 +388,7 @@ namespace Adamantium.Fonts.OTF
                     // this is token - remove this byte from byte stream
                     GetFirstByteAndRemove(byteArray);
 
+                    // TODO: fix issue with blend operator for CFF2
                     OperatorsRawValues[(DictOperatorsType)token] = rawOperands;
                     rawOperands = new List<GenericOperandResult>();
                 }

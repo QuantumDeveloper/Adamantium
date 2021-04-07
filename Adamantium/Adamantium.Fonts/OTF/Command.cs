@@ -5,11 +5,12 @@ namespace Adamantium.Fonts.OTF
     public struct Command
     {
         public OperatorsType @operator;
+        public OperatorsType? additionalOperator;
         public List<double> operands;
 
         public override string ToString()
         {
-            return $"{@operator} {string.Join(" , ", operands.ToArray())}";
+            return $"{additionalOperator} {@operator} {string.Join(" , ", operands.ToArray())}";
         }
     }
 }

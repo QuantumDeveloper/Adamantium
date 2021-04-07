@@ -38,7 +38,7 @@ namespace Adamantium.Fonts.OTF
         public double UnderlineThickness { get; set; }
         public double[] FontBBox { get; set; }
         
-        public CIDFontInfo CIDFontInfo { get; private set; }
+        public CIDFontInfo CIDFontInfo { get; }
         
         internal List<FontDict> CIDFontDicts { get; set; }
 
@@ -152,9 +152,14 @@ namespace Adamantium.Fonts.OTF
             IsLocalSubroutineAvailable = privateDictParser.IsOperatorAvailable(DictOperatorsType.Subrs);
         }
 
-        public GenericOperandResult GetDictOperatorValue(DictOperatorsType opType)
+        public GenericOperandResult GetTopDictOperatorValue(DictOperatorsType opType)
         {
             return topDictParser[opType];
+        }
+        
+        public GenericOperandResult GetPrivateDictOperatorValue(DictOperatorsType opType)
+        {
+            return privateDictParser[opType];
         }
 
         private bool IsCurrentFontCIDFont()
@@ -162,7 +167,8 @@ namespace Adamantium.Fonts.OTF
             switch (CIDFontInfo.FdSelectFormat)
             {
                 case 0 when CIDFontInfo.FdRanges0 != null:
-                case 3 when CIDFontInfo.FdRanges3 != null:
+                case 3 when CIDFontInfo.FdRanges != null:
+                case 4 when CIDFontInfo.FdRanges != null:
                     return true;
                 default:
                     return false;
