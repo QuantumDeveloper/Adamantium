@@ -114,6 +114,18 @@
       <Content Include="Models\F15C\weapons.png">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
+      <None Remove="Fonts\WoffFonts\Sarabun-Regular.woff2" />
+      <Content Include="Fonts\WoffFonts\Sarabun-Regular.woff2">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Fonts\TTFFonts\Sarabun-Regular.ttf" />
+      <Content Include="Fonts\TTFFonts\Sarabun-Regular.ttf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Fonts" />
     </ItemGroup>
 
     <Import Project="$(SolutionDir)Adamantium.targets" />

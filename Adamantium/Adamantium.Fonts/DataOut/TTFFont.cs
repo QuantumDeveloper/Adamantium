@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using Adamantium.Fonts.TTF;
+using Adamantium.Fonts.Parsers;
+using Adamantium.Fonts.Tables;
 
 namespace Adamantium.Fonts.DataOut
 {
@@ -9,9 +10,9 @@ namespace Adamantium.Fonts.DataOut
         public string FontFullName { get; internal set; }
         public ushort UnitsPerEm { get; internal set; } 
         public ushort LowestRecPPEM { get; internal set; } // smallest readable size in pixels
-        public Int32 LineSpace { get; internal set; } // space between base line and base line
+        public Int32 LineSpace { get; internal set; } // space between lines
         public Dictionary<UInt16, UInt16> CharToGlyphIndexMapWindowsUnicode { get; internal set; } // char to glyph index mapping (for Windows Unicode)
-        public TTFKerningSubtable KerningData { get; internal set; }
+        public KerningSubtable KerningData { get; internal set; }
         public bool HasKerningData => KerningData != null;
 
         public GlyphData[] GlyphData { get; internal set; }

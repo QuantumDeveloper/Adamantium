@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Content;
@@ -8,15 +9,14 @@ using Adamantium.Engine.Templates;
 using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
 using Adamantium.Fonts;
-using Adamantium.Fonts.OTF;
-using Adamantium.Fonts.TTF;
 using Adamantium.Game.Events;
+using Adamantium.Mathematics;
 
 namespace Adamantium.Game.Playground
 {
     internal class AdamantiumGame : Engine.Game
     {
-        private TTFParser parser;
+        private TypeFace typeFace;
         public AdamantiumGame(GameMode gameMode) : base(gameMode)
         {
             EventAggregator.GetEvent<GameOutputCreatedEvent>().Subscribe(OnWindowCreated);
@@ -47,8 +47,8 @@ namespace Adamantium.Game.Playground
         {
             ImportModel(@"Models\monkey\monkey.dae");
             //await ImportModel(@"Models\F15C\F-15C_Eagle.dae");
-            //ImportFont();
-            ImportOTFFont();
+            ImportFont();
+            //ImportOTFFont();
         }
 
         private void InitializeResources()
@@ -78,14 +78,13 @@ namespace Adamantium.Game.Playground
         {
             try
             {
-                parser = new TTFParser(@"PlayfairDisplay-Regular.ttf", 3);
-                var entity = new Entity(null, "PlayfairDisplay-Regular");
-                var ch = parser.FontData.GetGlyphForCharacter('@');
-                parser.GenerateGlyphTriangles(ch);
-                //parser.GenerateDefaultGlyphTriangles(ch);
+                typeFace = TypeFace.LoadFont(@"Fonts/WoffFonts/Sarabun-Regular.woff2", 3);
+                var entity = new Entity(null, "Sarabun-Regular.woff2");
+                var glyph = typeFace.GetGlyphByUnicode('@');
+                var points = glyph.Triangulate(3);
                 var mesh = new Mesh();
-                //mesh.MeshTopology = PrimitiveType.PointList;
-                mesh.SetPositions(ch.Vertices);
+                //mesh.MeshTopology = PrimitiveType.LineStrip;
+                mesh.SetPositions(points);
                 var meshComponent = new MeshData();
                 meshComponent.Mesh = mesh;
                 var meshRenderer = new MeshRenderer();
@@ -107,7 +106,7 @@ namespace Adamantium.Game.Playground
                 var typeface = TypeFace.LoadFont(@"OTFFonts/Poppins-Medium.otf", 3);
                 //var otfParser = new OTFParser(@"OTFFonts/Glametrix-oj9A.otf", 3);
                 var entity = new Entity(null, "Poppins-Medium");
-                var glyph = typeface.GetFont(0).GetGlyphByIndex(25);
+                var glyph = typeface.GetGlyphByIndex(25);
                 var points = glyph.Triangulate(7);
                 //parser.GenerateGlyphTriangles(ch);
                 //parser.GenerateDefaultGlyphTriangles(ch);

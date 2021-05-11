@@ -351,13 +351,15 @@ namespace Adamantium.Engine.Graphics
         {
             var queueFamilyIndices = MainDevice.PhysicalDevice.FindQueueFamilies(surface);
 
-            var poolInfo = new CommandPoolCreateInfo();
-            poolInfo.QueueFamilyIndex = queueFamilyIndices.graphicsFamily.Value;
-            poolInfo.Flags = (uint)CommandPoolCreateFlagBits.ResetCommandBufferBit;
+            var poolInfo = new CommandPoolCreateInfo
+            {
+                QueueFamilyIndex = queueFamilyIndices.graphicsFamily.Value,
+                Flags = (uint) CommandPoolCreateFlagBits.ResetCommandBufferBit
+            };
             CommandPool = LogicalDevice.CreateCommandPool(poolInfo);
             
             GraphicsQueue = LogicalDevice.GetDeviceQueue(queueFamilyIndices.graphicsFamily.Value, 0);
-            uint queueIndex = MainDevice.AvailableQueuesCount > 1 ? 1 : 0;
+            uint queueIndex = (uint) (MainDevice.AvailableQueuesCount > 1 ? 1 : 0);
             resourceQueue = LogicalDevice.GetDeviceQueue(queueFamilyIndices.graphicsFamily.Value, queueIndex);
             //resourceQueue = LogicalDevice.GetDeviceQueue(queueFamilyIndices.graphicsFamily.Value, 0);
         }

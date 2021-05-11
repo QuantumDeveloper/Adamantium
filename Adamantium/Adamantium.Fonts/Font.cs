@@ -1,0 +1,73 @@
+using System;
+
+namespace Adamantium.Fonts
+{
+    internal class Font : IFont
+    {
+        public Font()
+        {
+            Copyright = String.Empty;
+            FontFamily = String.Empty;
+            FontSubfamily = String.Empty;
+            UniqueId = String.Empty;
+            FullName = String.Empty;
+            Version = String.Empty;
+            Trademark = String.Empty;
+            Manufacturer = String.Empty;
+            Designer = String.Empty;
+            Description = String.Empty;
+            VendorUrl = String.Empty;
+            DesignerUrl = String.Empty;
+            LicenseDescription = String.Empty;
+            LicenseInfoUrl = String.Empty;
+            TypographicFamilyName = String.Empty;
+            TypographicSubfamilyName = String.Empty;
+            WwsFamilyName = String.Empty;
+            WwsSubfamilyName = String.Empty;
+            LightBackgroundPalette = String.Empty;
+            DarkBackgroundPalette = String.Empty;
+        }
+
+        // Name info section ---
+        public string Copyright { get; internal set; }
+        public string FontFamily { get; internal set; }
+        public string FontSubfamily { get; internal set; }
+        public string UniqueId { get; internal set; }
+        public string FullName { get; internal set; }
+        public string Version { get; internal set; }
+        public string Trademark { get; internal set; }
+        public string Manufacturer { get; internal set; }
+        public string Designer { get; internal set; }
+        public string Description { get; internal set; }
+        public string VendorUrl { get; internal set; }
+        public string DesignerUrl { get; internal set; }
+        public string LicenseDescription { get; internal set; }
+        public string LicenseInfoUrl { get; internal set; }
+        public string TypographicFamilyName { get; internal set; }
+        public string TypographicSubfamilyName { get; internal set; }
+        public string WwsFamilyName { get; internal set; }
+        public string WwsSubfamilyName { get; internal set; }
+        public string LightBackgroundPalette { get; internal set; }
+        public string DarkBackgroundPalette { get; internal set; }
+        
+        // ------
+        
+        public ushort UnitsPerEm { get; internal set; }
+        
+        /// <summary>
+        /// smallest readable size in pixels
+        /// </summary>
+        public UInt16 LowestRecPPEM { get; internal set; } 
+        
+        /// <summary>
+        /// space between lines
+        /// </summary>
+        public Int32 LineSpace { get; internal set; }
+        
+        public DateTime Created { get; internal set; }
+        
+        public DateTime Modified { get; internal set; }
+        
+        
+    }
+}

@@ -53,19 +53,6 @@ namespace Adamantium.FontTests
         }
         
         [Test]
-        public void LoadOtfCff1FontCollection_NotoSansCJK_Regular()
-        {
-            var typeFace = TypeFace.LoadFont(FontCollections.Cff1_NotoSansCJK_Regular, 2);
-        }
-        
-        [Test]
-        public void LoadOtfCff1FontCollection_Asana()
-        {
-            var typeFace = TypeFace.LoadFont(FontCollections.Ttf_Asana, 2);
-        }
-        
-        
-        [Test]
         public void LoadOtfCff2Font_AdobeVPPrototype()
         {
             var typeFace = TypeFace.LoadFont(CFF2Fonts.AdobeVFPrototype, 2);
@@ -77,6 +64,16 @@ namespace Adamantium.FontTests
             var typeFace = TypeFace.LoadFont(CFF2Fonts.SourceHanSerifVFProtoJP, 2);
         }
         
+        [Test]
+        public void LoadOtfCff1FontCollection_NotoSansCJK_Regular()
+        {
+            var typeFace = TypeFace.LoadFont(FontCollections.Cff1_NotoSansCJK_Regular, 2);
+        }
         
+        [Test]
+        public void LoadOtfCff1FontCollection_Asana()
+        {
+            var typeFace = TypeFace.LoadFont(FontCollections.Ttf_Asana, 2);
+        }
     }
 }

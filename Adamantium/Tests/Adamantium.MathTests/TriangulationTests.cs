@@ -7,7 +7,7 @@ namespace Adamantium.MathTests
     public class TriangulationTests
     {
         [Test]
-        public void TrinagulateComplexPolygonNonZero()
+        public void TriangulateComplexPolygonNonZero()
         {
             var points = new List<Vector2D>();
             Polygon polygon = new Polygon();
@@ -148,7 +148,7 @@ namespace Adamantium.MathTests
         }
 
         [Test]
-        public void TrinagulateComplexPolygonEvenOdd()
+        public void TriangulateComplexPolygonEvenOdd()
         {
             List<Vector2D> points = new List<Vector2D>();
             Polygon polygon = new Polygon();
@@ -328,19 +328,20 @@ namespace Adamantium.MathTests
         }
 
         [Test]
-        public void TrinagulateDoubleStarNonZero()
+        public void TriangulateDoubleStarNonZero()
         {
             List<Vector2D> points = new List<Vector2D>();
             Polygon polygon = new Polygon();
             polygon.FillRule = FillRule.NonZero;
-            points.Add(new Vector2D(-10));
+            points.Add(new Vector2D(-10, 0));
             points.Add(new Vector2D(0, 30));
-            points.Add(new Vector2D(10));
+            points.Add(new Vector2D(10, 0));
             points.Add(new Vector2D(-15, 15));
             points.Add(new Vector2D(15, 15));
-            points.Add(new Vector2D(-10));
+                
+            points.Add(new Vector2D(-10, 0));
             points.Add(new Vector2D(0, -30));
-            points.Add(new Vector2D(10));
+            points.Add(new Vector2D(10, 0));
             points.Add(new Vector2D(-15, -15));
             points.Add(new Vector2D(15, -15));
 
@@ -456,7 +457,7 @@ namespace Adamantium.MathTests
         }
 
         [Test]
-        public void TrinagulateDoubleStarEvenOdd()
+        public void TriangulateDoubleStarEvenOdd()
         {
             List<Vector2D> points = new List<Vector2D>();
             Polygon polygon = new Polygon();

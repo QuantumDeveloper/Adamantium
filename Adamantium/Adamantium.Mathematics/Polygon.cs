@@ -298,8 +298,9 @@ namespace Adamantium.Mathematics
                 //Split existing segments on more segments on edge points
                 UpdatePolygonUsingSelfPoints(edgePoints);
 
-                //If Non-zero and smallest polygon is not a hole, lets find a list of points describing all possible connections between smallest and biggest polygons
-                //and remove all segments, which connects any of two intersection points
+                // If Non-zero and smallest polygon is not a hole, lets find a list of points describing all possible
+                // connections between smallest and biggest polygons and remove all segments,
+                // which connects any of two intersection points
                 if (FillRule == FillRule.NonZero && intersectionResult == ContainmentType.Intersects && !polygon1.IsHole && !polygon2.IsHole)
                 {
                     var lst = FindAllPossibleIntersections(polygon1, polygon2, edgePoints);

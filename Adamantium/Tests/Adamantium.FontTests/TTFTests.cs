@@ -1,6 +1,6 @@
+using System;
+using Adamantium.Fonts;
 using Adamantium.Fonts.DataOut;
-using Adamantium.Fonts.OTF;
-using Adamantium.Fonts.TTF;
 using NUnit.Framework;
 
 namespace Adamantium.FontTests
@@ -10,36 +10,23 @@ namespace Adamantium.FontTests
         [Test]
         public void LoadTTFFont()
         {
-            //TTFFontParser fp = new TTFFontParser(@"D:\Test.ttf", 7);
-            TTFParser parser = new TTFParser(@"PlayfairDisplay-Regular.ttf", 7);
-
-            char ch = 'i';
-
-            var data = parser.FontData.GetGlyphForCharacter(ch);
+            var typeFace = TypeFace.LoadFont(@"TTFFonts\SourceSans3-Regular.ttf", 3);
+            
         }
         
         [Test]
-        public void TTFTriangulationTimeTest()
+        public void LoadTTFFont_SarabunRegular()
         {
-            //TTFFontParser fp = new TTFFontParser(@"D:\Test.ttf", 7);
-            TTFParser parser = new TTFParser(@"PlayfairDisplay-Regular.ttf", 7);
-
-            foreach (var glyphData in parser.FontData.GlyphData)
-            {
-                parser.GenerateGlyphTriangles(glyphData);
-            }
+            var typeFace = TypeFace.LoadFont(@"TTFFonts\Sarabun-Regular.ttf", 3);
+            var glyph = typeFace.GetGlyphByCharacter('@');
+            glyph.Triangulate(7);
         }
         
         [Test]
-        public void TTFTriangulation2TimeTest()
+        public void LoadTTFFont_PlayfairDisplay()
         {
-            //TTFFontParser fp = new TTFFontParser(@"D:\Test.ttf", 7);
-            TTFParser parser = new TTFParser(@"PlayfairDisplay-Regular.ttf", 7);
-
-            foreach (var glyphData in parser.FontData.GlyphData)
-            {
-                parser.GenerateGlyphTriangles(glyphData);
-            }
+            var typeFace = TypeFace.LoadFont(@"TTFFonts\PlayfairDisplay-Regular.ttf", 3);
+            
         }
     }
 }

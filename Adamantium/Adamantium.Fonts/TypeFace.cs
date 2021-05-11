@@ -1,19 +1,32 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
-using System.Text;
-using Adamantium.Fonts.OTF;
-using Adamantium.Fonts.TTF;
+using System.Linq;
+using System.Threading.Tasks;
+using Adamantium.Fonts.Parsers;
 
 namespace Adamantium.Fonts
 {
     public class TypeFace
     {
-        private List<IFont> fonts;
+        private readonly List<IFont> fonts;
+        private List<Glyph> glyphs;
+        private List<UInt32> unicodes;
+        private readonly List<string> errorMessages;
+        
+
+        private Dictionary<UInt32, Glyph> unicodeToGlyph;
+        private Dictionary<string, Glyph> nameToGlyph;
 
         public TypeFace()
         {
             fonts = new List<IFont>();
+            glyphs = new List<Glyph>();
+            unicodes = new List<uint>();
+            unicodeToGlyph = new Dictionary<uint, Glyph>();
+            
+            errorMessages = new List<string>();
         }
 
         public IReadOnlyCollection<IFont> Fonts => fonts.AsReadOnly();
@@ -28,106 +41,106 @@ namespace Adamantium.Fonts
             return fonts[(int)index];
         }
         
-        public static TypeFace LoadFont(string path, uint sampleResolution)
+        public IReadOnlyCollection<uint> Unicodes => unicodes.AsReadOnly();
+        public IReadOnlyCollection<Glyph> Glyphs => glyphs.AsReadOnly();
+        
+        public IReadOnlyCollection<string> ErrorMessages => errorMessages.AsReadOnly();
+        
+        public Glyph GetGlyphByName(string name)
+        {
+            if (!nameToGlyph.TryGetValue(name, out var glyph))
+            {
+                return null;
+            }
+
+            return glyph;
+        }
+        
+        public Glyph GetGlyphByCharacter(char character)
+        {
+            return GetGlyphByUnicode(character);
+        }
+
+        public Glyph GetGlyphByUnicode(uint unicode)
+        {
+            if (!unicodeToGlyph.TryGetValue(unicode, out var glyph))
+            {
+                return null;
+            }
+
+            return glyph;
+        }
+
+        public Glyph GetGlyphByIndex(uint index)
+        {
+            return glyphs[(int)index];
+        }
+        
+        internal void SetGlyphs(IEnumerable<Glyph> glyphsArray)
+        {
+            glyphs.Clear();
+            glyphs.AddRange(glyphsArray);
+        }
+
+        internal void UpdateGlyphNamesCache()
+        {
+            nameToGlyph = glyphs.ToDictionary(x => x.Name);
+        }
+
+        internal void SetGlyphUnicodes(Dictionary<uint, List<uint>> glyphMapping)
+        {
+            unicodes.Clear();
+            unicodeToGlyph.Clear();
+            
+            foreach (var (key, value) in glyphMapping)
+            {
+                unicodes.AddRange(value);
+                foreach (var unicode in value)
+                {
+                    unicodeToGlyph[unicode] = GetGlyphByIndex(key);
+                }
+            }
+        }
+
+        internal void AddErrorMessage(string message)
+        {
+            errorMessages.Add(message);
+        }
+        
+        public static TypeFace LoadFont(string path, byte sampleResolution)
         {
             if (!File.Exists(path))
                 throw new FileNotFoundException(nameof(path));
 
-            var reader = new FontHeaderReader(path);
+            var reader = new FontTypeReader(path);
             var fontType = reader.GetFontType();
             reader.Close();
-            IFontParser fontParser = null;
-
+            TypeFace typeFace = null;
+            
             switch (fontType)
             {
                 case FontType.TTF:
-                    fontParser = new TTFParser(path, sampleResolution);
+                    typeFace = TTFParser.Parse(path, sampleResolution);
                     break;
                 case FontType.OTF:
-                    fontParser = new OTFParser(path, sampleResolution);
+                    typeFace = OTFParser.Parse(path, sampleResolution);
                     break;
                 case FontType.WOFF:
-                    throw new NotSupportedException("WOFF fonts is not currently supported");
+                    typeFace = WoffParser.Parse(path, sampleResolution);
+                    break;
                 case FontType.WOFF2:
-                    throw new NotSupportedException("WOFF2 fonts is not currently supported"); 
+                    typeFace = Woff2Parser.Parse(path, sampleResolution);
+                    break;
                 default:
                     throw new NotSupportedException("This font type is not supported");
             }
 
-            return fontParser.TypeFace;
-        }
-        
-        
-    }
-
-    internal class FontHeaderReader : BinaryReader
-    {
-        private string fontPath;
-        public FontHeaderReader(String path) : this(File.Open(path, FileMode.Open, FileAccess.Read))
-        {
-            fontPath = path;
-        }
-    
-        public FontHeaderReader(Stream input) : base(input)
-        {
+            return typeFace;
         }
 
-        public FontHeaderReader(Stream input, Encoding encoding) : base(input, encoding)
+        public static async Task<TypeFace> LoadFontAsync(string path, byte sampleResolution)
         {
-        }
-
-        public FontHeaderReader(Stream input, Encoding encoding, bool leaveOpen) : base(input, encoding, leaveOpen)
-        {
-        }
-
-        public FontType GetFontType()
-        {
-            if (IsOTF())
-            {
-                return FontType.OTF;
-            }
-            else if (IsWOFF())
-            {
-                return FontType.WOFF;
-            }
-            else if (IsWOFF2())
-            {
-                return FontType.WOFF2;
-            }
-            else if (Path.GetExtension(fontPath).ToLower() == "ttf")
-            {
-                return FontType.TTF;
-            }
-            
-            return FontType.Unknown;
-        }
-        
-        private bool IsOTF()
-        {
-            BaseStream.Position = 0;
-            var bytes = new byte[4];
-            BaseStream.Read(bytes, 0, 4);
-            var header = Encoding.UTF8.GetString(bytes);
-            return header == "ttcf" || header == "OTTO";
-        }
-
-        private bool IsWOFF()
-        {
-            BaseStream.Position = 0;
-            var bytes = new byte[4];
-            BaseStream.Read(bytes, 0, 4);
-            var header = Encoding.UTF8.GetString(bytes);
-            return header == "WOFF";
-        }
-
-        private bool IsWOFF2()
-        {
-            BaseStream.Position = 0;
-            var bytes = new byte[4];
-            BaseStream.Read(bytes, 0, 4);
-            var header = Encoding.UTF8.GetString(bytes);
-            return header == "WOF2";
+            return await Task.Run(()=> LoadFont(path, sampleResolution));
         }
     }
-    
 }

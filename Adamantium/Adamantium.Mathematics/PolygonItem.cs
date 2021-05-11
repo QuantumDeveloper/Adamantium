@@ -164,18 +164,12 @@ namespace Adamantium.Mathematics
                     var index = tempSegments.IndexOf(segment);
                     tempSegments.RemoveAt(index);
                     var seg1 = new LineSegment2D(segment.Start, interPoint);
-                    //if (Polygon.ContainsInInterPoints(seg1, intersectionPoints, fillRule))
+                    if (Polygon.InsertSegment(tempSegments, seg1, index))
                     {
-                        if (Polygon.InsertSegment(tempSegments, seg1, index))
-                        {
-                            index++;
-                        }
+                        index++;
                     }
                     var seg2 = new LineSegment2D(interPoint, segment.End);
-                    //if (Polygon.ContainsInInterPoints(seg2, intersectionPoints, fillRule))
-                    {
-                        Polygon.InsertSegment(tempSegments, seg2, index);
-                    }
+                    Polygon.InsertSegment(tempSegments, seg2, index);
                 }
             }
             
