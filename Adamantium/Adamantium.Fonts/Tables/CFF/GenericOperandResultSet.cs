@@ -3,7 +3,7 @@ using System.Collections.ObjectModel;
 
 namespace Adamantium.Fonts.Tables.CFF
 {
-    public class GenericOperandResultSet
+    internal class GenericOperandResultSet
     {
         public IReadOnlyDictionary<DictOperatorsType, GenericOperandResult> Results { get; }
 

@@ -26,14 +26,19 @@ namespace Adamantium.Fonts.Common
             return this;
         }
         
-        public PipelineAssembler FillCommandList(CFFFont font, Stack<byte> stack, FontDict fontDict, bool clearMainStack = true, int index = 0)
+        public PipelineAssembler FillCommandList(
+            CFFFont font, 
+            Stack<byte> stack, 
+            FontDict fontDict, 
+            bool clearMainStack = true, 
+            int index = 0)
         {
             commandList.Clear();
             commandList.Fill(font, stack, fontDict, index);
 
             if (cffVersion == CFFVersion.CFF &&
                 commandList.commands.Count > 0 &&
-                commandList.commands.Last().@operator != OperatorsType.endchar)
+                commandList.commands.Last().Operator != OperatorsType.endchar)
             {
                 throw new CommandException($"Glyph {index} is not ending with EndChar command");
             }

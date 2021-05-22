@@ -15,7 +15,6 @@ namespace Adamantium.Fonts.Parsers.CFF
         private CFFHeader cffHeader;
         private CFFFontSet fontSet;
         private PipelineAssembler pipelineAssembler;
-        private VariationStore variationStore;
         
         public CFF2Parser(long cffOffset, FontStreamReader ttfReader)
         {
@@ -161,7 +160,7 @@ namespace Adamantium.Fonts.Parsers.CFF
                 variationDataList.Add(variationDataSubtable);
             }
 
-            variationStore = new VariationStore(variationRegionList, variationDataList.ToArray());
+            cffFont.VariationStore = new VariationStore(variationRegionList, variationDataList.ToArray());
         }
 
         private void ReadFDArray()
@@ -241,6 +240,7 @@ namespace Adamantium.Fonts.Parsers.CFF
                 }
                 catch (Exception e)
                 {
+                    glyphs.Add(new Glyph((uint)i){ OutlineType = OutlineType.CompactFontFormat, IsInvalid = true });
                     exceptions++;
                 }
             }

@@ -1,11 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using Adamantium.Fonts.Tables.CFF;
 
 namespace Adamantium.Fonts.Parsers.CFF
 {
-    public class DictOperandParser
+    internal class DictOperandParser
     {
         private Dictionary<ushort, DictOperatorsType> byteToOperatorMap;
         private Dictionary<DictOperatorsType, Func<List<GenericOperandResult>, GenericOperandResult>> operatorsActions;
@@ -389,9 +390,35 @@ namespace Adamantium.Fonts.Parsers.CFF
                     // this is token - remove this byte from byte stream
                     GetFirstByteAndRemove(byteArray);
 
-                    // TODO: fix issue with blend operator for CFF2
-                    OperatorsRawValues[(DictOperatorsType)token] = rawOperands;
-                    rawOperands = new List<GenericOperandResult>();
+                    if ((DictOperatorsType) token == DictOperatorsType.blend)
+                    {
+                        var operandsCount = rawOperands[^1].AsInt();
+                        var operandsForNextOperator = rawOperands.GetRange(0, operandsCount);
+
+                        var deltasData = rawOperands.ToArray()[operandsCount..^1];
+                        var regionCount = deltasData.Length / operandsCount;
+                        
+                        for (var op = 0; op < operandsCount; ++op)
+                        {
+                            var deltas = new List<double>();
+
+                            for (var region = 0; region < regionCount; ++region)
+                            {
+                                deltas.Add(deltasData[region + regionCount * op].AsDouble());
+                            }
+
+                            var genericResult = operandsForNextOperator[op];
+                            genericResult.Deltas = deltas;
+                            operandsForNextOperator[op] = genericResult;
+                        }
+
+                        rawOperands = operandsForNextOperator.ToList();
+                    }
+                    else
+                    {
+                        OperatorsRawValues[(DictOperatorsType)token] = rawOperands;
+                        rawOperands = new List<GenericOperandResult>();
+                    }
                 }
                 else
                 {

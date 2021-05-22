@@ -41,6 +41,8 @@ namespace Adamantium.Fonts.Tables.CFF
         
         public CIDFontInfo CIDFontInfo { get; }
         
+        public VariationStore VariationStore { get; set; } 
+        
         internal List<FontDict> CIDFontDicts { get; set; }
 
         public bool IsCIDFont => IsCurrentFontCIDFont();

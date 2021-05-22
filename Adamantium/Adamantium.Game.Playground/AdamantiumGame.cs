@@ -47,8 +47,8 @@ namespace Adamantium.Game.Playground
         {
             ImportModel(@"Models\monkey\monkey.dae");
             //await ImportModel(@"Models\F15C\F-15C_Eagle.dae");
-            ImportFont();
-            //ImportOTFFont();
+            //ImportFont();
+            ImportOTFFont();
         }
 
         private void InitializeResources()
@@ -104,7 +104,7 @@ namespace Adamantium.Game.Playground
         {
             try
             {
-                var typeface = TypeFace.LoadFont(@"OTFFonts/Poppins-Medium.otf", 3);
+                var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/CFF2/SourceHanSerifVFProtoJP.otf", 3);
                 //var otfParser = new OTFParser(@"OTFFonts/Glametrix-oj9A.otf", 3);
                 var entity = new Entity(null, "Poppins-Medium");
                 var glyph = typeface.GetGlyphByIndex(25);

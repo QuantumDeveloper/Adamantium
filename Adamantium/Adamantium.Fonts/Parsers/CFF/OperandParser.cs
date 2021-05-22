@@ -4,7 +4,7 @@ using Adamantium.Fonts.Tables.CFF;
 
 namespace Adamantium.Fonts.Parsers.CFF
 {
-    public abstract class OperandParser
+    internal abstract class OperandParser
     {
         protected GenericOperandResult Number(byte b0, Stack<byte> mainStack)
         {

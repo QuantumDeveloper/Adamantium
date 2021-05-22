@@ -80,7 +80,8 @@ namespace Adamantium.Fonts.Parsers.CFF
             ushort token;
             bool clearOperands;
             int stemCount = 0;
-            OperatorsType? additionalOperator = null;
+            var blendOperands = new List<double>();
+            var blendDeltas = new List<List<double>>();
 
             var fontDictBias = 0;
             if (fontDict?.LocalSubr != null)
@@ -191,9 +192,25 @@ namespace Adamantium.Fonts.Parsers.CFF
                             operands[0] = -operands[0];
                             break;
                         case (ushort)OperatorsType.blend:
-                            clearOperands = false;
-                            // TODO: think how to correctly integrate blend operators in existing structure (commands, interpreter, dict parser)
-                            additionalOperator = OperatorsType.blend;
+                            var operandsCount = operands[^1];
+                            blendOperands.AddRange(operands.GetRange(0, (int)operandsCount));
+
+                            var regionCount = font.VariationStore.VariationRegionList.RegionCount;
+                            var deltasData = operands.ToArray()[(int)operandsCount..^1];
+
+                            for (var i = 0; i < operandsCount; ++i)
+                            {
+                                var deltas = deltasData.ToList().GetRange(i * regionCount, regionCount);
+
+                                if (blendDeltas.Count > i)
+                                {
+                                    blendDeltas[i].AddRange(deltas);
+                                }
+                                else
+                                {
+                                    blendDeltas.Add(deltas);
+                                }
+                            }
                             break;
                         case (ushort)OperatorsType.hintmask:
                         case (ushort)OperatorsType.cntrmask:
@@ -256,13 +273,18 @@ namespace Adamantium.Fonts.Parsers.CFF
 
                             var command = new Command();
 
-                            command.@operator = bytesToOperatorMap[token];
-                            command.additionalOperator = additionalOperator;
-                            command.operands = operands;
+                            command.Operator = bytesToOperatorMap[token];
 
-                            additionalOperator = null;
+                            operands.InsertRange(0, blendOperands);
+
+                            command.Operands = operands;
+                            command.BlendDeltas = blendDeltas;
+                            
+                            blendOperands.Clear();
+                            blendDeltas.Clear();
 
                             commands.Add(command);
+
                             break;
                     }
 

@@ -27,7 +27,7 @@ namespace Adamantium.Fonts.Extensions
         
         private static bool IsNewOutline(this Command command)
         {
-            switch (command.@operator)
+            switch (command.Operator)
             {
                 case OperatorsType.rmoveto:
                 case OperatorsType.hmoveto:

@@ -3,7 +3,7 @@ using Adamantium.Fonts.Tables.CFF;
 
 namespace Adamantium.Fonts.Parsers.CFF
 {
-    public class PrivateDictParser : DictOperandParser
+    internal class PrivateDictParser : DictOperandParser
     {
         public PrivateDictParser(byte[] rawData) : base(rawData)
         {
