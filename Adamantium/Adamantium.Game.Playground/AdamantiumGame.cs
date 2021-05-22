@@ -80,7 +80,8 @@ namespace Adamantium.Game.Playground
             {
                 typeFace = TypeFace.LoadFont(@"Fonts/WoffFonts/Sarabun-Regular.woff2", 3);
                 var entity = new Entity(null, "Sarabun-Regular.woff2");
-                var glyph = typeFace.GetGlyphByUnicode('@');
+                var font = typeFace.GetFont(0);
+                var glyph = font.GetGlyphByUnicode('@');
                 var points = glyph.Triangulate(3);
                 var mesh = new Mesh();
                 //mesh.MeshTopology = PrimitiveType.LineStrip;

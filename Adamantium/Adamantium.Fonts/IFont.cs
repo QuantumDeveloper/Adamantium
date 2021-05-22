@@ -32,7 +32,21 @@ namespace Adamantium.Fonts
         /// </summary>
         string WwsSubfamilyName { get; }        
         string LightBackgroundPalette { get; }  
-        string DarkBackgroundPalette { get; }   
+        string DarkBackgroundPalette { get; }
+        
+        IReadOnlyCollection<uint> Unicodes { get; }
+
+        internal void UpdateGlyphNamesCache();
+
+        internal void SetGlyphUnicodes(Dictionary<uint, List<uint>> glyphMapping);
+
+        Glyph GetGlyphByIndex(uint index);
+
+        Glyph GetGlyphByName(string name);
+        
+        Glyph GetGlyphByUnicode(uint unicode);
+
+        Glyph GetGlyphByCharacter(char character);
 
     }
 }

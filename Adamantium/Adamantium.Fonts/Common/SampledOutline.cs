@@ -10,5 +10,17 @@ namespace Adamantium.Fonts.Common
         {
             Points = points;
         }
+
+        private SampledOutline()
+        {
+            
+        }
+
+        static SampledOutline()
+        {
+            Empty = new SampledOutline();
+        }
+
+        public static SampledOutline Empty;
     }
 }

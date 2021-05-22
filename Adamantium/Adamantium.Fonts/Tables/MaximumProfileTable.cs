@@ -2,7 +2,7 @@
 
 namespace Adamantium.Fonts.Tables
 {
-    internal class TTFMaximumProfileTable
+    internal class MaximumProfileTable
     {
         public UInt16 MajorVersion { get; set; }
         public UInt16 MinorVersion { get; set; }

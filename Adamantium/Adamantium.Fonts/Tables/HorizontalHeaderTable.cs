@@ -2,7 +2,7 @@
 
 namespace Adamantium.Fonts.Tables
 {
-    internal class TTFHorizontalHeaderTable
+    internal class HorizontalHeaderTable
     {
         public UInt16 MajorVersion { get; set; }
         public UInt16 MinorVersion { get; set; }

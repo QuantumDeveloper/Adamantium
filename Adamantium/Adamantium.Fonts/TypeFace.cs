@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -15,9 +14,8 @@ namespace Adamantium.Fonts
         private List<UInt32> unicodes;
         private readonly List<string> errorMessages;
         
-
         private Dictionary<UInt32, Glyph> unicodeToGlyph;
-        private Dictionary<string, Glyph> nameToGlyph;
+        
 
         public TypeFace()
         {
@@ -40,37 +38,24 @@ namespace Adamantium.Fonts
         {
             return fonts[(int)index];
         }
+
+        public IFont GetFont(string fullName)
+        {
+            return fonts.FirstOrDefault(x => x.FullName == fullName);
+        }
         
-        public IReadOnlyCollection<uint> Unicodes => unicodes.AsReadOnly();
         public IReadOnlyCollection<Glyph> Glyphs => glyphs.AsReadOnly();
         
         public IReadOnlyCollection<string> ErrorMessages => errorMessages.AsReadOnly();
-        
-        public Glyph GetGlyphByName(string name)
-        {
-            if (!nameToGlyph.TryGetValue(name, out var glyph))
-            {
-                return null;
-            }
 
-            return glyph;
+        internal void UpdateGlyphNames()
+        {
+            foreach (var font in fonts)
+            {
+                font.UpdateGlyphNamesCache();
+            }
         }
         
-        public Glyph GetGlyphByCharacter(char character)
-        {
-            return GetGlyphByUnicode(character);
-        }
-
-        public Glyph GetGlyphByUnicode(uint unicode)
-        {
-            if (!unicodeToGlyph.TryGetValue(unicode, out var glyph))
-            {
-                return null;
-            }
-
-            return glyph;
-        }
-
         public Glyph GetGlyphByIndex(uint index)
         {
             return glyphs[(int)index];
@@ -80,26 +65,6 @@ namespace Adamantium.Fonts
         {
             glyphs.Clear();
             glyphs.AddRange(glyphsArray);
-        }
-
-        internal void UpdateGlyphNamesCache()
-        {
-            nameToGlyph = glyphs.ToDictionary(x => x.Name);
-        }
-
-        internal void SetGlyphUnicodes(Dictionary<uint, List<uint>> glyphMapping)
-        {
-            unicodes.Clear();
-            unicodeToGlyph.Clear();
-            
-            foreach (var (key, value) in glyphMapping)
-            {
-                unicodes.AddRange(value);
-                foreach (var unicode in value)
-                {
-                    unicodeToGlyph[unicode] = GetGlyphByIndex(key);
-                }
-            }
         }
 
         internal void AddErrorMessage(string message)

@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 using Adamantium.Fonts.Common;
 using Adamantium.Fonts.Extensions;
 using Adamantium.Fonts.Tables;
+using Adamantium.Fonts.Tables.CMAP;
+using Adamantium.Fonts.Tables.Layout;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Fonts.Parsers
@@ -26,10 +28,10 @@ namespace Adamantium.Fonts.Parsers
         // tables
         private TTFFileHeader header;
         private HeadTable head;
-        private TTFMaximumProfileTable maxp;
+        private MaximumProfileTable maxp;
         private TTFIndexToLocationTable loca;
-        private TTFHorizontalHeaderTable hhea;
-        private TTFHorizontalMetricsTable hmtx;
+        private HorizontalHeaderTable hhea;
+        private HorizontalMetricsTable hmtx;
         private KerningTable kern;
 
         protected List<TableDirectory> TableDirectories { get; set; }
@@ -406,6 +408,11 @@ namespace Adamantium.Fonts.Parsers
             return parser.TypeFace;
         }
 
+        protected TTFParser()
+        {
+            
+        }
+
         protected TTFParser(string filePath, byte resolution)
         {
             Initialize(filePath, resolution);
@@ -420,7 +427,7 @@ namespace Adamantium.Fonts.Parsers
             ReadFontCollection();
         }
 
-        private void InitializeBase(string filePath, byte resolution)
+        protected void InitializeBase(string filePath, byte resolution)
         {
             TypeFace = new TypeFace();
             FilePath = filePath;
@@ -478,18 +485,20 @@ namespace Adamantium.Fonts.Parsers
                 CurrentTableDirectory = tableDirectory;
                 ReadTableDirectory(tableDirectory);
             }
+            
+            TypeFace.UpdateGlyphNames();
         }
 
         protected virtual void ReadTableDirectory(TableDirectory tableDirectory)
         {
-            var font = new Font();
+            var font = new Font(TypeFace);
             TypeFace.AddFont(font);
             CurrentFont = font;
 
             foreach (var tableEntry in tableDirectory.Tables)
             {
                 if (ReadTables.Contains(tableEntry.Offset))
-                    return;
+                    continue;
                 
                 ReadTables.Add(tableEntry.Offset);
                 
@@ -525,11 +534,15 @@ namespace Adamantium.Fonts.Parsers
                     case TableNames.kern:
                         ReadKerningTable(tableEntry);
                         break;
+                    case TableNames.GPOS:
+                        ReadGlyphPositioningTable(tableEntry);
+                        break;
                     default:
                         ReadTable(tableEntry);
                         break;
                 }
             }
+            
         }
         
         protected virtual void ReadTable(TableEntry entry)
@@ -589,8 +602,6 @@ namespace Adamantium.Fonts.Parsers
                     }
                     break;
             }
-            
-            TypeFace.UpdateGlyphNamesCache();
         }
 
         private void ReadTTFHeader()
@@ -671,7 +682,7 @@ namespace Adamantium.Fonts.Parsers
 
         protected virtual void ReadMaximumProfileTable(TableEntry entry)
         {
-            maxp = new TTFMaximumProfileTable();
+            maxp = new MaximumProfileTable();
             
             FontReader.Position = entry.Offset;
 
@@ -825,6 +836,7 @@ namespace Adamantium.Fonts.Parsers
             }
         }
 
+        // Cmap
         protected virtual void ReadCharToGlyphIndexTable(TableEntry entry)
         {
             CharacterToGlyphTable cmap = new CharacterToGlyphTable();
@@ -853,13 +865,18 @@ namespace Adamantium.Fonts.Parsers
             
             cmap.CollectUnicodeToGlyphMappings();
 
+            var glyphsList = new List<Glyph>();
+
             foreach (var glyphPair in cmap.GlyphToUnicode)
             {
                 var glyph = TypeFace.GetGlyphByIndex(glyphPair.Key);
                 glyph.SetUnicodes(glyphPair.Value);
+                glyphsList.Add(glyph);
             }
             
-            TypeFace.SetGlyphUnicodes(cmap.GlyphToUnicode);
+            CurrentFont.SetGlyphs(glyphsList);
+            var font = CurrentFont as IFont;
+            font.SetGlyphUnicodes(cmap.GlyphToUnicode);
         }
 
         private CharacterMap ReadCharacterMap(ushort format)
@@ -900,7 +917,7 @@ namespace Adamantium.Fonts.Parsers
 
         protected virtual void ReadHorizontalHeaderTable(TableEntry entry)
         {
-            hhea = new TTFHorizontalHeaderTable();
+            hhea = new HorizontalHeaderTable();
 
             FontReader.Position = entry.Offset;
 
@@ -928,7 +945,7 @@ namespace Adamantium.Fonts.Parsers
 
         protected virtual void ReadHorizontalMetricsTable(TableEntry entry)
         {
-            hmtx = new TTFHorizontalMetricsTable();
+            hmtx = new HorizontalMetricsTable();
             
             FontReader.Position = entry.Offset;
 
@@ -1304,10 +1321,9 @@ namespace Adamantium.Fonts.Parsers
 
         protected virtual void ReadKerningTable(TableEntry entry)
         {
-            kern = new KerningTable();
-            
             FontReader.Position = entry.Offset;
-
+            
+            kern = new KerningTable();
             kern.Version = FontReader.ReadUInt16();
             kern.NumTables = FontReader.ReadUInt16();
 
@@ -1359,6 +1375,34 @@ namespace Adamantium.Fonts.Parsers
             }
         }
 
+        protected virtual void ReadGlyphPositioningTable(TableEntry entry)
+        {
+            FontReader.Position = entry.Offset;
+            
+            var gpos = new GlyphPositioningTable();
+            gpos.MajorVersion = FontReader.ReadUInt16();
+            gpos.MinorVersion = FontReader.ReadUInt16();
+            gpos.ScriptListOffset = FontReader.ReadUInt16();
+            gpos.FeatureListOffset = FontReader.ReadUInt16();
+            gpos.LookupListOffset = FontReader.ReadUInt16();
+
+            if (gpos.MinorVersion == 1)
+            {
+                gpos.FeatureVariationsOffset = FontReader.ReadUInt16();
+            }
+            
+            var scriptListOffset = entry.Offset + gpos.ScriptListOffset;
+            var featureListOffset = entry.Offset + gpos.FeatureListOffset;
+            var lookupListOffset = entry.Offset + gpos.LookupListOffset;
+
+            var scriptList = FontReader.ReadScriptList(scriptListOffset);
+
+            var featureList = FontReader.ReadFeatureList(featureListOffset);
+
+            var lookupTable = FontReader.ReadLookupListTable(lookupListOffset);
+        }
+
+        
         private void ParseTTFCoverage(ushort rawCoverage, KerningSubtable kerningSubtable)
         {
             kerningSubtable.Horizontal = Convert.ToBoolean(rawCoverage & 0x0001);

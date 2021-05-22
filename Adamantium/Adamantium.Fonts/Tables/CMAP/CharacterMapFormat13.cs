@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Adamantium.Fonts.Tables
+namespace Adamantium.Fonts.Tables.CMAP
 {
     public class CharacterMapFormat13 : CharacterMap
     {

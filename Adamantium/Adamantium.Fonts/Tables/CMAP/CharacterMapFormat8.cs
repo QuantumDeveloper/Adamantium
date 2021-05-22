@@ -1,29 +1,32 @@
 using System;
 using System.Collections.Generic;
 
-namespace Adamantium.Fonts.Tables
+namespace Adamantium.Fonts.Tables.CMAP
 {
     /// <summary>
-    /// Trimmed array
-    /// This format is not widely used and is not supported by Microsoft.
-    /// It would be most suitable for fonts that support only a contiguous
-    /// range of Unicode supplementary-plane characters, but such fonts are rare. 
+    /// mixed 16-bit and 32-bit coverage
     /// </summary>
-    public class CharacterMapFormat10 : CharacterMap
+    public class CharacterMapFormat8 : CharacterMap
     {
-        public override UInt16 Format => 10;
+        public CharacterMapFormat8()
+        {
+            Is32 = new byte[8192];
+        }
+
+        public override UInt16 Format => 8;
         
         public UInt16 Reserved { get; set; }
 
-        public UInt32 Length { get; set; }
+        public UInt16 Length { get; set; }
 
         public UInt32 Language { get; set; }
         
-        public UInt32 StartCharCode { get; set; }
+        public byte[] Is32 { get; }
         
-        public UInt32 NumChars { get; set; }
+        public UInt32 NumGroups { get; set; }
         
-        public UInt16[] GlyphIdArray { get; set; }
+        // array size is NumGroups
+        public SequentialMapGroup[] Groups { get; set; }
         
         public override uint GetGlyphIndex(uint character)
         {

@@ -1,9 +1,4 @@
-using System;
 using System.Collections.Generic;
-using System.IO;
-using System.IO.Compression;
-using System.Linq;
-using System.Runtime.InteropServices;
 using System.Text;
 using Adamantium.Fonts.Common;
 using Adamantium.Fonts.Extensions;
@@ -13,11 +8,9 @@ using ICSharpCode.SharpZipLib.Zip.Compression;
 
 namespace Adamantium.Fonts.Parsers
 {
-    internal class WoffParser : IFontParser
+    internal class WoffParser : OTFParser
     {
-        private string filePath;
-        private FontStreamReader reader;
-        private byte resolution;
+        private readonly FontStreamReader reader;
 
         private WoffHeader header;
         private WoffTableDirectory tableDirectory;
@@ -25,10 +18,8 @@ namespace Adamantium.Fonts.Parsers
         
         private WoffParser(string filePath, byte resolution = 1)
         {
-            this.filePath = filePath;
-            this.resolution = resolution;
+            InitializeBase(filePath, resolution);
             reader = filePath.LoadIntoStream();
-            
             Parse();
         }
 
@@ -38,13 +29,12 @@ namespace Adamantium.Fonts.Parsers
             return parser.TypeFace;
         }
 
-        public TypeFace TypeFace { get; private set; }
-        
-        private void Parse()
+        protected override void Parse()
         {
             ReadWoffHeader();
             ReadTableDirectory();
             DecompressTables();
+            ReadFontCollection();
         }
 
         private void ReadWoffHeader()
@@ -95,57 +85,54 @@ namespace Adamantium.Fonts.Parsers
 
         private void DecompressTables()
         {
-            using (var decompressedStream = new FontStreamReader())
+            FontReader = new FontStreamReader();
+            foreach (var table in tables)
             {
-                foreach (var table in tables)
+                reader.Position = table.Offset;
+                var compressedBuffer = reader.ReadBytes(table.CompLength, true);
+                if (compressedBuffer.Length == table.OrigLength)
                 {
-                    reader.Position = table.Offset;
-                    var compressedBuffer = reader.ReadBytes(table.CompLength, true);
-                    if (compressedBuffer.Length == table.OrigLength)
-                    {
-                        decompressedStream.Write(compressedBuffer);
-                    }
-                    else
-                    {
-                        var decompressedBuffer = new byte[table.OrigLength];
-                        DecompressWoff(compressedBuffer, decompressedBuffer);
-                        decompressedStream.Write(decompressedBuffer);
-                    }
+                    FontReader.Write(compressedBuffer);
                 }
-                
-                decompressedStream.Position = 0;
-
-                var otfTableDirectory = new TableDirectory();
-                if (header.Flavor == 0x00010000)
+                else
                 {
-                    otfTableDirectory.OutlineType = OutlineType.TrueType;
+                    var decompressedBuffer = new byte[table.OrigLength];
+                    DecompressWoff(compressedBuffer, decompressedBuffer);
+                    FontReader.Write(decompressedBuffer);
                 }
-                else if (header.Flavor == 0x4F54544F)
-                {
-                    otfTableDirectory.OutlineType = OutlineType.CompactFontFormat;
-                }
-
-                otfTableDirectory.NumTables = header.NumTables;
-                otfTableDirectory.Tables = new TableEntry[header.NumTables];
-                for (int i = 0; i < header.NumTables; ++i)
-                {
-                    var table = new TableEntry();
-                    table.Name = tables[i].Tag;
-                    table.Offset = tables[i].ExpectedOffset;
-                    
-                    otfTableDirectory.Tables[i] = table;
-                }
-
-                otfTableDirectory.CreateTableEntriesMap();
-                
-                foreach (var (key, value) in tableDirectory.Tables)
-                {
-                    otfTableDirectory.TablesOffsets[key] = value.ExpectedOffset;
-                }
-                
-                TypeFace = OTFParser.Parse(decompressedStream, resolution, otfTableDirectory);
             }
 
+            FontReader.Position = 0;
+
+            TableDirectories = new List<TableDirectory>();
+            var otfTableDirectory = new TableDirectory();
+            TableDirectories.Add(otfTableDirectory);
+            if (header.Flavor == 0x00010000)
+            {
+                otfTableDirectory.OutlineType = OutlineType.TrueType;
+            }
+            else if (header.Flavor == 0x4F54544F)
+            {
+                otfTableDirectory.OutlineType = OutlineType.CompactFontFormat;
+            }
+
+            otfTableDirectory.NumTables = header.NumTables;
+            otfTableDirectory.Tables = new TableEntry[header.NumTables];
+            for (int i = 0; i < header.NumTables; ++i)
+            {
+                var table = new TableEntry();
+                table.Name = tables[i].Tag;
+                table.Offset = tables[i].ExpectedOffset;
+
+                otfTableDirectory.Tables[i] = table;
+            }
+
+            otfTableDirectory.CreateTableEntriesMap();
+
+            foreach (var (key, value) in tableDirectory.Tables)
+            {
+                otfTableDirectory.TablesOffsets[key] = value.ExpectedOffset;
+            }
         }
 
         private void DecompressWoff(byte[] compressed, byte[] decompressed)

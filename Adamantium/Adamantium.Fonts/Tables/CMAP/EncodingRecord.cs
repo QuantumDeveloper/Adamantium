@@ -1,7 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 
-namespace Adamantium.Fonts.Tables
+namespace Adamantium.Fonts.Tables.CMAP
 {
     [StructLayout(LayoutKind.Sequential)]
     public struct EncodingRecord

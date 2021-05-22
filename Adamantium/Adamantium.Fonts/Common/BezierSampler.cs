@@ -83,6 +83,7 @@ namespace Adamantium.Fonts.Common
             foreach (var outline in outlines)
             {
                 var sampledOutline = GenerateQuadraticBezierCurves(outline, rate);
+                if (sampledOutline == SampledOutline.Empty) continue;
                 sampledOutlines.Add(sampledOutline);
             }
 
@@ -102,7 +103,10 @@ namespace Adamantium.Fonts.Common
 
             foreach (var segment in outline.Segments)
             {
-                // all points from segments are added omitting the [0] point in segment points list, to avoid point duplication in resulting list
+                // all points from segments are added omitting the [0] point in segment points list,
+                // to avoid point duplication in resulting list
+                
+                if (segment.Points.Count <= 1) continue;
 
                 if (segment.Points.Count == 2)
                 {
@@ -118,6 +122,8 @@ namespace Adamantium.Fonts.Common
                     }
                 }
             }
+
+            if (points.Count == 0) return SampledOutline.Empty;
 
             // close contour by adding first point to the end of points list
             points.Add(points[0]);

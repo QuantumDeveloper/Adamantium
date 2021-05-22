@@ -18,7 +18,8 @@ namespace Adamantium.FontTests
         public void LoadTTFFont_SarabunRegular()
         {
             var typeFace = TypeFace.LoadFont(@"TTFFonts\Sarabun-Regular.ttf", 3);
-            var glyph = typeFace.GetGlyphByCharacter('@');
+            var font = typeFace.GetFont(0);
+            var glyph = font.GetGlyphByCharacter('@');
             glyph.Triangulate(7);
         }
         

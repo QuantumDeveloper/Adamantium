@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Adamantium.Fonts.Tables.CFF;
 
-namespace Adamantium.Fonts.Tables
+namespace Adamantium.Fonts.Tables.CMAP
 {
     /// <summary>
     /// Many-to-one range mappings

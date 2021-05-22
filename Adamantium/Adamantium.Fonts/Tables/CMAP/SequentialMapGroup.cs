@@ -1,6 +1,6 @@
 using System;
 
-namespace Adamantium.Fonts.Tables
+namespace Adamantium.Fonts.Tables.CMAP
 {
     public struct SequentialMapGroup
     {
