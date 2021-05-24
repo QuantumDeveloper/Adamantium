@@ -1,28 +1,29 @@
 ﻿using System.Collections.Generic;
+using Adamantium.Fonts.Common;
 using Adamantium.Fonts.Tables.CFF;
 
 namespace Adamantium.Fonts.Parsers.CFF
 {
-    internal struct Command
+    internal class Command
     {
         public OperatorsType Operator;
         public List<double> Operands;
+        // if 2 blend operators were consecutive, then we must apply first blend deltas on first operator set
+        // and then pass these modified operators to second blend
+        public List<BlendData> BlendData;
+
+        public bool IsBlendPresent => BlendData.Count > 0;
+
+        public Command()
+        {
+            BlendData = new List<BlendData>();
+        }
+
+        public void ApplyBlend(/*point on variation grid*/)
+        {
+            // @TODO Modify operands 
+        }
         
-        // Outer list is operand list, inner list - deltas for current operand for each region
-        /*
-            Regular: 100 200 rmoveto
-            Light: 100 150 rmoveto
-            Bold: 100 300 rmoveto
-            Condensed: 50 100 rmoveto
-            
-            (100 200) (0 0 -50) (-50 100 -100) 2 blend rmoveto
-            
-            https://docs.microsoft.com/en-us/typography/opentype/spec/cff2charstr#section4.5
-         */
-        public List<List<double>> BlendDeltas;
-
-        public bool IsBlendPresent => BlendDeltas != null;
-
         public override string ToString()
         {
             return $"IsBlendPresent: {IsBlendPresent}; {Operator} {string.Join(" , ", Operands.ToArray())}";

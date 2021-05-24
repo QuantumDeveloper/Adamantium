@@ -90,7 +90,7 @@ namespace Adamantium.Fonts.Parsers.CFF
 
             for (int i = 0; i < cffNameIndex.Count; ++i)
             {
-                var font = new CFFFont(fontSet);
+                var font = new CFFFont(fontSet, CFFVersion.CFF);
                 var name = Encoding.UTF8.GetString(cffNameIndex.DataByOffset[i]);
                 font.Name = name;
                 fontSet.AddFont(font);

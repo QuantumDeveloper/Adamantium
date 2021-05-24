@@ -37,7 +37,7 @@ namespace Adamantium.Fonts.Parsers.CFF
 
         public CFFFont Parse()
         {
-            cffFont = new CFFFont(fontSet) {IsLocalSubroutineAvailable = false};
+            cffFont = new CFFFont(fontSet, CFFVersion.CFF2) {IsLocalSubroutineAvailable = false};
             ReadHeader();
             ReadTopDict();
             ReadGlobalSubrIndex();

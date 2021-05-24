@@ -1398,7 +1398,7 @@ namespace Adamantium.Fonts.Parsers
 
             var featureList = FontReader.ReadFeatureList(featureListOffset);
 
-            var lookupTable = FontReader.ReadLookupListTable(lookupListOffset);
+            //var lookupTable = FontReader.ReadLookupListTable(lookupListOffset);
         }
 
         

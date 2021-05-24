@@ -21,3 +21,9 @@ https://wwwimages2.adobe.com/content/dam/acom/en/devnet/font/pdfs/5177.Type2.pdf
 
 Python implementation of commands:
 https://github.com/fonttools/fonttools/blob/master/Lib/fontTools/cffLib/specializer.py
+
+Variation explanation:
+https://docs.microsoft.com/en-us/typography/opentype/otspec182/otvaroverview
+
+Blend explanation (section 4.5):
+https://docs.microsoft.com/en-us/typography/opentype/otspec182/cff2charstr

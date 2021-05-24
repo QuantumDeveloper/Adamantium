@@ -48,12 +48,15 @@ namespace Adamantium.Fonts.Tables.CFF
         public bool IsCIDFont => IsCurrentFontCIDFont();
         
         public bool IsLocalSubroutineAvailable { get; internal set; }
-        
-        public CFFFont(CFFFontSet fontSet)
+
+        public CFFVersion CffVersion { get; }
+
+        public CFFFont(CFFFontSet fontSet, CFFVersion cffVersion)
         {
             glyphs = new List<Glyph>();
             CIDFontInfo = new CIDFontInfo();
             this.fontSet = fontSet;
+            CffVersion = cffVersion;
         }
         
         public Glyph GetGlyphByName(string name)

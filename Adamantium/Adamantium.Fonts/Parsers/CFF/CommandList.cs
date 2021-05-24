@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Adamantium.Fonts.Common;
 using Adamantium.Fonts.Extensions;
 using Adamantium.Fonts.Tables.CFF;
 
@@ -80,8 +81,7 @@ namespace Adamantium.Fonts.Parsers.CFF
             ushort token;
             bool clearOperands;
             int stemCount = 0;
-            var blendOperands = new List<double>();
-            var blendDeltas = new List<List<double>>();
+            BlendData blendData = null;
 
             var fontDictBias = 0;
             if (fontDict?.LocalSubr != null)
@@ -192,27 +192,36 @@ namespace Adamantium.Fonts.Parsers.CFF
                             operands[0] = -operands[0];
                             break;
                         case (ushort)OperatorsType.blend:
-                            var operandsCount = operands[^1];
-                            blendOperands.AddRange(operands.GetRange(0, (int)operandsCount));
+                            clearOperands = false;
+
+                            blendData = new BlendData();
                             
+                            var blendDeltas = new List<RegionData>();
+                            
+                            var operandsCount = operands[^1];
                             var regionCount = font.VariationStore.VariationRegionList.RegionCount;
                             var deltasData = operands.ToArray()[(int)operandsCount..^1];
-                            
-                            operands.Clear();
+                            operands = operands.GetRange(0, (int) operandsCount);
 
-                            // for (var i = 0; i < operandsCount; ++i)
-                            // {
-                            //     var deltas = deltasData.ToList().GetRange(i * regionCount, regionCount);
-                            //
-                            //     if (blendDeltas.Count > i)
-                            //     {
-                            //         blendDeltas[i].AddRange(deltas);
-                            //     }
-                            //     else
-                            //     {
-                            //         blendDeltas.Add(deltas);
-                            //     }
-                            // }
+                            try
+                            {
+                                for (var i = 0; i < operandsCount; ++i)
+                                {
+                                    var regionData = new RegionData
+                                    {
+                                        Data = deltasData.ToList().GetRange(i * regionCount, regionCount)
+                                    };
+
+                                    blendDeltas.Add(regionData);
+                                }
+
+                                blendData.Deltas = blendDeltas;
+                            }
+                            catch (Exception e)
+                            {
+                                
+                            }
+
                             break;
                         case (ushort)OperatorsType.hintmask:
                         case (ushort)OperatorsType.cntrmask:
@@ -233,8 +242,9 @@ namespace Adamantium.Fonts.Parsers.CFF
 
                             var subrIndex = (int) operands.Last() + cffParser.GlobalSubrBias;
                             var subrData = cffParser.GlobalSubroutineIndex.DataByOffset[subrIndex];
-                            cffParser.UnpackSubrToStack(subrData, mainStack);
+                            cffParser.UnpackSubrToStack(subrData, mainStack); 
                             operands.RemoveAt(operands.Count - 1);
+
                             clearOperands = false;
                             break;
                         case (ushort)OperatorsType.callsubr:
@@ -257,6 +267,7 @@ namespace Adamantium.Fonts.Parsers.CFF
                             }
 
                             operands.RemoveAt(operands.Count - 1);
+
                             clearOperands = false;
                             break;
                         case (ushort)OperatorsType.@return:
@@ -276,14 +287,12 @@ namespace Adamantium.Fonts.Parsers.CFF
                             var command = new Command();
 
                             command.Operator = bytesToOperatorMap[token];
-
-                            operands.InsertRange(0, blendOperands);
-
                             command.Operands = operands;
-                            command.BlendDeltas = blendDeltas;
-                            
-                            blendOperands.Clear();
-                            blendDeltas.Clear();
+                            if (blendData != null)
+                            {
+                                command.BlendData.Add(blendData);
+                                blendData = null;
+                            }
 
                             commands.Add(command);
 
