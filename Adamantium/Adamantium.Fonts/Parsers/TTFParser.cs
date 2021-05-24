@@ -542,7 +542,6 @@ namespace Adamantium.Fonts.Parsers
                         break;
                 }
             }
-            
         }
         
         protected virtual void ReadTable(TableEntry entry)
@@ -575,7 +574,7 @@ namespace Adamantium.Fonts.Parsers
                     break;
                 case 0x00020000:
                     post.Version = 2;
-                    
+                    CurrentFont.isGlyphNamesProvided = true;
                     var glyphsNumber = FontReader.ReadUInt16();
                     var glyphNameIndices = FontReader.ReadUInt16Array(glyphsNumber);
 
@@ -1399,7 +1398,7 @@ namespace Adamantium.Fonts.Parsers
 
             var featureList = FontReader.ReadFeatureList(featureListOffset);
 
-            //var lookupTable = FontReader.ReadLookupListTable(lookupListOffset);
+            var lookupTable = FontReader.ReadLookupListTable(lookupListOffset);
         }
 
         

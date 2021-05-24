@@ -43,6 +43,11 @@ namespace Adamantium.Fonts.Common
                 throw new CommandException($"Glyph {index} is not ending with EndChar command");
             }
 
+            if (index == 14)
+            {
+                
+            }
+
             if (clearMainStack)
                 stack.Clear();
 

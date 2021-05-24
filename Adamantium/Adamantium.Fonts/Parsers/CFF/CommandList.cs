@@ -194,23 +194,25 @@ namespace Adamantium.Fonts.Parsers.CFF
                         case (ushort)OperatorsType.blend:
                             var operandsCount = operands[^1];
                             blendOperands.AddRange(operands.GetRange(0, (int)operandsCount));
-
+                            
                             var regionCount = font.VariationStore.VariationRegionList.RegionCount;
                             var deltasData = operands.ToArray()[(int)operandsCount..^1];
+                            
+                            operands.Clear();
 
-                            for (var i = 0; i < operandsCount; ++i)
-                            {
-                                var deltas = deltasData.ToList().GetRange(i * regionCount, regionCount);
-
-                                if (blendDeltas.Count > i)
-                                {
-                                    blendDeltas[i].AddRange(deltas);
-                                }
-                                else
-                                {
-                                    blendDeltas.Add(deltas);
-                                }
-                            }
+                            // for (var i = 0; i < operandsCount; ++i)
+                            // {
+                            //     var deltas = deltasData.ToList().GetRange(i * regionCount, regionCount);
+                            //
+                            //     if (blendDeltas.Count > i)
+                            //     {
+                            //         blendDeltas[i].AddRange(deltas);
+                            //     }
+                            //     else
+                            //     {
+                            //         blendDeltas.Add(deltas);
+                            //     }
+                            // }
                             break;
                         case (ushort)OperatorsType.hintmask:
                         case (ushort)OperatorsType.cntrmask:

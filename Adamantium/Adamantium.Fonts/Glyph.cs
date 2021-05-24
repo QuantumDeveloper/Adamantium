@@ -54,6 +54,7 @@ namespace Adamantium.Fonts
         public Glyph(uint index)
         {
             Index = index;
+            Name = String.Empty;
             outlines = new List<Outline>();
             sampledOutlinesCache = new Dictionary<uint, SampledOutline[]>();
             triangulatedCache = new Dictionary<uint, Vector3F[]>();
@@ -65,6 +66,7 @@ namespace Adamantium.Fonts
         private Glyph(uint index, bool isEmpty) : this(index)
         {
             IsEmpty = isEmpty;
+            Name = String.Empty;
         }
         
         public SampledOutline[] Sample(byte rate)

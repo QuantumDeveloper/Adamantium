@@ -104,11 +104,11 @@ namespace Adamantium.Game.Playground
         {
             try
             {
-                var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/CFF2/SourceHanSerifVFProtoJP.otf", 3);
-                //var otfParser = new OTFParser(@"OTFFonts/Glametrix-oj9A.otf", 3);
+                //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/CFF2/SourceHanSerifVFProtoJP.otf", 3);
+                var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/CFF2/AdobeVFPrototype.otf", 3);
                 var entity = new Entity(null, "Poppins-Medium");
-                var glyph = typeface.GetGlyphByIndex(25);
-                var points = glyph.Triangulate(7);
+                var glyph = typeface.GetGlyphByIndex(94);
+                var points = glyph.Triangulate(3);
                 //parser.GenerateGlyphTriangles(ch);
                 //parser.GenerateDefaultGlyphTriangles(ch);
                 var mesh = new Mesh();

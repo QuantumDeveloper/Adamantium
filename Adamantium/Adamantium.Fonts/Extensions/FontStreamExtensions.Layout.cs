@@ -178,6 +178,7 @@ namespace Adamantium.Fonts.Extensions
 
         public static CoverageTable ReadCoverageTable(this FontStreamReader reader, long offset)
         {
+            reader.Position = offset;
             var format = reader.ReadUInt16();
 
             switch (format)
@@ -209,6 +210,48 @@ namespace Adamantium.Fonts.Extensions
                 default:
                     throw new NotSupportedException($"Format {format} is not supported for coverage table");
             }
+        }
+
+        public static AnchorTable ReadAnchorTable(this FontStreamReader reader, long offset)
+        {
+            reader.Position = offset;
+            var anchorTable = new AnchorTable();
+            anchorTable.Format = reader.ReadUInt16();
+            anchorTable.XCoordinate = reader.ReadInt16();
+            anchorTable.YCoordinate = reader.ReadInt16();
+            switch (anchorTable.Format)
+            {
+                case 2:
+                    anchorTable.AnchorPoint = reader.ReadUInt16();
+                    break;
+                case 3:
+                    var xDeviceOffset = reader.ReadUInt16();
+                    var yDeviceOffset = reader.ReadUInt16();
+                    if (xDeviceOffset > 0)
+                    {
+                        anchorTable.XDevice = reader.ReadDeviceTable(xDeviceOffset + offset);
+                    }
+
+                    if (yDeviceOffset > 0)
+                    {
+                        anchorTable.XDevice = reader.ReadDeviceTable(yDeviceOffset + offset);
+                    }
+                    break;
+            }
+
+            return anchorTable;
+        }
+
+        public static DeviceTable ReadDeviceTable(this FontStreamReader reader, long offset)
+        {
+            reader.Position = offset;
+            var table = new DeviceTable();
+            table.StartSize = reader.ReadUInt16();
+            table.EndSize = reader.ReadUInt16();
+            table.DeltaFormat = (DeltaFormatValues)reader.ReadUInt16();
+            table.DeltaValues = reader.ReadUInt16Array(table.EndSize - table.StartSize);
+
+            return table;
         }
 
         public static List<LookupTable> ReadLookupListTable(this FontStreamReader reader, long offset)
@@ -259,13 +302,21 @@ namespace Adamantium.Fonts.Extensions
                 case 1:
                     return reader.ReadLookupSubtableType1(subtableOffset);
                 case 2:
+                    return reader.ReadLookupSubtableType2(subtableOffset);
                 case 3:
+                    return reader.ReadLookupSubtableType3(subtableOffset);
                 case 4:
+                    return reader.ReadLookupSubtableType4(subtableOffset);
                 case 5:
+                    return reader.ReadLookupSubtableType5(subtableOffset);
                 case 6:
+                    return reader.ReadLookupSubtableType6(subtableOffset);
                 case 7:
+                    return reader.ReadLookupSubtableType7(subtableOffset);
                 case 8:
+                    return reader.ReadLookupSubtableType8(subtableOffset);
                 case 9:
+                    return reader.ReadLookupSubtableType9(subtableOffset);
                 default: throw new NotSupportedException();
             }
         }
@@ -334,7 +385,33 @@ namespace Adamantium.Fonts.Extensions
                 }
                 case 2:
                 {
+                    var coverageOffset = subtableOffset + reader.ReadUInt16();
+                    var value1Format = (ValueFormat)reader.ReadUInt16();
+                    var value2Format = (ValueFormat)reader.ReadUInt16();
+                    var classDef1Offset = subtableOffset + reader.ReadUInt16();
+                    var classDef2Offset = subtableOffset + reader.ReadUInt16();
+                    var class1Count = reader.ReadUInt16();
+                    var class2Count = reader.ReadUInt16();
+
+                    var class1Records = new Class1Record[class1Count];
+                    for (int i = 0; i < class1Count; ++i)
+                    {
+                        var class2Records = new Class2Record[class2Count];
+                        for (int j = 0; j < class2Count; j++)
+                        {
+                            var value1 = reader.ReadValueRecord(value1Format);
+                            var value2 = reader.ReadValueRecord(value1Format);
+                            class2Records[j] = new Class2Record() {Value1 = value1, Value2 = value2};
+                        }
+
+                        class1Records[i] = new Class1Record() {Class2Records = class2Records};
+                    }
+                    
                     var subtable = new LookupSubtableType2Format2();
+                    subtable.Class1Records = class1Records;
+                    subtable.ClassDef1 = reader.ReadClassDefTable(classDef1Offset);
+                    subtable.ClassDef1 = reader.ReadClassDefTable(classDef2Offset);
+                    subtable.CoverageTable = reader.ReadCoverageTable(coverageOffset);
                     return subtable;
                 }
                 default:
@@ -342,6 +419,75 @@ namespace Adamantium.Fonts.Extensions
             }
         }
 
+        private static LookupSubtable ReadLookupSubtableType3(this FontStreamReader reader, long subtableOffset)
+        {
+            reader.Position = subtableOffset;
+            
+            var lookup = new LookupSubtableType3();
+            lookup.Format = reader.ReadUInt16();
+            var coverageOffset = reader.ReadUInt16() + subtableOffset;
+            var entryExitCount = reader.ReadUInt16();
+            var entryAnchorOffset = new ushort[entryExitCount];
+            var exitAnchorOffset = new ushort[entryExitCount];
+
+            for (int i = 0; i < entryExitCount; ++i)
+            {
+                entryAnchorOffset[i] = reader.ReadUInt16();
+                exitAnchorOffset[i] = reader.ReadUInt16();
+            }
+
+            lookup.Coverage = reader.ReadCoverageTable(coverageOffset);
+
+            lookup.EntryAnchors = new AnchorTable[entryExitCount];
+            lookup.ExitAnchors = new AnchorTable[entryExitCount];
+            for (int i = 0; i < entryExitCount; i++)
+            {
+                var entryOffset = entryAnchorOffset[i];
+                if (entryOffset > 0)
+                {
+                    lookup.EntryAnchors[i] = reader.ReadAnchorTable(entryOffset + subtableOffset);
+                }
+
+                var exitOffset = exitAnchorOffset[i];
+                if (exitOffset > 0)
+                {
+                    lookup.ExitAnchors[i] = reader.ReadAnchorTable(exitOffset + subtableOffset);
+                }
+            }
+
+            return lookup;
+        }
+        
+        private static LookupSubtable ReadLookupSubtableType4(this FontStreamReader reader, long subtableOffset)
+        {
+            return null;
+        }
+        
+        private static LookupSubtable ReadLookupSubtableType5(this FontStreamReader reader, long subtableOffset)
+        {
+            return null;
+        }
+        
+        private static LookupSubtable ReadLookupSubtableType6(this FontStreamReader reader, long subtableOffset)
+        {
+            return null;
+        }
+        
+        private static LookupSubtable ReadLookupSubtableType7(this FontStreamReader reader, long subtableOffset)
+        {
+            return null;
+        }
+        
+        private static LookupSubtable ReadLookupSubtableType8(this FontStreamReader reader, long subtableOffset)
+        {
+            return null;
+        }
+        
+        private static LookupSubtable ReadLookupSubtableType9(this FontStreamReader reader, long subtableOffset)
+        {
+            return null;
+        }
+        
         private static PairSet ReadPairSet(this FontStreamReader reader, ValueFormat value1Format, ValueFormat value2Format)
         {
             var pairSet = new PairSet();
@@ -350,6 +496,62 @@ namespace Adamantium.Fonts.Extensions
             pairSet.ValueRecord2 = reader.ReadValueRecord(value2Format);
 
             return pairSet;
+        }
+        
+        private static ClassDefTable ReadClassDefTable(this FontStreamReader reader, long offset)
+        {
+            reader.Position = offset;
+            
+            var classDef = new ClassDefTable();
+            classDef.Format = reader.ReadUInt16();
+            switch (classDef.Format)
+            {
+                case 1:
+                    classDef.StartGlyphId = reader.ReadUInt16();
+                    var glyphCount = reader.ReadUInt16();
+                    classDef.ClassValueArray = reader.ReadUInt16Array(glyphCount);
+                    break;
+                case 2:
+                    var classRangeCount = reader.ReadUInt16();
+                    var records = new ClassRangeRecord[classRangeCount];
+                    for (int i = 0; i < classRangeCount; i++)
+                    {
+                        var start = reader.ReadUInt16();
+                        var end = reader.ReadUInt16();
+                        var classId = reader.ReadUInt16();
+                        var recordItem = new ClassRangeRecord(start, end, classId);
+                        records[i] = recordItem;
+                    }
+
+                    classDef.ClassRangeRecords = records;
+                    break;
+            }
+
+            return classDef;
+        }
+
+        private static MarkArrayTable ReadMarkArrayTable(this FontStreamReader reader, long subTableOffset)
+        {
+            reader.Position = subTableOffset;
+            
+            var markArrayTable = new MarkArrayTable();
+            var count = reader.ReadUInt16();
+            markArrayTable.MarkRecords = new MarkRecord[count];
+            for (int i = 0; i < count; i++)
+            {
+                var markClass = reader.ReadUInt16();
+                var offset = reader.ReadUInt16();
+                markArrayTable.MarkRecords[i] = new MarkRecord(markClass, offset);
+            }
+
+            markArrayTable.AnchorTables = new AnchorTable[count];
+            for (int i = 0; i < count; i++)
+            {
+                var markRecord = markArrayTable.MarkRecords[i];
+                markArrayTable.AnchorTables[i] = reader.ReadAnchorTable(markRecord.Offset + subTableOffset);
+            }
+
+            return markArrayTable;
         }
     }
 }

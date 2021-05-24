@@ -44,6 +44,8 @@ namespace Adamantium.Fonts
             LightBackgroundPalette = String.Empty;
             DarkBackgroundPalette = String.Empty;
         }
+        
+        public bool isGlyphNamesProvided { get; internal set; }
 
         // Name info section ---
         public string Copyright { get; internal set; }
@@ -97,6 +99,8 @@ namespace Adamantium.Fonts
 
         void IFont.UpdateGlyphNamesCache()
         {
+            if (!isGlyphNamesProvided) return;
+            
             foreach (var glyph in glyphs)
             {
                 var name = glyph.Name;

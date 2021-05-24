@@ -126,6 +126,10 @@
       <Content Include="Fonts\OTFFonts\CFF2\SourceHanSerifVFProtoJP.otf">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
+      <None Remove="Fonts\OTFFonts\CFF2\AdobeVFPrototype.otf" />
+      <Content Include="Fonts\OTFFonts\CFF2\AdobeVFPrototype.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
     </ItemGroup>
 
     <ItemGroup>

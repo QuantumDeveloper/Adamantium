@@ -229,6 +229,10 @@ namespace Adamantium.Fonts.Parsers.CFF
                         var fdArrayIndex = fdArraySelector.SelectFontDictArray((uint) i);
                         fontDict = cffFont.CIDFontDicts[fdArrayIndex];
                     }
+                    else if (cffFont.CIDFontDicts.Count == 1)
+                    {
+                        fontDict = cffFont.CIDFontDicts[0];
+                    }
                     
                     Glyph glyph = pipelineAssembler
                         .CreateGlyph((uint) i)

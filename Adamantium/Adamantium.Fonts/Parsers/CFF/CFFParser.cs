@@ -246,7 +246,6 @@ namespace Adamantium.Fonts.Parsers.CFF
                 // VertexBuf vb = g.Triangulate();
 
                 //List<Glyph> ...
-                Glyph glyph = null;
                 try
                 {
                     FontDict fontDict = null;
@@ -256,7 +255,7 @@ namespace Adamantium.Fonts.Parsers.CFF
                         fontDict = font.CIDFontDicts[fdArrayIndex];
                     }
                     
-                    glyph = pipelineAssembler
+                    var glyph = pipelineAssembler
                         .CreateGlyph((uint) i)
                         .FillCommandList(font, mainStack, fontDict, index: i)
                         .FillOutlines()
@@ -266,7 +265,7 @@ namespace Adamantium.Fonts.Parsers.CFF
                 }
                 catch (Exception e)
                 {
-                    glyph.IsInvalid = true;
+                    glyphs.Add(new Glyph((uint)i){ OutlineType = OutlineType.CompactFontFormat, IsInvalid = true });
                     exceptions++;
                 }
             }
