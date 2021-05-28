@@ -77,11 +77,11 @@ namespace Adamantium.Fonts.Parsers.CFF
 
         public void Fill(CFFFont font, Stack<byte> mainStack, FontDict fontDict, int index = 0)
         {
-            List<double> operands = new List<double>();
+            var operands = new List<CommandOperand>();
             ushort token;
             bool clearOperands;
+            bool isBlendPresent = false;
             int stemCount = 0;
-            BlendData blendData = null;
 
             var fontDictBias = 0;
             if (fontDict?.LocalSubr != null)
@@ -103,128 +103,129 @@ namespace Adamantium.Fonts.Parsers.CFF
                     clearOperands = true;
 
                     // TO DO: add mechanism to process operators like 'add' - not resulting in new Command, but instead pushes its result to the top of the stack
-                    switch (token)
+                    switch ((OperatorsType)token)
                     {
-                        case (ushort)OperatorsType.and:
-                            mainStack.Push(Convert.ToByte(Convert.ToBoolean(operands[0]) && Convert.ToBoolean(operands[1])));
+                        case OperatorsType.and:
+                            mainStack.Push(Convert.ToByte(Convert.ToBoolean(operands[0].Value) && Convert.ToBoolean(operands[1].Value)));
                             break;
-                        case (ushort)OperatorsType.or:
-                            mainStack.Push(Convert.ToByte(Convert.ToBoolean(operands[0]) || Convert.ToBoolean(operands[1])));
+                        case OperatorsType.or:
+                            mainStack.Push(Convert.ToByte(Convert.ToBoolean(operands[0].Value) || Convert.ToBoolean(operands[1].Value)));
                             break;
-                        case (ushort)OperatorsType.not:
-                            mainStack.Push(Convert.ToByte(!Convert.ToBoolean(operands[0])));
+                        case OperatorsType.not:
+                            mainStack.Push(Convert.ToByte(!Convert.ToBoolean(operands[0].Value)));
                             break;
-                        case (ushort)OperatorsType.eq:
-                            mainStack.Push(Convert.ToByte(Convert.ToBoolean(operands[0]) == Convert.ToBoolean(operands[1])));
+                        case OperatorsType.eq:
+                            mainStack.Push(Convert.ToByte(Convert.ToBoolean(operands[0].Value) == Convert.ToBoolean(operands[1].Value)));
                             break;
-                        case (ushort)OperatorsType.drop:
+                        case OperatorsType.drop:
                             operands.RemoveAt(0);
                             break;
-                        case (ushort)OperatorsType.ifelse:
+                        case OperatorsType.ifelse:
                             clearOperands = false;
 
                             var res = (operands[2] <= operands[3]) ? operands[0] : operands[1];
                             operands.Clear();
                             operands.Add(res);
                             break;
-                        case (ushort)OperatorsType.random:
+                        case OperatorsType.random:
                             clearOperands = false;
 
                             var random = new Random();
 
-                            double rand = -(random.NextDouble() - 1);
+                            var rand = new CommandOperand(-(random.NextDouble() - 1));
                             operands.Clear();
                             operands.Add(rand);
                             break;
-                        case (ushort)OperatorsType.abs:
+                        case OperatorsType.abs:
                             clearOperands = false;
 
-                            operands[0] = Math.Abs(operands[0]);
+                            operands[0].Value = Math.Abs(operands[0].Value);
                             break;
-                        case (ushort)OperatorsType.add:
+                        case OperatorsType.add:
                             clearOperands = false;
 
                             var sum = operands[0] + operands[1];
                             operands.Clear();
                             operands.Add(sum);
                             break;
-                        case (ushort)OperatorsType.sub:
+                        case OperatorsType.sub:
                             clearOperands = false;
 
                             var diff = operands[0] - operands[1];
                             operands.Clear();
                             operands.Add(diff);
                             break;
-                        case (ushort)OperatorsType.div:
+                        case OperatorsType.div:
                             clearOperands = false;
 
                             var quo = operands[0] / operands[1];
                             operands.Clear();
                             operands.Add(quo);
                             break;
-                        case (ushort)OperatorsType.mul:
+                        case OperatorsType.mul:
                             clearOperands = false;
 
                             var prod = operands[0] * operands[1];
                             operands.Clear();
                             operands.Add(prod);
                             break;
-                        case (ushort)OperatorsType.sqrt:
+                        case OperatorsType.sqrt:
                             clearOperands = false;
 
-                            operands[0] = Math.Sqrt(operands[0]);
+                            operands[0].Value = Math.Sqrt(operands[0].Value);
                             break;
-                        case (ushort)OperatorsType.dup:
+                        case OperatorsType.dup:
                             clearOperands = false;
 
                             operands.Add(operands[0]);
                             break;
-                        case (ushort)OperatorsType.exch:
+                        case OperatorsType.exch:
                             clearOperands = false;
 
                             var val = operands[0];
                             operands[0] = operands[1];
                             operands[1] = val;
                             break;
-                        case (ushort)OperatorsType.neg:
+                        case OperatorsType.neg:
                             clearOperands = false;
 
                             operands[0] = -operands[0];
                             break;
-                        case (ushort)OperatorsType.blend:
+                        case OperatorsType.blend:
                             clearOperands = false;
 
-                            blendData = new BlendData();
-                            
-                            var blendDeltas = new List<RegionData>();
-                            
-                            var operandsCount = operands[^1];
+                            isBlendPresent = true;
+
+                            var blendedOperandsCount =  operands[^1].Value;
                             var regionCount = font.VariationStore.VariationRegionList.RegionCount;
-                            var deltasData = operands.ToArray()[(int)operandsCount..^1];
-                            operands = operands.GetRange(0, (int) operandsCount);
+                            var overallBlendOperandsCount = blendedOperandsCount * (regionCount + 1) + 1;
 
-                            try
+                            var startIndexOfBlendOperands = operands.Count - overallBlendOperandsCount;
+
+                            var blendOperands = operands.ToArray()[(int)startIndexOfBlendOperands..].ToList();
+
+                            operands = operands.GetRange(0, (int)startIndexOfBlendOperands);
+
+                            var blendedOperands = blendOperands.GetRange(0, (int) blendedOperandsCount);
+                            var deltas = blendOperands.ToArray()[(int)(blendedOperandsCount)..^1];
+
+                            for (var op = 0; op < blendedOperands.Count; ++op)
                             {
-                                for (var i = 0; i < operandsCount; ++i)
-                                {
-                                    var regionData = new RegionData
-                                    {
-                                        Data = deltasData.ToList().GetRange(i * regionCount, regionCount)
-                                    };
+                                var blendData = new RegionData();
 
-                                    blendDeltas.Add(regionData);
+                                for (var region = 0; region < regionCount; ++region)
+                                {
+                                    blendData.Data.Add(deltas[op * regionCount + region].Value);
                                 }
 
-                                blendData.Deltas = blendDeltas;
-                            }
-                            catch (Exception e)
-                            {
-                                
+                                blendedOperands[op].BlendData = blendData;
                             }
 
+                            operands.AddRange(blendedOperands);
+
                             break;
-                        case (ushort)OperatorsType.hintmask:
-                        case (ushort)OperatorsType.cntrmask:
+                        case OperatorsType.hintmask:
+                        case OperatorsType.cntrmask:
                             stemCount += operands.Count / 2;
                             
                             if (stemCount == 0) stemCount = 1;
@@ -234,20 +235,20 @@ namespace Adamantium.Fonts.Parsers.CFF
                                 var maskByte = mainStack.Pop();
                             }
                             break;
-                        case (ushort)OperatorsType.callgsubr:
+                        case OperatorsType.callgsubr:
                             if (operands.Count == 0)
                             {
                                 throw new ArgumentException($"callgsubr operand count == 0!");
                             }
 
-                            var subrIndex = (int) operands.Last() + cffParser.GlobalSubrBias;
+                            var subrIndex = (int)operands.Last().Value + cffParser.GlobalSubrBias;
                             var subrData = cffParser.GlobalSubroutineIndex.DataByOffset[subrIndex];
                             cffParser.UnpackSubrToStack(subrData, mainStack); 
                             operands.RemoveAt(operands.Count - 1);
 
                             clearOperands = false;
                             break;
-                        case (ushort)OperatorsType.callsubr:
+                        case OperatorsType.callsubr:
                             if (operands.Count == 0)
                             {
                                 throw new ArgumentException($"callsubr operand count == 0!");
@@ -255,13 +256,13 @@ namespace Adamantium.Fonts.Parsers.CFF
 
                             if (font.IsLocalSubroutineAvailable)
                             {
-                                var localSubrIndex = (int) operands.Last() + font.LocalSubrBias;
+                                var localSubrIndex = (int)operands.Last().Value + font.LocalSubrBias;
                                 var localSubrData = font.LocalSubroutineIndex.DataByOffset[localSubrIndex];
                                 cffParser.UnpackSubrToStack(localSubrData, mainStack);
                             }
                             else if (fontDict != null) // get local subr from private dict
                             {
-                                var localSubrIndex = (int) operands.Last() + fontDictBias;
+                                var localSubrIndex = (int)operands.Last().Value + fontDictBias;
                                 var localSubrData = fontDict.LocalSubr[localSubrIndex];
                                 cffParser.UnpackSubrToStack(localSubrData, mainStack);
                             }
@@ -270,16 +271,16 @@ namespace Adamantium.Fonts.Parsers.CFF
 
                             clearOperands = false;
                             break;
-                        case (ushort)OperatorsType.@return:
+                        case OperatorsType.@return:
                             clearOperands = false;
                             break;
                         default:
-                            switch (token)
+                            switch ((OperatorsType)token)
                             {
-                                case (ushort)OperatorsType.vstem:
-                                case (ushort)OperatorsType.hstem:
-                                case (ushort)OperatorsType.hstemhm:
-                                case (ushort)OperatorsType.vstemhm:
+                                case OperatorsType.vstem:
+                                case OperatorsType.hstem:
+                                case OperatorsType.hstemhm:
+                                case OperatorsType.vstemhm:
                                     stemCount+=operands.Count/2;
                                     break;
                             }
@@ -288,25 +289,22 @@ namespace Adamantium.Fonts.Parsers.CFF
 
                             command.Operator = bytesToOperatorMap[token];
                             command.Operands = operands;
-                            if (blendData != null)
-                            {
-                                command.BlendData.Add(blendData);
-                                blendData = null;
-                            }
-
+                            command.IsBlendPresent = isBlendPresent;
                             commands.Add(command);
 
+                            isBlendPresent = false;
+                            
                             break;
                     }
 
                     if (clearOperands)
                     {
-                        operands = new List<double>();
+                        operands = new List<CommandOperand>();
                     }
                 }
                 else // this is operand
                 {
-                    operands.Add(Number((byte)token, mainStack).AsDouble());
+                    operands.Add(new (Number((byte)token, mainStack).AsDouble()));
                 }
             }
         }
