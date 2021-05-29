@@ -23,8 +23,8 @@ namespace Adamantium.Fonts.Parsers.CFF
                     {
                         startingIndex = 1;
                     }
-                    currentPoint.X += command.Operands[startingIndex++];
-                    currentPoint.Y += command.Operands[startingIndex];
+                    currentPoint.X += command.Operands[startingIndex++].Value;
+                    currentPoint.Y += command.Operands[startingIndex].Value;
                     pointList.Add(currentPoint);
                     break;
                 case OperatorsType.hmoveto:
@@ -33,7 +33,7 @@ namespace Adamantium.Fonts.Parsers.CFF
                     {
                         startingIndex = 1;
                     }
-                    currentPoint.X += command.Operands[startingIndex];
+                    currentPoint.X += command.Operands[startingIndex].Value;
                     pointList.Add(currentPoint);
                     break;
                 case OperatorsType.vmoveto:
@@ -42,7 +42,7 @@ namespace Adamantium.Fonts.Parsers.CFF
                     {
                         startingIndex = 1;
                     }
-                    currentPoint.Y += command.Operands[startingIndex];
+                    currentPoint.Y += command.Operands[startingIndex].Value;
                     pointList.Add(currentPoint);
                     break;
                 case OperatorsType.rlineto:
@@ -79,15 +79,15 @@ namespace Adamantium.Fonts.Parsers.CFF
 
                     if (command.Operands.Count % 2 != 0)
                     {
-                        currentPoint.X += command.Operands[0];
+                        currentPoint.X += command.Operands[0].Value;
                         pointList.Add(currentPoint);
                         
                         for (i = 1; i < command.Operands.Count; i+=2)
                         {
-                            currentPoint.Y += command.Operands[i];
+                            currentPoint.Y += command.Operands[i].Value;
                             pointList.Add(currentPoint);
                             
-                            currentPoint.X += command.Operands[i+1];
+                            currentPoint.X += command.Operands[i+1].Value;
                             pointList.Add(currentPoint);
                         }
                     }
@@ -95,10 +95,10 @@ namespace Adamantium.Fonts.Parsers.CFF
                     {
                         for (i = 0; i < command.Operands.Count; i+=2)
                         {
-                            currentPoint.X += command.Operands[i];
+                            currentPoint.X += command.Operands[i].Value;
                             pointList.Add(currentPoint);
                             
-                            currentPoint.Y += command.Operands[i+1];
+                            currentPoint.Y += command.Operands[i+1].Value;
                             pointList.Add(currentPoint);
                         }
                     }
@@ -123,15 +123,15 @@ namespace Adamantium.Fonts.Parsers.CFF
                     
                     if (command.Operands.Count % 2 != 0)
                     {
-                        currentPoint.Y += command.Operands[0];
+                        currentPoint.Y += command.Operands[0].Value;
                         pointList.Add(currentPoint);
                         
                         for (i = 1; i < command.Operands.Count; i+=2)
                         {
-                            currentPoint.X += command.Operands[i];
+                            currentPoint.X += command.Operands[i].Value;
                             pointList.Add(currentPoint);
                             
-                            currentPoint.Y += command.Operands[i+1];
+                            currentPoint.Y += command.Operands[i+1].Value;
                             pointList.Add(currentPoint);
                         }
                     }
@@ -139,10 +139,10 @@ namespace Adamantium.Fonts.Parsers.CFF
                     {
                         for (i = 0; i < command.Operands.Count; i+=2)
                         {
-                            currentPoint.Y += command.Operands[i];
+                            currentPoint.Y += command.Operands[i].Value;
                             pointList.Add(currentPoint);
                             
-                            currentPoint.X += command.Operands[i+1];
+                            currentPoint.X += command.Operands[i+1].Value;
                             pointList.Add(currentPoint);
                         }
                     }
@@ -165,16 +165,13 @@ namespace Adamantium.Fonts.Parsers.CFF
 
                     if ((command.Operands.Count % 2) != 0)
                     {
-                        double[] values =
-                        {
-                            command.Operands[1], 
-                            command.Operands[0], 
-                            command.Operands[2], 
+                        var points = Rrcurveto(
+                            command.Operands[1],
+                            command.Operands[0],
+                            command.Operands[2],
                             command.Operands[3],
-                            command.Operands[4], 
-                            0
-                        };
-                        var points = Rrcurveto(values);
+                            command.Operands[4],
+                            new CommandOperand(0));
                         pointList.AddRange(points);
 
                         i += 5;
@@ -186,15 +183,12 @@ namespace Adamantium.Fonts.Parsers.CFF
                         var values = command.Operands.Skip(i).Take(4).ToArray();
 
                         var points = Rrcurveto(
-                            new []
-                            {
-                                values[0], 
-                                0, 
-                                values[1], 
-                                values[2], 
-                                values[3], 
-                                0
-                            });
+                            values[0],
+                            new CommandOperand(0),
+                            values[1],
+                            values[2],
+                            values[3],
+                            new CommandOperand(0));
                         pointList.AddRange(points);
                     }
 
@@ -204,16 +198,13 @@ namespace Adamantium.Fonts.Parsers.CFF
 
                     if ((command.Operands.Count % 2) != 0)
                     {
-                        double[] values =
-                        {
+                        var points = Rrcurveto(
                             command.Operands[0],
                             command.Operands[1],
                             command.Operands[2],
                             command.Operands[3],
-                            0,
-                            command.Operands[4]
-                        };
-                        var points = Rrcurveto(values);
+                            new CommandOperand(0),
+                            command.Operands[4]);
                         pointList.AddRange(points);
 
                         i += 5;
@@ -224,7 +215,13 @@ namespace Adamantium.Fonts.Parsers.CFF
                         // take next 4 values
                         var values = command.Operands.Skip(i).Take(4).ToArray();
 
-                        var points = Rrcurveto(new [] {0, values[0], values[1], values[2], 0, values[3]});
+                        var points = Rrcurveto(
+                            new CommandOperand(0),
+                            values[0],
+                            values[1],
+                            values[2],
+                            new CommandOperand(0),
+                            values[3]);
                         pointList.AddRange(points);
                     }
 
@@ -238,31 +235,49 @@ namespace Adamantium.Fonts.Parsers.CFF
                         case 1:
                             //|- {dxa dxb dyb dyc dyd dxe dye dxf}+ dyf? hvcurveto (31) |-
                             i = 0;
-                            
+
                             for (; i < command.Operands.Count;)
                             {
                                 // take next 8 values
                                 var values = command.Operands.Skip(i).Take(8).ToArray();
 
-                                var points = Rrcurveto(new [] {values[0], 0, values[1], values[2], 0, values[3]});
+                                var points = Rrcurveto(
+                                    values[0],
+                                    new CommandOperand(0),
+                                    values[1],
+                                    values[2],
+                                    new CommandOperand(0),
+                                    values[3]);
                                 pointList.AddRange(points);
 
                                 //last cycle
                                 if (command.Operands.Count - i == 9)
                                 {
                                     values = command.Operands.Skip(i).Take(9).ToArray();
-                                    points = Rrcurveto(new [] {0, values[4], values[5], values[6], values[7], values[8]});
+                                    points = Rrcurveto(
+                                        new CommandOperand(0),
+                                        values[4],
+                                        values[5],
+                                        values[6],
+                                        values[7],
+                                        values[8]);
                                     pointList.AddRange(points);
                                     i += 9;
                                 }
                                 else
                                 {
-                                    points = Rrcurveto(new [] {0, values[4], values[5], values[6], values[7], 0});
+                                    points = Rrcurveto(
+                                        new CommandOperand(0),
+                                        values[4],
+                                        values[5],
+                                        values[6],
+                                        values[7],
+                                        new CommandOperand(0));
                                     pointList.AddRange(points);
-                                    i += 8;                                    
+                                    i += 8;
                                 }
                             }
-                            
+
                             break;
                         
                         case 4:
@@ -281,39 +296,67 @@ namespace Adamantium.Fonts.Parsers.CFF
                             if (command.Operands.Count == 5)
                             {
                                 var values = command.Operands.Skip(i).Take(5).ToArray();
-                                var points = Rrcurveto(new[]
-                                    {values[0], 0, values[1], values[2], values[4], values[3]});
+                                var points = Rrcurveto(
+                                    values[0],
+                                    new CommandOperand(0),
+                                    values[1],
+                                    values[2],
+                                    values[4],
+                                    values[3]);
                                 pointList.AddRange(points);
                                 i += 5;
                             }
                             else
                             {
                                 var values = command.Operands.Skip(i).Take(4).ToArray();
-                                var points = Rrcurveto(new[]
-                                    {values[0], 0, values[1], values[2], 0, values[3]});
+                                var points = Rrcurveto(
+                                    values[0],
+                                    new CommandOperand(0),
+                                    values[1],
+                                    values[2],
+                                    new CommandOperand(0),
+                                    values[3]);
                                 pointList.AddRange(points);
                                 i += 4;
                             }
-                            
+
                             for (; i < command.Operands.Count;)
                             {
                                 // take next 8 values
                                 var values = command.Operands.Skip(i).Take(8).ToArray();
 
-                                var points = Rrcurveto(new [] {0, values[0], values[1], values[2], values[3], 0});
+                                var points = Rrcurveto(
+                                    new CommandOperand(0),
+                                    values[0],
+                                    values[1],
+                                    values[2],
+                                    values[3],
+                                    new CommandOperand(0));
                                 pointList.AddRange(points);
 
                                 
                                 if (command.Operands.Count - i == 9)
                                 {
                                     values = command.Operands.Skip(i).Take(9).ToArray();
-                                    points = Rrcurveto(new [] {values[4], 0, values[5], values[6], values[8], values[7]});
+                                    points = Rrcurveto(
+                                        values[4],
+                                        new CommandOperand(0),
+                                        values[5],
+                                        values[6],
+                                        values[8],
+                                        values[7]);
                                     pointList.AddRange(points);
                                     i += 9;
                                 }
                                 else
                                 {
-                                    points = Rrcurveto(new [] {values[4], 0, values[5], values[6], 0, values[7]});
+                                    points = Rrcurveto(
+                                        values[4],
+                                        new CommandOperand(0),
+                                        values[5],
+                                        values[6],
+                                        new CommandOperand(0),
+                                        values[7]);
                                     pointList.AddRange(points);
                                     i += 8;                                    
                                 }
@@ -345,19 +388,37 @@ namespace Adamantium.Fonts.Parsers.CFF
                                 // take next 8 values
                                 var values = command.Operands.Skip(i).Take(8).ToArray();
 
-                                var points = Rrcurveto(new [] {0, values[0], values[1], values[2], values[3], 0});
+                                var points = Rrcurveto(
+                                    new CommandOperand(0),
+                                    values[0],
+                                    values[1],
+                                    values[2],
+                                    values[3],
+                                    new CommandOperand(0));
                                 pointList.AddRange(points);
 
                                 if (command.Operands.Count - i == 9)
                                 {
                                     values = command.Operands.Skip(i).Take(9).ToArray();
-                                    points = Rrcurveto(new [] {values[4], 0, values[5], values[6], values[8], values[7]});
+                                    points = Rrcurveto(
+                                        values[4],
+                                        new CommandOperand(0),
+                                        values[5],
+                                        values[6],
+                                        values[8],
+                                        values[7]);
                                     pointList.AddRange(points);
                                     i += 9;
                                 }
                                 else
                                 {
-                                    points = Rrcurveto(new [] {values[4], 0, values[5], values[6], 0, values[7]});
+                                    points = Rrcurveto(
+                                        values[4],
+                                        new CommandOperand(0),
+                                        values[5],
+                                        values[6],
+                                        new CommandOperand(0),
+                                        values[7]);
                                     pointList.AddRange(points);
                                     i += 8;                                    
                                 }
@@ -381,16 +442,26 @@ namespace Adamantium.Fonts.Parsers.CFF
                             if (command.Operands.Count == 5)
                             {
                                 var values = command.Operands.Skip(i).Take(5).ToArray();
-                                var points = Rrcurveto(new[]
-                                    {0, values[0], values[1], values[2], values[3], values[4]});
+                                var points = Rrcurveto(
+                                    new CommandOperand(0),
+                                    values[0],
+                                    values[1],
+                                    values[2],
+                                    values[3],
+                                    values[4]);
                                 pointList.AddRange(points);
                                 i += 5;
                             }
                             else
                             {
                                 var values = command.Operands.Skip(i).Take(4).ToArray();
-                                var points = Rrcurveto(new[]
-                                    {0, values[0], values[1], values[2], values[3], 0});
+                                var points = Rrcurveto(
+                                    new CommandOperand(0),
+                                    values[0],
+                                    values[1],
+                                    values[2],
+                                    values[3],
+                                    new CommandOperand(0));
                                 pointList.AddRange(points);
                                 i += 4;
                             }
@@ -400,20 +471,38 @@ namespace Adamantium.Fonts.Parsers.CFF
                                 // take next 8 values
                                 var values = command.Operands.Skip(i).Take(8).ToArray();
 
-                                var points = Rrcurveto(new [] {values[0], 0, values[1], values[2], 0, values[3]});
+                                var points = Rrcurveto(
+                                    values[0],
+                                    new CommandOperand(0),
+                                    values[1],
+                                    values[2],
+                                    new CommandOperand(0),
+                                    values[3]);
                                 pointList.AddRange(points);
 
                                 
                                 if (command.Operands.Count - i == 9)
                                 {
                                     values = command.Operands.Skip(i).Take(9).ToArray();
-                                    points = Rrcurveto(new [] {0, values[4], values[5], values[6], values[7], values[8]});
+                                    points = Rrcurveto(
+                                        new CommandOperand(0),
+                                        values[4],
+                                        values[5],
+                                        values[6],
+                                        values[7],
+                                        values[8]);
                                     pointList.AddRange(points);
                                     i += 9;
                                 }
                                 else
                                 {
-                                    points = Rrcurveto(new [] {0, values[4], values[5], values[6], values[7], 0});
+                                    points = Rrcurveto(
+                                        new CommandOperand(0),
+                                        values[4],
+                                        values[5],
+                                        values[6],
+                                        values[7],
+                                        new CommandOperand(0));
                                     pointList.AddRange(points);
                                     i += 8;                                    
                                 }
@@ -427,7 +516,7 @@ namespace Adamantium.Fonts.Parsers.CFF
                     if (command.Operands.Count >= 8 &&
                         command.Operands.Count % 6 == 2)
                     {
-                        double[] lastOperands = command.Operands.Skip(command.Operands.Count - 2).ToArray();
+                        var lastOperands = command.Operands.Skip(command.Operands.Count - 2).ToArray();
                         command.Operands.RemoveRange(command.Operands.Count - 2, 2);
 
                         for (; i < command.Operands.Count; i += 6)
@@ -448,7 +537,7 @@ namespace Adamantium.Fonts.Parsers.CFF
                     if (command.Operands.Count >= 8 &&
                         command.Operands.Count % 2 == 0)
                     {
-                        double[] lastOperands = command.Operands.Skip(command.Operands.Count - 6).ToArray();
+                        var lastOperands = command.Operands.Skip(command.Operands.Count - 6).ToArray();
                         command.Operands.RemoveRange(command.Operands.Count - 6, 6);
 
                         for (; i < command.Operands.Count; i += 2)
@@ -470,36 +559,36 @@ namespace Adamantium.Fonts.Parsers.CFF
             return pointList.ToArray();
         }
 
-        private OutlinePoint[] Rlineto(double[] values)
+        private OutlinePoint[] Rlineto(params CommandOperand[] values)
         {
             var pointList = new List<OutlinePoint>();
 
-            currentPoint.X += values[0];
-            currentPoint.Y += values[1];
+            currentPoint.X += values[0].Value;
+            currentPoint.Y += values[1].Value;
             pointList.Add(currentPoint);
 
             return pointList.ToArray();
         }
         
-        private OutlinePoint[] Rrcurveto(double[] values)
+        private OutlinePoint[] Rrcurveto(params CommandOperand[] values)
         {
             var pointList = new List<OutlinePoint>();
 
             // first control point
-            currentPoint.X += values[0];
-            currentPoint.Y += values[1];
+            currentPoint.X += values[0].Value;
+            currentPoint.Y += values[1].Value;
             currentPoint.IsControl = true;
             pointList.Add(currentPoint);
 
             // second control point
-            currentPoint.X += values[2];
-            currentPoint.Y += values[3];
+            currentPoint.X += values[2].Value;
+            currentPoint.Y += values[3].Value;
             currentPoint.IsControl = true;
             pointList.Add(currentPoint);
 
             // end (real) control point
-            currentPoint.X += values[4];
-            currentPoint.Y += values[5];
+            currentPoint.X += values[4].Value;
+            currentPoint.Y += values[5].Value;
             currentPoint.IsControl = false;
             pointList.Add(currentPoint);
 
