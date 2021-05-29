@@ -361,8 +361,8 @@ namespace Adamantium.Fonts.Extensions
                 case 1:
                 {
                     var coverageOffset = subtableOffset + reader.ReadUInt16();
-                    var value1Format = (ValueFormat)reader.ReadUInt16();
-                    var value2Format = (ValueFormat)reader.ReadUInt16();
+                    var value1Format = (ValueFormat)reader.ReadUInt16(); // can be null
+                    var value2Format = (ValueFormat)reader.ReadUInt16(); // can be null
                     var pairSetCount = reader.ReadUInt16();
                     var pairSetOffsetArray = reader.ReadUInt16Array(pairSetCount);
                     var pairSetTables = new PairSetTable[pairSetCount];
@@ -379,8 +379,12 @@ namespace Adamantium.Fonts.Extensions
                         }
 
                         subtable.CoverageTable = reader.ReadCoverageTable(coverageOffset);
-                        subtable.PairSetsTables = pairSetTables;
+                        var pairSetTable = new PairSetTable();
+                        pairSetTable.PairSets = pairSets;
+                        pairSetTables[i] = pairSetTable;
                     }
+                    
+                    subtable.PairSetsTables = pairSetTables;
                     return subtable;
                 }
                 case 2:
