@@ -22,15 +22,11 @@ namespace Adamantium.Fonts.Parsers.CFF
         private CFFIndex cffTopDictIndex;
         private CFFIndex cffStringIndex;
 
-        // Pipeline for constructing character
-        PipelineAssembler pipelineAssembler;
-        
         public CFFParser(long cffOffset, FontStreamReader ttfReader)
         {
             this.cffOffset = cffOffset;
             otfTtfReader = ttfReader;
             fontSet = new CFFFontSet();
-            pipelineAssembler = new PipelineAssembler(this);
         }
 
         public CFFIndex GlobalSubroutineIndex { get; private set; }
@@ -168,7 +164,7 @@ namespace Adamantium.Fonts.Parsers.CFF
 
             otfTtfReader.Position = cffOffset + font.CIDFontInfo.FDArray;
 
-            font.CIDFontDicts = otfTtfReader.ReadFDArray(cffOffset, (uint)font.CIDFontInfo.FDArray);
+            font.CIDFontDicts = otfTtfReader.ReadFDArray(cffOffset, (uint)font.CIDFontInfo.FDArray, font);
         }
 
         private void ReadLocalSubroutineIndex(CFFFont font)
@@ -255,11 +251,10 @@ namespace Adamantium.Fonts.Parsers.CFF
                         fontDict = font.CIDFontDicts[fdArrayIndex];
                     }
                     
-                    var glyph = pipelineAssembler
-                        .CreateGlyph((uint) i)
-                        .FillCommandList(font, mainStack, fontDict, index: i)
-                        .FillOutlines()
-                        .GetGlyph();
+                    var commandList = new CommandParser(this).Parse(font, mainStack, fontDict, index: i);
+
+                    var glyph = Glyph.Create((uint) i).SetCommands(commandList).FillOutlines();
+
                     glyphs.Add(glyph);
                     
                 }

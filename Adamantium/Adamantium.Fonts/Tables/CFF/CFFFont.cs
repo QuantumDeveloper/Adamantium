@@ -93,7 +93,7 @@ namespace Adamantium.Fonts.Tables.CFF
 
         public void ParseTopDict(byte[] data)
         {
-            topDictParser = new TopDictParser(data);
+            topDictParser = new TopDictParser(data, this);
 
             var result = topDictParser.GetAllAvailableOperands();
             foreach (var operandResult in result.Results)
@@ -153,7 +153,7 @@ namespace Adamantium.Fonts.Tables.CFF
 
         public void ParsePrivateDict(byte[] data)
         {
-            privateDictParser = new PrivateDictParser(data);
+            privateDictParser = new PrivateDictParser(data, this);
 
             IsLocalSubroutineAvailable = privateDictParser.IsOperatorAvailable(DictOperatorsType.Subrs);
         }

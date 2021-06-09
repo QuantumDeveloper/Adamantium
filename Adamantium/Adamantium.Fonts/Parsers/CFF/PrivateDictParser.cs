@@ -5,7 +5,7 @@ namespace Adamantium.Fonts.Parsers.CFF
 {
     internal class PrivateDictParser : DictOperandParser
     {
-        public PrivateDictParser(byte[] rawData) : base(rawData)
+        public PrivateDictParser(byte[] rawData, CFFFont font) : base(rawData, font)
         {
         }
 

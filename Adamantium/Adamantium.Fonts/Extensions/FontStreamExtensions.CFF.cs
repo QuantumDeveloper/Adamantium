@@ -68,16 +68,16 @@ namespace Adamantium.Fonts.Extensions
             return cffIndex;
         }
 
-        public static List<FontDict> ReadFDArray(this FontStreamReader otfTtfReader, long cffOffset, uint fdArrayOffset, CFFVersion version = CFFVersion.CFF)
+        public static List<FontDict> ReadFDArray(this FontStreamReader otfTtfReader, long cffOffset, uint fdArrayOffset, CFFFont font)
         {
             otfTtfReader.Position = cffOffset + fdArrayOffset;
 
-            var fontDictIndex = otfTtfReader.ReadCffIndex(version);
+            var fontDictIndex = otfTtfReader.ReadCffIndex(font.CffVersion);
             var fontDicts = new List<FontDict>();
             
             for (int i = 0; i < fontDictIndex.Count; i++)
             {
-                var dictParser = new DictOperandParser(fontDictIndex.DataByOffset[i]);
+                var dictParser = new DictOperandParser(fontDictIndex.DataByOffset[i], font);
                 var result = dictParser.GetAllAvailableOperands();
 
                 int name = 0;
@@ -108,7 +108,7 @@ namespace Adamantium.Fonts.Extensions
             {
                 otfTtfReader.Position = cffOffset + fontDict.PrivateDictOffset;
                 var bytes = otfTtfReader.ReadBytes(fontDict.PrivateDictSize, true);
-                var dictParser = new DictOperandParser(bytes);
+                var dictParser = new DictOperandParser(bytes, font);
                 var result = dictParser.GetAllAvailableOperands();
 
                 foreach (var operandResult in result.Results)
@@ -118,7 +118,7 @@ namespace Adamantium.Fonts.Extensions
                         case DictOperatorsType.Subrs:
                             var localSubrsOffset = operandResult.Value.AsInt();
                             otfTtfReader.Position = cffOffset + fontDict.PrivateDictOffset + localSubrsOffset;
-                            var offsets = otfTtfReader.ReadCffIndex(version);
+                            var offsets = otfTtfReader.ReadCffIndex(font.CffVersion);
                             fontDict.LocalSubr = offsets.DataByOffset;
                             break;
                     }

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using Adamantium.Fonts.Common;
 using Adamantium.Fonts.Tables.CFF;
 
 namespace Adamantium.Fonts.Parsers.CFF
@@ -11,10 +12,13 @@ namespace Adamantium.Fonts.Parsers.CFF
         private Dictionary<ushort, DictOperatorsType> byteToOperatorMap;
         private Dictionary<DictOperatorsType, Func<List<GenericOperandResult>, GenericOperandResult>> operatorsActions;
         protected Dictionary<DictOperatorsType, List<GenericOperandResult>> OperatorsRawValues;
-        public DictOperandParser(byte[] rawData)
+        protected CFFFont Font { get; }
+
+        public DictOperandParser(byte[] rawData, CFFFont font)
         {
             OperatorsRawValues = new Dictionary<DictOperatorsType, List<GenericOperandResult>>();
-
+            Font = font;
+            
             byteToOperatorMap = new Dictionary<ushort, DictOperatorsType>
             {
                 { (ushort)DictOperatorsType.version              , DictOperatorsType.version              },
@@ -142,7 +146,7 @@ namespace Adamantium.Fonts.Parsers.CFF
             };
 
             FillDefaultValues();
-            FillOperatorsRawValues(rawData);
+            FillOperatorsRawValues(font, rawData);
         }
         
         // convert raw byte stream to GenericOperandResult (will always produce Number)
@@ -368,7 +372,7 @@ namespace Adamantium.Fonts.Parsers.CFF
         {
         }
         
-        private void FillOperatorsRawValues(byte[] rawData)
+        private void FillOperatorsRawValues(CFFFont font, byte[] rawData)
         {
             var byteArray = new List<byte>(rawData);
             var rawOperands = new List<GenericOperandResult>();
@@ -392,27 +396,34 @@ namespace Adamantium.Fonts.Parsers.CFF
 
                     if ((DictOperatorsType) token == DictOperatorsType.blend)
                     {
-                        var operandsCount = rawOperands[^1].AsInt();
-                        var operandsForNextOperator = rawOperands.GetRange(0, operandsCount);
+                        var blendedOperandsCount =  rawOperands[^1].AsInt();
+                        var regionCount = font.VariationStore.VariationRegionList.RegionCount;
+                        var overallBlendOperandsCount = blendedOperandsCount * (regionCount + 1) + 1;
 
-                        var deltasData = rawOperands.ToArray()[operandsCount..^1];
-                        var regionCount = deltasData.Length / operandsCount;
-                        
-                        for (var op = 0; op < operandsCount; ++op)
+                        var startIndexOfBlendOperands = rawOperands.Count - overallBlendOperandsCount;
+
+                        var blendOperands = rawOperands.ToArray()[(int)startIndexOfBlendOperands..].ToList();
+
+                        rawOperands = rawOperands.GetRange(0, (int)startIndexOfBlendOperands);
+
+                        var blendedOperands = blendOperands.GetRange(0, (int) blendedOperandsCount);
+                        var deltas = blendOperands.ToArray()[(int)(blendedOperandsCount)..^1];
+
+                        for (var op = 0; op < blendedOperands.Count; ++op)
                         {
-                            var deltas = new List<double>();
+                            var blendData = new RegionData();
 
                             for (var region = 0; region < regionCount; ++region)
                             {
-                                deltas.Add(deltasData[region + regionCount * op].AsDouble());
+                                blendData.Data.Add(deltas[op * regionCount + region].AsDouble());
                             }
 
-                            var genericResult = operandsForNextOperator[op];
-                            genericResult.Deltas = deltas;
-                            operandsForNextOperator[op] = genericResult;
+                            var genericResult = blendedOperands[op];
+                            genericResult.BlendData = blendData;
+                            blendedOperands[op] = genericResult;
                         }
 
-                        rawOperands = operandsForNextOperator.ToList();
+                        rawOperands.AddRange(blendedOperands);
                     }
                     else
                     {

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Adamantium.Fonts.Common;
 
 namespace Adamantium.Fonts.Tables.CFF
 {
@@ -8,12 +9,7 @@ namespace Adamantium.Fonts.Tables.CFF
         public List<double> Result;
         
         // deltas for each variation region applicable for current operand
-        public List<double> Deltas;
-
-        public double GetDeltaForRegion(int index)
-        {
-            return Deltas[index];
-        }
+        public RegionData BlendData { get; set; }
         
         public int AsInt()
         {

@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Fonts.Common;
 using Adamantium.Fonts.Exceptions;
+using Adamantium.Fonts.Parsers.CFF;
+using Adamantium.Fonts.Tables.CFF;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Fonts
@@ -15,6 +17,8 @@ namespace Adamantium.Fonts
         private List<Outline> outlines;
         private bool isSplitOnSegments;
 
+        private List<Command> commandList;
+        
         internal IReadOnlyCollection<Outline> Outlines => outlines.AsReadOnly();
         private readonly Dictionary<uint, SampledOutline[]> sampledOutlinesCache;
         private readonly Dictionary<uint, Vector3F[]> triangulatedCache;
@@ -295,6 +299,37 @@ namespace Adamantium.Fonts
         public override string ToString()
         {
             return $"Name: {Name} Index: {Index}, SID: {SID} Unicodes: {string.Join(", ", Unicodes)}";
+        }
+
+        internal static Glyph Create(uint index)
+        {
+            return new Glyph(index);
+        }
+
+        internal Glyph SetCommands(List<Command> commands)
+        {
+            commandList = commands;
+            return this;
+        }
+        
+        internal Glyph FillOutlines(VariationRegionList regionList = null, float[] variationPoint = null)
+        {
+            var interpreter = new CommandInterpreter();
+            Outline outline = null;
+
+            foreach (var command in commandList)
+            {
+                if (command.IsNewOutline())
+                {
+                    outline = new Outline();
+                    AddOutline(outline);
+                }
+
+                var pts = interpreter.GetOutlinePoints(command, regionList, variationPoint);
+                outline?.Points.AddRange(pts);
+            }
+
+            return this;
         }
     }
 }
