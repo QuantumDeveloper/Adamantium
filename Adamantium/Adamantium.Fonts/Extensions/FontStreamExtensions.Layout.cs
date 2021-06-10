@@ -272,6 +272,268 @@ namespace Adamantium.Fonts.Extensions
             return lookupList;
         }
 
+        private static PairSet ReadPairSet(this FontStreamReader reader, ValueFormat value1Format, ValueFormat value2Format)
+        {
+            var pairSet = new PairSet();
+            pairSet.SecondGlyph = reader.ReadUInt16();
+            pairSet.ValueRecord1 = reader.ReadValueRecord(value1Format);
+            pairSet.ValueRecord2 = reader.ReadValueRecord(value2Format);
+
+            return pairSet;
+        }
+        
+        private static ClassDefTable ReadClassDefTable(this FontStreamReader reader, long offset)
+        {
+            reader.Position = offset;
+            
+            var classDef = new ClassDefTable();
+            classDef.Format = reader.ReadUInt16();
+            switch (classDef.Format)
+            {
+                case 1:
+                    classDef.StartGlyphId = reader.ReadUInt16();
+                    var glyphCount = reader.ReadUInt16();
+                    classDef.ClassValueArray = reader.ReadUInt16Array(glyphCount);
+                    break;
+                case 2:
+                    var classRangeCount = reader.ReadUInt16();
+                    var records = new ClassRangeRecord[classRangeCount];
+                    for (int i = 0; i < classRangeCount; i++)
+                    {
+                        var start = reader.ReadUInt16();
+                        var end = reader.ReadUInt16();
+                        var classId = reader.ReadUInt16();
+                        var recordItem = new ClassRangeRecord(start, end, classId);
+                        records[i] = recordItem;
+                    }
+
+                    classDef.ClassRangeRecords = records;
+                    break;
+            }
+
+            return classDef;
+        }
+
+        private static MarkArrayTable ReadMarkArrayTable(this FontStreamReader reader, long subTableOffset)
+        {
+            reader.Position = subTableOffset;
+            
+            var markArrayTable = new MarkArrayTable();
+            var count = reader.ReadUInt16();
+            markArrayTable.MarkRecords = new MarkRecord[count];
+            for (int i = 0; i < count; i++)
+            {
+                var markClass = reader.ReadUInt16();
+                var offset = reader.ReadUInt16();
+                markArrayTable.MarkRecords[i] = new MarkRecord(markClass, offset);
+            }
+
+            markArrayTable.AnchorTables = new AnchorTable[count];
+            for (int i = 0; i < count; i++)
+            {
+                var markRecord = markArrayTable.MarkRecords[i];
+                markArrayTable.AnchorTables[i] = reader.ReadAnchorTable(markRecord.Offset + subTableOffset);
+            }
+
+            return markArrayTable;
+        }
+        
+        private static Mark2ArrayTable ReadMark2ArrayTable(this FontStreamReader reader, long subTableOffset, int markClassCount)
+        {
+            reader.Position = subTableOffset;
+            
+            var markArrayTable = new Mark2ArrayTable();
+            var count = reader.ReadUInt16();
+            markArrayTable.Records = new Mark2Record[count];
+            for (int i = 0; i < count; i++)
+            {
+                var record = new Mark2Record();
+                markArrayTable.Records[i] = record;
+                record.Anchors = new AnchorTable[markClassCount];
+                var anchorOffsets = reader.ReadUInt16Array(markClassCount);
+                for (int k = 0; k < markClassCount; ++k)
+                {
+                    long offset = anchorOffsets[k];
+                    
+                    if (offset <= 0) continue;
+
+                    offset += subTableOffset;
+
+                    record.Anchors[k] = reader.ReadAnchorTable(offset);
+                }
+                
+            }
+
+            return markArrayTable;
+        }
+        
+        private static BaseArrayTable ReadBaseArrayTable(this FontStreamReader reader, long subTableOffset, int markClassCount)
+        {
+            reader.Position = subTableOffset;
+            
+            var baseArrayTable = new BaseArrayTable();
+            var count = reader.ReadUInt16();
+            baseArrayTable.BaseRecords = new BaseRecord[count];
+            var anchorOffsetArray = reader.ReadUInt16Array(markClassCount);
+            for (int k = 0; k < count; ++k)
+            {
+                var baseRecord = new BaseRecord();
+                baseArrayTable.BaseRecords[k] = baseRecord;
+                baseRecord.Anchors = new AnchorTable[markClassCount];
+                for (int i = 0; i < markClassCount; ++i)
+                {
+                    long offset = anchorOffsetArray[i];
+                    
+                    if (offset <= 0) continue;
+
+                    offset += subTableOffset;
+                    
+                    baseRecord.Anchors[i] = reader.ReadAnchorTable(offset);
+                }
+            }
+
+            return baseArrayTable;
+        }
+        
+        private static LigatureArrayTable ReadLigatureArrayTable(this FontStreamReader reader, long subTableOffset, int markClassCount)
+        {
+            reader.Position = subTableOffset;
+            
+            var ligatureArrayTable = new LigatureArrayTable();
+            var ligatureCount = reader.ReadUInt16();
+            ligatureArrayTable.AttachTables = new LigatureAttachTable[ligatureCount];
+            for (int k = 0; k < ligatureCount; ++k)
+            {
+                var ligatureAttachTable = new LigatureAttachTable();
+                ligatureArrayTable.AttachTables[k] = ligatureAttachTable;
+
+                var componentCount = reader.ReadUInt16();
+                ligatureAttachTable.ComponentRecords = new ComponentRecord[componentCount];
+                for (int i = 0; i < componentCount; ++i)
+                {
+                    var componentRecord = new ComponentRecord();
+                    componentRecord.Anchors = new AnchorTable[markClassCount];
+                    
+                    var anchorOffsetArray = reader.ReadUInt16Array(markClassCount);
+                    
+                    for (int m = 0; m < markClassCount; ++m)
+                    {
+                        long offset = anchorOffsetArray[i];
+                    
+                        if (offset <= 0) continue;
+
+                        offset += subTableOffset;
+                    
+                        componentRecord.Anchors[i] = reader.ReadAnchorTable(offset);
+                    }
+                }
+            }
+
+            return ligatureArrayTable;
+        }
+
+        private static SequenceRuleSetTable ReadSequenceRuleSetTable(this FontStreamReader reader, long offset)
+        {
+            reader.Position = offset;
+            
+            var count = reader.ReadUInt16();
+            var ruleSet = new SequenceRuleSetTable();
+            ruleSet.Rules = new SequenceRuleTable[count];
+
+            for (int i = 0; i < count; ++i)
+            {
+                ruleSet.Rules[i] = reader.ReadSequenceRuleTable();
+            }
+
+            return ruleSet;
+        }
+
+        private static SequenceRuleTable ReadSequenceRuleTable(this FontStreamReader reader)
+        {
+            var table = new SequenceRuleTable();
+            var glyphCount = reader.ReadUInt16();
+            var lookupCount = reader.ReadUInt16();
+            table.InputSequence = new ushort[glyphCount - 1];
+            table.SeqLookupRecords = reader.ReadSequenceLookupRecordArray(lookupCount);
+            
+            return table;
+        }
+        
+        private static ClassSequenceRuleSetTable ReadClassSequenceRuleSetTable(this FontStreamReader reader, long offset)
+        {
+            reader.Position = offset;
+            
+            var count = reader.ReadUInt16();
+            var ruleSet = new ClassSequenceRuleSetTable();
+            ruleSet.Rules = new ClassSequenceRuleTable[count];
+
+            for (int i = 0; i < count; ++i)
+            {
+                ruleSet.Rules[i] = reader.ReadClassSequenceRuleTable();
+            }
+
+            return ruleSet;
+        }
+
+        private static ClassSequenceRuleTable ReadClassSequenceRuleTable(this FontStreamReader reader)
+        {
+            var table = new ClassSequenceRuleTable();
+            var glyphCount = reader.ReadUInt16();
+            var lookupCount = reader.ReadUInt16();
+            table.InputSequence = new ushort[glyphCount - 1];
+            table.LookupRecords = reader.ReadSequenceLookupRecordArray(lookupCount);
+            return table;
+        }
+        
+        private static ChainedSequenceRuleSetTable ReadChainedSequenceRuleSetTable(this FontStreamReader reader, long subtableOffset)
+        {
+            reader.Position = subtableOffset;
+            
+            var count = reader.ReadUInt16();
+            var ruleSet = new ChainedSequenceRuleSetTable();
+            ruleSet.Rules = new ChainedSequenceRuleTable[count];
+            var offsets = reader.ReadUInt16Array(count);
+
+            for (int i = 0; i < count; ++i)
+            {
+                var offset = offsets[i] + subtableOffset;
+                ruleSet.Rules[i] = reader.ReadChainedSequenceRuleTable(offset);
+            }
+
+            return ruleSet;
+        }
+
+        private static ChainedSequenceRuleTable ReadChainedSequenceRuleTable(this FontStreamReader reader, long subtableOffset)
+        {
+            reader.Position = subtableOffset;
+            
+            var table = new ChainedSequenceRuleTable();
+            var backtrackGlyphCount = reader.ReadUInt16();
+            table.BacktrackSequence = reader.ReadUInt16Array(backtrackGlyphCount);
+            var inputGlyphCount = reader.ReadUInt16();
+            table.InputSequence = reader.ReadUInt16Array(inputGlyphCount - 1);
+            var lookaheadGlyphCount = reader.ReadUInt16();
+            table.LookaheadSequence = reader.ReadUInt16Array(lookaheadGlyphCount);
+            var seqLookupCount = reader.ReadUInt16();
+            table.SeqLookupRecords = reader.ReadSequenceLookupRecordArray(seqLookupCount);
+
+            return table;
+        }
+
+        private static SequenceLookupRecord[] ReadSequenceLookupRecordArray(this FontStreamReader reader, int count)
+        {
+            var lookupArray = new SequenceLookupRecord[count];
+            for (int i = 0; i < count; ++i)
+            {
+                var record = new SequenceLookupRecord();
+                record.SequenceIndex = reader.ReadUInt16();
+                record.LookupListIndex = reader.ReadUInt16();
+                lookupArray[i] = record;
+            }
+
+            return lookupArray;
+        }
+        
         public static LookupTable ReadLookupTable(this FontStreamReader reader, long offset)
         {
             reader.Position = offset;
@@ -294,35 +556,8 @@ namespace Adamantium.Fonts.Extensions
 
             return lookup;
         }
-
-        public static LookupSubtable ReadLookupSubtable(this FontStreamReader reader, ushort lookupType, long subtableOffset)
-        {
-            switch (lookupType)
-            {
-                case 1:
-                    return reader.ReadLookupSubtableType1(subtableOffset);
-                case 2:
-                    return reader.ReadLookupSubtableType2(subtableOffset);
-                case 3:
-                    return reader.ReadLookupSubtableType3(subtableOffset);
-                case 4:
-                    return reader.ReadLookupSubtableType4(subtableOffset);
-                case 5:
-                    return reader.ReadLookupSubtableType5(subtableOffset);
-                case 6:
-                    return reader.ReadLookupSubtableType6(subtableOffset);
-                case 7:
-                    return reader.ReadLookupSubtableType7(subtableOffset);
-                case 8:
-                    return reader.ReadLookupSubtableType8(subtableOffset);
-                case 9:
-                    return reader.ReadLookupSubtableType9(subtableOffset);
-                default: throw new NotSupportedException();
-            }
-        }
-
         
-        private static LookupSubtable ReadLookupSubtableType1(this FontStreamReader reader, long subtableOffset)
+        private static LookupSubtable ReadLookupSubTableType1(this FontStreamReader reader, long subtableOffset)
         {
             var format = reader.ReadUInt16();
             var coverageOffset = reader.ReadUInt16() + subtableOffset;
@@ -349,11 +584,12 @@ namespace Adamantium.Fonts.Extensions
 
                     return new LookupSubtableType1(coverage, records);
                 }
-                default: throw new NotSupportedException();
+                default:
+                    return new UnImplementedLookupSubTable(format);
             }
         }
 
-        private static LookupSubtable ReadLookupSubtableType2(this FontStreamReader reader, long subtableOffset)
+        private static LookupSubtable ReadLookupSubTableType2(this FontStreamReader reader, long subtableOffset)
         {
             var format = reader.ReadUInt16();
             switch (format)
@@ -419,16 +655,22 @@ namespace Adamantium.Fonts.Extensions
                     return subtable;
                 }
                 default:
-                    throw new NotSupportedException($"Format {format} is not supported");
+                    return new UnImplementedLookupSubTable(format);
             }
         }
 
-        private static LookupSubtable ReadLookupSubtableType3(this FontStreamReader reader, long subtableOffset)
+        private static LookupSubtable ReadLookupSubTableType3(this FontStreamReader reader, long subtableOffset)
         {
             reader.Position = subtableOffset;
             
-            var lookup = new LookupSubtableType3();
-            lookup.Format = reader.ReadUInt16();
+            var lookup = new LookupSubTableType3();
+            var format = reader.ReadUInt16();
+
+            if (format != 1)
+            {
+                return new UnImplementedLookupSubTable(format);
+            }
+
             var coverageOffset = reader.ReadUInt16() + subtableOffset;
             var entryExitCount = reader.ReadUInt16();
             var entryAnchorOffset = new ushort[entryExitCount];
@@ -462,100 +704,294 @@ namespace Adamantium.Fonts.Extensions
             return lookup;
         }
         
-        private static LookupSubtable ReadLookupSubtableType4(this FontStreamReader reader, long subtableOffset)
+        private static LookupSubtable ReadLookupSubTableType4(this FontStreamReader reader, long subtableOffset)
         {
-            return null;
-        }
-        
-        private static LookupSubtable ReadLookupSubtableType5(this FontStreamReader reader, long subtableOffset)
-        {
-            return null;
-        }
-        
-        private static LookupSubtable ReadLookupSubtableType6(this FontStreamReader reader, long subtableOffset)
-        {
-            return null;
-        }
-        
-        private static LookupSubtable ReadLookupSubtableType7(this FontStreamReader reader, long subtableOffset)
-        {
-            return null;
-        }
-        
-        private static LookupSubtable ReadLookupSubtableType8(this FontStreamReader reader, long subtableOffset)
-        {
-            return null;
-        }
-        
-        private static LookupSubtable ReadLookupSubtableType9(this FontStreamReader reader, long subtableOffset)
-        {
-            return null;
-        }
-        
-        private static PairSet ReadPairSet(this FontStreamReader reader, ValueFormat value1Format, ValueFormat value2Format)
-        {
-            var pairSet = new PairSet();
-            pairSet.SecondGlyph = reader.ReadUInt16();
-            pairSet.ValueRecord1 = reader.ReadValueRecord(value1Format);
-            pairSet.ValueRecord2 = reader.ReadValueRecord(value2Format);
+            reader.Position = subtableOffset;
 
-            return pairSet;
+            var format = reader.ReadUInt16();
+
+            if (format != 1)
+            {
+                return new UnImplementedLookupSubTable(format);
+            }
+
+            var markCoverageOffset = reader.ReadUInt16() + subtableOffset;
+            var baseCoverageOffset = reader.ReadUInt16() + subtableOffset;
+            var markClassCount = reader.ReadUInt16();
+            var markArrayOffset = reader.ReadUInt16() + subtableOffset;
+            var baseArrayOffset = reader.ReadUInt16() + subtableOffset;
+
+            var lookupType4 = new LookupSubTableType4();
+            lookupType4.MarkCoverage = reader.ReadCoverageTable(markCoverageOffset);
+            lookupType4.BaseCoverage = reader.ReadCoverageTable(baseCoverageOffset);
+            lookupType4.MarkArrayTable = reader.ReadMarkArrayTable(markArrayOffset);
+            lookupType4.BaseArrayTable = reader.ReadBaseArrayTable(baseArrayOffset, markClassCount);
+
+            return lookupType4;
         }
         
-        private static ClassDefTable ReadClassDefTable(this FontStreamReader reader, long offset)
+        private static LookupSubtable ReadLookupSubTableType5(this FontStreamReader reader, long subtableOffset)
         {
-            reader.Position = offset;
+            reader.Position = subtableOffset;
+
+            var format = reader.ReadUInt16();
+            if (format != 1)
+            {
+                return new UnImplementedLookupSubTable(format);
+            }
             
-            var classDef = new ClassDefTable();
-            classDef.Format = reader.ReadUInt16();
-            switch (classDef.Format)
+            var markCoverageOffset = reader.ReadUInt16() + subtableOffset;
+            var ligatureCoverageOffset = reader.ReadUInt16() + subtableOffset;
+            var markClassCount = reader.ReadUInt16();
+            var markArrayOffset = reader.ReadUInt16() + subtableOffset;
+            var ligatureArrayOffset = reader.ReadUInt16() + subtableOffset;
+            
+            var lookupType5 = new LookupSubTableType5();
+            lookupType5.MarkCoverage = reader.ReadCoverageTable(markArrayOffset);
+            lookupType5.LigatureCoverage = reader.ReadCoverageTable(ligatureCoverageOffset);
+            lookupType5.MarkArrayTable = reader.ReadMarkArrayTable(markArrayOffset);
+            lookupType5.LigatureArrayTable = reader.ReadLigatureArrayTable(ligatureArrayOffset, markClassCount);
+
+            return lookupType5;
+        }
+        
+        private static LookupSubtable ReadLookupSubTableType6(this FontStreamReader reader, long subtableOffset)
+        {
+            reader.Position = subtableOffset;
+
+            var format = reader.ReadUInt16();
+
+            if (format != 1)
+            {
+                return new UnImplementedLookupSubTable(format);
+            }
+
+            var markCoverageOffset = reader.ReadUInt16() + subtableOffset;
+            var ligatureCoverageOffset = reader.ReadUInt16() + subtableOffset;
+            var classCount = reader.ReadUInt16();
+            var markArrayOffset = reader.ReadUInt16() + subtableOffset;
+            var ligatureArrayOffset = reader.ReadUInt16() + subtableOffset;
+
+            var lookupSubTable = new LookupSubTableType6();
+            lookupSubTable.Mark1Coverage = reader.ReadCoverageTable(markCoverageOffset);
+            lookupSubTable.Mark2Coverage = reader.ReadCoverageTable(ligatureCoverageOffset);
+            lookupSubTable.Mark1ArrayTable = reader.ReadMarkArrayTable(markArrayOffset);
+            lookupSubTable.Mark2ArrayTable = reader.ReadMark2ArrayTable(ligatureArrayOffset, classCount);
+
+            return lookupSubTable;
+        }
+        
+        private static LookupSubtable ReadLookupSubTableType7(this FontStreamReader reader, long subtableOffset)
+        {
+            reader.Position = subtableOffset;
+
+            var format = reader.ReadUInt16();
+
+            switch (format)
             {
                 case 1:
-                    classDef.StartGlyphId = reader.ReadUInt16();
-                    var glyphCount = reader.ReadUInt16();
-                    classDef.ClassValueArray = reader.ReadUInt16Array(glyphCount);
-                    break;
-                case 2:
-                    var classRangeCount = reader.ReadUInt16();
-                    var records = new ClassRangeRecord[classRangeCount];
-                    for (int i = 0; i < classRangeCount; i++)
+                {
+                    var lookupFormat1 = new LookupSubTableType7Format1();
+                    var coverageOffset = reader.ReadUInt16() + subtableOffset;
+                    var ruleSetCount = reader.ReadUInt16();
+                    var ruleSetOffsets = reader.ReadUInt16Array(ruleSetCount);
+
+                    lookupFormat1.SequenceRuleSets = new SequenceRuleSetTable[ruleSetCount];
+                    for (int i = 0; i < ruleSetCount; i++)
                     {
-                        var start = reader.ReadUInt16();
-                        var end = reader.ReadUInt16();
-                        var classId = reader.ReadUInt16();
-                        var recordItem = new ClassRangeRecord(start, end, classId);
-                        records[i] = recordItem;
+                        long offset = ruleSetOffsets[i];
+
+                        if (offset <= 0) continue;
+
+                        offset += subtableOffset;
+                        var ruleSet = reader.ReadSequenceRuleSetTable(offset);
+                        lookupFormat1.SequenceRuleSets[i] = ruleSet;
                     }
 
-                    classDef.ClassRangeRecords = records;
-                    break;
-            }
+                    lookupFormat1.Coverage = reader.ReadCoverageTable(coverageOffset);
 
-            return classDef;
+                    return lookupFormat1;
+                }
+                case 2:
+                {
+                    var lookupFormat2 = new LookupSubTableType7Format2();
+                    var coverageOffset = reader.ReadUInt16() + subtableOffset;
+                    var classDefOffset = reader.ReadUInt16() + subtableOffset;
+                    var ruleSetCount = reader.ReadUInt16();
+                    var ruleSetOffsets = reader.ReadUInt16Array(ruleSetCount);
+
+                    lookupFormat2.Coverage = reader.ReadCoverageTable(coverageOffset);
+                    lookupFormat2.ClassDef = reader.ReadClassDefTable(classDefOffset);
+
+                    lookupFormat2.ClassSequenceRuleSets = new ClassSequenceRuleSetTable[ruleSetCount];
+                    
+                    for (int i = 0; i < ruleSetCount; i++)
+                    {
+                        long offset = ruleSetOffsets[i];
+
+                        if (offset <= 0) continue;
+
+                        offset += subtableOffset;
+                        var ruleSet = reader.ReadClassSequenceRuleSetTable(offset);
+                        lookupFormat2.ClassSequenceRuleSets[i] = ruleSet;
+                    }
+                    
+                    return lookupFormat2;
+                }
+                case 3:
+                {
+                    var glyphCount = reader.ReadUInt16();
+                    var lookupCount = reader.ReadUInt16();
+                    var coverageOffsets = reader.ReadUInt16Array(glyphCount);
+
+                    var lookupFormat3 = new LookupSubTableType7Format3();
+                    lookupFormat3.LookupRecords = reader.ReadSequenceLookupRecordArray(lookupCount);
+                    lookupFormat3.CoverageTables = new CoverageTable[glyphCount];
+                    
+                    for (int i = 0; i < glyphCount; ++i)
+                    {
+                        var offset = coverageOffsets[i];
+                        lookupFormat3.CoverageTables[i] = reader.ReadCoverageTable(offset + subtableOffset);
+                    }
+
+                    return lookupFormat3;
+                }
+                default:
+                    return new UnImplementedLookupSubTable(format);
+            }
         }
-
-        private static MarkArrayTable ReadMarkArrayTable(this FontStreamReader reader, long subTableOffset)
+        
+        private static LookupSubtable ReadLookupSubTableType8(this FontStreamReader reader, long subtableOffset)
         {
-            reader.Position = subTableOffset;
+            reader.Position = subtableOffset;
+
+            var format = reader.ReadUInt16();
+            switch (format)
+            {
+                case 1:
+                {
+                    var lookupFormat1 = new LookupSubTableType8Format1();
+                    var coverageOffset = reader.ReadUInt16() + subtableOffset;
+                    var chainedSeqRuleSetCount = reader.ReadUInt16();
+                    var chainedSeqRuleSetOffsets = reader.ReadUInt16Array(chainedSeqRuleSetCount);
+
+                    lookupFormat1.Coverage = reader.ReadCoverageTable(coverageOffset);
+                    lookupFormat1.ChainedSeqRuleSets = new ChainedSequenceRuleSetTable[chainedSeqRuleSetCount];
+                    for (int i = 0; i < chainedSeqRuleSetCount; i++)
+                    {
+                        long offset = chainedSeqRuleSetOffsets[i];
+                        if (offset <= 0) continue;
+
+                        offset += subtableOffset;
+
+                        lookupFormat1.ChainedSeqRuleSets[i] = reader.ReadChainedSequenceRuleSetTable(offset);
+                    }
+
+                    return lookupFormat1;
+                }
+                case 2:
+                {
+                    var lookupFormat2 = new LookupSubTableType8Format2();
+                    var coverageOffset = reader.ReadUInt16() + subtableOffset;
+                    var backtrackClassDefOffset = reader.ReadUInt16() + subtableOffset;
+                    var inputClassDefOffset = reader.ReadUInt16() + subtableOffset;
+                    var lookaheadClassDefOffset = reader.ReadUInt16() + subtableOffset;
+                    var chainedSeqRuleSetCount = reader.ReadUInt16();
+                    var chainedSeqRuleSetOffsets = reader.ReadUInt16Array(chainedSeqRuleSetCount);
+
+                    lookupFormat2.Coverage = reader.ReadCoverageTable(coverageOffset);
+                    lookupFormat2.ChainedSeqRuleSets = new ChainedSequenceRuleSetTable[chainedSeqRuleSetCount];
+                    for (int i = 0; i < chainedSeqRuleSetCount; i++)
+                    {
+                        long offset = chainedSeqRuleSetOffsets[i];
+                        if (offset <= 0) continue;
+
+                        offset += subtableOffset;
+
+                        lookupFormat2.ChainedSeqRuleSets[i] = reader.ReadChainedSequenceRuleSetTable(offset);
+                    }
+
+                    lookupFormat2.BacktrackClassDef = reader.ReadClassDefTable(backtrackClassDefOffset);
+                    lookupFormat2.InputClassDef = reader.ReadClassDefTable(inputClassDefOffset);
+                    lookupFormat2.LookaheadClassDef = reader.ReadClassDefTable(lookaheadClassDefOffset);
+
+                    return lookupFormat2;
+                }
+                case 3:
+                {
+                    var lookupFormat3 = new LookupSubTableType8Format3();
+                    var backtrackGlyphCount = reader.ReadUInt16();
+                    var backtrackCoverageOffsets = reader.ReadUInt16Array(backtrackGlyphCount);
+                    var inputGlyphCount = reader.ReadUInt16();
+                    var inputCoverageOffsets = reader.ReadUInt16Array(inputGlyphCount);
+                    var lookaheadGlyphCount = reader.ReadUInt16();
+                    var lookaheadCoverageOffsets = reader.ReadUInt16Array(lookaheadGlyphCount);
+                    var seqLookupCount = reader.ReadUInt16();
+                    lookupFormat3.LookupRecords = reader.ReadSequenceLookupRecordArray(seqLookupCount);
+
+                    lookupFormat3.BacktrackCoverages = new CoverageTable[backtrackGlyphCount];
+                    for (int i = 0; i < backtrackGlyphCount; ++i)
+                    {
+                        var offset = backtrackCoverageOffsets[i] + subtableOffset;
+                        lookupFormat3.BacktrackCoverages[i] = reader.ReadCoverageTable(offset);
+                    }
+                    
+                    lookupFormat3.InputCoverages = new CoverageTable[inputGlyphCount];
+                    for (int i = 0; i < inputGlyphCount; ++i)
+                    {
+                        var offset = inputCoverageOffsets[i] + subtableOffset;
+                        lookupFormat3.InputCoverages[i] = reader.ReadCoverageTable(offset);
+                    }
+                    
+                    lookupFormat3.LookaheadCoverages = new CoverageTable[lookaheadGlyphCount];
+                    for (int i = 0; i < lookaheadGlyphCount; ++i)
+                    {
+                        var offset = lookaheadCoverageOffsets[i] + subtableOffset;
+                        lookupFormat3.LookaheadCoverages[i] = reader.ReadCoverageTable(offset);
+                    }
+                    
+
+                    return lookupFormat3;
+                }
+                default:
+                    return new UnImplementedLookupSubTable(format);
+            }
+        }
+        
+        private static LookupSubtable ReadLookupSubTableType9(this FontStreamReader reader, long subtableOffset)
+        {
+            reader.Position = subtableOffset;
             
-            var markArrayTable = new MarkArrayTable();
-            var count = reader.ReadUInt16();
-            markArrayTable.MarkRecords = new MarkRecord[count];
-            for (int i = 0; i < count; i++)
+            var format = reader.ReadUInt16();
+            var extensionLookupType = reader.ReadUInt16();
+            var extensionOffset = reader.ReadUInt32();
+            return reader.ReadLookupSubtable(extensionLookupType, extensionOffset);
+        }
+        
+        public static LookupSubtable ReadLookupSubtable(this FontStreamReader reader, ushort lookupType, long subtableOffset)
+        {
+            switch (lookupType)
             {
-                var markClass = reader.ReadUInt16();
-                var offset = reader.ReadUInt16();
-                markArrayTable.MarkRecords[i] = new MarkRecord(markClass, offset);
+                case 1:
+                    return reader.ReadLookupSubTableType1(subtableOffset);
+                case 2:
+                    return reader.ReadLookupSubTableType2(subtableOffset);
+                case 3:
+                    return reader.ReadLookupSubTableType3(subtableOffset);
+                case 4:
+                    return reader.ReadLookupSubTableType4(subtableOffset);
+                case 5:
+                    return reader.ReadLookupSubTableType5(subtableOffset);
+                case 6:
+                    return reader.ReadLookupSubTableType6(subtableOffset);
+                case 7:
+                    return reader.ReadLookupSubTableType7(subtableOffset);
+                case 8:
+                    return reader.ReadLookupSubTableType8(subtableOffset);
+                case 9:
+                    return reader.ReadLookupSubTableType9(subtableOffset);
+                default: throw new NotSupportedException();
             }
-
-            markArrayTable.AnchorTables = new AnchorTable[count];
-            for (int i = 0; i < count; i++)
-            {
-                var markRecord = markArrayTable.MarkRecords[i];
-                markArrayTable.AnchorTables[i] = reader.ReadAnchorTable(markRecord.Offset + subTableOffset);
-            }
-
-            return markArrayTable;
         }
     }
 }

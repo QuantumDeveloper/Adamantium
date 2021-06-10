@@ -153,15 +153,14 @@ namespace Adamantium.Fonts.Parsers
                 
                 for (int i = 0; i < numFonts; ++i)
                 {
-                    fontEntry = new FontCollectionEntry();
-                    fontEntry.NumTables = reader.Read255UInt16();
-                    fontEntry.Flavor = reader.ReadUInt32();
-                    var indices = new ushort[fontEntry.NumTables];
-                    for (int x = 0; x < fontEntry.NumTables; ++x)
+                    var collectionEntry = new FontCollectionEntry();
+                    collectionEntry.NumTables = reader.Read255UInt16();
+                    collectionEntry.Flavor = reader.ReadUInt32();
+                    var indices = new ushort[collectionEntry.NumTables];
+                    for (int x = 0; x < collectionEntry.NumTables; ++x)
                     {
-                        
+                        indices[x] = reader.Read255UInt16();
                     }
-                    
                     
                 }
             }

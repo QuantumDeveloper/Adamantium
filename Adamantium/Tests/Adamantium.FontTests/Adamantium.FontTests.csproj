@@ -155,6 +155,14 @@
       <Content Include="TTFFonts\PlayfairDisplay-Regular.ttf">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
+      <None Remove="WoffFonts\WOFF2Collection\ASANA.woff2" />
+      <Content Include="WoffFonts\WOFF2Collection\ASANA.woff2">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="WoffFonts\WOFF2Collection\NotoSansCJK-Regular.woff2" />
+      <Content Include="WoffFonts\WOFF2Collection\NotoSansCJK-Regular.woff2">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
     </ItemGroup>
 
     <ItemGroup>
