@@ -33,6 +33,7 @@ namespace Adamantium.Fonts.Parsers
         private HorizontalHeaderTable hhea;
         private HorizontalMetricsTable hmtx;
         private KerningTable kern;
+        private NameTable name;
 
         protected List<TableDirectory> TableDirectories { get; set; }
 
@@ -338,6 +339,7 @@ namespace Adamantium.Fonts.Parsers
                 { "cmap",    70     },
                 { "hhea",    80     },
                 { "hmtx",    90     },
+                { "fvar",    91	    },
                 { "vhea",    100    },
                 { "vmtx",    110    },
                 { "OS/2",    120    },
@@ -376,7 +378,6 @@ namespace Adamantium.Fonts.Parsers
                 { "fdsc",    450	},
                 { "feat",    460	},
                 { "fmtx",    470	},
-                { "fvar",    480	},
                 { "gvar",    490	},
                 { "hsty",    500	},
                 { "just",    510	},
@@ -537,13 +538,86 @@ namespace Adamantium.Fonts.Parsers
                     case TableNames.GPOS:
                         ReadGlyphPositioningTable(tableEntry);
                         break;
+                    case TableNames.fvar:
+                        ReadFvarTable(tableEntry);
+                        break;
                     default:
                         ReadTable(tableEntry);
                         break;
                 }
             }
         }
-        
+
+        protected virtual void ReadFvarTable(TableEntry entry)
+        {
+            FontReader.Position = entry.Offset;
+
+            var majorVersion = FontReader.ReadUInt16();
+            var minorVersion = FontReader.ReadUInt16();
+            var axesArrayOffset = FontReader.ReadUInt16();
+            var reserved = FontReader.ReadUInt16();
+            var axisCount = FontReader.ReadUInt16();
+            var axisSize = FontReader.ReadUInt16();
+            var instanceCount = FontReader.ReadUInt16();
+            var instanceSize = FontReader.ReadUInt16();
+
+            FontReader.Position = entry.Offset + axesArrayOffset;
+            var currentOffset = FontReader.Position;
+            
+            var axes = new List<VariationAxisRecord>(); 
+            
+            for (var i = 0; i < axisCount; ++i)
+            {
+                var axis = new VariationAxisRecord();
+
+                axis.AxisTag = FontReader.ReadString(4);
+                axis.MinValue = FontReader.ReadInt32().FromF16Dot16();
+                axis.DefaultValue = FontReader.ReadInt32().FromF16Dot16();
+                axis.MaxValue = FontReader.ReadInt32().FromF16Dot16();
+                axis.Flags = FontReader.ReadUInt16();
+                axis.AxisNameID = FontReader.ReadUInt16();
+
+                axes.Add(axis);
+                
+                currentOffset += axisSize;
+                FontReader.Position = currentOffset;
+            }
+
+            var instances = new List<InstanceRecord>();
+            
+            for (var j = 0; j < instanceCount; ++j)
+            {
+                var instance = new InstanceRecord();
+
+                instance.SubfamilyNameID = FontReader.ReadUInt16();
+                instance.Flags = FontReader.ReadUInt16();
+                instance.Coordinates = new List<double>();
+                
+                for (var k = 0; k < axisCount; ++k)
+                {
+                    instance.Coordinates.Add(FontReader.ReadInt32().FromF16Dot16());
+                }
+
+                var nameTableOffset = CurrentTableDirectory.TablesOffsets[TableNames.name];
+                var nameRecord = name.NameRecords.FirstOrDefault(x => x.NameId == instance.SubfamilyNameID);
+
+                if (nameRecord != null)
+                {
+                    FontReader.Position = nameTableOffset + name.StorageOffset + nameRecord.StringOffset;
+                    var encoding = nameRecord.EncodingId is 3 or 1 ? Encoding.BigEndianUnicode : Encoding.UTF8;
+                    var str = FontReader.ReadString(nameRecord.Length, encoding);
+                    instance.InstanceSubfamilyName = str;
+                }
+
+                instances.Add(instance);
+                
+                currentOffset += instanceSize;
+                FontReader.Position = currentOffset;
+            }
+
+            CurrentFont.InstanceData = instances;
+        }
+
         protected virtual void ReadTable(TableEntry entry)
         {
             
@@ -808,6 +882,8 @@ namespace Adamantium.Fonts.Parsers
                         break;
                 }
             }
+
+            name = nameTable;
         }
 
         protected virtual void ReadGlyphIndexToLocationTable(TableEntry entry)
@@ -1183,16 +1259,16 @@ namespace Adamantium.Fonts.Parsers
                 {
                     Int16 xyScale = FontReader.ReadInt16();
 
-                    matrix.M11 = xyScale.ToF2Dot14();
-                    matrix.M22 = xyScale.ToF2Dot14();
+                    matrix.M11 = xyScale.FromF2Dot14();
+                    matrix.M22 = xyScale.FromF2Dot14();
                 }
                 else if (compositeFlag.WeHaveAnXAndYScale)
                 {
                     Int16 xScale = FontReader.ReadInt16();
                     Int16 yScale = FontReader.ReadInt16();
 
-                    matrix.M11 = xScale.ToF2Dot14();
-                    matrix.M22 = yScale.ToF2Dot14();
+                    matrix.M11 = xScale.FromF2Dot14();
+                    matrix.M22 = yScale.FromF2Dot14();
                 }
                 else if (compositeFlag.WeHaveATwoByTwo)
                 {
@@ -1201,10 +1277,10 @@ namespace Adamantium.Fonts.Parsers
                     Int16 scale10 = FontReader.ReadInt16();
                     Int16 yScale = FontReader.ReadInt16();
 
-                    matrix.M11 = xScale.ToF2Dot14();
-                    matrix.M12 = scale01.ToF2Dot14();
-                    matrix.M21 = scale10.ToF2Dot14();
-                    matrix.M22 = yScale.ToF2Dot14();
+                    matrix.M11 = xScale.FromF2Dot14();
+                    matrix.M12 = scale01.FromF2Dot14();
+                    matrix.M21 = scale10.FromF2Dot14();
+                    matrix.M22 = yScale.FromF2Dot14();
                 }
 
                 if (compositeFlag.ArgsAreXYValues) // matched points == false

@@ -7,19 +7,17 @@ using Adamantium.Fonts.Tables.CFF;
 
 namespace Adamantium.Fonts.Parsers.CFF
 {
-    internal class CommandList : OperandParser
+    internal class CommandParser : OperandParser
     {
         private static Dictionary<ushort, OperatorsType> bytesToOperatorMap;
         private ICFFParser cffParser;
-        internal List<Command> commands;
 
-        internal CommandList(ICFFParser cffParser)
+        internal CommandParser(ICFFParser cffParser)
         {
             this.cffParser = cffParser;
-            commands = new List<Command>();
         }
 
-        static CommandList()
+        static CommandParser()
         {
             bytesToOperatorMap = new Dictionary<ushort, OperatorsType>
             {
@@ -75,8 +73,10 @@ namespace Adamantium.Fonts.Parsers.CFF
             };
         }
 
-        public void Fill(CFFFont font, Stack<byte> mainStack, FontDict fontDict, int index = 0)
+        public List<Command> Parse(CFFFont font, Stack<byte> mainStack, FontDict fontDict, int index = 0)
         {
+            var commands = new List<Command>();
+            
             var operands = new List<CommandOperand>();
             ushort token;
             bool clearOperands;
@@ -307,11 +307,8 @@ namespace Adamantium.Fonts.Parsers.CFF
                     operands.Add(new (Number((byte)token, mainStack).AsDouble()));
                 }
             }
-        }
 
-        public void Clear()
-        {
-            commands?.Clear();
+            return commands;
         }
     }
 }

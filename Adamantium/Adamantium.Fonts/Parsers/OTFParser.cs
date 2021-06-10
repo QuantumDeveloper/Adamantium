@@ -255,6 +255,7 @@ namespace Adamantium.Fonts.Parsers
 
             cffFont = cffParser.Parse();
             TypeFace.SetGlyphs(cffFont.Glyphs);
+            CurrentFont.VariationData = cffFont.VariationStore;
         }
 
         

@@ -14,14 +14,12 @@ namespace Adamantium.Fonts.Parsers.CFF
         
         private CFFHeader cffHeader;
         private CFFFontSet fontSet;
-        private PipelineAssembler pipelineAssembler;
-        
+
         public CFF2Parser(long cffOffset, FontStreamReader ttfReader)
         {
             this.cffOffset = cffOffset;
             otfTtfReader = ttfReader;
             fontSet = new CFFFontSet();
-            pipelineAssembler = new PipelineAssembler(this, CFFVersion.CFF2);
         }
 
         public IReadOnlyCollection<Glyph> Glyphs { get; }
@@ -63,7 +61,7 @@ namespace Adamantium.Fonts.Parsers.CFF
         protected virtual void ReadTopDict()
         {
             var data = otfTtfReader.ReadBytes(cffHeader.TopDictLength, true);
-            var operandParser = new DictOperandParser(data);
+            var operandParser = new DictOperandParser(data, cffFont);
             var result = operandParser.GetAllAvailableOperands();
 
             foreach (var operandResult in result.Results)
@@ -125,9 +123,9 @@ namespace Adamantium.Fonts.Parsers.CFF
                 for (int i = 0; i < region.RegionAxes.Length; i++)
                 {
                     var axes = new RegionAxisCoordinates();
-                    axes.StartCoord = otfTtfReader.ReadInt16().ToF2Dot14();
-                    axes.PeakCoord = otfTtfReader.ReadInt16().ToF2Dot14();
-                    axes.EndCoord = otfTtfReader.ReadInt16().ToF2Dot14();
+                    axes.StartCoord = otfTtfReader.ReadInt16().FromF2Dot14();
+                    axes.PeakCoord = otfTtfReader.ReadInt16().FromF2Dot14();
+                    axes.EndCoord = otfTtfReader.ReadInt16().FromF2Dot14();
                     region.RegionAxes[i] = axes;
                 }
                 variationRegionList.VariationRegions[index] = region;
@@ -168,7 +166,7 @@ namespace Adamantium.Fonts.Parsers.CFF
             if (fdArrayOffset == 0) return;
             
             otfTtfReader.Position = cffOffset + fdArrayOffset;
-            cffFont.CIDFontDicts = otfTtfReader.ReadFDArray(cffOffset, fdArrayOffset, CFFVersion.CFF2);
+            cffFont.CIDFontDicts = otfTtfReader.ReadFDArray(cffOffset, fdArrayOffset, cffFont);
         }
 
         private void ReadFDSelect()
@@ -233,12 +231,11 @@ namespace Adamantium.Fonts.Parsers.CFF
                     {
                         fontDict = cffFont.CIDFontDicts[0];
                     }
-                    
-                    Glyph glyph = pipelineAssembler
-                        .CreateGlyph((uint) i)
-                        .FillCommandList(cffFont, mainStack, fontDict, index: i)
-                        .FillOutlines()
-                        .GetGlyph();
+
+                    var commandList = new CommandParser(this).Parse(cffFont, mainStack, fontDict, index: i);
+
+                    var glyph = Glyph.Create((uint) i).SetCommands(commandList).FillOutlines();
+
                     glyphs.Add(glyph);
                     
                 }

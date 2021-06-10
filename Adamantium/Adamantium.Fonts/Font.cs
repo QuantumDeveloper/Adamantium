@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Adamantium.Fonts.Tables;
+using Adamantium.Fonts.Tables.CFF;
 
 namespace Adamantium.Fonts
 {
@@ -8,12 +10,14 @@ namespace Adamantium.Fonts
     {
         private List<Glyph> glyphs;
         private List<UInt32> unicodes;
-        
+
         private Dictionary<string, Glyph> nameToGlyph;
         private Dictionary<UInt32, Glyph> unicodeToGlyph;
         
         internal TypeFace TypeFace { get; }
-        
+        internal VariationStore VariationData { get; set; }
+        internal List<InstanceRecord> InstanceData { get; set; }
+
         public Font(TypeFace typeFace)
         {
             TypeFace = typeFace;
