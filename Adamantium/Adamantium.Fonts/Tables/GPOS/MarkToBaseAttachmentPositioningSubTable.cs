@@ -1,8 +1,10 @@
-namespace Adamantium.Fonts.Tables.Layout
+using Adamantium.Fonts.Tables.Layout;
+
+namespace Adamantium.Fonts.Tables.GPOS
 {
-    internal class LookupSubTableType4 : LookupSubtable
+    internal class MarkToBaseAttachmentPositioningSubTable : GPOSLookupSubTable
     {
-        public override uint Type => 4;
+        public override GPOSLookupType Type => GPOSLookupType.MarkToBaseAttachment;
         
         public CoverageTable MarkCoverage { get; set; }
         

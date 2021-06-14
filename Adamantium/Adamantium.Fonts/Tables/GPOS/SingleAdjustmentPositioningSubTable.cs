@@ -1,4 +1,6 @@
-namespace Adamantium.Fonts.Tables.Layout
+using Adamantium.Fonts.Tables.Layout;
+
+namespace Adamantium.Fonts.Tables.GPOS
 {
     // Single Adjustment Positioning: Format 1
     // uint16	posFormat	Format identifier: format = 1
@@ -13,25 +15,25 @@ namespace Adamantium.Fonts.Tables.Layout
     // uint16	valueCount	Number of ValueRecords — must equal glyphCount in the Coverage table.
     // ValueRecord	valueRecords[valueCount]	Array of ValueRecords — positioning values applied to glyphs.
     
-    internal class LookupSubtableType1 : LookupSubtable
+    internal class SingleAdjustmentPositioningSubTable : GPOSLookupSubTable
     {
         private uint format;
         
-        public LookupSubtableType1(CoverageTable coverage, ValueRecord record)
+        public SingleAdjustmentPositioningSubTable(CoverageTable coverage, ValueRecord record)
         {
             format = 1;
             Coverage = coverage;
             ValueRecords = new[] {record};
         }
         
-        public LookupSubtableType1(CoverageTable coverage, ValueRecord[] records)
+        public SingleAdjustmentPositioningSubTable(CoverageTable coverage, ValueRecord[] records)
         {
             format = 2;
             Coverage = coverage;
             ValueRecords = records;
         }
         
-        public override uint Type => 1;
+        public override GPOSLookupType Type => GPOSLookupType.SingleAdjustment;
 
         public uint Format => format;
         

@@ -1,11 +1,13 @@
-namespace Adamantium.Fonts.Tables.Layout
+using Adamantium.Fonts.Tables.Layout;
+
+namespace Adamantium.Fonts.Tables.GPOS
 {
     /// <summary>
     /// MarkMarkPosFormat1
     /// </summary>
-    internal class LookupSubTableType6 : LookupSubtable
+    internal class MarkToMarkAttachmentPositioningSubtable : GPOSLookupSubTable
     {
-        public override uint Type => 6;
+        public override GPOSLookupType Type => GPOSLookupType.MarkToMarkAttachment;
         
         public CoverageTable Mark1Coverage { get; set; }
         

@@ -1,8 +1,10 @@
-namespace Adamantium.Fonts.Tables.Layout
+using Adamantium.Fonts.Tables.Layout;
+
+namespace Adamantium.Fonts.Tables.GPOS
 {
-    internal class LookupSubTableType8Format2 : LookupSubtable
+    internal class ChainedContextsPositioningSubtableFormat2 : GPOSLookupSubTable
     {
-        public override uint Type => 8;
+        public override GPOSLookupType Type => GPOSLookupType.ChainedContextPositioning;
         
         public CoverageTable Coverage { get; set; }
         

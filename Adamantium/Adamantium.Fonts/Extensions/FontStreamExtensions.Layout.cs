@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Adamantium.Fonts.Common;
+using Adamantium.Fonts.Tables.GPOS;
 using Adamantium.Fonts.Tables.Layout;
 
 namespace Adamantium.Fonts.Extensions
@@ -75,11 +76,12 @@ namespace Adamantium.Fonts.Extensions
             return langSysTable;
         }
 
-        public static List<FeatureTable> ReadFeatureList(this FontStreamReader reader, long featureListOffset)
+        public static FeatureTable[] ReadFeatureList(this FontStreamReader reader, long featureListOffset)
         {
-            var features = new List<FeatureTable>();
-
             reader.Position = featureListOffset;
+            
+            var features = new List<FeatureTable>();
+            
             var count = reader.ReadUInt16();
             var records = new FeatureRecord[count];
             for (int i = 0; i < count; ++i)
@@ -116,11 +118,13 @@ namespace Adamantium.Fonts.Extensions
                 features[i].FeatureParameters = paramsTable;
             }
 
-            return features;
+            return features.ToArray();
         }
 
-        public static List<ScriptTable> ReadScriptList(this FontStreamReader reader, long scriptListOffset)
+        public static ScriptTable[] ReadScriptList(this FontStreamReader reader, long scriptListOffset)
         {
+            reader.Position = scriptListOffset;
+            
             var scriptTables = new List<ScriptTable>();
 
             var count = reader.ReadUInt16();
@@ -157,7 +161,7 @@ namespace Adamantium.Fonts.Extensions
                 }
             }
 
-            return scriptTables;
+            return scriptTables.ToArray();
         }
 
         public static FeatureParametersTable ReadFeatureParametersTable(this FontStreamReader reader, long offset)
@@ -254,22 +258,22 @@ namespace Adamantium.Fonts.Extensions
             return table;
         }
 
-        public static List<LookupTable> ReadLookupListTable(this FontStreamReader reader, long offset)
+        public static GPOSLookupTable[] ReadGPOSLookupListTable(this FontStreamReader reader, long offset)
         {
             reader.Position = offset;
             var lookupCount = reader.ReadUInt16();
             var lookupOffsets = reader.ReadUInt16Array(lookupCount);
 
-            var lookupList = new List<LookupTable>();
+            var lookupList = new List<GPOSLookupTable>();
 
             for (int i = 0; i < lookupCount; i++)
             {
                 long lookupTableOffset = offset + lookupOffsets[i];
-                var lookup = reader.ReadLookupTable(lookupTableOffset);
+                var lookup = reader.ReadGPOSLookupTable(lookupTableOffset);
                 lookupList.Add(lookup);
             }
 
-            return lookupList;
+            return lookupList.ToArray();
         }
 
         private static PairSet ReadPairSet(this FontStreamReader reader, ValueFormat value1Format, ValueFormat value2Format)
@@ -451,9 +455,9 @@ namespace Adamantium.Fonts.Extensions
         private static SequenceRuleTable ReadSequenceRuleTable(this FontStreamReader reader)
         {
             var table = new SequenceRuleTable();
-            var glyphCount = reader.ReadUInt16();
+            table.GlyphCount = reader.ReadUInt16();
             var lookupCount = reader.ReadUInt16();
-            table.InputSequence = new ushort[glyphCount - 1];
+            table.InputSequence = new ushort[table.GlyphCount - 1];
             table.SeqLookupRecords = reader.ReadSequenceLookupRecordArray(lookupCount);
             
             return table;
@@ -533,465 +537,56 @@ namespace Adamantium.Fonts.Extensions
 
             return lookupArray;
         }
-        
-        public static LookupTable ReadLookupTable(this FontStreamReader reader, long offset)
+
+        private static AlternateSetTable ReadAlternateSetTable(this FontStreamReader reader, long offset)
         {
             reader.Position = offset;
-            var lookup = new LookupTable();
-            lookup.LookupType = reader.ReadUInt16();
-            lookup.LookupFlag = (LookupFlags)reader.ReadUInt16();
-            var subtableCount = reader.ReadUInt16();
-            var subtableOffsets = reader.ReadUInt16Array(subtableCount);
-            if (lookup.LookupFlag == LookupFlags.UseMarkFilteringSet)
-            {
-                lookup.MarkFilteringSet = reader.ReadUInt16();
-            }
-
-            lookup.Subtables = new LookupSubtable[subtableCount];
-            for (int i = 0; i < subtableCount; ++i)
-            {
-                var subtableOffset = subtableOffsets[i] + offset;
-                lookup.Subtables[i] = reader.ReadLookupSubtable(lookup.LookupType, subtableOffset);
-            }
-
-            return lookup;
-        }
-        
-        private static LookupSubtable ReadLookupSubTableType1(this FontStreamReader reader, long subtableOffset)
-        {
-            var format = reader.ReadUInt16();
-            var coverageOffset = reader.ReadUInt16() + subtableOffset;
-            var valueFormat = (ValueFormat) reader.ReadUInt16();
-
-            switch (format)
-            {
-                case 1:
-                {
-                    var record = reader.ReadValueRecord(valueFormat);
-                    var coverage = reader.ReadCoverageTable(coverageOffset);
-                    return new LookupSubtableType1(coverage, record);
-                }
-                case 2:
-                {
-                    var count = reader.ReadUInt16();
-                    var records = new ValueRecord[count];
-                    for (int i = 0; i < count; ++i)
-                    {
-                        records[i] = reader.ReadValueRecord(valueFormat);
-                    }
-
-                    var coverage = reader.ReadCoverageTable(coverageOffset);
-
-                    return new LookupSubtableType1(coverage, records);
-                }
-                default:
-                    return new UnImplementedLookupSubTable(format);
-            }
-        }
-
-        private static LookupSubtable ReadLookupSubTableType2(this FontStreamReader reader, long subtableOffset)
-        {
-            var format = reader.ReadUInt16();
-            switch (format)
-            {
-                case 1:
-                {
-                    var coverageOffset = subtableOffset + reader.ReadUInt16();
-                    var value1Format = (ValueFormat)reader.ReadUInt16(); // can be null
-                    var value2Format = (ValueFormat)reader.ReadUInt16(); // can be null
-                    var pairSetCount = reader.ReadUInt16();
-                    var pairSetOffsetArray = reader.ReadUInt16Array(pairSetCount);
-                    var pairSetTables = new PairSetTable[pairSetCount];
-                    var subtable = new LookupSubtableType2Format1();
-
-                    for (int i = 0; i < pairSetCount; ++i)
-                    {
-                        reader.Position = subtableOffset + pairSetOffsetArray[i]; 
-                        var pairCount = reader.ReadUInt16();
-                        var pairSets = new PairSet[pairCount];
-                        for (int j = 0; j < pairCount; j++)
-                        {
-                            pairSets[j] = reader.ReadPairSet(value1Format, value2Format);
-                        }
-
-                        subtable.CoverageTable = reader.ReadCoverageTable(coverageOffset);
-                        var pairSetTable = new PairSetTable();
-                        pairSetTable.PairSets = pairSets;
-                        pairSetTables[i] = pairSetTable;
-                    }
-                    
-                    subtable.PairSetsTables = pairSetTables;
-                    return subtable;
-                }
-                case 2:
-                {
-                    var coverageOffset = subtableOffset + reader.ReadUInt16();
-                    var value1Format = (ValueFormat)reader.ReadUInt16();
-                    var value2Format = (ValueFormat)reader.ReadUInt16();
-                    var classDef1Offset = subtableOffset + reader.ReadUInt16();
-                    var classDef2Offset = subtableOffset + reader.ReadUInt16();
-                    var class1Count = reader.ReadUInt16();
-                    var class2Count = reader.ReadUInt16();
-
-                    var class1Records = new Class1Record[class1Count];
-                    for (int i = 0; i < class1Count; ++i)
-                    {
-                        var class2Records = new Class2Record[class2Count];
-                        for (int j = 0; j < class2Count; j++)
-                        {
-                            var value1 = reader.ReadValueRecord(value1Format);
-                            var value2 = reader.ReadValueRecord(value1Format);
-                            class2Records[j] = new Class2Record() {Value1 = value1, Value2 = value2};
-                        }
-
-                        class1Records[i] = new Class1Record() {Class2Records = class2Records};
-                    }
-                    
-                    var subtable = new LookupSubtableType2Format2();
-                    subtable.Class1Records = class1Records;
-                    subtable.ClassDef1 = reader.ReadClassDefTable(classDef1Offset);
-                    subtable.ClassDef1 = reader.ReadClassDefTable(classDef2Offset);
-                    subtable.CoverageTable = reader.ReadCoverageTable(coverageOffset);
-                    return subtable;
-                }
-                default:
-                    return new UnImplementedLookupSubTable(format);
-            }
-        }
-
-        private static LookupSubtable ReadLookupSubTableType3(this FontStreamReader reader, long subtableOffset)
-        {
-            reader.Position = subtableOffset;
             
-            var lookup = new LookupSubTableType3();
-            var format = reader.ReadUInt16();
-
-            if (format != 1)
-            {
-                return new UnImplementedLookupSubTable(format);
-            }
-
-            var coverageOffset = reader.ReadUInt16() + subtableOffset;
-            var entryExitCount = reader.ReadUInt16();
-            var entryAnchorOffset = new ushort[entryExitCount];
-            var exitAnchorOffset = new ushort[entryExitCount];
-
-            for (int i = 0; i < entryExitCount; ++i)
-            {
-                entryAnchorOffset[i] = reader.ReadUInt16();
-                exitAnchorOffset[i] = reader.ReadUInt16();
-            }
-
-            lookup.Coverage = reader.ReadCoverageTable(coverageOffset);
-
-            lookup.EntryAnchors = new AnchorTable[entryExitCount];
-            lookup.ExitAnchors = new AnchorTable[entryExitCount];
-            for (int i = 0; i < entryExitCount; i++)
-            {
-                var entryOffset = entryAnchorOffset[i];
-                if (entryOffset > 0)
-                {
-                    lookup.EntryAnchors[i] = reader.ReadAnchorTable(entryOffset + subtableOffset);
-                }
-
-                var exitOffset = exitAnchorOffset[i];
-                if (exitOffset > 0)
-                {
-                    lookup.ExitAnchors[i] = reader.ReadAnchorTable(exitOffset + subtableOffset);
-                }
-            }
-
-            return lookup;
+            var alternateSetTable = new AlternateSetTable();
+            var glyphCount = reader.ReadUInt16();
+            alternateSetTable.AlternateGlyphIDs = reader.ReadUInt16Array(glyphCount);
+            
+            return alternateSetTable;
         }
         
-        private static LookupSubtable ReadLookupSubTableType4(this FontStreamReader reader, long subtableOffset)
+        private static LigatureSetTable ReadLigatureSetTable(this FontStreamReader reader, long offset)
         {
-            reader.Position = subtableOffset;
+            reader.Position = offset;
+            
+            var ligatureSetTable = new LigatureSetTable();
+            var glyphCount = reader.ReadUInt16();
+            var ligatureOffsets = reader.ReadUInt16Array(glyphCount);
+            ligatureSetTable.LigatureTables = new LigatureTable[glyphCount];
 
-            var format = reader.ReadUInt16();
-
-            if (format != 1)
+            for (int i = 0; i < glyphCount; ++i)
             {
-                return new UnImplementedLookupSubTable(format);
-            }
-
-            var markCoverageOffset = reader.ReadUInt16() + subtableOffset;
-            var baseCoverageOffset = reader.ReadUInt16() + subtableOffset;
-            var markClassCount = reader.ReadUInt16();
-            var markArrayOffset = reader.ReadUInt16() + subtableOffset;
-            var baseArrayOffset = reader.ReadUInt16() + subtableOffset;
-
-            var lookupType4 = new LookupSubTableType4();
-            lookupType4.MarkCoverage = reader.ReadCoverageTable(markCoverageOffset);
-            lookupType4.BaseCoverage = reader.ReadCoverageTable(baseCoverageOffset);
-            lookupType4.MarkArrayTable = reader.ReadMarkArrayTable(markArrayOffset);
-            lookupType4.BaseArrayTable = reader.ReadBaseArrayTable(baseArrayOffset, markClassCount);
-
-            return lookupType4;
-        }
-        
-        private static LookupSubtable ReadLookupSubTableType5(this FontStreamReader reader, long subtableOffset)
-        {
-            reader.Position = subtableOffset;
-
-            var format = reader.ReadUInt16();
-            if (format != 1)
-            {
-                return new UnImplementedLookupSubTable(format);
+                var ligatureOffset = ligatureOffsets[i] + offset;
+                ligatureSetTable.LigatureTables[i] = reader.ReadLigatureTable(ligatureOffset);
             }
             
-            var markCoverageOffset = reader.ReadUInt16() + subtableOffset;
-            var ligatureCoverageOffset = reader.ReadUInt16() + subtableOffset;
-            var markClassCount = reader.ReadUInt16();
-            var markArrayOffset = reader.ReadUInt16() + subtableOffset;
-            var ligatureArrayOffset = reader.ReadUInt16() + subtableOffset;
+            return ligatureSetTable;
+        }
+        
+        private static LigatureTable ReadLigatureTable(this FontStreamReader reader, long offset)
+        {
+            reader.Position = offset;
             
-            var lookupType5 = new LookupSubTableType5();
-            lookupType5.MarkCoverage = reader.ReadCoverageTable(markArrayOffset);
-            lookupType5.LigatureCoverage = reader.ReadCoverageTable(ligatureCoverageOffset);
-            lookupType5.MarkArrayTable = reader.ReadMarkArrayTable(markArrayOffset);
-            lookupType5.LigatureArrayTable = reader.ReadLigatureArrayTable(ligatureArrayOffset, markClassCount);
-
-            return lookupType5;
-        }
-        
-        private static LookupSubtable ReadLookupSubTableType6(this FontStreamReader reader, long subtableOffset)
-        {
-            reader.Position = subtableOffset;
-
-            var format = reader.ReadUInt16();
-
-            if (format != 1)
-            {
-                return new UnImplementedLookupSubTable(format);
-            }
-
-            var markCoverageOffset = reader.ReadUInt16() + subtableOffset;
-            var ligatureCoverageOffset = reader.ReadUInt16() + subtableOffset;
-            var classCount = reader.ReadUInt16();
-            var markArrayOffset = reader.ReadUInt16() + subtableOffset;
-            var ligatureArrayOffset = reader.ReadUInt16() + subtableOffset;
-
-            var lookupSubTable = new LookupSubTableType6();
-            lookupSubTable.Mark1Coverage = reader.ReadCoverageTable(markCoverageOffset);
-            lookupSubTable.Mark2Coverage = reader.ReadCoverageTable(ligatureCoverageOffset);
-            lookupSubTable.Mark1ArrayTable = reader.ReadMarkArrayTable(markArrayOffset);
-            lookupSubTable.Mark2ArrayTable = reader.ReadMark2ArrayTable(ligatureArrayOffset, classCount);
-
-            return lookupSubTable;
-        }
-        
-        private static LookupSubtable ReadLookupSubTableType7(this FontStreamReader reader, long subtableOffset)
-        {
-            reader.Position = subtableOffset;
-
-            var format = reader.ReadUInt16();
-
-            switch (format)
-            {
-                case 1:
-                {
-                    var lookupFormat1 = new LookupSubTableType7Format1();
-                    var coverageOffset = reader.ReadUInt16() + subtableOffset;
-                    var ruleSetCount = reader.ReadUInt16();
-                    var ruleSetOffsets = reader.ReadUInt16Array(ruleSetCount);
-
-                    lookupFormat1.SequenceRuleSets = new SequenceRuleSetTable[ruleSetCount];
-                    for (int i = 0; i < ruleSetCount; i++)
-                    {
-                        long offset = ruleSetOffsets[i];
-
-                        if (offset <= 0) continue;
-
-                        offset += subtableOffset;
-                        var ruleSet = reader.ReadSequenceRuleSetTable(offset);
-                        lookupFormat1.SequenceRuleSets[i] = ruleSet;
-                    }
-
-                    lookupFormat1.Coverage = reader.ReadCoverageTable(coverageOffset);
-
-                    return lookupFormat1;
-                }
-                case 2:
-                {
-                    var lookupFormat2 = new LookupSubTableType7Format2();
-                    var coverageOffset = reader.ReadUInt16() + subtableOffset;
-                    var classDefOffset = reader.ReadUInt16() + subtableOffset;
-                    var ruleSetCount = reader.ReadUInt16();
-                    var ruleSetOffsets = reader.ReadUInt16Array(ruleSetCount);
-
-                    lookupFormat2.Coverage = reader.ReadCoverageTable(coverageOffset);
-                    lookupFormat2.ClassDef = reader.ReadClassDefTable(classDefOffset);
-
-                    lookupFormat2.ClassSequenceRuleSets = new ClassSequenceRuleSetTable[ruleSetCount];
-                    
-                    for (int i = 0; i < ruleSetCount; i++)
-                    {
-                        long offset = ruleSetOffsets[i];
-
-                        if (offset <= 0) continue;
-
-                        offset += subtableOffset;
-                        var ruleSet = reader.ReadClassSequenceRuleSetTable(offset);
-                        lookupFormat2.ClassSequenceRuleSets[i] = ruleSet;
-                    }
-                    
-                    return lookupFormat2;
-                }
-                case 3:
-                {
-                    var glyphCount = reader.ReadUInt16();
-                    var lookupCount = reader.ReadUInt16();
-                    var coverageOffsets = reader.ReadUInt16Array(glyphCount);
-
-                    var lookupFormat3 = new LookupSubTableType7Format3();
-                    lookupFormat3.LookupRecords = reader.ReadSequenceLookupRecordArray(lookupCount);
-                    lookupFormat3.CoverageTables = new CoverageTable[glyphCount];
-                    
-                    for (int i = 0; i < glyphCount; ++i)
-                    {
-                        var offset = coverageOffsets[i];
-                        lookupFormat3.CoverageTables[i] = reader.ReadCoverageTable(offset + subtableOffset);
-                    }
-
-                    return lookupFormat3;
-                }
-                default:
-                    return new UnImplementedLookupSubTable(format);
-            }
-        }
-        
-        private static LookupSubtable ReadLookupSubTableType8(this FontStreamReader reader, long subtableOffset)
-        {
-            reader.Position = subtableOffset;
-
-            var format = reader.ReadUInt16();
-            switch (format)
-            {
-                case 1:
-                {
-                    var lookupFormat1 = new LookupSubTableType8Format1();
-                    var coverageOffset = reader.ReadUInt16() + subtableOffset;
-                    var chainedSeqRuleSetCount = reader.ReadUInt16();
-                    var chainedSeqRuleSetOffsets = reader.ReadUInt16Array(chainedSeqRuleSetCount);
-
-                    lookupFormat1.Coverage = reader.ReadCoverageTable(coverageOffset);
-                    lookupFormat1.ChainedSeqRuleSets = new ChainedSequenceRuleSetTable[chainedSeqRuleSetCount];
-                    for (int i = 0; i < chainedSeqRuleSetCount; i++)
-                    {
-                        long offset = chainedSeqRuleSetOffsets[i];
-                        if (offset <= 0) continue;
-
-                        offset += subtableOffset;
-
-                        lookupFormat1.ChainedSeqRuleSets[i] = reader.ReadChainedSequenceRuleSetTable(offset);
-                    }
-
-                    return lookupFormat1;
-                }
-                case 2:
-                {
-                    var lookupFormat2 = new LookupSubTableType8Format2();
-                    var coverageOffset = reader.ReadUInt16() + subtableOffset;
-                    var backtrackClassDefOffset = reader.ReadUInt16() + subtableOffset;
-                    var inputClassDefOffset = reader.ReadUInt16() + subtableOffset;
-                    var lookaheadClassDefOffset = reader.ReadUInt16() + subtableOffset;
-                    var chainedSeqRuleSetCount = reader.ReadUInt16();
-                    var chainedSeqRuleSetOffsets = reader.ReadUInt16Array(chainedSeqRuleSetCount);
-
-                    lookupFormat2.Coverage = reader.ReadCoverageTable(coverageOffset);
-                    lookupFormat2.ChainedSeqRuleSets = new ChainedSequenceRuleSetTable[chainedSeqRuleSetCount];
-                    for (int i = 0; i < chainedSeqRuleSetCount; i++)
-                    {
-                        long offset = chainedSeqRuleSetOffsets[i];
-                        if (offset <= 0) continue;
-
-                        offset += subtableOffset;
-
-                        lookupFormat2.ChainedSeqRuleSets[i] = reader.ReadChainedSequenceRuleSetTable(offset);
-                    }
-
-                    lookupFormat2.BacktrackClassDef = reader.ReadClassDefTable(backtrackClassDefOffset);
-                    lookupFormat2.InputClassDef = reader.ReadClassDefTable(inputClassDefOffset);
-                    lookupFormat2.LookaheadClassDef = reader.ReadClassDefTable(lookaheadClassDefOffset);
-
-                    return lookupFormat2;
-                }
-                case 3:
-                {
-                    var lookupFormat3 = new LookupSubTableType8Format3();
-                    var backtrackGlyphCount = reader.ReadUInt16();
-                    var backtrackCoverageOffsets = reader.ReadUInt16Array(backtrackGlyphCount);
-                    var inputGlyphCount = reader.ReadUInt16();
-                    var inputCoverageOffsets = reader.ReadUInt16Array(inputGlyphCount);
-                    var lookaheadGlyphCount = reader.ReadUInt16();
-                    var lookaheadCoverageOffsets = reader.ReadUInt16Array(lookaheadGlyphCount);
-                    var seqLookupCount = reader.ReadUInt16();
-                    lookupFormat3.LookupRecords = reader.ReadSequenceLookupRecordArray(seqLookupCount);
-
-                    lookupFormat3.BacktrackCoverages = new CoverageTable[backtrackGlyphCount];
-                    for (int i = 0; i < backtrackGlyphCount; ++i)
-                    {
-                        var offset = backtrackCoverageOffsets[i] + subtableOffset;
-                        lookupFormat3.BacktrackCoverages[i] = reader.ReadCoverageTable(offset);
-                    }
-                    
-                    lookupFormat3.InputCoverages = new CoverageTable[inputGlyphCount];
-                    for (int i = 0; i < inputGlyphCount; ++i)
-                    {
-                        var offset = inputCoverageOffsets[i] + subtableOffset;
-                        lookupFormat3.InputCoverages[i] = reader.ReadCoverageTable(offset);
-                    }
-                    
-                    lookupFormat3.LookaheadCoverages = new CoverageTable[lookaheadGlyphCount];
-                    for (int i = 0; i < lookaheadGlyphCount; ++i)
-                    {
-                        var offset = lookaheadCoverageOffsets[i] + subtableOffset;
-                        lookupFormat3.LookaheadCoverages[i] = reader.ReadCoverageTable(offset);
-                    }
-                    
-
-                    return lookupFormat3;
-                }
-                default:
-                    return new UnImplementedLookupSubTable(format);
-            }
-        }
-        
-        private static LookupSubtable ReadLookupSubTableType9(this FontStreamReader reader, long subtableOffset)
-        {
-            reader.Position = subtableOffset;
+            var ligatureTable = new LigatureTable();
+            ligatureTable.LigatureGlyphID = reader.ReadUInt16();
+            var componentCount = reader.ReadUInt16();
+            ligatureTable.ComponentGlypIDs = reader.ReadUInt16Array(componentCount - 1);
             
-            var format = reader.ReadUInt16();
-            var extensionLookupType = reader.ReadUInt16();
-            var extensionOffset = reader.ReadUInt32();
-            return reader.ReadLookupSubtable(extensionLookupType, extensionOffset);
+            return ligatureTable;
         }
-        
-        public static LookupSubtable ReadLookupSubtable(this FontStreamReader reader, ushort lookupType, long subtableOffset)
+
+        private static SequenceTable ReadSequenceTable(this FontStreamReader reader, long offset)
         {
-            switch (lookupType)
-            {
-                case 1:
-                    return reader.ReadLookupSubTableType1(subtableOffset);
-                case 2:
-                    return reader.ReadLookupSubTableType2(subtableOffset);
-                case 3:
-                    return reader.ReadLookupSubTableType3(subtableOffset);
-                case 4:
-                    return reader.ReadLookupSubTableType4(subtableOffset);
-                case 5:
-                    return reader.ReadLookupSubTableType5(subtableOffset);
-                case 6:
-                    return reader.ReadLookupSubTableType6(subtableOffset);
-                case 7:
-                    return reader.ReadLookupSubTableType7(subtableOffset);
-                case 8:
-                    return reader.ReadLookupSubTableType8(subtableOffset);
-                case 9:
-                    return reader.ReadLookupSubTableType9(subtableOffset);
-                default: throw new NotSupportedException();
-            }
+            reader.Position = offset;
+
+            var count = reader.ReadUInt16();
+            var sequence = new SequenceTable();
+            sequence.SubstituteGlyphIDs = reader.ReadUInt16Array(count);
+            return sequence;
         }
     }
 }

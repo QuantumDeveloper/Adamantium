@@ -1,8 +1,9 @@
 using System;
+using Adamantium.Fonts.Tables.Layout;
 
-namespace Adamantium.Fonts.Tables.Layout
+namespace Adamantium.Fonts.Tables.GPOS
 {
-    public class GlyphPositioningTable
+    internal class GlyphPositioningTable
     {
         public UInt16 MajorVersion { get; set; }
         
@@ -11,17 +12,17 @@ namespace Adamantium.Fonts.Tables.Layout
         /// <summary>
         /// Offset to ScriptList table, from beginning of GPOS table
         /// </summary>
-        public UInt16 ScriptListOffset { get; set; }
+        public ScriptTable[] ScriptList { get; set; }
         
         /// <summary>
         /// Offset to FeatureList table, from beginning of GPOS table
         /// </summary>
-        public UInt16 FeatureListOffset { get; set; }
+        public FeatureTable[] FeatureList { get; set; }
         
         /// <summary>
         /// Offset to LookupList table, from beginning of GPOS table
         /// </summary>
-        public UInt16 LookupListOffset { get; set; }
+        public GPOSLookupTable[] LookupList { get; set; }
         
         /// <summary>
         /// Offset to FeatureVariations table, from beginning of GPOS table (may be NULL)

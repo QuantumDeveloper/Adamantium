@@ -11,6 +11,8 @@ namespace Adamantium.FontTests
             public static string Glametrix;
 
             public static string Quicksand_Regular;
+
+            public static string SourceSans3_Regular;
         }
         
         internal static class CFF2Fonts
@@ -32,6 +34,7 @@ namespace Adamantium.FontTests
         {
             CFF1Fonts.Glametrix = Path.Combine("OTFFonts", "CFF", "Glametrix-oj9A.otf");
             CFF1Fonts.Quicksand_Regular = Path.Combine("OTFFonts", "CFF", "Quicksand-Regular.otf");
+            CFF1Fonts.SourceSans3_Regular = Path.Combine("OTFFonts", "SourceSans3-Regular.otf");
             
             CFF2Fonts.AdobeVFPrototype = Path.Combine("OTFFonts", "CFF2", "AdobeVFPrototype.otf");
             CFF2Fonts.SourceHanSerifVFProtoJP = Path.Combine("OTFFonts", "CFF2", "SourceHanSerifVFProtoJP.otf");
@@ -44,6 +47,12 @@ namespace Adamantium.FontTests
         public void LoadOtfCff1Font_Glametrix()
         {
             var typeFace = TypeFace.LoadFont(CFF1Fonts.Glametrix, 2);
+        }
+        
+        [Test]
+        public void LoadOtfCff1Font_SourceSans3()
+        {
+            var typeFace = TypeFace.LoadFont(CFF1Fonts.SourceSans3_Regular, 2);
         }
         
         [Test]

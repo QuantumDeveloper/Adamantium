@@ -7,7 +7,6 @@ using Adamantium.Fonts.Common;
 using Adamantium.Fonts.Extensions;
 using Adamantium.Fonts.Tables;
 using Adamantium.Fonts.Tables.CMAP;
-using Adamantium.Fonts.Tables.Layout;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Fonts.Parsers
@@ -33,7 +32,7 @@ namespace Adamantium.Fonts.Parsers
         private HorizontalHeaderTable hhea;
         private HorizontalMetricsTable hmtx;
         private KerningTable kern;
-        private NameTable name;
+        protected NameTable Name { get; set; }
 
         protected List<TableDirectory> TableDirectories { get; set; }
 
@@ -535,87 +534,11 @@ namespace Adamantium.Fonts.Parsers
                     case TableNames.kern:
                         ReadKerningTable(tableEntry);
                         break;
-                    case TableNames.GPOS:
-                        ReadGlyphPositioningTable(tableEntry);
-                        break;
-                    case TableNames.fvar:
-                        ReadFvarTable(tableEntry);
-                        break;
                     default:
                         ReadTable(tableEntry);
                         break;
                 }
             }
-        }
-
-        protected virtual void ReadFvarTable(TableEntry entry)
-        {
-            FontReader.Position = entry.Offset;
-
-            var majorVersion = FontReader.ReadUInt16();
-            var minorVersion = FontReader.ReadUInt16();
-            var axesArrayOffset = FontReader.ReadUInt16();
-            var reserved = FontReader.ReadUInt16();
-            var axisCount = FontReader.ReadUInt16();
-            var axisSize = FontReader.ReadUInt16();
-            var instanceCount = FontReader.ReadUInt16();
-            var instanceSize = FontReader.ReadUInt16();
-
-            FontReader.Position = entry.Offset + axesArrayOffset;
-            var currentOffset = FontReader.Position;
-            
-            var axes = new List<VariationAxisRecord>(); 
-            
-            for (var i = 0; i < axisCount; ++i)
-            {
-                var axis = new VariationAxisRecord();
-
-                axis.AxisTag = FontReader.ReadString(4);
-                axis.MinValue = FontReader.ReadInt32().FromF16Dot16();
-                axis.DefaultValue = FontReader.ReadInt32().FromF16Dot16();
-                axis.MaxValue = FontReader.ReadInt32().FromF16Dot16();
-                axis.Flags = FontReader.ReadUInt16();
-                axis.AxisNameID = FontReader.ReadUInt16();
-
-                axes.Add(axis);
-                
-                currentOffset += axisSize;
-                FontReader.Position = currentOffset;
-            }
-
-            var instances = new List<InstanceRecord>();
-            
-            for (var j = 0; j < instanceCount; ++j)
-            {
-                var instance = new InstanceRecord();
-
-                instance.SubfamilyNameID = FontReader.ReadUInt16();
-                instance.Flags = FontReader.ReadUInt16();
-                instance.Coordinates = new List<double>();
-                
-                for (var k = 0; k < axisCount; ++k)
-                {
-                    instance.Coordinates.Add(FontReader.ReadInt32().FromF16Dot16());
-                }
-
-                var nameTableOffset = CurrentTableDirectory.TablesOffsets[TableNames.name];
-                var nameRecord = name.NameRecords.FirstOrDefault(x => x.NameId == instance.SubfamilyNameID);
-
-                if (nameRecord != null)
-                {
-                    FontReader.Position = nameTableOffset + name.StorageOffset + nameRecord.StringOffset;
-                    var encoding = nameRecord.EncodingId is 3 or 1 ? Encoding.BigEndianUnicode : Encoding.UTF8;
-                    var str = FontReader.ReadString(nameRecord.Length, encoding);
-                    instance.InstanceSubfamilyName = str;
-                }
-
-                instances.Add(instance);
-                
-                currentOffset += instanceSize;
-                FontReader.Position = currentOffset;
-            }
-
-            CurrentFont.InstanceData = instances;
         }
 
         protected virtual void ReadTable(TableEntry entry)
@@ -883,7 +806,7 @@ namespace Adamantium.Fonts.Parsers
                 }
             }
 
-            name = nameTable;
+            Name = nameTable;
         }
 
         protected virtual void ReadGlyphIndexToLocationTable(TableEntry entry)
@@ -1450,34 +1373,6 @@ namespace Adamantium.Fonts.Parsers
             }
         }
 
-        protected virtual void ReadGlyphPositioningTable(TableEntry entry)
-        {
-            FontReader.Position = entry.Offset;
-            
-            var gpos = new GlyphPositioningTable();
-            gpos.MajorVersion = FontReader.ReadUInt16();
-            gpos.MinorVersion = FontReader.ReadUInt16();
-            gpos.ScriptListOffset = FontReader.ReadUInt16();
-            gpos.FeatureListOffset = FontReader.ReadUInt16();
-            gpos.LookupListOffset = FontReader.ReadUInt16();
-
-            if (gpos.MinorVersion == 1)
-            {
-                gpos.FeatureVariationsOffset = FontReader.ReadUInt16();
-            }
-            
-            var scriptListOffset = entry.Offset + gpos.ScriptListOffset;
-            var featureListOffset = entry.Offset + gpos.FeatureListOffset;
-            var lookupListOffset = entry.Offset + gpos.LookupListOffset;
-
-            var scriptList = FontReader.ReadScriptList(scriptListOffset);
-
-            var featureList = FontReader.ReadFeatureList(featureListOffset);
-
-            var lookupTable = FontReader.ReadLookupListTable(lookupListOffset);
-        }
-
-        
         private void ParseTTFCoverage(ushort rawCoverage, KerningSubtable kerningSubtable)
         {
             kerningSubtable.Horizontal = Convert.ToBoolean(rawCoverage & 0x0001);
