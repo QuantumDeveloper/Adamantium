@@ -17,8 +17,6 @@ namespace Adamantium.Fonts.Extensions
             return new(buffer);
         }
 
-        
-
         public static UInt16[] ReadUInt16Array(this FontStreamReader reader, int count)
         {
             var arr = new UInt16[count];

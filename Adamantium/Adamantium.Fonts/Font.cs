@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Adamantium.Fonts.Parsers;
 using Adamantium.Fonts.Tables;
 using Adamantium.Fonts.Tables.CFF;
 
@@ -95,12 +96,14 @@ namespace Adamantium.Fonts
         
         public IReadOnlyCollection<uint> Unicodes => unicodes.AsReadOnly();
 
+        internal KerningSubtable[] KerningData { get; set; }
+        
         internal void SetGlyphs(IEnumerable<Glyph> inputGlyphs)
         {
             glyphs.Clear();
             glyphs.AddRange(inputGlyphs);
         }
-
+        
         void IFont.UpdateGlyphNamesCache()
         {
             if (!isGlyphNamesProvided) return;
@@ -140,7 +143,10 @@ namespace Adamantium.Fonts
                 unicodes.AddRange(value);
                 foreach (var unicode in value)
                 {
-                    unicodeToGlyph[unicode] = TypeFace.GetGlyphByIndex(key);
+                    if (TypeFace.GetGlyphByIndex(key, out var glyph))
+                    {
+                        unicodeToGlyph[unicode] = glyph;
+                    }
                 }
             }
         }
@@ -173,6 +179,28 @@ namespace Adamantium.Fonts
         public Glyph GetGlyphByCharacter(char character)
         {
             return GetGlyphByUnicode(character);
+        }
+        
+        public Int16 GetKerningValue(UInt16 leftGlyphIndex, UInt16 rightGlyphIndex)
+        {
+            if (KerningData == null)
+            {
+                return 0;
+            }
+        
+            Int16 kerningValue = 0;
+            
+            UInt32 key = TTFParser.GenerateKerningKey(leftGlyphIndex, rightGlyphIndex);
+
+            foreach (var data in KerningData)
+            {
+                if (!data.KerningValues.ContainsKey(key)) continue;
+                
+                kerningValue = data.KerningValues[key];
+                break;
+            }
+        
+            return kerningValue;
         }
     }
 }

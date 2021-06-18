@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Adamantium.Fonts.Common;
 using Adamantium.Fonts.Tables.GPOS;
 using Adamantium.Fonts.Tables.Layout;
@@ -8,7 +9,7 @@ namespace Adamantium.Fonts.Extensions
 {
     internal static partial class FontStreamExtensions
     {
-        const uint DefaultTag = 1414284868;
+        const uint DefaultTag = 1145457748;
 
         public static ValueRecord ReadValueRecord(this FontStreamReader reader, ValueFormat format)
         {

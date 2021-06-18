@@ -1,6 +1,4 @@
-using System;
 using Adamantium.Fonts;
-using Adamantium.Fonts.DataOut;
 using NUnit.Framework;
 
 namespace Adamantium.FontTests

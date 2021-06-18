@@ -1,16 +1,17 @@
 using System;
-using Adamantium.Fonts.Tables.GPOS;
 using Adamantium.Fonts.Tables.Layout;
 
 namespace Adamantium.Fonts.Tables.GSUB
 {
-    internal class GSUBLookupTable
+    internal class GSUBLookupTable : ILookupTable
     {
         /// <summary>
         /// Different enumerations for GSUB and GPOS
         /// </summary>
-        public GSUBLookupType LookupType { get; set; }
-        
+        public UInt16 LookupType { get; set; }
+
+        public LookupOwnerType OwnerType => LookupOwnerType.GSUB;
+
         /// <summary>
         /// Lookup qualifiers
         /// </summary>
@@ -19,7 +20,7 @@ namespace Adamantium.Fonts.Tables.GSUB
         /// <summary>
         /// Array of offsets to lookup subtables, from beginning of Lookup table
         /// </summary>
-        public GSUBLookupSubTable[] SubTables { get; set; }
+        public ILookupSubTable[] SubTables { get; set; }
         
         /// <summary>
         /// Index (base 0) into GDEF mark glyph sets structure. This field is only present if the USE_MARK_FILTERING_SET lookup flag is set.

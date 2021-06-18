@@ -12,6 +12,6 @@ namespace Adamantium.Fonts.Tables.GSUB
         ChainingContext = 6,
         ExtensionSubstitution = 7,
         ReverseChainingContextSingle = 8,
-        Reserved = 9
+        Reserved = 9,
     }
 }

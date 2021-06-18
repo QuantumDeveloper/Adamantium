@@ -56,9 +56,15 @@ namespace Adamantium.Fonts
             }
         }
         
-        public Glyph GetGlyphByIndex(uint index)
+        public bool GetGlyphByIndex(uint index, out Glyph glyph)
         {
-            return glyphs[(int)index];
+            glyph = null;
+            
+            if (index >= glyphs.Count) return false;
+            
+            glyph = glyphs[(int)index];
+
+            return true;
         }
         
         internal void SetGlyphs(IEnumerable<Glyph> glyphsArray)

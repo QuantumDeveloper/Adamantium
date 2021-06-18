@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using Adamantium.Fonts.Common;
@@ -12,8 +11,6 @@ using Adamantium.Fonts.Tables;
 using Adamantium.Fonts.Tables.CFF;
 using Adamantium.Fonts.Tables.GPOS;
 using Adamantium.Fonts.Tables.GSUB;
-using Adamantium.Fonts.Tables.WOFF;
-using Adamantium.Mathematics;
 
 namespace Adamantium.Fonts.Parsers
 {
@@ -360,7 +357,7 @@ namespace Adamantium.Fonts.Parsers
             gpos.ScriptList = FontReader.ReadScriptList(scriptListOffset);
 
             gpos.FeatureList = FontReader.ReadFeatureList(featureListOffset);
-
+            
             gpos.LookupList = FontReader.ReadGPOSLookupListTable(lookupListOffset);
         }
 

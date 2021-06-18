@@ -31,7 +31,7 @@ namespace Adamantium.Fonts.Extensions
         {
             reader.Position = fffset;
             var lookup = new GSUBLookupTable();
-            lookup.LookupType = (GSUBLookupType)reader.ReadUInt16();
+            lookup.LookupType = reader.ReadUInt16();
             lookup.LookupFlag = (LookupFlags)reader.ReadUInt16();
             var subtableCount = reader.ReadUInt16();
             var subtableOffsets = reader.ReadUInt16Array(subtableCount);
@@ -44,7 +44,7 @@ namespace Adamantium.Fonts.Extensions
             for (int i = 0; i < subtableCount; ++i)
             {
                 var subtableOffset = subtableOffsets[i] + fffset;
-                lookup.SubTables[i] = reader.ReadGSUBLookupSubtable(lookup.LookupType, subtableOffset);
+                lookup.SubTables[i] = reader.ReadGSUBLookupSubtable((GSUBLookupType)lookup.LookupType, subtableOffset);
             }
 
             return lookup;
@@ -407,8 +407,7 @@ namespace Adamantium.Fonts.Extensions
                 case GSUBLookupType.Context: return reader.ReadContextualSubstitutionSubTable(type, subtableOffset);
                 case GSUBLookupType.ChainingContext: return reader.ReadChainedContextsSubstitutionSubTable(type, subtableOffset);
                 case GSUBLookupType.ReverseChainingContextSingle: return reader.ReadReverseChainingContextualSubstitutionSubTable(type, subtableOffset);
-                case GSUBLookupType.ExtensionSubstitution:
-                    return reader.ReadExtensionSubstitutionSubTable(type, subtableOffset);
+                case GSUBLookupType.ExtensionSubstitution: return reader.ReadExtensionSubstitutionSubTable(type, subtableOffset);
                 default: throw new NotSupportedException();
             }
         }

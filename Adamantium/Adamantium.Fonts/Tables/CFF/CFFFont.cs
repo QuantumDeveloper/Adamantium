@@ -79,16 +79,6 @@ namespace Adamantium.Fonts.Tables.CFF
             this.glyphs.Clear();
             this.glyphs.AddRange(glyphs);
             indexToGlyph = this.glyphs.ToDictionary(x => x.Index);
-            
-            //nameToGlyph = this.glyphs.ToDictionary(x => x.Name);
-            //unicodeToGlyph.Clear();
-            // foreach (var glyph in glyphs)
-            // {
-            //     foreach (var unicode in glyph.Unicodes)
-            //     {
-            //         unicodeToGlyph[unicode] = glyph;
-            //     }
-            // }
         }
 
         public void ParseTopDict(byte[] data)

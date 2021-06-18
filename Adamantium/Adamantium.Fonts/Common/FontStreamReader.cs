@@ -29,7 +29,7 @@ namespace Adamantium.Fonts.Common
 
             if (BitConverter.IsLittleEndian && !ignoreEndian)
             {
-                bytes = bytes.Reverse().ToArray();
+                Array.Reverse(bytes);
             }
 
             return bytes;
@@ -45,7 +45,7 @@ namespace Adamantium.Fonts.Common
 
             if (BitConverter.IsLittleEndian)
             {
-                bytes = bytes.Reverse().ToArray();
+                Array.Reverse(bytes);
             }
 
             return bytes;
@@ -69,8 +69,11 @@ namespace Adamantium.Fonts.Common
 
         public UInt32 ReadUInt24()
         {
-            byte highByte = ReadByte();
-            return (UInt32)(highByte << 16) | ReadUInt16();
+            var bytes = new byte[4];
+            bytes[2] = ReadByte();
+            bytes[1] = ReadByte();
+            bytes[0] = ReadByte();
+            return BitConverter.ToUInt32(bytes.ToArray(), 0);
         }
 
         public UInt32 ReadUInt32()

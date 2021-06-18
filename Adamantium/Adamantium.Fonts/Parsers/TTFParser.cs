@@ -31,7 +31,7 @@ namespace Adamantium.Fonts.Parsers
         private TTFIndexToLocationTable loca;
         private HorizontalHeaderTable hhea;
         private HorizontalMetricsTable hmtx;
-        private KerningTable kern;
+
         protected NameTable Name { get; set; }
 
         protected List<TableDirectory> TableDirectories { get; set; }
@@ -590,8 +590,7 @@ namespace Adamantium.Fonts.Parsers
                             glyphNames[i] = glyphName;
                         }
 
-                        var glyph = TypeFace.GetGlyphByIndex(i);
-                        if (glyph != null)
+                        if (TypeFace.GetGlyphByIndex(i, out var glyph))
                         {
                             glyph.Name = glyphNames[i];
                         }
@@ -867,7 +866,7 @@ namespace Adamantium.Fonts.Parsers
 
             foreach (var glyphPair in cmap.GlyphToUnicode)
             {
-                var glyph = TypeFace.GetGlyphByIndex(glyphPair.Key);
+                TypeFace.GetGlyphByIndex(glyphPair.Key, out var glyph);
                 glyph.SetUnicodes(glyphPair.Value);
                 glyphsList.Add(glyph);
             }
@@ -968,7 +967,7 @@ namespace Adamantium.Fonts.Parsers
 
                 var leftSideBearing = FontReader.ReadInt16();
                 hmtx.LeftSideBearings[i] = leftSideBearing;
-                var glyph = TypeFace.GetGlyphByIndex((uint)i);
+                TypeFace.GetGlyphByIndex((uint)i, out  var glyph);
                 glyph.AdvanceWidth = lastAdvanceWidth;
                 glyph.LeftSideBearing = leftSideBearing;
             }
@@ -996,7 +995,8 @@ namespace Adamantium.Fonts.Parsers
 
         private void ReadGlyphComponentData(Int64 glyfTableOffset, UInt16 glyphIndex)
         {
-            var glyph = TypeFace.GetGlyphByIndex(glyphIndex);
+            if (!TypeFace.GetGlyphByIndex(glyphIndex, out var glyph)) return;
+            
             // if offset for current glyph is equal to offset for the next glyph, then current glyph has no outline, skip all other steps, but the glyph considers as loaded
             if (loca.GlyphOffsets[glyphIndex] == loca.GlyphOffsets[glyphIndex + 1])
             {
@@ -1321,20 +1321,19 @@ namespace Adamantium.Fonts.Parsers
         {
             FontReader.Position = entry.Offset;
             
-            kern = new KerningTable();
-            kern.Version = FontReader.ReadUInt16();
-            kern.NumTables = FontReader.ReadUInt16();
+            var version = FontReader.ReadUInt16();
+            var numTables = FontReader.ReadUInt16();
 
-            kern.Subtables = new KerningSubtable[kern.NumTables];
+            var kernSubtables = new KerningSubtable[numTables];
 
             long nextSubtableOffset = FontReader.Position;
 
-            for (ushort i = 0; i < kern.NumTables; ++i)
+            for (ushort i = 0; i < numTables; ++i)
             {
                 if (i > 0)
                 {
                     // advance to next subtable
-                    nextSubtableOffset += kern.Subtables[i - 1].Length;
+                    nextSubtableOffset += kernSubtables[i - 1].Length;
                     FontReader.Position = nextSubtableOffset;
                 }
 
@@ -1348,7 +1347,7 @@ namespace Adamantium.Fonts.Parsers
 
                 if (kernSubtable.Format != 0) // Windows supports only format 0
                 {
-                    kern.Subtables[i] = kernSubtable;
+                    kernSubtables[i] = kernSubtable;
                     continue;
                 }
 
@@ -1366,10 +1365,9 @@ namespace Adamantium.Fonts.Parsers
                     kernSubtable.KerningValues[key] = FontReader.ReadInt16();
                 }
 
-                kern.Subtables[i] = kernSubtable;
-                
-                // TODO: define how to process kern data
-                //FontData.KerningData = kernSubtable;
+                kernSubtables[i] = kernSubtable;
+
+                CurrentFont.KerningData = kernSubtables;
             }
         }
 
@@ -1389,8 +1387,8 @@ namespace Adamantium.Fonts.Parsers
             var sampledOutlinesList = new List<SampledOutline>();
             foreach (var component in compositeGlyph.CompositeGlyphComponents)
             {
-                var sampleOutlines = TypeFace.GetGlyphByIndex(component.SimpleGlyphIndex)
-                    .TransformOutlines(component.TransformMatrix, Resolution);
+                TypeFace.GetGlyphByIndex(component.SimpleGlyphIndex, out var glyph);
+                var sampleOutlines = glyph.TransformOutlines(component.TransformMatrix, Resolution);
                 sampledOutlinesList.AddRange(sampleOutlines);
             }
             compositeGlyph.SetOutlinesForRate(Resolution, sampledOutlinesList.ToArray());

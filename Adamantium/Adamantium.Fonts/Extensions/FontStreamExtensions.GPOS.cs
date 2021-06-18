@@ -11,7 +11,7 @@ namespace Adamantium.Fonts.Extensions
         {
             reader.Position = offset;
             var lookup = new GPOSLookupTable();
-            lookup.LookupType = (GPOSLookupType)reader.ReadUInt16();
+            lookup.LookupType = reader.ReadUInt16();
             lookup.LookupFlag = (LookupFlags)reader.ReadUInt16();
             var subtableCount = reader.ReadUInt16();
             var subtableOffsets = reader.ReadUInt16Array(subtableCount);
@@ -24,7 +24,7 @@ namespace Adamantium.Fonts.Extensions
             for (int i = 0; i < subtableCount; ++i)
             {
                 var subtableOffset = subtableOffsets[i] + offset;
-                lookup.SubTables[i] = reader.ReadGPOSLookupSubtable(lookup.LookupType, subtableOffset);
+                lookup.SubTables[i] = reader.ReadGPOSLookupSubtable((GPOSLookupType)lookup.LookupType, subtableOffset);
             }
 
             return lookup;

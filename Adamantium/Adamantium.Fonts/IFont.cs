@@ -48,5 +48,7 @@ namespace Adamantium.Fonts
 
         Glyph GetGlyphByCharacter(char character);
 
+        public Int16 GetKerningValue(UInt16 leftGlyphIndex, UInt16 rightGlyphIndex);
+
     }
 }
