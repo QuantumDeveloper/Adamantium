@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Adamantium.Fonts.Common;
 
 namespace Adamantium.Fonts
 {
@@ -36,9 +37,15 @@ namespace Adamantium.Fonts
         
         IReadOnlyCollection<uint> Unicodes { get; }
 
+        public IReadOnlyCollection<FontLanguage> Languages { get; }
+
         internal void UpdateGlyphNamesCache();
 
         internal void SetGlyphUnicodes(Dictionary<uint, List<uint>> glyphMapping);
+
+        bool IsLanguageAvailable(string language);
+
+        void AddLanguage(FontLanguage language);
 
         Glyph GetGlyphByIndex(uint index);
 

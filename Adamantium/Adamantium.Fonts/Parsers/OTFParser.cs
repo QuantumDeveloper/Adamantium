@@ -385,6 +385,18 @@ namespace Adamantium.Fonts.Parsers
 
             gsub.LookupList = FontReader.ReadGSUBLookupListTable(lookupListOffset);
 
+            var languages = new List<FontLanguage>();
+            foreach (var scriptTable in gsub.ScriptList)
+            {
+                foreach (var langSysTable in scriptTable.LangSysTables)
+                {
+                    var lang = LanguageTags.GetLanguage(langSysTable.Name);
+                    var lng = new FontLanguage();
+                }
+            }
+            
+            CurrentFont.SetLanguages();
+
         }
 
     }

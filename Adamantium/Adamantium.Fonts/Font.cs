@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Adamantium.Fonts.Common;
 using Adamantium.Fonts.Parsers;
 using Adamantium.Fonts.Tables;
 using Adamantium.Fonts.Tables.CFF;
@@ -11,6 +12,8 @@ namespace Adamantium.Fonts
     {
         private List<Glyph> glyphs;
         private List<UInt32> unicodes;
+        private List<FontLanguage> languages;
+        private Dictionary<string, FontLanguage> languagesMap;
 
         private Dictionary<string, Glyph> nameToGlyph;
         private Dictionary<UInt32, Glyph> unicodeToGlyph;
@@ -24,6 +27,7 @@ namespace Adamantium.Fonts
             TypeFace = typeFace;
             glyphs = new List<Glyph>();
             unicodes = new List<uint>();
+            languages = new List<FontLanguage>();
 
             nameToGlyph = new Dictionary<string, Glyph>();
             unicodeToGlyph = new Dictionary<uint, Glyph>();
@@ -96,6 +100,8 @@ namespace Adamantium.Fonts
         
         public IReadOnlyCollection<uint> Unicodes => unicodes.AsReadOnly();
 
+        public IReadOnlyCollection<FontLanguage> Languages => languages.AsReadOnly();
+
         internal KerningSubtable[] KerningData { get; set; }
         
         internal void SetGlyphs(IEnumerable<Glyph> inputGlyphs)
@@ -103,7 +109,28 @@ namespace Adamantium.Fonts
             glyphs.Clear();
             glyphs.AddRange(inputGlyphs);
         }
-        
+
+        internal void SetLanguages(IEnumerable<FontLanguage> inputLanguages)
+        {
+            languages.Clear();
+            languages.AddRange(inputLanguages);
+            languagesMap = languages.ToDictionary(x => x.ShortName);
+        }
+
+        public bool IsLanguageAvailable(string language)
+        {
+            return languagesMap.ContainsKey(language);
+        }
+
+        public void AddLanguage(FontLanguage language)
+        {
+            if (!IsLanguageAvailable(language.ShortName))
+            {
+                languages.Add(language);
+                languagesMap[language.ShortName] = language;
+            }
+        }
+
         void IFont.UpdateGlyphNamesCache()
         {
             if (!isGlyphNamesProvided) return;
