@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Adamantium.Fonts.Common;
 using Adamantium.Fonts.Tables.GPOS;
 using Adamantium.Fonts.Tables.Layout;
@@ -7,7 +8,25 @@ namespace Adamantium.Fonts.Extensions
 {
     internal static partial class FontStreamExtensions
     {
-        public static GPOSLookupTable ReadGPOSLookupTable(this FontStreamReader reader, long offset)
+        public static ILookupTable[] ReadGPOSLookupListTable(this FontStreamReader reader, long offset)
+        {
+            reader.Position = offset;
+            var lookupCount = reader.ReadUInt16();
+            var lookupOffsets = reader.ReadUInt16Array(lookupCount);
+
+            var lookupList = new List<ILookupTable>();
+
+            for (int i = 0; i < lookupCount; i++)
+            {
+                long lookupTableOffset = offset + lookupOffsets[i];
+                var lookup = reader.ReadGPOSLookupTable(lookupTableOffset);
+                lookupList.Add(lookup);
+            }
+
+            return lookupList.ToArray();
+        }
+        
+        public static ILookupTable ReadGPOSLookupTable(this FontStreamReader reader, long offset)
         {
             reader.Position = offset;
             var lookup = new GPOSLookupTable();
@@ -30,7 +49,7 @@ namespace Adamantium.Fonts.Extensions
             return lookup;
         }
         
-        private static GPOSLookupSubTable ReadSingleAdjustmentPositioningSubTable(this FontStreamReader reader, GPOSLookupType type, long subtableOffset)
+        private static ILookupSubTable ReadSingleAdjustmentPositioningSubTable(this FontStreamReader reader, GPOSLookupType type, long subtableOffset)
         {
             reader.Position = subtableOffset;
             
@@ -64,7 +83,7 @@ namespace Adamantium.Fonts.Extensions
             }
         }
 
-        private static GPOSLookupSubTable ReadPairAdjustmentPositioningSubTable(this FontStreamReader reader, GPOSLookupType type, long subtableOffset)
+        private static ILookupSubTable ReadPairAdjustmentPositioningSubTable(this FontStreamReader reader, GPOSLookupType type, long subtableOffset)
         {
             reader.Position = subtableOffset;
             
@@ -136,7 +155,7 @@ namespace Adamantium.Fonts.Extensions
             }
         }
 
-        private static GPOSLookupSubTable ReadCursiveAttachmentPositioningSubTable(this FontStreamReader reader, GPOSLookupType type, long subtableOffset)
+        private static ILookupSubTable ReadCursiveAttachmentPositioningSubTable(this FontStreamReader reader, GPOSLookupType type, long subtableOffset)
         {
             reader.Position = subtableOffset;
             
@@ -161,8 +180,8 @@ namespace Adamantium.Fonts.Extensions
 
             lookup.Coverage = reader.ReadCoverageTable(coverageOffset);
 
-            lookup.EntryAnchors = new AnchorTable[entryExitCount];
-            lookup.ExitAnchors = new AnchorTable[entryExitCount];
+            lookup.EntryAnchors = new AnchorPointTable[entryExitCount];
+            lookup.ExitAnchors = new AnchorPointTable[entryExitCount];
             for (int i = 0; i < entryExitCount; i++)
             {
                 var entryOffset = entryAnchorOffset[i];
@@ -181,7 +200,7 @@ namespace Adamantium.Fonts.Extensions
             return lookup;
         }
         
-        private static GPOSLookupSubTable ReadMarkToBaseAttachmentPositioningSubTable(this FontStreamReader reader, GPOSLookupType type, long subtableOffset)
+        private static ILookupSubTable ReadMarkToBaseAttachmentPositioningSubTable(this FontStreamReader reader, GPOSLookupType type, long subtableOffset)
         {
             reader.Position = subtableOffset;
 
@@ -207,7 +226,7 @@ namespace Adamantium.Fonts.Extensions
             return lookupType4;
         }
         
-        private static GPOSLookupSubTable ReadMarkToLigatureAttachmentPositioningSubTable(this FontStreamReader reader, GPOSLookupType type, long subtableOffset)
+        private static ILookupSubTable ReadMarkToLigatureAttachmentPositioningSubTable(this FontStreamReader reader, GPOSLookupType type, long subtableOffset)
         {
             reader.Position = subtableOffset;
 
@@ -232,7 +251,7 @@ namespace Adamantium.Fonts.Extensions
             return lookupType5;
         }
         
-        private static GPOSLookupSubTable ReadMarkToMarkAttachmentPositioningSubtable(this FontStreamReader reader, GPOSLookupType type, long subtableOffset)
+        private static ILookupSubTable ReadMarkToMarkAttachmentPositioningSubtable(this FontStreamReader reader, GPOSLookupType type, long subtableOffset)
         {
             reader.Position = subtableOffset;
 
@@ -258,7 +277,7 @@ namespace Adamantium.Fonts.Extensions
             return lookupSubTable;
         }
         
-        private static GPOSLookupSubTable ReadContextualPositioningSubtable(this FontStreamReader reader, GPOSLookupType type, long subtableOffset)
+        private static ILookupSubTable ReadContextualPositioningSubtable(this FontStreamReader reader, GPOSLookupType type, long subtableOffset)
         {
             reader.Position = subtableOffset;
 
@@ -339,7 +358,7 @@ namespace Adamantium.Fonts.Extensions
             }
         }
         
-        private static GPOSLookupSubTable ReadChainedContextsPositioningSubtable(this FontStreamReader reader, GPOSLookupType type, long subtableOffset)
+        private static ILookupSubTable ReadChainedContextsPositioningSubtable(this FontStreamReader reader, GPOSLookupType type, long subtableOffset)
         {
             reader.Position = subtableOffset;
 
@@ -436,7 +455,7 @@ namespace Adamantium.Fonts.Extensions
             }
         }
         
-        private static GPOSLookupSubTable ReadExtensionPositioningSubTable(this FontStreamReader reader, GPOSLookupType type, long subtableOffset)
+        private static ILookupSubTable ReadExtensionPositioningSubTable(this FontStreamReader reader, GPOSLookupType type, long subtableOffset)
         {
             reader.Position = subtableOffset;
             
@@ -446,7 +465,7 @@ namespace Adamantium.Fonts.Extensions
             return reader.ReadGPOSLookupSubtable(extensionLookupType, extensionOffset + subtableOffset);
         }
 
-        private static GPOSLookupSubTable ReadGPOSLookupSubtable(this FontStreamReader reader, GPOSLookupType lookupType, long subtableOffset)
+        private static ILookupSubTable ReadGPOSLookupSubtable(this FontStreamReader reader, GPOSLookupType lookupType, long subtableOffset)
         {
             switch (lookupType)
             {

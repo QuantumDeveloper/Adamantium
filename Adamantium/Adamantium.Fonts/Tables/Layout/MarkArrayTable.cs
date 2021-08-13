@@ -4,9 +4,9 @@ namespace Adamantium.Fonts.Tables.Layout
     {
         public MarkRecord[] MarkRecords { get; set; }
         
-        public AnchorTable[] AnchorTables { get; set; }
+        public AnchorPointTable[] AnchorTables { get; set; }
 
-        public AnchorTable GetAnchorTable(int index)
+        public AnchorPointTable GetAnchorPoint(int index)
         {
             return AnchorTables[index];
         }

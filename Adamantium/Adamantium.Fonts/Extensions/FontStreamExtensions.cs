@@ -49,6 +49,17 @@ namespace Adamantium.Fonts.Extensions
 
             return arr;
         }
+        
+        public static UInt32[] ReadUInt32Array(this FontStreamReader reader, int count)
+        {
+            var arr = new UInt32[count];
+            for (int i = 0; i < count; i++)
+            {
+                arr[i] = reader.ReadUInt32();
+            }
+
+            return arr;
+        }
 
     }
 }

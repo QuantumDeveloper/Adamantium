@@ -10,11 +10,11 @@ namespace Adamantium.Fonts.Common
         {
             return tags[tag];
         }
-        
+
         static LanguageTags()
         {
             tags = new Dictionary<string, LanguageTag>();
-            tags["ABA "] = new LanguageTag("ABA ", "Abaza", "abq") ;
+            tags["ABA "] = new LanguageTag("ABA ", "Abaza", "abq");
             tags["ABK "] = new LanguageTag("ABK ", "Abkhazian", "abk");
             tags["ACH "] = new LanguageTag("ACH ", "Acholi", "ach");
             tags["ACR "] = new LanguageTag("ACR ", "Achi", "acr");
@@ -34,599 +34,627 @@ namespace Adamantium.Fonts.Common
             tags["ARG "] = new LanguageTag("ARG ", "Aragonese", "arg");
             tags["ARI "] = new LanguageTag("ARI ", "Aari", "aiw");
             tags["ARK "] = new LanguageTag("ARK ", "Rakhine", "mhv", "rmz", "rki");
+            tags["ASM "] = new LanguageTag("ASM ", "Assamese", "asm");
+            tags["AST "] = new LanguageTag("AST ", "Asturian", "ast");
+            tags["ATH "] = new LanguageTag("ATH ", "Athapaskan languages", "aht", "apa", "apk", "apj", "apl", "apm",
+                "apw", "ath", "bea", "sek", "bcr", "caf", "chp", "clc", "coq", "crx", "ctc", "den", "dgr", "gce", "gwi",
+                "haa", "hoi", "hup", "ing", "kkz", "koy", "ktw", "kuu", "mvb", "nav", "qwt", "scs", "srs", "taa", "tau",
+                "tcb", "tce", "tfn", "tgx", "tht", "tol", "ttm", "tuu", "txc", "wlk", "xup", "xsl");
+            tags["AVR "] = new LanguageTag("AVR ", "Avar", "ava");
+            tags["AWA "] = new LanguageTag("AWA ", "Awadhi", "awa");
+            tags["AYM "] = new LanguageTag("AYM ", "Aymara", "aym");
+            tags["AZB "] = new LanguageTag("AZB ", "Torki", "azb");
+            tags["AZE "] = new LanguageTag("AZE ", "Azerbaijani", "aze");
+            tags["BAD "] = new LanguageTag("BAD ", "Badaga", "bfq");
+            tags["BAD0"] = new LanguageTag("BAD0", "Banda", "bad", "bbp", "bfl", "bjo", "bpd", "bqk", "gox", "kuw",
+                "liy", "lna", "lnl", "mnh", "nue", "nuu", "tor", "yaj", "zmz");
+            tags["BAG "] = new LanguageTag("BAG ", "Baghelkhandi", "bfy");
+            tags["BAL "] = new LanguageTag("BAL ", "Balkar", "krc");
+            tags["BAN "] = new LanguageTag("BAN ", "Balinese", "ban");
+            tags["BAR "] = new LanguageTag("BAR ", "Bavarian", "bar");
+            tags["BAU "] = new LanguageTag("BAU ", "Baulé", "bci");
+            tags["BBC "] = new LanguageTag("BBC ", "Batak Toba", "bbc");
+            tags["BBR "] = new LanguageTag("BBR ", "Berber", "auj", "ber", "cnu", "gha", "gho", "grr", "jbe", "jbn",
+                "kab", "mzb", "oua", "rif", "sds", "shi", "shy", "siz", "sjs", "swn", "taq", "tez", "thv", "thz", "tia",
+                "tjo", "tmh", "ttq", "tzm", "zen", "zgh");
+            tags["BCH "] = new LanguageTag("BCH ", "Bench", "bcq");
+            tags["BCR "] = new LanguageTag("BCR ", "Bible Cree");
+            tags["BDY "] = new LanguageTag("BDY ", "Bandjalang", "bdy");
+            tags["BEL "] = new LanguageTag("BEL ", "Belarussian", "bel");
+            tags["BEM "] = new LanguageTag("BEM ", "Bemba", "bem");
+            tags["BEN "] = new LanguageTag("BEN ", "Bengali", "ben");
+            tags["BEN "] = new LanguageTag("BEN ", "Bengali", "ben");
+            tags["BGC "] = new LanguageTag("BGC ", "Haryanvi", "bgc");
+            tags["BGQ "] = new LanguageTag("BGQ ", "Bagri", "bgq");
+            tags["BGR "] = new LanguageTag("BGR ", "Bulgarian", "bul");
+            tags["BHI "] = new LanguageTag("BHI ", "Bhili", "bhi", "bhb");
+            tags["BHO "] = new LanguageTag("BHO ", "Bhojpuri", "bho");
+            tags["BIK "] = new LanguageTag("BIK ", "Bikol", "bik", "bhk", "bcl", "bto", "cts", "bln", "fbl", "lbl",
+                "rbl", "ubl");
+            tags["BIL "] = new LanguageTag("BIL ", "Bilen", "byn");
+            tags["BIS "] = new LanguageTag("BIS ", "Bislama", "bis");
+            tags["BJJ "] = new LanguageTag("BJJ ", "Kanauji", "bjj");
+            tags["BKF "] = new LanguageTag("BKF ", "Blackfoot", "bla");
+            tags["BLI "] = new LanguageTag("BLI ", "Baluchi", "bal");
+            tags["BLK "] = new LanguageTag("BLK ", "Pa’o Karen", "blk");
+            tags["BLN "] = new LanguageTag("BLN ", "Balante", "bjt", "ble");
+            tags["BLT "] = new LanguageTag("BLT ", "Balti", "bft");
+            tags["BMB "] = new LanguageTag("BMB ", "Bambara (Bamanankan)", "bam");
+            tags["BML "] = new LanguageTag("BML ", "Bamileke", "bai", "bbj", "bko", "byv", "fmp", "jgo", "nla", "nnh",
+                "nnz", "nwe", "xmg", "ybb");
+            tags["BOS "] = new LanguageTag("BOS ", "Bosnian", "bos");
+            tags["BPY "] = new LanguageTag("BPY ", "Bishnupriya Manipuri", "bpy");
+            tags["BRE "] = new LanguageTag("BRE ", "Breton", "bre");
+            tags["BRH "] = new LanguageTag("BRH ", "Brahui", "brh");
+            tags["BRI "] = new LanguageTag("BRI ", "Braj Bhasha", "bra");
+            tags["BRM "] = new LanguageTag("BRM ", "Burmese", "mya");
+            tags["BRX "] = new LanguageTag("BRX ", "Bodo", "brx");
+            tags["BSH "] = new LanguageTag("BSH ", "Bashkir", "bak");
+            tags["BSK "] = new LanguageTag("BSK ", "Burushaski", "bsk");
+            tags["BTD "] = new LanguageTag("BTD ", "Batak Dairi (Pakpak)", "btd");
+            tags["BTI "] = new LanguageTag("BTI ", "Beti", "btb", "beb", "bum", "bxp", "eto", "ewo", "mct");
+            tags["BTK "] = new LanguageTag("BTK ", "Batak languages", "akb", "bbc", "btd", "btk", "btm", "bts", "btx",
+                "btz");
+            tags["BTM "] = new LanguageTag("BTM ", "Batak Mandailing", "btm");
+            tags["BTS "] = new LanguageTag("BTS ", "Batak Simalungun", "bts");
+            tags["BTX "] = new LanguageTag("BTX ", "Batak Karo", "btx");
+            tags["BTZ "] = new LanguageTag("BTZ ", "Batak Alas-Kluet", "btz");
+            tags["BUG "] = new LanguageTag("BUG ", "Bugis", "bug");
+            tags["BYV "] = new LanguageTag("BYV ", "Medumba", "byv");
+            tags["CAK "] = new LanguageTag("CAK ", "Kaqchikel", "cak");
+            tags["CAT "] = new LanguageTag("CAT ", "Catalan", "cat");
+            tags["CBK "] = new LanguageTag("CBK ", "Zamboanga Chavacano", "cbk");
+            tags["CCHN "] = new LanguageTag("CCHN ", "Chinantec", "cco", "chj", "chq", "chz", "cle", "cnl", "cnt",
+                "cpa", "csa", "cso", "cte", "ctl", "cuc", "cvn");
+            tags["CEB "] = new LanguageTag("CEB ", "Cebuano", "ceb");
+            tags["CGG "] = new LanguageTag("CGG ", "Chiga", "cgg");
+            tags["CHA "] = new LanguageTag("CHA ", "Chamorro", "cha");
+            tags["CHE "] = new LanguageTag("CHE ", "Chechen", "che");
+            tags["CHG "] = new LanguageTag("CHG ", "Chaha Gurage", "sgw");
+            tags["CHH "] = new LanguageTag("CHH ", "Chattisgarhi", "hne");
+            tags["CHI "] = new LanguageTag("CHI ", "Chichewa (Chewa, Nyanja)", "nya");
+            tags["CHK "] = new LanguageTag("CHK ", "Chukchi", "ckt");
+            tags["CHK0"] = new LanguageTag("CHK0", "Chuukese", "chk");
+            tags["CHO "] = new LanguageTag("CHO ", "Choctaw", "cho");
+            tags["CHP "] = new LanguageTag("CHP ", "Chipewyan", "chp");
+            tags["CHR "] = new LanguageTag("CHR ", "Cherokee", "chr");
+            tags["CHU "] = new LanguageTag("CHU ", "Chuvash", "chv");
+            tags["CHY "] = new LanguageTag("CHY ", "Cheyenne", "chy");
+            tags["CJA "] = new LanguageTag("CJA ", "Western Cham", "cja");
+            tags["CJM "] = new LanguageTag("CJM ", "Eastern Cham", "cjm");
+            tags["CMR "] = new LanguageTag("CMR ", "Comorian", "swb", "wlc", "wni", "zdj");
+            tags["COP "] = new LanguageTag("COP ", "Coptic", "cop");
+            tags["COR "] = new LanguageTag("COR ", "Cornish", "cor");
+            tags["COS "] = new LanguageTag("COS ", "Corsican", "cos");
+            tags["CPP "] = new LanguageTag("CPP ", "Creoles", "abs", "acf", "afs", "aig", "aoa", "bah", "bew", "bis",
+                "bjs", "bpl", "bpq", "brc", "bxo", "bzj", "bzk", "cbk", "ccl", "ccm", "chn", "cks", "cpe", "cpf", "cpi",
+                "cpp", "cri", "crp", "crs", "dcr", "dep", "djk", "fab", "fng", "fpe", "gac", "gcf", "gcl", "gcr", "gib",
+                "goq", "gpe", "gul", "gyn", "hat", "hca", "hmo", "hwc", "icr", "idb", "ihb", "jam", "jvd", "kcn", "kea",
+                "kmv", "kri", "kww", "lir", "lou", "lrt", "max", "mbf", "mcm", "mfe", "mfp", "mkn", "mod", "msi", "mud",
+                "mzs", "nag", "nef", "ngm", "njt", "onx", "oor", "pap", "pcm", "pea", "pey", "pga", "pih", "pis", "pln",
+                "pml", "pmy", "pov", "pre", "rcf", "rop", "scf", "sci", "skw", "srm", "srn", "sta", "svc", "tas", "tch",
+                "tcs", "tgh", "tmg", "tpi", "trf", "tvy", "uln", "vic", "vkp", "wes", "xmm");
+            tags["CRE "] = new LanguageTag("CRE ", "Cree", "cre");
+            tags["CRR "] = new LanguageTag("CRR ", "Carrier", "crx", "caf");
+            tags["CRT "] = new LanguageTag("CRT ", "Crimean Tatar", "crh");
+            tags["CSB "] = new LanguageTag("CSB ", "Kashubian", "csb");
+            tags["CSL "] = new LanguageTag("CSL ", "Church Slavonic", "chu");
+            tags["CSY "] = new LanguageTag("CSY ", "Czech", "ces");
+            tags["CTG "] = new LanguageTag("CTG ", "Chittagonian", "ctg");
+            tags["CUK "] = new LanguageTag("CUK ", "San Blas Kuna", "cuk");
+            tags["DAG "] = new LanguageTag("DAG ", "Dagbani", "dag");
+            tags["DAN "] = new LanguageTag("DAN ", "Danish", "dan");
+            tags["DAR "] = new LanguageTag("DAR ", "Dargwa", "dar");
+            tags["DAX "] = new LanguageTag("DAX ", "Dayi", "dax");
+            tags["DCR "] = new LanguageTag("DCR ", "Woods Cree", "cwd");
+            tags["DEU "] = new LanguageTag("DEU ", "German", "deu");
+            tags["DGO "] = new LanguageTag("DGO ", "Dogri (individual language)", "dgo");
+            tags["DGR "] = new LanguageTag("DGR ", "Dogri (macrolanguage)", "doi");
+            tags["DHG "] = new LanguageTag("DHG ", "Dhangu", "dhg");
+            tags["DIQ "] = new LanguageTag("DIQ ", "Dimli", "diq");
+            tags["DIV "] = new LanguageTag("DIV ", "Divehi (Dhivehi, Maldivian)", "div");
+            tags["DJR "] = new LanguageTag("DJR ", "Zarma", "dje");
+            tags["DJR0"] = new LanguageTag("DJR0", "Djambarrpuyngu", "djr");
+            tags["DNG "] = new LanguageTag("DNG ", "Dangme", "ada");
+            tags["DNJ "] = new LanguageTag("DNJ ", "Dan", "dnj");
+            tags["DNK "] = new LanguageTag("DNK ", "Dinka", "din");
+            tags["DRI "] = new LanguageTag("DRI ", "Dari", "prs");
+            tags["DUJ "] = new LanguageTag("DUJ ", "Dhuwal", "duj", "dwu", "dwy");
+            tags["DUN "] = new LanguageTag("DUN ", "Dungan", "dng");
+            tags["DZN "] = new LanguageTag("DZN ", "Dzongkha", "dzo");
+            tags["EBI "] = new LanguageTag("EBI ", "Ebira", "igb");
+            tags["ECR "] = new LanguageTag("ECR ", "Eastern Cree", "crj", "crl");
+            tags["EDO "] = new LanguageTag("EDO ", "Edo", "bin");
+            tags["EFI "] = new LanguageTag("EFI ", "Efik", "efi");
+            tags["ELL "] = new LanguageTag("ELL ", "Greek", "ell");
+            tags["EMK "] = new LanguageTag("EMK ", "Eastern Maninkakan", "emk");
+            tags["ENG "] = new LanguageTag("ENG ", "English", "eng");
+            tags["ERZ "] = new LanguageTag("ERZ ", "Erzya", "myv");
+            tags["ESP "] = new LanguageTag("ESP ", "Spanish", "spa");
+            tags["ESU "] = new LanguageTag("ESU ", "Central Yupik", "esu");
+            tags["ETI "] = new LanguageTag("ETI ", "Estonian", "est");
+            tags["EUQ "] = new LanguageTag("EUQ ", "Basque", "eus");
+            tags["EVK "] = new LanguageTag("EVK ", "Evenki", "evn");
+            tags["EVN "] = new LanguageTag("EVN ", "Even", "eve");
+            tags["EWE "] = new LanguageTag("EWE ", "Ewe", "ewe");
+            tags["FAN "] = new LanguageTag("FAN ", "French Antillean", "acf");
+            tags["FAN0"] = new LanguageTag("FAN0", "Fang", "fan");
+            tags["FAR "] = new LanguageTag("FAR ", "Persian", "fas");
+            tags["FAT "] = new LanguageTag("FAT ", "Fanti", "fat");
+            tags["FIN "] = new LanguageTag("FIN ", "Finnish", "fin");
+            tags["FJI "] = new LanguageTag("FJI ", "Fijian", "fij");
+            tags["FLE "] = new LanguageTag("FLE ", "Dutch (Flemish)", "vls");
+            tags["FMP "] = new LanguageTag("FMP ", "Fe’fe’", "fmp");
+            tags["FNE "] = new LanguageTag("FNE ", "Forest Enets", "enf");
+            tags["FON "] = new LanguageTag("FON ", "Fon", "fon");
+            tags["FOS "] = new LanguageTag("FOS ", "Faroese", "fao");
+            tags["FRA "] = new LanguageTag("FRA ", "French", "fra");
+            tags["FRC "] = new LanguageTag("FRC ", "Cajun French", "frc");
+            tags["FRI "] = new LanguageTag("FRI ", "Frisian", "fry");
+            tags["FRL "] = new LanguageTag("FRL ", "Friulian", "fur");
+            tags["FRP "] = new LanguageTag("FRP ", "Arpitan", "frp");
+            tags["FTA "] = new LanguageTag("FTA ", "Futa", "fuf");
+            tags["FUL "] = new LanguageTag("FUL ", "Fulah", "ful");
+            tags["FUV "] = new LanguageTag("FUV ", "Nigerian Fulfulde", "fuv");
+            tags["GAD "] = new LanguageTag("GAD ", "Ga", "gaa");
+            tags["GAE "] = new LanguageTag("GAE ", "Scottish Gaelic (Gaelic)", "gla");
+            tags["GAG "] = new LanguageTag("GAG ", "Gagauz", "gag");
+            tags["GAL "] = new LanguageTag("GAL ", "Galician", "glg");
+            tags["GAR "] = new LanguageTag("GAR ", "Garshuni");
+            tags["GAW "] = new LanguageTag("GAW ", "Garhwali", "gbm");
+            tags["GEZ "] = new LanguageTag("GEZ ", "Geez", "gez");
+            tags["GIH "] = new LanguageTag("GIH ", "Githabul", "gih");
+            tags["GIL "] = new LanguageTag("GIL ", "Gilyak", "niv");
+            tags["GIL0"] = new LanguageTag("GIL0", "Kiribati (Gilbertese)", "gil");
+            tags["GKP "] = new LanguageTag("GKP ", "Kpelle (Guinea)", "gkp");
+            tags["GLK "] = new LanguageTag("GLK ", "Gilaki", "glk");
+            tags["GMZ "] = new LanguageTag("GMZ ", "Gumuz", "guk");
+            tags["GNN "] = new LanguageTag("GNN ", "Gumatj", "gnn");
+            tags["GOG "] = new LanguageTag("GOG ", "Gogo", "gog");
+            tags["GON "] = new LanguageTag("GON ", "Gondi", "gon");
+            tags["GRN "] = new LanguageTag("GRN ", "Greenlandic", "kal");
+            tags["GRO "] = new LanguageTag("GRO ", "Garo", "grt");
+            tags["GUA "] = new LanguageTag("GUA ", "Guarani", "grn");
+            tags["GUC "] = new LanguageTag("GUC ", "Wayuu", "guc");
+            tags["GUF "] = new LanguageTag("GUF ", "Gupapuyngu", "guf");
+            tags["GUJ "] = new LanguageTag("GUJ ", "Gujarati", "guj");
+            tags["GUZ "] = new LanguageTag("GUZ ", "Gusii", "guz");
+            tags["HAI "] = new LanguageTag("HAI ", "Haitian (Haitian Creole)", "hat");
+            tags["HAL "] = new LanguageTag("HAL ", "Halam (Falam Chin)", "cfm");
+            tags["HAR "] = new LanguageTag("HAR ", "Harauti", "hoj");
+            tags["HAU "] = new LanguageTag("HAU ", "Hausa", "hau");
+            tags["HAW "] = new LanguageTag("HAW ", "Hawaiian", "haw");
+            tags["HAY "] = new LanguageTag("HAY ", "Haya", "hay");
+            tags["HAZ "] = new LanguageTag("HAZ ", "Hazaragi", "haz");
+            tags["HBN "] = new LanguageTag("HBN ", "Hammer-Banna", "amf");
+            tags["HER "] = new LanguageTag("HER ", "Herero", "her");
+            tags["HIL "] = new LanguageTag("HIL ", "Hiligaynon", "hil");
+            tags["HIN "] = new LanguageTag("HIN ", "Hindi", "hin");
+            tags["HMA "] = new LanguageTag("HMA ", "High Mari", "mrj");
+            tags["HMN "] = new LanguageTag("HMN ", "Hmong", "hmn");
+            tags["HMO "] = new LanguageTag("HMO ", "Hiri Motu", "hmo");
+            tags["HND "] = new LanguageTag("HND ", "Hindko", "hno", "hnd");
+            tags["HO  "] = new LanguageTag("HO  ", "Ho", "hoc");
+            tags["HRI "] = new LanguageTag("HRI ", "Harari", "har");
+            tags["HRV "] = new LanguageTag("HRV ", "Croatian", "hrv");
+            tags["HUN "] = new LanguageTag("HUN ", "Hungarian", "hun");
+            tags["HYE "] = new LanguageTag("HYE ", "Armenian", "hye", "hyw");
+            tags["HYE0"] = new LanguageTag("HYE0", "Armenian East", "hye");
+            tags["IBA "] = new LanguageTag("IBA ", "Iban", "iba");
+            tags["IBB "] = new LanguageTag("IBB ", "Ibibio", "ibb");
+            tags["IBO "] = new LanguageTag("IBO ", "Igbo", "ibo");
+            tags["IDO "] = new LanguageTag("IDO ", "Ido", "ido");
+            tags["IJO "] = new LanguageTag("IJO ", "Ijo languages", "iby", "ijc", "ije", "ijn", "ijo", "ijs", "nkx",
+                "okd", "okr", "orr");
+            tags["ILE "] = new LanguageTag("ILE ", "Interlingue", "ile");
+            tags["ILO "] = new LanguageTag("ILO ", "Ilokano", "ilo");
+            tags["INA "] = new LanguageTag("INA ", "Interlingua", "ina");
+            tags["IND "] = new LanguageTag("IND ", "Indonesian", "ind");
+            tags["ING "] = new LanguageTag("ING ", "Ingush", "inh");
+            tags["INU "] = new LanguageTag("INU ", "Inuktitut", "iku");
+            tags["IPK "] = new LanguageTag("IPK ", "Inupiat", "ipk");
+            tags["IPPH"] = new LanguageTag("IPPH", "Phonetic transcription—IPA conventions");
+            tags["IRI "] = new LanguageTag("IRI ", "Irish", "gle");
+            tags["IRT "] = new LanguageTag("IRT ", "Irish Traditional", "gle");
+            tags["ISL "] = new LanguageTag("ISL ", "Icelandic", "isl");
+            tags["ISM "] = new LanguageTag("ISM ", "Inari Sami", "smn");
+            tags["ITA "] = new LanguageTag("ITA ", "Italian", "ita");
+            tags["IWR "] = new LanguageTag("IWR ", "Hebrew", "heb");
+            tags["JAM "] = new LanguageTag("JAM ", "Jamaican Creole", "jam");
+            tags["JAN "] = new LanguageTag("JAN ", "Japanese", "jpn");
+            tags["JAV "] = new LanguageTag("JAV ", "Javanese", "jav");
+            tags["JBO "] = new LanguageTag("JBO ", "Lojban", "jbo");
+            tags["JCT "] = new LanguageTag("JCT ", "Krymchak", "jct");
+            tags["JII "] = new LanguageTag("JII ", "Yiddish", "yid");
+            tags["JUD "] = new LanguageTag("JUD ", "Ladino", "lad");
+            tags["JUL "] = new LanguageTag("JUL ", "Jula", "dyu");
+            tags["KAB "] = new LanguageTag("KAB ", "Kabardian", "kbd");
+            tags["KAB0"] = new LanguageTag("KAB0", "Kabyle", "kab");
+            tags["KAC "] = new LanguageTag("KAC ", "Kachchi", "kfr");
+            tags["KAL "] = new LanguageTag("KAL ", "Kalenjin", "kln");
+            tags["KAN "] = new LanguageTag("KAN ", "Kannada", "kan");
+            tags["KAR "] = new LanguageTag("KAR ", "Karachay", "krc");
+            tags["KAT "] = new LanguageTag("KAT ", "Georgian", "kat");
+            tags["KAZ "] = new LanguageTag("KAZ ", "Kazakh", "kaz");
+            tags["KDE "] = new LanguageTag("KDE ", "Makonde", "kde");
+            tags["KEA "] = new LanguageTag("KEA ", "Kabuverdianu (Crioulo)", "kea");
+            tags["KEB "] = new LanguageTag("KEB ", "Kebena", "ktb");
+            tags["KEK "] = new LanguageTag("KEK ", "Kekchi", "kek");
+            tags["KGE "] = new LanguageTag("KGE ", "Khutsuri Georgian", "kat");
+            tags["KHA "] = new LanguageTag("KHA ", "Khakass", "kjh");
+            tags["KHK "] = new LanguageTag("KHK ", "Khanty-Kazim", "kca");
+            tags["KHM "] = new LanguageTag("KHM ", "Khmer", "khm");
+            tags["KHS "] = new LanguageTag("KHS ", "Khanty-Shurishkar", "kca");
+            tags["KHT "] = new LanguageTag("KHT ", "Khamti Shan", "kht");
+            tags["KHV "] = new LanguageTag("KHV ", "Khanty-Vakhi", "kca");
+            tags["KHW "] = new LanguageTag("KHW ", "Khowar", "khw");
+            tags["KIK "] = new LanguageTag("KIK ", "Kikuyu (Gikuyu)", "kik");
+            tags["KIR "] = new LanguageTag("KIR ", "Kirghiz (Kyrgyz)", "kir");
+            tags["KIS "] = new LanguageTag("KIS ", "Kisii", "kqs", "kss");
+            tags["KIU "] = new LanguageTag("KIU ", "Kirmanjki", "kiu");
+            tags["KJD "] = new LanguageTag("KJD ", "Southern Kiwai", "kjd");
+            tags["KJP "] = new LanguageTag("KJP ", "Eastern Pwo Karen", "kjp");
+            tags["KJZ "] = new LanguageTag("KJZ ", "Bumthangkha", "kjz");
+            tags["KKN "] = new LanguageTag("KKN ", "Kokni", "kex");
+            tags["KLM "] = new LanguageTag("KLM ", "Kalmyk", "xal");
+            tags["KMB "] = new LanguageTag("KMB ", "Kamba", "kam");
+            tags["KMN "] = new LanguageTag("KMN ", "Kumaoni", "kfy");
+            tags["KMO "] = new LanguageTag("KMO ", "Komo", "kmw");
+            tags["KMS "] = new LanguageTag("KMS ", "Komso", "kxc");
+            tags["KMZ "] = new LanguageTag("KMZ ", "Khorasani Turkic", "kmz");
+            tags["KNR "] = new LanguageTag("KNR ", "Kanuri", "kau");
+            tags["KOD "] = new LanguageTag("KOD ", "Kodagu", "kfa");
+            tags["KOH "] = new LanguageTag("KOH ", "Korean Old Hangul", "kor", "okm");
+            tags["KOK "] = new LanguageTag("KOK ", "Konkani", "kok");
+            tags["KOM "] = new LanguageTag("KOM ", "Komi", "kom");
+            tags["KON "] = new LanguageTag("KON ", "Kikongo", "ktu");
+            tags["KON0"] = new LanguageTag("KON0", "Kongo", "kon");
+            tags["KOP "] = new LanguageTag("KOP ", "Komi-Permyak", "koi");
+            tags["KOR "] = new LanguageTag("KOR ", "Korean", "kor");
+            tags["KOS "] = new LanguageTag("KOS ", "Kosraean", "kos");
+            tags["KOZ "] = new LanguageTag("KOZ ", "Komi-Zyrian", "kpv");
+            tags["KPL "] = new LanguageTag("KPL ", "Kpelle", "kpe");
+            tags["KRI "] = new LanguageTag("KRI ", "Krio", "kri");
+            tags["KRK "] = new LanguageTag("KRK ", "Karakalpak", "kaa");
+            tags["KRL "] = new LanguageTag("KRL ", "Karelian", "krl");
+            tags["KRM "] = new LanguageTag("KRM ", "Karaim", "kdr");
+            tags["KRN "] = new LanguageTag("KRN ", "Karen", "blk", "bwe", "eky", "ghk", "jkm", "jkp", "kar", "kjp",
+                "kjt", "ksw", "kvl", "kvq", "kvt", "kvu", "kvy", "kxf", "kxk", "kyu", "pdu", "pwo", "pww", "wea");
+            tags["KRT "] = new LanguageTag("KRT ", "Koorete", "kqy");
+            tags["KSH "] = new LanguageTag("KSH ", "Kashmiri", "kas");
+            tags["KSH0"] = new LanguageTag("KSH0", "Ripuarian", "ksh");
+            tags["KSI "] = new LanguageTag("KSI ", "Khasi", "kha");
+            tags["KSM "] = new LanguageTag("KSM ", "Kildin Sami", "sjd");
+            tags["KSW "] = new LanguageTag("KSW ", "S’gaw Karen", "ksw");
+            tags["KUA "] = new LanguageTag("KUA ", "Kuanyama", "kua");
+            tags["KUI "] = new LanguageTag("KUI ", "Kui", "kxu");
+            tags["KUL "] = new LanguageTag("KUL ", "Kulvi", "kfx");
+            tags["KUM "] = new LanguageTag("KUM ", "Kumyk", "kum");
+            tags["KUR "] = new LanguageTag("KUR ", "Kurdish", "kur");
+            tags["KUU "] = new LanguageTag("KUU ", "Kurukh", "kru");
+            tags["KUY "] = new LanguageTag("KUY ", "Kuy", "kdt");
+            tags["KYK "] = new LanguageTag("KYK ", "Koryak", "kpy");
+            tags["KYU "] = new LanguageTag("KYU ", "Western Kayah", "kyu");
+            tags["LAD "] = new LanguageTag("LAD ", "Ladin", "lld");
+            tags["LAH "] = new LanguageTag("LAH ", "Lahuli", "bfu");
+            tags["LAK "] = new LanguageTag("LAK ", "Lak", "lbe");
+            tags["LAM "] = new LanguageTag("LAM ", "Lambani", "lmn");
+            tags["LAO "] = new LanguageTag("LAO ", "Lao", "lao");
+            tags["LAT "] = new LanguageTag("LAT ", "Latin", "lat");
+            tags["LAZ "] = new LanguageTag("LAZ ", "Laz", "lzz");
+            tags["LCR "] = new LanguageTag("LCR ", "L-Cree", "crm");
+            tags["LDK "] = new LanguageTag("LDK ", "Ladakhi", "lbj");
+            tags["LEZ "] = new LanguageTag("LEZ ", "Lezgi", "lez");
+            tags["LIJ "] = new LanguageTag("LIJ ", "Ligurian", "lij");
+            tags["LIM "] = new LanguageTag("LIM ", "Limburgish", "lim");
+            tags["LIN "] = new LanguageTag("LIN ", "Lingala", "lin");
+            tags["LIS "] = new LanguageTag("LIS ", "Lisu", "lis");
+            tags["LJP "] = new LanguageTag("LJP ", "Lampung", "ljp");
+            tags["LKI "] = new LanguageTag("LKI ", "Laki", "lki");
+            tags["LMA "] = new LanguageTag("LMA ", "Low Mari", "mhr");
+            tags["LMB "] = new LanguageTag("LMA ", "Limbu", "lif");
+            tags["LMO "] = new LanguageTag("LMO ", "Lombard", "lmo");
+            tags["LMW "] = new LanguageTag("LMW ", "Lomwe", "ngl");
+            tags["LOM "] = new LanguageTag("LOM ", "Loma", "lom");
+            tags["LRC "] = new LanguageTag("LRC ", "Luri", "lrc", "luz", "bqi", "zum");
+            tags["LSB "] = new LanguageTag("LSB ", "Lower Sorbian", "dsb");
+            tags["LSM "] = new LanguageTag("LSM ", "Lule Sami", "smj");
+            tags["LTH "] = new LanguageTag("LTH ", "Lithuanian", "lit");
+            tags["LTZ "] = new LanguageTag("LTZ ", "Luxembourgish", "ltz");
+            tags["LUA "] = new LanguageTag("LUA ", "Luba-Lulua", "lua");
+            tags["LUB "] = new LanguageTag("LUB ", "Luba-Katanga", "lub");
+            tags["LUG "] = new LanguageTag("LUG ", "Ganda", "lug");
+            tags["LUH "] = new LanguageTag("LUH ", "Luyia", "luy");
+            tags["LUO "] = new LanguageTag("LUO ", "Luo", "luo");
+            tags["LVI "] = new LanguageTag("LVI ", "Latvian", "lav");
+            tags["MAD "] = new LanguageTag("MAD ", "Madura", "mad");
+            tags["MAG "] = new LanguageTag("MAG ", "Magahi", "mag");
+            tags["MAH "] = new LanguageTag("MAH ", "Marshallese", "mah");
+            tags["MAJ "] = new LanguageTag("MAJ ", "Majang", "mpe");
+            tags["MAK "] = new LanguageTag("MAK ", "Makhuwa", "vmw");
+            tags["MAL "] = new LanguageTag("MAL ", "Malayalam", "mal");
+            tags["MAM "] = new LanguageTag("MAM ", "Mam", "mam");
+            tags["MAN "] = new LanguageTag("MAN ", "Mansi", "mns");
+            tags["MAP "] = new LanguageTag("MAP ", "Mapudungun", "arn");
+            tags["MAR "] = new LanguageTag("MAR ", "Marathi", "mar");
+            tags["MAW "] = new LanguageTag("MAW ", "Marwari", "mwr", "dhd", "rwr", "mve", "wry", "mtr", "swv");
+            tags["MBN "] = new LanguageTag("MBN ", "Mbundu", "kmb");
+            tags["MBO "] = new LanguageTag("MBO ", "Mbo", "mbo");
+            tags["MCH "] = new LanguageTag("MCH ", "Manchu", "mnc");
+            tags["MCR "] = new LanguageTag("MCR ", "Moose Cree", "crm");
+            tags["MDE "] = new LanguageTag("MDE ", "Mende", "men");
+            tags["MDR "] = new LanguageTag("MDR ", "Mandar", "mdr");
+            tags["MEN "] = new LanguageTag("MEN ", "Me’en", "mym");
+            tags["MER "] = new LanguageTag("MER ", "Meru", "mer");
+            tags["MFA "] = new LanguageTag("MFA ", "Pattani Malay", "mfa");
+            tags["MFE "] = new LanguageTag("MFE ", "Morisyen", "mfe");
+            tags["MIN "] = new LanguageTag("MIN ", "Minangkabau", "min");
+            tags["MIZ "] = new LanguageTag("MIZ ", "Mizo", "lus");
+            tags["MKD "] = new LanguageTag("MKD ", "Macedonian", "mkd");
+            tags["MKR "] = new LanguageTag("MKR ", "Makasar", "mak");
+            tags["MKW "] = new LanguageTag("MKW ", "Kituba", "mkw");
+            tags["MLE "] = new LanguageTag("MLE ", "Male", "mdy");
+            tags["MLG "] = new LanguageTag("MLG ", "Malagasy", "mlg");
+            tags["MLN "] = new LanguageTag("MLN ", "Malinke", "mlq");
+            tags["MLR "] = new LanguageTag("MLR ", "Malayalam Reformed", "mal");
+            tags["MLY "] = new LanguageTag("MLY ", "Malay", "msa");
+            tags["MND "] = new LanguageTag("MND ", "Mandinka", "mnk");
+            tags["MNG "] = new LanguageTag("MNG ", "Mongolian", "mon");
+            tags["MNI "] = new LanguageTag("MNI ", "Manipuri", "mni");
+            tags["MNK "] = new LanguageTag("MNK ", "Maninka", "man", "mnk", "myq", "mku", "msc", "emk", "mwk", "mlq");
+            tags["MNX "] = new LanguageTag("MNX ", "Manx", "glv");
+            tags["MOH "] = new LanguageTag("MOH ", "Mohawk", "moh");
+            tags["MOK "] = new LanguageTag("MOK ", "Moksha", "mdf");
+            tags["MOL "] = new LanguageTag("MOL ", "Moldavian", "mol");
+            tags["MON "] = new LanguageTag("MON ", "Mon", "mnw");
+            tags["MOR "] = new LanguageTag("MOR ", "Moroccan");
+            tags["MOS "] = new LanguageTag("MOS ", "Mossi", "mos");
+            tags["MRI "] = new LanguageTag("MRI ", "Maori", "mri");
+            tags["MTH "] = new LanguageTag("MTH ", "Maithili", "mai");
+            tags["MTS "] = new LanguageTag("MTS ", "Maltese", "mlt");
+            tags["MUN "] = new LanguageTag("MUN ", "Mundari", "unr");
+            tags["MUS "] = new LanguageTag("MUS ", "Muscogee", "mus");
+            tags["MWL "] = new LanguageTag("MWL ", "Mirandese", "mwl");
+            tags["MWW "] = new LanguageTag("MWW ", "Hmong Daw", "mww");
+            tags["MYN "] = new LanguageTag("MYN ", "Mayan", "acr", "agu", "caa", "cac", "cak", "chf", "ckz", "cob",
+                "ctu", "emy", "hus", "itz", "ixl", "jac", "kek", "kjb", "knj", "lac", "mam", "mhc", "mop", "myn", "poc",
+                "poh", "quc", "qum", "quv", "toj", "ttc", "tzh", "tzj", "tzo", "usp", "yua");
+            tags["MZN "] = new LanguageTag("MZN ", "Mazanderani", "mzn");
+            tags["NAG "] = new LanguageTag("NAG ", "Naga-Assamese", "nag");
+            tags["NAH "] = new LanguageTag("NAH ", "Nahuatl", "azd", "azn", "azz", "nah", "naz", "nch", "nci", "ncj",
+                "ncl", "ncx", "ngu", "nhc", "nhe", "nhg", "nhi", "nhk", "nhm", "nhn", "nhp", "nhq", "nht", "nhv", "nhw",
+                "nhx", "nhy", "nhz", "nlv", "npl", "nsu", "nuz");
+            tags["NAN "] = new LanguageTag("NAN ", "Nanai", "gld");
+            tags["NAP "] = new LanguageTag("NAP ", "Neapolitan", "nap");
+            tags["NAS "] = new LanguageTag("NAS ", "Naskapi", "nsk");
+            tags["NAU "] = new LanguageTag("NAU ", "Nauruan", "nau");
+            tags["NAV "] = new LanguageTag("NAV ", "Navajo", "nav");
+            tags["NCR "] = new LanguageTag("NCR ", "N-Cree", "csw");
+            tags["NDB "] = new LanguageTag("NDB ", "Ndebele", "nbl", "nde");
+            tags["NDC "] = new LanguageTag("NDC ", "Ndau", "ndc");
+            tags["NDG "] = new LanguageTag("NDG ", "Ndonga", "ndo");
+            tags["NDS "] = new LanguageTag("NDS ", "Low Saxon", "nds");
+            tags["NEP "] = new LanguageTag("NEP ", "Nepali", "nep");
+            tags["NEW "] = new LanguageTag("NEW ", "Newari", "new");
+            tags["NGA "] = new LanguageTag("NGA ", "Ngbaka", "nga");
+            tags["NGR "] = new LanguageTag("NGR ", "Nagari");
+            tags["NHC "] = new LanguageTag("NHC ", "Norway House Cree", "csw");
+            tags["NIS "] = new LanguageTag("NIS ", "Nisi", "dap", "njz", "tgj");
+            tags["NIU "] = new LanguageTag("NIU ", "Niuean", "niu");
+            tags["NKL "] = new LanguageTag("NKL ", "Nyankole", "nyn");
+            tags["NKO "] = new LanguageTag("NKO ", "N’Ko", "nqo");
+            tags["NLD "] = new LanguageTag("NLD ", "Dutch", "nld");
+            tags["NOE "] = new LanguageTag("NOE ", "Nimadi", "noe");
+            tags["NOG "] = new LanguageTag("NOG ", "Nogai", "nog");
+            tags["NOR "] = new LanguageTag("NOR ", "Norwegian", "nob");
+            tags["NOV "] = new LanguageTag("NOV ", "Novial", "nov");
+            tags["NSM "] = new LanguageTag("NSM ", "Northern Sami", "sme");
+            tags["NSO "] = new LanguageTag("NSO ", "Northern Sotho", "nso");
+            tags["NTA "] = new LanguageTag("NTA ", "Northern Tai", "nod");
+            tags["NTO "] = new LanguageTag("NTO ", "Esperanto", "epo");
+            tags["NYM "] = new LanguageTag("NYM ", "Nyamwezi", "nym");
+            tags["NYN "] = new LanguageTag("NYN ", "Norwegian Nynorsk (Nynorsk, Norwegian)", "nno");
+            tags["NZA "] = new LanguageTag("NZA ", "Mbembe Tigon", "nza");
+            tags["OCI "] = new LanguageTag("OCI ", "Occitan", "oci");
+            tags["OCR "] = new LanguageTag("OCR ", "Oji-Cree", "ojs");
+            tags["OJB "] = new LanguageTag("OJB ", "Ojibway", "oji");
+            tags["ORI "] = new LanguageTag("ORI ", "Odia (formerly Oriya)", "ori");
+            tags["ORO "] = new LanguageTag("ORO ", "Oromo", "orm");
+            tags["OSS "] = new LanguageTag("OSS ", "Ossetian", "oss");
+            tags["PAA "] = new LanguageTag("PAA ", "Palestinian Aramaic", "sam");
+            tags["PAG "] = new LanguageTag("PAG ", "Pangasinan", "pag");
+            tags["PAL "] = new LanguageTag("PAL ", "Pali", "pli");
+            tags["PAM "] = new LanguageTag("PAM ", "Pampangan", "pam");
+            tags["PAN "] = new LanguageTag("PAN ", "Punjabi", "pan");
+            tags["PAP "] = new LanguageTag("PAP ", "Palpa", "plp");
+            tags["PAP0"] = new LanguageTag("PAP0", "Papiamentu", "pap");
+            tags["PAS "] = new LanguageTag("PAS ", "Pashto", "pus");
+            tags["PAU "] = new LanguageTag("PAU ", "Palauan", "pau");
+            tags["PCC "] = new LanguageTag("PCC ", "Bouyei", "pcc");
+            tags["PCD "] = new LanguageTag("PCD ", "Picard", "pcd");
+            tags["PDC "] = new LanguageTag("PDC ", "Pennsylvania German", "pdc");
+            tags["PGR "] = new LanguageTag("PGR ", "Polytonic Greek", "ell");
+            tags["PHK "] = new LanguageTag("PHK ", "Phake", "phk");
+            tags["PIH "] = new LanguageTag("PIH ", "Norfolk", "pih");
+            tags["PIL "] = new LanguageTag("PIL ", "Filipino", "fil");
+            tags["PLG "] = new LanguageTag("PLG ", "Palaung", "pce", "rbb", "pll");
+            tags["PLK "] = new LanguageTag("PLK ", "Polish", "pol");
+            tags["PMS "] = new LanguageTag("PMS ", "Piemontese", "pms");
+            tags["PNB "] = new LanguageTag("PNB ", "Western Panjabi", "pnb");
+            tags["POH "] = new LanguageTag("POH ", "Pocomchi", "poh");
+            tags["PON "] = new LanguageTag("PON ", "Pohnpeian", "pon");
+            tags["PRO "] = new LanguageTag("PRO ", "Provençal / Old Provençal", "pro");
+            tags["PTG "] = new LanguageTag("PTG ", "Portuguese", "por");
+            tags["PWO "] = new LanguageTag("PWO ", "Western Pwo Karen", "pwo");
+            tags["QIN "] = new LanguageTag("QIN ", "Chin", "bgr", "biu", "cek", "cey", "cfm", "cbl", "cka", "ckn",
+                "clj", "clt", "cmr", "cnb", "cnh", "cnk", "cnw", "csh", "csj", "csv", "csy", "ctd", "cth", "czt", "dao",
+                "gnb", "hlt", "hmr", "hra", "lus", "mrh", "mwq", "pck", "pkh", "pub", "ral", "rtc", "sch", "sez", "shl",
+                "smt", "tcp", "tcz", "vap", "weu", "zom", "zyp");
+            tags["QUC "] = new LanguageTag("QUC ", "K’iche’", "quc");
+            tags["QUH "] = new LanguageTag("QUH ", "Quechua (Bolivia)", "quh");
+            tags["QUZ "] = new LanguageTag("QUZ ", "Quechua", "quz");
+            tags["QVI "] = new LanguageTag("QVI ", "Quechua (Ecuador)", "qvi");
+            tags["QWH "] = new LanguageTag("QWH ", "Quechua (Peru)", "qwh");
+            tags["RAJ "] = new LanguageTag("RAJ ", "Rajasthani", "raj");
+            tags["RAR "] = new LanguageTag("RAR ", "Rarotongan", "rar");
+            tags["RBU "] = new LanguageTag("RBU ", "Russian Buriat", "bxr");
+            tags["RCR "] = new LanguageTag("RCR ", "R-Cree", "atj");
+            tags["REJ "] = new LanguageTag("REJ ", "Rejang", "rej");
+            tags["RIA "] = new LanguageTag("RIA ", "Riang", "ria");
+            tags["RIF "] = new LanguageTag("RIF ", "Tarifit", "rif");
+            tags["RIT "] = new LanguageTag("RIT ", "Ritarungo", "rit");
+            tags["RKW "] = new LanguageTag("RKW ", "Arakwal", "rkw");
+            tags["RMS "] = new LanguageTag("RMS ", "Romansh", "roh");
+            tags["RMY "] = new LanguageTag("RMY ", "Vlax Romani", "rmy");
+            tags["ROM "] = new LanguageTag("ROM ", "Romanian", "ron");
+            tags["ROY "] = new LanguageTag("ROY ", "Romany", "rom");
+            tags["RSY "] = new LanguageTag("RSY ", "Rusyn", "rue");
+            tags["RTM "] = new LanguageTag("RTM ", "Rotuman", "rtm");
+            tags["RUA "] = new LanguageTag("RUA ", "Kinyarwanda", "kin");
+            tags["RUN "] = new LanguageTag("RUN ", "Rundi", "run");
+            tags["RUP "] = new LanguageTag("RUP ", "Aromanian", "rup");
+            tags["RUS "] = new LanguageTag("RUS ", "Russian", "rus");
+            tags["SAD "] = new LanguageTag("SAD ", "Sadri", "sck");
+            tags["SAN "] = new LanguageTag("SAN ", "Sanskrit", "san");
+            tags["SAS "] = new LanguageTag("SAS ", "Sasak", "sas");
+            tags["SAT "] = new LanguageTag("SAT ", "Santali", "sat");
+            tags["SAY "] = new LanguageTag("SAY ", "Sayisi", "chp");
+            tags["SCN "] = new LanguageTag("SCN ", "Sicilian", "scn");
+            tags["SCO "] = new LanguageTag("SCO ", "Scots", "sco");
+            tags["SCS "] = new LanguageTag("SCS ", "North Slavey", "scs");
+            tags["SEK "] = new LanguageTag("SEK ", "Sekota", "xan");
+            tags["SEL "] = new LanguageTag("SEL ", "Selkup", "sel");
+            tags["SGA "] = new LanguageTag("SGA ", "Old Irish", "sga");
+            tags["SGO "] = new LanguageTag("SGO ", "Sango", "sag");
+            tags["SGS "] = new LanguageTag("SGS ", "Samogitian", "sgs");
+            tags["SHI "] = new LanguageTag("SHI ", "Tachelhit", "shi");
+            tags["SHN "] = new LanguageTag("SHN ", "Shan", "shn");
+            tags["SIB "] = new LanguageTag("SIB ", "Sibe", "sjo");
+            tags["SID "] = new LanguageTag("SID ", "Sidamo", "sid");
+            tags["SIG "] = new LanguageTag("SIG ", "Silte Gurage", "xst", "stv", "wle");
+            tags["SKS "] = new LanguageTag("SKS ", "Skolt Sami", "sms");
+            tags["SKY "] = new LanguageTag("SKY ", "Slovak", "slk");
+            tags["SLA "] = new LanguageTag("SLA ", "Slavey", "den", "scs", "xsl");
+            tags["SLV "] = new LanguageTag("SLV ", "Slovenian", "slv");
+            tags["SML "] = new LanguageTag("SML ", "Somali", "som");
+            tags["SMO "] = new LanguageTag("SMO ", "Samoan", "smo");
+            tags["SNA "] = new LanguageTag("SNA ", "Sena", "seh");
+            tags["SNA0"] = new LanguageTag("SNA0", "Shona", "sna");
+            tags["SND "] = new LanguageTag("SND ", "Sindhi", "snd");
+            tags["SNH "] = new LanguageTag("SNH ", "Sinhala (Sinhalese)", "sin");
+            tags["SNK "] = new LanguageTag("SNK ", "Soninke", "snk");
+            tags["SOG "] = new LanguageTag("SOG ", "Sodo Gurage", "gru");
+            tags["SOP "] = new LanguageTag("SOP ", "Songe", "sop");
+            tags["SOT "] = new LanguageTag("SOT ", "Southern Sotho", "sot");
+            tags["SQI "] = new LanguageTag("SQI ", "Albanian", "sqi");
+            tags["SRB "] = new LanguageTag("SRB ", "Serbian", "cnr", "srp");
+            tags["SRD "] = new LanguageTag("SRD ", "Sardinian", "cnr", "srd");
+            tags["SRK "] = new LanguageTag("SRK ", "Saraiki", "skr");
+            tags["SRR "] = new LanguageTag("SRR ", "Serer", "srr");
+            tags["SSL "] = new LanguageTag("SSL ", "South Slavey", "xsl");
+            tags["SSM "] = new LanguageTag("SSM ", "Southern Sami", "sma");
+            tags["STQ "] = new LanguageTag("STQ ", "Saterland Frisian", "stq");
+            tags["SUK "] = new LanguageTag("SUK ", "Sukuma", "suk");
+            tags["SUN "] = new LanguageTag("SUN ", "Sundanese", "sun");
+            tags["SUR "] = new LanguageTag("SUR ", "Suri", "suq");
+            tags["SVA "] = new LanguageTag("SVA ", "Svan", "sva");
+            tags["SVE "] = new LanguageTag("SVE ", "Swedish", "swe");
+            tags["SWA "] = new LanguageTag("SWA ", "Swadaya Aramaic", "aii");
+            tags["SWK "] = new LanguageTag("SWK ", "Swahili", "swa");
+            tags["SWZ "] = new LanguageTag("SWZ ", "Swati", "ssw");
+            tags["SXT "] = new LanguageTag("SXT ", "Sutu", "ngo", "xnj", "xnq");
+            tags["SXU "] = new LanguageTag("SXU ", "Upper Saxon", "sxu");
+            tags["SYL "] = new LanguageTag("SYL ", "Sylheti", "syl");
+            tags["SYR "] = new LanguageTag("SYR ", "Syriac", "aii", "amw", "cld", "syc", "syr", "tru");
+            tags["SYRE"] = new LanguageTag("SYRE", "Syriac, Estrangela script-variant (equivalent to ISO 15924 'Syre')",
+                "syc", "syr");
+            tags["SYRJ"] = new LanguageTag("SYRJ", "Syriac, Western script-variant (equivalent to ISO 15924 'Syrj')",
+                "syc", "syr");
+            tags["SYRN"] = new LanguageTag("SYRN", "Syriac, Eastern script-variant (equivalent to ISO 15924 'Syrn')",
+                "syc", "syr");
+            tags["SZL "] = new LanguageTag("SZL ", "Silesian", "szl");
+            tags["TAB "] = new LanguageTag("TAB ", "Tabasaran", "tab");
+            tags["TAJ "] = new LanguageTag("TAJ ", "Tajiki", "tgk");
+            tags["TAM "] = new LanguageTag("TAM ", "Tamil", "tam");
+            tags["TAT "] = new LanguageTag("TAT ", "Tatar", "tat");
+            tags["TCR "] = new LanguageTag("TCR ", "TH-Cree", "cwd");
+            tags["TDD "] = new LanguageTag("TDD ", "Dehong Dai", "tdd");
+            tags["TEL "] = new LanguageTag("TEL ", "Telugu", "tel");
+            tags["TET "] = new LanguageTag("TET ", "Tetum", "tet");
+            tags["TGL "] = new LanguageTag("TGL ", "Tagalog", "tgl");
+            tags["TGN "] = new LanguageTag("TGN ", "Tongan", "ton");
+            tags["TGR "] = new LanguageTag("TGR ", "Tigre", "tig");
+            tags["TGY "] = new LanguageTag("TGY ", "Tigrinya", "tir");
+            tags["THA "] = new LanguageTag("THA ", "Thai", "tha");
+            tags["THT "] = new LanguageTag("THT ", "Tahitian", "tah");
+            tags["TIB "] = new LanguageTag("TIB ", "Tibetan", "bod");
+            tags["TIV "] = new LanguageTag("TIV ", "Tiv", "tiv");
+            tags["TKM "] = new LanguageTag("TKM ", "Turkmen", "tuk");
+            tags["TMH "] = new LanguageTag("TMH ", "Tamashek", "taq", "thv", "thz", "tmh", "ttq");
+            tags["TMN "] = new LanguageTag("TMN ", "Temne", "tem");
+            tags["TNA "] = new LanguageTag("TNA ", "Tswana", "tsn");
+            tags["TNE "] = new LanguageTag("TNE ", "Tundra Enets", "enh");
+            tags["TNG "] = new LanguageTag("TNG ", "Tonga", "toi");
+            tags["TOD "] = new LanguageTag("TOD ", "Todo", "xal");
+            tags["TOD0"] = new LanguageTag("TOD0", "Toma", "tod");
+            tags["TPI "] = new LanguageTag("TPI ", "Tok Pisin", "tpi");
+            tags["TRK "] = new LanguageTag("TRK ", "Turkish", "tur");
+            tags["TSG "] = new LanguageTag("TSG ", "Tsonga", "tso");
+            tags["TSJ "] = new LanguageTag("TSJ ", "Tshangla", "tsj");
+            tags["TUA "] = new LanguageTag("TUA ", "Turoyo Aramaic", "tru");
+            tags["TUL "] = new LanguageTag("TUL ", "Tumbuka", "tcy");
+            tags["TUM "] = new LanguageTag("TUM ", "Tulu", "tum");
+            tags["TUV "] = new LanguageTag("TUV ", "Tuvin", "tyv");
+            tags["TVL "] = new LanguageTag("TVL ", "Tuvalu", "tvl");
+            tags["TWI "] = new LanguageTag("TWI ", "Twi", "twi");
+            tags["TYZ "] = new LanguageTag("TYZ ", "Tày", "tyz");
+            tags["TZM "] = new LanguageTag("TZM ", "Tamazight", "tzm");
+            tags["TZO "] = new LanguageTag("TZO ", "Tzotzil", "tzo");
+            tags["UDM "] = new LanguageTag("UDM ", "Udmurt", "udm");
+            tags["UKR "] = new LanguageTag("UKR ", "Ukrainian", "ukr");
+            tags["UMB "] = new LanguageTag("UMB ", "Umbundu", "umb");
+            tags["URD "] = new LanguageTag("URD ", "Urdu", "urd");
+            tags["USB "] = new LanguageTag("USB ", "Upper Sorbian", "hsb");
+            tags["UYG "] = new LanguageTag("UYG ", "Uyghur", "uig");
+            tags["UZB "] = new LanguageTag("UZB ", "Uzbek", "uzb");
+            tags["VEC "] = new LanguageTag("VEC ", "Venetian", "vec");
+            tags["VEN "] = new LanguageTag("VEN ", "Venda", "ven");
+            tags["VIT "] = new LanguageTag("VIT ", "Vietnamese", "vie");
+            tags["VOL "] = new LanguageTag("VOL ", "Volapük", "vol");
+            tags["VRO "] = new LanguageTag("VRO ", "Võro", "vro");
+            tags["WA  "] = new LanguageTag("WA  ", "Wa", "wbm");
+            tags["WAG "] = new LanguageTag("WAG ", "Wagdi", "wbr");
+            tags["WAR "] = new LanguageTag("WAR ", "Waray-Waray", "war");
+            tags["WCR "] = new LanguageTag("WCR ", "West-Cree", "crk");
+            tags["WEL "] = new LanguageTag("WEL ", "Welsh", "cym");
+            tags["WLF "] = new LanguageTag("WLF ", "Wolof", "wol");
+            tags["WLN "] = new LanguageTag("WLN ", "Walloon", "wln");
+            tags["WTM "] = new LanguageTag("WTM ", "Mewati", "wtm");
+            tags["XBD "] = new LanguageTag("XBD ", "Lü", "khb");
+            tags["XHS "] = new LanguageTag("XHS ", "Xhosa", "xho");
+            tags["XJB "] = new LanguageTag("XJB ", "Minjangbal", "xjb");
+            tags["XKF "] = new LanguageTag("XKF ", "Khengkha", "xkf");
+            tags["XOG "] = new LanguageTag("XOG ", "Soga", "xog");
+            tags["XPE "] = new LanguageTag("XPE ", "Kpelle (Liberia)", "xpe");
+            tags["YAK "] = new LanguageTag("YAK ", "Sakha", "sah");
+            tags["YAO "] = new LanguageTag("YAO ", "Yao", "yao");
+            tags["YAP "] = new LanguageTag("YAP ", "Yapese", "yap");
+            tags["YBA "] = new LanguageTag("YBA ", "Yoruba", "yor");
+            tags["YCR "] = new LanguageTag("YCR ", "Y-Cree", "crj", "crk", "crl");
+            tags["YIC "] = new LanguageTag("YIC ", "Yi Classic");
+            tags["YIM "] = new LanguageTag("YIM ", "Yi Modern", "iii");
+            tags["ZEA "] = new LanguageTag("ZEA ", "Zealandic", "zea");
+            tags["ZGH "] = new LanguageTag("ZGH ", "Standard Moroccan Tamazight", "zgh");
+            tags["ZHA "] = new LanguageTag("ZHA ", "Zhuang", "zha");
+            tags["ZHH "] = new LanguageTag("ZHH ", "Chinese, Traditional, Hong Kong SAR", "zho");
+            tags["ZHP "] = new LanguageTag("ZHP ", "Chinese, Phonetic", "zho");
+            tags["ZHS "] = new LanguageTag("ZHS ", "Chinese, Simplified", "zho");
+            tags["ZHT "] = new LanguageTag("ZHT ", "Chinese, Traditional", "zho");
+            tags["ZHTM"] = new LanguageTag("ZHTM", "Chinese, Traditional, Macao SAR", "zho");
+            tags["ZND "] = new LanguageTag("ZND ", "Zande", "zne");
+            tags["ZUL "] = new LanguageTag("ZUL ", "Zulu", "zul");
+            tags["ZZA "] = new LanguageTag("ZZA ", "Zazaki", "zza");
         }
-        /*
-Assamese	'ASM '	asm
-Asturian	'AST '	ast
-Athapaskan languages	'ATH '	aht, apa, apk, apj, apl, apm, apw, ath, bea, sek, bcr, caf, chp, clc, coq, crx, ctc, den, dgr, gce, gwi, haa, hoi, hup, ing, kkz, koy, ktw, kuu, mvb, nav, qwt, scs, srs, taa, tau, tcb, tce, tfn, tgx, tht, tol, ttm, tuu, txc, wlk, xup, xsl
-Avar	'AVR '	ava
-Awadhi	'AWA '	awa
-Aymara	'AYM '	aym
-Torki	'AZB '	azb
-Azerbaijani	'AZE '	aze
-Badaga	'BAD '	bfq
-Banda	BAD0	bad, bbp, bfl, bjo, bpd, bqk, gox, kuw, liy, lna, lnl, mnh, nue, nuu, tor, yaj, zmz
-Baghelkhandi	'BAG '	bfy
-Balkar	'BAL '	krc
-Balinese	'BAN '	ban
-Bavarian	'BAR '	bar
-Baulé	'BAU '	bci
-Batak Toba	'BBC '	bbc
-Berber	'BBR '	auj, ber, cnu, gha, gho, grr, jbe, jbn, kab, mzb, oua, rif, sds, shi, shy, siz, sjs, swn, taq, tez, thv, thz, tia, tjo, tmh, ttq, tzm, zen, zgh
-Bench	'BCH '	bcq
-Bible Cree	'BCR '	
-Bandjalang	'BDY '	bdy
-Belarussian	'BEL '	bel
-Bemba	'BEM '	bem
-Bengali	'BEN '	ben
-Haryanvi	'BGC '	bgc
-Bagri	'BGQ '	bgq
-Bulgarian	'BGR '	bul
-Bhili	'BHI '	bhi, bhb
-Bhojpuri	'BHO '	bho
-Bikol	'BIK '	bik, bhk, bcl, bto, cts, bln, fbl, lbl, rbl, ubl
-Bilen	'BIL '	byn
-Bislama	'BIS '	bis
-Kanauji	'BJJ '	bjj
-Blackfoot	'BKF '	bla
-Baluchi	'BLI '	bal
-Pa’o Karen	'BLK '	blk
-Balante	'BLN '	bjt, ble
-Balti	'BLT '	bft
-Bambara (Bamanankan)	'BMB '	bam
-Bamileke	'BML '	bai, bbj, bko, byv, fmp, jgo, nla, nnh, nnz, nwe, xmg, ybb
-Bosnian	'BOS '	bos
-Bishnupriya Manipuri	'BPY '	bpy
-Breton	'BRE '	bre
-Brahui	'BRH '	brh
-Braj Bhasha	'BRI '	bra
-Burmese	'BRM '	mya
-Bodo	'BRX '	brx
-Bashkir	'BSH '	bak
-Burushaski	'BSK '	bsk
-Batak Dairi (Pakpak)	'BTD '	btd
-Beti	'BTI '	btb, beb, bum, bxp, eto, ewo, mct
-Batak languages	'BTK '	akb, bbc, btd, btk, btm, bts, btx, btz
-Batak Mandailing	'BTM '	btm
-Batak Simalungun	'BTS '	bts
-Batak Karo	'BTX '	btx
-Batak Alas-Kluet	'BTZ '	btz
-Bugis	'BUG '	bug
-Medumba	'BYV '	byv
-Kaqchikel	'CAK '	cak
-Catalan	'CAT '	cat
-Zamboanga Chavacano	'CBK '	cbk
-Chinantec	CCHN	cco, chj, chq, chz, cle, cnl, cnt, cpa, csa, cso, cte, ctl, cuc, cvn
-Cebuano	'CEB '	ceb
-Chiga	'CGG '	cgg
-Chamorro	'CHA '	cha
-Chechen	'CHE '	che
-Chaha Gurage	'CHG '	sgw
-Chattisgarhi	'CHH '	hne
-Chichewa (Chewa, Nyanja)	'CHI '	nya
-Chukchi	'CHK '	ckt
-Chuukese	CHK0	chk
-Choctaw	'CHO '	cho
-Chipewyan	'CHP '	chp
-Cherokee	'CHR '	chr
-Chuvash	'CHU '	chv
-Cheyenne	'CHY '	chy
-Western Cham	'CJA '	cja
-Eastern Cham	'CJM '	cjm
-Comorian	'CMR '	swb, wlc, wni, zdj
-Coptic	'COP '	cop
-Cornish	'COR '	cor
-Corsican	'COS '	cos
-Creoles	'CPP '	abs, acf, afs, aig, aoa, bah, bew, bis, bjs, bpl, bpq, brc, bxo, bzj, bzk, cbk, ccl, ccm, chn, cks, cpe, cpf, cpi, cpp, cri, crp, crs, dcr, dep, djk, fab, fng, fpe, gac, gcf, gcl, gcr, gib, goq, gpe, gul, gyn, hat, hca, hmo, hwc, icr, idb, ihb, jam, jvd, kcn, kea, kmv, kri, kww, lir, lou, lrt, max, mbf, mcm, mfe, mfp, mkn, mod, msi, mud, mzs, nag, nef, ngm, njt, onx, oor, pap, pcm, pea, pey, pga, pih, pis, pln, pml, pmy, pov, pre, rcf, rop, scf, sci, skw, srm, srn, sta, svc, tas, tch, tcs, tgh, tmg, tpi, trf, tvy, uln, vic, vkp, wes, xmm
-Cree	'CRE '	cre
-Carrier	'CRR '	crx, caf
-Crimean Tatar	'CRT '	crh
-Kashubian	'CSB '	csb
-Church Slavonic	'CSL '	chu
-Czech	'CSY '	ces
-Chittagonian	'CTG '	ctg
-San Blas Kuna	'CUK '	cuk
-Dagbani	'DAG '	dag
-Danish	'DAN '	dan
-Dargwa	'DAR '	dar
-Dayi	'DAX '	dax
-Woods Cree	'DCR '	cwd
-German	'DEU '	deu
-Dogri (individual language)	'DGO '	dgo
-Dogri (macrolanguage)	'DGR '	doi
-Dhangu	'DHG '	dhg
-Divehi (Dhivehi, Maldivian)	'DHV ' (deprecated)	div
-Dimli	'DIQ '	diq
-Divehi (Dhivehi, Maldivian)	'DIV '	div
-Zarma	'DJR '	dje
-Djambarrpuyngu	DJR0	djr
-Dangme	'DNG '	ada
-Dan	'DNJ '	dnj
-Dinka	'DNK '	din
-Dari	'DRI '	prs
-Dhuwal	'DUJ '	duj, dwu, dwy
-Dungan	'DUN '	dng
-Dzongkha	'DZN '	dzo
-Ebira	'EBI '	igb
-Eastern Cree	'ECR '	crj, crl
-Edo	'EDO '	bin
-Efik	'EFI '	efi
-Greek	'ELL '	ell
-Eastern Maninkakan	'EMK '	emk
-English	'ENG '	eng
-Erzya	'ERZ '	myv
-Spanish	'ESP '	spa
-Central Yupik	'ESU '	esu
-Estonian	'ETI '	est
-Basque	'EUQ '	eus
-Evenki	'EVK '	evn
-Even	'EVN '	eve
-Ewe	'EWE '	ewe
-French Antillean	'FAN '	acf
-Fang	FAN0	fan
-Persian	'FAR '	fas
-Fanti	'FAT '	fat
-Finnish	'FIN '	fin
-Fijian	'FJI '	fij
-Dutch (Flemish)	'FLE '	vls
-Fe’fe’	'FMP '	fmp
-Forest Enets	'FNE '	enf
-Fon	'FON '	fon
-Faroese	'FOS '	fao
-French	'FRA '	fra
-Cajun French	'FRC '	frc
-Frisian	'FRI '	fry
-Friulian	'FRL '	fur
-Arpitan	'FRP '	frp
-Futa	'FTA '	fuf
-Fulah	'FUL '	ful
-Nigerian Fulfulde	'FUV '	fuv
-Ga	'GAD '	gaa
-Scottish Gaelic (Gaelic)	'GAE '	gla
-Gagauz	'GAG '	gag
-Galician	'GAL '	glg
-Garshuni	'GAR '	
-Garhwali	'GAW '	gbm
-Geez	'GEZ '	gez
-Githabul	'GIH '	gih
-Gilyak	'GIL '	niv
-Kiribati (Gilbertese)	GIL0	gil
-Kpelle (Guinea)	'GKP '	gkp
-Gilaki	'GLK '	glk
-Gumuz	'GMZ '	guk
-Gumatj	'GNN '	gnn
-Gogo	'GOG '	gog
-Gondi	'GON '	gon
-Greenlandic	'GRN '	kal
-Garo	'GRO '	grt
-Guarani	'GUA '	grn
-Wayuu	'GUC '	guc
-Gupapuyngu	'GUF '	guf
-Gujarati	'GUJ '	guj
-Gusii	'GUZ '	guz
-Haitian (Haitian Creole)	'HAI '	hat
-Halam (Falam Chin)	'HAL '	cfm
-Harauti	'HAR '	hoj
-Hausa	'HAU '	hau
-Hawaiian	'HAW '	haw
-Haya	'HAY '	hay
-Hazaragi	'HAZ '	haz
-Hammer-Banna	'HBN '	amf
-Herero	'HER '	her
-Hiligaynon	'HIL '	hil
-Hindi	'HIN '	hin
-High Mari	'HMA '	mrj
-Hmong	'HMN '	hmn
-Hiri Motu	'HMO '	hmo
-Hindko	'HND '	hno, hnd
-Ho	'HO '	hoc
-Harari	'HRI '	har
-Croatian	'HRV '	hrv
-Hungarian	'HUN '	hun
-Armenian	'HYE '	hye, hyw
-Armenian East	HYE0	hye
-Iban	'IBA '	iba
-Ibibio	'IBB '	ibb
-Igbo	'IBO '	ibo
-Ido	'IDO '	ido
-Ijo languages	'IJO '	iby, ijc, ije, ijn, ijo, ijs, nkx, okd, okr, orr
-Interlingue	'ILE '	ile
-Ilokano	'ILO '	ilo
-Interlingua	'INA '	ina
-Indonesian	'IND '	ind
-Ingush	'ING '	inh
-Inuktitut	'INU '	iku
-Inupiat	'IPK '	ipk
-Phonetic transcription—IPA conventions	IPPH	
-Irish	'IRI '	gle
-Irish Traditional	'IRT '	gle
-Icelandic	'ISL '	isl
-Inari Sami	'ISM '	smn
-Italian	'ITA '	ita
-Hebrew	'IWR '	heb
-Jamaican Creole	'JAM '	jam
-Japanese	'JAN '	jpn
-Javanese	'JAV '	jav
-Lojban	'JBO '	jbo
-Krymchak	'JCT '	jct
-Yiddish	'JII '	yid
-Ladino	'JUD '	lad
-Jula	'JUL '	dyu
-Kabardian	'KAB '	kbd
-Kabyle	KAB0	kab
-Kachchi	'KAC '	kfr
-Kalenjin	'KAL '	kln
-Kannada	'KAN '	kan
-Karachay	'KAR '	krc
-Georgian	'KAT '	kat
-Kazakh	'KAZ '	kaz
-Makonde	'KDE '	kde
-Kabuverdianu (Crioulo)	'KEA '	kea
-Kebena	'KEB '	ktb
-Kekchi	'KEK '	kek
-Khutsuri Georgian	'KGE '	kat
-Khakass	'KHA '	kjh
-Khanty-Kazim	'KHK '	kca
-Khmer	'KHM '	khm
-Khanty-Shurishkar	'KHS '	kca
-Khamti Shan	'KHT '	kht
-Khanty-Vakhi	'KHV '	kca
-Khowar	'KHW '	khw
-Kikuyu (Gikuyu)	'KIK '	kik
-Kirghiz (Kyrgyz)	'KIR '	kir
-Kisii	'KIS '	kqs, kss
-Kirmanjki	'KIU '	kiu
-Southern Kiwai	'KJD '	kjd
-Eastern Pwo Karen	'KJP '	kjp
-Bumthangkha	'KJZ '	kjz
-Kokni	'KKN '	kex
-Kalmyk	'KLM '	xal
-Kamba	'KMB '	kam
-Kumaoni	'KMN '	kfy
-Komo	'KMO '	kmw
-Komso	'KMS '	kxc
-Khorasani Turkic	'KMZ '	kmz
-Kanuri	'KNR '	kau
-Kodagu	'KOD '	kfa
-Korean Old Hangul	'KOH '	kor, okm
-Konkani	'KOK '	kok
-Komi	'KOM '	kom
-Kikongo	'KON '	ktu
-Kongo	KON0	kon
-Komi-Permyak	'KOP '	koi
-Korean	'KOR '	kor
-Kosraean	'KOS '	kos
-Komi-Zyrian	'KOZ '	kpv
-Kpelle	'KPL '	kpe
-Krio	'KRI '	kri
-Karakalpak	'KRK '	kaa
-Karelian	'KRL '	krl
-Karaim	'KRM '	kdr
-Karen	'KRN '	blk, bwe, eky, ghk, jkm, jkp, kar, kjp, kjt, ksw, kvl, kvq, kvt, kvu, kvy, kxf, kxk, kyu, pdu, pwo, pww, wea
-Koorete	'KRT '	kqy
-Kashmiri	'KSH '	kas
-Ripuarian	KSH0	ksh
-Khasi	'KSI '	kha
-Kildin Sami	'KSM '	sjd
-S’gaw Karen	'KSW '	ksw
-Kuanyama	'KUA '	kua
-Kui	'KUI '	kxu
-Kulvi	'KUL '	kfx
-Kumyk	'KUM '	kum
-Kurdish	'KUR '	kur
-Kurukh	'KUU '	kru
-Kuy	'KUY '	kdt
-Koryak	'KYK '	kpy
-Western Kayah	'KYU '	kyu
-Ladin	'LAD '	lld
-Lahuli	'LAH '	bfu
-Lak	'LAK '	lbe
-Lambani	'LAM '	lmn
-Lao	'LAO '	lao
-Latin	'LAT '	lat
-Laz	'LAZ '	lzz
-L-Cree	'LCR '	crm
-Ladakhi	'LDK '	lbj
-Lezgi	'LEZ '	lez
-Ligurian	'LIJ '	lij
-Limburgish	'LIM '	lim
-Lingala	'LIN '	lin
-Lisu	'LIS '	lis
-Lampung	'LJP '	ljp
-Laki	'LKI '	lki
-Low Mari	'LMA '	mhr
-Limbu	'LMB '	lif
-Lombard	'LMO '	lmo
-Lomwe	'LMW '	ngl
-Loma	'LOM '	lom
-Luri	'LRC '	lrc, luz, bqi, zum
-Lower Sorbian	'LSB '	dsb
-Lule Sami	'LSM '	smj
-Lithuanian	'LTH '	lit
-Luxembourgish	'LTZ '	ltz
-Luba-Lulua	'LUA '	lua
-Luba-Katanga	'LUB '	lub
-Ganda	'LUG '	lug
-Luyia	'LUH '	luy
-Luo	'LUO '	luo
-Latvian	'LVI '	lav
-Madura	'MAD '	mad
-Magahi	'MAG '	mag
-Marshallese	'MAH '	mah
-Majang	'MAJ '	mpe
-Makhuwa	'MAK '	vmw
-Malayalam	'MAL '	mal
-Mam	'MAM '	mam
-Mansi	'MAN '	mns
-Mapudungun	'MAP '	arn
-Marathi	'MAR '	mar
-Marwari	'MAW '	mwr, dhd, rwr, mve, wry, mtr, swv
-Mbundu	'MBN '	kmb
-Mbo	'MBO '	mbo
-Manchu	'MCH '	mnc
-Moose Cree	'MCR '	crm
-Mende	'MDE '	men
-Mandar	'MDR '	mdr
-Me’en	'MEN '	mym
-Meru	'MER '	mer
-Pattani Malay	'MFA '	mfa
-Morisyen	'MFE '	mfe
-Minangkabau	'MIN '	min
-Mizo	'MIZ '	lus
-Macedonian	'MKD '	mkd
-Makasar	'MKR '	mak
-Kituba	'MKW '	mkw
-Male	'MLE '	mdy
-Malagasy	'MLG '	mlg
-Malinke	'MLN '	mlq
-Malayalam Reformed	'MLR '	mal
-Malay	'MLY '	msa
-Mandinka	'MND '	mnk
-Mongolian	'MNG '	mon
-Manipuri	'MNI '	mni
-Maninka	'MNK '	man, mnk, myq, mku, msc, emk, mwk, mlq
-Manx	'MNX '	glv
-Mohawk	'MOH '	moh
-Moksha	'MOK '	mdf
-Moldavian	'MOL '	mol
-Mon	'MON '	mnw
-Moroccan	'MOR '	
-Mossi	'MOS '	mos
-Maori	'MRI '	mri
-Maithili	'MTH '	mai
-Maltese	'MTS '	mlt
-Mundari	'MUN '	unr
-Muscogee	'MUS '	mus
-Mirandese	'MWL '	mwl
-Hmong Daw	'MWW '	mww
-Mayan	'MYN '	acr, agu, caa, cac, cak, chf, ckz, cob, ctu, emy, hus, itz, ixl, jac, kek, kjb, knj, lac, mam, mhc, mop, myn, poc, poh, quc, qum, quv, toj, ttc, tzh, tzj, tzo, usp, yua
-Mazanderani	'MZN '	mzn
-Naga-Assamese	'NAG '	nag
-Nahuatl	'NAH '	azd, azn, azz, nah, naz, nch, nci, ncj, ncl, ncx, ngu, nhc, nhe, nhg, nhi, nhk, nhm, nhn, nhp, nhq, nht, nhv, nhw, nhx, nhy, nhz, nlv, npl, nsu, nuz
-Nanai	'NAN '	gld
-Neapolitan	'NAP '	nap
-Naskapi	'NAS '	nsk
-Nauruan	'NAU '	nau
-Navajo	'NAV '	nav
-N-Cree	'NCR '	csw
-Ndebele	'NDB '	nbl, nde
-Ndau	'NDC '	ndc
-Ndonga	'NDG '	ndo
-Low Saxon	'NDS '	nds
-Nepali	'NEP '	nep
-Newari	'NEW '	new
-Ngbaka	'NGA '	nga
-Nagari	'NGR '	
-Norway House Cree	'NHC '	csw
-Nisi	'NIS '	dap, njz, tgj
-Niuean	'NIU '	niu
-Nyankole	'NKL '	nyn
-N’Ko	'NKO '	nqo
-Dutch	'NLD '	nld
-Nimadi	'NOE '	noe
-Nogai	'NOG '	nog
-Norwegian	'NOR '	nob
-Novial	'NOV '	nov
-Northern Sami	'NSM '	sme
-Northern Sotho	'NSO '	nso
-Northern Tai	'NTA '	nod
-Esperanto	'NTO '	epo
-Nyamwezi	'NYM '	nym
-Norwegian Nynorsk (Nynorsk, Norwegian)	'NYN '	nno
-Mbembe Tigon	'NZA '	nza
-Occitan	'OCI '	oci
-Oji-Cree	'OCR '	ojs
-Ojibway	'OJB '	oji
-Odia (formerly Oriya)	'ORI '	ori
-Oromo	'ORO '	orm
-Ossetian	'OSS '	oss
-Palestinian Aramaic	'PAA '	sam
-Pangasinan	'PAG '	pag
-Pali	'PAL '	pli
-Pampangan	'PAM '	pam
-Punjabi	'PAN '	pan
-Palpa	'PAP '	plp
-Papiamentu	PAP0	pap
-Pashto	'PAS '	pus
-Palauan	'PAU '	pau
-Bouyei	'PCC '	pcc
-Picard	'PCD '	pcd
-Pennsylvania German	'PDC '	pdc
-Polytonic Greek	'PGR '	ell
-Phake	'PHK '	phk
-Norfolk	'PIH '	pih
-Filipino	'PIL '	fil
-Palaung	'PLG '	pce, rbb, pll
-Polish	'PLK '	pol
-Piemontese	'PMS '	pms
-Western Panjabi	'PNB '	pnb
-Pocomchi	'POH '	poh
-Pohnpeian	'PON '	pon
-Provençal / Old Provençal	'PRO '	pro
-Portuguese	'PTG '	por
-Western Pwo Karen	'PWO '	pwo
-Chin	'QIN '	bgr, biu, cek, cey, cfm, cbl, cka, ckn, clj, clt, cmr, cnb, cnh, cnk, cnw, csh, csj, csv, csy, ctd, cth, czt, dao, gnb, hlt, hmr, hra, lus, mrh, mwq, pck, pkh, pub, ral, rtc, sch, sez, shl, smt, tcp, tcz, vap, weu, zom, zyp
-K’iche’	'QUC '	quc
-Quechua (Bolivia)	'QUH '	quh
-Quechua	'QUZ '	quz
-Quechua (Ecuador)	'QVI '	qvi
-Quechua (Peru)	'QWH '	qwh
-Rajasthani	'RAJ '	raj
-Rarotongan	'RAR '	rar
-Russian Buriat	'RBU '	bxr
-R-Cree	'RCR '	atj
-Rejang	'REJ '	rej
-Riang	'RIA '	ria
-Tarifit	'RIF '	rif
-Ritarungo	'RIT '	rit
-Arakwal	'RKW '	rkw
-Romansh	'RMS '	roh
-Vlax Romani	'RMY '	rmy
-Romanian	'ROM '	ron
-Romany	'ROY '	rom
-Rusyn	'RSY '	rue
-Rotuman	'RTM '	rtm
-Kinyarwanda	'RUA '	kin
-Rundi	'RUN '	run
-Aromanian	'RUP '	rup
-Russian	'RUS '	rus
-Sadri	'SAD '	sck
-Sanskrit	'SAN '	san
-Sasak	'SAS '	sas
-Santali	'SAT '	sat
-Sayisi	'SAY '	chp
-Sicilian	'SCN '	scn
-Scots	'SCO '	sco
-North Slavey	'SCS '	scs
-Sekota	'SEK '	xan
-Selkup	'SEL '	sel
-Old Irish	'SGA '	sga
-Sango	'SGO '	sag
-Samogitian	'SGS '	sgs
-Tachelhit	'SHI '	shi
-Shan	'SHN '	shn
-Sibe	'SIB '	sjo
-Sidamo	'SID '	sid
-Silte Gurage	'SIG '	xst, stv, wle
-Skolt Sami	'SKS '	sms
-Slovak	'SKY '	slk
-Slavey	'SLA '	den, scs, xsl
-Slovenian	'SLV '	slv
-Somali	'SML '	som
-Samoan	'SMO '	smo
-Sena	'SNA '	seh
-Shona	SNA0	sna
-Sindhi	'SND '	snd
-Sinhala (Sinhalese)	'SNH '	sin
-Soninke	'SNK '	snk
-Sodo Gurage	'SOG '	gru
-Songe	'SOP '	sop
-Southern Sotho	'SOT '	sot
-Albanian	'SQI '	sqi
-Serbian	'SRB '	cnr, srp
-Sardinian	'SRD '	srd
-Saraiki	'SRK '	skr
-Serer	'SRR '	srr
-South Slavey	'SSL '	xsl
-Southern Sami	'SSM '	sma
-Saterland Frisian	'STQ '	stq
-Sukuma	'SUK '	suk
-Sundanese	'SUN '	sun
-Suri	'SUR '	suq
-Svan	'SVA '	sva
-Swedish	'SVE '	swe
-Swadaya Aramaic	'SWA '	aii
-Swahili	'SWK '	swa
-Swati	'SWZ '	ssw
-Sutu	'SXT '	ngo, xnj, xnq
-Upper Saxon	'SXU '	sxu
-Sylheti	'SYL '	syl
-Syriac	'SYR '	aii, amw, cld, syc, syr, tru
-Syriac, Estrangela script-variant (equivalent to ISO 15924 'Syre')	SYRE	syc, syr
-Syriac, Western script-variant (equivalent to ISO 15924 'Syrj')	SYRJ	syc, syr
-Syriac, Eastern script-variant (equivalent to ISO 15924 'Syrn')	SYRN	syc, syr
-Silesian	'SZL '	szl
-Tabasaran	'TAB '	tab
-Tajiki	'TAJ '	tgk
-Tamil	'TAM '	tam
-Tatar	'TAT '	tat
-TH-Cree	'TCR '	cwd
-Dehong Dai	'TDD '	tdd
-Telugu	'TEL '	tel
-Tetum	'TET '	tet
-Tagalog	'TGL '	tgl
-Tongan	'TGN '	ton
-Tigre	'TGR '	tig
-Tigrinya	'TGY '	tir
-Thai	'THA '	tha
-Tahitian	'THT '	tah
-Tibetan	'TIB '	bod
-Tiv	'TIV '	tiv
-Turkmen	'TKM '	tuk
-Tamashek	'TMH '	taq, thv, thz, tmh, ttq
-Temne	'TMN '	tem
-Tswana	'TNA '	tsn
-Tundra Enets	'TNE '	enh
-Tonga	'TNG '	toi
-Todo	'TOD '	xal
-Toma	TOD0	tod
-Tok Pisin	'TPI '	tpi
-Turkish	'TRK '	tur
-Tsonga	'TSG '	tso
-Tshangla	'TSJ '	tsj
-Turoyo Aramaic	'TUA '	tru
-Tumbuka	'TUL '	tcy
-Tulu	'TUM '	tum
-Tuvin	'TUV '	tyv
-Tuvalu	'TVL '	tvl
-Twi	'TWI '	twi
-Tày	'TYZ '	tyz
-Tamazight	'TZM '	tzm
-Tzotzil	'TZO '	tzo
-Udmurt	'UDM '	udm
-Ukrainian	'UKR '	ukr
-Umbundu	'UMB '	umb
-Urdu	'URD '	urd
-Upper Sorbian	'USB '	hsb
-Uyghur	'UYG '	uig
-Uzbek	'UZB '	uzb
-Venetian	'VEC '	vec
-Venda	'VEN '	ven
-Vietnamese	'VIT '	vie
-Volapük	'VOL '	vol
-Võro	'VRO '	vro
-Wa	'WA '	wbm
-Wagdi	'WAG '	wbr
-Waray-Waray	'WAR '	war
-West-Cree	'WCR '	crk
-Welsh	'WEL '	cym
-Wolof	'WLF '	wol
-Walloon	'WLN '	wln
-Mewati	'WTM '	wtm
-Lü	'XBD '	khb
-Xhosa	'XHS '	xho
-Minjangbal	'XJB '	xjb
-Khengkha	'XKF '	xkf
-Soga	'XOG '	xog
-Kpelle (Liberia)	'XPE '	xpe
-Sakha	'YAK '	sah
-Yao	'YAO '	yao
-Yapese	'YAP '	yap
-Yoruba	'YBA '	yor
-Y-Cree	'YCR '	crj, crk, crl
-Yi Classic	'YIC '	
-Yi Modern	'YIM '	iii
-Zealandic	'ZEA '	zea
-Standard Moroccan Tamazight	'ZGH '	zgh
-Zhuang	'ZHA '	zha
-Chinese, Traditional, Hong Kong SAR	'ZHH '	zho
-Chinese, Phonetic	'ZHP '	zho
-Chinese, Simplified	'ZHS '	zho
-Chinese, Traditional	'ZHT '	zho
-Chinese, Traditional, Macao SAR	'ZHTM'	zho
-Zande	'ZND '	zne
-Zulu	'ZUL '	zul
-Zazaki	'ZZA '	zza
-*/
+
     }
 }

@@ -2,7 +2,7 @@ using System;
 
 namespace Adamantium.Fonts.Tables.Layout
 {
-    internal class AnchorTable
+    internal class AnchorPointTable
     {
         public UInt16 Format { get; set; }
         

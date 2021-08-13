@@ -4,14 +4,14 @@ namespace Adamantium.Fonts.Tables.GSUB
     {
         public abstract GSUBLookupType Type { get; }
         public LookupOwnerType OwnerType => LookupOwnerType.GSUB;
-        public bool SubstituteGlyphs(IGlyphSubstitutionLookup substitutionLookup, uint index)
+        public void SubstituteGlyphs(IGlyphSubstitutionLookup substitutionLookup, uint index)
         {
-            return false;
+            
         }
 
-        public bool PositionGlyph(IGlyphPositioningLookup glyphPositioningLookup, uint index)
+        public void PositionGlyph(IGlyphPositioningLookup glyphPositioningLookup, uint startIndex, uint length)
         {
-            return false;
+            
         }
     }
 }

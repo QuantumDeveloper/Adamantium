@@ -1,3 +1,5 @@
+using System;
+
 namespace Adamantium.Fonts.Common
 {
     public readonly struct LanguageTag
@@ -15,6 +17,16 @@ namespace Adamantium.Fonts.Common
             {
                 ISONames[i] = isoNames[i];
             }
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(Tag, FriendlyName);
+        }
+
+        public override string ToString()
+        {
+            return $"Tag: {Tag} Name: {FriendlyName}";
         }
     }
 }

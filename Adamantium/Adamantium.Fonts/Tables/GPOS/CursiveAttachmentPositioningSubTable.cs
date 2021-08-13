@@ -8,9 +8,9 @@ namespace Adamantium.Fonts.Tables.GPOS
         
         public CoverageTable Coverage { get; set; }
         
-        public AnchorTable[] EntryAnchors { get; set; }
+        public AnchorPointTable[] EntryAnchors { get; set; }
         
-        public AnchorTable[] ExitAnchors { get; set; }
+        public AnchorPointTable[] ExitAnchors { get; set; }
         
     }
 }

@@ -4,14 +4,12 @@ namespace Adamantium.Fonts.Tables.GPOS
     {
         public abstract GPOSLookupType Type { get; }
         public LookupOwnerType OwnerType => LookupOwnerType.GPOS;
-        public virtual bool SubstituteGlyphs(IGlyphSubstitutionLookup substitutionLookup, uint index)
+        public virtual void SubstituteGlyphs(IGlyphSubstitutionLookup substitutionLookup, uint index)
         {
-            return false;
         }
 
-        public virtual bool PositionGlyph(IGlyphPositioningLookup glyphPositioningLookup, uint index)
+        public virtual void PositionGlyph(IGlyphPositioningLookup glyphPositioningLookup, uint startIndex, uint length)
         {
-            return false;
         }
     }
 }

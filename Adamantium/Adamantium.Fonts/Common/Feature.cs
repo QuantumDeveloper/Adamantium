@@ -4,11 +4,16 @@ namespace Adamantium.Fonts.Common
 {
     public class Feature
     {
-        public string FriendlyName { get; private set; }
+        public Feature(FeatureInfo featureInfo)
+        {
+            Info = featureInfo;
+        }
         
-        public string ShortName { get; private set; }
+        public FeatureInfo Info { get; }
         
         public FeatureParametersTable FeatureParameters { get; set; }
+        
+        public bool IsEnabled { get; set; }
         
         internal ILookupTable[] Lookups { get; set; }
 
@@ -27,6 +32,11 @@ namespace Adamantium.Fonts.Common
                     }
                 }
             }
+        }
+
+        public override string ToString()
+        {
+            return $"Short name: {Info.Tag}, Friendly name: {Info.FriendlyName}";
         }
     }
 }

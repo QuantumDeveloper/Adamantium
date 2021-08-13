@@ -4,8 +4,8 @@ namespace Adamantium.Fonts
     {
         public LookupOwnerType OwnerType { get; }
 
-        public bool SubstituteGlyphs(IGlyphSubstitutionLookup substitutionLookup, uint index);
+        public void SubstituteGlyphs(IGlyphSubstitutionLookup substitutionLookup, uint index);
 
-        public bool PositionGlyph(IGlyphPositioningLookup glyphPositioningLookup, uint index);
+        public void PositionGlyph(IGlyphPositioningLookup glyphPositioningLookup, uint startIndex, uint length);
     }
 }

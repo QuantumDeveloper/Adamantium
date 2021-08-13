@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Fonts.Common;
+using Adamantium.Fonts.Tables;
 using Adamantium.Fonts.Tables.GPOS;
 using Adamantium.Fonts.Tables.Layout;
 
@@ -217,10 +218,10 @@ namespace Adamantium.Fonts.Extensions
             }
         }
 
-        public static AnchorTable ReadAnchorTable(this FontStreamReader reader, long offset)
+        public static AnchorPointTable ReadAnchorTable(this FontStreamReader reader, long offset)
         {
             reader.Position = offset;
-            var anchorTable = new AnchorTable();
+            var anchorTable = new AnchorPointTable();
             anchorTable.Format = reader.ReadUInt16();
             anchorTable.XCoordinate = reader.ReadInt16();
             anchorTable.YCoordinate = reader.ReadInt16();
@@ -239,7 +240,7 @@ namespace Adamantium.Fonts.Extensions
 
                     if (yDeviceOffset > 0)
                     {
-                        anchorTable.XDevice = reader.ReadDeviceTable(yDeviceOffset + offset);
+                        anchorTable.YDevice = reader.ReadDeviceTable(yDeviceOffset + offset);
                     }
                     break;
             }
@@ -257,24 +258,6 @@ namespace Adamantium.Fonts.Extensions
             table.DeltaValues = reader.ReadUInt16Array(table.EndSize - table.StartSize);
 
             return table;
-        }
-
-        public static GPOSLookupTable[] ReadGPOSLookupListTable(this FontStreamReader reader, long offset)
-        {
-            reader.Position = offset;
-            var lookupCount = reader.ReadUInt16();
-            var lookupOffsets = reader.ReadUInt16Array(lookupCount);
-
-            var lookupList = new List<GPOSLookupTable>();
-
-            for (int i = 0; i < lookupCount; i++)
-            {
-                long lookupTableOffset = offset + lookupOffsets[i];
-                var lookup = reader.ReadGPOSLookupTable(lookupTableOffset);
-                lookupList.Add(lookup);
-            }
-
-            return lookupList.ToArray();
         }
 
         private static PairSet ReadPairSet(this FontStreamReader reader, ValueFormat value1Format, ValueFormat value2Format)
@@ -333,7 +316,7 @@ namespace Adamantium.Fonts.Extensions
                 markArrayTable.MarkRecords[i] = new MarkRecord(markClass, offset);
             }
 
-            markArrayTable.AnchorTables = new AnchorTable[count];
+            markArrayTable.AnchorTables = new AnchorPointTable[count];
             for (int i = 0; i < count; i++)
             {
                 var markRecord = markArrayTable.MarkRecords[i];
@@ -354,7 +337,7 @@ namespace Adamantium.Fonts.Extensions
             {
                 var record = new Mark2Record();
                 markArrayTable.Records[i] = record;
-                record.Anchors = new AnchorTable[markClassCount];
+                record.Anchors = new AnchorPointTable[markClassCount];
                 var anchorOffsets = reader.ReadUInt16Array(markClassCount);
                 for (int k = 0; k < markClassCount; ++k)
                 {
@@ -384,7 +367,7 @@ namespace Adamantium.Fonts.Extensions
             {
                 var baseRecord = new BaseRecord();
                 baseArrayTable.BaseRecords[k] = baseRecord;
-                baseRecord.Anchors = new AnchorTable[markClassCount];
+                baseRecord.Anchors = new AnchorPointTable[markClassCount];
                 for (int i = 0; i < markClassCount; ++i)
                 {
                     long offset = anchorOffsetArray[i];
@@ -417,7 +400,7 @@ namespace Adamantium.Fonts.Extensions
                 for (int i = 0; i < componentCount; ++i)
                 {
                     var componentRecord = new ComponentRecord();
-                    componentRecord.Anchors = new AnchorTable[markClassCount];
+                    componentRecord.Anchors = new AnchorPointTable[markClassCount];
                     
                     var anchorOffsetArray = reader.ReadUInt16Array(markClassCount);
                     
@@ -588,6 +571,141 @@ namespace Adamantium.Fonts.Extensions
             var sequence = new SequenceTable();
             sequence.SubstituteGlyphIDs = reader.ReadUInt16Array(count);
             return sequence;
+        }
+
+        private static AttachmentListTable ReadAttachListTable(this FontStreamReader reader, long offset)
+        {
+            reader.Position = offset;
+            
+            var attachmentListTable = new AttachmentListTable();
+            var coverageOffset = reader.ReadUInt16() + offset;
+            var glyphCount = reader.ReadUInt16();
+            var attachPointOffsets = reader.ReadUInt16Array(glyphCount);
+            attachmentListTable.AttachPoints = new AttachPoint[glyphCount];
+
+            for (int i = 0; i < glyphCount; i++)
+            {
+                var pointCount = reader.ReadUInt16();
+                var attachPoint = new AttachPoint();
+                attachPoint.PointIndices = reader.ReadUInt16Array(pointCount);
+                attachmentListTable.AttachPoints[i] = attachPoint;
+            }
+
+            attachmentListTable.Coverage = reader.ReadCoverageTable(coverageOffset);
+
+            return attachmentListTable;
+        }
+
+        private static LigatureCaretList ReadLigatureCaretList(this FontStreamReader reader, long offset)
+        {
+            reader.Position = offset;
+            
+            var ligatureCaretList = new LigatureCaretList();
+            var coverageOffset = reader.ReadUInt16() + offset;
+            var ligGlyphCount = reader.ReadUInt16();
+            var ligGlyphOffsets = reader.ReadUInt16Array(ligGlyphCount);
+            ligatureCaretList.LigatureGlyphs = new LigatureGlyph[ligGlyphCount];
+
+            for (int i = 0; i < ligGlyphCount; i++)
+            {
+                ligatureCaretList.LigatureGlyphs[i] = reader.ReadLigatureGlyph(ligGlyphOffsets[i] + offset);
+                
+            }
+
+            ligatureCaretList.Coverage = reader.ReadCoverageTable(coverageOffset);
+
+            return ligatureCaretList;
+        }
+
+        private static LigatureGlyph ReadLigatureGlyph(this FontStreamReader reader, long offset)
+        {
+            reader.Position = offset;
+            var ligTable = new LigatureGlyph();
+            var caretCount = reader.ReadUInt16();
+            ligTable.CaretValues = new CaretValue[caretCount];
+            var caretOffsets = reader.ReadUInt16Array(caretCount);
+            for (int j = 0; j < caretCount; ++j)
+            {
+                ligTable.CaretValues[j] = reader.ReadCaretValue(caretOffsets[j] + offset);
+            }
+
+            return ligTable;
+        }
+
+        private static CaretValue ReadCaretValue(this FontStreamReader reader, long offset)
+        {
+            reader.Position = offset;
+            
+            var caretValue = new CaretValue();
+            caretValue.Format = reader.ReadUInt16();
+            switch (caretValue.Format)
+            {
+                case 1:
+                    caretValue.Coordinate = reader.ReadInt16();
+                    break;
+                case 2:
+                    caretValue.PointIndex = reader.ReadUInt16();
+                    break;
+                case 3:
+                    caretValue.Coordinate = reader.ReadInt16();
+                    caretValue.DeviceOffset = reader.ReadUInt16() + offset;
+                    break;
+            }
+
+            return caretValue;
+        }
+
+        private static MarkGlyphSetsTable ReadMarkGlyphSetsTable(this FontStreamReader reader, long offset)
+        {
+            reader.Position = offset;
+
+            var mark = new MarkGlyphSetsTable();
+            var format = reader.ReadUInt16();
+            var count = reader.ReadUInt16();
+            var coverageOffsets = reader.ReadUInt32Array(count);
+
+            mark.CoverageTables = new CoverageTable[count];
+            for (int i = 0; i < count; ++i)
+            {
+                mark.CoverageTables[i] = reader.ReadCoverageTable(coverageOffsets[i] + offset);
+            }
+            
+            return mark;
+        }
+
+        public static GlyphDefinitionTable ReadGDEFTable(this FontStreamReader reader, long offset)
+        {
+            var gdef = new GlyphDefinitionTable();
+            gdef.MajorVersion = reader.ReadUInt16();
+            gdef.MinorVersion = reader.ReadUInt16();
+            var glyphClassDefOffset = reader.ReadUInt16() + offset;
+            var attachListOffset = reader.ReadUInt16() + offset;
+            var ligCaretListOffset = reader.ReadUInt16() + offset;
+            var markAttachClassDefOffset = reader.ReadUInt16() + offset;
+
+            gdef.GlyphClassDefTable = reader.ReadClassDefTable(glyphClassDefOffset);
+            gdef.AttachList = reader.ReadAttachListTable(attachListOffset);
+            gdef.LigatureCaretList = reader.ReadLigatureCaretList(ligCaretListOffset);
+            gdef.MarkAttachClassDefTable = reader.ReadClassDefTable(markAttachClassDefOffset);
+            
+            switch (gdef.MinorVersion)
+            {
+                case 2:
+                {
+                    var markGlyphSetsDefOffset = reader.ReadUInt16() + offset;
+                    gdef.MarkGlyphSetsTable = reader.ReadMarkGlyphSetsTable(markGlyphSetsDefOffset);
+                }
+                    break;
+                case 3:
+                {
+                    var markGlyphSetsDefOffset = reader.ReadUInt16() + offset;
+                    var itemVarStoreOffset = reader.ReadUInt32() + offset;
+                    gdef.MarkGlyphSetsTable = reader.ReadMarkGlyphSetsTable(markGlyphSetsDefOffset);
+                }
+                    break;
+            }
+
+            return gdef;
         }
     }
 }

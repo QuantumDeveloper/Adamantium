@@ -9,13 +9,13 @@ namespace Adamantium.Fonts.Extensions
 {
     internal static partial class FontStreamExtensions
     {
-        public static GSUBLookupTable[] ReadGSUBLookupListTable(this FontStreamReader reader, long offset)
+        public static ILookupTable[] ReadGSUBLookupListTable(this FontStreamReader reader, long offset)
         {
             reader.Position = offset;
             var lookupCount = reader.ReadUInt16();
             var lookupOffsets = reader.ReadUInt16Array(lookupCount);
 
-            var lookupList = new List<GSUBLookupTable>();
+            var lookupList = new List<ILookupTable>();
 
             for (int i = 0; i < lookupCount; i++)
             {
@@ -27,7 +27,7 @@ namespace Adamantium.Fonts.Extensions
             return lookupList.ToArray();
         }
         
-        public static GSUBLookupTable ReadGSUBLookupTable(this FontStreamReader reader, long fffset)
+        public static ILookupTable ReadGSUBLookupTable(this FontStreamReader reader, long fffset)
         {
             reader.Position = fffset;
             var lookup = new GSUBLookupTable();
@@ -50,7 +50,7 @@ namespace Adamantium.Fonts.Extensions
             return lookup;
         }
 
-        private static GSUBLookupSubTable ReadSingleSubstitutionSubTable(this FontStreamReader reader, GSUBLookupType type,
+        private static ILookupSubTable ReadSingleSubstitutionSubTable(this FontStreamReader reader, GSUBLookupType type,
             long subtableOffset)
         {
             reader.Position = subtableOffset;
@@ -80,7 +80,7 @@ namespace Adamantium.Fonts.Extensions
             }
         }
         
-        private static GSUBLookupSubTable ReadMultipleSubstitutionSubTable(this FontStreamReader reader, GSUBLookupType type,
+        private static ILookupSubTable ReadMultipleSubstitutionSubTable(this FontStreamReader reader, GSUBLookupType type,
             long subtableOffset)
         {
             reader.Position = subtableOffset;
@@ -108,7 +108,7 @@ namespace Adamantium.Fonts.Extensions
             return lookupType2;
         }
         
-        private static GSUBLookupSubTable ReadAlternateSubstitutionSubTable(this FontStreamReader reader, GSUBLookupType type,
+        private static ILookupSubTable ReadAlternateSubstitutionSubTable(this FontStreamReader reader, GSUBLookupType type,
             long subtableOffset)
         {
             reader.Position = subtableOffset;
@@ -136,7 +136,7 @@ namespace Adamantium.Fonts.Extensions
             return lookupType2;
         }
         
-        private static GSUBLookupSubTable ReadLigatureSubstitutionSubTable(this FontStreamReader reader, GSUBLookupType type,
+        private static ILookupSubTable ReadLigatureSubstitutionSubTable(this FontStreamReader reader, GSUBLookupType type,
             long subtableOffset)
         {
             reader.Position = subtableOffset;
@@ -164,7 +164,7 @@ namespace Adamantium.Fonts.Extensions
             return lookupType2;
         }
 
-        private static GSUBLookupSubTable ReadContextualSubstitutionSubTable(this FontStreamReader reader,
+        private static ILookupSubTable ReadContextualSubstitutionSubTable(this FontStreamReader reader,
             GSUBLookupType type,
             long subtableOffset)
         {
@@ -246,7 +246,7 @@ namespace Adamantium.Fonts.Extensions
             }
         }
 
-        private static GSUBLookupSubTable ReadChainedContextsSubstitutionSubTable(this FontStreamReader reader,
+        private static ILookupSubTable ReadChainedContextsSubstitutionSubTable(this FontStreamReader reader,
             GSUBLookupType type,
             long subtableOffset)
         {
@@ -345,7 +345,7 @@ namespace Adamantium.Fonts.Extensions
             }
         }
 
-        private static GSUBLookupSubTable ReadReverseChainingContextualSubstitutionSubTable(this FontStreamReader reader,
+        private static ILookupSubTable ReadReverseChainingContextualSubstitutionSubTable(this FontStreamReader reader,
             GSUBLookupType type,
             long subtableOffset)
         {
@@ -386,7 +386,7 @@ namespace Adamantium.Fonts.Extensions
             return reverseContext;
         }
         
-        private static GSUBLookupSubTable ReadExtensionSubstitutionSubTable(this FontStreamReader reader, GSUBLookupType type, long subtableOffset)
+        private static ILookupSubTable ReadExtensionSubstitutionSubTable(this FontStreamReader reader, GSUBLookupType type, long subtableOffset)
         {
             reader.Position = subtableOffset;
             
@@ -396,7 +396,7 @@ namespace Adamantium.Fonts.Extensions
             return reader.ReadGSUBLookupSubtable(extensionLookupType, extensionOffset + subtableOffset);
         }
 
-        private static GSUBLookupSubTable ReadGSUBLookupSubtable(this FontStreamReader reader, GSUBLookupType type, long subtableOffset)
+        private static ILookupSubTable ReadGSUBLookupSubtable(this FontStreamReader reader, GSUBLookupType type, long subtableOffset)
         {
             switch (type)
             {

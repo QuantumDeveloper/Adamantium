@@ -12,11 +12,14 @@ namespace Adamantium.Fonts
     {
         private List<Glyph> glyphs;
         private List<UInt32> unicodes;
-        private List<FontLanguage> languages;
-        private Dictionary<string, FontLanguage> languagesMap;
+        private List<FontLanguage> positioningSet;
+        private List<FontLanguage> substitutionSet;
+        private HashSet<LanguageTag> languagesSet;
 
         private Dictionary<string, Glyph> nameToGlyph;
         private Dictionary<UInt32, Glyph> unicodeToGlyph;
+
+        private Dictionary<string, List<Feature>> featuresMap;
         
         internal TypeFace TypeFace { get; }
         internal VariationStore VariationData { get; set; }
@@ -27,10 +30,14 @@ namespace Adamantium.Fonts
             TypeFace = typeFace;
             glyphs = new List<Glyph>();
             unicodes = new List<uint>();
-            languages = new List<FontLanguage>();
+            positioningSet = new List<FontLanguage>();
+            substitutionSet = new List<FontLanguage>();
+            languagesSet = new HashSet<LanguageTag>();
 
             nameToGlyph = new Dictionary<string, Glyph>();
             unicodeToGlyph = new Dictionary<uint, Glyph>();
+
+            featuresMap = new Dictionary<string, List<Feature>>();
             
             Copyright = String.Empty;
             FontFamily = String.Empty;
@@ -100,7 +107,10 @@ namespace Adamantium.Fonts
         
         public IReadOnlyCollection<uint> Unicodes => unicodes.AsReadOnly();
 
-        public IReadOnlyCollection<FontLanguage> Languages => languages.AsReadOnly();
+        public IReadOnlyCollection<FontLanguage> PositioningLanguageSet => positioningSet.AsReadOnly();
+        public IReadOnlyCollection<FontLanguage> SubstitutionLanguageSet => substitutionSet.AsReadOnly();
+
+        public IReadOnlyCollection<string> Features => featuresMap.Keys.ToList().AsReadOnly();
 
         internal KerningSubtable[] KerningData { get; set; }
         
@@ -110,24 +120,40 @@ namespace Adamantium.Fonts
             glyphs.AddRange(inputGlyphs);
         }
 
-        internal void SetLanguages(IEnumerable<FontLanguage> inputLanguages)
+        internal void SetSubstitutionLanguagesSet(IEnumerable<FontLanguage> inputLanguages)
         {
-            languages.Clear();
-            languages.AddRange(inputLanguages);
-            languagesMap = languages.ToDictionary(x => x.ShortName);
+            substitutionSet.Clear();
+            var fontLanguages = inputLanguages as FontLanguage[] ?? inputLanguages.ToArray();
+            substitutionSet.AddRange(fontLanguages);
+
+            foreach (var language in fontLanguages)
+            {
+                languagesSet.Add(language.Info);
+            }
+        }
+        
+        internal void SetPositioningLanguagesSet(IEnumerable<FontLanguage> inputLanguages)
+        {
+            positioningSet.Clear();
+            var fontLanguages = inputLanguages as FontLanguage[] ?? inputLanguages.ToArray();
+            positioningSet.AddRange(fontLanguages);
+            
+            foreach (var language in fontLanguages)
+            {
+                languagesSet.Add(language.Info);
+            }
         }
 
         public bool IsLanguageAvailable(string language)
         {
-            return languagesMap.ContainsKey(language);
+            return languagesSet.Contains(LanguageTags.GetLanguage(language));
         }
 
         public void AddLanguage(FontLanguage language)
         {
             if (!IsLanguageAvailable(language.ShortName))
             {
-                languages.Add(language);
-                languagesMap[language.ShortName] = language;
+                positioningSet.Add(language);
             }
         }
 
@@ -228,6 +254,39 @@ namespace Adamantium.Fonts
             }
         
             return kerningValue;
+        }
+
+        public void AddFeature(Feature feature)
+        {
+            if (featuresMap.TryGetValue(feature.Info.Tag, out var features))
+            {
+                features.Add(feature);
+            }
+            else
+            {
+                featuresMap[feature.Info.Tag] = new List<Feature>() {feature};
+            }
+        }
+
+        public void EnableFeature(string feature, bool enable)
+        {
+            if (featuresMap.TryGetValue(feature, out var features))
+            {
+                foreach (var featureItem in features)
+                {
+                    featureItem.IsEnabled = enable;
+                }
+            }
+        }
+
+        public bool IsFeatureEnabled(string feature)
+        {
+            if (featuresMap.TryGetValue(feature, out var features))
+            {
+                return features[0].IsEnabled;
+            }
+
+            return false;
         }
     }
 }

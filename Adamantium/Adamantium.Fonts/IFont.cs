@@ -6,6 +6,8 @@ namespace Adamantium.Fonts
 {
     public interface IFont
     {
+        #region Name
+        
         string Copyright { get; }                
         string FontFamily { get; }              
         string FontSubfamily { get; }            
@@ -35,9 +37,15 @@ namespace Adamantium.Fonts
         string LightBackgroundPalette { get; }  
         string DarkBackgroundPalette { get; }
         
-        IReadOnlyCollection<uint> Unicodes { get; }
+        #endregion
+        
+        public IReadOnlyCollection<uint> Unicodes { get; }
 
-        public IReadOnlyCollection<FontLanguage> Languages { get; }
+        public IReadOnlyCollection<FontLanguage> PositioningLanguageSet { get; }
+        
+        public IReadOnlyCollection<FontLanguage> SubstitutionLanguageSet { get; }
+        
+        public IReadOnlyCollection<string> Features { get; }
 
         internal void UpdateGlyphNamesCache();
 
@@ -57,5 +65,10 @@ namespace Adamantium.Fonts
 
         public Int16 GetKerningValue(UInt16 leftGlyphIndex, UInt16 rightGlyphIndex);
 
+        public void AddFeature(Feature feature);
+
+        public void EnableFeature(string feature, bool enable);
+
+        public bool IsFeatureEnabled(string feature);
     }
 }

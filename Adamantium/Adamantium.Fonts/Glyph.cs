@@ -45,6 +45,8 @@ namespace Adamantium.Fonts
         public Rectangle BoundingRectangle { get; internal set; }
         
         public OutlineType OutlineType { get; internal set; }
+        
+        public GlyphClassDefinition ClassDefinition { get; internal set; }
 
         internal List<CompositeGlyphComponent> CompositeGlyphComponents;
         

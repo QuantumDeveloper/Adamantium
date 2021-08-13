@@ -534,6 +534,9 @@ namespace Adamantium.Fonts.Parsers
                     case TableNames.kern:
                         ReadKerningTable(tableEntry);
                         break;
+                    case TableNames.GDEF:
+                        ReadGDEFTable(tableEntry);
+                        break;
                     default:
                         ReadTable(tableEntry);
                         break;
@@ -1369,6 +1372,12 @@ namespace Adamantium.Fonts.Parsers
 
                 CurrentFont.KerningData = kernSubtables;
             }
+        }
+
+        protected virtual void ReadGDEFTable(TableEntry entry)
+        {
+            var gdef = FontReader.ReadGDEFTable(entry.Offset);
+            gdef.FillData(TypeFace);
         }
 
         private void ParseTTFCoverage(ushort rawCoverage, KerningSubtable kerningSubtable)
