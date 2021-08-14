@@ -47,11 +47,19 @@ namespace Adamantium.Fonts
         
         public IReadOnlyCollection<string> Features { get; }
 
+        public IReadOnlyCollection<Feature> EnabledFeatures { get; }
+
         internal void UpdateGlyphNamesCache();
 
         internal void SetGlyphUnicodes(Dictionary<uint, List<uint>> glyphMapping);
 
-        bool IsLanguageAvailable(string language);
+        internal bool IsCharacterCached(FontLanguage currentLanguage, Feature feature, char character);
+
+        bool IsLanguageAvailableByMsdnName(string language);
+
+        bool IsLanguageAvailableByIsoName(string language);
+
+        bool IsLanguageAvailableByIsoName(string language, out FontLanguage fontLanguage);
 
         void AddLanguage(FontLanguage language);
 

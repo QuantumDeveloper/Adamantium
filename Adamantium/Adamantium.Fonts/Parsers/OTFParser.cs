@@ -401,7 +401,7 @@ namespace Adamantium.Fonts.Parsers
             {
                 foreach (var langSysTable in scriptTable.LangSysTables)
                 {
-                    var lang = LanguageTags.GetLanguage(langSysTable.Name);
+                    var lang = LanguageTags.GetMsdnLanguage(langSysTable.Name);
                     var lng = new FontLanguage(lang);
                     for (int i = 0; i < langSysTable.FeatureIndices.Length; i++)
                     {

@@ -17,8 +17,13 @@ namespace Adamantium.Fonts.Common
         
         internal ILookupTable[] Lookups { get; set; }
 
-        public void Apply(TypeFace typeface)
+        public void Apply(TypeFace typeface, uint glyphIndex)
         {
+            if (!IsEnabled)
+            {
+                return;
+            }
+            
             foreach (var lookup in Lookups)
             {
                 foreach (var subTable in lookup.SubTables)
@@ -26,8 +31,10 @@ namespace Adamantium.Fonts.Common
                     switch (subTable.OwnerType)
                     {
                         case LookupOwnerType.GSUB:
+                            subTable.SubstituteGlyphs(Info, typeface, glyphIndex);
                             break;
                         case LookupOwnerType.GPOS:
+                            subTable.PositionGlyph(Info, typeface, glyphIndex, 1);
                             break;
                     }
                 }

@@ -5,10 +5,11 @@ using Adamantium.Fonts.Common;
 using Adamantium.Fonts.Parsers;
 using Adamantium.Fonts.Tables;
 using Adamantium.Fonts.Tables.CFF;
+using Adamantium.Mathematics;
 
 namespace Adamantium.Fonts
 {
-    internal class Font : IFont
+    internal class Font : IFont, IGlyphPositioningLookup, IGlyphSubstitutionLookup
     {
         private List<Glyph> glyphs;
         private List<UInt32> unicodes;
@@ -20,7 +21,9 @@ namespace Adamantium.Fonts
         private Dictionary<UInt32, Glyph> unicodeToGlyph;
 
         private Dictionary<string, List<Feature>> featuresMap;
-        
+        private List<Feature> enabledFeatures;
+        private Dictionary<FontLanguage, FeatureCache> languageCache;
+
         internal TypeFace TypeFace { get; }
         internal VariationStore VariationData { get; set; }
         internal List<InstanceRecord> InstanceData { get; set; }
@@ -38,7 +41,9 @@ namespace Adamantium.Fonts
             unicodeToGlyph = new Dictionary<uint, Glyph>();
 
             featuresMap = new Dictionary<string, List<Feature>>();
-            
+            enabledFeatures = new List<Feature>();
+            languageCache = new Dictionary<FontLanguage, FeatureCache>();
+
             Copyright = String.Empty;
             FontFamily = String.Empty;
             FontSubfamily = String.Empty;
@@ -84,9 +89,9 @@ namespace Adamantium.Fonts
         public string WwsSubfamilyName { get; internal set; }
         public string LightBackgroundPalette { get; internal set; }
         public string DarkBackgroundPalette { get; internal set; }
-        
+
         // ------
-        
+
         public ushort UnitsPerEm { get; internal set; }
         
         /// <summary>
@@ -111,9 +116,12 @@ namespace Adamantium.Fonts
         public IReadOnlyCollection<FontLanguage> SubstitutionLanguageSet => substitutionSet.AsReadOnly();
 
         public IReadOnlyCollection<string> Features => featuresMap.Keys.ToList().AsReadOnly();
+        public IReadOnlyCollection<Feature> EnabledFeatures => enabledFeatures.AsReadOnly();
 
         internal KerningSubtable[] KerningData { get; set; }
-        
+
+        public uint Count => throw new NotImplementedException();
+
         internal void SetGlyphs(IEnumerable<Glyph> inputGlyphs)
         {
             glyphs.Clear();
@@ -141,17 +149,44 @@ namespace Adamantium.Fonts
             foreach (var language in fontLanguages)
             {
                 languagesSet.Add(language.Info);
+                languageCache[language] = null;
             }
         }
 
-        public bool IsLanguageAvailable(string language)
+        internal bool IsCharacterCached(FontLanguage currentLanguage, Feature feature, char character)
         {
-            return languagesSet.Contains(LanguageTags.GetLanguage(language));
+            if (!featuresMap.ContainsKey(feature.Info.Tag)) return false;
+
+            var glyph = GetGlyphByCharacter(character);
+
+            return languageCache[currentLanguage].IsGlyphCached(feature, glyph);
+        }
+
+        public bool IsLanguageAvailableByMsdnName(string language)
+        {
+            return languagesSet.Contains(LanguageTags.GetMsdnLanguage(language));
+        }
+
+        public bool IsLanguageAvailableByIsoName(string language)
+        {
+            return languagesSet.Contains(LanguageTags.GetIsoLanguage(language));
+        }
+
+        public bool IsLanguageAvailableByIsoName(string language, out FontLanguage fontLanguage)
+        {
+
+            if (languagesSet.Contains(LanguageTags.GetIsoLanguage(language)))
+            {
+                langu
+                fontLanguage = isoLanguage;
+            }
+
+            return ;
         }
 
         public void AddLanguage(FontLanguage language)
         {
-            if (!IsLanguageAvailable(language.ShortName))
+            if (!IsLanguageAvailableByMsdnName(language.ShortName))
             {
                 positioningSet.Add(language);
             }
@@ -275,6 +310,14 @@ namespace Adamantium.Fonts
                 foreach (var featureItem in features)
                 {
                     featureItem.IsEnabled = enable;
+                    if (featureItem.IsEnabled && !enabledFeatures.Contains(featureItem))
+                    {
+                        enabledFeatures.Add(featureItem);
+                    }
+                    else
+                    {
+                        enabledFeatures.Remove(featureItem);
+                    }
                 }
             }
         }
@@ -287,6 +330,50 @@ namespace Adamantium.Fonts
             }
 
             return false;
+        }
+
+        public void ClearLanguageCache()
+        {
+            foreach (var cache in languageCache)
+            {
+                cache.Value.Clear();
+            }
+
+            languageCache.Clear();
+        }
+        public GlyphClassDefinition GetGlyphClassDefinition(uint index)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void AppendGlyphOffset(uint glyphIndex, Vector2F offset)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void AppendGlyphAdvance(uint glyphIndex, Vector2F advance)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Vector2F GetOffset(uint glyphIndex)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Vector2F GetAdvance(uint glyphIndex)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Replace(uint glyphIndex, uint substitutionGlyphIndex)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Replace(uint glyphIndex, params uint[] substitutionArray)
+        {
+            throw new NotImplementedException();
         }
     }
 }

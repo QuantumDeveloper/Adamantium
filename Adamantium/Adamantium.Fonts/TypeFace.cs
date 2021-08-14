@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Adamantium.Fonts.Common;
 using Adamantium.Fonts.Parsers;
+using Adamantium.Mathematics;
 
 namespace Adamantium.Fonts
 {
@@ -15,7 +17,8 @@ namespace Adamantium.Fonts
         private readonly List<string> errorMessages;
         
         private Dictionary<UInt32, Glyph> unicodeToGlyph;
-        
+
+        public IFont CurrentFont { get; private set; }
 
         public TypeFace()
         {
@@ -23,7 +26,7 @@ namespace Adamantium.Fonts
             glyphs = new List<Glyph>();
             unicodes = new List<uint>();
             unicodeToGlyph = new Dictionary<uint, Glyph>();
-            
+
             errorMessages = new List<string>();
         }
 
@@ -48,12 +51,21 @@ namespace Adamantium.Fonts
         
         public IReadOnlyCollection<string> ErrorMessages => errorMessages.AsReadOnly();
 
+        public uint Count => throw new NotImplementedException();
+
         internal void UpdateGlyphNames()
         {
             foreach (var font in fonts)
             {
                 font.UpdateGlyphNamesCache();
             }
+        }
+
+        internal void SetCurrentFont(IFont font)
+        {
+            if (!fonts.Contains(font)) return;
+
+            CurrentFont = font;
         }
         
         public bool GetGlyphByIndex(uint index, out Glyph glyph)
