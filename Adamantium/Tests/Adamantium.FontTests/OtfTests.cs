@@ -1,3 +1,5 @@
+using System;
+using System.Diagnostics;
 using System.IO;
 using Adamantium.Fonts;
 using NUnit.Framework;
@@ -83,6 +85,31 @@ namespace Adamantium.FontTests
         public void LoadOtfCff1FontCollection_Asana()
         {
             var typeFace = TypeFace.LoadFont(FontCollections.Ttf_Asana, 2);
+        }
+        
+        [Test]
+        public void OutputFeatures_SourceSans3_Regular()
+        {
+            var typeFace = TypeFace.LoadFont(CFF1Fonts.SourceSans3_Regular, 2);
+            foreach (var font in typeFace.Fonts)
+            {
+                font.EnableFeature("kern", true);
+                foreach (var language in font.LanguageSet)
+                {
+                    Debug.WriteLine($"Lang: {language}");
+                    Debug.WriteLine("GPOS:");
+                    foreach (var gposFeature in language.GPOSFeatures)
+                    {
+                        Debug.WriteLine(gposFeature);
+                    }
+                    
+                    Debug.WriteLine("GSUB:");
+                    foreach (var gsubFeature in language.GSUBFeatures)
+                    {
+                        Debug.WriteLine(gsubFeature);
+                    }
+                }
+            }
         }
     }
 }

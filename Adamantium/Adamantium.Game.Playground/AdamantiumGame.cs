@@ -78,7 +78,8 @@ namespace Adamantium.Game.Playground
         {
             try
             {
-                typeFace = TypeFace.LoadFont(@"Fonts/WoffFonts/Sarabun-Regular.woff2", 3);
+                //typeFace = TypeFace.LoadFont(@"Fonts/WoffFonts/Sarabun-Regular.woff2", 3);
+                typeFace = TypeFace.LoadFont(@"Fonts/OTFFonts/SourceSans3-Regular.otf", 2);
                 var entity = new Entity(null, "Sarabun-Regular.woff2");
                 var font = typeFace.GetFont(0);
                 var glyph = font.GetGlyphByUnicode('@');

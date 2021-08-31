@@ -1,17 +1,23 @@
+using Adamantium.Fonts.Common;
+
 namespace Adamantium.Fonts.Tables.GSUB
 {
     internal abstract class GSUBLookupSubTable : ILookupSubTable
     {
         public abstract GSUBLookupType Type { get; }
-        public LookupOwnerType OwnerType => LookupOwnerType.GSUB;
-        public void SubstituteGlyphs(IGlyphSubstitutionLookup substitutionLookup, uint index)
+        public FeatureKind OwnerType => FeatureKind.GSUB;
+        public virtual void SubstituteGlyphs(FontLanguage language,
+            FeatureInfo featureInfo,
+            IGlyphSubstitutionLookup substitutionLookup,
+            uint index)
         {
-            
         }
 
-        public void PositionGlyph(IGlyphPositioningLookup glyphPositioningLookup, uint startIndex, uint length)
+        public virtual void PositionGlyph(FontLanguage language, FeatureInfo featureInfo,
+            IGlyphPositioningLookup glyphPositioningLookup,
+            uint startIndex,
+            uint length)
         {
-            
         }
     }
 }

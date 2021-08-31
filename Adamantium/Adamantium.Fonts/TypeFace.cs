@@ -9,7 +9,7 @@ using Adamantium.Mathematics;
 
 namespace Adamantium.Fonts
 {
-    public class TypeFace
+    public class TypeFace : IGlyphPositioningLookup, IGlyphSubstitutionLookup
     {
         private readonly List<IFont> fonts;
         private List<Glyph> glyphs;
@@ -50,8 +50,6 @@ namespace Adamantium.Fonts
         public IReadOnlyCollection<Glyph> Glyphs => glyphs.AsReadOnly();
         
         public IReadOnlyCollection<string> ErrorMessages => errorMessages.AsReadOnly();
-
-        public uint Count => throw new NotImplementedException();
 
         internal void UpdateGlyphNames()
         {
@@ -124,6 +122,48 @@ namespace Adamantium.Fonts
         public static async Task<TypeFace> LoadFontAsync(string path, byte sampleResolution)
         {
             return await Task.Run(()=> LoadFont(path, sampleResolution));
+        }
+        
+        public uint Count => throw new NotImplementedException();
+        public GlyphClassDefinition GetGlyphClassDefinition(uint index)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void AppendGlyphOffset(FontLanguage language, FeatureInfo featureInfo, uint glyphIndex, Vector2F offset)
+        {
+            if (GetGlyphByIndex(glyphIndex, out var glyph))
+            {
+                CurrentFont.AddFeatureDataToGlyph(language, featureInfo, glyph, GlyphPosition.FromOffset(offset));
+            }
+        }
+
+        public void AppendGlyphAdvance(FontLanguage language, FeatureInfo featureInfo, uint glyphIndex, Vector2F advance)
+        {
+            if (GetGlyphByIndex(glyphIndex, out var glyph))
+            {
+                CurrentFont.AddFeatureDataToGlyph(language, featureInfo, glyph, GlyphPosition.FromAdvance(advance));
+            }
+        }
+
+        public Vector2F GetOffset(uint glyphIndex)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Vector2F GetAdvance(uint glyphIndex)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Replace(uint glyphIndex, uint substitutionGlyphIndex)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Replace(uint glyphIndex, params uint[] substitutionArray)
+        {
+            throw new NotImplementedException();
         }
     }
 }

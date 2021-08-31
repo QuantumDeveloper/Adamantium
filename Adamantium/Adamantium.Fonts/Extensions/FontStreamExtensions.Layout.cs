@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using Adamantium.Fonts.Common;
 using Adamantium.Fonts.Tables;
@@ -585,6 +586,8 @@ namespace Adamantium.Fonts.Extensions
 
             for (int i = 0; i < glyphCount; i++)
             {
+                Debug.WriteLine($"Iteration = {i}");
+                reader.Position = offset + attachPointOffsets[i];
                 var pointCount = reader.ReadUInt16();
                 var attachPoint = new AttachPoint();
                 attachPoint.PointIndices = reader.ReadUInt16Array(pointCount);
@@ -675,21 +678,20 @@ namespace Adamantium.Fonts.Extensions
 
         public static GlyphDefinitionTable ReadGDEFTable(this FontStreamReader reader, long offset)
         {
+            reader.Position = offset;
+            
             var gdef = new GlyphDefinitionTable();
             gdef.MajorVersion = reader.ReadUInt16();
             gdef.MinorVersion = reader.ReadUInt16();
-            var glyphClassDefOffset = reader.ReadUInt16() + offset;
-            var attachListOffset = reader.ReadUInt16() + offset;
-            var ligCaretListOffset = reader.ReadUInt16() + offset;
-            var markAttachClassDefOffset = reader.ReadUInt16() + offset;
+            var glyphClassDefOffset = reader.ReadUInt16();
+            var attachListOffset = reader.ReadUInt16();
+            var ligCaretListOffset = reader.ReadUInt16();
+            var markAttachClassDefOffset = reader.ReadUInt16();
 
-            gdef.GlyphClassDefTable = reader.ReadClassDefTable(glyphClassDefOffset);
-            gdef.AttachList = reader.ReadAttachListTable(attachListOffset);
-            gdef.LigatureCaretList = reader.ReadLigatureCaretList(ligCaretListOffset);
-            gdef.MarkAttachClassDefTable = reader.ReadClassDefTable(markAttachClassDefOffset);
-            
             switch (gdef.MinorVersion)
             {
+                case 0:
+                    break;
                 case 2:
                 {
                     var markGlyphSetsDefOffset = reader.ReadUInt16() + offset;
@@ -704,6 +706,11 @@ namespace Adamantium.Fonts.Extensions
                 }
                     break;
             }
+            
+            gdef.GlyphClassDefTable = glyphClassDefOffset == 0 ? null : reader.ReadClassDefTable(glyphClassDefOffset + offset);
+            gdef.AttachList = attachListOffset == 0 ? null : reader.ReadAttachListTable(attachListOffset + offset);
+            gdef.LigatureCaretList = ligCaretListOffset == 0 ? null : reader.ReadLigatureCaretList(ligCaretListOffset + offset);
+            gdef.MarkAttachClassDefTable = markAttachClassDefOffset == 0 ? null : reader.ReadClassDefTable(markAttachClassDefOffset + offset);
 
             return gdef;
         }

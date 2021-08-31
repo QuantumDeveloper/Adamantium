@@ -1,6 +1,6 @@
 namespace Adamantium.Fonts
 {
-    public enum LookupOwnerType
+    public enum FeatureKind
     {
         GPOS,
         GSUB

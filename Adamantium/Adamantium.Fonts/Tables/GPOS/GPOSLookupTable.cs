@@ -11,7 +11,7 @@ namespace Adamantium.Fonts.Tables.GPOS
         /// </summary>
         public UInt16 LookupType { get; set; }
 
-        public LookupOwnerType OwnerType => LookupOwnerType.GPOS;
+        public FeatureKind OwnerType => FeatureKind.GPOS;
 
         /// <summary>
         /// Lookup qualifiers

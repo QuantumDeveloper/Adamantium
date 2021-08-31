@@ -1,4 +1,5 @@
 using System;
+using Adamantium.Fonts.Common;
 using Adamantium.Fonts.Extensions;
 using Adamantium.Fonts.Tables.Layout;
 using Adamantium.Mathematics;
@@ -17,7 +18,9 @@ namespace Adamantium.Fonts.Tables.GPOS
 
         public MarkArrayTable MarkArrayTable { get; set; }
 
-        public override void PositionGlyph(IGlyphPositioningLookup glyphPositioningLookup, uint startIndex, uint length)
+        public override void PositionGlyph(FontLanguage language, FeatureInfo feature,
+            IGlyphPositioningLookup glyphPositioningLookup,
+            uint startIndex, uint length)
         {
             var endIndex = Math.Min(startIndex + length, glyphPositioningLookup.Count);
 
@@ -47,7 +50,7 @@ namespace Adamantium.Fonts.Tables.GPOS
                 var xOffset = previousOffset.X + previousAnchor.XCoordinate -
                               (previousAdvance.X + currentOffset.X + anchor.XCoordinate);
                 var yOffset = previousOffset.Y + previousAnchor.YCoordinate - (currentOffset.Y + anchor.YCoordinate);
-                glyphPositioningLookup.AppendGlyphOffset(i, new Vector2F(xOffset, yOffset));
+                glyphPositioningLookup.AppendGlyphOffset(language, feature, i, new Vector2F(xOffset, yOffset));
             }
 
         }

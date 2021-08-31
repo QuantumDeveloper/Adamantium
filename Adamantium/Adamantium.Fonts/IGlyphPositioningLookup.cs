@@ -1,3 +1,4 @@
+using Adamantium.Fonts.Common;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Fonts
@@ -8,9 +9,9 @@ namespace Adamantium.Fonts
         
         GlyphClassDefinition GetGlyphClassDefinition(uint index);
         
-        void AppendGlyphOffset(uint glyphIndex, Vector2F offset);
+        void AppendGlyphOffset(FontLanguage language, FeatureInfo featureInfo, uint glyphIndex, Vector2F offset);
 
-        void AppendGlyphAdvance(uint glyphIndex, Vector2F advance);
+        void AppendGlyphAdvance(FontLanguage language, FeatureInfo feature, uint glyphIndex, Vector2F advance);
 
         Vector2F GetOffset(uint glyphIndex);
 

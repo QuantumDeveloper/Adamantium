@@ -10,7 +10,7 @@ namespace Adamantium.Fonts.Tables.GSUB
         /// </summary>
         public UInt16 LookupType { get; set; }
 
-        public LookupOwnerType OwnerType => LookupOwnerType.GSUB;
+        public FeatureKind OwnerType => FeatureKind.GSUB;
 
         /// <summary>
         /// Lookup qualifiers

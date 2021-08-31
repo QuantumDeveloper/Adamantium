@@ -4,10 +4,19 @@ namespace Adamantium.Fonts
 {
     public interface ILookupSubTable
     {
-        public LookupOwnerType OwnerType { get; }
+        public FeatureKind OwnerType { get; }
 
-        public void SubstituteGlyphs(FeatureInfo featureInfo, IGlyphSubstitutionLookup substitutionLookup, uint index);
+        public void SubstituteGlyphs(
+            FontLanguage language, 
+            FeatureInfo featureInfo, 
+            IGlyphSubstitutionLookup substitutionLookup, 
+            uint index);
 
-        public void PositionGlyph(FeatureInfo featureInfo, IGlyphPositioningLookup glyphPositioningLookup, uint startIndex, uint length);
+        public void PositionGlyph(
+            FontLanguage language, 
+            FeatureInfo featureInfo,
+            IGlyphPositioningLookup glyphPositioningLookup, 
+            uint startIndex, 
+            uint length);
     }
 }

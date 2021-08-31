@@ -1,4 +1,5 @@
 using System;
+using Adamantium.Fonts.Common;
 using Adamantium.Fonts.Tables.Layout;
 using Adamantium.Mathematics;
 
@@ -12,7 +13,9 @@ namespace Adamantium.Fonts.Tables.GPOS
         
         public PairSetTable[] PairSetsTables { get; set; }
 
-        public override void PositionGlyph(IGlyphPositioningLookup glyphPositioningLookup, uint startIndex, uint length)
+        public override void PositionGlyph(FontLanguage language, FeatureInfo feature,
+            IGlyphPositioningLookup glyphPositioningLookup,
+            uint startIndex, uint length)
         {
             var endIndex = Math.Min(startIndex + length, glyphPositioningLookup.Count);
             for (uint i = 0; i < endIndex; ++i)
@@ -31,14 +34,14 @@ namespace Adamantium.Fonts.Tables.GPOS
                     
                     if (valueRecord1 != null)
                     {
-                        glyphPositioningLookup.AppendGlyphOffset(i, new Vector2F(valueRecord1.XPlacement, valueRecord1.YPlacement));
-                        glyphPositioningLookup.AppendGlyphAdvance(i, new Vector2F(valueRecord1.XAdvance, valueRecord1.YAdvance));
+                        glyphPositioningLookup.AppendGlyphOffset(language, feature, i, new Vector2F(valueRecord1.XPlacement, valueRecord1.YPlacement));
+                        glyphPositioningLookup.AppendGlyphAdvance(language, feature, i, new Vector2F(valueRecord1.XAdvance, valueRecord1.YAdvance));
                     }
 
                     if (valueRecord2 != null)
                     {
-                        glyphPositioningLookup.AppendGlyphOffset(i + 1, new Vector2F(valueRecord2.XPlacement, valueRecord2.YPlacement));
-                        glyphPositioningLookup.AppendGlyphAdvance(i + 1, new Vector2F(valueRecord2.XAdvance, valueRecord2.YAdvance));
+                        glyphPositioningLookup.AppendGlyphOffset(language, feature, i + 1, new Vector2F(valueRecord2.XPlacement, valueRecord2.YPlacement));
+                        glyphPositioningLookup.AppendGlyphAdvance(language, feature, i + 1, new Vector2F(valueRecord2.XAdvance, valueRecord2.YAdvance));
                     }
                 }
             }

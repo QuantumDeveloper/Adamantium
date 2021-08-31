@@ -23,5 +23,15 @@ namespace Adamantium.Fonts.Common
 
             return left;
         }
+
+        public static GlyphPosition FromOffset(Vector2F offset)
+        {
+            return new GlyphPosition() { Offset = offset };
+        }
+        
+        public static GlyphPosition FromAdvance(Vector2F advance)
+        {
+            return new GlyphPosition() { Advance = advance };
+        }
     }
 }

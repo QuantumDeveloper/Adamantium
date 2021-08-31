@@ -50,6 +50,8 @@ namespace Adamantium.Fonts
 
         internal List<CompositeGlyphComponent> CompositeGlyphComponents;
         
+        public GlyphLayoutData Layout { get; internal set; }
+        
         internal byte[] Instructions { get; private set; }
         
         internal static Glyph EmptyGlyph(uint index)

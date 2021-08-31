@@ -1,46 +1,54 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
 
 namespace Adamantium.Fonts.Common
 {
     internal class FeatureCache
     {
-        private Dictionary<FeatureInfo, GlyphCache> featureCache;
+        private readonly Dictionary<FeatureInfo, GlyphLayoutData> featureCache;
+        private readonly Glyph glyph;
 
-        public FeatureCache()
+        public FeatureCache(Glyph glyph)
         {
-            featureCache = new Dictionary<FeatureInfo, GlyphCache>();
+            this.glyph = glyph;
+            featureCache = new Dictionary<FeatureInfo, GlyphLayoutData>();
         }
 
-        public void AddToFeatureCache(FeatureInfo info, Glyph glyph, GlyphPosition positionData)
+        public void AddToFeatureCache(FeatureInfo featureInfo, GlyphPosition positionData)
         {
-            if (!featureCache.TryGetValue(info, out var cache))
+            if (featureCache.TryGetValue(featureInfo, out var data))
             {
-                featureCache[info] = new GlyphCache(glyph, new GlyphFeatureData(positionData));
+                data.Position = positionData;
             }
             else
             {
-                cache.AddToGlyphCache(glyph, positionData);
+                featureCache[featureInfo] = new GlyphLayoutData(positionData);
+            }
+        }
+        
+        public void AddToFeatureCache(FeatureInfo featureInfo, params Glyph[] glyphs)
+        {
+            if (featureCache.TryGetValue(featureInfo, out var data))
+            {
+                data.AppendGlyphs(glyphs);
+            }
+            else
+            {
+                featureCache[featureInfo] = new GlyphLayoutData(glyphs);
             }
         }
 
-        public bool IsGlyphCached(Feature feature, Glyph glyph)
+        public bool IsFeatureCached(FeatureInfo featureInfo)
         {
-            if (!featureCache.ContainsKey(feature.Info)) return false;
+            return featureCache.ContainsKey(featureInfo);
+        }
 
-            return featureCache[feature.Info].IsGlyphCached(glyph);
+        public GlyphLayoutData GetLayoutData(FeatureInfo featureInfo)
+        {
+            return featureCache[featureInfo];
         }
 
         public void Clear()
         {
-            foreach (var cache in featureCache)
-            {
-                cache.Value.Clear();
-            }
-
             featureCache.Clear();
         }
     }

@@ -1,4 +1,5 @@
 using System;
+using Adamantium.Fonts.Common;
 using Adamantium.Fonts.Tables.Layout;
 using Adamantium.Mathematics;
 
@@ -43,7 +44,11 @@ namespace Adamantium.Fonts.Tables.GPOS
         
         public ValueRecord[] ValueRecords { get; }
 
-        public override void PositionGlyph(IGlyphPositioningLookup glyphPositioningLookup, uint startIndex, uint length)
+        public override void PositionGlyph(FontLanguage language,
+            FeatureInfo feature,
+            IGlyphPositioningLookup glyphPositioningLookup,
+            uint startIndex,
+            uint length)
         {
             var limitIndex = Math.Min(startIndex + length, glyphPositioningLookup.Count);
             for (uint i = startIndex; i < limitIndex; ++i)
@@ -52,8 +57,8 @@ namespace Adamantium.Fonts.Tables.GPOS
                 if (position > -1)
                 {
                     var record = ValueRecords[Format == 1 ? 0 : position];
-                    glyphPositioningLookup.AppendGlyphOffset(i, new Vector2F(record.XPlacement, record.YPlacement));
-                    glyphPositioningLookup.AppendGlyphAdvance(i, new Vector2F(record.XAdvance, record.YAdvance));
+                    glyphPositioningLookup.AppendGlyphOffset(language, feature, i, new Vector2F(record.XPlacement, record.YPlacement));
+                    glyphPositioningLookup.AppendGlyphAdvance(language, feature, i, new Vector2F(record.XAdvance, record.YAdvance));
                 }
             }
         }

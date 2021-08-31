@@ -1,4 +1,5 @@
 using System;
+using Adamantium.Fonts.Common;
 using Adamantium.Fonts.Extensions;
 using Adamantium.Fonts.Tables.Layout;
 
@@ -19,7 +20,9 @@ namespace Adamantium.Fonts.Tables.GPOS
         
         public Mark2ArrayTable Mark2ArrayTable { get; set;}
 
-        public override void PositionGlyph(IGlyphPositioningLookup glyphPositioningLookup, uint startIndex, uint length)
+        public override void PositionGlyph(FontLanguage language, FeatureInfo featureInfo,
+            IGlyphPositioningLookup glyphPositioningLookup,
+            uint startIndex, uint length)
         {
             var endIndex = Math.Min(startIndex + length, glyphPositioningLookup.Count);
 

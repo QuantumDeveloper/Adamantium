@@ -39,11 +39,11 @@ namespace Adamantium.Fonts
         
         #endregion
         
+        public GlyphLayoutData NotDefLayoutData { get; }
+        
         public IReadOnlyCollection<uint> Unicodes { get; }
 
-        public IReadOnlyCollection<FontLanguage> PositioningLanguageSet { get; }
-        
-        public IReadOnlyCollection<FontLanguage> SubstitutionLanguageSet { get; }
+        public IReadOnlyCollection<FontLanguage> LanguageSet { get; }
         
         public IReadOnlyCollection<string> Features { get; }
 
@@ -53,7 +53,15 @@ namespace Adamantium.Fonts
 
         internal void SetGlyphUnicodes(Dictionary<uint, List<uint>> glyphMapping);
 
-        internal bool IsCharacterCached(FontLanguage currentLanguage, Feature feature, char character);
+        internal bool IsCharacterCached(FontLanguage currentLanguage, char character);
+
+        internal bool IsFeatureCached(FontLanguage currentLanguage, Glyph glyph, FeatureInfo featureInfo);
+
+        internal GlyphLayoutData GetGlyphLayoutData(FontLanguage currentLanguage, FeatureInfo featureInfo, char character);
+
+        internal void AddFeatureDataToGlyph(FontLanguage currentLanguage, FeatureInfo feature, Glyph glyph, GlyphPosition positionData);
+
+        internal void RemoveFeatureDataFromGlyph(FontLanguage currentLanguage, FeatureInfo info, Glyph glyph);
 
         bool IsLanguageAvailableByMsdnName(string language);
 

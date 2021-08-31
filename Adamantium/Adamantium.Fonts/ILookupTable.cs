@@ -7,7 +7,7 @@ namespace Adamantium.Fonts
     {
         public UInt16 LookupType { get; }
         
-        public LookupOwnerType OwnerType { get; }
+        public FeatureKind OwnerType { get; }
         
         public LookupFlags LookupFlag { get; }
         

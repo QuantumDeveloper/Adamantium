@@ -1,9 +1,6 @@
 ﻿using Adamantium.Fonts.Common;
-using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Adamantium.Fonts
@@ -11,7 +8,7 @@ namespace Adamantium.Fonts
     internal class FontManager
     {
         private TypeFace currentTypeFace;
-        private List<TypeFace> typeFaces;
+        private readonly List<TypeFace> typeFaces;
         public IReadOnlyCollection<TypeFace> TypeFaces => typeFaces.AsReadOnly();
 
         public FontManager(TypeFace typeFace)
@@ -25,7 +22,7 @@ namespace Adamantium.Fonts
             typeFaces.Add(typeFace);
         }
 
-        public static async Task<FontManager> LoadTypeFace(string font)
+        public static async Task<FontManager> LoadTypeFaceAsync(string font)
         {
             var typeFace = await TypeFace.LoadFontAsync(font, 3); // @TODO think and change the resolution approach
             return new FontManager(typeFace);
@@ -36,23 +33,50 @@ namespace Adamantium.Fonts
             currentTypeFace = typeFace;
         }
 
-        public void SetCurrentTypeFace(IFont font)
+        public void SetCurrentFont(IFont font)
         {
             currentTypeFace.SetCurrentFont(font);
         }
 
-        public /*GlyphCompositeData*/ void GetGlyph(char character)
+        public bool TryGetCurrentLanguage(out FontLanguage lang)
+        {
+            var systemLanguage = CultureInfo.CurrentCulture.ThreeLetterISOLanguageName;
+            lang = null;
+
+            if (!currentTypeFace.CurrentFont.IsLanguageAvailableByIsoName(systemLanguage, out var currentLanguage))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        public bool ProcessGlyphLayout(char character)
         {
             var glyph = currentTypeFace.CurrentFont.GetGlyphByCharacter(character);
 
-            var systemLanguage = CultureInfo.CurrentCulture.ThreeLetterISOLanguageName;
-
-            if (!currentTypeFace.CurrentFont.IsLanguageAvailableByIsoName(systemLanguage)) return; // @TODO return GlyphCompositeData for notDef glyph
+            if (!TryGetCurrentLanguage(out var currentLanguage)) return false;
 
             foreach (var feature in currentTypeFace.CurrentFont.EnabledFeatures)
             {
-                if (!currentTypeFace.CurrentFont.IsCharacterCached(currentLanguage, feature, character);
+                if (!currentTypeFace.CurrentFont.IsFeatureCached(currentLanguage, glyph, feature.Info))
+                {
+                    feature.Apply(currentLanguage, currentTypeFace, glyph);
+                }
             }
+
+            return true;
         }
+        
+        public GlyphLayoutData GetGlyphLayoutData(FeatureInfo featureInfo, char character)
+        {
+            if (TryGetCurrentLanguage(out var currentLanguage))
+            {
+                return currentTypeFace.CurrentFont.GetGlyphLayoutData(currentLanguage, featureInfo, character);
+            }
+
+            return currentTypeFace.CurrentFont.NotDefLayoutData;
+        }
+        
     }
 }

@@ -361,9 +361,9 @@ namespace Adamantium.Fonts.Parsers
             
             gpos.LookupList = FontReader.ReadGPOSLookupListTable(lookupListOffset);
             
-            var languages = GetLanguages(gpos);
+            var languages = GetLanguages(gpos, FeatureKind.GPOS);
             
-            CurrentFont.SetPositioningLanguagesSet(languages);
+            CurrentFont.AddLanguagesSet(languages);
         }
 
         protected virtual void ReadGlyphSubstitutionTable(TableEntry entry)
@@ -389,12 +389,12 @@ namespace Adamantium.Fonts.Parsers
 
             gsub.LookupList = FontReader.ReadGSUBLookupListTable(lookupListOffset);
 
-            var languages = GetLanguages(gsub);
+            var languages = GetLanguages(gsub, FeatureKind.GSUB);
             
-            CurrentFont.SetSubstitutionLanguagesSet(languages);
+            CurrentFont.AddLanguagesSet(languages);
         }
 
-        private IEnumerable<FontLanguage> GetLanguages(IFontLayout layout)
+        private IEnumerable<FontLanguage> GetLanguages(IFontLayout layout, FeatureKind featureKind)
         {
             var languages = new List<FontLanguage>();
             foreach (var scriptTable in layout.ScriptList)
@@ -408,7 +408,7 @@ namespace Adamantium.Fonts.Parsers
                         var featureTable = layout.FeatureList[langSysTable.FeatureIndices[i]];
                         var feature = new Feature(FeatureInfos.GetFeature(featureTable.Name));
                         feature.FeatureParameters = featureTable.FeatureParameters;
-                        lng.AddFeature(feature);
+                        lng.AddFeature(feature, featureKind);
                         var lookups = new List<ILookupTable>();
                         for (int k = 0; k < featureTable.LookupListIndices.Length; ++k)
                         {
