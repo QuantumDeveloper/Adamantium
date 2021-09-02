@@ -37,7 +37,7 @@ namespace Adamantium.Fonts.Parsers
         private ICFFParser cffParser;
 
         private CFFFont cffFont;
-
+        
         static OTFParser()
         {
             commonMandatoryTables = new ReadOnlyCollection<string>(new List<string>
@@ -361,9 +361,8 @@ namespace Adamantium.Fonts.Parsers
             
             gpos.LookupList = FontReader.ReadGPOSLookupListTable(lookupListOffset);
             
-            var languages = GetLanguages(gpos, FeatureKind.GPOS);
+            ProcessFeatures(gpos, FeatureKind.GPOS);
             
-            CurrentFont.AddLanguagesSet(languages);
         }
 
         protected virtual void ReadGlyphSubstitutionTable(TableEntry entry)
@@ -373,7 +372,7 @@ namespace Adamantium.Fonts.Parsers
             var gsub = new GlyphSubstitutionTable();
             gsub.MajorVersion = FontReader.ReadUInt16();
             gsub.MinorVersion = FontReader.ReadUInt16();
-            
+
             var scriptListOffset = FontReader.ReadUInt16() + entry.Offset;
             var featureListOffset = FontReader.ReadUInt16() + entry.Offset;
             var lookupListOffset = FontReader.ReadUInt16() + entry.Offset;
@@ -382,33 +381,44 @@ namespace Adamantium.Fonts.Parsers
             {
                 gsub.FeatureVariationsOffset = FontReader.ReadUInt16();
             }
-            
+
             gsub.ScriptList = FontReader.ReadScriptList(scriptListOffset);
 
             gsub.FeatureList = FontReader.ReadFeatureList(featureListOffset);
 
             gsub.LookupList = FontReader.ReadGSUBLookupListTable(lookupListOffset);
 
-            var languages = GetLanguages(gsub, FeatureKind.GSUB);
-            
-            CurrentFont.AddLanguagesSet(languages);
+            ProcessFeatures(gsub, FeatureKind.GSUB);
+
         }
 
-        private IEnumerable<FontLanguage> GetLanguages(IFontLayout layout, FeatureKind featureKind)
+        private void ProcessFeatures(IFontLayout layout, FeatureKind featureKind)
         {
-            var languages = new List<FontLanguage>();
+            var featureManager = CurrentFont.FeatureManager;
+            
             foreach (var scriptTable in layout.ScriptList)
             {
                 foreach (var langSysTable in scriptTable.LangSysTables)
                 {
-                    var lang = LanguageTags.GetMsdnLanguage(langSysTable.Name);
-                    var lng = new FontLanguage(lang);
+                    var langInfo = LanguageTags.GetMsdnLanguage(langSysTable.Name);
+                    if (!featureManager.TryGetLanguage(langInfo, out var fontLang))
+                    {
+                        fontLang = new FontLanguage(langInfo);
+                        featureManager.AddLanguage(fontLang);
+                    }
+                    
                     for (int i = 0; i < langSysTable.FeatureIndices.Length; i++)
                     {
                         var featureTable = layout.FeatureList[langSysTable.FeatureIndices[i]];
-                        var feature = new Feature(FeatureInfos.GetFeature(featureTable.Name));
-                        feature.FeatureParameters = featureTable.FeatureParameters;
-                        lng.AddFeature(feature, featureKind);
+                        if (!featureManager.TryGetFeature(featureTable.Name, out var feature))
+                        {
+                            var featureInfo = FeatureInfos.GetFeature(featureTable.Name);
+                            feature = new Feature(featureInfo);
+                            feature.FeatureParameters = featureTable.FeatureParameters;
+                            featureManager.AddFeature(feature, featureKind);
+                        }
+                        
+                        fontLang.AddFeature(feature, featureKind);
                         var lookups = new List<ILookupTable>();
                         for (int k = 0; k < featureTable.LookupListIndices.Length; ++k)
                         {
@@ -417,14 +427,9 @@ namespace Adamantium.Fonts.Parsers
                         }
 
                         feature.Lookups = lookups.ToArray();
-                        CurrentFont.AddFeature(feature);
                     }
-                    languages.Add(lng);
                 }
             }
-
-            return languages;
         }
-
     }
 }

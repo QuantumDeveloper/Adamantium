@@ -5,7 +5,7 @@ namespace Adamantium.Fonts
 {
     public interface IGlyphPositioningLookup
     {
-        public uint Count { get; }
+        uint Count { get; }
         
         GlyphClassDefinition GetGlyphClassDefinition(uint index);
         

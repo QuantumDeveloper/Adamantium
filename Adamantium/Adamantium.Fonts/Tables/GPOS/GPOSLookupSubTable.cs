@@ -6,11 +6,12 @@ namespace Adamantium.Fonts.Tables.GPOS
     {
         public abstract GPOSLookupType Type { get; }
         public FeatureKind OwnerType => FeatureKind.GPOS;
-        public virtual void SubstituteGlyphs(FontLanguage language,
+        public virtual bool SubstituteGlyphs(FontLanguage language,
             FeatureInfo featureInfo,
             IGlyphSubstitutionLookup substitutionLookup,
             uint index)
         {
+            return false;
         }
 
         public virtual void PositionGlyph(FontLanguage language,

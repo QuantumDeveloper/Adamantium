@@ -541,12 +541,12 @@ namespace Adamantium.Fonts.Extensions
             var ligatureSetTable = new LigatureSetTable();
             var glyphCount = reader.ReadUInt16();
             var ligatureOffsets = reader.ReadUInt16Array(glyphCount);
-            ligatureSetTable.LigatureTables = new LigatureTable[glyphCount];
+            ligatureSetTable.Ligatures = new LigatureTable[glyphCount];
 
             for (int i = 0; i < glyphCount; ++i)
             {
                 var ligatureOffset = ligatureOffsets[i] + offset;
-                ligatureSetTable.LigatureTables[i] = reader.ReadLigatureTable(ligatureOffset);
+                ligatureSetTable.Ligatures[i] = reader.ReadLigatureTable(ligatureOffset);
             }
             
             return ligatureSetTable;

@@ -16,7 +16,7 @@ namespace Adamantium.Fonts.Common
         public bool IsEnabled { get; set; }
         
         internal ILookupTable[] Lookups { get; set; }
-
+        
         public void Apply(FontLanguage language, TypeFace typeface, Glyph glyph)
         {
             if (!IsEnabled)

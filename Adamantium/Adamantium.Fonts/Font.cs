@@ -65,6 +65,8 @@ namespace Adamantium.Fonts
             TypeFace.GetGlyphByIndex(0, out var notdef);
 
             NotDefLayoutData = new GlyphLayoutData(notdef);
+
+            FeatureManager = new FeatureManager();
         }
 
         public bool isGlyphNamesProvided { get; internal set; }
@@ -92,6 +94,8 @@ namespace Adamantium.Fonts
         public string DarkBackgroundPalette { get; internal set; }
         
         // ------
+        
+        public FeatureManager FeatureManager { get; }
 
         public ushort UnitsPerEm { get; internal set; }
 
@@ -113,12 +117,6 @@ namespace Adamantium.Fonts
 
         public IReadOnlyCollection<uint> Unicodes => unicodes.AsReadOnly();
 
-        public IReadOnlyCollection<FontLanguage> LanguageSet => languageSet.AsReadOnly();
-
-        public IReadOnlyCollection<string> Features => featuresMap.Keys.ToList().AsReadOnly();
-        
-        public IReadOnlyCollection<Feature> EnabledFeatures => enabledFeatures.AsReadOnly();
-        
         public GlyphLayoutData NotDefLayoutData { get; }
 
         internal KerningSubtable[] KerningData { get; set; }
@@ -127,27 +125,6 @@ namespace Adamantium.Fonts
         {
             glyphs.Clear();
             glyphs.AddRange(inputGlyphs);
-        }
-
-        internal void AddLanguagesSet(IEnumerable<FontLanguage> inputLanguages)
-        {
-            foreach (var language in inputLanguages)
-            {
-                AddLanguage(language);
-            }
-        }
-
-        public void AddLanguage(FontLanguage language)
-        {
-            if (languageMap.TryGetValue(language.Info, out var lng))
-            {
-                lng.Merge(language);
-            }
-            else
-            {
-                languageSet.Add(language);
-                languageMap[language.Info] = language;
-            }
         }
 
         bool IFont.IsCharacterCached(FontLanguage currentLanguage, char character)
@@ -308,57 +285,6 @@ namespace Adamantium.Fonts
             }
 
             return kerningValue;
-        }
-
-        public void AddFeature(Feature feature)
-        {
-            if (featuresMap.TryGetValue(feature.Info.Tag, out var features))
-            {
-                features.Add(feature);
-            }
-            else
-            {
-                featuresMap[feature.Info.Tag] = new List<Feature>() { feature };
-            }
-        }
-
-        public void EnableFeature(string feature, bool enable)
-        {
-            if (featuresMap.TryGetValue(feature, out var features))
-            {
-                foreach (var featureItem in features)
-                {
-                    featureItem.IsEnabled = enable;
-                    if (featureItem.IsEnabled && !enabledFeatures.Contains(featureItem))
-                    {
-                        enabledFeatures.Add(featureItem);
-                    }
-                    else
-                    {
-                        enabledFeatures.Remove(featureItem);
-                    }
-                }
-            }
-        }
-
-        public bool IsFeatureEnabled(string feature)
-        {
-            if (featuresMap.TryGetValue(feature, out var features))
-            {
-                return features[0].IsEnabled;
-            }
-
-            return false;
-        }
-
-        public void ClearLanguageCache()
-        {
-            foreach (var cache in languageCache)
-            {
-                cache.Value.Clear();
-            }
-
-            languageCache.Clear();
         }
     }
 }

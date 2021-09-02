@@ -93,8 +93,8 @@ namespace Adamantium.FontTests
             var typeFace = TypeFace.LoadFont(CFF1Fonts.SourceSans3_Regular, 2);
             foreach (var font in typeFace.Fonts)
             {
-                font.EnableFeature("kern", true);
-                foreach (var language in font.LanguageSet)
+                font.FeatureManager.EnableFeature("kern", true);
+                foreach (var language in font.FeatureManager.AvailableLanguages)
                 {
                     Debug.WriteLine($"Lang: {language}");
                     Debug.WriteLine("GPOS:");

@@ -165,5 +165,15 @@ namespace Adamantium.Fonts
         {
             throw new NotImplementedException();
         }
+
+        public void Replace(uint glyphIndex, params ushort[] substitutionArray)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Replace(uint glyphIndex, int removeLength, ushort replaceIndex)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

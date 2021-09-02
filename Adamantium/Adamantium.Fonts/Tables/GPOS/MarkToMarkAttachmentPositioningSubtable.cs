@@ -2,6 +2,7 @@ using System;
 using Adamantium.Fonts.Common;
 using Adamantium.Fonts.Extensions;
 using Adamantium.Fonts.Tables.Layout;
+using Adamantium.Mathematics;
 
 namespace Adamantium.Fonts.Tables.GPOS
 {
@@ -20,9 +21,12 @@ namespace Adamantium.Fonts.Tables.GPOS
         
         public Mark2ArrayTable Mark2ArrayTable { get; set;}
 
-        public override void PositionGlyph(FontLanguage language, FeatureInfo featureInfo,
+        public override void PositionGlyph(
+            FontLanguage language, 
+            FeatureInfo featureInfo,
             IGlyphPositioningLookup glyphPositioningLookup,
-            uint startIndex, uint length)
+            uint startIndex, 
+            uint length)
         {
             var endIndex = Math.Min(startIndex + length, glyphPositioningLookup.Count);
 
@@ -39,7 +43,16 @@ namespace Adamantium.Fonts.Tables.GPOS
 
                 var mark1ClassId = Mark1ArrayTable.GetMarkClass(mark1Index);
                 var previousAnchor = Mark2ArrayTable.GetAnchorPoint(mark2Index, mark1ClassId);
-                
+                var anchor = Mark1ArrayTable.GetAnchorPoint(mark1Index);
+
+                var prevAdvance = glyphPositioningLookup.GetAdvance((uint)previousMark);
+
+                var prevGlyphOffset = glyphPositioningLookup.GetOffset((uint)previousMark);
+                var glyphOffset = glyphPositioningLookup.GetOffset(i);
+                var xOffset = prevGlyphOffset.X + previousAnchor.XCoordinate -
+                              (prevAdvance.X + glyphOffset.X + anchor.XCoordinate);
+                var yOffset = prevGlyphOffset.Y + previousAnchor.YCoordinate - (glyphOffset.Y + anchor.YCoordinate);
+                glyphPositioningLookup.AppendGlyphOffset(language, featureInfo, i, new Vector2F(xOffset, yOffset));
             }
         }
     }

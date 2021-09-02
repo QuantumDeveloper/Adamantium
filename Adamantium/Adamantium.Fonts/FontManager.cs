@@ -57,7 +57,7 @@ namespace Adamantium.Fonts
 
             if (!TryGetCurrentLanguage(out var currentLanguage)) return false;
 
-            foreach (var feature in currentTypeFace.CurrentFont.EnabledFeatures)
+            foreach (var feature in currentTypeFace.CurrentFont.FeatureManager.EnabledFeatures)
             {
                 if (!currentTypeFace.CurrentFont.IsFeatureCached(currentLanguage, glyph, feature.Info))
                 {

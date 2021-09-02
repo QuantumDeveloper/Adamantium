@@ -39,15 +39,11 @@ namespace Adamantium.Fonts
         
         #endregion
         
+        public FeatureManager FeatureManager { get; }
+        
         public GlyphLayoutData NotDefLayoutData { get; }
         
         public IReadOnlyCollection<uint> Unicodes { get; }
-
-        public IReadOnlyCollection<FontLanguage> LanguageSet { get; }
-        
-        public IReadOnlyCollection<string> Features { get; }
-
-        public IReadOnlyCollection<Feature> EnabledFeatures { get; }
 
         internal void UpdateGlyphNamesCache();
 
@@ -69,8 +65,6 @@ namespace Adamantium.Fonts
 
         bool IsLanguageAvailableByIsoName(string language, out FontLanguage fontLanguage);
 
-        void AddLanguage(FontLanguage language);
-
         Glyph GetGlyphByIndex(uint index);
 
         Glyph GetGlyphByName(string name);
@@ -80,11 +74,5 @@ namespace Adamantium.Fonts
         Glyph GetGlyphByCharacter(char character);
 
         public Int16 GetKerningValue(UInt16 leftGlyphIndex, UInt16 rightGlyphIndex);
-
-        public void AddFeature(Feature feature);
-
-        public void EnableFeature(string feature, bool enable);
-
-        public bool IsFeatureEnabled(string feature);
     }
 }

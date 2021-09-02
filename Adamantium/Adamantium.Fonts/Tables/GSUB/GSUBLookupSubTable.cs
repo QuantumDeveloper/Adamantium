@@ -6,11 +6,12 @@ namespace Adamantium.Fonts.Tables.GSUB
     {
         public abstract GSUBLookupType Type { get; }
         public FeatureKind OwnerType => FeatureKind.GSUB;
-        public virtual void SubstituteGlyphs(FontLanguage language,
+        public virtual bool SubstituteGlyphs(FontLanguage language,
             FeatureInfo featureInfo,
             IGlyphSubstitutionLookup substitutionLookup,
             uint index)
         {
+            return false;
         }
 
         public virtual void PositionGlyph(FontLanguage language, FeatureInfo featureInfo,
