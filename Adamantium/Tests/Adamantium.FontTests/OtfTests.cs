@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Adamantium.Fonts;
+using Adamantium.Mathematics;
 using NUnit.Framework;
 
 namespace Adamantium.FontTests

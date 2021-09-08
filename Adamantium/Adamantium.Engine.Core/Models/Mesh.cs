@@ -407,7 +407,7 @@ namespace Adamantium.Engine.Core.Models
             SetUVs(0, uv0);
             SetIndices(indices);
 
-            if (!forceOptimization)
+            if (forceOptimization)
             {
                 Optimize();
             }

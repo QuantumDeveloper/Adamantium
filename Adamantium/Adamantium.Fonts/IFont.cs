@@ -44,6 +44,8 @@ namespace Adamantium.Fonts
         public GlyphLayoutData NotDefLayoutData { get; }
         
         public IReadOnlyCollection<uint> Unicodes { get; }
+        
+        public ushort UnitsPerEm { get; }
 
         internal void UpdateGlyphNamesCache();
 

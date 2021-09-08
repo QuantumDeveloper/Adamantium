@@ -26,6 +26,8 @@ namespace Adamantium.Fonts.Tables
 
         private void FillClassDefinitions(TypeFace typeFace)
         {
+            if (GlyphClassDefTable == null) return;
+            
             switch (GlyphClassDefTable.Format)
             {
                 case 1:

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Adamantium.Engine;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Content;
 using Adamantium.Engine.Core.Models;
@@ -47,8 +48,8 @@ namespace Adamantium.Game.Playground
         {
             ImportModel(@"Models\monkey\monkey.dae");
             //await ImportModel(@"Models\F15C\F-15C_Eagle.dae");
-            //ImportFont();
-            ImportOTFFont();
+            ImportFont();
+            //ImportOTFFont();
         }
 
         private void InitializeResources()
@@ -82,16 +83,20 @@ namespace Adamantium.Game.Playground
                 typeFace = TypeFace.LoadFont(@"Fonts/OTFFonts/SourceSans3-Regular.otf", 2);
                 var entity = new Entity(null, "Sarabun-Regular.woff2");
                 var font = typeFace.GetFont(0);
-                var glyph = font.GetGlyphByUnicode('@');
-                var points = glyph.Triangulate(3);
-                var mesh = new Mesh();
+                
+                var textLayout = new TextLayout(font, "Hello", 13, new Rectangle());
+                
+                //var glyph = font.GetGlyphByUnicode('@');
+                //var points = glyph.Triangulate(3);
+                //var mesh = new Mesh();
                 //mesh.MeshTopology = PrimitiveType.LineStrip;
-                mesh.SetPositions(points);
+                //mesh.SetPositions(points);
                 var meshComponent = new MeshData();
-                meshComponent.Mesh = mesh;
+                meshComponent.Mesh = textLayout.Mesh;
                 var meshRenderer = new MeshRenderer();
                 entity.AddComponent(meshComponent);
                 entity.AddComponent(meshRenderer);
+                entity.Transform.SetScaleFactor(textLayout.Scale);
                 EntityWorld.AddEntity(entity);
             }
             catch (Exception e)

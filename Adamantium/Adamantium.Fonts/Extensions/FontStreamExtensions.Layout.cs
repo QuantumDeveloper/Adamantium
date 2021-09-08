@@ -694,15 +694,15 @@ namespace Adamantium.Fonts.Extensions
                     break;
                 case 2:
                 {
-                    var markGlyphSetsDefOffset = reader.ReadUInt16() + offset;
-                    gdef.MarkGlyphSetsTable = reader.ReadMarkGlyphSetsTable(markGlyphSetsDefOffset);
+                    var markGlyphSetsDefOffset = reader.ReadUInt16();
+                    gdef.MarkGlyphSetsTable = markGlyphSetsDefOffset == 0 ? null : reader.ReadMarkGlyphSetsTable(markGlyphSetsDefOffset);
                 }
                     break;
                 case 3:
                 {
-                    var markGlyphSetsDefOffset = reader.ReadUInt16() + offset;
-                    var itemVarStoreOffset = reader.ReadUInt32() + offset;
-                    gdef.MarkGlyphSetsTable = reader.ReadMarkGlyphSetsTable(markGlyphSetsDefOffset);
+                    var markGlyphSetsDefOffset = reader.ReadUInt16();
+                    var itemVarStoreOffset = reader.ReadUInt32();
+                    gdef.MarkGlyphSetsTable = markGlyphSetsDefOffset == 0 ? null : reader.ReadMarkGlyphSetsTable(markGlyphSetsDefOffset);
                 }
                     break;
             }

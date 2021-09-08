@@ -1,0 +1,58 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Numerics;
+using Adamantium.Engine.Core.Models;
+using Adamantium.Fonts;
+using Adamantium.Mathematics;
+using Rectangle = Adamantium.Mathematics.Rectangle;
+
+namespace Adamantium.Engine
+{
+    public class TextLayout
+    {
+        private IFont font;
+        private string inputString;
+        private float fontSizeInPixels;
+        private Rectangle boundingRectangle;
+        public float Scale { get; }
+
+        public Mesh Mesh { get; private set; }
+
+        public TextLayout(IFont font, string inputString, float fontSizeInPixels, Rectangle boundingRectangle)
+        {
+            this.font = font;
+            this.inputString = inputString;
+            this.fontSizeInPixels = fontSizeInPixels;
+            this.boundingRectangle = boundingRectangle;
+            Mesh = new Mesh();
+            Scale = fontSizeInPixels / font.UnitsPerEm;
+
+            ProcessInput();
+        }
+
+        private void ProcessInput()
+        {
+            var glyphs = font.TranslateIntoGlyphs(inputString);
+            float stringWidth = 0;
+
+            foreach (var glyph in glyphs)
+            {
+                var outlines = glyph.Triangulate(2);
+
+                var mesh = new Mesh();
+                mesh.SetPositions(outlines);
+                
+                if (stringWidth > 0)
+                {
+                    var translationMatrix = new Matrix4x4F();
+                    translationMatrix.TranslationVector = new Vector3F(stringWidth, 0 ,0);
+                    mesh.ApplyTransform(translationMatrix);
+                }
+
+                Mesh = Mesh.Merge(mesh);
+
+                stringWidth += Bounds.FromPoints(outlines).Width * Scale;
+            }
+        }
+    }
+}

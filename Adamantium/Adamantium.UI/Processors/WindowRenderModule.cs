@@ -99,11 +99,11 @@ namespace Adamantium.UI.Processors
 
         private void CalculateProjectionMatrix()
         {
-            proj = Matrix4x4F.PerspectiveFov(MathHelper.DegreesToRadians(45),
-                (float) (window.ClientWidth / window.ClientHeight), 0.1f, 1000f);
+            //proj = Matrix4x4F.PerspectiveFov(MathHelper.DegreesToRadians(45),
+            //    (float) (window.ClientWidth / window.ClientHeight), 0.1f, 1000f);
             // proj = Matrix4x4F.Ortho(window.ClientWidth/500.0f, window.ClientHeight/500.0f, 0.1f, 1000f);
-            // proj = Matrix4x4F.OrthoOffCenter(0, window.ClientWidth, 0, window.ClientHeight, 0.01f,
-            //      100000f);
+             proj = Matrix4x4F.OrthoOffCenter(0, (float)window.ClientWidth, 0, (float)window.ClientHeight, 0.01f,
+                  100000f);
             //
             // proj = Matrix4x4F.PerspectiveOffCenter(0, window.ClientWidth, 0, window.ClientHeight, 1.0f,
             //     1000000.1f);
@@ -288,10 +288,10 @@ namespace Adamantium.UI.Processors
 
             world = /*Matrix4x4F.Scaling(1.0f, 1.0f, 1) * */Matrix4x4F.RotationQuaternion(rot) * 
                 Matrix4x4F.RotationQuaternion(rotX) * Matrix4x4F.Translation(0, 0f, -0.2f); //* Matrix4x4F.Scaling(0, 1.1f, 0);
-            wvp = world * view * fovPrj;
+            //wvp = world * view * fovPrj;
             
             // world = Matrix4x4F.Translation(200, 200, 1);
-            // wvp = world * orthoProj;
+             wvp = world * orthoProj;
              GraphicsDevice.BasicEffect.Parameters["wvp"].SetValue(wvp);
              GraphicsDevice.BasicEffect.Parameters["meshColor"].SetValue(Colors.Crimson.ToVector3());
              GraphicsDevice.BasicEffect.Parameters["transparency"].SetValue(1f);
