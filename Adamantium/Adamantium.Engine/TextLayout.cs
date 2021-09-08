@@ -26,6 +26,7 @@ namespace Adamantium.Engine
             this.boundingRectangle = boundingRectangle;
             Mesh = new Mesh();
             Scale = fontSizeInPixels / font.UnitsPerEm;
+            //Scale = 
 
             ProcessInput();
         }
@@ -39,19 +40,19 @@ namespace Adamantium.Engine
             {
                 var outlines = glyph.Triangulate(2);
 
-                var mesh = new Mesh();
-                mesh.SetPositions(outlines);
-                
-                if (stringWidth > 0)
+                if (glyph.HasOutlines)
                 {
+                    var mesh = new Mesh();
+                    mesh.SetPositions(outlines);
+
                     var translationMatrix = Matrix4x4F.Identity;
-                    translationMatrix.TranslationVector = new Vector3F(stringWidth, 0 ,0);
+                    translationMatrix.TranslationVector = new Vector3F(stringWidth, -1000, 0);
                     mesh.ApplyTransform(translationMatrix);
+
+                    Mesh = Mesh.Merge(mesh);
                 }
 
-                Mesh = Mesh.Merge(mesh);
-
-                stringWidth += Bounds.FromPoints(outlines).Width; //* Scale;
+                stringWidth += glyph.AdvanceWidth;
             }
         }
     }

@@ -51,6 +51,8 @@ namespace Adamantium.Fonts
         internal List<CompositeGlyphComponent> CompositeGlyphComponents;
         
         public GlyphLayoutData Layout { get; internal set; }
+
+        public bool HasOutlines => outlines.Count > 0;
         
         internal byte[] Instructions { get; private set; }
         

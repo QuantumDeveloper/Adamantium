@@ -2180,11 +2180,12 @@ namespace Adamantium.Mathematics
 
             var result = Matrix4x4F.Identity;
             result.M11 = 2.0f / (right - left);
-            result.M22 = 2.0f / (bottom - top);
+            result.M22 = -2.0f / (bottom - top);
             result.M33 = zRange;
             result.M41 = (left + right) / (left - right);
             result.M42 = (top + bottom) / (top - bottom);
             result.M43 = -znear * zRange;
+            //result.M43 = -znear / (zfar - znear);
 
             return result;
         }
