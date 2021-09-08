@@ -44,14 +44,14 @@ namespace Adamantium.Engine
                 
                 if (stringWidth > 0)
                 {
-                    var translationMatrix = new Matrix4x4F();
+                    var translationMatrix = Matrix4x4F.Identity;
                     translationMatrix.TranslationVector = new Vector3F(stringWidth, 0 ,0);
                     mesh.ApplyTransform(translationMatrix);
                 }
 
                 Mesh = Mesh.Merge(mesh);
 
-                stringWidth += Bounds.FromPoints(outlines).Width * Scale;
+                stringWidth += Bounds.FromPoints(outlines).Width; //* Scale;
             }
         }
     }

@@ -447,7 +447,7 @@ namespace Adamantium.Engine.Core.Models
             }
 
             var transformMatrix = transform.Value;
-
+            
             for (int i = 0; i < Positions.Length; i++)
             {
                 var position = Positions[i];

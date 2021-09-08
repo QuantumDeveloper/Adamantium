@@ -46,7 +46,7 @@ namespace Adamantium.Game.Playground
 
         private async void LoadModels()
         {
-            ImportModel(@"Models\monkey\monkey.dae");
+            //ImportModel(@"Models\monkey\monkey.dae");
             //await ImportModel(@"Models\F15C\F-15C_Eagle.dae");
             ImportFont();
             //ImportOTFFont();
@@ -84,7 +84,7 @@ namespace Adamantium.Game.Playground
                 var entity = new Entity(null, "Sarabun-Regular.woff2");
                 var font = typeFace.GetFont(0);
                 
-                var textLayout = new TextLayout(font, "Hello", 13, new Rectangle());
+                var textLayout = new TextLayout(font, "Hello", 25, new Rectangle());
                 
                 //var glyph = font.GetGlyphByUnicode('@');
                 //var points = glyph.Triangulate(3);
@@ -97,6 +97,7 @@ namespace Adamantium.Game.Playground
                 entity.AddComponent(meshComponent);
                 entity.AddComponent(meshRenderer);
                 entity.Transform.SetScaleFactor(textLayout.Scale);
+                entity.Transform.SetPosition(new Vector3D(0, 0, 5));
                 EntityWorld.AddEntity(entity);
             }
             catch (Exception e)
