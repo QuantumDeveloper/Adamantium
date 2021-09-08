@@ -12,16 +12,16 @@ namespace Adamantium.Fonts.Tables.GSUB
         public SequenceTable[] SequenceTables { get; set; }
 
         public override bool SubstituteGlyphs(
-            FontLanguage language, 
+            IGlyphSubstitutions substitutions,
             FeatureInfo featureInfo, 
-            IGlyphSubstitutionLookup substitutionLookup,
-            uint index)
+            uint position,
+            uint length)
         {
-            var foundPosition = Coverage.FindPosition((ushort)index);
+            var foundPosition = Coverage.FindPosition((ushort)substitutions.GetGlyphIndex(position));
             if (foundPosition > -1)
             {
                 var seqTable = SequenceTables[foundPosition];
-                substitutionLookup.Replace(index, seqTable.SubstituteGlyphIDs);
+                substitutions.Replace(featureInfo, position, seqTable.SubstituteGlyphIDs);
                 return true;
             }
             

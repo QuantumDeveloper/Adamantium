@@ -3,15 +3,17 @@ using Adamantium.Mathematics;
 
 namespace Adamantium.Fonts
 {
-    public interface IGlyphPositioningLookup
+    public interface IGlyphPositioning
     {
         uint Count { get; }
+
+        uint GetGlyphIndex(uint index);
         
         GlyphClassDefinition GetGlyphClassDefinition(uint index);
         
-        void AppendGlyphOffset(FontLanguage language, FeatureInfo featureInfo, uint glyphIndex, Vector2F offset);
+        void AppendGlyphOffset(FeatureInfo featureInfo, uint glyphIndex, Vector2F offset);
 
-        void AppendGlyphAdvance(FontLanguage language, FeatureInfo feature, uint glyphIndex, Vector2F advance);
+        void AppendGlyphAdvance(FeatureInfo featureInfo, uint glyphIndex, Vector2F advance);
 
         Vector2F GetOffset(uint glyphIndex);
 

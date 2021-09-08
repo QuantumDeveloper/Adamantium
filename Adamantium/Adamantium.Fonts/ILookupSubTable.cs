@@ -7,17 +7,15 @@ namespace Adamantium.Fonts
         public FeatureKind OwnerType { get; }
 
         public bool SubstituteGlyphs(
-            FontLanguage language,
+            IGlyphSubstitutions substitutions,
             FeatureInfo featureInfo,
-            IGlyphSubstitutionLookup substitutionLookup,
-            uint index);
-
-        public void PositionGlyph(
-            FontLanguage language,
-            FeatureInfo featureInfo,
-            IGlyphPositioningLookup glyphPositioningLookup,
-            uint startIndex,
+            uint index,
             uint length);
 
+        public void PositionGlyph(
+            IGlyphPositioning glyphPositioning,
+            FeatureInfo featureInfo,
+            uint startIndex,
+            uint length);
     }
 }

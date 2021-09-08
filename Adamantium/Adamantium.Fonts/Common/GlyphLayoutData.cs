@@ -5,26 +5,54 @@ namespace Adamantium.Fonts.Common
 {
     public class GlyphLayoutData
     {
-        private List<Glyph> substitutions;
+        private List<uint> substitutions;
 
         public GlyphPosition Position { get; set; }
 
-        public IReadOnlyCollection<Glyph> Substitutions => substitutions.AsReadOnly();
+        public IReadOnlyCollection<uint> Substitutions => substitutions.AsReadOnly();
+
+        public GlyphLayoutData()
+        {
+            
+        }
 
         public GlyphLayoutData(GlyphPosition position)
         {
             Position = position;
-            substitutions = new List<Glyph>();
+            substitutions = new List<uint>();
         }
         
-        public GlyphLayoutData(params Glyph[] glyphs)
+        public GlyphLayoutData(params uint[] glyphIndices)
         {
-            substitutions = new List<Glyph>(glyphs);
+            substitutions = new List<uint>(glyphIndices);
+        }
+        
+        public GlyphLayoutData(params ushort[] glyphIndices)
+        {
+            substitutions = new List<uint>();
+            for (int i = 0; i < glyphIndices.Length; i++)
+            {
+                substitutions.Add(glyphIndices[i]);
+            }
         }
 
-        public void AppendGlyphs(params Glyph[] glyphs)
+        public void AppendGlyphs(params uint[] glyphs)
         {
-            var tmpList = new List<Glyph>();
+            var tmpList = new List<uint>();
+            foreach (var glyph in glyphs)
+            {
+                if (!substitutions.Contains(glyph))
+                {
+                    tmpList.Add(glyph);
+                }
+            }
+            
+            substitutions.AddRange(tmpList);
+        }
+        
+        public void AppendGlyphs(params ushort[] glyphs)
+        {
+            var tmpList = new List<uint>();
             foreach (var glyph in glyphs)
             {
                 if (!substitutions.Contains(glyph))

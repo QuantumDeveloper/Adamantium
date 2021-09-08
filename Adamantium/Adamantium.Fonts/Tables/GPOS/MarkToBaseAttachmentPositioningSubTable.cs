@@ -18,25 +18,28 @@ namespace Adamantium.Fonts.Tables.GPOS
 
         public MarkArrayTable MarkArrayTable { get; set; }
 
-        public override void PositionGlyph(FontLanguage language, FeatureInfo feature,
-            IGlyphPositioningLookup glyphPositioningLookup,
-            uint startIndex, uint length)
+        public override void PositionGlyph(
+            IGlyphPositioning glyphPositioning,
+            FeatureInfo feature,
+            uint startIndex, 
+            uint length)
         {
-            var endIndex = Math.Min(startIndex + length, glyphPositioningLookup.Count);
+            var endIndex = Math.Min(startIndex + length, glyphPositioning.Count);
 
             for (var i = startIndex; i < endIndex; ++i)
             {
-                var markIndex = MarkCoverage.FindPosition((ushort) i);
+                var markIndex = MarkCoverage.FindPosition((ushort)glyphPositioning.GetGlyphIndex(i));
                 if (markIndex < 0) continue;
 
-                int j = glyphPositioningLookup.FindGlyphBackwardByKind(GlyphClassDefinition.Base, i, i - 1);
+                int j = glyphPositioning.FindGlyphBackwardByKind(GlyphClassDefinition.Base, i, i - 1);
                 if (j < 0)
                 {
-                    j = glyphPositioningLookup.FindGlyphBackwardByKind(GlyphClassDefinition.Zero, i, i - 1);
+                    j = glyphPositioning.FindGlyphBackwardByKind(GlyphClassDefinition.Zero, i, i - 1);
                     if (j < 0) continue;
                 }
 
-                var baseIndex = BaseCoverage.FindPosition((ushort) j);
+                var prevGlyphIndex = glyphPositioning.GetGlyphIndex((uint)j);
+                var baseIndex = BaseCoverage.FindPosition((ushort)prevGlyphIndex);
                 if (baseIndex < 0) continue;
 
                 var baseRecord = BaseArrayTable.BaseRecords[baseIndex];
@@ -44,13 +47,13 @@ namespace Adamantium.Fonts.Tables.GPOS
 
                 var anchor = MarkArrayTable.GetAnchorPoint(markClass);
                 var previousAnchor = baseRecord.Anchors[markClass];
-                var previousOffset = glyphPositioningLookup.GetOffset((uint) j);
-                var previousAdvance = glyphPositioningLookup.GetAdvance((uint) j);
-                var currentOffset = glyphPositioningLookup.GetOffset(i);
+                var previousOffset = glyphPositioning.GetOffset((uint) j);
+                var previousAdvance = glyphPositioning.GetAdvance((uint) j);
+                var currentOffset = glyphPositioning.GetOffset(i);
                 var xOffset = previousOffset.X + previousAnchor.XCoordinate -
                               (previousAdvance.X + currentOffset.X + anchor.XCoordinate);
                 var yOffset = previousOffset.Y + previousAnchor.YCoordinate - (currentOffset.Y + anchor.YCoordinate);
-                glyphPositioningLookup.AppendGlyphOffset(language, feature, i, new Vector2F(xOffset, yOffset));
+                glyphPositioning.AppendGlyphOffset(feature, i, new Vector2F(xOffset, yOffset));
             }
 
         }

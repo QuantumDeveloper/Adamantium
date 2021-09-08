@@ -574,7 +574,7 @@ namespace Adamantium.Fonts.Parsers
                     break;
                 case 0x00020000:
                     post.Version = 2;
-                    CurrentFont.isGlyphNamesProvided = true;
+                    CurrentFont.IsGlyphNamesProvided = true;
                     var glyphsNumber = FontReader.ReadUInt16();
                     var glyphNameIndices = FontReader.ReadUInt16Array(glyphsNumber);
 

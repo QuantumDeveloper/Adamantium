@@ -11,11 +11,14 @@ namespace Adamantium.Fonts.Tables.GSUB
         
         public LigatureSetTable[] LigatureSetTables { get; set; }
 
-        public override bool SubstituteGlyphs(FontLanguage language, FeatureInfo featureInfo, IGlyphSubstitutionLookup substitutionLookup,
-            uint index)
+        public override bool SubstituteGlyphs(
+            IGlyphSubstitutions substitutions,
+            FeatureInfo featureInfo, 
+            uint index,
+            uint length)
         {
-
-            var foundPos = Coverage.FindPosition((ushort)index);
+            var glyphIndex = substitutions.GetGlyphIndex(index);
+            var foundPos = Coverage.FindPosition((ushort)glyphIndex);
             if (foundPos > -1)
             {
                 var ligatureTable = LigatureSetTables[foundPos];
@@ -26,7 +29,7 @@ namespace Adamantium.Fonts.Tables.GSUB
                     var tmpIndex = index + 1;
                     for (int i = 0; i < componentLen; ++i)
                     {
-                        if (tmpIndex + i != ligature.ComponentGlypIDs[i])
+                        if (substitutions.GetGlyphIndex((uint)(tmpIndex + i)) != ligature.ComponentGlypIDs[i])
                         {
                             allMatched = false;
                             break;
@@ -35,7 +38,7 @@ namespace Adamantium.Fonts.Tables.GSUB
 
                     if (allMatched)
                     {
-                        substitutionLookup.Replace(index, componentLen + 1, ligature.LigatureGlyphID);
+                        substitutions.Replace(featureInfo, index, componentLen + 1, ligature.LigatureGlyphID);
                         return true;
                     }
                 }

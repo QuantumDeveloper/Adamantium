@@ -22,37 +22,36 @@ namespace Adamantium.Fonts.Tables.GPOS
         public Mark2ArrayTable Mark2ArrayTable { get; set;}
 
         public override void PositionGlyph(
-            FontLanguage language, 
+            IGlyphPositioning glyphPositioning,
             FeatureInfo featureInfo,
-            IGlyphPositioningLookup glyphPositioningLookup,
             uint startIndex, 
             uint length)
         {
-            var endIndex = Math.Min(startIndex + length, glyphPositioningLookup.Count);
+            var endIndex = Math.Min(startIndex + length, glyphPositioning.Count);
 
             for (var i = startIndex; i < endIndex; ++i)
             {
-                var mark1Index = Mark1Coverage.FindPosition((ushort)i);
+                var mark1Index = Mark1Coverage.FindPosition((ushort)glyphPositioning.GetGlyphIndex(i));
                 if (mark1Index < 0 ) continue;
 
-                var previousMark = glyphPositioningLookup.FindGlyphBackwardByKind(GlyphClassDefinition.Mark, i, i - 1);
+                var previousMark = glyphPositioning.FindGlyphBackwardByKind(GlyphClassDefinition.Mark, i, i - 1);
                 if (previousMark < 0) continue;
 
-                var mark2Index = Mark2Coverage.FindPosition((ushort) previousMark);
+                var mark2Index = Mark2Coverage.FindPosition((ushort) glyphPositioning.GetGlyphIndex((uint)previousMark));
                 if (mark2Index < 0) continue;
 
                 var mark1ClassId = Mark1ArrayTable.GetMarkClass(mark1Index);
                 var previousAnchor = Mark2ArrayTable.GetAnchorPoint(mark2Index, mark1ClassId);
                 var anchor = Mark1ArrayTable.GetAnchorPoint(mark1Index);
 
-                var prevAdvance = glyphPositioningLookup.GetAdvance((uint)previousMark);
+                var prevAdvance = glyphPositioning.GetAdvance((uint)previousMark);
 
-                var prevGlyphOffset = glyphPositioningLookup.GetOffset((uint)previousMark);
-                var glyphOffset = glyphPositioningLookup.GetOffset(i);
+                var prevGlyphOffset = glyphPositioning.GetOffset((uint)previousMark);
+                var glyphOffset = glyphPositioning.GetOffset(i);
                 var xOffset = prevGlyphOffset.X + previousAnchor.XCoordinate -
                               (prevAdvance.X + glyphOffset.X + anchor.XCoordinate);
                 var yOffset = prevGlyphOffset.Y + previousAnchor.YCoordinate - (glyphOffset.Y + anchor.YCoordinate);
-                glyphPositioningLookup.AppendGlyphOffset(language, featureInfo, i, new Vector2F(xOffset, yOffset));
+                glyphPositioning.AppendGlyphOffset(featureInfo, i, new Vector2F(xOffset, yOffset));
             }
         }
     }

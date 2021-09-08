@@ -12,14 +12,16 @@ namespace Adamantium.Fonts.Tables.GSUB
         
         public Int16 DeltaGlyphId { get; set; }
 
-        public override bool SubstituteGlyphs(FontLanguage language,
+        public override bool SubstituteGlyphs(
+            IGlyphSubstitutions substitutions,
             FeatureInfo featureInfo,
-            IGlyphSubstitutionLookup substitutionLookup,
-            uint index)
+            uint index,
+            uint length)
         {
-            if (Coverage.FindPosition((ushort)index) > -1)
+            var glyphIndex = substitutions.GetGlyphIndex(index);
+            if (Coverage.FindPosition((ushort)glyphIndex) > -1)
             {
-                substitutionLookup.Replace(index, (uint)(index + DeltaGlyphId));
+                substitutions.Replace(featureInfo, index, (uint)(glyphIndex + DeltaGlyphId));
                 return true;
             }
 

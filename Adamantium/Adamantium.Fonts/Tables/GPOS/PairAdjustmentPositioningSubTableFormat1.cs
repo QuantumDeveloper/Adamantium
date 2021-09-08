@@ -13,35 +13,38 @@ namespace Adamantium.Fonts.Tables.GPOS
         
         public PairSetTable[] PairSetsTables { get; set; }
 
-        public override void PositionGlyph(FontLanguage language, FeatureInfo feature,
-            IGlyphPositioningLookup glyphPositioningLookup,
-            uint startIndex, uint length)
+        public override void PositionGlyph(
+            IGlyphPositioning glyphPositioning, 
+            FeatureInfo feature,
+            uint startIndex, 
+            uint length)
         {
-            var endIndex = Math.Min(startIndex + length, glyphPositioningLookup.Count);
-            for (uint i = 0; i < endIndex; ++i)
+            var endIndex = Math.Min(startIndex + length, glyphPositioning.Count - 1);
+            for (uint i = startIndex; i < endIndex; ++i)
             {
-                var firstFoundGlyph = CoverageTable.FindPosition((ushort)i);
+                var glyphIndex = glyphPositioning.GetGlyphIndex(i);
+                var firstFoundGlyph = CoverageTable.FindPosition((ushort)glyphIndex);
                 if (firstFoundGlyph == -1) continue;
 
-                var pairSet = PairSetsTables[firstFoundGlyph];
+                var pairSetTable = PairSetsTables[firstFoundGlyph];
 
-                var secondGlyphIndex = i + 1;
+                var secondGlyphIndex = glyphPositioning.GetGlyphIndex(i + 1);
 
-                if (pairSet.FindPairSet((ushort) secondGlyphIndex, out var foundPairSet))
+                if (pairSetTable.FindPairSet((ushort) secondGlyphIndex, out var foundPairSet))
                 {
                     var valueRecord1 = foundPairSet.ValueRecord1;
                     var valueRecord2 = foundPairSet.ValueRecord2;
                     
                     if (valueRecord1 != null)
                     {
-                        glyphPositioningLookup.AppendGlyphOffset(language, feature, i, new Vector2F(valueRecord1.XPlacement, valueRecord1.YPlacement));
-                        glyphPositioningLookup.AppendGlyphAdvance(language, feature, i, new Vector2F(valueRecord1.XAdvance, valueRecord1.YAdvance));
+                        glyphPositioning.AppendGlyphOffset(feature, i, new Vector2F(valueRecord1.XPlacement, valueRecord1.YPlacement));
+                        glyphPositioning.AppendGlyphAdvance(feature, i, new Vector2F(valueRecord1.XAdvance, valueRecord1.YAdvance));
                     }
 
                     if (valueRecord2 != null)
                     {
-                        glyphPositioningLookup.AppendGlyphOffset(language, feature, i + 1, new Vector2F(valueRecord2.XPlacement, valueRecord2.YPlacement));
-                        glyphPositioningLookup.AppendGlyphAdvance(language, feature, i + 1, new Vector2F(valueRecord2.XAdvance, valueRecord2.YAdvance));
+                        glyphPositioning.AppendGlyphOffset(feature, i + 1, new Vector2F(valueRecord2.XPlacement, valueRecord2.YPlacement));
+                        glyphPositioning.AppendGlyphAdvance(feature, i + 1, new Vector2F(valueRecord2.XAdvance, valueRecord2.YAdvance));
                     }
                 }
             }

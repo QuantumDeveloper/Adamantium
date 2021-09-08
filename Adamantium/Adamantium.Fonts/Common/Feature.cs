@@ -11,13 +11,13 @@ namespace Adamantium.Fonts.Common
         
         public FeatureInfo Info { get; }
         
-        public FeatureParametersTable FeatureParameters { get; set; }
+        public FeatureParametersTable FeatureParameters { get; internal set; }
         
         public bool IsEnabled { get; set; }
         
         internal ILookupTable[] Lookups { get; set; }
         
-        public void Apply(FontLanguage language, TypeFace typeface, Glyph glyph)
+        public void Apply(GlyphLayoutContainer container, uint index, uint length)
         {
             if (!IsEnabled)
             {
@@ -31,10 +31,10 @@ namespace Adamantium.Fonts.Common
                     switch (subTable.OwnerType)
                     {
                         case FeatureKind.GSUB:
-                            subTable.SubstituteGlyphs(language, Info, typeface, glyph.Index);
+                            subTable.SubstituteGlyphs(container, Info, index, length);
                             break;
                         case FeatureKind.GPOS:
-                            subTable.PositionGlyph(language, Info, typeface, glyph.Index, 1);
+                            subTable.PositionGlyph(container, Info, index, length);
                             break;
                     }
                 }

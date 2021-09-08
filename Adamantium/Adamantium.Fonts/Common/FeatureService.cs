@@ -3,7 +3,7 @@ using System.Linq;
 
 namespace Adamantium.Fonts.Common
 {
-    public class FeatureManager
+    public class FeatureService
     {
         private List<Feature> gposFeatures;
         private List<Feature> gsubFeatures;
@@ -12,10 +12,10 @@ namespace Adamantium.Fonts.Common
         private List<FontLanguage> availableLanguages;
         private Dictionary<LanguageTag, FontLanguage> languagesMap;
         private List<Feature> availableFeatures;
-        private Dictionary<FeatureInfo, Feature> featuresMap;
+        private Dictionary<FeatureInfo, Feature> availableFeaturesMap;
         private List<Feature> enabledFeatures;
 
-        public FeatureManager()
+        public FeatureService()
         {
             gposFeatures = new List<Feature>();
             gsubFeatures = new List<Feature>();
@@ -26,7 +26,7 @@ namespace Adamantium.Fonts.Common
             languagesMap = new Dictionary<LanguageTag, FontLanguage>();
 
             availableFeatures = new List<Feature>();
-            featuresMap = new Dictionary<FeatureInfo, Feature>();
+            availableFeaturesMap = new Dictionary<FeatureInfo, Feature>();
             enabledFeatures = new List<Feature>();
         }
 
@@ -51,7 +51,7 @@ namespace Adamantium.Fonts.Common
 
         internal bool TryGetFeature(string featureName, out Feature feature)
         {
-            return featuresMap.TryGetValue(FeatureInfos.GetFeature(featureName), out feature);
+            return availableFeaturesMap.TryGetValue(FeatureInfos.GetFeature(featureName), out feature);
         }
 
         internal void AddLanguage(FontLanguage fontLanguage)
@@ -61,26 +61,26 @@ namespace Adamantium.Fonts.Common
             availableLanguages.Add(fontLanguage);
             languagesMap[fontLanguage.Info] = fontLanguage;
         }
-
-        // internal void SetFeatures(IEnumerable<Feature> inputFeatures, FeatureKind featureKind)
-        // {
-        //     switch (featureKind)
-        //     {
-        //         case FeatureKind.GPOS:
-        //             gposFeatures.AddRange(inputFeatures);
-        //             gposFeaturesMap = gposFeatures.ToDictionary(x => x.Info);
-        //             break;
-        //         case FeatureKind.GSUB:
-        //             gsubFeatures.AddRange(inputFeatures);
-        //             gsubFeaturesMap = gsubFeatures.ToDictionary(x => x.Info);
-        //             break;
-        //     }
-        // }
         
-        // public void Merge(IEnumerable<Feature> features, FeatureKind featureKind)
-        // {
-        //     SetFeatures(features, FeatureKind.GPOS);
-        // }
+        public bool IsLanguageAvailableByMsdnName(string language)
+        {
+            return languagesMap.ContainsKey(LanguageTags.GetMsdnLanguage(language));
+        }
+
+        public bool IsLanguageAvailableByIsoName(string language)
+        {
+            return languagesMap.ContainsKey(LanguageTags.GetIsoLanguage(language));
+        }
+
+        public bool IsLanguageAvailableByIsoName(string language, out FontLanguage fontLanguage)
+        {
+            if (languagesMap.TryGetValue(LanguageTags.GetIsoLanguage(language), out fontLanguage))
+            {
+                return true;
+            }
+
+            return false;
+        }
 
         internal void AddFeature(Feature feature, FeatureKind kind)
         {
@@ -91,16 +91,18 @@ namespace Adamantium.Fonts.Common
                     {
                         gposFeatures.Add(feature);
                         gposFeaturesMap[feature.Info] = feature;
+                        availableFeatures.Add(feature);
+                        availableFeaturesMap[feature.Info] = feature;
                     }
-
                     break;
                 case FeatureKind.GSUB:
                     if (!gsubFeaturesMap.ContainsKey(feature.Info))
                     {
                         gsubFeatures.Add(feature);
                         gsubFeaturesMap[feature.Info] = feature;
+                        availableFeatures.Add(feature);
+                        availableFeaturesMap[feature.Info] = feature;
                     }
-
                     break;
             }
         }
@@ -108,7 +110,7 @@ namespace Adamantium.Fonts.Common
         public void EnableFeature(string featureName, bool enable)
         {
             var info = FeatureInfos.GetFeature(featureName);
-            if (featuresMap.TryGetValue(info, out var featureItem))
+            if (availableFeaturesMap.TryGetValue(info, out var featureItem))
             {
                 featureItem.IsEnabled = enable;
                 if (featureItem.IsEnabled && !enabledFeatures.Contains(featureItem))
@@ -121,11 +123,23 @@ namespace Adamantium.Fonts.Common
                 }
             }
         }
+        
+        public bool ApplyFeature(string featureName, GlyphLayoutContainer container, uint index, uint length)
+        {
+            if (TryGetFeature(featureName, out var feature))
+            {
+                EnableFeature(featureName, true);
+                feature.Apply(container, index, length);
+                return true;
+            }
+
+            return false;
+        }
 
         public bool IsFeatureEnabled(string featureName)
         {
             var info = FeatureInfos.GetFeature(featureName);
-            if (featuresMap.TryGetValue(info, out var feature))
+            if (availableFeaturesMap.TryGetValue(info, out var feature))
             {
                 return enabledFeatures.Contains(feature);
             }

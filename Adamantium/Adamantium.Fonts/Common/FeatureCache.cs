@@ -5,12 +5,15 @@ namespace Adamantium.Fonts.Common
     internal class FeatureCache
     {
         private readonly Dictionary<FeatureInfo, GlyphLayoutData> featureCache;
-        private readonly Glyph glyph;
+        public uint GlyphIndex { get; }
+        
+        public GlyphLayoutData Layout { get; }
 
-        public FeatureCache(Glyph glyph)
+        public FeatureCache(uint glyphIndex)
         {
-            this.glyph = glyph;
+            GlyphIndex = glyphIndex;
             featureCache = new Dictionary<FeatureInfo, GlyphLayoutData>();
+            Layout = new GlyphLayoutData();
         }
 
         public void AddToFeatureCache(FeatureInfo featureInfo, GlyphPosition positionData)
@@ -23,9 +26,19 @@ namespace Adamantium.Fonts.Common
             {
                 featureCache[featureInfo] = new GlyphLayoutData(positionData);
             }
+
+            Layout.Position += positionData;
+        }
+
+        public void RemoveFeatureData(FeatureInfo featureInfo)
+        {
+            if (featureCache.TryGetValue(featureInfo, out var data))
+            {
+                Layout.SubtractData(data);
+            }
         }
         
-        public void AddToFeatureCache(FeatureInfo featureInfo, params Glyph[] glyphs)
+        public void AddToFeatureCache(FeatureInfo featureInfo, params uint[] glyphs)
         {
             if (featureCache.TryGetValue(featureInfo, out var data))
             {
@@ -35,6 +48,22 @@ namespace Adamantium.Fonts.Common
             {
                 featureCache[featureInfo] = new GlyphLayoutData(glyphs);
             }
+            
+            Layout.AppendGlyphs(glyphs);
+        }
+
+        public void AddToFeatureCache(FeatureInfo featureInfo, params ushort[] glyphs)
+        {
+            if (featureCache.TryGetValue(featureInfo, out var data))
+            {
+                data.AppendGlyphs(glyphs);
+            }
+            else
+            {
+                featureCache[featureInfo] = new GlyphLayoutData(glyphs);
+            }
+            
+            Layout.AppendGlyphs(glyphs);
         }
 
         public bool IsFeatureCached(FeatureInfo featureInfo)
@@ -42,7 +71,7 @@ namespace Adamantium.Fonts.Common
             return featureCache.ContainsKey(featureInfo);
         }
 
-        public GlyphLayoutData GetLayoutData(FeatureInfo featureInfo)
+        public GlyphLayoutData GetLayoutDataForFeature(FeatureInfo featureInfo)
         {
             return featureCache[featureInfo];
         }

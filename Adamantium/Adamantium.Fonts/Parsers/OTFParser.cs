@@ -394,7 +394,7 @@ namespace Adamantium.Fonts.Parsers
 
         private void ProcessFeatures(IFontLayout layout, FeatureKind featureKind)
         {
-            var featureManager = CurrentFont.FeatureManager;
+            var featureManager = CurrentFont.FeatureService;
             
             foreach (var scriptTable in layout.ScriptList)
             {

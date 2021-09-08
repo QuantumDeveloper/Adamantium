@@ -4,11 +4,11 @@ namespace Adamantium.Fonts.Tables.Layout
     {
         public PairSet[] PairSets { get; set; }
 
-        public bool FindPairSet(ushort sendGlyphIndex, out PairSet foundPairSet)
+        public bool FindPairSet(ushort secondGlyphIndex, out PairSet foundPairSet)
         {
             for (int i = 0; i < PairSets.Length; ++i)
             {
-                if (PairSets[i].SecondGlyph == sendGlyphIndex)
+                if (PairSets[i].SecondGlyph == secondGlyphIndex)
                 {
                     foundPairSet = PairSets[i];
                     return true;

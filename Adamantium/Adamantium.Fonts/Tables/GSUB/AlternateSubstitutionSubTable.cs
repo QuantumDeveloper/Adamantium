@@ -11,15 +11,18 @@ namespace Adamantium.Fonts.Tables.GSUB
         
         public AlternateSetTable[] AlternateSetTables { get; set; }
 
-        public override bool SubstituteGlyphs(FontLanguage language, FeatureInfo featureInfo, IGlyphSubstitutionLookup substitutionLookup,
-            uint index)
+        public override bool SubstituteGlyphs(
+            IGlyphSubstitutions substitutions,
+            FeatureInfo featureInfo, 
+            uint index,
+            uint length)
         {
-            var position = Coverage.FindPosition((ushort)index);
+            var position = Coverage.FindPosition((ushort)substitutions.GetGlyphIndex(index));
 
             if (position > -1)
             {
                 var alt = AlternateSetTables[index];
-                substitutionLookup.Replace(index, alt.AlternateGlyphIDs);
+                substitutions.Replace(featureInfo, index, alt.AlternateGlyphIDs);
                 return true;
             }
             

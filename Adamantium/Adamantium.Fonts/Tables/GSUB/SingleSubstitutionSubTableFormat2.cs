@@ -15,13 +15,16 @@ namespace Adamantium.Fonts.Tables.GSUB
         /// </summary>
         public UInt16[] SubstituteGlyphIds { get; set; }
 
-        public override bool SubstituteGlyphs(FontLanguage language, FeatureInfo featureInfo, IGlyphSubstitutionLookup substitutionLookup,
-            uint index)
+        public override bool SubstituteGlyphs(
+            IGlyphSubstitutions substitutions,
+            FeatureInfo featureInfo, 
+            uint index,
+            uint length)
         {
-            var foundAt = Coverage.FindPosition((ushort)index);
+            var foundAt = Coverage.FindPosition((ushort)substitutions.GetGlyphIndex(index));
             if (foundAt > -1)
             {
-                substitutionLookup.Replace(index, SubstituteGlyphIds[foundAt]);
+                substitutions.Replace(featureInfo, index, SubstituteGlyphIds[foundAt]);
                 return true;
             }
             

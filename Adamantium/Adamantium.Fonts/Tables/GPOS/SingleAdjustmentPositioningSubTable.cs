@@ -20,45 +20,44 @@ namespace Adamantium.Fonts.Tables.GPOS
     
     internal class SingleAdjustmentPositioningSubTable : GPOSLookupSubTable
     {
-        private uint format;
-        
         public SingleAdjustmentPositioningSubTable(CoverageTable coverage, ValueRecord record)
         {
-            format = 1;
+            Format = 1;
             Coverage = coverage;
             ValueRecords = new[] {record};
         }
         
         public SingleAdjustmentPositioningSubTable(CoverageTable coverage, ValueRecord[] records)
         {
-            format = 2;
+            Format = 2;
             Coverage = coverage;
             ValueRecords = records;
         }
         
         public override GPOSLookupType Type => GPOSLookupType.SingleAdjustment;
 
-        public uint Format => format;
-        
+        public uint Format { get; }
+
         public CoverageTable Coverage { get; }
         
         public ValueRecord[] ValueRecords { get; }
 
-        public override void PositionGlyph(FontLanguage language,
-            FeatureInfo feature,
-            IGlyphPositioningLookup glyphPositioningLookup,
+        public override void PositionGlyph(
+            IGlyphPositioning glyphPositioning,
+            FeatureInfo featureInfo,
             uint startIndex,
             uint length)
         {
-            var limitIndex = Math.Min(startIndex + length, glyphPositioningLookup.Count);
+            var limitIndex = Math.Min(startIndex + length, glyphPositioning.Count);
             for (uint i = startIndex; i < limitIndex; ++i)
             {
-                var position = Coverage.FindPosition((ushort) i);
+                var glyphIndex = glyphPositioning.GetGlyphIndex(i);
+                var position = Coverage.FindPosition((ushort)glyphIndex);
                 if (position > -1)
                 {
                     var record = ValueRecords[Format == 1 ? 0 : position];
-                    glyphPositioningLookup.AppendGlyphOffset(language, feature, i, new Vector2F(record.XPlacement, record.YPlacement));
-                    glyphPositioningLookup.AppendGlyphAdvance(language, feature, i, new Vector2F(record.XAdvance, record.YAdvance));
+                    glyphPositioning.AppendGlyphOffset(featureInfo, i, new Vector2F(record.XPlacement, record.YPlacement));
+                    glyphPositioning.AppendGlyphAdvance(featureInfo, i, new Vector2F(record.XAdvance, record.YAdvance));
                 }
             }
         }

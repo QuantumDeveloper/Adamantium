@@ -3,21 +3,17 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Adamantium.Fonts.Common;
 using Adamantium.Fonts.Parsers;
-using Adamantium.Mathematics;
 
 namespace Adamantium.Fonts
 {
-    public class TypeFace : IGlyphPositioningLookup, IGlyphSubstitutionLookup
+    public class TypeFace
     {
         private readonly List<IFont> fonts;
         private List<Glyph> glyphs;
         private List<UInt32> unicodes;
         private readonly List<string> errorMessages;
         
-        private Dictionary<UInt32, Glyph> unicodeToGlyph;
-
         public IFont CurrentFont { get; private set; }
 
         public TypeFace()
@@ -25,7 +21,6 @@ namespace Adamantium.Fonts
             fonts = new List<IFont>();
             glyphs = new List<Glyph>();
             unicodes = new List<uint>();
-            unicodeToGlyph = new Dictionary<uint, Glyph>();
 
             errorMessages = new List<string>();
         }
@@ -59,6 +54,11 @@ namespace Adamantium.Fonts
             }
         }
 
+        internal void SetDefaultFont()
+        {
+            CurrentFont = fonts[0];
+        }
+
         internal void SetCurrentFont(IFont font)
         {
             if (!fonts.Contains(font)) return;
@@ -87,7 +87,7 @@ namespace Adamantium.Fonts
         {
             errorMessages.Add(message);
         }
-        
+
         public static TypeFace LoadFont(string path, byte sampleResolution)
         {
             if (!File.Exists(path))
@@ -96,7 +96,7 @@ namespace Adamantium.Fonts
             var reader = new FontTypeReader(path);
             var fontType = reader.GetFontType();
             reader.Close();
-            TypeFace typeFace = null;
+            TypeFace typeFace;
             
             switch (fontType)
             {
@@ -122,58 +122,6 @@ namespace Adamantium.Fonts
         public static async Task<TypeFace> LoadFontAsync(string path, byte sampleResolution)
         {
             return await Task.Run(()=> LoadFont(path, sampleResolution));
-        }
-        
-        public uint Count => throw new NotImplementedException();
-        public GlyphClassDefinition GetGlyphClassDefinition(uint index)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void AppendGlyphOffset(FontLanguage language, FeatureInfo featureInfo, uint glyphIndex, Vector2F offset)
-        {
-            if (GetGlyphByIndex(glyphIndex, out var glyph))
-            {
-                CurrentFont.AddFeatureDataToGlyph(language, featureInfo, glyph, GlyphPosition.FromOffset(offset));
-            }
-        }
-
-        public void AppendGlyphAdvance(FontLanguage language, FeatureInfo featureInfo, uint glyphIndex, Vector2F advance)
-        {
-            if (GetGlyphByIndex(glyphIndex, out var glyph))
-            {
-                CurrentFont.AddFeatureDataToGlyph(language, featureInfo, glyph, GlyphPosition.FromAdvance(advance));
-            }
-        }
-
-        public Vector2F GetOffset(uint glyphIndex)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Vector2F GetAdvance(uint glyphIndex)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void Replace(uint glyphIndex, uint substitutionGlyphIndex)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void Replace(uint glyphIndex, params uint[] substitutionArray)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void Replace(uint glyphIndex, params ushort[] substitutionArray)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void Replace(uint glyphIndex, int removeLength, ushort replaceIndex)
-        {
-            throw new NotImplementedException();
         }
     }
 }

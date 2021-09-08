@@ -39,7 +39,7 @@ namespace Adamantium.Fonts
         
         #endregion
         
-        public FeatureManager FeatureManager { get; }
+        public FeatureService FeatureService { get; }
         
         public GlyphLayoutData NotDefLayoutData { get; }
         
@@ -49,21 +49,7 @@ namespace Adamantium.Fonts
 
         internal void SetGlyphUnicodes(Dictionary<uint, List<uint>> glyphMapping);
 
-        internal bool IsCharacterCached(FontLanguage currentLanguage, char character);
-
-        internal bool IsFeatureCached(FontLanguage currentLanguage, Glyph glyph, FeatureInfo featureInfo);
-
-        internal GlyphLayoutData GetGlyphLayoutData(FontLanguage currentLanguage, FeatureInfo featureInfo, char character);
-
-        internal void AddFeatureDataToGlyph(FontLanguage currentLanguage, FeatureInfo feature, Glyph glyph, GlyphPosition positionData);
-
-        internal void RemoveFeatureDataFromGlyph(FontLanguage currentLanguage, FeatureInfo info, Glyph glyph);
-
-        bool IsLanguageAvailableByMsdnName(string language);
-
-        bool IsLanguageAvailableByIsoName(string language);
-
-        bool IsLanguageAvailableByIsoName(string language, out FontLanguage fontLanguage);
+        Glyph[] TranslateIntoGlyphs(string input);
 
         Glyph GetGlyphByIndex(uint index);
 

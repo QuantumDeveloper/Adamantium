@@ -6,6 +6,15 @@ namespace Adamantium.Fonts.Tables.Layout
     internal class CoverageTableFormat2 : CoverageTable
     {
         public override uint Format => 2;
+        
+        public int RangeCount { get; set; }
+        
+        public UInt16[] StartIndices { get; set; }
+        
+        public UInt16[] EndIndices { get; set; }
+        
+        public UInt16[] CoverageIndices { get; set; }
+        
         public override int FindPosition(ushort glyphIndex)
         {
             // Ranges must be in glyph ID order, and they must be distinct, with no overlapping.
@@ -34,14 +43,5 @@ namespace Adamantium.Fonts.Tables.Layout
 
             return indices;
         }
-        
-        public int RangeCount { get; set; }
-        
-        public UInt16[] StartIndices { get; set; }
-        
-        public UInt16[] EndIndices { get; set; }
-        
-        public UInt16[] CoverageIndices { get; set; }
-
     }
 }

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Adamantium.Fonts.Common;
 using Adamantium.Fonts.Parsers;
 using Adamantium.Fonts.Tables;
@@ -12,15 +11,11 @@ namespace Adamantium.Fonts
     {
         private List<Glyph> glyphs;
         private List<UInt32> unicodes;
-        private List<FontLanguage> languageSet;
-        private Dictionary<LanguageTag, FontLanguage> languageMap;
 
         private Dictionary<string, Glyph> nameToGlyph;
         private Dictionary<UInt32, Glyph> unicodeToGlyph;
 
         private Dictionary<string, List<Feature>> featuresMap;
-        private List<Feature> enabledFeatures;
-        private Dictionary<FontLanguage, GlyphCache> languageCache;
 
         internal TypeFace TypeFace { get; }
         internal VariationStore VariationData { get; set; }
@@ -31,15 +26,11 @@ namespace Adamantium.Fonts
             TypeFace = typeFace;
             glyphs = new List<Glyph>();
             unicodes = new List<uint>();
-            languageSet = new List<FontLanguage>();
-            languageMap = new Dictionary<LanguageTag, FontLanguage>();
 
             nameToGlyph = new Dictionary<string, Glyph>();
             unicodeToGlyph = new Dictionary<uint, Glyph>();
 
             featuresMap = new Dictionary<string, List<Feature>>();
-            enabledFeatures = new List<Feature>();
-            languageCache = new Dictionary<FontLanguage, GlyphCache>();
 
             Copyright = String.Empty;
             FontFamily = String.Empty;
@@ -62,14 +53,12 @@ namespace Adamantium.Fonts
             LightBackgroundPalette = String.Empty;
             DarkBackgroundPalette = String.Empty;
 
-            TypeFace.GetGlyphByIndex(0, out var notdef);
+            NotDefLayoutData = new GlyphLayoutData(0);
 
-            NotDefLayoutData = new GlyphLayoutData(notdef);
-
-            FeatureManager = new FeatureManager();
+            FeatureService = new FeatureService();
         }
 
-        public bool isGlyphNamesProvided { get; internal set; }
+        public bool IsGlyphNamesProvided { get; internal set; }
 
         // Name info section ---
         public string Copyright { get; internal set; }
@@ -95,7 +84,7 @@ namespace Adamantium.Fonts
         
         // ------
         
-        public FeatureManager FeatureManager { get; }
+        public FeatureService FeatureService { get; }
 
         public ushort UnitsPerEm { get; internal set; }
 
@@ -127,70 +116,9 @@ namespace Adamantium.Fonts
             glyphs.AddRange(inputGlyphs);
         }
 
-        bool IFont.IsCharacterCached(FontLanguage currentLanguage, char character)
-        {
-            var glyph = GetGlyphByCharacter(character);
-            
-            return languageCache[currentLanguage].IsGlyphCached(glyph);
-        }
-
-        bool IFont.IsFeatureCached(FontLanguage currentLanguage, Glyph glyph, FeatureInfo featureInfo)
-        {
-            return languageCache[currentLanguage].IsFeatureCached(glyph, featureInfo);
-        }
-
-        GlyphLayoutData IFont.GetGlyphLayoutData(FontLanguage currentLanguage, FeatureInfo featureInfo, char character)
-        {
-            if (!featuresMap.ContainsKey(featureInfo.Tag)) return null;
-
-            var glyph = GetGlyphByCharacter(character);
-
-            return languageCache[currentLanguage].GetGlyphLayoutData(featureInfo, glyph);
-        }
-
-        void IFont.AddFeatureDataToGlyph(FontLanguage currentLanguage, FeatureInfo featureInfo, Glyph glyph, GlyphPosition positionData)
-        {
-            if (!featuresMap.ContainsKey(featureInfo.Tag)) return;
-            
-            if (!languageCache.TryGetValue(currentLanguage, out var cache))
-            {
-                languageCache[currentLanguage] = new GlyphCache(glyph, new GlyphLayoutData(positionData));
-            }
-
-            languageCache[currentLanguage].AddFeatureDataToGlyph(featureInfo, glyph, positionData);
-        }
-
-        void IFont.RemoveFeatureDataFromGlyph(FontLanguage currentLanguage, FeatureInfo info, Glyph glyph)
-        {
-            if (languageCache.TryGetValue(currentLanguage, out var cache))
-            {
-                languageCache[currentLanguage].RemoveFeatureDataFromGlyph(info, glyph);                
-            }
-        }
-
-        public bool IsLanguageAvailableByMsdnName(string language)
-        {
-            return languageMap.ContainsKey(LanguageTags.GetMsdnLanguage(language));
-        }
-
-        public bool IsLanguageAvailableByIsoName(string language)
-        {
-            return languageMap.ContainsKey(LanguageTags.GetIsoLanguage(language));
-        }
-
-        public bool IsLanguageAvailableByIsoName(string language, out FontLanguage fontLanguage)
-        {
-            if (languageMap.TryGetValue(LanguageTags.GetIsoLanguage(language), out fontLanguage))
-            {
-                return true;
-            }
-
-            return false;
-        }
-
         void IFont.UpdateGlyphNamesCache()
         {
-            if (!isGlyphNamesProvided) return;
+            if (!IsGlyphNamesProvided) return;
 
             foreach (var glyph in glyphs)
             {
@@ -234,6 +162,18 @@ namespace Adamantium.Fonts
                 }
             }
         }
+        
+        public Glyph[] TranslateIntoGlyphs(string input)
+        {
+            var translatedGlyphs = new List<Glyph>();
+            foreach (var character in input)
+            {
+                var glyph = GetGlyphByCharacter(character);
+                translatedGlyphs.Add(glyph);
+            }
+
+            return translatedGlyphs.ToArray();
+        }
 
         public Glyph GetGlyphByIndex(uint index)
         {
@@ -254,7 +194,7 @@ namespace Adamantium.Fonts
         {
             if (!unicodeToGlyph.TryGetValue(unicode, out var glyph))
             {
-                return null;
+                return glyphs[0];
             }
 
             return glyph;
