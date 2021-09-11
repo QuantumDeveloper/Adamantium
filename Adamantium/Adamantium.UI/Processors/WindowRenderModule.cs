@@ -266,7 +266,7 @@ namespace Adamantium.UI.Processors
             //var world = Matrix4x4F.RotationQuaternion(rot);
             //var world = /*Matrix4x4F.Translation(-250, 0, 10000.05f) */ Matrix4x4F.RotationQuaternion(rot) * Matrix4x4F.Translation(250, 0, 10000.05f); //* Matrix4x4F.Translation(250, 0, 1000.05f);
             var world = Matrix4x4F.Translation(0, 0, 10);
-            var fovPrj = Matrix4x4F.PerspectiveFov(MathHelper.DegreesToRadians(-45),
+            var fovPrj = Matrix4x4F.PerspectiveFovY(MathHelper.DegreesToRadians(-45),
                 (float) (window.ClientWidth / window.ClientHeight), 0.1f, 1000f);
             var wvp = world * view * fovPrj;
             // var world = Matrix4x4F.Translation(-250, 0, 0f) * Matrix4x4F.RotationQuaternion(rot) * Matrix4x4F.Translation(250, 0, 10000.05f);

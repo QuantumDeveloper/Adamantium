@@ -180,26 +180,12 @@ namespace Adamantium.EntityFramework.Components
 
         private void BuildPerspectiveFovX(float zNear, float zFar)
         {
-            float aspect = (float)Width / Height;
-            float e = 1.0f / (float)Math.Tan(MathHelper.DegreesToRadians(Fov / 2.0f));
-            float aspectInv = 1.0f / aspect;
-            float fovX = 2.0f * (float)Math.Atan(aspectInv / e);
-            float xScale = 1.0f / (float)Math.Tan(0.5f * fovX);
-            float yScale = xScale / aspectInv;
-            PerspectiveProjection = new Matrix4x4F
-            {
-                M11 = xScale,
-                M22 = -yScale,
-                M33 = zFar / (zFar - zNear),
-                M34 = 1.0f,
-                M43 = -zNear * zFar / (zFar - zNear),
-            };
+            PerspectiveProjection = Matrix4x4F.PerspectiveFovX(Fov, (float)Width / Height, zNear, zFar);
         }
 
         private void BuildPerspectiveFovY(float zNear, float zFar)
         {
-            PerspectiveProjection = Matrix4x4F.PerspectiveFov(Fov, (float)Width / Height, zNear,
-                zFar);
+            PerspectiveProjection = Matrix4x4F.PerspectiveFovY(Fov, (float)Width / Height, zNear, zFar);
         }
 
         private void GetAxisFromViewMatrix()

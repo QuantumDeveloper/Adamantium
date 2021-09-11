@@ -1134,6 +1134,12 @@ namespace Adamantium.Fonts.Parsers
                 }
             }
 
+            // Change the sign of all Y coordinates to match Vulkan coordinate system 
+            for (int i = 0; i < yCoords.Length; ++i)
+            {
+                yCoords[i] = (short)-yCoords[i];
+            }
+
             int currentPointIndex = 0;
             foreach (var outline in glyph.Outlines)
             {

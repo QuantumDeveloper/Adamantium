@@ -5,6 +5,7 @@ using Adamantium.Engine;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Content;
 using Adamantium.Engine.Core.Models;
+using Adamantium.Engine.Graphics;
 using Adamantium.Engine.Processors;
 using Adamantium.Engine.Templates;
 using Adamantium.EntityFramework;
@@ -49,7 +50,7 @@ namespace Adamantium.Game.Playground
             // var entity = await ImportModel(@"Models\monkey\monkey.dae");
             // var ent = entity.Dependencies[0];
             // ent.Transform.SetScaleFactor(100);
-            // ent.Transform.SetPosition(new Vector3D(0, 0, 50));
+            // ent.Transform.SetPosition(new Vector3D(500, 300, -150));
             //await ImportModel(@"Models\F15C\F-15C_Eagle.dae");
             ImportFont();
             //ImportOTFFont();
@@ -87,7 +88,7 @@ namespace Adamantium.Game.Playground
                 var entity = new Entity(null, "Sarabun-Regular.woff2");
                 var font = typeFace.GetFont(0);
                 
-                var textLayout = new TextLayout(font, "Hello Comrade", 25, new Rectangle());
+                var textLayout = new TextLayout(font, "Приветствую вас, майне либе. Проблема с матрицами решена!", 25, new Rectangle());
                 
                 //var glyph = font.GetGlyphByUnicode('@');
                 //var points = glyph.Triangulate(3);
@@ -96,11 +97,19 @@ namespace Adamantium.Game.Playground
                 //mesh.SetPositions(points);
                 var meshComponent = new MeshData();
                 meshComponent.Mesh = textLayout.Mesh;
+                // var vertices = new List<Vector3F>();
+                // vertices.Add(new Vector3F(0));
+                // vertices.Add(new Vector3F(50f, 50f, 0));
+                // vertices.Add(new Vector3F(-50f, 50f, 0));
+                // var triangle = new Mesh();
+                // triangle.SetPositions(vertices);
+                // meshComponent.Mesh = triangle;
+                
                 var meshRenderer = new MeshRenderer();
                 entity.AddComponent(meshComponent);
                 entity.AddComponent(meshRenderer);
                 entity.Transform.SetScaleFactor(textLayout.Scale);
-                entity.Transform.SetPosition(new Vector3D(0, 0, 5));
+                entity.Transform.SetPosition(new Vector3D(0, 0, 1));
                 EntityWorld.AddEntity(entity);
             }
             catch (Exception e)
