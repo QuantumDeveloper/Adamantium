@@ -85,6 +85,8 @@ namespace Adamantium.Fonts
             {
                 return Array.Empty<SampledOutline>();
             }
+            
+            if (rate == 0) rate = 1;
 
             if (!isSplitOnSegments)
             {
@@ -219,6 +221,8 @@ namespace Adamantium.Fonts
 
         public Vector3F[] Triangulate(byte rate)
         {
+            if (rate == 0) rate = 1;
+
             if (!triangulatedCache.TryGetValue(rate, out var points))
             {
                 if (!sampledOutlinesCache.TryGetValue(rate, out var sampledOutlines))

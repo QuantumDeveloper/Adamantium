@@ -465,8 +465,8 @@ namespace Adamantium.Engine.Processors
                                     {
                                         var material = current.GetComponent<Material>();
                                         //var wvp = transformation.WorldMatrix *ActiveCamera.ViewMatrix * ActiveCamera.ProjectionMatrix;
-                                        var orthoProj = Matrix4x4F.OrthoOffCenter(0, Window.Width, 0, Window.Height, 1f, 100000f);
-                                        var wvp = transformation.WorldMatrix * orthoProj;
+                                        //var orthoProj = Matrix4x4F.OrthoOffCenter(0, Window.Width, 0, Window.Height, 1f, 100000f);
+                                        var wvp = transformation.WorldMatrix * ActiveCamera.UiProjection;
                                         //var wvp = transformation.WorldMatrix * Matrix4x4F.Scaling(1, -1, 1) * Matrix4x4F.Scaling(2.0f / Window.Width, 2.0f/Window.Height, 1.0f / (100000f - 1f));
                                         GraphicsDevice.BasicEffect.Parameters["wvp"].SetValue(wvp);
                                         //GraphicsDevice.BasicEffect.Parameters["worldMatrix"].SetValue(transformation.WorldMatrix);

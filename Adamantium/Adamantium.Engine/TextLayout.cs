@@ -45,17 +45,26 @@ namespace Adamantium.Engine
                     mesh.SetPositions(outlines);
 
                     var translationMatrix = Matrix4x4F.Identity;
+                    //translationMatrix.ScaleVector = new Vector3F(Scale, Scale, 1);
                     translationMatrix.TranslationVector = new Vector3F(stringWidth, 1000, 0);
+                    // var scale = Matrix4x4F.Scaling(Scale, Scale, 1);
+                    // var result = scale * translationMatrix;
                     mesh.ApplyTransform(translationMatrix);
-
                     Mesh = Mesh.Merge(mesh);
                 }
 
-                stringWidth += glyph.AdvanceWidth;
+                stringWidth += glyph.AdvanceWidth - glyph.LeftSideBearing;
             }
+            
+            // for (var index = 0; index < Mesh.Positions.Length; index++)
+            // {
+            //     var position = Mesh.Positions[index];
+            //     position.X = (float)Math.Round(position.X * Scale, 0, MidpointRounding.AwayFromZero);
+            //     position.Y = (float)Math.Round(position.Y * Scale, 0, MidpointRounding.AwayFromZero);
+            //     Mesh.Positions[index] = position;
+            // }
 
             Mesh.Optimize(false, false);
-            //Mesh.ReverseWinding();
         }
     }
 }

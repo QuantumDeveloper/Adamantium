@@ -110,13 +110,14 @@ namespace Adamantium.EntityFramework.Components
         }
 
         /// <summary>
-        /// Initialize view/projection matrices for camera in free mode
+        /// Initialize view/projection matrices for camera
         /// </summary>
         public sealed override void Initialize()
         {
             GetAxisFromViewMatrix();
             BuildPerspectiveFoV();
-            BuildOffscreenProjective();
+            BuildOrthoProjection();
+            BuildUiProjection();
             BuildIsometricProjection();
             Frustum = new BoundingFrustum(ViewMatrix * ProjectionMatrix);
             base.Initialize();
@@ -165,7 +166,13 @@ namespace Adamantium.EntityFramework.Components
             IsometricProjection = Matrix4x4F.IsometricProjection(0.5f);
         }
 
-        private void BuildOffscreenProjective()
+        private void BuildOrthoProjection()
+        {
+            OrthoProjection = Matrix4x4F.OrthoLH(Width / OrthoScaleFactor, Height / OrthoScaleFactor, ZNear, ZFar);
+        }
+        
+
+        private void BuildUiProjection()
         {
             float znear = ZNear;
             float zfar = ZFar;
@@ -174,8 +181,8 @@ namespace Adamantium.EntityFramework.Components
             //     znear = ZFar;
             //     zfar = ZNear;
             // }
-            OrthoProjection = Matrix4x4F.OrthoLH(Width / OrthoScaleFactor, Height / OrthoScaleFactor, zfar, znear);
-            UiProjection = Matrix4x4F.OrthoOffCenterLH(0, Width, Height, 0, zfar, znear);
+            
+            UiProjection = Matrix4x4F.OrthoOffCenter(0, Width, 0, Height, zfar, znear);
         }
 
         private void BuildPerspectiveFovX(float zNear, float zFar)

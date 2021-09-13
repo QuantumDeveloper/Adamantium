@@ -138,7 +138,7 @@ namespace Adamantium.Fonts.Common
             
             // Round results because if its double, we will get a lot of digits after point and this will negatively influence on triangulation results
             // 4 digits after point will be enough
-            return new Vector2D(Math.Round(x, 4, MidpointRounding.AwayFromZero), Math.Round(y, 4, MidpointRounding.AwayFromZero));
+            return new Vector2D(Math.Round(x, 0, MidpointRounding.AwayFromZero), Math.Round(y, 0, MidpointRounding.AwayFromZero));
         }
         
         private static double QuadraticEquation(double begin, double control, double end, double t)
