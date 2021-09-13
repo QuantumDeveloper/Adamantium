@@ -78,7 +78,7 @@ namespace Adamantium.Fonts
             IsEmpty = isEmpty;
             Name = String.Empty;
         }
-        
+
         public SampledOutline[] Sample(byte rate)
         {
             if (IsEmpty)
