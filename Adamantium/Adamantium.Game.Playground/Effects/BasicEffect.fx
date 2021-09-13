@@ -110,4 +110,11 @@ technique10 Basic
             VertexShader = Basic_VS;
             PixelShader = BasicTextured_PS;
         }
+        
+    pass Colored
+        {
+            Profile = 5.1;
+            VertexShader = Basic_VS;
+            PixelShader = BasicColored_PS;
+        }
 }

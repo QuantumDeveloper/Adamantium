@@ -108,7 +108,7 @@ namespace Adamantium.Game.Playground
                 var meshRenderer = new MeshRenderer();
                 entity.AddComponent(meshComponent);
                 entity.AddComponent(meshRenderer);
-                //entity.Transform.SetScaleFactor(textLayout.Scale);
+                entity.Transform.SetScaleFactor(textLayout.Scale);
                 //entity.Transform.SetBaseScale(Vector3F.One);
                 entity.Transform.SetPosition(new Vector3D(0, 0, 1));
                 EntityWorld.AddEntity(entity);
