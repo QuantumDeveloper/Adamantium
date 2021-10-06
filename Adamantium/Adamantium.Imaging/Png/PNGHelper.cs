@@ -41,8 +41,8 @@ namespace Adamantium.Imaging.Png
             state.InfoPng.InterlaceMethod = InterlaceMethod.None;
             state.EncoderSettings.FilterStrategy = FilterStrategy.MinSum;
             state.EncoderSettings.AutoConvert = true;
-            state.InfoRaw.ColorType = colorType;
-            state.InfoRaw.BitDepth = (uint)description.Format.SizeOfInBits() / (uint)description.Format.SizeOfInBytes();
+            state.ColorModeRaw.ColorType = colorType;
+            state.ColorModeRaw.BitDepth = (uint)description.Format.SizeOfInBits() / (uint)description.Format.SizeOfInBytes();
 
             state.InfoPng.FramesCount = (uint)count;
             if (img.DefaultImage != null)

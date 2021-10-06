@@ -21,11 +21,11 @@ namespace Adamantium.Imaging.Png.Chunks
             var bytes = new List<byte>();
 
             var transparencyBytes = new List<byte>();
-            var info = state.InfoRaw;
+            var info = state.ColorModeRaw;
 
             if (info.ColorType == PNGColorType.Palette)
             {
-                var amount = state.InfoRaw.PaletteSize;
+                var amount = state.ColorModeRaw.PaletteSize;
                 /*the tail of palette values that all have 255 as alpha, does not have to be encoded*/
                 for (long i = info.PaletteSize; i != 0; --i)
                 {
@@ -66,9 +66,9 @@ namespace Adamantium.Imaging.Png.Chunks
         internal static tRNS FromState(PNGState state)
         {
             var trns = new tRNS();
-            trns.KeyR = (ushort)state.InfoRaw.KeyR;
-            trns.KeyG = (ushort)state.InfoRaw.KeyG;
-            trns.KeyB = (ushort)state.InfoRaw.KeyB;
+            trns.KeyR = (ushort)state.ColorModeRaw.KeyR;
+            trns.KeyG = (ushort)state.ColorModeRaw.KeyG;
+            trns.KeyB = (ushort)state.ColorModeRaw.KeyB;
             return trns;
         }
     }

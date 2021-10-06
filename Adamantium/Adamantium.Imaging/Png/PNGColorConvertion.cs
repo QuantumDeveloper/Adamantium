@@ -537,7 +537,7 @@ namespace Adamantium.Imaging.Png
         to RGBA or RGB with 8 bit per cannel. buffer must be RGBA or RGB output with
         enough memory, if has_alpha is true the output is RGBA. mode has the color mode
         of the input buffer.*/
-        private static unsafe void GetPixelColorsRGBA8(byte[] buffer, int numPixels, bool hasAlpha, byte[] inBuffer, PNGColorMode mode)
+        private static void GetPixelColorsRGBA8(byte[] buffer, int numPixels, bool hasAlpha, byte[] inBuffer, PNGColorMode mode)
         {
             int numChannels = hasAlpha ? 4 : 3;
             if (mode.ColorType == PNGColorType.Grey)
@@ -687,16 +687,13 @@ namespace Adamantium.Imaging.Png
             {
                 if (mode.BitDepth == 8)
                 {
-                    for (int i = 0; i != numPixels; ++i)
+                    int index = 0;
+                    for (int i = 0; i < buffer.Length; i += numChannels)
                     {
-                        int bufIndex = numChannels * i;
-                        buffer[bufIndex] = inBuffer[i * 4];
-                        buffer[bufIndex + 1] = inBuffer[i * 4 + 1];
-                        buffer[bufIndex + 2] = inBuffer[i * 4 + 2];
-                        if (hasAlpha)
-                        {
-                            buffer[bufIndex + 3] = inBuffer[i * 4 + 3];
-                        }
+                        buffer[i] = inBuffer[index];
+                        buffer[i + 1] = inBuffer[index + 1];
+                        buffer[i + 2] = inBuffer[index + 2];
+                        index+=4;
                     }
                 }
                 else

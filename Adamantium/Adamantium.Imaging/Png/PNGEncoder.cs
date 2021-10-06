@@ -46,7 +46,7 @@ namespace Adamantium.Imaging.Png
                 return state.Error;
             }
 
-            state.Error = PNGColorConvertion.CheckColorValidity(state.InfoRaw.ColorType, state.InfoRaw.BitDepth);
+            state.Error = PNGColorConvertion.CheckColorValidity(state.ColorModeRaw.ColorType, state.ColorModeRaw.BitDepth);
             if (state.Error > 0)
             {
                 return state.Error;
@@ -70,9 +70,9 @@ namespace Adamantium.Imaging.Png
                     PNGColorMode mode16 = PNGColorMode.Create(PNGColorType.RGB, 16);
                     PNGColorConvertion.ConvertRGB(ref r, ref g, ref b, bgR, bgG, bgB, mode16, state.InfoPng.ColorMode);
                     var frame = pngImage.Frames[0];
-                    PNGColorConvertion.GetColorProfile(profile, frame.RawPixelBuffer, frame.Width, frame.Height, state.InfoRaw);
+                    PNGColorConvertion.GetColorProfile(profile, frame.RawPixelBuffer, frame.Width, frame.Height, state.ColorModeRaw);
                     profile.Add(r, g, b, ushort.MaxValue);
-                    PNGColorProfile.AutoChooseColorFromProfile(info.ColorMode, state.InfoRaw, profile);
+                    PNGColorProfile.AutoChooseColorFromProfile(info.ColorMode, state.ColorModeRaw, profile);
                     error = PNGColorConvertion.ConvertRGB(ref info.BackgroundR, ref info.BackgroundG,
                         ref info.BackgroundB, bgR, bgG, bgB, info.ColorMode, state.InfoPng.ColorMode);
                     if (error > 0)
@@ -83,9 +83,10 @@ namespace Adamantium.Imaging.Png
                 else
                 {
                     var frame = pngImage.Frames[0];
-                    PNGColorProfile.AutoChooseColor(info.ColorMode, frame.RawPixelBuffer, frame.Width, frame.Height, state.InfoRaw);
-                    state.InfoRaw.ColorType = info.ColorMode.ColorType;
-                    state.InfoRaw.BitDepth = info.ColorMode.BitDepth;
+                    PNGColorProfile.AutoChooseColor(info.ColorMode, frame.RawPixelBuffer, frame.Width, frame.Height, state.ColorModeRaw);
+                    //state.InfoRaw.ColorType = info.ColorMode.ColorType;
+                    //state.InfoRaw.BitDepth = info.ColorMode.BitDepth;
+                    state.ColorModeRaw = info.ColorMode;
                 }
             }
 
