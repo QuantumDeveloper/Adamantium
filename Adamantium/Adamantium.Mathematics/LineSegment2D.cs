@@ -2,7 +2,7 @@
 
 namespace Adamantium.Mathematics
 {
-    public readonly struct LineSegment2D : IEquatable<LineSegment2D>
+    public struct LineSegment2D : IEquatable<LineSegment2D>
     {
         public override bool Equals(object obj)
         {
@@ -22,12 +22,27 @@ namespace Adamantium.Mathematics
 
         public Vector2D DirectionNormalized { get; }
 
+        public Color? StartInnerColor;
+        public Color? StartOuterColor;
+        public Color? EndInnerColor;
+        public Color? EndOuterColor;
+
+        public Color OuterColor;
+        
+        public Color InnerColor;
+
         public LineSegment2D(Vector2D start, Vector2D end)
         {
             Start = start;
             End = end;
             Direction = end - start;
             DirectionNormalized = Vector2D.Normalize(Direction);
+            OuterColor = Colors.Black;
+            InnerColor = Colors.White;
+            StartInnerColor = null;
+            StartOuterColor = null;
+            EndInnerColor = null;
+            EndOuterColor = null;
         }
 
         public bool Equals(LineSegment2D other)

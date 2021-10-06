@@ -73,7 +73,7 @@ namespace Adamantium.Game
         protected GameBase(GameMode mode)
         {
             Mode = mode;
-            Services = new AdamantiumServiceLocator();
+            Services = AdamantiumServiceLocator.Current;
             GameTime = new GameTime();
             gameTimer = new PreciseTimer();
             contextsMapping = new Dictionary<Object, GameContext>();

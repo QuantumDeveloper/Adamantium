@@ -44,7 +44,7 @@ namespace Adamantium.UI
         event KeyEventHandler PreviewKeyUp;
         event KeyboardGotFocusEventHandler PreviewGotKeyboardFocus;
         event KeyboardFocusChangedEventHandler PreviewLostKeyboardFocus;
-        event MouseButtonEventHandler PreviewMouseDoubcleClick;
+        event MouseButtonEventHandler PreviewMouseDoubleClick;
         event MouseEventHandler PreviewGotMouseCapture;
         event MouseEventHandler PreviewLostMouseCapture;
         event MouseButtonEventHandler PreviewMouseDown;
@@ -56,7 +56,7 @@ namespace Adamantium.UI
         event MouseWheelEventHandler PreviewMouseWheel;
         event MouseEventHandler PreviewMouseMove;
         event TextInputEventHandler PreviewTextInput;
-        event MouseButtonEventHandler PreviewMouseDoubleClick;
+        
         Cursor Cursor { get; set; }
         Boolean ClipToBounds { get; set; }
         Double Opacity { get; set; }

@@ -49,6 +49,7 @@ namespace Adamantium.Engine.Processors
             InputService = world.Services.Resolve<InputService>();
             CameraService = EntityWorld.Services.Resolve<CameraService>();
             ToolsService = EntityWorld.Services.Resolve<ToolsService>();
+
 //            BasicEffect = Effect.Load(@"Content\Effects\BasicEffect.fx.compiled", GraphicsDevice);
 //            SpriteBatch = new SpriteBatch(DeferredDevice, 25000);
         }

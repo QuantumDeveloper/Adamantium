@@ -1,31 +1,35 @@
 using System;
 using System.Runtime.InteropServices;
 using Adamantium.Core.DependencyInjection;
+using Adamantium.Core.Events;
 using Adamantium.MacOS;
 using Adamantium.Mathematics;
+using Adamantium.UI.AggregatorEvents;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Threading;
 using Rectangle = Adamantium.Mathematics.Rectangle;
 
 namespace Adamantium.UI.MacOS
 {
-    public class MacOSWindowWorker : AdamantiumComponent
+    public class MacOSWindowWorker : AdamantiumComponent, IWindowWorkerService
     {
-        private MacOSWindow window;
+        private WindowBase window;
         private IntPtr windowDelegate;
         
         private MacOSInterop.OnWindowWillResize willResizeDelegate;
         private MacOSInterop.OnWindowDidResize didResizeDelegate;
         private MacOSPlatform macOsApp;
+        private IEventAggregator eventAggregator;
 
         public MacOSWindowWorker()
         {
             willResizeDelegate = OnWindowWillResize;
             didResizeDelegate = OnWindowDidResize;
             macOsApp = AdamantiumServiceLocator.Current.Resolve<IApplicationPlatform>() as MacOSPlatform;
+            eventAggregator = AdamantiumServiceLocator.Current.Resolve<IEventAggregator>();
         }
 
-        public void SetWindow(MacOSWindow window)
+        public void SetWindow(WindowBase window)
         {
             this.window = window;
             var wndStyle = OSXWindowStyle.Borderless | 
@@ -37,6 +41,8 @@ namespace Adamantium.UI.MacOS
                 new Rectangle((int)window.Left, 0, (int)window.Width, (int)window.Height),  
                 (uint)wndStyle, 
                 window.Title);
+            this.window.SurfaceHandle = MacOSInterop.GetViewPtr(this.window.Handle);
+
             windowDelegate = MacOSInterop.CreateWindowDelegate();
             MacOSInterop.SetWindowDelegate(window.Handle, windowDelegate);
             macOsApp.AddWindow(window);
@@ -48,7 +54,7 @@ namespace Adamantium.UI.MacOS
                 Marshal.GetFunctionPointerForDelegate(didResizeDelegate));
             
             this.window.ApplyTemplate();
-            Application.Current.Windows.Add(this.window);
+            eventAggregator.GetEvent<WindowAddedEvent>().Publish(this.window);
             this.window.OnSourceInitialized();
             MacOSInterop.ShowWindow(window.Handle);
         }

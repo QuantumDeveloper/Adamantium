@@ -3,13 +3,6 @@ using System.Linq;
 
 namespace Adamantium.Core.Events
 {
-    public enum ThreadOption
-    {
-        PublisherThread,
-        BackgroundThread,
-        UIThread
-    }
-    
     public class BasicAggregatorEvent : EventBase
     {
         public SubscriptionToken Subscribe(Action action, ThreadOption threadOption = ThreadOption.PublisherThread)

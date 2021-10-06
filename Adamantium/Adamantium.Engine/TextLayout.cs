@@ -33,31 +33,31 @@ namespace Adamantium.Engine
 
         private void ProcessString()
         {
-            var glyphs = font.TranslateIntoGlyphs(inputString);
-            float stringWidth = 0;
-
-            foreach (var glyph in glyphs)
-            {
-                var outlines = glyph.Triangulate(2);
-
-                if (glyph.HasOutlines)
-                {
-                    var mesh = new Mesh();
-                    mesh.SetPositions(outlines);
-
-                    var translationMatrix = Matrix4x4F.Identity;
-                    //translationMatrix.ScaleVector = new Vector3F(Scale, Scale, 1);
-                    translationMatrix.TranslationVector = new Vector3F(stringWidth, 1000, 0);
-                    // var scale = Matrix4x4F.Scaling(Scale, Scale, 1);
-                    // var result = scale * translationMatrix;
-                    mesh.ApplyTransform(translationMatrix);
-                    Mesh = Mesh.Merge(mesh);
-                }
-
-                stringWidth += glyph.AdvanceWidth/* - glyph.LeftSideBearing*/;
-            }
-
-            Mesh.Optimize(false, false);
+            // var glyphs = font.TranslateIntoGlyphs(inputString);
+            // float stringWidth = 0;
+            //
+            // foreach (var glyph in glyphs)
+            // {
+            //     var outlines = glyph.Triangulate(2);
+            //
+            //     if (glyph.HasOutlines)
+            //     {
+            //         var mesh = new Mesh();
+            //         mesh.SetPositions(outlines);
+            //
+            //         var translationMatrix = Matrix4x4F.Identity;
+            //         //translationMatrix.ScaleVector = new Vector3F(Scale, Scale, 1);
+            //         translationMatrix.TranslationVector = new Vector3F(stringWidth, 1000, 0);
+            //         // var scale = Matrix4x4F.Scaling(Scale, Scale, 1);
+            //         // var result = scale * translationMatrix;
+            //         mesh.ApplyTransform(translationMatrix);
+            //         Mesh = Mesh.Merge(mesh);
+            //     }
+            //
+            //     stringWidth += glyph.AdvanceWidth/* - glyph.LeftSideBearing*/;
+            // }
+            //
+            // Mesh.Optimize(false, false);
         }
     }
 }

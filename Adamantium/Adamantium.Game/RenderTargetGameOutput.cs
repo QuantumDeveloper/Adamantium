@@ -12,7 +12,7 @@ using Rectangle = Adamantium.Mathematics.Rectangle;
 namespace Adamantium.Game
 {
     /// <summary>
-    /// Represents <see cref="GameOutput"/> based on <see cref="Window"/> 
+    /// Represents <see cref="GameOutput"/> based on <see cref="WindowBase"/> 
     /// </summary>
     public class RenderTargetGameOutput : AdamantiumGameOutputBase
     {

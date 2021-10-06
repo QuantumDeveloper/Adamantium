@@ -37,7 +37,7 @@ namespace Adamantium.Game
         protected override void InitializeInternal(GameContext context)
         {
             GameContext = context;
-            window = GameContext.Context as IWindow ?? throw new ArgumentException($"{nameof(context.Context)} should be of type RenderTargetPanel");
+            window = GameContext.Context as IWindow ?? throw new ArgumentException($"{nameof(context.Context)} should be of type {nameof(IWindow)}");
             UIComponent = window as FrameworkComponent;
             window.ClientSizeChanged += WindowOnClientSizeChanged;
             

@@ -9,6 +9,13 @@ namespace Adamantium.UI
 {
     public class UIComponent : VisualComponent, IInputElement, IUIComponent
     {
+        private Size renderSize;
+        private Size? _previousMeasure;
+        private Rect? _previousArrange;
+        
+        protected bool sizeChanged;
+        protected Size previousRenderSize;
+        
         #region Adamantium properties
 
         public static readonly AdamantiumProperty IsFocusedProperty =
@@ -378,12 +385,6 @@ namespace Adamantium.UI
         {
             add => AddHandler(Keyboard.PreviewLostKeyboardFocusEvent, value);
             remove => RemoveHandler(Keyboard.PreviewLostKeyboardFocusEvent, value);
-        }
-
-        public event MouseButtonEventHandler PreviewMouseDoubcleClick
-        {
-            add => AddHandler(PreviewMouseDoubleClickEvent, value);
-            remove => RemoveHandler(PreviewMouseDoubleClickEvent, value);
         }
 
         public event MouseEventHandler PreviewGotMouseCapture
@@ -1031,10 +1032,6 @@ namespace Adamantium.UI
             }
         }
 
-        protected Size previousRenderSize;
-        private Size renderSize;
-        protected bool sizeChanged;
-
         public void InvalidateMeasure()
         {
             var parent = this.GetVisualParent<UIComponent>();
@@ -1045,15 +1042,7 @@ namespace Adamantium.UI
             _previousMeasure = null;
             _previousArrange = null;
 
-            if (parent != null /*&& IsResizable((FrameworkElement)parent)*/)
-            {
-                parent.InvalidateMeasure();
-            }
-            //else
-            //{
-            //   var root = GetLayoutRoot();
-            //   root?.Item1.LayoutManager?.InvalidateMeasure(this, root.Item2);
-            //}
+            parent?.InvalidateMeasure();
         }
 
         public void InvalidateArrange()
@@ -1077,10 +1066,6 @@ namespace Adamantium.UI
         {
             return Double.IsNaN(control.Width) || Double.IsNaN(control.Height);
         }
-
-        private Size? _previousMeasure;
-
-        private Rect? _previousArrange;
 
         /// <summary>
         /// The default implementation of the control's measure pass.
@@ -1173,7 +1158,6 @@ namespace Adamantium.UI
             return finalSize;
         }
 
-
         /// <summary>
         /// Arranges the control and its children.
         /// </summary>
@@ -1223,8 +1207,7 @@ namespace Adamantium.UI
         }
 
         /// <summary>
-        /// Tests whether any of a <see cref="Rect"/>'s properties incude nagative values,
-        /// a NaN or Infinity.
+        /// Tests whether any of a <see cref="Rect"/>'s properties include negative values, a NaN or Infinity.
         /// </summary>
         /// <param name="rect">The rect.</param>
         /// <returns>True if the rect is invalid; otherwise false.</returns>
@@ -1238,8 +1221,7 @@ namespace Adamantium.UI
         }
 
         /// <summary>
-        /// Tests whether any of a <see cref="Size"/>'s properties incude nagative values,
-        /// a NaN or Infinity.
+        /// Tests whether any of a <see cref="Size"/>'s properties include negative values, a NaN or Infinity.
         /// </summary>
         /// <param name="size">The size.</param>
         /// <returns>True if the size is invalid; otherwise false.</returns>
@@ -1259,7 +1241,6 @@ namespace Adamantium.UI
         {
             return new Size(Math.Max(size.Width, 0), Math.Max(size.Height, 0));
         }
-
 
         public void AddHandler(RoutedEvent routedEvent, Delegate handler, bool handledEventsToo = false)
         {

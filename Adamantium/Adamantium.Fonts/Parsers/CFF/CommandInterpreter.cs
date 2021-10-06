@@ -561,7 +561,6 @@ namespace Adamantium.Fonts.Parsers.CFF
             for (int i = 0; i < pointList.Count; i++)
             {
                 var point = pointList[i];
-                point.Y = -point.Y;
                 pointList[i] = point;
             }
 

@@ -338,9 +338,9 @@ namespace Adamantium.Fonts.Parsers
                 { "cmap",    70     },
                 { "hhea",    80     },
                 { "hmtx",    90     },
-                { "fvar",    91	    },
+                { "vmtx",    91     },
+                { "fvar",    92	    },
                 { "vhea",    100    },
-                { "vmtx",    110    },
                 { "OS/2",    120    },
                 { "post",    130    },
                 { "BASE",    140    },
@@ -524,6 +524,9 @@ namespace Adamantium.Fonts.Parsers
                         break;
                     case TableNames.hmtx:
                         ReadHorizontalMetricsTable(tableEntry);
+                        break;
+                    case TableNames.OS2:
+                        ReadOS2Table(tableEntry);
                         break;
                     case TableNames.glyf:
                         ReadTTFGlyphs(tableEntry);
@@ -975,6 +978,11 @@ namespace Adamantium.Fonts.Parsers
                 glyph.LeftSideBearing = leftSideBearing;
             }
         }
+        
+        protected virtual void ReadOS2Table(TableEntry entry)
+        {
+            
+        }
 
         protected virtual void ReadTTFGlyphs(TableEntry entry)
         {
@@ -1132,12 +1140,6 @@ namespace Adamantium.Fonts.Parsers
                         }
                     }
                 }
-            }
-
-            // Change the sign of all Y coordinates to match Vulkan coordinate system 
-            for (int i = 0; i < yCoords.Length; ++i)
-            {
-                yCoords[i] = (short)-yCoords[i];
             }
 
             int currentPointIndex = 0;

@@ -70,6 +70,8 @@ namespace Adamantium.UI.Processors
         {
             _gameTime = gameTime;
             base.Draw(gameTime);
+            
+            if (windowRenderModule == null) return;
 
             if (windowRenderModule.Prepare())
             {

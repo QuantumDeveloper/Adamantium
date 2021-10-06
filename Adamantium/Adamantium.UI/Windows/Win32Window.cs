@@ -9,15 +9,11 @@ namespace Adamantium.UI.Windows
     {
         public override IntPtr Handle { get; internal set; }
 
-        public override bool IsClosed { get; protected set; }
-        internal bool IsLocked;
-
-
-        private WindowWorker windowWorker;
+        private Win32WindowWorker win32WindowWorker;
 
         public Win32Window()
         {
-            windowWorker = new WindowWorker();
+            win32WindowWorker = new Win32WindowWorker();
         }
 
         public override void Show()
@@ -25,30 +21,14 @@ namespace Adamantium.UI.Windows
             if (Handle == IntPtr.Zero)
             {
                 VerifyAccess();
-                windowWorker.SetWindow(this);
-            }
-        }
-
-        public override  void Close()
-        {
-            IsClosed = true;
-            OnClosed();
-        }
-
-        private void OnClosed()
-        {
-            var closingArgs = new WindowClosingEventArgs();
-            Closing?.Invoke(this, closingArgs);
-            if (!closingArgs.Cancel)
-            {
-                Closed?.Invoke(this, EventArgs.Empty);
+                win32WindowWorker.SetWindow(this);
             }
         }
 
         public override IntPtr SurfaceHandle => Handle;
         //public override event EventHandler<SizeChangedEventArgs> ClientSizeChanged;
-        public override event EventHandler<WindowClosingEventArgs> Closing;
-        public override event EventHandler<EventArgs> Closed;
+        //public override event EventHandler<WindowClosingEventArgs> Closing;
+        //public override event EventHandler<EventArgs> Closed;
 
         public override bool IsActive { get; internal set; }
 

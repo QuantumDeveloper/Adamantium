@@ -233,7 +233,7 @@ namespace Adamantium.Fonts.Parsers.CFF
 
                     var commandList = new CommandParser(this).Parse(cffFont, mainStack, fontDict, index: i);
 
-                    var glyph = Glyph.Create((uint) i).SetCommands(commandList).FillOutlines();
+                    var glyph = Glyph.Create((uint) i).SetCommands(commandList).FillOutlines().RecalculateBounds();
 
                     glyphs.Add(glyph);
                     

@@ -84,6 +84,8 @@ namespace Adamantium.Imaging.Png
                 {
                     var frame = pngImage.Frames[0];
                     PNGColorProfile.AutoChooseColor(info.ColorMode, frame.RawPixelBuffer, frame.Width, frame.Height, state.InfoRaw);
+                    state.InfoRaw.ColorType = info.ColorMode.ColorType;
+                    state.InfoRaw.BitDepth = info.ColorMode.BitDepth;
                 }
             }
 
@@ -159,7 +161,7 @@ namespace Adamantium.Imaging.Png
             var width = pngImage.Header.Width;
             var height = pngImage.Header.Height;
             pngStream.WriteSignature();
-            pngStream.WriteIHDR(state, (int)width, (int)height);
+            pngStream.WriteIHDR(state, width, height);
 
             if (info.IsIccpDefined)
             {

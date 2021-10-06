@@ -187,7 +187,7 @@ namespace Adamantium.UI.Processors
             //     return false;
             // }
 
-            if (isWindowResized || !GraphicsDevice.BeginDraw(Colors.CornflowerBlue, 1.0f, 0))
+            if (isWindowResized || !GraphicsDevice.BeginDraw(1.0f, 0))
             {
                 GraphicsDevice.ResizePresenter((uint)window.ClientWidth, (uint)window.ClientHeight);
                 isWindowResized = false;
@@ -291,7 +291,7 @@ namespace Adamantium.UI.Processors
             //wvp = world * view * fovPrj;
             
             // world = Matrix4x4F.Translation(200, 200, 1);
-             wvp = world * orthoProj;
+             //wvp = world * orthoProj;
              GraphicsDevice.BasicEffect.Parameters["wvp"].SetValue(wvp);
              GraphicsDevice.BasicEffect.Parameters["meshColor"].SetValue(Colors.Crimson.ToVector3());
              GraphicsDevice.BasicEffect.Parameters["transparency"].SetValue(1f);

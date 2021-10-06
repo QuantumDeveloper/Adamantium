@@ -134,6 +134,7 @@
       <Content Include="Fonts\OTFFonts\SourceSans3-Regular.otf">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
+      <None Remove="Textures\sdf.png" />
     </ItemGroup>
 
     <ItemGroup>

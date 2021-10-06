@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.ObjectModel;
 using Adamantium.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.Game.Events;
@@ -144,7 +143,7 @@ namespace Adamantium.Game
 
         internal static GameOutput NewWindow(uint width, uint height)
         {
-            var wnd = Window.New();
+            var wnd = new Window();
             wnd.Width = width;
             wnd.Height = height;
             return new AdamantiumGameOutput(new GameContext(wnd));

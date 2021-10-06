@@ -55,8 +55,9 @@ namespace Adamantium.Imaging.Png.Chunks
                 transparencyBytes.Add((byte)(KeyB >> 8));
                 transparencyBytes.Add((byte)(KeyB & 255));
             }
-            bytes.AddRange(Utilities.GetBytesWithReversedEndian(transparencyBytes.Count));
+            
             bytes.AddRange(GetNameAsBytes());
+            //bytes.AddRange(Utilities.GetBytesWithReversedEndian(transparencyBytes.Count));
             bytes.AddRange(transparencyBytes);
 
             return bytes.ToArray();

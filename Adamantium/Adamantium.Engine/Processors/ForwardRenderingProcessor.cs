@@ -263,7 +263,8 @@ namespace Adamantium.Engine.Processors
         private void CreateResources()
         {
             textureSampler = CreateTextureSampler();
-            defaultTexture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "texture.png"));
+            //defaultTexture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "texture.png"));
+            defaultTexture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "sdf.png"));
             //DeferredDevice.SetTargets(null);
 
             //var vbFlags = BufferFlags.VertexBuffer | BufferFlags.StreamOutput;
@@ -386,7 +387,7 @@ namespace Adamantium.Engine.Processors
 
             if (base.BeginDraw())
             {
-                if (GraphicsDevice.BeginDraw(Colors.White, 1.0f, 0))
+                if (GraphicsDevice.BeginDraw(1.0f, 0))
                 {
                     GraphicsDevice.SetViewports(Window.Viewport);
                     GraphicsDevice.SetScissors(Window.Scissor);
@@ -469,7 +470,8 @@ namespace Adamantium.Engine.Processors
                                         var wvp = transformation.WorldMatrix * ActiveCamera.UiProjection;
                                         //var wvp = transformation.WorldMatrix * Matrix4x4F.Scaling(1, -1, 1) * Matrix4x4F.Scaling(2.0f / Window.Width, 2.0f/Window.Height, 1.0f / (100000f - 1f));
                                         GraphicsDevice.BasicEffect.Parameters["wvp"].SetValue(wvp);
-                                        GraphicsDevice.BasicEffect.Parameters["meshColor"].SetValue(new Vector4F());
+                                        GraphicsDevice.BasicEffect.Parameters["meshColor"].SetValue(Colors.Black.ToVector3());
+                                        GraphicsDevice.BasicEffect.Parameters["transparency"].SetValue(0.5f);
                                         //GraphicsDevice.BasicEffect.Parameters["worldMatrix"].SetValue(transformation.WorldMatrix);
                                         //GraphicsDevice.BasicEffec.SetValue(Matrix4x4F.Transpose(Matrix4x4F.Invert(transformation.WorldMatrix)));
                                         
@@ -495,7 +497,9 @@ namespace Adamantium.Engine.Processors
 
                                         if (component is MeshRenderer)
                                         {
-                                            GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Colored"].Apply();
+                                            
+                                            //GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Colored"].Apply();
+                                            GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["MSDF"].Apply();
 
                                             //BasicEffect.Techniques["MeshVertex"].Passes["DirectionalLight"].Apply();
                                             component.Draw(GraphicsDevice, gameTime);

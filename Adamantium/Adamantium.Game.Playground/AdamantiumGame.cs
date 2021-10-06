@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Adamantium.Engine;
 using Adamantium.Engine.Core;
@@ -12,7 +13,10 @@ using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
 using Adamantium.Fonts;
 using Adamantium.Game.Events;
+using Adamantium.Imaging;
 using Adamantium.Mathematics;
+using AdamantiumVulkan.Core;
+using Image = Adamantium.Imaging.Image;
 
 namespace Adamantium.Game.Playground
 {
@@ -48,12 +52,13 @@ namespace Adamantium.Game.Playground
         private async void LoadModels()
         {
             // var entity = await ImportModel(@"Models\monkey\monkey.dae");
+            // EntityWorld.AddEntity(entity);
             // var ent = entity.Dependencies[0];
             // ent.Transform.SetScaleFactor(100);
             // ent.Transform.SetPosition(new Vector3D(500, 300, -150));
             //await ImportModel(@"Models\F15C\F-15C_Eagle.dae");
-            ImportFont();
-            //ImportOTFFont();
+            //ImportFont();
+            ImportOTFFont();
         }
 
         private void InitializeResources()
@@ -90,26 +95,13 @@ namespace Adamantium.Game.Playground
                 
                 var textLayout = new TextLayout(font, "Приветствую вас, майне либе. Проблема с матрицами решена!", 24, new Rectangle());
                 
-                //var glyph = font.GetGlyphByUnicode('@');
-                //var points = glyph.Triangulate(3);
-                //var mesh = new Mesh();
-                //mesh.MeshTopology = PrimitiveType.LineStrip;
-                //mesh.SetPositions(points);
                 var meshComponent = new MeshData();
                 meshComponent.Mesh = textLayout.Mesh;
-                // var vertices = new List<Vector3F>();
-                // vertices.Add(new Vector3F(0));
-                // vertices.Add(new Vector3F(50f, 50f, 0));
-                // vertices.Add(new Vector3F(-50f, 50f, 0));
-                // var triangle = new Mesh();
-                // triangle.SetPositions(vertices);
-                // meshComponent.Mesh = triangle;
                 
                 var meshRenderer = new MeshRenderer();
                 entity.AddComponent(meshComponent);
                 entity.AddComponent(meshRenderer);
                 entity.Transform.SetScaleFactor(textLayout.Scale);
-                //entity.Transform.SetBaseScale(Vector3F.One);
                 entity.Transform.SetPosition(new Vector3D(0, 0, 1));
                 EntityWorld.AddEntity(entity);
             }
@@ -125,20 +117,59 @@ namespace Adamantium.Game.Playground
             try
             {
                 //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/CFF2/SourceHanSerifVFProtoJP.otf", 3);
-                var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/CFF2/AdobeVFPrototype.otf", 3);
+                var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/SourceSans3-Regular.otf", 3);
                 var entity = new Entity(null, "Poppins-Medium");
-                typeface.GetGlyphByIndex(176, out var glyph);
-                var points = glyph.Triangulate(10);
+                var font = typeface.GetFont(0);
+                var glyph = font.GetGlyphByCharacter('/');
+                glyph.Sample(5);
+                uint size = 32;
+                
+                /*
+                //var colors = glyph.GenerateMSDF(size);
+                var colors = glyph.GenerateSDF(size);
+                var img = Image.New2D(size, size, 1, SurfaceFormat.R8G8B8A8.UNorm);
+                var pixels = img.GetPixelBuffer(0, 0);
+                pixels.SetPixels(colors);
+                img.Save(@"Textures\sdf.png", ImageFileType.Png);
+                */
+
+                var glyphSize = 250;
+                var quadList = new List<Vector3F>();
+                quadList.Add(new Vector3F(0));
+                quadList.Add(new Vector3F(glyphSize, 0, 0));
+                quadList.Add(new Vector3F(glyphSize, glyphSize, 0));
+                quadList.Add(new Vector3F(0, glyphSize, 0));
+
+                var uv = new List<Vector2F>();
+                uv.Add(new Vector2F(0));
+                uv.Add(new Vector2F(1, 0));
+                uv.Add(new Vector2F(1, 1));
+                uv.Add(new Vector2F(0, 1));
+                var mesh = new Mesh();
+                mesh.MeshTopology = PrimitiveType.TriangleList;
+                mesh.SetPositions(quadList);
+                mesh.SetUVs(0, uv);
+                mesh.SetIndices(new[] { 0, 1, 2, 0, 2, 3 });
+                var meshComponent = new MeshData();
+                meshComponent.Mesh = mesh;
+                var meshRenderer = new MeshRenderer();
+                entity.AddComponent(meshComponent);
+                entity.AddComponent(meshRenderer);
+                
+                /*
+                var points = glyph.Sample(5);
+                
                 //parser.GenerateGlyphTriangles(ch);
                 //parser.GenerateDefaultGlyphTriangles(ch);
                 var mesh = new Mesh();
-                //mesh.MeshTopology = PrimitiveType.LineStrip;
+                mesh.MeshTopology = PrimitiveType.LineList;
                 mesh.SetPositions(points);
                 var meshComponent = new MeshData();
                 meshComponent.Mesh = mesh;
                 var meshRenderer = new MeshRenderer();
                 entity.AddComponent(meshComponent);
                 entity.AddComponent(meshRenderer);
+                */
                 EntityWorld.AddEntity(entity);
             }
             catch (Exception e)

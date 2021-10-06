@@ -6,15 +6,16 @@ using Adamantium.Win32.RawInput;
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using System.Text;
+using Adamantium.Core.DependencyInjection;
+using Adamantium.Core.Events;
+using Adamantium.UI.AggregatorEvents;
 using Adamantium.UI.Controls;
-using InputDevice = Adamantium.Win32.RawInput.InputDevice;
 
 namespace Adamantium.UI.Windows
 {
-    internal class WindowWorker : AdamantiumComponent
+    internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
     {
-        private Win32Window window;
+        private WindowBase window;
         private Dictionary<uint, HandleMessage> messageTable;
 
         private bool isOverSizeFrame;
@@ -22,13 +23,16 @@ namespace Adamantium.UI.Windows
         private InputModifiers lastRawMouseModifiers;
         private Win32NativeWindowWrapper source;
 
-        static WindowWorker()
+        private IEventAggregator eventAggregator;
+
+        static Win32WindowWorker()
         {
             RawInputDevice.RegisterDevice(HIDUsagePage.Generic, HIDUsageId.Mouse, InputDeviceFlags.None);
         }
 
-        public WindowWorker()
+        public Win32WindowWorker()
         {
+            eventAggregator = AdamantiumServiceLocator.Current.Resolve<IEventAggregator>();
             messageTable = new Dictionary<uint, HandleMessage>();
             messageTable[(uint)WindowMessages.Activate] = HandleActivate;
             messageTable[(uint)WindowMessages.Syscommand] = HandleSysCommand;
@@ -63,7 +67,7 @@ namespace Adamantium.UI.Windows
             messageTable[(uint)WindowMessages.Setcursor] = HandleSetCursor;
         }
 
-        public void SetWindow(Win32Window window)
+        public void SetWindow(WindowBase window)
         {
             this.window = window;
             this.window.Closed += OnWindowClosed;
@@ -74,6 +78,8 @@ namespace Adamantium.UI.Windows
             this.window.Handle = source.Handle;
             if (source.Handle != IntPtr.Zero)
             {
+                this.window.SurfaceHandle = source.Handle;
+                
                 source.AddHook(CustomWndProc);
 
                 Win32Interop.GetClientRect(window.Handle, out var client);
@@ -81,7 +87,9 @@ namespace Adamantium.UI.Windows
                 this.window.ClientHeight = (uint)client.Height;
 
                 this.window.ApplyTemplate();
-                //Application.Current?.Windows.Add(this.window);
+                
+                eventAggregator.GetEvent<WindowAddedEvent>().Publish(this.window);
+                
                 this.window.OnSourceInitialized();
                 Win32Interop.ShowWindow(source.Handle, WindowShowStyle.ShowNormal);
             }
@@ -309,7 +317,7 @@ namespace Adamantium.UI.Windows
                 Messages.GetWheelDelta(wParam), 
                 RawMouseEventType.MouseWheel, 
                 window,
-                window.ScreenToClient(Messages.PointFromLParam(lParam)),
+                window.PointToClient(Messages.PointFromLParam(lParam)),
                 WindowsMouseDevice.GetKeyModifiers(windowMessage, wParam),
                 WindowsMouseDevice.Instance, GetTimeStamp());
             WindowsMouseDevice.Instance.ProcessEvent((RawMouseEventArgs)eventArgs);

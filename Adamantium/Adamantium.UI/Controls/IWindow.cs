@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Adamantium.Engine.Graphics;
 
 namespace Adamantium.UI.Controls
 {
@@ -21,7 +22,17 @@ namespace Adamantium.UI.Controls
         Double ClientHeight { get; set; }
 
         IntPtr SurfaceHandle { get; }
+        
+        double Left { get; set; }
+        
+        double Top { get; set; }
+        
+        string Title { get; set; }
+        
+        MSAALevel MSAALevel { get; set; }
 
+        public void Render();
+        
         event SizeChangedEventHandler ClientSizeChanged;
         event EventHandler<WindowClosingEventArgs> Closing;
         event EventHandler<EventArgs> Closed;

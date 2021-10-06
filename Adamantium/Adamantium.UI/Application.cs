@@ -5,10 +5,12 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using Adamantium.Core.DependencyInjection;
+using Adamantium.Core.Events;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.Engine.Graphics.Effects;
 using Adamantium.EntityFramework;
+using Adamantium.UI.AggregatorEvents;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Input;
 using Adamantium.UI.MacOS;
@@ -63,6 +65,8 @@ namespace Adamantium.UI
         private Thread renderThread;
         private CancellationTokenSource cancellationTokenSource;
 
+        private IEventAggregator eventAggregator;
+
         static Application()
         {
             WindowsPlatform.Initialize();
@@ -71,7 +75,7 @@ namespace Adamantium.UI
         protected Application()
         {
             Current = this;
-            
+            var d = Dispatcher.CurrentDispatcher;
             VulkanDllMap.Register();
             ShutDownMode = ShutDownMode.OnMainWindowClosed;
             systemManager = new ApplicationSystemManager(this);
@@ -84,10 +88,11 @@ namespace Adamantium.UI
             Windows.WindowRemoved += WindowRemoved;
             appTime = new ApplicationTime();
             preciseTimer = new PreciseTimer();
-            Services = new AdamantiumServiceLocator();
+            Services = AdamantiumServiceLocator.Current;
             Services.RegisterInstance<IService>(this);
             Services.RegisterInstance<SystemManager>(systemManager);
             entityWorld = new EntityWorld(Services);
+            eventAggregator = Services.Resolve<IEventAggregator>();
             Initialize();
             renderThread = new Thread(RenderThread);
         }
@@ -327,7 +332,6 @@ namespace Adamantium.UI
 
         protected void EndScene()
         {
-
         }
 
         protected void Initialize()
@@ -337,6 +341,8 @@ namespace Adamantium.UI
             //GraphicsDevice.RasterizerState = GraphicsDevice.RasterizerStates.CullNoneClipEnabled;
             //GraphicsDevice.DepthStencilState = GraphicsDevice.DepthStencilStates.DepthEnableGreaterEqual;
             Services.RegisterInstance<GraphicsDevice>(MainGraphicsDevice);
+
+            eventAggregator.GetEvent<WindowAddedEvent>().Subscribe(OnWindowAdded, ThreadOption.UIThread);
             Initialized?.Invoke(this, EventArgs.Empty);
         }
 

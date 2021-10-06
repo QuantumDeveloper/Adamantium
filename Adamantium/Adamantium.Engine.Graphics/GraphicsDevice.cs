@@ -88,10 +88,12 @@ namespace Adamantium.Engine.Graphics
             viewports = new TrackingCollection<Viewport>();
             scissors = new TrackingCollection<Rect2D>();
 
-            BlendState = BlendStates.Default;
+            BlendState = BlendStates.Fonts;
             //RasterizerState = RasterizerStates.CullBackClipDisabled;
             RasterizerState = RasterizerStates.CullNoneClipDisabled;
             DepthStencilState = DepthStencilStates.Default;
+            
+            ClearColor = Colors.CornflowerBlue;
 
             pipelineManager = new PipelineManager(this);
 
@@ -134,6 +136,8 @@ namespace Adamantium.Engine.Graphics
         public static DepthStencilStatesCollection DepthStencilStates { get; }
         
         public Effect BasicEffect { get; private set; }
+        
+        public Color ClearColor { get; set; }
 
         public BlendState BlendState
         {
@@ -411,7 +415,7 @@ namespace Adamantium.Engine.Graphics
             return LogicalDevice.CreateFramebuffer(info);
         }
 
-        public bool BeginDraw(Color clearColor, float depth = 1.0f, uint stencil = 0)
+        public bool BeginDraw(float depth = 1.0f, uint stencil = 0)
         {
             CanPresent = false;
             var renderFence = InFlightFences[CurrentFrame];
@@ -469,7 +473,7 @@ namespace Adamantium.Engine.Graphics
 
             ClearValue clearColorValue = new ClearValue();
             clearColorValue.Color = new ClearColorValue();
-            clearColorValue.Color.Float32 = clearColor.ToFloatArray();
+            clearColorValue.Color.Float32 = ClearColor.ToFloatArray();
 
             ClearValue clearDepthValue = new ClearValue();
             clearDepthValue.DepthStencil = new ClearDepthStencilValue();
@@ -478,7 +482,7 @@ namespace Adamantium.Engine.Graphics
 
             ClearValue clearColorValueResolve = new ClearValue();
             clearColorValueResolve.Color = new ClearColorValue();
-            clearColorValueResolve.Color.Float32 = clearColor.ToFloatArray();
+            clearColorValueResolve.Color.Float32 = ClearColor.ToFloatArray();
 
             renderPassInfo.PClearValues = new[] {clearColorValue, clearDepthValue, clearColorValueResolve};
             renderPassInfo.ClearValueCount = (uint) renderPassInfo.PClearValues.Length;
