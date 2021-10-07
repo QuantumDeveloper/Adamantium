@@ -585,29 +585,22 @@ namespace Adamantium.Fonts
             // 4. Generate colored pseudo-distance field
             var coloredDistances = new ColoredDistance[size, size];
             double maxDistance = Double.MinValue;
-            //double minDistance = Double.MaxValue;
 
             for (int y = 0; y < size; ++y)
             {
                 for (int x = 0; x < size; ++x)
                 {
                     // determine the closest segment to current sampling point
-                    var samplingPoint = new Vector2D(originalDimensions.X / size * x, originalDimensions.Y - (originalDimensions.Y / size * y));
+                    var samplingPoint = new Vector2D(originalDimensions.X / size * (x + 0.5), originalDimensions.Y - (originalDimensions.Y / size * (y + 0.5)));
                     
                     GetColoredDistances(samplingPoint, out coloredDistances[x, y].redDistance, out coloredDistances[x, y].greenDistance, out coloredDistances[x, y].blueDistance);
 
                     var maxOfThree = MaxOfThree(coloredDistances[x, y].redDistance, coloredDistances[x, y].greenDistance, coloredDistances[x, y].blueDistance);
-                    var minOfThree = MinOfThree(coloredDistances[x, y].redDistance, coloredDistances[x, y].greenDistance, coloredDistances[x, y].blueDistance);
 
                     if (maxOfThree > maxDistance)
                     {
                         maxDistance = maxOfThree;
                     }
-
-                    /*if (minOfThree < minDistance)
-                    {
-                        minDistance = minOfThree;
-                    }*/
                 }
             }
             
@@ -789,9 +782,7 @@ namespace Adamantium.Fonts
             var originalDimensions = new Vector2D(glyphSize);
             
             // calculate diff for placing glyph in center of calculated boundaries
-            var glyphCenter = new Vector2D(BoundingRectangle.Width / 2.0f, BoundingRectangle.Height / 2.0f);
-            glyphCenter.X += BoundingRectangle.X;
-            glyphCenter.Y += BoundingRectangle.Y;
+            var glyphCenter = BoundingRectangle.Center;
             var originalCenter = originalDimensions / 2;
             var diff = originalCenter - glyphCenter;
             
@@ -832,7 +823,7 @@ namespace Adamantium.Fonts
                 for (int x = 0; x < size; ++x)
                 {
                     // determine the closest segment to current sampling point
-                    var point = new Vector2D(originalDimensions.X / size * x, originalDimensions.Y - (originalDimensions.Y / size * y));
+                    var point = new Vector2D(originalDimensions.X / size * (x + 0.5), originalDimensions.Y - (originalDimensions.Y / size * (y + 0.5)));
                     var ray = new Ray2D(point, Vector2D.UnitX);
                     double distance = Double.MaxValue;
                     LineSegment2D closestSegment = new LineSegment2D();
