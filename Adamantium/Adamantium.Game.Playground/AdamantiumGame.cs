@@ -120,18 +120,20 @@ namespace Adamantium.Game.Playground
                 var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/SourceSans3-Regular.otf", 3);
                 var entity = new Entity(null, "Poppins-Medium");
                 var font = typeface.GetFont(0);
-                var glyph = font.GetGlyphByCharacter('/');
+                var glyph = font.GetGlyphByCharacter('A');
                 glyph.Sample(5);
-                uint size = 32;
+                uint size = 64;
                 
-                /*
+                //glyph.SetTestSegmentData(); 
+                var colors = glyph.GenerateDirectMSDF(size);
                 //var colors = glyph.GenerateMSDF(size);
-                var colors = glyph.GenerateSDF(size);
+                //var colors = glyph.GenerateSDF(size);
+                //var colors = glyph.GenerateSPDF(size);
                 var img = Image.New2D(size, size, 1, SurfaceFormat.R8G8B8A8.UNorm);
                 var pixels = img.GetPixelBuffer(0, 0);
                 pixels.SetPixels(colors);
                 img.Save(@"Textures\sdf.png", ImageFileType.Png);
-                */
+                
 
                 var glyphSize = 250;
                 var quadList = new List<Vector3F>();

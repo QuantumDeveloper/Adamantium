@@ -609,5 +609,68 @@ namespace Adamantium.Mathematics
         {
             return QuaternionF.Invert(a) * b;
         }
+
+        // --- DIVER MATH ---
+        
+        public static bool IsOneDiver(double a)
+        {
+            return IsZero(a - 1.0);
+        }
+        
+        public static double RadiansToDegrees(double radians)
+        {
+            return ((radians * 180.0) / System.Math.PI);
+        }
+        
+        public static double Dot(Vector2D v1, Vector2D v2)
+        {
+            return (v1.X * v2.X + v1.Y * v2.Y);
+        }
+        
+        public static Vector2D LineSegmentToVector(Vector2D start, Vector2D end)
+        {
+            return new Vector2D(end.X - start.X, end.Y - start.Y);
+        }
+
+        // find angle in degrees between to segments
+        public static double DetermineAngleInDegrees(Vector2D v1Start, Vector2D v1End, Vector2D v2Start, Vector2D v2End)
+        {
+            Vector2D v1 = LineSegmentToVector(v1Start, v1End);
+            Vector2D v2 = LineSegmentToVector(v2Start, v2End);
+
+            double dot = Dot(v1, v2);
+
+            double v1Length = v1.Length();
+            double v2Length = v2.Length();
+
+            double cos = dot / (v1Length * v2Length);
+
+            sbyte sign = cos < 0 ? (sbyte)-1 : (sbyte)1;
+
+            if (IsOneDiver(System.Math.Abs(cos)))
+            {
+                cos = sign;
+            }
+
+            double rad = System.Math.Acos(cos);
+
+            return RadiansToDegrees(rad);
+        }
+
+        public static double PointToLineDistance(Vector2D start, Vector2D end, Vector2D point)
+        {
+            var a = (end.Y - start.Y) * point.X;
+            var b = (end.X - start.X) * point.Y;
+            var c = end.X * start.Y;
+            var d = end.Y * start.X;
+
+            var e = Math.Pow((end.Y - start.Y), 2);
+            var f = Math.Pow((end.X - start.X), 2);
+
+            var num = Math.Abs(a - b + c - d);
+            var den = Math.Sqrt(e + f);
+
+            return (num / den);
+        }
     }
 }

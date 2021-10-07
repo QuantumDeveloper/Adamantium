@@ -392,6 +392,299 @@ namespace Adamantium.Fonts
             return points.ToArray();
         }
 
+        // --- DIRECT MSDF START ---
+
+        private void ColorSegments()
+        {
+            Color currentColor = Color.FromRgba(255, 0 ,255, 255);
+
+            for (int i = 0; i < segments.Count; ++i)
+            {
+                var currentSegment = segments[i];
+
+                if (i != (segments.Count - 1))
+                {
+                    var nextSegment = segments[i + 1];
+
+                    // new outline detected, reset current color
+                    if (!IsSegmentsConnected(ref currentSegment, ref nextSegment))
+                    {
+                        currentColor = Color.FromRgba(255, 0, 255, 255);
+                    }
+                }
+
+                currentSegment.MsdfColor = currentColor;
+                segments[i] = currentSegment;
+
+                if (currentColor == Color.FromRgba(255, 255, 0, 255))
+                {
+                    currentColor = Color.FromRgba(0, 255, 255, 255);
+                }
+                else
+                {
+                    currentColor = Color.FromRgba(255, 255, 0, 255);
+                }
+            }
+        }
+
+        private double GetDistanceToSegment(LineSegment2D segment, Vector2D point)
+        {
+            return point.DistanceToPoint(segment.Start, segment.End);
+        }
+
+        private double GetSignedDistanceToSegment(LineSegment2D segment, Vector2D point)
+        {
+            var distance = point.DistanceToPoint(segment.Start, segment.End);
+            
+            var ray = new Ray2D(point, Vector2D.UnitX);
+            var intersectionsCount = 0;
+            
+            foreach (var seg in segments)
+            {
+                var currentSeg = seg;
+                if (Collision2D.RaySegmentIntersection(ref ray, ref currentSeg, out var collision))
+                {
+                    intersectionsCount++;
+                }
+            }
+
+            // if outside of glyph - distance should be negative
+            if (intersectionsCount % 2 == 0)
+            {
+                distance = -distance;
+            }
+
+            return distance;
+        }
+        
+        private double GetSignedPseudoDistanceToSegment(LineSegment2D segment, Vector2D point)
+        {
+            var distance = MathHelper.PointToLineDistance(segment.Start, segment.End, point);
+            
+            var ray = new Ray2D(point, Vector2D.UnitX);
+            var intersectionsCount = 0;
+            
+            foreach (var seg in segments)
+            {
+                var currentSeg = seg;
+                if (Collision2D.RaySegmentIntersection(ref ray, ref currentSeg, out var collision))
+                {
+                    intersectionsCount++;
+                }
+            }
+
+            // if outside of glyph - distance should be negative
+            if (intersectionsCount % 2 == 0)
+            {
+                distance = -distance;
+            }
+
+            return distance;
+        }
+        
+        private Color ApplyColorMask(Color color, bool redMask, bool greenMask, bool blueMask)
+        {
+            color.R *= redMask ? (byte)1 : (byte)0;
+            color.G *= greenMask ? (byte)1 : (byte)0;
+            color.B *= blueMask ? (byte)1 : (byte)0;
+
+            return color;
+        }
+        
+        private struct ColoredDistance
+        {
+            public double redDistance;
+            public double greenDistance;
+            public double blueDistance;
+        }
+        
+        private void GetColoredDistances(Vector2D point, out double redDistance, out double greenDistance, out double blueDistance)
+        {
+            double closestRedDistance = Double.MaxValue;
+            double closestGreenDistance = Double.MaxValue;
+            double closestBlueDistance = Double.MaxValue;
+
+            LineSegment2D closestRedSegment = new LineSegment2D();
+            LineSegment2D closestGreenSegment = new LineSegment2D();
+            LineSegment2D closestBlueSegment = new LineSegment2D();
+            
+            foreach (var segment in segments)
+            {
+                var distance = GetDistanceToSegment(segment, point);
+
+                if (ApplyColorMask(segment.MsdfColor, true, false, false) != Colors.Black
+                    && distance < closestRedDistance)
+                {
+                    closestRedDistance = distance;
+                    closestRedSegment = segment;
+                }
+                
+                if (ApplyColorMask(segment.MsdfColor, false, true, false) != Colors.Black
+                    && distance < closestGreenDistance)
+                {
+                    closestGreenDistance = distance;
+                    closestGreenSegment = segment;
+                }
+                
+                if (ApplyColorMask(segment.MsdfColor, false, false, true) != Colors.Black
+                    && distance < closestBlueDistance)
+                {
+                    closestBlueDistance = distance;
+                    closestBlueSegment = segment;
+                }
+            }
+            
+            redDistance = GetSignedPseudoDistanceToSegment(closestRedSegment, point);
+            greenDistance = GetSignedPseudoDistanceToSegment(closestGreenSegment, point);
+            blueDistance = GetSignedPseudoDistanceToSegment(closestBlueSegment, point);
+        }
+
+        private double MaxOfThree(double d1, double d2, double d3)
+        {
+            return Math.Max(d1, Math.Max(d2, d3));
+        }
+        
+        private double MinOfThree(double d1, double d2, double d3)
+        {
+            return Math.Min(d1, Math.Min(d2, d3));
+        }
+
+        private double GetNormalizedMultiplier(double originalValue, double minValue, double maxValue)
+        {
+            return ((originalValue - minValue) / (maxValue - minValue));
+        }
+        
+        public Color[] GenerateDirectMSDF(uint size)
+        {
+            // 1. Color all segments
+            ColorSegments();
+            
+            // 2. Calculate boundaries for original glyph
+            float glyphSize = Math.Max(BoundingRectangle.Width, BoundingRectangle.Height);
+            glyphSize += glyphSize * 0.3f;
+            var originalDimensions = new Vector2D(glyphSize);
+            
+            // 3. Place glyph in center of calculated boundaries
+            var glyphCenter = BoundingRectangle.Center;
+            var originalCenter = originalDimensions / 2;
+            var diff = originalCenter - glyphCenter;
+            
+            for (var index = 0; index < segments.Count; index++)
+            {
+                var segment = segments[index];
+                var start = segment.Start;
+                var end = segment.End;
+                var msdfColor = segment.MsdfColor;
+                
+                segment = new LineSegment2D(start + diff, end + diff);
+                segment.MsdfColor = msdfColor;
+                
+                segments[index] = segment;
+            }
+
+            // 4. Generate colored pseudo-distance field
+            var coloredDistances = new ColoredDistance[size, size];
+            double maxDistance = Double.MinValue;
+            //double minDistance = Double.MaxValue;
+
+            for (int y = 0; y < size; ++y)
+            {
+                for (int x = 0; x < size; ++x)
+                {
+                    // determine the closest segment to current sampling point
+                    var samplingPoint = new Vector2D(originalDimensions.X / size * x, originalDimensions.Y - (originalDimensions.Y / size * y));
+                    
+                    GetColoredDistances(samplingPoint, out coloredDistances[x, y].redDistance, out coloredDistances[x, y].greenDistance, out coloredDistances[x, y].blueDistance);
+
+                    var maxOfThree = MaxOfThree(coloredDistances[x, y].redDistance, coloredDistances[x, y].greenDistance, coloredDistances[x, y].blueDistance);
+                    var minOfThree = MinOfThree(coloredDistances[x, y].redDistance, coloredDistances[x, y].greenDistance, coloredDistances[x, y].blueDistance);
+
+                    if (maxOfThree > maxDistance)
+                    {
+                        maxDistance = maxOfThree;
+                    }
+
+                    /*if (minOfThree < minDistance)
+                    {
+                        minDistance = minOfThree;
+                    }*/
+                }
+            }
+            
+            // 5. Normalize colored pseudo-distance field to [0 .. 255] range
+            var msdf = new List<Color>();
+
+            double minDistance = -maxDistance;
+            
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    if (coloredDistances[x, y].redDistance < minDistance)
+                    {
+                        coloredDistances[x, y].redDistance = minDistance;
+                    }
+                    
+                    if (coloredDistances[x, y].greenDistance < minDistance)
+                    {
+                        coloredDistances[x, y].greenDistance = minDistance;
+                    }
+                    
+                    if (coloredDistances[x, y].blueDistance < minDistance)
+                    {
+                        coloredDistances[x, y].blueDistance = minDistance;
+                    }
+                }
+            }
+            
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    coloredDistances[x, y].redDistance = GetNormalizedMultiplier(coloredDistances[x, y].redDistance, minDistance, maxDistance) * 255;
+                    coloredDistances[x, y].greenDistance = GetNormalizedMultiplier(coloredDistances[x, y].greenDistance, minDistance, maxDistance) * 255;
+                    coloredDistances[x, y].blueDistance = GetNormalizedMultiplier(coloredDistances[x, y].blueDistance, minDistance, maxDistance) * 255;
+
+                    var color = Color.FromRgba((byte)coloredDistances[x, y].redDistance, (byte)coloredDistances[x, y].greenDistance, (byte)coloredDistances[x, y].blueDistance, 255);
+                    msdf.Add(color);
+                }
+            }
+
+            return msdf.ToArray();
+        }
+
+        public void SetTestSegmentData()
+        {
+            segments = new List<LineSegment2D>();
+
+            var s1 = new LineSegment2D(new Vector2D(0, 0), new Vector2D(300, 400));
+            var s2 = new LineSegment2D(new Vector2D(300, 400), new Vector2D(500, 0));
+            var s3 = new LineSegment2D(new Vector2D(500, 0), new Vector2D(0, 0));
+
+            var s4 = new LineSegment2D(new Vector2D(100, 100), new Vector2D(300, 300));
+            var s5 = new LineSegment2D(new Vector2D(300, 300), new Vector2D(400, 100));
+            var s6 = new LineSegment2D(new Vector2D(400, 100), new Vector2D(100, 100));
+            
+            segments.Add(s1);
+            segments.Add(s2);
+            segments.Add(s3);
+            
+            segments.Add(s4);
+            segments.Add(s5);
+            segments.Add(s6);
+
+            var rectangle = BoundingRectangle;
+
+            rectangle.X = 0;
+            rectangle.Y = 0;
+            rectangle.Width = 500;
+            rectangle.Height = 400;
+
+            BoundingRectangle = rectangle;
+        }
+        
+        // --- DIRECT MSDF END ---
+        
         public Color[] GenerateMSDF(uint size)
         {
             float convexThreshold = 135;
@@ -401,6 +694,8 @@ namespace Adamantium.Fonts
             {
                 LineSegment2D prev;
                 LineSegment2D current;
+                
+                // cycle through all segment pairs, including last-first
                 if (i == segments.Count)
                 {
                     prev = segments[i-1];
@@ -412,9 +707,35 @@ namespace Adamantium.Fonts
                     current = segments[i];
                 }
                 
+                // if segments are not connected - they are from different outlines, skip
                 if (!IsSegmentsConnected(ref prev, ref current)) continue;
+
+                // revert prev direction in order to get correct angle between prev and current
+                var newPrev = new LineSegment2D(prev.End, prev.Start);
+
+                // angle will be between 0 and 180
+                var angle = MathHelper.DetermineAngleInDegrees(newPrev.Start, newPrev.End, current.Start, current.End);
                 
-                var angle = MathHelper.AngleBetween(prev, current);
+                // we must determine if prev is looking outside of glyph (convex corner), or inside (concave corner)
+                var prevRay = new Ray2D(prev.Start, prev.Direction);
+                int prevIntersectionsCount = 0;
+
+                foreach (var segment in segments)
+                {
+                    var seg = segment;
+                    if (Collision2D.RaySegmentIntersection(ref prevRay, ref seg, out var collision))
+                    {
+                        prevIntersectionsCount++;
+                    }
+                }
+                
+                // adjust the angle depending if it is the concave case
+                if (prevIntersectionsCount % 2 != 0) // concave
+                {
+                    angle = 360 - angle;
+                }
+
+                // check the threshold, color segments and their ends
                 if (angle < convexThreshold)
                 {
                     prev.EndOuterColor = current.StartOuterColor = Colors.Black;
@@ -462,9 +783,12 @@ namespace Adamantium.Fonts
                 }
             }
             
+            // calculate boundaries for original glyph
             float glyphSize = Math.Max(BoundingRectangle.Width, BoundingRectangle.Height);
             glyphSize += glyphSize * 0.1f;
             var originalDimensions = new Vector2D(glyphSize);
+            
+            // calculate diff for placing glyph in center of calculated boundaries
             var glyphCenter = new Vector2D(BoundingRectangle.Width / 2.0f, BoundingRectangle.Height / 2.0f);
             glyphCenter.X += BoundingRectangle.X;
             glyphCenter.Y += BoundingRectangle.Y;
@@ -474,6 +798,7 @@ namespace Adamantium.Fonts
             for (var index = 0; index < segments.Count; index++)
             {
                 var segment = segments[index];
+                
                 var innerColor = segment.InnerColor;
                 var outerColor = segment.OuterColor;
                 var start = segment.Start;
@@ -482,6 +807,8 @@ namespace Adamantium.Fonts
                 var endInnerColor = segment.EndInnerColor;
                 var startOuterColor = segment.StartOuterColor;
                 var endOuterColor = segment.EndOuterColor;
+                
+                // place glyph in center of calculated boundaries
                 segment = new LineSegment2D(start + diff, end + diff);
                 segment.InnerColor = innerColor;
                 segment.OuterColor = outerColor;
@@ -489,10 +816,14 @@ namespace Adamantium.Fonts
                 segment.StartOuterColor = startOuterColor;
                 segment.EndInnerColor = endInnerColor;
                 segment.EndOuterColor = endOuterColor;
+                
                 segments[index] = segment;
             }
 
+            // msdf color map
             Color[,] msdf = new Color[size, size];
+            
+            // sdf distances
             double[,] distances = new double[size, size];
             var distances2 = new List<double>();
 
@@ -500,6 +831,7 @@ namespace Adamantium.Fonts
             {
                 for (int x = 0; x < size; ++x)
                 {
+                    // determine the closest segment to current sampling point
                     var point = new Vector2D(originalDimensions.X / size * x, originalDimensions.Y - (originalDimensions.Y / size * y));
                     var ray = new Ray2D(point, Vector2D.UnitX);
                     double distance = Double.MaxValue;
@@ -523,17 +855,18 @@ namespace Adamantium.Fonts
                         }
                     }
 
-                    if (intersectionsCount % 2 != 0)
+                    if (intersectionsCount % 2 == 0)
                     {
                         distances[x, y] = -distances[x, y];
                     }
                     distances2.Add(distances[x, y]);
 
+                    // apply coloring to point with respect quad position (inside / outside, away / on top of segment)
                     if (intersectionsCount % 2 == 0)
                     {
                         if (pointRelativePosition == 0)
                         {
-                            msdf[x, y] = closestSegment.StartOuterColor.Value;
+                            msdf[x, y] = closestSegment.StartOuterColor;
                         }
                         else if(pointRelativePosition == 1)
                         {
@@ -541,14 +874,14 @@ namespace Adamantium.Fonts
                         }
                         else if (pointRelativePosition == 2)
                         {
-                            msdf[x, y] = closestSegment.EndOuterColor.Value;
+                            msdf[x, y] = closestSegment.EndOuterColor;
                         }
                     }
                     else
                     {
                         if (pointRelativePosition == 0)
                         {
-                            msdf[x, y] = closestSegment.StartInnerColor.Value;
+                            msdf[x, y] = closestSegment.StartInnerColor;
                         }
                         else if(pointRelativePosition == 1)
                         {
@@ -556,25 +889,28 @@ namespace Adamantium.Fonts
                         }
                         else if (pointRelativePosition == 2)
                         {
-                            msdf[x, y] = closestSegment.EndInnerColor.Value;
+                            msdf[x, y] = closestSegment.EndInnerColor;
                         }
                     }
+                    
+                    // workaround for correct saving in .png
                     msdf[x, y].A = 250;
                 }
             }
 
-            var min = distances2.Min();
+            /*var max = distances2.Max();
+            //var min = distances2.Min();
+            var min = -max;
             
-            var max = -min;
             var value = max - min;
 
             for (int y = 0; y < size; y++)
             {
                 for (int x = 0; x < size; x++)
                 {
-                    if (distances[x, y] > max)
+                    if (distances[x, y] < min)
                     {
-                        distances[x, y] = max;
+                        distances[x, y] = min;
                     }
                 }
             }
@@ -587,7 +923,7 @@ namespace Adamantium.Fonts
                     var b = (sdfValue - min) / value;
                     distances[x, y] = b;
                 }
-            }
+            }*/
 
             List<Color> colors = new List<Color>();
             for (int y = 0; y < size; ++y)
@@ -595,10 +931,10 @@ namespace Adamantium.Fonts
                 for (int x = 0; x < size; ++x)
                 {
                     var color = msdf[x, y];
-                    var dist = distances[x, y];
+                    /*var dist = distances[x, y];
                     color.R = (byte)(color.R * dist);
                     color.G = (byte)(color.G * dist);
-                    color.B = (byte)(color.B * dist);
+                    color.B = (byte)(color.B * dist);*/
                     colors.Add(color);
                 }
             }
@@ -619,9 +955,7 @@ namespace Adamantium.Fonts
             float glyphSize = Math.Max(BoundingRectangle.Width, BoundingRectangle.Height);
             glyphSize += glyphSize * 0.1f;
             var originalDimensions = new Vector2D(glyphSize);
-            var glyphCenter = new Vector2D(BoundingRectangle.Width / 2.0f, BoundingRectangle.Height / 2.0f);
-            glyphCenter.X += BoundingRectangle.X;
-            glyphCenter.Y += BoundingRectangle.Y;
+            var glyphCenter = BoundingRectangle.Center;
             var originalCenter = originalDimensions / 2;
             var diff = originalCenter - glyphCenter;
             
@@ -658,30 +992,29 @@ namespace Adamantium.Fonts
                     {
                         minValue = -minValue;
                     }
-                    commonList.Add(minValue);
 
                     doubleArray[x, y] = minValue;
+                    commonList.Add(minValue);
                 }
             }
 
-            var min = commonList.Min();
-            //var max = commonList.Max();
-            var max = -min;
+            //var min = commonList.Min();
+            var max = commonList.Max();
+            var min = -max;
             var value = max - min;
 
             for (int y = 0; y < size; y++)
             {
                 for (int x = 0; x < size; x++)
                 {
-                    if (doubleArray[x, y] > max)
+                    if (doubleArray[x, y] < min)
                     {
-                        doubleArray[x, y] = max;
+                        doubleArray[x, y] = min;
                     }
                 }
             }
             
             var bytes = new List<Color>();
-            var bytes2 = new List<byte>();
             for (int y = 0; y < size; y++)
             {
                 for (int x = 0; x < size; x++)
@@ -690,12 +1023,100 @@ namespace Adamantium.Fonts
                     var b = (byte)((sdfValue - min) / value * 255);
                     Debug.WriteLine($"SDF value = {sdfValue}");
                     bytes.Add(new Color(b, (byte)0, (byte)0, (byte)255));
-                    bytes2.Add(b);
                 }
             }
 
             return bytes.ToArray();
-            //return bytes2.ToArray();
+        }
+        
+        public Color[] GenerateSPDF(uint size)
+        {
+            var doubleArray = new Double[size, size];
+            var commonList = new List<double>();
+
+            float glyphSize = Math.Max(BoundingRectangle.Width, BoundingRectangle.Height);
+            glyphSize += glyphSize * 0.1f;
+            var originalDimensions = new Vector2D(glyphSize);
+            var glyphCenter = BoundingRectangle.Center;
+            var originalCenter = originalDimensions / 2;
+            var diff = originalCenter - glyphCenter;
+            
+            for (var index = 0; index < segments.Count; index++)
+            {
+                var segment = segments[index];
+                var start = segment.Start;
+                var end = segment.End;
+                segment = new LineSegment2D(start + diff, end + diff);
+                segments[index] = segment;
+            }
+
+            for (int y = 0; y < size; ++y)
+            {
+                for (int x = 0; x < size; ++x)
+                {
+                    var point = new Vector2D(originalDimensions.X / size * x, originalDimensions.Y - (originalDimensions.Y / size * y));
+                    var ray = new Ray2D(point, Vector2D.UnitX);
+                    var closestDist = Double.MaxValue;
+                    var closestSeg = new LineSegment2D();
+                    int intersectionsCount = 0;
+                    foreach (var segment in segments)
+                    {
+                        var dist = point.DistanceToPoint(segment.Start, segment.End);
+
+                        if (dist < closestDist)
+                        {
+                            closestDist = dist;
+                            closestSeg = segment;
+                        }
+
+                        var seg = segment;
+                        if (Collision2D.RaySegmentIntersection(ref ray, ref seg, out var collision))
+                        {
+                            intersectionsCount++;
+                        }
+                    }
+
+                    var pseudoDist = MathHelper.PointToLineDistance(closestSeg.Start, closestSeg.End, point);
+
+                    if (intersectionsCount % 2 == 0)
+                    {
+                        pseudoDist = -pseudoDist;
+                    }
+
+                    doubleArray[x, y] = pseudoDist;
+                    commonList.Add(pseudoDist);
+                }
+            }
+
+            //var min = commonList.Min();
+            var max = commonList.Max();
+            var min = -max;
+            var value = max - min;
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    if (doubleArray[x, y] < min)
+                    {
+                        doubleArray[x, y] = min;
+                    }
+                }
+            }
+            
+            var bytes = new List<Color>();
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    var sdfValue = doubleArray[x, y];
+                    var b = (byte)((sdfValue - min) / value * 255);
+                    Debug.WriteLine($"SDF value = {sdfValue}");
+                    bytes.Add(new Color(b, (byte)0, (byte)0, (byte)255));
+                }
+            }
+
+            return bytes.ToArray();
         }
         
         private struct DistancedPoint

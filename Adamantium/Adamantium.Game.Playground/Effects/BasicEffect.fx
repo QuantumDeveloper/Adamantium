@@ -84,23 +84,24 @@ float4 SDF_PS(PS_OUTPUT_BASIC input) : SV_TARGET
 
     float4 color;
     float upperPointCutOff = 0.5f;
-    float midpointCutOff = 0.48f;
+    float midpointCutOff = 0.5f;
     //float dist = upperPointCutOff - shaderTexture.Sample(sampleType, input.uv).r;
     float dist = shaderTexture.Sample(sampleType, input.uv).r;
 
     if (dist > upperPointCutOff)
     {
-        color = float4(1,1,1,1);
+        color = float4(0,0,0,1);
     }
     else if (dist > midpointCutOff)
     {
         float smooth = smoothstep(midpointCutOff, upperPointCutOff, dist);
-        color = float4(1, 1, 1, smooth);
+        color = float4(0, 0, 0, smooth);
     }
     else
     {
         color = float4(0,0,0,0);
     }
+    
     
     return color;
     
@@ -128,11 +129,11 @@ float4 MSDF_PS(PS_OUTPUT_BASIC input) : SV_TARGET
     float3 dist = shaderTexture.Sample(sampleType, input.uv).rgb;
     
     float d = median(dist.r, dist.g, dist.b) - 0.5;
+
+    float w = clamp(d/fwidth(d) + 0.5, 0.0, 1.0);
     
-    float w = clamp(d/fwidth(d) +0.5, 0.0, 1.0);
-    
-    float4 outside = float4(1,1,1,1);
-    float4 inside = float4(0,0,0,1);
+    float4 outside = float4(0, 0, 0, 0);
+    float4 inside = float4(0, 0, 0, 1);
     float4 color = lerp(outside, inside, w);
     
     return color;

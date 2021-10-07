@@ -22,14 +22,16 @@ namespace Adamantium.Mathematics
 
         public Vector2D DirectionNormalized { get; }
 
-        public Color? StartInnerColor;
-        public Color? StartOuterColor;
-        public Color? EndInnerColor;
-        public Color? EndOuterColor;
+        public Color StartInnerColor;
+        public Color StartOuterColor;
+        public Color EndInnerColor;
+        public Color EndOuterColor;
 
         public Color OuterColor;
         
         public Color InnerColor;
+
+        public Color MsdfColor;
 
         public LineSegment2D(Vector2D start, Vector2D end)
         {
@@ -37,12 +39,10 @@ namespace Adamantium.Mathematics
             End = end;
             Direction = end - start;
             DirectionNormalized = Vector2D.Normalize(Direction);
-            OuterColor = Colors.Black;
-            InnerColor = Colors.White;
-            StartInnerColor = null;
-            StartOuterColor = null;
-            EndInnerColor = null;
-            EndOuterColor = null;
+            StartOuterColor = EndOuterColor = OuterColor = Colors.Black;
+            StartInnerColor = EndInnerColor = InnerColor = Colors.White;
+
+            MsdfColor = Colors.White;
         }
 
         public bool Equals(LineSegment2D other)
