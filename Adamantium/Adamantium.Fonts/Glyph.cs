@@ -585,6 +585,7 @@ namespace Adamantium.Fonts
             // 4. Generate colored pseudo-distance field
             var coloredDistances = new ColoredDistance[size, size];
             double maxDistance = Double.MinValue;
+            double minDistance = Double.MaxValue;
 
             for (int y = 0; y < size; ++y)
             {
@@ -592,14 +593,20 @@ namespace Adamantium.Fonts
                 {
                     // determine the closest segment to current sampling point
                     var samplingPoint = new Vector2D(originalDimensions.X / size * (x + 0.5), originalDimensions.Y - (originalDimensions.Y / size * (y + 0.5)));
-                    
+
                     GetColoredDistances(samplingPoint, out coloredDistances[x, y].redDistance, out coloredDistances[x, y].greenDistance, out coloredDistances[x, y].blueDistance);
 
                     var maxOfThree = MaxOfThree(coloredDistances[x, y].redDistance, coloredDistances[x, y].greenDistance, coloredDistances[x, y].blueDistance);
+                    var minOfThree = MinOfThree(coloredDistances[x, y].redDistance, coloredDistances[x, y].greenDistance, coloredDistances[x, y].blueDistance);
 
                     if (maxOfThree > maxDistance)
                     {
                         maxDistance = maxOfThree;
+                    }
+                    
+                    if (minOfThree < minDistance)
+                    {
+                        minDistance = minOfThree;
                     }
                 }
             }
@@ -607,7 +614,7 @@ namespace Adamantium.Fonts
             // 5. Normalize colored pseudo-distance field to [0 .. 255] range
             var msdf = new List<Color>();
 
-            double minDistance = -maxDistance;
+            minDistance = -maxDistance;
             
             for (int y = 0; y < size; y++)
             {
@@ -677,261 +684,6 @@ namespace Adamantium.Fonts
         }
         
         // --- DIRECT MSDF END ---
-        
-        public Color[] GenerateMSDF(uint size)
-        {
-            float convexThreshold = 135;
-            float concaveThreshold = 225;
-
-            for (int i = 1; i <= segments.Count; ++i)
-            {
-                LineSegment2D prev;
-                LineSegment2D current;
-                
-                // cycle through all segment pairs, including last-first
-                if (i == segments.Count)
-                {
-                    prev = segments[i-1];
-                    current = segments[0];
-                }
-                else
-                {
-                    prev = segments[i - 1];
-                    current = segments[i];
-                }
-                
-                // if segments are not connected - they are from different outlines, skip
-                if (!IsSegmentsConnected(ref prev, ref current)) continue;
-
-                // revert prev direction in order to get correct angle between prev and current
-                var newPrev = new LineSegment2D(prev.End, prev.Start);
-
-                // angle will be between 0 and 180
-                var angle = MathHelper.DetermineAngleInDegrees(newPrev.Start, newPrev.End, current.Start, current.End);
-                
-                // we must determine if prev is looking outside of glyph (convex corner), or inside (concave corner)
-                var prevRay = new Ray2D(prev.Start, prev.Direction);
-                int prevIntersectionsCount = 0;
-
-                foreach (var segment in segments)
-                {
-                    var seg = segment;
-                    if (Collision2D.RaySegmentIntersection(ref prevRay, ref seg, out var collision))
-                    {
-                        prevIntersectionsCount++;
-                    }
-                }
-                
-                // adjust the angle depending if it is the concave case
-                if (prevIntersectionsCount % 2 != 0) // concave
-                {
-                    angle = 360 - angle;
-                }
-
-                // check the threshold, color segments and their ends
-                if (angle < convexThreshold)
-                {
-                    prev.EndOuterColor = current.StartOuterColor = Colors.Black;
-                    if (prev.OuterColor != Colors.Black)
-                    {
-                        current.OuterColor = Color.Subtract(prev.InnerColor, prev.OuterColor);
-                        current.InnerColor = prev.InnerColor;
-                    }
-                    else
-                    {
-                        prev.OuterColor = Colors.Red;
-                        current.OuterColor = Colors.Blue;
-                        prev.InnerColor = current.InnerColor = new Color(255, 0, 255);
-                    }
-
-                    prev.EndInnerColor = current.StartInnerColor = prev.InnerColor;
-                }
-                else if (angle > concaveThreshold)
-                {
-                    prev.EndInnerColor = current.StartInnerColor = Colors.White;
-                    if (prev.OuterColor != Colors.Black)
-                    {
-                        current.OuterColor = prev.OuterColor;
-                        var newColor = Color.Subtract(Colors.White, prev.InnerColor);
-                        current.InnerColor = Color.Add(prev.OuterColor, newColor);
-                    }
-                    else
-                    {
-                        prev.InnerColor = new Color(255, 0, 255);
-                        current.InnerColor = new Color(0, 255, 255);;
-                        prev.OuterColor = current.OuterColor = Colors.Blue;
-                    }
-                    prev.EndOuterColor = current.StartOuterColor = prev.OuterColor;
-                }
-                
-                if (i == segments.Count)
-                {
-                    segments[i - 1] = prev;
-                    segments[0] = current;
-                }
-                else
-                {
-                    segments[i - 1] = prev;
-                    segments[i] = current;
-                }
-            }
-            
-            // calculate boundaries for original glyph
-            float glyphSize = Math.Max(BoundingRectangle.Width, BoundingRectangle.Height);
-            glyphSize += glyphSize * 0.1f;
-            var originalDimensions = new Vector2D(glyphSize);
-            
-            // calculate diff for placing glyph in center of calculated boundaries
-            var glyphCenter = BoundingRectangle.Center;
-            var originalCenter = originalDimensions / 2;
-            var diff = originalCenter - glyphCenter;
-            
-            for (var index = 0; index < segments.Count; index++)
-            {
-                var segment = segments[index];
-                
-                var innerColor = segment.InnerColor;
-                var outerColor = segment.OuterColor;
-                var start = segment.Start;
-                var end = segment.End;
-                var startInnerColor = segment.StartInnerColor;
-                var endInnerColor = segment.EndInnerColor;
-                var startOuterColor = segment.StartOuterColor;
-                var endOuterColor = segment.EndOuterColor;
-                
-                // place glyph in center of calculated boundaries
-                segment = new LineSegment2D(start + diff, end + diff);
-                segment.InnerColor = innerColor;
-                segment.OuterColor = outerColor;
-                segment.StartInnerColor = startInnerColor;
-                segment.StartOuterColor = startOuterColor;
-                segment.EndInnerColor = endInnerColor;
-                segment.EndOuterColor = endOuterColor;
-                
-                segments[index] = segment;
-            }
-
-            // msdf color map
-            Color[,] msdf = new Color[size, size];
-            
-            // sdf distances
-            double[,] distances = new double[size, size];
-            var distances2 = new List<double>();
-
-            for (int y = 0; y < size; ++y)
-            {
-                for (int x = 0; x < size; ++x)
-                {
-                    // determine the closest segment to current sampling point
-                    var point = new Vector2D(originalDimensions.X / size * (x + 0.5), originalDimensions.Y - (originalDimensions.Y / size * (y + 0.5)));
-                    var ray = new Ray2D(point, Vector2D.UnitX);
-                    double distance = Double.MaxValue;
-                    LineSegment2D closestSegment = new LineSegment2D();
-                    int intersectionsCount = 0;
-                    byte pointRelativePosition = 4;
-                    foreach (var segment in segments)
-                    {
-                        var currentDistance = point.DistanceToPoint(segment.Start, segment.End, out var tmpPointRelativePosition);
-                        if (currentDistance <= distance)
-                        {
-                            distance = currentDistance;
-                            distances[x, y] = distance;
-                            closestSegment = segment;
-                            pointRelativePosition = tmpPointRelativePosition;
-                        }
-                        var seg = segment;
-                        if (Collision2D.RaySegmentIntersection(ref ray, ref seg, out var collision))
-                        {
-                            intersectionsCount++;
-                        }
-                    }
-
-                    if (intersectionsCount % 2 == 0)
-                    {
-                        distances[x, y] = -distances[x, y];
-                    }
-                    distances2.Add(distances[x, y]);
-
-                    // apply coloring to point with respect quad position (inside / outside, away / on top of segment)
-                    if (intersectionsCount % 2 == 0)
-                    {
-                        if (pointRelativePosition == 0)
-                        {
-                            msdf[x, y] = closestSegment.StartOuterColor;
-                        }
-                        else if(pointRelativePosition == 1)
-                        {
-                            msdf[x, y] = closestSegment.OuterColor;
-                        }
-                        else if (pointRelativePosition == 2)
-                        {
-                            msdf[x, y] = closestSegment.EndOuterColor;
-                        }
-                    }
-                    else
-                    {
-                        if (pointRelativePosition == 0)
-                        {
-                            msdf[x, y] = closestSegment.StartInnerColor;
-                        }
-                        else if(pointRelativePosition == 1)
-                        {
-                            msdf[x, y] = closestSegment.InnerColor;
-                        }
-                        else if (pointRelativePosition == 2)
-                        {
-                            msdf[x, y] = closestSegment.EndInnerColor;
-                        }
-                    }
-                    
-                    // workaround for correct saving in .png
-                    msdf[x, y].A = 250;
-                }
-            }
-
-            /*var max = distances2.Max();
-            //var min = distances2.Min();
-            var min = -max;
-            
-            var value = max - min;
-
-            for (int y = 0; y < size; y++)
-            {
-                for (int x = 0; x < size; x++)
-                {
-                    if (distances[x, y] < min)
-                    {
-                        distances[x, y] = min;
-                    }
-                }
-            }
-            
-            for (int y = 0; y < size; y++)
-            {
-                for (int x = 0; x < size; x++)
-                {
-                    var sdfValue = distances[x, y];
-                    var b = (sdfValue - min) / value;
-                    distances[x, y] = b;
-                }
-            }*/
-
-            List<Color> colors = new List<Color>();
-            for (int y = 0; y < size; ++y)
-            {
-                for (int x = 0; x < size; ++x)
-                {
-                    var color = msdf[x, y];
-                    /*var dist = distances[x, y];
-                    color.R = (byte)(color.R * dist);
-                    color.G = (byte)(color.G * dist);
-                    color.B = (byte)(color.B * dist);*/
-                    colors.Add(color);
-                }
-            }
-
-            return colors.ToArray();
-        }
 
         private bool IsSegmentsConnected(ref LineSegment2D segment1, ref LineSegment2D segment2)
         {
@@ -1019,97 +771,7 @@ namespace Adamantium.Fonts
 
             return bytes.ToArray();
         }
-        
-        public Color[] GenerateSPDF(uint size)
-        {
-            var doubleArray = new Double[size, size];
-            var commonList = new List<double>();
 
-            float glyphSize = Math.Max(BoundingRectangle.Width, BoundingRectangle.Height);
-            glyphSize += glyphSize * 0.1f;
-            var originalDimensions = new Vector2D(glyphSize);
-            var glyphCenter = BoundingRectangle.Center;
-            var originalCenter = originalDimensions / 2;
-            var diff = originalCenter - glyphCenter;
-            
-            for (var index = 0; index < segments.Count; index++)
-            {
-                var segment = segments[index];
-                var start = segment.Start;
-                var end = segment.End;
-                segment = new LineSegment2D(start + diff, end + diff);
-                segments[index] = segment;
-            }
-
-            for (int y = 0; y < size; ++y)
-            {
-                for (int x = 0; x < size; ++x)
-                {
-                    var point = new Vector2D(originalDimensions.X / size * x, originalDimensions.Y - (originalDimensions.Y / size * y));
-                    var ray = new Ray2D(point, Vector2D.UnitX);
-                    var closestDist = Double.MaxValue;
-                    var closestSeg = new LineSegment2D();
-                    int intersectionsCount = 0;
-                    foreach (var segment in segments)
-                    {
-                        var dist = point.DistanceToPoint(segment.Start, segment.End);
-
-                        if (dist < closestDist)
-                        {
-                            closestDist = dist;
-                            closestSeg = segment;
-                        }
-
-                        var seg = segment;
-                        if (Collision2D.RaySegmentIntersection(ref ray, ref seg, out var collision))
-                        {
-                            intersectionsCount++;
-                        }
-                    }
-
-                    var pseudoDist = MathHelper.PointToLineDistance(closestSeg.Start, closestSeg.End, point);
-
-                    if (intersectionsCount % 2 == 0)
-                    {
-                        pseudoDist = -pseudoDist;
-                    }
-
-                    doubleArray[x, y] = pseudoDist;
-                    commonList.Add(pseudoDist);
-                }
-            }
-
-            //var min = commonList.Min();
-            var max = commonList.Max();
-            var min = -max;
-            var value = max - min;
-
-            for (int y = 0; y < size; y++)
-            {
-                for (int x = 0; x < size; x++)
-                {
-                    if (doubleArray[x, y] < min)
-                    {
-                        doubleArray[x, y] = min;
-                    }
-                }
-            }
-            
-            var bytes = new List<Color>();
-            for (int y = 0; y < size; y++)
-            {
-                for (int x = 0; x < size; x++)
-                {
-                    var sdfValue = doubleArray[x, y];
-                    var b = (byte)((sdfValue - min) / value * 255);
-                    Debug.WriteLine($"SDF value = {sdfValue}");
-                    bytes.Add(new Color(b, (byte)0, (byte)0, (byte)255));
-                }
-            }
-
-            return bytes.ToArray();
-        }
-        
         private struct DistancedPoint
         {
             public DistancedPoint(Vector2D point, double distance)

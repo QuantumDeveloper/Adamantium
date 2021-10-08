@@ -148,11 +148,11 @@ float4 MSDF_PS(PS_OUTPUT_BASIC input) : SV_TARGET
     {
         color = float4(0, 0, 0, 1);
     }
-    else if (sd > midpointCutOff)
+    /*else if (sd > midpointCutOff)
     {
         float smooth = smoothstep(midpointCutOff, upperPointCutOff, sd);
         color = float4(0, 0, 0, smooth);
-    }
+    }*/
     else
     {
         color = float4(1, 1, 1, 1);
