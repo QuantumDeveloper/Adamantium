@@ -499,8 +499,8 @@ namespace Adamantium.Engine.Processors
                                         {
                                             
                                             //GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Colored"].Apply();
-                                            GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["MSDF"].Apply();
-                                            //GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["SDF"].Apply();
+                                            //GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["MSDF"].Apply();
+                                            GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["SDF"].Apply();
 
                                             //BasicEffect.Techniques["MeshVertex"].Passes["DirectionalLight"].Apply();
                                             component.Draw(GraphicsDevice, gameTime);

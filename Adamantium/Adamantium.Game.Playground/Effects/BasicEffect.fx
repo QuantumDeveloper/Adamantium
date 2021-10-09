@@ -79,10 +79,67 @@ float4 BasicColored_PS(PS_OUTPUT_BASIC input) : SV_TARGET
     return color;
 }
 
+float median(float a, float b, float c)
+{
+    return max(min(a,b), min(max(a,b), c));
+}
+
+float contour(in float d, in float w) {
+    // smoothstep(lower edge0, upper edge1, x)
+    return smoothstep(0.5 - w, 0.5 + w, d);
+}
+
+float samp(in float2 uv, float w) {
+    return contour(shaderTexture.Sample(sampleType, uv).r, w);
+}
+
 float4 SDF_PS(PS_OUTPUT_BASIC input) : SV_TARGET
 {
+    // retrieve distance from texture
+    float2 uv = input.uv;
+    float dist = shaderTexture.Sample(sampleType, uv).r;
 
-    float4 color;
+
+    /*float3 msd = shaderTexture.Sample(sampleType, input.uv).rgb;
+    float sd = median(msd.r, msd.g, msd.b);
+    dist = sd;*/
+
+    // fwidth helps keep outlines a constant width irrespective of scaling
+    // GLSL's fwidth = abs(dFdx(uv)) + abs(dFdy(uv))
+    //float width = fwidth(dist);
+    // Stefan Gustavson's fwidth
+    float width = 0.7 * length(float2(ddx(dist), ddy(dist)));
+
+    // basic version
+    //float alpha = smoothstep(0.5 - width, 0.5 + width, dist);
+
+    // supersampled version
+
+    float alpha = contour(dist, width);
+    //float alpha = aastep( 0.5, dist );
+    // ------- (comment this block out to get your original behavior)
+    // Supersample, 4 extra points
+    float dscale = 0.354; // half of 1/sqrt2; you can play with this
+    
+    float2 duv = dscale * (ddx(uv) + ddy(uv));
+    
+    float2 uvMinusDuv = uv - duv;
+    float2 uvPlusDuv = uv + duv;
+    
+    float4 box = float4(uvMinusDuv, uvPlusDuv);
+
+    float asum = samp(box.xy, width) + samp(box.zw, width) + samp(box.xw, width) + samp(box.zy, width);
+
+    // weighted average, with 4 extra points having 0.5 weight each,
+    // so 1 + 0.5*4 = 3 is the divisor
+    alpha = (alpha + 0.5 * asum) / 3.0;
+
+    //alpha = smoothstep(0.5 - width, 0.5 + width, dist);
+    float4 color = float4(0, 0, 0, alpha);
+    
+    
+    
+    /*float4 color;
     float upperPointCutOff = 0.5f;
     float midpointCutOff = 0.49f;
     //float dist = upperPointCutOff - shaderTexture.Sample(sampleType, input.uv).r;
@@ -99,29 +156,11 @@ float4 SDF_PS(PS_OUTPUT_BASIC input) : SV_TARGET
     }
     else
     {
-        color = float4(1, 1, 1, 1);
-    }
+        color = float4(0, 0, 0, 0);
+    }*/
     
     
     return color;
-    
-    /*
-    float dist = shaderTexture.Sample(sampleType, input.uv).r;
-    float scale = 1.0 / fwidth(dist);
-        float signedDistance = (dist - 0.5) * scale;
-    
-        float color = 0.0;
-        
-        //    float alpha = clamp(signedDistance + scale * 0.125, 0.0, 1.0);
-        float alpha = clamp(signedDistance, 0.0, 1.0);
-        float4 dstColor = float4(color, color, color, 1) * alpha;
-        return dstColor;
-        */
-}
-
-float median(float a, float b, float c)
-{
-    return max(min(a,b), min(max(a,b), c));
 }
 
 float4 MSDF_PS(PS_OUTPUT_BASIC input) : SV_TARGET
@@ -136,7 +175,7 @@ float4 MSDF_PS(PS_OUTPUT_BASIC input) : SV_TARGET
     float4 inside = float4(0, 0, 0, 1);
     float4 color = lerp(outside, inside, w);*/
     
-    float3 msd = shaderTexture.Sample(sampleType, input.uv).rgb;        
+    float3 msd = shaderTexture.Sample(sampleType, input.uv).rgb;
     float sd = median(msd.r, msd.g, msd.b);
     
     float4 color;

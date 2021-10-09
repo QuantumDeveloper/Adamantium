@@ -135,6 +135,10 @@
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
       <None Remove="Textures\sdf.png" />
+      <None Remove="Fonts\OTFFonts\Japan\NotoSansCJKjp-Light.otf" />
+      <Content Include="Fonts\OTFFonts\Japan\NotoSansCJKjp-Light.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
     </ItemGroup>
 
     <ItemGroup>
