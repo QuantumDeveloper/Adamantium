@@ -121,20 +121,30 @@ namespace Adamantium.Game.Playground
                 //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/Japan/NotoSansCJKjp-Light.otf", 3);
                 var entity = new Entity(null, "Poppins-Medium");
                 var font = typeface.GetFont(0);
-                var glyph = font.GetGlyphByCharacter('№');
+                var glyph = font.GetGlyphByCharacter('@');
                 //var glyph = font.GetGlyphByIndex(2710);
                 glyph.Sample(5);
                 uint size = 64;
 
+                /*
                 //glyph.SetTestSegmentData(); 
-                //var colors = glyph.GenerateDirectMSDF(size);
-                var colors = glyph.GenerateSDF(size);
+                var colors = glyph.GenerateDirectMSDF(size);
+                //var colors = glyph.GenerateSDF(size);
                 var img = Image.New2D(size, size, 1, SurfaceFormat.R8G8B8A8.UNorm);
                 var pixels = img.GetPixelBuffer(0, 0);
                 pixels.SetPixels(colors);
                 img.Save(@"Textures\sdf.png", ImageFileType.Png);
+                */
 
-                var glyphSize = 12;
+                var newMesh = glyph.GetColoredPoints();
+                newMesh.MeshTopology = PrimitiveType.LineList;
+                var newMeshComponent = new MeshData();
+                newMeshComponent.Mesh = newMesh;
+                var newMeshRenderer = new MeshRenderer();
+                entity.AddComponent(newMeshComponent);
+                entity.AddComponent(newMeshRenderer);
+                
+                /*var glyphSize = 10;
                 var quadList = new List<Vector3F>();
                 quadList.Add(new Vector3F(10));
                 quadList.Add(new Vector3F(glyphSize + 10, 10, 0));
@@ -155,7 +165,7 @@ namespace Adamantium.Game.Playground
                 meshComponent.Mesh = mesh;
                 var meshRenderer = new MeshRenderer();
                 entity.AddComponent(meshComponent);
-                entity.AddComponent(meshRenderer);
+                entity.AddComponent(meshRenderer);*/
                 
                 /*
                 var points = glyph.Sample(5);

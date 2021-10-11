@@ -79,6 +79,11 @@ float4 BasicColored_PS(PS_OUTPUT_BASIC input) : SV_TARGET
     return color;
 }
 
+float4 BasicColored2_PS(PS_OUTPUT_BASIC input) : SV_TARGET
+{
+    return input.color;
+}
+
 float median(float a, float b, float c)
 {
     return max(min(a,b), min(max(a,b), c));
@@ -238,6 +243,13 @@ technique10 Basic
             VertexShader = Basic_VS;
             PixelShader = BasicColored_PS;
         }
+        
+    pass Colored2
+    {
+        Profile = 5.1;
+        VertexShader = Basic_VS;
+        PixelShader = BasicColored2_PS;
+    }
         
     pass SDF
             {

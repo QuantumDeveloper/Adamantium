@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using Adamantium.Engine.Core.Models;
+using Adamantium.Engine.Graphics;
 using Adamantium.Fonts.Common;
 using Adamantium.Fonts.Exceptions;
 using Adamantium.Fonts.Parsers.CFF;
@@ -394,27 +396,37 @@ namespace Adamantium.Fonts
 
         // --- DIRECT MSDF START ---
 
+        private double GetSegmentsAngle(LineSegment2D current, LineSegment2D next)
+        {
+            var newSeg = new LineSegment2D(current.End, current.Start);
+
+            return MathHelper.DetermineAngleInDegrees(newSeg.Start, newSeg.End, next.Start, next.End);
+        }
+        
         private void ColorSegments()
         {
+            var angleTresholdInDegrees = 135;
+            
             Color currentColor = Color.FromRgba(255, 0 ,255, 255);
 
-            for (int i = 0; i < segments.Count; ++i)
+            for (int i = 0; i < segments.Count - 1; ++i)
             {
                 var currentSegment = segments[i];
-
-                if (i != (segments.Count - 1))
+                var nextSegment = segments[i + 1];
+                
+                // new outline detected, reset current color
+                if (!IsSegmentsConnected(ref currentSegment, ref nextSegment))
                 {
-                    var nextSegment = segments[i + 1];
-
-                    // new outline detected, reset current color
-                    if (!IsSegmentsConnected(ref currentSegment, ref nextSegment))
-                    {
-                        currentColor = Color.FromRgba(255, 0, 255, 255);
-                    }
+                    currentColor = Color.FromRgba(255, 0, 255, 255);
                 }
 
                 currentSegment.MsdfColor = currentColor;
                 segments[i] = currentSegment;
+                
+                if (GetSegmentsAngle(currentSegment, nextSegment) > angleTresholdInDegrees)
+                {
+                    continue;
+                }
 
                 if (currentColor == Color.FromRgba(255, 255, 0, 255))
                 {
@@ -553,7 +565,29 @@ namespace Adamantium.Fonts
         {
             return ((originalValue - minValue) / (maxValue - minValue));
         }
-        
+
+        public Mesh GetColoredPoints()
+        {
+            ColorSegments();
+
+            var mesh = new Mesh();
+
+            var positions = new List<Vector2D>();
+            var colors = new List<Color>();
+            
+            foreach (var segment in segments)
+            {
+                positions.Add(segment.Start);
+                positions.Add(segment.End);
+                colors.Add(segment.MsdfColor);
+            }
+
+            mesh.SetPositions(positions);
+            mesh.SetColors(colors);
+
+            return mesh;
+        }
+
         public Color[] GenerateDirectMSDF(uint size)
         {
             // 1. Color all segments

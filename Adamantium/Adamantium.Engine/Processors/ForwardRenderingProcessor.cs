@@ -465,13 +465,13 @@ namespace Adamantium.Engine.Processors
                                     foreach (var component in renderers)
                                     {
                                         var material = current.GetComponent<Material>();
-                                        //var wvp = transformation.WorldMatrix *ActiveCamera.ViewMatrix * ActiveCamera.ProjectionMatrix;
+                                        var wvp = transformation.WorldMatrix *ActiveCamera.ViewMatrix * ActiveCamera.ProjectionMatrix;
                                         //var orthoProj = Matrix4x4F.OrthoOffCenter(0, Window.Width, 0, Window.Height, 1f, 100000f);
-                                        var wvp = transformation.WorldMatrix * ActiveCamera.UiProjection;
+                                        //var wvp = transformation.WorldMatrix * ActiveCamera.UiProjection;
                                         //var wvp = transformation.WorldMatrix * Matrix4x4F.Scaling(1, -1, 1) * Matrix4x4F.Scaling(2.0f / Window.Width, 2.0f/Window.Height, 1.0f / (100000f - 1f));
                                         GraphicsDevice.BasicEffect.Parameters["wvp"].SetValue(wvp);
                                         GraphicsDevice.BasicEffect.Parameters["meshColor"].SetValue(Colors.Black.ToVector3());
-                                        GraphicsDevice.BasicEffect.Parameters["transparency"].SetValue(0.5f);
+                                        //GraphicsDevice.BasicEffect.Parameters["transparency"].SetValue(0.5f);
                                         //GraphicsDevice.BasicEffect.Parameters["worldMatrix"].SetValue(transformation.WorldMatrix);
                                         //GraphicsDevice.BasicEffec.SetValue(Matrix4x4F.Transpose(Matrix4x4F.Invert(transformation.WorldMatrix)));
                                         
@@ -499,8 +499,9 @@ namespace Adamantium.Engine.Processors
                                         {
                                             
                                             //GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Colored"].Apply();
+                                            GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Colored2"].Apply();
                                             //GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["MSDF"].Apply();
-                                            GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["SDF"].Apply();
+                                            //GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["SDF"].Apply();
 
                                             //BasicEffect.Techniques["MeshVertex"].Passes["DirectionalLight"].Apply();
                                             component.Draw(GraphicsDevice, gameTime);
