@@ -38,7 +38,7 @@ namespace Adamantium.Game
         {
             GameContext = context;
             window = GameContext.Context as IWindow ?? throw new ArgumentException($"{nameof(context.Context)} should be of type {nameof(IWindow)}");
-            UIComponent = window as FrameworkComponent;
+            UiComponent = window as FrameworkComponent;
             window.ClientSizeChanged += WindowOnClientSizeChanged;
             
             Description = new GameWindowDescription(PresenterType.Swapchain);

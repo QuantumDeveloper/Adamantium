@@ -51,8 +51,8 @@ namespace Adamantium.Game.Playground
 
         private async void LoadModels()
         {
-            // var entity = await ImportModel(@"Models\monkey\monkey.dae");
-            // EntityWorld.AddEntity(entity);
+            var entity = await ImportModel(@"Models\monkey\monkey.dae");
+            EntityWorld.AddEntity(entity);
             // var ent = entity.Dependencies[0];
             // ent.Transform.SetScaleFactor(100);
             // ent.Transform.SetPosition(new Vector3D(500, 300, -150));
@@ -121,7 +121,7 @@ namespace Adamantium.Game.Playground
                 //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/Japan/NotoSansCJKjp-Light.otf", 3);
                 var entity = new Entity(null, "Poppins-Medium");
                 var font = typeface.GetFont(0);
-                var glyph = font.GetGlyphByCharacter('@');
+                var glyph = font.GetGlyphByCharacter('e');
                 //var glyph = font.GetGlyphByIndex(2710);
                 glyph.Sample(5);
                 uint size = 64;

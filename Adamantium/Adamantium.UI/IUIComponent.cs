@@ -7,7 +7,7 @@ using Adamantium.UI.Media;
 
 namespace Adamantium.UI
 {
-    public interface IUIComponent : IVisual
+    public interface IUIComponent : IVisualComponent
     {
         event MouseButtonEventHandler RawMouseDown;
         event MouseButtonEventHandler RawMouseUp;
@@ -82,7 +82,7 @@ namespace Adamantium.UI
         Rect Bounds { get; set; }
         Rect ClipRectangle { get; }
         Point ClipPosition { get; set; }
-        IVisual VisualParent { get; }
+        IVisualComponent VisualComponentParent { get; }
         Int32 ZIndex { get; set; }
         bool IsAttachedToVisualTree { get; }
 
@@ -125,8 +125,8 @@ namespace Adamantium.UI
         bool CaptureStylus();
         bool Focus();
         void RaiseEvent(RoutedEventArgs e);
-        IEnumerable<UIComponent> GetBubbleEventRoute();
-        IEnumerable<UIComponent> GetTunnelEventRoute();
+        IEnumerable<UiComponent> GetBubbleEventRoute();
+        IEnumerable<UiComponent> GetTunnelEventRoute();
         void RemoveHandler(RoutedEvent routedEvent, Delegate handler);
         void ReleaseMouseCapture();
         void ReleaseStylusCapture();

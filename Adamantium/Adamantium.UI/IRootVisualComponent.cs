@@ -3,7 +3,7 @@ using Adamantium.UI.Media;
 
 namespace Adamantium.UI
 {
-   public interface IRootVisual : IVisual
+   public interface IRootVisualComponent : IVisualComponent
    {
       /// <summary>
       /// Converts a point from screen to client coordinates.

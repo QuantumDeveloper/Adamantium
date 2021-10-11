@@ -23,6 +23,7 @@ namespace Adamantium.EntityFramework.Components
             int length = mesh.Positions.Length;
 
             var normals = mesh.Semantic & VertexSemantic.Normal;
+            var colors = mesh.Semantic.HasFlag(VertexSemantic.Color);
             var texcoords0 = mesh.Semantic & VertexSemantic.UV0;
             var texcoords1 = mesh.Semantic & VertexSemantic.UV1;
             var texcoords2 = mesh.Semantic & VertexSemantic.UV2;
@@ -59,6 +60,11 @@ namespace Adamantium.EntityFramework.Components
                 {
                     vertex.Tangent = mesh.Tangents[i];
                     vertex.BiTangent = mesh.BiTangents[i];
+                }
+
+                if (colors)
+                {
+                    vertex.Color = mesh.Colors[i].ToVector4();
                 }
 
                 vertices[i] = vertex;

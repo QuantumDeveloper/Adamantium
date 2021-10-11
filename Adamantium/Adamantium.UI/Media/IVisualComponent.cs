@@ -5,7 +5,7 @@ using Adamantium.Mathematics;
 
 namespace Adamantium.UI.Media
 {
-   public interface IVisual : IComponent
+   public interface IVisualComponent : IComponent
    {
       bool IsAttachedToVisualTree { get; }
 
@@ -13,9 +13,9 @@ namespace Adamantium.UI.Media
 
       Visibility Visibility { get; set; }
 
-      IVisual VisualParent { get; }
+      IVisualComponent VisualComponentParent { get; }
 
-      ReadOnlyCollection<IVisual> VisualChildren { get; }
+      ReadOnlyCollection<IVisualComponent> VisualChildren { get; }
 
       Rect Bounds { get; }
 

@@ -580,6 +580,7 @@ namespace Adamantium.Fonts
                 positions.Add(segment.Start);
                 positions.Add(segment.End);
                 colors.Add(segment.MsdfColor);
+                colors.Add(segment.MsdfColor);
             }
 
             mesh.SetPositions(positions);

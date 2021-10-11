@@ -5,7 +5,7 @@ using Adamantium.UI.Threading;
 
 namespace Adamantium.UI.Controls
 {
-    public class AdamantiumComponent : IComponent, IAdamantiumComponent
+    public class AdamantiumComponent : IAdamantiumComponent
     {
         public long Uid { get; set; }
 

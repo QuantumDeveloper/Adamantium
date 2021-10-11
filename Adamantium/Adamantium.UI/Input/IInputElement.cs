@@ -6,7 +6,7 @@ namespace Adamantium.UI.Input
    /// <summary>
    /// Interface for all elements, which takes user input
    /// </summary>
-   public interface IInputElement:IVisual
+   public interface IInputElement:IVisualComponent
    {
       /// <summary>
       /// Define is element could receive focus

@@ -8,7 +8,7 @@ using Adamantium.UI.Controls;
 
 namespace Adamantium.UI.Media
 {
-   public class VisualComponent: AdamantiumComponent, IVisual
+   public class VisualComponent: AdamantiumComponent, IVisualComponent
    {
       public static readonly AdamantiumProperty PositionProperty = AdamantiumProperty.Register(nameof(Location),
          typeof (Point), typeof (VisualComponent), new PropertyMetadata(Point.Zero));
@@ -50,7 +50,7 @@ namespace Adamantium.UI.Media
 
       public VisualComponent()
       {
-         VisualChildren = new TrackingCollection<IVisual>();
+         VisualChildren = new TrackingCollection<IVisualComponent>();
          VisualChildren.CollectionChanged += VisualChildrenCollectionChanged;
       }
 
@@ -80,38 +80,38 @@ namespace Adamantium.UI.Media
 
       public Point ClipPosition { get; set; }
 
-      private VisualComponent visualParent;
+      private VisualComponent visualComponentParent;
 
-      public IVisual VisualParent => visualParent;
+      public IVisualComponent VisualComponentParent => visualComponentParent;
 
       public Int32 ZIndex { get; set; }
 
-      ReadOnlyCollection<IVisual> IVisual.VisualChildren => VisualChildren.AsReadOnly();
+      ReadOnlyCollection<IVisualComponent> IVisualComponent.VisualChildren => VisualChildren.AsReadOnly();
 
-      protected TrackingCollection<IVisual> VisualChildren { get; private set; } 
+      protected TrackingCollection<IVisualComponent> VisualChildren { get; private set; } 
       
       public bool IsAttachedToVisualTree { get; private set; }
 
       protected void SetVisualParent(VisualComponent parent)
       {
-         if (visualParent == parent)
+         if (visualComponentParent == parent)
          {
             return;
          }
 
-         var old = visualParent;
-         visualParent = parent;
+         var old = visualComponentParent;
+         visualComponentParent = parent;
 
          if (IsAttachedToVisualTree)
          {
-            var root = (this as IRootVisual) ?? old.GetSelfAndVisualAncestors().OfType<IRootVisual>().FirstOrDefault();
+            var root = (this as IRootVisualComponent) ?? old.GetSelfAndVisualAncestors().OfType<IRootVisualComponent>().FirstOrDefault();
             var e = new VisualTreeAttachmentEventArgs(root);
             DetachedFromVisualTree(e);
          }
 
-         if (visualParent is IRootVisual || visualParent?.IsAttachedToVisualTree == true)
+         if (visualComponentParent is IRootVisualComponent || visualComponentParent?.IsAttachedToVisualTree == true)
          {
-            var root =  this.GetVisualAncestors().OfType<IRootVisual>().FirstOrDefault();
+            var root =  this.GetVisualAncestors().OfType<IRootVisualComponent>().FirstOrDefault();
             var e = new VisualTreeAttachmentEventArgs(root);
             AttachedToVisualTree(e);
          }

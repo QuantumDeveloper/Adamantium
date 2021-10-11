@@ -6,7 +6,7 @@ using Adamantium.Engine.Graphics;
 
 namespace Adamantium.UI.Controls
 {
-    public interface IWindow : IRootVisual, IFrameworkComponent
+    public interface IWindow : IRootVisualComponent, IFrameworkComponent
     {
         void Show();
         void Close();

@@ -41,7 +41,7 @@ namespace Adamantium.Game
             
             GameContext = context;
             nativeWindow = (RenderTargetPanel)GameContext.Context;
-            UIComponent = nativeWindow;
+            UiComponent = nativeWindow;
             nativeWindow.RenderTargetChanged += NativeWindow_RenderTargetChanged;
             nativeWindow.GotFocus += NativeWindow_GotFocus;
             nativeWindow.LostFocus += NativeWindow_LostFocus;
@@ -79,7 +79,7 @@ namespace Adamantium.Game
         /// </summary>
         public override object NativeWindow => nativeWindow;
 
-        public override bool IsActive => UIComponent.IsFocused;
+        public override bool IsActive => UiComponent.IsFocused;
 
         internal override bool CanHandle(GameContext gameContext)
         {

@@ -32,11 +32,11 @@ namespace Adamantium.UI.Controls
             case NotifyCollectionChangedAction.Add:
                var controls = e.NewItems.OfType<FrameworkComponent>();
                LogicalChildren.InsertRange(e.NewStartingIndex, controls);
-               VisualChildren.AddRange(e.NewItems.OfType<IVisual>());
+               VisualChildren.AddRange(e.NewItems.OfType<IVisualComponent>());
                break;
             case NotifyCollectionChangedAction.Remove:
                LogicalChildren.Remove(e.OldItems.OfType<FrameworkComponent>());
-               VisualChildren.Remove(e.OldItems.OfType<IVisual>());
+               VisualChildren.Remove(e.OldItems.OfType<IVisualComponent>());
                break;
             case NotifyCollectionChangedAction.Replace:
                for (var i = 0; i < e.OldItems.Count; ++i)

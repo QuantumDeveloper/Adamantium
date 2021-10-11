@@ -12,10 +12,10 @@ namespace Adamantium.UI.Processors
         {
         }
 
-        public void TraverseInDepth(IVisual visualElement, Action<IVisual> action)
+        public void TraverseInDepth(IVisualComponent visualComponentElement, Action<IVisualComponent> action)
         {
-            var stack = new Stack<IVisual>();
-            stack.Push(visualElement);
+            var stack = new Stack<IVisualComponent>();
+            stack.Push(visualComponentElement);
             while (stack.Count > 0)
             {
                 var control = stack.Pop();
@@ -29,10 +29,10 @@ namespace Adamantium.UI.Processors
             }
         }
 
-        public void TraverseByLayer(IVisual visualElement, Action<IVisual> action)
+        public void TraverseByLayer(IVisualComponent visualComponentElement, Action<IVisualComponent> action)
         {
-            var queue = new Queue<IVisual>();
-            queue.Enqueue(visualElement);
+            var queue = new Queue<IVisualComponent>();
+            queue.Enqueue(visualComponentElement);
             while (queue.Count > 0)
             {
                 var control = queue.Dequeue();

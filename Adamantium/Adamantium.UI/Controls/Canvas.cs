@@ -6,16 +6,16 @@ namespace Adamantium.UI.Controls
    public class Canvas : Panel
    {
       public static readonly AdamantiumProperty LeftProperty = AdamantiumProperty.RegisterAttached("Left",
-         typeof(Double), typeof(UIComponent), new PropertyMetadata(Double.NaN, PropertyMetadataOptions.AffectsArrange));
+         typeof(Double), typeof(UiComponent), new PropertyMetadata(Double.NaN, PropertyMetadataOptions.AffectsArrange));
 
       public static readonly AdamantiumProperty TopProperty = AdamantiumProperty.RegisterAttached("Top",
-         typeof(Double), typeof(UIComponent), new PropertyMetadata(Double.NaN, PropertyMetadataOptions.AffectsArrange));
+         typeof(Double), typeof(UiComponent), new PropertyMetadata(Double.NaN, PropertyMetadataOptions.AffectsArrange));
 
       public static readonly AdamantiumProperty RightProperty = AdamantiumProperty.RegisterAttached("Right",
-         typeof(Double), typeof(UIComponent), new PropertyMetadata(Double.NaN, PropertyMetadataOptions.AffectsArrange));
+         typeof(Double), typeof(UiComponent), new PropertyMetadata(Double.NaN, PropertyMetadataOptions.AffectsArrange));
 
       public static readonly AdamantiumProperty BottomProperty = AdamantiumProperty.RegisterAttached("Bottom",
-         typeof(Double), typeof(UIComponent), new PropertyMetadata(Double.NaN, PropertyMetadataOptions.AffectsArrange));
+         typeof(Double), typeof(UiComponent), new PropertyMetadata(Double.NaN, PropertyMetadataOptions.AffectsArrange));
 
 
       public static Double GetLeft(AdamantiumComponent element)

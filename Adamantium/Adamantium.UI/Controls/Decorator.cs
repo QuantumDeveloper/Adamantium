@@ -8,7 +8,7 @@
             PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange));
 
       public static readonly AdamantiumProperty ChildProperty = AdamantiumProperty.Register(nameof(Child),
-         typeof(UIComponent), typeof(Decorator),
+         typeof(UiComponent), typeof(Decorator),
          new PropertyMetadata(null,
             PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange, ChildChanged));
 
@@ -20,13 +20,13 @@
             if (e.OldValue != null && e.OldValue != AdamantiumProperty.UnsetValue)
             {
                o.LogicalChildren.Remove((FrameworkComponent)e.OldValue);
-               o.VisualChildren.Remove((UIComponent)e.OldValue);
+               o.VisualChildren.Remove((UiComponent)e.OldValue);
             }
 
             if (e.NewValue != null)
             {
                o.LogicalChildren.Add((FrameworkComponent)e.NewValue);
-               o.VisualChildren.Add((UIComponent)e.NewValue);
+               o.VisualChildren.Add((UiComponent)e.NewValue);
             }
          }
       }
@@ -38,9 +38,9 @@
       }
 
       [Content]
-      public UIComponent Child
+      public UiComponent Child
       {
-         get { return GetValue<UIComponent>(ChildProperty); }
+         get { return GetValue<UiComponent>(ChildProperty); }
          set { SetValue(ChildProperty, value);}
       }
 

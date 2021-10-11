@@ -17,12 +17,7 @@ namespace Adamantium.Imaging.Png
             compressor = new PNGCompressor();
         }
 
-        public Image Decode()
-        {
-            return Decode(PNGColorType.RGBA, 8);
-        }
-
-        private Image Decode(PNGColorType colorType = PNGColorType.RGBA, uint bitDepth = 8)
+        public Image Decode(PNGColorType colorType = PNGColorType.RGBA, uint bitDepth = 8)
         {
             PNGState state = new PNGState();
             state.ColorModeRaw.ColorType = colorType;

@@ -4,9 +4,9 @@ namespace Adamantium.UI
 {
    public class VisualTreeAttachmentEventArgs : EventArgs
    {
-      IRootVisual Root { get; }
+      IRootVisualComponent Root { get; }
 
-      public VisualTreeAttachmentEventArgs(IRootVisual root)
+      public VisualTreeAttachmentEventArgs(IRootVisualComponent root)
       {
          Root = root;
       }

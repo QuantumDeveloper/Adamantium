@@ -8,71 +8,71 @@ namespace Adamantium.UI
    public static class VisualExtensions
    {
       /// <summary>
-      /// Enumerates the ancestors of an <see cref="IVisual"/> in the visual tree.
+      /// Enumerates the ancestors of an <see cref="IVisualComponent"/> in the visual tree.
       /// </summary>
-      /// <param name="visual">The visual.</param>
+      /// <param name="visualComponentual.</param>
       /// <returns>The visual's ancestors.</returns>
-      public static IEnumerable<IVisual> GetVisualAncestors(this IVisual visual)
+      public static IEnumerable<IVisualComponent> GetVisualAncestors(this IVisualComponent visualComponent)
       {
-         visual = visual.VisualParent;
+         visualComponent = visualComponent.VisualComponentParent;
 
-         while (visual != null)
+         while (visualComponent != null)
          {
-            yield return visual;
-            visual = visual.VisualParent;
+            yield return visualComponent;
+            visualComponent = visualComponent.VisualComponentParent;
          }
       }
 
 
-      public static IEnumerable<IVisual> GetSelfAndVisualAncestors(this IVisual visual)
+      public static IEnumerable<IVisualComponent> GetSelfAndVisualAncestors(this IVisualComponent visualComponent)
       {
-         yield return visual;
+         yield return visualComponent;
 
-         foreach (var ancestor in visual.GetVisualAncestors())
+         foreach (var ancestor in visualComponent.GetVisualAncestors())
          {
             yield return ancestor;
          }
       }
 
-      public static T GetVisualParent<T>(this IVisual visual) where T : class
+      public static T GetVisualParent<T>(this IVisualComponent visualComponent) where T : class
       {
-         return visual.VisualParent as T;
+         return visualComponent.VisualComponentParent as T;
       }
 
-      public static IReadOnlyList<IVisual> GetVisualDescends(this IVisual visual)
+      public static IReadOnlyList<IVisualComponent> GetVisualDescends(this IVisualComponent visualComponent)
       {
-         return visual.VisualChildren;
+         return visualComponent.VisualChildren;
       }
 
-      public static Point PointToClient(this IVisual visual, Point point)
+      public static Point PointToClient(this IVisualComponent visualComponent, Point point)
       {
-         var pair = GetRootAndAbsolutePosition(visual);
+         var pair = GetRootAndAbsolutePosition(visualComponent);
          return pair.Key.PointToClient(point + pair.Value);
       }
 
-      public static Point PointToScreen(this IVisual visual, Point point)
+      public static Point PointToScreen(this IVisualComponent visualComponent, Point point)
       {
-         var pair = GetRootAndAbsolutePosition(visual);
+         var pair = GetRootAndAbsolutePosition(visualComponent);
          return pair.Key.PointToScreen(point +pair.Value);
       }
 
-      private static KeyValuePair<IRootVisual, Point> GetRootAndAbsolutePosition(this IVisual visual)
+      private static KeyValuePair<IRootVisualComponent, Point> GetRootAndAbsolutePosition(this IVisualComponent visualComponent)
       {
          Point p = new Point();
 
-         while (!(visual is IRootVisual))
+         while (!(visualComponent is IRootVisualComponent))
          {
-            p += visual.ClipRectangle.Location;
+            p += visualComponent.ClipRectangle.Location;
 
-            visual = visual.VisualParent;
+            visualComponent = visualComponent.VisualComponentParent;
 
-            if (visual == null)
+            if (visualComponent == null)
             {
                throw new InvalidOperationException("Control is not attached to visual tree.");
             }
          }
 
-         return new KeyValuePair<IRootVisual, Point>((IRootVisual)visual, p);
+         return new KeyValuePair<IRootVisualComponent, Point>((IRootVisualComponent)visualComponent, p);
       } 
    }
 }

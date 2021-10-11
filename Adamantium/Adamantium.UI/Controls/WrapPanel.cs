@@ -188,12 +188,12 @@ namespace Adamantium.UI.Controls
 
       }
 
-      private IEnumerable<UIComponent> GetContolsBetween(int first, int last)
+      private IEnumerable<UiComponent> GetContolsBetween(int first, int last)
       {
          return Children.Skip(first).Take(last - first);
       }
 
-      private void ArrangeLine(double accumulated, double lineSize, IEnumerable<UIComponent> contols)
+      private void ArrangeLine(double accumulated, double lineSize, IEnumerable<UiComponent> contols)
       {
          bool isHorizontal = (Orientation == Orientation.Horizontal);
          double accumulatedY = 0;

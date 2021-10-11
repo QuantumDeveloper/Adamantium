@@ -173,15 +173,15 @@ namespace Adamantium.UI
 
         public abstract void Render();
         
-        public void TraverseInDepth(IVisual visualElement, Action<IVisual> action)
+        public void Update()
         {
-            var stack = new Stack<IVisual>();
-            stack.Push(visualElement);
+            var stack = new Stack<IVisualComponent>();
+            stack.Push(this);
             while (stack.Count > 0)
             {
                 var control = stack.Pop();
 
-                action(control);
+                UpdateControl(control);
 
                 foreach (var visual in control.GetVisualDescends())
                 {
@@ -190,15 +190,23 @@ namespace Adamantium.UI
             }
         }
 
-        internal void Update()
+        private void UpdateControl(IVisualComponent visualComponent)
         {
-            var control = (FrameworkComponent)this;
+            var control = (FrameworkComponent)visualComponent;
             if (!control.IsMeasureValid)
             {
                 if (!Double.IsNaN(control.Width) && !Double.IsNaN(control.Height))
                 {
                     Size s = new Size(control.Width, control.Height);
                     control.Measure(s);
+                }
+                else if (Double.IsNaN(control.Width) && !Double.IsNaN(control.Height))
+                {
+                    control.Measure(new Size(Double.PositiveInfinity, control.Height));
+                }
+                else if (!Double.IsNaN(control.Width) && Double.IsNaN(control.Height))
+                {
+                    control.Measure(new Size(control.Width, Double.PositiveInfinity));
                 }
                 else
                 {
@@ -217,7 +225,7 @@ namespace Adamantium.UI
                 control.ClipPosition = control.ClipRectangle.Location + control.Parent.Location;
             }
         }
-        
+
         protected void OnClosed()
         {
             var closingArgs = new WindowClosingEventArgs();

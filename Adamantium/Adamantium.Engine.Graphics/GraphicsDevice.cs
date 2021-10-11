@@ -55,6 +55,7 @@ namespace Adamantium.Engine.Graphics
             BlendStates = new BlendStatesCollection();
             RasterizerStates = new RasterizerStateCollection();
             DepthStencilStates = new DepthStencilStatesCollection();
+            
         }
 
         private GraphicsDevice(MainGraphicsDevice mainDevice)
@@ -92,6 +93,8 @@ namespace Adamantium.Engine.Graphics
             //RasterizerState = RasterizerStates.CullBackClipDisabled;
             RasterizerState = RasterizerStates.CullNoneClipDisabled;
             DepthStencilState = DepthStencilStates.Default;
+            SamplerStates = new SamplerStateCollection(this);
+            Sampler = SamplerStates.Default;
             
             ClearColor = Colors.CornflowerBlue;
 
@@ -135,9 +138,13 @@ namespace Adamantium.Engine.Graphics
         
         public static DepthStencilStatesCollection DepthStencilStates { get; }
         
+        public SamplerStateCollection SamplerStates { get; internal set; }
+        
         public Effect BasicEffect { get; private set; }
         
         public Color ClearColor { get; set; }
+        
+        public SamplerState Sampler { get; set; }
 
         public BlendState BlendState
         {

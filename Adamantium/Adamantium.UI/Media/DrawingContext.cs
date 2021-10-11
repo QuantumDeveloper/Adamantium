@@ -9,34 +9,34 @@ namespace Adamantium.UI.Media
    {
       internal GraphicsDevice GraphicsDevice { get; set; }
       //internal D2DGraphicDevice D2DGraphicDevice { get; set; }
-      internal Dictionary<IVisual, ShapePresentation> VisualPresentations;
+      internal Dictionary<IVisualComponent, ShapePresentation> VisualPresentations;
 
       internal DrawingContext(GraphicsDevice d3dDevice)
       {
          GraphicsDevice = d3dDevice;
-         VisualPresentations = new Dictionary<IVisual, ShapePresentation>();
+         VisualPresentations = new Dictionary<IVisualComponent, ShapePresentation>();
       }
 
-      public void BeginDraw(IVisual visual)
+      public void BeginDraw(IVisualComponent visualComponent)
       {
-         if (VisualPresentations.ContainsKey(visual))
+         if (VisualPresentations.ContainsKey(visualComponent))
          {
-            var presentation = VisualPresentations[visual];
+            var presentation = VisualPresentations[visualComponent];
             presentation.DisposeAndClearItems();
             presentation.IsSealed = false;
          }
          else
          {
-            VisualPresentations[visual] = new ShapePresentation();
+            VisualPresentations[visualComponent] = new ShapePresentation();
          }
       }
 
-      public void EndDraw(IVisual visual)
+      public void EndDraw(IVisualComponent visualComponent)
       {
-         VisualPresentations[visual].IsSealed = true;
+         VisualPresentations[visualComponent].IsSealed = true;
       }
 
-      public void DrawRectangle(IVisual visual, Brush brush, Rect rect, Pen pen = null, double radiusX = 0.0, double radiusY = 0.0)
+      public void DrawRectangle(IVisualComponent visualComponent, Brush brush, Rect rect, Pen pen = null, double radiusX = 0.0, double radiusY = 0.0)
       {
          RectangleGeometry rectangle = new RectangleGeometry(rect, radiusX, radiusY);
          StrokeGeometry stroke = null;
@@ -46,12 +46,12 @@ namespace Adamantium.UI.Media
          }
 
          ShapePresentation shapePresentation = null;
-         VisualPresentations.TryGetValue(visual, out shapePresentation);
+         VisualPresentations.TryGetValue(visualComponent, out shapePresentation);
          shapePresentation?.AddItem(new PresentationItem(this, null, rectangle, stroke, brush, pen?.Brush));
 
       }
 
-      public void DrawRectangle(IVisual visual, Brush brush, Rect rect, Thickness corners,Pen pen = null)
+      public void DrawRectangle(IVisualComponent visualComponent, Brush brush, Rect rect, Thickness corners,Pen pen = null)
       {
          RectangleGeometry rectangle = new RectangleGeometry(rect, corners);
          StrokeGeometry stroke = null;
@@ -61,15 +61,15 @@ namespace Adamantium.UI.Media
          }
 
          ShapePresentation shapePresentation = null;
-         VisualPresentations.TryGetValue(visual, out shapePresentation);
+         VisualPresentations.TryGetValue(visualComponent, out shapePresentation);
          shapePresentation?.AddItem(new PresentationItem(this, null, rectangle, stroke, brush, pen?.Brush));
 
       }
 
-      public void DrawGeometry(IVisual visual, Brush brush, Pen pen, Geometry geometry)
+      public void DrawGeometry(IVisualComponent visualComponent, Brush brush, Pen pen, Geometry geometry)
       {
          ShapePresentation shapePresentation = null;
-         VisualPresentations.TryGetValue(visual, out shapePresentation);
+         VisualPresentations.TryGetValue(visualComponent, out shapePresentation);
          StrokeGeometry strokeGeometry = null;
          if (pen != null && pen.Thickness > 0.0)
          {
@@ -77,38 +77,38 @@ namespace Adamantium.UI.Media
          }
          shapePresentation = new ShapePresentation();
          shapePresentation.AddItem(new PresentationItem(this, null, geometry, strokeGeometry, brush, pen?.Brush));
-         if (!VisualPresentations.ContainsKey(visual))
+         if (!VisualPresentations.ContainsKey(visualComponent))
          {
-            VisualPresentations.Add(visual, shapePresentation);
+            VisualPresentations.Add(visualComponent, shapePresentation);
          }
          else
          {
-            VisualPresentations[visual] = shapePresentation;
+            VisualPresentations[visualComponent] = shapePresentation;
          }
 
       }
 
-      public void DrawImage(IVisual visual, BitmapSource bitmap, Brush filter, Rect destinationRect, Double radiusX,
+      public void DrawImage(IVisualComponent visualComponent, BitmapSource bitmap, Brush filter, Rect destinationRect, Double radiusX,
          Double radiusY)
       {
          ShapePresentation shapePresentation = new ShapePresentation();
          var geometry = new RectangleGeometry(destinationRect, radiusX, radiusY);
          shapePresentation.AddItem(new PresentationItem(this, bitmap, geometry, null, filter, null));
-         if (!VisualPresentations.ContainsKey(visual))
+         if (!VisualPresentations.ContainsKey(visualComponent))
          {
-            VisualPresentations.Add(visual, shapePresentation);
+            VisualPresentations.Add(visualComponent, shapePresentation);
          }
          else
          {
-            VisualPresentations[visual] = shapePresentation;
+            VisualPresentations[visualComponent] = shapePresentation;
          }
       }
 
-      public void PushTexture(IVisual visual, BitmapSource bitmap)
+      public void PushTexture(IVisualComponent visualComponent, BitmapSource bitmap)
       {
          ShapePresentation shapePresentation = null;
 
-         if (VisualPresentations.TryGetValue(visual, out shapePresentation))
+         if (VisualPresentations.TryGetValue(visualComponent, out shapePresentation))
          {
             if (shapePresentation[0].HasTexture)
             {
@@ -118,11 +118,11 @@ namespace Adamantium.UI.Media
          }
       }
 
-      public void PushTexture(IVisual visual, Texture bitmap)
+      public void PushTexture(IVisualComponent visualComponent, Texture bitmap)
       {
          ShapePresentation shapePresentation = null;
 
-         if (VisualPresentations.TryGetValue(visual, out shapePresentation))
+         if (VisualPresentations.TryGetValue(visualComponent, out shapePresentation))
          {
             if (shapePresentation[0].HasTexture)
             {
@@ -132,12 +132,12 @@ namespace Adamantium.UI.Media
          }
       }
 
-      public void DrawEmptyRectangle(IVisual visual, Brush brush, Rect rect, Thickness borderThickness, Thickness cornerRadius)
+      public void DrawEmptyRectangle(IVisualComponent visualComponent, Brush brush, Rect rect, Thickness borderThickness, Thickness cornerRadius)
       {
          
       }
 
-      public void DrawFilledRectangle(IVisual visual, Brush brush, Rect rect, Thickness cornerRadius)
+      public void DrawFilledRectangle(IVisualComponent visualComponent, Brush brush, Rect rect, Thickness cornerRadius)
       {
 
       }

@@ -1,9 +1,11 @@
-﻿namespace Adamantium.UI
+﻿using Adamantium.EntityFramework.ComponentsBasics;
+
+namespace Adamantium.UI
 {
    /// <summary>
    /// Interface for getting/setting <see cref="AdamantiumProperty"/> values on an object.
    /// </summary>
-   public interface IAdamantiumComponent
+   public interface IAdamantiumComponent : IComponent
    {
       /// <summary>
       /// The parent object that inherited values are inherited from.
