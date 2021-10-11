@@ -11,10 +11,10 @@ namespace Adamantium.MathTests
         [Test]
         public void AngleTest()
         {
-            var prev = new LineSegment2D(new Vector2D(1, 10), new Vector2D(1, 1));
-            var cur = new LineSegment2D(new Vector2D(1, 10), new Vector2D(2, 20));
+            var current = new LineSegment2D(new Vector2D(1, 1), new Vector2D(2, 10));
+            var next = new LineSegment2D(new Vector2D(1, 1), new Vector2D(4, 10));
 
-            var res = MathHelper.DetermineAngleInDegrees(prev.Start, prev.End, cur.Start, cur.End);
+            var res = MathHelper.Cross2D(current.Direction, next.Direction);
         }
 
         [Test]

@@ -51,8 +51,8 @@ namespace Adamantium.Game.Playground
 
         private async void LoadModels()
         {
-            var entity = await ImportModel(@"Models\monkey\monkey.dae");
-            EntityWorld.AddEntity(entity);
+            // var entity = await ImportModel(@"Models\monkey\monkey.dae");
+            // EntityWorld.AddEntity(entity);
             // var ent = entity.Dependencies[0];
             // ent.Transform.SetScaleFactor(100);
             // ent.Transform.SetPosition(new Vector3D(500, 300, -150));
@@ -121,12 +121,12 @@ namespace Adamantium.Game.Playground
                 //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/Japan/NotoSansCJKjp-Light.otf", 3);
                 var entity = new Entity(null, "Poppins-Medium");
                 var font = typeface.GetFont(0);
-                var glyph = font.GetGlyphByCharacter('e');
+                var glyph = font.GetGlyphByCharacter('A');
                 //var glyph = font.GetGlyphByIndex(2710);
                 glyph.Sample(5);
                 uint size = 64;
 
-                /*
+                
                 //glyph.SetTestSegmentData(); 
                 var colors = glyph.GenerateDirectMSDF(size);
                 //var colors = glyph.GenerateSDF(size);
@@ -134,17 +134,17 @@ namespace Adamantium.Game.Playground
                 var pixels = img.GetPixelBuffer(0, 0);
                 pixels.SetPixels(colors);
                 img.Save(@"Textures\sdf.png", ImageFileType.Png);
-                */
+                
 
-                var newMesh = glyph.GetColoredPoints();
+                /*var newMesh = glyph.GetColoredPoints();
                 newMesh.MeshTopology = PrimitiveType.LineList;
                 var newMeshComponent = new MeshData();
                 newMeshComponent.Mesh = newMesh;
                 var newMeshRenderer = new MeshRenderer();
                 entity.AddComponent(newMeshComponent);
-                entity.AddComponent(newMeshRenderer);
+                entity.AddComponent(newMeshRenderer);*/
                 
-                /*var glyphSize = 10;
+                var glyphSize = 250;
                 var quadList = new List<Vector3F>();
                 quadList.Add(new Vector3F(10));
                 quadList.Add(new Vector3F(glyphSize + 10, 10, 0));
@@ -165,7 +165,7 @@ namespace Adamantium.Game.Playground
                 meshComponent.Mesh = mesh;
                 var meshRenderer = new MeshRenderer();
                 entity.AddComponent(meshComponent);
-                entity.AddComponent(meshRenderer);*/
+                entity.AddComponent(meshRenderer);
                 
                 /*
                 var points = glyph.Sample(5);
