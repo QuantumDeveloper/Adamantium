@@ -943,7 +943,7 @@ namespace Adamantium.Fonts
                     //var color = Color.FromRgba(0, (byte)coloredDistances[x, y].greenDistance, 0, 255);
                     //var color = Color.FromRgba(0, 0, (byte)coloredDistances[x, y].blueDistance, 255);
                     
-                    var color = Color.FromRgba((byte)coloredDistances[x, y].redDistance, (byte)coloredDistances[x, y].greenDistance, (byte)coloredDistances[x, y].blueDistance, 250);
+                    var color = Color.FromRgba((byte)coloredDistances[x, y].redDistance, (byte)coloredDistances[x, y].greenDistance, (byte)coloredDistances[x, y].blueDistance, 255);
                     
                     msdf.Add(color);
                 }
