@@ -471,7 +471,7 @@ namespace Adamantium.Engine.Processors
                                         //var wvp = transformation.WorldMatrix * Matrix4x4F.Scaling(1, -1, 1) * Matrix4x4F.Scaling(2.0f / Window.Width, 2.0f/Window.Height, 1.0f / (100000f - 1f));
                                         GraphicsDevice.BasicEffect.Parameters["wvp"].SetValue(wvp);
                                         GraphicsDevice.BasicEffect.Parameters["meshColor"].SetValue(Colors.Black.ToVector3());
-                                        //GraphicsDevice.BasicEffect.Parameters["transparency"].SetValue(0.5f);
+                                        GraphicsDevice.BasicEffect.Parameters["transparency"].SetValue(0.5f);
                                         //GraphicsDevice.BasicEffect.Parameters["worldMatrix"].SetValue(transformation.WorldMatrix);
                                         //GraphicsDevice.BasicEffec.SetValue(Matrix4x4F.Transpose(Matrix4x4F.Invert(transformation.WorldMatrix)));
                                         
