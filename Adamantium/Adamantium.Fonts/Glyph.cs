@@ -68,10 +68,10 @@ namespace Adamantium.Fonts
         
         internal static Glyph EmptyGlyph(uint index)
         {
-            return new Glyph(index, true);
+            return new Glyph(index, true, OutlineType.Unknown);
         }
 
-        public Glyph(uint index)
+        public Glyph(uint index, OutlineType outlineType)
         {
             Index = index;
             Name = String.Empty;
@@ -81,9 +81,10 @@ namespace Adamantium.Fonts
             uniqueUnicodes = new HashSet<uint>();
             CompositeGlyphComponents = new List<CompositeGlyphComponent>();
             Msdf = new MsdfGenerator();
+            OutlineType = outlineType;
         }
 
-        private Glyph(uint index, bool isEmpty) : this(index)
+        private Glyph(uint index, bool isEmpty, OutlineType outlineType) : this(index, outlineType)
         {
             IsEmpty = isEmpty;
             Name = String.Empty;
@@ -313,9 +314,9 @@ namespace Adamantium.Fonts
             return $"Name: {Name} Index: {Index}, SID: {SID} Unicodes: {string.Join(", ", Unicodes)}";
         }
 
-        internal static Glyph Create(uint index)
+        internal static Glyph Create(uint index, OutlineType outlineType)
         {
-            return new Glyph(index);
+            return new Glyph(index, outlineType);
         }
 
         internal Glyph SetCommands(List<Command> commands)
@@ -373,7 +374,7 @@ namespace Adamantium.Fonts
 
                     if (segment.Start == segment.End)
                     {
-                        throw new Exception("OUTLINE START == END");
+                       throw new Exception("OUTLINE START == END");
                     }
                 }
             }

@@ -123,7 +123,7 @@ namespace Adamantium.Game.Playground
                 var font = typeface.GetFont(0);
                 var glyph = font.GetGlyphByCharacter('e');
                 //var glyph = font.GetGlyphByIndex(2710);
-                glyph.Sample(1);
+                glyph.Sample(5);
                 uint size = 64;
 
                 //glyph.SetTestSegmentData(); 

@@ -989,7 +989,7 @@ namespace Adamantium.Fonts.Parsers
             var glyphs = new Glyph[maxp.NumGlyphs];
             for (uint i = 0; i < glyphs.Length; ++i)
             {
-                var glyph = new Glyph(i) {OutlineType = OutlineType.TrueType};
+                var glyph = new Glyph(i, OutlineType.TrueType);
                 glyphs[i] = glyph;
             }
             

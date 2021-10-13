@@ -8,14 +8,12 @@ namespace Adamantium.Fonts.Common
     {
         public static SampledOutline[] GenerateOutlines(this Glyph glyph, byte rate)
         {
-            if (glyph.OutlineType == OutlineType.TrueType)
+            return glyph.OutlineType switch
             {
-                return GenerateQuadraticBezierOutlines(glyph.Outlines, rate);
-            }
-            else
-            {
-                return GenerateCubicBezierOutlines(glyph.Outlines, rate);
-            }
+                OutlineType.TrueType => GenerateQuadraticBezierOutlines(glyph.Outlines, rate),
+                OutlineType.CompactFontFormat => GenerateCubicBezierOutlines(glyph.Outlines, rate),
+                _ => Array.Empty<SampledOutline>(),
+            };
         }
         
         // Cubic Bezier generator
@@ -30,7 +28,13 @@ namespace Adamantium.Fonts.Common
                 foreach (var segment in outline.Segments)
                 {
                     var tmp = GenerateCubicOutlineFromSegment(segment, rate);
-                    sampledPoints.AddRange(tmp);
+                    foreach (var point in tmp)
+                    {
+                      if (sampledPoints.Contains(point)) continue;
+                      
+                      sampledPoints.Add(point);
+                    }
+                    //sampledPoints.AddRange(tmp);
                 }
                 
                 sampledOutlines.Add(new SampledOutline(sampledPoints.ToArray()));

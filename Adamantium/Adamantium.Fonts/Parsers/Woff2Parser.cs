@@ -387,7 +387,7 @@ namespace Adamantium.Fonts.Parsers
             FontReader.Position = compositeStreamStartAt;
             foreach (var compositeGlyph in compositeGlyphs)
             {
-                var glyph = new Glyph(compositeGlyph.Index);
+                var glyph = new Glyph(compositeGlyph.Index, OutlineType.TrueType);
                 compositeGlyph.HasInstructions = ReadTTFCompositeGlyphComponentData(glyph, false);
                 glyphs[compositeGlyph.Index] = glyph;
             }
@@ -482,7 +482,7 @@ namespace Adamantium.Fonts.Parsers
 
             if (glyph == null)
             {
-                glyph = new Glyph(tempGlyph.Index);
+                glyph = new Glyph(tempGlyph.Index, OutlineType.TrueType);
             }
 
             for (int i = 0; i < numContours; ++i)

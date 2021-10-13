@@ -253,14 +253,14 @@ namespace Adamantium.Fonts.Parsers.CFF
                     
                     var commandList = new CommandParser(this).Parse(font, mainStack, fontDict, index: i);
 
-                    var glyph = Glyph.Create((uint) i).SetCommands(commandList).FillOutlines().RecalculateBounds();
+                    var glyph = Glyph.Create((uint) i, OutlineType.CompactFontFormat).SetCommands(commandList).FillOutlines().RecalculateBounds();
 
                     glyphs.Add(glyph);
                     
                 }
                 catch (Exception e)
                 {
-                    glyphs.Add(new Glyph((uint)i){ OutlineType = OutlineType.CompactFontFormat, IsInvalid = true });
+                    glyphs.Add(new Glyph((uint)i, OutlineType.CompactFontFormat){IsInvalid = true });
                     exceptions++;
                 }
             }
