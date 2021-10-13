@@ -121,13 +121,24 @@ namespace Adamantium.Game.Playground
                 //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/Japan/NotoSansCJKjp-Light.otf", 3);
                 var entity = new Entity(null, "Poppins-Medium");
                 var font = typeface.GetFont(0);
-                var glyph = font.GetGlyphByCharacter('@');
+                var glyph = font.GetGlyphByCharacter('e');
                 //var glyph = font.GetGlyphByIndex(2710);
                 glyph.Sample(1);
                 uint size = 64;
 
                 //glyph.SetTestSegmentData(); 
                 var colors = glyph.GenerateDirectMSDF(size);
+
+                bool hasColors = false;
+                foreach (var color in colors)
+                {
+                    if (color.R != 0 || color.G != 0 || color.B != 0)
+                    {
+                        hasColors = true;
+                        break;
+                    }
+                }
+                
                 //var colors = glyph.GenerateSDF(size);
                 var img = Image.New2D(size, size, 1, SurfaceFormat.R8G8B8A8.UNorm);
                 var pixels = img.GetPixelBuffer(0, 0);

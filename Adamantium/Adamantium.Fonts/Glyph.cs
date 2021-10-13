@@ -418,15 +418,6 @@ namespace Adamantium.Fonts
                 }
             }
 
-            if (CheckSegments(segments))
-            {
-                int good = 0;
-            }
-            else
-            {
-                int bad = 0;
-            }
-            
             Msdf.SetSegmentData(segments);
             
             var points = new List<Vector3F>();
@@ -440,19 +431,6 @@ namespace Adamantium.Fonts
             return points.ToArray();
         }
 
-        private bool CheckSegments(List<LineSegment2D> segments)
-        {
-            foreach (var segment in segments)
-            {
-                if (segment.Start == segment.End)
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-        
         /*private void RemoveZeroAngleSegments()
         {
             for (int i = 0; i < segments.Count; i++)

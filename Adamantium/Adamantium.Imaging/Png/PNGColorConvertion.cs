@@ -750,14 +750,7 @@ namespace Adamantium.Imaging.Png
                     int j = (int)(index * mode.BitDepth);
                     var value = BitHelper.ReadBitsFromReversedStream(ref j, inBuffer, (int)mode.BitDepth);
                     r = g = b = (byte)((value * 255) / highest);
-                    if (mode.IsKeyDefined && value == mode.KeyR)
-                    {
-                        a = 0;
-                    }
-                    else
-                    {
-                        a = 255;
-                    }
+                    a = mode.IsKeyDefined && value == mode.KeyR ? (byte)0 : (byte)255;
                 }
             }
             else if (mode.ColorType == PNGColorType.RGB)
