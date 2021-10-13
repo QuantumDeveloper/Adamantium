@@ -123,10 +123,9 @@ namespace Adamantium.Game.Playground
                 var font = typeface.GetFont(0);
                 var glyph = font.GetGlyphByCharacter('@');
                 //var glyph = font.GetGlyphByIndex(2710);
-                glyph.Sample(5);
+                glyph.Sample(1);
                 uint size = 64;
 
-                
                 //glyph.SetTestSegmentData(); 
                 var colors = glyph.GenerateDirectMSDF(size);
                 //var colors = glyph.GenerateSDF(size);
@@ -134,7 +133,6 @@ namespace Adamantium.Game.Playground
                 var pixels = img.GetPixelBuffer(0, 0);
                 pixels.SetPixels(colors);
                 img.Save(@"Textures\sdf.png", ImageFileType.Png);
-                
 
                 /*var newMesh = glyph.GetColoredPoints();
                 newMesh.MeshTopology = PrimitiveType.LineList;

@@ -26,7 +26,7 @@ namespace Adamantium.Fonts.Common
             foreach (var outline in outlines)
             {
                 var sampledPoints = new List<Vector2D>();
-                
+
                 foreach (var segment in outline.Segments)
                 {
                     var tmp = GenerateCubicOutlineFromSegment(segment, rate);

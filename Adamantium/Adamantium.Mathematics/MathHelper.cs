@@ -664,18 +664,29 @@ namespace Adamantium.Mathematics
 
         public static double PointToLineDistance(Vector2D start, Vector2D end, Vector2D point)
         {
-            var a = (end.Y - start.Y) * point.X;
-            var b = (end.X - start.X) * point.Y;
-            var c = end.X * start.Y;
-            var d = end.Y * start.X;
+            double res = 0;
+            
+            if (start != end)
+            {
+                var a = (end.Y - start.Y) * point.X;
+                var b = (end.X - start.X) * point.Y;
+                var c = end.X * start.Y;
+                var d = end.Y * start.X;
 
-            var e = Math.Pow((end.Y - start.Y), 2);
-            var f = Math.Pow((end.X - start.X), 2);
+                var e = Math.Pow((end.Y - start.Y), 2);
+                var f = Math.Pow((end.X - start.X), 2);
 
-            var num = Math.Abs(a - b + c - d);
-            var den = Math.Sqrt(e + f);
+                var num = Math.Abs(a - b + c - d);
+                var den = Math.Sqrt(e + f);
 
-            return (num / den);
+                res = num / den;
+            }
+            else
+            {
+                res = (point - start).Length();
+            }
+
+            return res;
         }
     }
 }
