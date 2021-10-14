@@ -110,22 +110,50 @@ namespace Adamantium.Fonts
             //     return sampledOutlines;
             // }
 
-            var sampledOutlines = this.GenerateOutlines(rate);
-
-            foreach (var outline in sampledOutlines)
+            foreach (var outline in outlines)
             {
-                for (int i = 0; i < (outline.Points.Length - 1); i++)
+                foreach (var seg in outline.Segments)
                 {
-                    if (outline.Points[i] == outline.Points[i + 1])
+                    for (int i = 0; i < seg.Points.Count; i++)
                     {
-                        throw new Exception("OUTLINE i == i+1");
+                        var cur = seg.Points[i];
+                        var next = new Vector2D();
+
+                        if (i < (seg.Points.Count - 1))
+                        {
+                            next = seg.Points[i + 1];
+                        }
+                        else
+                        {
+                            next = seg.Points[0];
+                        }
+
+                        if (cur == next)
+                        {
+                            throw new Exception("SPLIT cur == next");
+                        }
                     }
                 }
             }
             
+            var sampledOutlines = this.GenerateOutlines(rate);
             sampledOutlinesCache[rate] = sampledOutlines;
+
+            foreach (var sampledOutline in sampledOutlines)
+            {
+                foreach (var sampledSegment in sampledOutline.Segments)
+                {
+                    if (sampledSegment.Start == sampledSegment.End)
+                    {
+                        throw new Exception("SAMPLED st == end");
+                    }
+                }
+            }
+            
             var points = RemoveSelfIntersections(sampledOutlines);
 
+            //Msdf.RemoveZeroAngleSegments();
+            
             return points;
         }
 
@@ -235,8 +263,21 @@ namespace Adamantium.Fonts
                     }
                 }
                 
+                // currently segment must contain exactly one point
+                if (segment.Count != 1)
+                {
+                    throw new Exception($"Segment must contain 1 point currently, actual points count = {segment.Count}");
+                }
+
                 // add the first point of current outline as the last point of the last segment
-                segment.Add(outline.Points[0]);
+                // but only if these two points are not equal
+                // in some cases outline assumes we build this list segment (like in 'A')
+                // but in some cases outline's last and first points are equal (like in 'O'), so we do not need to build this last segment
+                if (segment[0] != outline.Points[0])
+                {
+                    segment.Add(outline.Points[0]);
+                    outline.Segments.Add(new OutlineSegment(segment));
+                }
             }
         }
 
@@ -363,28 +404,22 @@ namespace Adamantium.Fonts
             bool isPointInside = false;
             var segments = new List<LineSegment2D>();
             var localSegments = new List<LineSegment2D>();
+
             foreach (var outline in outlines)
             {
-                for (var index = 0; index < outline.Points.Length - 1; index++)
+                foreach (var segment in outline.Segments)
                 {
-                    var start = outline.Points[index];
-                    var end = outline.Points[index + 1];
-                    var segment = new LineSegment2D(start, end);
                     localSegments.Add(segment);
-
-                    if (segment.Start == segment.End)
-                    {
-                       throw new Exception("OUTLINE START == END");
-                    }
                 }
             }
-
+            
             for (var i = 0; i < localSegments.Count; i++)
             {
                 var checkedSegment = localSegments[i];
                 var intersections = new List<DistancedPoint>();
                 for (var j = i+1; j < localSegments.Count; j++)
                 {
+                    // find all intersections of checked segment with the rest of segments
                     var currentSegment = localSegments[j];
                     if (Collision2D.SegmentSegmentIntersection(ref checkedSegment, ref currentSegment, out var point) && 
                         (point != checkedSegment.Start &&
@@ -395,6 +430,7 @@ namespace Adamantium.Fonts
                     }
                 }
 
+                // sort intersections by distance from checked segment start - we will then be switching "inside" flag on each intersection
                 var sortedIntersections = intersections.OrderBy(x => x.Distance).ToArray();
                 var start = checkedSegment.Start;
                 for (int j = 0; j < sortedIntersections.Length; j++)
@@ -432,32 +468,6 @@ namespace Adamantium.Fonts
             return points.ToArray();
         }
 
-        /*private void RemoveZeroAngleSegments()
-        {
-            for (int i = 0; i < segments.Count; i++)
-            {
-                var currentSeg = segments[i];
-                var nextSeg = new LineSegment2D();
-
-                if (i == (segments.Count - 1))
-                {
-                    nextSeg = segments[0];
-                }
-                else
-                {
-                    nextSeg = segments[i + 1];
-                }
-
-                if (IsSegmentsConnected(ref currentSeg, ref nextSeg) &&
-                    MathHelper.DetermineAngleInDegrees(currentSeg.Start, currentSeg.End, nextSeg.Start, nextSeg.End) == 0)
-                {
-                    var newSeg = new LineSegment2D(currentSeg.Start, nextSeg.End);
-                    segments[i] = newSeg;
-                    segments.Remove(nextSeg);
-                }
-            }
-        }*/
-
         public Color[] GenerateDirectMSDF(uint size)
         {
             return Msdf.GenerateDirectMSDF(size, BoundingRectangle);
@@ -473,7 +483,8 @@ namespace Adamantium.Fonts
         {
             var segments = new List<LineSegment2D>();
 
-            var s1 = new LineSegment2D(new Vector2D(300, 0), new Vector2D(500, 500));
+            // square
+            /*var s1 = new LineSegment2D(new Vector2D(300, 0), new Vector2D(500, 500));
             var s2 = new LineSegment2D(new Vector2D(500, 500), new Vector2D(200, 500));
             var s3 = new LineSegment2D(new Vector2D(200, 500), new Vector2D(0, 0));
             var s4 = new LineSegment2D(new Vector2D(0, 0), new Vector2D(300, 0));
@@ -490,8 +501,34 @@ namespace Adamantium.Fonts
             rectangle.Width = 500;
             rectangle.Height = 500;
 
-            BoundingRectangle = rectangle;
+            BoundingRectangle = rectangle;*/
             
+            // triangle in triangle
+            var s1 = new LineSegment2D(new Vector2D(0, 0), new Vector2D(500, 0));
+            var s2 = new LineSegment2D(new Vector2D(500, 0), new Vector2D(250, 500));
+            var s3 = new LineSegment2D(new Vector2D(250, 500), new Vector2D(0, 0));
+            
+            var s4 = new LineSegment2D(new Vector2D(400, 100), new Vector2D(100, 100));
+            var s5 = new LineSegment2D(new Vector2D(100, 100), new Vector2D(250, 400));
+            var s6 = new LineSegment2D(new Vector2D(250, 400), new Vector2D(400, 100));
+            
+            segments.Add(s1);
+            segments.Add(s2);
+            segments.Add(s3);
+            
+            segments.Add(s4);
+            segments.Add(s5);
+            segments.Add(s6);
+            
+            var rectangle = BoundingRectangle;
+
+            rectangle.X = 0;
+            rectangle.Y = 0;
+            rectangle.Width = 500;
+            rectangle.Height = 500;
+
+            BoundingRectangle = rectangle;
+
             Msdf.SetSegmentData(segments);
         }
         

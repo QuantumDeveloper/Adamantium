@@ -118,17 +118,26 @@ namespace Adamantium.Game.Playground
             {
                 //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/CFF2/SourceHanSerifVFProtoJP.otf", 3);
                 var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/SourceSans3-Regular.otf", 3);
+                //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/GlametrixLight-0zjo.otf", 3);
                 //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/Japan/NotoSansCJKjp-Light.otf", 3);
                 var entity = new Entity(null, "Poppins-Medium");
                 var font = typeface.GetFont(0);
-                var glyph = font.GetGlyphByCharacter('e');
+                var glyph = font.GetGlyphByCharacter('A');
                 //var glyph = font.GetGlyphByIndex(2710);
-                glyph.Sample(5);
+                glyph.Sample(15);
                 uint size = 64;
 
-                //glyph.SetTestSegmentData(); 
+                glyph.SetTestSegmentData(); 
                 var colors = glyph.GenerateDirectMSDF(size);
 
+                /*var newMesh = glyph.GetColoredPoints();
+                newMesh.MeshTopology = PrimitiveType.LineList;
+                var newMeshComponent = new MeshData();
+                newMeshComponent.Mesh = newMesh;
+                var newMeshRenderer = new MeshRenderer();
+                entity.AddComponent(newMeshComponent);
+                entity.AddComponent(newMeshRenderer);*/
+                
                 bool hasColors = false;
                 foreach (var color in colors)
                 {
@@ -143,15 +152,7 @@ namespace Adamantium.Game.Playground
                 var img = Image.New2D(size, size, 1, SurfaceFormat.R8G8B8A8.UNorm);
                 var pixels = img.GetPixelBuffer(0, 0);
                 pixels.SetPixels(colors);
-                img.Save(@"Textures\sdf.png", ImageFileType.Png);
-
-                /*var newMesh = glyph.GetColoredPoints();
-                newMesh.MeshTopology = PrimitiveType.LineList;
-                var newMeshComponent = new MeshData();
-                newMeshComponent.Mesh = newMesh;
-                var newMeshRenderer = new MeshRenderer();
-                entity.AddComponent(newMeshComponent);
-                entity.AddComponent(newMeshRenderer);*/
+                img.Save(@"Textures\sdf.png", ImageFileType.Png);                
                 
                 var glyphSize = 250;
                 var quadList = new List<Vector3F>();

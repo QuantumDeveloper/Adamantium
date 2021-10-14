@@ -10,7 +10,7 @@ namespace Adamantium.Fonts.Common
         {
             return glyph.OutlineType switch
             {
-                OutlineType.TrueType => GenerateQuadraticBezierOutlines(glyph.Outlines, rate),
+                OutlineType.TrueType => GenerateQuadraticBezierOutlines(glyph.Outlines, rate), // @TODO fix such that it should return segments
                 OutlineType.CompactFontFormat => GenerateCubicBezierOutlines(glyph.Outlines, rate),
                 _ => Array.Empty<SampledOutline>(),
             };
@@ -23,21 +23,19 @@ namespace Adamantium.Fonts.Common
 
             foreach (var outline in outlines)
             {
-                var sampledPoints = new List<Vector2D>();
+                var sampledSegments = new List<LineSegment2D>();
 
                 foreach (var segment in outline.Segments)
                 {
-                    var tmp = GenerateCubicOutlineFromSegment(segment, rate);
-                    foreach (var point in tmp)
+                    var sampledPoints = GenerateCubicOutlineFromSegment(segment, rate);
+                    for (var i = 0; i < (sampledPoints.Count - 1); i++)
                     {
-                      if (sampledPoints.Contains(point)) continue;
-                      
-                      sampledPoints.Add(point);
+                        var sampledSegment = new LineSegment2D(sampledPoints[i], sampledPoints[i + 1]);
+                        sampledSegments.Add(sampledSegment);
                     }
-                    //sampledPoints.AddRange(tmp);
                 }
-                
-                sampledOutlines.Add(new SampledOutline(sampledPoints.ToArray()));
+
+                sampledOutlines.Add(new SampledOutline(sampledSegments.ToArray()));
             }
 
             return sampledOutlines.ToArray();

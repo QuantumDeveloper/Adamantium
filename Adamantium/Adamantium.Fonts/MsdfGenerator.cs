@@ -150,15 +150,8 @@ namespace Adamantium.Fonts
                     for (int i = 0; i < edge.Segments.Count; i++)
                     {
                         var currentSeg = edge.Segments[i];
-
-                        /*if (currentSeg.Direction.Length() < segmentLengthThreshold)
-                        {
-                            currentSeg.MsdfColor = Colors.White;    
-                        }
-                        else
-                        {*/
                         currentSeg.MsdfColor = currentColor;
-                        /*}*/
+                        //currentSeg.MsdfColor = currentSeg.Direction.Length() < segmentLengthThreshold ? Colors.White : currentColor;
 
                         segments.Add(currentSeg);
                     }
@@ -290,8 +283,8 @@ namespace Adamantium.Fonts
             // 5. Normalize colored pseudo-distance field to [0 .. 255] range
             var msdf = new List<Color>();
 
-            maxDistance = Math.Max(Math.Abs(minDistance), maxDistance);
-            /*maxDistance = maxDistance / 3;
+            //maxDistance = Math.Max(Math.Abs(minDistance), maxDistance);
+            maxDistance = maxDistance / 3;
             minDistance = -maxDistance;
 
             for (int y = 0; y < size; y++)
@@ -328,7 +321,7 @@ namespace Adamantium.Fonts
                         coloredDistances[x, y].blueDistance = maxDistance;
                     }
                 }
-            }*/
+            }
 
             FixArtefacts(coloredDistances, size);
             
@@ -529,6 +522,32 @@ namespace Adamantium.Fonts
 
             return color;
         }
+        
+        /*public void RemoveZeroAngleSegments()
+        {
+            for (int i = 0; i < segments.Count; i++)
+            {
+                var currentSeg = segments[i];
+                var nextSeg = new LineSegment2D();
+
+                if (i == (segments.Count - 1))
+                {
+                    nextSeg = segments[0];
+                }
+                else
+                {
+                    nextSeg = segments[i + 1];
+                }
+
+                if (IsSegmentsConnected(ref currentSeg, ref nextSeg) &&
+                    MathHelper.DetermineAngleInDegrees(currentSeg.Start, currentSeg.End, nextSeg.Start, nextSeg.End) == 0)
+                {
+                    var newSeg = new LineSegment2D(currentSeg.Start, nextSeg.End);
+                    segments[i] = newSeg;
+                    segments.Remove(nextSeg);
+                }
+            }
+        }*/
         
         // --- ADDITIONAL DATA TYPES ---
         private struct ColoredDistance
