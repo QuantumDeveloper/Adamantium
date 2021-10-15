@@ -161,7 +161,7 @@ namespace Adamantium.Fonts
             }
         }
         
-        private void GetColoredDistances(Vector2D point, out double redDistance, out double greenDistance, out double blueDistance, out double alphaDistance)
+        private ColoredDistance GetColoredDistances(Vector2D point, double glyphSize, uint textureSize)
         {
             double closestRedDistance = Double.MaxValue;
             double closestGreenDistance = Double.MaxValue;
@@ -228,22 +228,41 @@ namespace Adamantium.Fonts
                 }
             }
 
-            redDistance = GetSignedDistanceToSegmentsJoint(closestRedSegments, point, true);
-            greenDistance = GetSignedDistanceToSegmentsJoint(closestGreenSegments, point, true);
-            blueDistance = GetSignedDistanceToSegmentsJoint(closestBlueSegments, point, true);
-            alphaDistance = GetSignedDistanceToSegmentsJoint(closestAlphaSegments, point, false);
+            var coloredDistance = new ColoredDistance();
+            
+            coloredDistance.redDistance = GetSignedDistanceToSegmentsJoint(closestRedSegments, point, true);
+            coloredDistance.greenDistance = GetSignedDistanceToSegmentsJoint(closestGreenSegments, point, true);
+            coloredDistance.blueDistance = GetSignedDistanceToSegmentsJoint(closestBlueSegments, point, true);
+            coloredDistance.alphaDistance = GetSignedDistanceToSegmentsJoint(closestAlphaSegments, point, false);
+
+            // prepare distance data for normalization
+            var scale = textureSize / glyphSize;
+            var range = GetRange(4, scale, scale);
+
+            coloredDistance.redDistance = coloredDistance.redDistance / range + 0.5;
+            coloredDistance.greenDistance = coloredDistance.greenDistance / range + 0.5;
+            coloredDistance.blueDistance = coloredDistance.blueDistance / range + 0.5;
+            coloredDistance.alphaDistance = coloredDistance.alphaDistance / range + 0.5;
+
+            return coloredDistance;
         }
-        
+
+        /// <summary>
+        /// Generates MSDF texture
+        /// </summary>
+        /// <param name="size">Width and height of MSDF texture</param>
+        /// <param name="glyphBoundingRectangle">Bounding rectangle of original glyph</param>
+        /// <returns>MSDF color data in for of single-dimension array</returns>
         public Color[] GenerateDirectMSDF(uint size, Rectangle glyphBoundingRectangle)
         {
             // 1. Color all segments
             ColorEdges();
             
             // 2. Calculate boundaries for original glyph
-            float glyphSize = Math.Max(glyphBoundingRectangle.Width, glyphBoundingRectangle.Height);
-            glyphSize += glyphSize * 0.3f;
+            double glyphSize = Math.Max(glyphBoundingRectangle.Width, glyphBoundingRectangle.Height);
+            glyphSize += glyphSize * 0.1f;
             var originalDimensions = new Vector2D(glyphSize);
-            
+
             // 3. Place glyph in center of calculated boundaries
             var glyphCenter = glyphBoundingRectangle.Center;
             var originalCenter = originalDimensions / 2;
@@ -265,9 +284,6 @@ namespace Adamantium.Fonts
             // 4. Generate colored pseudo-distance field
             var coloredDistances = new ColoredDistance[size, size];
 
-            double minDistance = Double.MaxValue;
-            double maxDistance = Double.MinValue;
-            
             double sdfMaxDistance = Double.MinValue;
 
             for (var y = 0; y < size; ++y)
@@ -277,83 +293,28 @@ namespace Adamantium.Fonts
                     // determine the closest segment to current sampling point
                     var samplingPoint = new Vector2D(originalDimensions.X / size * (x + 0.5), originalDimensions.Y - (originalDimensions.Y / size * (y + 0.5)));
 
-                    GetColoredDistances(samplingPoint, out coloredDistances[x, y].redDistance, out coloredDistances[x, y].greenDistance, out coloredDistances[x, y].blueDistance, out coloredDistances[x, y].alphaDistance);
-
-                    var medianDistance = Median(coloredDistances[x, y].redDistance, coloredDistances[x, y].greenDistance, coloredDistances[x, y].blueDistance);
-                    if (medianDistance > maxDistance)
-                    {
-                        maxDistance = medianDistance;
-                    }
-
-                    //minDistance = Math.Min(minDistance, MinOfThree(coloredDistances[x, y].redDistance, coloredDistances[x, y].greenDistance, coloredDistances[x, y].blueDistance));
-                    //maxDistance = Math.Max(maxDistance, MaxOfThree(coloredDistances[x, y].redDistance, coloredDistances[x, y].greenDistance, coloredDistances[x, y].blueDistance));
+                    coloredDistances[x, y] = GetColoredDistances(samplingPoint, glyphSize, size);
 
                     sdfMaxDistance = Math.Max(sdfMaxDistance, coloredDistances[x, y].alphaDistance);
                 }
             }
             
-            // 5. Normalize colored signed pseudo-distance field to [0 .. 255] range
+            // 5. Fix artefacts
+            //FixArtefacts(coloredDistances, size);
+            
+            // 6. Normalize MSDF and SDF to [0 .. 255] range
             var msdf = new List<Color>();
-
-            //maxDistance = Math.Max(Math.Abs(minDistance), maxDistance);
-            //maxDistance = maxDistance / 3;
-            minDistance = -maxDistance;
-            var sdfMinDistance = -sdfMaxDistance;
-
-            for (var y = 0; y < size; y++)
-            {
-                for (var x = 0; x < size; x++)
-                {
-                    if (coloredDistances[x, y].redDistance < minDistance)
-                    {
-                        coloredDistances[x, y].redDistance = minDistance;
-                    }
-                    
-                    if (coloredDistances[x, y].redDistance > maxDistance)
-                    {
-                        coloredDistances[x, y].redDistance = maxDistance;
-                    }
-                    
-                    if (coloredDistances[x, y].greenDistance < minDistance)
-                    {
-                        coloredDistances[x, y].greenDistance = minDistance;
-                    }
-                    
-                    if (coloredDistances[x, y].greenDistance > maxDistance)
-                    {
-                        coloredDistances[x, y].greenDistance = maxDistance;
-                    }
-                    
-                    if (coloredDistances[x, y].blueDistance < minDistance)
-                    {
-                        coloredDistances[x, y].blueDistance = minDistance;
-                    }
-                    
-                    if (coloredDistances[x, y].blueDistance > maxDistance)
-                    {
-                        coloredDistances[x, y].blueDistance = maxDistance;
-                    }
-                    
-                    // normalize sdf
-                    if (coloredDistances[x, y].alphaDistance < sdfMinDistance)
-                    {
-                        coloredDistances[x, y].alphaDistance = sdfMinDistance;
-                    }
-                }
-            }
-
-            FixArtefacts(coloredDistances, size);
             
             for (var y = 0; y < size; y++)
             {
                 for (var x = 0; x < size; x++)
                 {
-                    coloredDistances[x, y].redDistance = GetDistanceColor(coloredDistances[x, y].redDistance, maxDistance);
-                    coloredDistances[x, y].greenDistance = GetDistanceColor(coloredDistances[x, y].greenDistance, maxDistance);
-                    coloredDistances[x, y].blueDistance = GetDistanceColor(coloredDistances[x, y].blueDistance, maxDistance);
-                    coloredDistances[x, y].alphaDistance = GetDistanceColor(coloredDistances[x, y].alphaDistance, sdfMaxDistance);
+                    var red = PixelFloatToByte(coloredDistances[x, y].redDistance);
+                    var green = PixelFloatToByte(coloredDistances[x, y].greenDistance);
+                    var blue = PixelFloatToByte(coloredDistances[x, y].blueDistance);
+                    var alpha = PixelFloatToByte(coloredDistances[x, y].alphaDistance);
 
-                    var color = Color.FromRgba((byte)coloredDistances[x, y].redDistance, (byte)coloredDistances[x, y].greenDistance, (byte)coloredDistances[x, y].blueDistance, (byte)coloredDistances[x, y].alphaDistance);
+                    var color = Color.FromRgba(red, green, blue, alpha);
 
                     msdf.Add(color);
                 }
@@ -414,13 +375,13 @@ namespace Adamantium.Fonts
             return true;
         }
 
-        private void FixArtefacts(ColoredDistance[,] data, uint size)
+        private void FixArtefacts(ColoredDistance[,] data, uint textureSize)
         {
             var correctionList = new List<CorrectionLocation>();
 
-            for (var y = 1; y < size - 1; y++)
+            for (var y = 1; y < textureSize - 1; y++)
             {
-                for (var x = 1; x < size - 1; x++)
+                for (var x = 1; x < textureSize - 1; x++)
                 {
                     var current = data[x, y];
                     var neighbors = new List<ColoredDistance>
@@ -478,11 +439,23 @@ namespace Adamantium.Fonts
             return Math.Max(Math.Min(a,b), Math.Min(Math.Max(a,b), c));
         }
 
-        /*private double GetRange(double pxRange, double width, double height)
+        private double GetRange(double pxRange, double scaleX, double scaleY)
         {
-            return pxRange/Math.Min(width, height);
-        }*/
+            return pxRange / Math.Min(scaleX, scaleY);
+        }
 
+        private byte PixelFloatToByte(double x)
+        {
+            return (byte)(Clamp(256.0 * x, 255.0));
+        }
+        
+        private double Clamp(double n, double b)
+        {
+            var tmp = n > 0 ? 1.0 : 0.0;
+
+            return ((n >= 0 && n <= b) ? n : (tmp * b));
+        }
+        
         private byte GetDistanceColor(double distance, double maxDistance)
         {
             var range = 2 * maxDistance;

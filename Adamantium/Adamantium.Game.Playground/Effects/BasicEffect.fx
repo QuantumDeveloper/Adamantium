@@ -79,7 +79,7 @@ float4 BasicColored_PS(PS_OUTPUT_BASIC input) : SV_TARGET
     return color;
 }
 
-float4 BasicColored2_PS(PS_OUTPUT_BASIC input) : SV_TARGET
+float4 BasicVertexColored_PS(PS_OUTPUT_BASIC input) : SV_TARGET
 {
     return input.color;
 }
@@ -89,56 +89,8 @@ float median(float a, float b, float c)
     return max(min(a,b), min(max(a,b), c));
 }
 
-float contour(in float d, in float w) {
-    // smoothstep(lower edge0, upper edge1, x)
-    return smoothstep(0.5 - w, 0.5 + w, d);
-}
-
-float samp(in float2 uv, float w) {
-    return contour(shaderTexture.Sample(sampleType, uv).r, w);
-}
-
-float4 SDF_PS(PS_OUTPUT_BASIC input) : SV_TARGET
-{
-    float4 color;
-    float upperPointCutOff = 0.5f;
-    float midpointCutOff = 0.49f;
-    //float dist = upperPointCutOff - shaderTexture.Sample(sampleType, input.uv).r;
-    float dist = shaderTexture.Sample(sampleType, input.uv).a;
-
-    if (dist > upperPointCutOff)
-    {
-        color = float4(0, 0, 0, 1);
-    }
-    else if (dist > midpointCutOff)
-    {
-        float smooth = smoothstep(midpointCutOff, upperPointCutOff, dist);
-        color = float4(0, 0, 0, smooth);
-    }
-    else
-    {
-        color = float4(0, 0, 0, 0);
-    }
-
-    return color;
-}
-
 float4 MSDF_PS(PS_OUTPUT_BASIC input) : SV_TARGET
 {
-    /*float4 dist = shaderTexture.Sample(sampleType, input.uv).rgba;
-    
-    float d = median(dist.r, dist.g, dist.b) - 0.5;
-
-    float w = clamp(d/fwidth(d) + 0.5, 0.0, 1.0);
-    
-    float4 outside = float4(0, 0, 0, 0);
-    float4 inside = float4(0, 0, 0, 1);
-    float4 mainColor = lerp(outside, inside, w);    
-    float4 alphaColor = float4(0, 0, 0, dist.a);
-    float4 color = lerp(alphaColor, mainColor, w);
-    
-    color = mainColor;*/
-    
     float3 sample = shaderTexture.Sample(sampleType, input.uv).rgb;
     int2 sz;
     shaderTexture.GetDimensions(sz.x, sz.y);
@@ -192,19 +144,13 @@ technique10 Basic
             PixelShader = BasicColored_PS;
         }
         
-    pass Colored2
+    pass VertexColored
     {
         Profile = 5.1;
         VertexShader = Basic_VS;
-        PixelShader = BasicColored2_PS;
+        PixelShader = BasicVertexColored_PS;
     }
-        
-    pass SDF
-            {
-                Profile = 5.1;
-                VertexShader = Basic_VS;
-                PixelShader = SDF_PS;
-            }
+
     pass MSDF
     {
         Profile = 5.1;
