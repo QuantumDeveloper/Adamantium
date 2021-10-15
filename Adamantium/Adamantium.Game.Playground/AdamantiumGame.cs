@@ -144,7 +144,7 @@ namespace Adamantium.Game.Playground
                 pixels.SetPixels(colors);
                 img.Save(@"Textures\sdf.png", ImageFileType.Png);                
                 
-                var glyphSize = 250;
+                var glyphSize = 10;
                 var quadList = new List<Vector3F>();
                 quadList.Add(new Vector3F(10));
                 quadList.Add(new Vector3F(glyphSize + 10, 10, 0));
@@ -157,11 +157,7 @@ namespace Adamantium.Game.Playground
                 uv.Add(new Vector2F(1.0f, 0.0f));
                 uv.Add(new Vector2F(1.0f, 1.0f));
                 uv.Add(new Vector2F(0.0f, 1.0f));
-                
-                /*uv.Add(new Vector2F(0.1f, 0.1f));
-                uv.Add(new Vector2F(0.9f, 0.1f));
-                uv.Add(new Vector2F(0.9f, 0.9f));
-                uv.Add(new Vector2F(0.1f, 0.9f));*/
+
                 var mesh = new Mesh();
                 mesh.MeshTopology = PrimitiveType.TriangleList;
                 mesh.SetPositions(quadList);

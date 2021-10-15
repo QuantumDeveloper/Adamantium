@@ -125,7 +125,7 @@ float4 SDF_PS(PS_OUTPUT_BASIC input) : SV_TARGET
 
 float4 MSDF_PS(PS_OUTPUT_BASIC input) : SV_TARGET
 {
-    float4 dist = shaderTexture.Sample(sampleType, input.uv).rgba;
+    /*float4 dist = shaderTexture.Sample(sampleType, input.uv).rgba;
     
     float d = median(dist.r, dist.g, dist.b) - 0.5;
 
@@ -134,10 +134,23 @@ float4 MSDF_PS(PS_OUTPUT_BASIC input) : SV_TARGET
     float4 outside = float4(0, 0, 0, 0);
     float4 inside = float4(0, 0, 0, 1);
     float4 mainColor = lerp(outside, inside, w);    
-    //float4 alphaColor = float4(0, 0, 0, dist.a);
-    //float4 color = lerp(alphaColor, mainColor, w);
+    float4 alphaColor = float4(0, 0, 0, dist.a);
+    float4 color = lerp(alphaColor, mainColor, w);
     
-    return mainColor;
+    color = mainColor;*/
+    
+    float3 sample = shaderTexture.Sample(sampleType, input.uv).rgb;
+    int2 sz;
+    shaderTexture.GetDimensions(sz.x, sz.y);
+    float dx = ddx( input.uv.x ) * sz.x;
+    float dy = ddy( input.uv.y ) * sz.y;
+    float toPixels = 10.0 * rsqrt( dx * dx + dy * dy );
+    float sigDist = median( sample.r, sample.g, sample.b ) - 0.5;
+    float opacity = clamp( sigDist * toPixels + 0.5, 0.0, 1.0 );
+    
+    float4 color = float4(0, 0, 0, opacity);
+    
+    return color;
 }
 
 float4 BasicTextured_PS(PS_OUTPUT_BASIC input) : SV_TARGET

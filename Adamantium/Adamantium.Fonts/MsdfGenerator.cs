@@ -477,7 +477,12 @@ namespace Adamantium.Fonts
         {
             return Math.Max(Math.Min(a,b), Math.Min(Math.Max(a,b), c));
         }
-        
+
+        /*private double GetRange(double pxRange, double width, double height)
+        {
+            return pxRange/Math.Min(width, height);
+        }*/
+
         private byte GetDistanceColor(double distance, double maxDistance)
         {
             var range = 2 * maxDistance;
