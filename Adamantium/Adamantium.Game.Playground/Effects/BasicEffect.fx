@@ -184,7 +184,7 @@ float4 MSDF_PS(PS_OUTPUT_BASIC input) : SV_TARGET
     
     float4 color;
     
-    float upperPointCutOff = 0.8f;
+    float upperPointCutOff = 0.5f;
     float midpointCutOff = 0.5f;
     
     if (sd > upperPointCutOff)

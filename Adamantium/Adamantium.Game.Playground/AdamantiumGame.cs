@@ -122,12 +122,12 @@ namespace Adamantium.Game.Playground
                 //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/Japan/NotoSansCJKjp-Light.otf", 3);
                 var entity = new Entity(null, "Poppins-Medium");
                 var font = typeface.GetFont(0);
-                var glyph = font.GetGlyphByCharacter('A');
+                var glyph = font.GetGlyphByCharacter('/');
                 //var glyph = font.GetGlyphByIndex(2710);
                 glyph.Sample(15);
                 uint size = 64;
 
-                glyph.SetTestSegmentData(); 
+                //glyph.SetTestSegmentData(); 
                 var colors = glyph.GenerateDirectMSDF(size);
 
                 /*var newMesh = glyph.GetColoredPoints();
@@ -162,10 +162,16 @@ namespace Adamantium.Game.Playground
                 quadList.Add(new Vector3F(10, glyphSize + 10, 0));
 
                 var uv = new List<Vector2F>();
-                uv.Add(new Vector2F(0));
-                uv.Add(new Vector2F(1, 0));
-                uv.Add(new Vector2F(1, 1));
-                uv.Add(new Vector2F(0, 1));
+                
+                uv.Add(new Vector2F(0.0f, 0.0f));
+                uv.Add(new Vector2F(1.0f, 0.0f));
+                uv.Add(new Vector2F(1.0f, 1.0f));
+                uv.Add(new Vector2F(0.0f, 1.0f));
+                
+                /*uv.Add(new Vector2F(0.1f, 0.1f));
+                uv.Add(new Vector2F(0.9f, 0.1f));
+                uv.Add(new Vector2F(0.9f, 0.9f));
+                uv.Add(new Vector2F(0.1f, 0.9f));*/
                 var mesh = new Mesh();
                 mesh.MeshTopology = PrimitiveType.TriangleList;
                 mesh.SetPositions(quadList);

@@ -484,6 +484,26 @@ namespace Adamantium.Fonts
             var segments = new List<LineSegment2D>();
 
             // square
+            /*var s1 = new LineSegment2D(new Vector2D(0, 0), new Vector2D(500, 0));
+            var s2 = new LineSegment2D(new Vector2D(500, 0), new Vector2D(500, 500));
+            var s3 = new LineSegment2D(new Vector2D(500, 500), new Vector2D(0, 500));
+            var s4 = new LineSegment2D(new Vector2D(0, 500), new Vector2D(0, 0));
+            
+            segments.Add(s1);
+            segments.Add(s2);
+            segments.Add(s3);
+            segments.Add(s4);
+            
+            var rectangle = BoundingRectangle;
+
+            rectangle.X = 0;
+            rectangle.Y = 0;
+            rectangle.Width = 500;
+            rectangle.Height = 500;
+
+            BoundingRectangle = rectangle;*/
+            
+            // parallelogram
             /*var s1 = new LineSegment2D(new Vector2D(300, 0), new Vector2D(500, 500));
             var s2 = new LineSegment2D(new Vector2D(500, 500), new Vector2D(200, 500));
             var s3 = new LineSegment2D(new Vector2D(200, 500), new Vector2D(0, 0));

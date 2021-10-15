@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Engine.Core.Models;
 using Adamantium.Mathematics;
+using AdamantiumVulkan.Core;
 
 namespace Adamantium.Fonts
 {
@@ -136,14 +137,13 @@ namespace Adamantium.Fonts
         private void ColorEdges()
         {
             var segmentLengthThreshold = 10;
-            Color currentColor;
             var contours = SplitToEdgedContours();
             
             segments.Clear();
 
             foreach (var contour in contours)
             {
-                currentColor = Color.FromRgba(255, contour.Edges.Count == 1 ? (byte) 255 : (byte) 0, 255, 255);
+                var currentColor = Color.FromRgba(255, contour.Edges.Count == 1 ? (byte) 255 : (byte) 0, 255, 255);
 
                 foreach (var edge in contour.Edges)
                 {
@@ -155,15 +155,8 @@ namespace Adamantium.Fonts
 
                         segments.Add(currentSeg);
                     }
-                    
-                    if (currentColor == Color.FromRgba(255, 255, 0, 255))
-                    {
-                        currentColor = Color.FromRgba(0, 255, 255, 255);
-                    }
-                    else
-                    {
-                        currentColor = Color.FromRgba(255, 255, 0, 255);
-                    }
+
+                    currentColor = currentColor == Color.FromRgba(255, 255, 0, 255) ? Color.FromRgba(0, 255, 255, 255) : Color.FromRgba(255, 255, 0, 255);
                 }
             }
         }
@@ -266,17 +259,23 @@ namespace Adamantium.Fonts
             double minDistance = Double.MaxValue;
             double maxDistance = Double.MinValue;
 
-            for (int y = 0; y < size; ++y)
+            for (var y = 0; y < size; ++y)
             {
-                for (int x = 0; x < size; ++x)
+                for (var x = 0; x < size; ++x)
                 {
                     // determine the closest segment to current sampling point
                     var samplingPoint = new Vector2D(originalDimensions.X / size * (x + 0.5), originalDimensions.Y - (originalDimensions.Y / size * (y + 0.5)));
 
                     GetColoredDistances(samplingPoint, out coloredDistances[x, y].redDistance, out coloredDistances[x, y].greenDistance, out coloredDistances[x, y].blueDistance);
-                    
-                    minDistance = Math.Min(minDistance, MinOfThree(coloredDistances[x, y].redDistance, coloredDistances[x, y].greenDistance, coloredDistances[x, y].blueDistance));
-                    maxDistance = Math.Max(maxDistance, MaxOfThree(coloredDistances[x, y].redDistance, coloredDistances[x, y].greenDistance, coloredDistances[x, y].blueDistance));
+
+                    var medianDistance = Median(coloredDistances[x, y].redDistance, coloredDistances[x, y].greenDistance, coloredDistances[x, y].blueDistance);
+                    if (medianDistance > maxDistance)
+                    {
+                        maxDistance = medianDistance;
+                    }
+
+                    //minDistance = Math.Min(minDistance, MinOfThree(coloredDistances[x, y].redDistance, coloredDistances[x, y].greenDistance, coloredDistances[x, y].blueDistance));
+                    //maxDistance = Math.Max(maxDistance, MaxOfThree(coloredDistances[x, y].redDistance, coloredDistances[x, y].greenDistance, coloredDistances[x, y].blueDistance));
                 }
             }
             
@@ -284,12 +283,12 @@ namespace Adamantium.Fonts
             var msdf = new List<Color>();
 
             //maxDistance = Math.Max(Math.Abs(minDistance), maxDistance);
-            maxDistance = maxDistance / 3;
+            //maxDistance = maxDistance / 3;
             minDistance = -maxDistance;
 
-            for (int y = 0; y < size; y++)
+            for (var y = 0; y < size; y++)
             {
-                for (int x = 0; x < size; x++)
+                for (var x = 0; x < size; x++)
                 {
                     if (coloredDistances[x, y].redDistance < minDistance)
                     {
@@ -323,16 +322,16 @@ namespace Adamantium.Fonts
                 }
             }
 
-            FixArtefacts(coloredDistances, size);
+            //FixArtefacts(coloredDistances, size);
             
-            for (int y = 0; y < size; y++)
+            for (var y = 0; y < size; y++)
             {
-                for (int x = 0; x < size; x++)
+                for (var x = 0; x < size; x++)
                 {
                     coloredDistances[x, y].redDistance = GetDistanceColor(coloredDistances[x, y].redDistance, maxDistance);
                     coloredDistances[x, y].greenDistance = GetDistanceColor(coloredDistances[x, y].greenDistance, maxDistance);
                     coloredDistances[x, y].blueDistance = GetDistanceColor(coloredDistances[x, y].blueDistance, maxDistance);
-
+                    
                     var color = Color.FromRgba((byte)coloredDistances[x, y].redDistance, (byte)coloredDistances[x, y].greenDistance, (byte)coloredDistances[x, y].blueDistance, 255);
                     
                     msdf.Add(color);
@@ -346,9 +345,9 @@ namespace Adamantium.Fonts
         // true - no collision, false - collision
         private bool CheckNeighbor(ColoredDistance neighbor, ColoredDistance current)
         {
-            var threshold = 50;
+            const int threshold = 50;
 
-            int cnt = 0;
+            var cnt = 0;
             
             bool isNeighborRedPositive = (neighbor.redDistance >= 0);
             bool isNeighborGreenPositive = (neighbor.greenDistance >= 0);
@@ -398,31 +397,32 @@ namespace Adamantium.Fonts
         {
             var correctionList = new List<CorrectionLocation>();
 
-            for (int y = 1; y < size - 1; y++)
+            for (var y = 1; y < size - 1; y++)
             {
-                for (int x = 1; x < size - 1; x++)
+                for (var x = 1; x < size - 1; x++)
                 {
-                    var neighbors = new List<ColoredDistance>();
-
-                    // get 8 neighbors of the current pixel
-                    neighbors.Add(data[x - 1, y - 1]);
-                    neighbors.Add(data[x, y - 1]);
-                    neighbors.Add(data[x + 1, y - 1]);
-                    
-                    neighbors.Add(data[x - 1, y]);
                     var current = data[x, y];
-                    neighbors.Add(data[x + 1, y]);
-                    
-                    neighbors.Add(data[x - 1, y + 1]);
-                    neighbors.Add(data[x, y + 1]);
-                    neighbors.Add(data[x + 1, y + 1]);
+                    var neighbors = new List<ColoredDistance>
+                    {
+                        // get 8 neighbors of the current pixel
+                        data[x - 1, y - 1],
+                        data[x, y - 1],
+                        data[x + 1, y - 1],
+                        data[x - 1, y],
+                        data[x + 1, y],
+                        data[x - 1, y + 1],
+                        data[x, y + 1],
+                        data[x + 1, y + 1]
+                    };
 
                     if (!CheckForCollision(neighbors, current))
                     {
-                        var correction = new CorrectionLocation();
-                        correction.X = x;
-                        correction.Y = y;
-                        
+                        var correction = new CorrectionLocation
+                        {
+                            X = x,
+                            Y = y
+                        };
+
                         correctionList.Add(correction);
                     }
                 }
@@ -442,7 +442,7 @@ namespace Adamantium.Fonts
         // --- HELPERS ---
         private bool IsSegmentsConnected(ref LineSegment2D segment1, ref LineSegment2D segment2)
         {
-            return segment1.End == segment2.Start;
+            return segment1.End == segment2.Start || segment2.End == segment1.Start || segment1.Start == segment2.Start || segment1.End == segment2.End ;
         }
         
         private double GetSegmentsAngle(LineSegment2D current, LineSegment2D next)
@@ -459,9 +459,9 @@ namespace Adamantium.Fonts
         
         private byte GetDistanceColor(double distance, double maxDistance)
         {
-            double range = 2 * maxDistance;
+            var range = 2 * maxDistance;
 
-            double color = (distance / range + 0.5) * 255;
+            var color = (distance / range + 0.5) * 255;
 
             return (byte)color;
         }
@@ -487,7 +487,7 @@ namespace Adamantium.Fonts
 
             var startToPointVector = new LineSegment2D(segment.Start, point);
 
-            var cross = MathHelper.Cross2D(segment.Direction, startToPointVector.Direction);
+            var cross = MathHelper.Cross2D(segment.DirectionNormalized, startToPointVector.DirectionNormalized);
 
             if (cross < 0)
             {
@@ -499,19 +499,52 @@ namespace Adamantium.Fonts
         
         private double GetSignedPseudoDistanceToSegmentsJoint(List<LineSegment2D> closestSegments, Vector2D point)
         {
-            var signedDistances = new List<double>();
-            
-            if (closestSegments.Count > 2)
+            // there must be at least one closest segment
+            if (closestSegments.Count < 1)
             {
-                throw new Exception("COUNT > 2");
-            }
-            
-            foreach (var segment in closestSegments)
-            {
-                signedDistances.Add(GetSignedPseudoDistanceToSegment(segment, point));
+                throw new Exception($"Closest segments count < 1");
             }
 
-            return signedDistances.Min();
+            // if there is only one closest segment
+            // or two closest segments are not connected
+            // return distance to segment at index 0
+            if (closestSegments.Count == 1)
+            {
+                return GetSignedPseudoDistanceToSegment(closestSegments[0], point);
+            }
+            else
+            {
+                var seg1 = closestSegments[0];
+                var seg2 = closestSegments[1];
+
+                if (!IsSegmentsConnected(ref seg1, ref seg2))
+                {
+                    return GetSignedPseudoDistanceToSegment(closestSegments[0], point);
+                }
+            }
+
+            // determine the order of the connected closest segments
+            var first = closestSegments[0].End == closestSegments[1].Start ? closestSegments[0] : closestSegments[1];
+            var second = closestSegments[0].End == closestSegments[1].Start ? closestSegments[1] : closestSegments[0];
+            
+            // revert first segment, so both segments have same start
+            var revertedFirst = new LineSegment2D(first.End, first.Start);
+
+            // find bisection (vector in the middle) of two closest segments
+            var bisectionNormalized = (revertedFirst.DirectionNormalized + second.DirectionNormalized);
+            bisectionNormalized.Normalize();
+
+            var jointToPoint = new LineSegment2D(first.End, point);
+            var bisectionCross = MathHelper.Cross2D(bisectionNormalized, jointToPoint.DirectionNormalized);
+
+            var firstToBisection = new LineSegment2D(revertedFirst.DirectionNormalized, bisectionNormalized);
+            var firstCross = MathHelper.Cross2D(first.DirectionNormalized, firstToBisection.DirectionNormalized);
+
+            var isBisectionCrossNegative = (bisectionCross < 0);
+            var isFirstCrossNegative = (firstCross < 0);
+            var isCrossesHaveSameSign = !(isBisectionCrossNegative ^ isFirstCrossNegative);
+
+            return GetSignedPseudoDistanceToSegment(isCrossesHaveSameSign ? first : second, point);
         }
         
         private Color ApplyColorMask(Color color, bool redMask, bool greenMask, bool blueMask)
@@ -522,7 +555,7 @@ namespace Adamantium.Fonts
 
             return color;
         }
-        
+
         /*public void RemoveZeroAngleSegments()
         {
             for (int i = 0; i < segments.Count; i++)
