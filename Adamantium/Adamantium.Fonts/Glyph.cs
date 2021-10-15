@@ -109,47 +109,8 @@ namespace Adamantium.Fonts
             // {
             //     return sampledOutlines;
             // }
-
-            foreach (var outline in outlines)
-            {
-                foreach (var seg in outline.Segments)
-                {
-                    for (int i = 0; i < seg.Points.Count; i++)
-                    {
-                        var cur = seg.Points[i];
-                        var next = new Vector2D();
-
-                        if (i < (seg.Points.Count - 1))
-                        {
-                            next = seg.Points[i + 1];
-                        }
-                        else
-                        {
-                            next = seg.Points[0];
-                        }
-
-                        if (cur == next)
-                        {
-                            throw new Exception("SPLIT cur == next");
-                        }
-                    }
-                }
-            }
-            
             var sampledOutlines = this.GenerateOutlines(rate);
             sampledOutlinesCache[rate] = sampledOutlines;
-
-            foreach (var sampledOutline in sampledOutlines)
-            {
-                foreach (var sampledSegment in sampledOutline.Segments)
-                {
-                    if (sampledSegment.Start == sampledSegment.End)
-                    {
-                        throw new Exception("SAMPLED st == end");
-                    }
-                }
-            }
-            
             var points = RemoveSelfIntersections(sampledOutlines);
 
             //Msdf.RemoveZeroAngleSegments();
@@ -553,87 +514,5 @@ namespace Adamantium.Fonts
         }
         
         // --- DIRECT MSDF TEST END ---
-
-        /*public Color[] GenerateSDF(uint size)
-        {
-            var doubleArray = new Double[size, size];
-            var commonList = new List<double>();
-
-            float glyphSize = Math.Max(BoundingRectangle.Width, BoundingRectangle.Height);
-            glyphSize += glyphSize * 0.1f;
-            var originalDimensions = new Vector2D(glyphSize);
-            var glyphCenter = BoundingRectangle.Center;
-            var originalCenter = originalDimensions / 2;
-            var diff = originalCenter - glyphCenter;
-            
-            for (var index = 0; index < segments.Count; index++)
-            {
-                var segment = segments[index];
-                var start = segment.Start;
-                var end = segment.End;
-                segment = new LineSegment2D(start + diff, end + diff);
-                segments[index] = segment;
-            }
-
-            for (int y = 0; y < size; ++y)
-            {
-                for (int x = 0; x < size; ++x)
-                {
-                    var point = new Vector2D(originalDimensions.X / size * x, originalDimensions.Y - (originalDimensions.Y / size * y));
-                    var ray = new Ray2D(point, Vector2D.UnitX);
-                    var distances = new List<Double>();
-                    int intersectionsCount = 0;
-                    foreach (var segment in segments)
-                    {
-                        distances.Add(point.DistanceToPoint(segment.Start, segment.End));
-                        var seg = segment;
-                        if (Collision2D.RaySegmentIntersection(ref ray, ref seg, out var collision))
-                        {
-                            intersectionsCount++;
-                        }
-                    }
-
-                    var minValue = distances.Min();
-
-                    if (intersectionsCount % 2 == 0)
-                    {
-                        minValue = -minValue;
-                    }
-
-                    doubleArray[x, y] = minValue;
-                    commonList.Add(minValue);
-                }
-            }
-
-            //var min = commonList.Min();
-            var max = commonList.Max();
-            var min = -max;
-            var value = max - min;
-
-            for (int y = 0; y < size; y++)
-            {
-                for (int x = 0; x < size; x++)
-                {
-                    if (doubleArray[x, y] < min)
-                    {
-                        doubleArray[x, y] = min;
-                    }
-                }
-            }
-            
-            var bytes = new List<Color>();
-            for (int y = 0; y < size; y++)
-            {
-                for (int x = 0; x < size; x++)
-                {
-                    var sdfValue = doubleArray[x, y];
-                    var b = (byte)((sdfValue - min) / value * 255);
-                    Debug.WriteLine($"SDF value = {sdfValue}");
-                    bytes.Add(new Color(b, (byte)0, (byte)0, (byte)255));
-                }
-            }
-
-            return bytes.ToArray();
-        }*/
     }
 }

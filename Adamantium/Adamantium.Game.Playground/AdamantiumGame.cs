@@ -122,7 +122,7 @@ namespace Adamantium.Game.Playground
                 //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/Japan/NotoSansCJKjp-Light.otf", 3);
                 var entity = new Entity(null, "Poppins-Medium");
                 var font = typeface.GetFont(0);
-                var glyph = font.GetGlyphByCharacter('/');
+                var glyph = font.GetGlyphByCharacter('A');
                 //var glyph = font.GetGlyphByIndex(2710);
                 glyph.Sample(15);
                 uint size = 64;
@@ -137,16 +137,6 @@ namespace Adamantium.Game.Playground
                 var newMeshRenderer = new MeshRenderer();
                 entity.AddComponent(newMeshComponent);
                 entity.AddComponent(newMeshRenderer);*/
-                
-                bool hasColors = false;
-                foreach (var color in colors)
-                {
-                    if (color.R != 0 || color.G != 0 || color.B != 0)
-                    {
-                        hasColors = true;
-                        break;
-                    }
-                }
                 
                 //var colors = glyph.GenerateSDF(size);
                 var img = Image.New2D(size, size, 1, SurfaceFormat.R8G8B8A8.UNorm);

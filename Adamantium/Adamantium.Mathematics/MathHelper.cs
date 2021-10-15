@@ -616,12 +616,6 @@ namespace Adamantium.Mathematics
         }
 
         // --- DIVER MATH ---
-        
-        public static bool IsOneDiver(double a)
-        {
-            return IsZero(a - 1.0);
-        }
-        
         public static double RadiansToDegrees(double radians)
         {
             return ((radians * 180.0) / System.Math.PI);
@@ -652,7 +646,7 @@ namespace Adamantium.Mathematics
 
             sbyte sign = cos < 0 ? (sbyte)-1 : (sbyte)1;
 
-            if (IsOneDiver(System.Math.Abs(cos)))
+            if (IsOne(System.Math.Abs(cos)))
             {
                 cos = sign;
             }
@@ -662,6 +656,50 @@ namespace Adamantium.Mathematics
             return RadiansToDegrees(rad);
         }
 
+        public static double Distance(Vector2D v1, Vector2D v2)
+        {
+            return System.Math.Sqrt(System.Math.Pow(v2.X - v1.X, 2) + System.Math.Pow(v2.Y - v1.Y, 2));
+        }
+
+        public static double Distance(double x1, double y1, double x2, double y2)
+        {
+            return System.Math.Sqrt(System.Math.Pow(x2 - x1, 2) + System.Math.Pow(y2 - y1, 2));
+        }
+        
+        public static double DistanceToPoint(Vector2D start, Vector2D end, Vector2D point)
+        {
+            double dStart = Distance(point, start);
+            double dEnd = Distance(point, end);
+            double dStartEnd = Distance(start, end);
+
+            if (dStart >= Distance(dEnd, dStartEnd, 0, 0))
+            {
+                return Distance(point, end);
+            }
+            else if (dEnd >= Distance(dStart, dStartEnd, 0 ,0))
+            {
+                return Distance(point, start);
+            }
+            else
+            {
+                double a = end.Y - start.Y;
+                double b = start.X - end.X;
+                double c = -start.X * (end.Y - start.Y) + start.Y * (end.X - start.X);
+                double t = Distance(a, b, 0, 0);
+
+                if (c > 0)
+                {
+                    a = -a;
+                    b = -b;
+                    c = -c;
+                }
+
+                double ret = (a * point.X + b * point.Y + c) / t;
+
+                return System.Math.Abs(ret);
+            }
+        }
+        
         public static double PointToLineDistance(Vector2D start, Vector2D end, Vector2D point)
         {
             double res = 0;

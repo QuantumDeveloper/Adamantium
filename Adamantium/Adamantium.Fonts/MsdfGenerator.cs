@@ -161,11 +161,12 @@ namespace Adamantium.Fonts
             }
         }
         
-        private void GetColoredDistances(Vector2D point, out double redDistance, out double greenDistance, out double blueDistance)
+        private void GetColoredDistances(Vector2D point, out double redDistance, out double greenDistance, out double blueDistance, out double alphaDistance)
         {
             double closestRedDistance = Double.MaxValue;
             double closestGreenDistance = Double.MaxValue;
             double closestBlueDistance = Double.MaxValue;
+            double closestAlphaDistance = Double.MaxValue;
 
             // there can be up to two closest segments in case if point is close to segments' connection
             // we will store both and then determine the signed pseudo-distance
@@ -173,14 +174,10 @@ namespace Adamantium.Fonts
             var closestRedSegments = new List<LineSegment2D>();
             var closestGreenSegments = new List<LineSegment2D>();
             var closestBlueSegments = new List<LineSegment2D>();
+            var closestAlphaSegments = new List<LineSegment2D>();
 
             foreach (var segment in segments)
             {
-                if (segment.Start == segment.End)
-                {
-                    throw new Exception("START == END");
-                }
-                
                 var distance = GetDistanceToSegment(segment, point);
 
                 if (ApplyColorMask(segment.MsdfColor, true, false, false) != Colors.Black
@@ -218,11 +215,23 @@ namespace Adamantium.Fonts
                     
                     closestBlueSegments.Add(segment);
                 }
+
+                if (distance <= closestAlphaDistance)
+                {
+                    if (distance < closestAlphaDistance)
+                    {
+                        closestAlphaSegments.Clear();
+                        closestAlphaDistance = distance;
+                    }
+                    
+                    closestAlphaSegments.Add(segment);
+                }
             }
 
-            redDistance = GetSignedPseudoDistanceToSegmentsJoint(closestRedSegments, point);
-            greenDistance = GetSignedPseudoDistanceToSegmentsJoint(closestGreenSegments, point);
-            blueDistance = GetSignedPseudoDistanceToSegmentsJoint(closestBlueSegments, point);
+            redDistance = GetSignedDistanceToSegmentsJoint(closestRedSegments, point, true);
+            greenDistance = GetSignedDistanceToSegmentsJoint(closestGreenSegments, point, true);
+            blueDistance = GetSignedDistanceToSegmentsJoint(closestBlueSegments, point, true);
+            alphaDistance = GetSignedDistanceToSegmentsJoint(closestAlphaSegments, point, false);
         }
         
         public Color[] GenerateDirectMSDF(uint size, Rectangle glyphBoundingRectangle)
@@ -258,6 +267,8 @@ namespace Adamantium.Fonts
 
             double minDistance = Double.MaxValue;
             double maxDistance = Double.MinValue;
+            
+            double sdfMaxDistance = Double.MinValue;
 
             for (var y = 0; y < size; ++y)
             {
@@ -266,7 +277,7 @@ namespace Adamantium.Fonts
                     // determine the closest segment to current sampling point
                     var samplingPoint = new Vector2D(originalDimensions.X / size * (x + 0.5), originalDimensions.Y - (originalDimensions.Y / size * (y + 0.5)));
 
-                    GetColoredDistances(samplingPoint, out coloredDistances[x, y].redDistance, out coloredDistances[x, y].greenDistance, out coloredDistances[x, y].blueDistance);
+                    GetColoredDistances(samplingPoint, out coloredDistances[x, y].redDistance, out coloredDistances[x, y].greenDistance, out coloredDistances[x, y].blueDistance, out coloredDistances[x, y].alphaDistance);
 
                     var medianDistance = Median(coloredDistances[x, y].redDistance, coloredDistances[x, y].greenDistance, coloredDistances[x, y].blueDistance);
                     if (medianDistance > maxDistance)
@@ -276,15 +287,18 @@ namespace Adamantium.Fonts
 
                     //minDistance = Math.Min(minDistance, MinOfThree(coloredDistances[x, y].redDistance, coloredDistances[x, y].greenDistance, coloredDistances[x, y].blueDistance));
                     //maxDistance = Math.Max(maxDistance, MaxOfThree(coloredDistances[x, y].redDistance, coloredDistances[x, y].greenDistance, coloredDistances[x, y].blueDistance));
+
+                    sdfMaxDistance = Math.Max(sdfMaxDistance, coloredDistances[x, y].alphaDistance);
                 }
             }
             
-            // 5. Normalize colored pseudo-distance field to [0 .. 255] range
+            // 5. Normalize colored signed pseudo-distance field to [0 .. 255] range
             var msdf = new List<Color>();
 
             //maxDistance = Math.Max(Math.Abs(minDistance), maxDistance);
             //maxDistance = maxDistance / 3;
             minDistance = -maxDistance;
+            var sdfMinDistance = -sdfMaxDistance;
 
             for (var y = 0; y < size; y++)
             {
@@ -319,10 +333,16 @@ namespace Adamantium.Fonts
                     {
                         coloredDistances[x, y].blueDistance = maxDistance;
                     }
+                    
+                    // normalize sdf
+                    if (coloredDistances[x, y].alphaDistance < sdfMinDistance)
+                    {
+                        coloredDistances[x, y].alphaDistance = sdfMinDistance;
+                    }
                 }
             }
 
-            //FixArtefacts(coloredDistances, size);
+            FixArtefacts(coloredDistances, size);
             
             for (var y = 0; y < size; y++)
             {
@@ -331,9 +351,10 @@ namespace Adamantium.Fonts
                     coloredDistances[x, y].redDistance = GetDistanceColor(coloredDistances[x, y].redDistance, maxDistance);
                     coloredDistances[x, y].greenDistance = GetDistanceColor(coloredDistances[x, y].greenDistance, maxDistance);
                     coloredDistances[x, y].blueDistance = GetDistanceColor(coloredDistances[x, y].blueDistance, maxDistance);
-                    
-                    var color = Color.FromRgba((byte)coloredDistances[x, y].redDistance, (byte)coloredDistances[x, y].greenDistance, (byte)coloredDistances[x, y].blueDistance, 255);
-                    
+                    coloredDistances[x, y].alphaDistance = GetDistanceColor(coloredDistances[x, y].alphaDistance, sdfMaxDistance);
+
+                    var color = Color.FromRgba((byte)coloredDistances[x, y].redDistance, (byte)coloredDistances[x, y].greenDistance, (byte)coloredDistances[x, y].blueDistance, (byte)coloredDistances[x, y].alphaDistance);
+
                     msdf.Add(color);
                 }
             }
@@ -481,6 +502,22 @@ namespace Adamantium.Fonts
             return point.DistanceToPoint(segment.Start, segment.End);
         }
 
+        private double GetSignedDistanceToSegment(LineSegment2D segment, Vector2D point)
+        {
+            var distance = GetDistanceToSegment(segment, point);
+
+            var startToPointVector = new LineSegment2D(segment.Start, point);
+
+            var cross = MathHelper.Cross2D(segment.DirectionNormalized, startToPointVector.DirectionNormalized);
+
+            if (cross < 0)
+            {
+                distance = -distance;
+            }
+
+            return distance;
+        }
+
         private double GetSignedPseudoDistanceToSegment(LineSegment2D segment, Vector2D point)
         {
             var distance = MathHelper.PointToLineDistance(segment.Start, segment.End, point);
@@ -497,8 +534,19 @@ namespace Adamantium.Fonts
             return distance;
         }
         
-        private double GetSignedPseudoDistanceToSegmentsJoint(List<LineSegment2D> closestSegments, Vector2D point)
+        private double GetSignedDistanceToSegmentsJoint(List<LineSegment2D> closestSegments, Vector2D point, bool pseudo)
         {
+            Func<LineSegment2D, Vector2D, double> SignedDistanceFunc = null;
+
+            if (pseudo)
+            {
+                SignedDistanceFunc = GetSignedPseudoDistanceToSegment;
+            }
+            else
+            {
+                SignedDistanceFunc = GetSignedDistanceToSegment;
+            }
+
             // there must be at least one closest segment
             if (closestSegments.Count < 1)
             {
@@ -510,7 +558,8 @@ namespace Adamantium.Fonts
             // return distance to segment at index 0
             if (closestSegments.Count == 1)
             {
-                return GetSignedPseudoDistanceToSegment(closestSegments[0], point);
+                //return GetSignedPseudoDistanceToSegment(closestSegments[0], point);
+                return SignedDistanceFunc(closestSegments[0], point);
             }
             else
             {
@@ -519,7 +568,8 @@ namespace Adamantium.Fonts
 
                 if (!IsSegmentsConnected(ref seg1, ref seg2))
                 {
-                    return GetSignedPseudoDistanceToSegment(closestSegments[0], point);
+                    //return GetSignedPseudoDistanceToSegment(closestSegments[0], point);
+                    return SignedDistanceFunc(closestSegments[0], point);
                 }
             }
 
@@ -544,7 +594,8 @@ namespace Adamantium.Fonts
             var isFirstCrossNegative = (firstCross < 0);
             var isCrossesHaveSameSign = !(isBisectionCrossNegative ^ isFirstCrossNegative);
 
-            return GetSignedPseudoDistanceToSegment(isCrossesHaveSameSign ? first : second, point);
+            //return GetSignedPseudoDistanceToSegment(isCrossesHaveSameSign ? first : second, point);
+            return SignedDistanceFunc(isCrossesHaveSameSign ? first : second, point);
         }
         
         private Color ApplyColorMask(Color color, bool redMask, bool greenMask, bool blueMask)
@@ -588,6 +639,7 @@ namespace Adamantium.Fonts
             public double redDistance;
             public double greenDistance;
             public double blueDistance;
+            public double alphaDistance;
         }
         
         private struct CorrectionLocation
