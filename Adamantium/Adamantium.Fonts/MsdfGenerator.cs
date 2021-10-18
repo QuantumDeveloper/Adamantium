@@ -669,5 +669,78 @@ namespace Adamantium.Fonts
 
             return mesh;
         }
+        
+        // --- SUBPIXEL SAMPLING ---
+        public bool[,] SampleSubpixels(uint size, Rectangle glyphBoundingRectangle)
+        {
+            // 1. Calculate boundaries for original glyph
+            double glyphSize = Math.Max(glyphBoundingRectangle.Width, glyphBoundingRectangle.Height);
+            var originalDimensions = new Vector2D(glyphSize);
+
+            // 2. Place glyph in center of calculated boundaries
+            var glyphCenter = glyphBoundingRectangle.Center;
+            var originalCenter = originalDimensions / 2;
+            var diff = originalCenter - glyphCenter;
+
+            for (var index = 0; index < segments.Count; index++)
+            {
+                var segment = segments[index];
+                var start = segment.Start;
+                var end = segment.End;
+
+                segment = new LineSegment2D(start + diff, end + diff);
+
+                segments[index] = segment;
+            }
+            
+            // 3. Sample glyph by subpixels
+            var width = size * 3;
+            var height = size;
+            
+            var subpixels = new bool[width, height];
+            
+            for (var y = 0; y < height; ++y)
+            {
+                for (var x = 0; x < width; ++x)
+                {
+                    // determine the closest segment to current sampling point
+                    var samplingPoint = new Vector2D(originalDimensions.X / width * (x + 0.5), originalDimensions.Y - (originalDimensions.Y / height * (y + 0.5)));
+
+                    subpixels[x, y] = IsSubpixelInsideGlyph(samplingPoint);
+                }
+            }
+
+            return subpixels;
+        }
+        
+        private bool IsSubpixelInsideGlyph(Vector2D point)
+        {
+            double closestDistance = Double.MaxValue;
+
+            // there can be up to two closest segments in case if point is close to segments' connection
+            // we will store both and then determine the signed pseudo-distance
+            // if these two signed pseudo-distances have different signs, use the one with negative, because the point is outside
+            var closestSegments = new List<LineSegment2D>();
+
+            foreach (var segment in segments)
+            {
+                var distance = GetDistanceToSegment(segment, point);
+
+                if (distance <= closestDistance)
+                {
+                    if (distance < closestDistance)
+                    {
+                        closestSegments.Clear();
+                        closestDistance = distance;
+                    }
+                    
+                    closestSegments.Add(segment);
+                }
+            }
+
+            closestDistance = GetSignedDistanceToSegmentsJoint(closestSegments, point, false);
+
+            return (closestDistance >= 0);
+        }
     }
 }

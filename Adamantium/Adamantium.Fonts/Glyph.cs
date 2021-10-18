@@ -29,6 +29,7 @@ namespace Adamantium.Fonts
         private readonly Dictionary<uint, SampledOutline[]> sampledOutlinesCache;
 
         public MsdfGenerator Msdf;
+        public SubpixelRasterizer Subpixel;
         public uint Index { get; }
         
         public bool IsEmpty { get; }
@@ -81,6 +82,7 @@ namespace Adamantium.Fonts
             uniqueUnicodes = new HashSet<uint>();
             CompositeGlyphComponents = new List<CompositeGlyphComponent>();
             Msdf = new MsdfGenerator();
+            Subpixel = new SubpixelRasterizer();
             OutlineType = outlineType;
         }
 
@@ -89,6 +91,7 @@ namespace Adamantium.Fonts
             IsEmpty = isEmpty;
             Name = String.Empty;
             Msdf = new MsdfGenerator();
+            Subpixel = new SubpixelRasterizer();
         }
 
         public Vector3F[] Sample(byte rate)
@@ -432,6 +435,16 @@ namespace Adamantium.Fonts
         public Color[] GenerateDirectMSDF(uint size)
         {
             return Msdf.GenerateDirectMSDF(size, BoundingRectangle);
+        }
+
+        public bool[,] SampleSubpixels(uint size)
+        {
+            return Msdf.SampleSubpixels(size, BoundingRectangle);
+        }
+        
+        public Color[] ProcessGlyphSubpixelSampling(bool[,] sampledData)
+        {
+            return Subpixel.ProcessGlyphSubpixelSampling(sampledData);
         }
         
         // --- DIRECT MSDF TEST START ---

@@ -122,13 +122,16 @@ namespace Adamantium.Game.Playground
                 //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/Japan/NotoSansCJKjp-Light.otf", 3);
                 var entity = new Entity(null, "Poppins-Medium");
                 var font = typeface.GetFont(0);
-                var glyph = font.GetGlyphByCharacter('G');
+                var glyph = font.GetGlyphByCharacter('A');
                 //var glyph = font.GetGlyphByIndex(2710);
-                glyph.Sample(15);
-                uint size = 64;
+                glyph.Sample(10);
+                uint size = 10;
 
                 //glyph.SetTestSegmentData(); 
-                var colors = glyph.GenerateDirectMSDF(size);
+                //var colors = glyph.GenerateDirectMSDF(size);
+
+                var subpixels = glyph.SampleSubpixels(size);
+                var colors = glyph.ProcessGlyphSubpixelSampling(subpixels);
 
                 /*var newMesh = glyph.GetColoredPoints();
                 newMesh.MeshTopology = PrimitiveType.LineList;
@@ -143,7 +146,7 @@ namespace Adamantium.Game.Playground
                 pixels.SetPixels(colors);
                 img.Save(@"Textures\sdf.png", ImageFileType.Png);                
                 
-                var glyphSize = 250;
+                var glyphSize = 12;
                 var quadList = new List<Vector3F>();
                 quadList.Add(new Vector3F(10));
                 quadList.Add(new Vector3F(glyphSize + 10, 10, 0));
