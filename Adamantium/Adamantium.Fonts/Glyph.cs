@@ -23,6 +23,8 @@ namespace Adamantium.Fonts
         private List<Outline> outlines;
         private bool isSplitOnSegments;
 
+        private List<LineSegment2D> mergedOutlinesSegments;
+
         private List<Command> commandList;
 
         internal IReadOnlyCollection<Outline> Outlines => outlines.AsReadOnly();
@@ -366,7 +368,7 @@ namespace Adamantium.Fonts
         private Vector3F[] RemoveSelfIntersections(in SampledOutline[] outlines)
         {
             bool isPointInside = false;
-            var segments = new List<LineSegment2D>();
+            mergedOutlinesSegments = new List<LineSegment2D>();
             var localSegments = new List<LineSegment2D>();
 
             foreach (var outline in outlines)
@@ -402,7 +404,7 @@ namespace Adamantium.Fonts
                     if (!isPointInside)
                     {
                         var segment = new LineSegment2D(start, sortedIntersections[j].Point);
-                        segments.Add(segment);
+                        mergedOutlinesSegments.Add(segment);
                     }
                     else
                     {
@@ -415,15 +417,13 @@ namespace Adamantium.Fonts
                 if (!isPointInside)
                 {
                     var lastSegment = new LineSegment2D(start, checkedSegment.End);
-                    segments.Add(lastSegment);
+                    mergedOutlinesSegments.Add(lastSegment);
                 }
             }
 
-            Msdf.SetSegmentData(segments);
-            
             var points = new List<Vector3F>();
 
-            foreach (var segment in segments)
+            foreach (var segment in mergedOutlinesSegments)
             {
                 points.Add(new Vector3F((float)segment.Start.X, (float)segment.Start.Y, 0));
                 points.Add(new Vector3F((float)segment.End.X, (float)segment.End.Y, 0));
@@ -434,98 +434,12 @@ namespace Adamantium.Fonts
 
         public Color[] GenerateDirectMSDF(uint size)
         {
-            return Msdf.GenerateDirectMSDF(size, BoundingRectangle);
+            return Msdf.GenerateDirectMSDF(size, BoundingRectangle, mergedOutlinesSegments);
         }
 
-        public bool[,] SampleSubpixels(uint size)
+        public Color[] RasterizeGlyphBySubpixels(uint size)
         {
-            return Msdf.SampleSubpixels(size, BoundingRectangle);
+            return Subpixel.RasterizeGlyphBySubpixels(size, BoundingRectangle, mergedOutlinesSegments);
         }
-        
-        public Color[] ProcessGlyphSubpixelSampling(bool[,] sampledData)
-        {
-            return Subpixel.ProcessGlyphSubpixelSampling(sampledData);
-        }
-        
-        // --- DIRECT MSDF TEST START ---
-        public Mesh GetColoredPoints()
-        {
-            return Msdf.GetColoredPoints();
-        }
-
-        public void SetTestSegmentData()
-        {
-            var segments = new List<LineSegment2D>();
-
-            // square
-            /*var s1 = new LineSegment2D(new Vector2D(0, 0), new Vector2D(500, 0));
-            var s2 = new LineSegment2D(new Vector2D(500, 0), new Vector2D(500, 500));
-            var s3 = new LineSegment2D(new Vector2D(500, 500), new Vector2D(0, 500));
-            var s4 = new LineSegment2D(new Vector2D(0, 500), new Vector2D(0, 0));
-            
-            segments.Add(s1);
-            segments.Add(s2);
-            segments.Add(s3);
-            segments.Add(s4);
-            
-            var rectangle = BoundingRectangle;
-
-            rectangle.X = 0;
-            rectangle.Y = 0;
-            rectangle.Width = 500;
-            rectangle.Height = 500;
-
-            BoundingRectangle = rectangle;*/
-            
-            // parallelogram
-            /*var s1 = new LineSegment2D(new Vector2D(300, 0), new Vector2D(500, 500));
-            var s2 = new LineSegment2D(new Vector2D(500, 500), new Vector2D(200, 500));
-            var s3 = new LineSegment2D(new Vector2D(200, 500), new Vector2D(0, 0));
-            var s4 = new LineSegment2D(new Vector2D(0, 0), new Vector2D(300, 0));
-            
-            segments.Add(s1);
-            segments.Add(s2);
-            segments.Add(s3);
-            segments.Add(s4);
-            
-            var rectangle = BoundingRectangle;
-
-            rectangle.X = 0;
-            rectangle.Y = 0;
-            rectangle.Width = 500;
-            rectangle.Height = 500;
-
-            BoundingRectangle = rectangle;*/
-            
-            // triangle in triangle
-            var s1 = new LineSegment2D(new Vector2D(0, 0), new Vector2D(500, 0));
-            var s2 = new LineSegment2D(new Vector2D(500, 0), new Vector2D(250, 500));
-            var s3 = new LineSegment2D(new Vector2D(250, 500), new Vector2D(0, 0));
-            
-            var s4 = new LineSegment2D(new Vector2D(400, 100), new Vector2D(100, 100));
-            var s5 = new LineSegment2D(new Vector2D(100, 100), new Vector2D(250, 400));
-            var s6 = new LineSegment2D(new Vector2D(250, 400), new Vector2D(400, 100));
-            
-            segments.Add(s1);
-            segments.Add(s2);
-            segments.Add(s3);
-            
-            segments.Add(s4);
-            segments.Add(s5);
-            segments.Add(s6);
-            
-            var rectangle = BoundingRectangle;
-
-            rectangle.X = 0;
-            rectangle.Y = 0;
-            rectangle.Width = 500;
-            rectangle.Height = 500;
-
-            BoundingRectangle = rectangle;
-
-            Msdf.SetSegmentData(segments);
-        }
-        
-        // --- DIRECT MSDF TEST END ---
     }
 }

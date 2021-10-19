@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Engine.Core.Models;
+using Adamantium.Fonts.Common;
 using Adamantium.Mathematics;
 using AdamantiumVulkan.Core;
 
@@ -9,27 +10,13 @@ namespace Adamantium.Fonts
 {
     public class MsdfGenerator
     {
-        private List<LineSegment2D> segments;
+        private List<MsdfGlyphSegment> segments;
 
-        public MsdfGenerator()
-        {
-        }
-
-        public MsdfGenerator(List<LineSegment2D> segmentData)
-        {
-            segments = segmentData;
-        }
-
-        public void SetSegmentData(List<LineSegment2D> segmentData)
-        {
-            segments = segmentData;
-        }
-        
         // --- PREPROCESSORS ---
-        private List<List<LineSegment2D>> SplitToRawContours()
+        private List<List<MsdfGlyphSegment>> SplitToRawContours()
         {
-            var res = new List<List<LineSegment2D>>();
-            var contour = new List<LineSegment2D>();
+            var res = new List<List<MsdfGlyphSegment>>();
+            var contour = new List<MsdfGlyphSegment>();
 
             for (var i = 0; i < (segments.Count - 1); ++i)
             {
@@ -38,10 +25,10 @@ namespace Adamantium.Fonts
                 
                 contour.Add(currentSegment);
 
-                if (!IsSegmentsConnected(ref currentSegment, ref nextSegment))
+                if (!GlyphSegmentsMath.IsSegmentsConnected(ref currentSegment.Segment, ref nextSegment.Segment))
                 {
                     res.Add(contour);
-                    contour = new List<LineSegment2D>();
+                    contour = new List<MsdfGlyphSegment>();
                 }
 
                 if (i == (segments.Count - 2))
@@ -54,7 +41,7 @@ namespace Adamantium.Fonts
             return res;
         }
 
-        private bool FindFirstSharpAngle(List<LineSegment2D> contour, int angleThreshold, out int startIndex)
+        private bool FindFirstSharpAngle(List<MsdfGlyphSegment> contour, int angleThreshold, out int startIndex)
         {
             for (int i = startIndex = 0; i < contour.Count; i++)
             {
@@ -71,7 +58,7 @@ namespace Adamantium.Fonts
 
                 var nextSeg = contour[startIndex];
 
-                if (GetSegmentsAngle(currentSeg, nextSeg) < angleThreshold)
+                if (GlyphSegmentsMath.GetSegmentsAngle(currentSeg.Segment, nextSeg.Segment) < angleThreshold)
                 {
                     return true;
                 }
@@ -116,7 +103,7 @@ namespace Adamantium.Fonts
 
                         var nextSeg = contour[index];
 
-                        if (GetSegmentsAngle(currentSeg, nextSeg) < angleThreshold)
+                        if (GlyphSegmentsMath.GetSegmentsAngle(currentSeg.Segment, nextSeg.Segment) < angleThreshold)
                         {
                             edgedContour.Edges.Add(currentEdge);
                             currentEdge = new Edge();
@@ -178,7 +165,7 @@ namespace Adamantium.Fonts
 
             foreach (var segment in segments)
             {
-                var distance = GetDistanceToSegment(segment, point);
+                var distance = GlyphSegmentsMath.GetDistanceToSegment(segment.Segment, point);
 
                 if (ApplyColorMask(segment.MsdfColor, true, false, false) != Colors.Black
                     && distance <= closestRedDistance)
@@ -189,7 +176,7 @@ namespace Adamantium.Fonts
                         closestRedDistance = distance;
                     }
                     
-                    closestRedSegments.Add(segment);
+                    closestRedSegments.Add(segment.Segment);
                 }
                 
                 if (ApplyColorMask(segment.MsdfColor, false, true, false) != Colors.Black
@@ -201,7 +188,7 @@ namespace Adamantium.Fonts
                         closestGreenDistance = distance;
                     }
                     
-                    closestGreenSegments.Add(segment);
+                    closestGreenSegments.Add(segment.Segment);
                 }
                 
                 if (ApplyColorMask(segment.MsdfColor, false, false, true) != Colors.Black
@@ -213,7 +200,7 @@ namespace Adamantium.Fonts
                         closestBlueDistance = distance;
                     }
                     
-                    closestBlueSegments.Add(segment);
+                    closestBlueSegments.Add(segment.Segment);
                 }
 
                 if (distance <= closestAlphaDistance)
@@ -224,16 +211,16 @@ namespace Adamantium.Fonts
                         closestAlphaDistance = distance;
                     }
                     
-                    closestAlphaSegments.Add(segment);
+                    closestAlphaSegments.Add(segment.Segment);
                 }
             }
 
             var coloredDistance = new ColoredDistance();
             
-            coloredDistance.redDistance = GetSignedDistanceToSegmentsJoint(closestRedSegments, point, true);
-            coloredDistance.greenDistance = GetSignedDistanceToSegmentsJoint(closestGreenSegments, point, true);
-            coloredDistance.blueDistance = GetSignedDistanceToSegmentsJoint(closestBlueSegments, point, true);
-            coloredDistance.alphaDistance = GetSignedDistanceToSegmentsJoint(closestAlphaSegments, point, false);
+            coloredDistance.redDistance = GlyphSegmentsMath.GetSignedDistanceToSegmentsJoint(closestRedSegments, point, true);
+            coloredDistance.greenDistance = GlyphSegmentsMath.GetSignedDistanceToSegmentsJoint(closestGreenSegments, point, true);
+            coloredDistance.blueDistance = GlyphSegmentsMath.GetSignedDistanceToSegmentsJoint(closestBlueSegments, point, true);
+            coloredDistance.alphaDistance = GlyphSegmentsMath.GetSignedDistanceToSegmentsJoint(closestAlphaSegments, point, false);
 
             // prepare distance data for normalization
             var scale = textureSize / glyphSize;
@@ -253,8 +240,15 @@ namespace Adamantium.Fonts
         /// <param name="size">Width and height of MSDF texture</param>
         /// <param name="glyphBoundingRectangle">Bounding rectangle of original glyph</param>
         /// <returns>MSDF color data in for of single-dimension array</returns>
-        public Color[] GenerateDirectMSDF(uint size, Rectangle glyphBoundingRectangle)
+        public Color[] GenerateDirectMSDF(uint size, Rectangle glyphBoundingRectangle, List<LineSegment2D> glyphSegments)
         {
+            segments = new List<MsdfGlyphSegment>();
+
+            foreach (var segment in glyphSegments)
+            {
+                segments.Add(new MsdfGlyphSegment(segment.Start, segment.End));
+            }
+            
             // 1. Color all segments
             ColorEdges();
             
@@ -271,13 +265,12 @@ namespace Adamantium.Fonts
             for (var index = 0; index < segments.Count; index++)
             {
                 var segment = segments[index];
-                var start = segment.Start;
-                var end = segment.End;
+                var start = segment.Segment.Start;
+                var end = segment.Segment.End;
                 var msdfColor = segment.MsdfColor;
                 
-                segment = new LineSegment2D(start + diff, end + diff);
-                segment.MsdfColor = msdfColor;
-                
+                segment = new MsdfGlyphSegment(start + diff, end + diff, msdfColor);
+
                 segments[index] = segment;
             }
 
@@ -300,7 +293,7 @@ namespace Adamantium.Fonts
             }
             
             // 5. Fix artefacts
-            //FixArtefacts(coloredDistances, size);
+            FixArtefacts(coloredDistances, size);
             
             // 6. Normalize MSDF and SDF to [0 .. 255] range
             var msdf = new List<Color>();
@@ -422,18 +415,6 @@ namespace Adamantium.Fonts
         }
         
         // --- HELPERS ---
-        private bool IsSegmentsConnected(ref LineSegment2D segment1, ref LineSegment2D segment2)
-        {
-            return segment1.End == segment2.Start || segment2.End == segment1.Start || segment1.Start == segment2.Start || segment1.End == segment2.End ;
-        }
-        
-        private double GetSegmentsAngle(LineSegment2D current, LineSegment2D next)
-        {
-            var newSeg = new LineSegment2D(current.End, current.Start);
-
-            return MathHelper.DetermineAngleInDegrees(newSeg.Start, newSeg.End, next.Start, next.End);
-        }
-        
         private double Median(double a, double b, double c)
         {
             return Math.Max(Math.Min(a,b), Math.Min(Math.Max(a,b), c));
@@ -455,127 +436,7 @@ namespace Adamantium.Fonts
 
             return ((n >= 0 && n <= b) ? n : (tmp * b));
         }
-        
-        private byte GetDistanceColor(double distance, double maxDistance)
-        {
-            var range = 2 * maxDistance;
 
-            var color = (distance / range + 0.5) * 255;
-
-            return (byte)color;
-        }
-        
-        private double MinOfThree(double d1, double d2, double d3)
-        {
-            return Math.Min(d1, Math.Min(d2, d3));
-        }
-        
-        private double MaxOfThree(double d1, double d2, double d3)
-        {
-            return Math.Max(d1, Math.Max(d2, d3));
-        }
-        
-        private double GetDistanceToSegment(LineSegment2D segment, Vector2D point)
-        {
-            return point.DistanceToPoint(segment.Start, segment.End);
-        }
-
-        private double GetSignedDistanceToSegment(LineSegment2D segment, Vector2D point)
-        {
-            var distance = GetDistanceToSegment(segment, point);
-
-            var startToPointVector = new LineSegment2D(segment.Start, point);
-
-            var cross = MathHelper.Cross2D(segment.DirectionNormalized, startToPointVector.DirectionNormalized);
-
-            if (cross < 0)
-            {
-                distance = -distance;
-            }
-
-            return distance;
-        }
-
-        private double GetSignedPseudoDistanceToSegment(LineSegment2D segment, Vector2D point)
-        {
-            var distance = MathHelper.PointToLineDistance(segment.Start, segment.End, point);
-
-            var startToPointVector = new LineSegment2D(segment.Start, point);
-
-            var cross = MathHelper.Cross2D(segment.DirectionNormalized, startToPointVector.DirectionNormalized);
-
-            if (cross < 0)
-            {
-                distance = -distance;
-            }
-            
-            return distance;
-        }
-        
-        private double GetSignedDistanceToSegmentsJoint(List<LineSegment2D> closestSegments, Vector2D point, bool pseudo)
-        {
-            Func<LineSegment2D, Vector2D, double> SignedDistanceFunc = null;
-
-            if (pseudo)
-            {
-                SignedDistanceFunc = GetSignedPseudoDistanceToSegment;
-            }
-            else
-            {
-                SignedDistanceFunc = GetSignedDistanceToSegment;
-            }
-
-            // there must be at least one closest segment
-            if (closestSegments.Count < 1)
-            {
-                throw new Exception($"Closest segments count < 1");
-            }
-
-            // if there is only one closest segment
-            // or two closest segments are not connected
-            // return distance to segment at index 0
-            if (closestSegments.Count == 1)
-            {
-                //return GetSignedPseudoDistanceToSegment(closestSegments[0], point);
-                return SignedDistanceFunc(closestSegments[0], point);
-            }
-            else
-            {
-                var seg1 = closestSegments[0];
-                var seg2 = closestSegments[1];
-
-                if (!IsSegmentsConnected(ref seg1, ref seg2))
-                {
-                    //return GetSignedPseudoDistanceToSegment(closestSegments[0], point);
-                    return SignedDistanceFunc(closestSegments[0], point);
-                }
-            }
-
-            // determine the order of the connected closest segments
-            var first = closestSegments[0].End == closestSegments[1].Start ? closestSegments[0] : closestSegments[1];
-            var second = closestSegments[0].End == closestSegments[1].Start ? closestSegments[1] : closestSegments[0];
-            
-            // revert first segment, so both segments have same start
-            var revertedFirst = new LineSegment2D(first.End, first.Start);
-
-            // find bisection (vector in the middle) of two closest segments
-            var bisectionNormalized = (revertedFirst.DirectionNormalized + second.DirectionNormalized);
-            bisectionNormalized.Normalize();
-
-            var jointToPoint = new LineSegment2D(first.End, point);
-            var bisectionCross = MathHelper.Cross2D(bisectionNormalized, jointToPoint.DirectionNormalized);
-
-            var firstToBisection = new LineSegment2D(revertedFirst.DirectionNormalized, bisectionNormalized);
-            var firstCross = MathHelper.Cross2D(first.DirectionNormalized, firstToBisection.DirectionNormalized);
-
-            var isBisectionCrossNegative = (bisectionCross < 0);
-            var isFirstCrossNegative = (firstCross < 0);
-            var isCrossesHaveSameSign = !(isBisectionCrossNegative ^ isFirstCrossNegative);
-
-            //return GetSignedPseudoDistanceToSegment(isCrossesHaveSameSign ? first : second, point);
-            return SignedDistanceFunc(isCrossesHaveSameSign ? first : second, point);
-        }
-        
         private Color ApplyColorMask(Color color, bool redMask, bool greenMask, bool blueMask)
         {
             color.R *= redMask ? (byte)1 : (byte)0;
@@ -585,32 +446,6 @@ namespace Adamantium.Fonts
             return color;
         }
 
-        /*public void RemoveZeroAngleSegments()
-        {
-            for (int i = 0; i < segments.Count; i++)
-            {
-                var currentSeg = segments[i];
-                var nextSeg = new LineSegment2D();
-
-                if (i == (segments.Count - 1))
-                {
-                    nextSeg = segments[0];
-                }
-                else
-                {
-                    nextSeg = segments[i + 1];
-                }
-
-                if (IsSegmentsConnected(ref currentSeg, ref nextSeg) &&
-                    MathHelper.DetermineAngleInDegrees(currentSeg.Start, currentSeg.End, nextSeg.Start, nextSeg.End) == 0)
-                {
-                    var newSeg = new LineSegment2D(currentSeg.Start, nextSeg.End);
-                    segments[i] = newSeg;
-                    segments.Remove(nextSeg);
-                }
-            }
-        }*/
-        
         // --- ADDITIONAL DATA TYPES ---
         private struct ColoredDistance
         {
@@ -638,109 +473,12 @@ namespace Adamantium.Fonts
         
         private class Edge
         {
-            public List<LineSegment2D> Segments;
+            public List<MsdfGlyphSegment> Segments;
 
             public Edge()
             {
-                Segments = new List<LineSegment2D>();
+                Segments = new List<MsdfGlyphSegment>();
             }
-        }
-        
-        // --- TEST HELPERS ---
-        public Mesh GetColoredPoints()
-        {
-            ColorEdges();
-
-            var mesh = new Mesh();
-
-            var positions = new List<Vector2D>();
-            var colors = new List<Color>();
-            
-            foreach (var segment in segments)
-            {
-                positions.Add(segment.Start);
-                positions.Add(segment.End);
-                colors.Add(segment.MsdfColor);
-                colors.Add(segment.MsdfColor);
-            }
-
-            mesh.SetPositions(positions);
-            mesh.SetColors(colors);
-
-            return mesh;
-        }
-        
-        // --- SUBPIXEL SAMPLING ---
-        public bool[,] SampleSubpixels(uint size, Rectangle glyphBoundingRectangle)
-        {
-            // 1. Calculate boundaries for original glyph
-            double glyphSize = Math.Max(glyphBoundingRectangle.Width, glyphBoundingRectangle.Height);
-            var originalDimensions = new Vector2D(glyphSize);
-
-            // 2. Place glyph in center of calculated boundaries
-            var glyphCenter = glyphBoundingRectangle.Center;
-            var originalCenter = originalDimensions / 2;
-            var diff = originalCenter - glyphCenter;
-
-            for (var index = 0; index < segments.Count; index++)
-            {
-                var segment = segments[index];
-                var start = segment.Start;
-                var end = segment.End;
-
-                segment = new LineSegment2D(start + diff, end + diff);
-
-                segments[index] = segment;
-            }
-            
-            // 3. Sample glyph by subpixels
-            var width = size * 3;
-            var height = size;
-            
-            var subpixels = new bool[width, height];
-            
-            for (var y = 0; y < height; ++y)
-            {
-                for (var x = 0; x < width; ++x)
-                {
-                    // determine the closest segment to current sampling point
-                    var samplingPoint = new Vector2D(originalDimensions.X / width * (x + 0.5), originalDimensions.Y - (originalDimensions.Y / height * (y + 0.5)));
-
-                    subpixels[x, y] = IsSubpixelInsideGlyph(samplingPoint);
-                }
-            }
-
-            return subpixels;
-        }
-        
-        private bool IsSubpixelInsideGlyph(Vector2D point)
-        {
-            double closestDistance = Double.MaxValue;
-
-            // there can be up to two closest segments in case if point is close to segments' connection
-            // we will store both and then determine the signed pseudo-distance
-            // if these two signed pseudo-distances have different signs, use the one with negative, because the point is outside
-            var closestSegments = new List<LineSegment2D>();
-
-            foreach (var segment in segments)
-            {
-                var distance = GetDistanceToSegment(segment, point);
-
-                if (distance <= closestDistance)
-                {
-                    if (distance < closestDistance)
-                    {
-                        closestSegments.Clear();
-                        closestDistance = distance;
-                    }
-                    
-                    closestSegments.Add(segment);
-                }
-            }
-
-            closestDistance = GetSignedDistanceToSegmentsJoint(closestSegments, point, false);
-
-            return (closestDistance >= 0);
         }
     }
 }

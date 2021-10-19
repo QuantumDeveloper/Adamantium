@@ -22,15 +22,12 @@ namespace Adamantium.Mathematics
 
         public Vector2D DirectionNormalized { get; }
 
-        public Color MsdfColor;
-
         public LineSegment2D(Vector2D start, Vector2D end)
         {
             Start = start;
             End = end;
             Direction = end - start;
             DirectionNormalized = Vector2D.Normalize(Direction);
-            MsdfColor = Colors.White;
         }
 
         public bool Equals(LineSegment2D other)
