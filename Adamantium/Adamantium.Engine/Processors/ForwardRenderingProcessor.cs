@@ -9,6 +9,7 @@ using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
 using Adamantium.Game;
 using Adamantium.Game.GameInput;
+using Adamantium.Imaging;
 using Adamantium.Mathematics;
 using Adamantium.Win32;
 using AdamantiumVulkan.Core;
@@ -265,6 +266,7 @@ namespace Adamantium.Engine.Processors
             textureSampler = CreateTextureSampler();
             //defaultTexture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "texture.png"));
             defaultTexture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "sdf.png"));
+            defaultTexture.Save(Path.Combine("Textures", "subpixel.png"), ImageFileType.Png);
             //DeferredDevice.SetTargets(null);
 
             //var vbFlags = BufferFlags.VertexBuffer | BufferFlags.StreamOutput;
@@ -500,7 +502,8 @@ namespace Adamantium.Engine.Processors
                                             
                                             //GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Colored"].Apply();
                                             //GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["VertexColored"].Apply();
-                                            GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["MSDF"].Apply();
+                                            //GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["MSDF"].Apply();
+                                            GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Textured"].Apply();
 
                                             //BasicEffect.Techniques["MeshVertex"].Passes["DirectionalLight"].Apply();
                                             component.Draw(GraphicsDevice, gameTime);

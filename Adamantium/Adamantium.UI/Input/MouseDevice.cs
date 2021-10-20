@@ -61,14 +61,14 @@ namespace Adamantium.UI.Input
         public Point GetPosition(IInputElement relativeTo)
         {
             Point p = Position;
-            IVisualComponent v = relativeTo;
-            IVisualComponent root = null;
+            IUIComponent v = relativeTo;
+            IUIComponent root = null;
 
             while (v != null)
             {
                 p -= v.Bounds.Location;
                 root = v;
-                v = v.VisualComponentParent;
+                v = v.VisualParent;
             }
 
             return root.PointToClient(p);

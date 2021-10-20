@@ -18,7 +18,7 @@ namespace Adamantium.UI.Input
          List<IInputElement> elements = new List<IInputElement>();
          Stack<IInputElement> stack = new Stack<IInputElement>();
 
-         stack.Push((UiComponent)root);
+         stack.Push((UIComponent)root);
 
          while (stack.Count > 0)
          {
@@ -42,7 +42,7 @@ namespace Adamantium.UI.Input
                         child.IsEnabled &&
                         child.IsHitTestVisible)
                      {
-                        stack.Push((UiComponent) child);
+                        stack.Push((UIComponent) child);
                      }
                   }
                }

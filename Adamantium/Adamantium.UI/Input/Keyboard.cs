@@ -7,28 +7,28 @@ namespace Adamantium.UI.Input
    public static class Keyboard
    {
       public static readonly RoutedEvent KeyDownEvent = EventManager.RegisterRoutedEvent("KeyDown",
-         RoutingStrategy.Bubble, typeof(KeyEventHandler), typeof(UiComponent));
+         RoutingStrategy.Bubble, typeof(KeyEventHandler), typeof(UIComponent));
 
       public static readonly RoutedEvent KeyUpEvent = EventManager.RegisterRoutedEvent("KeyUp",
-         RoutingStrategy.Bubble, typeof(KeyEventHandler), typeof(UiComponent));
+         RoutingStrategy.Bubble, typeof(KeyEventHandler), typeof(UIComponent));
 
       public static readonly RoutedEvent GotKeyboardFocusEvent = EventManager.RegisterRoutedEvent("GotKeyboardFocus",
-         RoutingStrategy.Bubble, typeof(KeyboardGotFocusEventHandler), typeof(UiComponent));
+         RoutingStrategy.Bubble, typeof(KeyboardGotFocusEventHandler), typeof(UIComponent));
 
       public static readonly RoutedEvent LostKeyboardFocusEvent = EventManager.RegisterRoutedEvent("LostKeyboardFocus",
-         RoutingStrategy.Bubble, typeof(KeyboardFocusChangedEventHandler), typeof(UiComponent));
+         RoutingStrategy.Bubble, typeof(KeyboardFocusChangedEventHandler), typeof(UIComponent));
 
       public static readonly RoutedEvent PreviewKeyDownEvent = EventManager.RegisterRoutedEvent("PreviewKeyDown",
-         RoutingStrategy.Tunnel, typeof(KeyEventHandler), typeof(UiComponent));
+         RoutingStrategy.Tunnel, typeof(KeyEventHandler), typeof(UIComponent));
 
       public static readonly RoutedEvent PreviewKeyUpEvent = EventManager.RegisterRoutedEvent("PreviewKeyUp",
-         RoutingStrategy.Tunnel, typeof(KeyEventHandler), typeof(UiComponent));
+         RoutingStrategy.Tunnel, typeof(KeyEventHandler), typeof(UIComponent));
 
       public static readonly RoutedEvent PreviewLostKeyboardFocusEvent = EventManager.RegisterRoutedEvent("PreviewLostKeyboardFocus",
-         RoutingStrategy.Tunnel, typeof(KeyboardFocusChangedEventHandler), typeof(UiComponent));
+         RoutingStrategy.Tunnel, typeof(KeyboardFocusChangedEventHandler), typeof(UIComponent));
 
       public static readonly RoutedEvent PreviewGotKeyboardFocusEvent = EventManager.RegisterRoutedEvent("PreviewGotKeyboardFocus",
-         RoutingStrategy.Tunnel, typeof(KeyboardGotFocusEventHandler), typeof(UiComponent));
+         RoutingStrategy.Tunnel, typeof(KeyboardGotFocusEventHandler), typeof(UIComponent));
 
 
       private static Stopwatch timer;

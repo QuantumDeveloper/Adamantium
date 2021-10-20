@@ -175,7 +175,7 @@ namespace Adamantium.UI
         
         public void Update()
         {
-            var stack = new Stack<IVisualComponent>();
+            var stack = new Stack<IUIComponent>();
             stack.Push(this);
             while (stack.Count > 0)
             {
@@ -183,14 +183,14 @@ namespace Adamantium.UI
 
                 UpdateControl(control);
 
-                foreach (var visual in control.GetVisualDescends())
+                foreach (var visual in control.GetVisualDescendants())
                 {
                     stack.Push(visual as FrameworkComponent);
                 }
             }
         }
 
-        private void UpdateControl(IVisualComponent visualComponent)
+        private void UpdateControl(IUIComponent visualComponent)
         {
             var control = (FrameworkComponent)visualComponent;
             if (!control.IsMeasureValid)

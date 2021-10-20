@@ -9,15 +9,15 @@ namespace Adamantium.UI.Media
    {
       internal GraphicsDevice GraphicsDevice { get; set; }
       //internal D2DGraphicDevice D2DGraphicDevice { get; set; }
-      internal Dictionary<IVisualComponent, ShapePresentation> VisualPresentations;
+      internal Dictionary<IUIComponent, ShapePresentation> VisualPresentations;
 
       internal DrawingContext(GraphicsDevice d3dDevice)
       {
          GraphicsDevice = d3dDevice;
-         VisualPresentations = new Dictionary<IVisualComponent, ShapePresentation>();
+         VisualPresentations = new Dictionary<IUIComponent, ShapePresentation>();
       }
 
-      public void BeginDraw(IVisualComponent visualComponent)
+      public void BeginDraw(IUIComponent visualComponent)
       {
          if (VisualPresentations.ContainsKey(visualComponent))
          {
@@ -31,12 +31,12 @@ namespace Adamantium.UI.Media
          }
       }
 
-      public void EndDraw(IVisualComponent visualComponent)
+      public void EndDraw(IUIComponent visualComponent)
       {
          VisualPresentations[visualComponent].IsSealed = true;
       }
 
-      public void DrawRectangle(IVisualComponent visualComponent, Brush brush, Rect rect, Pen pen = null, double radiusX = 0.0, double radiusY = 0.0)
+      public void DrawRectangle(IUIComponent visualComponent, Brush brush, Rect rect, Pen pen = null, double radiusX = 0.0, double radiusY = 0.0)
       {
          RectangleGeometry rectangle = new RectangleGeometry(rect, radiusX, radiusY);
          StrokeGeometry stroke = null;
@@ -51,7 +51,7 @@ namespace Adamantium.UI.Media
 
       }
 
-      public void DrawRectangle(IVisualComponent visualComponent, Brush brush, Rect rect, Thickness corners,Pen pen = null)
+      public void DrawRectangle(IUIComponent visualComponent, Brush brush, Rect rect, Thickness corners,Pen pen = null)
       {
          RectangleGeometry rectangle = new RectangleGeometry(rect, corners);
          StrokeGeometry stroke = null;
@@ -66,7 +66,7 @@ namespace Adamantium.UI.Media
 
       }
 
-      public void DrawGeometry(IVisualComponent visualComponent, Brush brush, Pen pen, Geometry geometry)
+      public void DrawGeometry(IUIComponent visualComponent, Brush brush, Pen pen, Geometry geometry)
       {
          ShapePresentation shapePresentation = null;
          VisualPresentations.TryGetValue(visualComponent, out shapePresentation);
@@ -88,7 +88,7 @@ namespace Adamantium.UI.Media
 
       }
 
-      public void DrawImage(IVisualComponent visualComponent, BitmapSource bitmap, Brush filter, Rect destinationRect, Double radiusX,
+      public void DrawImage(IUIComponent visualComponent, BitmapSource bitmap, Brush filter, Rect destinationRect, Double radiusX,
          Double radiusY)
       {
          ShapePresentation shapePresentation = new ShapePresentation();
@@ -104,7 +104,7 @@ namespace Adamantium.UI.Media
          }
       }
 
-      public void PushTexture(IVisualComponent visualComponent, BitmapSource bitmap)
+      public void PushTexture(IUIComponent visualComponent, BitmapSource bitmap)
       {
          ShapePresentation shapePresentation = null;
 
@@ -118,7 +118,7 @@ namespace Adamantium.UI.Media
          }
       }
 
-      public void PushTexture(IVisualComponent visualComponent, Texture bitmap)
+      public void PushTexture(IUIComponent visualComponent, Texture bitmap)
       {
          ShapePresentation shapePresentation = null;
 
@@ -132,12 +132,12 @@ namespace Adamantium.UI.Media
          }
       }
 
-      public void DrawEmptyRectangle(IVisualComponent visualComponent, Brush brush, Rect rect, Thickness borderThickness, Thickness cornerRadius)
+      public void DrawEmptyRectangle(IUIComponent visualComponent, Brush brush, Rect rect, Thickness borderThickness, Thickness cornerRadius)
       {
          
       }
 
-      public void DrawFilledRectangle(IVisualComponent visualComponent, Brush brush, Rect rect, Thickness cornerRadius)
+      public void DrawFilledRectangle(IUIComponent visualComponent, Brush brush, Rect rect, Thickness cornerRadius)
       {
 
       }

@@ -96,7 +96,7 @@ float4 MSDF_PS(PS_OUTPUT_BASIC input) : SV_TARGET
     shaderTexture.GetDimensions(sz.x, sz.y);
     float dx = ddx( input.uv.x ) * sz.x;
     float dy = ddy( input.uv.y ) * sz.y;
-    float toPixels = 10.0 * rsqrt( dx * dx + dy * dy );
+    float toPixels = 8.0 * rsqrt( dx * dx + dy * dy );
     float sigDist = median( sample.r, sample.g, sample.b ) - 0.5;
     float opacity = clamp( sigDist * toPixels + 0.5, 0.0, 1.0 );
     

@@ -1,13 +1,18 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.Linq;
+using Adamantium.Core.Collections;
+using Adamantium.Mathematics;
+using Adamantium.UI.Controls;
 using Adamantium.UI.Input;
 using Adamantium.UI.Media;
 using Adamantium.UI.Windows.Input;
 
 namespace Adamantium.UI
 {
-    public class UiComponent : VisualComponent, IInputElement, IUIComponent
+    public class UIComponent : AdamantiumComponent, IInputElement, IUIComponent
     {
         private Size renderSize;
         private Size? _previousMeasure;
@@ -17,52 +22,66 @@ namespace Adamantium.UI
         protected Size previousRenderSize;
         
         #region Adamantium properties
+        
+        public static readonly AdamantiumProperty PositionProperty = AdamantiumProperty.Register(nameof(Location),
+            typeof (Point), typeof (UIComponent), new PropertyMetadata(Point.Zero));
 
+        public static readonly AdamantiumProperty RotationProperty = AdamantiumProperty.Register(nameof(Rotation),
+            typeof(Double), typeof(UIComponent), new PropertyMetadata((Double)0));
+
+        public static readonly AdamantiumProperty ScaleProperty = AdamantiumProperty.Register(nameof(Scale),
+            typeof(Vector2D), typeof(UIComponent), new PropertyMetadata(Vector2D.One));
+
+        public static readonly AdamantiumProperty VisibilityProperty = AdamantiumProperty.Register(nameof(Visibility),
+            typeof(Visibility), typeof(UIComponent),
+            new PropertyMetadata(Visibility.Visible,
+                PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsArrange));
+      
         public static readonly AdamantiumProperty IsFocusedProperty =
          AdamantiumProperty.RegisterReadOnly(nameof(IsFocused),
-            typeof(Boolean), typeof(UiComponent), new PropertyMetadata(false));
+            typeof(Boolean), typeof(UIComponent), new PropertyMetadata(false));
 
         public static readonly AdamantiumProperty IsHitTestVisibleProperty =
            AdamantiumProperty.Register(nameof(IsHitTestVisible),
-              typeof(Boolean), typeof(UiComponent), new PropertyMetadata(true));
+              typeof(Boolean), typeof(UIComponent), new PropertyMetadata(true));
 
         public static readonly AdamantiumProperty ClipToBoundsProperty = AdamantiumProperty.Register(nameof(ClipToBounds),
-         typeof(Boolean), typeof(UiComponent),
+         typeof(Boolean), typeof(UIComponent),
          new PropertyMetadata(true, PropertyMetadataOptions.BindsTwoWayByDefault));
 
         public static readonly AdamantiumProperty IsEnabledProperty = AdamantiumProperty.Register(nameof(IsEnabled),
-           typeof(Boolean), typeof(UiComponent),
+           typeof(Boolean), typeof(UIComponent),
            new PropertyMetadata(true, PropertyMetadataOptions.BindsTwoWayByDefault));
 
         public static readonly AdamantiumProperty OpacityProperty = AdamantiumProperty.Register(nameof(Opacity),
-           typeof(Double), typeof(UiComponent),
+           typeof(Double), typeof(UIComponent),
            new PropertyMetadata(1.0, PropertyMetadataOptions.BindsTwoWayByDefault));
 
         public static readonly AdamantiumProperty AllowDropProperty = AdamantiumProperty.Register(nameof(AllowDrop),
-           typeof(Boolean), typeof(UiComponent), new PropertyMetadata(true));
+           typeof(Boolean), typeof(UIComponent), new PropertyMetadata(true));
 
         public static readonly AdamantiumProperty FocusableProperty = AdamantiumProperty.Register(nameof(Focusable),
-           typeof(Boolean), typeof(UiComponent), new PropertyMetadata(true));
+           typeof(Boolean), typeof(UIComponent), new PropertyMetadata(true));
 
         public static readonly AdamantiumProperty IsMouseOverProperty =
            AdamantiumProperty.RegisterReadOnly(nameof(IsMouseOver),
-              typeof(Boolean), typeof(UiComponent), new PropertyMetadata(false));
+              typeof(Boolean), typeof(UIComponent), new PropertyMetadata(false));
 
         public static readonly AdamantiumProperty IsMouseDirectlyOverProperty =
            AdamantiumProperty.RegisterReadOnly(nameof(IsMouseDirectlyOver),
-              typeof(Boolean), typeof(UiComponent), new PropertyMetadata(false));
+              typeof(Boolean), typeof(UIComponent), new PropertyMetadata(false));
 
         public static readonly AdamantiumProperty IsKeyboardFocusedProperty =
            AdamantiumProperty.RegisterReadOnly(nameof(IsKeyboardFocused),
-              typeof(Boolean), typeof(UiComponent), new PropertyMetadata(false));
+              typeof(Boolean), typeof(UIComponent), new PropertyMetadata(false));
 
         public static readonly AdamantiumProperty UidProperty = AdamantiumProperty.Register(nameof(Uid),
-           typeof(String), typeof(UiComponent), new PropertyMetadata(String.Empty));
+           typeof(String), typeof(UIComponent), new PropertyMetadata(String.Empty));
 
         public static readonly AdamantiumProperty UseLayoutRoundingProperty = AdamantiumProperty.Register(nameof(UseLayoutRounding),
            typeof(Boolean), typeof(FrameworkComponent), new PropertyMetadata(false, PropertyMetadataOptions.AffectsArrange));
 
-        public static readonly AdamantiumProperty CursorProperty = AdamantiumProperty.Register(nameof(Cursor), typeof(Cursor), typeof(UiComponent), new PropertyMetadata(Cursor.Default));
+        public static readonly AdamantiumProperty CursorProperty = AdamantiumProperty.Register(nameof(Cursor), typeof(Cursor), typeof(UIComponent), new PropertyMetadata(Cursor.Default));
 
         #endregion
 
@@ -70,102 +89,101 @@ namespace Adamantium.UI
         #region Routed events
 
         public static readonly RoutedEvent LoadedEvent = EventManager.RegisterRoutedEvent("Loaded",
-           RoutingStrategy.Direct, typeof(TextInputEventHandler), typeof(UiComponent));
+           RoutingStrategy.Direct, typeof(TextInputEventHandler), typeof(UIComponent));
 
         public static readonly RoutedEvent InitializedEvent = EventManager.RegisterRoutedEvent("Initialized",
-           RoutingStrategy.Direct, typeof(TextInputEventHandler), typeof(UiComponent));
+           RoutingStrategy.Direct, typeof(TextInputEventHandler), typeof(UIComponent));
 
         public static readonly RoutedEvent TextInputEvent = EventManager.RegisterRoutedEvent("TextInput",
-         RoutingStrategy.Bubble, typeof(TextInputEventHandler), typeof(UiComponent));
+         RoutingStrategy.Bubble, typeof(TextInputEventHandler), typeof(UIComponent));
 
         public static readonly RoutedEvent PreviewMouseDoubleClickEvent = EventManager.RegisterRoutedEvent(
            "PreviewMouseDoubleClick",
-           RoutingStrategy.Tunnel, typeof(MouseButtonEventHandler), typeof(UiComponent));
+           RoutingStrategy.Tunnel, typeof(MouseButtonEventHandler), typeof(UIComponent));
 
         public static readonly RoutedEvent PreviewTextInputEvent = 
             EventManager.RegisterRoutedEvent("PreviewTextInput",
-           RoutingStrategy.Tunnel, typeof(TextInputEventHandler), typeof(UiComponent));
+           RoutingStrategy.Tunnel, typeof(TextInputEventHandler), typeof(UIComponent));
         
         public static readonly RoutedEvent SizeChangedEvent = 
             EventManager.RegisterRoutedEvent("SizeChangedEvent",
-                RoutingStrategy.Bubble, typeof(TextInputEventHandler), typeof(UiComponent));
+                RoutingStrategy.Bubble, typeof(TextInputEventHandler), typeof(UIComponent));
 
         public static readonly RoutedEvent MouseLeftButtonDownEvent =
            EventManager.RegisterRoutedEvent("MouseLeftButtonDown",
-              RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UiComponent));
+              RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UIComponent));
 
         public static readonly RoutedEvent RawMouseLeftButtonDownEvent =
            EventManager.RegisterRoutedEvent("RawMouseLeftButtonDownEvent",
-              RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UiComponent));
+              RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UIComponent));
 
         public static readonly RoutedEvent RawMouseLeftButtonUpEvent =
            EventManager.RegisterRoutedEvent("RawMouseLeftButtonUpEvent",
-              RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UiComponent));
+              RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UIComponent));
 
         public static readonly RoutedEvent RawMouseRightButtonDownEvent =
            EventManager.RegisterRoutedEvent("RawMouseRightButtonDownEvent",
-              RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UiComponent));
+              RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UIComponent));
 
         public static readonly RoutedEvent RawMouseRightButtonUpEvent =
            EventManager.RegisterRoutedEvent("RawMouseRightButtonUpEvent",
-              RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UiComponent));
+              RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UIComponent));
 
         public static readonly RoutedEvent RawMouseMiddleButtonDownEvent =
            EventManager.RegisterRoutedEvent("RawMouseMiddleButtonDownEvent",
-              RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UiComponent));
+              RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UIComponent));
 
         public static readonly RoutedEvent RawMouseMiddleButtonUpEvent =
            EventManager.RegisterRoutedEvent("RawMouseMiddleButtonUpEvent",
-              RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UiComponent));
+              RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UIComponent));
 
         public static readonly RoutedEvent MouseLeftButtonUpEvent = 
             EventManager.RegisterRoutedEvent("MouseLeftButtonUp",
-           RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UiComponent));
+           RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UIComponent));
 
         public static readonly RoutedEvent MouseRightButtonDownEvent =
            EventManager.RegisterRoutedEvent("MouseRightButtonDown",
-              RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UiComponent));
+              RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UIComponent));
 
         public static readonly RoutedEvent MouseRightButtonUpEvent = EventManager.RegisterRoutedEvent(
            "MouseRightButtonUp",
-           RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UiComponent));
+           RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UIComponent));
 
         public static readonly RoutedEvent MouseMiddleButtonDownEvent =
            EventManager.RegisterRoutedEvent("MouseMiddleButtonDown",
-              RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UiComponent));
+              RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UIComponent));
 
         public static readonly RoutedEvent MouseMiddleButtonUpEvent = EventManager.RegisterRoutedEvent(
            "MouseMiddleButtonUp",
-           RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UiComponent));
+           RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UIComponent));
 
 
 
         public static readonly RoutedEvent PreviewMouseLeftButtonDownEvent =
            EventManager.RegisterRoutedEvent("PreviewMouseLeftButtonDown",
-              RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UiComponent));
+              RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UIComponent));
 
         public static readonly RoutedEvent PreviewMouseLeftButtonUpEvent =
            EventManager.RegisterRoutedEvent("PreviewMouseLeftButtonUp",
-              RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UiComponent));
+              RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UIComponent));
 
         public static readonly RoutedEvent PreviewMouseRightButtonDownEvent =
            EventManager.RegisterRoutedEvent("PreviewMouseRightButtonDown",
-              RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UiComponent));
+              RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UIComponent));
 
         public static readonly RoutedEvent PreviewMouseRightButtonUpEvent =
            EventManager.RegisterRoutedEvent("PreviewMouseRightButtonUp",
-              RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UiComponent));
+              RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UIComponent));
 
         public static readonly RoutedEvent PreviewMouseMiddleButtonDownEvent =
            EventManager.RegisterRoutedEvent("PreviewMouseMiddleButtonDown",
-              RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UiComponent));
+              RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UIComponent));
 
         public static readonly RoutedEvent PreviewMouseMiddleButtonUpEvent =
            EventManager.RegisterRoutedEvent("PreviewMouseMiddleButtonUp",
-              RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UiComponent));
+              RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UIComponent));
 
         #endregion
-
 
 
         #region Events
@@ -463,6 +481,30 @@ namespace Adamantium.UI
 
 
         #region Properties
+        
+        public Point Location
+        {
+            get => GetValue<Point>(PositionProperty);
+            set => SetValue(PositionProperty, value);
+        }
+
+        public Vector2D Scale
+        {
+            get => GetValue<Vector2D>(ScaleProperty);
+            set => SetValue(ScaleProperty, value);
+        }
+
+        public Double Rotation
+        {
+            get => GetValue<Double>(RotationProperty);
+            set => SetValue(RotationProperty, value);
+        }
+
+        public Visibility Visibility
+        {
+            get => GetValue<Visibility>(VisibilityProperty);
+            set => SetValue(VisibilityProperty, value);
+        }
 
         public Cursor Cursor
         {
@@ -548,72 +590,74 @@ namespace Adamantium.UI
         private readonly Dictionary<RoutedEvent, List<EventSubscription>> eventHandlers =
            new Dictionary<RoutedEvent, List<EventSubscription>>();
 
-        public UiComponent()
+        public UIComponent()
         {
+            VisualChildrenCollection = new TrackingCollection<IUIComponent>();
+            VisualChildrenCollection.CollectionChanged += VisualChildrenCollectionChanged;
         }
 
-        static UiComponent()
+        static UIComponent()
         {
-            FocusManager.GotFocusEvent.RegisterClassHandler<UiComponent>(new RoutedEventHandler(GotFocusHandler));
-            FocusManager.LostFocusEvent.RegisterClassHandler<UiComponent>(new RoutedEventHandler(LostFocusHandler));
-            Mouse.MouseEnterEvent.RegisterClassHandler<UiComponent>(new MouseEventHandler(MouseEnterHandler));
-            Mouse.MouseLeaveEvent.RegisterClassHandler<UiComponent>(new MouseEventHandler(MouseLeaveHandler));
-            Mouse.PreviewMouseDownEvent.RegisterClassHandler<UiComponent>(new MouseButtonEventHandler(PreviewMouseDownHandler));
-            Mouse.MouseDownEvent.RegisterClassHandler<UiComponent>(new MouseButtonEventHandler(MouseDownHandler));
-            Mouse.PreviewMouseUpEvent.RegisterClassHandler<UiComponent>(new MouseButtonEventHandler(PreviewMouseUpHandler));
-            Mouse.MouseUpEvent.RegisterClassHandler<UiComponent>(new MouseButtonEventHandler(MouseUpHandler));
-            Mouse.RawMouseDownEvent.RegisterClassHandler<UiComponent>(new MouseButtonEventHandler(RawMouseDownHandler));
-            Mouse.RawMouseUpEvent.RegisterClassHandler<UiComponent>(new MouseButtonEventHandler(RawMouseUpHandler));
-            Mouse.MouseMoveEvent.RegisterClassHandler<UiComponent>(new MouseEventHandler(MouseMoveHandler));
-            Mouse.RawMouseMoveEvent.RegisterClassHandler<UiComponent>(new RawMouseEventHandler(RawMouseMoveHandler));
+            FocusManager.GotFocusEvent.RegisterClassHandler<UIComponent>(new RoutedEventHandler(GotFocusHandler));
+            FocusManager.LostFocusEvent.RegisterClassHandler<UIComponent>(new RoutedEventHandler(LostFocusHandler));
+            Mouse.MouseEnterEvent.RegisterClassHandler<UIComponent>(new MouseEventHandler(MouseEnterHandler));
+            Mouse.MouseLeaveEvent.RegisterClassHandler<UIComponent>(new MouseEventHandler(MouseLeaveHandler));
+            Mouse.PreviewMouseDownEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(PreviewMouseDownHandler));
+            Mouse.MouseDownEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(MouseDownHandler));
+            Mouse.PreviewMouseUpEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(PreviewMouseUpHandler));
+            Mouse.MouseUpEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(MouseUpHandler));
+            Mouse.RawMouseDownEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(RawMouseDownHandler));
+            Mouse.RawMouseUpEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(RawMouseUpHandler));
+            Mouse.MouseMoveEvent.RegisterClassHandler<UIComponent>(new MouseEventHandler(MouseMoveHandler));
+            Mouse.RawMouseMoveEvent.RegisterClassHandler<UIComponent>(new RawMouseEventHandler(RawMouseMoveHandler));
 
-            PreviewMouseLeftButtonDownEvent.RegisterClassHandler<UiComponent>(new MouseButtonEventHandler(PreviewMouseLeftButtonDownHandler));
-            PreviewMouseLeftButtonUpEvent.RegisterClassHandler<UiComponent>(new MouseButtonEventHandler(PreviewMouseLeftButtonUpHandler));
-            MouseLeftButtonDownEvent.RegisterClassHandler<UiComponent>(new MouseButtonEventHandler(MouseLeftButtonDownHandler));
-            MouseLeftButtonUpEvent.RegisterClassHandler<UiComponent>(new MouseButtonEventHandler(MouseLeftButtonUpHandler));
+            PreviewMouseLeftButtonDownEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(PreviewMouseLeftButtonDownHandler));
+            PreviewMouseLeftButtonUpEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(PreviewMouseLeftButtonUpHandler));
+            MouseLeftButtonDownEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(MouseLeftButtonDownHandler));
+            MouseLeftButtonUpEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(MouseLeftButtonUpHandler));
 
-            PreviewMouseRightButtonDownEvent.RegisterClassHandler<UiComponent>(new MouseButtonEventHandler(PreviewMouseRightButtonDownHandler));
-            PreviewMouseRightButtonUpEvent.RegisterClassHandler<UiComponent>(new MouseButtonEventHandler(PreviewMouseRightButtonUpHandler));
-            MouseRightButtonDownEvent.RegisterClassHandler<UiComponent>(new MouseButtonEventHandler(MouseRightButtonDownHandler));
-            MouseRightButtonUpEvent.RegisterClassHandler<UiComponent>(new MouseButtonEventHandler(MouseRightButtonUpHandler));
+            PreviewMouseRightButtonDownEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(PreviewMouseRightButtonDownHandler));
+            PreviewMouseRightButtonUpEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(PreviewMouseRightButtonUpHandler));
+            MouseRightButtonDownEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(MouseRightButtonDownHandler));
+            MouseRightButtonUpEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(MouseRightButtonUpHandler));
 
-            PreviewMouseMiddleButtonDownEvent.RegisterClassHandler<UiComponent>(new MouseButtonEventHandler(PreviewMouseMiddleButtonDownHandler));
-            PreviewMouseMiddleButtonUpEvent.RegisterClassHandler<UiComponent>(new MouseButtonEventHandler(PreviewMouseMiddleButtonUpHandler));
-            MouseMiddleButtonDownEvent.RegisterClassHandler<UiComponent>(new MouseButtonEventHandler(MouseMiddleButtonDownHandler));
-            MouseMiddleButtonUpEvent.RegisterClassHandler<UiComponent>(new MouseButtonEventHandler(MouseMiddleButtonUpHandler));
+            PreviewMouseMiddleButtonDownEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(PreviewMouseMiddleButtonDownHandler));
+            PreviewMouseMiddleButtonUpEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(PreviewMouseMiddleButtonUpHandler));
+            MouseMiddleButtonDownEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(MouseMiddleButtonDownHandler));
+            MouseMiddleButtonUpEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(MouseMiddleButtonUpHandler));
 
-            RawMouseLeftButtonDownEvent.RegisterClassHandler<UiComponent>(new MouseButtonEventHandler(RawMouseLeftButtonDownHandler));
-            RawMouseLeftButtonUpEvent.RegisterClassHandler<UiComponent>(new MouseButtonEventHandler(RawMouseLeftButtonUpHandler));
-            RawMouseRightButtonDownEvent.RegisterClassHandler<UiComponent>(new MouseButtonEventHandler(RawMouseRightButtonDownHandler));
-            RawMouseRightButtonUpEvent.RegisterClassHandler<UiComponent>(new MouseButtonEventHandler(RawMouseRightButtonUpHandler));
-            RawMouseMiddleButtonDownEvent.RegisterClassHandler<UiComponent>(new MouseButtonEventHandler(RawMouseMiddleButtonDownHandler));
-            RawMouseMiddleButtonUpEvent.RegisterClassHandler<UiComponent>(new MouseButtonEventHandler(RawMouseMiddleButtonUpHandler));
+            RawMouseLeftButtonDownEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(RawMouseLeftButtonDownHandler));
+            RawMouseLeftButtonUpEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(RawMouseLeftButtonUpHandler));
+            RawMouseRightButtonDownEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(RawMouseRightButtonDownHandler));
+            RawMouseRightButtonUpEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(RawMouseRightButtonUpHandler));
+            RawMouseMiddleButtonDownEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(RawMouseMiddleButtonDownHandler));
+            RawMouseMiddleButtonUpEvent.RegisterClassHandler<UIComponent>(new MouseButtonEventHandler(RawMouseMiddleButtonUpHandler));
 
 
-            SizeChangedEvent.RegisterClassHandler<UiComponent>(new SizeChangedEventHandler(SizeChangedHandler));
+            SizeChangedEvent.RegisterClassHandler<UIComponent>(new SizeChangedEventHandler(SizeChangedHandler));
         }
 
         private static void SizeChangedHandler(object sender, SizeChangedEventArgs e)
         {
-            var ui = sender as UiComponent;
+            var ui = sender as UIComponent;
             ui?.OnSizeChanged(e);
         }
 
         private static void GotFocusHandler(object sender, RoutedEventArgs e)
         {
-            var ui = sender as UiComponent;
+            var ui = sender as UIComponent;
             ui?.OnGotFocus(e);
         }
 
         private static void LostFocusHandler(object sender, RoutedEventArgs e)
         {
-            var ui = sender as UiComponent;
+            var ui = sender as UIComponent;
             ui?.OnLostFocus(e);
         }
 
         private static void MouseEnterHandler(object sender, MouseEventArgs e)
         {
-            if (sender is UiComponent ui && !ui.IsMouseOver)
+            if (sender is UIComponent ui && !ui.IsMouseOver)
             {
                 ui.OnMouseEnter(e);
             }
@@ -621,7 +665,7 @@ namespace Adamantium.UI
 
         private static void MouseLeaveHandler(object sender, MouseEventArgs e)
         {
-            if (sender is UiComponent ui && ui.IsMouseOver)
+            if (sender is UIComponent ui && ui.IsMouseOver)
             {
                 ui.OnMouseLeave(e);
             }
@@ -629,7 +673,7 @@ namespace Adamantium.UI
 
         private static void PreviewMouseDownHandler(object sender, MouseButtonEventArgs e)
         {
-            if (sender is UiComponent ui)
+            if (sender is UIComponent ui)
             {
                 MouseButtonEventArgs args = new MouseButtonEventArgs(e.MouseDevice, e.ChangedButton, e.ButtonState, e.Modifiers, e.Timestamp);
                 if (e.ChangedButton == MouseButtons.Left)
@@ -650,7 +694,7 @@ namespace Adamantium.UI
 
         private static void PreviewMouseUpHandler(object sender, MouseButtonEventArgs e)
         {
-            if (sender is UiComponent ui)
+            if (sender is UIComponent ui)
             {
                 MouseButtonEventArgs args = new MouseButtonEventArgs(e.MouseDevice, e.ChangedButton, e.ButtonState, e.Modifiers, e.Timestamp);
                 if (e.ChangedButton == MouseButtons.Left)
@@ -671,7 +715,7 @@ namespace Adamantium.UI
 
         private static void MouseDownHandler(object sender, MouseButtonEventArgs e)
         {
-            if (sender is UiComponent ui)
+            if (sender is UIComponent ui)
             {
                 MouseButtonEventArgs args = new MouseButtonEventArgs(e.MouseDevice, e.ChangedButton, e.ButtonState, e.Modifiers, e.Timestamp);
                 if (e.ChangedButton == MouseButtons.Left)
@@ -693,7 +737,7 @@ namespace Adamantium.UI
 
         private static void MouseUpHandler(object sender, MouseButtonEventArgs e)
         {
-            if (sender is UiComponent ui)
+            if (sender is UIComponent ui)
             {
                 MouseButtonEventArgs args = new MouseButtonEventArgs(e.MouseDevice, e.ChangedButton, e.ButtonState, e.Modifiers, e.Timestamp);
                 if (e.ChangedButton == MouseButtons.Left)
@@ -715,7 +759,7 @@ namespace Adamantium.UI
 
         private static void RawMouseDownHandler(object sender, MouseButtonEventArgs e)
         {
-            if (sender is UiComponent ui)
+            if (sender is UIComponent ui)
             {
                 MouseButtonEventArgs args = new MouseButtonEventArgs(e.MouseDevice, e.ChangedButton, e.ButtonState, e.Modifiers, e.Timestamp);
                 if (e.ChangedButton == MouseButtons.Left)
@@ -740,7 +784,7 @@ namespace Adamantium.UI
 
         private static void RawMouseUpHandler(object sender, MouseButtonEventArgs e)
         {
-            if (sender is UiComponent ui)
+            if (sender is UIComponent ui)
             {
                 MouseButtonEventArgs args = new MouseButtonEventArgs(e.MouseDevice, e.ChangedButton, e.ButtonState, e.Modifiers, e.Timestamp);
                 if (e.ChangedButton == MouseButtons.Left)
@@ -765,121 +809,121 @@ namespace Adamantium.UI
 
         private static void RawMouseMoveHandler(object sender, UnboundMouseEventArgs e)
         {
-            var ui = sender as UiComponent;
+            var ui = sender as UIComponent;
             ui?.OnRawMouseMove(ui, e);
         }
 
         private static void MouseMoveHandler(object sender, MouseEventArgs e)
         {
-            var ui = sender as UiComponent;
+            var ui = sender as UIComponent;
             ui?.OnMouseMove(ui, e);
         }
 
         private static void PreviewMouseLeftButtonDownHandler(object sender, MouseButtonEventArgs e)
         {
-            var ui = sender as UiComponent;
+            var ui = sender as UIComponent;
             ui?.OnPreviewMouseLeftButtonDown(ui, e);
         }
 
         private static void PreviewMouseLeftButtonUpHandler(object sender, MouseButtonEventArgs e)
         {
-            var ui = sender as UiComponent;
+            var ui = sender as UIComponent;
             ui?.OnPreviewMouseLeftButtonUp(ui, e);
         }
 
         private static void MouseLeftButtonDownHandler(object sender, MouseButtonEventArgs e)
         {
-            var ui = sender as UiComponent;
+            var ui = sender as UIComponent;
             ui?.OnMouseLeftButtonDown(ui, e);
         }
 
         private static void MouseLeftButtonUpHandler(object sender, MouseButtonEventArgs e)
         {
-            var ui = sender as UiComponent;
+            var ui = sender as UIComponent;
             ui?.OnMouseLeftButtonUp(ui, e);
         }
 
         private static void PreviewMouseRightButtonDownHandler(object sender, MouseButtonEventArgs e)
         {
-            var ui = sender as UiComponent;
+            var ui = sender as UIComponent;
             ui?.OnPreviewMouseRightButtonDown(ui, e);
         }
 
         private static void PreviewMouseRightButtonUpHandler(object sender, MouseButtonEventArgs e)
         {
-            var ui = sender as UiComponent;
+            var ui = sender as UIComponent;
             ui?.OnPreviewMouseRightButtonUp(ui, e);
         }
 
         private static void MouseRightButtonDownHandler(object sender, MouseButtonEventArgs e)
         {
-            var ui = sender as UiComponent;
+            var ui = sender as UIComponent;
             ui?.OnMouseRightButtonDown(ui, e);
         }
 
         private static void MouseRightButtonUpHandler(object sender, MouseButtonEventArgs e)
         {
-            var ui = sender as UiComponent;
+            var ui = sender as UIComponent;
             ui?.OnMouseRightButtonUp(ui, e);
         }
 
         private static void PreviewMouseMiddleButtonDownHandler(object sender, MouseButtonEventArgs e)
         {
-            var ui = sender as UiComponent;
+            var ui = sender as UIComponent;
             ui?.OnPreviewMouseMiddleButtonDown(ui, e);
         }
 
         private static void PreviewMouseMiddleButtonUpHandler(object sender, MouseButtonEventArgs e)
         {
-            var ui = sender as UiComponent;
+            var ui = sender as UIComponent;
             ui?.OnPreviewMouseMiddleButtonUp(ui, e);
         }
 
         private static void MouseMiddleButtonDownHandler(object sender, MouseButtonEventArgs e)
         {
-            var ui = sender as UiComponent;
+            var ui = sender as UIComponent;
             ui?.OnMouseMiddleButtonDown(ui, e);
         }
 
         private static void MouseMiddleButtonUpHandler(object sender, MouseButtonEventArgs e)
         {
-            var ui = sender as UiComponent;
+            var ui = sender as UIComponent;
             ui?.OnMouseMiddleButtonUp(ui, e);
         }
 
         private static void RawMouseLeftButtonDownHandler(object sender, MouseButtonEventArgs e)
         {
-            var ui = sender as UiComponent;
+            var ui = sender as UIComponent;
             ui?.OnRawMouseLeftButtonDown(ui, e);
         }
 
         private static void RawMouseLeftButtonUpHandler(object sender, MouseButtonEventArgs e)
         {
-            var ui = sender as UiComponent;
+            var ui = sender as UIComponent;
             ui?.OnRawMouseLeftButtonUp(ui, e);
         }
 
         private static void RawMouseRightButtonDownHandler(object sender, MouseButtonEventArgs e)
         {
-            var ui = sender as UiComponent;
+            var ui = sender as UIComponent;
             ui?.OnRawMouseRightButtonDown(ui, e);
         }
 
         private static void RawMouseRightButtonUpHandler(object sender, MouseButtonEventArgs e)
         {
-            var ui = sender as UiComponent;
+            var ui = sender as UIComponent;
             ui?.OnRawMouseRightButtonUp(ui, e);
         }
 
         private static void RawMouseMiddleButtonDownHandler(object sender, MouseButtonEventArgs e)
         {
-            var ui = sender as UiComponent;
+            var ui = sender as UIComponent;
             ui?.OnRawMouseMiddleButtonDown(ui, e);
         }
 
         private static void RawMouseMiddleButtonUpHandler(object sender, MouseButtonEventArgs e)
         {
-            var ui = sender as UiComponent;
+            var ui = sender as UIComponent;
             ui?.OnRawMouseMiddleButtonUp(ui, e);
         }
 
@@ -1034,7 +1078,7 @@ namespace Adamantium.UI
 
         public void InvalidateMeasure()
         {
-            var parent = this.GetVisualParent<UiComponent>();
+            var parent = this.GetVisualParent<UIComponent>();
 
             IsMeasureValid = false;
             IsArrangeValid = false;
@@ -1093,7 +1137,7 @@ namespace Adamantium.UI
 
             foreach (var visual in VisualChildren)
             {
-                var child = (UiComponent)visual;
+                var child = (UIComponent)visual;
                 child.Measure(availableSize);
                 width = Math.Max(width, child.DesiredSize.Width);
                 height = Math.Max(height, child.DesiredSize.Height);
@@ -1151,7 +1195,7 @@ namespace Adamantium.UI
         {
             foreach (var visual in VisualChildren)
             {
-                var child = (UiComponent)visual;
+                var child = (UIComponent)visual;
                 child.Arrange(new Rect(finalSize));
             }
 
@@ -1303,8 +1347,8 @@ namespace Adamantium.UI
                 throw new NullReferenceException(nameof(e.RoutedEvent));
             }
 
-            e.Source = e.Source ?? this;
-            e.OriginalSource = e.OriginalSource ?? this;
+            e.Source ??= this;
+            e.OriginalSource ??= this;
 
             if (e.RoutedEvent != null)
             {
@@ -1356,7 +1400,7 @@ namespace Adamantium.UI
                 throw new ArgumentNullException(nameof(e));
             }
 
-            foreach (var element in GetBubbleEventRoute())
+            foreach (UIComponent element in GetBubbleEventRoute())
             {
                 e.Source = element;
                 element.RaiseDirectEvent(e);
@@ -1370,7 +1414,7 @@ namespace Adamantium.UI
                 throw new ArgumentNullException(nameof(e));
             }
 
-            foreach (var element in GetTunnelEventRoute())
+            foreach (UIComponent element in GetTunnelEventRoute())
             {
                 e.Source = element;
                 element.RaiseDirectEvent(e);
@@ -1378,17 +1422,17 @@ namespace Adamantium.UI
         }
 
 
-        public IEnumerable<UiComponent> GetBubbleEventRoute()
+        public IEnumerable<IUIComponent> GetBubbleEventRoute()
         {
             var element = this;
             while (element != null)
             {
                 yield return element;
-                element = (UiComponent)element.VisualComponentParent;
+                element = (UIComponent)element.VisualParent;
             }
         }
 
-        public IEnumerable<UiComponent> GetTunnelEventRoute()
+        public IEnumerable<IUIComponent> GetTunnelEventRoute()
         {
             return GetBubbleEventRoute().Reverse();
         }
@@ -1424,5 +1468,128 @@ namespace Adamantium.UI
         {
             throw new NotImplementedException();
         }
+
+        private void VisualChildrenCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+      {
+         switch (e.Action)
+         {
+               case NotifyCollectionChangedAction.Add:
+               foreach (UIComponent visual in e.NewItems)
+               {
+                  visual.SetVisualParent(this);
+               }
+               break;
+
+               case NotifyCollectionChangedAction.Remove:
+               foreach (UIComponent visual in e.OldItems)
+               {
+                  visual.SetVisualParent(null);
+               }
+               break;
+         }
+      }
+
+      public Rect Bounds { get; set; }
+
+      public Rect ClipRectangle { get; internal set; }
+
+      public Point ClipPosition { get; set; }
+
+      private IUIComponent visualComponentParent;
+
+      public IUIComponent VisualParent => visualComponentParent;
+
+      public Int32 ZIndex { get; set; }
+
+      public IReadOnlyCollection<IUIComponent> GetVisualDescendants()
+      {
+          return VisualChildrenCollection.AsReadOnly();
+      }
+
+      public IReadOnlyCollection<IUIComponent> VisualChildren => VisualChildrenCollection.AsReadOnly();
+
+      protected TrackingCollection<IUIComponent> VisualChildrenCollection { get; private set; } 
+      
+      public bool IsAttachedToVisualTree { get; private set; }
+
+      protected void SetVisualParent(IUIComponent parent)
+      {
+         if (visualComponentParent == parent)
+         {
+            return;
+         }
+
+         var old = visualComponentParent;
+         visualComponentParent = parent;
+
+         if (IsAttachedToVisualTree)
+         {
+            var root = (this as IRootVisualComponent) ?? old.GetSelfAndVisualAncestors().OfType<IRootVisualComponent>().FirstOrDefault();
+            var e = new VisualTreeAttachmentEventArgs(root);
+            DetachedFromVisualTree(e);
+         }
+
+         if (visualComponentParent is IRootVisualComponent || visualComponentParent?.IsAttachedToVisualTree == true)
+         {
+            var root =  this.GetVisualAncestors().OfType<IRootVisualComponent>().FirstOrDefault();
+            var e = new VisualTreeAttachmentEventArgs(root);
+            AttachedToVisualTree(e);
+         }
+
+         OnVisualParentChanged(old, parent);
+      }
+
+      private void AttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+      {
+         IsAttachedToVisualTree = true;
+
+         OnAttachedToVisualTree(e);
+
+         // TODO: check if we need to call AttachedToVisualTree in chain
+         if (VisualChildren.Count > 0)
+         {
+            foreach (UIComponent visual in VisualChildren)
+            {
+               visual.AttachedToVisualTree(e);
+            }
+         }
+      }
+
+      private void DetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+      {
+         IsAttachedToVisualTree = false;
+
+         OnDetachedFromVisualTree(e);
+
+         // TODO: check if we need to call DetachedFromVisualTree in chain
+         if (VisualChildren.Count > 0)
+         {
+            foreach (UIComponent visual in VisualChildren)
+            {
+                visual.DetachedFromVisualTree(e);
+            }
+         }
+      }
+
+      protected virtual void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+      {
+         
+      }
+
+      protected virtual void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+      {
+         
+      }
+
+      protected void OnVisualParentChanged(IUIComponent oldParent, IUIComponent newParent)
+      {
+         VisualParentChanged?.Invoke(this, new VisualParentChangedEventArgs(oldParent, newParent));
+      }
+
+      public EventHandler<VisualParentChangedEventArgs> VisualParentChanged; 
+
+      public virtual void OnRender(DrawingContext context)
+      {
+      }
     }
 }

@@ -8,7 +8,7 @@ using Adamantium.UI.Controls;
 
 namespace Adamantium.UI
 {
-    public class FrameworkComponent : UiComponent, IName, IFrameworkComponent
+    public class FrameworkComponent : UIComponent, IName, IFrameworkComponent
     {
         private FrameworkComponent _parent;
         private TrackingCollection<FrameworkComponent> logicalChildren;

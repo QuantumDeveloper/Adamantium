@@ -1,4 +1,5 @@
-﻿using Adamantium.EntityFramework.ComponentsBasics;
+﻿using System;
+using Adamantium.EntityFramework.ComponentsBasics;
 
 namespace Adamantium.UI
 {
@@ -11,7 +12,6 @@ namespace Adamantium.UI
       /// The parent object that inherited values are inherited from.
       /// </summary>
       IAdamantiumComponent InheritanceParent { get; }
-
 
       /// <summary>
       /// Clear <see cref="AdamantiumProperty"/>`s local value
@@ -54,7 +54,17 @@ namespace Adamantium.UI
       /// <param name="property">The property.</param>
       /// <param name="value">The value.</param>
       void SetValue(AdamantiumProperty property, object value);
-
       
+      /// <summary>
+      /// Sets a <see cref="AdamantiumProperty"/> value.
+      /// </summary>
+      /// <param name="property">The property.</param>
+      /// <param name="value">New value.</param>
+      void SetCurrentValue(AdamantiumProperty property, object value);
+
+      /// <summary>
+      /// Fires when value on <see cref="AdamantiumProperty"/> was changed
+      /// </summary>
+      event EventHandler<AdamantiumPropertyChangedEventArgs> PropertyChanged;
    }
 }

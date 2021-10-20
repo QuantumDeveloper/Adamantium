@@ -4,14 +4,14 @@ namespace Adamantium.UI.Media
 {
     public class VisualParentChangedEventArgs : EventArgs
     {
-        public VisualParentChangedEventArgs(VisualComponent oldParent, VisualComponent newParent)
+        public VisualParentChangedEventArgs(IUIComponent oldParent, IUIComponent newParent)
         {
             OldParent = oldParent;
             NewParent = newParent;
         }
 
-        public VisualComponent OldParent { get; }
+        public IUIComponent OldParent { get; }
 
-        public VisualComponent NewParent { get; }
+        public IUIComponent NewParent { get; }
     }
 }

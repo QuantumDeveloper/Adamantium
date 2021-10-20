@@ -5,26 +5,26 @@ using Adamantium.UI.Media;
 
 namespace Adamantium.UI
 {
-   public static class VisualExtensions
+   public static class UIExtensions
    {
       /// <summary>
-      /// Enumerates the ancestors of an <see cref="IVisualComponent"/> in the visual tree.
+      /// Enumerates the ancestors of an <see cref="IUIComponent"/> in the visual tree.
       /// </summary>
-      /// <param name="visualComponentual.</param>
+      /// <param name="visualComponent</param>
       /// <returns>The visual's ancestors.</returns>
-      public static IEnumerable<IVisualComponent> GetVisualAncestors(this IVisualComponent visualComponent)
+      public static IEnumerable<IUIComponent> GetVisualAncestors(this IUIComponent visualComponent)
       {
-         visualComponent = visualComponent.VisualComponentParent;
+         visualComponent = visualComponent.VisualParent;
 
          while (visualComponent != null)
          {
             yield return visualComponent;
-            visualComponent = visualComponent.VisualComponentParent;
+            visualComponent = visualComponent.VisualParent;
          }
       }
 
 
-      public static IEnumerable<IVisualComponent> GetSelfAndVisualAncestors(this IVisualComponent visualComponent)
+      public static IEnumerable<IUIComponent> GetSelfAndVisualAncestors(this IUIComponent visualComponent)
       {
          yield return visualComponent;
 
@@ -34,29 +34,24 @@ namespace Adamantium.UI
          }
       }
 
-      public static T GetVisualParent<T>(this IVisualComponent visualComponent) where T : class
+      public static T GetVisualParent<T>(this IUIComponent visualComponent) where T : class
       {
-         return visualComponent.VisualComponentParent as T;
+         return visualComponent.VisualParent as T;
       }
 
-      public static IReadOnlyList<IVisualComponent> GetVisualDescends(this IVisualComponent visualComponent)
-      {
-         return visualComponent.VisualChildren;
-      }
-
-      public static Point PointToClient(this IVisualComponent visualComponent, Point point)
+      public static Point PointToClient(this IUIComponent visualComponent, Point point)
       {
          var pair = GetRootAndAbsolutePosition(visualComponent);
          return pair.Key.PointToClient(point + pair.Value);
       }
 
-      public static Point PointToScreen(this IVisualComponent visualComponent, Point point)
+      public static Point PointToScreen(this IUIComponent visualComponent, Point point)
       {
          var pair = GetRootAndAbsolutePosition(visualComponent);
          return pair.Key.PointToScreen(point +pair.Value);
       }
 
-      private static KeyValuePair<IRootVisualComponent, Point> GetRootAndAbsolutePosition(this IVisualComponent visualComponent)
+      private static KeyValuePair<IRootVisualComponent, Point> GetRootAndAbsolutePosition(this IUIComponent visualComponent)
       {
          Point p = new Point();
 
@@ -64,7 +59,7 @@ namespace Adamantium.UI
          {
             p += visualComponent.ClipRectangle.Location;
 
-            visualComponent = visualComponent.VisualComponentParent;
+            visualComponent = visualComponent.VisualParent;
 
             if (visualComponent == null)
             {

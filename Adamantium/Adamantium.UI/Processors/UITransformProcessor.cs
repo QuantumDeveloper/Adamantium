@@ -25,7 +25,7 @@ namespace Adamantium.UI.Processors
             }
         }
 
-        private void ProcessControl(IVisualComponent element)
+        private void ProcessControl(IUIComponent element)
         {
             var control = (FrameworkComponent)element;
             if (!control.IsMeasureValid)

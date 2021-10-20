@@ -17,7 +17,7 @@ namespace Adamantium.UI
          RoutedEvent = routedEvent;
       }
 
-      public RoutedEventArgs(RoutedEvent routedEvent, UiComponent originalSource)
+      public RoutedEventArgs(RoutedEvent routedEvent, UIComponent originalSource)
       {
          RoutedEvent = routedEvent;
          OriginalSource = originalSource;

@@ -224,10 +224,10 @@ namespace Adamantium.UI.Input
             {
                var inputArgs = eventArgs as RawTextInputEventArgs;
                TextInputEventArgs textArgs = new TextInputEventArgs(inputArgs?.Text);
-               textArgs.RoutedEvent = UiComponent.PreviewTextInputEvent;
+               textArgs.RoutedEvent = UIComponent.PreviewTextInputEvent;
                FocusedElement.RaiseEvent(textArgs);
 
-               textArgs.RoutedEvent = UiComponent.TextInputEvent;
+               textArgs.RoutedEvent = UIComponent.TextInputEvent;
                FocusedElement.RaiseEvent(textArgs);
             }
          }

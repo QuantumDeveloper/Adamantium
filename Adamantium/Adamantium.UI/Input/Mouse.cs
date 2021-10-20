@@ -35,7 +35,7 @@ namespace Adamantium.UI.Input
 
       //TODO: deside leave it as bubble or make it direct event
       public static readonly RoutedEvent RawMouseMoveEvent = EventManager.RegisterRoutedEvent("RawMouseMove",
-         RoutingStrategy.Direct, typeof (RawMouseEventHandler), typeof (UiComponent));
+         RoutingStrategy.Direct, typeof (RawMouseEventHandler), typeof (UIComponent));
 
       public static readonly RoutedEvent RawMouseDownEvent = EventManager.RegisterRoutedEvent("RawMouseDown",
          RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(Mouse));

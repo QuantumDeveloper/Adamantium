@@ -20,13 +20,13 @@
             if (e.OldValue != null && e.OldValue != AdamantiumProperty.UnsetValue)
             {
                o.LogicalChildren.Remove((FrameworkComponent)e.OldValue);
-               o.VisualChildren.Remove((FrameworkComponent)e.OldValue);
+               o.VisualChildrenCollection.Remove((FrameworkComponent)e.OldValue);
             }
 
             if (e.NewValue != null)
             {
                o.LogicalChildren.Add((FrameworkComponent)e.NewValue);
-               o.VisualChildren.Add((FrameworkComponent)e.NewValue);
+               o.VisualChildrenCollection.Add((FrameworkComponent)e.NewValue);
             }
          }
       }

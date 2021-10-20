@@ -32,11 +32,11 @@ namespace Adamantium.UI.Controls
             case NotifyCollectionChangedAction.Add:
                var controls = e.NewItems.OfType<FrameworkComponent>();
                LogicalChildren.InsertRange(e.NewStartingIndex, controls);
-               VisualChildren.AddRange(e.NewItems.OfType<IVisualComponent>());
+               VisualChildrenCollection.AddRange(e.NewItems.OfType<IUIComponent>());
                break;
             case NotifyCollectionChangedAction.Remove:
                LogicalChildren.Remove(e.OldItems.OfType<FrameworkComponent>());
-               VisualChildren.Remove(e.OldItems.OfType<IVisualComponent>());
+               VisualChildrenCollection.Remove(e.OldItems.OfType<IUIComponent>());
                break;
             case NotifyCollectionChangedAction.Replace:
                for (var i = 0; i < e.OldItems.Count; ++i)
@@ -44,13 +44,13 @@ namespace Adamantium.UI.Controls
                   var index = LogicalChildren.IndexOf((FrameworkComponent)e.OldItems[i]);
                   var child = (FrameworkComponent)e.NewItems[i];
                   LogicalChildren[index] = child;
-                  VisualChildren[index] = child;
+                  VisualChildrenCollection[index] = child;
                }
                break;
 
             case NotifyCollectionChangedAction.Reset:
                LogicalChildren.Clear();
-               VisualChildren.Clear();
+               VisualChildrenCollection.Clear();
                break;
          }
 

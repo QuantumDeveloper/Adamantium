@@ -1,6 +1,8 @@
+using System.Collections.Generic;
 using Adamantium.Engine.Graphics;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Media;
 using AdamantiumVulkan.Core;
 
 namespace Adamantium.UI
@@ -79,6 +81,30 @@ namespace Adamantium.UI
         {
             GraphicsDevice.SetViewports(viewport);
             GraphicsDevice.SetScissors(scissor);
+        }
+
+        private void ProcessVisualTree()
+        {
+            var queue = new Queue<IUIComponent>();
+            queue.Enqueue(window);
+            while (queue.Count > 0)
+            {
+                var component = queue.Dequeue();
+                
+                RenderControl(component);
+
+                foreach (var visual in component.VisualChildren)
+                {
+                    queue.Enqueue(visual);
+                }
+            }
+        }
+
+        private void RenderControl(IUIComponent component)
+        {
+            if (component.Visibility != Visibility.Visible) return;
+            
+            
         }
     }
 }

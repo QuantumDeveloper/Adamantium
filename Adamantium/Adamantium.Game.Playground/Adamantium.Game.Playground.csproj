@@ -143,6 +143,10 @@
       <Content Include="Fonts\OTFFonts\GlametrixLight-0zjo.otf">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
+      <None Remove="Fonts\OTFFonts\CFF\Quicksand-Regular.otf" />
+      <Content Include="Fonts\OTFFonts\CFF\Quicksand-Regular.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
     </ItemGroup>
 
     <ItemGroup>
