@@ -125,28 +125,21 @@ namespace Adamantium.Game.Playground
                 var glyph = font.GetGlyphByCharacter('A');
                 //var glyph = font.GetGlyphByIndex(2710);
                 glyph.Sample(10);
-                uint size = 10;
+                uint msdfTextureSize = 64;
+                uint subpixelGlyphSize = 12;
 
-                //glyph.SetTestSegmentData(); 
-                //var colors = glyph.GenerateDirectMSDF(size);
+                //var colors = glyph.GenerateDirectMSDF(msdfTextureSize);
+                //uint size = msdfTextureSize;
 
-                var subpixels = glyph.SampleSubpixels(size);
-                var colors = glyph.ProcessGlyphSubpixelSampling(subpixels);
+                var colors = glyph.RasterizeGlyphBySubpixels(subpixelGlyphSize);
+                uint size = subpixelGlyphSize;
 
-                /*var newMesh = glyph.GetColoredPoints();
-                newMesh.MeshTopology = PrimitiveType.LineList;
-                var newMeshComponent = new MeshData();
-                newMeshComponent.Mesh = newMesh;
-                var newMeshRenderer = new MeshRenderer();
-                entity.AddComponent(newMeshComponent);
-                entity.AddComponent(newMeshRenderer);*/
-                
                 var img = Image.New2D(size, size, 1, SurfaceFormat.R8G8B8A8.UNorm);
                 var pixels = img.GetPixelBuffer(0, 0);
                 pixels.SetPixels(colors);
-                img.Save(@"Textures\sdf.png", ImageFileType.Png);
-
-                var glyphSize = 12;
+                img.Save(@"Textures\sdf.png", ImageFileType.Png);                
+                
+                var glyphSize = 250;
                 var quadList = new List<Vector3F>();
                 quadList.Add(new Vector3F(0, 0));
                 quadList.Add(new Vector3F(glyphSize, 0, 0));

@@ -1,12 +1,102 @@
 ﻿using System;
 using System.Collections.Generic;
+using Adamantium.Fonts.Common;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Fonts
 {
     public class SubpixelRasterizer
     {
-        public Color[] ProcessGlyphSubpixelSampling(bool[,] sampledData)
+        private List<LineSegment2D> segments;
+        private Rectangle boundingRectangle;
+        private uint size;
+
+        public Color[] RasterizeGlyphBySubpixels(uint requiredSize, Rectangle glyphBoundingRectangle, List<LineSegment2D> glyphSegments)
+        {
+            segments = glyphSegments;
+            boundingRectangle = glyphBoundingRectangle;
+            size = requiredSize;
+            
+            // 1. Sample glyph with triple size width
+            var sampledData = SampleSubpixels();
+            
+            // 2. Process sampled data
+            return ProcessGlyphSubpixelSampling(sampledData);
+        }
+        
+        private bool[,] SampleSubpixels()
+        {
+            // 1. Calculate boundaries for original glyph
+            double glyphSize = Math.Max(boundingRectangle.Width, boundingRectangle.Height);
+            var originalDimensions = new Vector2D(glyphSize);
+
+            // 2. Place glyph in center of calculated boundaries
+            var glyphCenter = boundingRectangle.Center;
+            var originalCenter = originalDimensions / 2;
+            var diff = originalCenter - glyphCenter;
+
+            for (var index = 0; index < segments.Count; index++)
+            {
+                var segment = segments[index];
+                var start = segment.Start;
+                var end = segment.End;
+
+                segment = new LineSegment2D(start + diff, end + diff);
+
+                segments[index] = segment;
+            }
+            
+            // 3. Sample glyph by subpixels
+            var width = size * 3;
+            var height = size;
+            
+            var subpixels = new bool[width, height];
+            
+            for (var y = 0; y < height; ++y)
+            {
+                for (var x = 0; x < width; ++x)
+                {
+                    // determine the closest segment to current sampling point
+                    var samplingPoint = new Vector2D(originalDimensions.X / width * (x + 0.5), originalDimensions.Y - (originalDimensions.Y / height * (y + 0.5)));
+
+                    subpixels[x, y] = IsSubpixelInsideGlyph(samplingPoint);
+                }
+            }
+
+            return subpixels;
+        }
+        
+        private bool IsSubpixelInsideGlyph(Vector2D point)
+        {
+            double closestDistance = Double.MaxValue;
+
+            // there can be up to two closest segments in case if point is close to segments' connection
+            // we will store both and then determine the signed pseudo-distance
+            // if these two signed pseudo-distances have different signs, use the one with negative, because the point is outside
+            var closestSegments = new List<LineSegment2D>();
+
+            foreach (var segment in segments)
+            {
+                var distance = GlyphSegmentsMath.GetDistanceToSegment(segment, point);
+
+                if (distance <= closestDistance)
+                {
+                    if (distance < closestDistance)
+                    {
+                        closestSegments.Clear();
+                        closestDistance = distance;
+                    }
+                    
+                    closestSegments.Add(segment);
+                }
+            }
+
+            closestDistance = GlyphSegmentsMath.GetSignedDistanceToSegmentsJoint(closestSegments, point, false);
+
+            return (closestDistance >= 0);
+        }
+
+        private Color[] ProcessGlyphSubpixelSampling(bool[,] sampledData)
         {
             var width = sampledData.GetLength(0);
             var height = sampledData.GetLength(1);
