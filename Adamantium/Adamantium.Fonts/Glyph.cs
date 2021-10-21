@@ -437,9 +437,9 @@ namespace Adamantium.Fonts
             return Msdf.GenerateDirectMSDF(size, BoundingRectangle, mergedOutlinesSegments);
         }
 
-        public Color[] RasterizeGlyphBySubpixels(uint size)
+        public Color[] RasterizeGlyphBySubpixels(uint textSize, Color foreground, Color background)
         {
-            return Subpixel.RasterizeGlyphBySubpixels(size, BoundingRectangle, mergedOutlinesSegments);
+            return Subpixel.RasterizeGlyphBySubpixels(textSize, foreground, background, BoundingRectangle, mergedOutlinesSegments);
         }
     }
 }

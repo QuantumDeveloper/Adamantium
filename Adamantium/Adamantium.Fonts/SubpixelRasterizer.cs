@@ -7,16 +7,31 @@ namespace Adamantium.Fonts
 {
     public class SubpixelRasterizer
     {
-        private List<LineSegment2D> segments;
-        private Rectangle boundingRectangle;
-        private uint size;
+        private uint textSize;
+        private Color foreground;
+        private Color background;
+        private Rectangle glyphBoundingRectangle;
+        private List<LineSegment2D> glyphSegments;
 
-        public Color[] RasterizeGlyphBySubpixels(uint requiredSize, Rectangle glyphBoundingRectangle, List<LineSegment2D> glyphSegments)
+        private struct Subpixel
         {
-            segments = glyphSegments;
-            boundingRectangle = glyphBoundingRectangle;
-            size = requiredSize;
+            public byte Energy;
+            public bool isVisible;
+        }
+        
+        public Color[] RasterizeGlyphBySubpixels(uint textSize, Color foreground, Color background, Rectangle glyphBoundingRectangle, List<LineSegment2D> glyphSegments)
+        {
+            if (glyphSegments.Count == 0)
+            {
+                return new List<Color>().ToArray();
+            }
             
+            this.textSize = textSize;
+            this.foreground = foreground;
+            this.background = background;
+            this.glyphBoundingRectangle = glyphBoundingRectangle;
+            this.glyphSegments = glyphSegments;
+
             // 1. Sample glyph with triple size width
             var sampledData = SampleSubpixels();
             
@@ -27,28 +42,28 @@ namespace Adamantium.Fonts
         private bool[,] SampleSubpixels()
         {
             // 1. Calculate boundaries for original glyph
-            double glyphSize = Math.Max(boundingRectangle.Width, boundingRectangle.Height);
+            double glyphSize = Math.Max(glyphBoundingRectangle.Width, glyphBoundingRectangle.Height);
             var originalDimensions = new Vector2D(glyphSize);
 
             // 2. Place glyph in center of calculated boundaries
-            var glyphCenter = boundingRectangle.Center;
+            var glyphCenter = glyphBoundingRectangle.Center;
             var originalCenter = originalDimensions / 2;
             var diff = originalCenter - glyphCenter;
 
-            for (var index = 0; index < segments.Count; index++)
+            for (var index = 0; index < glyphSegments.Count; index++)
             {
-                var segment = segments[index];
+                var segment = glyphSegments[index];
                 var start = segment.Start;
                 var end = segment.End;
 
                 segment = new LineSegment2D(start + diff, end + diff);
 
-                segments[index] = segment;
+                glyphSegments[index] = segment;
             }
             
             // 3. Sample glyph by subpixels
-            var width = size * 3;
-            var height = size;
+            var width = textSize * 3;
+            var height = textSize;
             
             var subpixels = new bool[width, height];
             
@@ -75,7 +90,7 @@ namespace Adamantium.Fonts
             // if these two signed pseudo-distances have different signs, use the one with negative, because the point is outside
             var closestSegments = new List<LineSegment2D>();
 
-            foreach (var segment in segments)
+            foreach (var segment in glyphSegments)
             {
                 var distance = GlyphSegmentsMath.GetDistanceToSegment(segment, point);
 
@@ -100,14 +115,18 @@ namespace Adamantium.Fonts
         {
             var width = sampledData.GetLength(0);
             var height = sampledData.GetLength(1);
-            
-            var subpixels = new byte[width, height];
 
+            var subpixels = new Subpixel[width, height];
+            
             for (var y = 0; y < height; y++)
             {
                 for (var x = 0; x < width; x++)
                 {
-                    subpixels[x, y] = (sampledData[x, y] ? (byte)0 : (byte)255);
+                    subpixels[x, y].isVisible = sampledData[x, y];
+                    
+                    if (x % 3 == 0) subpixels[x, y].Energy = subpixels[x, y].isVisible ? foreground.R : background.R;
+                    if (x % 3 == 1) subpixels[x, y].Energy = subpixels[x, y].isVisible ? foreground.G : background.G;
+                    if (x % 3 == 2) subpixels[x, y].Energy = subpixels[x, y].isVisible ? foreground.B : background.B;
                 }
             }
 
@@ -116,62 +135,89 @@ namespace Adamantium.Fonts
             return ConvertToPixels(rebalancedSubpixels);
         }
 
-        private List<byte> RebalanceEnergy(byte[,] subpixels)
+        private List<Subpixel> RebalanceEnergy(Subpixel[,] subpixels)
         {
             var width = subpixels.GetLength(0);
             var height = subpixels.GetLength(1);
 
-            var rebalancedSubpixels = new List<byte>();
+            var rebalancedSubpixels = new List<Subpixel>();
 
             for (var y = 0; y < height; y++)
             {
                 for (var x = 0; x < width; x++)
                 {
-                    byte mostLeftNeighborEnergy = 255;
-                    byte leastLeftNeighborEnergy = 255;
-                    byte currentSubpixelEnergy = subpixels[x, y];
-                    byte leastRightNeighborEnergy = 255;
-                    byte mostRightNeighborEnergy = 255;
+                    byte mostLeftNeighborEnergy;
+                    byte leastLeftNeighborEnergy;
+                    byte currentSubpixelEnergy = subpixels[x, y].Energy;
+                    byte leastRightNeighborEnergy;
+                    byte mostRightNeighborEnergy;
 
-                    if (x > 0)
+                    if (x == 0)
                     {
-                        leastLeftNeighborEnergy = subpixels[x - 1, y];
+                        mostLeftNeighborEnergy = background.G;
+                        leastLeftNeighborEnergy = background.B;
+                        leastRightNeighborEnergy = subpixels[x + 1, y].Energy;
+                        mostRightNeighborEnergy = subpixels[x + 2, y].Energy;
                     }
+                    else if (x == 1)
+                    {
+                        mostLeftNeighborEnergy = background.B;
+                        leastLeftNeighborEnergy = subpixels[x - 1, y].Energy;
+                        leastRightNeighborEnergy = subpixels[x + 1, y].Energy;
+                        mostRightNeighborEnergy = subpixels[x + 2, y].Energy;
+                    }
+                    else if (x == (width - 2))
+                    {
+                        mostLeftNeighborEnergy = subpixels[x - 2, y].Energy;
+                        leastLeftNeighborEnergy = subpixels[x - 1, y].Energy;
+                        leastRightNeighborEnergy = subpixels[x + 1, y].Energy;
+                        mostRightNeighborEnergy = background.R;
+                    }
+                    else if (x == (width - 1))
+                    {
+                        mostLeftNeighborEnergy = subpixels[x - 2, y].Energy;
+                        leastLeftNeighborEnergy = subpixels[x - 1, y].Energy;
+                        leastRightNeighborEnergy = background.R;
+                        mostRightNeighborEnergy = background.G;
+                    }
+                    else
+                    {
+                        mostLeftNeighborEnergy = subpixels[x - 2, y].Energy;
+                        leastLeftNeighborEnergy = subpixels[x - 1, y].Energy;
+                        leastRightNeighborEnergy = subpixels[x + 1, y].Energy;
+                        mostRightNeighborEnergy = subpixels[x + 2, y].Energy;
+                    }
+
+                    var rebalancedSubpixelEnergy = (mostLeftNeighborEnergy / 9.0) +
+                                                   ((leastLeftNeighborEnergy * 2.0) / 9.0) +
+                                                   ((currentSubpixelEnergy * 3.0) / 9.0) +
+                                                   ((leastRightNeighborEnergy * 2.0) / 9.0) +
+                                                   (mostRightNeighborEnergy / 9.0);
+
+                    subpixels[x, y].Energy = (byte)rebalancedSubpixelEnergy;
                     
-                    if (x > 1)
-                    {
-                        mostLeftNeighborEnergy = subpixels[x - 2, y];
-                    }
-
-                    if (x < (width - 2))
-                    {
-                        mostRightNeighborEnergy = subpixels[x + 2, y];
-                    }
-                    
-                    if (x < (width - 1))
-                    {
-                        leastRightNeighborEnergy = subpixels[x + 1, y];
-                    }
-
-                    var rebalancedSubpixelEnergy = (mostLeftNeighborEnergy / 9.0) + ((leastLeftNeighborEnergy * 2.0) / 9.0) + ((currentSubpixelEnergy * 3.0) / 9.0) + ((leastRightNeighborEnergy * 2.0) / 9.0) + (mostRightNeighborEnergy / 9.0);
-
-                    rebalancedSubpixels.Add((byte)rebalancedSubpixelEnergy);
+                    rebalancedSubpixels.Add(subpixels[x, y]);
                 }
             }
-            
+
             return rebalancedSubpixels;
         }
 
-        private Color[] ConvertToPixels(List<byte> subpixels)
+        private Color[] ConvertToPixels(List<Subpixel> subpixels)
         {
             var pixels = new List<Color>();
             
             for (var i = 2; i < subpixels.Count; i+=3)
             {
-                byte red = subpixels[i - 2];
-                byte green = subpixels[i - 1];
-                byte blue = subpixels[i];
-                byte alpha = (byte)(red == 255 && green == 255 && blue == 255 ? 0 : 255);
+                bool isRedVisible = subpixels[i - 2].isVisible;
+                bool isGreenVisible = subpixels[i - 1].isVisible;
+                bool isBlueVisible = subpixels[i].isVisible;
+                
+                byte red = subpixels[i - 2].Energy;
+                byte green = subpixels[i - 1].Energy;
+                byte blue = subpixels[i].Energy;
+
+                byte alpha = (byte)(isRedVisible || isGreenVisible || isBlueVisible ? 255 : 0);
 
                 pixels.Add(Color.FromRgba(red, green, blue, alpha));
             }

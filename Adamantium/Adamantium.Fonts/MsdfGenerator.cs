@@ -242,6 +242,13 @@ namespace Adamantium.Fonts
         /// <returns>MSDF color data in for of single-dimension array</returns>
         public Color[] GenerateDirectMSDF(uint size, Rectangle glyphBoundingRectangle, List<LineSegment2D> glyphSegments)
         {
+            var msdf = new List<Color>();
+
+            if (glyphSegments.Count == 0)
+            {
+                return msdf.ToArray();
+            }
+            
             segments = new List<MsdfGlyphSegment>();
 
             foreach (var segment in glyphSegments)
@@ -296,8 +303,6 @@ namespace Adamantium.Fonts
             FixArtefacts(coloredDistances, size);
             
             // 6. Normalize MSDF and SDF to [0 .. 255] range
-            var msdf = new List<Color>();
-            
             for (var y = 0; y < size; y++)
             {
                 for (var x = 0; x < size; x++)

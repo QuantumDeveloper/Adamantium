@@ -245,28 +245,37 @@ namespace Adamantium.Engine.Processors
         Sampler CreateTextureSampler()
         {
             SamplerCreateInfo samplerInfo = new SamplerCreateInfo();
-            samplerInfo.MagFilter = Filter.Linear;
-            samplerInfo.MinFilter = Filter.Linear;
+            /*samplerInfo.MagFilter = Filter.Linear;
+            samplerInfo.MinFilter = Filter.Linear;*/
+            
+            samplerInfo.MagFilter = Filter.Nearest;
+            samplerInfo.MinFilter = Filter.Nearest;
+            
             samplerInfo.AddressModeU = SamplerAddressMode.Repeat;
             samplerInfo.AddressModeV = SamplerAddressMode.Repeat;
             samplerInfo.AddressModeW = SamplerAddressMode.Repeat;
             samplerInfo.AnisotropyEnable = true;
+            //samplerInfo.AnisotropyEnable = false;
             samplerInfo.MaxAnisotropy = 16;
             samplerInfo.BorderColor = BorderColor.IntOpaqueWhite;
             samplerInfo.UnnormalizedCoordinates = false;
             samplerInfo.CompareEnable = false;
             samplerInfo.CompareOp = CompareOp.Always;
-            samplerInfo.MipmapMode = SamplerMipmapMode.Linear;
+            //samplerInfo.MipmapMode = SamplerMipmapMode.Linear;
+            
+            samplerInfo.MipmapMode = SamplerMipmapMode.Nearest;
 
             return GraphicsDevice.CreateSampler(samplerInfo);
         }
 
         private void CreateResources()
         {
+            GraphicsDevice.ClearColor = Colors.CornflowerBlue;
+            
             textureSampler = CreateTextureSampler();
             //defaultTexture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "texture.png"));
             defaultTexture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "sdf.png"));
-            defaultTexture.Save(Path.Combine("Textures", "subpixel.png"), ImageFileType.Png);
+            //defaultTexture.Save(Path.Combine("Textures", "subpixel.png"), ImageFileType.Png);
             //DeferredDevice.SetTargets(null);
 
             //var vbFlags = BufferFlags.VertexBuffer | BufferFlags.StreamOutput;

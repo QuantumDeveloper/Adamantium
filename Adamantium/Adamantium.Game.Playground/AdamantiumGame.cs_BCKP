@@ -112,7 +112,7 @@ namespace Adamantium.Game.Playground
                 throw;
             }
         }
-        
+
         private Mutex FontMutex;
         private Mutex ResultCopyMutex;
         private IFont shareableFont;
@@ -140,7 +140,7 @@ namespace Adamantium.Game.Playground
 
                 glyph.Sample(10);
                 //res.AddRange(glyph.GenerateDirectMSDF(textureSize));
-                //res.AddRange(glyph.RasterizeGlyphBySubpixels(textureSize));
+                res.AddRange(glyph.RasterizeGlyphBySubpixels(textureSize));
             }
 
             ResultCopyMutex.WaitOne();
@@ -168,19 +168,13 @@ namespace Adamantium.Game.Playground
                 //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/Japan/NotoSansCJKjp-Light.otf", 3);
                 var entity = new Entity(null, "Poppins-Medium");
                 var font = typeface.GetFont(0);
-                var glyph = font.GetGlyphByCharacter('A');
-                //var glyph = font.GetGlyphByIndex(2710);
+                //var glyph = font.GetGlyphByCharacter('A');
+                var glyph = font.GetGlyphByIndex(0);
                 glyph.Sample(10);
                 uint msdfTextureSize = 64;
                 uint subpixelGlyphSize = 12;
 
-                //var colors = glyph.GenerateDirectMSDF(msdfTextureSize);
-                //uint size = msdfTextureSize;
-
-                var colors = glyph.RasterizeGlyphBySubpixels(subpixelGlyphSize, Colors.Black, Colors.CornflowerBlue);
-                uint size = subpixelGlyphSize;
-
-                /*FontMutex = new Mutex();
+                FontMutex = new Mutex();
                 ResultCopyMutex = new Mutex();
                 shareableFont = font;
                 textureSize = subpixelGlyphSize;
@@ -196,6 +190,12 @@ namespace Adamantium.Game.Playground
                 Parallel.For(0, threadCount, GenerateAtlasTextures);
                 Console.Write("]\n");
                 
+                //var colors = glyph.GenerateDirectMSDF(msdfTextureSize);
+                //uint size = msdfTextureSize;
+
+                //var colors = glyph.RasterizeGlyphBySubpixels(subpixelGlyphSize);
+                //uint size = subpixelGlyphSize;
+
                 uint atlasWidth = 0;
                 uint atlasHeight = 0;
                 
@@ -204,20 +204,14 @@ namespace Adamantium.Game.Playground
                 var img = Image.New2D(atlasWidth, atlasHeight, 1, SurfaceFormat.R8G8B8A8.UNorm);
                 var pixels = img.GetPixelBuffer(0, 0);
                 pixels.SetPixels(msdfAtlas.ToArray());
-                img.Save(@"Textures\sdf.png", ImageFileType.Png);*/
+                img.Save(@"Textures\sdf.png", ImageFileType.Png);                
                 
-                var img = Image.New2D(size, size, 1, SurfaceFormat.R8G8B8A8.UNorm);
-                var pixels = img.GetPixelBuffer(0, 0);
-                pixels.SetPixels(colors);
-                img.Save(@"Textures\sdf.png", ImageFileType.Png);
-
-                var glyphShift = 10;
-                var glyphSize = subpixelGlyphSize;
+                var glyphSize = 250;
                 var quadList = new List<Vector3F>();
-                quadList.Add(new Vector3F(glyphShift, glyphShift));
-                quadList.Add(new Vector3F(glyphSize + glyphShift, glyphShift, 0));
-                quadList.Add(new Vector3F(glyphSize + glyphShift, glyphSize + glyphShift, 0));
-                quadList.Add(new Vector3F(glyphShift, glyphSize + glyphShift, 0));
+                quadList.Add(new Vector3F(10));
+                quadList.Add(new Vector3F(glyphSize + 10, 10, 0));
+                quadList.Add(new Vector3F(glyphSize + 10, glyphSize + 10, 0));
+                quadList.Add(new Vector3F(10, glyphSize + 10, 0));
 
                 var uv = new List<Vector2F>();
                 
