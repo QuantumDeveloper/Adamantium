@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Adamantium.Fonts.Common;
+using Adamantium.Fonts.Tables.GPOS;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Fonts
@@ -16,7 +17,7 @@ namespace Adamantium.Fonts
         private struct Subpixel
         {
             public byte Energy;
-            public bool isVisible;
+            public bool isInsideGlyph;
         }
         
         public Color[] RasterizeGlyphBySubpixels(uint textSize, Color foreground, Color background, Rectangle glyphBoundingRectangle, List<LineSegment2D> glyphSegments)
@@ -122,11 +123,11 @@ namespace Adamantium.Fonts
             {
                 for (var x = 0; x < width; x++)
                 {
-                    subpixels[x, y].isVisible = sampledData[x, y];
+                    subpixels[x, y].isInsideGlyph = sampledData[x, y];
                     
-                    if (x % 3 == 0) subpixels[x, y].Energy = subpixels[x, y].isVisible ? foreground.R : background.R;
-                    if (x % 3 == 1) subpixels[x, y].Energy = subpixels[x, y].isVisible ? foreground.G : background.G;
-                    if (x % 3 == 2) subpixels[x, y].Energy = subpixels[x, y].isVisible ? foreground.B : background.B;
+                    if (x % 3 == 0) subpixels[x, y].Energy = subpixels[x, y].isInsideGlyph ? foreground.R : background.R;
+                    if (x % 3 == 1) subpixels[x, y].Energy = subpixels[x, y].isInsideGlyph ? foreground.G : background.G;
+                    if (x % 3 == 2) subpixels[x, y].Energy = subpixels[x, y].isInsideGlyph ? foreground.B : background.B;
                 }
             }
 
@@ -146,56 +147,71 @@ namespace Adamantium.Fonts
             {
                 for (var x = 0; x < width; x++)
                 {
-                    byte mostLeftNeighborEnergy;
-                    byte leastLeftNeighborEnergy;
-                    byte currentSubpixelEnergy = subpixels[x, y].Energy;
-                    byte leastRightNeighborEnergy;
-                    byte mostRightNeighborEnergy;
+                    Subpixel mostLeftNeighbor = new Subpixel();
+                    Subpixel leastLeftNeighbor = new Subpixel();
+                    Subpixel currentSubpixel = subpixels[x, y];
+                    Subpixel leastRightNeighbor = new Subpixel();
+                    Subpixel mostRightNeighbor = new Subpixel();
 
                     if (x == 0)
                     {
-                        mostLeftNeighborEnergy = background.G;
-                        leastLeftNeighborEnergy = background.B;
-                        leastRightNeighborEnergy = subpixels[x + 1, y].Energy;
-                        mostRightNeighborEnergy = subpixels[x + 2, y].Energy;
+                        mostLeftNeighbor = new Subpixel() {isInsideGlyph = false, Energy = background.G};
+                        leastLeftNeighbor = new Subpixel() {isInsideGlyph = false, Energy = background.B};
+                        leastLeftNeighbor = subpixels[x + 1, y];
+                        mostRightNeighbor = subpixels[x + 2, y];
                     }
                     else if (x == 1)
                     {
-                        mostLeftNeighborEnergy = background.B;
-                        leastLeftNeighborEnergy = subpixels[x - 1, y].Energy;
-                        leastRightNeighborEnergy = subpixels[x + 1, y].Energy;
-                        mostRightNeighborEnergy = subpixels[x + 2, y].Energy;
+                        mostLeftNeighbor = new Subpixel() {isInsideGlyph = false, Energy = background.B};
+                        leastLeftNeighbor = subpixels[x - 1, y];
+                        leastRightNeighbor = subpixels[x + 1, y];
+                        mostRightNeighbor = subpixels[x + 2, y];
                     }
                     else if (x == (width - 2))
                     {
-                        mostLeftNeighborEnergy = subpixels[x - 2, y].Energy;
-                        leastLeftNeighborEnergy = subpixels[x - 1, y].Energy;
-                        leastRightNeighborEnergy = subpixels[x + 1, y].Energy;
-                        mostRightNeighborEnergy = background.R;
+                        mostLeftNeighbor = subpixels[x - 2, y];
+                        leastLeftNeighbor = subpixels[x - 1, y];
+                        leastRightNeighbor = subpixels[x + 1, y];
+                        mostRightNeighbor = new Subpixel() {isInsideGlyph = false, Energy = background.R};
                     }
                     else if (x == (width - 1))
                     {
-                        mostLeftNeighborEnergy = subpixels[x - 2, y].Energy;
-                        leastLeftNeighborEnergy = subpixels[x - 1, y].Energy;
-                        leastRightNeighborEnergy = background.R;
-                        mostRightNeighborEnergy = background.G;
+                        mostLeftNeighbor = subpixels[x - 2, y];
+                        leastLeftNeighbor = subpixels[x - 1, y];
+                        leastRightNeighbor = new Subpixel() {isInsideGlyph = false, Energy = background.R};
+                        mostRightNeighbor = new Subpixel() {isInsideGlyph = false, Energy = background.G};
                     }
                     else
                     {
-                        mostLeftNeighborEnergy = subpixels[x - 2, y].Energy;
-                        leastLeftNeighborEnergy = subpixels[x - 1, y].Energy;
-                        leastRightNeighborEnergy = subpixels[x + 1, y].Energy;
-                        mostRightNeighborEnergy = subpixels[x + 2, y].Energy;
+                        mostLeftNeighbor = subpixels[x - 2, y];
+                        leastLeftNeighbor = subpixels[x - 1, y];
+                        leastRightNeighbor = subpixels[x + 1, y];
+                        mostRightNeighbor = subpixels[x + 2, y];
                     }
 
-                    var rebalancedSubpixelEnergy = (mostLeftNeighborEnergy / 9.0) +
-                                                   ((leastLeftNeighborEnergy * 2.0) / 9.0) +
-                                                   ((currentSubpixelEnergy * 3.0) / 9.0) +
-                                                   ((leastRightNeighborEnergy * 2.0) / 9.0) +
-                                                   (mostRightNeighborEnergy / 9.0);
+                    var rebalancedSubpixelEnergy = (mostLeftNeighbor.Energy / 9.0) +
+                                                   ((leastLeftNeighbor.Energy * 2.0) / 9.0) +
+                                                   ((currentSubpixel.Energy * 3.0) / 9.0) +
+                                                   ((leastRightNeighbor.Energy * 2.0) / 9.0) +
+                                                   (mostRightNeighbor.Energy / 9.0);
 
-                    subpixels[x, y].Energy = (byte)rebalancedSubpixelEnergy;
+                    bool isWholePixelInside = false;
+
+                    if (x % 3 == 0) isWholePixelInside = currentSubpixel.isInsideGlyph && leastRightNeighbor.isInsideGlyph && mostRightNeighbor.isInsideGlyph;
+                    if (x % 3 == 1) isWholePixelInside = leastLeftNeighbor.isInsideGlyph && currentSubpixel.isInsideGlyph && leastRightNeighbor.isInsideGlyph;
+                    if (x % 3 == 2) isWholePixelInside = mostLeftNeighbor.isInsideGlyph && leastLeftNeighbor.isInsideGlyph && currentSubpixel.isInsideGlyph;
                     
+                    bool isPixelPartiallyInside = false;
+
+                    if (x % 3 == 0) isPixelPartiallyInside = currentSubpixel.isInsideGlyph || leastRightNeighbor.isInsideGlyph || mostRightNeighbor.isInsideGlyph;
+                    if (x % 3 == 1) isPixelPartiallyInside = leastLeftNeighbor.isInsideGlyph || currentSubpixel.isInsideGlyph || leastRightNeighbor.isInsideGlyph;
+                    if (x % 3 == 2) isPixelPartiallyInside = mostLeftNeighbor.isInsideGlyph || leastLeftNeighbor.isInsideGlyph || currentSubpixel.isInsideGlyph;
+                    
+                    if (!isWholePixelInside && isPixelPartiallyInside)
+                    {
+                        subpixels[x, y].Energy = (byte) rebalancedSubpixelEnergy;
+                    }
+
                     rebalancedSubpixels.Add(subpixels[x, y]);
                 }
             }
@@ -209,17 +225,17 @@ namespace Adamantium.Fonts
             
             for (var i = 2; i < subpixels.Count; i+=3)
             {
-                bool isRedVisible = subpixels[i - 2].isVisible;
-                bool isGreenVisible = subpixels[i - 1].isVisible;
-                bool isBlueVisible = subpixels[i].isVisible;
+                bool isRedInside = subpixels[i - 2].isInsideGlyph;
+                bool isGreenInside = subpixels[i - 1].isInsideGlyph;
+                bool isBlueInside = subpixels[i].isInsideGlyph;
                 
                 byte red = subpixels[i - 2].Energy;
                 byte green = subpixels[i - 1].Energy;
                 byte blue = subpixels[i].Energy;
 
-                byte alpha = (byte)(isRedVisible || isGreenVisible || isBlueVisible ? 255 : 0);
+                //byte alpha = (byte)(isRedVisible || isGreenVisible || isBlueVisible ? 255 : 0);
 
-                pixels.Add(Color.FromRgba(red, green, blue, alpha));
+                pixels.Add(Color.FromRgba(red, green, blue, 255));
             }
 
             return pixels.ToArray();

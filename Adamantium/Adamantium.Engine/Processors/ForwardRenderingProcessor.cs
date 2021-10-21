@@ -270,7 +270,7 @@ namespace Adamantium.Engine.Processors
 
         private void CreateResources()
         {
-            GraphicsDevice.ClearColor = Colors.CornflowerBlue;
+            GraphicsDevice.ClearColor = Color.FromRgba(0, 255, 255, 255);
             
             textureSampler = CreateTextureSampler();
             //defaultTexture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "texture.png"));
