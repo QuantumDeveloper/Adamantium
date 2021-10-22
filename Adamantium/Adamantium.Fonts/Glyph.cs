@@ -441,5 +441,11 @@ namespace Adamantium.Fonts
         {
             return Subpixel.RasterizeGlyphBySubpixels(textSize, foreground, background, BoundingRectangle, mergedOutlinesSegments);
         }
+        
+        // for visualizing
+        public byte[,] GetVisSubpixels()
+        {
+            return Subpixel.GetVisSubpixels();
+        }
     }
 }

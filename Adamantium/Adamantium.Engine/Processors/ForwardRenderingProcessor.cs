@@ -270,7 +270,7 @@ namespace Adamantium.Engine.Processors
 
         private void CreateResources()
         {
-            GraphicsDevice.ClearColor = Color.FromRgba(0, 255, 255, 255);
+            GraphicsDevice.ClearColor = Color.FromRgba(255, 255, 255, 255);
             
             textureSampler = CreateTextureSampler();
             //defaultTexture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "texture.png"));
@@ -508,11 +508,20 @@ namespace Adamantium.Engine.Processors
 
                                         if (component is MeshRenderer)
                                         {
+                                            if (component.Name == "Glyph")
+                                            {
+                                                GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Textured"].Apply();
+                                            }
+                                            else
+                                            {
+                                                GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["VertexColored"].Apply();
+                                            }
+                                            
                                             
                                             //GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Colored"].Apply();
                                             //GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["VertexColored"].Apply();
                                             //GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["MSDF"].Apply();
-                                            GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Textured"].Apply();
+                                            //GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Textured"].Apply();
 
                                             //BasicEffect.Techniques["MeshVertex"].Passes["DirectionalLight"].Apply();
                                             component.Draw(GraphicsDevice, gameTime);

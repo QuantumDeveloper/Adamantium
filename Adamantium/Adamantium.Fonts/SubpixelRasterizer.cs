@@ -13,7 +13,15 @@ namespace Adamantium.Fonts
         private Color background;
         private Rectangle glyphBoundingRectangle;
         private List<LineSegment2D> glyphSegments;
-
+        
+        // for visualizing
+        private byte[,] visSubpixels;
+        public byte[,] GetVisSubpixels()
+        {
+            return visSubpixels;
+        }
+        // ----------------
+        
         private struct Subpixel
         {
             public byte Energy;
@@ -141,6 +149,10 @@ namespace Adamantium.Fonts
             var width = subpixels.GetLength(0);
             var height = subpixels.GetLength(1);
 
+            // for visualizing
+            visSubpixels = new byte[width, height];
+            // -------------
+            
             var rebalancedSubpixels = new List<Subpixel>();
 
             for (var y = 0; y < height; y++)
@@ -157,7 +169,7 @@ namespace Adamantium.Fonts
                     {
                         mostLeftNeighbor = new Subpixel() {isInsideGlyph = false, Energy = background.G};
                         leastLeftNeighbor = new Subpixel() {isInsideGlyph = false, Energy = background.B};
-                        leastLeftNeighbor = subpixels[x + 1, y];
+                        leastRightNeighbor = subpixels[x + 1, y];
                         mostRightNeighbor = subpixels[x + 2, y];
                     }
                     else if (x == 1)
@@ -206,13 +218,17 @@ namespace Adamantium.Fonts
                     if (x % 3 == 0) isPixelPartiallyInside = currentSubpixel.isInsideGlyph || leastRightNeighbor.isInsideGlyph || mostRightNeighbor.isInsideGlyph;
                     if (x % 3 == 1) isPixelPartiallyInside = leastLeftNeighbor.isInsideGlyph || currentSubpixel.isInsideGlyph || leastRightNeighbor.isInsideGlyph;
                     if (x % 3 == 2) isPixelPartiallyInside = mostLeftNeighbor.isInsideGlyph || leastLeftNeighbor.isInsideGlyph || currentSubpixel.isInsideGlyph;
-                    
+
                     if (!isWholePixelInside && isPixelPartiallyInside)
                     {
-                        subpixels[x, y].Energy = (byte) rebalancedSubpixelEnergy;
+                        currentSubpixel.Energy = (byte) rebalancedSubpixelEnergy;
                     }
 
-                    rebalancedSubpixels.Add(subpixels[x, y]);
+                    // for visualizing
+                    visSubpixels[x, y] = currentSubpixel.Energy;
+                    // ----------------
+                    
+                    rebalancedSubpixels.Add(currentSubpixel);
                 }
             }
 

@@ -113,6 +113,129 @@ namespace Adamantium.Game.Playground
             }
         }
         
+        // --- SUBPIXEL VISUALIZING START ---
+
+        private Entity VisualizeSubpixelRendering(byte[,] subpixels)
+        {
+            var entity = new Entity(null, "SubpixelVisualizer");
+            
+            var width = subpixels.GetLength(0);
+            var height = subpixels.GetLength(1);
+            
+            var subpixelHeight = 30;
+            var subpixelWidth = 10;
+
+            var pixelHeight = 10;
+            
+            var startPosX = 100;
+            var startPosY = 100;
+
+            var spaceX = 3;
+            var spaceY = 3;
+
+            var subpixelsQuadList = new List<Vector3F>();
+            var pixelsQuadList = new List<Vector3F>();
+            var subpixelsColors = new List<Color>();
+            var pixelsColors = new List<Color>();
+
+            for (var y = 0; y < height; y++)
+            {
+                var p0 = new Vector3F();
+                var p1 = new Vector3F();
+                var p2 = new Vector3F();
+                var p3 = new Vector3F();
+                
+                byte red = 0;
+                byte green = 0;
+                byte blue = 0;
+                
+                for (var x = 0; x < width; x++)
+                {
+                    subpixelsQuadList.Add(new Vector3F(startPosX + subpixelWidth * x + spaceX * x, startPosY + subpixelHeight * y + spaceY * y));
+                    subpixelsQuadList.Add(new Vector3F(startPosX + subpixelWidth * x + subpixelWidth + spaceX * x, startPosY + subpixelHeight * y + spaceY * y));
+                    subpixelsQuadList.Add(new Vector3F(startPosX + subpixelWidth * x + subpixelWidth + spaceX * x, startPosY + subpixelHeight * y + subpixelHeight + spaceY * y));
+                    
+                    subpixelsQuadList.Add(new Vector3F(startPosX + subpixelWidth * x + spaceX * x, startPosY + subpixelHeight * y + spaceY * y));
+                    subpixelsQuadList.Add(new Vector3F(startPosX + subpixelWidth * x + subpixelWidth + spaceX * x, startPosY + subpixelHeight * y + subpixelHeight + spaceY * y));
+                    subpixelsQuadList.Add(new Vector3F(startPosX + subpixelWidth * x + spaceX * x, startPosY + subpixelHeight * y + subpixelHeight + spaceY * y));
+
+                    var subpixelColor = new Color();
+
+                    if (x % 3 == 0)
+                    {
+                        subpixelColor = Color.FromRgba(subpixels[x, y], 0, 0, 255);
+                        red = subpixels[x, y];
+
+                        p0 = new Vector3F(startPosX + subpixelWidth * x + subpixelWidth / 2.0f + spaceX * x, startPosY + subpixelHeight * y + subpixelHeight * 2 / 3.0f + spaceY * y);
+                        p3 = new Vector3F(startPosX + subpixelWidth * x + subpixelWidth / 2.0f + spaceX * x, startPosY + subpixelHeight * y + subpixelHeight * 2 / 3.0f + pixelHeight + spaceY * y);
+                    }
+
+                    if (x % 3 == 1)
+                    {
+                        subpixelColor = Color.FromRgba(0, subpixels[x, y], 0, 255);
+                        green = subpixels[x, y];
+                    }
+
+                    if (x % 3 == 2)
+                    {
+                        subpixelColor = Color.FromRgba(0, 0, subpixels[x, y], 255);
+                        blue = subpixels[x, y];
+
+                        p1 = new Vector3F(startPosX + subpixelWidth * x + subpixelWidth / 2.0f + spaceX * x, startPosY + subpixelHeight * y + subpixelHeight * 2 / 3.0f + spaceY * y);
+                        p2 = new Vector3F(startPosX + subpixelWidth * x + subpixelWidth / 2.0f + spaceX * x, startPosY + subpixelHeight * y + subpixelHeight * 2 / 3.0f + pixelHeight + spaceY * y);
+                        
+                        pixelsQuadList.Add(p0);
+                        pixelsQuadList.Add(p1);
+                        pixelsQuadList.Add(p2);
+                    
+                        pixelsQuadList.Add(p0);
+                        pixelsQuadList.Add(p2);
+                        pixelsQuadList.Add(p3);
+
+                        var pixelColor = new Color();
+                        pixelColor = Color.FromRgba(red, green, blue, 255);
+                        
+                        pixelsColors.Add(pixelColor);
+                        pixelsColors.Add(pixelColor);
+                        pixelsColors.Add(pixelColor);
+                        pixelsColors.Add(pixelColor);
+                        pixelsColors.Add(pixelColor);
+                        pixelsColors.Add(pixelColor);
+                    }
+
+                    subpixelsColors.Add(subpixelColor);
+                    subpixelsColors.Add(subpixelColor);
+                    subpixelsColors.Add(subpixelColor);
+                    subpixelsColors.Add(subpixelColor);
+                    subpixelsColors.Add(subpixelColor);
+                    subpixelsColors.Add(subpixelColor);
+                }
+            }
+
+            var mesh = new Mesh();
+            mesh.MeshTopology = PrimitiveType.TriangleList;
+            
+            //subpixelsQuadList.AddRange(pixelsQuadList);
+            pixelsQuadList.AddRange(subpixelsQuadList);
+            mesh.SetPositions(pixelsQuadList);
+            
+            //subpixelsColors.AddRange(pixelsColors);
+            pixelsColors.AddRange(subpixelsColors);
+            mesh.SetColors(pixelsColors);
+            
+            var meshComponent = new MeshData();
+            meshComponent.Mesh = mesh;
+            var meshRenderer = new MeshRenderer();
+            meshRenderer.Name = "Visualize";
+            entity.AddComponent(meshComponent);
+            entity.AddComponent(meshRenderer);
+            
+            return entity;
+        }
+        
+        // --- SUBPIXEL VISUALIZING END ---
+        
+        // --- ATLAS START ---
         private Mutex FontMutex;
         private Mutex ResultCopyMutex;
         private IFont shareableFont;
@@ -157,6 +280,7 @@ namespace Adamantium.Game.Playground
             width = singleTextureSize * glyphsPerRow;
             height = singleTextureSize * (uint)glyphsPerColumn;
         }
+        // --- ATLAS END ---
 
         private void ImportOTFFont()
         {
@@ -172,13 +296,18 @@ namespace Adamantium.Game.Playground
                 //var glyph = font.GetGlyphByIndex(2710);
                 glyph.Sample(10);
                 uint msdfTextureSize = 64;
-                uint subpixelGlyphSize = 12;
+                uint subpixelGlyphSize = 14;
+
+                var colors = glyph.RasterizeGlyphBySubpixels(subpixelGlyphSize, Color.FromRgba(255, 0, 0, 255), Color.FromRgba(0, 255, 255, 255));
+                uint size = subpixelGlyphSize;
+                var visSubpixels = glyph.GetVisSubpixels();
+                var visEntity = VisualizeSubpixelRendering(visSubpixels);
 
                 //var colors = glyph.GenerateDirectMSDF(msdfTextureSize);
                 //uint size = msdfTextureSize;
 
-                var colors = glyph.RasterizeGlyphBySubpixels(subpixelGlyphSize, Color.FromRgba(255, 0, 0, 255), Color.FromRgba(0, 255, 255, 255));
-                uint size = subpixelGlyphSize;
+                //var colors = glyph.RasterizeGlyphBySubpixels(subpixelGlyphSize, Color.FromRgba(255, 0, 0, 255), Color.FromRgba(0, 255, 255, 255));
+                //uint size = subpixelGlyphSize;
 
                 /*FontMutex = new Mutex();
                 ResultCopyMutex = new Mutex();
@@ -211,6 +340,7 @@ namespace Adamantium.Game.Playground
                 pixels.SetPixels(colors);
                 img.Save(@"Textures\sdf.png", ImageFileType.Png);
 
+                
                 var glyphShift = 10;
                 var glyphSize = subpixelGlyphSize;
                 var quadList = new List<Vector3F>();
@@ -234,6 +364,7 @@ namespace Adamantium.Game.Playground
                 var meshComponent = new MeshData();
                 meshComponent.Mesh = mesh;
                 var meshRenderer = new MeshRenderer();
+                meshRenderer.Name = "Glyph";
                 entity.AddComponent(meshComponent);
                 entity.AddComponent(meshRenderer);
                 
@@ -252,6 +383,7 @@ namespace Adamantium.Game.Playground
                 entity.AddComponent(meshRenderer);
                 */
                 EntityWorld.AddEntity(entity);
+                EntityWorld.AddEntity(visEntity);
             }
             catch (Exception e)
             {
