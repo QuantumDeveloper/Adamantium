@@ -296,9 +296,9 @@ namespace Adamantium.Game.Playground
                 //var glyph = font.GetGlyphByIndex(2710);
                 glyph.Sample(10);
                 uint msdfTextureSize = 64;
-                uint subpixelGlyphSize = 14;
+                uint subpixelGlyphSize = 128;
 
-                var colors = glyph.RasterizeGlyphBySubpixels(subpixelGlyphSize, Color.FromRgba(255, 0, 0, 255), Color.FromRgba(0, 255, 255, 255));
+                var colors = glyph.RasterizeGlyphBySubpixels(subpixelGlyphSize, Color.FromRgba(87, 166, 74, 255), Color.FromRgba(30, 30, 30, 255));
                 uint size = subpixelGlyphSize;
                 var visSubpixels = glyph.GetVisSubpixels();
                 var visEntity = VisualizeSubpixelRendering(visSubpixels);
