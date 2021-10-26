@@ -5,6 +5,9 @@ float transparency;
 sampler sampleType;
 //[[vk::binding(2)]] 
 Texture2D shaderTexture;
+float gamma;
+float4 foregroundColor;
+float4 backgroundColor;
 
 struct TexturedVertexInputType
 {
@@ -105,12 +108,39 @@ float4 MSDF_PS(PS_OUTPUT_BASIC input) : SV_TARGET
     return color;
 }
 
+float4 EncodedToBrightness(float4 encoded)
+{
+    return pow(encoded, gamma);
+}
+        
+float4 BrightnessToEncoded(float4 brightness)
+{
+    return pow(brightness, 1.0 / gamma);
+}
+
+float4 Subpixel_PS(PS_OUTPUT_BASIC input) : SV_TARGET
+{
+    float4 sample = shaderTexture.Sample(sampleType, input.uv);
+    
+    float4 linearSample = EncodedToBrightness(sample);
+    float4 linearForegroundColor = EncodedToBrightness(foregroundColor);
+    float4 linearBackgroundColor = EncodedToBrightness(backgroundColor);
+    
+    float blendedRed   = linearSample.r * linearForegroundColor.r + (1.0 - linearSample.r) * linearBackgroundColor.r;
+    float blendedGreen = linearSample.g * linearForegroundColor.g + (1.0 - linearSample.g) * linearBackgroundColor.g;
+    float blendedBlue  = linearSample.b * linearForegroundColor.b + (1.0 - linearSample.b) * linearBackgroundColor.b;
+    float blendedAlpha = linearSample.a * linearForegroundColor.a + (1.0 - linearSample.a) * linearBackgroundColor.a;
+    
+    float4 color = BrightnessToEncoded(float4(blendedRed, blendedGreen, blendedBlue, blendedAlpha));
+    
+    return color;
+}
+
 float4 BasicTextured_PS(PS_OUTPUT_BASIC input) : SV_TARGET
 {
     float4 color = shaderTexture.Sample(sampleType, input.uv);
     return color;
 }
-
 technique10 Render
 {
 	pass Textured
@@ -156,5 +186,12 @@ technique10 Basic
         Profile = 5.1;
         VertexShader = Basic_VS;
         PixelShader = MSDF_PS;
+    }
+    
+    pass Subpixel
+    {
+        Profile = 5.1;
+        VertexShader = Basic_VS;
+        PixelShader = Subpixel_PS;
     }
 }

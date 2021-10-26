@@ -290,8 +290,8 @@ namespace Adamantium.Game.Playground
             try
             {
                 //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/CFF2/SourceHanSerifVFProtoJP.otf", 3);
-                var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/SourceSans3-Regular.otf", 3);
-                //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/GlametrixLight-0zjo.otf", 3);
+                //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/SourceSans3-Regular.otf", 3);
+                var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/GlametrixLight-0zjo.otf", 3);
                 //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/Japan/NotoSansCJKjp-Light.otf", 3);
                 var entity = new Entity(null, "Poppins-Medium");
                 var font = typeface.GetFont(0);
@@ -299,14 +299,14 @@ namespace Adamantium.Game.Playground
                 //var glyph = font.GetGlyphByIndex(2710);
                 glyph.Sample(10);
                 uint msdfTextureSize = 64;
-                uint subpixelGlyphSize = 26;
+                uint subpixelGlyphSize = 8;
 
                 var em = font.UnitsPerEm;
                 
-                var colors = glyph.RasterizeGlyphBySubpixels(subpixelGlyphSize, Color.FromRgba(0, 0, 0, 255), Color.FromRgba(255, 255, 255, 255), em);
+                var colors = glyph.RasterizeGlyphBySubpixels(subpixelGlyphSize, em);
                 uint size = subpixelGlyphSize;
-                var visSubpixels = glyph.GetVisSubpixels();
-                var visEntity = VisualizeSubpixelRendering(visSubpixels);
+                /*var visSubpixels = glyph.GetVisSubpixels();
+                var visEntity = VisualizeSubpixelRendering(visSubpixels);*/
 
                 //var colors = glyph.GenerateDirectMSDF(msdfTextureSize);
                 //uint size = msdfTextureSize;
@@ -372,6 +372,25 @@ namespace Adamantium.Game.Playground
                 meshRenderer.Name = "Glyph";
                 entity.AddComponent(meshComponent);
                 entity.AddComponent(meshRenderer);
+
+                /*
+                // OUTLINES CHECK
+                List<Vector3F> vertexList;
+                List<Color> colorList;
+
+                glyph.GetSegments(out vertexList, out colorList);
+                
+                
+                var mesh = new Mesh();
+                mesh.MeshTopology = PrimitiveType.LineList;
+                mesh.SetPositions(vertexList);
+                mesh.SetColors(colorList);
+                var meshComponent = new MeshData();
+                meshComponent.Mesh = mesh;
+                var meshRenderer = new MeshRenderer();
+                meshRenderer.Name = "GlyphOutlines";
+                entity.AddComponent(meshComponent);
+                entity.AddComponent(meshRenderer);*/
                 
                 /*
                 var points = glyph.Sample(5);
@@ -388,7 +407,7 @@ namespace Adamantium.Game.Playground
                 entity.AddComponent(meshRenderer);
                 */
                 EntityWorld.AddEntity(entity);
-                EntityWorld.AddEntity(visEntity);
+                //EntityWorld.AddEntity(visEntity);
             }
             catch (Exception e)
             {

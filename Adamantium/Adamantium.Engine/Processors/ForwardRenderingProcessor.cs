@@ -510,7 +510,11 @@ namespace Adamantium.Engine.Processors
                                         {
                                             if (component.Name == "Glyph")
                                             {
-                                                GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Textured"].Apply();
+                                                //GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Textured"].Apply();
+                                                GraphicsDevice.BasicEffect.Parameters["gamma"].SetValue(1.43f);
+                                                GraphicsDevice.BasicEffect.Parameters["foregroundColor"].SetValue(Color.FromRgba(0, 0, 0, 255).ToVector4());
+                                                GraphicsDevice.BasicEffect.Parameters["backgroundColor"].SetValue(GraphicsDevice.ClearColor.ToVector4());
+                                                GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Subpixel"].Apply();
                                             }
                                             else
                                             {

@@ -121,7 +121,7 @@ namespace Adamantium.Fonts
             //AutoHint();
             
             //Msdf.RemoveZeroAngleSegments();
-            
+
             return points;
         }
 
@@ -378,6 +378,7 @@ namespace Adamantium.Fonts
                 foreach (var segment in outline.Segments)
                 {
                     localSegments.Add(segment);
+                    mergedOutlinesSegments.Add(segment);
                 }
             }
             
@@ -419,7 +420,7 @@ namespace Adamantium.Fonts
                 if (!isPointInside)
                 {
                     var lastSegment = new LineSegment2D(start, checkedSegment.End);
-                    mergedOutlinesSegments.Add(lastSegment);
+                    //mergedOutlinesSegments.Add(lastSegment);
                 }
             }
 
@@ -499,15 +500,33 @@ namespace Adamantium.Fonts
             return Msdf.GenerateDirectMSDF(size, BoundingRectangle, mergedOutlinesSegments);
         }
 
-        public Color[] RasterizeGlyphBySubpixels(uint textSize, Color foreground, Color background, ushort em)
+        public Color[] RasterizeGlyphBySubpixels(uint textSize, ushort em)
         {
-            return Subpixel.RasterizeGlyphBySubpixels(textSize, foreground, background, BoundingRectangle, mergedOutlinesSegments, em);
+            return Subpixel.RasterizeGlyphBySubpixels(textSize, BoundingRectangle, mergedOutlinesSegments, em);
         }
         
         // for visualizing
         public byte[,] GetVisSubpixels()
         {
             return Subpixel.GetVisSubpixels();
+        }
+
+        public void GetSegments(out List<Vector3F> vertexList, out List<Color> colorList)
+        {
+            vertexList = new List<Vector3F>();
+            colorList = new List<Color>();
+            
+            foreach (var mergedSegment in mergedOutlinesSegments)
+            {
+                var newStart = new Vector3F((float)mergedSegment.Start.X, (float)mergedSegment.Start.Y, 0);
+                var newEnd = new Vector3F((float)mergedSegment.End.X, (float)mergedSegment.End.Y, 0);
+                
+                vertexList.Add(newStart);
+                vertexList.Add(newEnd);
+                
+                colorList.Add(Colors.Red);
+                colorList.Add(Colors.Red);
+            }
         }
     }
 }

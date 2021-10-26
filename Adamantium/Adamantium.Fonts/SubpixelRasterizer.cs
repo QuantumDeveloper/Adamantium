@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Adamantium.Fonts.Common;
 using Adamantium.Fonts.Tables.GPOS;
+using Adamantium.Imaging;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Fonts
@@ -9,12 +10,9 @@ namespace Adamantium.Fonts
     public class SubpixelRasterizer
     {
         private uint textSize;
-        private Color foreground;
-        private Color background;
         private Rectangle glyphBoundingRectangle;
         private List<LineSegment2D> glyphSegments;
         private ushort em;
-        private double gamma;
 
         // for visualizing
         private byte[,] visSubpixels;
@@ -23,20 +21,8 @@ namespace Adamantium.Fonts
             return visSubpixels;
         }
         // ----------------
-        
-        private struct Subpixel
-        {
-            public byte Energy;
-            public double Distance;
-            public bool IsVisible;
-        }
 
-        public SubpixelRasterizer()
-        {
-            gamma = 1.43;
-        }
-
-        private double EncodedToBrightness(byte encoded)
+        /*private double EncodedToBrightness(byte encoded)
         {
             return Math.Pow(encoded / 255.0, gamma);
         }
@@ -44,9 +30,9 @@ namespace Adamantium.Fonts
         private byte BrightnessToEncoded(double brightness)
         {
             return (byte)(255.0 * Math.Pow(brightness, 1.0 / gamma));
-        }
+        }*/
         
-        public Color[] RasterizeGlyphBySubpixels(uint textSize, Color foreground, Color background, Rectangle glyphBoundingRectangle, List<LineSegment2D> glyphSegments, ushort em)
+        public Color[] RasterizeGlyphBySubpixels(uint textSize, Rectangle glyphBoundingRectangle, List<LineSegment2D> glyphSegments, ushort em)
         {
             if (glyphSegments.Count == 0)
             {
@@ -54,20 +40,15 @@ namespace Adamantium.Fonts
             }
             
             this.textSize = textSize;
-            this.foreground = foreground;
-            this.background = background;
             this.glyphBoundingRectangle = glyphBoundingRectangle;
             this.glyphSegments = glyphSegments;
             this.em = em;
 
-            // 1. Sample glyph with triple size width
-            var sampledData = SampleSubpixels();
-            
-            // 2. Process sampled data
-            return ProcessGlyphSubpixelSampling(sampledData);
+            // Sample glyph with triple size width
+            return SampleSubpixels();
         }
         
-        private Subpixel[,] SampleSubpixels()
+        private Color[] SampleSubpixels()
         {
             // 1. Calculate boundaries for original glyph (the position of the EM square)
             var emSquare = new Rectangle(0, 0, em, em);
@@ -85,9 +66,9 @@ namespace Adamantium.Fonts
             // 3. Sample glyph by subpixels
             var width = textSize * 3;
             var height = textSize;
-            
-            var subpixels = new Subpixel[width, height];
-            
+
+            var distances = new List<double>();
+
             var minDist = Double.MaxValue;
             var maxDist = Double.MinValue;
             
@@ -96,32 +77,40 @@ namespace Adamantium.Fonts
                 for (var x = 0; x < width; ++x)
                 {
                     // determine the closest segment to current sampling point
-                    var samplingPoint = new Vector2D((emSquare.Width / width * x) + emSquare.X, emSquare.Height - (emSquare.Height / height * y) + emSquare.Y);
+                    var samplingPoint = new Vector2D((emSquare.Width / width * (x + 0.0)) + emSquare.X, emSquare.Height - (emSquare.Height / height * (y + 0.0)) + emSquare.Y);
 
-                    subpixels[x, y].Distance = GetSignedDistance(samplingPoint);
-                    subpixels[x, y].IsVisible = (subpixels[x, y].Distance >= 0);
+                    var distance = GetSignedDistance(samplingPoint);
 
-                    if (subpixels[x, y].Distance < minDist) minDist = subpixels[x, y].Distance;
-                    if (subpixels[x, y].Distance > maxDist) maxDist = subpixels[x, y].Distance;
+                    distances.Add(distance);
+
+                    if (distance < minDist) minDist = distance;
+                    if (distance > maxDist) maxDist = distance;
                 }
             }
 
             // 4. Normalize
-            maxDist = Math.Min(Math.Abs(minDist), maxDist);
+            maxDist = Math.Min(Math.Abs(minDist), Math.Abs(maxDist));
             minDist = -maxDist * 2;
 
-            for (var y = 0; y < height; ++y)
+            var colors = new List<Color>();
+            Color color = default;
+            color.A = 255;
+            
+            for (var i = 0; i < distances.Count; i++)
             {
-                for (var x = 0; x < width; ++x)
-                {
-                    if (subpixels[x, y].Distance < minDist) subpixels[x, y].Distance = minDist;
-                    if (subpixels[x, y].Distance > maxDist) subpixels[x, y].Distance = maxDist;
+                if (distances[i] < minDist) distances[i] = minDist;
+                if (distances[i] > maxDist) distances[i] = maxDist;
 
-                    subpixels[x, y].Distance = (subpixels[x, y].Distance - minDist) / (maxDist - minDist);
+                if (i % 3 == 0) color.R = (byte)(255 * (distances[i] - minDist) / (maxDist - minDist));
+                if (i % 3 == 1) color.G = (byte)(255 * (distances[i] - minDist) / (maxDist - minDist));
+                if (i % 3 == 2)
+                {
+                    color.B = (byte)(255 * (distances[i] - minDist) / (maxDist - minDist));
+                    colors.Add(color);
                 }
             }
 
-            return subpixels;
+            return colors.ToArray();
         }
         
         private double GetSignedDistance(Vector2D point)
@@ -154,7 +143,7 @@ namespace Adamantium.Fonts
             return closestDistance;
         }
 
-        private Color[] ProcessGlyphSubpixelSampling(Subpixel[,] sampledData)
+        /*private Color[] ProcessGlyphSubpixelSampling(Subpixel[,] sampledData)
         {
             var blendedSubpixels = BlendSubpixel(sampledData);
 
@@ -227,6 +216,6 @@ namespace Adamantium.Fonts
             }
 
             return pixels.ToArray();
-        }
+        }*/   
     }
 }
