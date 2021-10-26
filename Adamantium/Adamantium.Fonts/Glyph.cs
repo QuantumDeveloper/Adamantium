@@ -118,6 +118,8 @@ namespace Adamantium.Fonts
             sampledOutlinesCache[rate] = sampledOutlines;
             var points = RemoveSelfIntersections(sampledOutlines);
 
+            //AutoHint();
+            
             //Msdf.RemoveZeroAngleSegments();
             
             return points;
@@ -432,6 +434,66 @@ namespace Adamantium.Fonts
             return points.ToArray();
         }
 
+        private void AutoHint()
+        {
+            var indicesToHint = new List<int>();
+
+            for (var i = 0; i < mergedOutlinesSegments.Count; i++)
+            {
+                if (mergedOutlinesSegments[i].Start.X == mergedOutlinesSegments[i].End.X ||
+                    mergedOutlinesSegments[i].Start.Y == mergedOutlinesSegments[i].End.Y)
+                {
+                    indicesToHint.Add(i);
+                }
+            }
+            
+            foreach (var index in indicesToHint)
+            {
+                var prevIndex = index > 0 ? index - 1 : mergedOutlinesSegments.Count - 1;
+                var currentIndex = index;
+                var nextIndex = index < (mergedOutlinesSegments.Count - 1) ? index + 1 : 0;
+
+                var prevSegment = mergedOutlinesSegments[prevIndex];
+                var currentSegment = mergedOutlinesSegments[currentIndex];
+                var nextSegment = mergedOutlinesSegments[nextIndex];
+
+                var hintedCurrentStart = new Vector2D();
+                var hintedCurrentEnd = new Vector2D();
+                var hintedValue = 0.0;
+                
+                // vertical stem
+                if (currentSegment.Start.X == currentSegment.End.X)
+                {
+                    hintedValue = Math.Round(currentSegment.Start.X);
+                    hintedCurrentStart = new Vector2D(hintedValue, currentSegment.Start.Y);
+                    hintedCurrentEnd = new Vector2D(hintedValue, currentSegment.End.Y);
+                }
+                
+                // horizontal stem
+                if (currentSegment.Start.Y == currentSegment.End.Y)
+                {
+                    hintedValue = Math.Round(currentSegment.Start.Y);
+                    hintedCurrentStart = new Vector2D(currentSegment.Start.X, hintedValue);
+                    hintedCurrentEnd = new Vector2D(currentSegment.End.X, hintedValue);
+                }
+                
+                var hintedCurrentSegment = new LineSegment2D(hintedCurrentStart, hintedCurrentEnd);
+                mergedOutlinesSegments[currentIndex] = hintedCurrentSegment;
+
+                if (GlyphSegmentsMath.IsSegmentsConnected(ref prevSegment, ref currentSegment))
+                {
+                    var hintedPrevSegment = new LineSegment2D(prevSegment.Start, hintedCurrentStart);
+                    mergedOutlinesSegments[prevIndex] = hintedPrevSegment;
+                }
+                    
+                if (GlyphSegmentsMath.IsSegmentsConnected(ref currentSegment, ref nextSegment))
+                {
+                    var hintedNextSegment = new LineSegment2D(hintedCurrentEnd, nextSegment.End);
+                    mergedOutlinesSegments[nextIndex] = hintedNextSegment;
+                }
+            }
+        }
+        
         public Color[] GenerateDirectMSDF(uint size)
         {
             return Msdf.GenerateDirectMSDF(size, BoundingRectangle, mergedOutlinesSegments);

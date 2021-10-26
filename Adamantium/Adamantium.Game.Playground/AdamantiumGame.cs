@@ -163,8 +163,8 @@ namespace Adamantium.Game.Playground
 
                     if (x % 3 == 0)
                     {
-                        //subpixelColor = Color.FromRgba(subpixels[x, y], 0, 0, 255);
-                        subpixelColor = Color.FromRgba(subpixels[x, y], subpixels[x, y], subpixels[x, y], 255);
+                        subpixelColor = Color.FromRgba(subpixels[x, y], 0, 0, 255);
+                        //subpixelColor = Color.FromRgba(subpixels[x, y], subpixels[x, y], subpixels[x, y], 255);
                         red = subpixels[x, y];
 
                         p0 = new Vector3F(startPosX + subpixelWidth * x + subpixelWidth / 2.0f + spaceX * x, startPosY + subpixelHeight * y + subpixelHeight * 2 / 3.0f + spaceY * y);
@@ -173,15 +173,15 @@ namespace Adamantium.Game.Playground
 
                     if (x % 3 == 1)
                     {
-                        //subpixelColor = Color.FromRgba(0, subpixels[x, y], 0, 255);
-                        subpixelColor = Color.FromRgba(subpixels[x, y], subpixels[x, y], subpixels[x, y], 255);
+                        subpixelColor = Color.FromRgba(0, subpixels[x, y], 0, 255);
+                        //subpixelColor = Color.FromRgba(subpixels[x, y], subpixels[x, y], subpixels[x, y], 255);
                         green = subpixels[x, y];
                     }
 
                     if (x % 3 == 2)
                     {
-                        //subpixelColor = Color.FromRgba(0, 0, subpixels[x, y], 255);
-                        subpixelColor = Color.FromRgba(subpixels[x, y], subpixels[x, y], subpixels[x, y], 255);
+                        subpixelColor = Color.FromRgba(0, 0, subpixels[x, y], 255);
+                        //subpixelColor = Color.FromRgba(subpixels[x, y], subpixels[x, y], subpixels[x, y], 255);
                         blue = subpixels[x, y];
 
                         p1 = new Vector3F(startPosX + subpixelWidth * x + subpixelWidth / 2.0f + spaceX * x, startPosY + subpixelHeight * y + subpixelHeight * 2 / 3.0f + spaceY * y);
@@ -295,11 +295,11 @@ namespace Adamantium.Game.Playground
                 //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/Japan/NotoSansCJKjp-Light.otf", 3);
                 var entity = new Entity(null, "Poppins-Medium");
                 var font = typeface.GetFont(0);
-                var glyph = font.GetGlyphByCharacter('/');
+                var glyph = font.GetGlyphByCharacter('@');
                 //var glyph = font.GetGlyphByIndex(2710);
                 glyph.Sample(10);
                 uint msdfTextureSize = 64;
-                uint subpixelGlyphSize = 10;
+                uint subpixelGlyphSize = 26;
 
                 var em = font.UnitsPerEm;
                 

@@ -15,8 +15,7 @@ namespace Adamantium.Fonts
         private List<LineSegment2D> glyphSegments;
         private ushort em;
         private double gamma;
-        private double inversedGamma;
-        
+
         // for visualizing
         private byte[,] visSubpixels;
         public byte[,] GetVisSubpixels()
@@ -28,13 +27,23 @@ namespace Adamantium.Fonts
         private struct Subpixel
         {
             public byte Energy;
+            public double Distance;
             public bool IsVisible;
         }
 
         public SubpixelRasterizer()
         {
             gamma = 1.43;
-            inversedGamma = 1.0 / gamma;
+        }
+
+        private double EncodedToBrightness(byte encoded)
+        {
+            return Math.Pow(encoded / 255.0, gamma);
+        }
+        
+        private byte BrightnessToEncoded(double brightness)
+        {
+            return (byte)(255.0 * Math.Pow(brightness, 1.0 / gamma));
         }
         
         public Color[] RasterizeGlyphBySubpixels(uint textSize, Color foreground, Color background, Rectangle glyphBoundingRectangle, List<LineSegment2D> glyphSegments, ushort em)
@@ -58,34 +67,28 @@ namespace Adamantium.Fonts
             return ProcessGlyphSubpixelSampling(sampledData);
         }
         
-        private double[,] SampleSubpixels()
+        private Subpixel[,] SampleSubpixels()
         {
-            // 1. Calculate boundaries for original glyph
-            //double glyphSize = Math.Max(glyphBoundingRectangle.Width, glyphBoundingRectangle.Height);
-            var emSquareDimensions = new Vector2D(em);
+            // 1. Calculate boundaries for original glyph (the position of the EM square)
+            var emSquare = new Rectangle(0, 0, em, em);
 
-            // 2. Place glyph in center of calculated boundaries
+            // 2. Place EM square so that its center matches glyph center
             var glyphCenter = glyphBoundingRectangle.Center;
-            var emSquareCenter = emSquareDimensions / 2;
-            var diff = emSquareCenter - glyphCenter;
+            var emSquareCenter = emSquare.Center;
+            var diff = glyphCenter - emSquareCenter;
+            diff.X = Math.Floor(diff.X);
+            diff.Y = Math.Floor(diff.Y);
 
-            for (var index = 0; index < glyphSegments.Count; index++)
-            {
-                var segment = glyphSegments[index];
-                var start = segment.Start;
-                var end = segment.End;
+            emSquare.X += (int)diff.X;
+            emSquare.Y += (int)diff.Y;
 
-                segment = new LineSegment2D(start + diff, end + diff);
-
-                glyphSegments[index] = segment;
-            }
-            
             // 3. Sample glyph by subpixels
             var width = textSize * 3;
             var height = textSize;
             
-            var subpixels = new double[width, height];
+            var subpixels = new Subpixel[width, height];
             
+            var minDist = Double.MaxValue;
             var maxDist = Double.MinValue;
             
             for (var y = 0; y < height; ++y)
@@ -93,30 +96,28 @@ namespace Adamantium.Fonts
                 for (var x = 0; x < width; ++x)
                 {
                     // determine the closest segment to current sampling point
-                    var samplingPoint = new Vector2D(emSquareDimensions.X / width * x, emSquareDimensions.Y - (emSquareDimensions.Y / height * y));
+                    var samplingPoint = new Vector2D((emSquare.Width / width * x) + emSquare.X, emSquare.Height - (emSquare.Height / height * y) + emSquare.Y);
 
-                    subpixels[x, y] = GetSignedDistance(samplingPoint);
+                    subpixels[x, y].Distance = GetSignedDistance(samplingPoint);
+                    subpixels[x, y].IsVisible = (subpixels[x, y].Distance >= 0);
 
-                    if (subpixels[x, y] > maxDist) maxDist = subpixels[x, y];
+                    if (subpixels[x, y].Distance < minDist) minDist = subpixels[x, y].Distance;
+                    if (subpixels[x, y].Distance > maxDist) maxDist = subpixels[x, y].Distance;
                 }
             }
 
             // 4. Normalize
-            var minDist = -maxDist;
+            maxDist = Math.Min(Math.Abs(minDist), maxDist);
+            minDist = -maxDist * 2;
 
-            // for visualizing
-            visSubpixels = new byte[width, height];
-            // -------------
-            
             for (var y = 0; y < height; ++y)
             {
                 for (var x = 0; x < width; ++x)
                 {
-                    if (subpixels[x, y] < minDist) subpixels[x, y] = minDist;
-                    if (subpixels[x, y] > maxDist) subpixels[x, y] = maxDist;
+                    if (subpixels[x, y].Distance < minDist) subpixels[x, y].Distance = minDist;
+                    if (subpixels[x, y].Distance > maxDist) subpixels[x, y].Distance = maxDist;
 
-                    subpixels[x, y] = (subpixels[x, y] - minDist) / (maxDist - minDist);
-                    visSubpixels[x, y] = (byte)(255 * subpixels[x, y]);
+                    subpixels[x, y].Distance = (subpixels[x, y].Distance - minDist) / (maxDist - minDist);
                 }
             }
 
@@ -153,30 +154,30 @@ namespace Adamantium.Fonts
             return closestDistance;
         }
 
-        private Color[] ProcessGlyphSubpixelSampling(double[,] sampledData)
+        private Color[] ProcessGlyphSubpixelSampling(Subpixel[,] sampledData)
         {
-            var rebalancedSubpixels = RebalanceEnergy(sampledData);
+            var blendedSubpixels = BlendSubpixel(sampledData);
 
-            return ConvertToPixels(rebalancedSubpixels);
+            return ConvertToPixels(blendedSubpixels);
         }
 
-        private List<Subpixel> RebalanceEnergy(double[,] subpixels)
+        private List<Subpixel> BlendSubpixel(Subpixel[,] subpixels)
         {
             var width = subpixels.GetLength(0);
             var height = subpixels.GetLength(1);
 
-            var redForegroundLinear = Math.Pow(foreground.R / 255.0, inversedGamma);
-            var greenForegroundLinear = Math.Pow(foreground.G / 255.0, inversedGamma);
-            var blueForegroundLinear = Math.Pow(foreground.B / 255.0, inversedGamma);
+            var redForegroundLinear = EncodedToBrightness(foreground.R);
+            var greenForegroundLinear = EncodedToBrightness(foreground.G);
+            var blueForegroundLinear = EncodedToBrightness(foreground.B);
 
-            var redBackgroundLinear = Math.Pow(background.R / 255.0, inversedGamma);
-            var greenBackgroundLinear = Math.Pow(background.G / 255.0, inversedGamma);
-            var blueBackgroundLinear = Math.Pow(background.B / 255.0, inversedGamma);
+            var redBackgroundLinear = EncodedToBrightness(background.R);
+            var greenBackgroundLinear = EncodedToBrightness(background.G);
+            var blueBackgroundLinear = EncodedToBrightness(background.B);
 
             var blendedSubpixels = new List<Subpixel>();
 
             // for visualizing
-            //visSubpixels = new byte[width, height];
+            visSubpixels = new byte[width, height];
             // -------------
             
             for (var y = 0; y < height; y++)
@@ -185,21 +186,20 @@ namespace Adamantium.Fonts
                 {
                     var blendedValue = 0.0;
 
-                    var currentEnergy = subpixels[x, y];// > 0.5 ? 1.0 : subpixels[x, y];
+                    var currentDistance = subpixels[x, y].Distance;
 
-                    if (x % 3 == 0) blendedValue = currentEnergy * redForegroundLinear   + (1.0 - currentEnergy) * redBackgroundLinear;
-                    if (x % 3 == 1) blendedValue = currentEnergy * greenForegroundLinear + (1.0 - currentEnergy) * greenBackgroundLinear;
-                    if (x % 3 == 2) blendedValue = currentEnergy * blueForegroundLinear  + (1.0 - currentEnergy) * blueBackgroundLinear;
+                    if (x % 3 == 0) blendedValue = currentDistance * redForegroundLinear   + (1.0 - currentDistance) * redBackgroundLinear;
+                    if (x % 3 == 1) blendedValue = currentDistance * greenForegroundLinear + (1.0 - currentDistance) * greenBackgroundLinear;
+                    if (x % 3 == 2) blendedValue = currentDistance * blueForegroundLinear  + (1.0 - currentDistance) * blueBackgroundLinear;
                     
                     var blendedSubpixel = new Subpixel();
-                    blendedSubpixel.Energy = (byte)(255.0 * Math.Pow(blendedValue, gamma));
-                    //blendedSubpixel.IsVisible = (currentEnergy > 0.5);
-                    blendedSubpixel.IsVisible = true;
-                    
+                    blendedSubpixel.Energy = BrightnessToEncoded(blendedValue);
+                    blendedSubpixel.IsVisible = subpixels[x, y].IsVisible;
+
                     blendedSubpixels.Add(blendedSubpixel);
                     
                     // for visualizing
-                    //visSubpixels[x, y] = (byte)(255.0 * Math.Pow(blendedValue, gamma));
+                    visSubpixels[x, y] = blendedSubpixel.Energy;
                     // ----------------
                 }
             }
@@ -223,7 +223,7 @@ namespace Adamantium.Fonts
 
                 byte alpha = (byte)(isRedVisible || isGreenVisible || isBlueVisible ? 255 : 0);
 
-                pixels.Add(Color.FromRgba((byte)red, (byte)green, (byte)blue, 255));
+                pixels.Add(Color.FromRgba(red, green, blue, 255));
             }
 
             return pixels.ToArray();
