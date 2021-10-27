@@ -495,9 +495,9 @@ namespace Adamantium.Fonts
             }
         }
         
-        public Color[] GenerateDirectMSDF(uint size)
+        public Color[] GenerateDirectMSDF(uint size, ushort em)
         {
-            return Msdf.GenerateDirectMSDF(size, BoundingRectangle, mergedOutlinesSegments);
+            return Msdf.GenerateDirectMSDF(size, BoundingRectangle, mergedOutlinesSegments, em);
         }
 
         public Color[] RasterizeGlyphBySubpixels(uint textSize, ushort em)
@@ -508,7 +508,8 @@ namespace Adamantium.Fonts
         // for visualizing
         public byte[,] GetVisSubpixels()
         {
-            return Subpixel.GetVisSubpixels();
+            return null;
+            //return Subpixel.GetVisSubpixels();
         }
 
         public void GetSegments(out List<Vector3F> vertexList, out List<Color> colorList)

@@ -308,8 +308,8 @@ namespace Adamantium.Game.Playground
                 /*var visSubpixels = glyph.GetVisSubpixels();
                 var visEntity = VisualizeSubpixelRendering(visSubpixels);*/
 
-                //var colors = glyph.GenerateDirectMSDF(msdfTextureSize);
-                //uint size = msdfTextureSize;
+                /*var colors = glyph.GenerateDirectMSDF(msdfTextureSize, em);
+                uint size = msdfTextureSize;*/
 
                 //var colors = glyph.RasterizeGlyphBySubpixels(subpixelGlyphSize, Color.FromRgba(255, 0, 0, 255), Color.FromRgba(0, 255, 255, 255));
                 //uint size = subpixelGlyphSize;
