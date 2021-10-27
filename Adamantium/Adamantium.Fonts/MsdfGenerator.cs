@@ -240,13 +240,15 @@ namespace Adamantium.Fonts
         /// <param name="size">Width and height of MSDF texture</param>
         /// <param name="glyphBoundingRectangle">Bounding rectangle of original glyph</param>
         /// <returns>MSDF color data in for of single-dimension array</returns>
-        public Color[] GenerateDirectMSDF(uint size, Rectangle glyphBoundingRectangle, List<LineSegment2D> glyphSegments, ushort em)
+        public Color[,] GenerateDirectMSDF(uint size, Rectangle glyphBoundingRectangle, List<LineSegment2D> glyphSegments, ushort em)
         {
-            var msdf = new List<Color>();
+            //var msdf = new List<Color>();
+            var msdf = new Color[size, size];
 
             if (glyphSegments.Count == 0)
             {
-                return msdf.ToArray();
+                //return msdf.ToArray();
+                return msdf;
             }
             
             segments = new List<MsdfGlyphSegment>();
@@ -306,11 +308,13 @@ namespace Adamantium.Fonts
 
                     var color = Color.FromRgba(red, green, blue, alpha);
 
-                    msdf.Add(color);
+                    //msdf.Add(color);
+                    msdf[x, y] = color;
                 }
             }
 
-            return msdf.ToArray();
+            //return msdf.ToArray();
+            return msdf;
         }
 
         // --- ARTEFACT FIXING ---

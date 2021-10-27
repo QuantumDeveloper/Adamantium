@@ -29,6 +29,7 @@
     <ItemGroup>
       <ProjectReference Include="..\Adamantium.Engine.Graphics\Adamantium.Engine.Graphics.csproj" />
       <ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
+      <ProjectReference Include="..\Adamantium.UI\Adamantium.UI.csproj" />
     </ItemGroup>
 
     <ItemGroup>

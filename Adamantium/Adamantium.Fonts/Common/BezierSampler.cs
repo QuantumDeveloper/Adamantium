@@ -43,13 +43,19 @@ namespace Adamantium.Fonts.Common
 
         private static List<Vector2D> GenerateCubicOutlineFromSegment(OutlineSegment segment, byte rate)
         {
+            var sampledPoints = new List<Vector2D>();
+
             // If this is a line, then just return these points without modification
             if (segment.Points.Count == 2)
             {
-                return new List<Vector2D>(segment.Points);
+                foreach (var point in segment.Points)
+                {
+                    sampledPoints.Add(new Vector2D(Math.Round(point.X, 4), Math.Round(point.Y, 4)));
+                }
+
+                return sampledPoints;
             }
 
-            var sampledPoints = new List<Vector2D>();
             var t = 1.0 / rate;
 
             for (double d = 0; d <= 1; d += t)

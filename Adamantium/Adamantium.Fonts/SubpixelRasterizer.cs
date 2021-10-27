@@ -22,11 +22,11 @@ namespace Adamantium.Fonts
         }
         // ----------------
 
-        public Color[] RasterizeGlyphBySubpixels(uint textSize, Rectangle glyphBoundingRectangle, List<LineSegment2D> glyphSegments, ushort em)
+        public Color[,] RasterizeGlyphBySubpixels(uint textSize, Rectangle glyphBoundingRectangle, List<LineSegment2D> glyphSegments, ushort em)
         {
             if (glyphSegments.Count == 0)
             {
-                return new List<Color>().ToArray();
+                return new Color[textSize, textSize];
             }
             
             this.textSize = textSize;
@@ -38,7 +38,7 @@ namespace Adamantium.Fonts
             return SampleSubpixels();
         }
         
-        private Color[] SampleSubpixels()
+        private Color[,] SampleSubpixels()
         {
             // 1. Calculate boundaries for original glyph (the position of the EM square)
             var emSquare = new Rectangle(0, 0, em, em);
@@ -57,7 +57,7 @@ namespace Adamantium.Fonts
             var width = textSize * 3;
             var height = textSize;
 
-            var distances = new List<double>();
+            var distances = new double[width, height];
 
             var minDist = Double.MaxValue;
             var maxDist = Double.MinValue;
@@ -71,7 +71,7 @@ namespace Adamantium.Fonts
 
                     var distance = GetSignedDistance(samplingPoint);
 
-                    distances.Add(distance);
+                    distances[x, y] = distance;
 
                     if (distance < minDist) minDist = distance;
                     if (distance > maxDist) maxDist = distance;
@@ -82,25 +82,30 @@ namespace Adamantium.Fonts
             maxDist = Math.Min(Math.Abs(minDist), Math.Abs(maxDist));
             minDist = -maxDist * 2;
 
-            var colors = new List<Color>();
+            var colors = new Color[textSize, textSize];
             Color color = default;
             color.A = 255;
-            
-            for (var i = 0; i < distances.Count; i++)
-            {
-                if (distances[i] < minDist) distances[i] = minDist;
-                if (distances[i] > maxDist) distances[i] = maxDist;
 
-                if (i % 3 == 0) color.R = (byte)(255 * (distances[i] - minDist) / (maxDist - minDist));
-                if (i % 3 == 1) color.G = (byte)(255 * (distances[i] - minDist) / (maxDist - minDist));
-                if (i % 3 == 2)
+            for (var y = 0; y < height; ++y)
+            {
+                var resX = 0;
+
+                for (var x = 0; x < width; ++x)
                 {
-                    color.B = (byte)(255 * (distances[i] - minDist) / (maxDist - minDist));
-                    colors.Add(color);
+                    if (distances[x, y] < minDist) distances[x, y] = minDist;
+                    if (distances[x, y] > maxDist) distances[x, y] = maxDist;
+
+                    if (x % 3 == 0) color.R = (byte)(255 * (distances[x, y] - minDist) / (maxDist - minDist));
+                    if (x % 3 == 1) color.G = (byte)(255 * (distances[x, y] - minDist) / (maxDist - minDist));
+                    if (x % 3 == 2)
+                    {
+                        color.B = (byte)(255 * (distances[x, y] - minDist) / (maxDist - minDist));
+                        colors[resX++, y] = color;
+                    }
                 }
             }
 
-            return colors.ToArray();
+            return colors;
         }
         
         private double GetSignedDistance(Vector2D point)

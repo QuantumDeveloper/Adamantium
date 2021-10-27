@@ -512,15 +512,15 @@ namespace Adamantium.Engine.Processors
                                             {
                                                 //GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Textured"].Apply();
                                                 GraphicsDevice.BasicEffect.Parameters["gamma"].SetValue(1.0f);
-                                                GraphicsDevice.BasicEffect.Parameters["glyphSize"].SetValue(8);
+                                                GraphicsDevice.BasicEffect.Parameters["glyphSize"].SetValue(18);
                                                 GraphicsDevice.BasicEffect.Parameters["foregroundColor"].SetValue(Color.FromRgba(0, 0, 0, 255).ToVector4());
-                                                GraphicsDevice.BasicEffect.Parameters["backgroundColor"].SetValue(GraphicsDevice.ClearColor.ToVector4());
+                                                GraphicsDevice.BasicEffect.Parameters["backgroundColor"].SetValue(Color.FromRgba(255, 255, 255, 255).ToVector4());
                                                 GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Subpixel"].Apply();
                                                 //GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["MSDF"].Apply();
                                             }
                                             else
                                             {
-                                                GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["VertexColored"].Apply();
+                                                //GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["VertexColored"].Apply();
                                             }
                                             
                                             

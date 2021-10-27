@@ -177,6 +177,12 @@ namespace Adamantium.Fonts
 
         public Glyph GetGlyphByIndex(uint index)
         {
+            if (index >= glyphs.Count)
+            {
+                TypeFace.GetGlyphByIndex(0, out var glyph);
+                return glyph;
+            }
+            
             return glyphs[(int)index];
         }
 
