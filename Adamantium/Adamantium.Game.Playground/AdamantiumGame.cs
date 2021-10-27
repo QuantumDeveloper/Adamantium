@@ -295,11 +295,11 @@ namespace Adamantium.Game.Playground
                 //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/Japan/NotoSansCJKjp-Light.otf", 3);
                 var entity = new Entity(null, "Poppins-Medium");
                 var font = typeface.GetFont(0);
-                var glyph = font.GetGlyphByCharacter('@');
+                var glyph = font.GetGlyphByCharacter('W');
                 //var glyph = font.GetGlyphByIndex(2710);
                 glyph.Sample(10);
                 uint msdfTextureSize = 64;
-                uint subpixelGlyphSize = 8;
+                uint subpixelGlyphSize = 12;
 
                 var em = font.UnitsPerEm;
                 
@@ -308,8 +308,8 @@ namespace Adamantium.Game.Playground
                 /*var visSubpixels = glyph.GetVisSubpixels();
                 var visEntity = VisualizeSubpixelRendering(visSubpixels);*/
 
-                //var colors = glyph.GenerateDirectMSDF(msdfTextureSize);
-                //uint size = msdfTextureSize;
+                /*var colors = glyph.GenerateDirectMSDF(msdfTextureSize, em);
+                uint size = msdfTextureSize;*/
 
                 //var colors = glyph.RasterizeGlyphBySubpixels(subpixelGlyphSize, Color.FromRgba(255, 0, 0, 255), Color.FromRgba(0, 255, 255, 255));
                 //uint size = subpixelGlyphSize;

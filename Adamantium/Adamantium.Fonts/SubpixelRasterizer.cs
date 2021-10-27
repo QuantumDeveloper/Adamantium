@@ -77,7 +77,7 @@ namespace Adamantium.Fonts
                 for (var x = 0; x < width; ++x)
                 {
                     // determine the closest segment to current sampling point
-                    var samplingPoint = new Vector2D((emSquare.Width / width * (x + 0.0)) + emSquare.X, emSquare.Height - (emSquare.Height / height * (y + 0.0)) + emSquare.Y);
+                    var samplingPoint = new Vector2D((emSquare.Width / width * (x + 0.5)) + emSquare.X, emSquare.Height - (emSquare.Height / height * (y + 0.5)) + emSquare.Y);
 
                     var distance = GetSignedDistance(samplingPoint);
 

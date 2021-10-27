@@ -240,7 +240,7 @@ namespace Adamantium.Fonts
         /// <param name="size">Width and height of MSDF texture</param>
         /// <param name="glyphBoundingRectangle">Bounding rectangle of original glyph</param>
         /// <returns>MSDF color data in for of single-dimension array</returns>
-        public Color[] GenerateDirectMSDF(uint size, Rectangle glyphBoundingRectangle, List<LineSegment2D> glyphSegments)
+        public Color[] GenerateDirectMSDF(uint size, Rectangle glyphBoundingRectangle, List<LineSegment2D> glyphSegments, ushort em)
         {
             var msdf = new List<Color>();
 
@@ -259,27 +259,18 @@ namespace Adamantium.Fonts
             // 1. Color all segments
             ColorEdges();
             
-            // 2. Calculate boundaries for original glyph
-            double glyphSize = Math.Max(glyphBoundingRectangle.Width, glyphBoundingRectangle.Height);
-            glyphSize += glyphSize * 0.1f;
-            var originalDimensions = new Vector2D(glyphSize);
+            // 2. Calculate boundaries for original glyph (the position of the EM square)
+            var emSquare = new Rectangle(0, 0, em, em);
 
-            // 3. Place glyph in center of calculated boundaries
+            // 3. Place EM square so that its center matches glyph center
             var glyphCenter = glyphBoundingRectangle.Center;
-            var originalCenter = originalDimensions / 2;
-            var diff = originalCenter - glyphCenter;
-            
-            for (var index = 0; index < segments.Count; index++)
-            {
-                var segment = segments[index];
-                var start = segment.Segment.Start;
-                var end = segment.Segment.End;
-                var msdfColor = segment.MsdfColor;
-                
-                segment = new MsdfGlyphSegment(start + diff, end + diff, msdfColor);
+            var emSquareCenter = emSquare.Center;
+            var diff = glyphCenter - emSquareCenter;
+            diff.X = Math.Floor(diff.X);
+            diff.Y = Math.Floor(diff.Y);
 
-                segments[index] = segment;
-            }
+            emSquare.X += (int)diff.X;
+            emSquare.Y += (int)diff.Y;
 
             // 4. Generate colored pseudo-distance field
             var coloredDistances = new ColoredDistance[size, size];
@@ -291,9 +282,10 @@ namespace Adamantium.Fonts
                 for (var x = 0; x < size; ++x)
                 {
                     // determine the closest segment to current sampling point
-                    var samplingPoint = new Vector2D(originalDimensions.X / size * (x + 0.5), originalDimensions.Y - (originalDimensions.Y / size * (y + 0.5)));
+                    //var samplingPoint = new Vector2D(originalDimensions.X / size * (x + 0.5), originalDimensions.Y - (originalDimensions.Y / size * (y + 0.5)));
+                    var samplingPoint = new Vector2D((emSquare.Width / size * (x + 0.5)) + emSquare.X, emSquare.Height - (emSquare.Height / size * (y + 0.5)) + emSquare.Y);
 
-                    coloredDistances[x, y] = GetColoredDistances(samplingPoint, glyphSize, size);
+                    coloredDistances[x, y] = GetColoredDistances(samplingPoint, emSquare.Width, size);
 
                     sdfMaxDistance = Math.Max(sdfMaxDistance, coloredDistances[x, y].alphaDistance);
                 }
