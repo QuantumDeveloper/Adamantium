@@ -86,6 +86,7 @@ namespace Adamantium.Fonts
         
         public FeatureService FeatureService { get; }
 
+        public uint GlyphCount => (uint)glyphs.Count;
         public ushort UnitsPerEm { get; internal set; }
 
         /// <summary>

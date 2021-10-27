@@ -27,6 +27,8 @@ namespace Adamantium.Fonts
 
         public IReadOnlyCollection<IFont> Fonts => fonts.AsReadOnly();
 
+        public uint GlyphCount => (uint)glyphs.Count;
+
         internal void AddFont(IFont font)
         {
             fonts.Add(font);
