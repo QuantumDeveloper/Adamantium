@@ -270,7 +270,7 @@ namespace Adamantium.Engine.Processors
 
         private void CreateResources()
         {
-            GraphicsDevice.ClearColor = Color.FromRgba(255, 255, 255, 255);
+            GraphicsDevice.ClearColor = Colors.White;
             
             textureSampler = CreateTextureSampler();
             //defaultTexture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "texture.png"));
@@ -511,8 +511,8 @@ namespace Adamantium.Engine.Processors
                                             if (component.Name == "Glyph")
                                             {
                                                 //GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Textured"].Apply();
-                                                GraphicsDevice.BasicEffect.Parameters["rebalance"].SetValue(0.5f);
-                                                GraphicsDevice.BasicEffect.Parameters["gamma"].SetValue(1.43f);
+                                                GraphicsDevice.BasicEffect.Parameters["gamma"].SetValue(1.0f);
+                                                GraphicsDevice.BasicEffect.Parameters["glyphSize"].SetValue(8);
                                                 GraphicsDevice.BasicEffect.Parameters["foregroundColor"].SetValue(Color.FromRgba(0, 0, 0, 255).ToVector4());
                                                 GraphicsDevice.BasicEffect.Parameters["backgroundColor"].SetValue(GraphicsDevice.ClearColor.ToVector4());
                                                 GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Subpixel"].Apply();

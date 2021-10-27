@@ -508,7 +508,8 @@ namespace Adamantium.Fonts
         // for visualizing
         public byte[,] GetVisSubpixels()
         {
-            return Subpixel.GetVisSubpixels();
+            return null;
+            //return Subpixel.GetVisSubpixels();
         }
 
         public void GetSegments(out List<Vector3F> vertexList, out List<Color> colorList)

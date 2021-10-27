@@ -295,11 +295,11 @@ namespace Adamantium.Game.Playground
                 //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/Japan/NotoSansCJKjp-Light.otf", 3);
                 var entity = new Entity(null, "Poppins-Medium");
                 var font = typeface.GetFont(0);
-                var glyph = font.GetGlyphByCharacter('W');
+                var glyph = font.GetGlyphByCharacter('@');
                 //var glyph = font.GetGlyphByIndex(2710);
                 glyph.Sample(10);
                 uint msdfTextureSize = 64;
-                uint subpixelGlyphSize = 12;
+                uint subpixelGlyphSize = 8;
 
                 var em = font.UnitsPerEm;
                 

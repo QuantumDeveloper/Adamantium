@@ -22,16 +22,6 @@ namespace Adamantium.Fonts
         }
         // ----------------
 
-        /*private double EncodedToBrightness(byte encoded)
-        {
-            return Math.Pow(encoded / 255.0, gamma);
-        }
-        
-        private byte BrightnessToEncoded(double brightness)
-        {
-            return (byte)(255.0 * Math.Pow(brightness, 1.0 / gamma));
-        }*/
-        
         public Color[] RasterizeGlyphBySubpixels(uint textSize, Rectangle glyphBoundingRectangle, List<LineSegment2D> glyphSegments, ushort em)
         {
             if (glyphSegments.Count == 0)
@@ -142,80 +132,5 @@ namespace Adamantium.Fonts
 
             return closestDistance;
         }
-
-        /*private Color[] ProcessGlyphSubpixelSampling(Subpixel[,] sampledData)
-        {
-            var blendedSubpixels = BlendSubpixel(sampledData);
-
-            return ConvertToPixels(blendedSubpixels);
-        }
-
-        private List<Subpixel> BlendSubpixel(Subpixel[,] subpixels)
-        {
-            var width = subpixels.GetLength(0);
-            var height = subpixels.GetLength(1);
-
-            var redForegroundLinear = EncodedToBrightness(foreground.R);
-            var greenForegroundLinear = EncodedToBrightness(foreground.G);
-            var blueForegroundLinear = EncodedToBrightness(foreground.B);
-
-            var redBackgroundLinear = EncodedToBrightness(background.R);
-            var greenBackgroundLinear = EncodedToBrightness(background.G);
-            var blueBackgroundLinear = EncodedToBrightness(background.B);
-
-            var blendedSubpixels = new List<Subpixel>();
-
-            // for visualizing
-            visSubpixels = new byte[width, height];
-            // -------------
-            
-            for (var y = 0; y < height; y++)
-            {
-                for (var x = 0; x < width; x++)
-                {
-                    var blendedValue = 0.0;
-
-                    var currentDistance = subpixels[x, y].Distance;
-
-                    if (x % 3 == 0) blendedValue = currentDistance * redForegroundLinear   + (1.0 - currentDistance) * redBackgroundLinear;
-                    if (x % 3 == 1) blendedValue = currentDistance * greenForegroundLinear + (1.0 - currentDistance) * greenBackgroundLinear;
-                    if (x % 3 == 2) blendedValue = currentDistance * blueForegroundLinear  + (1.0 - currentDistance) * blueBackgroundLinear;
-                    
-                    var blendedSubpixel = new Subpixel();
-                    blendedSubpixel.Energy = BrightnessToEncoded(blendedValue);
-                    blendedSubpixel.IsVisible = subpixels[x, y].IsVisible;
-
-                    blendedSubpixels.Add(blendedSubpixel);
-                    
-                    // for visualizing
-                    visSubpixels[x, y] = blendedSubpixel.Energy;
-                    // ----------------
-                }
-            }
-
-            return blendedSubpixels;
-        }
-
-        private Color[] ConvertToPixels(List<Subpixel> subpixels)
-        {
-            var pixels = new List<Color>();
-            
-            for (var i = 2; i < subpixels.Count; i+=3)
-            {
-                bool isRedVisible = subpixels[i - 2].IsVisible;
-                bool isGreenVisible = subpixels[i - 1].IsVisible;
-                bool isBlueVisible = subpixels[i].IsVisible;
-                
-                byte red = subpixels[i - 2].Energy;
-                byte green = subpixels[i - 1].Energy;
-                byte blue = subpixels[i].Energy;
-
-                byte alpha = (byte)(isRedVisible || isGreenVisible || isBlueVisible ? 255 : 0);
-
-                pixels.Add(Color.FromRgba(red, green, blue, 255));
-            }
-
-            return pixels.ToArray();
-        }*/   
     }
 }

@@ -8,7 +8,7 @@ Texture2D shaderTexture;
 float gamma;
 float4 foregroundColor;
 float4 backgroundColor;
-float rebalance;
+uint glyphSize;
 
 struct TexturedVertexInputType
 {
@@ -119,31 +119,42 @@ float4 BrightnessToEncoded(float4 brightness)
     return pow(brightness, 1.0 / gamma);
 }
 
+float GetRebalancedSubpixel(float mostLeft, float leastLeft, float current, float leastRight, float mostRight)
+{
+    return (mostLeft / 9.0) +
+           ((leastLeft * 2.0) / 9.0) +
+           ((current * 3.0) / 9.0) +
+           ((leastRight * 2.0) / 9.0) +
+           (mostRight / 9.0);
+}
+
 float4 Subpixel_PS(PS_OUTPUT_BASIC input) : SV_TARGET
 {
-    float4 sample = shaderTexture.Sample(sampleType, input.uv);
+    float pixelStep = 1.0 / glyphSize;
+    float2 leftPos = float2(input.uv.x - pixelStep, input.uv.y);
+    float2 rightPos = float2(input.uv.x + pixelStep, input.uv.y);
 
-    float4 linearSample = EncodedToBrightness(sample);
+    float4 leftPixel = shaderTexture.Sample(sampleType, leftPos);
+    float4 currentPixel = shaderTexture.Sample(sampleType, input.uv);
+    float4 rightPixel = shaderTexture.Sample(sampleType, rightPos);
+
+    leftPixel = EncodedToBrightness(leftPixel);
+    currentPixel = EncodedToBrightness(currentPixel);
+    rightPixel = EncodedToBrightness(rightPixel);    
+
+    float redDist = GetRebalancedSubpixel(leftPixel.g, leftPixel.b, currentPixel.r, currentPixel.g, currentPixel.b);
+    float greenDist = GetRebalancedSubpixel(leftPixel.b, currentPixel.r, currentPixel.g, currentPixel.b, rightPixel.r);
+    float blueDist = GetRebalancedSubpixel(currentPixel.r, currentPixel.g, currentPixel.b, rightPixel.r, rightPixel.g);
+
     float4 linearForegroundColor = EncodedToBrightness(foregroundColor);
     float4 linearBackgroundColor = EncodedToBrightness(backgroundColor);
     
-    float blendedRed   = linearSample.r * linearForegroundColor.r + (1.0 - linearSample.r) * linearBackgroundColor.r;
-    float blendedGreen = linearSample.g * linearForegroundColor.g + (1.0 - linearSample.g) * linearBackgroundColor.g;
-    float blendedBlue  = linearSample.b * linearForegroundColor.b + (1.0 - linearSample.b) * linearBackgroundColor.b;
-    //float blendedAlpha = linearSample.a * linearForegroundColor.a + (1.0 - linearSample.a) * linearBackgroundColor.a;
+    float blendedRed   = redDist * linearForegroundColor.r + (1.0 - redDist) * linearBackgroundColor.r;
+    float blendedGreen = greenDist * linearForegroundColor.g + (1.0 - greenDist) * linearBackgroundColor.g;
+    float blendedBlue  = blueDist * linearForegroundColor.b + (1.0 - blueDist) * linearBackgroundColor.b;
+    float blendedAlpha = currentPixel.a * linearForegroundColor.a + (1.0 - currentPixel.a) * linearBackgroundColor.a;
     
-    
-    float median = (blendedRed + blendedGreen + blendedBlue) / 3.0;
-    
-    float redDelta = (median - blendedRed) * rebalance;
-    float greenDelta = (median - blendedGreen) * rebalance;
-    float blueDelta = (median - blendedBlue) * rebalance;
-    
-    blendedRed = blendedRed + redDelta;
-    blendedGreen = blendedGreen + greenDelta;
-    blendedBlue = blendedBlue + blueDelta;
-    
-    float4 color = BrightnessToEncoded(float4(blendedRed, blendedGreen, blendedBlue, 1.0));
+    float4 color = BrightnessToEncoded(float4(blendedRed, blendedGreen, blendedBlue, blendedAlpha));
     
     return color;
 }
