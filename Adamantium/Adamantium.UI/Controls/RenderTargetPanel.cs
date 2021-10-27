@@ -116,7 +116,7 @@ namespace Adamantium.UI.Controls
 
       public event EventHandler<RenderTargetEventArgs> RenderTargetInitialized;
 
-      public override void OnRender(DrawingContext context)
+      protected override void OnRender(DrawingContext context)
       {
          if (rendertarget != null)
          {

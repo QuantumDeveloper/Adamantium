@@ -127,7 +127,6 @@ namespace Adamantium.UI
         void RemoveHandler(RoutedEvent routedEvent, Delegate handler);
         void ReleaseMouseCapture();
         void ReleaseStylusCapture();
-        void OnRender(DrawingContext context);
 
-        }
+    }
 }

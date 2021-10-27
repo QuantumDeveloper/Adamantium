@@ -22,14 +22,14 @@ namespace Adamantium.UI.Controls
 
       public Double RadiusX
       {
-         get { return GetValue<Double>(RadiusXProperty); }
-         set { SetValue(RadiusXProperty, value);}
+         get => GetValue<Double>(RadiusXProperty);
+         set => SetValue(RadiusXProperty, value);
       }
 
       public Double RadiusY
       {
-         get { return GetValue<Double>(RadiusYProperty); }
-         set { SetValue(RadiusYProperty, value);}
+         get => GetValue<Double>(RadiusYProperty);
+         set => SetValue(RadiusYProperty, value);
       }
 
       public override Geometry RenderGeometry => geometry;
@@ -59,7 +59,7 @@ namespace Adamantium.UI.Controls
       //   return new Size(StrokeThickness, StrokeThickness);
       //}
 
-      public override void OnRender(DrawingContext context)
+      protected override void OnRender(DrawingContext context)
       {
          base.OnRender(context);
          geometry = new RectangleGeometry(new Rect(new Size(ActualWidth, ActualHeight)).Deflate(StrokeThickness),RadiusX, RadiusY);

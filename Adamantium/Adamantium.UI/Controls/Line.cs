@@ -51,7 +51,7 @@ namespace Adamantium.UI.Controls
          set { SetValue(Y2Property, value); }
       }
 
-      public override void OnRender(DrawingContext context)
+      protected override void OnRender(DrawingContext context)
       {
          base.OnRender(context);
          geometry = new LineGeometry(new Point(X1, Y1), new Point(X2, Y2), StrokeThickness);

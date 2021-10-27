@@ -8,7 +8,6 @@ namespace Adamantium.UI.Media
    public class DrawingContext
    {
       internal GraphicsDevice GraphicsDevice { get; set; }
-      //internal D2DGraphicDevice D2DGraphicDevice { get; set; }
       internal Dictionary<IUIComponent, ShapePresentation> VisualPresentations;
 
       internal DrawingContext(GraphicsDevice d3dDevice)

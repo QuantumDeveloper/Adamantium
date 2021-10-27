@@ -211,7 +211,7 @@ namespace Adamantium.UI.Controls
       private Size childSize;
       Stopwatch measureTimer;
 
-      public override void OnRender(DrawingContext context)
+      protected override void OnRender(DrawingContext context)
       {
          context.BeginDraw(this);
          context.DrawRectangle(this, Background, new Rect(new Size(ActualWidth, ActualHeight)));
@@ -956,11 +956,10 @@ namespace Adamantium.UI.Controls
 
          public override bool Equals(object obj)
          {
-            SpanData sk = obj as SpanData;
-            return sk != null
-                   && sk.Segments == Segments
-                   && sk.Start == Start
-                   && sk.Count == Count;
+            return obj is SpanData sd
+                   && sd.Segments == Segments
+                   && sd.Start == Start
+                   && sd.Count == Count;
          }
       }
    }
