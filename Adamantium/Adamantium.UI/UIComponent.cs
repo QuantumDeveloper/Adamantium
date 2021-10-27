@@ -1588,7 +1588,7 @@ namespace Adamantium.UI
 
       public EventHandler<VisualParentChangedEventArgs> VisualParentChanged; 
 
-      public virtual void OnRender(DrawingContext context)
+      protected virtual void OnRender(DrawingContext context)
       {
       }
     }

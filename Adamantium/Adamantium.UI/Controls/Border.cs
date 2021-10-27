@@ -77,7 +77,7 @@ namespace Adamantium.UI.Controls
          return finalSize;
       }
 
-      public override void OnRender(DrawingContext context)
+      protected override void OnRender(DrawingContext context)
       {
          var size = new Size(ActualWidth, ActualHeight);
          var borderThickness = BorderThickness;

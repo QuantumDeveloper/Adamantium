@@ -66,21 +66,21 @@ namespace Adamantium.UI.Controls
 
       public Double StartAngle
       {
-         get { return GetValue<Double>(StartAngleProperty); }
-         set { SetValue(StartAngleProperty, value); }
+         get => GetValue<Double>(StartAngleProperty);
+         set => SetValue(StartAngleProperty, value);
       }
 
       public Double StopAngle
       {
-         get { return GetValue<Double>(StopAngleProperty); }
-         set { SetValue(StopAngleProperty, value); }
+         get => GetValue<Double>(StopAngleProperty);
+         set => SetValue(StopAngleProperty, value);
       }
 
 
       public override Geometry RenderGeometry => geometry;
 
 
-      public override void OnRender(DrawingContext context)
+      protected override void OnRender(DrawingContext context)
       {
          if (!IsGeometryValid)
          {

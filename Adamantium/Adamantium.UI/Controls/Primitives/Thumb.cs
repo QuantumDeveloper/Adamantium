@@ -144,7 +144,7 @@ namespace Adamantium.UI.Controls.Primitives
          IsDragging = false;
       }
 
-      public override void OnRender(DrawingContext context)
+      protected override void OnRender(DrawingContext context)
       {
          if (!IsGeometryValid)
          {

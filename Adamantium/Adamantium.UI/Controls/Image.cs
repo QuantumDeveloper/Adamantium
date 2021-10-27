@@ -69,7 +69,7 @@ namespace Adamantium.UI.Controls
          }
       }
 
-      public override void OnRender(DrawingContext context)
+      protected override void OnRender(DrawingContext context)
       {
          base.OnRender(context);
          var source = Source;
