@@ -8,7 +8,7 @@ Texture2D shaderTexture;
 float gamma;
 float4 foregroundColor;
 float4 backgroundColor;
-uint glyphSize;
+uint atlasSize;
 
 struct TexturedVertexInputType
 {
@@ -104,7 +104,7 @@ float4 MSDF_PS(PS_OUTPUT_BASIC input) : SV_TARGET
     float sigDist = median( sample.r, sample.g, sample.b ) - 0.5;
     float opacity = clamp( sigDist * toPixels + 0.5, 0.0, 1.0 );
     
-    float4 color = float4(0, 0, 0, opacity);
+    float4 color = float4(foregroundColor.r, foregroundColor.g, foregroundColor.b, opacity);
     
     return color;
 }
@@ -130,7 +130,7 @@ float GetRebalancedSubpixel(float mostLeft, float leastLeft, float current, floa
 
 float4 Subpixel_PS(PS_OUTPUT_BASIC input) : SV_TARGET
 {
-    float pixelStep = 1.0 / glyphSize;
+    float pixelStep = 1.0 / atlasSize;
     float2 leftPos = float2(input.uv.x - pixelStep, input.uv.y);
     float2 rightPos = float2(input.uv.x + pixelStep, input.uv.y);
 
@@ -147,7 +147,7 @@ float4 Subpixel_PS(PS_OUTPUT_BASIC input) : SV_TARGET
     float blueDist = GetRebalancedSubpixel(currentPixel.r, currentPixel.g, currentPixel.b, rightPixel.r, rightPixel.g);
 
     float4 linearForegroundColor = EncodedToBrightness(foregroundColor);
-    float4 linearBackgroundColor = EncodedToBrightness(backgroundColor);
+    float4 linearBackgroundColor = EncodedToBrightness(backgroundColor);    
     
     float blendedRed   = redDist * linearForegroundColor.r + (1.0 - redDist) * linearBackgroundColor.r;
     float blendedGreen = greenDist * linearForegroundColor.g + (1.0 - greenDist) * linearBackgroundColor.g;

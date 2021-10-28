@@ -12,6 +12,7 @@ using Adamantium.Fonts.Exceptions;
 using Adamantium.Fonts.Parsers.CFF;
 using Adamantium.Fonts.Tables.CFF;
 using Adamantium.Mathematics;
+using Adamantium.UI;
 using Matrix3x2 = Adamantium.Mathematics.Matrix3x2;
 
 namespace Adamantium.Fonts
@@ -107,6 +108,31 @@ namespace Adamantium.Fonts
             IsEmpty = isEmpty;
         }
 
+        public Vector2D[] GetTextureAtlasUVCoordinates(uint glyphTextureSize, uint atlasStartGlyphIndex, uint glyphCount)
+        {
+            var uv = new Vector2D[2];
+
+            var glyphsPerRow = (uint)Math.Ceiling(Math.Sqrt(glyphCount));
+            var glyphsPerColumn = (uint)Math.Ceiling((double)glyphCount / glyphsPerRow);
+            
+            var atlasDimensions = new Size(glyphsPerRow, glyphsPerColumn);
+            
+            var relativeGlyphIndex = Index - atlasStartGlyphIndex;
+
+            var startX = (relativeGlyphIndex % (int)atlasDimensions.Width) * glyphTextureSize;
+            var startY = (relativeGlyphIndex / (int)atlasDimensions.Width) * glyphTextureSize;
+            
+            Size atlasSize = new Size(atlasDimensions.Width * glyphTextureSize, atlasDimensions.Height * glyphTextureSize);
+            
+            var uvStart = new Vector2D(startX / atlasSize.Width, startY / atlasSize.Height);
+            var uvEnd   = new Vector2D((startX + glyphTextureSize) / atlasSize.Width, (startY + glyphTextureSize) / atlasSize.Height);
+
+            uv[0] = uvStart;
+            uv[1] = uvEnd;
+            
+            return uv;
+        }
+        
         public Vector3F[] Sample(byte rate)
         {
             if (IsEmpty)

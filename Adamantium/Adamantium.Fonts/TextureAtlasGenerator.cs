@@ -20,14 +20,21 @@ namespace Adamantium.Fonts
         private Size atlasDimensions;
         private Size atlasSize;
         private uint glyphTextureSize;
+        private byte sampleRate;
         private TypeFace typeFace;
         private IFont font;
         private GeneratorType generatorType;
         private int startGlyphIndex;
 
-        public TextureAtlasData GenerateTextureAtlas(TypeFace typeFace, IFont font, uint glyphTextureSize, int startGlyphIndex, int glyphCount, GeneratorType generatorType)
+        public TextureAtlasData GenerateTextureAtlas(TypeFace typeFace, IFont font, uint glyphTextureSize, byte sampleRate, int startGlyphIndex, int glyphCount, GeneratorType generatorType)
         {
+            if (startGlyphIndex < 0 || glyphCount <= 0)
+            {
+                return default;
+            }
+            
             this.glyphTextureSize = glyphTextureSize;
+            this.sampleRate = sampleRate;
             this.typeFace = typeFace;
             this.font = font;
             this.generatorType = generatorType;
@@ -40,7 +47,7 @@ namespace Adamantium.Fonts
             rawAtlas = new Color[(uint)atlasSize.Width, (uint)atlasSize.Height];
                 
             Console.Write("[");
-            Parallel.For(startGlyphIndex, startGlyphIndex + glyphCount, new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount }, GenerateTextureAtlas);
+            Parallel.For(startGlyphIndex, startGlyphIndex + glyphCount, new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount }, GenerateTextureForGlyph);
             Console.Write("]\n");
 
             for (var y = 0; y < atlasSize.Height; y++)
@@ -55,7 +62,7 @@ namespace Adamantium.Fonts
             return data;
         }
 
-        private void GenerateTextureAtlas(int glyphIndex)
+        private void GenerateTextureForGlyph(int glyphIndex)
         {
             typeFace.GetGlyphByIndex((uint)glyphIndex, out var glyph);
             var em = font.UnitsPerEm;
@@ -70,9 +77,9 @@ namespace Adamantium.Fonts
 
             glyph.MsdfAtlasUV = new GlyphUVCoordinates() { Start = UVStart, End = UVEnd};
 
-            glyph.Sample(10);
+            glyph.Sample(sampleRate);
 
-            var rawGlyph = new Color[glyphTextureSize, glyphTextureSize];
+            Color[,] rawGlyph;
             
             if (generatorType == GeneratorType.Msdf)
             {
@@ -96,10 +103,10 @@ namespace Adamantium.Fonts
             Console.Write(".");
         }
 
-        private Size CalculateAtlasDimensions(int glyphCnt)
+        private Size CalculateAtlasDimensions(int glyphCount)
         {
-            var glyphsPerRow = (uint)Math.Ceiling(Math.Sqrt(glyphCnt));
-            var glyphsPerColumn = (uint)Math.Ceiling((double)glyphCnt / glyphsPerRow);
+            var glyphsPerRow = (uint)Math.Ceiling(Math.Sqrt(glyphCount));
+            var glyphsPerColumn = (uint)Math.Ceiling((double)glyphCount / glyphsPerRow);
 
             return new Size(glyphsPerRow, glyphsPerColumn);
         }

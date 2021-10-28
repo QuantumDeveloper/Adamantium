@@ -80,7 +80,7 @@ namespace Adamantium.Fonts
 
             // 4. Normalize
             maxDist = Math.Min(Math.Abs(minDist), Math.Abs(maxDist));
-            minDist = -maxDist * 2;
+            minDist = -maxDist;
 
             var colors = new Color[textSize, textSize];
             Color color = default;

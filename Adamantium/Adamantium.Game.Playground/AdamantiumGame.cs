@@ -243,6 +243,55 @@ namespace Adamantium.Game.Playground
             pixels.SetPixels(data.AtlasColors);
             img.Save(path, ImageFileType.Png);
         }
+
+        uint mtsdfTextureSize = 64;
+        private uint subpixelMaxFontSize = 24;
+
+        private Entity PrintText(IFont font, uint fontSize, string text)
+        {
+            var entity = new Entity(null, "PrintText");
+            
+            var glyphTextureSize = fontSize <= subpixelMaxFontSize ? fontSize : mtsdfTextureSize;
+
+            var quadList = new List<Vector3F>();
+            var uvList = new List<Vector2F>();
+
+            for (var i = 0; i < text.Length; i++)
+            {
+                var glyph = font.GetGlyphByCharacter(text[i]);
+
+                quadList.Add(new Vector3F(fontSize * i,            0));
+                quadList.Add(new Vector3F(fontSize * i + fontSize, 0));
+                quadList.Add(new Vector3F(fontSize * i + fontSize, fontSize));
+                
+                quadList.Add(new Vector3F(fontSize * i,            0));
+                quadList.Add(new Vector3F(fontSize * i + fontSize, fontSize));
+                quadList.Add(new Vector3F(fontSize * i,            fontSize));
+
+                var glyphUV = glyph.GetTextureAtlasUVCoordinates(glyphTextureSize, 0, font.GlyphCount);
+
+                uvList.Add(new Vector2F((float)glyphUV[0].X,   (float)glyphUV[0].Y));
+                uvList.Add(new Vector2F((float)glyphUV[1].X,   (float)glyphUV[0].Y));
+                uvList.Add(new Vector2F((float)glyphUV[1].X,   (float)glyphUV[1].Y));
+
+                uvList.Add(new Vector2F((float)glyphUV[0].X,   (float)glyphUV[0].Y));
+                uvList.Add(new Vector2F((float)glyphUV[1].X,   (float)glyphUV[1].Y));
+                uvList.Add(new Vector2F((float)glyphUV[0].X,   (float)glyphUV[1].Y));
+            }
+
+            var mesh = new Mesh();
+            mesh.MeshTopology = PrimitiveType.TriangleList;
+            mesh.SetPositions(quadList);
+            mesh.SetUVs(0, uvList);
+            var meshComponent = new MeshData();
+            meshComponent.Mesh = mesh;
+            var meshRenderer = new MeshRenderer();
+            meshRenderer.Name = fontSize <= subpixelMaxFontSize ? "SmallGlyph" : "LargeGlyph";
+            entity.AddComponent(meshComponent);
+            entity.AddComponent(meshRenderer);
+            
+            return entity;
+        }
         
         private void ImportOTFFont()
         {
@@ -252,61 +301,30 @@ namespace Adamantium.Game.Playground
                 var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/SourceSans3-Regular.otf", 3);
                 //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/GlametrixLight-0zjo.otf", 3);
                 //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/Japan/NotoSansCJKjp-Light.otf", 3);
-                var entity = new Entity(null, "Poppins-Medium");
                 var font = typeface.GetFont(0);
-                var glyph = font.GetGlyphByCharacter('@');
-                //typeface.GetGlyphByIndex(2058, out var glyph);
-                //glyph.Sample(10);
-                uint msdfTextureSize = 64;
-                uint subpixelGlyphSize = 18;
+                byte sampleRate = 10;
+                uint fontSize = 24;
 
                 /*var colors = glyph.RasterizeGlyphBySubpixels(subpixelGlyphSize, em);
                 uint size = subpixelGlyphSize;
                 var visSubpixels = glyph.GetVisSubpixels();
                 var visEntity = VisualizeSubpixelRendering(visSubpixels);*/
 
-                var atlasGen = new TextureAtlasGenerator();
+                //var atlasGen = new TextureAtlasGenerator();
 
-                /*var msdfAtlasData = atlasGen.GenerateTextureAtlas(font, msdfTextureSize, 0, 529);
-                SaveAtlas(@"Textures\sdf.png", msdfAtlasData);*/
+                /*var mtsdfAtlasData = atlasGen.GenerateTextureAtlas(typeface, font, mtsdfTextureSize, sampleRate, 0, (int)font.GlyphCount, GeneratorType.Msdf);
+                SaveAtlas(@"Textures\mtsdf.png", mtsdfAtlasData);*/
 
-                var subAtlasData = atlasGen.GenerateTextureAtlas(typeface, font, subpixelGlyphSize, 0, 2200, GeneratorType.Subpixel);
-                SaveAtlas(@"Textures\sdf.png", subAtlasData);
+                /*var subAtlasData = atlasGen.GenerateTextureAtlas(typeface, font, fontSize, sampleRate, 0, (int)font.GlyphCount, GeneratorType.Subpixel);
+                SaveAtlas(@"Textures\subpixel.png", subAtlasData);*/
 
-                var glyphShift = 10;
-                var glyphSize = subpixelGlyphSize;
-                var quadList = new List<Vector3F>();
-                quadList.Add(new Vector3F(glyphShift, glyphShift));
-                quadList.Add(new Vector3F(glyphSize + glyphShift, glyphShift, 0));
-                quadList.Add(new Vector3F(glyphSize + glyphShift, glyphSize + glyphShift, 0));
-                quadList.Add(new Vector3F(glyphShift, glyphSize + glyphShift, 0));
+                var textEntity = PrintText(font, fontSize, "Привет!");
 
-                var uv = new List<Vector2F>();
-                
-                uv.Add(new Vector2F((float)glyph.MsdfAtlasUV.Start.X, (float)glyph.MsdfAtlasUV.Start.Y));
-                uv.Add(new Vector2F((float)glyph.MsdfAtlasUV.End.X,   (float)glyph.MsdfAtlasUV.Start.Y));
-                uv.Add(new Vector2F((float)glyph.MsdfAtlasUV.End.X,   (float)glyph.MsdfAtlasUV.End.Y));
-                uv.Add(new Vector2F((float)glyph.MsdfAtlasUV.Start.X, (float)glyph.MsdfAtlasUV.End.Y));
-
-                var mesh = new Mesh();
-                mesh.MeshTopology = PrimitiveType.TriangleList;
-                mesh.SetPositions(quadList);
-                mesh.SetUVs(0, uv);
-                mesh.SetIndices(new[] { 0, 1, 2, 0, 2, 3 });
-                var meshComponent = new MeshData();
-                meshComponent.Mesh = mesh;
-                var meshRenderer = new MeshRenderer();
-                meshRenderer.Name = "Glyph";
-                entity.AddComponent(meshComponent);
-                entity.AddComponent(meshRenderer);
-
-                /*
-                // OUTLINES CHECK
+                /* // OUTLINES CHECK
                 List<Vector3F> vertexList;
                 List<Color> colorList;
 
-                glyph.GetSegments(out vertexList, out colorList);
-                
+                glyph.GetSegments(out vertexList, out colorList);                
                 
                 var mesh = new Mesh();
                 mesh.MeshTopology = PrimitiveType.LineList;
@@ -319,7 +337,7 @@ namespace Adamantium.Game.Playground
                 entity.AddComponent(meshComponent);
                 entity.AddComponent(meshRenderer);*/
 
-                EntityWorld.AddEntity(entity);
+                EntityWorld.AddEntity(textEntity);
                 //EntityWorld.AddEntity(visEntity);
             }
             catch (Exception e)

@@ -22,9 +22,11 @@ namespace Adamantium.Engine.Processors
 {
     public class ForwardRenderingProcessor : RenderProcessor
     {
-        private Sampler textureSampler;
-        private Texture defaultTexture;
-        
+        private Sampler mtsdfTextureSampler;
+        private Sampler subpixelTextureSampler;
+        private Texture mtsdfTexture;
+        private Texture subpixelTexture;
+
         public ForwardRenderingProcessor(EntityWorld world, GameOutput window) : base(world, window)
         {
             //DeferredDevice = GraphicsDevice.CreateDeferred();
@@ -242,39 +244,34 @@ namespace Adamantium.Engine.Processors
             decals[7] = new Vector3F(0, voxelSize, 0);
         }
         
-        Sampler CreateTextureSampler()
+        Sampler CreateTextureSampler(bool mtsdf)
         {
             SamplerCreateInfo samplerInfo = new SamplerCreateInfo();
-            /*samplerInfo.MagFilter = Filter.Linear;
-            samplerInfo.MinFilter = Filter.Linear;*/
-            
-            samplerInfo.MagFilter = Filter.Nearest;
-            samplerInfo.MinFilter = Filter.Nearest;
-            
+            samplerInfo.MagFilter = mtsdf ? Filter.Linear : Filter.Nearest;
+            samplerInfo.MinFilter = mtsdf ? Filter.Linear : Filter.Nearest;
             samplerInfo.AddressModeU = SamplerAddressMode.Repeat;
             samplerInfo.AddressModeV = SamplerAddressMode.Repeat;
             samplerInfo.AddressModeW = SamplerAddressMode.Repeat;
             samplerInfo.AnisotropyEnable = true;
-            //samplerInfo.AnisotropyEnable = false;
             samplerInfo.MaxAnisotropy = 16;
             samplerInfo.BorderColor = BorderColor.IntOpaqueWhite;
             samplerInfo.UnnormalizedCoordinates = false;
             samplerInfo.CompareEnable = false;
             samplerInfo.CompareOp = CompareOp.Always;
-            //samplerInfo.MipmapMode = SamplerMipmapMode.Linear;
-            
-            samplerInfo.MipmapMode = SamplerMipmapMode.Nearest;
+            samplerInfo.MipmapMode = mtsdf ? SamplerMipmapMode.Linear : SamplerMipmapMode.Nearest;
 
             return GraphicsDevice.CreateSampler(samplerInfo);
         }
 
         private void CreateResources()
         {
-            GraphicsDevice.ClearColor = Colors.White;
-            
-            textureSampler = CreateTextureSampler();
+            mtsdfTextureSampler = CreateTextureSampler(true);
+            subpixelTextureSampler = CreateTextureSampler(false);
             //defaultTexture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "texture.png"));
-            defaultTexture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "sdf.png"));
+            //defaultTexture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "sdf.png"));
+            mtsdfTexture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "mtsdf.png"));
+            subpixelTexture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "subpixel.png"));
+            
             //defaultTexture.Save(Path.Combine("Textures", "subpixel.png"), ImageFileType.Png);
             //DeferredDevice.SetTargets(null);
 
@@ -488,17 +485,15 @@ namespace Adamantium.Engine.Processors
                                         
                                         //DeferredDevice.RasterizerState = DeferredDevice.RasterizerStates.Default;
                                         //DeferredDevice.SetRasterizerState(DeferredDevice.RasterizerStates.CullBackClipDisabled);
-                                        
-                                        GraphicsDevice.BasicEffect.Parameters["sampleType"].SetResource(textureSampler);
 
                                         if (material?.Texture != null)
                                         {
                                             GraphicsDevice.BasicEffect.Parameters["shaderTexture"].SetResource(material.Texture);
                                         }
-                                        else
+                                        /*else
                                         {
                                             GraphicsDevice.BasicEffect.Parameters["shaderTexture"].SetResource(defaultTexture);
-                                        }
+                                        }*/
 
                                         if (component is SkinnedMeshRenderer)
                                         {
@@ -508,19 +503,31 @@ namespace Adamantium.Engine.Processors
 
                                         if (component is MeshRenderer)
                                         {
-                                            if (component.Name == "Glyph")
+                                            if (component.Name == "SmallGlyph")
                                             {
-                                                //GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Textured"].Apply();
+                                                var foreground = Colors.White;
+                                                GraphicsDevice.ClearColor = Colors.CornflowerBlue;
+                                                GraphicsDevice.BasicEffect.Parameters["sampleType"].SetResource(subpixelTextureSampler);
+                                                GraphicsDevice.BasicEffect.Parameters["shaderTexture"].SetResource(subpixelTexture);
                                                 GraphicsDevice.BasicEffect.Parameters["gamma"].SetValue(1.0f);
-                                                GraphicsDevice.BasicEffect.Parameters["glyphSize"].SetValue(18);
-                                                GraphicsDevice.BasicEffect.Parameters["foregroundColor"].SetValue(Color.FromRgba(0, 0, 0, 255).ToVector4());
-                                                GraphicsDevice.BasicEffect.Parameters["backgroundColor"].SetValue(Color.FromRgba(255, 255, 255, 255).ToVector4());
+                                                GraphicsDevice.BasicEffect.Parameters["atlasSize"].SetValue(subpixelTexture.Width);
+                                                GraphicsDevice.BasicEffect.Parameters["foregroundColor"].SetValue(foreground.ToVector4());
+                                                GraphicsDevice.BasicEffect.Parameters["backgroundColor"].SetValue(GraphicsDevice.ClearColor.ToVector4());
                                                 GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Subpixel"].Apply();
-                                                //GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["MSDF"].Apply();
+                                                //GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Textured"].Apply();
+                                            }
+                                            else if (component.Name == "LargeGlyph")
+                                            {
+                                                var foreground = Colors.White;
+                                                GraphicsDevice.ClearColor = Colors.CornflowerBlue;
+                                                GraphicsDevice.BasicEffect.Parameters["sampleType"].SetResource(mtsdfTextureSampler);
+                                                GraphicsDevice.BasicEffect.Parameters["shaderTexture"].SetResource(mtsdfTexture);
+                                                GraphicsDevice.BasicEffect.Parameters["foregroundColor"].SetValue(foreground.ToVector4());
+                                                GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["MSDF"].Apply();
                                             }
                                             else
                                             {
-                                                //GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["VertexColored"].Apply();
+                                                GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["VertexColored"].Apply();
                                             }
                                             
                                             
