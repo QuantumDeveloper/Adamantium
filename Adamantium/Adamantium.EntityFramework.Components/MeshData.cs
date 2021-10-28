@@ -1,5 +1,4 @@
 ﻿using System;
-using Adamantium.Engine;
 using Adamantium.Engine.Core.Models;
 using Adamantium.Engine.Graphics;
 using Adamantium.EntityFramework.ComponentsBasics;

@@ -26,32 +26,32 @@ namespace Adamantium.UI.Media
 
       public Double RadiusX
       {
-         get { return GetValue<Double>(RadiusXProperty); }
-         set { SetValue(RadiusXProperty, value); }
+         get => GetValue<Double>(RadiusXProperty);
+         set => SetValue(RadiusXProperty, value);
       }
 
       public Double RadiusY
       {
-         get { return GetValue<Double>(RadiusYProperty); }
-         set { SetValue(RadiusYProperty, value); }
+         get => GetValue<Double>(RadiusYProperty);
+         set => SetValue(RadiusYProperty, value);
       }
 
       public Double StartAngle
       {
-         get { return GetValue<Double>(StartAngleProperty); }
-         set { SetValue(StartAngleProperty, value); }
+         get => GetValue<Double>(StartAngleProperty);
+         set => SetValue(StartAngleProperty, value);
       }
 
       public Double StopAngle
       {
-         get { return GetValue<Double>(StopAngleProperty); }
-         set { SetValue(StopAngleProperty, value); }
+         get => GetValue<Double>(StopAngleProperty);
+         set => SetValue(StopAngleProperty, value);
       }
 
       public Point Center
       {
-         get { return GetValue<Point>(CenterProperty); }
-         set { SetValue(CenterProperty, value); }
+         get => GetValue<Point>(CenterProperty);
+         set => SetValue(CenterProperty, value);
       }
 
       public EllipseGeometry()

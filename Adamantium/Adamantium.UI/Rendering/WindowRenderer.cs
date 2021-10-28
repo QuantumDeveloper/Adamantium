@@ -15,11 +15,13 @@ namespace Adamantium.UI
         private Viewport viewport;
         private Rect2D scissor;
         private Matrix4x4F projectionMatrix;
-        private GraphicsDevice GraphicsDevice;
+        private GraphicsDevice graphicsDevice;
+        private DrawingContext context;
         
         public WindowRenderer(GraphicsDevice device)
         {
-            GraphicsDevice = device;
+            graphicsDevice = device;
+            context = new DrawingContext(graphicsDevice);
         }
         
         private void Window_ClientSizeChanged(object sender, SizeChangedEventArgs e)
@@ -52,7 +54,7 @@ namespace Adamantium.UI
                 100000f);
         }
 
-        private void UnsubsribeFromEvents()
+        private void UnsubscribeFromEvents()
         {
             if (window != null)
             {
@@ -65,22 +67,22 @@ namespace Adamantium.UI
             window.ClientSizeChanged += Window_ClientSizeChanged;
         }
 
-        public void SetWindow(IWindow window)
+        public void SetWindow(IWindow wnd)
         {
-            if (window == null) return;
+            if (wnd == null) return;
             
-            UnsubsribeFromEvents();
+            UnsubscribeFromEvents();
 
-            this.window = window;
+            window = wnd;
             
             SubscribeToEvents();
-            InitializeWindowResources((uint)window.ClientWidth, (uint)window.ClientHeight);
+            InitializeWindowResources((uint)wnd.ClientWidth, (uint)wnd.ClientHeight);
         }
 
         public void Render()
         {
-            GraphicsDevice.SetViewports(viewport);
-            GraphicsDevice.SetScissors(scissor);
+            graphicsDevice.SetViewports(viewport);
+            graphicsDevice.SetScissors(scissor);
         }
 
         private void ProcessVisualTree()
@@ -103,6 +105,13 @@ namespace Adamantium.UI
         private void RenderControl(IUIComponent component)
         {
             if (component.Visibility != Visibility.Visible) return;
+
+            if (!component.IsGeometryValid)
+            {
+                component.Render(context);
+            }
+
+            if (!context.VisualPresentations.TryGetValue(component, out var presentation)) return;
             
             
         }

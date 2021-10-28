@@ -303,22 +303,23 @@ namespace Adamantium.Game.Playground
                 //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/Japan/NotoSansCJKjp-Light.otf", 3);
                 var font = typeface.GetFont(0);
                 byte sampleRate = 10;
-                uint fontSize = 24;
+                uint fontSize = 12;
 
                 /*var colors = glyph.RasterizeGlyphBySubpixels(subpixelGlyphSize, em);
                 uint size = subpixelGlyphSize;
                 var visSubpixels = glyph.GetVisSubpixels();
                 var visEntity = VisualizeSubpixelRendering(visSubpixels);*/
 
-                //var atlasGen = new TextureAtlasGenerator();
+                /*
+                var atlasGen = new TextureAtlasGenerator();
+                var mtsdfAtlasData = atlasGen.GenerateTextureAtlas(typeface, font, mtsdfTextureSize, sampleRate, 0, (int)font.GlyphCount, GeneratorType.Msdf);
+                SaveAtlas(@"Textures\mtsdf.png", mtsdfAtlasData);
 
-                /*var mtsdfAtlasData = atlasGen.GenerateTextureAtlas(typeface, font, mtsdfTextureSize, sampleRate, 0, (int)font.GlyphCount, GeneratorType.Msdf);
-                SaveAtlas(@"Textures\mtsdf.png", mtsdfAtlasData);*/
+                var subAtlasData = atlasGen.GenerateTextureAtlas(typeface, font, fontSize, sampleRate, 0, (int)font.GlyphCount, GeneratorType.Subpixel);
+                SaveAtlas(@"Textures\subpixel.png", subAtlasData);
+                */
 
-                /*var subAtlasData = atlasGen.GenerateTextureAtlas(typeface, font, fontSize, sampleRate, 0, (int)font.GlyphCount, GeneratorType.Subpixel);
-                SaveAtlas(@"Textures\subpixel.png", subAtlasData);*/
-
-                var textEntity = PrintText(font, fontSize, "Привет!");
+                var textEntity = PrintText(font, fontSize, "Привет, майне либовски! Оно таки работает");
 
                 /* // OUTLINES CHECK
                 List<Vector3F> vertexList;
