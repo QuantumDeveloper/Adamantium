@@ -33,15 +33,15 @@
 
       public Thickness Padding
       {
-         get { return GetValue<Thickness>(PaddingProperty); }
-         set { SetValue(PaddingProperty, value);}
+         get => GetValue<Thickness>(PaddingProperty);
+         set => SetValue(PaddingProperty, value);
       }
 
       [Content]
       public UIComponent Child
       {
-         get { return GetValue<UIComponent>(ChildProperty); }
-         set { SetValue(ChildProperty, value);}
+         get => GetValue<UIComponent>(ChildProperty);
+         set => SetValue(ChildProperty, value);
       }
 
       protected override Size MeasureOverride(Size availableSize)

@@ -39,8 +39,8 @@ namespace Adamantium.UI.Controls
 
       public Boolean ShowGridLines
       {
-         get { return GetValue<Boolean>(ShowGridLinesProperty); }
-         set { SetValue(ShowGridLinesProperty, value); }
+         get => GetValue<Boolean>(ShowGridLinesProperty);
+         set => SetValue(ShowGridLinesProperty, value);
       }
 
       public static Int32 GetColumn(AdamantiumComponent element)
@@ -85,26 +85,26 @@ namespace Adamantium.UI.Controls
 
       public Boolean IndividualRowSpacing
       {
-         get { return GetValue<Boolean>(IndividualRowSpacingProperty); }
-         set { SetValue(IndividualRowSpacingProperty, value);}
+         get => GetValue<Boolean>(IndividualRowSpacingProperty);
+         set => SetValue(IndividualRowSpacingProperty, value);
       }
 
       public Boolean IndividualColumnSpacing
       {
-         get { return GetValue<Boolean>(IndividualColumnSpacingProperty); }
-         set { SetValue(IndividualColumnSpacingProperty, value); }
+         get => GetValue<Boolean>(IndividualColumnSpacingProperty);
+         set => SetValue(IndividualColumnSpacingProperty, value);
       }
 
       public Double RowSpacing
       {
-         get { return GetValue<Double>(RowSpacingProperty); }
-         set { SetValue(RowSpacingProperty, value); }
+         get => GetValue<Double>(RowSpacingProperty);
+         set => SetValue(RowSpacingProperty, value);
       }
 
       public Double ColumnSpacing
       {
-         get { return GetValue<Double>(ColumnSpacingProperty); }
-         set { SetValue(ColumnSpacingProperty, value); }
+         get => GetValue<Double>(ColumnSpacingProperty);
+         set => SetValue(ColumnSpacingProperty, value);
       }
 
 

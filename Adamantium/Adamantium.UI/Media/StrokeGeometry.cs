@@ -30,32 +30,23 @@ namespace Adamantium.UI.Media
 
       public StrokeGeometry(Pen pen, RectangleGeometry geometry)
       {
-         PrimitiveType = PrimitiveType.TriangleStrip;
          CreateRectangleStroke(geometry, pen.Thickness, pen.DashStyle);
          
       }
 
       public StrokeGeometry(EllipseGeometry ellipseGeometry, Double thickness, DashStyle strokeDashArray)
       {
-         PrimitiveType = PrimitiveType.TriangleStrip;
          CreateEllipseStroke(ellipseGeometry, thickness, strokeDashArray);
       }
 
       internal void CreateRectangleStroke(RectangleGeometry geometry, Double thickness, DashStyle dashStyle)
       {
-         PrimitiveType = PrimitiveType.TriangleStrip;
-         VertexArray.Clear();
-         IndicesArray.Clear();
          lastIndex = 0;
          RectangleStroke(geometry.Bounds, geometry.RadiusX, geometry.RadiusY, thickness, dashStyle);
       }
 
       internal void CreateEllipseStroke(EllipseGeometry ellipseGeometry, Double thickness, DashStyle strokeDashArray)
       {
-         PrimitiveType = PrimitiveType.TriangleStrip;
-
-         VertexArray.Clear();
-         IndicesArray.Clear();
          lastIndex = 0;
          CircleStroke(ellipseGeometry.Center, new Size(ellipseGeometry.RadiusX + thickness, ellipseGeometry.RadiusY + thickness),
             ellipseGeometry.StartAngle, ellipseGeometry.StopAngle, thickness, strokeDashArray);
@@ -330,16 +321,16 @@ namespace Adamantium.UI.Media
 
       private void SimpleRectangle(Rect rect)
       {
-         VertexArray.Add(new VertexPositionTexture(rect.TopLeft, Vector2F.One));
-         VertexArray.Add(new VertexPositionTexture(rect.TopRight, Vector2F.One));
-         VertexArray.Add(new VertexPositionTexture(rect.BottomLeft, Vector2F.One));
-         VertexArray.Add(new VertexPositionTexture(rect.BottomRight, Vector2F.One));
-
-         IndicesArray.Add(lastIndex++);
-         IndicesArray.Add(lastIndex++);
-         IndicesArray.Add(lastIndex++);
-         IndicesArray.Add(lastIndex++);
-         IndicesArray.Add(interrupt);
+         // VertexArray.Add(new VertexPositionTexture(rect.TopLeft, Vector2F.One));
+         // VertexArray.Add(new VertexPositionTexture(rect.TopRight, Vector2F.One));
+         // VertexArray.Add(new VertexPositionTexture(rect.BottomLeft, Vector2F.One));
+         // VertexArray.Add(new VertexPositionTexture(rect.BottomRight, Vector2F.One));
+         //
+         // IndicesArray.Add(lastIndex++);
+         // IndicesArray.Add(lastIndex++);
+         // IndicesArray.Add(lastIndex++);
+         // IndicesArray.Add(lastIndex++);
+         // IndicesArray.Add(interrupt);
       }
 
       /// <summary>
@@ -365,15 +356,15 @@ namespace Adamantium.UI.Media
 
                double x = center.X + ((radius.Width - thickness) * Math.Cos(angle));
                double y = center.Y + ((radius.Height - thickness) * Math.Sin(angle));
-               VertexArray.Add(new VertexPositionTexture(new Vector3D(x, y, 0), new Vector2D()));
-               IndicesArray.Add(lastIndex++);
+               //VertexArray.Add(new VertexPositionTexture(new Vector3D(x, y, 0), new Vector2D()));
+               //IndicesArray.Add(lastIndex++);
 
                x = center.X + ((radius.Width) * Math.Cos(angle));
                y = center.Y + ((radius.Height) * Math.Sin(angle));
-               VertexArray.Add(new VertexPositionTexture(new Vector3D(x, y, 0), new Vector2D()));
-               IndicesArray.Add(lastIndex++);
+               //VertexArray.Add(new VertexPositionTexture(new Vector3D(x, y, 0), new Vector2D()));
+               //IndicesArray.Add(lastIndex++);
             }
-            IndicesArray.Add(interrupt);
+            //IndicesArray.Add(interrupt);
          }
 
          else
@@ -415,19 +406,19 @@ namespace Adamantium.UI.Media
 
                      double x = center.X + ((radius.Width - thickness) * Math.Cos(angle));
                      double y = center.Y + ((radius.Height - thickness) * Math.Sin(angle));
-                     VertexArray.Add(new VertexPositionTexture(new Vector3D(x, y, 0), new Vector2D()));
-                     IndicesArray.Add(lastIndex);
+                     //VertexArray.Add(new VertexPositionTexture(new Vector3D(x, y, 0), new Vector2D()));
+                     //IndicesArray.Add(lastIndex);
                      lastIndex++;
 
                      x = center.X + ((radius.Width) * Math.Cos(angle));
                      y = center.Y + ((radius.Height) * Math.Sin(angle));
-                     VertexArray.Add(new VertexPositionTexture(new Vector3D(x, y, 0), new Vector2D()));
-                     IndicesArray.Add(lastIndex);
+                     //VertexArray.Add(new VertexPositionTexture(new Vector3D(x, y, 0), new Vector2D()));
+                     //IndicesArray.Add(lastIndex);
 
                      lastIndex++;
                   }
 
-                  IndicesArray.Add(interrupt);
+                  //IndicesArray.Add(interrupt);
                   cumulativeAngle += dashLength[k];
                   cumulativeAngle += spaceLength[k];
                   if (cumulativeAngle > stopAngle)

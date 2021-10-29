@@ -117,10 +117,7 @@ namespace Adamantium.UI
 
       public object DefaultValue
       {
-         get
-         {
-            return defaultValue;
-         }
+         get => defaultValue;
          set
          {
             if (!IsSealed)
@@ -132,10 +129,7 @@ namespace Adamantium.UI
 
       public PropertyChangedCallback PropertyChangedCallback
       {
-         get
-         {
-            return propertyChangedCallback;
-         }
+         get => propertyChangedCallback;
          set
          {
             if (!IsSealed)

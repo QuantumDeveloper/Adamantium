@@ -29,26 +29,26 @@ namespace Adamantium.UI.Controls
 
       public Double X1
       {
-         get { return GetValue<Double>(X1Property); }
-         set { SetValue(X1Property, value); }
+         get => GetValue<Double>(X1Property);
+         set => SetValue(X1Property, value);
       }
 
       public Double X2
       {
-         get { return GetValue<Double>(X2Property); }
-         set { SetValue(X2Property, value); }
+         get => GetValue<Double>(X2Property);
+         set => SetValue(X2Property, value);
       }
 
       public Double Y1
       {
-         get { return GetValue<Double>(Y1Property); }
-         set { SetValue(Y1Property, value); }
+         get => GetValue<Double>(Y1Property);
+         set => SetValue(Y1Property, value);
       }
 
       public Double Y2
       {
-         get { return GetValue<Double>(Y2Property); }
-         set { SetValue(Y2Property, value); }
+         get => GetValue<Double>(Y2Property);
+         set => SetValue(Y2Property, value);
       }
 
       protected override void OnRender(DrawingContext context)

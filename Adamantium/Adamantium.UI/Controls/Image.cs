@@ -23,32 +23,32 @@ namespace Adamantium.UI.Controls
 
       public Double RadiusX
       {
-         get { return GetValue<Double>(RadiusXProperty); }
-         set { SetValue(RadiusXProperty, value); }
+         get => GetValue<Double>(RadiusXProperty);
+         set => SetValue(RadiusXProperty, value);
       }
 
       public Double RadiusY
       {
-         get { return GetValue<Double>(RadiusYProperty); }
-         set { SetValue(RadiusYProperty, value); }
+         get => GetValue<Double>(RadiusYProperty);
+         set => SetValue(RadiusYProperty, value);
       }
 
       public Brush FilterBrush {
-         get { return GetValue<Brush>(FilterBrushProperty); }
-         set { SetValue(FilterBrushProperty, value); }
+         get => GetValue<Brush>(FilterBrushProperty);
+         set => SetValue(FilterBrushProperty, value);
       }
 
 
       public Stretch Stretch
       {
-         get { return GetValue<Stretch>(StretchProperty); }
-         set { SetValue(StretchProperty, value); }
+         get => GetValue<Stretch>(StretchProperty);
+         set => SetValue(StretchProperty, value);
       }
 
       public BitmapSource Source
       {
-         get { return GetValue<BitmapSource>(SourceProperty); }
-         set { SetValue(SourceProperty, value); }
+         get => GetValue<BitmapSource>(SourceProperty);
+         set => SetValue(SourceProperty, value);
       }
 
       public Image()

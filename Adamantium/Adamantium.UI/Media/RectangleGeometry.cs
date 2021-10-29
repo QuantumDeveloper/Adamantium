@@ -22,8 +22,7 @@ namespace Adamantium.UI.Media
 
       public RectangleGeometry(RectangleGeometry copy)
       {
-         IndicesArray = copy.IndicesArray;
-         VertexArray = copy.VertexArray;
+         Mesh = copy.Mesh;
       }
 
       public RectangleGeometry(Rect size, Double radiusX, Double radiusY)
@@ -44,28 +43,26 @@ namespace Adamantium.UI.Media
 
       public Double RadiusX
       {
-         get { return GetValue<Double>(RadiusXProperty); }
-         set { SetValue(RadiusXProperty, value);}
+         get => GetValue<Double>(RadiusXProperty);
+         set => SetValue(RadiusXProperty, value);
       }
 
       public Double RadiusY
       {
-         get { return GetValue<Double>(RadiusYProperty); }
-         set { SetValue(RadiusYProperty, value); }
+         get => GetValue<Double>(RadiusYProperty);
+         set => SetValue(RadiusYProperty, value);
       }
 
       public Rect Rect
       {
-         get { return GetValue<Rect>(RectProperty); }
-         set { SetValue(RectProperty, value); }
+         get => GetValue<Rect>(RectProperty);
+         set => SetValue(RectProperty, value);
       }
 
       internal void CreateRectangle(Rect rect, Thickness corners)
       {
          Rect = rect;
          bounds = rect;
-         VertexArray.Clear();
-         IndicesArray.Clear();
 
          Point position = rect.Location;
 
@@ -187,23 +184,23 @@ namespace Adamantium.UI.Media
          //VertexArray.Clear();
          //VertexArray.AddRange(newGeometry);
 
-         Point center = new Point(position.X + (int)(rect.Width / 2), position.Y + (int)(rect.Height / 2));
-         Size roundedRadius = new Size(rect.Width / 2, rect.Height / 2);
-         for (int i = 0; i < VertexArray.Count; i++)
-         {
-            var vertex1 = VertexArray[i];
-            vertex1.UV = new Vector2D(0.5f - (center.X - vertex1.Position.X) / (2 * roundedRadius.Width),
-               0.5f - (center.Y - vertex1.Position.Y) / (2 * roundedRadius.Height));
-            VertexArray[i] = vertex1;
-         }
+         // Point center = new Point(position.X + (int)(rect.Width / 2), position.Y + (int)(rect.Height / 2));
+         // Size roundedRadius = new Size(rect.Width / 2, rect.Height / 2);
+         // for (int i = 0; i < VertexArray.Count; i++)
+         // {
+         //    var vertex1 = VertexArray[i];
+         //    vertex1.UV = new Vector2D(0.5f - (center.X - vertex1.Position.X) / (2 * roundedRadius.Width),
+         //       0.5f - (center.Y - vertex1.Position.Y) / (2 * roundedRadius.Height));
+         //    VertexArray[i] = vertex1;
+         // }
       }
 
       internal void CreateRectangle(Rect rect, Point radius)
       {
          Rect = rect;
          bounds = rect;
-         VertexArray.Clear();
-         IndicesArray.Clear();
+         //VertexArray.Clear();
+         //IndicesArray.Clear();
 
          Point position = rect.Location;
 
@@ -275,19 +272,19 @@ namespace Adamantium.UI.Media
          }
 
          VertexPositionTexture[] newGeometry = null;
-         IndicesArray.AddRange(OptimizeShape(VertexArray.ToArray(), out newGeometry));
-         VertexArray.Clear();
-         VertexArray.AddRange(newGeometry);
+         // IndicesArray.AddRange(OptimizeShape(VertexArray.ToArray(), out newGeometry));
+         // VertexArray.Clear();
+         // VertexArray.AddRange(newGeometry);
 
          Point center = new Point(position.X + (int)(rect.Width / 2), position.Y + (int)(rect.Height / 2));
          Size roundedRadius = new Size(rect.Width / 2, rect.Height / 2);
-         for (int i = 0; i < VertexArray.Count; i++)
-         {
-            var vertex1 = VertexArray[i];
-            vertex1.UV = new Vector2D(0.5f - (center.X - vertex1.Position.X) / (2 * roundedRadius.Width),
-               0.5f - (center.Y - vertex1.Position.Y) / (2 * roundedRadius.Height));
-            VertexArray[i] = vertex1;
-         }
+         // for (int i = 0; i < VertexArray.Count; i++)
+         // {
+         //    var vertex1 = VertexArray[i];
+         //    vertex1.UV = new Vector2D(0.5f - (center.X - vertex1.Position.X) / (2 * roundedRadius.Width),
+         //       0.5f - (center.Y - vertex1.Position.Y) / (2 * roundedRadius.Height));
+         //    VertexArray[i] = vertex1;
+         // }
       }
 
       private void CreateFilledEllipseSector(Point center, Point radius, double startAngle, double endAngle)
@@ -313,33 +310,33 @@ namespace Adamantium.UI.Media
             vertex3.UV = new Vector2D(0.5f - (vertex3.Position.X - center.X) / (2 * radius.X),
                0.5f - (vertex3.Position.Y - center.Y) / (2 * radius.Y));
 
-            VertexArray.Add(vertex1);
-            VertexArray.Add(vertex2);
-            VertexArray.Add(vertex3);
-
-            IndicesArray.Add(lastIndex++);
-            IndicesArray.Add(lastIndex++);
-            IndicesArray.Add(lastIndex++);
+            // VertexArray.Add(vertex1);
+            // VertexArray.Add(vertex2);
+            // VertexArray.Add(vertex3);
+            //
+            // IndicesArray.Add(lastIndex++);
+            // IndicesArray.Add(lastIndex++);
+            // IndicesArray.Add(lastIndex++);
 
             y1 = y2;
             x1 = x2;
          }
 
-         IndicesArray.Add(interrupt);
+         //IndicesArray.Add(interrupt);
       }
 
       private void CreateSimpleRectangle(Rect rectangle)
       {
-         VertexArray.Add(new VertexPositionTexture(rectangle.Location, Vector2F.Zero));
-         VertexArray.Add(new VertexPositionTexture(rectangle.TopRight, new Vector2F(1, 0)));
-         VertexArray.Add(new VertexPositionTexture(rectangle.BottomLeft, new Vector2F(0, 1)));
-         VertexArray.Add(new VertexPositionTexture(rectangle.BottomRight, Vector2F.One));
-
-         IndicesArray.Add(lastIndex++);
-         IndicesArray.Add(lastIndex++);
-         IndicesArray.Add(lastIndex++);
-         IndicesArray.Add(lastIndex++);
-         IndicesArray.Add(interrupt);
+         // VertexArray.Add(new VertexPositionTexture(rectangle.Location, Vector2F.Zero));
+         // VertexArray.Add(new VertexPositionTexture(rectangle.TopRight, new Vector2F(1, 0)));
+         // VertexArray.Add(new VertexPositionTexture(rectangle.BottomLeft, new Vector2F(0, 1)));
+         // VertexArray.Add(new VertexPositionTexture(rectangle.BottomRight, Vector2F.One));
+         //
+         // IndicesArray.Add(lastIndex++);
+         // IndicesArray.Add(lastIndex++);
+         // IndicesArray.Add(lastIndex++);
+         // IndicesArray.Add(lastIndex++);
+         // IndicesArray.Add(interrupt);
       }
 
       private Rect bounds;

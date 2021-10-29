@@ -36,20 +36,20 @@ namespace Adamantium.UI.Controls
 
       public ResizeDirection ResizeDirection
       {
-         get { return GetValue<ResizeDirection>(ResizeDirectionProperty); }
-         set { SetValue(ResizeDirectionProperty, value);}
+         get => GetValue<ResizeDirection>(ResizeDirectionProperty);
+         set => SetValue(ResizeDirectionProperty, value);
       }
 
       public GridResizeBehavior ResizeBehavior
       {
-         get { return GetValue<GridResizeBehavior>(ResizeBehaviorProperty); }
-         set { SetValue(ResizeBehaviorProperty, value);}
+         get => GetValue<GridResizeBehavior>(ResizeBehaviorProperty);
+         set => SetValue(ResizeBehaviorProperty, value);
       }
 
       public Boolean DeferredResizeEnabled
       {
-         get { return GetValue<Boolean>(DeferredResizeEnabledProperty); }
-         set { SetValue(DeferredResizeEnabledProperty, value);}
+         get => GetValue<Boolean>(DeferredResizeEnabledProperty);
+         set => SetValue(DeferredResizeEnabledProperty, value);
       }
 
       public GridSplitter()

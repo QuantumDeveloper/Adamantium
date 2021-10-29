@@ -20,26 +20,26 @@ namespace Adamantium.UI.Controls.Primitives
 
       public event DragStartedEventHandler DragStarted
       {
-         add { AddHandler(DragStartedEvent, value);}
-         remove { RemoveHandler(DragStartedEvent, value);}
+         add => AddHandler(DragStartedEvent, value);
+         remove => RemoveHandler(DragStartedEvent, value);
       }
 
       public event DragEventHandler DragDelta
       {
-         add { AddHandler(DragDeltaEvent, value); }
-         remove { RemoveHandler(DragDeltaEvent, value); }
+         add => AddHandler(DragDeltaEvent, value);
+         remove => RemoveHandler(DragDeltaEvent, value);
       }
 
       public event DragCompletedEventHandler DragCompleted
       {
-         add { AddHandler(DragCompletedEvent, value); }
-         remove { RemoveHandler(DragCompletedEvent, value); }
+         add => AddHandler(DragCompletedEvent, value);
+         remove => RemoveHandler(DragCompletedEvent, value);
       }
 
       public bool IsDragging
       {
-         get {return GetValue<bool>(IsDraggingProperty); }
-         private set { SetValue(IsDraggingProperty, value);}
+         get => GetValue<bool>(IsDraggingProperty);
+         private set => SetValue(IsDraggingProperty, value);
       }
 
       static Thumb()

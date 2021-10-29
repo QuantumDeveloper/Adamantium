@@ -92,7 +92,7 @@ namespace Adamantium.UI.Input
             Win32Interop.GetCursorPos(out point);
             return point;
          }
-         set { Win32Interop.SetCursorPos((int)value.X, (int)value.Y); }
+         set => Win32Interop.SetCursorPos((int)value.X, (int)value.Y);
       }
 
       public static Point GetPosition(IInputElement element)
