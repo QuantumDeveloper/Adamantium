@@ -247,7 +247,7 @@ namespace Adamantium.Game.Playground
         uint mtsdfTextureSize = 64;
         private uint subpixelMaxFontSize = 24;
 
-        private Entity PrintText(IFont font, uint fontSize, string text)
+        private Entity PrintText(TypeFace typeface, IFont font, uint fontSize, string text)
         {
             var entity = new Entity(null, "PrintText");
             
@@ -256,19 +256,25 @@ namespace Adamantium.Game.Playground
             var quadList = new List<Vector3F>();
             var uvList = new List<Vector2F>();
 
+            double penPosition = 0.0;
+            
             for (var i = 0; i < text.Length; i++)
             {
                 var glyph = font.GetGlyphByCharacter(text[i]);
+                glyph.CalculateEmRelatedMultipliers(font.UnitsPerEm); // @TODO: need to somehow calculate this at glyph creation time (for each glyph, maybe at parser)
 
-                quadList.Add(new Vector3F(fontSize * i,            0));
-                quadList.Add(new Vector3F(fontSize * i + fontSize, 0));
-                quadList.Add(new Vector3F(fontSize * i + fontSize, fontSize));
+                var positionMultiplier = glyph.EmRelatedCenterToBaseLineMultiplier;
+                var leftSideBearingMultiplier = glyph.EmRelatedLeftSideBearingMultiplier;
                 
-                quadList.Add(new Vector3F(fontSize * i,            0));
-                quadList.Add(new Vector3F(fontSize * i + fontSize, fontSize));
-                quadList.Add(new Vector3F(fontSize * i,            fontSize));
+                quadList.Add(new Vector3F((float)(penPosition + fontSize * leftSideBearingMultiplier),            (float)(fontSize * positionMultiplier.Y)           ));
+                quadList.Add(new Vector3F((float)(penPosition + fontSize * leftSideBearingMultiplier + fontSize), (float)(fontSize * positionMultiplier.Y)           ));
+                quadList.Add(new Vector3F((float)(penPosition + fontSize * leftSideBearingMultiplier + fontSize), (float)(fontSize * positionMultiplier.Y) + fontSize));
+                
+                quadList.Add(new Vector3F((float)(penPosition + fontSize * leftSideBearingMultiplier),            (float)(fontSize * positionMultiplier.Y)           ));
+                quadList.Add(new Vector3F((float)(penPosition + fontSize * leftSideBearingMultiplier + fontSize), (float)(fontSize * positionMultiplier.Y) + fontSize));
+                quadList.Add(new Vector3F((float)(penPosition + fontSize * leftSideBearingMultiplier),            (float)(fontSize * positionMultiplier.Y) + fontSize));
 
-                var glyphUV = glyph.GetTextureAtlasUVCoordinates(glyphTextureSize, 0, font.GlyphCount);
+                var glyphUV = glyph.GetTextureAtlasUVCoordinates(glyphTextureSize, 0, typeface.GlyphCount);
 
                 uvList.Add(new Vector2F((float)glyphUV[0].X,   (float)glyphUV[0].Y));
                 uvList.Add(new Vector2F((float)glyphUV[1].X,   (float)glyphUV[0].Y));
@@ -277,6 +283,8 @@ namespace Adamantium.Game.Playground
                 uvList.Add(new Vector2F((float)glyphUV[0].X,   (float)glyphUV[0].Y));
                 uvList.Add(new Vector2F((float)glyphUV[1].X,   (float)glyphUV[1].Y));
                 uvList.Add(new Vector2F((float)glyphUV[0].X,   (float)glyphUV[1].Y));
+
+                penPosition += fontSize * glyph.EmRelatedAdvanceWidthMultiplier;
             }
 
             var mesh = new Mesh();
@@ -303,22 +311,54 @@ namespace Adamantium.Game.Playground
                 //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/Japan/NotoSansCJKjp-Light.otf", 3);
                 var font = typeface.GetFont(0);
                 byte sampleRate = 10;
-                uint fontSize = 24;
+                uint fontSize = 240;
 
                 /*var colors = glyph.RasterizeGlyphBySubpixels(subpixelGlyphSize, em);
                 uint size = subpixelGlyphSize;
                 var visSubpixels = glyph.GetVisSubpixels();
                 var visEntity = VisualizeSubpixelRendering(visSubpixels);*/
 
-                //var atlasGen = new TextureAtlasGenerator();
+                var atlasGen = new TextureAtlasGenerator();
 
-                /*var mtsdfAtlasData = atlasGen.GenerateTextureAtlas(typeface, font, mtsdfTextureSize, sampleRate, 0, (int)font.GlyphCount, GeneratorType.Msdf);
+                /*var mtsdfAtlasData = atlasGen.GenerateTextureAtlas(typeface, font, mtsdfTextureSize, sampleRate, 0, (int)typeface.GlyphCount, GeneratorType.Msdf);
                 SaveAtlas(@"Textures\mtsdf.png", mtsdfAtlasData);*/
 
-                /*var subAtlasData = atlasGen.GenerateTextureAtlas(typeface, font, fontSize, sampleRate, 0, (int)font.GlyphCount, GeneratorType.Subpixel);
+                /*var subAtlasData = atlasGen.GenerateTextureAtlas(typeface, font, fontSize, sampleRate, 0, (int)typeface.GlyphCount, GeneratorType.Subpixel);
                 SaveAtlas(@"Textures\subpixel.png", subAtlasData);*/
 
-                var textEntity = PrintText(font, fontSize, "Привет!");
+                var testEntity = new Entity(null, "Test");
+            
+                var quadList = new List<Vector3F>();
+                var uvList = new List<Vector2F>();
+                
+                quadList.Add(new Vector3F(0, 0));
+                quadList.Add(new Vector3F(500, 0));
+                quadList.Add(new Vector3F(500, 500));
+
+                quadList.Add(new Vector3F(0, 0));
+                quadList.Add(new Vector3F(500, 500));
+                quadList.Add(new Vector3F(0, 500));
+                
+                uvList.Add(new Vector2F(0, 0));
+                uvList.Add(new Vector2F(1, 0));
+                uvList.Add(new Vector2F(1, 1));
+
+                uvList.Add(new Vector2F(0, 0));
+                uvList.Add(new Vector2F(1, 1));
+                uvList.Add(new Vector2F(0, 1));
+                
+                var mesh = new Mesh();
+                mesh.MeshTopology = PrimitiveType.TriangleList;
+                mesh.SetPositions(quadList);
+                mesh.SetUVs(0, uvList);
+                var meshComponent = new MeshData();
+                meshComponent.Mesh = mesh;
+                var meshRenderer = new MeshRenderer();
+                meshRenderer.Name = "Test";
+                testEntity.AddComponent(meshComponent);
+                testEntity.AddComponent(meshRenderer);
+                
+                var textEntity = PrintText(typeface, font, fontSize, "W");
 
                 /* // OUTLINES CHECK
                 List<Vector3F> vertexList;
@@ -336,8 +376,9 @@ namespace Adamantium.Game.Playground
                 meshRenderer.Name = "GlyphOutlines";
                 entity.AddComponent(meshComponent);
                 entity.AddComponent(meshRenderer);*/
-
+                
                 EntityWorld.AddEntity(textEntity);
+                EntityWorld.AddEntity(testEntity);
                 //EntityWorld.AddEntity(visEntity);
             }
             catch (Exception e)

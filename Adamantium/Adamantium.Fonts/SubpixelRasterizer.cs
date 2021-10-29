@@ -84,7 +84,6 @@ namespace Adamantium.Fonts
 
             var colors = new Color[textSize, textSize];
             Color color = default;
-            color.A = 255;
 
             for (var y = 0; y < height; ++y)
             {
@@ -100,6 +99,8 @@ namespace Adamantium.Fonts
                     if (x % 3 == 2)
                     {
                         color.B = (byte)(255 * (distances[x, y] - minDist) / (maxDist - minDist));
+                        color.A = (color.R == 0 && color.G == 0 && color.B == 0) ? (byte)0 : (byte)255;
+
                         colors[resX++, y] = color;
                     }
                 }

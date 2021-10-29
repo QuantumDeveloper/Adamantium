@@ -32,19 +32,18 @@ namespace Adamantium.Fonts
 
         private List<Outline> outlines;
         private bool isSplitOnSegments;
-
         private List<LineSegment2D> mergedOutlinesSegments;
-
-        private List<Command> commandList;
-
         internal IReadOnlyCollection<Outline> Outlines => outlines.AsReadOnly();
         private readonly Dictionary<uint, SampledOutline[]> sampledOutlinesCache;
         
-        public MsdfGenerator Msdf;
-        public SubpixelRasterizer Subpixel;
+        private List<Command> commandList;
 
-        public GlyphUVCoordinates MsdfAtlasUV { get; set; }
-        public GlyphUVCoordinates SubpixelAtlasUV { get; set; }
+        private MsdfGenerator msdfGenerator;
+        private SubpixelRasterizer subpixelRasterizer;
+
+        public double   EmRelatedLeftSideBearingMultiplier { get; private set; }
+        public double   EmRelatedAdvanceWidthMultiplier { get; private set; }
+        public Vector2D EmRelatedCenterToBaseLineMultiplier { get; private set; }
 
         public uint Index { get; }
         
@@ -98,8 +97,8 @@ namespace Adamantium.Fonts
             unicodes = new List<uint>();
             uniqueUnicodes = new HashSet<uint>();
             CompositeGlyphComponents = new List<CompositeGlyphComponent>();
-            Msdf = new MsdfGenerator();
-            Subpixel = new SubpixelRasterizer();
+            msdfGenerator = new MsdfGenerator();
+            subpixelRasterizer = new SubpixelRasterizer();
             OutlineType = outlineType;
         }
 
@@ -112,27 +111,36 @@ namespace Adamantium.Fonts
         {
             var uv = new Vector2D[2];
 
-            var glyphsPerRow = (uint)Math.Ceiling(Math.Sqrt(glyphCount));
-            var glyphsPerColumn = (uint)Math.Ceiling((double)glyphCount / glyphsPerRow);
-            
+            var glyphsPerRow = (uint) Math.Ceiling(Math.Sqrt(glyphCount));
+            var glyphsPerColumn = (uint) Math.Ceiling((double) glyphCount / glyphsPerRow);
+
             var atlasDimensions = new Size(glyphsPerRow, glyphsPerColumn);
-            
+
             var relativeGlyphIndex = Index - atlasStartGlyphIndex;
 
-            var startX = (relativeGlyphIndex % (int)atlasDimensions.Width) * glyphTextureSize;
-            var startY = (relativeGlyphIndex / (int)atlasDimensions.Width) * glyphTextureSize;
-            
-            Size atlasSize = new Size(atlasDimensions.Width * glyphTextureSize, atlasDimensions.Height * glyphTextureSize);
-            
+            var startX = (relativeGlyphIndex % (int) atlasDimensions.Width) * glyphTextureSize;
+            var startY = (relativeGlyphIndex / (int) atlasDimensions.Width) * glyphTextureSize;
+
+            Size atlasSize = new Size(atlasDimensions.Width * glyphTextureSize,
+                atlasDimensions.Height * glyphTextureSize);
+
             var uvStart = new Vector2D(startX / atlasSize.Width, startY / atlasSize.Height);
-            var uvEnd   = new Vector2D((startX + glyphTextureSize) / atlasSize.Width, (startY + glyphTextureSize) / atlasSize.Height);
+            var uvEnd = new Vector2D((startX + glyphTextureSize) / atlasSize.Width,
+                (startY + glyphTextureSize) / atlasSize.Height);
 
             uv[0] = uvStart;
             uv[1] = uvEnd;
-            
+
             return uv;
         }
-        
+
+        public void CalculateEmRelatedMultipliers(ushort unitsPerEm)
+        {
+            CalculateEmRelatedLeftSideBearingMultiplier(unitsPerEm);
+            CalculateEmRelatedCenterToBaseLineMultiplier(unitsPerEm);
+            CalculateEmRelatedAdvanceWidthMultiplier(unitsPerEm);
+        }
+
         public Vector3F[] Sample(byte rate)
         {
             if (IsEmpty)
@@ -159,12 +167,28 @@ namespace Adamantium.Fonts
 
                 //AutoHint();
 
-                //Msdf.RemoveZeroAngleSegments();
-
                 return points;
             }
         }
 
+        private void CalculateEmRelatedLeftSideBearingMultiplier(ushort unitsPerEm)
+        {
+            EmRelatedLeftSideBearingMultiplier = (double)LeftSideBearing / unitsPerEm;
+        }
+
+        private void CalculateEmRelatedAdvanceWidthMultiplier(ushort unitsPerEm)
+        {
+            EmRelatedAdvanceWidthMultiplier = (double)AdvanceWidth / unitsPerEm;
+        }
+        
+        private void CalculateEmRelatedCenterToBaseLineMultiplier(ushort unitsPerEm)
+        {
+            var emSquare = new Rectangle(0, 0, unitsPerEm, unitsPerEm);
+            var diff = emSquare.Center - BoundingRectangle.Center;
+
+            EmRelatedCenterToBaseLineMultiplier = new Vector2D(diff.X / unitsPerEm, diff.Y / unitsPerEm);
+        }
+        
         private void SplitOnSegments()
         {
             if (OutlineType == OutlineType.TrueType)
@@ -538,7 +562,7 @@ namespace Adamantium.Fonts
         {
             lock(this)
             {
-                return Msdf.GenerateDirectMSDF(size, BoundingRectangle, mergedOutlinesSegments, em);
+                return msdfGenerator.GenerateDirectMSDF(size, BoundingRectangle, mergedOutlinesSegments, em);
             }
         }
 
@@ -546,15 +570,14 @@ namespace Adamantium.Fonts
         {
             lock (this)
             {
-                return Subpixel.RasterizeGlyphBySubpixels(textSize, BoundingRectangle, mergedOutlinesSegments, em);
+                return subpixelRasterizer.RasterizeGlyphBySubpixels(textSize, BoundingRectangle, mergedOutlinesSegments, em);
             }
         }
         
         // for visualizing
         public byte[,] GetVisSubpixels()
         {
-            return null;
-            //return Subpixel.GetVisSubpixels();
+            return subpixelRasterizer.GetVisSubpixels();
         }
 
         public void GetSegments(out List<Vector3F> vertexList, out List<Color> colorList)

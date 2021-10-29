@@ -72,11 +72,6 @@ namespace Adamantium.Fonts
             var startX = (relativeGlyphIndex % (int)atlasDimensions.Width) * glyphTextureSize;
             var startY = (relativeGlyphIndex / (int)atlasDimensions.Width) * glyphTextureSize;
 
-            var UVStart = new Vector2D(startX / atlasSize.Width, startY / atlasSize.Height);
-            var UVEnd   = new Vector2D((startX + glyphTextureSize) / atlasSize.Width, (startY + glyphTextureSize) / atlasSize.Height);
-
-            glyph.MsdfAtlasUV = new GlyphUVCoordinates() { Start = UVStart, End = UVEnd};
-
             glyph.Sample(sampleRate);
 
             Color[,] rawGlyph;

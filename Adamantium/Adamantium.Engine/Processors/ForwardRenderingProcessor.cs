@@ -26,6 +26,7 @@ namespace Adamantium.Engine.Processors
         private Sampler subpixelTextureSampler;
         private Texture mtsdfTexture;
         private Texture subpixelTexture;
+        private Texture testTexture;
 
         public ForwardRenderingProcessor(EntityWorld world, GameOutput window) : base(world, window)
         {
@@ -271,6 +272,7 @@ namespace Adamantium.Engine.Processors
             //defaultTexture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "sdf.png"));
             mtsdfTexture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "mtsdf.png"));
             subpixelTexture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "subpixel.png"));
+            testTexture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "texture.png"));
             
             //defaultTexture.Save(Path.Combine("Textures", "subpixel.png"), ImageFileType.Png);
             //DeferredDevice.SetTargets(null);
@@ -524,6 +526,12 @@ namespace Adamantium.Engine.Processors
                                                 GraphicsDevice.BasicEffect.Parameters["shaderTexture"].SetResource(mtsdfTexture);
                                                 GraphicsDevice.BasicEffect.Parameters["foregroundColor"].SetValue(foreground.ToVector4());
                                                 GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["MSDF"].Apply();
+                                            }
+                                            else if (component.Name == "Test")
+                                            {
+                                                GraphicsDevice.BasicEffect.Parameters["sampleType"].SetResource(mtsdfTextureSampler);
+                                                GraphicsDevice.BasicEffect.Parameters["shaderTexture"].SetResource(testTexture);
+                                                GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Textured"].Apply();
                                             }
                                             else
                                             {

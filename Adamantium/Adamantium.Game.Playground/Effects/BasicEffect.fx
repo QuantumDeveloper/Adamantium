@@ -152,9 +152,9 @@ float4 Subpixel_PS(PS_OUTPUT_BASIC input) : SV_TARGET
     float blendedRed   = redDist * linearForegroundColor.r + (1.0 - redDist) * linearBackgroundColor.r;
     float blendedGreen = greenDist * linearForegroundColor.g + (1.0 - greenDist) * linearBackgroundColor.g;
     float blendedBlue  = blueDist * linearForegroundColor.b + (1.0 - blueDist) * linearBackgroundColor.b;
-    float blendedAlpha = currentPixel.a * linearForegroundColor.a + (1.0 - currentPixel.a) * linearBackgroundColor.a;
+    //float blendedAlpha = currentPixel.a * linearForegroundColor.a + (1.0 - currentPixel.a) * linearBackgroundColor.a;
     
-    float4 color = BrightnessToEncoded(float4(blendedRed, blendedGreen, blendedBlue, blendedAlpha));
+    float4 color = BrightnessToEncoded(float4(blendedRed, blendedGreen, blendedBlue, currentPixel.a));
     
     return color;
 }
