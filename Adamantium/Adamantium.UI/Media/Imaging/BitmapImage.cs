@@ -33,8 +33,8 @@ namespace Adamantium.UI.Media.Imaging
 
       public Uri UriSource
       {
-         get { return GetValue<Uri>(UriSourceProperty); }
-         set { SetValue(UriSourceProperty, value);}
+         get => GetValue<Uri>(UriSourceProperty);
+         set => SetValue(UriSourceProperty, value);
       }
 
       public BitmapImage(Uri source)

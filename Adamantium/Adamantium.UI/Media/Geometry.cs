@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Adamantium.Engine.Core;
+using Adamantium.Engine.Core.Models;
 using Adamantium.Engine.Graphics;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
@@ -9,8 +10,8 @@ namespace Adamantium.UI.Media
 {
    public abstract class Geometry : AdamantiumComponent
    {
-      internal List<VertexPositionTexture> VertexArray { get; set; }
-      internal List<Int32> IndicesArray { get; set; }
+      internal Mesh Mesh { get; set; }
+      
       public Matrix4x4F Transform { get; set; }
       protected int lastIndex = 0;
       protected readonly int interrupt = -1;
@@ -19,13 +20,10 @@ namespace Adamantium.UI.Media
 
       internal Geometry()
       {
-         PrimitiveType = PrimitiveType.TriangleStrip;
+         Mesh = new Mesh();
          Transformation = Matrix4x4F.Identity;
-         VertexArray = new List<VertexPositionTexture>();
-         IndicesArray = new List<int>();
       }
-      public PrimitiveType PrimitiveType { get; protected set; }
-      
+     
       public abstract Rect Bounds { get; }
       public Matrix4x4F Transformation { get; set; }
 
@@ -62,11 +60,7 @@ namespace Adamantium.UI.Media
 
       public Boolean IsEmpty()
       {
-         if (VertexArray.Count == 0)
-         {
-            return true;
-         }
-         return false;
+         return Mesh.Positions.Length == 0;
       }
    }
 }

@@ -120,7 +120,7 @@ namespace Adamantium.UI.Controls
         /// </value>
         public AdamantiumComponent InheritanceParent
         {
-            get { return inheritanceParent; }
+            get => inheritanceParent;
             set
             {
                 if (inheritanceParent != value)
@@ -148,8 +148,8 @@ namespace Adamantium.UI.Controls
         /// <param name="property"><see cref="AdamantiumProperty"/></param>
         public object this[AdamantiumProperty property]
         {
-            get { return GetValue(property); }
-            set { SetValue(property, value); }
+            get => GetValue(property);
+            set => SetValue(property, value);
         }
 
         /// <summary>

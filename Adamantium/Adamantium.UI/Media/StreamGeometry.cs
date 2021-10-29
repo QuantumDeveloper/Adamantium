@@ -101,8 +101,6 @@ namespace Adamantium.UI.Media
          currentPosition = point;
       }
 
-
-
       public void QuadraticBezier(Point point1, Point point2, Point point3, double thickness)
       {
          //Calculate exactly how many line segments shoud be

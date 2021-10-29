@@ -37,20 +37,20 @@ namespace Adamantium.UI.Controls
 
       public SurfaceFormat PixelFormat
       {
-         get { return GetValue<SurfaceFormat>(PixelFormatProperty); }
-         set { SetValue(PixelFormatProperty, value);}
+         get => GetValue<SurfaceFormat>(PixelFormatProperty);
+         set => SetValue(PixelFormatProperty, value);
       }
       
       public Int32 PixelWidth
       {
-         get { return GetValue<Int32>(PixelWidthProperty); }
-         set { SetValue(PixelWidthProperty, value);}
+         get => GetValue<Int32>(PixelWidthProperty);
+         set => SetValue(PixelWidthProperty, value);
       }
 
       public Int32 PixelHeight
       {
-         get { return GetValue<Int32>(PixelHeightProperty); }
-         set { SetValue(PixelHeightProperty, value); }
+         get => GetValue<Int32>(PixelHeightProperty);
+         set => SetValue(PixelHeightProperty, value);
       }
 
       private static void RenderTargetParametersChanged(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
@@ -72,8 +72,8 @@ namespace Adamantium.UI.Controls
       /// </summary>
       public IntPtr Handle
       {
-         get { return GetValue<IntPtr>(HandleProperty); }
-         private set { SetValue(HandleProperty, value);}
+         get => GetValue<IntPtr>(HandleProperty);
+         private set => SetValue(HandleProperty, value);
       }
 
       private void UpdateOrCreateRenderTarget()

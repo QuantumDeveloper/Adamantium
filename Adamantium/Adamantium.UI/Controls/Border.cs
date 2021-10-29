@@ -24,26 +24,26 @@ namespace Adamantium.UI.Controls
 
       public Brush BorderBrush
       {
-         get { return GetValue<Brush>(BorderBrushProperty); }
-         set { SetValue(BorderBrushProperty, value); }
+         get => GetValue<Brush>(BorderBrushProperty);
+         set => SetValue(BorderBrushProperty, value);
       }
 
       public Brush Background
       {
-         get { return GetValue<Brush>(BackgroundProperty); }
-         set { SetValue(BackgroundProperty, value); }
+         get => GetValue<Brush>(BackgroundProperty);
+         set => SetValue(BackgroundProperty, value);
       }
 
       public Thickness CornerRadius
       {
-         get { return GetValue<Thickness>(CornerRadiusProperty); }
-         set { SetValue(CornerRadiusProperty, value); }
+         get => GetValue<Thickness>(CornerRadiusProperty);
+         set => SetValue(CornerRadiusProperty, value);
       }
 
       public Thickness BorderThickness
       {
-         get { return GetValue<Thickness>(BorderThicknessProperty); }
-         set { SetValue(BorderThicknessProperty, value); }
+         get => GetValue<Thickness>(BorderThicknessProperty);
+         set => SetValue(BorderThicknessProperty, value);
       }
 
       public Border()
@@ -114,8 +114,8 @@ namespace Adamantium.UI.Controls
 
 
 
-         geometry.VertexArray = geometry.context.VertexArray;
-         geometry.IndicesArray = geometry.context.IndicesArray;
+         // geometry.VertexArray = geometry.context.VertexArray;
+         // geometry.IndicesArray = geometry.context.IndicesArray;
 
          context.BeginDraw(this);
          context.DrawGeometry(this, BorderBrush, null, geometry);

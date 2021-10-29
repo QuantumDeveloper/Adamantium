@@ -47,38 +47,38 @@ namespace Adamantium.UI.Controls
 
       public Brush Fill
       {
-         get { return GetValue<Brush>(FillProperty); }
-         set { SetValue(FillProperty, value); }
+         get => GetValue<Brush>(FillProperty);
+         set => SetValue(FillProperty, value);
       }
 
       public Brush Stroke
       {
-         get { return GetValue<Brush>(StrokeProperty); }
-         set { SetValue(StrokeProperty, value); }
+         get => GetValue<Brush>(StrokeProperty);
+         set => SetValue(StrokeProperty, value);
       }
 
       public Double StrokeThickness
       {
-         get { return GetValue<Double>(StrokeThicknessProperty); }
-         set { SetValue(StrokeThicknessProperty, value); }
+         get => GetValue<Double>(StrokeThicknessProperty);
+         set => SetValue(StrokeThicknessProperty, value);
       }
 
       public AdamantiumCollection<Double> StrokeDashArray
       {
-         get { return GetValue<AdamantiumCollection<Double>>(StrokeDashArrayProperty); }
-         set { SetValue(StrokeDashArrayProperty, value); }
+         get => GetValue<AdamantiumCollection<Double>>(StrokeDashArrayProperty);
+         set => SetValue(StrokeDashArrayProperty, value);
       }
 
       public Stretch Stretch
       {
-         get { return GetValue<Stretch>(StretchProperty); }
-         set { SetValue(StretchProperty, value); }
+         get => GetValue<Stretch>(StretchProperty);
+         set => SetValue(StretchProperty, value);
       }
 
       public PenLineCap StrokeDashCap
       {
-         get { return GetValue<PenLineCap>(StrokeDashCapProperty); }
-         set { SetValue(StrokeDashCapProperty, value);}
+         get => GetValue<PenLineCap>(StrokeDashCapProperty);
+         set => SetValue(StrokeDashCapProperty, value);
       }
 
       public PenLineCap StartLineCap { get; set; }

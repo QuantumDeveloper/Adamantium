@@ -21,16 +21,10 @@ namespace Adamantium.UI.Media
 
       public LineGeometry()
       {
-         PrimitiveType = PrimitiveType.TriangleStrip;
-         VertexArray = new List<VertexPositionTexture>();
-         IndicesArray = new List<int>();
       }
 
       public LineGeometry(Point startPoint, Point endPoint, Double thickness)
-      {
-         PrimitiveType = PrimitiveType.TriangleStrip;
-         VertexArray = new List<VertexPositionTexture>();
-         IndicesArray = new List<int>();
+      { 
          StartPosition = startPoint;
          EndPosition = endPoint;
 
@@ -45,16 +39,16 @@ namespace Adamantium.UI.Media
          var p0 = StartPosition + cross * (float)thickness;
          var p1 = EndPosition + cross * (float)thickness;
 
-         VertexArray.Add(new VertexPositionTexture(StartPosition, Vector2F.Zero));
-         VertexArray.Add(new VertexPositionTexture(EndPosition, new Vector2F(1, 0)));
-         VertexArray.Add(new VertexPositionTexture(new Vector3F(p0, 0), Vector2F.One));
-         VertexArray.Add(new VertexPositionTexture(new Vector3F(p1, 0), new Vector2F(0, 1)));
-
-         IndicesArray.Add(lastIndex++);
-         IndicesArray.Add(lastIndex++);
-         IndicesArray.Add(lastIndex++);
-         IndicesArray.Add(lastIndex++);
-         IndicesArray.Add(interrupt);
+         // VertexArray.Add(new VertexPositionTexture(StartPosition, Vector2F.Zero));
+         // VertexArray.Add(new VertexPositionTexture(EndPosition, new Vector2F(1, 0)));
+         // VertexArray.Add(new VertexPositionTexture(new Vector3F(p0, 0), Vector2F.One));
+         // VertexArray.Add(new VertexPositionTexture(new Vector3F(p1, 0), new Vector2F(0, 1)));
+         //
+         // IndicesArray.Add(lastIndex++);
+         // IndicesArray.Add(lastIndex++);
+         // IndicesArray.Add(lastIndex++);
+         // IndicesArray.Add(lastIndex++);
+         // IndicesArray.Add(interrupt);
       }
    }
 }

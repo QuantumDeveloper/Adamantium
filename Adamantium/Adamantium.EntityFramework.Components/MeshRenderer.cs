@@ -21,7 +21,7 @@ namespace Adamantium.EntityFramework.Components
 
             if (MeshData == null || (!MeshData.Mesh.IsModified && !MeshDataChanged)) return true;
             
-            var vertices = ToMeshVertices(MeshData.Mesh);
+            var vertices = MeshData.Mesh.ToMeshVertices();
 
             return UpdateBuffers(graphicsContext, vertices);
         }

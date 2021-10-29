@@ -26,37 +26,36 @@ namespace Adamantium.UI.Media
 
       public Double RadiusX
       {
-         get { return GetValue<Double>(RadiusXProperty); }
-         set { SetValue(RadiusXProperty, value); }
+         get => GetValue<Double>(RadiusXProperty);
+         set => SetValue(RadiusXProperty, value);
       }
 
       public Double RadiusY
       {
-         get { return GetValue<Double>(RadiusYProperty); }
-         set { SetValue(RadiusYProperty, value); }
+         get => GetValue<Double>(RadiusYProperty);
+         set => SetValue(RadiusYProperty, value);
       }
 
       public Double StartAngle
       {
-         get { return GetValue<Double>(StartAngleProperty); }
-         set { SetValue(StartAngleProperty, value); }
+         get => GetValue<Double>(StartAngleProperty);
+         set => SetValue(StartAngleProperty, value);
       }
 
       public Double StopAngle
       {
-         get { return GetValue<Double>(StopAngleProperty); }
-         set { SetValue(StopAngleProperty, value); }
+         get => GetValue<Double>(StopAngleProperty);
+         set => SetValue(StopAngleProperty, value);
       }
 
       public Point Center
       {
-         get { return GetValue<Point>(CenterProperty); }
-         set { SetValue(CenterProperty, value); }
+         get => GetValue<Point>(CenterProperty);
+         set => SetValue(CenterProperty, value);
       }
 
       public EllipseGeometry()
       {
-         PrimitiveType = PrimitiveType.TriangleStrip;
       }
 
       public EllipseGeometry(Rect rect, Double startAngle = 0, Double stopAngle = 360)
@@ -100,8 +99,6 @@ namespace Adamantium.UI.Media
          Center = rect.Center;
          StartAngle = startAngle;
          StopAngle = stopAngle;
-         VertexArray.Clear();
-         IndicesArray.Clear();
          FilledEllipse(Center, RadiusX, RadiusY, startAngle, stopAngle);
       }
 
@@ -128,9 +125,9 @@ namespace Adamantium.UI.Media
             vertex3.UV = new Vector2D(0.5 + (vertex3.Position.X - center.X) / (2 * radiusX),
                0.5f - (vertex3.Position.Y - center.Y) / (2 * radiusY));
 
-            VertexArray.Add(vertex1);
-            VertexArray.Add(vertex2);
-            VertexArray.Add(vertex3);
+            // VertexArray.Add(vertex1);
+            // VertexArray.Add(vertex2);
+            // VertexArray.Add(vertex3);
 
             y1 = y2;
             x1 = x2;
@@ -142,9 +139,9 @@ namespace Adamantium.UI.Media
       private void Optimize()
       {
          VertexPositionTexture[] newGeometry = null;
-         IndicesArray.AddRange(OptimizeShape(VertexArray.ToArray(), out newGeometry));
-         VertexArray.Clear();
-         VertexArray.AddRange(newGeometry);
+         // IndicesArray.AddRange(OptimizeShape(VertexArray.ToArray(), out newGeometry));
+         // VertexArray.Clear();
+         // VertexArray.AddRange(newGeometry);
       }
 
       private Rect bounds;
