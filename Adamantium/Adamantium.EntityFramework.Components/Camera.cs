@@ -182,7 +182,7 @@ namespace Adamantium.EntityFramework.Components
             //     zfar = ZNear;
             // }
             
-            UiProjection = Matrix4x4F.OrthoOffCenter(0, Width, 0, Height, zfar, znear);
+            UiProjection = Matrix4x4F.OrthoOffCenter(0, Width, 0, Height, znear, zfar);
         }
 
         private void BuildPerspectiveFovX(float zNear, float zFar)

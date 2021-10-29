@@ -507,28 +507,37 @@ namespace Adamantium.Engine.Processors
                                         {
                                             if (component.Name == "SmallGlyph")
                                             {
-                                                var foreground = Colors.White;
+                                                material = current.GetComponent<Material>();
                                                 GraphicsDevice.ClearColor = Colors.CornflowerBlue;
+                                                transformation.WorldMatrix = Matrix4x4F.Translation(current.Transform.Position);
+                                                wvp = transformation.WorldMatrix * ActiveCamera.UiProjection;
+                                                GraphicsDevice.BasicEffect.Parameters["wvp"].SetValue(wvp);
                                                 GraphicsDevice.BasicEffect.Parameters["sampleType"].SetResource(subpixelTextureSampler);
                                                 GraphicsDevice.BasicEffect.Parameters["shaderTexture"].SetResource(subpixelTexture);
                                                 GraphicsDevice.BasicEffect.Parameters["gamma"].SetValue(1.0f);
                                                 GraphicsDevice.BasicEffect.Parameters["atlasSize"].SetValue(subpixelTexture.Width);
-                                                GraphicsDevice.BasicEffect.Parameters["foregroundColor"].SetValue(foreground.ToVector4());
+                                                GraphicsDevice.BasicEffect.Parameters["foregroundColor"].SetValue(material.AmbientColor);
                                                 GraphicsDevice.BasicEffect.Parameters["backgroundColor"].SetValue(GraphicsDevice.ClearColor.ToVector4());
                                                 GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Subpixel"].Apply();
                                                 //GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Textured"].Apply();
                                             }
                                             else if (component.Name == "LargeGlyph")
                                             {
-                                                var foreground = Colors.White;
+                                                material = current.GetComponent<Material>();
                                                 GraphicsDevice.ClearColor = Colors.CornflowerBlue;
+                                                transformation.WorldMatrix = Matrix4x4F.Translation(current.Transform.Position);
+                                                wvp = transformation.WorldMatrix * ActiveCamera.UiProjection;
+                                                GraphicsDevice.BasicEffect.Parameters["wvp"].SetValue(wvp);
                                                 GraphicsDevice.BasicEffect.Parameters["sampleType"].SetResource(mtsdfTextureSampler);
                                                 GraphicsDevice.BasicEffect.Parameters["shaderTexture"].SetResource(mtsdfTexture);
-                                                GraphicsDevice.BasicEffect.Parameters["foregroundColor"].SetValue(foreground.ToVector4());
+                                                GraphicsDevice.BasicEffect.Parameters["foregroundColor"].SetValue(material.AmbientColor);
                                                 GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["MSDF"].Apply();
                                             }
                                             else if (component.Name == "Test")
                                             {
+                                                transformation.WorldMatrix = Matrix4x4F.Translation(current.Transform.Position);
+                                                wvp = transformation.WorldMatrix * ActiveCamera.UiProjection;
+                                                GraphicsDevice.BasicEffect.Parameters["wvp"].SetValue(wvp);
                                                 GraphicsDevice.BasicEffect.Parameters["sampleType"].SetResource(mtsdfTextureSampler);
                                                 GraphicsDevice.BasicEffect.Parameters["shaderTexture"].SetResource(testTexture);
                                                 GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Textured"].Apply();

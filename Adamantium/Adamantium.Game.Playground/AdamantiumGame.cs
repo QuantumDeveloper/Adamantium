@@ -247,7 +247,7 @@ namespace Adamantium.Game.Playground
         uint mtsdfTextureSize = 64;
         private uint subpixelMaxFontSize = 24;
 
-        private Entity PrintText(TypeFace typeface, IFont font, uint fontSize, string text)
+        private Entity PrintText(TypeFace typeface, IFont font, uint fontSize, string text, Color foreground)
         {
             var entity = new Entity(null, "PrintText");
             
@@ -297,6 +297,9 @@ namespace Adamantium.Game.Playground
             meshRenderer.Name = fontSize <= subpixelMaxFontSize ? "SmallGlyph" : "LargeGlyph";
             entity.AddComponent(meshComponent);
             entity.AddComponent(meshRenderer);
+            var material = new Material();
+            material.AmbientColor = foreground.ToVector4();
+            entity.AddComponent(material);
             
             return entity;
         }
@@ -311,7 +314,7 @@ namespace Adamantium.Game.Playground
                 //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/Japan/NotoSansCJKjp-Light.otf", 3);
                 var font = typeface.GetFont(0);
                 byte sampleRate = 10;
-                uint fontSize = 240;
+                uint fontSize = 20;
 
                 /*var colors = glyph.RasterizeGlyphBySubpixels(subpixelGlyphSize, em);
                 uint size = subpixelGlyphSize;
@@ -320,7 +323,8 @@ namespace Adamantium.Game.Playground
 
                 var atlasGen = new TextureAtlasGenerator();
 
-                /*var mtsdfAtlasData = atlasGen.GenerateTextureAtlas(typeface, font, mtsdfTextureSize, sampleRate, 0, (int)typeface.GlyphCount, GeneratorType.Msdf);
+                /*
+                var mtsdfAtlasData = atlasGen.GenerateTextureAtlas(typeface, font, mtsdfTextureSize, sampleRate, 0, (int)typeface.GlyphCount, GeneratorType.Msdf);
                 SaveAtlas(@"Textures\mtsdf.png", mtsdfAtlasData);*/
 
                 /*var subAtlasData = atlasGen.GenerateTextureAtlas(typeface, font, fontSize, sampleRate, 0, (int)typeface.GlyphCount, GeneratorType.Subpixel);
@@ -357,8 +361,14 @@ namespace Adamantium.Game.Playground
                 meshRenderer.Name = "Test";
                 testEntity.AddComponent(meshComponent);
                 testEntity.AddComponent(meshRenderer);
+                testEntity.Transform.Position = new Vector3D(0, 0, 6);
                 
-                var textEntity = PrintText(typeface, font, fontSize, "W");
+                var textEntity = PrintText(typeface, font, fontSize, "майне либовски", Colors.Red);
+                var textEntity2 = PrintText(typeface, font, fontSize, "A", Colors.Fuchsia);
+                var textEntity3 = PrintText(typeface, font, fontSize, "Z", Colors.Green);
+                textEntity.Transform.Position = new Vector3D(0, 0, 6);
+                textEntity2.Transform.Position = new Vector3D(50, 0, 6);
+                textEntity3.Transform.Position = new Vector3D(50, 0, 6);
 
                 /* // OUTLINES CHECK
                 List<Vector3F> vertexList;
@@ -377,8 +387,11 @@ namespace Adamantium.Game.Playground
                 entity.AddComponent(meshComponent);
                 entity.AddComponent(meshRenderer);*/
                 
-                EntityWorld.AddEntity(textEntity);
                 EntityWorld.AddEntity(testEntity);
+                EntityWorld.AddEntity(textEntity);
+                //EntityWorld.AddEntity(textEntity2);
+                //EntityWorld.AddEntity(textEntity3);
+                
                 //EntityWorld.AddEntity(visEntity);
             }
             catch (Exception e)
