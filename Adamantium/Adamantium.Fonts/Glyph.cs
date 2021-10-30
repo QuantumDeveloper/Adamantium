@@ -17,12 +17,6 @@ using Matrix3x2 = Adamantium.Mathematics.Matrix3x2;
 
 namespace Adamantium.Fonts
 {
-    public struct GlyphUVCoordinates
-    {
-        public Vector2D Start;
-        public Vector2D End;
-    }
-    
     public class Glyph
     {
         private ReaderWriterLockSlim locker;
