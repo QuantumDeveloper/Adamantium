@@ -271,12 +271,11 @@ namespace Adamantium.Engine
             Vector3D? initialPosition = null,
             float width = 2,
             float height = 1,
-            float radiusX = 0,
-            float radiusY = 0,
+            CornerRadius corners = default,
             int tesselation = 40,
             Matrix4x4F? transform = null)
         {
-            var template = new RectangleTemplate(geometryType, width, height, radiusX, radiusY, tesselation, transform);
+            var template = new RectangleTemplate(geometryType, width, height, corners, tesselation, transform);
             var primitive = await entityWorld.CreateEntityFromTemplate(template, owner, "Rectangle", false);
             return EntityPostCreation(entityWorld, camera, primitive, initialPosition);
         }

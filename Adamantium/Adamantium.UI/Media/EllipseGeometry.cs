@@ -69,15 +69,9 @@ namespace Adamantium.UI.Media
          CreateEllipse(rect, StartAngle, StopAngle);
       }
 
-      public EllipseGeometry(Point center, Double radiusX, Double radiusY, Double startAngle = 0, Double stopAngle = 360)
+      public EllipseGeometry(Point center, Double radiusX, Double radiusY, Double startAngle = 0, Double stopAngle = 360) :
+         this(center, radiusX, radiusY, startAngle, stopAngle, Matrix4x4F.Identity)
       {
-         bounds = new Rect(center - new Point(radiusX, radiusY), new Size(radiusX*2, radiusY*2));
-         Center = center;
-         RadiusX = radiusX;
-         RadiusY = radiusY;
-         StartAngle = startAngle;
-         StopAngle = stopAngle;
-         CreateEllipse(bounds, StartAngle, StopAngle);
       }
 
       public EllipseGeometry(Point center, Double radiusX, Double radiusY, Double startAngle, Double stopAngle, Matrix4x4F transform)
@@ -99,49 +93,15 @@ namespace Adamantium.UI.Media
          Center = rect.Center;
          StartAngle = startAngle;
          StopAngle = stopAngle;
-         FilledEllipse(Center, RadiusX, RadiusY, startAngle, stopAngle);
-      }
-
-      private void FilledEllipse(Point center, Double radiusX, Double radiusY, Double startAngle, Double stopAngle)
-      {
-         double x1 = center.X + (radiusX * Math.Cos(startAngle));
-         double y1 = center.Y + (radiusY * Math.Sin(startAngle));
-
-         for (double i = startAngle; i <= stopAngle; i++)
-         {
-            double angle = Math.PI * 2 / 360 * (i + 1);
-
-            double x2 = center.X + (radiusX * Math.Cos(angle));
-            double y2 = center.Y + (radiusY * Math.Sin(angle));
-
-            var vertex1 = new VertexPositionTexture(new Vector3D(center.X, center.Y, 0), Vector2D.Zero);
-            var vertex2 = new VertexPositionTexture(new Vector3D(x1, y1, 0), Vector2D.Zero);
-            var vertex3 = new VertexPositionTexture(new Vector3D(x2, y2, 0), Vector2D.Zero);
-
-            vertex1.UV = new Vector2D(0.5 + (vertex1.Position.X - center.X) / (2 * radiusX),
-               0.5f - (vertex1.Position.Y - center.Y) / (2 * radiusY));
-            vertex2.UV = new Vector2D(0.5 + (vertex2.Position.X - center.X) / (2 * radiusX),
-               0.5f - (vertex2.Position.Y - center.Y) / (2 * radiusY));
-            vertex3.UV = new Vector2D(0.5 + (vertex3.Position.X - center.X) / (2 * radiusX),
-               0.5f - (vertex3.Position.Y - center.Y) / (2 * radiusY));
-
-            // VertexArray.Add(vertex1);
-            // VertexArray.Add(vertex2);
-            // VertexArray.Add(vertex3);
-
-            y1 = y2;
-            x1 = x2;
-         }
-
-         Optimize();
-      }
-
-      private void Optimize()
-      {
-         VertexPositionTexture[] newGeometry = null;
-         // IndicesArray.AddRange(OptimizeShape(VertexArray.ToArray(), out newGeometry));
-         // VertexArray.Clear();
-         // VertexArray.AddRange(newGeometry);
+         
+         var translation = Matrix4x4F.Translation((float)rect.Width/2, (float)rect.Height/2, 0);
+         Mesh = Engine.Graphics.Shapes.Ellipse.GenerateGeometry(
+            GeometryType.Solid, 
+            EllipseType.Sector,
+            new Vector2F((float)rect.Width, (float)rect.Height), 
+            (float)StartAngle, 
+            (float)StopAngle,
+            transform: translation);
       }
 
       private Rect bounds;

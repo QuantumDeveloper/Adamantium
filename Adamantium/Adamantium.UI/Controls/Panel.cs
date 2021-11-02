@@ -6,7 +6,9 @@ namespace Adamantium.UI.Controls
 {
    public abstract class Panel: FrameworkComponent
    {
-      public static readonly AdamantiumProperty BackgroundProperty = AdamantiumProperty.Register(nameof(Background), typeof(Brush), typeof(Panel), new PropertyMetadata(Brushes.Transparent, PropertyMetadataOptions.AffectsRender));
+      public static readonly AdamantiumProperty BackgroundProperty = AdamantiumProperty.Register(nameof(Background),
+         typeof(Brush), typeof(Panel),
+         new PropertyMetadata(Brushes.Transparent, PropertyMetadataOptions.AffectsRender));
 
       public Brush Background
       {

@@ -10,115 +10,138 @@ namespace Adamantium.UI.Media
    {
       internal GraphicsDevice GraphicsDevice { get; }
       
-      internal Dictionary<IUIComponent, UIPresentationContainer> VisualPresentations;
+      private Dictionary<IUIComponent, UIPresentationContainer> visualPresentations;
+
+      private UIPresentationContainer currentContainer;
 
       internal DrawingContext(GraphicsDevice d3dDevice)
       {
          GraphicsDevice = d3dDevice;
-         VisualPresentations = new Dictionary<IUIComponent, UIPresentationContainer>();
+         visualPresentations = new Dictionary<IUIComponent, UIPresentationContainer>();
+      }
+
+      internal bool GetPresentationForComponent(IUIComponent component, out UIPresentationContainer container)
+      {
+         return visualPresentations.TryGetValue(component, out container);
       }
 
       public void BeginDraw(IUIComponent visualComponent)
       {
-         if (VisualPresentations.ContainsKey(visualComponent))
+         if (visualPresentations.ContainsKey(visualComponent))
          {
-            var presentation = VisualPresentations[visualComponent];
+            var presentation = visualPresentations[visualComponent];
             presentation.DisposeAndClearItems();
          }
-         else
-         {
-            VisualPresentations[visualComponent] = new UIPresentationContainer();
-         }
+         currentContainer = new UIPresentationContainer();
       }
 
       public void EndDraw(IUIComponent visualComponent)
       {
-         //VisualPresentations[visualComponent].IsSealed = true;
+         visualPresentations[visualComponent] = currentContainer;
+         currentContainer = null;
       }
 
-      public void DrawRectangle(IUIComponent visualComponent, Brush brush, Rect rect, Pen pen = null, double radiusX = 0.0, double radiusY = 0.0)
+      public void DrawRectangle(IUIComponent visualComponent, Brush brush, Rect rect, Pen pen = null)
       {
-         RectangleGeometry rectangle = new RectangleGeometry(rect, radiusX, radiusY);
+         var rectangle = new RectangleGeometry(rect, new CornerRadius(0));
          StrokeGeometry stroke = null;
          if (pen != null && pen.Thickness > 0.0)
          {
             stroke = new StrokeGeometry(pen, rectangle);
          }
 
-         VisualPresentations.TryGetValue(visualComponent, out var uiPresentationContainer);
-         var uiRenderer = UIComponentRenderer.Create(GraphicsDevice, rectangle.Mesh, brush);
-         var strokeRenderer = UIComponentRenderer.Create(GraphicsDevice, stroke?.Mesh, pen?.Brush);
          var presentationItem = new UIPresentationItem();
+         
+         var uiRenderer = UIComponentRenderer.Create(GraphicsDevice, rectangle.Mesh, brush);
          presentationItem.GeometryRenderer = uiRenderer;
-         presentationItem.StrokeRenderer = strokeRenderer;
-         uiPresentationContainer?.AddItem(presentationItem);
 
+         if (stroke != null)
+         {
+            var strokeRenderer = UIComponentRenderer.Create(GraphicsDevice, stroke?.Mesh, pen?.Brush);
+            presentationItem.StrokeRenderer = strokeRenderer;
+         }
+         
+         currentContainer?.AddItem(presentationItem);
       }
-
-      public void DrawRectangle(IUIComponent visualComponent, Brush brush, Rect rect, Thickness corners, Pen pen = null)
+      
+      public void DrawEllipse(IUIComponent visualComponent, Rect destinationRect, Brush brush, Double startAngle, Double stopAngle, Pen pen = null)
       {
-         RectangleGeometry rectangle = new RectangleGeometry(rect, corners);
+         var ellipse = new EllipseGeometry(destinationRect, startAngle, stopAngle);
          StrokeGeometry stroke = null;
          if (pen != null && pen.Thickness > 0.0)
          {
-            stroke = new StrokeGeometry(pen, rectangle);
+            stroke = new StrokeGeometry(pen, ellipse);
          }
 
-         VisualPresentations.TryGetValue(visualComponent, out var uiPresentationContainer);
-         var uiRenderer = UIComponentRenderer.Create(GraphicsDevice, rectangle.Mesh, brush);
-         var strokeRenderer = UIComponentRenderer.Create(GraphicsDevice, stroke?.Mesh, pen?.Brush);
          var presentationItem = new UIPresentationItem();
+         
+         var uiRenderer = UIComponentRenderer.Create(GraphicsDevice, ellipse.Mesh, brush);
          presentationItem.GeometryRenderer = uiRenderer;
-         presentationItem.StrokeRenderer = strokeRenderer;
-         uiPresentationContainer?.AddItem(presentationItem);
+
+         if (stroke != null)
+         {
+            var strokeRenderer = UIComponentRenderer.Create(GraphicsDevice, stroke?.Mesh, pen?.Brush);
+            presentationItem.StrokeRenderer = strokeRenderer;
+         }
+         
+         currentContainer?.AddItem(presentationItem);
+      }
+
+      public void DrawRectangle(IUIComponent visualComponent, Brush brush, Rect rect, CornerRadius corners, Pen pen = null)
+      {
+         var rectangle = new RectangleGeometry(rect, corners);
+         StrokeGeometry strokeGeometry = null;
+         if (pen != null && pen.Thickness > 0.0)
+         {
+            strokeGeometry = new StrokeGeometry(pen, rectangle);
+         }
+
+         var presentationItem = new UIPresentationItem();
+         var uiRenderer = UIComponentRenderer.Create(GraphicsDevice, rectangle.Mesh, brush);
+         presentationItem.GeometryRenderer = uiRenderer;
+
+         if (strokeGeometry != null)
+         {
+            var strokeRenderer = UIComponentRenderer.Create(GraphicsDevice, strokeGeometry?.Mesh, pen?.Brush);
+            presentationItem.StrokeRenderer = strokeRenderer;
+         }
+         
+         currentContainer?.AddItem(presentationItem);
       }
 
       public void DrawGeometry(IUIComponent visualComponent, Brush brush, Pen pen, Geometry geometry)
       {
-         VisualPresentations.TryGetValue(visualComponent, out var uiPresentation);
          StrokeGeometry strokeGeometry = null;
          if (pen != null && pen.Thickness > 0.0)
          {
             strokeGeometry = new StrokeGeometry(pen, geometry);
          }
 
-         uiPresentation = new UIPresentationContainer();
-         var uiRenderer = UIComponentRenderer.Create(GraphicsDevice, geometry.Mesh, brush);
-         var strokeRenderer = UIComponentRenderer.Create(GraphicsDevice, strokeGeometry?.Mesh, pen?.Brush);
          var presentationItem = new UIPresentationItem();
-         presentationItem.GeometryRenderer = uiRenderer;
-         presentationItem.StrokeRenderer = strokeRenderer;
-         uiPresentation.AddItem(presentationItem);
-         if (!VisualPresentations.ContainsKey(visualComponent))
+         if (geometry != null)
          {
-            VisualPresentations.Add(visualComponent, uiPresentation);
+            var uiRenderer = UIComponentRenderer.Create(GraphicsDevice, geometry.Mesh, brush);
+            presentationItem.GeometryRenderer = uiRenderer;
          }
-         else
+         
+         if (strokeGeometry != null)
          {
-            VisualPresentations[visualComponent] = uiPresentation;
+            var strokeRenderer = UIComponentRenderer.Create(GraphicsDevice, strokeGeometry?.Mesh, pen?.Brush);
+            presentationItem.StrokeRenderer = strokeRenderer;
          }
-
+         
+         currentContainer?.AddItem(presentationItem);
       }
 
-      public void DrawImage(IUIComponent visualComponent, BitmapSource bitmap, Brush filter, Rect destinationRect, Double radiusX,
-         Double radiusY)
+      public void DrawImage(IUIComponent visualComponent, BitmapSource bitmap, Brush filter, Rect destinationRect, CornerRadius corners)
       {
-         var geometry = new RectangleGeometry(destinationRect, radiusX, radiusY);
+         var geometry = new RectangleGeometry(destinationRect, corners);
          
-         var uiPresentation = new UIPresentationContainer();
          var uiRenderer = UIComponentRenderer.Create(GraphicsDevice, geometry.Mesh, filter);
+         uiRenderer.Bitmap = bitmap;
          var presentationItem = new UIPresentationItem();
          presentationItem.GeometryRenderer = uiRenderer;
-         uiPresentation.AddItem(presentationItem);
-
-         if (!VisualPresentations.ContainsKey(visualComponent))
-         {
-            VisualPresentations.Add(visualComponent, uiPresentation);
-         }
-         else
-         {
-            VisualPresentations[visualComponent] = uiPresentation;
-         }
+         currentContainer?.AddItem(presentationItem);
       }
 
       public void PushTexture(IUIComponent visualComponent, BitmapSource bitmap)

@@ -100,7 +100,7 @@ namespace Adamantium.EntityFramework.Components
                     shape = Shapes.Arc.GenerateGeometry(Metadata.GeometryType, new Vector2F(Metadata.Width, Metadata.Height), Metadata.Thickness, Metadata.StartAngle, Metadata.StopAngle, Metadata.IsClockwise, Metadata.TessellationFactor);
                     break;
                 case ShapeType.Rectangle:
-                    shape = Shapes.Rectangle.GenerateGeometry(Metadata.GeometryType, Metadata.Width, Metadata.Height, Metadata.RadiusX, Metadata.RadiusY, Metadata.TessellationFactor);
+                    shape = Shapes.Rectangle.GenerateGeometry(Metadata.GeometryType, Metadata.Width, Metadata.Height, Metadata.Corners, Metadata.TessellationFactor);
                     break;
                 case ShapeType.Line:
                     shape = Shapes.Line.GenerateGeometry(Metadata.GeometryType, Metadata.LineStart, Metadata.LineEnd, Metadata.Thickness);

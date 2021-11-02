@@ -12,11 +12,6 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Effect Include="Effects\BasicEffect.fx" />
-      <Effect Include="Effects\UIEffect.fx" />
-    </ItemGroup>
-
-    <ItemGroup>
       <Content Include="Models\swordman.dae">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
@@ -151,6 +146,10 @@
 
     <ItemGroup>
       <Folder Include="Fonts" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Effect Include="Effects\BasicEffect.fx" />
     </ItemGroup>
 
     <Import Project="$(SolutionDir)Adamantium.targets" />

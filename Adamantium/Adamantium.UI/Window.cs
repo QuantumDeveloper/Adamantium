@@ -1,5 +1,6 @@
 using System;
 using Adamantium.Mathematics;
+using Adamantium.UI.Rendering;
 
 namespace Adamantium.UI
 {

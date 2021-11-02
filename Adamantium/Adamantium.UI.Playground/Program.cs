@@ -14,7 +14,6 @@ namespace Adamantium.UI.Playground
             app.MainWindow = wnd;
             wnd.Show();
             app.Run();
-            var mainWindow = new Window();
             // mainWindow.Width = 1280;
             // mainWindow.Height = 720;
             //app.Run(mainWindow);

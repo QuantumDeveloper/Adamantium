@@ -15,22 +15,13 @@ namespace Adamantium.UI.Controls
       public static readonly AdamantiumProperty FilterBrushProperty = AdamantiumProperty.Register(nameof(FilterBrush),
          typeof(Brush), typeof(Image), new PropertyMetadata(Brushes.White, PropertyMetadataOptions.AffectsRender));
 
-      public static readonly AdamantiumProperty RadiusXProperty = AdamantiumProperty.Register(nameof(RadiusX),
-         typeof(Double), typeof(Image), new PropertyMetadata(0.0, PropertyMetadataOptions.AffectsRender));
+      public static readonly AdamantiumProperty CornerRadiusProperty = AdamantiumProperty.Register(nameof(CornerRadius),
+         typeof(CornerRadius), typeof(Image), new PropertyMetadata(new CornerRadius(0), PropertyMetadataOptions.AffectsRender));
 
-      public static readonly AdamantiumProperty RadiusYProperty = AdamantiumProperty.Register(nameof(RadiusY),
-         typeof(Double), typeof(Image), new PropertyMetadata(0.0, PropertyMetadataOptions.AffectsRender));
-
-      public Double RadiusX
+      public CornerRadius CornerRadius
       {
-         get => GetValue<Double>(RadiusXProperty);
-         set => SetValue(RadiusXProperty, value);
-      }
-
-      public Double RadiusY
-      {
-         get => GetValue<Double>(RadiusYProperty);
-         set => SetValue(RadiusYProperty, value);
+         get => GetValue<CornerRadius>(CornerRadiusProperty);
+         set => SetValue(CornerRadiusProperty, value);
       }
 
       public Brush FilterBrush {
@@ -75,7 +66,7 @@ namespace Adamantium.UI.Controls
          var source = Source;
          if (source != null)
          {
-            context.DrawImage(this, source, FilterBrush, new Rect(Bounds.Size), RadiusX, RadiusY);
+            context.DrawImage(this, source, FilterBrush, new Rect(Bounds.Size), CornerRadius);
          }
       }
 

@@ -32,9 +32,9 @@ namespace Adamantium.UI
                 if (mainWindow != null)
                 {
                     mainWindow.Closed -= MainWindow_Closed;
-                    mainWindow.Closed += MainWindow_Closed;
                 }
                 mainWindow = value;
+                mainWindow.Closed += MainWindow_Closed;
             }
         }
 
@@ -48,8 +48,7 @@ namespace Adamantium.UI
         internal IDependencyResolver Services { get; set; }
 
         private EntityWorld entityWorld;
-        private Dictionary<IWindow, UIRenderProcessor> windowToSystem;
-        private Dictionary<IWindow, GraphicsDevice> windowToDevices;
+        private Dictionary<IWindow, WindowProcessor> windowToSystem;
 
         private ApplicationTime appTime;
         private TimeSpan totalTime;
@@ -79,8 +78,7 @@ namespace Adamantium.UI
             VulkanDllMap.Register();
             ShutDownMode = ShutDownMode.OnMainWindowClosed;
             systemManager = new ApplicationSystemManager(this);
-            windowToSystem = new Dictionary<IWindow, UIRenderProcessor>();
-            windowToDevices = new Dictionary<IWindow, GraphicsDevice>();
+            windowToSystem = new Dictionary<IWindow, WindowProcessor>();
             addedWindows = new List<IWindow>();
             closedWindows = new List<IWindow>();
             Windows = new WindowCollection();
@@ -117,33 +115,15 @@ namespace Adamantium.UI
         
         public static Application Current { get; private set; }
 
-        public bool IsRunning => !(cancellationTokenSource?.IsCancellationRequested == true);
+        public bool IsRunning => cancellationTokenSource?.IsCancellationRequested != true;
         public bool IsPaused { get; private set; }
 
         protected void OnWindowAdded(IWindow window)
         {
-            var @params = new PresentationParameters(
-                PresenterType.Swapchain,
-                (uint)window.ClientWidth,
-                (uint)window.ClientHeight,
-                window.SurfaceHandle,
-                MSAALevel.X4
-                )
-            {
-                HInstanceHandle = Process.GetCurrentProcess().Handle
-            };
-            
-            var device = MainGraphicsDevice.CreateRenderDevice(@params);
-            device.AddDynamicStates(DynamicState.Viewport, DynamicState.Scissor);
-
-            windowToDevices[window] = device;
-
-            var transformProcessor = new UITransformProcessor(entityWorld);
-            var renderProcessor = new UIRenderProcessor(entityWorld, device);
+            var renderProcessor = new WindowProcessor(entityWorld, window, MainGraphicsDevice);
             var entity = new Entity();
             entity.AddComponent(window);
             entityWorld.AddEntity(entity);
-            entityWorld.AddProcessor(transformProcessor);
             entityWorld.AddProcessor(renderProcessor);
 
             windowToSystem.Add(window, renderProcessor);
@@ -161,9 +141,6 @@ namespace Adamantium.UI
             processor.UnloadContent();
             entityWorld.RemoveProcessor(processor);
             windowToSystem.Remove(window);
-            var device = windowToDevices[window];
-            device?.Dispose();
-            windowToDevices.Remove(window);
 
             if (window == MainWindow)
             {
@@ -208,9 +185,7 @@ namespace Adamantium.UI
         {
             if (cancellationTokenSource != null) return;
 
-            if (window == null) throw new ArgumentNullException($"{nameof(window)}");
-
-            MainWindow = window;
+            MainWindow = window ?? throw new ArgumentNullException($"{nameof(window)}");
             MainWindow.Show();
             Windows.Add(window);
             
@@ -337,9 +312,6 @@ namespace Adamantium.UI
         protected void Initialize()
         {
             MainGraphicsDevice = MainGraphicsDevice.Create("Adamantium Engine", true);
-            //GraphicsDevice.BlendState = GraphicsDevice.BlendStates.AlphaBlend;
-            //GraphicsDevice.RasterizerState = GraphicsDevice.RasterizerStates.CullNoneClipEnabled;
-            //GraphicsDevice.DepthStencilState = GraphicsDevice.DepthStencilStates.DepthEnableGreaterEqual;
             Services.RegisterInstance<GraphicsDevice>(MainGraphicsDevice);
 
             eventAggregator.GetEvent<WindowAddedEvent>().Subscribe(OnWindowAdded, ThreadOption.UIThread);
@@ -363,7 +335,7 @@ namespace Adamantium.UI
             if (!IsPaused)
             {
                 IsPaused = true;
-                Paused?.Invoke(this, new EventArgs());
+                Paused?.Invoke(this, EventArgs.Empty);
             }
         }
 
@@ -375,7 +347,7 @@ namespace Adamantium.UI
             if (IsPaused)
             {
                 IsPaused = false;
-                Resumed?.Invoke(this, new EventArgs());
+                Resumed?.Invoke(this, EventArgs.Empty);
             }
         }
 

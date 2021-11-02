@@ -13,7 +13,7 @@ namespace Adamantium.Engine.Templates.Camera
     {
         public Entity BuildEntity(Entity owner, string name)
         {
-            var rectangle = Shapes.Rectangle.GenerateGeometry(GeometryType.Outlined, 0.5f, 0.3f, 0.05f, 0.05f, 10);
+            var rectangle = Shapes.Rectangle.GenerateGeometry(GeometryType.Outlined, 0.5f, 0.3f, new CornerRadius(0.05f), 10);
             
             var ellipse1 = Shapes.Ellipse.GenerateGeometry(GeometryType.Outlined, EllipseType.EdgeToEdge, new Vector2F(0.3f), 0, 360, true, 40, Matrix4x4F.Translation(-0.25f, 0.15f, 0));
             var ellipse2 = ellipse1.Clone(Matrix4x4F.Translation(0.24f, 0.12f, 0));

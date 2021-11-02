@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
 using Adamantium.Core;
@@ -43,7 +44,7 @@ namespace Adamantium.Engine.Graphics.Effects
 
         private uint appliesCounter;
 
-        private uint poolCountMultiplier = 1000;
+        private uint poolCountMultiplier = 100;
 
         private List<DescriptorEntrySet> descriptorEntrySets;
 
@@ -592,6 +593,7 @@ namespace Adamantium.Engine.Graphics.Effects
         
         private void CreateDescriptorPool()
         {
+            var timer = Stopwatch.StartNew();
             var buffersCount = graphicsDevice.Presenter.Description.BuffersCount * poolCountMultiplier;
             var poolSizes = new List<DescriptorPoolSize>();
             var bindingGroups = layoutBindings.GroupBy(x => x.DescriptorType).SelectMany(g=>g).ToList();
@@ -609,6 +611,8 @@ namespace Adamantium.Engine.Graphics.Effects
             poolInfo.MaxSets = buffersCount * poolCountMultiplier;
 
             DescriptorPool = graphicsDevice.CreateDescriptorPool(poolInfo);
+            timer.Stop();
+            Console.WriteLine($"Descriptor pool creation time: {timer.ElapsedMilliseconds} ms");
         }
 
         private DescriptorSet[] CreateDescriptorSets()

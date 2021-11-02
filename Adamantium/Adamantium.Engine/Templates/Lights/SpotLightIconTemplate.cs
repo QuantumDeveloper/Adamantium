@@ -52,7 +52,13 @@ namespace Adamantium.Engine.Templates.Lights
 
             float height = 0.1f;
             float raySize = 0.3f;
-            var centralRay = Shapes.Rectangle.GenerateGeometry(GeometryType.Solid, raySize, height, height/2, height/2, tessellation, Matrix4x4F.RotationZ(MathHelper.DegreesToRadians(90))*Matrix4x4F.Translation(new Vector3F(0, (-raySize / 2)-0.2f, 0)));
+            var centralRay = Shapes.Rectangle.GenerateGeometry(
+                GeometryType.Solid, 
+                raySize, 
+                height, 
+                new CornerRadius(height/2),
+                tessellation, 
+                Matrix4x4F.RotationZ(MathHelper.DegreesToRadians(90))*Matrix4x4F.Translation(new Vector3F(0, (-raySize / 2)-0.2f, 0)));
             var leftRay = centralRay.Clone(Matrix4x4F.RotationZ(MathHelper.DegreesToRadians(-45)) * Matrix4x4F.Translation(-size/2, 0, 0));
             var rightRay = centralRay.Clone(Matrix4x4F.RotationZ(MathHelper.DegreesToRadians(45)) * Matrix4x4F.Translation(size/2, 0, 0));
 

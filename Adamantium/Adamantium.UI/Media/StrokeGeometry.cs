@@ -42,7 +42,7 @@ namespace Adamantium.UI.Media
       internal void CreateRectangleStroke(RectangleGeometry geometry, Double thickness, DashStyle dashStyle)
       {
          lastIndex = 0;
-         RectangleStroke(geometry.Bounds, geometry.RadiusX, geometry.RadiusY, thickness, dashStyle);
+         RectangleStroke(geometry.Bounds, geometry.CornerRadius, thickness, dashStyle);
       }
 
       internal void CreateEllipseStroke(EllipseGeometry ellipseGeometry, Double thickness, DashStyle strokeDashArray)
@@ -52,10 +52,12 @@ namespace Adamantium.UI.Media
             ellipseGeometry.StartAngle, ellipseGeometry.StopAngle, thickness, strokeDashArray);
       }
 
-      private void RectangleStroke(Rect bounds, Double radiusX, Double radiusY, Double thickness, DashStyle dashStyle)
+      private void RectangleStroke(Rect bounds, CornerRadius cornerRadius, Double thickness, DashStyle dashStyle)
       {
+         /*
          if (dashStyle?.Dashes == null || dashStyle.Dashes.Count == 0)
          {
+            
             //Create top stroke
             Rect rect;
             if (radiusX > 0)
@@ -137,7 +139,7 @@ namespace Adamantium.UI.Media
             centerX = bounds.BottomLeft.X + radiusX;
             centerY = bounds.BottomLeft.Y - radiusY;
             CircleStroke(new Point(centerX, centerY), radius, 90, 180, thickness, dashStyle);
-         }
+         }*/
       }
 
 

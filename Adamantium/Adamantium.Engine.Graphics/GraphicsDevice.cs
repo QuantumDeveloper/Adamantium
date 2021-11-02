@@ -2,9 +2,11 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using Adamantium.Core;
 using Adamantium.Core.Collections;
+using Adamantium.Engine.Core.Effects;
 using Adamantium.Engine.Graphics.Effects;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
@@ -100,8 +102,8 @@ namespace Adamantium.Engine.Graphics
 
             pipelineManager = new PipelineManager(this);
 
-            //BasicEffect = Effect.CompileFromFile(Path.Combine("Effects", "BasicEffect.fx"), this);
             BasicEffect = Effect.Load(Path.Combine("Effects", "BasicEffect.fx.compiled"), this);
+            //BasicEffect = Effect.Load(Path.Combine("HLSL", "BasicEffect.fx.compiled"), this);
         }
         
         public bool IsResourceLoaderDevice { get; }

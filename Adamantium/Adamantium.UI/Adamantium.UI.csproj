@@ -22,4 +22,10 @@
     <ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.Windows\AdamantiumVulkan.Windows.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Effect Include="Shaders\UIEffect.fx" />
+  </ItemGroup>
+
+  <Import Project="$(SolutionDir)Adamantium.targets" />
+
 </Project>

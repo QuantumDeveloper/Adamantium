@@ -10,8 +10,8 @@ namespace Adamantium.UI.Controls
          new PropertyMetadata(Brushes.Transparent, PropertyMetadataOptions.AffectsRender));
 
       public static readonly AdamantiumProperty CornerRadiusProperty = AdamantiumProperty.Register(nameof(CornerRadius),
-         typeof (Thickness), typeof (Border),
-         new PropertyMetadata(default(Thickness), PropertyMetadataOptions.AffectsMeasure));
+         typeof (CornerRadius), typeof (Border),
+         new PropertyMetadata(default(CornerRadius), PropertyMetadataOptions.AffectsMeasure));
 
       public static readonly AdamantiumProperty BorderThicknessProperty =
          AdamantiumProperty.Register(nameof(BorderThickness),
@@ -34,9 +34,9 @@ namespace Adamantium.UI.Controls
          set => SetValue(BackgroundProperty, value);
       }
 
-      public Thickness CornerRadius
+      public CornerRadius CornerRadius
       {
-         get => GetValue<Thickness>(CornerRadiusProperty);
+         get => GetValue<CornerRadius>(CornerRadiusProperty);
          set => SetValue(CornerRadiusProperty, value);
       }
 
@@ -84,6 +84,7 @@ namespace Adamantium.UI.Controls
          var cornerRadius = CornerRadius;
          base.OnRender(context);
          StreamGeometry geometry = new StreamGeometry();
+         /*
          geometry.context.BeginFigure(new Point(cornerRadius.Left, 0));
 
 
@@ -112,15 +113,12 @@ namespace Adamantium.UI.Controls
                new Point(cornerRadius.Left, 0), borderThickness.Left);
          }
 
-
-
-         // geometry.VertexArray = geometry.context.VertexArray;
-         // geometry.IndicesArray = geometry.context.IndicesArray;
-
+         */
          context.BeginDraw(this);
          context.DrawGeometry(this, BorderBrush, null, geometry);
          context.DrawRectangle(this, Background, new Rect(new Point(BorderThickness.Left, BorderThickness.Top), RenderSize.Deflate(BorderThickness)), CornerRadius);
          context.EndDraw(this);
+         
       }
    }
 }

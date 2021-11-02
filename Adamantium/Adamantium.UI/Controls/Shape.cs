@@ -148,13 +148,13 @@ namespace Adamantium.UI.Controls
                shapeSize.Height = Math.Max(desiredSize.Width, desiredSize.Height);
                break;
             default:
-               shapeSize = new Size(StrokeThickness, StrokeThickness);
+               shapeSize = new Size(desiredSize.Width, desiredSize.Height);
                break;
          }
-         _rect = new Rect(shapeSize);
+         Rect = new Rect(shapeSize);
          return new Size(shapeSize.Width, shapeSize.Height);
       }
 
-      protected Rect _rect;
+      protected Rect Rect;
    }
 }

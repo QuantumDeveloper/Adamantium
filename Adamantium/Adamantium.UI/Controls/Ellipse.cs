@@ -85,11 +85,15 @@ namespace Adamantium.UI.Controls
          if (!IsGeometryValid)
          {
             base.OnRender(context);
-            geometry = new EllipseGeometry(new Rect(new Size(ActualWidth, ActualHeight)).Deflate(StrokeThickness), StartAngle, StopAngle);
+            var destRect = Rect.Deflate(StrokeThickness);
+            var pen = new Pen(
+               Stroke, 
+               StrokeThickness, 
+               new DashStyle(StrokeDashArray?.AsReadOnly()), StrokeDashCap,
+               StartLineCap,
+               EndLineCap);
             context.BeginDraw(this);
-            context.DrawGeometry(this, Fill,
-               new Pen(Stroke, StrokeThickness, new DashStyle(StrokeDashArray?.AsReadOnly()), StrokeDashCap, StartLineCap,
-                  EndLineCap), geometry);
+            context.DrawEllipse(this, destRect, Fill, StartAngle, StopAngle, pen);
             context.EndDraw(this);
          }
       }

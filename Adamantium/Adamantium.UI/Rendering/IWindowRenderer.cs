@@ -1,6 +1,6 @@
 using Adamantium.UI.Controls;
 
-namespace Adamantium.UI
+namespace Adamantium.UI.Rendering
 {
     public interface IWindowRenderer
     {

@@ -129,6 +129,12 @@ namespace Adamantium.EntityFramework.Components
             set => SetProperty(ref _radiusY, value);
         }
 
+        public CornerRadius Corners
+        {
+            get;
+            set;
+        }
+
         public float StartAngle
         {
             get => _startAngle;

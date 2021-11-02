@@ -32,6 +32,8 @@ namespace Adamantium.UI.Controls
         MSAALevel MSAALevel { get; set; }
 
         public void Render();
+
+        public void Update();
         
         event SizeChangedEventHandler ClientSizeChanged;
         event EventHandler<WindowClosingEventArgs> Closing;

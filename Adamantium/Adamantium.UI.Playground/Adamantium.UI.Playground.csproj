@@ -13,8 +13,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Effect Include="Effects\UIEffect.fx" />
-    <Effect Include="Effects\BasicEffect.fx" />
     <Content Include="Textures\texture.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -31,6 +29,11 @@
   <ItemGroup>
     <ProjectReference Include="..\Adamantium.Fonts\Adamantium.Fonts.csproj" />
     <ProjectReference Include="..\Adamantium.UI\Adamantium.UI.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Effect Include="Effects\BasicEffect.fx" />
+    <Effect Include="Effects\UIEffect.fx" />
   </ItemGroup>
 
   <Import Project="$(SolutionDir)Adamantium.targets" />

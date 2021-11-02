@@ -1,11 +1,12 @@
 using System.Collections.Generic;
 using Adamantium.Engine.Graphics;
+using Adamantium.Engine.Graphics.Effects;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Media;
 using AdamantiumVulkan.Core;
 
-namespace Adamantium.UI
+namespace Adamantium.UI.Rendering
 {
     internal class WindowRenderer : IWindowRenderer
     {
@@ -17,9 +18,12 @@ namespace Adamantium.UI
         private Matrix4x4F projectionMatrix;
         private GraphicsDevice graphicsDevice;
         private DrawingContext context;
+        private Effect uiEffect;
         
         public WindowRenderer(GraphicsDevice device)
         {
+            viewport = new Viewport();
+            scissor = new Rect2D();
             graphicsDevice = device;
             context = new DrawingContext(graphicsDevice);
         }
@@ -33,7 +37,7 @@ namespace Adamantium.UI
         private void InitializeWindowResources(uint width, uint height)
         {
             viewport.Width = width;
-            viewport.Width = height;
+            viewport.Height = height;
             
             scissor.Extent = new Extent2D();
             scissor.Extent.Width = width;
@@ -83,6 +87,8 @@ namespace Adamantium.UI
         {
             graphicsDevice.SetViewports(viewport);
             graphicsDevice.SetScissors(scissor);
+            
+            ProcessVisualTree();
         }
 
         private void ProcessVisualTree()
@@ -111,9 +117,13 @@ namespace Adamantium.UI
                 component.Render(context);
             }
 
-            if (!context.VisualPresentations.TryGetValue(component, out var presentation)) return;
-            
-            
+            if (!context.GetPresentationForComponent(component, out var presentation)) return;
+
+            foreach (var item in presentation.Items)
+            {
+                item.GeometryRenderer?.Draw(context.GraphicsDevice, component, projectionMatrix);
+                item.StrokeRenderer?.Draw(context.GraphicsDevice, component, projectionMatrix);
+            }
         }
     }
 }

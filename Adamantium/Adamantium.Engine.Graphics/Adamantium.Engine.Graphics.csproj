@@ -35,4 +35,6 @@
 
   <Import Project="$(SolutionDir)Adamantium.targets" />
 
+  <Import Project="$(SolutionDir)Adamantium.targets" />
+
 </Project>
