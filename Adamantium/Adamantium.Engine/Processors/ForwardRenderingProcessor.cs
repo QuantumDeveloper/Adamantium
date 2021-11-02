@@ -22,10 +22,9 @@ namespace Adamantium.Engine.Processors
 {
     public class ForwardRenderingProcessor : RenderProcessor
     {
-        private Sampler mtsdfTextureSampler;
-        private Sampler subpixelTextureSampler;
+        private Sampler smallGlyphTextureSampler;
+        private Sampler largeGlyphTextureSampler;
         private Texture mtsdfTexture;
-        private Texture subpixelTexture;
         private Texture testTexture;
 
         public ForwardRenderingProcessor(EntityWorld world, GameOutput window) : base(world, window)
@@ -266,12 +265,11 @@ namespace Adamantium.Engine.Processors
 
         private void CreateResources()
         {
-            mtsdfTextureSampler = CreateTextureSampler(true);
-            subpixelTextureSampler = CreateTextureSampler(false);
+            smallGlyphTextureSampler = CreateTextureSampler(false);
+            largeGlyphTextureSampler = CreateTextureSampler(true);
             //defaultTexture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "texture.png"));
             //defaultTexture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "sdf.png"));
             mtsdfTexture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "mtsdf.png"));
-            subpixelTexture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "subpixel.png"));
             testTexture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "texture.png"));
             
             //defaultTexture.Save(Path.Combine("Textures", "subpixel.png"), ImageFileType.Png);
@@ -505,40 +503,27 @@ namespace Adamantium.Engine.Processors
 
                                         if (component is MeshRenderer)
                                         {
+                                            material = current.GetComponent<Material>();
+                                            GraphicsDevice.ClearColor = Colors.CornflowerBlue;
+                                            transformation.WorldMatrix = Matrix4x4F.Translation(current.Transform.Position);
+                                            wvp = transformation.WorldMatrix * ActiveCamera.UiProjection;
+                                            GraphicsDevice.BasicEffect.Parameters["wvp"].SetValue(wvp);
+                                            GraphicsDevice.BasicEffect.Parameters["shaderTexture"].SetResource(mtsdfTexture);
+
                                             if (component.Name == "SmallGlyph")
                                             {
-                                                material = current.GetComponent<Material>();
-                                                GraphicsDevice.ClearColor = Colors.CornflowerBlue;
-                                                transformation.WorldMatrix = Matrix4x4F.Translation(current.Transform.Position);
-                                                wvp = transformation.WorldMatrix * ActiveCamera.UiProjection;
-                                                GraphicsDevice.BasicEffect.Parameters["wvp"].SetValue(wvp);
-                                                GraphicsDevice.BasicEffect.Parameters["sampleType"].SetResource(subpixelTextureSampler);
-                                                GraphicsDevice.BasicEffect.Parameters["shaderTexture"].SetResource(subpixelTexture);
-                                                GraphicsDevice.BasicEffect.Parameters["gamma"].SetValue(1.0f);
-                                                GraphicsDevice.BasicEffect.Parameters["atlasSize"].SetValue(subpixelTexture.Width);
                                                 GraphicsDevice.BasicEffect.Parameters["foregroundColor"].SetValue(material.AmbientColor);
-                                                GraphicsDevice.BasicEffect.Parameters["backgroundColor"].SetValue(GraphicsDevice.ClearColor.ToVector4());
-                                                GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Subpixel"].Apply();
-                                                //GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Textured"].Apply();
+                                                GraphicsDevice.BasicEffect.Parameters["sampleType"].SetResource(largeGlyphTextureSampler);
+                                                GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["SmallGlyph"].Apply();
                                             }
                                             else if (component.Name == "LargeGlyph")
                                             {
-                                                material = current.GetComponent<Material>();
-                                                GraphicsDevice.ClearColor = Colors.CornflowerBlue;
-                                                transformation.WorldMatrix = Matrix4x4F.Translation(current.Transform.Position);
-                                                wvp = transformation.WorldMatrix * ActiveCamera.UiProjection;
-                                                GraphicsDevice.BasicEffect.Parameters["wvp"].SetValue(wvp);
-                                                GraphicsDevice.BasicEffect.Parameters["sampleType"].SetResource(mtsdfTextureSampler);
-                                                GraphicsDevice.BasicEffect.Parameters["shaderTexture"].SetResource(mtsdfTexture);
                                                 GraphicsDevice.BasicEffect.Parameters["foregroundColor"].SetValue(material.AmbientColor);
-                                                GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["MSDF"].Apply();
+                                                GraphicsDevice.BasicEffect.Parameters["sampleType"].SetResource(largeGlyphTextureSampler);
+                                                GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["LargeGlyph"].Apply();
                                             }
                                             else if (component.Name == "Test")
                                             {
-                                                transformation.WorldMatrix = Matrix4x4F.Translation(current.Transform.Position);
-                                                wvp = transformation.WorldMatrix * ActiveCamera.UiProjection;
-                                                GraphicsDevice.BasicEffect.Parameters["wvp"].SetValue(wvp);
-                                                GraphicsDevice.BasicEffect.Parameters["sampleType"].SetResource(mtsdfTextureSampler);
                                                 GraphicsDevice.BasicEffect.Parameters["shaderTexture"].SetResource(testTexture);
                                                 GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Textured"].Apply();
                                             }
