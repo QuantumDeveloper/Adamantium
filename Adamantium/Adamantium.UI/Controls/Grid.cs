@@ -660,8 +660,7 @@ namespace Adamantium.UI.Controls
          if (groupIndex> MaxGroupIndex)
             return;
 
-         if (!cellsDictionary.ContainsKey(groupIndex))
-         return;
+         if (!cellsDictionary.ContainsKey(groupIndex)) return;
 
          var list = cellsDictionary[groupIndex];
          foreach (var cell in list)
@@ -840,11 +839,6 @@ namespace Adamantium.UI.Controls
                if (segment[i].IsStar)
                {
                   segment[i].MeasuredSize = Math.Max(((finalAvailableSize/allStars)*segment[i].Stars), 0);
-                  
-                  if (segment[i].MeasuredSize <= 0)
-                  {
-                     int x = 0;
-                  }
                }
             }
          }

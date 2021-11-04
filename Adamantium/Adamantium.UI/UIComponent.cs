@@ -23,7 +23,7 @@ namespace Adamantium.UI
         
         #region Adamantium properties
         
-        public static readonly AdamantiumProperty PositionProperty = AdamantiumProperty.Register(nameof(Location),
+        public static readonly AdamantiumProperty LocationProperty = AdamantiumProperty.Register(nameof(Location),
             typeof (Point), typeof (UIComponent), new PropertyMetadata(Point.Zero));
 
         public static readonly AdamantiumProperty RotationProperty = AdamantiumProperty.Register(nameof(Rotation),
@@ -484,8 +484,8 @@ namespace Adamantium.UI
         
         public Point Location
         {
-            get => GetValue<Point>(PositionProperty);
-            set => SetValue(PositionProperty, value);
+            get => GetValue<Point>(LocationProperty);
+            set => SetValue(LocationProperty, value);
         }
 
         public Vector2D Scale

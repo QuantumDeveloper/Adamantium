@@ -10,7 +10,7 @@ namespace Adamantium.UI
 {
     public class FrameworkComponent : UIComponent, IName, IFrameworkComponent
     {
-        private FrameworkComponent _parent;
+        private FrameworkComponent parent;
         private TrackingCollection<FrameworkComponent> logicalChildren;
         
         public FrameworkComponent()
@@ -188,7 +188,7 @@ namespace Adamantium.UI
         }
 
         public event AdamantiumPropertyChangedEventHandler DataContextChanged;
-        public FrameworkComponent Parent => _parent;
+        public FrameworkComponent Parent => parent;
         public IReadOnlyCollection<FrameworkComponent> LogicalChildrenCollection => LogicalChildren.AsReadOnly();
 
 
@@ -280,7 +280,7 @@ namespace Adamantium.UI
                 }
 
                 InheritanceParent = parent;
-                _parent = parent;
+                this.parent = parent;
 
                 /*
                 var root = FindStyleRoot(old);
@@ -335,9 +335,20 @@ namespace Adamantium.UI
             if (Visibility == Visibility.Visible || Visibility == Visibility.Hidden)
             {
                 var margin = Margin;
-
-                //TODO: This should be ignored by top level controls
-                Size constrained = this.ApplyLayoutConstraints(availableSize).Deflate(margin);
+                
+                Size constrained; 
+                
+                // IWindow is top level control. Constraints should be ignored by top level controls
+                // because it will lead to incorrect measurements
+                if (this is IWindow)
+                {
+                    constrained = availableSize;
+                    margin = new Thickness(0);
+                }
+                else
+                {
+                    constrained = this.ApplyLayoutConstraints(availableSize).Deflate(margin);
+                }
 
                 var measured = MeasureOverride(constrained);
                 var width = measured.Width;
@@ -359,7 +370,6 @@ namespace Adamantium.UI
                 height = Math.Min(height, MaxHeight);
                 height = Math.Max(height, MinHeight);
 
-                //TODO: This should be ignored by top level controls
                 return NonNegative(new Size(width, height).Inflate(margin));
             }
             else
@@ -380,10 +390,15 @@ namespace Adamantium.UI
         {
             if (Visibility == Visibility.Visible || Visibility == Visibility.Hidden)
             {
-                //TODO: Margin should be ignored by top level controls
                 var margin = Margin;
-
-
+                
+                // IWindow is top level control. Margin should be ignored by top level controls
+                // because there is no element to margin from for IWindow
+                if (this is IWindow)
+                {
+                    margin = new Thickness(0);
+                }
+                
                 double originX = finalRect.X + margin.Left;
                 double originY = finalRect.Y + margin.Top;
 
@@ -406,6 +421,11 @@ namespace Adamantium.UI
                 }
 
                 size = this.ApplyLayoutConstraints(size);
+                
+                if (this is IWindow)
+                {
+                    size = DesiredSize;
+                }
 
                 if (UseLayoutRounding)
                 {

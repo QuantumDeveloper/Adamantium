@@ -24,10 +24,10 @@ namespace Adamantium.UI.Controls
       protected Panel()
       {
          childern = new UIElementCollection();
-         childern.CollectionChanged += ChildernChanged;
+         childern.CollectionChanged += ChildrenChanged;
       }
 
-      private void ChildernChanged(object sender, NotifyCollectionChangedEventArgs e)
+      private void ChildrenChanged(object sender, NotifyCollectionChangedEventArgs e)
       {
          switch (e.Action)
          {

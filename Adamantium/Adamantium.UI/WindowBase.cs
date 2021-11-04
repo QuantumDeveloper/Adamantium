@@ -189,28 +189,19 @@ namespace Adamantium.UI
                 }
             }
         }
-
+        
         private void UpdateControl(IUIComponent visualComponent)
         {
             var control = (FrameworkComponent)visualComponent;
             if (!control.IsMeasureValid)
             {
-                if (!Double.IsNaN(control.Width) && !Double.IsNaN(control.Height))
+                if (control is IWindow wnd)
                 {
-                    Size s = new Size(control.Width, control.Height);
-                    control.Measure(s);
-                }
-                else if (Double.IsNaN(control.Width) && !Double.IsNaN(control.Height))
-                {
-                    control.Measure(new Size(Double.PositiveInfinity, control.Height));
-                }
-                else if (!Double.IsNaN(control.Width) && Double.IsNaN(control.Height))
-                {
-                    control.Measure(new Size(control.Width, Double.PositiveInfinity));
+                    MeasureControl(control, wnd.ClientWidth, wnd.ClientHeight);
                 }
                 else
                 {
-                    control.Measure(Size.Infinity);
+                    MeasureControl(control, control.Width, control.Height);
                 }
             }
 
@@ -218,11 +209,32 @@ namespace Adamantium.UI
             {
                 control.Arrange(new Rect(control.DesiredSize));
             }
-
+            
             if (control.Parent != null)
             {
                 control.Location = control.Bounds.Location + control.Parent.Location;
                 control.ClipPosition = control.ClipRectangle.Location + control.Parent.Location;
+            }
+        }
+
+        private void MeasureControl(IUIComponent control, Double width, Double height)
+        {
+            if (!Double.IsNaN(width) && !Double.IsNaN(height))
+            {
+                Size s = new Size(width, height);
+                control.Measure(s);
+            }
+            else if (Double.IsNaN(width) && !Double.IsNaN(height))
+            {
+                control.Measure(new Size(Double.PositiveInfinity, height));
+            }
+            else if (!Double.IsNaN(width) && Double.IsNaN(height))
+            {
+                control.Measure(new Size(width, Double.PositiveInfinity));
+            }
+            else
+            {
+                control.Measure(Size.Infinity);
             }
         }
 

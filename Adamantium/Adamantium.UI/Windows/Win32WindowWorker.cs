@@ -73,8 +73,18 @@ namespace Adamantium.UI.Windows
             this.window.Closed += OnWindowClosed;
             var classStyle = WindowClassStyle.OwnDC | WindowClassStyle.DoubleClicks | WindowClassStyle.VerticalRedraw | WindowClassStyle.HorizontalRedraw;
             var wndStyleEx = WindowStyleEx.Appwindow | WindowStyleEx.Acceptfiles;
-            var wndStyle = /*WindowStyle.Popup |*/ WindowStyle.Overlappedwindow | WindowStyle.Maximizebox | WindowStyle.Minimizebox | WindowStyle.Clipsiblings | WindowStyle.Clipchildren | WindowStyle.Sizeframe;
-            source = new Win32NativeWindowWrapper(classStyle, wndStyleEx, wndStyle, (int)window.Location.X, (int)window.Location.Y, (int)window.Width, (int)window.Height, IntPtr.Zero);
+            var wndStyle = //WindowStyle.Popup |
+                           WindowStyle.Overlappedwindow | WindowStyle.Maximizebox | WindowStyle.Minimizebox |
+                           WindowStyle.Clipsiblings | WindowStyle.Clipchildren | WindowStyle.Sizeframe;
+            source = new Win32NativeWindowWrapper(
+                classStyle, 
+                wndStyleEx, 
+                wndStyle, 
+                (int)window.Location.X,
+                (int)window.Location.Y, 
+                (int)window.Width, 
+                (int)window.Height, 
+                IntPtr.Zero);
             this.window.Handle = source.Handle;
             if (source.Handle != IntPtr.Zero)
             {

@@ -201,16 +201,11 @@ namespace Adamantium.Engine.Graphics
 
         Extent2D ChooseSwapExtent(SurfaceCapabilitiesKHR capabilities)
         {
-            if (capabilities.CurrentExtent.Width != uint.MaxValue)
-            {
-                return capabilities.CurrentExtent;
-            }
-
-            Extent2D actualExtent = new Extent2D() { Width = Description.Width, Height = Description.Height };
-
+            var actualExtent = new Extent2D() { Width = Description.Width, Height = Description.Height };
+            
             actualExtent.Width = Math.Max(capabilities.MinImageExtent.Width, Math.Min(capabilities.MaxImageExtent.Width, actualExtent.Width));
             actualExtent.Height = Math.Max(capabilities.MinImageExtent.Height, Math.Min(capabilities.MaxImageExtent.Height, actualExtent.Height));
-
+            
             return actualExtent;
         }
 
@@ -230,10 +225,8 @@ namespace Adamantium.Engine.Graphics
             presentInfo.PImageIndices = new [] { GraphicsDevice.ImageIndex };
 
             var result = presentQueue.QueuePresentKHR(presentInfo);
-            if (result != Result.Success)
+            if (result != Result.Success && result != Result.SuboptimalKhr)
             {
-                //MessageBox.Show("Failed to present swap chain image");
-                //throw new Exception();
                 Debug.WriteLine("Failed to present swap chain image");
             }
 
@@ -242,14 +235,13 @@ namespace Adamantium.Engine.Graphics
 
 
         /// <summary>
-        /// Resize graphics presenter bacbuffer according to width and height
+        /// Resize graphics presenter backbuffer according to width and height
         /// </summary>
         /// <param name="width"></param>
         /// <param name="height"></param>
         /// <param name="buffersCount"></param>
         /// <param name="format"></param>
         /// <param name="depthFormat"></param>
-        /// <param name="flags"></param>
         public override bool Resize(uint width, uint height, uint buffersCount, SurfaceFormat format, DepthFormat depthFormat)
         {
             if (!base.Resize(width, height, buffersCount, format, depthFormat))
@@ -289,7 +281,6 @@ namespace Adamantium.Engine.Graphics
             CreateDepthBuffer();
             CreateImageViews();
             CreateFramebuffers();
-            
         }
 
         protected override void CleanupSwapChain()

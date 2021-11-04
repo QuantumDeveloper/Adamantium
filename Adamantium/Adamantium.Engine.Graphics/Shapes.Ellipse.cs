@@ -80,8 +80,12 @@ namespace Adamantium.Engine.Graphics
                 for (int i = 0; i < tessellation; ++i)
                 {
                     var angleItem = MathHelper.DegreesToRadians(currentAngle * sign);
-                    float x = center.X + (radiusX * (float)Math.Cos(angleItem));
-                    float y = center.Y + (radiusY * (float)Math.Sin(angleItem));
+                    double x = center.X + (radiusX * Math.Cos(angleItem));
+                    Double y = center.Y + (radiusY * Math.Sin(angleItem));
+                    
+                    x = Math.Round(x, 4);
+                    y = Math.Round(y, 4);
+                    
                     var vertex = new Vector2D(x, y);
                         
                     vertices.Add(vertex);

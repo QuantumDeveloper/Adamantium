@@ -186,6 +186,8 @@ namespace Adamantium.Engine.Graphics
                     var x = center.X + (radius.X * (float) Math.Cos(angle));
                     var y = center.Y - (radius.Y * (float) Math.Sin(angle));
                     angle += angleItem;
+                    x = Math.Round(x, 3);
+                    y = Math.Round(y, 3);
                     vertices.Add(new Vector2D(x, y));
                 }
             }

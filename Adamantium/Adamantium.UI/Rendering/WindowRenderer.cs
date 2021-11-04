@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Adamantium.Engine.Graphics;
 using Adamantium.Engine.Graphics.Effects;
@@ -11,8 +12,8 @@ namespace Adamantium.UI.Rendering
     internal class WindowRenderer : IWindowRenderer
     {
         private IWindow window;
-        
-        private bool isWindowResized;
+
+        public bool IsWindowResized { get; private set; }
         private Viewport viewport;
         private Rect2D scissor;
         private Matrix4x4F projectionMatrix;
@@ -30,21 +31,41 @@ namespace Adamantium.UI.Rendering
         
         private void Window_ClientSizeChanged(object sender, SizeChangedEventArgs e)
         {
-            isWindowResized = true;
-            InitializeWindowResources((uint)e.NewSize.Width, (uint)e.NewSize.Height);
+            lock (this)
+            {
+                IsWindowResized = true;
+            }
+            InitializeWindowResources();
         }
 
-        private void InitializeWindowResources(uint width, uint height)
+        private void InitializeWindowResources()
         {
+            var width = (uint)window.ClientWidth;
+            var height = (uint)window.ClientHeight;
+            
             viewport.Width = width;
             viewport.Height = height;
-            
+
             scissor.Extent = new Extent2D();
             scissor.Extent.Width = width;
             scissor.Extent.Height = height;
             scissor.Offset = new Offset2D();
             
             CalculateProjectionMatrix();
+        }
+        
+        public void ResizePresenter(PresentationParameters parameters)
+        {
+            graphicsDevice.ResizePresenter(
+                (uint)window.ClientWidth, 
+                (uint)window.ClientHeight, 
+                parameters.BuffersCount,
+                parameters.ImageFormat,
+                parameters.DepthFormat);
+            lock (this)
+            {
+                IsWindowResized = false;
+            }
         }
 
         private void CalculateProjectionMatrix()
@@ -76,11 +97,10 @@ namespace Adamantium.UI.Rendering
             if (wnd == null) return;
             
             UnsubscribeFromEvents();
-
             window = wnd;
             
             SubscribeToEvents();
-            InitializeWindowResources((uint)wnd.ClientWidth, (uint)wnd.ClientHeight);
+            InitializeWindowResources();
         }
 
         public void Render()
@@ -118,7 +138,7 @@ namespace Adamantium.UI.Rendering
             }
 
             if (!context.GetPresentationForComponent(component, out var presentation)) return;
-
+            
             foreach (var item in presentation.Items)
             {
                 item.GeometryRenderer?.Draw(context.GraphicsDevice, component, projectionMatrix);

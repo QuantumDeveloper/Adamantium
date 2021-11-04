@@ -411,8 +411,6 @@ namespace Adamantium.Engine.Processors
         public override void Draw(IGameTime gameTime)
         {
             base.Draw(gameTime);
-            GraphicsDevice.SetViewports(Window.Viewport);
-            GraphicsDevice.SetScissors(Window.Scissor);
             //GraphicsDevice.RasterizerState = GraphicsDevice.RasterizerStates.CullNoneClipDisabled;
             if (ActiveCamera == null)
             {

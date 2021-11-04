@@ -19,7 +19,9 @@ namespace Adamantium.UI.Playground
             rectangle.CornerRadius = new CornerRadius(0, 10, 0, 10);
             rectangle.Width = 200;
             rectangle.Height = 50;
+            rectangle.HorizontalAlignment = HorizontalAlignment.Right;
             rectangle.Fill = Brushes.Chocolate;
+            rectangle.Margin = new Thickness(0, 0, 1, 0);
 
             var ellipse = new Ellipse();
             ellipse.Width = 150;
@@ -27,6 +29,7 @@ namespace Adamantium.UI.Playground
             ellipse.HorizontalAlignment = HorizontalAlignment.Left;
             ellipse.VerticalAlignment = VerticalAlignment.Bottom;
             ellipse.Fill = Brushes.Crimson;
+            ellipse.Margin = new Thickness(1, 0, 0, 1);
             
             grid.Children.Add(rectangle);
             grid.Children.Add(ellipse);

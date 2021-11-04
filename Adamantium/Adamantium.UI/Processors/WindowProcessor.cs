@@ -13,6 +13,7 @@ namespace Adamantium.UI.Processors
     {
         private IGameTime _gameTime;
         private IWindow window;
+        private PresentationParameters parameters;
         private GraphicsDevice graphicsDevice;
         private IWindowRenderer windowRenderer;
 
@@ -25,7 +26,7 @@ namespace Adamantium.UI.Processors
 
         private void CreateResources(MainGraphicsDevice mainDevice)
         {
-            var @params = new PresentationParameters(
+            parameters = new PresentationParameters(
                 PresenterType.Swapchain,
                 (uint)window.ClientWidth,
                 (uint)window.ClientHeight,
@@ -36,7 +37,7 @@ namespace Adamantium.UI.Processors
                 HInstanceHandle = Process.GetCurrentProcess().Handle
             };
             
-            graphicsDevice = mainDevice.CreateRenderDevice(@params);
+            graphicsDevice = mainDevice.CreateRenderDevice(@parameters);
             graphicsDevice.AddDynamicStates(DynamicState.Viewport, DynamicState.Scissor);
 
             windowRenderer = new WindowRenderer(graphicsDevice);
@@ -62,6 +63,11 @@ namespace Adamantium.UI.Processors
             base.EndDraw();
             graphicsDevice.EndDraw();
             graphicsDevice.Present();
+
+            if (windowRenderer.IsWindowResized)
+            {
+                windowRenderer.ResizePresenter(parameters);
+            }
         }
         
         public override void Draw(IGameTime gameTime)
@@ -70,7 +76,7 @@ namespace Adamantium.UI.Processors
             base.Draw(gameTime);
             
             if (windowRenderer == null) return;
-
+            
             if (graphicsDevice.BeginDraw(1, 0))
             {
                 windowRenderer.Render();
