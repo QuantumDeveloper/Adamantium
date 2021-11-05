@@ -276,6 +276,20 @@ namespace Adamantium.Game.Playground
 
                 var glyphUV = glyph.GetTextureAtlasUVCoordinates(glyphTextureSize, 0, typeface.GlyphCount);
 
+                var clampX = glyphUV[1].X - glyphUV[0].X;
+                var clampY = glyphUV[1].Y - glyphUV[0].Y;
+
+                var multiplier = 0.001;
+                
+                clampX *= multiplier;
+                clampY *= multiplier;
+
+                glyphUV[0].X += clampX;
+                glyphUV[0].Y += clampY;
+                
+                glyphUV[1].X -= clampX;
+                glyphUV[1].Y -= clampY;
+                
                 uvList.Add(new Vector2F((float)glyphUV[0].X,   (float)glyphUV[0].Y));
                 uvList.Add(new Vector2F((float)glyphUV[1].X,   (float)glyphUV[0].Y));
                 uvList.Add(new Vector2F((float)glyphUV[1].X,   (float)glyphUV[1].Y));
@@ -309,8 +323,8 @@ namespace Adamantium.Game.Playground
             try
             {
                 //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/CFF2/SourceHanSerifVFProtoJP.otf", 3);
-                var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/SourceSans3-Regular.otf", 3);
-                //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/GlametrixLight-0zjo.otf", 3);
+                //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/SourceSans3-Regular.otf", 3);
+                var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/GlametrixLight-0zjo.otf", 3);
                 //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/Japan/NotoSansCJKjp-Light.otf", 3);
                 var font = typeface.GetFont(0);
                 byte sampleRate = 10;
@@ -322,8 +336,8 @@ namespace Adamantium.Game.Playground
 
                 var atlasGen = new TextureAtlasGenerator();
                 
-                /*var mtsdfAtlasData = atlasGen.GenerateTextureAtlas(typeface, font, mtsdfTextureSize, sampleRate, 0, (int)typeface.GlyphCount, GeneratorType.Msdf);
-                SaveAtlas(@"Textures\mtsdf.png", mtsdfAtlasData);*/
+                var mtsdfAtlasData = atlasGen.GenerateTextureAtlas(typeface, font, mtsdfTextureSize, sampleRate, 0, (int)typeface.GlyphCount, GeneratorType.Msdf);
+                SaveAtlas(@"Textures\mtsdf.png", mtsdfAtlasData);
 
                 /*var subAtlasData = atlasGen.GenerateTextureAtlas(typeface, font, fontSize, sampleRate, 0, (int)typeface.GlyphCount, GeneratorType.Subpixel);
                 SaveAtlas(@"Textures\subpixel.png", subAtlasData);*/
@@ -361,7 +375,7 @@ namespace Adamantium.Game.Playground
                 testEntity.AddComponent(meshRenderer);
                 testEntity.Transform.Position = new Vector3D(0, 0, 6);
                 
-                var textEntity = PrintText(typeface, font, 12, Colors.Beige, "Очень длинный текст, специально подобранный для того, чтобы выйти за пределы текстуры и проверить шрифт на разном бэкграунде.");
+                var textEntity = PrintText(typeface, font, 200, Colors.Beige, "Очень длинный текст для проверки");
                 textEntity.Transform.Position = new Vector3D(0, 0, 6);
 
                 /* // OUTLINES CHECK
@@ -381,7 +395,7 @@ namespace Adamantium.Game.Playground
                 entity.AddComponent(meshComponent);
                 entity.AddComponent(meshRenderer);*/
                 
-                EntityWorld.AddEntity(testEntity);
+                //EntityWorld.AddEntity(testEntity);
                 EntityWorld.AddEntity(textEntity);
 
                 //EntityWorld.AddEntity(visEntity);

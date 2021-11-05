@@ -321,7 +321,7 @@ namespace Adamantium.Fonts
         // true - no collision, false - collision
         private bool CheckNeighbor(ColoredDistance neighbor, ColoredDistance current)
         {
-            const int threshold = 50;
+            const double threshold = 2.5;
 
             var cnt = 0;
             
@@ -336,19 +336,19 @@ namespace Adamantium.Fonts
             if (isNeighborRedPositive ^ isCurrentRedPositive && 
                 Math.Abs(neighbor.redDistance - current.redDistance) > threshold)
             {
-                cnt++;
+                ++cnt;
             }
             
             if (isNeighborGreenPositive ^ isCurrentGreenPositive && 
                 Math.Abs(neighbor.greenDistance - current.greenDistance) > threshold)
             {
-                cnt++;
+                ++cnt;
             }
             
             if (isNeighborBluePositive ^ isCurrentBluePositive && 
                 Math.Abs(neighbor.blueDistance - current.blueDistance) > threshold)
             {
-                cnt++;
+                ++cnt;
             }
 
             return (cnt < 2);
