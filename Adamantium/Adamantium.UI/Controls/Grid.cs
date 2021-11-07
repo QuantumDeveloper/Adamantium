@@ -541,6 +541,7 @@ namespace Adamantium.UI.Controls
                index++;
             }
          }
+         
          //Debug.WriteLine("Grid arrange time = " + arrangeTimer.ElapsedMilliseconds);
          return finalSize;
       }

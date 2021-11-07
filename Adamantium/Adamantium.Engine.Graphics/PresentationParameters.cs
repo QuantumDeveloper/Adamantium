@@ -28,6 +28,17 @@ namespace Adamantium.Engine.Graphics
             DepthFormat = parameters.DepthFormat;
             MSAALevel = parameters.MSAALevel;
             BuffersCount = parameters.BuffersCount;
+
+            MinImageCount = parameters.MinImageCount;
+            ImageColorSpace = parameters.ImageColorSpace;
+
+            // Should be 1 for monoscopic and 2 for stereoscopic swapchain
+            ImageArrayLayers = parameters.ImageArrayLayers;
+            ImageUsage = parameters.ImageUsage;
+            ImageSharingMode = parameters.ImageSharingMode;
+            PreTransform = parameters.PreTransform;
+            PresentMode = parameters.PresentMode;
+            Clipped = parameters.Clipped;
         }
 
         public PresentationParameters(
@@ -77,7 +88,7 @@ namespace Adamantium.Engine.Graphics
 
         public PresentationParameters Clone()
         {
-            return (PresentationParameters)MemberwiseClone();
+            return new PresentationParameters(this);
         }
     }
 }

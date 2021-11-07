@@ -47,9 +47,9 @@ namespace Adamantium.UI
         
         public static readonly AdamantiumProperty MSAALevelProperty = AdamantiumProperty.Register(nameof(MSAALevel), 
             typeof(MSAALevel), typeof(WindowBase),
-            new PropertyMetadata( Engine.Graphics.MSAALevel.X4, PropertyMetadataOptions.AffectsRender, MSAALevelChanged));
+            new PropertyMetadata( Engine.Graphics.MSAALevel.X4, PropertyMetadataOptions.AffectsRender, MSAALevelChangedCallback));
 
-        private static void MSAALevelChanged(AdamantiumComponent adamantiumComponent, AdamantiumPropertyChangedEventArgs e)
+        private static void MSAALevelChangedCallback(AdamantiumComponent adamantiumComponent, AdamantiumPropertyChangedEventArgs e)
         {
             if (!(adamantiumComponent is WindowBase component)) return;
 
@@ -165,6 +165,12 @@ namespace Adamantium.UI
             remove => RemoveHandler(ClientSizeChangedEvent, value);
         }
         
+        public event MSAALeveChangedHandler MSAALevelChanged
+        {
+            add => AddHandler(MSAALevelChangedEvent, value);
+            remove => RemoveHandler(MSAALevelChangedEvent, value);
+        }
+        
         internal void OnSourceInitialized()
         {
             SourceInitialized?.Invoke(this, EventArgs.Empty);
@@ -193,6 +199,7 @@ namespace Adamantium.UI
         private void UpdateControl(IUIComponent visualComponent)
         {
             var control = (FrameworkComponent)visualComponent;
+            var parent = control.VisualParent;
             if (!control.IsMeasureValid)
             {
                 if (control is IWindow wnd)
@@ -204,17 +211,24 @@ namespace Adamantium.UI
                     MeasureControl(control, control.Width, control.Height);
                 }
             }
-
+            
             if (!control.IsArrangeValid)
             {
-                control.Arrange(new Rect(control.DesiredSize));
+                if (parent != null)
+                {
+                    control.Arrange(new Rect(parent.DesiredSize));
+                }
+                else
+                {
+                    control.Arrange(new Rect(control.DesiredSize));
+                }
             }
             
-            if (control.Parent != null)
-            {
-                control.Location = control.Bounds.Location + control.Parent.Location;
-                control.ClipPosition = control.ClipRectangle.Location + control.Parent.Location;
-            }
+            // if (control.Parent != null)
+            // {
+            //     control.Location = control.Bounds.Location + control.Parent.Location;
+            //     control.ClipPosition = control.ClipRectangle.Location + control.Parent.Location;
+            // }
         }
 
         private void MeasureControl(IUIComponent control, Double width, Double height)

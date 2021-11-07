@@ -622,7 +622,7 @@ namespace Adamantium.Game
         }
 
         /// <summary>
-        /// Called aftre EndScene to update all devices and resources to avoid resizing issues and black screens
+        /// Called after EndScene to update all devices and resources to avoid resizing issues and black screens
         /// </summary>
         protected virtual void MakePreparations()
         {

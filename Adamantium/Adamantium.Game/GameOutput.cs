@@ -94,7 +94,7 @@ namespace Adamantium.Game
         {
             if (IsUpToDate())
             {
-                GraphicsDevice.Present();
+                GraphicsDevice.Present(Description);
             }
         }
 
@@ -176,12 +176,7 @@ namespace Adamantium.Game
 
         internal void ResizePresenter()
         {
-            GraphicsDevice.ResizePresenter(
-                Description.Width, 
-                Description.Height, 
-                Description.BuffersCount,
-                Description.PixelFormat,
-                Description.DepthFormat);
+            GraphicsDevice.ResizePresenter(Description);
         }
 
         internal void SetPresentOptions()

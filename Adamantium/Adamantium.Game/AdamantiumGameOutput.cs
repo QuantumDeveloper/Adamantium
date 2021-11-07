@@ -13,11 +13,7 @@ namespace Adamantium.Game
     {
         private IWindow window;
 
-        public AdamantiumGameOutput(
-            IWindow window, 
-            SurfaceFormat pixelFormat, 
-            DepthFormat depthFormat, 
-            MSAALevel msaaLevel)
+        public AdamantiumGameOutput(IWindow window)
         {
             Initialize(new GameContext(window));
         }
@@ -42,8 +38,8 @@ namespace Adamantium.Game
             window.ClientSizeChanged += WindowOnClientSizeChanged;
             
             Description = new GameWindowDescription(PresenterType.Swapchain);
-            Width = (uint)window.Width;
-            Height = (uint)window.Height;
+            Width = (uint)window.ClientWidth;
+            Height = (uint)window.ClientHeight;
             Handle = window.Handle;
             ClientBounds = new Rectangle(0, 0, (int)Description.Width, (int)Description.Height);
             UpdateViewportAndScissor((uint)ClientBounds.Width, (uint)ClientBounds.Height);
@@ -53,8 +49,8 @@ namespace Adamantium.Game
         
         private void WindowOnClientSizeChanged(object sender, SizeChangedEventArgs e)
         {
-            Width = (uint)window.Width;
-            Height = (uint)window.Height;
+            Width = (uint)window.ClientWidth;
+            Height = (uint)window.ClientHeight;
             Resize(Width, Height);
             ResizeRequested = true;
             window.Measure(new Size(Width, Height));

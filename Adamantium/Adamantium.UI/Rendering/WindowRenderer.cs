@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using Adamantium.Engine.Graphics;
 using Adamantium.Engine.Graphics.Effects;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Media;
+using Adamantium.UI.RoutedEvents;
 using AdamantiumVulkan.Core;
 
 namespace Adamantium.UI.Rendering
@@ -20,6 +22,8 @@ namespace Adamantium.UI.Rendering
         private GraphicsDevice graphicsDevice;
         private DrawingContext context;
         private Effect uiEffect;
+
+        public PresentationParameters Parameters;
         
         public WindowRenderer(GraphicsDevice device)
         {
@@ -29,12 +33,14 @@ namespace Adamantium.UI.Rendering
             context = new DrawingContext(graphicsDevice);
         }
         
-        private void Window_ClientSizeChanged(object sender, SizeChangedEventArgs e)
+        private void OnClientSizeChanged(object sender, SizeChangedEventArgs e)
         {
-            lock (this)
-            {
-                IsWindowResized = true;
-            }
+            UpdateWindowResources();
+        }
+
+        private void UpdateWindowResources()
+        {
+            IsWindowResized = true;
             InitializeWindowResources();
         }
 
@@ -50,22 +56,17 @@ namespace Adamantium.UI.Rendering
             scissor.Extent.Width = width;
             scissor.Extent.Height = height;
             scissor.Offset = new Offset2D();
-            
+
+
+            Parameters.Width = width;
+            Parameters.Height = height;
             CalculateProjectionMatrix();
         }
         
         public void ResizePresenter(PresentationParameters parameters)
         {
-            graphicsDevice.ResizePresenter(
-                (uint)window.ClientWidth, 
-                (uint)window.ClientHeight, 
-                parameters.BuffersCount,
-                parameters.ImageFormat,
-                parameters.DepthFormat);
-            lock (this)
-            {
-                IsWindowResized = false;
-            }
+            graphicsDevice.ResizePresenter(parameters);
+            IsWindowResized = false;
         }
 
         private void CalculateProjectionMatrix()
@@ -83,13 +84,20 @@ namespace Adamantium.UI.Rendering
         {
             if (window != null)
             {
-                window.ClientSizeChanged -= Window_ClientSizeChanged;
+                window.ClientSizeChanged -= OnClientSizeChanged;
+                window.MSAALevelChanged -= OnMSAALevelChanged;
             }
         }
 
         private void SubscribeToEvents()
         {
-            window.ClientSizeChanged += Window_ClientSizeChanged;
+            window.ClientSizeChanged += OnClientSizeChanged;
+            window.MSAALevelChanged += OnMSAALevelChanged;
+        }
+
+        private void OnMSAALevelChanged(object sender, MSAALevelChangedEventArgs e)
+        {
+            UpdateWindowResources();
         }
 
         public void SetWindow(IWindow wnd)

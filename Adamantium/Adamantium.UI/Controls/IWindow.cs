@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using Adamantium.Engine.Graphics;
+using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI.Controls
 {
@@ -38,5 +39,6 @@ namespace Adamantium.UI.Controls
         event SizeChangedEventHandler ClientSizeChanged;
         event EventHandler<WindowClosingEventArgs> Closing;
         event EventHandler<EventArgs> Closed;
+        event MSAALeveChangedHandler MSAALevelChanged;
     }
 }

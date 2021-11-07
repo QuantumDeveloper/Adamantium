@@ -24,6 +24,8 @@ namespace Adamantium.UI
 {
     public abstract class Application : AdamantiumComponent, IService
     {
+        //private Mutex mutex = new Mutex(false, "adamantiumMutex");
+        
         public IWindow MainWindow
         {
             get => mainWindow;
@@ -34,7 +36,10 @@ namespace Adamantium.UI
                     mainWindow.Closed -= MainWindow_Closed;
                 }
                 mainWindow = value;
-                mainWindow.Closed += MainWindow_Closed;
+                if (mainWindow != null)
+                {
+                    mainWindow.Closed += MainWindow_Closed;
+                }
             }
         }
 
@@ -191,18 +196,19 @@ namespace Adamantium.UI
             
             Run();
         }
-
+        
         protected void RunUpdateDrawBlock()
         {
             try
             {
                 var frameTime = preciseTimer.GetElapsedTime();
                 ProcessPendingWindows();
+                //mutex.WaitOne();
                 Update(appTime);
                 BeginScene();
                 Draw(appTime);
                 EndScene();
-
+                //mutex.ReleaseMutex();
                 UpdateGameTime(frameTime);
                 CalculateFps(frameTime);
                 

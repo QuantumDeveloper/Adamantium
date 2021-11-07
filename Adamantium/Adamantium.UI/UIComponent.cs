@@ -1230,6 +1230,12 @@ namespace Adamantium.UI
                 ArrangeCore(rect);
                 _previousArrange = rect;
             }
+            
+            if (VisualParent != null)
+            {
+                Location = Bounds.Location + VisualParent.Location;
+                ClipPosition = ClipRectangle.Location + VisualParent.Location;
+            }
         }
 
         /// <summary>
