@@ -148,7 +148,7 @@ namespace Adamantium.Fonts
             }
         }
         
-        private ColoredDistance GetColoredDistances(Vector2D point, double glyphSize, uint textureSize)
+        private ColoredDistance GetColoredDistances(Vector2D point, double range)
         {
             double closestRedDistance = Double.MaxValue;
             double closestGreenDistance = Double.MaxValue;
@@ -223,9 +223,6 @@ namespace Adamantium.Fonts
             coloredDistance.alphaDistance = GlyphSegmentsMath.GetSignedDistanceToSegmentsJoint(closestAlphaSegments, point, false);
 
             // prepare distance data for normalization
-            var scale = textureSize / glyphSize;
-            var range = GetRange(4, scale, scale);
-
             coloredDistance.redDistance = coloredDistance.redDistance / range + 0.5;
             coloredDistance.greenDistance = coloredDistance.greenDistance / range + 0.5;
             coloredDistance.blueDistance = coloredDistance.blueDistance / range + 0.5;
@@ -240,7 +237,7 @@ namespace Adamantium.Fonts
         /// <param name="size">Width and height of MSDF texture</param>
         /// <param name="glyphBoundingRectangle">Bounding rectangle of original glyph</param>
         /// <returns>MSDF color data in for of single-dimension array</returns>
-        public Color[,] GenerateDirectMSDF(uint size, Rectangle glyphBoundingRectangle, List<LineSegment2D> glyphSegments, ushort em)
+        public Color[,] GenerateDirectMSDF(uint size, double pxRange, Rectangle glyphBoundingRectangle, List<LineSegment2D> glyphSegments, ushort em)
         {
             //var msdf = new List<Color>();
             var msdf = new Color[size, size];
@@ -277,8 +274,18 @@ namespace Adamantium.Fonts
             // 4. Generate colored pseudo-distance field
             var coloredDistances = new ColoredDistance[size, size];
 
-            double sdfMaxDistance = Double.MinValue;
+            var scale = size / (double)emSquare.Width;
+            var range = GetRange(pxRange, scale, scale);
 
+            var additionalSpace = emSquare.Width / 100.0;
+            
+            ColoredDistance minColoredDistance;
+                        
+            minColoredDistance.redDistance   = (-emSquare.Width / 2) / range + 0.5;
+            minColoredDistance.greenDistance = (-emSquare.Width / 2) / range + 0.5;
+            minColoredDistance.blueDistance  = (-emSquare.Width / 2) / range + 0.5;
+            minColoredDistance.alphaDistance = (-emSquare.Width / 2) / range + 0.5;
+            
             for (var y = 0; y < size; ++y)
             {
                 for (var x = 0; x < size; ++x)
@@ -287,9 +294,15 @@ namespace Adamantium.Fonts
                     //var samplingPoint = new Vector2D(originalDimensions.X / size * (x + 0.5), originalDimensions.Y - (originalDimensions.Y / size * (y + 0.5)));
                     var samplingPoint = new Vector2D((emSquare.Width / size * (x + 0.5)) + emSquare.X, emSquare.Height - (emSquare.Height / size * (y + 0.5)) + emSquare.Y);
 
-                    coloredDistances[x, y] = GetColoredDistances(samplingPoint, emSquare.Width, size);
-
-                    sdfMaxDistance = Math.Max(sdfMaxDistance, coloredDistances[x, y].alphaDistance);
+                    if (samplingPoint.X >= (glyphBoundingRectangle.X - additionalSpace) && samplingPoint.X <= (glyphBoundingRectangle.Right + additionalSpace) &&
+                        samplingPoint.Y >= (glyphBoundingRectangle.Y - additionalSpace) && samplingPoint.Y <= (glyphBoundingRectangle.Bottom + additionalSpace))
+                    {
+                        coloredDistances[x, y] = GetColoredDistances(samplingPoint, range);
+                    }
+                    else
+                    {
+                        coloredDistances[x, y] = minColoredDistance;
+                    }
                 }
             }
             

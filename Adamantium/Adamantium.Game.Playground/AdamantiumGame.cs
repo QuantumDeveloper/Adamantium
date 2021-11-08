@@ -341,7 +341,7 @@ namespace Adamantium.Game.Playground
  
                 stopwatch.Start();
 
-                var mtsdfAtlasData = atlasGen.GenerateTextureAtlas(typeface, font, mtsdfTextureSize, sampleRate, 0, (int)typeface.GlyphCount, GeneratorType.Msdf);
+                var mtsdfAtlasData = atlasGen.GenerateTextureAtlas(typeface, font, mtsdfTextureSize, sampleRate, 4,0, (int)typeface.GlyphCount, GeneratorType.Msdf);
                 
                 stopwatch.Stop();
                 
@@ -385,7 +385,7 @@ namespace Adamantium.Game.Playground
                 testEntity.AddComponent(meshRenderer);
                 testEntity.Transform.Position = new Vector3D(0, 0, 6);
                 
-                var textEntity = PrintText(typeface, font, 200, Colors.Beige, "Очень длинный текст для проверки");
+                var textEntity = PrintText(typeface, font, 200, Colors.Beige, "test i I l 1");
                 textEntity.Transform.Position = new Vector3D(0, 0, 6);
 
                 /* // OUTLINES CHECK

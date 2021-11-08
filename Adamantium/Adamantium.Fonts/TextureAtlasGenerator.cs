@@ -21,12 +21,13 @@ namespace Adamantium.Fonts
         private Size atlasSize;
         private uint glyphTextureSize;
         private byte sampleRate;
+        private double pxRange;
         private TypeFace typeFace;
         private IFont font;
         private GeneratorType generatorType;
         private int startGlyphIndex;
 
-        public TextureAtlasData GenerateTextureAtlas(TypeFace typeFace, IFont font, uint glyphTextureSize, byte sampleRate, int startGlyphIndex, int glyphCount, GeneratorType generatorType)
+        public TextureAtlasData GenerateTextureAtlas(TypeFace typeFace, IFont font, uint glyphTextureSize, byte sampleRate, double pxRange, int startGlyphIndex, int glyphCount, GeneratorType generatorType)
         {
             if (startGlyphIndex < 0 || glyphCount <= 0)
             {
@@ -35,6 +36,7 @@ namespace Adamantium.Fonts
             
             this.glyphTextureSize = glyphTextureSize;
             this.sampleRate = sampleRate;
+            this.pxRange = pxRange;
             this.typeFace = typeFace;
             this.font = font;
             this.generatorType = generatorType;
@@ -78,7 +80,7 @@ namespace Adamantium.Fonts
             
             if (generatorType == GeneratorType.Msdf)
             {
-                rawGlyph = glyph.GenerateDirectMSDF(glyphTextureSize, em);
+                rawGlyph = glyph.GenerateDirectMSDF(glyphTextureSize, pxRange, em);
             }
             else
             {

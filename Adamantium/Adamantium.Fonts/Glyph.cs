@@ -553,11 +553,11 @@ namespace Adamantium.Fonts
             }
         }
         
-        public Color[,] GenerateDirectMSDF(uint size, ushort em)
+        public Color[,] GenerateDirectMSDF(uint size, double pxRange, ushort em)
         {
             lock(this)
             {
-                return msdfGenerator.GenerateDirectMSDF(size, BoundingRectangle, mergedOutlinesSegments, em);
+                return msdfGenerator.GenerateDirectMSDF(size, pxRange, BoundingRectangle, mergedOutlinesSegments, em);
             }
         }
 
