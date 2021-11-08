@@ -1,8 +1,12 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Threading;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.EntityFramework;
+using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Rendering;
 using AdamantiumVulkan.Core;
@@ -11,12 +15,14 @@ namespace Adamantium.UI.Processors
 {
     public class WindowProcessor : UIProcessor
     {
+        //private Mutex mutex = new Mutex(false, "adamantiumMutex");
+        
         private IGameTime _gameTime;
         private IWindow window;
         private PresentationParameters parameters;
         private GraphicsDevice graphicsDevice;
         private IWindowRenderer windowRenderer;
-
+        
         public WindowProcessor(EntityWorld world, IWindow window, MainGraphicsDevice mainDevice)
             : base(world)
         {
@@ -31,23 +37,26 @@ namespace Adamantium.UI.Processors
                 (uint)window.ClientWidth,
                 (uint)window.ClientHeight,
                 window.SurfaceHandle,
-                MSAALevel.X4
+                window.MSAALevel
             )
             {
                 HInstanceHandle = Process.GetCurrentProcess().Handle
             };
             
             graphicsDevice = mainDevice.CreateRenderDevice(@parameters);
+            graphicsDevice.ClearColor = Colors.White;
             graphicsDevice.AddDynamicStates(DynamicState.Viewport, DynamicState.Scissor);
 
             windowRenderer = new WindowRenderer(graphicsDevice);
+            var renderer = (WindowRenderer)windowRenderer;
+            renderer.Parameters = parameters;
             windowRenderer.SetWindow(window);
         }
 
         public override void UnloadContent()
         {
         }
-
+        
         public override void Update(IGameTime gameTime)
         {
             window.Update();
@@ -58,18 +67,6 @@ namespace Adamantium.UI.Processors
             return IsVisible;
         }
 
-        public override void EndDraw()
-        {
-            base.EndDraw();
-            graphicsDevice.EndDraw();
-            graphicsDevice.Present();
-
-            if (windowRenderer.IsWindowResized)
-            {
-                windowRenderer.ResizePresenter(parameters);
-            }
-        }
-        
         public override void Draw(IGameTime gameTime)
         {
             _gameTime = gameTime;
@@ -80,6 +77,20 @@ namespace Adamantium.UI.Processors
             if (graphicsDevice.BeginDraw(1, 0))
             {
                 windowRenderer.Render();
+            }
+        }
+        
+        public override void EndDraw()
+        {
+            base.EndDraw();
+            graphicsDevice.EndDraw();
+            parameters.Width = (uint)window.ClientWidth;
+            parameters.Height = (uint)window.ClientHeight;
+            
+            graphicsDevice.Present(parameters);
+            if (windowRenderer.IsWindowResized)
+            {
+                windowRenderer.ResizePresenter(parameters);
             }
         }
     }

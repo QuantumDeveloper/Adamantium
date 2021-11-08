@@ -113,6 +113,8 @@ namespace Adamantium.Engine.Graphics
         internal Semaphore[] ImageAvailableSemaphores { get; private set; }
         internal Semaphore[] RenderFinishedSemaphores { get; private set; }
         internal Fence[] InFlightFences { get; private set; }
+        
+        public PresenterState LastPresenterState { get; private set; }
 
         public event Action FrameFinished;
 
@@ -717,15 +719,15 @@ namespace Adamantium.Engine.Graphics
             return sampler;
         }
 
-        public bool ResizePresenter(uint width = 0, uint height = 0)
+        public bool ResizePresenter(uint width = 1, uint height = 1)
         {
             bool ResizeFunc() => Presenter.Resize(width, height);
             return ResizePresenter(ResizeFunc);
         }
 
-        public bool ResizePresenter(uint width, uint height, uint buffersCount, SurfaceFormat surfaceFormat, DepthFormat depthFormat)
+        public bool ResizePresenter(PresentationParameters parameters)
         {
-            bool ResizeFunc() => Presenter.Resize(width, height, buffersCount, surfaceFormat, depthFormat);
+            bool ResizeFunc() => Presenter.Resize(parameters);
             return ResizePresenter(ResizeFunc);
         }
 
@@ -743,7 +745,7 @@ namespace Adamantium.Engine.Graphics
             return true;
         }
 
-        public void Present()
+        public void Present(PresentationParameters parameters)
         {
             if (!CanPresent)
             {
@@ -751,11 +753,11 @@ namespace Adamantium.Engine.Graphics
                 return;
             }
             
-            var presentResult = Presenter.Present();
-            if (presentResult == Result.SuboptimalKhr || presentResult == Result.ErrorOutOfDateKhr)
-            {
-                //ResizePresenter();
-            }
+            LastPresenterState = Presenter.Present();
+            // if (presentResult is Result.SuboptimalKhr or Result.ErrorOutOfDateKhr)
+            // {
+            //     ResizePresenter(parameters.Width, parameters.Height, parameters.BuffersCount, parameters.ImageFormat, parameters.DepthFormat);
+            // }
             
             UpdateCurrentFrameNumber();
         }

@@ -90,44 +90,19 @@ namespace Adamantium.Engine.Graphics
         /// </summary>
         public bool Resize(UInt32 width = 0, UInt32 height = 0)
         {
-            return Resize(width, height, BuffersCount, Description.ImageFormat, DepthFormat);
+            Description.Width = width;
+            Description.Height = height;
+            return Resize(Description);
         }
 
         /// <summary>
         /// Resize graphics presenter backbuffer according to width and height
         /// </summary>
-        /// <param name="width"></param>
-        /// <param name="height"></param>
-        /// <param name="buffersCount"></param>
-        /// <param name="pixelFormat"></param>
-        /// <param name="depthFormat"></param>
-        public virtual bool Resize(UInt32 width, UInt32 height, uint buffersCount, SurfaceFormat pixelFormat, DepthFormat depthFormat)
+        /// <param name="parameters"></param>
+        public virtual bool Resize(PresentationParameters parameters)
         {
-            bool updateDepthStencil = false;
-            if (Description.DepthFormat != depthFormat || (Description.Width != width || Description.Height != height))
-            {
-                Description.DepthFormat = depthFormat;
-                updateDepthStencil = true;
-            }
-
-            //if (Description.BackBufferWidth == width && Description.BackBufferHeight == height &&
-            //    Description.BuffersCount == buffersCount && Description.PixelFormat == pixelFormat
-            //    && Description.Flags == flags)
-            //{
-            //   return false;
-            //}
-
-            Description.Width = width;
-            Description.Height = height;
-            Description.ImageFormat = pixelFormat;
-            Description.BuffersCount = buffersCount;
-
-            if (updateDepthStencil)
-            {
-                //RemoveAndDispose(ref depthBuffer);
-                //CreateDepthBuffer();
-            }
-
+            Description = parameters.Clone();
+            
             CreateViewPort();
 
             return true;
@@ -215,7 +190,32 @@ namespace Adamantium.Engine.Graphics
         /// <summary>
         /// Present rendered image on screen
         /// </summary>
-        public abstract Result Present();
+        public abstract PresenterState Present();
+        
+        protected PresenterState ConvertState(Result result)
+        {
+            switch (result)
+            {
+                case Result.Success:
+                    return PresenterState.Success;
+                case Result.SuboptimalKhr:
+                    return PresenterState.Suboptimal;
+                case Result.ErrorDeviceLost:
+                    return PresenterState.DeviceLost;
+                case Result.ErrorOutOfHostMemory:
+                    return PresenterState.OutOfHostMemory;
+                case Result.ErrorOutOfDeviceMemory:
+                    return PresenterState.OutOfDeviceMemory;
+                case Result.ErrorOutOfDateKhr:
+                    return PresenterState.OutOfDate;
+                case Result.ErrorSurfaceLostKhr:
+                    return PresenterState.SurfaceLost;
+                case Result.ErrorFullScreenExclusiveModeLostExt:
+                    return PresenterState.FullScreenExclusiveModeLost;
+                default:
+                    return PresenterState.Unknown;
+            }
+        }
 
         /// <summary>
         /// Takes screenshot from current backbuffer frame

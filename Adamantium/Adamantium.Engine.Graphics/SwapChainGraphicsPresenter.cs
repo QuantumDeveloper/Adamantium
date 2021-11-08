@@ -212,7 +212,7 @@ namespace Adamantium.Engine.Graphics
         /// <summary>
         /// Present rendered image on screen
         /// </summary>
-        public override Result Present()
+        public override PresenterState Present()
         {
             Semaphore[] waitSemaphores = { GraphicsDevice.GetRenderFinishedSemaphoreForCurrentFrame() };
             var presentInfo = new PresentInfoKHR();
@@ -230,21 +230,16 @@ namespace Adamantium.Engine.Graphics
                 Debug.WriteLine("Failed to present swap chain image");
             }
 
-            return result;
+            return ConvertState(result);;
         }
-
 
         /// <summary>
         /// Resize graphics presenter backbuffer according to width and height
         /// </summary>
-        /// <param name="width"></param>
-        /// <param name="height"></param>
-        /// <param name="buffersCount"></param>
-        /// <param name="format"></param>
-        /// <param name="depthFormat"></param>
-        public override bool Resize(uint width, uint height, uint buffersCount, SurfaceFormat format, DepthFormat depthFormat)
+        /// <param name="parameters"></param>
+        public override bool Resize(PresentationParameters parameters)
         {
-            if (!base.Resize(width, height, buffersCount, format, depthFormat))
+            if (!base.Resize(parameters))
             {
                 return false;
             }
@@ -274,6 +269,7 @@ namespace Adamantium.Engine.Graphics
 
         private void RecreateSwapchain()
         {
+            var timer = Stopwatch.StartNew();
             CleanupSwapChain();
 
             CreateSwapchain();
@@ -281,6 +277,8 @@ namespace Adamantium.Engine.Graphics
             CreateDepthBuffer();
             CreateImageViews();
             CreateFramebuffers();
+            timer.Stop();
+            Console.WriteLine($"Resize presenter time: {timer.ElapsedMilliseconds}");
         }
 
         protected override void CleanupSwapChain()

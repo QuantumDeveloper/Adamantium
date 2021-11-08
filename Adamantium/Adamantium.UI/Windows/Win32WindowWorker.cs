@@ -6,6 +6,7 @@ using Adamantium.Win32.RawInput;
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Threading;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.Core.Events;
 using Adamantium.UI.AggregatorEvents;
@@ -17,6 +18,7 @@ namespace Adamantium.UI.Windows
     {
         private WindowBase window;
         private Dictionary<uint, HandleMessage> messageTable;
+        //private Mutex mutex = Mutex.OpenExisting("adamantiumMutex");
 
         private bool isOverSizeFrame;
         private bool trackMouse;
@@ -71,7 +73,7 @@ namespace Adamantium.UI.Windows
         {
             this.window = window;
             this.window.Closed += OnWindowClosed;
-            var classStyle = WindowClassStyle.OwnDC | WindowClassStyle.DoubleClicks | WindowClassStyle.VerticalRedraw | WindowClassStyle.HorizontalRedraw;
+            var classStyle = WindowClassStyle.OwnDC | WindowClassStyle.DoubleClicks; //| WindowClassStyle.VerticalRedraw | WindowClassStyle.HorizontalRedraw;
             var wndStyleEx = WindowStyleEx.Appwindow | WindowStyleEx.Acceptfiles;
             var wndStyle = //WindowStyle.Popup |
                            WindowStyle.Overlappedwindow | WindowStyle.Maximizebox | WindowStyle.Minimizebox |
@@ -239,6 +241,7 @@ namespace Adamantium.UI.Windows
 
         private IntPtr HandleResize(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
         {
+            //mutex.WaitOne();
             Win32Interop.GetWindowRect(window.Handle, out var rect);
             window.Width = rect.Width;
             window.Height = rect.Height;
@@ -248,6 +251,7 @@ namespace Adamantium.UI.Windows
             window.ClientHeight = (uint)client.Height;
 
             handled = true;
+            //mutex.ReleaseMutex();
             return IntPtr.Zero;
         }
 
