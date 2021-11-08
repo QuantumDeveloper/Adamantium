@@ -1,6 +1,7 @@
 ﻿using System;
 using Adamantium.Engine.Graphics;
 using Adamantium.UI.Controls;
+using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI.Media.Imaging
 {

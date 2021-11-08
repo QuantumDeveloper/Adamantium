@@ -1,4 +1,4 @@
-﻿namespace Adamantium.UI
+﻿namespace Adamantium.UI.RoutedEvents
 {
    public struct AdamantiumPropertyChangedEventArgs
    {

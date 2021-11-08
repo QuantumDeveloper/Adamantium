@@ -63,7 +63,6 @@ namespace Adamantium.UI.Media
 
       public override Geometry Clone()
       {
-         //return new RectangleGeometry(bounds, RadiusX, RadiusY);
          return new RectangleGeometry(this);
       }
    }

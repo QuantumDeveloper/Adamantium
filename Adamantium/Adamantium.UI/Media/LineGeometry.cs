@@ -7,9 +7,10 @@ using Point = Adamantium.Mathematics.Point;
 
 namespace Adamantium.UI.Media
 {
-   public class LineGeometry:Geometry
+   public class LineGeometry : Geometry
    {
       public override Rect Bounds { get; }
+
       public override Geometry Clone()
       {
          throw new NotImplementedException();
@@ -24,7 +25,7 @@ namespace Adamantium.UI.Media
       }
 
       public LineGeometry(Point startPoint, Point endPoint, Double thickness)
-      { 
+      {
          StartPosition = startPoint;
          EndPosition = endPoint;
 

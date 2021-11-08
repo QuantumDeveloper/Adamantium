@@ -1,4 +1,6 @@
-﻿namespace Adamantium.UI.Controls
+﻿using Adamantium.UI.RoutedEvents;
+
+namespace Adamantium.UI.Controls
 {
    public class ContentControl:Control
    {

@@ -94,6 +94,12 @@ namespace Adamantium.Engine.Processors
         public virtual void CreateSystemResources()
         { }
 
+        public override bool BeginDraw()
+        {
+            //return Window.IsVisible;
+            return IsVisible;
+        }
+
         public override void Draw(IGameTime gameTime)
         {
             base.Draw(gameTime);

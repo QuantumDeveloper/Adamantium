@@ -31,6 +31,8 @@ namespace Adamantium.UI.Controls
         string Title { get; set; }
         
         MSAALevel MSAALevel { get; set; }
+        
+        WindowState State { get; set; }
 
         public void Render();
 
@@ -40,5 +42,6 @@ namespace Adamantium.UI.Controls
         event EventHandler<WindowClosingEventArgs> Closing;
         event EventHandler<EventArgs> Closed;
         event MSAALeveChangedHandler MSAALevelChanged;
+        event StateChangedHandler StateChanged;
     }
 }
