@@ -13,6 +13,10 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" />
     <ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />

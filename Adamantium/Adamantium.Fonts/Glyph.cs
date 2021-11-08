@@ -430,6 +430,7 @@ namespace Adamantium.Fonts
             bool isPointInside = false;
             mergedOutlinesSegments = new List<LineSegment2D>();
             var localSegments = new List<LineSegment2D>();
+            var intersections = new List<DistancedPoint>();
 
             foreach (var outline in outlines)
             {
@@ -442,7 +443,7 @@ namespace Adamantium.Fonts
             for (var i = 0; i < localSegments.Count; i++)
             {
                 var checkedSegment = localSegments[i];
-                var intersections = new List<DistancedPoint>();
+                intersections.Clear();
                 for (var j = i+1; j < localSegments.Count; j++)
                 {
                     // find all intersections of checked segment with the rest of segments
