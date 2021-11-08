@@ -5,6 +5,7 @@ using System.Linq;
 using Adamantium.Core.Collections;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
+using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI
 {

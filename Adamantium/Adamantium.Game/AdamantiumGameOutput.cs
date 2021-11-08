@@ -5,6 +5,7 @@ using Adamantium.Imaging;
 using Adamantium.UI;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Input;
+using Adamantium.UI.RoutedEvents;
 using Rectangle = Adamantium.Mathematics.Rectangle;
 
 namespace Adamantium.Game
@@ -25,6 +26,8 @@ namespace Adamantium.Game
 
         public override bool IsActive => window.IsActive;
 
+        public override bool IsVisible => window.State != WindowState.Minimized;
+
         internal override bool CanHandle(GameContext gameContext)
         {
             return gameContext.ContextType == GameContextType.Window && window != null;
@@ -36,7 +39,7 @@ namespace Adamantium.Game
             window = GameContext.Context as IWindow ?? throw new ArgumentException($"{nameof(context.Context)} should be of type {nameof(IWindow)}");
             UiComponent = window as FrameworkComponent;
             window.ClientSizeChanged += WindowOnClientSizeChanged;
-            
+
             Description = new GameWindowDescription(PresenterType.Swapchain);
             Width = (uint)window.ClientWidth;
             Height = (uint)window.ClientHeight;
@@ -46,7 +49,7 @@ namespace Adamantium.Game
             
             base.InitializeInternal(context);
         }
-        
+
         private void WindowOnClientSizeChanged(object sender, SizeChangedEventArgs e)
         {
             Width = (uint)window.ClientWidth;

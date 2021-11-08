@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Adamantium.UI.Controls.Primitives;
 using Adamantium.UI.Input;
+using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI.Controls
 {

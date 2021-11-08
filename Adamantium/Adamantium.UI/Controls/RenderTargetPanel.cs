@@ -4,6 +4,7 @@ using Adamantium.Engine.Graphics;
 using Adamantium.Imaging;
 using Adamantium.UI.Media;
 using Adamantium.UI.Media.Imaging;
+using Adamantium.UI.RoutedEvents;
 using Adamantium.Win32;
 
 namespace Adamantium.UI.Controls

@@ -11,6 +11,7 @@ using Adamantium.Core.DependencyInjection;
 using Adamantium.Core.Events;
 using Adamantium.UI.AggregatorEvents;
 using Adamantium.UI.Controls;
+using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI.Windows
 {
@@ -38,7 +39,7 @@ namespace Adamantium.UI.Windows
             messageTable = new Dictionary<uint, HandleMessage>();
             messageTable[(uint)WindowMessages.Activate] = HandleActivate;
             messageTable[(uint)WindowMessages.Syscommand] = HandleSysCommand;
-            //messageTable[(uint)WindowMessages.Nclbuttondown] = HandleNcButtonDown;
+            messageTable[(uint)WindowMessages.Nclbuttondown] = HandleNcButtonDown;
             messageTable[(uint)WindowMessages.Nchittest] = HandleNcHittest;
             //messageTable[(uint)WindowMessages.Nccalcsize] = HandleNcCalcSize;
             messageTable[(uint)WindowMessages.Size] = HandleResize;
@@ -104,6 +105,27 @@ namespace Adamantium.UI.Windows
                 
                 this.window.OnSourceInitialized();
                 Win32Interop.ShowWindow(source.Handle, WindowShowStyle.ShowNormal);
+                this.window.StateChanged+= WindowOnStateChanged;
+            }
+        }
+
+        private void WindowOnStateChanged(object sender, StateChangedEventArgs e)
+        {
+            Win32Interop.ShowWindow(window.Handle, ConvertStateToShowStyle(e.State));
+        }
+
+        private WindowShowStyle ConvertStateToShowStyle(WindowState state)
+        {
+            switch (state)
+            {
+                case WindowState.Normal:
+                    return WindowShowStyle.ShowNormal;
+                case WindowState.Maximized:
+                    return WindowShowStyle.Maximize;
+                case WindowState.Minimized:
+                    return WindowShowStyle.Minimize;
+                default:
+                    return WindowShowStyle.ShowNormal;
             }
         }
 
@@ -155,11 +177,21 @@ namespace Adamantium.UI.Windows
         private IntPtr HandleNcButtonDown(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
         {
             var ht = (NcHitTest)(Environment.Is64BitProcess ? wParam.ToInt64() : wParam.ToInt32());
-            if (ht == NcHitTest.Close)
+            window.StateChanged -= WindowOnStateChanged;
+            switch (ht)
             {
-                window.Close();
+                case NcHitTest.Close:
+                    window.Close();
+                    break;
+                case NcHitTest.Minbutton:
+                    window.State = WindowState.Minimized;
+                    break;
+                case NcHitTest.Maxbutton:
+                    window.State = WindowState.Maximized;
+                    break;
             }
-            handled = false;
+            handled = true;
+            window.StateChanged += WindowOnStateChanged;
             return Win32Interop.DefWindowProc(window.Handle, windowMessage, wParam, lParam);
         }
 

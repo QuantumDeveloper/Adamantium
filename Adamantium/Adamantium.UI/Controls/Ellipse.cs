@@ -1,5 +1,6 @@
 ﻿using System;
 using Adamantium.UI.Media;
+using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI.Controls
 {

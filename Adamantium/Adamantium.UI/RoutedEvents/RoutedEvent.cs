@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Reflection;
 
-namespace Adamantium.UI
+namespace Adamantium.UI.RoutedEvents
 {
    public sealed class RoutedEvent
    {

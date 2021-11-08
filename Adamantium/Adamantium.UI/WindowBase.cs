@@ -24,6 +24,10 @@ namespace Adamantium.UI
         public static readonly RoutedEvent MSAALevelChangedEvent = EventManager.RegisterRoutedEvent("MSAALevelChanged",
             RoutingStrategy.Direct, typeof(MSAALeveChangedHandler), typeof(WindowBase));
         
+        public static readonly RoutedEvent StateChangedEvent = EventManager.RegisterRoutedEvent("StateChanged",
+            RoutingStrategy.Direct, typeof(StateChangedHandler), typeof(WindowBase));
+        
+        
         public static readonly AdamantiumProperty LeftProperty = AdamantiumProperty.Register(nameof(Left),
             typeof(Double), typeof(WindowBase), new PropertyMetadata(0d));
         
@@ -47,8 +51,21 @@ namespace Adamantium.UI
         
         public static readonly AdamantiumProperty MSAALevelProperty = AdamantiumProperty.Register(nameof(MSAALevel), 
             typeof(MSAALevel), typeof(WindowBase),
-            new PropertyMetadata( Engine.Graphics.MSAALevel.X4, PropertyMetadataOptions.AffectsRender, MSAALevelChangedCallback));
+            new PropertyMetadata(Engine.Graphics.MSAALevel.X4, PropertyMetadataOptions.AffectsRender, MSAALevelChangedCallback));
 
+        public static readonly AdamantiumProperty StateProperty = AdamantiumProperty.Register(nameof(State), 
+            typeof(WindowState), typeof(WindowBase),
+            new PropertyMetadata(WindowState.Normal, PropertyMetadataOptions.AffectsRender, StateChangedCallback));
+        
+        private static void StateChangedCallback(AdamantiumComponent adamantiumComponent, AdamantiumPropertyChangedEventArgs e)
+        {
+            if (!(adamantiumComponent is WindowBase component)) return;
+
+            var args = new StateChangedEventArgs((WindowState)e.NewValue);
+            args.RoutedEvent = StateChangedEvent;
+            component.RaiseEvent(args);
+        }
+        
         private static void MSAALevelChangedCallback(AdamantiumComponent adamantiumComponent, AdamantiumPropertyChangedEventArgs e)
         {
             if (!(adamantiumComponent is WindowBase component)) return;
@@ -60,18 +77,18 @@ namespace Adamantium.UI
 
         private static void ClientWidthChangedCallBack(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
         {
-            if (!(adamantiumObject is WindowBase o)) return;
+            if (!(adamantiumObject is WindowBase component)) return;
             Size old = default;
             if (e.OldValue == AdamantiumProperty.UnsetValue)
                 return;
             
             old.Width = (double) e.OldValue;
-            old.Height = o.Height;
+            old.Height = component.Height;
             
-            var newSize = new Size((double)e.NewValue, o.Height);
+            var newSize = new Size((double)e.NewValue, component.Height);
             var args = new SizeChangedEventArgs(old, newSize, true, false);
             args.RoutedEvent = ClientSizeChangedEvent;
-            o.RaiseEvent(args);
+            component.RaiseEvent(args);
         }
         
         private static void ClientHeightChangedCallBack(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
@@ -111,6 +128,12 @@ namespace Adamantium.UI
         {
             get => GetValue<MSAALevel>(MSAALevelProperty);
             set => SetValue(MSAALevelProperty, value);
+        }
+
+        public WindowState State
+        {
+            get => GetValue<WindowState>(StateProperty);
+            set => SetValue(StateProperty, value);
         }
 
         public Double ClientWidth
@@ -170,7 +193,13 @@ namespace Adamantium.UI
             add => AddHandler(MSAALevelChangedEvent, value);
             remove => RemoveHandler(MSAALevelChangedEvent, value);
         }
-        
+
+        public event StateChangedHandler StateChanged
+        {
+            add => AddHandler(StateChangedEvent, value);
+            remove => RemoveHandler(StateChangedEvent, value);
+        }
+
         internal void OnSourceInitialized()
         {
             SourceInitialized?.Invoke(this, EventArgs.Empty);

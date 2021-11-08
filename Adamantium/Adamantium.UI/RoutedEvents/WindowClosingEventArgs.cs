@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 
-namespace Adamantium.UI
+namespace Adamantium.UI.RoutedEvents
 {
     public class WindowClosingEventArgs : EventArgs
     {

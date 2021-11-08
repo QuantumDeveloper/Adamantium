@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Adamantium.UI
+namespace Adamantium.UI.RoutedEvents
 {
    public class VisualTreeAttachmentEventArgs : EventArgs
    {

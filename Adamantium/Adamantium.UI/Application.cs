@@ -19,6 +19,8 @@ using Adamantium.UI.Threading;
 using Adamantium.UI.Windows;
 using AdamantiumVulkan;
 using AdamantiumVulkan.Core;
+using UnhandledExceptionEventArgs = Adamantium.UI.RoutedEvents.UnhandledExceptionEventArgs;
+using UnhandledExceptionEventHandler = Adamantium.UI.RoutedEvents.UnhandledExceptionEventHandler;
 
 namespace Adamantium.UI
 {

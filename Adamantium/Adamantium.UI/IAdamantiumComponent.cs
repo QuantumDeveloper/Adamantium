@@ -1,5 +1,6 @@
 ﻿using System;
 using Adamantium.EntityFramework.ComponentsBasics;
+using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI
 {
