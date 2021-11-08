@@ -294,7 +294,7 @@ namespace Adamantium.Fonts
             }
             
             // 5. Fix artefacts
-            FixArtefacts(coloredDistances, size);
+            //FixArtefacts(coloredDistances, size);
             
             // 6. Normalize MSDF and SDF to [0 .. 255] range
             for (var y = 0; y < size; y++)

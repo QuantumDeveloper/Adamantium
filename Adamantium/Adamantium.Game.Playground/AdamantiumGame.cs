@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -336,7 +337,16 @@ namespace Adamantium.Game.Playground
 
                 var atlasGen = new TextureAtlasGenerator();
                 
+                var stopwatch = new Stopwatch();
+ 
+                stopwatch.Start();
+
                 var mtsdfAtlasData = atlasGen.GenerateTextureAtlas(typeface, font, mtsdfTextureSize, sampleRate, 0, (int)typeface.GlyphCount, GeneratorType.Msdf);
+                
+                stopwatch.Stop();
+                
+                Console.WriteLine($"{typeface.GlyphCount} glyphs: {stopwatch.ElapsedMilliseconds} ms");
+                
                 SaveAtlas(@"Textures\mtsdf.png", mtsdfAtlasData);
 
                 /*var subAtlasData = atlasGen.GenerateTextureAtlas(typeface, font, fontSize, sampleRate, 0, (int)typeface.GlyphCount, GeneratorType.Subpixel);
