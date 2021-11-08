@@ -19,7 +19,7 @@ namespace Adamantium.Fonts
 {
     public class Glyph
     {
-        private ReaderWriterLockSlim locker;
+        private readonly object lockObject = new object();
         
         private HashSet<UInt32> uniqueUnicodes;
         private List<UInt32> unicodes;
@@ -83,7 +83,6 @@ namespace Adamantium.Fonts
 
         public Glyph(uint index, OutlineType outlineType)
         {
-            locker = new ReaderWriterLockSlim();
             Index = index;
             Name = String.Empty;
             outlines = new List<Outline>();
@@ -144,8 +143,9 @@ namespace Adamantium.Fonts
             
             if (rate == 0) rate = 1;
 
-            lock (this)
+            try
             {
+                Monitor.TryEnter(lockObject);
                 if (!isSplitOnSegments)
                 {
                     SplitOnSegments();
@@ -162,6 +162,10 @@ namespace Adamantium.Fonts
                 //AutoHint();
 
                 return points;
+            }
+            finally
+            {
+                Monitor.Exit(lockObject);
             }
         }
 
@@ -555,17 +559,31 @@ namespace Adamantium.Fonts
         
         public Color[,] GenerateDirectMSDF(uint size, ushort em)
         {
-            lock(this)
+            try
             {
+                Monitor.TryEnter(lockObject);
                 return msdfGenerator.GenerateDirectMSDF(size, BoundingRectangle, mergedOutlinesSegments, em);
+            }
+            finally
+            {
+                Monitor.Exit(lockObject);
             }
         }
 
         public Color[,] RasterizeGlyphBySubpixels(uint textSize, ushort em)
         {
-            lock (this)
+            try
             {
-                return subpixelRasterizer.RasterizeGlyphBySubpixels(textSize, BoundingRectangle, mergedOutlinesSegments, em);
+                Monitor.TryEnter(lockObject);
+                return subpixelRasterizer.RasterizeGlyphBySubpixels(
+                    textSize, 
+                    BoundingRectangle, 
+                    mergedOutlinesSegments,
+                    em);
+            }
+            finally
+            {
+                Monitor.Exit(lockObject);
             }
         }
         
