@@ -2,13 +2,14 @@
 
   <PropertyGroup>
     <TargetFramework>net5.0</TargetFramework>
-    <Platforms>AnyCPU;x64</Platforms>
+    <Platforms>x64</Platforms>
     <AssemblyName>Adamantium.UI</AssemblyName>
     <RootNamespace>Adamantium.UI</RootNamespace>
     <PackageId>Adamantium.UI</PackageId>
     <Authors>Adamantium.UI</Authors>
     <Company>Adamantium.UI</Company>
     <Product>Adamantium.UI</Product>
+    <Configurations>Debug;Release</Configurations>
   </PropertyGroup>
 
   <ItemGroup>

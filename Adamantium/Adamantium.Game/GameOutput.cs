@@ -4,9 +4,10 @@ using Adamantium.Engine.Graphics;
 using Adamantium.Game.Events;
 using Adamantium.Game.GameInput;
 using Adamantium.Imaging;
-using Adamantium.Mathematics;
 using Adamantium.UI;
+using Adamantium.UI.Controls;
 using AdamantiumVulkan.Core;
+using Rectangle = Adamantium.Mathematics.Rectangle;
 
 namespace Adamantium.Game
 {
@@ -51,6 +52,8 @@ namespace Adamantium.Game
         public abstract Boolean IsVisible { get; }
         
         public abstract bool IsActive { get; } 
+        
+        public abstract WindowState State { get; set; }
 
         internal abstract bool CanHandle(GameContext gameContext);
 
@@ -224,6 +227,11 @@ namespace Adamantium.Game
         /// Occurs when window is closed
         /// </summary>
         public event EventHandler<EventArgs> Closed;
+
+        /// <summary>
+        /// Occurs when window state changed
+        /// </summary>
+        public Action<WindowStatePayload> StateChanged;
 
         internal void OnClosed()
         {

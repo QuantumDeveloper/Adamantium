@@ -5,6 +5,7 @@ using Adamantium.Win32;
 using Adamantium.Win32.RawInput;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
 using Adamantium.Core.DependencyInjection;
@@ -132,7 +133,6 @@ namespace Adamantium.UI.Windows
         private void OnWindowClosed(object sender, EventArgs e)
         {
             source.RemoveHook(CustomWndProc);
-            //Application.Current.Windows.Remove(this.window);
         }
 
         /// <summary>
@@ -148,6 +148,7 @@ namespace Adamantium.UI.Windows
         {
             if (messageTable.TryGetValue(msg, out var handler))
             {
+                Debug.WriteLine((WindowMessages)msg);
                 return handler((WindowMessages)msg, wParam, lParam, out handled);
             }
 
@@ -183,12 +184,12 @@ namespace Adamantium.UI.Windows
                 case NcHitTest.Close:
                     window.Close();
                     break;
-                case NcHitTest.Minbutton:
-                    window.State = WindowState.Minimized;
-                    break;
-                case NcHitTest.Maxbutton:
-                    window.State = WindowState.Maximized;
-                    break;
+                // case NcHitTest.Minbutton:
+                //     window.State = WindowState.Minimized;
+                //     break;
+                // case NcHitTest.Maxbutton:
+                //     window.State = WindowState.Maximized;
+                //     break;
             }
             handled = true;
             window.StateChanged += WindowOnStateChanged;
@@ -244,10 +245,12 @@ namespace Adamantium.UI.Windows
             return Win32Interop.DefWindowProc(window.Handle, windowMessage, wParam, lParam);
         }
 
+        private WindowState lastWindowState;
         private IntPtr HandleSysCommand(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
         {
             var command = (SystemCommands)(Environment.Is64BitProcess ? wParam.ToInt64() : wParam.ToInt32());
             var p = Messages.PointFromLParam(lParam);
+            window.StateChanged -= WindowOnStateChanged;
             switch (command)
             {
                 case SystemCommands.CLOSE:
@@ -262,17 +265,44 @@ namespace Adamantium.UI.Windows
                     Win32Interop.SetWindowPos(window.Handle, IntPtr.Zero, (int)p.X, (int)p.Y, (int)window.Width,
                        (int)window.Height, SetWindowPosFlags.Asyncwindowpos | SetWindowPosFlags.Nosize);
                     break;
+                case SystemCommands.MAXIMIZE:
+                    window.State = WindowState.Maximized;
+                    Win32Interop.ShowWindow(window.Handle, WindowShowStyle.Maximize);
+                    break;
+                case SystemCommands.MINIMIZE:
+                    lastWindowState = window.State;
+                    window.State = WindowState.Minimized;
+                    Win32Interop.ShowWindow(window.Handle, WindowShowStyle.Minimize);
+                    break;
+                case SystemCommands.RESTORE:
+                    if (lastWindowState == WindowState.Maximized && window.State == WindowState.Minimized)
+                    {
+                        lastWindowState = WindowState.Maximized;
+                    }
+                    else
+                    {
+                        lastWindowState = WindowState.Normal;
+                    }
+                    var style = ConvertStateToShowStyle(lastWindowState);
+                    window.State = lastWindowState;
+                    Win32Interop.ShowWindow(window.Handle, style);
+                    break;
                 default:
                     Win32Interop.DefWindowProc(window.Handle, windowMessage, wParam, lParam);
                     break;
             }
-
+            window.StateChanged += WindowOnStateChanged;
             handled = true;
             return IntPtr.Zero;
         }
 
         private IntPtr HandleResize(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
         {
+            handled = true;
+            if (window.State == WindowState.Minimized)
+            {
+                return IntPtr.Zero;
+            }
             //mutex.WaitOne();
             Win32Interop.GetWindowRect(window.Handle, out var rect);
             window.Width = rect.Width;
@@ -282,7 +312,6 @@ namespace Adamantium.UI.Windows
             window.ClientWidth = (uint)client.Width;
             window.ClientHeight = (uint)client.Height;
 
-            handled = true;
             //mutex.ReleaseMutex();
             return IntPtr.Zero;
         }

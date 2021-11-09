@@ -3,7 +3,8 @@
   <PropertyGroup>
     <TargetFramework>net5.0</TargetFramework>
     <Platforms>AnyCPU;x64</Platforms>
-    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies> <!-- This will copy all nuget references for this project to output and will let it correctly work when using from .targets files -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <Configurations>Debug;Release</Configurations> <!-- This will copy all nuget references for this project to output and will let it correctly work when using from .targets files -->
   </PropertyGroup>
 
   <ItemGroup>

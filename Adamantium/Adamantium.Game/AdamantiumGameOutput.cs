@@ -1,5 +1,6 @@
 ﻿using System;
 using Adamantium.Engine.Graphics;
+using Adamantium.Game.Events;
 using Adamantium.Game.GameInput;
 using Adamantium.Imaging;
 using Adamantium.UI;
@@ -26,7 +27,14 @@ namespace Adamantium.Game
 
         public override bool IsActive => window.IsActive;
 
-        public override bool IsVisible => window.State != WindowState.Minimized;
+        public override WindowState State
+        {
+            get => window.State;
+            set
+            {
+                window.State = value;
+            }
+        }
 
         internal override bool CanHandle(GameContext gameContext)
         {
@@ -39,6 +47,7 @@ namespace Adamantium.Game
             window = GameContext.Context as IWindow ?? throw new ArgumentException($"{nameof(context.Context)} should be of type {nameof(IWindow)}");
             UiComponent = window as FrameworkComponent;
             window.ClientSizeChanged += WindowOnClientSizeChanged;
+            window.StateChanged += WindowOnStateChanged;
 
             Description = new GameWindowDescription(PresenterType.Swapchain);
             Width = (uint)window.ClientWidth;
@@ -48,6 +57,12 @@ namespace Adamantium.Game
             UpdateViewportAndScissor((uint)ClientBounds.Width, (uint)ClientBounds.Height);
             
             base.InitializeInternal(context);
+        }
+
+        private void WindowOnStateChanged(object sender, StateChangedEventArgs e)
+        {
+            State = window.State;
+            StateChanged?.Invoke(new WindowStatePayload(State));
         }
 
         private void WindowOnClientSizeChanged(object sender, SizeChangedEventArgs e)

@@ -277,7 +277,7 @@ namespace Adamantium.Fonts
             var scale = size / (double)emSquare.Width;
             var range = GetRange(pxRange, scale, scale);
 
-            var additionalSpace = emSquare.Width / 100.0;
+            var additionalSpace = emSquare.Width / 90.0;
             
             ColoredDistance minColoredDistance;
                         

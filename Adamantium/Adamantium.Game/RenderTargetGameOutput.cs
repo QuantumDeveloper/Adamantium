@@ -81,6 +81,8 @@ namespace Adamantium.Game
         public override object NativeWindow => nativeWindow;
 
         public override bool IsActive => UiComponent.IsFocused;
+        
+        public override WindowState State { get; set; }
 
         internal override bool CanHandle(GameContext gameContext)
         {

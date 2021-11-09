@@ -37,7 +37,7 @@ namespace Adamantium.Win32
             IntPtr lParam);
 
         [DllImport("user32.dll", SetLastError = true)]
-        public static extern IntPtr ShowWindow(IntPtr hwnd, WindowShowStyle count);
+        public static extern IntPtr ShowWindow(IntPtr hwnd, WindowShowStyle show);
 
         [DllImport("user32.dll", SetLastError = true, EntryPoint = "DefWindowProcW")]
         public static extern IntPtr DefWindowProcW(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);

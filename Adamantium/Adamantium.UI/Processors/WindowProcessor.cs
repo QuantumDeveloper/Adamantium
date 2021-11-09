@@ -9,6 +9,7 @@ using Adamantium.EntityFramework;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Rendering;
+using Adamantium.UI.RoutedEvents;
 using AdamantiumVulkan.Core;
 
 namespace Adamantium.UI.Processors
@@ -22,12 +23,34 @@ namespace Adamantium.UI.Processors
         private PresentationParameters parameters;
         private GraphicsDevice graphicsDevice;
         private IWindowRenderer windowRenderer;
+        private AutoResetEvent _pauseEvent;
         
         public WindowProcessor(EntityWorld world, IWindow window, MainGraphicsDevice mainDevice)
             : base(world)
         {
             this.window = window;
+            this.window.SizeChanged += WindowOnSizeChanged;
+            this.window.StateChanged += WindowOnStateChanged;
             CreateResources(mainDevice);
+            _pauseEvent = new AutoResetEvent(false);
+        }
+
+        private void WindowOnStateChanged(object sender, StateChangedEventArgs e)
+        {
+            if (window.State is WindowState.Maximized or WindowState.Normal)
+            {
+                _pauseEvent.Set();
+                //_pauseEvent.Reset();
+            }
+
+        }
+
+        private void WindowOnSizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            // if (window.State is WindowState.Maximized or WindowState.Normal)
+            // {
+            //     _pauseEvent.Set();
+            // }
         }
 
         private void CreateResources(MainGraphicsDevice mainDevice)
@@ -69,6 +92,12 @@ namespace Adamantium.UI.Processors
 
         public override void Draw(IGameTime gameTime)
         {
+            if (window.State == WindowState.Minimized)
+            {
+                _pauseEvent.WaitOne();
+                //_pauseEvent.WaitOne();
+            }
+            
             _gameTime = gameTime;
             base.Draw(gameTime);
             
