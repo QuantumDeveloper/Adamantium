@@ -26,6 +26,9 @@ namespace Adamantium.UI.Controls
 
       public static readonly AdamantiumProperty Y2Property = AdamantiumProperty.Register(nameof(Y2), typeof(Double),
          typeof(Line), new PropertyMetadata(0.0, PropertyMetadataOptions.AffectsMeasure));
+      
+      public static readonly AdamantiumProperty LineThicknessProperty = AdamantiumProperty.Register(nameof(LineThickness), typeof(Double),
+         typeof(Line), new PropertyMetadata(1.0, PropertyMetadataOptions.AffectsMeasure));
 
       public Double X1
       {
@@ -50,14 +53,21 @@ namespace Adamantium.UI.Controls
          get => GetValue<Double>(Y2Property);
          set => SetValue(Y2Property, value);
       }
+      
+      public Double LineThickness
+      {
+         get => GetValue<Double>(LineThicknessProperty);
+         set => SetValue(LineThicknessProperty, value);
+      }
 
       protected override void OnRender(DrawingContext context)
       {
          base.OnRender(context);
-         geometry = new LineGeometry(new Point(X1, Y1), new Point(X2, Y2), StrokeThickness);
+         var newStart = new Point(X1, Y1); //+ Location;
+         var newEnd = new Point(X2, Y2); //+ Location;
+
          context.BeginDraw(this);
-         context.DrawGeometry(this, Stroke, new Pen(Stroke, StrokeThickness, null, StrokeDashCap, StartLineCap,
-            EndLineCap), geometry);
+         context.DrawLine(this, Fill, newStart, newEnd, LineThickness);
          context.EndDraw(this);
 
       }

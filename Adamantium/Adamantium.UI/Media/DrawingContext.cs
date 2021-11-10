@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Adamantium.Engine.Graphics;
+using Adamantium.Mathematics;
 using Adamantium.UI.Media.Imaging;
 using Adamantium.UI.Rendering;
 
@@ -130,6 +131,16 @@ namespace Adamantium.UI.Media
             presentationItem.StrokeRenderer = strokeRenderer;
          }
          
+         currentContainer?.AddItem(presentationItem);
+      }
+
+      public void DrawLine(IUIComponent component, Brush brush, Point start, Point end, Double thickness)
+      {
+         var lineGeometry = new LineGeometry(start, end, thickness);
+
+         var presentationItem = new UIPresentationItem();
+         var uiRenderer = UIComponentRenderer.Create(GraphicsDevice, lineGeometry.Mesh, brush);
+         presentationItem.GeometryRenderer = uiRenderer;
          currentContainer?.AddItem(presentationItem);
       }
 

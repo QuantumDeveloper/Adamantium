@@ -41,6 +41,8 @@ namespace Adamantium.Engine.Graphics
         private TrackingCollection<Rect2D> scissors;
         private TrackingCollection<DynamicState> dynamicStates;
         
+        private readonly uint[] waitStages = {(uint) PipelineStageFlagBits.ColorAttachmentOutputBit};
+        
         private PipelineManager pipelineManager;
 
         internal Device LogicalDevice => MainDevice?.LogicalDevice;
@@ -510,7 +512,6 @@ namespace Adamantium.Engine.Graphics
 
         public void EndDraw()
         {
-            
             var commandBuffer = commandBuffers[ImageIndex];
 
             commandBuffer.EndRenderPass();
@@ -521,12 +522,10 @@ namespace Adamantium.Engine.Graphics
                 throw new Exception("failed to record command buffer!");
             }
 
-            
-            
             var submitInfo = new SubmitInfo();
 
             Semaphore[] waitSemaphores = new[] {ImageAvailableSemaphores[CurrentFrame]};
-            uint[] waitStages = new[] {(uint) PipelineStageFlagBits.ColorAttachmentOutputBit};
+            
             submitInfo.WaitSemaphoreCount = 1;
             submitInfo.PWaitSemaphores = waitSemaphores;
             submitInfo.PWaitDstStageMask = waitStages;
