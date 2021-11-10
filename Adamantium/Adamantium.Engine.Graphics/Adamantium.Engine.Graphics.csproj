@@ -1,9 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net5.0</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
     <Platforms>x64</Platforms>
-    <LangVersion>preview</LangVersion>
+    <LangVersion>latestmajor</LangVersion>
     <Configurations>Debug;Release</Configurations>
   </PropertyGroup>
 

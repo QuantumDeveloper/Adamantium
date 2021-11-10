@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net5.0</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
     <Platforms>x64</Platforms>
     <AssemblyName>Adamantium.UI</AssemblyName>
     <RootNamespace>Adamantium.UI</RootNamespace>
@@ -10,6 +10,7 @@
     <Company>Adamantium.UI</Company>
     <Product>Adamantium.UI</Product>
     <Configurations>Debug;Release</Configurations>
+    <LangVersion>latestmajor</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>

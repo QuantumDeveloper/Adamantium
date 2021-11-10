@@ -139,7 +139,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Quantizers.DistinctSelection
                     ToList();
 
                 // workaround for backgrounds, the most prevalent color
-                DistinctColorInfo background = colorInfoList.MaxBy(info => info.Count);
+                DistinctColorInfo background = Extend.MaxBy(colorInfoList, info => info.Count);
                 colorInfoList.Remove(background);
                 colorCount--;
 
