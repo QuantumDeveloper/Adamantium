@@ -14,6 +14,7 @@ namespace Adamantium.UI.Media
       private Dictionary<IUIComponent, UIPresentationContainer> visualPresentations;
 
       private UIPresentationContainer currentContainer;
+      private IUIComponent currentComponent;
 
       internal DrawingContext(GraphicsDevice d3dDevice)
       {
@@ -34,15 +35,17 @@ namespace Adamantium.UI.Media
             presentation.DisposeAndClearItems();
          }
          currentContainer = new UIPresentationContainer();
+         currentComponent = visualComponent;
       }
 
       public void EndDraw(IUIComponent visualComponent)
       {
          visualPresentations[visualComponent] = currentContainer;
          currentContainer = null;
+         currentComponent = null;
       }
 
-      public void DrawRectangle(IUIComponent visualComponent, Brush brush, Rect rect, Pen pen = null)
+      public void DrawRectangle(Brush brush, Rect rect, Pen pen = null)
       {
          var rectangle = new RectangleGeometry(rect, new CornerRadius(0));
          StrokeGeometry stroke = null;
@@ -65,7 +68,7 @@ namespace Adamantium.UI.Media
          currentContainer?.AddItem(presentationItem);
       }
       
-      public void DrawEllipse(IUIComponent visualComponent, Rect destinationRect, Brush brush, Double startAngle, Double stopAngle, Pen pen = null)
+      public void DrawEllipse(Rect destinationRect, Brush brush, Double startAngle, Double stopAngle, Pen pen = null)
       {
          var ellipse = new EllipseGeometry(destinationRect, startAngle, stopAngle);
          StrokeGeometry stroke = null;
@@ -88,7 +91,7 @@ namespace Adamantium.UI.Media
          currentContainer?.AddItem(presentationItem);
       }
 
-      public void DrawRectangle(IUIComponent visualComponent, Brush brush, Rect rect, CornerRadius corners, Pen pen = null)
+      public void DrawRectangle(Brush brush, Rect rect, CornerRadius corners, Pen pen = null)
       {
          var rectangle = new RectangleGeometry(rect, corners);
          StrokeGeometry strokeGeometry = null;
@@ -110,7 +113,7 @@ namespace Adamantium.UI.Media
          currentContainer?.AddItem(presentationItem);
       }
 
-      public void DrawGeometry(IUIComponent visualComponent, Brush brush, Pen pen, Geometry geometry)
+      public void DrawGeometry(Brush brush, Geometry geometry, Pen pen = null)
       {
          StrokeGeometry strokeGeometry = null;
          if (pen != null && pen.Thickness > 0.0)
@@ -134,7 +137,7 @@ namespace Adamantium.UI.Media
          currentContainer?.AddItem(presentationItem);
       }
 
-      public void DrawLine(IUIComponent component, Brush brush, Point start, Point end, Double thickness)
+      public void DrawLine(Brush brush, Point start, Point end, Double thickness)
       {
          var lineGeometry = new LineGeometry(start, end, thickness);
 
@@ -144,7 +147,7 @@ namespace Adamantium.UI.Media
          currentContainer?.AddItem(presentationItem);
       }
 
-      public void DrawImage(IUIComponent visualComponent, BitmapSource bitmap, Brush filter, Rect destinationRect, CornerRadius corners)
+      public void DrawImage(BitmapSource bitmap, Brush filter, Rect destinationRect, CornerRadius corners)
       {
          var geometry = new RectangleGeometry(destinationRect, corners);
          
@@ -155,7 +158,7 @@ namespace Adamantium.UI.Media
          currentContainer?.AddItem(presentationItem);
       }
 
-      public void PushTexture(IUIComponent visualComponent, BitmapSource bitmap)
+      public void PushTexture(BitmapSource bitmap)
       {
          // if (VisualPresentations.TryGetValue(visualComponent, out var shapePresentation))
          // {
@@ -167,7 +170,7 @@ namespace Adamantium.UI.Media
          // }
       }
 
-      public void PushTexture(IUIComponent visualComponent, Texture bitmap)
+      public void PushTexture(Texture bitmap)
       {
          // if (VisualPresentations.TryGetValue(visualComponent, out var shapePresentation))
          // {
@@ -179,12 +182,12 @@ namespace Adamantium.UI.Media
          // }
       }
 
-      public void DrawEmptyRectangle(IUIComponent visualComponent, Brush brush, Rect rect, Thickness borderThickness, Thickness cornerRadius)
+      public void DrawEmptyRectangle(Brush brush, Rect rect, Thickness borderThickness, Thickness cornerRadius)
       {
          
       }
 
-      public void DrawFilledRectangle(IUIComponent visualComponent, Brush brush, Rect rect, Thickness cornerRadius)
+      public void DrawFilledRectangle(Brush brush, Rect rect, Thickness cornerRadius)
       {
 
       }

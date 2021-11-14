@@ -1,14 +1,16 @@
 ﻿using System;
 using Adamantium.Core.Collections;
 using Adamantium.UI.Media;
-using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI.Controls
 {
    public abstract class Shape : FrameworkComponent
    {
+      protected Rect Rect;
+      
       protected Shape()
       {
+         BoundingRectangle = new Rect();
       }
 
       public static readonly AdamantiumProperty FillProperty = AdamantiumProperty.Register(nameof(Fill),
@@ -23,7 +25,7 @@ namespace Adamantium.UI.Controls
          AdamantiumProperty.Register(nameof(StrokeThickness),
             typeof (Double), typeof (Shape),
             new PropertyMetadata((Double) 0,
-               PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsRender, PropertyChangedCallback, CoerceStrokeThickness ));
+               PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsRender, CoerceStrokeThickness ));
 
       public static readonly AdamantiumProperty StrokeDashArrayProperty =
          AdamantiumProperty.Register(nameof(StrokeDashArray),
@@ -86,13 +88,7 @@ namespace Adamantium.UI.Controls
 
       public PenLineCap EndLineCap { get; set; }
 
-      public virtual Geometry RenderGeometry { get; private set; }
-
-
-      private static void PropertyChangedCallback(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs adamantiumPropertyChangedEventArgs)
-      {
-
-      }
+      protected Rect BoundingRectangle { get; set; }
 
       private static object CoerceStrokeThickness(AdamantiumComponent adamantiumObject, object baseValue)
       {
@@ -106,8 +102,7 @@ namespace Adamantium.UI.Controls
 
       protected override Size MeasureOverride(Size availableSize)
       {
-         Rect shapeBounds = RenderGeometry.Bounds;
-         Size shapeSize = new Size(shapeBounds.Right, shapeBounds.Bottom);
+         Size shapeSize = BoundingRectangle.Size;
          Size desiredSize = new Size(availableSize.Width, availableSize.Height);
 
          if (double.IsInfinity(availableSize.Width))
@@ -119,19 +114,26 @@ namespace Adamantium.UI.Controls
          {
             desiredSize.Height = shapeSize.Height;
          }
-
          
          if (double.IsNaN(Width) && HorizontalAlignment != HorizontalAlignment.Stretch)
          {
-            desiredSize.Width = 0;
+            desiredSize.Width = shapeSize.Width;
          }
-         
 
          if (double.IsNaN(Height) && VerticalAlignment != VerticalAlignment.Stretch)
          {
-            desiredSize.Height = 0;
+            desiredSize.Height = shapeSize.Height;
          }
-         
+
+         if (!double.IsNaN(Width))
+         {
+            desiredSize.Width = Width;
+         }
+
+         if (!double.IsNaN(Height))
+         {
+            desiredSize.Height = Height;
+         }
 
          switch (Stretch)
          {
@@ -149,13 +151,11 @@ namespace Adamantium.UI.Controls
                shapeSize.Height = Math.Max(desiredSize.Width, desiredSize.Height);
                break;
             default:
-               shapeSize = new Size(desiredSize.Width, desiredSize.Height);
+               shapeSize = desiredSize;
                break;
          }
          Rect = new Rect(shapeSize);
          return new Size(shapeSize.Width, shapeSize.Height);
       }
-
-      protected Rect Rect;
    }
 }

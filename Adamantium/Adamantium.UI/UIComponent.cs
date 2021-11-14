@@ -13,7 +13,7 @@ using Adamantium.UI.Windows.Input;
 
 namespace Adamantium.UI
 {
-    public class UIComponent : AdamantiumComponent, IInputElement, IUIComponent
+    public class UIComponent : AdamantiumComponent, IInputElement
     {
         private Size renderSize;
         private Size? _previousMeasure;

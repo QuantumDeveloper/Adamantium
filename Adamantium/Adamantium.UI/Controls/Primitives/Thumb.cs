@@ -151,7 +151,7 @@ namespace Adamantium.UI.Controls.Primitives
          {
             base.OnRender(context);
             context.BeginDraw(this);
-            context.DrawRectangle(this, Background, new Rect(new Size(ActualWidth, ActualHeight)));
+            context.DrawRectangle(Background, new Rect(new Size(ActualWidth, ActualHeight)));
             context.EndDraw(this);
          }
       }

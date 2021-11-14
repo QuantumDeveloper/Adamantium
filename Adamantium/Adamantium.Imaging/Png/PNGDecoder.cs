@@ -41,7 +41,7 @@ namespace Adamantium.Imaging.Png
             return GetSingleFrameImage(pngImage, state);
 
             // TODO: should move these code to another place
-            ////Premultiply alpha for formats, which does not support tansparency
+            ////Premultiply alpha for formats, which does not support transparency
             //for (int i = 0; i < rawBuffer.Length; i+=4)
             //{
             //    float alpha = rawBuffer[i + 3] / 255.0f;

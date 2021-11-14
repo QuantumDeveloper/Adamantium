@@ -25,6 +25,8 @@ namespace Adamantium.UI.Rendering
 
         public void Draw(GraphicsDevice graphicsDevice, IUIComponent component, Matrix4x4F projectionMatrix)
         {
+            if (VertexBuffer == null) return;
+            
             graphicsDevice.SetVertexBuffer(VertexBuffer);
             graphicsDevice.VertexType = VertexType;
             graphicsDevice.PrimitiveTopology = PrimitiveType;
@@ -44,8 +46,12 @@ namespace Adamantium.UI.Rendering
         {
             var renderer = new UIComponentRenderer();
             var vertices = mesh.ToMeshVertices();
-            renderer.VertexBuffer = Buffer.Vertex.New(device, vertices);
-            renderer.IndexBuffer = Buffer.Index.New(device, mesh.Indices);
+            if (vertices != null)
+            {
+                renderer.VertexBuffer = Buffer.Vertex.New(device, vertices);
+                renderer.IndexBuffer = Buffer.Index.New(device, mesh.Indices);
+            }
+
             renderer.VertexType = typeof(MeshVertex);
             renderer.PrimitiveType = mesh.MeshTopology;
             renderer.Brush = brush;

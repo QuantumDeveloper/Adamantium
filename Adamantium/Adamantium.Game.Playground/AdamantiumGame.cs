@@ -245,7 +245,7 @@ namespace Adamantium.Game.Playground
             img.Save(path, ImageFileType.Png);
         }
 
-        uint mtsdfTextureSize = 64;
+        uint mtsdfTextureSize = 51;
         private uint smallFontSizeMaxValue = 24;
 
         private Entity PrintText(TypeFace typeface, IFont font, uint fontSize, Color foreground, string text)
@@ -385,7 +385,7 @@ namespace Adamantium.Game.Playground
                 testEntity.AddComponent(meshRenderer);
                 testEntity.Transform.Position = new Vector3D(0, 0, 6);
                 
-                var textEntity = PrintText(typeface, font, 400, Colors.Beige, "ЮеЭсэ  ю для проверки");
+                var textEntity = PrintText(typeface, font, 600, Colors.Beige, "Ы");
                 textEntity.Transform.Position = new Vector3D(0, 0, 6);
 
                 /* // OUTLINES CHECK

@@ -114,7 +114,7 @@ namespace Adamantium.Engine.Graphics
             colorAttachment.Format = ImageFormat;
             colorAttachment.Samples = (SampleCountFlagBits)MSAALevel;
             colorAttachment.LoadOp = AttachmentLoadOp.Clear;
-            colorAttachment.StoreOp = MSAALevel > MSAALevel.None ? AttachmentStoreOp.Store : AttachmentStoreOp.DontCare;
+            colorAttachment.StoreOp = MSAALevel == MSAALevel.None ? AttachmentStoreOp.Store : AttachmentStoreOp.DontCare;
             colorAttachment.StencilLoadOp = AttachmentLoadOp.DontCare;
             colorAttachment.StencilStoreOp = AttachmentStoreOp.DontCare;
             colorAttachment.InitialLayout = ImageLayout.Undefined;
@@ -124,7 +124,7 @@ namespace Adamantium.Engine.Graphics
             depthAttachment.Format = (Format)DepthFormat;
             depthAttachment.Samples = (SampleCountFlagBits)MSAALevel;
             depthAttachment.LoadOp = AttachmentLoadOp.Clear;
-            depthAttachment.StoreOp = MSAALevel > MSAALevel.None ? AttachmentStoreOp.Store : AttachmentStoreOp.DontCare;
+            depthAttachment.StoreOp = MSAALevel == MSAALevel.None ? AttachmentStoreOp.Store : AttachmentStoreOp.DontCare;
             depthAttachment.StencilLoadOp = AttachmentLoadOp.DontCare;
             depthAttachment.StencilStoreOp = AttachmentStoreOp.DontCare;
             depthAttachment.InitialLayout = ImageLayout.Undefined;
@@ -157,7 +157,7 @@ namespace Adamantium.Engine.Graphics
             subpass.ColorAttachmentCount = 1;
             subpass.PColorAttachments = new[] { colorAttachmentRef };
             subpass.PDepthStencilAttachment = depthAttachmentRef;
-            if (MSAALevel > MSAALevel.None)
+            if (MSAALevel != MSAALevel.None)
             {
                 subpass.PResolveAttachments = new[] {colorAttachmentResolveRef};
             }
@@ -170,7 +170,16 @@ namespace Adamantium.Engine.Graphics
             subpassDependency.DstStageMask = (uint) PipelineStageFlagBits.ColorAttachmentOutputBit;
             subpassDependency.DstAccessMask = (uint)(AccessFlagBits.ColorAttachmentReadBit | AccessFlagBits.ColorAttachmentWriteBit);
 
-            var attachments = new [] { colorAttachment, depthAttachment, colorAttachmentResolve}; 
+            AttachmentDescription[] attachments = null;
+            if (MSAALevel != MSAALevel.None)
+            {
+                attachments = new[] { colorAttachment, depthAttachment, colorAttachmentResolve };
+            }
+            else
+            {
+                attachments = new [] { colorAttachmentResolve, depthAttachment};
+            }
+            
             var renderPassInfo = new RenderPassCreateInfo();
             renderPassInfo.AttachmentCount = (uint)attachments.Length;
             renderPassInfo.PAttachments = attachments;
@@ -222,7 +231,7 @@ namespace Adamantium.Engine.Graphics
         /// </summary>
         /// <param name="fileName">File path for image to save</param>
         /// <param name="fileType">Type of the saving image</param>
-        public void TakeScreenshot(String fileName, ImageFileType fileType)
+        public virtual void TakeScreenshot(String fileName, ImageFileType fileType)
         {
             Task.Factory.StartNew(() =>
             {

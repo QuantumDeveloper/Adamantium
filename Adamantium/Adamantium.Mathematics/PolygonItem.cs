@@ -47,7 +47,7 @@ namespace Adamantium.Mathematics
         /// Constructs <see cref="PolygonItem"/>
         /// </summary>
         /// <param name="points">polygon points</param>
-        public PolygonItem(List<Vector2D> points)
+        public PolygonItem(IEnumerable<Vector2D> points)
         {
             SelfIntersectedPoints = new List<Vector2D>();
             SelfIntersectedSegments = new List<LineSegment2D>();

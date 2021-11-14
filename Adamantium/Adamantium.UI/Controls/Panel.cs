@@ -62,7 +62,7 @@ namespace Adamantium.UI.Controls
       protected override void OnRender(DrawingContext context)
       {
          context.BeginDraw(this);
-         context.DrawRectangle(this, Background, new Rect(new Size(ActualWidth, ActualHeight)));
+         context.DrawRectangle(Background, new Rect(new Size(ActualWidth, ActualHeight)));
          context.EndDraw(this);
       }
    }

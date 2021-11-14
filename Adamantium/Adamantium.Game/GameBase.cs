@@ -304,7 +304,7 @@ namespace Adamantium.Game
 
         internal void OnStarted()
         {
-            Started?.Invoke(this, new EventArgs());
+            Started?.Invoke(this, EventArgs.Empty);
         }
 
         /// <summary>

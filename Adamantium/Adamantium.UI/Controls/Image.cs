@@ -66,7 +66,9 @@ namespace Adamantium.UI.Controls
          var source = Source;
          if (source != null)
          {
-            context.DrawImage(this, source, FilterBrush, new Rect(Bounds.Size), CornerRadius);
+            context.BeginDraw(this);
+            context.DrawImage(source, FilterBrush, new Rect(Bounds.Size), CornerRadius);
+            context.BeginDraw(this);
          }
       }
 

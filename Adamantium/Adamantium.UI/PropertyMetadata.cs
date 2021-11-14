@@ -58,6 +58,15 @@ namespace Adamantium.UI
          MetadataOptions = options;
          ParseMetadataOptions(options);
       }
+      
+      public PropertyMetadata(object defaultValue, PropertyMetadataOptions options, CoerceValueCallback coerceValueCallback)
+      {
+         DefaultValue = defaultValue;
+         PropertyChangedCallback = null;
+         CoerceValueCallback = coerceValueCallback;
+         MetadataOptions = options;
+         ParseMetadataOptions(options);
+      }
 
       public PropertyMetadata(object defaultValue, PropertyMetadataOptions options, PropertyChangedCallback propertyChangedCallback, CoerceValueCallback coerceValueCallback)
       {
@@ -67,7 +76,7 @@ namespace Adamantium.UI
          MetadataOptions = options;
          ParseMetadataOptions(options);
       }
-
+      
       public PropertyMetadata(object defaultValue, PropertyMetadataOptions options, PropertyChangedCallback propertyChangedCallback, CoerceValueCallback coerceValueCallback, UpdateSourceTrigger defaultUpdateSourceTrigger)
       {
          DefaultValue = defaultValue;

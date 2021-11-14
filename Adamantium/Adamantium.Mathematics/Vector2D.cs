@@ -1548,6 +1548,11 @@ namespace Adamantium.Mathematics
       {
          return new((float)value.X, (float)value.Y);
       }
+      
+      public static implicit operator Point(Vector2D value)
+      {
+         return new((float)value.X, (float)value.Y);
+      }
 
    }
 }

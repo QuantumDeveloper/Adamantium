@@ -1,5 +1,10 @@
+using Adamantium.Core.Collections;
+using Adamantium.Engine.Graphics;
+using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Media;
+using Polygon = Adamantium.UI.Controls.Polygon;
+using Rectangle = Adamantium.UI.Controls.Rectangle;
 
 namespace Adamantium.UI.Playground
 {
@@ -9,6 +14,7 @@ namespace Adamantium.UI.Playground
         {
             Width = 1280;
             Height = 720;
+            //MSAALevel = MSAALevel.X8;
             FillControls();
         }
 
@@ -26,8 +32,9 @@ namespace Adamantium.UI.Playground
             var ellipse = new Ellipse();
             ellipse.Width = 150;
             ellipse.Height = 150;
+            ellipse.Stretch = Stretch.UniformToFill;
             ellipse.HorizontalAlignment = HorizontalAlignment.Left;
-            ellipse.VerticalAlignment = VerticalAlignment.Bottom;
+            ellipse.VerticalAlignment = VerticalAlignment.Stretch;
             ellipse.Fill = Brushes.Crimson;
             ellipse.Margin = new Thickness(1, 0, 0, 1);
 
@@ -41,12 +48,26 @@ namespace Adamantium.UI.Playground
             line.Height = 350;
             line.VerticalAlignment = VerticalAlignment.Center;
             line.HorizontalAlignment = HorizontalAlignment.Center;
-            line.Fill = Brushes.Indigo;
-            
+            line.Fill = Brushes.Coral;
+
+            var polygon = new Polygon();
+            polygon.Width = 100;
+            polygon.Points = new TrackingCollection<Vector2D>();
+            polygon.Points.Add(new Vector2D(10, 80));
+            polygon.Points.Add(new Vector2D(190, 80));
+            polygon.Points.Add(new Vector2D(30, 190));
+            polygon.Points.Add(new Vector2D(100, 10));
+            polygon.Points.Add(new Vector2D(170, 190));
+            polygon.Fill = Brushes.Crimson;
+            polygon.FillRule = FillRule.EvenOdd;
+            polygon.HorizontalAlignment = HorizontalAlignment.Left;
+            //polygon.ClipToBounds = false;
+                
             grid.Background = Brushes.White;
             grid.Children.Add(rectangle);
             grid.Children.Add(ellipse);
             grid.Children.Add(line);
+            grid.Children.Add(polygon);
 
             Content = grid;
         }

@@ -4,19 +4,14 @@ using Adamantium.UI.Media;
 
 namespace Adamantium.UI.Controls
 {
-   public class Line:Shape
+   public class Line : Shape
    {
-      private LineGeometry geometry;
-
       public Line()
       {
-         geometry = new LineGeometry();
       }
 
-      public override Geometry RenderGeometry => geometry;
-
-      public static readonly AdamantiumProperty X1Property = AdamantiumProperty.Register(nameof(X1), typeof (Double),
-         typeof (Line), new PropertyMetadata(0.0, PropertyMetadataOptions.AffectsMeasure));
+      public static readonly AdamantiumProperty X1Property = AdamantiumProperty.Register(nameof(X1), typeof(Double),
+         typeof(Line), new PropertyMetadata(0.0, PropertyMetadataOptions.AffectsMeasure));
 
       public static readonly AdamantiumProperty X2Property = AdamantiumProperty.Register(nameof(X2), typeof(Double),
          typeof(Line), new PropertyMetadata(0.0, PropertyMetadataOptions.AffectsMeasure));
@@ -26,8 +21,9 @@ namespace Adamantium.UI.Controls
 
       public static readonly AdamantiumProperty Y2Property = AdamantiumProperty.Register(nameof(Y2), typeof(Double),
          typeof(Line), new PropertyMetadata(0.0, PropertyMetadataOptions.AffectsMeasure));
-      
-      public static readonly AdamantiumProperty LineThicknessProperty = AdamantiumProperty.Register(nameof(LineThickness), typeof(Double),
+
+      public static readonly AdamantiumProperty LineThicknessProperty = AdamantiumProperty.Register(
+         nameof(LineThickness), typeof(Double),
          typeof(Line), new PropertyMetadata(1.0, PropertyMetadataOptions.AffectsMeasure));
 
       public Double X1
@@ -53,11 +49,21 @@ namespace Adamantium.UI.Controls
          get => GetValue<Double>(Y2Property);
          set => SetValue(Y2Property, value);
       }
-      
+
       public Double LineThickness
       {
          get => GetValue<Double>(LineThicknessProperty);
          set => SetValue(LineThicknessProperty, value);
+      }
+
+      protected override Size MeasureOverride(Size availableSize)
+      {
+         var point1 = new Vector2D(X1, Y1);
+         var point2 = new Vector2D(X2, Y2);
+         var min = Vector2D.Min(point1, point2);
+         var max = Vector2D.Max(point1, point2);
+         BoundingRectangle = new Rect(min, max);
+         return base.MeasureOverride(availableSize);
       }
 
       protected override void OnRender(DrawingContext context)
@@ -67,9 +73,8 @@ namespace Adamantium.UI.Controls
          var newEnd = new Point(X2, Y2); //+ Location;
 
          context.BeginDraw(this);
-         context.DrawLine(this, Fill, newStart, newEnd, LineThickness);
+         context.DrawLine(Fill, newStart, newEnd, LineThickness);
          context.EndDraw(this);
-
       }
    }
 }

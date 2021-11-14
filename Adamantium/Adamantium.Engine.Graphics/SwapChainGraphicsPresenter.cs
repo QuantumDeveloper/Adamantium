@@ -3,6 +3,7 @@ using Adamantium.Win32;
 using AdamantiumVulkan.Core;
 using System;
 using System.Diagnostics;
+using System.Threading.Tasks;
 using VulkanImage = AdamantiumVulkan.Core.Image;
 
 namespace Adamantium.Engine.Graphics
@@ -150,7 +151,15 @@ namespace Adamantium.Engine.Graphics
             {
                 FramebufferCreateInfo framebufferInfo = new FramebufferCreateInfo();
                 framebufferInfo.RenderPass = RenderPass;
-                framebufferInfo.PAttachments = new [] { renderTarget, depthBuffer, imageViews[i] };
+                if (MSAALevel != MSAALevel.None)
+                {
+                    framebufferInfo.PAttachments = new [] { renderTarget, depthBuffer, imageViews[i] };
+                }
+                else
+                {
+                    framebufferInfo.PAttachments = new [] { imageViews[i], depthBuffer };
+                }
+                
                 framebufferInfo.AttachmentCount = (uint)framebufferInfo.PAttachments.Length;
                 framebufferInfo.Width = Width;
                 framebufferInfo.Height = Height;
@@ -297,6 +306,15 @@ namespace Adamantium.Engine.Graphics
             RemoveAndDispose(ref renderTarget);
 
             swapchain?.Destroy(GraphicsDevice);
+        }
+        
+        public override void TakeScreenshot(String fileName, ImageFileType fileType)
+        {
+            Task.Factory.StartNew(() =>
+            {
+                // TODO: implement saving backbuffer to file
+                //framebuffers[GraphicsDevice.CurrentFrame].Save(fileName, fileType);
+            }, TaskCreationOptions.LongRunning);
         }
 
         public static implicit operator SwapchainKHR(SwapChainGraphicsPresenter presenter)

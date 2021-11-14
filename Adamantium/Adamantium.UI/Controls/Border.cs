@@ -115,8 +115,8 @@ namespace Adamantium.UI.Controls
 
          */
          context.BeginDraw(this);
-         context.DrawGeometry(this, BorderBrush, null, geometry);
-         context.DrawRectangle(this, Background, new Rect(new Point(BorderThickness.Left, BorderThickness.Top), RenderSize.Deflate(BorderThickness)), CornerRadius);
+         context.DrawGeometry(BorderBrush, geometry);
+         context.DrawRectangle(Background, new Rect(new Point(BorderThickness.Left, BorderThickness.Top), RenderSize.Deflate(BorderThickness)), CornerRadius);
          context.EndDraw(this);
          
       }

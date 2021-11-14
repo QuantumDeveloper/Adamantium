@@ -212,53 +212,6 @@ namespace Adamantium.UI.Controls
       private Size childSize;
       Stopwatch measureTimer;
 
-      protected override void OnRender(DrawingContext context)
-      {
-         context.BeginDraw(this);
-         context.DrawRectangle(this, Background, new Rect(new Size(ActualWidth, ActualHeight)));
-         if (ShowGridLines && rowSegments != null)
-         {
-            var lineBrush = Brushes.Black;
-            
-            //for (int i = 1; i < RowDefinitions.Count; ++i)
-            //{
-            //   context.DrawRectangle(this, lineBrush,
-            //      new Rect(new Point(0, RowDefinitions[i].Offset), new Size(ActualWidth, 1)));
-            //   context.DrawRectangle(this, lineBrush,
-            //      new Rect(new Point(0, RowDefinitions[i].Offset+ RowDefinitions[i].ActualHeight), new Size(ActualWidth, 1)));
-            //}
-            //for (int i = 1; i < ColumnDefinitions.Count; ++i)
-            //{
-            //   context.DrawRectangle(this, lineBrush,
-            //      new Rect(new Point(ColumnDefinitions[i].Offset, 0), new Size(1, ActualHeight)));
-            //}
-
-            if (rowSegments.Length > 1)
-            {
-               for (int i = 1; i < rowSegments.Length; ++i)
-               {
-                  context.DrawRectangle(this, lineBrush,
-                     new Rect(new Point(0, rowSegments[i].Offset), new Size(ActualWidth, 1)));
-                  context.DrawRectangle(this, lineBrush,
-                     new Rect(new Point(0, rowSegments[i].Offset + rowSegments[i].FullSize),
-                        new Size(ActualWidth, 1)));
-               }
-            }
-            if (colSegments.Length > 0)
-            {
-               for (int i = 1; i < colSegments.Length; ++i)
-               {
-                  context.DrawRectangle(this, lineBrush,
-                     new Rect(new Point(colSegments[i].Offset, 0), new Size(1, ActualHeight)));
-                  context.DrawRectangle(this, lineBrush,
-                     new Rect(new Point(colSegments[i].Offset + colSegments[i].FullSize, 0), new Size(1, ActualHeight)));
-               }
-            }
-         }
-         context.EndDraw(this);
-      }
-
-
       /*
       * Algorithm main goal to measure each logical element only once to speedup Measure and Arrange passes and skip unneccessary calculations
       * It breaks Grid on 3 groups starting from 0 to 2.
@@ -545,6 +498,52 @@ namespace Adamantium.UI.Controls
          
          //Debug.WriteLine("Grid arrange time = " + arrangeTimer.ElapsedMilliseconds);
          return finalSize;
+      }
+      
+      protected override void OnRender(DrawingContext context)
+      {
+         context.BeginDraw(this);
+         context.DrawRectangle(Background, new Rect(new Size(ActualWidth, ActualHeight)));
+         if (ShowGridLines && rowSegments != null)
+         {
+            var lineBrush = Brushes.Black;
+            
+            //for (int i = 1; i < RowDefinitions.Count; ++i)
+            //{
+            //   context.DrawRectangle(this, lineBrush,
+            //      new Rect(new Point(0, RowDefinitions[i].Offset), new Size(ActualWidth, 1)));
+            //   context.DrawRectangle(this, lineBrush,
+            //      new Rect(new Point(0, RowDefinitions[i].Offset+ RowDefinitions[i].ActualHeight), new Size(ActualWidth, 1)));
+            //}
+            //for (int i = 1; i < ColumnDefinitions.Count; ++i)
+            //{
+            //   context.DrawRectangle(this, lineBrush,
+            //      new Rect(new Point(ColumnDefinitions[i].Offset, 0), new Size(1, ActualHeight)));
+            //}
+
+            if (rowSegments.Length > 1)
+            {
+               for (int i = 1; i < rowSegments.Length; ++i)
+               {
+                  context.DrawRectangle(lineBrush,
+                     new Rect(new Point(0, rowSegments[i].Offset), new Size(ActualWidth, 1)));
+                  context.DrawRectangle(lineBrush,
+                     new Rect(new Point(0, rowSegments[i].Offset + rowSegments[i].FullSize),
+                        new Size(ActualWidth, 1)));
+               }
+            }
+            if (colSegments.Length > 0)
+            {
+               for (int i = 1; i < colSegments.Length; ++i)
+               {
+                  context.DrawRectangle(lineBrush,
+                     new Rect(new Point(colSegments[i].Offset, 0), new Size(1, ActualHeight)));
+                  context.DrawRectangle(lineBrush,
+                     new Rect(new Point(colSegments[i].Offset + colSegments[i].FullSize, 0), new Size(1, ActualHeight)));
+               }
+            }
+         }
+         context.EndDraw(this);
       }
 
       private double GetArrangeSize(GridSegment[] segments, int start, int count)

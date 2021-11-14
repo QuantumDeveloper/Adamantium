@@ -125,7 +125,7 @@ namespace Adamantium.UI.Controls
             if (sizeChanged)
             {
                context.BeginDraw(this);
-               context.DrawImage(this, rendertarget, Brushes.White, new Rect(Bounds.Size), new CornerRadius(0));
+               context.DrawImage(rendertarget, Brushes.White, new Rect(Bounds.Size), new CornerRadius(0));
                context.EndDraw(this);
                sizeChanged = false;
             }

@@ -1,4 +1,6 @@
-﻿namespace Adamantium.Game.Playground
+﻿using Adamantium.Engine.Graphics;
+
+namespace Adamantium.Game.Playground
 {
     using Game = Adamantium.Engine.Game;
 
@@ -8,6 +10,7 @@
         {
             var game = new AdamantiumGame(GameMode.Standalone);
             var wnd = game.CreateWindow();
+            wnd.MSAALevel = MSAALevel.None;
             wnd.Show();
             game.Run();
         }

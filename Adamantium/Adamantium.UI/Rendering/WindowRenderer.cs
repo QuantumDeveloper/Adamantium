@@ -23,12 +23,17 @@ namespace Adamantium.UI.Rendering
         private DrawingContext context;
         private Effect uiEffect;
 
+        private Rect2D clipRect;
+
         public PresentationParameters Parameters;
         
         public WindowRenderer(GraphicsDevice device)
         {
             viewport = new Viewport();
             scissor = new Rect2D();
+            clipRect = new Rect2D();
+            clipRect.Offset = new Offset2D();
+            clipRect.Extent = new Extent2D();
             graphicsDevice = device;
             context = new DrawingContext(graphicsDevice);
         }
@@ -114,8 +119,6 @@ namespace Adamantium.UI.Rendering
         public void Render()
         {
             graphicsDevice.SetViewports(viewport);
-            graphicsDevice.SetScissors(scissor);
-            
             ProcessVisualTree();
         }
 
@@ -146,7 +149,21 @@ namespace Adamantium.UI.Rendering
             }
 
             if (!context.GetPresentationForComponent(component, out var presentation)) return;
-            
+
+            if (component.ClipToBounds)
+            {
+                clipRect.Offset.X = (int)component.ClipRectangle.X;
+                clipRect.Offset.Y = (int)component.ClipRectangle.Y;
+                clipRect.Extent.Width = (uint)component.ClipRectangle.Width;
+                clipRect.Extent.Height = (uint)component.ClipRectangle.Height;
+
+                graphicsDevice.SetScissors(clipRect);
+            }
+            else
+            {
+                graphicsDevice.SetScissors(scissor);
+            }
+
             foreach (var item in presentation.Items)
             {
                 item.GeometryRenderer?.Draw(context.GraphicsDevice, component, projectionMatrix);

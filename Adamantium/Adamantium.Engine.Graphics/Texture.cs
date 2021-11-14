@@ -32,14 +32,14 @@ namespace Adamantium.Engine.Graphics
         
         public long TotalSizeInBytes { get; }
 
-        public IntPtr NativePointer { get; }
+        public IntPtr NativePointer => VulkanImage.NativePointer;
         
         public string Name { get; set; }
 
         public GraphicsDevice GraphicsDevice { get; private set; }
 
-        protected VulkanImage VulkanImage { get => vulkanImage; set => vulkanImage = value; }
-        protected DeviceMemory ImageMemory { get => vulkanImageMemory; set => vulkanImageMemory = value; }
+        protected VulkanImage VulkanImage => vulkanImage;
+        protected DeviceMemory ImageMemory => vulkanImageMemory;
         protected ImageView ImageView { get; set; }
 
         protected Texture(GraphicsDevice device, TextureDescription description)
@@ -151,7 +151,7 @@ namespace Adamantium.Engine.Graphics
             region.ImageSubresource.BaseArrayLayer = 0;
             region.ImageSubresource.LayerCount = 1;
             region.ImageOffset = new Offset3D() { X = 0, Y = 0, Z = 0};
-            region.ImageExtent = new Extent3D() {Width = description.Width, Height = Description.Height, Depth = 1}; 
+            region.ImageExtent = new Extent3D() {Width = description.Width, Height = description.Height, Depth = 1}; 
             
             commandBuffer.CopyImageToBuffer(image, ImageLayout.TransferDstOptimal, buffer, 1, region);
             GraphicsDevice.EndSingleTimeCommands(commandBuffer);
@@ -433,7 +433,7 @@ namespace Adamantium.Engine.Graphics
         /// <summary>
         /// Loads a texture from a file.
         /// </summary>
-        /// <param name="device">Specify the <see cref="D3DGraphicsDevice"/> used to load and create a texture from a file.</param>
+        /// <param name="device">Specify the <see cref="GraphicsDevice"/> used to load and create a texture from a file.</param>
         /// <param name="filePath">The file to load the texture from.</param>
         /// <param name="flags">Texture flags</param>
         /// <param name="usage">Resource usage</param>
