@@ -10,7 +10,6 @@ namespace Adamantium.Game.Playground
         {
             var game = new AdamantiumGame(GameMode.Standalone);
             var wnd = game.CreateWindow();
-            wnd.MSAALevel = MSAALevel.None;
             wnd.Show();
             game.Run();
         }
