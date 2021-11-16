@@ -48,6 +48,8 @@ namespace Adamantium.Fonts
         public uint GlyphCount { get; }
         
         public ushort UnitsPerEm { get; }
+        
+        public Int16 Ascender { get; }  
 
         internal void UpdateGlyphNamesCache();
 

@@ -33,6 +33,11 @@ namespace Adamantium.Fonts
         }
 
         public uint Count => (uint)displayedGlyphs.Count;
+
+        public Glyph GetGlyph(int index)
+        {
+            return displayedGlyphs[index];
+        }
         
         public uint GetGlyphIndex(uint index)
         {
@@ -81,7 +86,7 @@ namespace Adamantium.Fonts
             }
             
             displayedGlyphs.RemoveRange((int)glyphIndex, removeLength);
-            if (typeFace.GetGlyphByIndex((uint)newGlyphIndex, out var glyph))
+            if (typeFace.GetGlyphByIndex(newGlyphIndex, out var glyph))
             {
                 displayedGlyphs.Insert((int)glyphIndex, glyph); 
             }
@@ -103,7 +108,7 @@ namespace Adamantium.Fonts
                 featureCache = new FeatureCache(glyphIndex);
                 glyphCacheMap[glyphIndex] = featureCache;
             }
-            
+
             featureCache.AddToFeatureCache(featureInfo, GlyphPosition.FromOffset(offset));
         }
 
@@ -120,12 +125,14 @@ namespace Adamantium.Fonts
 
         public Vector2F GetOffset(uint glyphIndex)
         {
-            return glyphCacheMap[glyphIndex].Layout.Position.Offset;
+            glyphCacheMap.TryGetValue(glyphIndex, out var featureCache);
+            return featureCache != null ? featureCache.Layout.Position.Offset : new Vector2F(0, 0);
         }
 
         public Vector2F GetAdvance(uint glyphIndex)
         {
-            return glyphCacheMap[glyphIndex].Layout.Position.Advance;
+            glyphCacheMap.TryGetValue(glyphIndex, out var featureCache);
+            return featureCache != null ? featureCache.Layout.Position.Advance : new Vector2F(0, 0);
         }
     }
 }

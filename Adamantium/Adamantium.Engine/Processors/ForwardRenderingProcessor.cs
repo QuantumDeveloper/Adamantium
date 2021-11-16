@@ -511,7 +511,7 @@ namespace Adamantium.Engine.Processors
                                             if (component.Name == "SmallGlyph")
                                             {
                                                 GraphicsDevice.BasicEffect.Parameters["foregroundColor"].SetValue(material.AmbientColor);
-                                                GraphicsDevice.BasicEffect.Parameters["sampleType"].SetResource(largeGlyphTextureSampler);
+                                                GraphicsDevice.BasicEffect.Parameters["sampleType"].SetResource(smallGlyphTextureSampler);
                                                 GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["SmallGlyph"].Apply();
                                             }
                                             else if (component.Name == "LargeGlyph")

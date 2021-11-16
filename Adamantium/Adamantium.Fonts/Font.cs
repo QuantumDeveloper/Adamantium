@@ -89,6 +89,8 @@ namespace Adamantium.Fonts
         public uint GlyphCount => (uint)glyphs.Count;
         public ushort UnitsPerEm { get; internal set; }
 
+        public Int16 Ascender { get; internal set; }
+
         /// <summary>
         /// smallest readable size in pixels
         /// </summary>

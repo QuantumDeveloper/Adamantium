@@ -245,7 +245,7 @@ namespace Adamantium.Game.Playground
             img.Save(path, ImageFileType.Png);
         }
 
-        uint mtsdfTextureSize = 45;
+        uint mtsdfTextureSize = 64;
         private uint smallFontSizeMaxValue = 24;
 
         private Entity PrintText(TypeFace typeface, IFont font, uint fontSize, Color foreground, string text)
@@ -258,22 +258,46 @@ namespace Adamantium.Game.Playground
             var uvList = new List<Vector2F>();
 
             double penPosition = 0.0;
+            var ascenderLineDiff = fontSize * (font.UnitsPerEm - font.Ascender) / (double)font.UnitsPerEm;
+
+            var layoutContainer = new GlyphLayoutContainer(typeface);
+            var glyphs = font.TranslateIntoGlyphs(text);
+            layoutContainer.AddGlyphs(glyphs);
             
-            for (var i = 0; i < text.Length; i++)
+            // try to apply GPOS kern
+            var kernApplied = font.FeatureService.ApplyFeature(FeatureNames.kern, layoutContainer, 0, (uint) glyphs.Length);
+
+            for (var i = 0; i < layoutContainer.Count; i++)
             {
-                var glyph = font.GetGlyphByCharacter(text[i]);
+                var glyph = layoutContainer.GetGlyph(i); // @TODO move everything inside Layout Container, and remove GetGlyph method
                 glyph.CalculateEmRelatedMultipliers(font.UnitsPerEm); // @TODO: need to somehow calculate this at glyph creation time (for each glyph, maybe at parser)
 
                 var positionMultiplier = glyph.EmRelatedCenterToBaseLineMultiplier;
-                var leftSideBearingMultiplier = glyph.EmRelatedLeftSideBearingMultiplier;
-                
-                quadList.Add(new Vector3F((float)(penPosition + fontSize * leftSideBearingMultiplier),            (float)(fontSize * positionMultiplier.Y)           ));
-                quadList.Add(new Vector3F((float)(penPosition + fontSize * leftSideBearingMultiplier + fontSize), (float)(fontSize * positionMultiplier.Y)           ));
-                quadList.Add(new Vector3F((float)(penPosition + fontSize * leftSideBearingMultiplier + fontSize), (float)(fontSize * positionMultiplier.Y) + fontSize));
-                
-                quadList.Add(new Vector3F((float)(penPosition + fontSize * leftSideBearingMultiplier),            (float)(fontSize * positionMultiplier.Y)           ));
-                quadList.Add(new Vector3F((float)(penPosition + fontSize * leftSideBearingMultiplier + fontSize), (float)(fontSize * positionMultiplier.Y) + fontSize));
-                quadList.Add(new Vector3F((float)(penPosition + fontSize * leftSideBearingMultiplier),            (float)(fontSize * positionMultiplier.Y) + fontSize));
+
+                double left = penPosition - fontSize * positionMultiplier.X;
+
+                // if GPOS kern is not applied - try TTF kern approach
+                if (!kernApplied)
+                {
+                    if (i > 0)
+                    {
+                        Glyph prevGlyph = layoutContainer.GetGlyph(i - 1); // @TODO move everything inside Layout Container, and remove GetGlyph method
+                        left += fontSize * font.GetKerningValue((ushort)prevGlyph.Index, (ushort)glyph.Index) / (double)font.UnitsPerEm;
+                    }
+                }
+
+                double top = fontSize * positionMultiplier.Y - ascenderLineDiff;
+
+                double right = left + fontSize;
+                double bottom = top + fontSize;
+
+                quadList.Add(new Vector3F((float) left, (float) top));
+                quadList.Add(new Vector3F((float) right, (float) top));
+                quadList.Add(new Vector3F((float) right, (float) bottom));
+
+                quadList.Add(new Vector3F((float) left, (float) top));
+                quadList.Add(new Vector3F((float) right, (float) bottom));
+                quadList.Add(new Vector3F((float) left, (float) bottom));
 
                 var glyphUV = glyph.GetTextureAtlasUVCoordinates(glyphTextureSize, 0, typeface.GlyphCount);
 
@@ -281,25 +305,31 @@ namespace Adamantium.Game.Playground
                 var clampY = glyphUV[1].Y - glyphUV[0].Y;
 
                 var multiplier = 0.001;
-                
+
                 clampX *= multiplier;
                 clampY *= multiplier;
 
                 glyphUV[0].X += clampX;
                 glyphUV[0].Y += clampY;
-                
+
                 glyphUV[1].X -= clampX;
                 glyphUV[1].Y -= clampY;
-                
-                uvList.Add(new Vector2F((float)glyphUV[0].X,   (float)glyphUV[0].Y));
-                uvList.Add(new Vector2F((float)glyphUV[1].X,   (float)glyphUV[0].Y));
-                uvList.Add(new Vector2F((float)glyphUV[1].X,   (float)glyphUV[1].Y));
 
-                uvList.Add(new Vector2F((float)glyphUV[0].X,   (float)glyphUV[0].Y));
-                uvList.Add(new Vector2F((float)glyphUV[1].X,   (float)glyphUV[1].Y));
-                uvList.Add(new Vector2F((float)glyphUV[0].X,   (float)glyphUV[1].Y));
+                uvList.Add(new Vector2F((float) glyphUV[0].X, (float) glyphUV[0].Y));
+                uvList.Add(new Vector2F((float) glyphUV[1].X, (float) glyphUV[0].Y));
+                uvList.Add(new Vector2F((float) glyphUV[1].X, (float) glyphUV[1].Y));
+
+                uvList.Add(new Vector2F((float) glyphUV[0].X, (float) glyphUV[0].Y));
+                uvList.Add(new Vector2F((float) glyphUV[1].X, (float) glyphUV[1].Y));
+                uvList.Add(new Vector2F((float) glyphUV[0].X, (float) glyphUV[1].Y));
 
                 penPosition += fontSize * glyph.EmRelatedAdvanceWidthMultiplier;
+
+                // if GPOS kern is applied - modify the advance for current glyph
+                if (kernApplied)
+                {
+                    penPosition += fontSize * layoutContainer.GetAdvance((uint)i).X / (double)font.UnitsPerEm;
+                }
             }
 
             var mesh = new Mesh();
@@ -324,8 +354,8 @@ namespace Adamantium.Game.Playground
             try
             {
                 //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/CFF2/SourceHanSerifVFProtoJP.otf", 3);
-                //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/SourceSans3-Regular.otf", 3);
-                var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/GlametrixLight-0zjo.otf", 3);
+                var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/SourceSans3-Regular.otf", 3);
+                //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/GlametrixLight-0zjo.otf", 3);
                 //var typeface = TypeFace.LoadFont(@"Fonts/OTFFonts/Japan/NotoSansCJKjp-Light.otf", 3);
                 var font = typeface.GetFont(0);
                 byte sampleRate = 10;
@@ -337,14 +367,12 @@ namespace Adamantium.Game.Playground
 
                 var atlasGen = new TextureAtlasGenerator();
                 
-                var stopwatch = new Stopwatch();
- 
+                var stopwatch = new Stopwatch(); 
                 stopwatch.Start();
 
                 var mtsdfAtlasData = atlasGen.GenerateTextureAtlas(typeface, font, mtsdfTextureSize, sampleRate, 4,0, (int)typeface.GlyphCount, GeneratorType.Msdf);
                 
-                stopwatch.Stop();
-                
+                stopwatch.Stop();                
                 Console.WriteLine($"{typeface.GlyphCount} glyphs: {stopwatch.ElapsedMilliseconds} ms");
                 
                 SaveAtlas(@"Textures\mtsdf.png", mtsdfAtlasData);
@@ -385,7 +413,7 @@ namespace Adamantium.Game.Playground
                 testEntity.AddComponent(meshRenderer);
                 testEntity.Transform.Position = new Vector3D(0, 0, 6);
                 
-                var textEntity = PrintText(typeface, font, 600, Colors.Beige, "ы");
+                var textEntity = PrintText(typeface, font, 24, Colors.Beige, "This is a nice kerned SansSource font text! mailto: vp@gmail.com");
                 textEntity.Transform.Position = new Vector3D(0, 0, 6);
 
                 /* // OUTLINES CHECK

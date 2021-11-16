@@ -943,6 +943,7 @@ namespace Adamantium.Fonts.Parsers
             hhea.MetricDataFormat = FontReader.ReadInt16();
             hhea.NumberOfHMetrics = FontReader.ReadUInt16();
 
+            CurrentFont.Ascender = hhea.Ascender;
             CurrentFont.LineSpace = hhea.Ascender - hhea.Descender + hhea.LineGap;
         }
 
