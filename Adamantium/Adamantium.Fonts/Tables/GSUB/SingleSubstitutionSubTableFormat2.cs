@@ -21,14 +21,18 @@ namespace Adamantium.Fonts.Tables.GSUB
             uint index,
             uint length)
         {
-            var foundAt = Coverage.FindPosition((ushort)substitutions.GetGlyphIndex(index));
-            if (foundAt > -1)
+            var limitIndex = Math.Min(index + length, substitutions.Count);
+            for (uint i = index; i < limitIndex; ++i)
             {
-                substitutions.Replace(featureInfo, index, SubstituteGlyphIds[foundAt]);
-                return true;
+                var foundAt = Coverage.FindPosition((ushort) substitutions.GetGlyphIndex(i));
+                if (foundAt > -1)
+                {
+                    substitutions.Replace(featureInfo, i, SubstituteGlyphIds[foundAt]);
+                }
             }
-            
-            return false;
+
+            //@TODO check the return value and how it is used
+            return true;
         }
     }
 }

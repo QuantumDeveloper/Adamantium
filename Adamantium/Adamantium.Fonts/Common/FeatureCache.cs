@@ -4,9 +4,11 @@ namespace Adamantium.Fonts.Common
 {
     internal class FeatureCache
     {
+        // cache for possibility to switch off features one by one
         private readonly Dictionary<FeatureInfo, GlyphLayoutData> featureCache;
         public uint GlyphIndex { get; }
         
+        // all features applied here
         public GlyphLayoutData Layout { get; }
 
         public FeatureCache(uint glyphIndex)

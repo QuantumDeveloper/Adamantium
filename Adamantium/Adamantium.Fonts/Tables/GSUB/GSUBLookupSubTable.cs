@@ -5,6 +5,6 @@ namespace Adamantium.Fonts.Tables.GSUB
     internal abstract class GSUBLookupSubTable : LookupSubTableBase
     {
         public abstract GSUBLookupType Type { get; }
-        public FeatureKind OwnerType => FeatureKind.GSUB;
+        public override FeatureKind OwnerType => FeatureKind.GSUB;
     }
 }

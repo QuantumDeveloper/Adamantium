@@ -281,8 +281,10 @@ namespace Adamantium.Fonts.Parsers.CFF
                     ReadCharsetFormat0(font);
                     break;
                 case 1:
+                    ReadCharsetFormat1Or2(font, true);
+                    break;
                 case 2:
-                    ReadCharsetFormat1Or2(font, format);
+                    ReadCharsetFormat1Or2(font, false);
                     break;
             }
         }
@@ -297,32 +299,21 @@ namespace Adamantium.Fonts.Parsers.CFF
             }
         }
         
-        private void ReadCharsetFormat1Or2(CFFFont font, byte format)
+        private void ReadCharsetFormat1Or2(CFFFont font, bool isFormat1)
         {
-            for (var index = 1; index < font.Glyphs.Count; index++)
+            for (var glyphIndex = 1; glyphIndex < font.Glyphs.Count;)
             {
                 uint sid = otfTtfReader.ReadUInt16();
-                int count = 0;
-                if (format == 1)
-                {
-                    count = otfTtfReader.ReadByte() + 1; // +1 because first glyph is not included
-                }
-                else
-                {
-                    count = otfTtfReader.ReadUInt16() + 1;
-                }
+                int count = (isFormat1 ? otfTtfReader.ReadByte() : otfTtfReader.ReadUInt16()) + 1; // +1 because first glyph is not included in count, but we need to store it below anyway
 
-                do
+                font.GetGlyphByIndex((uint)glyphIndex).SID = sid;
+
+                while (count-- > 0)
                 {
-                    var glyph = font.GetGlyphByIndex((uint)index);
-                    glyph.SID = sid;
+                    var glyph = font.GetGlyphByIndex((uint)glyphIndex++);
+                    glyph.SID = sid++; // each SID range in formats 1 and 2 are just sequential SIDs, so just increment initial SID 'count' times, no need to read anything from font file till next range
                     glyph.Name = fontSet.GetStringBySid(glyph.SID);
-
-                    sid++;
-                    index++;
-                    count--;
-
-                } while (count > 0);
+                }
             }
         }
     }

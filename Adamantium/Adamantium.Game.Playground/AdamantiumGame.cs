@@ -265,7 +265,8 @@ namespace Adamantium.Game.Playground
             layoutContainer.AddGlyphs(glyphs);
             
             // try to apply GPOS kern
-            var kernApplied = font.FeatureService.ApplyFeature(FeatureNames.kern, layoutContainer, 0, (uint) glyphs.Length);
+            var kernApplied = font.FeatureService.ApplyFeature(FeatureNames.kern, layoutContainer, 0, (uint)glyphs.Length);
+            var subApp = font.FeatureService.ApplyFeature(FeatureNames.aalt, layoutContainer, 0, (uint)glyphs.Length);
 
             for (var i = 0; i < layoutContainer.Count; i++)
             {
@@ -365,7 +366,7 @@ namespace Adamantium.Game.Playground
                 var visSubpixels = glyph.GetVisSubpixels();
                 var visEntity = VisualizeSubpixelRendering(visSubpixels);*/
 
-                var atlasGen = new TextureAtlasGenerator();
+                /*var atlasGen = new TextureAtlasGenerator();
                 
                 var stopwatch = new Stopwatch(); 
                 stopwatch.Start();
@@ -375,7 +376,7 @@ namespace Adamantium.Game.Playground
                 stopwatch.Stop();                
                 Console.WriteLine($"{typeface.GlyphCount} glyphs: {stopwatch.ElapsedMilliseconds} ms");
                 
-                SaveAtlas(@"Textures\mtsdf.png", mtsdfAtlasData);
+                SaveAtlas(@"Textures\mtsdf.png", mtsdfAtlasData);*/
 
                 /*var subAtlasData = atlasGen.GenerateTextureAtlas(typeface, font, fontSize, sampleRate, 0, (int)typeface.GlyphCount, GeneratorType.Subpixel);
                 SaveAtlas(@"Textures\subpixel.png", subAtlasData);*/
@@ -413,7 +414,7 @@ namespace Adamantium.Game.Playground
                 testEntity.AddComponent(meshRenderer);
                 testEntity.Transform.Position = new Vector3D(0, 0, 6);
                 
-                var textEntity = PrintText(typeface, font, 24, Colors.Beige, "This is a nice kerned SansSource font text! mailto: vp@gmail.com");
+                var textEntity = PrintText(typeface, font, 24, Colors.Beige, "hi all");
                 textEntity.Transform.Position = new Vector3D(0, 0, 6);
 
                 /* // OUTLINES CHECK

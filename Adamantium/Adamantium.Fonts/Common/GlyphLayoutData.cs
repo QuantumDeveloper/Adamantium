@@ -13,13 +13,12 @@ namespace Adamantium.Fonts.Common
 
         public GlyphLayoutData()
         {
-            
+            substitutions = new List<uint>();
         }
 
-        public GlyphLayoutData(GlyphPosition position)
+        public GlyphLayoutData(GlyphPosition position) : this()
         {
             Position = position;
-            substitutions = new List<uint>();
         }
         
         public GlyphLayoutData(params uint[] glyphIndices)
@@ -27,9 +26,8 @@ namespace Adamantium.Fonts.Common
             substitutions = new List<uint>(glyphIndices);
         }
         
-        public GlyphLayoutData(params ushort[] glyphIndices)
+        public GlyphLayoutData(params ushort[] glyphIndices) : this()
         {
-            substitutions = new List<uint>();
             for (int i = 0; i < glyphIndices.Length; i++)
             {
                 substitutions.Add(glyphIndices[i]);

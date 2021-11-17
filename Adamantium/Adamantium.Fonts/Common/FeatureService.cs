@@ -130,6 +130,7 @@ namespace Adamantium.Fonts.Common
             {
                 EnableFeature(featureName, true);
                 feature.Apply(container, index, length);
+                //@TODO check how to properly return if the feature is actually applied 
                 return true;
             }
 

@@ -51,6 +51,12 @@ namespace Adamantium.Fonts
                 featureCache = new FeatureCache(glyphIndex);
                 glyphCacheMap[glyphIndex] = featureCache;
             }
+
+            if (typeFace.GetGlyphByIndex(substitutionGlyphIndex, out var glyph))
+            {
+                displayedGlyphs.RemoveAt((int)glyphIndex);
+                displayedGlyphs.Insert((int)glyphIndex, glyph); 
+            }
             
             featureCache.AddToFeatureCache(featureInfo, substitutionGlyphIndex);
         }
@@ -74,6 +80,12 @@ namespace Adamantium.Fonts
                 glyphCacheMap[glyphIndex] = featureCache;
             }
 
+            if (typeFace.GetGlyphByIndex(substitutionArray[0], out var glyph))
+            {
+                displayedGlyphs.RemoveAt((int)glyphIndex);
+                displayedGlyphs.Insert((int)glyphIndex, glyph); 
+            }
+            
             featureCache.AddToFeatureCache(featureInfo, substitutionArray);
         }
 
@@ -84,13 +96,13 @@ namespace Adamantium.Fonts
                 featureCache = new FeatureCache(glyphIndex);
                 glyphCacheMap[glyphIndex] = featureCache;
             }
-            
-            displayedGlyphs.RemoveRange((int)glyphIndex, removeLength);
+
+            // many to one replacement (e.g. ligatures)
             if (typeFace.GetGlyphByIndex(newGlyphIndex, out var glyph))
             {
+                displayedGlyphs.RemoveRange((int)glyphIndex, removeLength);
                 displayedGlyphs.Insert((int)glyphIndex, glyph); 
             }
-            
 
             featureCache.AddToFeatureCache(featureInfo, newGlyphIndex);
             //TODO: need to check does this logic is correct
