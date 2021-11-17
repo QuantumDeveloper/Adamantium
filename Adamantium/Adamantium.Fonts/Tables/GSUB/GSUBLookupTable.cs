@@ -15,7 +15,7 @@ namespace Adamantium.Fonts.Tables.GSUB
         /// <summary>
         /// Lookup qualifiers
         /// </summary>
-        public LookupFlags LookupFlag { get; set; }
+        public UInt16 LookupFlag { get; set; }
         
         /// <summary>
         /// Array of offsets to lookup subtables, from beginning of Lookup table

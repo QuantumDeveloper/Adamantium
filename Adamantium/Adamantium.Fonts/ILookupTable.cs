@@ -9,7 +9,7 @@ namespace Adamantium.Fonts
         
         public FeatureKind OwnerType { get; }
         
-        public LookupFlags LookupFlag { get; }
+        public UInt16 LookupFlag { get; }
         
         public ILookupSubTable[] SubTables { get; }
         

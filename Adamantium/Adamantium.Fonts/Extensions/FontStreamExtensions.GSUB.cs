@@ -27,15 +27,15 @@ namespace Adamantium.Fonts.Extensions
             return lookupList.ToArray();
         }
         
-        public static ILookupTable ReadGSUBLookupTable(this FontStreamReader reader, long fffset)
+        public static ILookupTable ReadGSUBLookupTable(this FontStreamReader reader, long offset)
         {
-            reader.Position = fffset;
+            reader.Position = offset;
             var lookup = new GSUBLookupTable();
             lookup.LookupType = reader.ReadUInt16();
-            lookup.LookupFlag = (LookupFlags)reader.ReadUInt16();
+            lookup.LookupFlag = reader.ReadUInt16();
             var subtableCount = reader.ReadUInt16();
             var subtableOffsets = reader.ReadUInt16Array(subtableCount);
-            if (lookup.LookupFlag == LookupFlags.UseMarkFilteringSet)
+            if ((lookup.LookupFlag & (UInt16)LookupFlags.UseMarkFilteringSet) != 0)
             {
                 lookup.MarkFilteringSet = reader.ReadUInt16();
             }
@@ -43,7 +43,7 @@ namespace Adamantium.Fonts.Extensions
             lookup.SubTables = new GSUBLookupSubTable[subtableCount];
             for (int i = 0; i < subtableCount; ++i)
             {
-                var subtableOffset = subtableOffsets[i] + fffset;
+                var subtableOffset = subtableOffsets[i] + offset;
                 lookup.SubTables[i] = reader.ReadGSUBLookupSubtable((GSUBLookupType)lookup.LookupType, subtableOffset);
             }
 

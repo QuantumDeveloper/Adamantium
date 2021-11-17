@@ -25,7 +25,7 @@ namespace Adamantium.Fonts.Tables.GSUB
 
                 if (position > -1)
                 {
-                    var alt = AlternateSetTables[i];
+                    var alt = AlternateSetTables[position];
                     substitutions.Replace(featureInfo, i, alt.AlternateGlyphIDs);
                 }
             }

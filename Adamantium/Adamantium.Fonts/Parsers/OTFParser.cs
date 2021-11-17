@@ -379,7 +379,7 @@ namespace Adamantium.Fonts.Parsers
 
             if (gsub.MinorVersion == 1)
             {
-                gsub.FeatureVariationsOffset = FontReader.ReadUInt16();
+                gsub.FeatureVariationsOffset = FontReader.ReadUInt32();
             }
 
             gsub.ScriptList = FontReader.ReadScriptList(scriptListOffset);

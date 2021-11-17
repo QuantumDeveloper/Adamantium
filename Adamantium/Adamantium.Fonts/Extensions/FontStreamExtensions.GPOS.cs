@@ -31,10 +31,10 @@ namespace Adamantium.Fonts.Extensions
             reader.Position = offset;
             var lookup = new GPOSLookupTable();
             lookup.LookupType = reader.ReadUInt16();
-            lookup.LookupFlag = (LookupFlags)reader.ReadUInt16();
+            lookup.LookupFlag = reader.ReadUInt16();
             var subtableCount = reader.ReadUInt16();
             var subtableOffsets = reader.ReadUInt16Array(subtableCount);
-            if (lookup.LookupFlag == LookupFlags.UseMarkFilteringSet)
+            if ((lookup.LookupFlag & (UInt16)LookupFlags.UseMarkFilteringSet) != 0)
             {
                 lookup.MarkFilteringSet = reader.ReadUInt16();
             }

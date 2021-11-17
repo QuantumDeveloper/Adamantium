@@ -194,7 +194,6 @@ namespace Adamantium.Fonts.Extensions
                     var count = reader.ReadUInt16();
                     var glyphs = reader.ReadUInt16Array(count);
                     return new CoverageTableFormat1() {GlyphIdArray = glyphs};
-                    break;
                 case 2:
                     var rangeCount = reader.ReadUInt16();
                     ushort[] startIndices = new ushort[rangeCount];
