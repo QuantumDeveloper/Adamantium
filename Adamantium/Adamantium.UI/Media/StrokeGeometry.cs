@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.Mathematics;
+using AdamantiumVulkan.SPIRV;
 using Point = Adamantium.Mathematics.Point;
 
 namespace Adamantium.UI.Media
@@ -34,10 +36,28 @@ namespace Adamantium.UI.Media
          var bottomStrokes = new List<Vector3F>();
          var points = geometry.StrokeMesh.Positions;
          float halfThickness = (float)pen.Thickness / 2;
+
+         var testSegs = new List<Vector3F>();
+         testSegs.Add(new Vector3F(10, 20, 0));
+         testSegs.Add(new Vector3F(210, 20, 0));
+         testSegs.Add(new Vector3F(210, 40, 0));
+         testSegs.Add(new Vector3F(10, 40, 0));
+
+         points = testSegs.ToArray();
+         geometry.IsClosed = true;
+         
          for (int i = 0; i < points.Length; ++i)
          {
+            var nextIndex = i + 1;
+
+            if (i == points.Length - 1)
+            {
+               if (!geometry.IsClosed) break;
+               nextIndex = 0;
+            }
+
             var startPoint = points[i];
-            var endPoint = i == points.Length - 1 ? points[0] : points[i + 1];
+            var endPoint = points[nextIndex];
             
             var dir = endPoint - startPoint;
             var normal = new Vector3F(-dir.Y, dir.X, 0);
@@ -48,24 +68,12 @@ namespace Adamantium.UI.Media
             var point2 = endPoint - halfThickness * normal;
             var point0 = startPoint + halfThickness * normal;
             var point3 = endPoint + halfThickness * normal;
+
+            bottomStrokes.Add(point0);
+            bottomStrokes.Add(point3);
             
-            switch (pen.PenLineJoin)
-            {
-               case PenLineJoin.Miter:
-                  // point1 -= dir * halfThickness;
-                  // point2 += dir * halfThickness;
-                  break;
-               
-               case PenLineJoin.Round:
-                  //TODO: implement rounding angles
-                  break;
-            }
-            
-            topStrokes.Add(point0);
-            topStrokes.Add(point3);
-            
-            bottomStrokes.Add(point1);
-            bottomStrokes.Add(point2);
+            topStrokes.Add(point1);
+            topStrokes.Add(point2);
          }
 
          var topSegments = new List<LineSegment2D>();
@@ -84,84 +92,105 @@ namespace Adamantium.UI.Media
             bottomSegments.Add(line);
          }
 
-         var indices = new List<int>();
-         int index = 0;
-         strokes.Add((Vector3F)bottomSegments[0].Start);
-         strokes.Add((Vector3F)topSegments[0].Start);
-         // indices.Add(index++);
-         // indices.Add(index++);
-         
-         for (int i = 0; i < topSegments.Count - 1; i++)
+         var sampledTopPart = new List<Vector2D>();
+         var sampledBottomPart = new List<Vector2D>();
+         var strokeOutline = new List<Vector2D>();
+
+         sampledTopPart.Add(topSegments[0].Start);
+         sampledBottomPart.Add(bottomSegments[0].Start);
+
+         for (int i = 0; i < topSegments.Count; i++)
          {
-            bool isTopDisconnected = true;
-            bool isBottomDisconnected = true;
-            
-            var bottom1 = bottomSegments[i];
-            var bottom2 = bottomSegments[i + 1];
-            
-            var top1 = topSegments[i];
-            var top2 = topSegments[i + 1];
-            
-            if (Collision2D.SegmentSegmentIntersection(ref bottom1, ref bottom2, out var point))
+            var nextIndex = i + 1;
+
+            if (i == topSegments.Count - 1)
             {
-               isBottomDisconnected = false;
-               bottom1 = new LineSegment2D(bottom1.Start, point);
-               bottom2 = new LineSegment2D(point, bottom2.End);
-               bottomSegments[i] = bottom1;
-               bottomSegments[i + 1] = bottom2;
-               strokes.Add((Vector3F)point);
-               //indices.Add(index++);
-            }
-            
-            if (Collision2D.SegmentSegmentIntersection(ref top1, ref top2, out point))
-            {
-               isTopDisconnected = false;
-               top1 = new LineSegment2D(top1.Start, point);
-               top2 = new LineSegment2D(point, top2.End);
-               topSegments[i] = top1;
-               topSegments[i + 1] = top2;
-               strokes.Add((Vector3F)top1.Start);
-               strokes.Add((Vector3F)point);
-               strokes.Add((Vector3F)bottom1.End);
-               //strokes.Add((Vector3F)point);
-               //indices.Add(index++);
+               if (!geometry.IsClosed) break;
+               nextIndex = 0;
             }
 
-            if (isTopDisconnected)
-            {
-               if (pen.PenLineJoin == PenLineJoin.Bevel)
-               {
-                  //var line = new LineSegment2D(top1.End, top2.Start);
-                  //topSegments.Insert(i+1, line);
-                  strokes.Add((Vector3F)top1.Start);
-                  strokes.Add((Vector3F)top1.End);
-                  strokes.Add((Vector3F)bottom1.End);
-                  
-                  strokes.Add((Vector3F)bottom1.End);
-                  strokes.Add((Vector3F)top1.End);
-                  strokes.Add((Vector3F)top2.Start);
-               }
-            }
-
-            if (isBottomDisconnected)
-            {
-               if (pen.PenLineJoin == PenLineJoin.Bevel)
-               {
-                  //var line = new LineSegment2D(bottom1.End, bottom2.Start);
-                  //bottomSegments.Insert(i+1, line);
-                  strokes.Add((Vector3F)bottom1.End);
-                  
-                  
-                  strokes.Add((Vector3F)bottom1.End);
-                  strokes.Add((Vector3F)top1.End);
-                  strokes.Add((Vector3F)bottom2.Start);
-               }
-            }
+            ProcessPartSegments(topSegments, sampledTopPart, i, nextIndex, pen.PenLineJoin);
+            ProcessPartSegments(bottomSegments, sampledBottomPart, i, nextIndex, pen.PenLineJoin);
          }
+
+         if (!geometry.IsClosed)
+         {
+            sampledTopPart.Add(topSegments[^1].End);
+            sampledBottomPart.Add(bottomSegments[^1].End);
+            
+            strokeOutline.AddRange(sampledTopPart);
+            sampledBottomPart.Reverse();
+            strokeOutline.AddRange(sampledBottomPart);
+         }
+         else
+         {
+            strokeOutline.AddRange(sampledTopPart);
+            sampledBottomPart[0] = sampledBottomPart[^1];
+            sampledBottomPart.Reverse();
+            strokeOutline.AddRange(sampledBottomPart);
+         }
+
+         RemoveCollinearSegments(strokeOutline, geometry.IsClosed);
          
-         Mesh.SetPositions(strokes).Optimize();
+         //@TODO process triangulate here ( https://www.youtube.com/watch?v=QAdfkylpYwc )
+         
+         //Mesh.SetPositions(strokes).Optimize();
+
+         Mesh.SetPositions(strokeOutline);
+         Mesh.SetTopology(PrimitiveType.LineStrip);
+         Mesh.GenerateBasicIndices();
       }
 
+      private void RemoveCollinearSegments(List<Vector2D> strokeOutline, bool isClosedGeometry)
+      {
+         for (var i = 1; i < strokeOutline.Count; i++)
+         {
+            var nextIndex = i + 1;
+
+            if (i == strokeOutline.Count - 1)
+            {
+               if (!isClosedGeometry) break;
+               nextIndex = 1;
+            }
+            
+            var currentSegment = new LineSegment2D(strokeOutline[i - 1], strokeOutline[i]);
+            var nextSegment = new LineSegment2D(strokeOutline[i], strokeOutline[nextIndex]);
+
+            if (MathHelper.IsZero(MathHelper.AngleBetween(currentSegment, nextSegment)))
+            {
+               strokeOutline.RemoveAt(i);
+            }
+         }
+      }
+
+      private void ProcessPartSegments(List<LineSegment2D> partSegments, List<Vector2D> strokePart, int currentIndex, int nextIndex, PenLineJoin penLineJoin)
+      {
+         var first = partSegments[currentIndex];
+         var second = partSegments[nextIndex];
+         
+         AddPointsToStrokePart(first, second, strokePart, penLineJoin);
+      }
+      
+      private void AddPointsToStrokePart(LineSegment2D first, LineSegment2D second, List<Vector2D> strokePart, PenLineJoin penLineJoin)
+      {
+         if (first.End == second.Start)
+         {
+            strokePart.Add(first.End);
+         }
+         else if (Collision2D.SegmentSegmentIntersection(ref first, ref second, out var point))
+         {
+            strokePart.Add(point);
+         }
+         else
+         {
+            if (penLineJoin == PenLineJoin.Bevel)
+            {
+               strokePart.Add(first.End);
+               strokePart.Add(second.Start);
+            }
+         }
+      }
+      
       internal void CreateRectangleStroke(RectangleGeometry geometry, Double thickness, DashStyle dashStyle)
       {
          lastIndex = 0;

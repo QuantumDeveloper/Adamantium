@@ -112,7 +112,7 @@ namespace Adamantium.Mathematics
             {
                 // a or b is zero or both are extremely close to it
                 // relative error is less meaningful here
-                return diff < epsilon; //*FloatNormal;
+                return diff <= epsilon; //*FloatNormal;
             }
 
             // use relative error
@@ -755,6 +755,30 @@ namespace Adamantium.Mathematics
             }
 
             return res;
+        }
+        
+        /// <summary>
+        /// Determine the position of the point relative to line
+        /// </summary>
+        /// <param name="point">Point</param>
+        /// <param name="start">Start of line</param>
+        /// <param name="end">End of line</param>
+        /// <returns>Positive value if on the right of line, negative if on the left</returns>
+        private static double DeterminePointPosition (Vector2D point, Vector2D start, Vector2D end)
+        {
+            return (point.X - end.X) * (start.Y - end.Y) - (start.X - end.X) * (point.Y - end.Y);
+        }
+
+        public static bool PointInTriangle (Vector2D pt, Vector2D v1, Vector2D v2, Vector2D v3)
+        {
+            double d1 = DeterminePointPosition(pt, v1, v2);
+            double d2 = DeterminePointPosition(pt, v2, v3);
+            double d3 = DeterminePointPosition(pt, v3, v1);
+
+            bool hasNeg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+            bool hasPos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+
+            return !(hasNeg && hasPos);
         }
     }
 }

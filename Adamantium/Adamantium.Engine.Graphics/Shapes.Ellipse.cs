@@ -77,7 +77,7 @@ namespace Adamantium.Engine.Graphics
                     vertices.Add(Vector2D.Zero);
                 }
 
-                for (int i = 0; i < tessellation; ++i)
+                for (int i = 0; i <= tessellation; ++i)
                 {
                     var angleItem = MathHelper.DegreesToRadians(currentAngle * sign);
                     double x = center.X + (radiusX * Math.Cos(angleItem));

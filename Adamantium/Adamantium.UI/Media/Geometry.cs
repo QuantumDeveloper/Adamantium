@@ -18,6 +18,8 @@ namespace Adamantium.UI.Media
       
       public Matrix4x4F Transform { get; set; }
 
+      public bool IsClosed { get; set; }
+
       protected readonly int interrupt = -1;
 
       internal Geometry()
