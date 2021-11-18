@@ -102,6 +102,14 @@ namespace Adamantium.UI.Media
             (float)StartAngle, 
             (float)StopAngle,
             transform: translation);
+         
+         StrokeMesh = Engine.Graphics.Shapes.Ellipse.GenerateGeometry(
+            GeometryType.Outlined, 
+            EllipseType.Sector,
+            new Vector2F((float)rect.Width, (float)rect.Height), 
+            (float)StartAngle, 
+            (float)StopAngle,
+            transform: translation);
       }
 
       private Rect bounds;

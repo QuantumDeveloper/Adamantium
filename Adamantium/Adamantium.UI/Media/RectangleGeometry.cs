@@ -55,6 +55,14 @@ namespace Adamantium.UI.Media
             CornerRadius, 
             TesselationFactor, 
             translation);
+         
+         StrokeMesh = Engine.Graphics.Shapes.Rectangle.GenerateGeometry(
+            GeometryType.Outlined, 
+            (float)rect.Width, 
+            (float)rect.Height,
+            CornerRadius, 
+            TesselationFactor, 
+            translation);
       }
 
       private Rect bounds;

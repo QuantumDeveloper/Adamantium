@@ -71,9 +71,16 @@ namespace Adamantium.UI.Controls
          base.OnRender(context);
          var newStart = new Point(X1, Y1); //+ Location;
          var newEnd = new Point(X2, Y2); //+ Location;
+         
+         var pen = new Pen(
+            Stroke,
+            StrokeThickness,
+            new DashStyle(StrokeDashArray?.AsReadOnly()), StrokeDashCap,
+            StartLineCap,
+            EndLineCap);
 
          context.BeginDraw(this);
-         context.DrawLine(Fill, newStart, newEnd, LineThickness);
+         context.DrawLine(Stroke, newStart, newEnd, pen);
          context.EndDraw(this);
       }
    }

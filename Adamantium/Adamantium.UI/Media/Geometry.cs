@@ -11,7 +11,10 @@ namespace Adamantium.UI.Media
    public abstract class Geometry : AdamantiumComponent
    {
       internal Mesh Mesh { get; set; }
-      protected Int32 TesselationFactor { get; set; } = 20;
+      
+      internal Mesh StrokeMesh { get; set; }
+      
+      protected Int32 TesselationFactor { get; set; } = 2;
       
       public Matrix4x4F Transform { get; set; }
 

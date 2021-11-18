@@ -33,11 +33,10 @@ namespace Adamantium.UI.Media
          }
       }
 
-      public static DashStyle DashDotDot => dashDotDot ??
-                                            (dashDotDot = new DashStyle(new double[] { 2, 2, 0, 2, 0, 2 }, 1));
+      public static DashStyle DashDotDot => dashDotDot ??= new DashStyle(new double[] { 2, 2, 0, 2, 0, 2 }, 1);
 
-      public static DashStyle DashDot => dashDot ?? (dashDot = new DashStyle(new double[] { 2, 2, 0, 2 }, 1));
+      public static DashStyle DashDot => dashDot ??= new DashStyle(new double[] { 2, 2, 0, 2 }, 1);
 
-      public static DashStyle Dot => dot ?? (dot = new DashStyle(new double[] { 0, 2 }));
+      public static DashStyle Dot => dot ??= new DashStyle(new double[] { 0, 2 });
    }
 }

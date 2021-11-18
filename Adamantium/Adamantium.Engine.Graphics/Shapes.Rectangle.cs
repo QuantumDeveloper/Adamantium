@@ -181,7 +181,7 @@ namespace Adamantium.Engine.Graphics
             {
                 var angleItem = -MathHelper.DegreesToRadians(rectangleSector / tessellation);
                 var angle = MathHelper.DegreesToRadians(startAngle);
-                for (int i = 0; i < tessellation; ++i)
+                for (int i = 0; i <= tessellation; ++i)
                 {
                     var x = center.X + (radius.X * (float) Math.Cos(angle));
                     var y = center.Y - (radius.Y * (float) Math.Sin(angle));

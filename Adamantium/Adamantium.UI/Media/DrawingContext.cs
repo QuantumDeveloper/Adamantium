@@ -137,12 +137,25 @@ namespace Adamantium.UI.Media
          currentContainer?.AddItem(presentationItem);
       }
 
-      public void DrawLine(Brush brush, Point start, Point end, Double thickness)
+      public void DrawLine(Brush brush, Point start, Point end, Pen pen)
       {
-         var lineGeometry = new LineGeometry(start, end, thickness);
+         var geometry = new LineGeometry(start, end, pen.Thickness);
+         
+         StrokeGeometry strokeGeometry = null;
+         if (pen != null && pen.Thickness > 0.0)
+         {
+            strokeGeometry = new StrokeGeometry(pen, geometry);
+         }
 
          var presentationItem = new UIPresentationItem();
-         var uiRenderer = UIComponentRenderer.Create(GraphicsDevice, lineGeometry.Mesh, brush);
+         
+         if (strokeGeometry != null)
+         {
+            var strokeRenderer = UIComponentRenderer.Create(GraphicsDevice, strokeGeometry?.Mesh, pen?.Brush);
+            presentationItem.StrokeRenderer = strokeRenderer;
+         }
+         
+         var uiRenderer = UIComponentRenderer.Create(GraphicsDevice, geometry.Mesh, brush);
          presentationItem.GeometryRenderer = uiRenderer;
          currentContainer?.AddItem(presentationItem);
       }

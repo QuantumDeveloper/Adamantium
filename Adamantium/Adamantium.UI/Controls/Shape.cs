@@ -103,7 +103,7 @@ namespace Adamantium.UI.Controls
       protected override Size MeasureOverride(Size availableSize)
       {
          Size shapeSize = BoundingRectangle.Size;
-         Size desiredSize = new Size(availableSize.Width, availableSize.Height);
+         Size desiredSize = new Size(availableSize.Width, availableSize.Height).Deflate(new Thickness(StrokeThickness/2));
 
          if (double.IsInfinity(availableSize.Width))
          {

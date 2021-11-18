@@ -26,6 +26,14 @@ namespace Adamantium.UI.Media
             var result = polygon.Fill();
             Mesh = new Mesh();
             Mesh.SetPositions(result).GenerateBasicIndices().Optimize();
+            StrokeMesh = new Mesh();
+            var lst = new List<Vector3F>();
+            foreach (var point in points)
+            {
+                lst.Add((Vector3F)point);
+            }
+
+            StrokeMesh.SetPositions(lst);
         }
     }
 }

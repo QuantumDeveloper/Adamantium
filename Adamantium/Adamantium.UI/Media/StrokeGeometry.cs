@@ -18,25 +18,148 @@ namespace Adamantium.UI.Media
 
       public StrokeGeometry(Pen pen, Geometry geometry)
       {
-         if (geometry is RectangleGeometry)
-         {
-            CreateRectangleStroke(geometry as RectangleGeometry, pen.Thickness, pen.DashStyle);
-         }
-         else if (geometry is EllipseGeometry)
-         {
-            CreateEllipseStroke(geometry as EllipseGeometry, pen.Thickness, pen.DashStyle);
-         }
-      }
-
-      public StrokeGeometry(Pen pen, RectangleGeometry geometry)
-      {
-         CreateRectangleStroke(geometry, pen.Thickness, pen.DashStyle);
-         
+         GenerateStroke(pen, geometry);
       }
 
       public StrokeGeometry(EllipseGeometry ellipseGeometry, Double thickness, DashStyle strokeDashArray)
       {
          CreateEllipseStroke(ellipseGeometry, thickness, strokeDashArray);
+      }
+
+      private void GenerateStroke(Pen pen, Geometry geometry)
+      {
+         pen.PenLineJoin = PenLineJoin.Bevel;
+         var strokes = new List<Vector3F>();
+         var topStrokes = new List<Vector3F>();
+         var bottomStrokes = new List<Vector3F>();
+         var points = geometry.StrokeMesh.Positions;
+         float halfThickness = (float)pen.Thickness / 2;
+         for (int i = 0; i < points.Length; ++i)
+         {
+            var startPoint = points[i];
+            var endPoint = i == points.Length - 1 ? points[0] : points[i + 1];
+            
+            var dir = endPoint - startPoint;
+            var normal = new Vector3F(-dir.Y, dir.X, 0);
+            normal.Normalize();
+            dir.Normalize();
+            
+            var point1 = startPoint - halfThickness * normal;
+            var point2 = endPoint - halfThickness * normal;
+            var point0 = startPoint + halfThickness * normal;
+            var point3 = endPoint + halfThickness * normal;
+            
+            switch (pen.PenLineJoin)
+            {
+               case PenLineJoin.Miter:
+                  // point1 -= dir * halfThickness;
+                  // point2 += dir * halfThickness;
+                  break;
+               
+               case PenLineJoin.Round:
+                  //TODO: implement rounding angles
+                  break;
+            }
+            
+            topStrokes.Add(point0);
+            topStrokes.Add(point3);
+            
+            bottomStrokes.Add(point1);
+            bottomStrokes.Add(point2);
+         }
+
+         var topSegments = new List<LineSegment2D>();
+         var bottomSegments = new List<LineSegment2D>();
+
+         for (int i = 0; i < topStrokes.Count - 1; i+=2)
+         {
+            var start = (Vector2D)topStrokes[i];
+            var end = (Vector2D)topStrokes[i + 1];
+            var line = new LineSegment2D(start, end);
+            topSegments.Add(line);
+            
+            start = (Vector2D)bottomStrokes[i];
+            end = (Vector2D)bottomStrokes[i + 1];
+            line = new LineSegment2D(start, end);
+            bottomSegments.Add(line);
+         }
+
+         var indices = new List<int>();
+         int index = 0;
+         strokes.Add((Vector3F)bottomSegments[0].Start);
+         strokes.Add((Vector3F)topSegments[0].Start);
+         // indices.Add(index++);
+         // indices.Add(index++);
+         
+         for (int i = 0; i < topSegments.Count - 1; i++)
+         {
+            bool isTopDisconnected = true;
+            bool isBottomDisconnected = true;
+            
+            var bottom1 = bottomSegments[i];
+            var bottom2 = bottomSegments[i + 1];
+            
+            var top1 = topSegments[i];
+            var top2 = topSegments[i + 1];
+            
+            if (Collision2D.SegmentSegmentIntersection(ref bottom1, ref bottom2, out var point))
+            {
+               isBottomDisconnected = false;
+               bottom1 = new LineSegment2D(bottom1.Start, point);
+               bottom2 = new LineSegment2D(point, bottom2.End);
+               bottomSegments[i] = bottom1;
+               bottomSegments[i + 1] = bottom2;
+               strokes.Add((Vector3F)point);
+               //indices.Add(index++);
+            }
+            
+            if (Collision2D.SegmentSegmentIntersection(ref top1, ref top2, out point))
+            {
+               isTopDisconnected = false;
+               top1 = new LineSegment2D(top1.Start, point);
+               top2 = new LineSegment2D(point, top2.End);
+               topSegments[i] = top1;
+               topSegments[i + 1] = top2;
+               strokes.Add((Vector3F)top1.Start);
+               strokes.Add((Vector3F)point);
+               strokes.Add((Vector3F)bottom1.End);
+               //strokes.Add((Vector3F)point);
+               //indices.Add(index++);
+            }
+
+            if (isTopDisconnected)
+            {
+               if (pen.PenLineJoin == PenLineJoin.Bevel)
+               {
+                  //var line = new LineSegment2D(top1.End, top2.Start);
+                  //topSegments.Insert(i+1, line);
+                  strokes.Add((Vector3F)top1.Start);
+                  strokes.Add((Vector3F)top1.End);
+                  strokes.Add((Vector3F)bottom1.End);
+                  
+                  strokes.Add((Vector3F)bottom1.End);
+                  strokes.Add((Vector3F)top1.End);
+                  strokes.Add((Vector3F)top2.Start);
+               }
+            }
+
+            if (isBottomDisconnected)
+            {
+               if (pen.PenLineJoin == PenLineJoin.Bevel)
+               {
+                  //var line = new LineSegment2D(bottom1.End, bottom2.Start);
+                  //bottomSegments.Insert(i+1, line);
+                  strokes.Add((Vector3F)bottom1.End);
+                  
+                  
+                  strokes.Add((Vector3F)bottom1.End);
+                  strokes.Add((Vector3F)top1.End);
+                  strokes.Add((Vector3F)bottom2.Start);
+               }
+            }
+         }
+         
+         Mesh.SetPositions(strokes).Optimize();
       }
 
       internal void CreateRectangleStroke(RectangleGeometry geometry, Double thickness, DashStyle dashStyle)

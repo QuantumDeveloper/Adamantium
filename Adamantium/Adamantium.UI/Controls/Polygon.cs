@@ -39,9 +39,17 @@ namespace Adamantium.UI.Controls
 
         protected override void OnRender(DrawingContext context)
         {
+            base.OnRender(context);
+            
             context.BeginDraw(this);
+            var pen = new Pen(
+                Stroke,
+                StrokeThickness,
+                new DashStyle(StrokeDashArray?.AsReadOnly()), StrokeDashCap,
+                StartLineCap,
+                EndLineCap);
             Geometry geometry = new PolygonGeometry(Points, FillRule); 
-            context.DrawGeometry(Fill, geometry);
+            context.DrawGeometry(Fill, geometry, pen);
             context.EndDraw(this);
         }
     }

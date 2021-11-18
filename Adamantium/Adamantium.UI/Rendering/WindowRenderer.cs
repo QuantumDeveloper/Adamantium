@@ -150,23 +150,23 @@ namespace Adamantium.UI.Rendering
 
             if (!context.GetPresentationForComponent(component, out var presentation)) return;
 
-            if (component.ClipToBounds)
-            {
-                clipRect.Offset.X = (int)component.ClipRectangle.X;
-                clipRect.Offset.Y = (int)component.ClipRectangle.Y;
-                clipRect.Extent.Width = (uint)component.ClipRectangle.Width;
-                clipRect.Extent.Height = (uint)component.ClipRectangle.Height;
-
-                graphicsDevice.SetScissors(clipRect);
-            }
-            else
+            // if (component.ClipToBounds)
+            // {
+            //     clipRect.Offset.X = (int)component.ClipRectangle.X;
+            //     clipRect.Offset.Y = (int)component.ClipRectangle.Y;
+            //     clipRect.Extent.Width = (uint)component.ClipRectangle.Width;
+            //     clipRect.Extent.Height = (uint)component.ClipRectangle.Height;
+            //
+            //     graphicsDevice.SetScissors(clipRect);
+            // }
+            // else
             {
                 graphicsDevice.SetScissors(scissor);
             }
 
             foreach (var item in presentation.Items)
             {
-                item.GeometryRenderer?.Draw(context.GraphicsDevice, component, projectionMatrix);
+                //item.GeometryRenderer?.Draw(context.GraphicsDevice, component, projectionMatrix);
                 item.StrokeRenderer?.Draw(context.GraphicsDevice, component, projectionMatrix);
             }
         }

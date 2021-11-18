@@ -480,12 +480,12 @@ namespace Adamantium.Mathematics
 
         public static float Cross2D(Vector3F v0, Vector3F v1)
         {
-            return v0.X * v1.Y - v1.X * v0.Y;
+            return v0.X * v1.Y - v0.Y * v1.X;
         }
         
         public static double Cross2D(Vector2D v0, Vector2D v1)
         {
-            return v0.X * v1.Y - v1.X * v0.Y;
+            return v0.X * v1.Y - v0.Y * v1.X;
         }
 
         public static float AngleBetween(Vector3F vector0, Vector3F vector1, Vector3F normal)
@@ -502,8 +502,10 @@ namespace Adamantium.Mathematics
             if (is360Degrees)
             {
                 var dot = Vector3F.Dot(vector0, vector1);
-                var determinant = Determinant(vector0, vector1);
-                angle = (float)Math.Atan2(determinant, dot);
+                // var determinant = Determinant(vector0, vector1);
+                // angle = (float)Math.Atan2(determinant, dot);
+                //atan2(v2.y,v2.x) - atan2(v1.y,v1.x)
+                angle = (float)Math.Atan2(vector1.Y, vector1.X) - (float)Math.Atan2(vector0.Y, vector0.X);
                 angle = RadiansToDegrees(angle);
                 if (angle < 0)
                 {
@@ -513,11 +515,37 @@ namespace Adamantium.Mathematics
             else
             {
                 var dot = Vector3F.Dot(vector0, vector1);
-                angle = (float)Math.Acos(dot);
+                angle = RadiansToDegrees((float)Math.Acos(dot));
             }
 
             return angle;
         }
+
+        public static Double AngleBetween(Vector2D vector0, Vector2D vector1, Vector2D vector3, Vector2D vector4)
+        {
+            // find vectors
+            Vector2D v1 = vector1 - vector0;
+            Vector2D v2 = vector4 - vector3;
+
+            var len1 = v1.Length();
+            var len2 = v2.Length();
+
+            var dot = Vector2D.Dot(v1, v2);
+            double cos = dot / len1 / len2;
+
+            var cross = Cross2D(v1, v2);
+            double sin = cross / len1 / len2;
+            
+            // Find angle
+            double angle = Math.Acos(cos);
+            if (sin < 0)
+            {
+                angle = -angle;
+            }
+
+            return RadiansToDegrees(angle);
+        }
+        
 
         public static float AngleBetween(LineSegment2D s1, LineSegment2D s2, bool is360Degrees = true)
         {

@@ -19,12 +19,12 @@ namespace Adamantium.UI.Media
 
       public PenLineJoin PenLineJoin { get; set; }
 
-      public Pen(Vector4D brush, Double thicness = 1.0, DashStyle dashStyle = null, PenLineCap dashCap = PenLineCap.Flat,
+      public Pen(Vector4D brush, Double thickness = 1.0, DashStyle dashStyle = null, PenLineCap dashCap = PenLineCap.Flat,
          PenLineCap startLineCap = PenLineCap.Flat,
          PenLineCap endLineCap = PenLineCap.Flat, PenLineJoin penLineJoin = PenLineJoin.Miter)
       {
          Brush = new SolidColorBrush(Colors.Transparent);
-         Thickness = thicness;
+         Thickness = thickness;
          DashStyle = dashStyle;
          DashCap = dashCap;
          StartLineCap = startLineCap;
