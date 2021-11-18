@@ -9,6 +9,9 @@ namespace Adamantium.Fonts
         private readonly List<Glyph> displayedGlyphs;
         private Dictionary<uint, FeatureCache> glyphCacheMap;
         private TypeFace typeFace;
+        private int unprocessedGlyphs;
+
+        public bool IsProcessingDone => unprocessedGlyphs == 0;
         
         public GlyphLayoutContainer(TypeFace typeFace)
         {
@@ -57,6 +60,8 @@ namespace Adamantium.Fonts
                 displayedGlyphs.RemoveAt((int)glyphIndex);
                 displayedGlyphs.Insert((int)glyphIndex, glyph); 
             }
+
+            unprocessedGlyphs--;
             
             featureCache.AddToFeatureCache(featureInfo, substitutionGlyphIndex);
         }
@@ -69,6 +74,8 @@ namespace Adamantium.Fonts
                 glyphCacheMap[glyphIndex] = featureCache;
             }
 
+            unprocessedGlyphs--;
+            
             featureCache.AddToFeatureCache(featureInfo, substitutionArray);
         }
 
@@ -85,6 +92,8 @@ namespace Adamantium.Fonts
                 displayedGlyphs.RemoveAt((int)glyphIndex);
                 displayedGlyphs.Insert((int)glyphIndex, glyph); 
             }
+            
+            unprocessedGlyphs--;
             
             featureCache.AddToFeatureCache(featureInfo, substitutionArray);
         }
@@ -104,6 +113,8 @@ namespace Adamantium.Fonts
                 displayedGlyphs.Insert((int)glyphIndex, glyph); 
             }
 
+            unprocessedGlyphs -= removeLength;
+            
             featureCache.AddToFeatureCache(featureInfo, newGlyphIndex);
             //TODO: need to check does this logic is correct
         }
@@ -145,6 +156,11 @@ namespace Adamantium.Fonts
         {
             glyphCacheMap.TryGetValue(glyphIndex, out var featureCache);
             return featureCache != null ? featureCache.Layout.Position.Advance : new Vector2F(0, 0);
+        }
+
+        public void NewProcessingStart()
+        {
+            unprocessedGlyphs = displayedGlyphs.Count;
         }
     }
 }

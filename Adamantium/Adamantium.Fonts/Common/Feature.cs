@@ -23,6 +23,9 @@ namespace Adamantium.Fonts.Common
             {
                 return;
             }
+
+            // optimization, reset unprocessed glyphs counter
+            container.NewProcessingStart();
             
             foreach (var lookup in Lookups)
             {
@@ -37,6 +40,9 @@ namespace Adamantium.Fonts.Common
                             subTable.PositionGlyph(container, Info, index, length);
                             break;
                     }
+
+                    // when all glyphs are processed - we stop cycling through lookup tables
+                    if (container.IsProcessingDone) return;
                 }
             }
         }

@@ -414,7 +414,7 @@ namespace Adamantium.Game.Playground
                 testEntity.AddComponent(meshRenderer);
                 testEntity.Transform.Position = new Vector3D(0, 0, 6);
                 
-                var textEntity = PrintText(typeface, font, 24, Colors.Beige, "hi all");
+                var textEntity = PrintText(typeface, font, 240, Colors.Beige, "hi all");
                 textEntity.Transform.Position = new Vector3D(0, 0, 6);
 
                 /* // OUTLINES CHECK
