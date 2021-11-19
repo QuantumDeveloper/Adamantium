@@ -14,7 +14,7 @@ namespace Adamantium.UI.Media
       
       internal Mesh StrokeMesh { get; set; }
       
-      protected Int32 TesselationFactor { get; set; } = 2;
+      protected Int32 TesselationFactor { get; set; } = 20;
       
       public Matrix4x4F Transform { get; set; }
 

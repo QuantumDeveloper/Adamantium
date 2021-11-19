@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices.ComTypes;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.Mathematics;
@@ -14,6 +15,8 @@ namespace Adamantium.UI.Media
       private Rect bounds;
       private int lastIndex = 0;
       private const int interrupt = -1;
+      private int doublePrecision = 4;
+      internal uint SampleRate { get; set; } = 15;
 
       public StrokeGeometry()
       { }
@@ -30,24 +33,37 @@ namespace Adamantium.UI.Media
 
       private void GenerateStroke(Pen pen, Geometry geometry)
       {
-         pen.PenLineJoin = PenLineJoin.Bevel;
-         var strokes = new List<Vector3F>();
-         var topStrokes = new List<Vector3F>();
-         var bottomStrokes = new List<Vector3F>();
+         pen.PenLineJoin = PenLineJoin.Round;
+         pen.StartLineCap = PenLineCap.Round;
+         pen.EndLineCap = PenLineCap.Round;
+         var topSegments = new List<LineSegment2D>();
+         var bottomSegments = new List<LineSegment2D>();
          var points = geometry.StrokeMesh.Positions;
-         float halfThickness = (float)pen.Thickness / 2;
+         var flatPoints = new List<Vector2D>();
 
+         // for test purposes start
          var testSegs = new List<Vector3F>();
-         testSegs.Add(new Vector3F(10, 20, 0));
-         testSegs.Add(new Vector3F(210, 20, 0));
-         testSegs.Add(new Vector3F(210, 40, 0));
-         testSegs.Add(new Vector3F(10, 40, 0));
+         
+         testSegs.Add(new Vector3F(50, 10, 0));
+         testSegs.Add(new Vector3F(260, 10, 0));
+         testSegs.Add(new Vector3F(155, 180, 0));
+         testSegs.Add(new Vector3F(200, 195, 0));
+         testSegs.Add(new Vector3F(100, 295, 0));
+         testSegs.Add(new Vector3F(90, 310, 0));
 
          points = testSegs.ToArray();
          geometry.IsClosed = true;
-         
+
+         for (var i = 0; i < points.Length; i++)
+         {
+            points[i] = new Vector3F((float) Math.Round(points[i].X, 4), (float) Math.Round(points[i].Y, 4), 0);
+         }
+
+         // for test purposes end
+
          for (int i = 0; i < points.Length; ++i)
          {
+            flatPoints.Add((Vector2D)points[i]);
             var nextIndex = i + 1;
 
             if (i == points.Length - 1)
@@ -56,40 +72,9 @@ namespace Adamantium.UI.Media
                nextIndex = 0;
             }
 
-            var startPoint = points[i];
-            var endPoint = points[nextIndex];
-            
-            var dir = endPoint - startPoint;
-            var normal = new Vector3F(-dir.Y, dir.X, 0);
-            normal.Normalize();
-            dir.Normalize();
-            
-            var point1 = startPoint - halfThickness * normal;
-            var point2 = endPoint - halfThickness * normal;
-            var point0 = startPoint + halfThickness * normal;
-            var point3 = endPoint + halfThickness * normal;
-
-            bottomStrokes.Add(point0);
-            bottomStrokes.Add(point3);
-            
-            topStrokes.Add(point1);
-            topStrokes.Add(point2);
-         }
-
-         var topSegments = new List<LineSegment2D>();
-         var bottomSegments = new List<LineSegment2D>();
-
-         for (int i = 0; i < topStrokes.Count - 1; i+=2)
-         {
-            var start = (Vector2D)topStrokes[i];
-            var end = (Vector2D)topStrokes[i + 1];
-            var line = new LineSegment2D(start, end);
-            topSegments.Add(line);
-            
-            start = (Vector2D)bottomStrokes[i];
-            end = (Vector2D)bottomStrokes[i + 1];
-            line = new LineSegment2D(start, end);
-            bottomSegments.Add(line);
+            var topBottomLines = GenerateTopBottomLines((Vector2D)points[i], (Vector2D)points[nextIndex], pen.Thickness);
+            bottomSegments.Add(topBottomLines[1]);
+            topSegments.Add(topBottomLines[0]);
          }
 
          var sampledTopPart = new List<Vector2D>();
@@ -124,25 +109,240 @@ namespace Adamantium.UI.Media
          }
          else
          {
-            strokeOutline.AddRange(sampledTopPart);
             sampledBottomPart[0] = sampledBottomPart[^1];
+            sampledTopPart[0] = sampledTopPart[^1];
+            strokeOutline.AddRange(sampledTopPart);
             sampledBottomPart.Reverse();
             strokeOutline.AddRange(sampledBottomPart);
          }
 
          RemoveCollinearSegments(strokeOutline, geometry.IsClosed);
          
-         //@TODO process triangulate here ( https://www.youtube.com/watch?v=QAdfkylpYwc )
-         
-         //Mesh.SetPositions(strokes).Optimize();
-
-         Mesh.SetPositions(strokeOutline);
+         /*Mesh.SetPositions(strokeOutline);
          Mesh.SetTopology(PrimitiveType.LineStrip);
-         Mesh.GenerateBasicIndices();
+         Mesh.GenerateBasicIndices();*/
+
+         var vertices = new List<Vector3F>();
+         
+         // ear clipping triangulation ( https://www.youtube.com/watch?v=QAdfkylpYwc )
+         var strokePoints = TriangulateSimplePolygon(strokeOutline);
+
+         if (strokePoints != null)
+         {
+            vertices.AddRange(strokePoints);
+         }
+
+         if (!geometry.IsClosed)
+         {
+            var capPoints = GenerateLineCaps(pen, flatPoints);
+            if (capPoints != null)
+            {
+               vertices.AddRange(capPoints);
+            }
+         }
+
+         if (vertices.Count > 0)
+         {
+            Mesh.SetPositions(vertices).Optimize();
+         }
       }
 
+      private List<Vector3F> GenerateLineCaps(Pen pen, List<Vector2D> linePoints)
+      {
+         if (linePoints.Count < 2) return null;
+
+         var caps = new List<Vector3F>();
+         
+         var startSegment = new LineSegment2D(linePoints[1], linePoints[0]);
+         var endSegment = new LineSegment2D(linePoints[^2], linePoints[^1]);
+         var startSegmentNormal = GenerateNormalToSegment(startSegment.Start, startSegment.End);
+         var endSegmentNormal = GenerateNormalToSegment(endSegment.Start, endSegment.End);
+
+         var startNorm = startSegment.DirectionNormalized;
+         var endNorm = endSegment.DirectionNormalized;
+
+         var startBasePoints = GenerateTopBottomPoints(startSegment.End, pen.Thickness, startSegmentNormal);
+         var endBasePoints = GenerateTopBottomPoints(endSegment.End, pen.Thickness, endSegmentNormal);
+         
+         var startCapEnd = startSegment.End + startNorm * pen.Thickness / 2.0;
+         var endCapEnd = endSegment.End + endNorm * pen.Thickness / 2.0;
+
+         var startCapOutline = GenerateCapOutline(pen.StartLineCap, startBasePoints[0], startBasePoints[1], startCapEnd, startNorm, pen.Thickness);
+         var endCapOutline = GenerateCapOutline(pen.EndLineCap, endBasePoints[0], endBasePoints[1], endCapEnd, endNorm, pen.Thickness);
+
+         if (startCapOutline != null)
+         {
+            var startCapTriangulated = TriangulateSimplePolygon(startCapOutline);
+
+            if (startCapTriangulated != null)
+            {
+               caps.AddRange(startCapTriangulated);
+            }
+         }
+         
+         if (endCapOutline != null)
+         {
+            var endCapTriangulated = TriangulateSimplePolygon(endCapOutline);
+
+            if (endCapTriangulated != null)
+            {
+               caps.AddRange(endCapTriangulated);
+            }
+         }
+         
+         return caps.Count > 0 ? caps : null;
+      }
+
+      private List<Vector2D> GenerateCapOutline(PenLineCap capType, Vector2D basePoint1, Vector2D basePoint2, Vector2D capEnd, Vector2D capNormal, double thickness)
+      {
+         var outline = new List<Vector2D>();
+
+         switch (capType)
+         {
+            case PenLineCap.Triangle:
+               outline.Add(basePoint1);
+               outline.Add(capEnd);
+               outline.Add(basePoint2);
+               break;
+            case PenLineCap.Square:
+            {
+               var capPoint1 = basePoint1 + thickness / 2.0 * capNormal;
+               var capPoint2 = basePoint2 + thickness / 2.0 * capNormal;
+
+               outline.Add(basePoint1);
+               outline.Add(capPoint1);
+               outline.Add(capPoint2);
+               outline.Add(basePoint2);
+
+               break;
+            }
+            case PenLineCap.Round:
+            {
+               var capPoint1 = basePoint1 + thickness * 0.70 * capNormal;
+               var capPoint2 = basePoint2 + thickness * 0.70 * capNormal;
+               var roundPoints = MathHelper.GetCubicBezier(basePoint1, capPoint1, capPoint2, basePoint2, SampleRate);
+               outline.AddRange(roundPoints);
+               break;
+            }
+            default:
+               return null;
+         }
+
+         return outline;
+      }
+      
+      private LineSegment2D[] GenerateTopBottomLines(Vector2D startPoint, Vector2D endPoint, double thickness)
+      {
+         var normal = GenerateNormalToSegment(startPoint, endPoint);
+
+         var startTopBottomPoints = GenerateTopBottomPoints(startPoint, thickness, normal);
+         var endTopBottomPoints = GenerateTopBottomPoints(endPoint, thickness, normal);
+         
+         var bottom = new LineSegment2D(startTopBottomPoints[1], endTopBottomPoints[1]);
+         var top = new LineSegment2D(startTopBottomPoints[0], endTopBottomPoints[0]);
+         
+         return new [] { top, bottom };
+      }
+
+      private Vector2D GenerateNormalToSegment(Vector2D startPoint, Vector2D endPoint)
+      {
+         var dir = endPoint - startPoint;
+         var normal = new Vector2D(-dir.Y, dir.X);
+         normal.Normalize();
+
+         return RoundVector2D(normal, doublePrecision);
+      }
+      
+      private Vector2D[] GenerateTopBottomPoints(Vector2D point, double thickness, Vector2D normal)
+      {
+         return new []
+         {
+            RoundVector2D(point - thickness / 2.0 * normal, doublePrecision),
+            RoundVector2D(point + thickness / 2.0 * normal, doublePrecision)
+         };
+      }
+
+      private Vector2D RoundVector2D(Vector2D vector, int precision)
+      {
+         return new Vector2D(Math.Round(vector.X, precision), Math.Round(vector.Y, precision));
+      }
+      
+      private List<Vector3F> TriangulateSimplePolygon(List<Vector2D> points)
+      {
+         // if there are less than 3 points - exit
+         if (points.Count < 3) return null;
+         
+         var trianglePoints = new List<Vector3F>();
+         var currentIndex = 0;
+
+         // just process until only 3 vertices left in point list
+         while (points.Count > 3)
+         {
+            if (currentIndex == points.Count) currentIndex = 0;
+            
+            var prevIndex = currentIndex - 1;
+            var nextIndex = currentIndex + 1;
+            
+            if (currentIndex == 0) prevIndex = points.Count - 1;
+            else if (currentIndex == points.Count - 1) nextIndex = 0;
+
+            var p1 = points[prevIndex];
+            var p2 = points[currentIndex];
+            var p3 = points[nextIndex];
+
+            // 1. determine the angle between segments, it must be less than 180
+            var angle = MathHelper.AngleBetween(p1, p2, p2, p3);
+
+            if (angle <= 0)
+            {
+               currentIndex++;
+               continue;
+            }
+
+            // 2. Check if any other point is inside p1-p2-p3 triangle
+            var skipPoint = false;
+            foreach (var point in points)
+            {
+               if (point == p1 || point == p2 || point == p3) continue;
+
+               if (MathHelper.PointInTriangle(point, p1, p2, p3))
+               {
+                  skipPoint = true;
+                  break;
+               }
+            }
+
+            if (skipPoint)
+            {
+               currentIndex++;
+               continue;
+            }
+            
+            // 3. Found ear - clip it
+            // add triangle to list
+            trianglePoints.Add((Vector3F)p1);
+            trianglePoints.Add((Vector3F)p2);
+            trianglePoints.Add((Vector3F)p3);
+            
+            // delete current point from list
+            points.RemoveAt(currentIndex);
+
+            // start the process from beginning of point list
+            currentIndex = 0;
+         }
+
+         // add last 3 points as the final triangle
+         trianglePoints.Add((Vector3F)points[0]);
+         trianglePoints.Add((Vector3F)points[1]);
+         trianglePoints.Add((Vector3F)points[2]);
+
+         return trianglePoints;
+      }
+      
       private void RemoveCollinearSegments(List<Vector2D> strokeOutline, bool isClosedGeometry)
       {
+         var epsilon = 0.001;
+         
          for (var i = 1; i < strokeOutline.Count; i++)
          {
             var nextIndex = i + 1;
@@ -152,11 +352,14 @@ namespace Adamantium.UI.Media
                if (!isClosedGeometry) break;
                nextIndex = 1;
             }
-            
+
             var currentSegment = new LineSegment2D(strokeOutline[i - 1], strokeOutline[i]);
             var nextSegment = new LineSegment2D(strokeOutline[i], strokeOutline[nextIndex]);
 
-            if (MathHelper.IsZero(MathHelper.AngleBetween(currentSegment, nextSegment)))
+            var angle = MathHelper.AngleBetween(currentSegment, nextSegment);
+            
+            if (Math.Abs(0 - angle) <= epsilon ||
+                Math.Abs(360 - angle) <= epsilon)
             {
                strokeOutline.RemoveAt(i);
             }
@@ -179,14 +382,41 @@ namespace Adamantium.UI.Media
          }
          else if (Collision2D.SegmentSegmentIntersection(ref first, ref second, out var point))
          {
-            strokePart.Add(point);
+            strokePart.Add(RoundVector2D(point, doublePrecision));
          }
          else
          {
-            if (penLineJoin == PenLineJoin.Bevel)
+            switch (penLineJoin)
             {
-               strokePart.Add(first.End);
-               strokePart.Add(second.Start);
+               case PenLineJoin.Bevel:
+                  strokePart.Add(first.End);
+                  strokePart.Add(second.Start);
+                  break;
+               case PenLineJoin.Miter:
+               {
+                  var intersection = Collision2D.lineLineIntersection(first.Start, first.End, second.Start, second.End);
+
+                  if (intersection != null)
+                  {
+                     strokePart.Add(first.End);
+                     strokePart.Add(RoundVector2D((Vector2D)intersection, doublePrecision));
+                     strokePart.Add(second.Start);
+                  }
+
+                  break;
+               }
+               case PenLineJoin.Round:
+               {
+                  var intersection = Collision2D.lineLineIntersection(first.Start, first.End, second.Start, second.End);
+
+                  if (intersection != null)
+                  {
+                     var roundPoints = MathHelper.GetQuadraticBezier(first.End, (Vector2D) intersection, second.Start, SampleRate);
+                     strokePart.AddRange(roundPoints);
+                  }
+
+                  break;
+               }
             }
          }
       }

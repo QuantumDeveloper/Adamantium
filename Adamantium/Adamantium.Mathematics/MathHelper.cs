@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 namespace Adamantium.Mathematics
@@ -779,6 +780,130 @@ namespace Adamantium.Mathematics
             bool hasPos = (d1 > 0) || (d2 > 0) || (d3 > 0);
 
             return !(hasNeg && hasPos);
+        }
+        
+        public static List<Vector2D> GetBSpline2(List<Vector2D> controlPoints, uint resolution)
+        {
+            if (controlPoints == null ||
+                controlPoints.Count < 3 ||
+                resolution < 2)
+            {
+                // just return empty list
+                return new List<Vector2D>();
+            }
+
+            var curvePoints = new List<Vector2D>();
+
+            var start = 1;
+            var end = controlPoints.Count - 1;
+
+            for (var i = start; i < end; ++i)
+            {
+                double uDelta = 1.0 / resolution;
+
+                for (double u = 0.0; u < 1.0; u += uDelta)
+                {
+                    curvePoints.Add(curve(controlPoints, i, u));
+                }
+
+                // add last curve point
+                if (i == end - 1)
+                {
+                    curvePoints.Add(curve(controlPoints, i, 1));
+                }
+            }
+
+            return curvePoints;
+        }
+
+        private static Vector2D curve(List<Vector2D> controlPoints, int index, double u)
+        {
+            return (blend03(u) * controlPoints[index - 1] + blend13(u) * controlPoints[index] + blend23(u) * controlPoints[index + 1]);
+        }
+
+        private static double blend03(double u)
+        {
+            return ((1 - u) * (1 - u) / 2.0);
+        }
+
+        private static double blend13(double u)
+        {
+            return (-(u * u) + u + 0.5);
+        }
+
+        private static double blend23(double u)
+        {
+            return ((u * u) / 2);
+        }
+
+        public static List<Vector2D> GetQuadraticBezier(Vector2D start, Vector2D control, Vector2D end, uint sampleRate)
+        {
+            if (sampleRate < 2) return new List<Vector2D>() { start, control, end };
+            
+            var bezierPoints = new List<Vector2D>();
+
+            var t = 1.0 / sampleRate;
+
+            for (double d = 0; d <= 1; d = Math.Round(d + t, 4))
+            {
+                var point = Math.Pow(1 - d, 2) * start + 2 * d * (1 - d) * control + Math.Pow(d, 2) * end;
+                point = new Vector2D(Math.Round(point.X, 4), Math.Round(point.Y, 4));
+                bezierPoints.Add(point);
+            }
+            
+            if (bezierPoints.Count == sampleRate) bezierPoints.Add(end);
+            
+            // because of possible float pointing precision issues
+            bezierPoints[0] = start;
+            bezierPoints[^1] = end;
+            
+            return bezierPoints;
+        }
+        
+        public static List<Vector2D> GetCubicBezier(Vector2D start, Vector2D control1, Vector2D control2, Vector2D end, uint sampleRate)
+        {
+            if (sampleRate < 2) return new List<Vector2D>() { start, control1, control2, end };
+            
+            var bezierPoints = new List<Vector2D>();
+
+            var t = 1.0 / sampleRate;
+
+            for (double d = 0; d <= 1; d += t)
+            {
+                var point = Math.Pow(1 - d, 3) * start +
+                                    3 * d * Math.Pow(1 - d, 2) * control1 +
+                                    3 * Math.Pow(d, 2) * (1 - d) * control2 +
+                                    Math.Pow(d, 3) * end;
+                point = new Vector2D(Math.Round(point.X, 4), Math.Round(point.Y, 4));
+                bezierPoints.Add(point);
+            }
+
+            if (bezierPoints.Count == sampleRate) bezierPoints.Add(end);
+            
+            // because of possible float pointing precision issues
+            bezierPoints[0] = start;
+            bezierPoints[^1] = end;
+            
+            return bezierPoints;
+        }
+        
+        public static double[] GetArcAngles(Vector2D start, Vector2D end, double radius, bool clockwise = true)
+        {
+            var d = new Vector2D((end.X - start.X) * 0.5, (end.Y - start.Y) * 0.5);
+            var a = d.Length();
+            
+            if (a > radius) return null;
+
+            var side = clockwise ? 1 : -1;
+
+            var oc = Math.Sqrt(radius * radius - a * a);
+            var ox = (start.X + end.X) * 0.5 - side * oc * d.Y / a;
+            var oy = (start.Y + end.Y) * 0.5 + side * oc * d.X / a;
+
+            var startAngle = Math.Atan2(start.Y - oy, start.X - ox) * 180.0 / Math.PI;
+            var sweepAngle = side * 2.0 * Math.Asin(a / radius) * 180.0 / Math.PI;
+
+            return new[] { startAngle, sweepAngle, ox, oy };
         }
     }
 }
