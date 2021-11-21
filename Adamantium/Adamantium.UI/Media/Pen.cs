@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using Adamantium.Core.Collections;
 using Adamantium.Mathematics;
 
 namespace Adamantium.UI.Media
@@ -9,9 +11,7 @@ namespace Adamantium.UI.Media
 
       public Double Thickness { get; }
 
-      public DashStyle DashStyle { get; }
-
-      public PenLineCap DashCap { get; set; }
+      public AdamantiumCollection<Double> DashStrokeArray { get; }
 
       public PenLineCap StartLineCap { get; set; }
 
@@ -19,31 +19,20 @@ namespace Adamantium.UI.Media
 
       public PenLineJoin PenLineJoin { get; set; }
 
-      public Pen(Vector4D brush, Double thickness = 1.0, DashStyle dashStyle = null, PenLineCap dashCap = PenLineCap.Flat,
+      public Pen(
+         Brush brush, 
+         Double thickness = 1.0, 
+         IEnumerable<Double> dashStrokeArray = null,
          PenLineCap startLineCap = PenLineCap.Flat,
-         PenLineCap endLineCap = PenLineCap.Flat, PenLineJoin penLineJoin = PenLineJoin.Miter)
-      {
-         Brush = new SolidColorBrush(Colors.Transparent);
-         Thickness = thickness;
-         DashStyle = dashStyle;
-         DashCap = dashCap;
-         StartLineCap = startLineCap;
-         EndLineCap = endLineCap;
-         PenLineJoin = penLineJoin;
-      }
-
-      public Pen(Brush brush, Double thicness = 1.0, DashStyle dashStyle = null, PenLineCap dashCap = PenLineCap.Flat, PenLineCap startLineCap = PenLineCap.Flat,
-         PenLineCap endLineCap = PenLineCap.Flat, PenLineJoin penLineJoin = PenLineJoin.Miter)
+         PenLineCap endLineCap = PenLineCap.Flat, 
+         PenLineJoin penLineJoin = PenLineJoin.Miter)
       {
          Brush = brush;
-         Thickness = thicness;
-         DashStyle = dashStyle;
-         DashCap = dashCap;
+         DashStrokeArray = new AdamantiumCollection<double>(dashStrokeArray);
+         Thickness = thickness;
          StartLineCap = startLineCap;
          EndLineCap = endLineCap;
          PenLineJoin = penLineJoin;
       }
    }
-
-   
 }

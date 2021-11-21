@@ -82,7 +82,7 @@ namespace Adamantium.UI.Controls
             var pen = new Pen(
                Stroke,
                StrokeThickness,
-               new DashStyle(StrokeDashArray?.AsReadOnly()), StrokeDashCap,
+               StrokeDashArray,
                StartLineCap,
                EndLineCap);
             context.BeginDraw(this);

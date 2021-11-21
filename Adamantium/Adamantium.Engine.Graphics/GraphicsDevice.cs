@@ -619,7 +619,6 @@ namespace Adamantium.Engine.Graphics
             commandBuffer.BindIndexBuffer(indexBuffer, 0, IndexType.Uint32);
         }
 
-
         public void Draw(uint vertexCount, uint instanceCount, uint firstVertex = 0, uint firstInstance = 0)
         {
             if (CurrentEffectPass == null)

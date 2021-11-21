@@ -29,16 +29,12 @@ namespace Adamantium.UI.Controls
 
       public static readonly AdamantiumProperty StrokeDashArrayProperty =
          AdamantiumProperty.Register(nameof(StrokeDashArray),
-            typeof (AdamantiumCollection<Double>), typeof (Shape), new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender));
+            typeof (TrackingCollection<Double>), typeof(Shape), new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender));
 
       public static readonly AdamantiumProperty StretchProperty = AdamantiumProperty.Register(nameof(Stretch),
          typeof (Stretch), typeof (Shape),
          new PropertyMetadata(Stretch.None,
             PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure|PropertyMetadataOptions.AffectsRender));
-
-      public static readonly AdamantiumProperty StrokeDashCapProperty =
-         AdamantiumProperty.Register(nameof(StrokeDashCap), typeof (PenLineCap), typeof (Shape),
-            new PropertyMetadata(PenLineCap.Flat, PropertyMetadataOptions.AffectsRender));
 
       public static readonly AdamantiumProperty StartLineCapProperty =
          AdamantiumProperty.Register(nameof(StartLineCap), typeof(PenLineCap), typeof(Shape),
@@ -47,6 +43,10 @@ namespace Adamantium.UI.Controls
       public static readonly AdamantiumProperty EndLineCapProperty =
          AdamantiumProperty.Register(nameof(EndLineCap), typeof(PenLineCap), typeof(Shape),
             new PropertyMetadata(PenLineCap.Flat, PropertyMetadataOptions.AffectsRender));
+      
+      public static readonly AdamantiumProperty StrokeLineJoinProperty =
+         AdamantiumProperty.Register(nameof(StrokeLineJoin), typeof(PenLineJoin), typeof(Shape),
+            new PropertyMetadata(PenLineJoin.Miter, PropertyMetadataOptions.AffectsRender));
 
       public Brush Fill
       {
@@ -66,9 +66,9 @@ namespace Adamantium.UI.Controls
          set => SetValue(StrokeThicknessProperty, value);
       }
 
-      public AdamantiumCollection<Double> StrokeDashArray
+      public TrackingCollection<Double> StrokeDashArray
       {
-         get => GetValue<AdamantiumCollection<Double>>(StrokeDashArrayProperty);
+         get => GetValue<TrackingCollection<Double>>(StrokeDashArrayProperty);
          set => SetValue(StrokeDashArrayProperty, value);
       }
 
@@ -78,15 +78,23 @@ namespace Adamantium.UI.Controls
          set => SetValue(StretchProperty, value);
       }
 
-      public PenLineCap StrokeDashCap
+      public PenLineCap StartLineCap
       {
-         get => GetValue<PenLineCap>(StrokeDashCapProperty);
-         set => SetValue(StrokeDashCapProperty, value);
+         get => GetValue<PenLineCap>(StartLineCapProperty);
+         set => SetValue(StartLineCapProperty, value);
       }
 
-      public PenLineCap StartLineCap { get; set; }
+      public PenLineCap EndLineCap
+      {
+         get => GetValue<PenLineCap>(EndLineCapProperty);
+         set => SetValue(EndLineCapProperty, value);
+      }
 
-      public PenLineCap EndLineCap { get; set; }
+      public PenLineJoin StrokeLineJoin
+      {
+         get => GetValue<PenLineJoin>(StrokeLineJoinProperty);
+         set => SetValue(StrokeLineJoinProperty, value);
+      }
 
       protected Rect BoundingRectangle { get; set; }
 

@@ -21,6 +21,7 @@ namespace Adamantium.UI.Playground
         private void FillControls()
         {
             var grid = new Grid();
+            
             var rectangle = new Rectangle();
             rectangle.CornerRadius = new CornerRadius(0, 40, 0, 40);
             rectangle.Width = 200;
@@ -31,6 +32,7 @@ namespace Adamantium.UI.Playground
             rectangle.Stroke = Brushes.CornflowerBlue;
             rectangle.StrokeThickness = 5;
             rectangle.ClipToBounds = false;
+            rectangle.StrokeDashArray = new TrackingCollection<double>() { 10, 5 };
 
             var ellipse = new Ellipse();
             ellipse.Width = 150;
@@ -67,13 +69,14 @@ namespace Adamantium.UI.Playground
             polygon.FillRule = FillRule.EvenOdd;
             polygon.HorizontalAlignment = HorizontalAlignment.Left;
             polygon.ClipToBounds = false;
-            polygon.StrokeThickness = 4;
+            polygon.StrokeThickness = 20;
             polygon.Stroke = Brushes.Black;
+            polygon.StrokeDashArray = new TrackingCollection<double>() { 20, 40, 0 };
                 
             grid.Background = Brushes.White;
-            grid.Children.Add(rectangle);
-            grid.Children.Add(ellipse);
-            grid.Children.Add(line);
+            //grid.Children.Add(rectangle);
+            //grid.Children.Add(ellipse);
+            //grid.Children.Add(line);
             grid.Children.Add(polygon);
 
             Content = grid;

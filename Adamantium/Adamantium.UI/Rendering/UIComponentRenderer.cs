@@ -30,16 +30,22 @@ namespace Adamantium.UI.Rendering
             graphicsDevice.SetVertexBuffer(VertexBuffer);
             graphicsDevice.VertexType = VertexType;
             graphicsDevice.PrimitiveTopology = PrimitiveType;
-            graphicsDevice.SetIndexBuffer(IndexBuffer);
-            
+
             var world = Matrix4x4F.Translation((float)component.Location.X, (float)component.Location.Y, 5);
             graphicsDevice.BasicEffect.Parameters["wvp"].SetValue(world * projectionMatrix);
             var color = Brush as SolidColorBrush;
             graphicsDevice.BasicEffect.Parameters["meshColor"].SetValue(color.Color.ToVector4());
             graphicsDevice.BasicEffect.Parameters["transparency"].SetValue((float)Brush.Opacity);
             graphicsDevice.BasicEffect.Techniques["Basic"].Passes["Colored"].Apply();
-            
-            graphicsDevice.DrawIndexed(VertexBuffer, IndexBuffer);
+
+            if (IndexBuffer != null)
+            {
+                graphicsDevice.DrawIndexed(VertexBuffer, IndexBuffer);
+            }
+            else
+            {
+                graphicsDevice.Draw(VertexBuffer.ElementCount, 1);
+            }
         }
 
         public static UIComponentRenderer Create(GraphicsDevice device, Mesh mesh, Brush brush)
@@ -49,6 +55,10 @@ namespace Adamantium.UI.Rendering
             if (vertices != null)
             {
                 renderer.VertexBuffer = Buffer.Vertex.New(device, vertices);
+            }
+
+            if (mesh.HasIndices)
+            {
                 renderer.IndexBuffer = Buffer.Index.New(device, mesh.Indices);
             }
 

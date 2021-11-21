@@ -29,6 +29,14 @@ namespace Adamantium.Mathematics
             Direction = end - start;
             DirectionNormalized = Vector2D.Normalize(Direction);
         }
+        
+        public LineSegment2D(Vector3F start, Vector3F end)
+        {
+            Start = (Vector2D)start;
+            End = (Vector2D)end;
+            Direction = End - Start;
+            DirectionNormalized = Vector2D.Normalize(Direction);
+        }
 
         public bool Equals(LineSegment2D other)
         {
