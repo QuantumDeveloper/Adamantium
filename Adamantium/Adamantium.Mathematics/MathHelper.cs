@@ -887,12 +887,12 @@ namespace Adamantium.Mathematics
             return bezierPoints;
         }
         
-        public static double[] GetArcAngles(Vector2D start, Vector2D end, double radius, bool clockwise = true)
+        private static double[] GetArcData(Vector2D start, Vector2D end, double radius, bool clockwise = true)
         {
             var d = new Vector2D((end.X - start.X) * 0.5, (end.Y - start.Y) * 0.5);
             var a = d.Length();
             
-            if (a > radius) return null;
+            if (a > radius) radius = a; //return null;
 
             var side = clockwise ? 1 : -1;
 
@@ -904,6 +904,25 @@ namespace Adamantium.Mathematics
             var sweepAngle = side * 2.0 * Math.Asin(a / radius) * 180.0 / Math.PI;
 
             return new[] { startAngle, sweepAngle, ox, oy };
+        }
+
+        public static Vector2D[] GetArcPoints(Vector2D start, Vector2D end, double radius, bool convex, double sampleRate)
+        {
+            var points = new List<Vector2D>();
+
+            var arcData = GetArcData(start, end, radius, convex);
+
+            var center = new Vector2D(arcData[2], arcData[3]);
+            var startAngle = Math.Min(arcData[0], arcData[0] + arcData[1]);
+            var endAngle = Math.Max(arcData[0], arcData[0] + arcData[1]);
+
+            for (double angle = DegreesToRadians(startAngle); angle <= DegreesToRadians(endAngle); angle += sampleRate) //You are using radians so you will have to increase by a very small amount
+            {
+                //This will have the coordinates  you want to draw a point at
+                points.Add(new Vector2D((float)(center.X + radius * Math.Cos(angle)), (float)(center.Y + radius * Math.Sin(angle))));
+            }
+
+            return points.ToArray();
         }
     }
 }

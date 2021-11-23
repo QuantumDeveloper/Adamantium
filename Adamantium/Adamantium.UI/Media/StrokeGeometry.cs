@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Core.Collections;
+using Adamantium.Engine.Core;
 using Adamantium.Mathematics;
 
 namespace Adamantium.UI.Media
@@ -25,18 +26,20 @@ namespace Adamantium.UI.Media
 
       private void GenerateStroke(Pen pen, Geometry geometry)
       {
-         pen.PenLineJoin = PenLineJoin.Round;
-         pen.StartLineCap = PenLineCap.Round;
-         pen.EndLineCap = PenLineCap.Round;
+         pen.PenLineJoin = PenLineJoin.Miter;
+         //@TODO check concave zero length triangulation
+         pen.StartLineCap = PenLineCap.ConcaveRound;
+         pen.EndLineCap = PenLineCap.ConcaveRound;
          var points = geometry.StrokeMesh.Positions;
 
          // for test purposes start
-         geometry.IsClosed = true;
+         geometry.IsClosed = false;
          var testSegs = new List<Vector3F>();
 
          testSegs.Add(new Vector3F(50, 10, 0));
-         testSegs.Add(new Vector3F(260, 10, 0));
-         testSegs.Add(new Vector3F(155, 180, 0));
+         testSegs.Add(new Vector3F(50, 10, 0));
+         //testSegs.Add(new Vector3F(260, 10, 0));
+         //testSegs.Add(new Vector3F(155, 180, 0));
          //testSegs.Add(new Vector3F(200, 195, 0));
          //testSegs.Add(new Vector3F(100, 295, 0));
          //testSegs.Add(new Vector3F(90, 310, 0));
@@ -185,11 +188,11 @@ namespace Adamantium.UI.Media
                vertices.AddRange(strokePoints);
             }
 
-            var capPoints = GenerateLineCaps(pen, dashPoints.ToArray());
+            /*var capPoints = GenerateLineCaps(pen, dashPoints.ToArray());
             if (capPoints != null)
             {
                vertices.AddRange(capPoints);
-            }
+            }*/
          }
 
          Mesh.SetPositions(vertices).Optimize();
@@ -201,51 +204,79 @@ namespace Adamantium.UI.Media
       /// <param name="points">Geometry points</param>
       /// <param name="pen">Stroke's pen</param>
       /// <param name="isGeometryClosed">Is geometry closed (like triangle, square etc.) or is it just a line</param>
-      private void GenerateStroke(Vector3F[] points, Pen pen, bool isGeometryClosed)
+      /// <param name="zeroLengthLineDirection">Direction for the case of zero length line</param>
+      private void GenerateStroke(Vector3F[] points, Pen pen, bool isGeometryClosed, Vector2D? zeroLengthLineDirection = null)
       {
+         // check if geometry is valid
+         if (points.Length < 2) return;
+
          var topSegments = new List<LineSegment2D>();
          var bottomSegments = new List<LineSegment2D>();
-
-         // generate top and bottom parts of stroke outline
-         for (var i = 0; i < points.Length; ++i)
+         
+         // corner case - if line has zero length
+         if (points.Length == 2 && points[0] == points[1])
          {
-            var nextIndex = i + 1;
+            // if there is no direction for zero length line - set it to default value of (1,0)
+            if (zeroLengthLineDirection == null) zeroLengthLineDirection = new Vector2D(1, 0);
 
-            if (i == points.Length - 1)
+            // compute normal to zero length line based on zero length line direction
+            var zeroLengthLineNormal = new Vector2D(-zeroLengthLineDirection.Value.Y, zeroLengthLineDirection.Value.X);
+            
+            // generate top and bottom segments
+            var startTopBottomPoints = GenerateTopBottomPoints((Vector2D)points[0], pen.Thickness, zeroLengthLineNormal);
+            var endTopBottomPoints = GenerateTopBottomPoints((Vector2D)points[1], pen.Thickness, zeroLengthLineNormal);
+
+            topSegments.Add(new LineSegment2D(startTopBottomPoints[0], endTopBottomPoints[0]));
+            bottomSegments.Add(new LineSegment2D(startTopBottomPoints[1], endTopBottomPoints[1]));
+         }
+         else
+         {
+            // generate top and bottom parts of stroke outline
+            for (var i = 0; i < points.Length; ++i)
             {
-               if (!isGeometryClosed) break;
+               var nextIndex = i + 1;
 
-               // loop cycle around
-               nextIndex = 0;
+               if (i == points.Length - 1)
+               {
+                  if (!isGeometryClosed) break;
+
+                  // loop cycle around
+                  nextIndex = 0;
+               }
+
+               var topBottomSegments =
+                  GenerateTopBottomSegments((Vector2D) points[i], (Vector2D) points[nextIndex], pen.Thickness);
+
+               topSegments.Add(topBottomSegments[0]);
+               bottomSegments.Add(topBottomSegments[1]);
             }
-
-            var topBottomSegments =
-               GenerateTopBottomSegments((Vector2D)points[i], (Vector2D)points[nextIndex], pen.Thickness);
-
-            topSegments.Add(topBottomSegments[0]);
-            bottomSegments.Add(topBottomSegments[1]);
          }
 
          var sampledStrokeTopOutlinePart = new List<Vector2D>();
          var sampledStrokeBottomOutlinePart = new List<Vector2D>();
-         var strokeOutline = new List<Vector2D>();
 
          // add start points, in cycle we will be adding only end points
          sampledStrokeTopOutlinePart.Add(topSegments[0].Start);
          sampledStrokeBottomOutlinePart.Add(bottomSegments[0].Start);
 
-         for (var i = 0; i < topSegments.Count; i++)
+         // we only need to calculate joins if points count greater than 2
+         if (points.Length > 2)
          {
-            var nextIndex = i + 1;
-
-            if (i == topSegments.Count - 1)
+            for (var i = 0; i < topSegments.Count; i++)
             {
-               if (!isGeometryClosed) break;
-               nextIndex = 0;
-            }
+               var nextIndex = i + 1;
 
-            GenerateStrokeJoin(topSegments[i], topSegments[nextIndex], sampledStrokeTopOutlinePart, pen.PenLineJoin);
-            GenerateStrokeJoin(bottomSegments[i], bottomSegments[nextIndex], sampledStrokeBottomOutlinePart, pen.PenLineJoin);
+               if (i == topSegments.Count - 1)
+               {
+                  if (!isGeometryClosed) break;
+                  nextIndex = 0;
+               }
+
+               // generate join points for top and bottom outline parts separately
+               GenerateStrokeJoin(topSegments[i], topSegments[nextIndex], sampledStrokeTopOutlinePart, pen.PenLineJoin);
+               GenerateStrokeJoin(bottomSegments[i], bottomSegments[nextIndex], sampledStrokeBottomOutlinePart,
+                  pen.PenLineJoin);
+            }
          }
 
          if (!isGeometryClosed)
@@ -260,140 +291,179 @@ namespace Adamantium.UI.Media
             sampledStrokeTopOutlinePart[0] = sampledStrokeTopOutlinePart[^1];
             sampledStrokeBottomOutlinePart[0] = sampledStrokeBottomOutlinePart[^1];
          }
-         
-         // add top part, then add reversed bottom part - the outline then will be complete
-         strokeOutline.AddRange(sampledStrokeTopOutlinePart);
-         sampledStrokeBottomOutlinePart.Reverse();
-         strokeOutline.AddRange(sampledStrokeBottomOutlinePart);
 
+         // compose stroke outline from top / bottom parts and caps outlines
+         var strokeOutline = ComposeStrokeOutline(pen, points, sampledStrokeTopOutlinePart, sampledStrokeBottomOutlinePart, isGeometryClosed, zeroLengthLineDirection);
+         
          // remove collinear segments
          RemoveCollinearSegments(strokeOutline, isGeometryClosed);
 
-         var vertices = new List<Vector3F>();
-
          // triangulate stroke
          var triangulatedStroke = TriangulateSimplePolygon(strokeOutline);
-         if (triangulatedStroke != null) vertices.AddRange(triangulatedStroke);
-
-         if (!isGeometryClosed)
-         {
-            // generate line caps
-            var triangulatedCaps = GenerateLineCaps(pen, points);
-            if (triangulatedCaps != null) vertices.AddRange(triangulatedCaps);
-         }
-
-         if (vertices.Count > 0) Mesh.SetPositions(vertices).Optimize();
+         
+         if (triangulatedStroke == null) return;
+         
+         var vertices = new List<Vector3F>();
+         vertices.AddRange(triangulatedStroke);
+         Mesh.SetPositions(vertices).Optimize();
       }
 
       /// <summary>
-      /// Generates triangulated line caps for stroke according to required types.
-      /// Caps will only be generated if geometry is not closed. 
+      /// Composes the outline from top / bottom parts plus outlines for caps
       /// </summary>
       /// <param name="pen">Stroke's pen</param>
       /// <param name="linePoints">Geometry points</param>
-      /// <returns>Triangles for line caps or null if generation failed</returns>
-      private List<Vector3F> GenerateLineCaps(Pen pen, Vector3F[] linePoints)
+      /// <param name="topStrokeOutlinePart">Top stroke part</param>
+      /// <param name="bottomStrokeOutlinePart">Bottom stroke part</param>
+      /// <param name="isGeometryClosed">Is geometry closed</param>
+      /// <param name="zeroLengthLineDirection">Direction for the case of zero length line</param>
+      /// <returns></returns>
+      private List<Vector2D> ComposeStrokeOutline(Pen pen,
+         Vector3F[] linePoints,
+         List<Vector2D> topStrokeOutlinePart,
+         List<Vector2D> bottomStrokeOutlinePart,
+         bool isGeometryClosed,
+         Vector2D? zeroLengthLineDirection = null)
       {
-         if (linePoints.Length < 2) return null;
-
-         var triangulatedStartCap = GenerateLineCap(pen.StartLineCap, linePoints, pen.Thickness, true);
-         var triangulatedEndCap = GenerateLineCap(pen.EndLineCap, linePoints, pen.Thickness, false);
-
-         var triangulatedCaps = new List<Vector3F>();
+         Vector2D startCapDirection;
+         Vector2D endCapDirection;
          
-         if (triangulatedStartCap != null) triangulatedCaps.AddRange(triangulatedStartCap);
-         if (triangulatedEndCap != null) triangulatedCaps.AddRange(triangulatedEndCap);
+         if (zeroLengthLineDirection == null)
+         {
+            // normal case
+            startCapDirection = new LineSegment2D(linePoints[1], linePoints[0]).DirectionNormalized;
+            endCapDirection = new LineSegment2D(linePoints[^2], linePoints[^1]).DirectionNormalized;
+         }
+         else
+         {
+            // end cap direction is similar to line direction, start cap direction is opposite to line direction
+            endCapDirection = (Vector2D)zeroLengthLineDirection;
+            startCapDirection = -endCapDirection;
+         }
 
-         return triangulatedCaps.Count > 0 ? triangulatedCaps : null;
+         if (!isGeometryClosed)
+         {
+            AddCapOutline(pen.StartLineCap, (Vector2D)linePoints[0], startCapDirection, topStrokeOutlinePart, bottomStrokeOutlinePart, pen.Thickness, true);
+            AddCapOutline(pen.EndLineCap, (Vector2D)linePoints[^1], endCapDirection, topStrokeOutlinePart, bottomStrokeOutlinePart, pen.Thickness, false);
+         }
+
+         // reverse the bottom part, so that the order of points in stroke outline will be correct
+         bottomStrokeOutlinePart.Reverse();
+
+         var strokeOutline = new List<Vector2D>();
+         
+         strokeOutline.AddRange(topStrokeOutlinePart);
+         strokeOutline.AddRange(bottomStrokeOutlinePart);
+
+         return strokeOutline;
       }
 
       /// <summary>
-      /// Generates single triangulated cap
+      /// Adds cap outline to stroke outline so that they can be triangulated all together as one outline
       /// </summary>
       /// <param name="capType">Cap type</param>
-      /// <param name="linePoints">Geometry points</param>
-      /// <param name="thickness">Thickness of the stroke</param>
-      /// <param name="startCap">If the cap is start or end</param>
-      /// <returns>List of triangles or null if generation failed</returns>
-      private List<Vector3F> GenerateLineCap(PenLineCap capType,  Vector3F[] linePoints, double thickness, bool startCap)
+      /// <param name="geometryEnd">Geometry end point</param>
+      /// <param name="capDirection">Direction of the cap</param>
+      /// <param name="topStrokeOutlinePart">Top stroke outline part</param>
+      /// <param name="bottomStrokeOutlinePart">Bottom stroke outline part</param>
+      /// <param name="thickness">Thickness of stroke</param>
+      /// <param name="startCap">If start cap requested</param>
+      private void AddCapOutline(PenLineCap capType, Vector2D geometryEnd, Vector2D capDirection, List<Vector2D> topStrokeOutlinePart,
+         List<Vector2D> bottomStrokeOutlinePart, double thickness, bool startCap)
       {
          // if cap type is Flat - return null
-         if (capType == PenLineCap.Flat) return null;
+         if (capType == PenLineCap.Flat) return;
 
-         // get the required geometry segment (start or end) with proper direction
-         var segment = startCap ? new LineSegment2D(linePoints[1], linePoints[0]) : new LineSegment2D(linePoints[^2], linePoints[^1]);
-         
-         // calculate normal for segment
-         var segmentNormal = GenerateNormalToSegment(segment.Start, segment.End);
-         
-         // determine direction of the segment
-         var segmentDirection = segment.DirectionNormalized;
-         
-         // generate base points
-         //   X------
+         // determine base points
+         //   X------   top outline part
          //   |
-         //   X------
-         var basePoints = GenerateTopBottomPoints(segment.End, thickness, segmentNormal);
-         
-         // generate cap end (it will be thickness/2 away from line end
-         //      X----
-         //  X   |
-         //      X----
-         var capEnd = segment.End + segmentDirection * thickness / 2.0;
-         
+         //   X------   geometry line (basePoint0 or geometryEnd)
+         //   |
+         //   X------   bottom outline part
+         var basePoint1 = startCap ? bottomStrokeOutlinePart.First() : topStrokeOutlinePart.Last();
+         var basePoint2 = startCap ? topStrokeOutlinePart.First() : bottomStrokeOutlinePart.Last();
+
          // generate cap outline
-         var capOutline = GenerateCapOutline(capType, basePoints[0], basePoints[1], capEnd, segmentDirection, thickness);
+         var capOutline = GenerateCapOutline(capType, geometryEnd, basePoint1, basePoint2, capDirection, thickness);
 
-         if (capOutline != null)
+         if (capOutline == null) return;
+
+         // add cap outline to stroke outline
+         if (startCap)
          {
-            // triangulate cap outline
-            return TriangulateSimplePolygon(capOutline);
+            // add to the start of top part
+            topStrokeOutlinePart.InsertRange(0, capOutline);
          }
-
-         return null;
+         else
+         {
+            // add to the end of top part
+            topStrokeOutlinePart.AddRange(capOutline);
+         }
       }
-      
+
       /// <summary>
       /// Generates outline for stroke cap
       /// </summary>
       /// <param name="capType">Type of the cap</param>
+      /// <param name="basePoint0">End point of geometry (according to what we are processing - start cap or end cap)</param>
       /// <param name="basePoint1">First of two end points of current stroke's end</param>
       /// <param name="basePoint2">Second of two end points of current stroke's end</param>
-      /// <param name="capEnd">Third point (aside from two base points) for cap type 'triangle'</param>
-      /// <param name="capNormal">Direction in which cap should be drawn</param>
+      /// <param name="capDirection">Direction in which cap should be drawn</param>
       /// <param name="thickness">Thickness of the stroke</param>
       /// <returns>Points of the cap's outline</returns>
-      private List<Vector2D> GenerateCapOutline(PenLineCap capType, Vector2D basePoint1, Vector2D basePoint2,
-         Vector2D capEnd, Vector2D capNormal, double thickness)
+      private List<Vector2D> GenerateCapOutline(PenLineCap capType, Vector2D basePoint0, Vector2D basePoint1, Vector2D basePoint2, Vector2D capDirection, double thickness)
       {
          var outline = new List<Vector2D>();
 
          switch (capType)
          {
-            case PenLineCap.Triangle:
-               outline.Add(basePoint1);
-               outline.Add(capEnd);
-               outline.Add(basePoint2);
-               break;
-            case PenLineCap.Square:
+            case PenLineCap.ConvexTriangle:
             {
-               var capPoint1 = basePoint1 + thickness / 2.0 * capNormal;
-               var capPoint2 = basePoint2 + thickness / 2.0 * capNormal;
-
-               outline.Add(basePoint1);
-               outline.Add(capPoint1);
-               outline.Add(capPoint2);
-               outline.Add(basePoint2);
+               var capPoint0 = basePoint0 + thickness / 2.0 * capDirection;
+               outline.Add(capPoint0);
 
                break;
             }
-            case PenLineCap.Round:
+            case PenLineCap.ConcaveTriangle:
             {
-               var capPoint1 = basePoint1 + thickness * 0.70 * capNormal;
-               var capPoint2 = basePoint2 + thickness * 0.70 * capNormal;
+               var capPoint0 = basePoint0 - thickness / 2.0 * capDirection;
+               outline.Add(capPoint0);
 
+               break;
+            }
+            case PenLineCap.Square:
+            {
+               var capPoint1 = basePoint1 + thickness / 2.0 * capDirection;
+               var capPoint2 = basePoint2 + thickness / 2.0 * capDirection;
+
+               outline.Add(capPoint1);
+               outline.Add(capPoint2);
+
+               break;
+            }
+            case PenLineCap.ConvexRound:
+            {
+               var capPoint1 = basePoint1 + thickness * 0.70 * capDirection;
+               var capPoint2 = basePoint2 + thickness * 0.70 * capDirection;
                var roundPoints = MathHelper.GetCubicBezier(basePoint1, capPoint1, capPoint2, basePoint2, SampleRate);
 
+               // remove base points from cap outline - they are already included into stroke outline
+               roundPoints.RemoveAt(0);
+               roundPoints.RemoveAt(roundPoints.Count - 1);
+               
+               outline.AddRange(roundPoints);
+               break;
+            }
+            case PenLineCap.ConcaveRound:
+            {
+               var capPoint1 = basePoint1 - thickness * 0.70 * capDirection;
+               var capPoint2 = basePoint2 - thickness * 0.70 * capDirection;
+               var roundPoints = MathHelper.GetCubicBezier(basePoint1, capPoint1, capPoint2, basePoint2, SampleRate);
+
+               // remove base points from cap outline - they are already included into stroke outline
+               roundPoints.RemoveAt(0);
+               roundPoints.RemoveAt(roundPoints.Count - 1);
+               
                outline.AddRange(roundPoints);
                break;
             }
@@ -418,8 +488,8 @@ namespace Adamantium.UI.Media
          var startTopBottomPoints = GenerateTopBottomPoints(startPoint, thickness, normal);
          var endTopBottomPoints = GenerateTopBottomPoints(endPoint, thickness, normal);
 
-         var bottom = new LineSegment2D(startTopBottomPoints[1], endTopBottomPoints[1]);
          var top = new LineSegment2D(startTopBottomPoints[0], endTopBottomPoints[0]);
+         var bottom = new LineSegment2D(startTopBottomPoints[1], endTopBottomPoints[1]);
 
          return new[] { top, bottom };
       }
@@ -617,6 +687,9 @@ namespace Adamantium.UI.Media
       /// <param name="isClosedGeometry">Depending on this argument algorithm will or will not check last vs first segments</param>
       private void RemoveCollinearSegments(List<Vector2D> strokeOutline, bool isClosedGeometry)
       {
+         // collinear segments are only possible if there are 3 or more points in outline
+         if (strokeOutline.Count < 3) return;
+         
          // due to floating point numbers calculation precision issues we will evaluate against small epsilon, not zero further in the algorithm
          var epsilon = 0.001;
 

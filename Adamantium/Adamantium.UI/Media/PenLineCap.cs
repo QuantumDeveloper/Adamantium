@@ -4,7 +4,9 @@
    {
       Flat,
       Square,
-      Triangle,
-      Round,
+      ConvexTriangle,
+      ConcaveTriangle,
+      ConvexRound,
+      ConcaveRound
    }
 }
