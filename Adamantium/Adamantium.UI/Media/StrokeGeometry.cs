@@ -13,7 +13,8 @@ namespace Adamantium.UI.Media
       private int lastIndex = 0;
       private const int interrupt = -1;
       private int doublePrecision = 4;
-      internal uint SampleRate { get; set; } = 15;
+      internal uint BezierSampleRate { get; set; } = 15;
+      internal double ArcSampleRate { get; set; } = 0.1;
 
       public StrokeGeometry()
       {
@@ -29,7 +30,7 @@ namespace Adamantium.UI.Media
          pen.PenLineJoin = PenLineJoin.Miter;
          //@TODO check concave zero length triangulation
          pen.StartLineCap = PenLineCap.ConcaveRound;
-         pen.EndLineCap = PenLineCap.ConcaveRound;
+         pen.EndLineCap = PenLineCap.ConvexRound;
          var points = geometry.StrokeMesh.Positions;
 
          // for test purposes start
@@ -37,7 +38,7 @@ namespace Adamantium.UI.Media
          var testSegs = new List<Vector3F>();
 
          testSegs.Add(new Vector3F(50, 10, 0));
-         testSegs.Add(new Vector3F(50, 10, 0));
+         testSegs.Add(new Vector3F(60, 10, 0));
          //testSegs.Add(new Vector3F(260, 10, 0));
          //testSegs.Add(new Vector3F(155, 180, 0));
          //testSegs.Add(new Vector3F(200, 195, 0));
@@ -45,11 +46,12 @@ namespace Adamantium.UI.Media
          //testSegs.Add(new Vector3F(90, 310, 0));
 
          points = testSegs.ToArray();
+         var zeroLineDir = new LineSegment2D(new Vector2D(0, 0), new Vector2D(0.3, 1)).DirectionNormalized;
          // for test purposes end
 
          if (pen.DashStrokeArray == null || pen.DashStrokeArray.Count == 0)
          {
-            GenerateStroke(points, pen, geometry.IsClosed);
+            GenerateStroke(points, pen, geometry.IsClosed, zeroLineDir);
          }
          else
          {
@@ -231,6 +233,9 @@ namespace Adamantium.UI.Media
          }
          else
          {
+            // ensure that zero length line direction will not be used further
+            zeroLengthLineDirection = null;
+            
             // generate top and bottom parts of stroke outline
             for (var i = 0; i < points.Length; ++i)
             {
@@ -295,8 +300,8 @@ namespace Adamantium.UI.Media
          // compose stroke outline from top / bottom parts and caps outlines
          var strokeOutline = ComposeStrokeOutline(pen, points, sampledStrokeTopOutlinePart, sampledStrokeBottomOutlinePart, isGeometryClosed, zeroLengthLineDirection);
          
-         // remove collinear segments
-         RemoveCollinearSegments(strokeOutline, isGeometryClosed);
+         // remove collinear segments (stroke outline is always closed geometry, so second argument is true)
+         RemoveCollinearSegments(strokeOutline, true);
 
          // triangulate stroke
          var triangulatedStroke = TriangulateSimplePolygon(strokeOutline);
@@ -420,14 +425,19 @@ namespace Adamantium.UI.Media
             case PenLineCap.ConvexTriangle:
             {
                var capPoint0 = basePoint0 + thickness / 2.0 * capDirection;
+
                outline.Add(capPoint0);
 
                break;
             }
             case PenLineCap.ConcaveTriangle:
             {
-               var capPoint0 = basePoint0 - thickness / 2.0 * capDirection;
-               outline.Add(capPoint0);
+               var capPoint1 = basePoint1 + thickness / 2.0 * capDirection;
+               var capPoint2 = basePoint2 + thickness / 2.0 * capDirection;
+               
+               outline.Add(capPoint1);
+               outline.Add(basePoint0);
+               outline.Add(capPoint2);
 
                break;
             }
@@ -443,28 +453,31 @@ namespace Adamantium.UI.Media
             }
             case PenLineCap.ConvexRound:
             {
-               var capPoint1 = basePoint1 + thickness * 0.70 * capDirection;
+               /*var capPoint1 = basePoint1 + thickness * 0.70 * capDirection;
                var capPoint2 = basePoint2 + thickness * 0.70 * capDirection;
-               var roundPoints = MathHelper.GetCubicBezier(basePoint1, capPoint1, capPoint2, basePoint2, SampleRate);
+               var roundPoints = MathHelper.GetCubicBezier(basePoint1, capPoint1, capPoint2, basePoint2, SampleRate);*/
+
+               var roundPoints = MathHelper.GetArcPoints(basePoint1, basePoint2, thickness / 2.0, true, ArcSampleRate);
 
                // remove base points from cap outline - they are already included into stroke outline
                roundPoints.RemoveAt(0);
                roundPoints.RemoveAt(roundPoints.Count - 1);
                
                outline.AddRange(roundPoints);
+
                break;
             }
             case PenLineCap.ConcaveRound:
             {
-               var capPoint1 = basePoint1 - thickness * 0.70 * capDirection;
-               var capPoint2 = basePoint2 - thickness * 0.70 * capDirection;
-               var roundPoints = MathHelper.GetCubicBezier(basePoint1, capPoint1, capPoint2, basePoint2, SampleRate);
+               var capPoint1 = basePoint1 + thickness / 2.0 * capDirection;
+               var capPoint2 = basePoint2 + thickness / 2.0 * capDirection;
 
-               // remove base points from cap outline - they are already included into stroke outline
-               roundPoints.RemoveAt(0);
-               roundPoints.RemoveAt(roundPoints.Count - 1);
-               
+               //var roundPoints = MathHelper.GetCubicBezier(capPoint1, basePoint1, basePoint2, capPoint2, SampleRate);
+
+               var roundPoints = MathHelper.GetArcPoints(capPoint1, capPoint2, thickness / 2.0, false, ArcSampleRate);
+
                outline.AddRange(roundPoints);
+
                break;
             }
             default:
@@ -667,7 +680,7 @@ namespace Adamantium.UI.Media
                   if (intersection != null)
                   {
                      var roundPoints =
-                        MathHelper.GetQuadraticBezier(first.End, (Vector2D)intersection, second.Start, SampleRate);
+                        MathHelper.GetQuadraticBezier(first.End, (Vector2D)intersection, second.Start, BezierSampleRate);
                      strokeOutlinePart.AddRange(roundPoints);
                   }
 
@@ -692,28 +705,46 @@ namespace Adamantium.UI.Media
          
          // due to floating point numbers calculation precision issues we will evaluate against small epsilon, not zero further in the algorithm
          var epsilon = 0.001;
+         var i = 1;
 
-         for (var i = 1; i < strokeOutline.Count; i++)
+         do
          {
+            if (i == strokeOutline.Count) i = 0;
+
+            var prevIndex = i - 1;
             var nextIndex = i + 1;
 
-            if (i == strokeOutline.Count - 1)
+            if (i == 0)
+            {
+               prevIndex = strokeOutline.Count - 1;
+            }
+            else if (i == strokeOutline.Count - 1)
             {
                if (!isClosedGeometry) break;
-               nextIndex = 1;
+               nextIndex = 0;
             }
 
-            var currentSegment = new LineSegment2D(strokeOutline[i - 1], strokeOutline[i]);
+            // zero length line case
+            if (strokeOutline[prevIndex] == strokeOutline[i] ||
+                strokeOutline[i] == strokeOutline[nextIndex])
+            {
+               strokeOutline.RemoveAt(i);
+               continue;
+            }
+
+            var currentSegment = new LineSegment2D(strokeOutline[prevIndex], strokeOutline[i]);
             var nextSegment = new LineSegment2D(strokeOutline[i], strokeOutline[nextIndex]);
-
             var angle = MathHelper.AngleBetween(currentSegment, nextSegment);
-
+            
             if (Math.Abs(0 - angle) <= epsilon ||
                 Math.Abs(360 - angle) <= epsilon)
             {
                strokeOutline.RemoveAt(i);
+               continue;
             }
-         }
+            
+            i++;
+         } while (i != 1);
       }
 
       public override Rect Bounds { get; }

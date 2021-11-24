@@ -887,7 +887,7 @@ namespace Adamantium.Mathematics
             return bezierPoints;
         }
         
-        private static double[] GetArcData(Vector2D start, Vector2D end, double radius, bool clockwise = true)
+        private static (double startAngle, double sweepAngle, Vector2D center) GetArcData(Vector2D start, Vector2D end, double radius, bool clockwise = true)
         {
             var d = new Vector2D((end.X - start.X) * 0.5, (end.Y - start.Y) * 0.5);
             var a = d.Length();
@@ -903,26 +903,29 @@ namespace Adamantium.Mathematics
             var startAngle = Math.Atan2(start.Y - oy, start.X - ox) * 180.0 / Math.PI;
             var sweepAngle = side * 2.0 * Math.Asin(a / radius) * 180.0 / Math.PI;
 
-            return new[] { startAngle, sweepAngle, ox, oy };
+            return (startAngle, sweepAngle, new Vector2D(ox, oy));
         }
 
-        public static Vector2D[] GetArcPoints(Vector2D start, Vector2D end, double radius, bool convex, double sampleRate)
+        public static List<Vector2D> GetArcPoints(Vector2D start, Vector2D end, double radius, bool convex, double sampleRate)
         {
             var points = new List<Vector2D>();
 
-            var arcData = GetArcData(start, end, radius, convex);
+            var (arcStartAngle, arcSweepAngle, arcCenter) = GetArcData(start, end, radius, convex);
 
-            var center = new Vector2D(arcData[2], arcData[3]);
-            var startAngle = Math.Min(arcData[0], arcData[0] + arcData[1]);
-            var endAngle = Math.Max(arcData[0], arcData[0] + arcData[1]);
+            var startAngle = convex ? Math.Min(arcStartAngle, arcStartAngle + arcSweepAngle) : Math.Max(arcStartAngle, arcStartAngle + arcSweepAngle);
+            var endAngle = convex ? Math.Max(arcStartAngle, arcStartAngle + arcSweepAngle) : Math.Min(arcStartAngle, arcStartAngle + arcSweepAngle);
 
-            for (double angle = DegreesToRadians(startAngle); angle <= DegreesToRadians(endAngle); angle += sampleRate) //You are using radians so you will have to increase by a very small amount
+            Func<double, bool> compare = convex ? x => x <= DegreesToRadians(endAngle) : x => x >= DegreesToRadians(endAngle);
+            
+            sampleRate *= convex ? 1 : -1;
+
+            for (double angle = DegreesToRadians(startAngle); compare(angle); angle += sampleRate) //You are using radians so you will have to increase by a very small amount
             {
                 //This will have the coordinates  you want to draw a point at
-                points.Add(new Vector2D((float)(center.X + radius * Math.Cos(angle)), (float)(center.Y + radius * Math.Sin(angle))));
+                points.Add(new Vector2D(arcCenter.X + radius * Math.Cos(angle), arcCenter.Y + radius * Math.Sin(angle)));
             }
 
-            return points.ToArray();
+            return points;
         }
     }
 }
