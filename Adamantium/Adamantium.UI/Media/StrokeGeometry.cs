@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Linq;
 using Adamantium.Core.Collections;
 using Adamantium.Engine.Core;
@@ -27,36 +29,494 @@ namespace Adamantium.UI.Media
 
       private void GenerateStroke(Pen pen, Geometry geometry)
       {
-         pen.PenLineJoin = PenLineJoin.Miter;
+         if (geometry.StrokeMesh.Positions.Length == 0) return;
+         
+         pen.PenLineJoin = PenLineJoin.Bevel;
          //@TODO check concave zero length triangulation
-         pen.StartLineCap = PenLineCap.ConcaveRound;
-         pen.EndLineCap = PenLineCap.ConvexRound;
+         pen.StartLineCap = PenLineCap.Flat;
+         pen.EndLineCap = PenLineCap.Flat;
          var points = geometry.StrokeMesh.Positions;
 
          // for test purposes start
          geometry.IsClosed = false;
          var testSegs = new List<Vector3F>();
 
-         testSegs.Add(new Vector3F(50, 10, 0));
-         testSegs.Add(new Vector3F(60, 10, 0));
-         //testSegs.Add(new Vector3F(260, 10, 0));
-         //testSegs.Add(new Vector3F(155, 180, 0));
-         //testSegs.Add(new Vector3F(200, 195, 0));
-         //testSegs.Add(new Vector3F(100, 295, 0));
-         //testSegs.Add(new Vector3F(90, 310, 0));
+         /*testSegs.Add(new Vector3F(100, 100, 0));
+         testSegs.Add(new Vector3F(200, 100, 0));
+         testSegs.Add(new Vector3F(200, 200, 0));
+         testSegs.Add(new Vector3F(100, 200, 0));*/
+
+         testSegs.Add(new Vector3F(100, 100, 0));
+         testSegs.Add(new Vector3F(200, 100, 0));
 
          points = testSegs.ToArray();
          var zeroLineDir = new LineSegment2D(new Vector2D(0, 0), new Vector2D(0.3, 1)).DirectionNormalized;
          // for test purposes end
 
+         // sanitize geometry - remove equal points
+         var index = 0;
+         bool goOn = true;
+         var pointList = points.ToList();
+         do
+         {
+            var nextIndex = index + 1;
+
+            if (index == pointList.Count - 1)
+            {
+               nextIndex = 0;
+               goOn = false;
+            }
+
+            if (pointList[index] == pointList[nextIndex]) pointList.RemoveAt(nextIndex);
+            else index++;
+         } while (goOn);
+
+         /*points = pointList.ToArray();
+
+         List<Vector3F> vertices;
+         
          if (pen.DashStrokeArray == null || pen.DashStrokeArray.Count == 0)
          {
-            GenerateStroke(points, pen, geometry.IsClosed, zeroLineDir);
+            vertices = GenerateStroke(points, pen, geometry.IsClosed, zeroLineDir);
          }
          else
          {
-            GenerateDashStroke(points, pen, false);
+            vertices = GenerateDashes(points, pen, 10, geometry.IsClosed);
          }
+
+         if (vertices != null && vertices.Count > 0) Mesh.SetPositions(vertices);*/
+
+         var shape1 = new List<LineSegment2D>
+         {
+            new (new Vector2D(100, 100), new Vector2D(200, 100)),
+            new (new Vector2D(200, 100), new Vector2D(200, 200)),
+            new (new Vector2D(200, 200), new Vector2D(100, 200)),
+            new (new Vector2D(100, 200), new Vector2D(100, 100))
+         };
+
+         var shape2 = new List<LineSegment2D>
+         {
+            new (new Vector2D(150, 100), new Vector2D(250, 100)),
+            new (new Vector2D(250, 100), new Vector2D(250, 200)),
+            new (new Vector2D(250, 200), new Vector2D(150, 200)),
+            new (new Vector2D(150, 200), new Vector2D(150, 100))
+         };
+
+         /*var shape1 = new List<Vector2D>
+         {
+            new (100, 100),
+            new (200, 100),
+            new (200, 200),
+            new (100, 200)
+         };
+         
+         var shape2 = new List<Vector2D>
+         {
+            new (150, 100),
+            new (250, 100),
+            new (250, 200),
+            new (150, 200)
+         };
+         
+         var polygon = new Polygon();
+         var polItem1 = new PolygonItem(shape1);
+         var polItem2 = new PolygonItem(shape2);
+         
+         polygon.Polygons.Add(polItem1);
+         polygon.Polygons.Add(polItem2);
+
+         polygon.FillRule = FillRule.NonZero;
+         var res = polygon.Fill();*/
+         
+         
+         
+         testSegs.Clear();
+         
+         /*foreach (var segment in shape1)
+         {
+            testSegs.Add(new Vector3F((float)segment.Start.X, (float)segment.Start.Y, 0));
+            testSegs.Add(new Vector3F((float)segment.End.X, (float)segment.End.Y, 0));
+         }
+
+         foreach (var segment in shape2)
+         {
+            testSegs.Add(new Vector3F((float)segment.Start.X, (float)segment.Start.Y, 0));
+            testSegs.Add(new Vector3F((float)segment.End.X, (float)segment.End.Y, 0));
+         }*/
+
+         var mergedShape = MergeShapes(shape1, shape2);
+         /*var mergedShape = new List<LineSegment2D>();
+         
+         mergedShape.AddRange(shape1);
+         mergedShape.AddRange(shape2);*/
+         
+         /*foreach (var segment in mergedShape)
+         {
+            testSegs.Add(new Vector3F((float)segment.Start.X, (float)segment.Start.Y, 0));
+            testSegs.Add(new Vector3F((float)segment.End.X, (float)segment.End.Y, 0));
+         }*/
+         
+         /*var geometrySegments = new List<LineSegment2D>
+         {
+            new (new Vector2D(100, 100), new Vector2D(200, 100)),
+            new (new Vector2D(200, 100), new Vector2D(300, 200))
+         };
+
+         var mergedShape = new List<LineSegment2D>();
+         
+         foreach (var geometrySegment in geometrySegments)
+         {
+            var strokeCore = GenerateStrokeCore(geometrySegment, pen.Thickness);
+
+            mergedShape = MergeShapes(strokeCore, mergedShape);
+         }*/
+         
+         foreach (var segment in mergedShape)
+         {
+            testSegs.Add(new Vector3F((float)segment.Start.X, (float)segment.Start.Y, 0));
+            testSegs.Add(new Vector3F((float)segment.End.X, (float)segment.End.Y, 0));
+         }
+
+         points = testSegs.ToArray();
+         
+         Mesh.SetPositions(points);
+         Mesh.SetTopology(PrimitiveType.LineList);
+         Mesh.GenerateBasicIndices();
+      }
+
+      private List<LineSegment2D> MergeShapes(List<LineSegment2D> shape1, List<LineSegment2D> shape2)
+      {
+         var mergedShape = new List<LineSegment2D>();
+
+         mergedShape.AddRange(SubtractShape(shape1, shape2));
+         mergedShape.AddRange(SubtractShape(shape2, mergedShape));
+         
+         return mergedShape;
+      }
+
+      private List<LineSegment2D> SubtractShape(List<LineSegment2D> shape, List<LineSegment2D> stencil)
+      {
+         if (stencil == null || stencil.Count == 0) return shape;
+         
+         var subtractedSegments = new List<LineSegment2D>();
+         
+         bool isInsideStencil = false;
+         
+         foreach (var segment in shape)
+         {
+            //@TODO can be optimized if segments are consequent, just check once if we are starting inside or outside stencil, and then just toggle this flag at each intersection
+            isInsideStencil = MathHelper.IsPointInShape(segment.Start, stencil); 
+            var intersections = GetSegmentIntersectionsWithShape(segment, stencil);
+
+            for (var i = 0; i <= intersections.Count; i++, isInsideStencil = !isInsideStencil)
+            {
+               var start = (i == 0) ? segment.Start : (Vector2D)intersections.GetByIndex(i - 1);
+               var end = (i == intersections.Count) ? segment.End : (Vector2D)intersections.GetByIndex(i);
+               
+               if (!isInsideStencil && start != end) subtractedSegments.Add(new LineSegment2D(start, end));
+            }
+         }
+
+         return subtractedSegments;
+      }
+
+      private SortedList GetSegmentIntersectionsWithShape(LineSegment2D segment, List<LineSegment2D> shape)
+      {
+         var sortedIntersections = new SortedList();
+
+         foreach (var shapeSegment in shape)
+         {
+            var shapeSeg = shapeSegment;
+
+            if (!Collision2D.SegmentSegmentIntersection(ref segment, ref shapeSeg, out var intersection)) continue;
+            
+            var length = (intersection - segment.Start).Length();
+            sortedIntersections.Add(length, intersection);
+         }
+
+         return sortedIntersections;
+      }
+
+      private List<LineSegment2D> GenerateStrokeCore(LineSegment2D geometrySegment, double thickness)
+      {
+         var topBottomSegments = GenerateTopBottomSegments(geometrySegment.Start, geometrySegment.End, thickness);
+
+         var strokeCore = new List<LineSegment2D>
+         {
+            topBottomSegments[0],
+            new (topBottomSegments[0].End, topBottomSegments[1].End),
+            new (topBottomSegments[1].End, topBottomSegments[1].Start),
+            new (topBottomSegments[1].Start, topBottomSegments[0].Start)
+         };
+
+         return strokeCore;
+      }
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      private List<Vector3F> GenerateDashes(Vector3F[] points, Pen pen, double offset, bool isGeometryClosed)
+      {
+         var vertices = new List<Vector3F>();
+         var dashesGeometry = SplitGeometryToDashes(points, pen, offset, isGeometryClosed);
+
+         foreach (var dashGeometry in dashesGeometry)
+         {
+            var triangulatedDash = GenerateStroke(dashGeometry.ToArray(), pen, false);
+            
+            if (triangulatedDash != null) vertices.AddRange(triangulatedDash);
+         }
+
+         return vertices;
+      }
+      
+      private double GetGeometryLength(Vector3F[] points, bool isGeometryClosed)
+      {
+         var length = 0.0;
+
+         for (var i = 0; i < points.Length; i++)
+         {
+            var next = i + 1;
+
+            if (i == points.Length - 1)
+            {
+               if (isGeometryClosed) next = 0;
+               else break;
+            }
+
+            var start = (Vector2D)points[i];
+            var end = (Vector2D)points[next];
+
+            length += (end - start).Length();
+         }
+
+         return length;
+      }
+      
+      private List<List<Vector3F>> SplitGeometryToDashes(Vector3F[] points, Pen pen, double offset, bool isGeometryClosed)
+      {
+         var dashesGeometry = new List<List<Vector3F>>(); 
+         
+         var remainingGeometryLength = GetGeometryLength(points, isGeometryClosed);
+
+         // clip the offset if it is too long and is greater then geometry length
+         offset %= remainingGeometryLength;
+
+         var dashArrayIndex = 0;
+         var dashArrayCounter = 0;
+         var dashGeometry = new List<Vector3F>();
+         bool goOn = true;
+
+         var currentPoint = GetPointAlongGeometry(points, 0, (Vector2D)points[0], offset, isGeometryClosed, out var currentSegmentIndex, out var intermediatePointIndices, out var pathLength);
+
+         do
+         {
+            // loop dash array usage
+            if (dashArrayIndex == pen.DashStrokeArray.Count) dashArrayIndex = 0;
+            
+            // determine if this is dash or space, if dash - add first point of dash
+            if (dashArrayCounter % 2 == 0) dashGeometry.Add((Vector3F)currentPoint);
+
+            var currentOffset = pen.DashStrokeArray[dashArrayIndex];
+            
+            // move offset in accordance to line cap endings
+            if (dashArrayCounter % 2 != 0)
+            {
+               // if not flat, add prev dash's end cap width
+               if (pen.EndLineCap != PenLineCap.Flat) currentOffset += pen.Thickness / 2.0;
+               
+               // if not flat, add next dash's start cap width
+               if (pen.StartLineCap != PenLineCap.Flat) currentOffset += pen.Thickness / 2.0;
+            }
+
+            if (currentOffset >= remainingGeometryLength)
+            {
+               goOn = false;
+               currentOffset = remainingGeometryLength;
+            }
+
+            currentPoint = GetPointAlongGeometry(points, currentSegmentIndex, currentPoint, currentOffset, isGeometryClosed, out currentSegmentIndex, out intermediatePointIndices, out pathLength);
+
+            if (dashArrayCounter % 2 == 0)
+            {
+               if (isGeometryClosed)
+               {
+                  dashGeometry.AddRange(intermediatePointIndices.Select(index => points[index]));
+                  dashGeometry.Add((Vector3F)currentPoint);
+                  dashesGeometry.Add(dashGeometry);
+                  dashGeometry = new List<Vector3F>();
+               }
+               else
+               {
+                  foreach (var pointIndex in intermediatePointIndices)
+                  {
+                     dashGeometry.Add(points[pointIndex]);
+                     
+                     if (pointIndex == points.Length - 1)
+                     {
+                        dashesGeometry.Add(dashGeometry);
+                        dashGeometry = new List<Vector3F>();
+                        dashGeometry.Add(points[0]);
+                     }
+                  }
+                  
+                  dashGeometry.Add((Vector3F)currentPoint);
+                  dashesGeometry.Add(dashGeometry);
+                  dashGeometry = new List<Vector3F>();
+               }
+            }
+
+            if (!goOn) break;
+            
+            remainingGeometryLength -= pathLength;
+            dashArrayIndex++;
+            dashArrayCounter++;
+         } while (true);
+
+         // merge last and first dashes only if last dash is not empty space and it's end equals to first dash's start
+         if (dashesGeometry[^1][^1] == dashesGeometry[0][0])
+         {
+            var mergedDash = dashesGeometry.Last();
+            
+            // remove last point of last dash - it is the same as first point of first dash and will be added along with other first dash points
+            mergedDash.RemoveAt(mergedDash.Count - 1);
+            mergedDash.AddRange(dashesGeometry[0]);
+            
+            // rewrite original first dash
+            dashesGeometry[0] = mergedDash;
+            
+            // remove original last dash
+            dashesGeometry.RemoveAt(dashesGeometry.Count - 1);
+         }
+         
+         return dashesGeometry;
+      }
+
+      private Vector2D GetPointAlongGeometry(Vector3F[] points, int startSegmentIndex, Vector2D startPoint, double offsetFromStartPoint, bool isGeometryClosed, out int segmentIndex, out List<int> intermediatePointIndices, out double pathLength)
+      {
+         segmentIndex = startSegmentIndex;
+         intermediatePointIndices = new List<int>();
+         pathLength = 0.0;
+         
+         // if offset is 0 - return start point of geometry
+         if (offsetFromStartPoint == 0) return startPoint;
+         
+         // determine the direction of movement along geometry - positive offset is forward, negative offset is backwards
+         var moveForward = offsetFromStartPoint > 0;
+         offsetFromStartPoint = Math.Abs(offsetFromStartPoint);
+
+         // index of start point of segment on which lies the point with desired offset
+         var index = startSegmentIndex;
+         Vector2D segmentStart;
+         Vector2D segmentEnd;
+
+         bool useStartPoint = true;
+         
+         // determine on which segment lies the point with desired offset
+         do
+         {
+            // loop the cycle according to geometry type and move direction
+            if (isGeometryClosed)
+            {
+               if (moveForward)
+               {
+                  if (index >= points.Length) index = 0;
+               }
+               else
+               {
+                  if (index <= -1) index = points.Length - 1;
+               }
+            }
+            else
+            {
+               if (moveForward)
+               {
+                  if (index >= points.Length - 1) index = 0;
+               }
+               else
+               {
+                  if (index <= 0) index = points.Length - 1;
+               }
+            }
+
+            var nextIndex = index + (moveForward ? 1 : -1);
+
+            if (nextIndex == points.Length) nextIndex = 0;
+            if (nextIndex == -1) nextIndex = points.Length - 1;
+
+            segmentStart = useStartPoint ? startPoint : (Vector2D)points[index];
+            segmentEnd = (Vector2D)points[nextIndex];
+
+            // use start point only at the start of new 'path', so use it only once
+            if (useStartPoint) useStartPoint = false;
+
+            var currentSegmentLength = (segmentEnd - segmentStart).Length();
+            var currentOffsetDiff = offsetFromStartPoint - currentSegmentLength;
+
+            // offset point is directly in the end of current segment, return the end point
+            if (currentOffsetDiff == 0)
+            {
+               segmentIndex = nextIndex;
+               pathLength += currentSegmentLength;
+               return segmentEnd;
+            }
+
+            // we found the segment on which required point lies, break the cycle
+            if (currentOffsetDiff < 0)
+            {
+               if (!moveForward) segmentIndex = nextIndex;
+               pathLength += offsetFromStartPoint;
+               break;
+            }
+
+            offsetFromStartPoint = currentOffsetDiff;
+            segmentIndex = nextIndex;
+            intermediatePointIndices.Add(nextIndex);
+            pathLength += currentSegmentLength;
+            index += (moveForward ? 1 : -1);
+         } while (true);
+
+         return GetPointAlongSegment(segmentStart, segmentEnd, offsetFromStartPoint);
+      }
+
+      private Vector2D GetPointAlongSegment(Vector2D start, Vector2D end, double offsetFromStartOfSegment)
+      {
+         var segment = new LineSegment2D(start, end);
+
+         var direction = segment.DirectionNormalized;
+
+         return start + offsetFromStartOfSegment * direction;
       }
 
       private void GenerateDashStroke(Vector3F[] points, Pen pen, bool isGeometryClosed)
@@ -169,8 +629,8 @@ namespace Adamantium.UI.Media
                   nextIndex = 0;
                }
 
-               GenerateStrokeJoin(currentTopSegments[i], currentTopSegments[nextIndex], sampledTopPart, pen.PenLineJoin);
-               GenerateStrokeJoin(currentBottomSegments[i], currentBottomSegments[nextIndex], sampledBottomPart, pen.PenLineJoin);
+               /*GenerateStrokeJoin(currentTopSegments[i], currentTopSegments[nextIndex], sampledTopPart, pen.PenLineJoin);
+               GenerateStrokeJoin(currentBottomSegments[i], currentBottomSegments[nextIndex], sampledBottomPart, pen.PenLineJoin);*/
             }
 
             sampledTopPart.Add(currentTopSegments[^1].End);
@@ -207,10 +667,10 @@ namespace Adamantium.UI.Media
       /// <param name="pen">Stroke's pen</param>
       /// <param name="isGeometryClosed">Is geometry closed (like triangle, square etc.) or is it just a line</param>
       /// <param name="zeroLengthLineDirection">Direction for the case of zero length line</param>
-      private void GenerateStroke(Vector3F[] points, Pen pen, bool isGeometryClosed, Vector2D? zeroLengthLineDirection = null)
+      private List<Vector3F> GenerateStroke(Vector3F[] points, Pen pen, bool isGeometryClosed, Vector2D? zeroLengthLineDirection = null)
       {
          // check if geometry is valid
-         if (points.Length < 2) return;
+         if (points.Length < 2) return null;
 
          var topSegments = new List<LineSegment2D>();
          var bottomSegments = new List<LineSegment2D>();
@@ -278,9 +738,8 @@ namespace Adamantium.UI.Media
                }
 
                // generate join points for top and bottom outline parts separately
-               GenerateStrokeJoin(topSegments[i], topSegments[nextIndex], sampledStrokeTopOutlinePart, pen.PenLineJoin);
-               GenerateStrokeJoin(bottomSegments[i], bottomSegments[nextIndex], sampledStrokeBottomOutlinePart,
-                  pen.PenLineJoin);
+               GenerateStrokeJoin(topSegments[i], topSegments[nextIndex], sampledStrokeTopOutlinePart, true, pen.PenLineJoin);
+               GenerateStrokeJoin(bottomSegments[i], bottomSegments[nextIndex], sampledStrokeBottomOutlinePart, false, pen.PenLineJoin);
             }
          }
 
@@ -306,11 +765,12 @@ namespace Adamantium.UI.Media
          // triangulate stroke
          var triangulatedStroke = TriangulateSimplePolygon(strokeOutline);
          
-         if (triangulatedStroke == null) return;
+         if (triangulatedStroke == null) return null;
          
          var vertices = new List<Vector3F>();
          vertices.AddRange(triangulatedStroke);
-         Mesh.SetPositions(vertices).Optimize();
+
+         return vertices;
       }
 
       /// <summary>
@@ -600,7 +1060,7 @@ namespace Adamantium.UI.Media
             {
                if (point == p1 || point == p2 || point == p3) continue;
 
-               if (MathHelper.PointInTriangle(point, p1, p2, p3))
+               if (MathHelper.IsPointInTriangle(point, p1, p2, p3))
                {
                   skipPoint = true;
                   break;
@@ -639,9 +1099,10 @@ namespace Adamantium.UI.Media
       /// <param name="first">First of two consecutive stroke outline segments</param>
       /// <param name="second">Second of two consecutive stroke outline segments</param>
       /// <param name="strokeOutlinePart">One of two stroke outline parts - top or bottom, newly generated points will be added here</param>
+      /// <param name="isTopStrokeOutlinePart">Indicates if we are dealing with top stroke outline part</param>
       /// <param name="penLineJoin">Join type</param>
       /// <exception cref="ArgumentException">This exception will be thrown on unhandled join type</exception>
-      private void GenerateStrokeJoin(LineSegment2D first, LineSegment2D second, List<Vector2D> strokeOutlinePart,
+      private void GenerateStrokeJoin(LineSegment2D first, LineSegment2D second, List<Vector2D> strokeOutlinePart, bool isTopStrokeOutlinePart,
          PenLineJoin penLineJoin)
       {
          if (first.End == second.Start)
@@ -654,41 +1115,61 @@ namespace Adamantium.UI.Media
          }
          else
          {
-            switch (penLineJoin)
+            var angle = MathHelper.AngleBetween(first, second);
+
+            // outer case - use PenLineJoin property
+            if ((angle < 180 && isTopStrokeOutlinePart) || (angle > 180 && !isTopStrokeOutlinePart))
             {
-               case PenLineJoin.Bevel:
-                  strokeOutlinePart.Add(first.End);
-                  strokeOutlinePart.Add(second.Start);
-                  break;
-               case PenLineJoin.Miter:
+               switch (penLineJoin)
                {
-                  var intersection = Collision2D.lineLineIntersection(first.Start, first.End, second.Start, second.End);
-
-                  if (intersection != null)
-                  {
+                  case PenLineJoin.Bevel:
                      strokeOutlinePart.Add(first.End);
-                     strokeOutlinePart.Add(RoundVector2D((Vector2D)intersection, doublePrecision));
                      strokeOutlinePart.Add(second.Start);
-                  }
-
-                  break;
-               }
-               case PenLineJoin.Round:
-               {
-                  var intersection = Collision2D.lineLineIntersection(first.Start, first.End, second.Start, second.End);
-
-                  if (intersection != null)
+                     break;
+                  case PenLineJoin.Miter:
                   {
-                     var roundPoints =
-                        MathHelper.GetQuadraticBezier(first.End, (Vector2D)intersection, second.Start, BezierSampleRate);
-                     strokeOutlinePart.AddRange(roundPoints);
-                  }
+                     var intersection =
+                        Collision2D.lineLineIntersection(first.Start, first.End, second.Start, second.End);
 
-                  break;
+                     if (intersection != null)
+                     {
+                        strokeOutlinePart.Add(first.End);
+                        strokeOutlinePart.Add(RoundVector2D((Vector2D) intersection, doublePrecision));
+                        strokeOutlinePart.Add(second.Start);
+                     }
+
+                     break;
+                  }
+                  case PenLineJoin.Round:
+                  {
+                     var intersection =
+                        Collision2D.lineLineIntersection(first.Start, first.End, second.Start, second.End);
+
+                     if (intersection != null)
+                     {
+                        var roundPoints =
+                           MathHelper.GetQuadraticBezier(first.End, (Vector2D) intersection, second.Start,
+                              BezierSampleRate);
+                        strokeOutlinePart.AddRange(roundPoints);
+                     }
+
+                     break;
+                  }
+                  default:
+                     throw new ArgumentException("Unhandled stroke join type");
                }
-               default:
-                  throw new ArgumentException("Unhandled stroke join type");
-                  break;
+            }
+            else // inner case - construct manually
+            {
+               var intersection =
+                  Collision2D.lineLineIntersection(first.Start, first.End, second.Start, second.End);
+
+               if (intersection != null)
+               {
+                  strokeOutlinePart.Add(first.End);
+                  strokeOutlinePart.Add(RoundVector2D((Vector2D) intersection, doublePrecision));
+                  strokeOutlinePart.Add(second.Start);
+               }
             }
          }
       }

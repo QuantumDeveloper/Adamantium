@@ -71,7 +71,7 @@ namespace Adamantium.UI.Playground
             polygon.ClipToBounds = false;
             polygon.StrokeThickness = 20;
             polygon.Stroke = Brushes.Black;
-            polygon.StrokeDashArray = new TrackingCollection<double>() { 20, 40, 0 };
+            //polygon.StrokeDashArray = new TrackingCollection<double>() { 25, 15, 5 };
                 
             grid.Background = Brushes.White;
             //grid.Children.Add(rectangle);

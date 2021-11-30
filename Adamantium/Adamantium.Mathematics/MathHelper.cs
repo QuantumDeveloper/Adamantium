@@ -770,7 +770,7 @@ namespace Adamantium.Mathematics
             return (point.X - end.X) * (start.Y - end.Y) - (start.X - end.X) * (point.Y - end.Y);
         }
 
-        public static bool PointInTriangle (Vector2D pt, Vector2D v1, Vector2D v2, Vector2D v3)
+        public static bool IsPointInTriangle (Vector2D pt, Vector2D v1, Vector2D v2, Vector2D v3)
         {
             double d1 = DeterminePointPosition(pt, v1, v2);
             double d2 = DeterminePointPosition(pt, v2, v3);
@@ -780,6 +780,26 @@ namespace Adamantium.Mathematics
             bool hasPos = (d1 > 0) || (d2 > 0) || (d3 > 0);
 
             return !(hasNeg && hasPos);
+        }
+
+        public static bool IsPointInShape(Vector2D pt, List<LineSegment2D> shape)
+        {
+            bool? side = null;
+            
+            foreach (var segment in shape)
+            {
+                var pos = DeterminePointPosition(pt, segment.Start, segment.End);
+
+                if (pos == 0) continue;
+                
+                var curSide = pos > 0;
+
+                side ??= curSide;
+
+                if ((bool) side ^ curSide) return false;
+            }
+
+            return true;
         }
         
         public static List<Vector2D> GetBSpline2(List<Vector2D> controlPoints, uint resolution)
