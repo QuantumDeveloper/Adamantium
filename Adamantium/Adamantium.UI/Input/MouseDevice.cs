@@ -71,7 +71,7 @@ namespace Adamantium.UI.Input
                 v = v.VisualParent;
             }
 
-            return root.Vector2DToClient(p);
+            return root.PointToClient(p);
         }
 
         public void SetCursor(Cursor cursor)
@@ -101,7 +101,7 @@ namespace Adamantium.UI.Input
 
         public void ProcessEvent(RawMouseEventArgs e)
         {
-            Position = e.RootElement.Vector2DToScreen(e.Position);
+            Position = e.RootElement.PointToScreen(e.Position);
             UpdateButtonStates(e.InputModifiers);
             MouseButtons button = MouseButtons.None;
             switch (e.EventType)

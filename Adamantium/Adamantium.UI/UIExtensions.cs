@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using Adamantium.Mathematics;
-using Adamantium.UI.Media;
 
 namespace Adamantium.UI
 {
@@ -10,7 +9,7 @@ namespace Adamantium.UI
       /// <summary>
       /// Enumerates the ancestors of an <see cref="IUIComponent"/> in the visual tree.
       /// </summary>
-      /// <param name="visualComponent</param>
+      /// <param name="visualComponent"></param>
       /// <returns>The visual's ancestors.</returns>
       public static IEnumerable<IUIComponent> GetVisualAncestors(this IUIComponent visualComponent)
       {
@@ -39,16 +38,16 @@ namespace Adamantium.UI
          return visualComponent.VisualParent as T;
       }
 
-      public static Vector2D Vector2DToClient(this IUIComponent visualComponent, Vector2D Vector2D)
+      public static Vector2D PointToClient(this IUIComponent visualComponent, Vector2D point)
       {
          var pair = GetRootAndAbsolutePosition(visualComponent);
-         return pair.Key.Vector2DToClient(Vector2D + pair.Value);
+         return pair.Key.PointToClient(point + pair.Value);
       }
 
-      public static Vector2D Vector2DToScreen(this IUIComponent visualComponent, Vector2D Vector2D)
+      public static Vector2D PointToScreen(this IUIComponent visualComponent, Vector2D point)
       {
          var pair = GetRootAndAbsolutePosition(visualComponent);
-         return pair.Key.Vector2DToScreen(Vector2D +pair.Value);
+         return pair.Key.PointToScreen(point + pair.Value);
       }
 
       private static KeyValuePair<IRootVisualComponent, Vector2D> GetRootAndAbsolutePosition(this IUIComponent visualComponent)
