@@ -111,7 +111,7 @@ namespace Adamantium.UI.Controls
                }
             }
 
-            child.Arrange(new Rect(new Point(x, y), child.DesiredSize));
+            child.Arrange(new Rect(new Vector2D(x, y), child.DesiredSize));
          }
 
          return finalSize;

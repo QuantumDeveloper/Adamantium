@@ -33,7 +33,7 @@ namespace Adamantium.UI.Controls
         {
             var maxX = Points.Select(x=>x.X).Max();
             var maxY = Points.Select(y=>y.Y).Max();
-            BoundingRectangle = new Rect(new Point(0), new Point(maxX, maxY));
+            BoundingRectangle = new Rect(new Vector2D(0), new Vector2D(maxX, maxY));
             return base.MeasureOverride(availableSize);
         }
 

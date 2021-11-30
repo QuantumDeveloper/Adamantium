@@ -8,14 +8,14 @@ namespace Adamantium.UI.Controls
     public class Polyline : Shape
     {
         public static readonly AdamantiumProperty PointsProperty = AdamantiumProperty.Register(nameof(Points),
-            typeof(TrackingCollection<Point>), typeof(Polygon),
-            new PropertyMetadata(default(Point),
+            typeof(TrackingCollection<Vector2D>), typeof(Polygon),
+            new PropertyMetadata(default(Vector2D),
                 PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure |
                 PropertyMetadataOptions.AffectsArrange | PropertyMetadataOptions.AffectsRender));
         
-        public TrackingCollection<Point> Points
+        public TrackingCollection<Vector2D> Points
         {
-            get => GetValue<TrackingCollection<Point>>(PointsProperty);
+            get => GetValue<TrackingCollection<Vector2D>>(PointsProperty);
             set => SetValue(PointsProperty, value);
         }
         
@@ -23,7 +23,7 @@ namespace Adamantium.UI.Controls
         {
             var maxX = Points.Select(x=>x.X).Max();
             var maxY = Points.Select(y=>y.Y).Max();
-            BoundingRectangle = new Rect(new Point(0), new Point(maxX, maxY));
+            BoundingRectangle = new Rect(new Vector2D(0), new Vector2D(maxX, maxY));
             return base.MeasureOverride(availableSize);
         }
 

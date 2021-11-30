@@ -213,7 +213,7 @@ namespace Adamantium.Mathematics
 
       /// <summary>Changes the position of the rectangle.</summary>
       /// <param name="amount">The values to adjust the position of the rectangle by.</param>
-      public void Offset(Point amount)
+      public void Offset(Vector2D amount)
       {
          Offset((float)amount.X, (float)amount.Y);
       }
@@ -294,7 +294,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="point">Coordinate <see cref="Point"/>.</param>
       /// <returns><c>true</c> if <see cref="Point"/> is inside <see cref="RectangleF"/>, otherwise <c>false</c>.</returns>
-      public bool Contains(Point point)
+      public bool Contains(Vector2D point)
       {
          return Contains((float)point.X, (float)point.Y);
       }

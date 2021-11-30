@@ -7,12 +7,12 @@ namespace Adamantium.UI.Input
 {
    public static class InputExtensions
    {
-      public static IInputElement HitTest(this IInputElement root, Point p)
+      public static IInputElement HitTest(this IInputElement root, Vector2D p)
       {
          return root.GetInputElementsAt(p).FirstOrDefault();
       }
 
-      public static IEnumerable<IInputElement> GetInputElementsAt(this IInputElement root, Point p)
+      public static IEnumerable<IInputElement> GetInputElementsAt(this IInputElement root, Vector2D p)
       {
          
          List<IInputElement> elements = new List<IInputElement>();

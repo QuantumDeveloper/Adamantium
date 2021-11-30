@@ -16,12 +16,12 @@ namespace Adamantium.UI
             
         }
 
-        public override Point PointToClient(Point point)
+        public override Vector2D PointToClient(Vector2D point)
         {
             return ScreenToClient(point);
         }
 
-        public override Point PointToScreen(Point point)
+        public override Vector2D PointToScreen(Vector2D point)
         {
             return ClientToScreen(point);
         }

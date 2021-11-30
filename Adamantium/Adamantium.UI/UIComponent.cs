@@ -25,7 +25,7 @@ namespace Adamantium.UI
         #region Adamantium properties
         
         public static readonly AdamantiumProperty LocationProperty = AdamantiumProperty.Register(nameof(Location),
-            typeof (Point), typeof (UIComponent), new PropertyMetadata(Point.Zero));
+            typeof (Vector2D), typeof (UIComponent), new PropertyMetadata(Vector2D.Zero));
 
         public static readonly AdamantiumProperty RotationProperty = AdamantiumProperty.Register(nameof(Rotation),
             typeof(Double), typeof(UIComponent), new PropertyMetadata((Double)0));
@@ -483,9 +483,9 @@ namespace Adamantium.UI
 
         #region Properties
         
-        public Point Location
+        public Vector2D Location
         {
-            get => GetValue<Point>(LocationProperty);
+            get => GetValue<Vector2D>(LocationProperty);
             set => SetValue(LocationProperty, value);
         }
 
@@ -1500,7 +1500,7 @@ namespace Adamantium.UI
 
       public Rect ClipRectangle { get; internal set; }
 
-      public Point ClipPosition { get; set; }
+      public Vector2D ClipPosition { get; set; }
 
       private IUIComponent visualComponentParent;
 

@@ -126,7 +126,7 @@ namespace Adamantium.Mathematics
       /// <value>
       /// The center.
       /// </value>
-      public Point Center => new Point(X + (Width / 2), Y + (Height / 2));
+      public Vector2D Center => new Vector2D(X + (Width / 2), Y + (Height / 2));
 
 
       /// <summary>

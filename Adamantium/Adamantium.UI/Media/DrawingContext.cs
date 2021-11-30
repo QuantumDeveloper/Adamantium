@@ -160,7 +160,7 @@ namespace Adamantium.UI.Media
          currentContainer?.AddItem(presentationItem);
       }
 
-      public void DrawPolyline(IEnumerable<Point> points, Pen pen)
+      public void DrawPolyline(IEnumerable<Vector2D> points, Pen pen)
       {
          var presentationItem = new UIPresentationItem();
          // StrokeGeometry strokeGeometry = new StrokeGeometry(pen, points, false);

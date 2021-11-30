@@ -11,12 +11,12 @@ namespace Adamantium.UI.Controls
                 PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsRender));
         
         public static readonly AdamantiumProperty ControlPoint1Property = AdamantiumProperty.Register(nameof(ControlPoint1),
-            typeof(BezierLine), typeof(Point),
-            new PropertyMetadata(default(Point), PropertyMetadataOptions.AffectsRender));
+            typeof(BezierLine), typeof(Vector2D),
+            new PropertyMetadata(default(Vector2D), PropertyMetadataOptions.AffectsRender));
         
         public static readonly AdamantiumProperty ControlPoint2Property = AdamantiumProperty.Register(nameof(ControlPoint2),
-            typeof(BezierLine), typeof(Point),
-            new PropertyMetadata(default(Point), PropertyMetadataOptions.AffectsRender));
+            typeof(BezierLine), typeof(Vector2D),
+            new PropertyMetadata(default(Vector2D), PropertyMetadataOptions.AffectsRender));
 
         public BezierType BezierType
         {
@@ -24,23 +24,23 @@ namespace Adamantium.UI.Controls
             set => SetValue(BezierTypeProperty, value);
         }
         
-        public Point ControlPoint1
+        public Vector2D ControlPoint1
         {
-            get => GetValue<Point>(ControlPoint1Property);
+            get => GetValue<Vector2D>(ControlPoint1Property);
             set => SetValue(ControlPoint1Property, value);
         }
         
-        public Point ControlPoint2
+        public Vector2D ControlPoint2
         {
-            get => GetValue<Point>(ControlPoint2Property);
+            get => GetValue<Vector2D>(ControlPoint2Property);
             set => SetValue(ControlPoint2Property, value);
         }
 
         protected override void OnRender(DrawingContext context)
         {
             base.OnRender(context);
-            var start = new Point(X1, Y1);
-            var end = new Point(X2, Y2);
+            var start = new Vector2D(X1, Y1);
+            var end = new Vector2D(X2, Y2);
          
             context.BeginDraw(this);
             //context.DrawLine();

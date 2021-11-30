@@ -5,9 +5,9 @@ namespace Adamantium.UI.Controls.Primitives
 {
    public class DragEventArgs:RoutedEventArgs
    {
-      public Point Change { get; }
+      public Vector2D Change { get; }
 
-      public DragEventArgs(Point changedPoint)
+      public DragEventArgs(Vector2D changedPoint)
       {
          Change = changedPoint;
       }

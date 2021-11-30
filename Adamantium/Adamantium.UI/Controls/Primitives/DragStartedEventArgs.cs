@@ -5,9 +5,9 @@ namespace Adamantium.UI.Controls.Primitives
 {
    public class DragStartedEventArgs:RoutedEventArgs
    {
-      public Point Offset { get; }
+      public Vector2D Offset { get; }
 
-      public DragStartedEventArgs(Point offset)
+      public DragStartedEventArgs(Vector2D offset)
       {
          Offset = offset;
       }

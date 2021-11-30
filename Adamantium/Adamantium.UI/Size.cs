@@ -157,9 +157,9 @@ namespace Adamantium.UI
       /// </summary>
       /// <param name="size"></param>
       /// <returns></returns>
-      public static implicit operator Point(Size size)
+      public static implicit operator Vector2D(Size size)
       {
-         return new Point(size.Width, size.Height);
+         return new Vector2D(size.Width, size.Height);
       }
 
       /// <summary>

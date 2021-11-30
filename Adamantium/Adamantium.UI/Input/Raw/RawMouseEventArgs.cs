@@ -5,7 +5,7 @@ namespace Adamantium.UI.Input.Raw
 {
     public class RawMouseEventArgs : RawInputEventArgs
     {
-        public RawMouseEventArgs(RawMouseEventType eventType, IInputElement rootElement, Point position, InputModifiers modifiers, MouseDevice device, UInt32 timeStep)
+        public RawMouseEventArgs(RawMouseEventType eventType, IInputElement rootElement, Vector2D position, InputModifiers modifiers, MouseDevice device, UInt32 timeStep)
            : base(modifiers, timeStep)
         {
             MouseDevice = device;
@@ -17,6 +17,6 @@ namespace Adamantium.UI.Input.Raw
         public MouseDevice MouseDevice { get; private set; }
         public RawMouseEventType EventType { get; private set; }
         public IInputElement RootElement { get; private set; }
-        public Point Position { get; private set; }
+        public Vector2D Position { get; private set; }
     }
 }

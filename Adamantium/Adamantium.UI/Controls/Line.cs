@@ -69,8 +69,8 @@ namespace Adamantium.UI.Controls
       protected override void OnRender(DrawingContext context)
       {
          base.OnRender(context);
-         var start = new Point(X1, Y1);
-         var end = new Point(X2, Y2);
+         var start = new Vector2D(X1, Y1);
+         var end = new Vector2D(X2, Y2);
          
          context.BeginDraw(this);
          context.DrawLine(start, end, GetPen());

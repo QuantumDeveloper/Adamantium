@@ -84,7 +84,7 @@ namespace Adamantium.UI.Controls.Primitives
       {
       }
 
-      private Point dragStartPoint;
+      private Vector2D dragStartPoint;
 
       public void CancelDrag()
       {
@@ -115,7 +115,7 @@ namespace Adamantium.UI.Controls.Primitives
          e.Handled = true;
          if (IsDragging && e.MouseDevice.LeftButton == MouseButtonState.Pressed)
          {
-            Point delta = e.GetPosition(this) - dragStartPoint;
+            var delta = e.GetPosition(this) - dragStartPoint;
             DragEventArgs args = new DragEventArgs(delta);
             args.RoutedEvent = DragDeltaEvent;
             RaiseEvent(args);
@@ -137,7 +137,7 @@ namespace Adamantium.UI.Controls.Primitives
          e.Handled = true;
          if (IsDragging)
          {
-            Point delta = e.GetPosition(this) - dragStartPoint;
+            var delta = e.GetPosition(this) - dragStartPoint;
             DragCompletedEventArgs args = new DragCompletedEventArgs(delta, false);
             args.RoutedEvent = DragCompletedEvent;
             RaiseEvent(args);

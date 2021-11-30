@@ -1,7 +1,6 @@
 ﻿using System;
 using Adamantium.Engine.Graphics;
 using Adamantium.Mathematics;
-using Point = Adamantium.Mathematics.Point;
 
 namespace Adamantium.UI.Media
 {

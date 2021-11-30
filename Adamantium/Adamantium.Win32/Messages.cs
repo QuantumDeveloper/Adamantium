@@ -32,15 +32,15 @@ namespace Adamantium.Win32
       public static extern uint RegisterWindowMessage(string message);
 
 
-      public static Point PointFromLParam(IntPtr lParam)
+      public static Vector2D PointFromLParam(IntPtr lParam)
       {
          var coordinates = (Environment.Is64BitProcess ? lParam.ToInt64() : lParam.ToInt32());
          int x = unchecked((short)coordinates);
          int y = unchecked((short)(coordinates >> 16));
-         return new Point(x, y);
+         return new Vector2D(x, y);
       }
 
-      public static IntPtr LParamFromPoint(Point p)
+      public static IntPtr LParamFromPoint(Vector2D p)
       {
          int value = ((ushort)p.Y << 16 | (ushort)p.X);
          return new IntPtr(value);

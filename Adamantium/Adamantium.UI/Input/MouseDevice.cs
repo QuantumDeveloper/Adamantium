@@ -28,7 +28,7 @@ namespace Adamantium.UI.Input
 
         public Cursor OverrideCursor { get; set; }
 
-        private Point Position;
+        private Vector2D Position;
 
         private static MouseDevice currentDeice;
         
@@ -58,9 +58,9 @@ namespace Adamantium.UI.Input
             return false;
         }
 
-        public Point GetPosition(IInputElement relativeTo)
+        public Vector2D GetPosition(IInputElement relativeTo)
         {
-            Point p = Position;
+            var p = Position;
             IUIComponent v = relativeTo;
             IUIComponent root = null;
 
@@ -71,7 +71,7 @@ namespace Adamantium.UI.Input
                 v = v.VisualParent;
             }
 
-            return root.PointToClient(p);
+            return root.Vector2DToClient(p);
         }
 
         public void SetCursor(Cursor cursor)
@@ -84,10 +84,9 @@ namespace Adamantium.UI.Input
 
         }
 
-        public Point GetScreenPosition()
+        public Vector2D GetScreenPosition()
         {
-            NativePoint point;
-            Win32Interop.GetCursorPos(out point);
+            Win32Interop.GetCursorPos(out var point);
             return point;
         }
 
@@ -102,7 +101,7 @@ namespace Adamantium.UI.Input
 
         public void ProcessEvent(RawMouseEventArgs e)
         {
-            Position = e.RootElement.PointToScreen(e.Position);
+            Position = e.RootElement.Vector2DToScreen(e.Position);
             UpdateButtonStates(e.InputModifiers);
             MouseButtons button = MouseButtons.None;
             switch (e.EventType)
@@ -251,7 +250,7 @@ namespace Adamantium.UI.Input
             }
         }
 
-        private void RawInputMouseDown(IInputElement rootElement, Point p, uint timestamp, MouseButtons button,
+        private void RawInputMouseDown(IInputElement rootElement, Vector2D p, uint timestamp, MouseButtons button,
            InputModifiers inputModifiers)
         {
             if (FocusManager.Focused != null)
@@ -262,7 +261,7 @@ namespace Adamantium.UI.Input
             }
         }
 
-        private void RawMouseEvent(IInputElement element, Point delta, InputModifiers modifiers, uint timestamp)
+        private void RawMouseEvent(IInputElement element, Vector2D delta, InputModifiers modifiers, uint timestamp)
         {
             if (FocusManager.Focused != null)
             {
@@ -272,7 +271,7 @@ namespace Adamantium.UI.Input
             }
         }
 
-        private void MouseDoubleClick(IInputElement rootElement, Point p, uint timestamp, MouseButtons button, InputModifiers inputModifiers)
+        private void MouseDoubleClick(IInputElement rootElement, Vector2D p, uint timestamp, MouseButtons button, InputModifiers inputModifiers)
         {
             var hit = rootElement.HitTest(p);
             if (hit != null)
@@ -293,7 +292,7 @@ namespace Adamantium.UI.Input
             }
         }
 
-        private void LeaveWindow(IInputElement rootElement, Point p, InputModifiers inputModifiers, uint timestamp)
+        private void LeaveWindow(IInputElement rootElement, Vector2D p, InputModifiers inputModifiers, uint timestamp)
         {
             MouseEventArgs args = new MouseEventArgs(this, inputModifiers, timestamp)
             {
@@ -303,7 +302,7 @@ namespace Adamantium.UI.Input
             DirectlyOver = null;
         }
 
-        private void MouseMove(IInputElement rootElement, Point p, InputModifiers inputModifiers, uint timestamp)
+        private void MouseMove(IInputElement rootElement, Vector2D p, InputModifiers inputModifiers, uint timestamp)
         {
             IInputElement source = null;
 
@@ -323,7 +322,7 @@ namespace Adamantium.UI.Input
             source.RaiseEvent(args);
         }
 
-        private IInputElement SetMouseOver(IInputElement rootElement, Point p, InputModifiers modifiers, uint timestamp)
+        private IInputElement SetMouseOver(IInputElement rootElement, Vector2D p, InputModifiers modifiers, uint timestamp)
         {
             var element = rootElement.HitTest(p);
             return SetMouseOver(rootElement, element, modifiers, timestamp);
@@ -360,7 +359,7 @@ namespace Adamantium.UI.Input
             return DirectlyOver;
         }
 
-        private void MouseDown(IInputElement rootElement, Point p, uint timestamp, MouseButtons button, InputModifiers inputModifiers)
+        private void MouseDown(IInputElement rootElement, Vector2D p, uint timestamp, MouseButtons button, InputModifiers inputModifiers)
         {
             var hit = rootElement.HitTest(p);
 
@@ -386,7 +385,7 @@ namespace Adamantium.UI.Input
             }
         }
 
-        private void MouseUp(IInputElement rootElement, Point p, uint timestamp, MouseButtons button, InputModifiers inputModifiers)
+        private void MouseUp(IInputElement rootElement, Vector2D p, uint timestamp, MouseButtons button, InputModifiers inputModifiers)
         {
             var hit = rootElement.HitTest(p);
 
@@ -428,7 +427,7 @@ namespace Adamantium.UI.Input
             }
         }
 
-        private void MouseWheel(IInputElement rootElement, Point p, InputModifiers modifiers, uint timestemp, Int32 wheelDelta)
+        private void MouseWheel(IInputElement rootElement, Vector2D p, InputModifiers modifiers, uint timestemp, Int32 wheelDelta)
         {
             var hit = rootElement.HitTest(p);
 

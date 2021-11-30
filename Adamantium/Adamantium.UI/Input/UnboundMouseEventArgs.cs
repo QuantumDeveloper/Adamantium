@@ -4,9 +4,9 @@ namespace Adamantium.UI.Input
 {
    public class UnboundMouseEventArgs:MouseEventArgs
    {
-      public Point Delta { get; }
+      public Vector2D Delta { get; }
 
-      public UnboundMouseEventArgs(MouseDevice device, Point mouseDelta, InputModifiers modifiers, uint timestamp) : base(device, modifiers, timestamp)
+      public UnboundMouseEventArgs(MouseDevice device, Vector2D mouseDelta, InputModifiers modifiers, uint timestamp) : base(device, modifiers, timestamp)
       {
          Delta = mouseDelta;
       }
