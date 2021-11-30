@@ -164,8 +164,12 @@ namespace Adamantium.Mathematics
 
                     var bb1 = polygon1.BoundingBox;
                     var bb2 = polygon2.BoundingBox;
-                    var containment1 = polygon1.BoundingBox.Contains(bb2);
-                    var containment2 = polygon2.BoundingBox.Contains(bb1);
+                    // var containment1 = polygon1.BoundingBox.Contains(bb2);
+                    // var containment2 = polygon2.BoundingBox.Contains(bb1);
+                    
+                    var containment1 = polygon1.BoundingBox.Intersects(bb2);
+                    var containment2 = polygon2.BoundingBox.Intersects(bb1);
+
                     if (containment1 || containment2)
                     {
                         canAdd = false;

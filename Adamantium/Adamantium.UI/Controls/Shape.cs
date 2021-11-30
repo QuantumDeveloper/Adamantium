@@ -47,6 +47,10 @@ namespace Adamantium.UI.Controls
       public static readonly AdamantiumProperty StrokeLineJoinProperty =
          AdamantiumProperty.Register(nameof(StrokeLineJoin), typeof(PenLineJoin), typeof(Shape),
             new PropertyMetadata(PenLineJoin.Miter, PropertyMetadataOptions.AffectsRender));
+      
+      public static readonly AdamantiumProperty StrokeDashOffsetProperty =
+         AdamantiumProperty.Register(nameof(StrokeDashOffset), typeof(Double), typeof(Shape),
+            new PropertyMetadata(0d, PropertyMetadataOptions.AffectsRender));
 
       public Brush Fill
       {
@@ -96,6 +100,12 @@ namespace Adamantium.UI.Controls
          set => SetValue(StrokeLineJoinProperty, value);
       }
 
+      public Double StrokeDashOffset
+      {
+         get => GetValue<Double>(StrokeDashOffsetProperty);
+         set => SetValue(StrokeDashOffsetProperty, value);
+      }
+      
       protected Rect BoundingRectangle { get; set; }
 
       private static object CoerceStrokeThickness(AdamantiumComponent adamantiumObject, object baseValue)
@@ -106,6 +116,17 @@ namespace Adamantium.UI.Controls
             return (Double) 0;
          }
          return baseValue;
+      }
+
+      protected Pen GetPen()
+      {
+         return new Pen(
+            Stroke,
+            StrokeThickness,
+            StrokeDashOffset,
+            StrokeDashArray,
+            StartLineCap,
+            EndLineCap);
       }
 
       protected override Size MeasureOverride(Size availableSize)

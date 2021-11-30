@@ -84,36 +84,36 @@ namespace Adamantium.UI.Controls
          var cornerRadius = CornerRadius;
          base.OnRender(context);
          StreamGeometry geometry = new StreamGeometry();
-         /*
-         geometry.context.BeginFigure(new Point(cornerRadius.Left, 0));
+         
+         geometry.context.BeginFigure(new Point(cornerRadius.TopLeft, 0));
 
 
-         geometry.context.LineTo(new Point(size.Width - cornerRadius.Right, 0), borderThickness.Top);
-         if (cornerRadius.Top > 0.0)
-         {
-            geometry.context.QuadraticBezier(new Point(size.Width - cornerRadius.Right, 0), new Point(size.Width, 0),
-               new Point(size.Width, cornerRadius.Top), borderThickness.Right);
-         }
-         geometry.context.LineTo(new Point(size.Width, size.Height - cornerRadius.Right), BorderThickness.Right);
-         if (cornerRadius.Right > 0.0)
-         {
-            geometry.context.QuadraticBezier(new Point(size.Width, size.Height - cornerRadius.Right), new Point(size),
-               new Point(size.Width - cornerRadius.Right, size.Height), borderThickness.Right);
-         }
-         geometry.context.LineTo(new Point(cornerRadius.Bottom, size.Height), BorderThickness.Bottom);
-         if (cornerRadius.Bottom > 0.0)
-         {
-            geometry.context.QuadraticBezier(new Point(cornerRadius.Bottom, size.Height), new Point(0, size.Height),
-               new Point(0, size.Height - cornerRadius.Bottom), borderThickness.Bottom);
-         }
-         geometry.context.LineTo(new Point(0, cornerRadius.Left), borderThickness.Left);
-         if (cornerRadius.Left > 0.0)
-         {
-            geometry.context.QuadraticBezier(new Point(0, cornerRadius.Left), new Point(0, 0),
-               new Point(cornerRadius.Left, 0), borderThickness.Left);
-         }
+         // geometry.context.LineTo(new Point(size.Width - cornerRadius.TopRight, 0), borderThickness.Top);
+         // if (cornerRadius.TopRight > 0.0)
+         // {
+         //    geometry.context.QuadraticBezier(new Point(size.Width - cornerRadius.Right, 0), new Point(size.Width, 0),
+         //       new Point(size.Width, cornerRadius.Top), borderThickness.Right);
+         // }
+         // geometry.context.LineTo(new Point(size.Width, size.Height - cornerRadius.Right), BorderThickness.Right);
+         // if (cornerRadius.Right > 0.0)
+         // {
+         //    geometry.context.QuadraticBezier(new Point(size.Width, size.Height - cornerRadius.Right), new Point(size),
+         //       new Point(size.Width - cornerRadius.Right, size.Height), borderThickness.Right);
+         // }
+         // geometry.context.LineTo(new Point(cornerRadius.Bottom, size.Height), BorderThickness.Bottom);
+         // if (cornerRadius.Bottom > 0.0)
+         // {
+         //    geometry.context.QuadraticBezier(new Point(cornerRadius.Bottom, size.Height), new Point(0, size.Height),
+         //       new Point(0, size.Height - cornerRadius.Bottom), borderThickness.Bottom);
+         // }
+         // geometry.context.LineTo(new Point(0, cornerRadius.Left), borderThickness.Left);
+         // if (cornerRadius.Left > 0.0)
+         // {
+         //    geometry.context.QuadraticBezier(new Point(0, cornerRadius.Left), new Point(0, 0),
+         //       new Point(cornerRadius.Left, 0), borderThickness.Left);
+         // }
 
-         */
+         
          context.BeginDraw(this);
          context.DrawGeometry(BorderBrush, geometry);
          context.DrawRectangle(Background, new Rect(new Point(BorderThickness.Left, BorderThickness.Top), RenderSize.Deflate(BorderThickness)), CornerRadius);

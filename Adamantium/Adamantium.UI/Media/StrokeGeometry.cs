@@ -86,23 +86,23 @@ namespace Adamantium.UI.Media
 
          if (vertices != null && vertices.Count > 0) Mesh.SetPositions(vertices);*/
 
-         var shape1 = new List<LineSegment2D>
-         {
-            new (new Vector2D(100, 100), new Vector2D(200, 100)),
-            new (new Vector2D(200, 100), new Vector2D(200, 200)),
-            new (new Vector2D(200, 200), new Vector2D(100, 200)),
-            new (new Vector2D(100, 200), new Vector2D(100, 100))
-         };
+         // var shape1 = new List<LineSegment2D>
+         // {
+         //    new (new Vector2D(100, 100), new Vector2D(200, 100)),
+         //    new (new Vector2D(200, 100), new Vector2D(200, 200)),
+         //    new (new Vector2D(200, 200), new Vector2D(100, 200)),
+         //    new (new Vector2D(100, 200), new Vector2D(100, 100))
+         // };
+         //
+         // var shape2 = new List<LineSegment2D>
+         // {
+         //    new (new Vector2D(150, 100), new Vector2D(250, 100)),
+         //    new (new Vector2D(250, 100), new Vector2D(250, 200)),
+         //    new (new Vector2D(250, 200), new Vector2D(150, 200)),
+         //    new (new Vector2D(150, 200), new Vector2D(150, 100))
+         // };
 
-         var shape2 = new List<LineSegment2D>
-         {
-            new (new Vector2D(150, 100), new Vector2D(250, 100)),
-            new (new Vector2D(250, 100), new Vector2D(250, 200)),
-            new (new Vector2D(250, 200), new Vector2D(150, 200)),
-            new (new Vector2D(150, 200), new Vector2D(150, 100))
-         };
-
-         /*var shape1 = new List<Vector2D>
+         var shape1 = new List<Vector2D>
          {
             new (100, 100),
             new (200, 100),
@@ -126,7 +126,7 @@ namespace Adamantium.UI.Media
          polygon.Polygons.Add(polItem2);
 
          polygon.FillRule = FillRule.NonZero;
-         var res = polygon.Fill();*/
+         var res = polygon.Fill();
          
          
          
@@ -144,7 +144,7 @@ namespace Adamantium.UI.Media
             testSegs.Add(new Vector3F((float)segment.End.X, (float)segment.End.Y, 0));
          }*/
 
-         var mergedShape = MergeShapes(shape1, shape2);
+         //var mergedShape = MergeShapes(shape1, shape2);
          /*var mergedShape = new List<LineSegment2D>();
          
          mergedShape.AddRange(shape1);
@@ -171,16 +171,16 @@ namespace Adamantium.UI.Media
             mergedShape = MergeShapes(strokeCore, mergedShape);
          }*/
          
-         foreach (var segment in mergedShape)
-         {
-            testSegs.Add(new Vector3F((float)segment.Start.X, (float)segment.Start.Y, 0));
-            testSegs.Add(new Vector3F((float)segment.End.X, (float)segment.End.Y, 0));
-         }
+         // foreach (var segment in mergedShape)
+         // {
+         //    testSegs.Add(new Vector3F((float)segment.Start.X, (float)segment.Start.Y, 0));
+         //    testSegs.Add(new Vector3F((float)segment.End.X, (float)segment.End.Y, 0));
+         // }
 
-         points = testSegs.ToArray();
+         points = res.ToArray();
          
          Mesh.SetPositions(points);
-         Mesh.SetTopology(PrimitiveType.LineList);
+         Mesh.SetTopology(PrimitiveType.TriangleList);
          Mesh.GenerateBasicIndices();
       }
 

@@ -25,8 +25,7 @@ namespace Adamantium.UI.Controls
          base.OnRender(context);
          context.BeginDraw(this);
          var dstRect = Rect.Deflate(StrokeThickness);
-         var pen = new Pen(Stroke, StrokeThickness, StrokeDashArray, StartLineCap, EndLineCap);
-         context.DrawRectangle(Fill, dstRect, CornerRadius, pen);
+         context.DrawRectangle(Fill, dstRect, CornerRadius, GetPen());
          context.EndDraw(this);
 
       }

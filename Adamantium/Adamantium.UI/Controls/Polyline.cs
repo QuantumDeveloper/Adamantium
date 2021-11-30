@@ -5,30 +5,20 @@ using Adamantium.UI.Media;
 
 namespace Adamantium.UI.Controls
 {
-    public class Polygon : Shape
+    public class Polyline : Shape
     {
         public static readonly AdamantiumProperty PointsProperty = AdamantiumProperty.Register(nameof(Points),
-            typeof(TrackingCollection<Vector2D>), typeof(Polygon),
-            new PropertyMetadata(null,
+            typeof(TrackingCollection<Point>), typeof(Polygon),
+            new PropertyMetadata(default(Point),
                 PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure |
                 PropertyMetadataOptions.AffectsArrange | PropertyMetadataOptions.AffectsRender));
-
-        public static readonly AdamantiumProperty FillRuleProperty = AdamantiumProperty.Register(nameof(FillRule),
-            typeof(FillRule), typeof(Polygon),
-            new PropertyMetadata(Mathematics.FillRule.EvenOdd, PropertyMetadataOptions.AffectsRender));
-
-        public TrackingCollection<Vector2D> Points
+        
+        public TrackingCollection<Point> Points
         {
-            get => GetValue<TrackingCollection<Vector2D>>(PointsProperty);
+            get => GetValue<TrackingCollection<Point>>(PointsProperty);
             set => SetValue(PointsProperty, value);
         }
         
-        public FillRule FillRule
-        {
-            get => GetValue<FillRule>(FillRuleProperty);
-            set => SetValue(FillRuleProperty, value);
-        }
-
         protected override Size MeasureOverride(Size availableSize)
         {
             var maxX = Points.Select(x=>x.X).Max();
@@ -42,8 +32,7 @@ namespace Adamantium.UI.Controls
             base.OnRender(context);
             
             context.BeginDraw(this);
-            Geometry geometry = new PolygonGeometry(Points, FillRule); 
-            context.DrawGeometry(Fill, geometry, GetPen());
+            context.DrawPolyline(Points, GetPen());
             context.EndDraw(this);
         }
     }

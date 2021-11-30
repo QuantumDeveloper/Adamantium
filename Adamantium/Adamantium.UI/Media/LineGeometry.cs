@@ -16,15 +16,15 @@ namespace Adamantium.UI.Media
          throw new NotImplementedException();
       }
 
-      public Point StartPosition { get; set; }
+      public Vector2D StartPosition { get; set; }
 
-      public Point EndPosition { get; set; }
+      public Vector2D EndPosition { get; set; }
 
       public LineGeometry()
       {
       }
 
-      public LineGeometry(Point startPoint, Point endPoint, Double thickness)
+      public LineGeometry(Vector2D startPoint, Vector2D endPoint, Double thickness)
       {
          StartPosition = startPoint;
          EndPosition = endPoint;
@@ -36,8 +36,8 @@ namespace Adamantium.UI.Media
       {
          Mesh = Engine.Graphics.Shapes.Line.GenerateGeometry(
             GeometryType.Solid, 
-            StartPosition,
-            EndPosition,
+            (Vector3F)StartPosition,
+            (Vector3F)EndPosition,
             (float)thickness);
       }
    }

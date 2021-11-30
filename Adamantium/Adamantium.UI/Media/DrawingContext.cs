@@ -11,7 +11,7 @@ namespace Adamantium.UI.Media
    {
       internal GraphicsDevice GraphicsDevice { get; }
       
-      private Dictionary<IUIComponent, UIPresentationContainer> visualPresentations;
+      private readonly Dictionary<IUIComponent, UIPresentationContainer> visualPresentations;
 
       private UIPresentationContainer currentContainer;
       private IUIComponent currentComponent;
@@ -137,7 +137,7 @@ namespace Adamantium.UI.Media
          currentContainer?.AddItem(presentationItem);
       }
 
-      public void DrawLine(Brush brush, Point start, Point end, Pen pen)
+      public void DrawLine(Vector2D start, Vector2D end, Pen pen)
       {
          var geometry = new LineGeometry(start, end, pen.Thickness);
          
@@ -155,9 +155,18 @@ namespace Adamantium.UI.Media
             presentationItem.StrokeRenderer = strokeRenderer;
          }
          
-         var uiRenderer = UIComponentRenderer.Create(GraphicsDevice, geometry.Mesh, brush);
-         presentationItem.GeometryRenderer = uiRenderer;
+         // var uiRenderer = UIComponentRenderer.Create(GraphicsDevice, geometry.Mesh, brush);
+         // presentationItem.GeometryRenderer = uiRenderer;
          currentContainer?.AddItem(presentationItem);
+      }
+
+      public void DrawPolyline(IEnumerable<Point> points, Pen pen)
+      {
+         var presentationItem = new UIPresentationItem();
+         // StrokeGeometry strokeGeometry = new StrokeGeometry(pen, points, false);
+         // var strokeRenderer = UIComponentRenderer.Create(GraphicsDevice, strokeGeometry?.Mesh, pen?.Brush);
+         // presentationItem.StrokeRenderer = strokeRenderer;
+         // currentContainer?.AddItem(presentationItem);
       }
 
       public void DrawImage(BitmapSource bitmap, Brush filter, Rect destinationRect, CornerRadius corners)
@@ -193,16 +202,6 @@ namespace Adamantium.UI.Media
          //       textured.Texture = bitmap;
          //    }
          // }
-      }
-
-      public void DrawEmptyRectangle(Brush brush, Rect rect, Thickness borderThickness, Thickness cornerRadius)
-      {
-         
-      }
-
-      public void DrawFilledRectangle(Brush brush, Rect rect, Thickness cornerRadius)
-      {
-
       }
 
    }

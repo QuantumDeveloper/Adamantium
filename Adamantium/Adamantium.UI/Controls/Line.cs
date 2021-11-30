@@ -69,18 +69,11 @@ namespace Adamantium.UI.Controls
       protected override void OnRender(DrawingContext context)
       {
          base.OnRender(context);
-         var newStart = new Point(X1, Y1); //+ Location;
-         var newEnd = new Point(X2, Y2); //+ Location;
+         var start = new Point(X1, Y1);
+         var end = new Point(X2, Y2);
          
-         var pen = new Pen(
-            Stroke,
-            StrokeThickness,
-            StrokeDashArray,
-            StartLineCap,
-            EndLineCap);
-
          context.BeginDraw(this);
-         context.DrawLine(Stroke, newStart, newEnd, pen);
+         context.DrawLine(start, end, GetPen());
          context.EndDraw(this);
       }
    }

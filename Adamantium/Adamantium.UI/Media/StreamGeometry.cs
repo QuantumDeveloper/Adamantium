@@ -6,7 +6,7 @@ using Point = Adamantium.Mathematics.Point;
 
 namespace Adamantium.UI.Media
 {
-   public sealed class StreamGeometry:Geometry
+   public sealed class StreamGeometry : Geometry
    {
       public StreamGeometryContext context;
 
@@ -16,6 +16,7 @@ namespace Adamantium.UI.Media
       }
 
       public override Rect Bounds { get; }
+
       public override Geometry Clone()
       {
          throw new NotImplementedException();

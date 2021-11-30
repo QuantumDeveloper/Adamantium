@@ -79,14 +79,8 @@ namespace Adamantium.UI.Controls
          {
             base.OnRender(context);
             var destRect = Rect.Deflate(StrokeThickness);
-            var pen = new Pen(
-               Stroke,
-               StrokeThickness,
-               StrokeDashArray,
-               StartLineCap,
-               EndLineCap);
             context.BeginDraw(this);
-            context.DrawEllipse(destRect, Fill, StartAngle, StopAngle, pen);
+            context.DrawEllipse(destRect, Fill, StartAngle, StopAngle, GetPen());
             context.EndDraw(this);
          }
       }
