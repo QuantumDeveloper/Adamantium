@@ -942,8 +942,15 @@ namespace Adamantium.Mathematics
             for (double angle = DegreesToRadians(startAngle); compare(angle); angle += sampleRate) //You are using radians so you will have to increase by a very small amount
             {
                 //This will have the coordinates  you want to draw a point at
-                points.Add(new Vector2D(arcCenter.X + radius * Math.Cos(angle), arcCenter.Y + radius * Math.Sin(angle)));
+                var point = new Vector2D(arcCenter.X + radius * Math.Cos(angle),
+                    arcCenter.Y + radius * Math.Sin(angle));
+                point.X = Math.Round(point.X, 4);
+                point.Y = Math.Round(point.Y, 4);
+                points.Add(point);
             }
+            
+            points[0] = start;
+            points[^1] = end;
 
             return points;
         }

@@ -1,10 +1,6 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Collections.Specialized;
 using System.Linq;
-using Adamantium.Core.Collections;
-using Adamantium.Engine.Core;
 using Adamantium.Mathematics;
 
 namespace Adamantium.UI.Media
@@ -15,8 +11,8 @@ namespace Adamantium.UI.Media
       private int lastIndex = 0;
       private const int interrupt = -1;
       private int doublePrecision = 4;
-      internal uint BezierSampleRate { get; set; } = 15;
-      internal double ArcSampleRate { get; set; } = 0.1;
+      public uint BezierSampleRate { get; set; } = 15;
+      public double ArcSampleRate { get; set; } = 0.1;
 
       private struct StrokeSegment
       {
@@ -39,10 +35,10 @@ namespace Adamantium.UI.Media
       {
          if (geometry.StrokeMesh.Positions.Length == 0) return;
          
-         pen.PenLineJoin = PenLineJoin.Bevel;
+         pen.PenLineJoin = PenLineJoin.Round;
          //@TODO check concave zero length triangulation
-         pen.StartLineCap = PenLineCap.ConvexRound;
-         pen.EndLineCap = PenLineCap.ConvexRound;
+         pen.StartLineCap = PenLineCap.Flat;
+         pen.EndLineCap = PenLineCap.Flat;
          var points = geometry.StrokeMesh.Positions;
 
          // for test purposes start
@@ -50,7 +46,8 @@ namespace Adamantium.UI.Media
          var testSegs = new List<Vector3F>();
 
          testSegs.Add(new Vector3F(100, 100, 0));
-         testSegs.Add(new Vector3F(150, 100, 0));
+         testSegs.Add(new Vector3F(105, 100, 0));
+         testSegs.Add(new Vector3F(105, 105, 0));
          
 
          points = testSegs.ToArray();
@@ -481,9 +478,9 @@ namespace Adamantium.UI.Media
             }
             case PenLineCap.ConvexRound:
             {
-               /*var capPoint1 = basePoint1 + thickness * 0.70 * capDirection;
-               var capPoint2 = basePoint2 + thickness * 0.70 * capDirection;
-               var roundPoints = MathHelper.GetCubicBezier(basePoint1, capPoint1, capPoint2, basePoint2, SampleRate);*/
+               // var capPoint1 = basePoint1 + thickness * 0.70 * capDirection;
+               // var capPoint2 = basePoint2 + thickness * 0.70 * capDirection;
+               // var roundPoints = MathHelper.GetCubicBezier(basePoint1, capPoint1, capPoint2, basePoint2, SampleRate);
 
                var roundPoints = MathHelper.GetArcPoints(capBasePoint1, capBasePoint2, thickness / 2.0, true, ArcSampleRate);
 

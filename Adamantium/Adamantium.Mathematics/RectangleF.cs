@@ -315,7 +315,7 @@ namespace Adamantium.Mathematics
       /// <param name="result">[OutAttribute] true if the specified rectangle intersects with this one; false otherwise.</param>
       public void Intersects(ref RectangleF value, out bool result)
       {
-         result = (value.X < Right) && (X < value.Right) && (value.Y < Bottom) && (Y < value.Bottom);
+         result = (value.X <= Right) && (X <= value.Right) && (value.Y <= Bottom) && (Y <= value.Bottom);
       }
 
       /// <summary>
