@@ -32,7 +32,7 @@ namespace Adamantium.MathTests
             points.Add(new Vector2D(20, 0));
 
             Polygon polygon = new Polygon();
-            polygon.Polygons.Add(new PolygonItem(points));
+            polygon.AddItem(new PolygonItem(points));
 
             var timer = Stopwatch.StartNew();
             Assert.IsTrue(Polygon.IsConcave(polygon.MergedSegments), "polygon is not concave");
@@ -319,7 +319,7 @@ namespace Adamantium.MathTests
             points.Add(new Vector2D(-15, -15));
             points.Add(new Vector2D(15, -15));
 
-            polygon.Polygons.Add(new PolygonItem(points));
+            polygon.AddItem(new PolygonItem(points));
 
             polygon.FillRule = FillRule.NonZero;
             var result = polygon.Fill();

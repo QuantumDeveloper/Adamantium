@@ -9,6 +9,9 @@ namespace Adamantium.Mathematics
     /// </summary>
     public class Polygon
     {
+        private readonly HashSet<Vector2D> mergedPointsHash;
+        private readonly List<PolygonItem> polygons;
+
         /// <summary>
         /// Precision level for polygon triangulation
         /// </summary>
@@ -25,24 +28,22 @@ namespace Adamantium.Mathematics
         /// <summary>
         /// Collection of <see cref="PolygonItem"/>
         /// </summary>
-        public List<PolygonItem> Polygons { get; private set; }
+        public IReadOnlyCollection<PolygonItem> Polygons => polygons.AsReadOnly();
 
         /// <summary>
         /// Collection of points from all <see cref="PolygonItem"/>s in current <see cref="Polygon"/>
         /// </summary>
         public List<Vector2D> MergedPoints { get; private set; }
 
-        private readonly HashSet<Vector2D> MergedPointsHash;
-
         /// <summary>
         /// Collection of segments from all <see cref="PolygonItem"/>s in current <see cref="Polygon"/>
         /// </summary>
-        public List<LineSegment2D> MergedSegments { get; private set; }
+        public List<LineSegment2D> MergedSegments { get; private init; }
 
         /// <summary>
         /// Collection of self intersected points from all <see cref="PolygonItem"/>s in current <see cref="Polygon"/>
         /// </summary>
-        public List<Vector2D> SelfIntersectedPoints;
+        public List<Vector2D> SelfIntersectedPoints { get; private init; }
 
         /// <summary>
         /// Defines presence of self intersection
@@ -52,7 +53,7 @@ namespace Adamantium.Mathematics
         /// <summary>
         /// Collection of self intersected segments
         /// </summary>
-        public List<LineSegment2D> SelfIntersectedSegments;
+        public List<LineSegment2D> SelfIntersectedSegments { get; private init; }
 
         /// <summary>
         /// Highest point in polygon 
@@ -72,14 +73,24 @@ namespace Adamantium.Mathematics
         /// </summary>
         public Polygon()
         {
-            Polygons = new List<PolygonItem>();
+            polygons = new List<PolygonItem>();
             MergedPoints = new List<Vector2D>();
-            MergedPointsHash = new HashSet<Vector2D>();
+            mergedPointsHash = new HashSet<Vector2D>();
             MergedSegments = new List<LineSegment2D>();
             SelfIntersectedPoints = new List<Vector2D>();
             SelfIntersectedSegments = new List<LineSegment2D>();
             checkedPolygons = new List<PolygonPair>();
             FillRule = FillRule.EvenOdd;
+        }
+
+        public void AddItem(PolygonItem item)
+        {
+            polygons.Add(item);
+        }
+
+        public void AddItems(params PolygonItem[] items)
+        {
+            polygons.AddRange(items);
         }
         
         /// <summary>
@@ -88,26 +99,29 @@ namespace Adamantium.Mathematics
         /// <returns></returns>
         public List<Vector3F> Fill()
         {
-            Parallel.For(0, Polygons.Count, i =>
+            Parallel.For(0, polygons.Count, i =>
             {
-                Polygons[i].SplitOnSegments();
-                Polygons[i].CheckForSelfIntersection(FillRule);
+                polygons[i].SplitOnSegments();
+                polygons[i].CheckForSelfIntersection(FillRule);
             });
 
-            var polygons = CheckPolygonItemIntersections();
+            var nonIntersectedPolygons = CheckPolygonItemIntersections();
 
             var vertices = new List<Vector3F>();
 
-            Parallel.ForEach(polygons, item =>
+            if (nonIntersectedPolygons.Count > 1)
             {
-                var result1 = TriangulatePolygonItem(item);
-                lock (vertexLocker)
+                Parallel.ForEach(nonIntersectedPolygons, item =>
                 {
-                    vertices.AddRange(result1);
-                }
-            });
+                    var result1 = TriangulatePolygonItem(item);
+                    lock (vertexLocker)
+                    {
+                        vertices.AddRange(result1);
+                    }
+                });
+            }
 
-            if (Polygons.Count > 0)
+            if (polygons.Count > 0)
             {
                 MergePoints();
                 MergeSegments();
@@ -185,9 +199,9 @@ namespace Adamantium.Mathematics
 
             foreach(var p in polygonsList)
             {
-                if (Polygons.Contains(p))
+                if (polygons.Contains(p))
                 {
-                    Polygons.Remove(p);
+                    polygons.Remove(p);
                 }
             }
 
@@ -200,9 +214,9 @@ namespace Adamantium.Mathematics
         private void MergePoints()
         {
             MergedPoints.Clear();
-            for (var i = 0; i < Polygons.Count; ++i)
+            for (var i = 0; i < polygons.Count; ++i)
             {
-                MergedPoints.AddRange(Polygons[i].Points);
+                MergedPoints.AddRange(polygons[i].Points);
             }
         }
 
@@ -212,9 +226,9 @@ namespace Adamantium.Mathematics
         private void MergeSelfIntersectedPoints()
         {
             SelfIntersectedPoints.Clear();
-            for (var i = 0; i < Polygons.Count; ++i)
+            for (var i = 0; i < polygons.Count; ++i)
             {
-                SelfIntersectedPoints.AddRange(Polygons[i].SelfIntersectedPoints);
+                SelfIntersectedPoints.AddRange(polygons[i].SelfIntersectedPoints);
             }
         }
 
@@ -224,9 +238,9 @@ namespace Adamantium.Mathematics
         private void MergeSegments()
         {
             MergedSegments.Clear();
-            for (var i = 0; i < Polygons.Count; ++i)
+            for (var i = 0; i < polygons.Count; ++i)
             {
-                MergedSegments.AddRange(Polygons[i].Segments);
+                MergedSegments.AddRange(polygons[i].Segments);
             }
         }
 
@@ -238,7 +252,7 @@ namespace Adamantium.Mathematics
             SelfIntersectedSegments.Clear();
             for (var i = 0; i < Polygons.Count; ++i)
             {
-                SelfIntersectedSegments.AddRange(Polygons[i].SelfIntersectedSegments);
+                SelfIntersectedSegments.AddRange(polygons[i].SelfIntersectedSegments);
             }
         }
 
@@ -247,18 +261,18 @@ namespace Adamantium.Mathematics
         /// </summary>
         private void CheckPolygonsIntersection()
         {
-            if (Polygons.Count <= 1)
+            if (polygons.Count <= 1)
             {
                 return;
             }
 
             var edgePoints = new List<Vector2D>();
-            for (var i = 0; i < Polygons.Count; i++)
+            for (var i = 0; i < polygons.Count; i++)
             {
-                var polygon1 = Polygons[i];
+                var polygon1 = polygons[i];
                 for (var j = 0; j < Polygons.Count; j++)
                 {
-                    var polygon2 = Polygons[j];
+                    var polygon2 = polygons[j];
                     if (polygon1 == polygon2 || ContainsPolygonPair(polygon1, polygon2))
                     {
                         continue;
@@ -266,15 +280,7 @@ namespace Adamantium.Mathematics
 
                     //Check if polygons are inside each other and if yes, then mark inner as a Hole
                     var intersectionResult = polygon1.IsCompletelyContains(polygon2);
-                    if (intersectionResult == ContainmentType.Contains)
-                    {
-                        polygon2.IsHole = true;
-                    }
-                    else if (polygon2.IsCompletelyContains(polygon1) == ContainmentType.Contains)
-                    {
-                        polygon1.IsHole = true;
-                    }
-
+                    
                     AddPolygonsPairsToList(polygon1, polygon2, intersectionResult);
                 }
             }
@@ -305,7 +311,7 @@ namespace Adamantium.Mathematics
                 // If Non-zero and smallest polygon is not a hole, lets find a list of points describing all possible
                 // connections between smallest and biggest polygons and remove all segments,
                 // which connects any of two intersection points
-                if (FillRule == FillRule.NonZero && intersectionResult == ContainmentType.Intersects && !polygon1.IsHole && !polygon2.IsHole)
+                if (FillRule == FillRule.NonZero && intersectionResult == ContainmentType.Intersects)
                 {
                     var lst = FindAllPossibleIntersections(polygon1, polygon2, edgePoints);
                     RemoveInternalSegments(lst);
@@ -313,9 +319,12 @@ namespace Adamantium.Mathematics
             }
         }
 
-        internal void RemoveInternalSegments(List<Vector2D> interPoints)
+        /// <summary>
+        /// Remove all segments based on intersection points in case of Non-Zero rule
+        /// </summary>
+        /// <param name="interPoints"></param>
+        private void RemoveInternalSegments(List<Vector2D> interPoints)
         {
-            //Remove all segments based on intersection points in case of Non-Zero rule
             if (FillRule != FillRule.NonZero || interPoints.Count <= 0) return;
             for (var i = 0; i < interPoints.Count; i++)
             {
@@ -328,43 +337,11 @@ namespace Adamantium.Mathematics
 
                     if (IsConnected(point1, point2, MergedSegments, out var segment2D))
                     {
-                        if (!IsBelongToPolygonWithHole(ref segment2D))
-                        {
-                            MergedSegments.Remove(segment2D);
-                        }
+                        MergedSegments.Remove(segment2D);
                     }
                 }
             }
             UpdateMergedPoints();
-        }
-
-        /// <summary>
-        /// This method checks if certain segment belongs to polygon which is defined as hole.
-        /// If so, its segment should not be deleted, because it shared between several polygons 
-        /// and could produce incorrect results in cases when one of the polygons intersects 
-        /// with 2 or more polygons for NonZero triangulation rule
-        /// </summary>
-        /// <param name="segment2D"></param>
-        /// <returns></returns>
-        private bool IsBelongToPolygonWithHole(ref LineSegment2D segment2D)
-        {
-            foreach (var polygon in Polygons)
-            {
-                if (!polygon.IsHole)
-                {
-                    continue;
-                }
-
-                foreach (var polygonSegment in polygon.Segments)
-                {
-                    if (polygonSegment == segment2D)
-                    {
-                        return true;
-                    }
-                }
-            }
-
-            return false;
         }
 
         private bool FindEdgeIntersectionPoints(PolygonItem polygon1, PolygonItem polygon2, out List<Vector2D> edgePoints)
@@ -622,57 +599,22 @@ namespace Adamantium.Mathematics
         private void UpdateMergedPoints()
         {
             MergedPoints.Clear();
-            MergedPointsHash.Clear();
+            mergedPointsHash.Clear();
             for (var i = 0; i < MergedSegments.Count; ++i)
             {
                 var segment = MergedSegments[i];
-                if (!MergedPointsHash.Contains(segment.Start))
+                if (!mergedPointsHash.Contains(segment.Start))
                 {
                     MergedPoints.Add(segment.Start);
-                    MergedPointsHash.Add(segment.Start);
+                    mergedPointsHash.Add(segment.Start);
                 }
 
-                if (!MergedPointsHash.Contains(segment.End))
+                if (!mergedPointsHash.Contains(segment.End))
                 {
                     MergedPoints.Add(segment.End);
-                    MergedPointsHash.Add(segment.End);
+                    mergedPointsHash.Add(segment.End);
                 }
             }
-        }
-
-        /// <summary>
-        /// Checks does all points in array belongs to polygon, which forms a hole
-        /// </summary>
-        /// <param name="polygons">Collection of <see cref="PolygonItem"/></param>
-        /// <param name="points">Array of points to check</param>
-        /// <returns>True if all points are belongs to hole polygone, otherwise false</returns>
-        internal static bool PointsInHole(List<PolygonItem> polygons, params Vector2D[] points)
-        {
-            for (var i = 0; i < polygons.Count; ++i)
-            {
-                if (polygons[i].IsHole)
-                {
-                    var polygon = polygons[i];
-                    var cnt = 0;
-                    for (var k = 0; k < points.Length; k++)
-                    {
-                        for (var j = 0; j < polygon.Segments.Count; j++)
-                        {
-                            var segment = polygon.Segments[j];
-                            if (Collision2D.IsPointOnSegment(ref segment, ref points[k]))
-                            {
-                                cnt++;
-                                break;
-                            }
-                        }
-                    }
-                    if (cnt == points.Length)
-                    {
-                        return true;
-                    }
-                }
-            }
-            return false;
         }
 
         /// <summary>

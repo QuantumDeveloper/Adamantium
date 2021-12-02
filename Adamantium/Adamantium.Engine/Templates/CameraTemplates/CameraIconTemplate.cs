@@ -32,10 +32,7 @@ namespace Adamantium.Engine.Templates.Camera
             var ell2 = new PolygonItem(ellipse2.Positions);
             var lens = new PolygonItem(lensPoints);
             polygon.FillRule = FillRule.NonZero;
-            polygon.Polygons.Add(cameraBase);
-            polygon.Polygons.Add(ell1);
-            polygon.Polygons.Add(ell2);
-            polygon.Polygons.Add(lens);
+            polygon.AddItems(cameraBase, ell1,ell2,lens);
             var result = polygon.Fill();
 
             Mesh mesh = new Mesh();

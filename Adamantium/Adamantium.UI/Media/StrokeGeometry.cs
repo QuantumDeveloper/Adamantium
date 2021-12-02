@@ -78,15 +78,33 @@ namespace Adamantium.UI.Media
          
          if (pen.DashStrokeArray == null || pen.DashStrokeArray.Count == 0)
          {
-            polygon.Polygons.AddRange(GenerateStroke(points, pen, geometry.IsClosed, zeroLineDir));
+            //polygon.Polygons.AddRange(GenerateStroke(points, pen, geometry.IsClosed, zeroLineDir));
          }
          else
          {
             //vertices = GenerateDashes(points, pen, 10, geometry.IsClosed);
          }
 
-         if (polygon.Polygons.Count <= 0) return;
-
+         //if (polygon.Polygons.Count <= 0) return;
+         var rect = new Vector2D[]
+         {
+            new Vector2D(100, 100),
+            new Vector2D(300, 100),
+            new Vector2D(300, 300),
+            new Vector2D(100, 300),
+         };
+         var polygonItem = new PolygonItem(rect);
+         
+         var rect2 = new Vector2D[]
+         {
+            new Vector2D(150, 150),
+            new Vector2D(200, 150),
+            new Vector2D(200, 250),
+            new Vector2D(150, 250),
+         };
+         var polygonItem2 = new PolygonItem(rect2);
+         polygon.AddItems(polygonItem, polygonItem2);
+         
          polygon.FillRule = FillRule.NonZero;
          var vertices = polygon.Fill();
          Mesh.SetPositions(vertices).Optimize();

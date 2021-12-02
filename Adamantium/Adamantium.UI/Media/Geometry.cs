@@ -20,8 +20,6 @@ namespace Adamantium.UI.Media
 
       public bool IsClosed { get; set; }
 
-      protected readonly int interrupt = -1;
-
       internal Geometry()
       {
          Mesh = new Mesh();

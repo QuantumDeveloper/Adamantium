@@ -103,11 +103,7 @@ namespace Adamantium.Engine.Templates.Lights
             PolygonItem base1 = new PolygonItem(bulbBasePoints4) { Name = "Base_4" };
 
             Polygon polygon = new Polygon();
-            polygon.Polygons.Add(base1);
-            polygon.Polygons.Add(base2);
-            polygon.Polygons.Add(base3);
-            polygon.Polygons.Add(bulbBase);
-            polygon.Polygons.Add(bulb);
+            polygon.AddItems(base1, base2, base3, bulbBase, bulb);
 
             polygon.FillRule = FillRule.NonZero;
             Stopwatch timer = Stopwatch.StartNew();

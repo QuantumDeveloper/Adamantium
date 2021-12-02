@@ -19,7 +19,7 @@ namespace Adamantium.UI
       public AdamantiumProperty Property { get; set; }
       public Object Value { get; set; }
 
-      public void Apply(FrameworkComponent control)
+      public void  Apply(FrameworkComponent control)
       {
          var binding = Value as BindingBase;
 

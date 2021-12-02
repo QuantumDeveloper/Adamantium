@@ -21,11 +21,6 @@ namespace Adamantium.Mathematics
         /// </summary>
         public bool HasSelfIntersections => SelfIntersectedPoints.Count > 0;
 
-        /// <summary>
-        /// Defines if this polygon creates a hole in <see cref="Polygon"/>
-        /// </summary>
-        public bool IsHole { get; internal set; }
-
         public RectangleF BoundingBox { get; internal set; }
 
         /// <summary>

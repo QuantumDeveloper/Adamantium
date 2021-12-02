@@ -18,7 +18,7 @@ namespace Adamantium.MathTests
             points.Add(new Vector2D(-15, 15));
             points.Add(new Vector2D(15, 15));
 
-            polygon.Polygons.Add(new PolygonItem(points));
+            polygon.AddItem(new PolygonItem(points));
 
             var points2 = new List<Vector2D>();
 
@@ -27,14 +27,14 @@ namespace Adamantium.MathTests
             points2.Add(new Vector2D(2, 10));
             points2.Add(new Vector2D(-6, 10));
 
-            polygon.Polygons.Add(new PolygonItem(points2));
+            polygon.AddItem(new PolygonItem(points2));
 
             points2.Clear();
             points2.Add(new Vector2D(-2, 22));
             points2.Add(new Vector2D(2, 22));
             points2.Add(new Vector2D(2, 10));
             points2.Add(new Vector2D(-2, 10));
-            polygon.Polygons.Add(new PolygonItem(points2));
+            polygon.AddItem(new PolygonItem(points2));
 
             var triangles = polygon.Fill();
 
@@ -158,7 +158,7 @@ namespace Adamantium.MathTests
             points.Add(new Vector2D(-15, 15));
             points.Add(new Vector2D(15, 15));
 
-            polygon.Polygons.Add(new PolygonItem(points));
+            polygon.AddItem(new PolygonItem(points));
 
             var points2 = new List<Vector2D>();
 
@@ -167,14 +167,14 @@ namespace Adamantium.MathTests
             points2.Add(new Vector2D(2, 10));
             points2.Add(new Vector2D(-6, 10));
 
-            polygon.Polygons.Add(new PolygonItem(points2));
+            polygon.AddItem(new PolygonItem(points2));
 
             points2.Clear();
             points2.Add(new Vector2D(-2, 22));
             points2.Add(new Vector2D(2, 22));
             points2.Add(new Vector2D(2, 10f));
             points2.Add(new Vector2D(-2, 10f));
-            polygon.Polygons.Add(new PolygonItem(points2));
+            polygon.AddItem(new PolygonItem(points2));
 
             var triangles = polygon.Fill();
 
@@ -345,7 +345,7 @@ namespace Adamantium.MathTests
             points.Add(new Vector2D(-15, -15));
             points.Add(new Vector2D(15, -15));
 
-            polygon.Polygons.Add(new PolygonItem(points));
+            polygon.AddItem(new PolygonItem(points));
 
             var triangles = polygon.Fill();
 
@@ -472,7 +472,7 @@ namespace Adamantium.MathTests
             points.Add(new Vector2D(-15, -15));
             points.Add(new Vector2D(15, -15));
 
-            polygon.Polygons.Add(new PolygonItem(points));
+            polygon.AddItem(new PolygonItem(points));
 
             var triangles = polygon.Fill();
 

@@ -103,7 +103,7 @@ namespace Adamantium.Engine.Graphics
                 }
 
                 var polygon = new Mathematics.Polygon();
-                polygon.Polygons.Add(new PolygonItem(vertices));
+                polygon.AddItem(new PolygonItem(vertices));
                 var points = polygon.Fill();
 
                 for (int i = 0; i < points.Count; ++i)

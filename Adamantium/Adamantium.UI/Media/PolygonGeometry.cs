@@ -6,6 +6,16 @@ namespace Adamantium.UI.Media
 {
     public class PolygonGeometry : Geometry
     {
+        public static readonly AdamantiumProperty FillRuleProperty = AdamantiumProperty.Register(nameof(FillRule),
+            typeof(FillRule), typeof(PolygonGeometry),
+            new PropertyMetadata(FillRule.EvenOdd, PropertyMetadataOptions.AffectsRender));
+
+        public FillRule FillRule
+        {
+            get => GetValue<FillRule>(FillRuleProperty);
+            set => SetValue(FillRuleProperty, value);
+        }
+        
         public override Rect Bounds { get; }
         public override Geometry Clone()
         {
@@ -14,15 +24,16 @@ namespace Adamantium.UI.Media
 
         public PolygonGeometry(IEnumerable<Vector2D> points, FillRule fillRule)
         {
-            GenerateGeometry(points, fillRule);
+            FillRule = fillRule;
+            GenerateGeometry(points);
         }
 
-        internal void GenerateGeometry(IEnumerable<Vector2D> points, FillRule fillRule)
+        internal void GenerateGeometry(IEnumerable<Vector2D> points)
         {
             var polygonItem = new PolygonItem(points);
             var polygon = new Polygon();
-            polygon.Polygons.Add(polygonItem);
-            polygon.FillRule = fillRule;
+            polygon.AddItem(polygonItem);
+            polygon.FillRule = FillRule;
             var result = polygon.Fill();
             Mesh = new Mesh();
             Mesh.SetPositions(result).GenerateBasicIndices().Optimize();
