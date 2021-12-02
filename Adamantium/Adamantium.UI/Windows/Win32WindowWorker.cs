@@ -369,7 +369,7 @@ namespace Adamantium.UI.Windows
         private IntPtr HandleMouseLeave(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
         {
             trackMouse = false;
-            var eventArgs = new RawMouseEventArgs(RawMouseEventType.LeaveWindow, window, Vector2D.Zero,
+            var eventArgs = new RawMouseEventArgs(RawMouseEventType.LeaveWindow, window, Vector2.Zero,
                WindowsKeyboardDevice.Instance.Modifiers, WindowsMouseDevice.Instance, GetTimeStamp());
             WindowsMouseDevice.Instance.ProcessEvent((RawMouseEventArgs)eventArgs);
             handled = true;
@@ -422,7 +422,7 @@ namespace Adamantium.UI.Windows
                 WindowStyle value = Win32Interop.GetWindowStyle(window.Handle, WindowLongType.Style);
                 if (!window.IsLocked)
                 {
-                    var delta = new Vector2D(inputData.Data.Mouse.LastX, inputData.Data.Mouse.LastY);
+                    var delta = new Vector2(inputData.Data.Mouse.LastX, inputData.Data.Mouse.LastY);
                     if (inputData.Data.Mouse.Data.ButtonFlags != RawMouseButtons.None)
                     {
                         lastRawMouseModifiers = WindowsMouseDevice.GetRawMouseModifiers(inputData.Data.Mouse);

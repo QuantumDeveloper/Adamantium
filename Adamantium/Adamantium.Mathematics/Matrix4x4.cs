@@ -5,22 +5,22 @@ using System.Runtime.InteropServices;
 
 namespace Adamantium.Mathematics
 {
-   public struct Matrix4x4D
+   public struct Matrix4x4
    {
       /// <summary>
-      /// The size of the <see cref="Matrix4x4D"/> type, in bytes.
+      /// The size of the <see cref="Matrix4x4"/> type, in bytes.
       /// </summary>
-      public static readonly int SizeInBytes = 4 * 4 * Marshal.SizeOf(typeof(Matrix4x4D));
+      public static readonly int SizeInBytes = 4 * 4 * Marshal.SizeOf(typeof(Matrix4x4));
 
       /// <summary>
-      /// A <see cref="Matrix4x4D"/> with all of its components set to zero.
+      /// A <see cref="Matrix4x4"/> with all of its components set to zero.
       /// </summary>
-      public static readonly Matrix4x4D Zero = new Matrix4x4D();
+      public static readonly Matrix4x4 Zero = new Matrix4x4();
 
       /// <summary>
-      /// The identity <see cref="Matrix4x4D"/>.
+      /// The identity <see cref="Matrix4x4"/>.
       /// </summary>
-      public static readonly Matrix4x4D Identity = new Matrix4x4D() { M11 = 1.0f, M22 = 1.0f, M33 = 1.0f, M44 = 1.0f };
+      public static readonly Matrix4x4 Identity = new Matrix4x4() { M11 = 1.0f, M22 = 1.0f, M33 = 1.0f, M44 = 1.0f };
 
       /// <summary>
       /// Value at row 1 column 1 of the matrix.
@@ -102,7 +102,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       public double M44;
 
-      public Matrix4x4D(
+      public Matrix4x4(
          double m11,
          double m12,
          double m13,
@@ -139,10 +139,10 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
-      /// Initializes a new instance of the <see cref="Matrix4x4D"/> struct.
+      /// Initializes a new instance of the <see cref="Matrix4x4"/> struct.
       /// </summary>
       /// <param name="value">The value that will be assigned to all components.</param>
-      public Matrix4x4D(double value)
+      public Matrix4x4(double value)
       {
          M11 = M12 = M13 = M14 =
          M21 = M22 = M23 = M24 =
@@ -151,12 +151,12 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
-      /// Initializes a new instance of the <see cref="Matrix4x4D"/> struct.
+      /// Initializes a new instance of the <see cref="Matrix4x4"/> struct.
       /// </summary>
       /// <param name="values">The values to assign to the components of the matrix. This must be an array with sixteen elements.</param>
       /// <exception cref="ArgumentNullException">Thrown when <paramref name="values"/> is <c>null</c>.</exception>
       /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="values"/> contains more or less than sixteen elements.</exception>
-      public Matrix4x4D(double[] values)
+      public Matrix4x4(double[] values)
       {
          if (values == null)
             throw new ArgumentNullException(nameof(values));
@@ -185,13 +185,13 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
-      /// Gets or sets the up <see cref="Vector3D"/> of the matrix; that is M21, M22, and M23.
+      /// Gets or sets the up <see cref="Vector3"/> of the matrix; that is M21, M22, and M23.
       /// </summary>
-      public Vector3D Up
+      public Vector3 Up
       {
          get
          {
-            Vector3D vector3;
+            Vector3 vector3;
             vector3.X = M21;
             vector3.Y = M22;
             vector3.Z = M23;
@@ -206,13 +206,13 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
-      /// Gets or sets the down <see cref="Vector3D"/> of the matrix; that is -M21, -M22, and -M23.
+      /// Gets or sets the down <see cref="Vector3"/> of the matrix; that is -M21, -M22, and -M23.
       /// </summary>
-      public Vector3D Down
+      public Vector3 Down
       {
          get
          {
-            Vector3D vector3;
+            Vector3 vector3;
             vector3.X = -M21;
             vector3.Y = -M22;
             vector3.Z = -M23;
@@ -227,13 +227,13 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
-      /// Gets or sets the right <see cref="Vector3D"/> of the matrix; that is M11, M12, and M13.
+      /// Gets or sets the right <see cref="Vector3"/> of the matrix; that is M11, M12, and M13.
       /// </summary>
-      public Vector3D Right
+      public Vector3 Right
       {
          get
          {
-            Vector3D vector3;
+            Vector3 vector3;
             vector3.X = M11;
             vector3.Y = M12;
             vector3.Z = M13;
@@ -248,13 +248,13 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
-      /// Gets or sets the left <see cref="Vector3D"/> of the matrix; that is -M11, -M12, and -M13.
+      /// Gets or sets the left <see cref="Vector3"/> of the matrix; that is -M11, -M12, and -M13.
       /// </summary>
-      public Vector3D Left
+      public Vector3 Left
       {
          get
          {
-            Vector3D vector3;
+            Vector3 vector3;
             vector3.X = -M11;
             vector3.Y = -M12;
             vector3.Z = -M13;
@@ -269,13 +269,13 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
-      /// Gets or sets the forward <see cref="Vector3D"/> of the matrix; that is -M31, -M32, and -M33.
+      /// Gets or sets the forward <see cref="Vector3"/> of the matrix; that is -M31, -M32, and -M33.
       /// </summary>
-      public Vector3D Forward
+      public Vector3 Forward
       {
          get
          {
-            Vector3D vector3;
+            Vector3 vector3;
             vector3.X = -M31;
             vector3.Y = -M32;
             vector3.Z = -M33;
@@ -290,13 +290,13 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
-      /// Gets or sets the backward <see cref="Vector3D"/> of the matrix; that is M31, M32, and M33.
+      /// Gets or sets the backward <see cref="Vector3"/> of the matrix; that is M31, M32, and M33.
       /// </summary>
-      public Vector3D Backward
+      public Vector3 Backward
       {
          get
          {
-            Vector3D vector3;
+            Vector3 vector3;
             vector3.X = M31;
             vector3.Y = M32;
             vector3.Z = M33;
@@ -313,90 +313,90 @@ namespace Adamantium.Mathematics
       /// <summary>
       /// Gets or sets the first row in the matrix; that is M11, M12, M13, and M14.
       /// </summary>
-      public Vector4D Row1
+      public Vector4 Row1
       {
-         get { return new Vector4D(M11, M12, M13, M14); }
+         get { return new Vector4(M11, M12, M13, M14); }
          set { M11 = value.X; M12 = value.Y; M13 = value.Z; M14 = value.W; }
       }
 
       /// <summary>
       /// Gets or sets the second row in the matrix; that is M21, M22, M23, and M24.
       /// </summary>
-      public Vector4D Row2
+      public Vector4 Row2
       {
-         get { return new Vector4D(M21, M22, M23, M24); }
+         get { return new Vector4(M21, M22, M23, M24); }
          set { M21 = value.X; M22 = value.Y; M23 = value.Z; M24 = value.W; }
       }
 
       /// <summary>
       /// Gets or sets the third row in the matrix; that is M31, M32, M33, and M34.
       /// </summary>
-      public Vector4D Row3
+      public Vector4 Row3
       {
-         get { return new Vector4D(M31, M32, M33, M34); }
+         get { return new Vector4(M31, M32, M33, M34); }
          set { M31 = value.X; M32 = value.Y; M33 = value.Z; M34 = value.W; }
       }
 
       /// <summary>
       /// Gets or sets the fourth row in the matrix; that is M41, M42, M43, and M44.
       /// </summary>
-      public Vector4D Row4
+      public Vector4 Row4
       {
-         get { return new Vector4D(M41, M42, M43, M44); }
+         get { return new Vector4(M41, M42, M43, M44); }
          set { M41 = value.X; M42 = value.Y; M43 = value.Z; M44 = value.W; }
       }
 
       /// <summary>
       /// Gets or sets the first column in the matrix; that is M11, M21, M31, and M41.
       /// </summary>
-      public Vector4D Column1
+      public Vector4 Column1
       {
-         get { return new Vector4D(M11, M21, M31, M41); }
+         get { return new Vector4(M11, M21, M31, M41); }
          set { M11 = value.X; M21 = value.Y; M31 = value.Z; M41 = value.W; }
       }
 
       /// <summary>
       /// Gets or sets the second column in the matrix; that is M12, M22, M32, and M42.
       /// </summary>
-      public Vector4D Column2
+      public Vector4 Column2
       {
-         get { return new Vector4D(M12, M22, M32, M42); }
+         get { return new Vector4(M12, M22, M32, M42); }
          set { M12 = value.X; M22 = value.Y; M32 = value.Z; M42 = value.W; }
       }
 
       /// <summary>
       /// Gets or sets the third column in the matrix; that is M13, M23, M33, and M43.
       /// </summary>
-      public Vector4D Column3
+      public Vector4 Column3
       {
-         get { return new Vector4D(M13, M23, M33, M43); }
+         get { return new Vector4(M13, M23, M33, M43); }
          set { M13 = value.X; M23 = value.Y; M33 = value.Z; M43 = value.W; }
       }
 
       /// <summary>
       /// Gets or sets the fourth column in the matrix; that is M14, M24, M34, and M44.
       /// </summary>
-      public Vector4D Column4
+      public Vector4 Column4
       {
-         get { return new Vector4D(M14, M24, M34, M44); }
+         get { return new Vector4(M14, M24, M34, M44); }
          set { M14 = value.X; M24 = value.Y; M34 = value.Z; M44 = value.W; }
       }
 
       /// <summary>
       /// Gets or sets the translation of the matrix; that is M41, M42, and M43.
       /// </summary>
-      public Vector3D TranslationVector
+      public Vector3 TranslationVector
       {
-         get { return new Vector3D(M41, M42, M43); }
+         get { return new Vector3(M41, M42, M43); }
          set { M41 = value.X; M42 = value.Y; M43 = value.Z; }
       }
 
       /// <summary>
       /// Gets or sets the scale of the matrix; that is M11, M22, and M33.
       /// </summary>
-      public Vector3D ScaleVector
+      public Vector3 ScaleVector
       {
-         get { return new Vector3D(M11, M22, M33); }
+         get { return new Vector3(M11, M22, M33); }
          set { M11 = value.X; M22 = value.Y; M33 = value.Z; }
       }
 
@@ -580,27 +580,27 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="Q">When the method completes, contains the orthonormalized matrix of the decomposition.</param>
       /// <param name="R">When the method completes, contains the right triangular matrix of the decomposition.</param>
-      public void DecomposeQR(out Matrix4x4D Q, out Matrix4x4D R)
+      public void DecomposeQR(out Matrix4x4 Q, out Matrix4x4 R)
       {
-         Matrix4x4D temp = this;
+         Matrix4x4 temp = this;
          temp.Transpose();
          Orthonormalize(ref temp, out Q);
          Q.Transpose();
 
-         R = new Matrix4x4D();
-         R.M11 = Vector4D.Dot(Q.Column1, Column1);
-         R.M12 = Vector4D.Dot(Q.Column1, Column2);
-         R.M13 = Vector4D.Dot(Q.Column1, Column3);
-         R.M14 = Vector4D.Dot(Q.Column1, Column4);
+         R = new Matrix4x4();
+         R.M11 = Vector4.Dot(Q.Column1, Column1);
+         R.M12 = Vector4.Dot(Q.Column1, Column2);
+         R.M13 = Vector4.Dot(Q.Column1, Column3);
+         R.M14 = Vector4.Dot(Q.Column1, Column4);
 
-         R.M22 = Vector4D.Dot(Q.Column2, Column2);
-         R.M23 = Vector4D.Dot(Q.Column2, Column3);
-         R.M24 = Vector4D.Dot(Q.Column2, Column4);
+         R.M22 = Vector4.Dot(Q.Column2, Column2);
+         R.M23 = Vector4.Dot(Q.Column2, Column3);
+         R.M24 = Vector4.Dot(Q.Column2, Column4);
 
-         R.M33 = Vector4D.Dot(Q.Column3, Column3);
-         R.M34 = Vector4D.Dot(Q.Column3, Column4);
+         R.M33 = Vector4.Dot(Q.Column3, Column3);
+         R.M34 = Vector4.Dot(Q.Column3, Column4);
 
-         R.M44 = Vector4D.Dot(Q.Column4, Column4);
+         R.M44 = Vector4.Dot(Q.Column4, Column4);
       }
 
       /// <summary>
@@ -608,24 +608,24 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="L">When the method completes, contains the lower triangular matrix of the decomposition.</param>
       /// <param name="Q">When the method completes, contains the orthonormalized matrix of the decomposition.</param>
-      public void DecomposeLQ(out Matrix4x4D L, out Matrix4x4D Q)
+      public void DecomposeLQ(out Matrix4x4 L, out Matrix4x4 Q)
       {
          Orthonormalize(ref this, out Q);
 
-         L = new Matrix4x4D();
-         L.M11 = Vector4D.Dot(Q.Row1, Row1);
+         L = new Matrix4x4();
+         L.M11 = Vector4.Dot(Q.Row1, Row1);
 
-         L.M21 = Vector4D.Dot(Q.Row1, Row2);
-         L.M22 = Vector4D.Dot(Q.Row2, Row2);
+         L.M21 = Vector4.Dot(Q.Row1, Row2);
+         L.M22 = Vector4.Dot(Q.Row2, Row2);
 
-         L.M31 = Vector4D.Dot(Q.Row1, Row3);
-         L.M32 = Vector4D.Dot(Q.Row2, Row3);
-         L.M33 = Vector4D.Dot(Q.Row3, Row3);
+         L.M31 = Vector4.Dot(Q.Row1, Row3);
+         L.M32 = Vector4.Dot(Q.Row2, Row3);
+         L.M33 = Vector4.Dot(Q.Row3, Row3);
 
-         L.M41 = Vector4D.Dot(Q.Row1, Row4);
-         L.M42 = Vector4D.Dot(Q.Row2, Row4);
-         L.M43 = Vector4D.Dot(Q.Row3, Row4);
-         L.M44 = Vector4D.Dot(Q.Row4, Row4);
+         L.M41 = Vector4.Dot(Q.Row1, Row4);
+         L.M42 = Vector4.Dot(Q.Row2, Row4);
+         L.M43 = Vector4.Dot(Q.Row3, Row4);
+         L.M44 = Vector4.Dot(Q.Row4, Row4);
       }
 
       /// <summary>
@@ -637,7 +637,7 @@ namespace Adamantium.Mathematics
       /// <remarks>
       /// This method is designed to decompose an SRT transformation matrix only.
       /// </remarks>
-      public bool Decompose(out Vector3D scale, out QuaternionD rotation, out Vector3D translation)
+      public bool Decompose(out Vector3 scale, out Quaternion rotation, out Vector3 translation)
       {
          //Source: Unknown
          //References: http://www.gamedev.net/community/forums/topic.asp?topic_id=441695
@@ -657,12 +657,12 @@ namespace Adamantium.Mathematics
              MathHelper.IsZero(scale.Y) ||
              MathHelper.IsZero(scale.Z))
          {
-            rotation = QuaternionD.Identity;
+            rotation = Quaternion.Identity;
             return false;
          }
 
          //The rotation is the left over matrix after dividing out the scaling.
-         Matrix4x4D rotationmatrix = new Matrix4x4D();
+         Matrix4x4 rotationmatrix = new Matrix4x4();
          rotationmatrix.M11 = M11 / scale.X;
          rotationmatrix.M12 = M12 / scale.X;
          rotationmatrix.M13 = M13 / scale.X;
@@ -677,7 +677,7 @@ namespace Adamantium.Mathematics
 
          rotationmatrix.M44 = 1f;
 
-         QuaternionD.RotationMatrix(ref rotationmatrix, out rotation);
+         Quaternion.RotationMatrix(ref rotationmatrix, out rotation);
          return true;
       }
 
@@ -691,7 +691,7 @@ namespace Adamantium.Mathematics
       /// <remarks>
       /// This method is designed to decompose only an SRT transformation matrix that has the same scale in every axis.
       /// </remarks>
-      public bool DecomposeUniformScale(out double scale, out QuaternionD rotation, out Vector3D translation)
+      public bool DecomposeUniformScale(out double scale, out Quaternion rotation, out Vector3 translation)
       {
          //Get the translation.
          translation.X = this.M41;
@@ -705,12 +705,12 @@ namespace Adamantium.Mathematics
          //If any of the scaling factors are zero, then the rotation matrix can not exist.
          if (Math.Abs(scale) < MathHelper.ZeroToleranceF)
          {
-            rotation = QuaternionD.Identity;
+            rotation = Quaternion.Identity;
             return false;
          }
 
          //The rotation is the left over matrix after dividing out the scaling.
-         Matrix4x4D rotationmatrix = new Matrix4x4D();
+         Matrix4x4 rotationmatrix = new Matrix4x4();
          rotationmatrix.M11 = M11 * inv_scale;
          rotationmatrix.M12 = M12 * inv_scale;
          rotationmatrix.M13 = M13 * inv_scale;
@@ -725,7 +725,7 @@ namespace Adamantium.Mathematics
 
          rotationmatrix.M44 = 1f;
 
-         QuaternionD.RotationMatrix(ref rotationmatrix, out rotation);
+         Quaternion.RotationMatrix(ref rotationmatrix, out rotation);
          return true;
       }
 
@@ -814,7 +814,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first matrix to add.</param>
       /// <param name="right">The second matrix to add.</param>
       /// <param name="result">When the method completes, contains the sum of the two matrices.</param>
-      public static void Add(ref Matrix4x4D left, ref Matrix4x4D right, out Matrix4x4D result)
+      public static void Add(ref Matrix4x4 left, ref Matrix4x4 right, out Matrix4x4 result)
       {
          result.M11 = left.M11 + right.M11;
          result.M12 = left.M12 + right.M12;
@@ -840,9 +840,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first matrix to add.</param>
       /// <param name="right">The second matrix to add.</param>
       /// <returns>The sum of the two matrices.</returns>
-      public static Matrix4x4D Add(Matrix4x4D left, Matrix4x4D right)
+      public static Matrix4x4 Add(Matrix4x4 left, Matrix4x4 right)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          Add(ref left, ref right, out result);
          return result;
       }
@@ -853,7 +853,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first matrix to subtract.</param>
       /// <param name="right">The second matrix to subtract.</param>
       /// <param name="result">When the method completes, contains the difference between the two matrices.</param>
-      public static void Subtract(ref Matrix4x4D left, ref Matrix4x4D right, out Matrix4x4D result)
+      public static void Subtract(ref Matrix4x4 left, ref Matrix4x4 right, out Matrix4x4 result)
       {
          result.M11 = left.M11 - right.M11;
          result.M12 = left.M12 - right.M12;
@@ -879,9 +879,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first matrix to subtract.</param>
       /// <param name="right">The second matrix to subtract.</param>
       /// <returns>The difference between the two matrices.</returns>
-      public static Matrix4x4D Subtract(Matrix4x4D left, Matrix4x4D right)
+      public static Matrix4x4 Subtract(Matrix4x4 left, Matrix4x4 right)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          Subtract(ref left, ref right, out result);
          return result;
       }
@@ -892,7 +892,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">The matrix to scale.</param>
       /// <param name="right">The amount by which to scale.</param>
       /// <param name="result">When the method completes, contains the scaled matrix.</param>
-      public static void Multiply(ref Matrix4x4D left, double right, out Matrix4x4D result)
+      public static void Multiply(ref Matrix4x4 left, double right, out Matrix4x4 result)
       {
          result.M11 = left.M11 * right;
          result.M12 = left.M12 * right;
@@ -918,9 +918,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The matrix to scale.</param>
       /// <param name="right">The amount by which to scale.</param>
       /// <returns>The scaled matrix.</returns>
-      public static Matrix4x4D Multiply(Matrix4x4D left, double right)
+      public static Matrix4x4 Multiply(Matrix4x4 left, double right)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          Multiply(ref left, right, out result);
          return result;
       }
@@ -931,9 +931,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first matrix to multiply.</param>
       /// <param name="right">The second matrix to multiply.</param>
       /// <param name="result">The product of the two matrices.</param>
-      public static void Multiply(ref Matrix4x4D left, ref Matrix4x4D right, out Matrix4x4D result)
+      public static void Multiply(ref Matrix4x4 left, ref Matrix4x4 right, out Matrix4x4 result)
       {
-         Matrix4x4D temp = new Matrix4x4D();
+         Matrix4x4 temp = new Matrix4x4();
          temp.M11 = (left.M11 * right.M11) + (left.M12 * right.M21) + (left.M13 * right.M31) + (left.M14 * right.M41);
          temp.M12 = (left.M11 * right.M12) + (left.M12 * right.M22) + (left.M13 * right.M32) + (left.M14 * right.M42);
          temp.M13 = (left.M11 * right.M13) + (left.M12 * right.M23) + (left.M13 * right.M33) + (left.M14 * right.M43);
@@ -959,9 +959,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first matrix to multiply.</param>
       /// <param name="right">The second matrix to multiply.</param>
       /// <returns>The product of the two matrices.</returns>
-      public static Matrix4x4D Multiply(Matrix4x4D left, Matrix4x4D right)
+      public static Matrix4x4 Multiply(Matrix4x4 left, Matrix4x4 right)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          Multiply(ref left, ref right, out result);
          return result;
       }
@@ -972,7 +972,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">The matrix to scale.</param>
       /// <param name="right">The amount by which to scale.</param>
       /// <param name="result">When the method completes, contains the scaled matrix.</param>
-      public static void Divide(ref Matrix4x4D left, double right, out Matrix4x4D result)
+      public static void Divide(ref Matrix4x4 left, double right, out Matrix4x4 result)
       {
          double inv = 1.0f / right;
 
@@ -1000,9 +1000,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The matrix to scale.</param>
       /// <param name="right">The amount by which to scale.</param>
       /// <returns>The scaled matrix.</returns>
-      public static Matrix4x4D Divide(Matrix4x4D left, double right)
+      public static Matrix4x4 Divide(Matrix4x4 left, double right)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          Divide(ref left, right, out result);
          return result;
       }
@@ -1013,7 +1013,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first matrix to divide.</param>
       /// <param name="right">The second matrix to divide.</param>
       /// <param name="result">When the method completes, contains the quotient of the two matrices.</param>
-      public static void Divide(ref Matrix4x4D left, ref Matrix4x4D right, out Matrix4x4D result)
+      public static void Divide(ref Matrix4x4 left, ref Matrix4x4 right, out Matrix4x4 result)
       {
          result.M11 = left.M11 / right.M11;
          result.M12 = left.M12 / right.M12;
@@ -1039,9 +1039,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first matrix to divide.</param>
       /// <param name="right">The second matrix to divide.</param>
       /// <returns>The quotient of the two matrices.</returns>
-      public static Matrix4x4D Divide(Matrix4x4D left, Matrix4x4D right)
+      public static Matrix4x4 Divide(Matrix4x4 left, Matrix4x4 right)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          Divide(ref left, ref right, out result);
          return result;
       }
@@ -1053,7 +1053,7 @@ namespace Adamantium.Mathematics
       /// <param name="exponent">The exponent to raise the matrix to.</param>
       /// <param name="result">When the method completes, contains the exponential matrix.</param>
       /// <exception cref="System.ArgumentOutOfRangeException">Thrown when the <paramref name="exponent"/> is negative.</exception>
-      public static void Exponent(ref Matrix4x4D value, int exponent, out Matrix4x4D result)
+      public static void Exponent(ref Matrix4x4 value, int exponent, out Matrix4x4 result)
       {
          //Source: http://rosettacode.org
          //Reference: http://rosettacode.org/wiki/Matrix4x4D-exponentiation_operator
@@ -1063,7 +1063,7 @@ namespace Adamantium.Mathematics
 
          if (exponent == 0)
          {
-            result = Matrix4x4D.Identity;
+            result = Matrix4x4.Identity;
             return;
          }
 
@@ -1073,8 +1073,8 @@ namespace Adamantium.Mathematics
             return;
          }
 
-         Matrix4x4D identity = Matrix4x4D.Identity;
-         Matrix4x4D temp = value;
+         Matrix4x4 identity = Matrix4x4.Identity;
+         Matrix4x4 temp = value;
 
          while (true)
          {
@@ -1099,9 +1099,9 @@ namespace Adamantium.Mathematics
       /// <param name="exponent">The exponent to raise the matrix to.</param>
       /// <returns>The exponential matrix.</returns>
       /// <exception cref="System.ArgumentOutOfRangeException">Thrown when the <paramref name="exponent"/> is negative.</exception>
-      public static Matrix4x4D Exponent(Matrix4x4D value, int exponent)
+      public static Matrix4x4 Exponent(Matrix4x4 value, int exponent)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          Exponent(ref value, exponent, out result);
          return result;
       }
@@ -1111,7 +1111,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The matrix to be negated.</param>
       /// <param name="result">When the method completes, contains the negated matrix.</param>
-      public static void Negate(ref Matrix4x4D value, out Matrix4x4D result)
+      public static void Negate(ref Matrix4x4 value, out Matrix4x4 result)
       {
          result.M11 = -value.M11;
          result.M12 = -value.M12;
@@ -1136,9 +1136,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The matrix to be negated.</param>
       /// <returns>The negated matrix.</returns>
-      public static Matrix4x4D Negate(Matrix4x4D value)
+      public static Matrix4x4 Negate(Matrix4x4 value)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          Negate(ref value, out result);
          return result;
       }
@@ -1153,7 +1153,7 @@ namespace Adamantium.Mathematics
       /// <remarks>
       /// Passing <paramref name="amount"/> a value of 0 will cause <paramref name="start"/> to be returned; a value of 1 will cause <paramref name="end"/> to be returned. 
       /// </remarks>
-      public static void Lerp(ref Matrix4x4D start, ref Matrix4x4D end, double amount, out Matrix4x4D result)
+      public static void Lerp(ref Matrix4x4 start, ref Matrix4x4 end, double amount, out Matrix4x4 result)
       {
          result.M11 = MathHelper.Lerp(start.M11, end.M11, amount);
          result.M12 = MathHelper.Lerp(start.M12, end.M12, amount);
@@ -1183,9 +1183,9 @@ namespace Adamantium.Mathematics
       /// <remarks>
       /// Passing <paramref name="amount"/> a value of 0 will cause <paramref name="start"/> to be returned; a value of 1 will cause <paramref name="end"/> to be returned. 
       /// </remarks>
-      public static Matrix4x4D Lerp(Matrix4x4D start, Matrix4x4D end, double amount)
+      public static Matrix4x4 Lerp(Matrix4x4 start, Matrix4x4 end, double amount)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          Lerp(ref start, ref end, amount, out result);
          return result;
       }
@@ -1197,7 +1197,7 @@ namespace Adamantium.Mathematics
       /// <param name="end">End matrix.</param>
       /// <param name="amount">Value between 0 and 1 indicating the weight of <paramref name="end"/>.</param>
       /// <param name="result">When the method completes, contains the cubic interpolation of the two matrices.</param>
-      public static void SmoothStep(ref Matrix4x4D start, ref Matrix4x4D end, double amount, out Matrix4x4D result)
+      public static void SmoothStep(ref Matrix4x4 start, ref Matrix4x4 end, double amount, out Matrix4x4 result)
       {
          amount = MathHelper.SmoothStep(amount);
          Lerp(ref start, ref end, amount, out result);
@@ -1210,9 +1210,9 @@ namespace Adamantium.Mathematics
       /// <param name="end">End matrix.</param>
       /// <param name="amount">Value between 0 and 1 indicating the weight of <paramref name="end"/>.</param>
       /// <returns>The cubic interpolation of the two matrices.</returns>
-      public static Matrix4x4D SmoothStep(Matrix4x4D start, Matrix4x4D end, double amount)
+      public static Matrix4x4 SmoothStep(Matrix4x4 start, Matrix4x4 end, double amount)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          SmoothStep(ref start, ref end, amount, out result);
          return result;
       }
@@ -1222,9 +1222,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The matrix whose transpose is to be calculated.</param>
       /// <param name="result">When the method completes, contains the transpose of the specified matrix.</param>
-      public static void Transpose(ref Matrix4x4D value, out Matrix4x4D result)
+      public static void Transpose(ref Matrix4x4 value, out Matrix4x4 result)
       {
-         Matrix4x4D temp = new Matrix4x4D();
+         Matrix4x4 temp = new Matrix4x4();
          temp.M11 = value.M11;
          temp.M12 = value.M21;
          temp.M13 = value.M31;
@@ -1250,7 +1250,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The matrix whose transpose is to be calculated.</param>
       /// <param name="result">When the method completes, contains the transpose of the specified matrix.</param>
-      public static void TransposeByRef(ref Matrix4x4D value, ref Matrix4x4D result)
+      public static void TransposeByRef(ref Matrix4x4 value, ref Matrix4x4 result)
       {
          result.M11 = value.M11;
          result.M12 = value.M21;
@@ -1275,9 +1275,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The matrix whose transpose is to be calculated.</param>
       /// <returns>The transpose of the specified matrix.</returns>
-      public static Matrix4x4D Transpose(Matrix4x4D value)
+      public static Matrix4x4 Transpose(Matrix4x4 value)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          Transpose(ref value, out result);
          return result;
       }
@@ -1287,7 +1287,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The matrix whose inverse is to be calculated.</param>
       /// <param name="result">When the method completes, contains the inverse of the specified matrix.</param>
-      public static void Invert(ref Matrix4x4D value, out Matrix4x4D result)
+      public static void Invert(ref Matrix4x4 value, out Matrix4x4 result)
       {
          double b0 = (value.M31 * value.M42) - (value.M32 * value.M41);
          double b1 = (value.M31 * value.M43) - (value.M33 * value.M41);
@@ -1304,7 +1304,7 @@ namespace Adamantium.Mathematics
          double det = value.M11 * d11 - value.M12 * d12 + value.M13 * d13 - value.M14 * d14;
          if (Math.Abs(det) == 0.0f)
          {
-            result = Matrix4x4D.Zero;
+            result = Matrix4x4.Zero;
             return;
          }
 
@@ -1343,7 +1343,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The matrix whose inverse is to be calculated.</param>
       /// <returns>The inverse of the specified matrix.</returns>
-      public static Matrix4x4D Invert(Matrix4x4D value)
+      public static Matrix4x4 Invert(Matrix4x4 value)
       {
          value.Invert();
          return value;
@@ -1365,7 +1365,7 @@ namespace Adamantium.Mathematics
       /// If you wish for this operation to be performed on the columns, first transpose the
       /// input and than transpose the output.</para>
       /// </remarks>
-      public static void Orthogonalize(ref Matrix4x4D value, out Matrix4x4D result)
+      public static void Orthogonalize(ref Matrix4x4 value, out Matrix4x4 result)
       {
          //Uses the modified Gram-Schmidt process.
          //q1 = m1
@@ -1376,14 +1376,14 @@ namespace Adamantium.Mathematics
          //By separating the above algorithm into multiple lines, we actually increase accuracy.
          result = value;
 
-         result.Row2 = result.Row2 - (Vector4D.Dot(result.Row1, result.Row2) / Vector4D.Dot(result.Row1, result.Row1)) * result.Row1;
+         result.Row2 = result.Row2 - (Vector4.Dot(result.Row1, result.Row2) / Vector4.Dot(result.Row1, result.Row1)) * result.Row1;
 
-         result.Row3 = result.Row3 - (Vector4D.Dot(result.Row1, result.Row3) / Vector4D.Dot(result.Row1, result.Row1)) * result.Row1;
-         result.Row3 = result.Row3 - (Vector4D.Dot(result.Row2, result.Row3) / Vector4D.Dot(result.Row2, result.Row2)) * result.Row2;
+         result.Row3 = result.Row3 - (Vector4.Dot(result.Row1, result.Row3) / Vector4.Dot(result.Row1, result.Row1)) * result.Row1;
+         result.Row3 = result.Row3 - (Vector4.Dot(result.Row2, result.Row3) / Vector4.Dot(result.Row2, result.Row2)) * result.Row2;
 
-         result.Row4 = result.Row4 - (Vector4D.Dot(result.Row1, result.Row4) / Vector4D.Dot(result.Row1, result.Row1)) * result.Row1;
-         result.Row4 = result.Row4 - (Vector4D.Dot(result.Row2, result.Row4) / Vector4D.Dot(result.Row2, result.Row2)) * result.Row2;
-         result.Row4 = result.Row4 - (Vector4D.Dot(result.Row3, result.Row4) / Vector4D.Dot(result.Row3, result.Row3)) * result.Row3;
+         result.Row4 = result.Row4 - (Vector4.Dot(result.Row1, result.Row4) / Vector4.Dot(result.Row1, result.Row1)) * result.Row1;
+         result.Row4 = result.Row4 - (Vector4.Dot(result.Row2, result.Row4) / Vector4.Dot(result.Row2, result.Row2)) * result.Row2;
+         result.Row4 = result.Row4 - (Vector4.Dot(result.Row3, result.Row4) / Vector4.Dot(result.Row3, result.Row3)) * result.Row3;
       }
 
       /// <summary>
@@ -1402,9 +1402,9 @@ namespace Adamantium.Mathematics
       /// If you wish for this operation to be performed on the columns, first transpose the
       /// input and than transpose the output.</para>
       /// </remarks>
-      public static Matrix4x4D Orthogonalize(Matrix4x4D value)
+      public static Matrix4x4 Orthogonalize(Matrix4x4 value)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          Orthogonalize(ref value, out result);
          return result;
       }
@@ -1427,7 +1427,7 @@ namespace Adamantium.Mathematics
       /// If you wish for this operation to be performed on the columns, first transpose the
       /// input and than transpose the output.</para>
       /// </remarks>
-      public static void Orthonormalize(ref Matrix4x4D value, out Matrix4x4D result)
+      public static void Orthonormalize(ref Matrix4x4 value, out Matrix4x4 result)
       {
          //Uses the modified Gram-Schmidt process.
          //Because we are making unit vectors, we can optimize the math for orthonormalization
@@ -1440,19 +1440,19 @@ namespace Adamantium.Mathematics
          //By separating the above algorithm into multiple lines, we actually increase accuracy.
          result = value;
 
-         result.Row1 = Vector4D.Normalize(result.Row1);
+         result.Row1 = Vector4.Normalize(result.Row1);
 
-         result.Row2 = result.Row2 - Vector4D.Dot(result.Row1, result.Row2) * result.Row1;
-         result.Row2 = Vector4D.Normalize(result.Row2);
+         result.Row2 = result.Row2 - Vector4.Dot(result.Row1, result.Row2) * result.Row1;
+         result.Row2 = Vector4.Normalize(result.Row2);
 
-         result.Row3 = result.Row3 - Vector4D.Dot(result.Row1, result.Row3) * result.Row1;
-         result.Row3 = result.Row3 - Vector4D.Dot(result.Row2, result.Row3) * result.Row2;
-         result.Row3 = Vector4D.Normalize(result.Row3);
+         result.Row3 = result.Row3 - Vector4.Dot(result.Row1, result.Row3) * result.Row1;
+         result.Row3 = result.Row3 - Vector4.Dot(result.Row2, result.Row3) * result.Row2;
+         result.Row3 = Vector4.Normalize(result.Row3);
 
-         result.Row4 = result.Row4 - Vector4D.Dot(result.Row1, result.Row4) * result.Row1;
-         result.Row4 = result.Row4 - Vector4D.Dot(result.Row2, result.Row4) * result.Row2;
-         result.Row4 = result.Row4 - Vector4D.Dot(result.Row3, result.Row4) * result.Row3;
-         result.Row4 = Vector4D.Normalize(result.Row4);
+         result.Row4 = result.Row4 - Vector4.Dot(result.Row1, result.Row4) * result.Row1;
+         result.Row4 = result.Row4 - Vector4.Dot(result.Row2, result.Row4) * result.Row2;
+         result.Row4 = result.Row4 - Vector4.Dot(result.Row3, result.Row4) * result.Row3;
+         result.Row4 = Vector4.Normalize(result.Row4);
       }
 
       /// <summary>
@@ -1473,9 +1473,9 @@ namespace Adamantium.Mathematics
       /// If you wish for this operation to be performed on the columns, first transpose the
       /// input and than transpose the output.</para>
       /// </remarks>
-      public static Matrix4x4D Orthonormalize(Matrix4x4D value)
+      public static Matrix4x4 Orthonormalize(Matrix4x4 value)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          Orthonormalize(ref value, out result);
          return result;
       }
@@ -1491,7 +1491,7 @@ namespace Adamantium.Mathematics
       /// of linear equations, than this often means that either no solution exists or an infinite
       /// number of solutions exist.
       /// </remarks>
-      public static void UpperTriangularForm(ref Matrix4x4D value, out Matrix4x4D result)
+      public static void UpperTriangularForm(ref Matrix4x4 value, out Matrix4x4 result)
       {
          //Adapted from the row echelon code.
          result = value;
@@ -1553,9 +1553,9 @@ namespace Adamantium.Mathematics
       /// of linear equations, than this often means that either no solution exists or an infinite
       /// number of solutions exist.
       /// </remarks>
-      public static Matrix4x4D UpperTriangularForm(Matrix4x4D value)
+      public static Matrix4x4 UpperTriangularForm(Matrix4x4 value)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          UpperTriangularForm(ref value, out result);
          return result;
       }
@@ -1571,11 +1571,11 @@ namespace Adamantium.Mathematics
       /// of linear equations, than this often means that either no solution exists or an infinite
       /// number of solutions exist.
       /// </remarks>
-      public static void LowerTriangularForm(ref Matrix4x4D value, out Matrix4x4D result)
+      public static void LowerTriangularForm(ref Matrix4x4 value, out Matrix4x4 result)
       {
          //Adapted from the row echelon code.
-         Matrix4x4D temp = value;
-         Matrix4x4D.Transpose(ref temp, out result);
+         Matrix4x4 temp = value;
+         Matrix4x4.Transpose(ref temp, out result);
 
          int lead = 0;
          int rowcount = 4;
@@ -1623,7 +1623,7 @@ namespace Adamantium.Mathematics
             lead++;
          }
 
-         Matrix4x4D.Transpose(ref result, out result);
+         Matrix4x4.Transpose(ref result, out result);
       }
 
       /// <summary>
@@ -1637,9 +1637,9 @@ namespace Adamantium.Mathematics
       /// of linear equations, than this often means that either no solution exists or an infinite
       /// number of solutions exist.
       /// </remarks>
-      public static Matrix4x4D LowerTriangularForm(Matrix4x4D value)
+      public static Matrix4x4 LowerTriangularForm(Matrix4x4 value)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          LowerTriangularForm(ref value, out result);
          return result;
       }
@@ -1649,7 +1649,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The matrix to put into row echelon form.</param>
       /// <param name="result">When the method completes, contains the row echelon form of the matrix.</param>
-      public static void RowEchelonForm(ref Matrix4x4D value, out Matrix4x4D result)
+      public static void RowEchelonForm(ref Matrix4x4 value, out Matrix4x4 result)
       {
          //Source: Wikipedia pseudo code
          //Reference: http://en.wikipedia.org/wiki/Row_echelon_form#Pseudocode
@@ -1711,9 +1711,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The matrix to put into row echelon form.</param>
       /// <returns>When the method completes, contains the row echelon form of the matrix.</returns>
-      public static Matrix4x4D RowEchelonForm(Matrix4x4D value)
+      public static Matrix4x4 RowEchelonForm(Matrix4x4 value)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          RowEchelonForm(ref value, out result);
          return result;
       }
@@ -1735,7 +1735,7 @@ namespace Adamantium.Mathematics
       /// the <paramref name="augmentResult"/> will contain the solution for the system. It is up to the user
       /// to analyze both the input and the result to determine if a solution really exists.</para>
       /// </remarks>
-      public static void ReducedRowEchelonForm(ref Matrix4x4D value, ref Vector4D augment, out Matrix4x4D result, out Vector4D augmentResult)
+      public static void ReducedRowEchelonForm(ref Matrix4x4 value, ref Vector4 augment, out Matrix4x4 result, out Vector4 augmentResult)
       {
          //Source: http://rosettacode.org
          //Reference: http://rosettacode.org/wiki/Reduced_row_echelon_form
@@ -1851,11 +1851,11 @@ namespace Adamantium.Mathematics
       /// <param name="cameraUpVector">The up vector of the camera.</param>
       /// <param name="cameraForwardVector">The forward vector of the camera.</param>
       /// <param name="result">When the method completes, contains the created billboard matrix.</param>
-      public static void BillboardLH(ref Vector3D objectPosition, ref Vector3D cameraPosition, ref Vector3D cameraUpVector, ref Vector3D cameraForwardVector, out Matrix4x4D result)
+      public static void BillboardLH(ref Vector3 objectPosition, ref Vector3 cameraPosition, ref Vector3 cameraUpVector, ref Vector3 cameraForwardVector, out Matrix4x4 result)
       {
-         Vector3D crossed;
-         Vector3D final;
-         Vector3D difference = cameraPosition - objectPosition;
+         Vector3 crossed;
+         Vector3 final;
+         Vector3 difference = cameraPosition - objectPosition;
 
          double lengthSq = difference.LengthSquared();
          if (MathHelper.IsZero(lengthSq))
@@ -1863,9 +1863,9 @@ namespace Adamantium.Mathematics
          else
             difference *= (1.0 / Math.Sqrt(lengthSq));
 
-         Vector3D.Cross(ref cameraUpVector, ref difference, out crossed);
+         Vector3.Cross(ref cameraUpVector, ref difference, out crossed);
          crossed.Normalize();
-         Vector3D.Cross(ref difference, ref crossed, out final);
+         Vector3.Cross(ref difference, ref crossed, out final);
 
          result.M11 = crossed.X;
          result.M12 = crossed.Y;
@@ -1893,9 +1893,9 @@ namespace Adamantium.Mathematics
       /// <param name="cameraUpVector">The up vector of the camera.</param>
       /// <param name="cameraForwardVector">The forward vector of the camera.</param>
       /// <returns>The created billboard matrix.</returns>
-      public static Matrix4x4D BillboardLH(Vector3D objectPosition, Vector3D cameraPosition, Vector3D cameraUpVector, Vector3D cameraForwardVector)
+      public static Matrix4x4 BillboardLH(Vector3 objectPosition, Vector3 cameraPosition, Vector3 cameraUpVector, Vector3 cameraForwardVector)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          BillboardLH(ref objectPosition, ref cameraPosition, ref cameraUpVector, ref cameraForwardVector, out result);
          return result;
       }
@@ -1908,11 +1908,11 @@ namespace Adamantium.Mathematics
       /// <param name="cameraUpVector">The up vector of the camera.</param>
       /// <param name="cameraForwardVector">The forward vector of the camera.</param>
       /// <param name="result">When the method completes, contains the created billboard matrix.</param>
-      public static void BillboardRH(ref Vector3D objectPosition, ref Vector3D cameraPosition, ref Vector3D cameraUpVector, ref Vector3D cameraForwardVector, out Matrix4x4D result)
+      public static void BillboardRH(ref Vector3 objectPosition, ref Vector3 cameraPosition, ref Vector3 cameraUpVector, ref Vector3 cameraForwardVector, out Matrix4x4 result)
       {
-         Vector3D crossed;
-         Vector3D final;
-         Vector3D difference = objectPosition - cameraPosition;
+         Vector3 crossed;
+         Vector3 final;
+         Vector3 difference = objectPosition - cameraPosition;
 
          double lengthSq = difference.LengthSquared();
          if (MathHelper.IsZero(lengthSq))
@@ -1920,9 +1920,9 @@ namespace Adamantium.Mathematics
          else
             difference *= (1.0 / Math.Sqrt(lengthSq));
 
-         Vector3D.Cross(ref cameraUpVector, ref difference, out crossed);
+         Vector3.Cross(ref cameraUpVector, ref difference, out crossed);
          crossed.Normalize();
-         Vector3D.Cross(ref difference, ref crossed, out final);
+         Vector3.Cross(ref difference, ref crossed, out final);
 
          result.M11 = crossed.X;
          result.M12 = crossed.Y;
@@ -1950,9 +1950,9 @@ namespace Adamantium.Mathematics
       /// <param name="cameraUpVector">The up vector of the camera.</param>
       /// <param name="cameraForwardVector">The forward vector of the camera.</param>
       /// <returns>The created billboard matrix.</returns>
-      public static Matrix4x4D BillboardRH(Vector3D objectPosition, Vector3D cameraPosition, Vector3D cameraUpVector, Vector3D cameraForwardVector)
+      public static Matrix4x4 BillboardRH(Vector3 objectPosition, Vector3 cameraPosition, Vector3 cameraUpVector, Vector3 cameraForwardVector)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          BillboardRH(ref objectPosition, ref cameraPosition, ref cameraUpVector, ref cameraForwardVector, out result);
          return result;
       }
@@ -1964,21 +1964,21 @@ namespace Adamantium.Mathematics
       /// <param name="target">The camera look-at target.</param>
       /// <param name="up">The camera's up vector.</param>
       /// <param name="result">When the method completes, contains the created look-at matrix.</param>
-      public static void LookAtLH(ref Vector3D eye, ref Vector3D target, ref Vector3D up, out Matrix4x4D result)
+      public static void LookAtLH(ref Vector3 eye, ref Vector3 target, ref Vector3 up, out Matrix4x4 result)
       {
-         Vector3D xaxis, yaxis, zaxis;
-         Vector3D.Subtract(ref target, ref eye, out zaxis); zaxis.Normalize();
-         Vector3D.Cross(ref up, ref zaxis, out xaxis); xaxis.Normalize();
-         Vector3D.Cross(ref zaxis, ref xaxis, out yaxis);
+         Vector3 xaxis, yaxis, zaxis;
+         Vector3.Subtract(ref target, ref eye, out zaxis); zaxis.Normalize();
+         Vector3.Cross(ref up, ref zaxis, out xaxis); xaxis.Normalize();
+         Vector3.Cross(ref zaxis, ref xaxis, out yaxis);
 
          result = Identity;
          result.M11 = xaxis.X; result.M21 = xaxis.Y; result.M31 = xaxis.Z;
          result.M12 = yaxis.X; result.M22 = yaxis.Y; result.M32 = yaxis.Z;
          result.M13 = zaxis.X; result.M23 = zaxis.Y; result.M33 = zaxis.Z;
 
-         Vector3D.Dot(ref xaxis, ref eye, out result.M41);
-         Vector3D.Dot(ref yaxis, ref eye, out result.M42);
-         Vector3D.Dot(ref zaxis, ref eye, out result.M43);
+         Vector3.Dot(ref xaxis, ref eye, out result.M41);
+         Vector3.Dot(ref yaxis, ref eye, out result.M42);
+         Vector3.Dot(ref zaxis, ref eye, out result.M43);
 
          result.M41 = -result.M41;
          result.M42 = -result.M42;
@@ -1992,9 +1992,9 @@ namespace Adamantium.Mathematics
       /// <param name="target">The camera look-at target.</param>
       /// <param name="up">The camera's up vector.</param>
       /// <returns>The created look-at matrix.</returns>
-      public static Matrix4x4D LookAtLH(Vector3D eye, Vector3D target, Vector3D up)
+      public static Matrix4x4 LookAtLH(Vector3 eye, Vector3 target, Vector3 up)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          LookAtLH(ref eye, ref target, ref up, out result);
          return result;
       }
@@ -2006,21 +2006,21 @@ namespace Adamantium.Mathematics
       /// <param name="target">The camera look-at target.</param>
       /// <param name="up">The camera's up vector.</param>
       /// <param name="result">When the method completes, contains the created look-at matrix.</param>
-      public static void LookAtRH(ref Vector3D eye, ref Vector3D target, ref Vector3D up, out Matrix4x4D result)
+      public static void LookAtRH(ref Vector3 eye, ref Vector3 target, ref Vector3 up, out Matrix4x4 result)
       {
-         Vector3D xaxis, yaxis, zaxis;
-         Vector3D.Subtract(ref eye, ref target, out zaxis); zaxis.Normalize();
-         Vector3D.Cross(ref up, ref zaxis, out xaxis); xaxis.Normalize();
-         Vector3D.Cross(ref zaxis, ref xaxis, out yaxis);
+         Vector3 xaxis, yaxis, zaxis;
+         Vector3.Subtract(ref eye, ref target, out zaxis); zaxis.Normalize();
+         Vector3.Cross(ref up, ref zaxis, out xaxis); xaxis.Normalize();
+         Vector3.Cross(ref zaxis, ref xaxis, out yaxis);
 
-         result = Matrix4x4D.Identity;
+         result = Matrix4x4.Identity;
          result.M11 = xaxis.X; result.M21 = xaxis.Y; result.M31 = xaxis.Z;
          result.M12 = yaxis.X; result.M22 = yaxis.Y; result.M32 = yaxis.Z;
          result.M13 = zaxis.X; result.M23 = zaxis.Y; result.M33 = zaxis.Z;
 
-         Vector3D.Dot(ref xaxis, ref eye, out result.M41);
-         Vector3D.Dot(ref yaxis, ref eye, out result.M42);
-         Vector3D.Dot(ref zaxis, ref eye, out result.M43);
+         Vector3.Dot(ref xaxis, ref eye, out result.M41);
+         Vector3.Dot(ref yaxis, ref eye, out result.M42);
+         Vector3.Dot(ref zaxis, ref eye, out result.M43);
 
          result.M41 = -result.M41;
          result.M42 = -result.M42;
@@ -2034,9 +2034,9 @@ namespace Adamantium.Mathematics
       /// <param name="target">The camera look-at target.</param>
       /// <param name="up">The camera's up vector.</param>
       /// <returns>The created look-at matrix.</returns>
-      public static Matrix4x4D LookAtRH(Vector3D eye, Vector3D target, Vector3D up)
+      public static Matrix4x4 LookAtRH(Vector3 eye, Vector3 target, Vector3 up)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          LookAtRH(ref eye, ref target, ref up, out result);
          return result;
       }
@@ -2049,7 +2049,7 @@ namespace Adamantium.Mathematics
       /// <param name="znear">Minimum z-value of the viewing volume.</param>
       /// <param name="zfar">Maximum z-value of the viewing volume.</param>
       /// <param name="result">When the method completes, contains the created projection matrix.</param>
-      public static void OrthoLH(double width, double height, double znear, double zfar, out Matrix4x4D result)
+      public static void OrthoLH(double width, double height, double znear, double zfar, out Matrix4x4 result)
       {
          double halfWidth = width * 0.5f;
          double halfHeight = height * 0.5f;
@@ -2065,9 +2065,9 @@ namespace Adamantium.Mathematics
       /// <param name="znear">Minimum z-value of the viewing volume.</param>
       /// <param name="zfar">Maximum z-value of the viewing volume.</param>
       /// <returns>The created projection matrix.</returns>
-      public static Matrix4x4D OrthoLH(double width, double height, double znear, double zfar)
+      public static Matrix4x4 OrthoLH(double width, double height, double znear, double zfar)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          OrthoLH(width, height, znear, zfar, out result);
          return result;
       }
@@ -2080,7 +2080,7 @@ namespace Adamantium.Mathematics
       /// <param name="znear">Minimum z-value of the viewing volume.</param>
       /// <param name="zfar">Maximum z-value of the viewing volume.</param>
       /// <param name="result">When the method completes, contains the created projection matrix.</param>
-      public static void OrthoRH(double width, double height, double znear, double zfar, out Matrix4x4D result)
+      public static void OrthoRH(double width, double height, double znear, double zfar, out Matrix4x4 result)
       {
          double halfWidth = width * 0.5f;
          double halfHeight = height * 0.5f;
@@ -2096,9 +2096,9 @@ namespace Adamantium.Mathematics
       /// <param name="znear">Minimum z-value of the viewing volume.</param>
       /// <param name="zfar">Maximum z-value of the viewing volume.</param>
       /// <returns>The created projection matrix.</returns>
-      public static Matrix4x4D OrthoRH(double width, double height, double znear, double zfar)
+      public static Matrix4x4 OrthoRH(double width, double height, double znear, double zfar)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          OrthoRH(width, height, znear, zfar, out result);
          return result;
       }
@@ -2113,11 +2113,11 @@ namespace Adamantium.Mathematics
       /// <param name="znear">Minimum z-value of the viewing volume.</param>
       /// <param name="zfar">Maximum z-value of the viewing volume.</param>
       /// <param name="result">When the method completes, contains the created projection matrix.</param>
-      public static void OrthoOffCenterLH(double left, double right, double bottom, double top, double znear, double zfar, out Matrix4x4D result)
+      public static void OrthoOffCenterLH(double left, double right, double bottom, double top, double znear, double zfar, out Matrix4x4 result)
       {
          double zRange = 1.0f / (zfar - znear);
 
-         result = Matrix4x4D.Identity;
+         result = Matrix4x4.Identity;
          result.M11 = 2.0f / (right - left);
          result.M22 = 2.0f / (top - bottom);
          result.M33 = zRange;
@@ -2136,9 +2136,9 @@ namespace Adamantium.Mathematics
       /// <param name="znear">Minimum z-value of the viewing volume.</param>
       /// <param name="zfar">Maximum z-value of the viewing volume.</param>
       /// <returns>The created projection matrix.</returns>
-      public static Matrix4x4D OrthoOffCenterLH(double left, double right, double bottom, double top, double znear, double zfar)
+      public static Matrix4x4 OrthoOffCenterLH(double left, double right, double bottom, double top, double znear, double zfar)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          OrthoOffCenterLH(left, right, bottom, top, znear, zfar, out result);
          return result;
       }
@@ -2153,7 +2153,7 @@ namespace Adamantium.Mathematics
       /// <param name="znear">Minimum z-value of the viewing volume.</param>
       /// <param name="zfar">Maximum z-value of the viewing volume.</param>
       /// <param name="result">When the method completes, contains the created projection matrix.</param>
-      public static void OrthoOffCenterRH(double left, double right, double bottom, double top, double znear, double zfar, out Matrix4x4D result)
+      public static void OrthoOffCenterRH(double left, double right, double bottom, double top, double znear, double zfar, out Matrix4x4 result)
       {
          OrthoOffCenterLH(left, right, bottom, top, znear, zfar, out result);
          result.M33 *= -1.0f;
@@ -2169,9 +2169,9 @@ namespace Adamantium.Mathematics
       /// <param name="znear">Minimum z-value of the viewing volume.</param>
       /// <param name="zfar">Maximum z-value of the viewing volume.</param>
       /// <returns>The created projection matrix.</returns>
-      public static Matrix4x4D OrthoOffCenterRH(double left, double right, double bottom, double top, double znear, double zfar)
+      public static Matrix4x4 OrthoOffCenterRH(double left, double right, double bottom, double top, double znear, double zfar)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          OrthoOffCenterRH(left, right, bottom, top, znear, zfar, out result);
          return result;
       }
@@ -2184,7 +2184,7 @@ namespace Adamantium.Mathematics
       /// <param name="znear">Minimum z-value of the viewing volume.</param>
       /// <param name="zfar">Maximum z-value of the viewing volume.</param>
       /// <param name="result">When the method completes, contains the created projection matrix.</param>
-      public static void PerspectiveLH(double width, double height, double znear, double zfar, out Matrix4x4D result)
+      public static void PerspectiveLH(double width, double height, double znear, double zfar, out Matrix4x4 result)
       {
          double halfWidth = width * 0.5f;
          double halfHeight = height * 0.5f;
@@ -2200,9 +2200,9 @@ namespace Adamantium.Mathematics
       /// <param name="znear">Minimum z-value of the viewing volume.</param>
       /// <param name="zfar">Maximum z-value of the viewing volume.</param>
       /// <returns>The created projection matrix.</returns>
-      public static Matrix4x4D PerspectiveLH(double width, double height, double znear, double zfar)
+      public static Matrix4x4 PerspectiveLH(double width, double height, double znear, double zfar)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          PerspectiveLH(width, height, znear, zfar, out result);
          return result;
       }
@@ -2215,7 +2215,7 @@ namespace Adamantium.Mathematics
       /// <param name="znear">Minimum z-value of the viewing volume.</param>
       /// <param name="zfar">Maximum z-value of the viewing volume.</param>
       /// <param name="result">When the method completes, contains the created projection matrix.</param>
-      public static void PerspectiveRH(double width, double height, double znear, double zfar, out Matrix4x4D result)
+      public static void PerspectiveRH(double width, double height, double znear, double zfar, out Matrix4x4 result)
       {
          double halfWidth = width * 0.5f;
          double halfHeight = height * 0.5f;
@@ -2231,9 +2231,9 @@ namespace Adamantium.Mathematics
       /// <param name="znear">Minimum z-value of the viewing volume.</param>
       /// <param name="zfar">Maximum z-value of the viewing volume.</param>
       /// <returns>The created projection matrix.</returns>
-      public static Matrix4x4D PerspectiveRH(double width, double height, double znear, double zfar)
+      public static Matrix4x4 PerspectiveRH(double width, double height, double znear, double zfar)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          PerspectiveRH(width, height, znear, zfar, out result);
          return result;
       }
@@ -2246,12 +2246,12 @@ namespace Adamantium.Mathematics
       /// <param name="znear">Minimum z-value of the viewing volume.</param>
       /// <param name="zfar">Maximum z-value of the viewing volume.</param>
       /// <param name="result">When the method completes, contains the created projection matrix.</param>
-      public static void PerspectiveFovLH(double fov, double aspect, double znear, double zfar, out Matrix4x4D result)
+      public static void PerspectiveFovLH(double fov, double aspect, double znear, double zfar, out Matrix4x4 result)
       {
          double yScale = (1.0f / Math.Tan(fov * 0.5f));
          double q = zfar / (zfar - znear);
 
-         result = new Matrix4x4D();
+         result = new Matrix4x4();
          result.M11 = yScale / aspect;
          result.M22 = yScale;
          result.M33 = q;
@@ -2267,9 +2267,9 @@ namespace Adamantium.Mathematics
       /// <param name="znear">Minimum z-value of the viewing volume.</param>
       /// <param name="zfar">Maximum z-value of the viewing volume.</param>
       /// <returns>The created projection matrix.</returns>
-      public static Matrix4x4D PerspectiveFovLH(double fov, double aspect, double znear, double zfar)
+      public static Matrix4x4 PerspectiveFovLH(double fov, double aspect, double znear, double zfar)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          PerspectiveFovLH(fov, aspect, znear, zfar, out result);
          return result;
       }
@@ -2282,12 +2282,12 @@ namespace Adamantium.Mathematics
       /// <param name="znear">Minimum z-value of the viewing volume.</param>
       /// <param name="zfar">Maximum z-value of the viewing volume.</param>
       /// <param name="result">When the method completes, contains the created projection matrix.</param>
-      public static void PerspectiveFovRH(double fov, double aspect, double znear, double zfar, out Matrix4x4D result)
+      public static void PerspectiveFovRH(double fov, double aspect, double znear, double zfar, out Matrix4x4 result)
       {
          double yScale = (1.0f / Math.Tan(fov * 0.5f));
          double q = zfar / (znear - zfar);
 
-         result = new Matrix4x4D();
+         result = new Matrix4x4();
          result.M11 = yScale / aspect;
          result.M22 = yScale;
          result.M33 = q;
@@ -2303,9 +2303,9 @@ namespace Adamantium.Mathematics
       /// <param name="znear">Minimum z-value of the viewing volume.</param>
       /// <param name="zfar">Maximum z-value of the viewing volume.</param>
       /// <returns>The created projection matrix.</returns>
-      public static Matrix4x4D PerspectiveFovRH(double fov, double aspect, double znear, double zfar)
+      public static Matrix4x4 PerspectiveFovRH(double fov, double aspect, double znear, double zfar)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          PerspectiveFovRH(fov, aspect, znear, zfar, out result);
          return result;
       }
@@ -2320,11 +2320,11 @@ namespace Adamantium.Mathematics
       /// <param name="znear">Minimum z-value of the viewing volume.</param>
       /// <param name="zfar">Maximum z-value of the viewing volume.</param>
       /// <param name="result">When the method completes, contains the created projection matrix.</param>
-      public static void PerspectiveOffCenterLH(double left, double right, double bottom, double top, double znear, double zfar, out Matrix4x4D result)
+      public static void PerspectiveOffCenterLH(double left, double right, double bottom, double top, double znear, double zfar, out Matrix4x4 result)
       {
          double zRange = zfar / (zfar - znear);
 
-         result = new Matrix4x4D();
+         result = new Matrix4x4();
          result.M11 = 2.0f * znear / (right - left);
          result.M22 = 2.0f * znear / (top - bottom);
          result.M31 = (left + right) / (left - right);
@@ -2344,9 +2344,9 @@ namespace Adamantium.Mathematics
       /// <param name="znear">Minimum z-value of the viewing volume.</param>
       /// <param name="zfar">Maximum z-value of the viewing volume.</param>
       /// <returns>The created projection matrix.</returns>
-      public static Matrix4x4D PerspectiveOffCenterLH(double left, double right, double bottom, double top, double znear, double zfar)
+      public static Matrix4x4 PerspectiveOffCenterLH(double left, double right, double bottom, double top, double znear, double zfar)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          PerspectiveOffCenterLH(left, right, bottom, top, znear, zfar, out result);
          return result;
       }
@@ -2361,7 +2361,7 @@ namespace Adamantium.Mathematics
       /// <param name="znear">Minimum z-value of the viewing volume.</param>
       /// <param name="zfar">Maximum z-value of the viewing volume.</param>
       /// <param name="result">When the method completes, contains the created projection matrix.</param>
-      public static void PerspectiveOffCenterRH(double left, double right, double bottom, double top, double znear, double zfar, out Matrix4x4D result)
+      public static void PerspectiveOffCenterRH(double left, double right, double bottom, double top, double znear, double zfar, out Matrix4x4 result)
       {
          PerspectiveOffCenterLH(left, right, bottom, top, znear, zfar, out result);
          result.M31 *= -1.0f;
@@ -2380,9 +2380,9 @@ namespace Adamantium.Mathematics
       /// <param name="znear">Minimum z-value of the viewing volume.</param>
       /// <param name="zfar">Maximum z-value of the viewing volume.</param>
       /// <returns>The created projection matrix.</returns>
-      public static Matrix4x4D PerspectiveOffCenterRH(double left, double right, double bottom, double top, double znear, double zfar)
+      public static Matrix4x4 PerspectiveOffCenterRH(double left, double right, double bottom, double top, double znear, double zfar)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          PerspectiveOffCenterRH(left, right, bottom, top, znear, zfar, out result);
          return result;
       }
@@ -2393,7 +2393,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="scale">Scaling factor for all three axes.</param>
       /// <param name="result">When the method completes, contains the created scaling matrix.</param>
-      public static void Scaling(ref Vector3D scale, out Matrix4x4D result)
+      public static void Scaling(ref Vector3 scale, out Matrix4x4 result)
       {
          Scaling(scale.X, scale.Y, scale.Z, out result);
       }
@@ -2403,9 +2403,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="scale">Scaling factor for all three axes.</param>
       /// <returns>The created scaling matrix.</returns>
-      public static Matrix4x4D Scaling(Vector3D scale)
+      public static Matrix4x4 Scaling(Vector3 scale)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          Scaling(ref scale, out result);
          return result;
       }
@@ -2417,9 +2417,9 @@ namespace Adamantium.Mathematics
       /// <param name="y">Scaling factor that is applied along the y-axis.</param>
       /// <param name="z">Scaling factor that is applied along the z-axis.</param>
       /// <param name="result">When the method completes, contains the created scaling matrix.</param>
-      public static void Scaling(double x, double y, double z, out Matrix4x4D result)
+      public static void Scaling(double x, double y, double z, out Matrix4x4 result)
       {
-         result = Matrix4x4D.Identity;
+         result = Matrix4x4.Identity;
          result.M11 = x;
          result.M22 = y;
          result.M33 = z;
@@ -2432,9 +2432,9 @@ namespace Adamantium.Mathematics
       /// <param name="y">Scaling factor that is applied along the y-axis.</param>
       /// <param name="z">Scaling factor that is applied along the z-axis.</param>
       /// <returns>The created scaling matrix.</returns>
-      public static Matrix4x4D Scaling(double x, double y, double z)
+      public static Matrix4x4 Scaling(double x, double y, double z)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          Scaling(x, y, z, out result);
          return result;
       }
@@ -2444,9 +2444,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="scale">The uniform scale that is applied along all axis.</param>
       /// <param name="result">When the method completes, contains the created scaling matrix.</param>
-      public static void Scaling(double scale, out Matrix4x4D result)
+      public static void Scaling(double scale, out Matrix4x4 result)
       {
-         result = Matrix4x4D.Identity;
+         result = Matrix4x4.Identity;
          result.M11 = result.M22 = result.M33 = scale;
       }
 
@@ -2455,9 +2455,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="scale">The uniform scale that is applied along all axis.</param>
       /// <returns>The created scaling matrix.</returns>
-      public static Matrix4x4D Scaling(double scale)
+      public static Matrix4x4 Scaling(double scale)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          Scaling(scale, out result);
          return result;
       }
@@ -2467,12 +2467,12 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="angle">Angle of rotation in radians. Angles are measured clockwise when looking along the rotation axis toward the origin.</param>
       /// <param name="result">When the method completes, contains the created rotation matrix.</param>
-      public static void RotationX(double angle, out Matrix4x4D result)
+      public static void RotationX(double angle, out Matrix4x4 result)
       {
          double cos = Math.Cos(angle);
          double sin = Math.Sin(angle);
 
-         result = Matrix4x4D.Identity;
+         result = Matrix4x4.Identity;
          result.M22 = cos;
          result.M23 = sin;
          result.M32 = -sin;
@@ -2484,9 +2484,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="angle">Angle of rotation in radians. Angles are measured clockwise when looking along the rotation axis toward the origin.</param>
       /// <returns>The created rotation matrix.</returns>
-      public static Matrix4x4D RotationX(double angle)
+      public static Matrix4x4 RotationX(double angle)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          RotationX(angle, out result);
          return result;
       }
@@ -2496,12 +2496,12 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="angle">Angle of rotation in radians. Angles are measured clockwise when looking along the rotation axis toward the origin.</param>
       /// <param name="result">When the method completes, contains the created rotation matrix.</param>
-      public static void RotationY(double angle, out Matrix4x4D result)
+      public static void RotationY(double angle, out Matrix4x4 result)
       {
          double cos = Math.Cos(angle);
          double sin = Math.Sin(angle);
 
-         result = Matrix4x4D.Identity;
+         result = Matrix4x4.Identity;
          result.M11 = cos;
          result.M13 = -sin;
          result.M31 = sin;
@@ -2513,9 +2513,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="angle">Angle of rotation in radians. Angles are measured clockwise when looking along the rotation axis toward the origin.</param>
       /// <returns>The created rotation matrix.</returns>
-      public static Matrix4x4D RotationY(double angle)
+      public static Matrix4x4 RotationY(double angle)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          RotationY(angle, out result);
          return result;
       }
@@ -2525,12 +2525,12 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="angle">Angle of rotation in radians. Angles are measured clockwise when looking along the rotation axis toward the origin.</param>
       /// <param name="result">When the method completes, contains the created rotation matrix.</param>
-      public static void RotationZ(double angle, out Matrix4x4D result)
+      public static void RotationZ(double angle, out Matrix4x4 result)
       {
          double cos = Math.Cos(angle);
          double sin = Math.Sin(angle);
 
-         result = Matrix4x4D.Identity;
+         result = Matrix4x4.Identity;
          result.M11 = cos;
          result.M12 = sin;
          result.M21 = -sin;
@@ -2542,9 +2542,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="angle">Angle of rotation in radians. Angles are measured clockwise when looking along the rotation axis toward the origin.</param>
       /// <returns>The created rotation matrix.</returns>
-      public static Matrix4x4D RotationZ(double angle)
+      public static Matrix4x4 RotationZ(double angle)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          RotationZ(angle, out result);
          return result;
       }
@@ -2555,7 +2555,7 @@ namespace Adamantium.Mathematics
       /// <param name="axis">The axis around which to rotate. This parameter is assumed to be normalized.</param>
       /// <param name="angle">Angle of rotation in radians. Angles are measured clockwise when looking along the rotation axis toward the origin.</param>
       /// <param name="result">When the method completes, contains the created rotation matrix.</param>
-      public static void RotationAxis(ref Vector3D axis, double angle, out Matrix4x4D result)
+      public static void RotationAxis(ref Vector3 axis, double angle, out Matrix4x4 result)
       {
          double x = axis.X;
          double y = axis.Y;
@@ -2569,7 +2569,7 @@ namespace Adamantium.Mathematics
          double xz = x * z;
          double yz = y * z;
 
-         result = Matrix4x4D.Identity;
+         result = Matrix4x4.Identity;
          result.M11 = xx + (cos * (1.0f - xx));
          result.M12 = (xy - (cos * xy)) + (sin * z);
          result.M13 = (xz - (cos * xz)) - (sin * y);
@@ -2587,9 +2587,9 @@ namespace Adamantium.Mathematics
       /// <param name="axis">The axis around which to rotate. This parameter is assumed to be normalized.</param>
       /// <param name="angle">Angle of rotation in radians. Angles are measured clockwise when looking along the rotation axis toward the origin.</param>
       /// <returns>The created rotation matrix.</returns>
-      public static Matrix4x4D RotationAxis(Vector3D axis, double angle)
+      public static Matrix4x4 RotationAxis(Vector3 axis, double angle)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          RotationAxis(ref axis, angle, out result);
          return result;
       }
@@ -2599,7 +2599,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="rotation">The quaternion to use to build the matrix.</param>
       /// <param name="result">The created rotation matrix.</param>
-      public static void RotationQuaternion(ref QuaternionD rotation, out Matrix4x4D result)
+      public static void RotationQuaternion(ref Quaternion rotation, out Matrix4x4 result)
       {
          double xx = rotation.X * rotation.X;
          double yy = rotation.Y * rotation.Y;
@@ -2611,7 +2611,7 @@ namespace Adamantium.Mathematics
          double yz = rotation.Y * rotation.Z;
          double xw = rotation.X * rotation.W;
 
-         result = Matrix4x4D.Identity;
+         result = Matrix4x4.Identity;
          result.M11 = 1.0f - (2.0f * (yy + zz));
          result.M12 = 2.0f * (xy + zw);
          result.M13 = 2.0f * (zx - yw);
@@ -2628,9 +2628,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="rotation">The quaternion to use to build the matrix.</param>
       /// <returns>The created rotation matrix.</returns>
-      public static Matrix4x4D RotationQuaternion(QuaternionD rotation)
+      public static Matrix4x4 RotationQuaternion(Quaternion rotation)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          RotationQuaternion(ref rotation, out result);
          return result;
       }
@@ -2642,10 +2642,10 @@ namespace Adamantium.Mathematics
       /// <param name="pitch">Pitch around the x-axis, in radians.</param>
       /// <param name="roll">Roll around the z-axis, in radians.</param>
       /// <param name="result">When the method completes, contains the created rotation matrix.</param>
-      public static void RotationYawPitchRoll(double yaw, double pitch, double roll, out Matrix4x4D result)
+      public static void RotationYawPitchRoll(double yaw, double pitch, double roll, out Matrix4x4 result)
       {
-         QuaternionD quaternion = new QuaternionD();
-         QuaternionD.RotationYawPitchRoll(yaw, pitch, roll, out quaternion);
+         Quaternion quaternion = new Quaternion();
+         Quaternion.RotationYawPitchRoll(yaw, pitch, roll, out quaternion);
          RotationQuaternion(ref quaternion, out result);
       }
 
@@ -2656,9 +2656,9 @@ namespace Adamantium.Mathematics
       /// <param name="pitch">Pitch around the x-axis, in radians.</param>
       /// <param name="roll">Roll around the z-axis, in radians.</param>
       /// <returns>The created rotation matrix.</returns>
-      public static Matrix4x4D RotationYawPitchRoll(double yaw, double pitch, double roll)
+      public static Matrix4x4 RotationYawPitchRoll(double yaw, double pitch, double roll)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          RotationYawPitchRoll(yaw, pitch, roll, out result);
          return result;
       }
@@ -2668,7 +2668,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The offset for all three coordinate planes.</param>
       /// <param name="result">When the method completes, contains the created translation matrix.</param>
-      public static void Translation(ref Vector3D value, out Matrix4x4D result)
+      public static void Translation(ref Vector3 value, out Matrix4x4 result)
       {
          Translation(value.X, value.Y, value.Z, out result);
       }
@@ -2678,9 +2678,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The offset for all three coordinate planes.</param>
       /// <returns>The created translation matrix.</returns>
-      public static Matrix4x4D Translation(Vector3D value)
+      public static Matrix4x4 Translation(Vector3 value)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          Translation(ref value, out result);
          return result;
       }
@@ -2692,9 +2692,9 @@ namespace Adamantium.Mathematics
       /// <param name="y">Y-coordinate offset.</param>
       /// <param name="z">Z-coordinate offset.</param>
       /// <param name="result">When the method completes, contains the created translation matrix.</param>
-      public static void Translation(double x, double y, double z, out Matrix4x4D result)
+      public static void Translation(double x, double y, double z, out Matrix4x4 result)
       {
-         result = Matrix4x4D.Identity;
+         result = Matrix4x4.Identity;
          result.M41 = x;
          result.M42 = y;
          result.M43 = z;
@@ -2707,9 +2707,9 @@ namespace Adamantium.Mathematics
       /// <param name="y">Y-coordinate offset.</param>
       /// <param name="z">Z-coordinate offset.</param>
       /// <returns>The created translation matrix.</returns>
-      public static Matrix4x4D Translation(double x, double y, double z)
+      public static Matrix4x4 Translation(double x, double y, double z)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          Translation(x, y, z, out result);
          return result;
       }
@@ -2723,19 +2723,19 @@ namespace Adamantium.Mathematics
       /// <param name="rotationVec">The rotation vector</param>
       /// <param name="transVec">The translation vector</param>
       /// <param name="matrix">Contains the created skew/shear matrix. </param>
-      public static void Skew(double angle, ref Vector3D rotationVec, ref Vector3D transVec, out Matrix4x4D matrix)
+      public static void Skew(double angle, ref Vector3 rotationVec, ref Vector3 transVec, out Matrix4x4 matrix)
       {
          //http://elckerlyc.ewi.utwente.nl/browser/Elckerlyc/Hmi/HmiMath/src/hmi/math/Mat3f.java
          double MINIMAL_SKEW_ANGLE = 0.000001f;
 
-         Vector3D e0 = rotationVec;
-         Vector3D e1 = Vector3D.Normalize(transVec);
+         Vector3 e0 = rotationVec;
+         Vector3 e1 = Vector3.Normalize(transVec);
 
          double rv1;
-         Vector3D.Dot(ref rotationVec, ref e1, out rv1);
+         Vector3.Dot(ref rotationVec, ref e1, out rv1);
          e0 += rv1 * e1;
          double rv0;
-         Vector3D.Dot(ref rotationVec, ref e0, out rv0);
+         Vector3.Dot(ref rotationVec, ref e0, out rv0);
          double cosa = Math.Cos(angle);
          double sina = Math.Sin(angle);
          double rr0 = rv0 * cosa - rv1 * sina;
@@ -2746,7 +2746,7 @@ namespace Adamantium.Mathematics
 
          double d = (rr1 / rr0) - (rv1 / rv0);
 
-         matrix = Matrix4x4D.Identity;
+         matrix = Matrix4x4.Identity;
          matrix.M11 = d * e1[0] * e0[0] + 1.0f;
          matrix.M12 = d * e1[0] * e0[1];
          matrix.M13 = d * e1[0] * e0[2];
@@ -2765,7 +2765,7 @@ namespace Adamantium.Mathematics
       /// <param name="rotation">The rotation of the transformation.</param>
       /// <param name="translation">The translation factor of the transformation.</param>
       /// <param name="result">When the method completes, contains the created affine transformation matrix.</param>
-      public static void AffineTransformation(double scaling, ref QuaternionD rotation, ref Vector3D translation, out Matrix4x4D result)
+      public static void AffineTransformation(double scaling, ref Quaternion rotation, ref Vector3 translation, out Matrix4x4 result)
       {
          result = Scaling(scaling) * RotationQuaternion(rotation) * Translation(translation);
       }
@@ -2777,9 +2777,9 @@ namespace Adamantium.Mathematics
       /// <param name="rotation">The rotation of the transformation.</param>
       /// <param name="translation">The translation factor of the transformation.</param>
       /// <returns>The created affine transformation matrix.</returns>
-      public static Matrix4x4D AffineTransformation(double scaling, QuaternionD rotation, Vector3D translation)
+      public static Matrix4x4 AffineTransformation(double scaling, Quaternion rotation, Vector3 translation)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          AffineTransformation(scaling, ref rotation, ref translation, out result);
          return result;
       }
@@ -2792,7 +2792,7 @@ namespace Adamantium.Mathematics
       /// <param name="rotation">The rotation of the transformation.</param>
       /// <param name="translation">The translation factor of the transformation.</param>
       /// <param name="result">When the method completes, contains the created affine transformation matrix.</param>
-      public static void AffineTransformation(double scaling, ref Vector3D rotationCenter, ref QuaternionD rotation, ref Vector3D translation, out Matrix4x4D result)
+      public static void AffineTransformation(double scaling, ref Vector3 rotationCenter, ref Quaternion rotation, ref Vector3 translation, out Matrix4x4 result)
       {
          result = Scaling(scaling) * Translation(-rotationCenter) * RotationQuaternion(rotation) *
              Translation(rotationCenter) * Translation(translation);
@@ -2806,9 +2806,9 @@ namespace Adamantium.Mathematics
       /// <param name="rotation">The rotation of the transformation.</param>
       /// <param name="translation">The translation factor of the transformation.</param>
       /// <returns>The created affine transformation matrix.</returns>
-      public static Matrix4x4D AffineTransformation(double scaling, Vector3D rotationCenter, QuaternionD rotation, Vector3D translation)
+      public static Matrix4x4 AffineTransformation(double scaling, Vector3 rotationCenter, Quaternion rotation, Vector3 translation)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          AffineTransformation(scaling, ref rotationCenter, ref rotation, ref translation, out result);
          return result;
       }
@@ -2820,9 +2820,9 @@ namespace Adamantium.Mathematics
       /// <param name="rotation">The rotation of the transformation.</param>
       /// <param name="translation">The translation factor of the transformation.</param>
       /// <param name="result">When the method completes, contains the created affine transformation matrix.</param>
-      public static void AffineTransformation2D(double scaling, double rotation, ref Vector2D translation, out Matrix4x4D result)
+      public static void AffineTransformation2D(double scaling, double rotation, ref Vector2 translation, out Matrix4x4 result)
       {
-         result = Scaling(scaling, scaling, 1.0f) * RotationZ(rotation) * Translation((Vector3D)translation);
+         result = Scaling(scaling, scaling, 1.0f) * RotationZ(rotation) * Translation((Vector3)translation);
       }
 
       /// <summary>
@@ -2832,9 +2832,9 @@ namespace Adamantium.Mathematics
       /// <param name="rotation">The rotation of the transformation.</param>
       /// <param name="translation">The translation factor of the transformation.</param>
       /// <returns>The created affine transformation matrix.</returns>
-      public static Matrix4x4D AffineTransformation2D(double scaling, double rotation, Vector2D translation)
+      public static Matrix4x4 AffineTransformation2D(double scaling, double rotation, Vector2 translation)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          AffineTransformation2D(scaling, rotation, ref translation, out result);
          return result;
       }
@@ -2847,10 +2847,10 @@ namespace Adamantium.Mathematics
       /// <param name="rotation">The rotation of the transformation.</param>
       /// <param name="translation">The translation factor of the transformation.</param>
       /// <param name="result">When the method completes, contains the created affine transformation matrix.</param>
-      public static void AffineTransformation2D(double scaling, ref Vector2D rotationCenter, double rotation, ref Vector2D translation, out Matrix4x4D result)
+      public static void AffineTransformation2D(double scaling, ref Vector2 rotationCenter, double rotation, ref Vector2 translation, out Matrix4x4 result)
       {
-         result = Scaling(scaling, scaling, 1.0f) * Translation((Vector3D)(-rotationCenter)) * RotationZ(rotation) *
-             Translation((Vector3D)rotationCenter) * Translation((Vector3D)translation);
+         result = Scaling(scaling, scaling, 1.0f) * Translation((Vector3)(-rotationCenter)) * RotationZ(rotation) *
+             Translation((Vector3)rotationCenter) * Translation((Vector3)translation);
       }
 
       /// <summary>
@@ -2861,9 +2861,9 @@ namespace Adamantium.Mathematics
       /// <param name="rotation">The rotation of the transformation.</param>
       /// <param name="translation">The translation factor of the transformation.</param>
       /// <returns>The created affine transformation matrix.</returns>
-      public static Matrix4x4D AffineTransformation2D(double scaling, Vector2D rotationCenter, double rotation, Vector2D translation)
+      public static Matrix4x4 AffineTransformation2D(double scaling, Vector2 rotationCenter, double rotation, Vector2 translation)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          AffineTransformation2D(scaling, ref rotationCenter, rotation, ref translation, out result);
          return result;
       }
@@ -2878,9 +2878,9 @@ namespace Adamantium.Mathematics
       /// <param name="rotation">The rotation of the transformation.</param>
       /// <param name="translation">The translation factor of the transformation.</param>
       /// <param name="result">When the method completes, contains the created transformation matrix.</param>
-      public static void Transformation(ref Vector3D scalingCenter, ref QuaternionD scalingRotation, ref Vector3D scaling, ref Vector3D rotationCenter, ref QuaternionD rotation, ref Vector3D translation, out Matrix4x4D result)
+      public static void Transformation(ref Vector3 scalingCenter, ref Quaternion scalingRotation, ref Vector3 scaling, ref Vector3 rotationCenter, ref Quaternion rotation, ref Vector3 translation, out Matrix4x4 result)
       {
-         Matrix4x4D sr = RotationQuaternion(scalingRotation);
+         Matrix4x4 sr = RotationQuaternion(scalingRotation);
 
          result = Translation(-scalingCenter) * Transpose(sr) * Scaling(scaling) * sr * Translation(scalingCenter) * Translation(-rotationCenter) *
              RotationQuaternion(rotation) * Translation(rotationCenter) * Translation(translation);
@@ -2896,9 +2896,9 @@ namespace Adamantium.Mathematics
       /// <param name="rotation">The rotation of the transformation.</param>
       /// <param name="translation">The translation factor of the transformation.</param>
       /// <returns>The created transformation matrix.</returns>
-      public static Matrix4x4D Transformation(Vector3D scalingCenter, QuaternionD scalingRotation, Vector3D scaling, Vector3D rotationCenter, QuaternionD rotation, Vector3D translation)
+      public static Matrix4x4 Transformation(Vector3 scalingCenter, Quaternion scalingRotation, Vector3 scaling, Vector3 rotationCenter, Quaternion rotation, Vector3 translation)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          Transformation(ref scalingCenter, ref scalingRotation, ref scaling, ref rotationCenter, ref rotation, ref translation, out result);
          return result;
       }
@@ -2913,10 +2913,10 @@ namespace Adamantium.Mathematics
       /// <param name="rotation">The rotation of the transformation.</param>
       /// <param name="translation">The translation factor of the transformation.</param>
       /// <param name="result">When the method completes, contains the created transformation matrix.</param>
-      public static void Transformation2D(ref Vector2D scalingCenter, double scalingRotation, ref Vector2D scaling, ref Vector2D rotationCenter, double rotation, ref Vector2D translation, out Matrix4x4D result)
+      public static void Transformation2D(ref Vector2 scalingCenter, double scalingRotation, ref Vector2 scaling, ref Vector2 rotationCenter, double rotation, ref Vector2 translation, out Matrix4x4 result)
       {
-         result = Translation((Vector3D)(-scalingCenter)) * RotationZ(-scalingRotation) * Scaling((Vector3D)scaling) * RotationZ(scalingRotation) * Translation((Vector3D)scalingCenter) *
-             Translation((Vector3D)(-rotationCenter)) * RotationZ(rotation) * Translation((Vector3D)rotationCenter) * Translation((Vector3D)translation);
+         result = Translation((Vector3)(-scalingCenter)) * RotationZ(-scalingRotation) * Scaling((Vector3)scaling) * RotationZ(scalingRotation) * Translation((Vector3)scalingCenter) *
+             Translation((Vector3)(-rotationCenter)) * RotationZ(rotation) * Translation((Vector3)rotationCenter) * Translation((Vector3)translation);
 
          result.M33 = 1f;
          result.M44 = 1f;
@@ -2932,9 +2932,9 @@ namespace Adamantium.Mathematics
       /// <param name="rotation">The rotation of the transformation.</param>
       /// <param name="translation">The translation factor of the transformation.</param>
       /// <returns>The created transformation matrix.</returns>
-      public static Matrix4x4D Transformation2D(Vector2D scalingCenter, double scalingRotation, Vector2D scaling, Vector2D rotationCenter, double rotation, Vector2D translation)
+      public static Matrix4x4 Transformation2D(Vector2 scalingCenter, double scalingRotation, Vector2 scaling, Vector2 rotationCenter, double rotation, Vector2 translation)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          Transformation2D(ref scalingCenter, scalingRotation, ref scaling, ref rotationCenter, rotation, ref translation, out result);
          return result;
       }
@@ -2945,9 +2945,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first matrix to add.</param>
       /// <param name="right">The second matrix to add.</param>
       /// <returns>The sum of the two matrices.</returns>
-      public static Matrix4x4D operator +(Matrix4x4D left, Matrix4x4D right)
+      public static Matrix4x4 operator +(Matrix4x4 left, Matrix4x4 right)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          Add(ref left, ref right, out result);
          return result;
       }
@@ -2957,7 +2957,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The matrix to assert (unchanged).</param>
       /// <returns>The asserted (unchanged) matrix.</returns>
-      public static Matrix4x4D operator +(Matrix4x4D value)
+      public static Matrix4x4 operator +(Matrix4x4 value)
       {
          return value;
       }
@@ -2968,9 +2968,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first matrix to subtract.</param>
       /// <param name="right">The second matrix to subtract.</param>
       /// <returns>The difference between the two matrices.</returns>
-      public static Matrix4x4D operator -(Matrix4x4D left, Matrix4x4D right)
+      public static Matrix4x4 operator -(Matrix4x4 left, Matrix4x4 right)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          Subtract(ref left, ref right, out result);
          return result;
       }
@@ -2980,9 +2980,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The matrix to negate.</param>
       /// <returns>The negated matrix.</returns>
-      public static Matrix4x4D operator -(Matrix4x4D value)
+      public static Matrix4x4 operator -(Matrix4x4 value)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          Negate(ref value, out result);
          return result;
       }
@@ -2993,9 +2993,9 @@ namespace Adamantium.Mathematics
       /// <param name="right">The matrix to scale.</param>
       /// <param name="left">The amount by which to scale.</param>
       /// <returns>The scaled matrix.</returns>
-      public static Matrix4x4D operator *(double left, Matrix4x4D right)
+      public static Matrix4x4 operator *(double left, Matrix4x4 right)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          Multiply(ref right, left, out result);
          return result;
       }
@@ -3006,9 +3006,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The matrix to scale.</param>
       /// <param name="right">The amount by which to scale.</param>
       /// <returns>The scaled matrix.</returns>
-      public static Matrix4x4D operator *(Matrix4x4D left, double right)
+      public static Matrix4x4 operator *(Matrix4x4 left, double right)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          Multiply(ref left, right, out result);
          return result;
       }
@@ -3019,9 +3019,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first matrix to multiply.</param>
       /// <param name="right">The second matrix to multiply.</param>
       /// <returns>The product of the two matrices.</returns>
-      public static Matrix4x4D operator *(Matrix4x4D left, Matrix4x4D right)
+      public static Matrix4x4 operator *(Matrix4x4 left, Matrix4x4 right)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          Multiply(ref left, ref right, out result);
          return result;
       }
@@ -3032,9 +3032,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The matrix to scale.</param>
       /// <param name="right">The amount by which to scale.</param>
       /// <returns>The scaled matrix.</returns>
-      public static Matrix4x4D operator /(Matrix4x4D left, double right)
+      public static Matrix4x4 operator /(Matrix4x4 left, double right)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          Divide(ref left, right, out result);
          return result;
       }
@@ -3045,9 +3045,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first matrix to divide.</param>
       /// <param name="right">The second matrix to divide.</param>
       /// <returns>The quotient of the two matrices.</returns>
-      public static Matrix4x4D operator /(Matrix4x4D left, Matrix4x4D right)
+      public static Matrix4x4 operator /(Matrix4x4 left, Matrix4x4 right)
       {
-         Matrix4x4D result;
+         Matrix4x4 result;
          Divide(ref left, ref right, out result);
          return result;
       }
@@ -3059,7 +3059,7 @@ namespace Adamantium.Mathematics
       /// <param name="right">The second value to compare.</param>
       /// <returns><c>true</c> if <paramref name="left"/> has the same value as <paramref name="right"/>; otherwise, <c>false</c>.</returns>
       [MethodImpl(MethodImplOptions.AggressiveInlining)]
-      public static bool operator ==(Matrix4x4D left, Matrix4x4D right)
+      public static bool operator ==(Matrix4x4 left, Matrix4x4 right)
       {
          return left.Equals(ref right);
       }
@@ -3071,7 +3071,7 @@ namespace Adamantium.Mathematics
       /// <param name="right">The second value to compare.</param>
       /// <returns><c>true</c> if <paramref name="left"/> has a different value than <paramref name="right"/>; otherwise, <c>false</c>.</returns>
       [MethodImpl(MethodImplOptions.AggressiveInlining)]
-      public static bool operator !=(Matrix4x4D left, Matrix4x4D right)
+      public static bool operator !=(Matrix4x4 left, Matrix4x4 right)
       {
          return !left.Equals(ref right);
       }
@@ -3174,13 +3174,13 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
-      /// Determines whether the specified <see cref="Matrix4x4D"/> is equal to this instance.
+      /// Determines whether the specified <see cref="Matrix4x4"/> is equal to this instance.
       /// </summary>
-      /// <param name="other">The <see cref="Matrix4x4D"/> to compare with this instance.</param>
+      /// <param name="other">The <see cref="Matrix4x4"/> to compare with this instance.</param>
       /// <returns>
-      /// <c>true</c> if the specified <see cref="Matrix4x4D"/> is equal to this instance; otherwise, <c>false</c>.
+      /// <c>true</c> if the specified <see cref="Matrix4x4"/> is equal to this instance; otherwise, <c>false</c>.
       /// </returns>
-      public bool Equals(ref Matrix4x4D other)
+      public bool Equals(ref Matrix4x4 other)
       {
          return (MathHelper.NearEqual(other.M11, M11) &&
              MathHelper.NearEqual(other.M12, M12) &&
@@ -3201,14 +3201,14 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
-      /// Determines whether the specified <see cref="Matrix4x4D"/> is equal to this instance.
+      /// Determines whether the specified <see cref="Matrix4x4"/> is equal to this instance.
       /// </summary>
-      /// <param name="other">The <see cref="Matrix4x4D"/> to compare with this instance.</param>
+      /// <param name="other">The <see cref="Matrix4x4"/> to compare with this instance.</param>
       /// <returns>
-      /// <c>true</c> if the specified <see cref="Matrix4x4D"/> is equal to this instance; otherwise, <c>false</c>.
+      /// <c>true</c> if the specified <see cref="Matrix4x4"/> is equal to this instance; otherwise, <c>false</c>.
       /// </returns>
       [MethodImpl(MethodImplOptions.AggressiveInlining)]
-      public bool Equals(Matrix4x4D other)
+      public bool Equals(Matrix4x4 other)
       {
          return Equals(ref other);
       }
@@ -3222,10 +3222,10 @@ namespace Adamantium.Mathematics
       /// </returns>
       public override bool Equals(object value)
       {
-         if (!(value is Matrix4x4D))
+         if (!(value is Matrix4x4))
             return false;
 
-         var strongValue = (Matrix4x4D)value;
+         var strongValue = (Matrix4x4)value;
          return Equals(ref strongValue);
       }
    }

@@ -7,14 +7,14 @@ namespace Adamantium.EntityFramework.ComponentsBasics
     public abstract class CameraBase : ActivatableComponent
     {
         private QuaternionF rotation = QuaternionF.Identity;
-        private Vector3D offset;
+        private Vector3 offset;
         private uint width;
         private uint height;
         private Single fov;
         private Single fovY;
         private Single tanFov;
         private Vector3F up;
-        private Vector3D? lookAt;
+        private Vector3? lookAt;
         private Double radius;
         private bool isDepthInversed;
         private CameraType cameraType;
@@ -44,7 +44,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
 
         public BoundingFrustum Frustum { get; set; }
 
-        public Vector3D? LookAt { get; set; }
+        public Vector3? LookAt { get; set; }
 
         public Double Velocity { get; set; }
 
@@ -272,7 +272,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
         ///<summary>
         ///Sets camera as Free with specific parameters.
         ///</summary>
-        public abstract void SetFreeCamera(Vector3D position, Vector3D lookAt, Vector3F up);
+        public abstract void SetFreeCamera(Vector3 position, Vector3 lookAt, Vector3F up);
 
         ///<summary>
         ///Sets camera as Free without any parameters
@@ -282,12 +282,12 @@ namespace Adamantium.EntityFramework.ComponentsBasics
         ///<summary>
         ///Changes the Position (Offset) of Free camera.
         ///</summary>
-        public abstract void SetFreePosition(Vector3D position);
+        public abstract void SetFreePosition(Vector3 position);
 
         ///<summary>
         ///Changes the LookAt of Free camera.
         ///</summary>
-        public abstract void SetFreeLookAt(Vector3D lookAt);
+        public abstract void SetFreeLookAt(Vector3 lookAt);
 
         ///<summary>
         ///Sets camera as First Person with specific parameters.
@@ -295,12 +295,12 @@ namespace Adamantium.EntityFramework.ComponentsBasics
         ///<remarks>
         ///objectRotation - rotation of the camera host (e.g. position of human body (and face) in space).
         ///</remarks>
-        public abstract void SetFirstPersonCamera(Vector3D position, QuaternionF objectRotation, Double faceDistance);
+        public abstract void SetFirstPersonCamera(Vector3 position, QuaternionF objectRotation, Double faceDistance);
 
         ///<summary>
         ///Changes the Position (Offset) and Rotation of First Person camera.
         ///</summary>
-        public abstract void SetFirstPersonPositionRotation(Vector3D position, QuaternionF objectRotation);
+        public abstract void SetFirstPersonPositionRotation(Vector3 position, QuaternionF objectRotation);
 
         ///<summary>
         ///Sets camera as Third Person with specific parameters.
@@ -316,10 +316,10 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             Entity hostObject,
             Vector3F initialRelRotation,
             CameraType desiredType,
-            Vector3D? lookAt = null,
+            Vector3? lookAt = null,
             Double? distanceToObject = null);
 
-        public abstract void SetSpecialCamera(Vector3D lookAt);
+        public abstract void SetSpecialCamera(Vector3 lookAt);
 
         ///<summary>
         ///Sets the Radius of spinning for 1st and 3rd person camera.
@@ -329,7 +329,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
         ///<summary>
         ///Sets the LookAt of Third Person camera.
         ///</summary>
-        public abstract void SetThirdPersonLookAt(Vector3D lookAt);
+        public abstract void SetThirdPersonLookAt(Vector3 lookAt);
 
         ///<summary>
         ///Sets the camera's rear view.

@@ -21,7 +21,7 @@ namespace Adamantium.Engine
         /// <param name="initialPosition"></param>
         /// <returns></returns>
         public static async Task<Entity> CreatePrimitive(EntityWorld entityWorld, Camera camera,
-            ShapeType primitiveType, GeometryType geometryType, Entity owner = null, Vector3D? initialPosition = null)
+            ShapeType primitiveType, GeometryType geometryType, Entity owner = null, Vector3? initialPosition = null)
         {
             switch (primitiveType)
             {
@@ -72,7 +72,7 @@ namespace Adamantium.Engine
             return null;
         }
 
-        private static Entity EntityPostCreation(EntityWorld entityWorld, Camera camera, Entity primitive, Vector3D? initialPosition = null)
+        private static Entity EntityPostCreation(EntityWorld entityWorld, Camera camera, Entity primitive, Vector3? initialPosition = null)
         {
             if (initialPosition == null && camera != null)
             {
@@ -94,7 +94,7 @@ namespace Adamantium.Engine
             Camera camera,
             GeometryType geometryType,
             Entity owner = null,
-            Vector3D? initialPosition = null,
+            Vector3? initialPosition = null,
             float width = 1,
             float length = 1,
             int tesselation = 1,
@@ -110,7 +110,7 @@ namespace Adamantium.Engine
             Camera camera,
             GeometryType geometryType,
             Entity owner = null,
-            Vector3D? initialPosition = null,
+            Vector3? initialPosition = null,
             float width = 1,
             float height = 1,
             float depth = 1,
@@ -127,7 +127,7 @@ namespace Adamantium.Engine
             Camera camera,
             GeometryType geometryType,
             Entity owner = null,
-            Vector3D? initialPosition = null,
+            Vector3? initialPosition = null,
             float diameter = 1,
             float thickness = 0.33333f,
             int tesselation = 3,
@@ -143,7 +143,7 @@ namespace Adamantium.Engine
             Camera camera,
             GeometryType geometryType,
             Entity owner = null,
-            Vector3D? initialPosition = null,
+            Vector3? initialPosition = null,
             float diameter = 1,
             float height = 1,
             int tesselation = 32,
@@ -159,7 +159,7 @@ namespace Adamantium.Engine
             Camera camera,
             GeometryType geometryType,
             Entity owner = null,
-            Vector3D? initialPosition = null,
+            Vector3? initialPosition = null,
             float diameter = 1f,
             float height = 1f,
             float thickness = 0.01f,
@@ -176,7 +176,7 @@ namespace Adamantium.Engine
             Camera camera,
             GeometryType geometryType,
             Entity owner = null,
-            Vector3D? initialPosition = null,
+            Vector3? initialPosition = null,
             float height = 1f,
             float topDiameter = 0f,
             float bottomDiameter = 1f,
@@ -192,7 +192,7 @@ namespace Adamantium.Engine
             EntityWorld entityWorld,
             Camera camera,
             Entity owner = null,
-            Vector3D? initialPosition = null,
+            Vector3? initialPosition = null,
             float size = 1,
             int tesselation = 8,
             Matrix4x4F? transform = null)
@@ -208,7 +208,7 @@ namespace Adamantium.Engine
             GeometryType geometryType,
             SphereType sphereType,
             Entity owner = null,
-            Vector3D? initialPosition = null,
+            Vector3? initialPosition = null,
             float diameter = 1,
             int tesselation = 3,
             Matrix4x4F? transform = null)
@@ -237,7 +237,7 @@ namespace Adamantium.Engine
             Camera camera,
             GeometryType geometryType,
             Entity owner = null,
-            Vector3D? initialPosition = null,
+            Vector3? initialPosition = null,
             float height = 1f,
             float radius = 1f,
             int tesselation = 40,
@@ -254,7 +254,7 @@ namespace Adamantium.Engine
             GeometryType geometryType,
             Vector2F diameter,
             Entity owner = null,
-            Vector3D? initialPosition = null,
+            Vector3? initialPosition = null,
             int tesselation = 40,
             Matrix4x4F? transform = null)
         {
@@ -268,7 +268,7 @@ namespace Adamantium.Engine
             Camera camera,
             GeometryType geometryType,
             Entity owner = null,
-            Vector3D? initialPosition = null,
+            Vector3? initialPosition = null,
             float width = 2,
             float height = 1,
             CornerRadius corners = default,
@@ -287,7 +287,7 @@ namespace Adamantium.Engine
             EllipseType ellipseType,
             Vector2F diameter,
             Entity owner = null,
-            Vector3D? initialPosition = null,
+            Vector3? initialPosition = null,
             float startAngle = 0,
             float stopAngle = 360,
             bool isClockwise = true,
@@ -305,7 +305,7 @@ namespace Adamantium.Engine
             GeometryType geometryType,
             Vector2F diameter,
             Entity owner = null,
-            Vector3D? initialPosition = null,
+            Vector3? initialPosition = null,
             float thickness = 0.1f,
             float startAngle = 0,
             float stopAngle = 360,
@@ -325,7 +325,7 @@ namespace Adamantium.Engine
             Vector3F startPoint,
             Vector3F endPoint,
             Entity owner = null,
-            Vector3D? initialPosition = null,
+            Vector3? initialPosition = null,
             float thickness = 0.1f,
             Matrix4x4F? transform = null)
         {

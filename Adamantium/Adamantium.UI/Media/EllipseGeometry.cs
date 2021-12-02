@@ -13,7 +13,7 @@ namespace Adamantium.UI.Media
          typeof(Double), typeof(EllipseGeometry), new PropertyMetadata((Double)0));
 
       public static readonly AdamantiumProperty CenterProperty = AdamantiumProperty.Register(nameof(Center),
-         typeof(Vector2D), typeof(EllipseGeometry), new PropertyMetadata(Vector2D.Zero));
+         typeof(Vector2), typeof(EllipseGeometry), new PropertyMetadata(Vector2.Zero));
 
       public static readonly AdamantiumProperty StartAngleProperty = AdamantiumProperty.Register(nameof(StartAngle),
          typeof(Double), typeof(EllipseGeometry), new PropertyMetadata((Double)0));
@@ -46,9 +46,9 @@ namespace Adamantium.UI.Media
          set => SetValue(StopAngleProperty, value);
       }
 
-      public Vector2D Center
+      public Vector2 Center
       {
-         get => GetValue<Vector2D>(CenterProperty);
+         get => GetValue<Vector2>(CenterProperty);
          set => SetValue(CenterProperty, value);
       }
 
@@ -67,14 +67,14 @@ namespace Adamantium.UI.Media
          CreateEllipse(rect, StartAngle, StopAngle);
       }
 
-      public EllipseGeometry(Vector2D center, Double radiusX, Double radiusY, Double startAngle = 0, Double stopAngle = 360) :
+      public EllipseGeometry(Vector2 center, Double radiusX, Double radiusY, Double startAngle = 0, Double stopAngle = 360) :
          this(center, radiusX, radiusY, startAngle, stopAngle, Matrix4x4F.Identity)
       {
       }
 
-      public EllipseGeometry(Vector2D center, Double radiusX, Double radiusY, Double startAngle, Double stopAngle, Matrix4x4F transform)
+      public EllipseGeometry(Vector2 center, Double radiusX, Double radiusY, Double startAngle, Double stopAngle, Matrix4x4F transform)
       {
-         bounds = new Rect(center - new Vector2D(radiusX, radiusY), new Size(radiusX * 2, radiusY * 2));
+         bounds = new Rect(center - new Vector2(radiusX, radiusY), new Size(radiusX * 2, radiusY * 2));
          Center = center;
          RadiusX = radiusX;
          RadiusY = radiusY;

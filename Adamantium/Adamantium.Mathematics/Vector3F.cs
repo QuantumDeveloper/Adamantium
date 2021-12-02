@@ -1637,9 +1637,9 @@ namespace Adamantium.Mathematics
         /// <param name="right">The second vector to subtract.</param>
         /// <returns>The difference of the two vectors.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Vector3D operator -(Vector3D left, Vector3F right)
+        public static Vector3 operator -(Vector3 left, Vector3F right)
         {
-            return new Vector3D(left.X - right.X, left.Y - right.Y, left.Z - right.Z);
+            return new Vector3(left.X - right.X, left.Y - right.Y, left.Z - right.Z);
         }
 
         /// <summary>
@@ -1800,9 +1800,9 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
-        public static explicit operator Vector2D(Vector3F value)
+        public static explicit operator Vector2(Vector3F value)
         {
-            return new Vector2D(value.X, value.Y);
+            return new Vector2(value.X, value.Y);
         }
 
         /// <summary>
@@ -1930,9 +1930,9 @@ namespace Adamantium.Mathematics
             return Equals(ref strongValue);
         }
 
-        public static implicit operator Vector3D(Vector3F value)
+        public static implicit operator Vector3(Vector3F value)
         {
-            return new Vector3D(value.X, value.Y, value.Z);
+            return new Vector3(value.X, value.Y, value.Z);
         }
 
     }

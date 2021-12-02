@@ -115,7 +115,7 @@ namespace Adamantium.Engine.Core.Models
             return this;
         }
 
-        public Mesh SetPositions(List<Vector2D> inPositions, bool updateBoundingBox = true)
+        public Mesh SetPositions(List<Vector2> inPositions, bool updateBoundingBox = true)
         {
             var positions = new Vector3F[inPositions.Count];
             for (int i = 0; i < inPositions.Count; ++i)

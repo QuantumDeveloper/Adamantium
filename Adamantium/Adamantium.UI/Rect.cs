@@ -45,7 +45,7 @@ namespace Adamantium.UI
       /// </summary>
       /// <param name="position">The position of the rectangle.</param>
       /// <param name="size">The size of the rectangle.</param>
-      public Rect(Vector2D position, Size size)
+      public Rect(Vector2 position, Size size)
       {
          X = position.X;
          Y = position.Y;
@@ -58,7 +58,7 @@ namespace Adamantium.UI
       /// </summary>
       /// <param name="topLeft">The top left position of the rectangle.</param>
       /// <param name="bottomRight">The bottom right position of the rectangle.</param>
-      public Rect(Vector2D topLeft, Vector2D bottomRight)
+      public Rect(Vector2 topLeft, Vector2 bottomRight)
       {
          X = topLeft.X;
          Y = topLeft.Y;
@@ -89,7 +89,7 @@ namespace Adamantium.UI
       /// <summary>
       /// Gets the position of the rectangle.
       /// </summary>
-      public Vector2D Location => new Vector2D(X, Y);
+      public Vector2 Location => new Vector2(X, Y);
 
       /// <summary>
       /// Gets the size of the rectangle.
@@ -109,27 +109,27 @@ namespace Adamantium.UI
       /// <summary>
       /// Gets the top left Vector2D of the rectangle.
       /// </summary>
-      public Vector2D TopLeft => new Vector2D(X, Y);
+      public Vector2 TopLeft => new Vector2(X, Y);
 
       /// <summary>
       /// Gets the top right Vector2D of the rectangle.
       /// </summary>
-      public Vector2D TopRight => new Vector2D(Right, Y);
+      public Vector2 TopRight => new Vector2(Right, Y);
 
       /// <summary>
       /// Gets the bottom left Vector2D of the rectangle.
       /// </summary>
-      public Vector2D BottomLeft => new Vector2D(X, Bottom);
+      public Vector2 BottomLeft => new Vector2(X, Bottom);
 
       /// <summary>
       /// Gets the bottom right Vector2D of the rectangle.
       /// </summary>
-      public Vector2D BottomRight => new Vector2D(Right, Bottom);
+      public Vector2 BottomRight => new Vector2(Right, Bottom);
 
       /// <summary>
       /// Gets the center Vector2D of the rectangle.
       /// </summary>
-      public Vector2D Center => new Vector2D(X + (Width / 2), Y + (Height / 2));
+      public Vector2 Center => new Vector2(X + (Width / 2), Y + (Height / 2));
 
       /// <summary>
       /// Gets a value that indicates whether the rectangle is empty.
@@ -164,7 +164,7 @@ namespace Adamantium.UI
       /// <param name="rect">The rectangle.</param>
       /// <param name="scale">The vector scale.</param>
       /// <returns>The scaled rectangle.</returns>
-      public static Rect operator *(Rect rect, Vector2D scale)
+      public static Rect operator *(Rect rect, Vector2 scale)
       {
          return new Rect(
              rect.X * scale.X,
@@ -194,7 +194,7 @@ namespace Adamantium.UI
       /// <param name="rect">The rectangle.</param>
       /// <param name="scale">The vector scale.</param>
       /// <returns>The scaled rectangle.</returns>
-      public static Rect operator /(Rect rect, Vector2D scale)
+      public static Rect operator /(Rect rect, Vector2 scale)
       {
          return new Rect(
              rect.X / scale.X,
@@ -208,7 +208,7 @@ namespace Adamantium.UI
       /// </summary>
       /// <param name="p">The Vector2D.</param>
       /// <returns>true if the Vector2D is in the bounds of the rectangle; otherwise false.</returns>
-      public bool Contains(Vector2D p)
+      public bool Contains(Vector2 p)
       {
          return p.X >= X && p.X < X + Width &&
                 p.Y >= Y && p.Y < Y + Height;
@@ -235,7 +235,7 @@ namespace Adamantium.UI
       /// <returns>The inflated rectangle.</returns>
       public Rect Inflate(double thickness)
       {
-         return new Rect(new Vector2D(X - thickness, Y - thickness), Size.Inflate(new Thickness(thickness)));
+         return new Rect(new Vector2(X - thickness, Y - thickness), Size.Inflate(new Thickness(thickness)));
       }
 
       /// <summary>
@@ -246,7 +246,7 @@ namespace Adamantium.UI
       public Rect Inflate(Thickness thickness)
       {
          return new Rect(
-             new Vector2D(X - thickness.Left, Y - thickness.Top),
+             new Vector2(X - thickness.Left, Y - thickness.Top),
              Size.Inflate(thickness));
       }
 
@@ -270,7 +270,7 @@ namespace Adamantium.UI
       public Rect Deflate(Thickness thickness)
       {
          return new Rect(
-             new Vector2D(X + thickness.Left, Y + thickness.Top),
+             new Vector2(X + thickness.Left, Y + thickness.Top),
              Size.Deflate(thickness));
       }
 
@@ -380,7 +380,7 @@ namespace Adamantium.UI
             if (p.Y > bottom) bottom = p.Y;
          }
 
-         return new Rect(new Vector2D(left, top), new Vector2D(right, bottom));
+         return new Rect(new Vector2(left, top), new Vector2(right, bottom));
       }
       
 
@@ -389,7 +389,7 @@ namespace Adamantium.UI
       /// </summary>
       /// <param name="offset">The offset.</param>
       /// <returns>The translated rectangle.</returns>
-      public Rect Translate(Vector2D offset)
+      public Rect Translate(Vector2 offset)
       {
          return new Rect(Location + offset, Size);
       }

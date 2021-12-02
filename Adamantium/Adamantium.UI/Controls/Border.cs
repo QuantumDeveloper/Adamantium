@@ -85,7 +85,7 @@ namespace Adamantium.UI.Controls
          base.OnRender(context);
          StreamGeometry geometry = new StreamGeometry();
          
-         geometry.context.BeginFigure(new Vector2D(cornerRadius.TopLeft, 0));
+         geometry.context.BeginFigure(new Vector2(cornerRadius.TopLeft, 0));
 
 
          // geometry.context.LineTo(new Point(size.Width - cornerRadius.TopRight, 0), borderThickness.Top);
@@ -116,7 +116,7 @@ namespace Adamantium.UI.Controls
          
          context.BeginDraw(this);
          context.DrawGeometry(BorderBrush, geometry);
-         context.DrawRectangle(Background, new Rect(new Vector2D(BorderThickness.Left, BorderThickness.Top), RenderSize.Deflate(BorderThickness)), CornerRadius);
+         context.DrawRectangle(Background, new Rect(new Vector2(BorderThickness.Left, BorderThickness.Top), RenderSize.Deflate(BorderThickness)), CornerRadius);
          context.EndDraw(this);
          
       }

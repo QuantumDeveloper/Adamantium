@@ -102,7 +102,7 @@ namespace Adamantium.Mathematics
       /// <summary>
       /// Gets or sets the first row in the matrix; that is M11 and M12.
       /// </summary>
-      public Vector2D Row1
+      public Vector2 Row1
       {
          get => new(M11, M12);
          set { M11 = value.X; M12 = value.Y; }
@@ -111,7 +111,7 @@ namespace Adamantium.Mathematics
       /// <summary>
       /// Gets or sets the second row in the matrix; that is M21 and M22.
       /// </summary>
-      public Vector2D Row2
+      public Vector2 Row2
       {
          get => new(M21, M22);
          set { M21 = value.X; M22 = value.Y; }
@@ -120,7 +120,7 @@ namespace Adamantium.Mathematics
       /// <summary>
       /// Gets or sets the third row in the matrix; that is M31 and M32.
       /// </summary>
-      public Vector2D Row3
+      public Vector2 Row3
       {
          get => new(M31, M32);
          set { M31 = value.X; M32 = value.Y; }
@@ -131,7 +131,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       public Vector3F Column1
       {
-         get => new Vector3D(M11, M21, M31);
+         get => new Vector3(M11, M21, M31);
          set { M11 = value.X; M21 = value.Y; M31 = value.Z; }
       }
 
@@ -140,14 +140,14 @@ namespace Adamantium.Mathematics
       /// </summary>
       public Vector3F Column2
       {
-         get => new Vector3D(M12, M22, M32);
+         get => new Vector3(M12, M22, M32);
          set { M12 = value.X; M22 = value.Y; M32 = value.Z; }
       }
 
       /// <summary>
       /// Gets or sets the translation of the matrix; that is M31 and M32.
       /// </summary>
-      public Vector2D TranslationVector
+      public Vector2 TranslationVector
       {
          get => new(M31, M32);
          set { M31 = value.X; M32 = value.Y; }
@@ -156,7 +156,7 @@ namespace Adamantium.Mathematics
       /// <summary>
       /// Gets or sets the scale of the matrix; that is M11 and M22.
       /// </summary>
-      public Vector2D ScaleVector
+      public Vector2 ScaleVector
       {
          get => new(M11, M22);
          set { M11 = value.X; M22 = value.Y; }
@@ -491,7 +491,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="scale">Scaling factor for both axes.</param>
       /// <param name="result">When the method completes, contains the created scaling matrix.</param>
-      public static void Scaling(ref Vector2D scale, out Matrix3x2 result)
+      public static void Scaling(ref Vector2 scale, out Matrix3x2 result)
       {
          Scaling(scale.X, scale.Y, out result);
       }
@@ -501,7 +501,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="scale">Scaling factor for both axes.</param>
       /// <returns>The created scaling matrix.</returns>
-      public static Matrix3x2 Scaling(Vector2D scale)
+      public static Matrix3x2 Scaling(Vector2 scale)
       {
          Scaling(ref scale, out var result);
          return result;
@@ -561,7 +561,7 @@ namespace Adamantium.Mathematics
       /// <param name="y">Scaling factor that is applied along the y-axis.</param>
       /// <param name="center">The center of the scaling.</param>
       /// <returns>The created scaling matrix.</returns>
-      public static Matrix3x2 Scaling(double x, double y, Vector2D center)
+      public static Matrix3x2 Scaling(double x, double y, Vector2 center)
       {
          Matrix3x2 result;
 
@@ -581,7 +581,7 @@ namespace Adamantium.Mathematics
       /// <param name="y">Scaling factor that is applied along the y-axis.</param>
       /// <param name="center">The center of the scaling.</param>
       /// <param name="result">The created scaling matrix.</param>
-      public static void Scaling(double x, double y, ref Vector2D center, out Matrix3x2 result)
+      public static void Scaling(double x, double y, ref Vector2 center, out Matrix3x2 result)
       {
          Matrix3x2 localResult;
 
@@ -637,7 +637,7 @@ namespace Adamantium.Mathematics
       /// <param name="angle">Angle of rotation in radians. Angles are measured clockwise when looking along the rotation axis.</param>
       /// <param name="center">The center of the rotation.</param>
       /// <returns>The created rotation matrix.</returns>
-      public static Matrix3x2 Rotation(double angle, Vector2D center)
+      public static Matrix3x2 Rotation(double angle, Vector2 center)
       {
          Rotation(angle, center, out var result);
          return result;
@@ -649,7 +649,7 @@ namespace Adamantium.Mathematics
       /// <param name="angle">Angle of rotation in radians. Angles are measured clockwise when looking along the rotation axis.</param>
       /// <param name="center">The center of the rotation.</param>
       /// <param name="result">When the method completes, contains the created rotation matrix.</param>
-      public static void Rotation(double angle, Vector2D center, out Matrix3x2 result)
+      public static void Rotation(double angle, Vector2 center, out Matrix3x2 result)
       {
          result = Translation(-center) * Rotation(angle) * Translation(center);
       }
@@ -688,7 +688,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The offset for both coordinate planes.</param>
       /// <param name="result">When the method completes, contains the created translation matrix.</param>
-      public static void Translation(ref Vector2D value, out Matrix3x2 result)
+      public static void Translation(ref Vector2 value, out Matrix3x2 result)
       {
          Translation(value.X, value.Y, out result);
       }
@@ -698,7 +698,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The offset for both coordinate planes.</param>
       /// <returns>The created translation matrix.</returns>
-      public static Matrix3x2 Translation(Vector2D value)
+      public static Matrix3x2 Translation(Vector2 value)
       {
          Translation(ref value, out var result);
          return result;
@@ -735,9 +735,9 @@ namespace Adamantium.Mathematics
       /// <param name="matrix">The matrix to use as a transformation matrix.</param>
       /// <param name="point">The original vector to apply the transformation.</param>
       /// <returns>The result of the transformation for the input vector.</returns>
-      public static Vector2D TransformPoint(Matrix3x2 matrix, Vector2D point)
+      public static Vector2 TransformPoint(Matrix3x2 matrix, Vector2 point)
       {
-         Vector2D result;
+         Vector2 result;
          result.X = (point.X * matrix.M11) + (point.Y * matrix.M21) + matrix.M31;
          result.Y = (point.X * matrix.M12) + (point.Y * matrix.M22) + matrix.M32;
          return result;
@@ -750,9 +750,9 @@ namespace Adamantium.Mathematics
       /// <param name="point">The original vector to apply the transformation.</param>
       /// <param name="result">The result of the transformation for the input vector.</param>
       /// <returns></returns>
-      public static void TransformPoint(ref Matrix3x2 matrix, ref Vector2D point, out Vector2D result)
+      public static void TransformPoint(ref Matrix3x2 matrix, ref Vector2 point, out Vector2 result)
       {
-         Vector2D localResult;
+         Vector2 localResult;
          localResult.X = (point.X * matrix.M11) + (point.Y * matrix.M21) + matrix.M31;
          localResult.Y = (point.X * matrix.M12) + (point.Y * matrix.M22) + matrix.M32;
          result = localResult;

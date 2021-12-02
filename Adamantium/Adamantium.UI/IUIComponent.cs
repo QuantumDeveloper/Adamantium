@@ -78,13 +78,13 @@ namespace Adamantium.UI
         bool IsGeometryValid { get; }
         Size DesiredSize { get; }
         Size RenderSize { get; set; }
-        Vector2D Location { get; set; }
-        Vector2D Scale { get; set; }
+        Vector2 Location { get; set; }
+        Vector2 Scale { get; set; }
         Double Rotation { get; set; }
         Visibility Visibility { get; set; }
         Rect Bounds { get; set; }
         Rect ClipRectangle { get; }
-        Vector2D ClipPosition { get; set; }
+        Vector2 ClipPosition { get; set; }
         IUIComponent VisualParent { get; }
         Int32 ZIndex { get; set; }
         bool IsAttachedToVisualTree { get; }

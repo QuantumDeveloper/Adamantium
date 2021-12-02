@@ -10,27 +10,27 @@ using System.Threading.Tasks;
 namespace Adamantium.Mathematics
 {
    [StructLayout(LayoutKind.Sequential, Pack = 4)]
-   public struct QuaternionD : IEquatable<QuaternionD>, IFormattable
+   public struct Quaternion : IEquatable<Quaternion>, IFormattable
    {
       /// <summary>
-      /// The size of the <see cref="QuaternionD"/> type, in bytes.
+      /// The size of the <see cref="Quaternion"/> type, in bytes.
       /// </summary>
-      public static readonly int SizeInBytes = Marshal.SizeOf(typeof(QuaternionD));
+      public static readonly int SizeInBytes = Marshal.SizeOf(typeof(Quaternion));
 
       /// <summary>
-      /// A <see cref="QuaternionD"/> with all of its components set to zero.
+      /// A <see cref="Quaternion"/> with all of its components set to zero.
       /// </summary>
-      public static readonly QuaternionD Zero = new QuaternionD();
+      public static readonly Quaternion Zero = new Quaternion();
 
       /// <summary>
-      /// A <see cref="QuaternionD"/> with all of its components set to one.
+      /// A <see cref="Quaternion"/> with all of its components set to one.
       /// </summary>
-      public static readonly QuaternionD One = new QuaternionD(1.0f, 1.0f, 1.0f, 1.0f);
+      public static readonly Quaternion One = new Quaternion(1.0f, 1.0f, 1.0f, 1.0f);
 
       /// <summary>
-      /// The identity <see cref="QuaternionD"/> (0, 0, 0, 1).
+      /// The identity <see cref="Quaternion"/> (0, 0, 0, 1).
       /// </summary>
-      public static readonly QuaternionD Identity = new QuaternionD(0.0f, 0.0f, 0.0f, 1.0f);
+      public static readonly Quaternion Identity = new Quaternion(0.0f, 0.0f, 0.0f, 1.0f);
 
       /// <summary>
       /// The X component of the quaternion.
@@ -53,10 +53,10 @@ namespace Adamantium.Mathematics
       public double W;
 
       /// <summary>
-      /// Initializes a new instance of the <see cref="QuaternionD"/> struct.
+      /// Initializes a new instance of the <see cref="Quaternion"/> struct.
       /// </summary>
       /// <param name="value">The value that will be assigned to all components.</param>
-      public QuaternionD(double value)
+      public Quaternion(double value)
       {
          X = value;
          Y = value;
@@ -65,10 +65,10 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
-      /// Initializes a new instance of the <see cref="QuaternionD"/> struct.
+      /// Initializes a new instance of the <see cref="Quaternion"/> struct.
       /// </summary>
       /// <param name="value">A vector containing the values with which to initialize the components.</param>
-      public QuaternionD(Vector4F value)
+      public Quaternion(Vector4F value)
       {
          X = value.X;
          Y = value.Y;
@@ -77,11 +77,11 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
-      /// Initializes a new instance of the <see cref="QuaternionD"/> struct.
+      /// Initializes a new instance of the <see cref="Quaternion"/> struct.
       /// </summary>
       /// <param name="value">A vector containing the values with which to initialize the X, Y, and Z components.</param>
       /// <param name="w">Initial value for the W component of the quaternion.</param>
-      public QuaternionD(Vector3D value, double w)
+      public Quaternion(Vector3 value, double w)
       {
          X = value.X;
          Y = value.Y;
@@ -90,12 +90,12 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
-      /// Initializes a new instance of the <see cref="QuaternionD"/> struct.
+      /// Initializes a new instance of the <see cref="Quaternion"/> struct.
       /// </summary>
       /// <param name="value">A vector containing the values with which to initialize the X and Y components.</param>
       /// <param name="z">Initial value for the Z component of the quaternion.</param>
       /// <param name="w">Initial value for the W component of the quaternion.</param>
-      public QuaternionD(Vector2F value, double z, double w)
+      public Quaternion(Vector2F value, double z, double w)
       {
          X = value.X;
          Y = value.Y;
@@ -104,13 +104,13 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
-      /// Initializes a new instance of the <see cref="QuaternionD"/> struct.
+      /// Initializes a new instance of the <see cref="Quaternion"/> struct.
       /// </summary>
       /// <param name="x">Initial value for the X component of the quaternion.</param>
       /// <param name="y">Initial value for the Y component of the quaternion.</param>
       /// <param name="z">Initial value for the Z component of the quaternion.</param>
       /// <param name="w">Initial value for the W component of the quaternion.</param>
-      public QuaternionD(double x, double y, double z, double w)
+      public Quaternion(double x, double y, double z, double w)
       {
          X = x;
          Y = y;
@@ -119,12 +119,12 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
-      /// Initializes a new instance of the <see cref="QuaternionD"/> struct.
+      /// Initializes a new instance of the <see cref="Quaternion"/> struct.
       /// </summary>
       /// <param name="values">The values to assign to the X, Y, Z, and W components of the quaternion. This must be an array with four elements.</param>
       /// <exception cref="ArgumentNullException">Thrown when <paramref name="values"/> is <c>null</c>.</exception>
       /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="values"/> contains more or less than four elements.</exception>
-      public QuaternionD(double[] values)
+      public Quaternion(double[] values)
       {
          if (values == null)
             throw new ArgumentNullException(nameof(values));
@@ -170,16 +170,16 @@ namespace Adamantium.Mathematics
       /// Gets the axis components of the quaternion.
       /// </summary>
       /// <value>The axis components of the quaternion.</value>
-      public Vector3D Axis
+      public Vector3 Axis
       {
          get
          {
             double length = (X * X) + (Y * Y) + (Z * Z);
             if (MathHelper.IsZero(length))
-               return Vector3D.UnitX;
+               return Vector3.UnitX;
 
             double inv = 1.0f / Math.Sqrt(length);
-            return new Vector3D(X * inv, Y * inv, Z * inv);
+            return new Vector3(X * inv, Y * inv, Z * inv);
          }
       }
 
@@ -250,7 +250,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <returns>The length of the quaternion.</returns>
       /// <remarks>
-      /// <see cref="QuaternionD.LengthSquared"/> may be preferred when only the relative length is needed
+      /// <see cref="Quaternion.LengthSquared"/> may be preferred when only the relative length is needed
       /// and speed is of the essence.
       /// </remarks>
       public double Length()
@@ -263,7 +263,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <returns>The squared length of the quaternion.</returns>
       /// <remarks>
-      /// This method may be preferred to <see cref="QuaternionD.Length"/> when only a relative length is needed
+      /// This method may be preferred to <see cref="Quaternion.Length"/> when only a relative length is needed
       /// and speed is of the essence.
       /// </remarks>
       public double LengthSquared()
@@ -302,7 +302,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first quaternion to add.</param>
       /// <param name="right">The second quaternion to add.</param>
       /// <param name="result">When the method completes, contains the sum of the two quaternions.</param>
-      public static void Add(ref QuaternionD left, ref QuaternionD right, out QuaternionD result)
+      public static void Add(ref Quaternion left, ref Quaternion right, out Quaternion result)
       {
          result.X = left.X + right.X;
          result.Y = left.Y + right.Y;
@@ -316,9 +316,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first quaternion to add.</param>
       /// <param name="right">The second quaternion to add.</param>
       /// <returns>The sum of the two quaternions.</returns>
-      public static QuaternionD Add(QuaternionD left, QuaternionD right)
+      public static Quaternion Add(Quaternion left, Quaternion right)
       {
-         QuaternionD result;
+         Quaternion result;
          Add(ref left, ref right, out result);
          return result;
       }
@@ -329,7 +329,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first quaternion to subtract.</param>
       /// <param name="right">The second quaternion to subtract.</param>
       /// <param name="result">When the method completes, contains the difference of the two quaternions.</param>
-      public static void Subtract(ref QuaternionD left, ref QuaternionD right, out QuaternionD result)
+      public static void Subtract(ref Quaternion left, ref Quaternion right, out Quaternion result)
       {
          result.X = left.X - right.X;
          result.Y = left.Y - right.Y;
@@ -343,9 +343,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first quaternion to subtract.</param>
       /// <param name="right">The second quaternion to subtract.</param>
       /// <returns>The difference of the two quaternions.</returns>
-      public static QuaternionD Subtract(QuaternionD left, QuaternionD right)
+      public static Quaternion Subtract(Quaternion left, Quaternion right)
       {
-         QuaternionD result;
+         Quaternion result;
          Subtract(ref left, ref right, out result);
          return result;
       }
@@ -356,7 +356,7 @@ namespace Adamantium.Mathematics
       /// <param name="value">The quaternion to scale.</param>
       /// <param name="scale">The amount by which to scale the quaternion.</param>
       /// <param name="result">When the method completes, contains the scaled quaternion.</param>
-      public static void Multiply(ref QuaternionD value, double scale, out QuaternionD result)
+      public static void Multiply(ref Quaternion value, double scale, out Quaternion result)
       {
          result.X = value.X * scale;
          result.Y = value.Y * scale;
@@ -370,9 +370,9 @@ namespace Adamantium.Mathematics
       /// <param name="value">The quaternion to scale.</param>
       /// <param name="scale">The amount by which to scale the quaternion.</param>
       /// <returns>The scaled quaternion.</returns>
-      public static QuaternionD Multiply(QuaternionD value, double scale)
+      public static Quaternion Multiply(Quaternion value, double scale)
       {
-         QuaternionD result;
+         Quaternion result;
          Multiply(ref value, scale, out result);
          return result;
       }
@@ -383,7 +383,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first quaternion to multiply.</param>
       /// <param name="right">The second quaternion to multiply.</param>
       /// <param name="result">When the method completes, contains the multiplied quaternion.</param>
-      public static void Multiply(ref QuaternionD left, ref QuaternionD right, out QuaternionD result)
+      public static void Multiply(ref Quaternion left, ref Quaternion right, out Quaternion result)
       {
          double lx = left.X;
          double ly = left.Y;
@@ -409,9 +409,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first quaternion to multiply.</param>
       /// <param name="right">The second quaternion to multiply.</param>
       /// <returns>The multiplied quaternion.</returns>
-      public static QuaternionD Multiply(QuaternionD left, QuaternionD right)
+      public static Quaternion Multiply(Quaternion left, Quaternion right)
       {
-         QuaternionD result;
+         Quaternion result;
          Multiply(ref left, ref right, out result);
          return result;
       }
@@ -421,7 +421,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The quaternion to negate.</param>
       /// <param name="result">When the method completes, contains a quaternion facing in the opposite direction.</param>
-      public static void Negate(ref QuaternionD value, out QuaternionD result)
+      public static void Negate(ref Quaternion value, out Quaternion result)
       {
          result.X = -value.X;
          result.Y = -value.Y;
@@ -434,42 +434,42 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The quaternion to negate.</param>
       /// <returns>A quaternion facing in the opposite direction.</returns>
-      public static QuaternionD Negate(QuaternionD value)
+      public static Quaternion Negate(Quaternion value)
       {
-         QuaternionD result;
+         Quaternion result;
          Negate(ref value, out result);
          return result;
       }
 
       /// <summary>
-      /// Returns a <see cref="QuaternionD"/> containing the 4D Cartesian coordinates of a point specified in Barycentric coordinates relative to a 2D triangle.
+      /// Returns a <see cref="Quaternion"/> containing the 4D Cartesian coordinates of a point specified in Barycentric coordinates relative to a 2D triangle.
       /// </summary>
-      /// <param name="value1">A <see cref="QuaternionD"/> containing the 4D Cartesian coordinates of vertex 1 of the triangle.</param>
-      /// <param name="value2">A <see cref="QuaternionD"/> containing the 4D Cartesian coordinates of vertex 2 of the triangle.</param>
-      /// <param name="value3">A <see cref="QuaternionD"/> containing the 4D Cartesian coordinates of vertex 3 of the triangle.</param>
+      /// <param name="value1">A <see cref="Quaternion"/> containing the 4D Cartesian coordinates of vertex 1 of the triangle.</param>
+      /// <param name="value2">A <see cref="Quaternion"/> containing the 4D Cartesian coordinates of vertex 2 of the triangle.</param>
+      /// <param name="value3">A <see cref="Quaternion"/> containing the 4D Cartesian coordinates of vertex 3 of the triangle.</param>
       /// <param name="amount1">Barycentric coordinate b2, which expresses the weighting factor toward vertex 2 (specified in <paramref name="value2"/>).</param>
       /// <param name="amount2">Barycentric coordinate b3, which expresses the weighting factor toward vertex 3 (specified in <paramref name="value3"/>).</param>
-      /// <param name="result">When the method completes, contains a new <see cref="QuaternionD"/> containing the 4D Cartesian coordinates of the specified point.</param>
-      public static void Barycentric(ref QuaternionD value1, ref QuaternionD value2, ref QuaternionD value3, double amount1, double amount2, out QuaternionD result)
+      /// <param name="result">When the method completes, contains a new <see cref="Quaternion"/> containing the 4D Cartesian coordinates of the specified point.</param>
+      public static void Barycentric(ref Quaternion value1, ref Quaternion value2, ref Quaternion value3, double amount1, double amount2, out Quaternion result)
       {
-         QuaternionD start, end;
+         Quaternion start, end;
          Slerp(ref value1, ref value2, amount1 + amount2, out start);
          Slerp(ref value1, ref value3, amount1 + amount2, out end);
          Slerp(ref start, ref end, amount2 / (amount1 + amount2), out result);
       }
 
       /// <summary>
-      /// Returns a <see cref="QuaternionD"/> containing the 4D Cartesian coordinates of a point specified in Barycentric coordinates relative to a 2D triangle.
+      /// Returns a <see cref="Quaternion"/> containing the 4D Cartesian coordinates of a point specified in Barycentric coordinates relative to a 2D triangle.
       /// </summary>
-      /// <param name="value1">A <see cref="QuaternionD"/> containing the 4D Cartesian coordinates of vertex 1 of the triangle.</param>
-      /// <param name="value2">A <see cref="QuaternionD"/> containing the 4D Cartesian coordinates of vertex 2 of the triangle.</param>
-      /// <param name="value3">A <see cref="QuaternionD"/> containing the 4D Cartesian coordinates of vertex 3 of the triangle.</param>
+      /// <param name="value1">A <see cref="Quaternion"/> containing the 4D Cartesian coordinates of vertex 1 of the triangle.</param>
+      /// <param name="value2">A <see cref="Quaternion"/> containing the 4D Cartesian coordinates of vertex 2 of the triangle.</param>
+      /// <param name="value3">A <see cref="Quaternion"/> containing the 4D Cartesian coordinates of vertex 3 of the triangle.</param>
       /// <param name="amount1">Barycentric coordinate b2, which expresses the weighting factor toward vertex 2 (specified in <paramref name="value2"/>).</param>
       /// <param name="amount2">Barycentric coordinate b3, which expresses the weighting factor toward vertex 3 (specified in <paramref name="value3"/>).</param>
-      /// <returns>A new <see cref="QuaternionD"/> containing the 4D Cartesian coordinates of the specified point.</returns>
-      public static QuaternionD Barycentric(QuaternionD value1, QuaternionD value2, QuaternionD value3, double amount1, double amount2)
+      /// <returns>A new <see cref="Quaternion"/> containing the 4D Cartesian coordinates of the specified point.</returns>
+      public static Quaternion Barycentric(Quaternion value1, Quaternion value2, Quaternion value3, double amount1, double amount2)
       {
-         QuaternionD result;
+         Quaternion result;
          Barycentric(ref value1, ref value2, ref value3, amount1, amount2, out result);
          return result;
       }
@@ -479,7 +479,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The quaternion to conjugate.</param>
       /// <param name="result">When the method completes, contains the conjugated quaternion.</param>
-      public static void Conjugate(ref QuaternionD value, out QuaternionD result)
+      public static void Conjugate(ref Quaternion value, out Quaternion result)
       {
          result.X = -value.X;
          result.Y = -value.Y;
@@ -492,9 +492,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The quaternion to conjugate.</param>
       /// <returns>The conjugated quaternion.</returns>
-      public static QuaternionD Conjugate(QuaternionD value)
+      public static Quaternion Conjugate(Quaternion value)
       {
-         QuaternionD result;
+         Quaternion result;
          Conjugate(ref value, out result);
          return result;
       }
@@ -505,7 +505,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">First source quaternion.</param>
       /// <param name="right">Second source quaternion.</param>
       /// <param name="result">When the method completes, contains the dot product of the two quaternions.</param>
-      public static void Dot(ref QuaternionD left, ref QuaternionD right, out double result)
+      public static void Dot(ref Quaternion left, ref Quaternion right, out double result)
       {
          result = (left.X * right.X) + (left.Y * right.Y) + (left.Z * right.Z) + (left.W * right.W);
       }
@@ -516,7 +516,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">First source quaternion.</param>
       /// <param name="right">Second source quaternion.</param>
       /// <returns>The dot product of the two quaternions.</returns>
-      public static double Dot(QuaternionD left, QuaternionD right)
+      public static double Dot(Quaternion left, Quaternion right)
       {
          return (left.X * right.X) + (left.Y * right.Y) + (left.Z * right.Z) + (left.W * right.W);
       }
@@ -526,7 +526,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The quaternion to exponentiate.</param>
       /// <param name="result">When the method completes, contains the exponentiated quaternion.</param>
-      public static void Exponential(ref QuaternionD value, out QuaternionD result)
+      public static void Exponential(ref Quaternion value, out Quaternion result)
       {
          double angle = (double)Math.Sqrt((value.X * value.X) + (value.Y * value.Y) + (value.Z * value.Z));
          double sin = (double)Math.Sin(angle);
@@ -551,9 +551,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The quaternion to exponentiate.</param>
       /// <returns>The exponentiated quaternion.</returns>
-      public static QuaternionD Exponential(QuaternionD value)
+      public static Quaternion Exponential(Quaternion value)
       {
-         QuaternionD result;
+         Quaternion result;
          Exponential(ref value, out result);
          return result;
       }
@@ -563,7 +563,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The quaternion to conjugate and renormalize.</param>
       /// <param name="result">When the method completes, contains the conjugated and renormalized quaternion.</param>
-      public static void Invert(ref QuaternionD value, out QuaternionD result)
+      public static void Invert(ref Quaternion value, out Quaternion result)
       {
          result = value;
          result.Invert();
@@ -574,9 +574,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The quaternion to conjugate and renormalize.</param>
       /// <returns>The conjugated and renormalized quaternion.</returns>
-      public static QuaternionD Invert(QuaternionD value)
+      public static Quaternion Invert(Quaternion value)
       {
-         QuaternionD result;
+         Quaternion result;
          Invert(ref value, out result);
          return result;
       }
@@ -593,7 +593,7 @@ namespace Adamantium.Mathematics
       /// <code>start + (end - start) * amount</code>
       /// Passing <paramref name="amount"/> a value of 0 will cause <paramref name="start"/> to be returned; a value of 1 will cause <paramref name="end"/> to be returned. 
       /// </remarks>
-      public static void Lerp(ref QuaternionD start, ref QuaternionD end, double amount, out QuaternionD result)
+      public static void Lerp(ref Quaternion start, ref Quaternion end, double amount, out Quaternion result)
       {
          double inverse = 1.0f - amount;
 
@@ -627,9 +627,9 @@ namespace Adamantium.Mathematics
       /// <code>start + (end - start) * amount</code>
       /// Passing <paramref name="amount"/> a value of 0 will cause <paramref name="start"/> to be returned; a value of 1 will cause <paramref name="end"/> to be returned. 
       /// </remarks>
-      public static QuaternionD Lerp(QuaternionD start, QuaternionD end, double amount)
+      public static Quaternion Lerp(Quaternion start, Quaternion end, double amount)
       {
-         QuaternionD result;
+         Quaternion result;
          Lerp(ref start, ref end, amount, out result);
          return result;
       }
@@ -639,7 +639,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The quaternion whose logarithm will be calculated.</param>
       /// <param name="result">When the method completes, contains the natural logarithm of the quaternion.</param>
-      public static void Logarithm(ref QuaternionD value, out QuaternionD result)
+      public static void Logarithm(ref Quaternion value, out Quaternion result)
       {
          if (Math.Abs(value.W) < 1.0)
          {
@@ -671,9 +671,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The quaternion whose logarithm will be calculated.</param>
       /// <returns>The natural logarithm of the quaternion.</returns>
-      public static QuaternionD Logarithm(QuaternionD value)
+      public static Quaternion Logarithm(Quaternion value)
       {
-         QuaternionD result;
+         Quaternion result;
          Logarithm(ref value, out result);
          return result;
       }
@@ -683,9 +683,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The quaternion to normalize.</param>
       /// <param name="result">When the method completes, contains the normalized quaternion.</param>
-      public static void Normalize(ref QuaternionD value, out QuaternionD result)
+      public static void Normalize(ref Quaternion value, out Quaternion result)
       {
-         QuaternionD temp = value;
+         Quaternion temp = value;
          result = temp;
          result.Normalize();
       }
@@ -695,7 +695,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The quaternion to normalize.</param>
       /// <returns>The normalized quaternion.</returns>
-      public static QuaternionD Normalize(QuaternionD value)
+      public static Quaternion Normalize(Quaternion value)
       {
          value.Normalize();
          return value;
@@ -707,10 +707,10 @@ namespace Adamantium.Mathematics
       /// <param name="axis">The axis of rotation.</param>
       /// <param name="angle">The angle of rotation.</param>
       /// <param name="result">When the method completes, contains the newly created quaternion.</param>
-      public static void RotationAxis(ref Vector3D axis, double angle, out QuaternionD result)
+      public static void RotationAxis(ref Vector3 axis, double angle, out Quaternion result)
       {
-         Vector3D normalized;
-         Vector3D.Normalize(ref axis, out normalized);
+         Vector3 normalized;
+         Vector3.Normalize(ref axis, out normalized);
 
          double half = angle * 0.5f;
          double sin = (double)Math.Sin(half);
@@ -728,9 +728,9 @@ namespace Adamantium.Mathematics
       /// <param name="axis">The axis of rotation.</param>
       /// <param name="angle">The angle of rotation.</param>
       /// <returns>The newly created quaternion.</returns>
-      public static QuaternionD RotationAxis(Vector3D axis, double angle)
+      public static Quaternion RotationAxis(Vector3 axis, double angle)
       {
-         QuaternionD result;
+         Quaternion result;
          RotationAxis(ref axis, angle, out result);
          return result;
       }
@@ -740,7 +740,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="matrix">The rotation matrix.</param>
       /// <param name="result">When the method completes, contains the newly created quaternion.</param>
-      public static void RotationMatrix(ref Matrix4x4D matrix, out QuaternionD result)
+      public static void RotationMatrix(ref Matrix4x4 matrix, out Quaternion result)
       {
          double sqrt;
          double half;
@@ -793,7 +793,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="matrix">The rotation matrix.</param>
       /// <param name="result">When the method completes, contains the newly created quaternion.</param>
-      public static void RotationMatrix(ref Matrix3x3D matrix, out QuaternionD result)
+      public static void RotationMatrix(ref Matrix3x3 matrix, out Quaternion result)
       {
          double sqrt;
          double half;
@@ -848,10 +848,10 @@ namespace Adamantium.Mathematics
       /// <param name="target">The camera look-at target.</param>
       /// <param name="up">The camera's up vector.</param>
       /// <param name="result">When the method completes, contains the created look-at quaternion.</param>
-      public static void LookAtLH(ref Vector3D eye, ref Vector3D target, ref Vector3D up, out QuaternionD result)
+      public static void LookAtLH(ref Vector3 eye, ref Vector3 target, ref Vector3 up, out Quaternion result)
       {
-         Matrix3x3D matrix;
-         Matrix3x3D.LookAtLH(ref eye, ref target, ref up, out matrix);
+         Matrix3x3 matrix;
+         Matrix3x3.LookAtLH(ref eye, ref target, ref up, out matrix);
          RotationMatrix(ref matrix, out result);
       }
 
@@ -862,9 +862,9 @@ namespace Adamantium.Mathematics
       /// <param name="target">The camera look-at target.</param>
       /// <param name="up">The camera's up vector.</param>
       /// <returns>The created look-at quaternion.</returns>
-      public static QuaternionD LookAtLH(Vector3D eye, Vector3D target, Vector3D up)
+      public static Quaternion LookAtLH(Vector3 eye, Vector3 target, Vector3 up)
       {
-         QuaternionD result;
+         Quaternion result;
          LookAtLH(ref eye, ref target, ref up, out result);
          return result;
       }
@@ -875,10 +875,10 @@ namespace Adamantium.Mathematics
       /// <param name="forward">The camera's forward direction.</param>
       /// <param name="up">The camera's up vector.</param>
       /// <param name="result">When the method completes, contains the created look-at quaternion.</param>
-      public static void RotationLookAtLH(ref Vector3D forward, ref Vector3D up, out QuaternionD result)
+      public static void RotationLookAtLH(ref Vector3 forward, ref Vector3 up, out Quaternion result)
       {
-         Vector3D eye = Vector3D.Zero;
-         QuaternionD.LookAtLH(ref eye, ref forward, ref up, out result);
+         Vector3 eye = Vector3.Zero;
+         Quaternion.LookAtLH(ref eye, ref forward, ref up, out result);
       }
 
       /// <summary>
@@ -887,9 +887,9 @@ namespace Adamantium.Mathematics
       /// <param name="forward">The camera's forward direction.</param>
       /// <param name="up">The camera's up vector.</param>
       /// <returns>The created look-at quaternion.</returns>
-      public static QuaternionD RotationLookAtLH(Vector3D forward, Vector3D up)
+      public static Quaternion RotationLookAtLH(Vector3 forward, Vector3 up)
       {
-         QuaternionD result;
+         Quaternion result;
          RotationLookAtLH(ref forward, ref up, out result);
          return result;
       }
@@ -901,10 +901,10 @@ namespace Adamantium.Mathematics
       /// <param name="target">The camera look-at target.</param>
       /// <param name="up">The camera's up vector.</param>
       /// <param name="result">When the method completes, contains the created look-at quaternion.</param>
-      public static void LookAtRH(ref Vector3D eye, ref Vector3D target, ref Vector3D up, out QuaternionD result)
+      public static void LookAtRH(ref Vector3 eye, ref Vector3 target, ref Vector3 up, out Quaternion result)
       {
-         Matrix3x3D matrix;
-         Matrix3x3D.LookAtRH(ref eye, ref target, ref up, out matrix);
+         Matrix3x3 matrix;
+         Matrix3x3.LookAtRH(ref eye, ref target, ref up, out matrix);
          RotationMatrix(ref matrix, out result);
       }
 
@@ -915,9 +915,9 @@ namespace Adamantium.Mathematics
       /// <param name="target">The camera look-at target.</param>
       /// <param name="up">The camera's up vector.</param>
       /// <returns>The created look-at quaternion.</returns>
-      public static QuaternionD LookAtRH(Vector3D eye, Vector3D target, Vector3D up)
+      public static Quaternion LookAtRH(Vector3 eye, Vector3 target, Vector3 up)
       {
-         QuaternionD result;
+         Quaternion result;
          LookAtRH(ref eye, ref target, ref up, out result);
          return result;
       }
@@ -928,9 +928,9 @@ namespace Adamantium.Mathematics
       /// <param name="forward">The camera's forward direction.</param>
       /// <param name="up">The camera's up vector.</param>
       /// <param name="result">When the method completes, contains the created look-at quaternion.</param>
-      public static void RotationLookAtRH(ref Vector3D forward, ref Vector3D up, out QuaternionD result)
+      public static void RotationLookAtRH(ref Vector3 forward, ref Vector3 up, out Quaternion result)
       {
-         Vector3D eye = Vector3D.Zero;
+         Vector3 eye = Vector3.Zero;
          LookAtRH(ref eye, ref forward, ref up, out result);
       }
 
@@ -940,9 +940,9 @@ namespace Adamantium.Mathematics
       /// <param name="forward">The camera's forward direction.</param>
       /// <param name="up">The camera's up vector.</param>
       /// <returns>The created look-at quaternion.</returns>
-      public static QuaternionD RotationLookAtRH(Vector3D forward, Vector3D up)
+      public static Quaternion RotationLookAtRH(Vector3 forward, Vector3 up)
       {
-         QuaternionD result;
+         Quaternion result;
          RotationLookAtRH(ref forward, ref up, out result);
          return result;
       }
@@ -955,10 +955,10 @@ namespace Adamantium.Mathematics
       /// <param name="cameraUpVector">The up vector of the camera.</param>
       /// <param name="cameraForwardVector">The forward vector of the camera.</param>
       /// <param name="result">When the method completes, contains the created billboard quaternion.</param>
-      public static void BillboardLH(ref Vector3D objectPosition, ref Vector3D cameraPosition, ref Vector3D cameraUpVector, ref Vector3D cameraForwardVector, out QuaternionD result)
+      public static void BillboardLH(ref Vector3 objectPosition, ref Vector3 cameraPosition, ref Vector3 cameraUpVector, ref Vector3 cameraForwardVector, out Quaternion result)
       {
-         Matrix3x3D matrix;
-         Matrix3x3D.BillboardLH(ref objectPosition, ref cameraPosition, ref cameraUpVector, ref cameraForwardVector, out matrix);
+         Matrix3x3 matrix;
+         Matrix3x3.BillboardLH(ref objectPosition, ref cameraPosition, ref cameraUpVector, ref cameraForwardVector, out matrix);
          RotationMatrix(ref matrix, out result);
       }
 
@@ -970,9 +970,9 @@ namespace Adamantium.Mathematics
       /// <param name="cameraUpVector">The up vector of the camera.</param>
       /// <param name="cameraForwardVector">The forward vector of the camera.</param>
       /// <returns>The created billboard quaternion.</returns>
-      public static QuaternionD BillboardLH(Vector3D objectPosition, Vector3D cameraPosition, Vector3D cameraUpVector, Vector3D cameraForwardVector)
+      public static Quaternion BillboardLH(Vector3 objectPosition, Vector3 cameraPosition, Vector3 cameraUpVector, Vector3 cameraForwardVector)
       {
-         QuaternionD result;
+         Quaternion result;
          BillboardLH(ref objectPosition, ref cameraPosition, ref cameraUpVector, ref cameraForwardVector, out result);
          return result;
       }
@@ -982,9 +982,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="matrix">The rotation matrix.</param>
       /// <returns>The newly created quaternion.</returns>
-      public static QuaternionD RotationMatrix(Matrix4x4D matrix)
+      public static Quaternion RotationMatrix(Matrix4x4 matrix)
       {
-         QuaternionD result;
+         Quaternion result;
          RotationMatrix(ref matrix, out result);
          return result;
       }
@@ -996,7 +996,7 @@ namespace Adamantium.Mathematics
       /// <param name="pitch">The pitch of rotation.</param>
       /// <param name="roll">The roll of rotation.</param>
       /// <param name="result">When the method completes, contains the newly created quaternion.</param>
-      public static void RotationYawPitchRoll(double yaw, double pitch, double roll, out QuaternionD result)
+      public static void RotationYawPitchRoll(double yaw, double pitch, double roll, out Quaternion result)
       {
          double halfRoll = roll * 0.5f;
          double halfPitch = pitch * 0.5f;
@@ -1022,9 +1022,9 @@ namespace Adamantium.Mathematics
       /// <param name="pitch">The pitch of rotation.</param>
       /// <param name="roll">The roll of rotation.</param>
       /// <returns>The newly created quaternion.</returns>
-      public static QuaternionD RotationYawPitchRoll(double yaw, double pitch, double roll)
+      public static Quaternion RotationYawPitchRoll(double yaw, double pitch, double roll)
       {
-         QuaternionD result;
+         Quaternion result;
          RotationYawPitchRoll(yaw, pitch, roll, out result);
          return result;
       }
@@ -1036,7 +1036,7 @@ namespace Adamantium.Mathematics
       /// <param name="end">End quaternion.</param>
       /// <param name="amount">Value between 0 and 1 indicating the weight of <paramref name="end"/>.</param>
       /// <param name="result">When the method completes, contains the spherical linear interpolation of the two quaternions.</param>
-      public static void Slerp(ref QuaternionD start, ref QuaternionD end, double amount, out QuaternionD result)
+      public static void Slerp(ref Quaternion start, ref Quaternion end, double amount, out Quaternion result)
       {
          double opposite;
          double inverse;
@@ -1069,9 +1069,9 @@ namespace Adamantium.Mathematics
       /// <param name="end">End quaternion.</param>
       /// <param name="amount">Value between 0 and 1 indicating the weight of <paramref name="end"/>.</param>
       /// <returns>The spherical linear interpolation of the two quaternions.</returns>
-      public static QuaternionD Slerp(QuaternionD start, QuaternionD end, double amount)
+      public static Quaternion Slerp(Quaternion start, Quaternion end, double amount)
       {
-         QuaternionD result;
+         Quaternion result;
          Slerp(ref start, ref end, amount, out result);
          return result;
       }
@@ -1085,9 +1085,9 @@ namespace Adamantium.Mathematics
       /// <param name="value4">Fourth source quaternion.</param>
       /// <param name="amount">Value between 0 and 1 indicating the weight of interpolation.</param>
       /// <param name="result">When the method completes, contains the spherical quadrangle interpolation of the quaternions.</param>
-      public static void Squad(ref QuaternionD value1, ref QuaternionD value2, ref QuaternionD value3, ref QuaternionD value4, double amount, out QuaternionD result)
+      public static void Squad(ref Quaternion value1, ref Quaternion value2, ref Quaternion value3, ref Quaternion value4, double amount, out Quaternion result)
       {
-         QuaternionD start, end;
+         Quaternion start, end;
          Slerp(ref value1, ref value4, amount, out start);
          Slerp(ref value2, ref value3, amount, out end);
          Slerp(ref start, ref end, 2.0f * amount * (1.0f - amount), out result);
@@ -1102,9 +1102,9 @@ namespace Adamantium.Mathematics
       /// <param name="value4">Fourth source quaternion.</param>
       /// <param name="amount">Value between 0 and 1 indicating the weight of interpolation.</param>
       /// <returns>The spherical quadrangle interpolation of the quaternions.</returns>
-      public static QuaternionD Squad(QuaternionD value1, QuaternionD value2, QuaternionD value3, QuaternionD value4, double amount)
+      public static Quaternion Squad(Quaternion value1, Quaternion value2, Quaternion value3, Quaternion value4, double amount)
       {
-         QuaternionD result;
+         Quaternion result;
          Squad(ref value1, ref value2, ref value3, ref value4, amount, out result);
          return result;
       }
@@ -1117,18 +1117,18 @@ namespace Adamantium.Mathematics
       /// <param name="value3">Third source quaternion.</param>
       /// <param name="value4">Fourth source quaternion.</param>
       /// <returns>An array of three quaternions that represent control points for spherical quadrangle interpolation.</returns>
-      public static QuaternionD[] SquadSetup(QuaternionD value1, QuaternionD value2, QuaternionD value3, QuaternionD value4)
+      public static Quaternion[] SquadSetup(Quaternion value1, Quaternion value2, Quaternion value3, Quaternion value4)
       {
-         QuaternionD q0 = (value1 + value2).LengthSquared() < (value1 - value2).LengthSquared() ? -value1 : value1;
-         QuaternionD q2 = (value2 + value3).LengthSquared() < (value2 - value3).LengthSquared() ? -value3 : value3;
-         QuaternionD q3 = (value3 + value4).LengthSquared() < (value3 - value4).LengthSquared() ? -value4 : value4;
-         QuaternionD q1 = value2;
+         Quaternion q0 = (value1 + value2).LengthSquared() < (value1 - value2).LengthSquared() ? -value1 : value1;
+         Quaternion q2 = (value2 + value3).LengthSquared() < (value2 - value3).LengthSquared() ? -value3 : value3;
+         Quaternion q3 = (value3 + value4).LengthSquared() < (value3 - value4).LengthSquared() ? -value4 : value4;
+         Quaternion q1 = value2;
 
-         QuaternionD q1Exp, q2Exp;
+         Quaternion q1Exp, q2Exp;
          Exponential(ref q1, out q1Exp);
          Exponential(ref q2, out q2Exp);
 
-         QuaternionD[] results = new QuaternionD[3];
+         Quaternion[] results = new Quaternion[3];
          results[0] = q1 * Exponential(-0.25f * (Logarithm(q1Exp * q2) + Logarithm(q1Exp * q0)));
          results[1] = q2 * Exponential(-0.25f * (Logarithm(q2Exp * q3) + Logarithm(q2Exp * q1)));
          results[2] = q2;
@@ -1142,9 +1142,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first quaternion to add.</param>
       /// <param name="right">The second quaternion to add.</param>
       /// <returns>The sum of the two quaternions.</returns>
-      public static QuaternionD operator +(QuaternionD left, QuaternionD right)
+      public static Quaternion operator +(Quaternion left, Quaternion right)
       {
-         QuaternionD result;
+         Quaternion result;
          Add(ref left, ref right, out result);
          return result;
       }
@@ -1155,9 +1155,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first quaternion to subtract.</param>
       /// <param name="right">The second quaternion to subtract.</param>
       /// <returns>The difference of the two quaternions.</returns>
-      public static QuaternionD operator -(QuaternionD left, QuaternionD right)
+      public static Quaternion operator -(Quaternion left, Quaternion right)
       {
-         QuaternionD result;
+         Quaternion result;
          Subtract(ref left, ref right, out result);
          return result;
       }
@@ -1167,9 +1167,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The quaternion to negate.</param>
       /// <returns>A quaternion facing in the opposite direction.</returns>
-      public static QuaternionD operator -(QuaternionD value)
+      public static Quaternion operator -(Quaternion value)
       {
-         QuaternionD result;
+         Quaternion result;
          Negate(ref value, out result);
          return result;
       }
@@ -1180,9 +1180,9 @@ namespace Adamantium.Mathematics
       /// <param name="value">The quaternion to scale.</param>
       /// <param name="scale">The amount by which to scale the quaternion.</param>
       /// <returns>The scaled quaternion.</returns>
-      public static QuaternionD operator *(double scale, QuaternionD value)
+      public static Quaternion operator *(double scale, Quaternion value)
       {
-         QuaternionD result;
+         Quaternion result;
          Multiply(ref value, scale, out result);
          return result;
       }
@@ -1193,9 +1193,9 @@ namespace Adamantium.Mathematics
       /// <param name="value">The quaternion to scale.</param>
       /// <param name="scale">The amount by which to scale the quaternion.</param>
       /// <returns>The scaled quaternion.</returns>
-      public static QuaternionD operator *(QuaternionD value, double scale)
+      public static Quaternion operator *(Quaternion value, double scale)
       {
-         QuaternionD result;
+         Quaternion result;
          Multiply(ref value, scale, out result);
          return result;
       }
@@ -1206,9 +1206,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first quaternion to multiply.</param>
       /// <param name="right">The second quaternion to multiply.</param>
       /// <returns>The multiplied quaternion.</returns>
-      public static QuaternionD operator *(QuaternionD left, QuaternionD right)
+      public static Quaternion operator *(Quaternion left, Quaternion right)
       {
-         QuaternionD result;
+         Quaternion result;
          Multiply(ref left, ref right, out result);
          return result;
       }
@@ -1220,7 +1220,7 @@ namespace Adamantium.Mathematics
       /// <param name="right">The second value to compare.</param>
       /// <returns><c>true</c> if <paramref name="left"/> has the same value as <paramref name="right"/>; otherwise, <c>false</c>.</returns>
       [MethodImpl(MethodImplOptions.AggressiveInlining)]
-      public static bool operator ==(QuaternionD left, QuaternionD right)
+      public static bool operator ==(Quaternion left, Quaternion right)
       {
          return left.Equals(ref right);
       }
@@ -1232,7 +1232,7 @@ namespace Adamantium.Mathematics
       /// <param name="right">The second value to compare.</param>
       /// <returns><c>true</c> if <paramref name="left"/> has a different value than <paramref name="right"/>; otherwise, <c>false</c>.</returns>
       [MethodImpl(MethodImplOptions.AggressiveInlining)]
-      public static bool operator !=(QuaternionD left, QuaternionD right)
+      public static bool operator !=(Quaternion left, Quaternion right)
       {
          return !left.Equals(ref right);
       }
@@ -1312,27 +1312,27 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
-      /// Determines whether the specified <see cref="QuaternionD"/> is equal to this instance.
+      /// Determines whether the specified <see cref="Quaternion"/> is equal to this instance.
       /// </summary>
-      /// <param name="other">The <see cref="QuaternionD"/> to compare with this instance.</param>
+      /// <param name="other">The <see cref="Quaternion"/> to compare with this instance.</param>
       /// <returns>
-      /// <c>true</c> if the specified <see cref="QuaternionD"/> is equal to this instance; otherwise, <c>false</c>.
+      /// <c>true</c> if the specified <see cref="Quaternion"/> is equal to this instance; otherwise, <c>false</c>.
       /// </returns>
       [MethodImpl(MethodImplOptions.AggressiveInlining)]
-      public bool Equals(ref QuaternionD other)
+      public bool Equals(ref Quaternion other)
       {
          return MathHelper.NearEqual(other.X, X) && MathHelper.NearEqual(other.Y, Y) && MathHelper.NearEqual(other.Z, Z) && MathHelper.NearEqual(other.W, W);
       }
 
       /// <summary>
-      /// Determines whether the specified <see cref="QuaternionD"/> is equal to this instance.
+      /// Determines whether the specified <see cref="Quaternion"/> is equal to this instance.
       /// </summary>
-      /// <param name="other">The <see cref="QuaternionD"/> to compare with this instance.</param>
+      /// <param name="other">The <see cref="Quaternion"/> to compare with this instance.</param>
       /// <returns>
-      /// <c>true</c> if the specified <see cref="QuaternionD"/> is equal to this instance; otherwise, <c>false</c>.
+      /// <c>true</c> if the specified <see cref="Quaternion"/> is equal to this instance; otherwise, <c>false</c>.
       /// </returns>
       [MethodImpl(MethodImplOptions.AggressiveInlining)]
-      public bool Equals(QuaternionD other)
+      public bool Equals(Quaternion other)
       {
          return Equals(ref other);
       }
@@ -1346,10 +1346,10 @@ namespace Adamantium.Mathematics
       /// </returns>
       public override bool Equals(object value)
       {
-         if (!(value is QuaternionD))
+         if (!(value is Quaternion))
             return false;
 
-         var strongValue = (QuaternionD)value;
+         var strongValue = (Quaternion)value;
          return Equals(ref strongValue);
       }
 

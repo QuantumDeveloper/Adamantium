@@ -58,10 +58,10 @@ namespace Adamantium.UI.Controls
 
       protected override Size MeasureOverride(Size availableSize)
       {
-         var point1 = new Vector2D(X1, Y1);
-         var point2 = new Vector2D(X2, Y2);
-         var min = Vector2D.Min(point1, point2);
-         var max = Vector2D.Max(point1, point2);
+         var point1 = new Vector2(X1, Y1);
+         var point2 = new Vector2(X2, Y2);
+         var min = Vector2.Min(point1, point2);
+         var max = Vector2.Max(point1, point2);
          BoundingRectangle = new Rect(min, max);
          return base.MeasureOverride(availableSize);
       }
@@ -69,8 +69,8 @@ namespace Adamantium.UI.Controls
       protected override void OnRender(DrawingContext context)
       {
          base.OnRender(context);
-         var start = new Vector2D(X1, Y1);
-         var end = new Vector2D(X2, Y2);
+         var start = new Vector2(X1, Y1);
+         var end = new Vector2(X2, Y2);
          
          context.BeginDraw(this);
          context.DrawLine(start, end, GetPen());

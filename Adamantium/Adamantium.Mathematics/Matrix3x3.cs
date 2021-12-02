@@ -6,22 +6,22 @@ using System.Runtime.InteropServices;
 namespace Adamantium.Mathematics
 {
    [StructLayout(LayoutKind.Sequential, Pack = 4)]
-   public struct Matrix3x3D : IEquatable<Matrix3x3D>, IFormattable
+   public struct Matrix3x3 : IEquatable<Matrix3x3>, IFormattable
    {
       /// <summary>
-      /// The size of the <see cref="Matrix3x3D"/> type, in bytes.
+      /// The size of the <see cref="Matrix3x3"/> type, in bytes.
       /// </summary>
-      public static readonly int SizeInBytes = Marshal.SizeOf(typeof(Matrix3x3D));
+      public static readonly int SizeInBytes = Marshal.SizeOf(typeof(Matrix3x3));
 
       /// <summary>
-      /// A <see cref="Matrix3x3D"/> with all of its components set to zero.
+      /// A <see cref="Matrix3x3"/> with all of its components set to zero.
       /// </summary>
-      public static readonly Matrix3x3D Zero = new Matrix3x3D();
+      public static readonly Matrix3x3 Zero = new Matrix3x3();
 
       /// <summary>
-      /// The identity <see cref="Matrix3x3D"/>.
+      /// The identity <see cref="Matrix3x3"/>.
       /// </summary>
-      public static readonly Matrix3x3D Identity = new Matrix3x3D() { M11 = 1.0f, M22 = 1.0f, M33 = 1.0f };
+      public static readonly Matrix3x3 Identity = new Matrix3x3() { M11 = 1.0f, M22 = 1.0f, M33 = 1.0f };
 
       /// <summary>
       /// Value at row 1 column 1 of the Matrix3x3D.
@@ -69,10 +69,10 @@ namespace Adamantium.Mathematics
       public double M33;
 
       /// <summary>
-      /// Initializes a new instance of the <see cref="Matrix3x3D"/> struct.
+      /// Initializes a new instance of the <see cref="Matrix3x3"/> struct.
       /// </summary>
       /// <param name="value">The value that will be assigned to all components.</param>
-      public Matrix3x3D(double value)
+      public Matrix3x3(double value)
       {
          M11 = M12 = M13 =
          M21 = M22 = M23 =
@@ -80,7 +80,7 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
-      /// Initializes a new instance of the <see cref="Matrix3x3D"/> struct.
+      /// Initializes a new instance of the <see cref="Matrix3x3"/> struct.
       /// </summary>
       /// <param name="M11">The value to assign at row 1 column 1 of the Matrix3x3D.</param>
       /// <param name="M12">The value to assign at row 1 column 2 of the Matrix3x3D.</param>
@@ -91,7 +91,7 @@ namespace Adamantium.Mathematics
       /// <param name="M31">The value to assign at row 3 column 1 of the Matrix3x3D.</param>
       /// <param name="M32">The value to assign at row 3 column 2 of the Matrix3x3D.</param>
       /// <param name="M33">The value to assign at row 3 column 3 of the Matrix3x3D.</param>
-      public Matrix3x3D(double M11, double M12, double M13,
+      public Matrix3x3(double M11, double M12, double M13,
           double M21, double M22, double M23,
           double M31, double M32, double M33)
       {
@@ -101,12 +101,12 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
-      /// Initializes a new instance of the <see cref="Matrix3x3D"/> struct.
+      /// Initializes a new instance of the <see cref="Matrix3x3"/> struct.
       /// </summary>
       /// <param name="values">The values to assign to the components of the Matrix3x3D. This must be an array with sixteen elements.</param>
       /// <exception cref="ArgumentNullException">Thrown when <paramref name="values"/> is <c>null</c>.</exception>
       /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="values"/> contains more or less than sixteen elements.</exception>
-      public Matrix3x3D(double[] values)
+      public Matrix3x3(double[] values)
       {
          if (values == null)
             throw new ArgumentNullException(nameof(values));
@@ -129,63 +129,63 @@ namespace Adamantium.Mathematics
       /// <summary>
       /// Gets or sets the first row in the Matrix3x3D; that is M11, M12, M13
       /// </summary>
-      public Vector3D Row1
+      public Vector3 Row1
       {
-         get { return new Vector3D(M11, M12, M13); }
+         get { return new Vector3(M11, M12, M13); }
          set { M11 = value.X; M12 = value.Y; M13 = value.Z; }
       }
 
       /// <summary>
       /// Gets or sets the second row in the Matrix3x3D; that is M21, M22, M23
       /// </summary>
-      public Vector3D Row2
+      public Vector3 Row2
       {
-         get { return new Vector3D(M21, M22, M23); }
+         get { return new Vector3(M21, M22, M23); }
          set { M21 = value.X; M22 = value.Y; M23 = value.Z; }
       }
 
       /// <summary>
       /// Gets or sets the third row in the Matrix3x3D; that is M31, M32, M33
       /// </summary>
-      public Vector3D Row3
+      public Vector3 Row3
       {
-         get { return new Vector3D(M31, M32, M33); }
+         get { return new Vector3(M31, M32, M33); }
          set { M31 = value.X; M32 = value.Y; M33 = value.Z; }
       }
 
       /// <summary>
       /// Gets or sets the first column in the Matrix3x3D; that is M11, M21, M31
       /// </summary>
-      public Vector3D Column1
+      public Vector3 Column1
       {
-         get { return new Vector3D(M11, M21, M31); }
+         get { return new Vector3(M11, M21, M31); }
          set { M11 = value.X; M21 = value.Y; M31 = value.Z; }
       }
 
       /// <summary>
       /// Gets or sets the second column in the Matrix3x3D; that is M12, M22, M32
       /// </summary>
-      public Vector3D Column2
+      public Vector3 Column2
       {
-         get { return new Vector3D(M12, M22, M32); }
+         get { return new Vector3(M12, M22, M32); }
          set { M12 = value.X; M22 = value.Y; M32 = value.Z; }
       }
 
       /// <summary>
       /// Gets or sets the third column in the Matrix3x3D; that is M13, M23, M33
       /// </summary>
-      public Vector3D Column3
+      public Vector3 Column3
       {
-         get { return new Vector3D(M13, M23, M33); }
+         get { return new Vector3(M13, M23, M33); }
          set { M13 = value.X; M23 = value.Y; M33 = value.Z; }
       }
 
       /// <summary>
       /// Gets or sets the scale of the Matrix3x3D; that is M11, M22, and M33.
       /// </summary>
-      public Vector3D ScaleVector
+      public Vector3 ScaleVector
       {
-         get { return new Vector3D(M11, M22, M33); }
+         get { return new Vector3(M11, M22, M33); }
          set { M11 = value.X; M22 = value.Y; M33 = value.Z; }
       }
 
@@ -346,22 +346,22 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="Q">When the method completes, contains the orthonormalized Matrix3x3D of the decomposition.</param>
       /// <param name="R">When the method completes, contains the right triangular Matrix3x3D of the decomposition.</param>
-      public void DecomposeQR(out Matrix3x3D Q, out Matrix3x3D R)
+      public void DecomposeQR(out Matrix3x3 Q, out Matrix3x3 R)
       {
-         Matrix3x3D temp = this;
+         Matrix3x3 temp = this;
          temp.Transpose();
          Orthonormalize(ref temp, out Q);
          Q.Transpose();
 
-         R = new Matrix3x3D();
-         R.M11 = Vector3D.Dot(Q.Column1, Column1);
-         R.M12 = Vector3D.Dot(Q.Column1, Column2);
-         R.M13 = Vector3D.Dot(Q.Column1, Column3);
+         R = new Matrix3x3();
+         R.M11 = Vector3.Dot(Q.Column1, Column1);
+         R.M12 = Vector3.Dot(Q.Column1, Column2);
+         R.M13 = Vector3.Dot(Q.Column1, Column3);
 
-         R.M22 = Vector3D.Dot(Q.Column2, Column2);
-         R.M23 = Vector3D.Dot(Q.Column2, Column3);
+         R.M22 = Vector3.Dot(Q.Column2, Column2);
+         R.M23 = Vector3.Dot(Q.Column2, Column3);
 
-         R.M33 = Vector3D.Dot(Q.Column3, Column3);
+         R.M33 = Vector3.Dot(Q.Column3, Column3);
       }
 
       /// <summary>
@@ -369,19 +369,19 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="L">When the method completes, contains the lower triangular Matrix3x3D of the decomposition.</param>
       /// <param name="Q">When the method completes, contains the orthonormalized Matrix3x3D of the decomposition.</param>
-      public void DecomposeLQ(out Matrix3x3D L, out Matrix3x3D Q)
+      public void DecomposeLQ(out Matrix3x3 L, out Matrix3x3 Q)
       {
          Orthonormalize(ref this, out Q);
 
-         L = new Matrix3x3D();
-         L.M11 = Vector3D.Dot(Q.Row1, Row1);
+         L = new Matrix3x3();
+         L.M11 = Vector3.Dot(Q.Row1, Row1);
 
-         L.M21 = Vector3D.Dot(Q.Row1, Row2);
-         L.M22 = Vector3D.Dot(Q.Row2, Row2);
+         L.M21 = Vector3.Dot(Q.Row1, Row2);
+         L.M22 = Vector3.Dot(Q.Row2, Row2);
 
-         L.M31 = Vector3D.Dot(Q.Row1, Row3);
-         L.M32 = Vector3D.Dot(Q.Row2, Row3);
-         L.M33 = Vector3D.Dot(Q.Row3, Row3);
+         L.M31 = Vector3.Dot(Q.Row1, Row3);
+         L.M32 = Vector3.Dot(Q.Row2, Row3);
+         L.M33 = Vector3.Dot(Q.Row3, Row3);
       }
 
       /// <summary>
@@ -392,7 +392,7 @@ namespace Adamantium.Mathematics
       /// <remarks>
       /// This method is designed to decompose an SRT transformation Matrix3x3D only.
       /// </remarks>
-      public bool Decompose(out Vector3D scale, out QuaternionD rotation)
+      public bool Decompose(out Vector3 scale, out Quaternion rotation)
       {
          //Source: Unknown
          //References: http://www.gamedev.net/community/forums/topic.asp?topic_id=441695
@@ -407,12 +407,12 @@ namespace Adamantium.Mathematics
              MathHelper.IsZero(scale.Y) ||
              MathHelper.IsZero(scale.Z))
          {
-            rotation = QuaternionD.Identity;
+            rotation = Quaternion.Identity;
             return false;
          }
 
          //The rotation is the left over Matrix3x3D after dividing out the scaling.
-         Matrix3x3D rotationMatrix3x3 = new Matrix3x3D();
+         Matrix3x3 rotationMatrix3x3 = new Matrix3x3();
          rotationMatrix3x3.M11 = M11 / scale.X;
          rotationMatrix3x3.M12 = M12 / scale.X;
          rotationMatrix3x3.M13 = M13 / scale.X;
@@ -425,7 +425,7 @@ namespace Adamantium.Mathematics
          rotationMatrix3x3.M32 = M32 / scale.Z;
          rotationMatrix3x3.M33 = M33 / scale.Z;
 
-         QuaternionD.RotationMatrix(ref rotationMatrix3x3, out rotation);
+         Quaternion.RotationMatrix(ref rotationMatrix3x3, out rotation);
          return true;
       }
 
@@ -438,7 +438,7 @@ namespace Adamantium.Mathematics
       /// <remarks>
       /// This method is designed to decompose only an SRT transformation matrix that has the same scale in every axis.
       /// </remarks>
-      public bool DecomposeUniformScale(out double scale, out QuaternionD rotation)
+      public bool DecomposeUniformScale(out double scale, out Quaternion rotation)
       {
          //Scaling is the length of the rows. ( just take one row since this is a uniform matrix)
          scale = (double)Math.Sqrt((M11 * M11) + (M12 * M12) + (M13 * M13));
@@ -447,12 +447,12 @@ namespace Adamantium.Mathematics
          //If any of the scaling factors are zero, then the rotation matrix can not exist.
          if (Math.Abs(scale) < MathHelper.ZeroToleranceF)
          {
-            rotation = QuaternionD.Identity;
+            rotation = Quaternion.Identity;
             return false;
          }
 
          //The rotation is the left over matrix after dividing out the scaling.
-         Matrix3x3D rotationmatrix = new Matrix3x3D();
+         Matrix3x3 rotationmatrix = new Matrix3x3();
          rotationmatrix.M11 = M11 * inv_scale;
          rotationmatrix.M12 = M12 * inv_scale;
          rotationmatrix.M13 = M13 * inv_scale;
@@ -465,7 +465,7 @@ namespace Adamantium.Mathematics
          rotationmatrix.M32 = M32 * inv_scale;
          rotationmatrix.M33 = M33 * inv_scale;
 
-         QuaternionD.RotationMatrix(ref rotationmatrix, out rotation);
+         Quaternion.RotationMatrix(ref rotationmatrix, out rotation);
          return true;
       }
 
@@ -548,7 +548,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first Matrix3x3D to add.</param>
       /// <param name="right">The second Matrix3x3D to add.</param>
       /// <param name="result">When the method completes, contains the sum of the two matrices.</param>
-      public static void Add(ref Matrix3x3D left, ref Matrix3x3D right, out Matrix3x3D result)
+      public static void Add(ref Matrix3x3 left, ref Matrix3x3 right, out Matrix3x3 result)
       {
          result.M11 = left.M11 + right.M11;
          result.M12 = left.M12 + right.M12;
@@ -567,9 +567,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first Matrix3x3D to add.</param>
       /// <param name="right">The second Matrix3x3D to add.</param>
       /// <returns>The sum of the two matrices.</returns>
-      public static Matrix3x3D Add(Matrix3x3D left, Matrix3x3D right)
+      public static Matrix3x3 Add(Matrix3x3 left, Matrix3x3 right)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          Add(ref left, ref right, out result);
          return result;
       }
@@ -580,7 +580,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first Matrix3x3D to subtract.</param>
       /// <param name="right">The second Matrix3x3D to subtract.</param>
       /// <param name="result">When the method completes, contains the difference between the two matrices.</param>
-      public static void Subtract(ref Matrix3x3D left, ref Matrix3x3D right, out Matrix3x3D result)
+      public static void Subtract(ref Matrix3x3 left, ref Matrix3x3 right, out Matrix3x3 result)
       {
          result.M11 = left.M11 - right.M11;
          result.M12 = left.M12 - right.M12;
@@ -599,9 +599,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first Matrix3x3D to subtract.</param>
       /// <param name="right">The second Matrix3x3D to subtract.</param>
       /// <returns>The difference between the two matrices.</returns>
-      public static Matrix3x3D Subtract(Matrix3x3D left, Matrix3x3D right)
+      public static Matrix3x3 Subtract(Matrix3x3 left, Matrix3x3 right)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          Subtract(ref left, ref right, out result);
          return result;
       }
@@ -612,7 +612,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">The Matrix3x3D to scale.</param>
       /// <param name="right">The amount by which to scale.</param>
       /// <param name="result">When the method completes, contains the scaled Matrix3x3D.</param>
-      public static void Multiply(ref Matrix3x3D left, double right, out Matrix3x3D result)
+      public static void Multiply(ref Matrix3x3 left, double right, out Matrix3x3 result)
       {
          result.M11 = left.M11 * right;
          result.M12 = left.M12 * right;
@@ -631,9 +631,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The Matrix3x3D to scale.</param>
       /// <param name="right">The amount by which to scale.</param>
       /// <returns>The scaled Matrix3x3D.</returns>
-      public static Matrix3x3D Multiply(Matrix3x3D left, double right)
+      public static Matrix3x3 Multiply(Matrix3x3 left, double right)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          Multiply(ref left, right, out result);
          return result;
       }
@@ -644,9 +644,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first Matrix3x3D to multiply.</param>
       /// <param name="right">The second Matrix3x3D to multiply.</param>
       /// <param name="result">The product of the two matrices.</param>
-      public static void Multiply(ref Matrix3x3D left, ref Matrix3x3D right, out Matrix3x3D result)
+      public static void Multiply(ref Matrix3x3 left, ref Matrix3x3 right, out Matrix3x3 result)
       {
-         Matrix3x3D temp = new Matrix3x3D();
+         Matrix3x3 temp = new Matrix3x3();
          temp.M11 = (left.M11 * right.M11) + (left.M12 * right.M21) + (left.M13 * right.M31);
          temp.M12 = (left.M11 * right.M12) + (left.M12 * right.M22) + (left.M13 * right.M32);
          temp.M13 = (left.M11 * right.M13) + (left.M12 * right.M23) + (left.M13 * right.M33);
@@ -665,9 +665,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first Matrix3x3D to multiply.</param>
       /// <param name="right">The second Matrix3x3D to multiply.</param>
       /// <returns>The product of the two matrices.</returns>
-      public static Matrix3x3D Multiply(Matrix3x3D left, Matrix3x3D right)
+      public static Matrix3x3 Multiply(Matrix3x3 left, Matrix3x3 right)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          Multiply(ref left, ref right, out result);
          return result;
       }
@@ -678,7 +678,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">The Matrix3x3D to scale.</param>
       /// <param name="right">The amount by which to scale.</param>
       /// <param name="result">When the method completes, contains the scaled Matrix3x3D.</param>
-      public static void Divide(ref Matrix3x3D left, double right, out Matrix3x3D result)
+      public static void Divide(ref Matrix3x3 left, double right, out Matrix3x3 result)
       {
          double inv = 1.0f / right;
 
@@ -699,9 +699,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The Matrix3x3D to scale.</param>
       /// <param name="right">The amount by which to scale.</param>
       /// <returns>The scaled Matrix3x3D.</returns>
-      public static Matrix3x3D Divide(Matrix3x3D left, double right)
+      public static Matrix3x3 Divide(Matrix3x3 left, double right)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          Divide(ref left, right, out result);
          return result;
       }
@@ -712,7 +712,7 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first Matrix3x3D to divide.</param>
       /// <param name="right">The second Matrix3x3D to divide.</param>
       /// <param name="result">When the method completes, contains the quotient of the two matrices.</param>
-      public static void Divide(ref Matrix3x3D left, ref Matrix3x3D right, out Matrix3x3D result)
+      public static void Divide(ref Matrix3x3 left, ref Matrix3x3 right, out Matrix3x3 result)
       {
          result.M11 = left.M11 / right.M11;
          result.M12 = left.M12 / right.M12;
@@ -731,9 +731,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first Matrix3x3D to divide.</param>
       /// <param name="right">The second Matrix3x3D to divide.</param>
       /// <returns>The quotient of the two matrices.</returns>
-      public static Matrix3x3D Divide(Matrix3x3D left, Matrix3x3D right)
+      public static Matrix3x3 Divide(Matrix3x3 left, Matrix3x3 right)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          Divide(ref left, ref right, out result);
          return result;
       }
@@ -745,7 +745,7 @@ namespace Adamantium.Mathematics
       /// <param name="exponent">The exponent to raise the Matrix3x3D to.</param>
       /// <param name="result">When the method completes, contains the exponential Matrix3x3D.</param>
       /// <exception cref="System.ArgumentOutOfRangeException">Thrown when the <paramref name="exponent"/> is negative.</exception>
-      public static void Exponent(ref Matrix3x3D value, int exponent, out Matrix3x3D result)
+      public static void Exponent(ref Matrix3x3 value, int exponent, out Matrix3x3 result)
       {
          //Source: http://rosettacode.org
          //Reference: http://rosettacode.org/wiki/Matrix3x3D-exponentiation_operator
@@ -755,7 +755,7 @@ namespace Adamantium.Mathematics
 
          if (exponent == 0)
          {
-            result = Matrix3x3D.Identity;
+            result = Matrix3x3.Identity;
             return;
          }
 
@@ -765,8 +765,8 @@ namespace Adamantium.Mathematics
             return;
          }
 
-         Matrix3x3D identity = Matrix3x3D.Identity;
-         Matrix3x3D temp = value;
+         Matrix3x3 identity = Matrix3x3.Identity;
+         Matrix3x3 temp = value;
 
          while (true)
          {
@@ -791,9 +791,9 @@ namespace Adamantium.Mathematics
       /// <param name="exponent">The exponent to raise the Matrix3x3D to.</param>
       /// <returns>The exponential Matrix3x3D.</returns>
       /// <exception cref="System.ArgumentOutOfRangeException">Thrown when the <paramref name="exponent"/> is negative.</exception>
-      public static Matrix3x3D Exponent(Matrix3x3D value, int exponent)
+      public static Matrix3x3 Exponent(Matrix3x3 value, int exponent)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          Exponent(ref value, exponent, out result);
          return result;
       }
@@ -803,7 +803,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The Matrix3x3D to be negated.</param>
       /// <param name="result">When the method completes, contains the negated Matrix3x3D.</param>
-      public static void Negate(ref Matrix3x3D value, out Matrix3x3D result)
+      public static void Negate(ref Matrix3x3 value, out Matrix3x3 result)
       {
          result.M11 = -value.M11;
          result.M12 = -value.M12;
@@ -821,9 +821,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The Matrix3x3D to be negated.</param>
       /// <returns>The negated Matrix3x3D.</returns>
-      public static Matrix3x3D Negate(Matrix3x3D value)
+      public static Matrix3x3 Negate(Matrix3x3 value)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          Negate(ref value, out result);
          return result;
       }
@@ -838,7 +838,7 @@ namespace Adamantium.Mathematics
       /// <remarks>
       /// Passing <paramref name="amount"/> a value of 0 will cause <paramref name="start"/> to be returned; a value of 1 will cause <paramref name="end"/> to be returned. 
       /// </remarks>
-      public static void Lerp(ref Matrix3x3D start, ref Matrix3x3D end, double amount, out Matrix3x3D result)
+      public static void Lerp(ref Matrix3x3 start, ref Matrix3x3 end, double amount, out Matrix3x3 result)
       {
          result.M11 = MathHelper.Lerp(start.M11, end.M11, amount);
          result.M12 = MathHelper.Lerp(start.M12, end.M12, amount);
@@ -861,9 +861,9 @@ namespace Adamantium.Mathematics
       /// <remarks>
       /// Passing <paramref name="amount"/> a value of 0 will cause <paramref name="start"/> to be returned; a value of 1 will cause <paramref name="end"/> to be returned. 
       /// </remarks>
-      public static Matrix3x3D Lerp(Matrix3x3D start, Matrix3x3D end, double amount)
+      public static Matrix3x3 Lerp(Matrix3x3 start, Matrix3x3 end, double amount)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          Lerp(ref start, ref end, amount, out result);
          return result;
       }
@@ -875,7 +875,7 @@ namespace Adamantium.Mathematics
       /// <param name="end">End Matrix3x3D.</param>
       /// <param name="amount">Value between 0 and 1 indicating the weight of <paramref name="end"/>.</param>
       /// <param name="result">When the method completes, contains the cubic interpolation of the two matrices.</param>
-      public static void SmoothStep(ref Matrix3x3D start, ref Matrix3x3D end, double amount, out Matrix3x3D result)
+      public static void SmoothStep(ref Matrix3x3 start, ref Matrix3x3 end, double amount, out Matrix3x3 result)
       {
          amount = MathHelper.SmoothStep(amount);
          Lerp(ref start, ref end, amount, out result);
@@ -888,9 +888,9 @@ namespace Adamantium.Mathematics
       /// <param name="end">End Matrix3x3D.</param>
       /// <param name="amount">Value between 0 and 1 indicating the weight of <paramref name="end"/>.</param>
       /// <returns>The cubic interpolation of the two matrices.</returns>
-      public static Matrix3x3D SmoothStep(Matrix3x3D start, Matrix3x3D end, double amount)
+      public static Matrix3x3 SmoothStep(Matrix3x3 start, Matrix3x3 end, double amount)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          SmoothStep(ref start, ref end, amount, out result);
          return result;
       }
@@ -900,9 +900,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The Matrix3x3D whose transpose is to be calculated.</param>
       /// <param name="result">When the method completes, contains the transpose of the specified Matrix3x3D.</param>
-      public static void Transpose(ref Matrix3x3D value, out Matrix3x3D result)
+      public static void Transpose(ref Matrix3x3 value, out Matrix3x3 result)
       {
-         Matrix3x3D temp = new Matrix3x3D();
+         Matrix3x3 temp = new Matrix3x3();
          temp.M11 = value.M11;
          temp.M12 = value.M21;
          temp.M13 = value.M31;
@@ -921,7 +921,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The Matrix3x3D whose transpose is to be calculated.</param>
       /// <param name="result">When the method completes, contains the transpose of the specified Matrix3x3D.</param>
-      public static void TransposeByRef(ref Matrix3x3D value, ref Matrix3x3D result)
+      public static void TransposeByRef(ref Matrix3x3 value, ref Matrix3x3 result)
       {
          result.M11 = value.M11;
          result.M12 = value.M21;
@@ -939,9 +939,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The Matrix3x3D whose transpose is to be calculated.</param>
       /// <returns>The transpose of the specified Matrix3x3D.</returns>
-      public static Matrix3x3D Transpose(Matrix3x3D value)
+      public static Matrix3x3 Transpose(Matrix3x3 value)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          Transpose(ref value, out result);
          return result;
       }
@@ -951,7 +951,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The Matrix3x3D whose inverse is to be calculated.</param>
       /// <param name="result">When the method completes, contains the inverse of the specified Matrix3x3D.</param>
-      public static void Invert(ref Matrix3x3D value, out Matrix3x3D result)
+      public static void Invert(ref Matrix3x3 value, out Matrix3x3 result)
       {
          double d11 = value.M22 * value.M33 + value.M23 * -value.M32;
          double d12 = value.M21 * value.M33 + value.M23 * -value.M31;
@@ -960,7 +960,7 @@ namespace Adamantium.Mathematics
          double det = value.M11 * d11 - value.M12 * d12 + value.M13 * d13;
          if (Math.Abs(det) == 0.0f)
          {
-            result = Matrix3x3D.Zero;
+            result = Matrix3x3.Zero;
             return;
          }
 
@@ -984,7 +984,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The Matrix3x3D whose inverse is to be calculated.</param>
       /// <returns>The inverse of the specified Matrix3x3D.</returns>
-      public static Matrix3x3D Invert(Matrix3x3D value)
+      public static Matrix3x3 Invert(Matrix3x3 value)
       {
          value.Invert();
          return value;
@@ -1006,7 +1006,7 @@ namespace Adamantium.Mathematics
       /// If you wish for this operation to be performed on the columns, first transpose the
       /// input and than transpose the output.</para>
       /// </remarks>
-      public static void Orthogonalize(ref Matrix3x3D value, out Matrix3x3D result)
+      public static void Orthogonalize(ref Matrix3x3 value, out Matrix3x3 result)
       {
          //Uses the modified Gram-Schmidt process.
          //q1 = m1
@@ -1016,10 +1016,10 @@ namespace Adamantium.Mathematics
          //By separating the above algorithm into multiple lines, we actually increase accuracy.
          result = value;
 
-         result.Row2 = result.Row2 - (Vector3D.Dot(result.Row1, result.Row2) / Vector3D.Dot(result.Row1, result.Row1)) * result.Row1;
+         result.Row2 = result.Row2 - (Vector3.Dot(result.Row1, result.Row2) / Vector3.Dot(result.Row1, result.Row1)) * result.Row1;
 
-         result.Row3 = result.Row3 - (Vector3D.Dot(result.Row1, result.Row3) / Vector3D.Dot(result.Row1, result.Row1)) * result.Row1;
-         result.Row3 = result.Row3 - (Vector3D.Dot(result.Row2, result.Row3) / Vector3D.Dot(result.Row2, result.Row2)) * result.Row2;
+         result.Row3 = result.Row3 - (Vector3.Dot(result.Row1, result.Row3) / Vector3.Dot(result.Row1, result.Row1)) * result.Row1;
+         result.Row3 = result.Row3 - (Vector3.Dot(result.Row2, result.Row3) / Vector3.Dot(result.Row2, result.Row2)) * result.Row2;
       }
 
       /// <summary>
@@ -1038,9 +1038,9 @@ namespace Adamantium.Mathematics
       /// If you wish for this operation to be performed on the columns, first transpose the
       /// input and than transpose the output.</para>
       /// </remarks>
-      public static Matrix3x3D Orthogonalize(Matrix3x3D value)
+      public static Matrix3x3 Orthogonalize(Matrix3x3 value)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          Orthogonalize(ref value, out result);
          return result;
       }
@@ -1063,7 +1063,7 @@ namespace Adamantium.Mathematics
       /// If you wish for this operation to be performed on the columns, first transpose the
       /// input and than transpose the output.</para>
       /// </remarks>
-      public static void Orthonormalize(ref Matrix3x3D value, out Matrix3x3D result)
+      public static void Orthonormalize(ref Matrix3x3 value, out Matrix3x3 result)
       {
          //Uses the modified Gram-Schmidt process.
          //Because we are making unit vectors, we can optimize the math for orthonormalization
@@ -1075,14 +1075,14 @@ namespace Adamantium.Mathematics
          //By separating the above algorithm into multiple lines, we actually increase accuracy.
          result = value;
 
-         result.Row1 = Vector3D.Normalize(result.Row1);
+         result.Row1 = Vector3.Normalize(result.Row1);
 
-         result.Row2 = result.Row2 - Vector3D.Dot(result.Row1, result.Row2) * result.Row1;
-         result.Row2 = Vector3D.Normalize(result.Row2);
+         result.Row2 = result.Row2 - Vector3.Dot(result.Row1, result.Row2) * result.Row1;
+         result.Row2 = Vector3.Normalize(result.Row2);
 
-         result.Row3 = result.Row3 - Vector3D.Dot(result.Row1, result.Row3) * result.Row1;
-         result.Row3 = result.Row3 - Vector3D.Dot(result.Row2, result.Row3) * result.Row2;
-         result.Row3 = Vector3D.Normalize(result.Row3);
+         result.Row3 = result.Row3 - Vector3.Dot(result.Row1, result.Row3) * result.Row1;
+         result.Row3 = result.Row3 - Vector3.Dot(result.Row2, result.Row3) * result.Row2;
+         result.Row3 = Vector3.Normalize(result.Row3);
       }
 
       /// <summary>
@@ -1103,9 +1103,9 @@ namespace Adamantium.Mathematics
       /// If you wish for this operation to be performed on the columns, first transpose the
       /// input and than transpose the output.</para>
       /// </remarks>
-      public static Matrix3x3D Orthonormalize(Matrix3x3D value)
+      public static Matrix3x3 Orthonormalize(Matrix3x3 value)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          Orthonormalize(ref value, out result);
          return result;
       }
@@ -1121,7 +1121,7 @@ namespace Adamantium.Mathematics
       /// of linear equations, than this often means that either no solution exists or an infinite
       /// number of solutions exist.
       /// </remarks>
-      public static void UpperTriangularForm(ref Matrix3x3D value, out Matrix3x3D result)
+      public static void UpperTriangularForm(ref Matrix3x3 value, out Matrix3x3 result)
       {
          //Adapted from the row echelon code.
          result = value;
@@ -1182,9 +1182,9 @@ namespace Adamantium.Mathematics
       /// of linear equations, than this often means that either no solution exists or an infinite
       /// number of solutions exist.
       /// </remarks>
-      public static Matrix3x3D UpperTriangularForm(Matrix3x3D value)
+      public static Matrix3x3 UpperTriangularForm(Matrix3x3 value)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          UpperTriangularForm(ref value, out result);
          return result;
       }
@@ -1200,11 +1200,11 @@ namespace Adamantium.Mathematics
       /// of linear equations, than this often means that either no solution exists or an infinite
       /// number of solutions exist.
       /// </remarks>
-      public static void LowerTriangularForm(ref Matrix3x3D value, out Matrix3x3D result)
+      public static void LowerTriangularForm(ref Matrix3x3 value, out Matrix3x3 result)
       {
          //Adapted from the row echelon code.
-         Matrix3x3D temp = value;
-         Matrix3x3D.Transpose(ref temp, out result);
+         Matrix3x3 temp = value;
+         Matrix3x3.Transpose(ref temp, out result);
 
          int lead = 0;
          int rowcount = 3;
@@ -1251,7 +1251,7 @@ namespace Adamantium.Mathematics
             lead++;
          }
 
-         Matrix3x3D.Transpose(ref result, out result);
+         Matrix3x3.Transpose(ref result, out result);
       }
 
       /// <summary>
@@ -1265,9 +1265,9 @@ namespace Adamantium.Mathematics
       /// of linear equations, than this often means that either no solution exists or an infinite
       /// number of solutions exist.
       /// </remarks>
-      public static Matrix3x3D LowerTriangularForm(Matrix3x3D value)
+      public static Matrix3x3 LowerTriangularForm(Matrix3x3 value)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          LowerTriangularForm(ref value, out result);
          return result;
       }
@@ -1277,7 +1277,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The Matrix3x3D to put into row echelon form.</param>
       /// <param name="result">When the method completes, contains the row echelon form of the Matrix3x3D.</param>
-      public static void RowEchelonForm(ref Matrix3x3D value, out Matrix3x3D result)
+      public static void RowEchelonForm(ref Matrix3x3 value, out Matrix3x3 result)
       {
          //Source: Wikipedia pseudo code
          //Reference: http://en.wikipedia.org/wiki/Row_echelon_form#Pseudocode
@@ -1337,9 +1337,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The Matrix3x3D to put into row echelon form.</param>
       /// <returns>When the method completes, contains the row echelon form of the Matrix3x3D.</returns>
-      public static Matrix3x3D RowEchelonForm(Matrix3x3D value)
+      public static Matrix3x3 RowEchelonForm(Matrix3x3 value)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          RowEchelonForm(ref value, out result);
          return result;
       }
@@ -1352,11 +1352,11 @@ namespace Adamantium.Mathematics
       /// <param name="cameraUpVector">The up vector of the camera.</param>
       /// <param name="cameraForwardVector">The forward vector of the camera.</param>
       /// <param name="result">When the method completes, contains the created billboard Matrix3x3D.</param>
-      public static void BillboardLH(ref Vector3D objectPosition, ref Vector3D cameraPosition, ref Vector3D cameraUpVector, ref Vector3D cameraForwardVector, out Matrix3x3D result)
+      public static void BillboardLH(ref Vector3 objectPosition, ref Vector3 cameraPosition, ref Vector3 cameraUpVector, ref Vector3 cameraForwardVector, out Matrix3x3 result)
       {
-         Vector3D crossed;
-         Vector3D final;
-         Vector3D difference = cameraPosition - objectPosition;
+         Vector3 crossed;
+         Vector3 final;
+         Vector3 difference = cameraPosition - objectPosition;
 
          double lengthSq = difference.LengthSquared();
          if (MathHelper.IsZero(lengthSq))
@@ -1364,9 +1364,9 @@ namespace Adamantium.Mathematics
          else
             difference *= (double)(1.0 / Math.Sqrt(lengthSq));
 
-         Vector3D.Cross(ref cameraUpVector, ref difference, out crossed);
+         Vector3.Cross(ref cameraUpVector, ref difference, out crossed);
          crossed.Normalize();
-         Vector3D.Cross(ref difference, ref crossed, out final);
+         Vector3.Cross(ref difference, ref crossed, out final);
 
          result.M11 = crossed.X;
          result.M12 = crossed.Y;
@@ -1387,9 +1387,9 @@ namespace Adamantium.Mathematics
       /// <param name="cameraUpVector">The up vector of the camera.</param>
       /// <param name="cameraForwardVector">The forward vector of the camera.</param>
       /// <returns>The created billboard Matrix3x3D.</returns>
-      public static Matrix3x3D BillboardLH(Vector3D objectPosition, Vector3D cameraPosition, Vector3D cameraUpVector, Vector3D cameraForwardVector)
+      public static Matrix3x3 BillboardLH(Vector3 objectPosition, Vector3 cameraPosition, Vector3 cameraUpVector, Vector3 cameraForwardVector)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          BillboardLH(ref objectPosition, ref cameraPosition, ref cameraUpVector, ref cameraForwardVector, out result);
          return result;
       }
@@ -1402,11 +1402,11 @@ namespace Adamantium.Mathematics
       /// <param name="cameraUpVector">The up vector of the camera.</param>
       /// <param name="cameraForwardVector">The forward vector of the camera.</param>
       /// <param name="result">When the method completes, contains the created billboard Matrix3x3D.</param>
-      public static void BillboardRH(ref Vector3D objectPosition, ref Vector3D cameraPosition, ref Vector3D cameraUpVector, ref Vector3D cameraForwardVector, out Matrix3x3D result)
+      public static void BillboardRH(ref Vector3 objectPosition, ref Vector3 cameraPosition, ref Vector3 cameraUpVector, ref Vector3 cameraForwardVector, out Matrix3x3 result)
       {
-         Vector3D crossed;
-         Vector3D final;
-         Vector3D difference = objectPosition - cameraPosition;
+         Vector3 crossed;
+         Vector3 final;
+         Vector3 difference = objectPosition - cameraPosition;
 
          double lengthSq = difference.LengthSquared();
          if (MathHelper.IsZero(lengthSq))
@@ -1414,9 +1414,9 @@ namespace Adamantium.Mathematics
          else
             difference *= (double)(1.0 / Math.Sqrt(lengthSq));
 
-         Vector3D.Cross(ref cameraUpVector, ref difference, out crossed);
+         Vector3.Cross(ref cameraUpVector, ref difference, out crossed);
          crossed.Normalize();
-         Vector3D.Cross(ref difference, ref crossed, out final);
+         Vector3.Cross(ref difference, ref crossed, out final);
 
          result.M11 = crossed.X;
          result.M12 = crossed.Y;
@@ -1437,9 +1437,9 @@ namespace Adamantium.Mathematics
       /// <param name="cameraUpVector">The up vector of the camera.</param>
       /// <param name="cameraForwardVector">The forward vector of the camera.</param>
       /// <returns>The created billboard Matrix3x3D.</returns>
-      public static Matrix3x3D BillboardRH(Vector3D objectPosition, Vector3D cameraPosition, Vector3D cameraUpVector, Vector3D cameraForwardVector)
+      public static Matrix3x3 BillboardRH(Vector3 objectPosition, Vector3 cameraPosition, Vector3 cameraUpVector, Vector3 cameraForwardVector)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          BillboardRH(ref objectPosition, ref cameraPosition, ref cameraUpVector, ref cameraForwardVector, out result);
          return result;
       }
@@ -1451,14 +1451,14 @@ namespace Adamantium.Mathematics
       /// <param name="target">The camera look-at target.</param>
       /// <param name="up">The camera's up vector.</param>
       /// <param name="result">When the method completes, contains the created look-at Matrix3x3D.</param>
-      public static void LookAtLH(ref Vector3D eye, ref Vector3D target, ref Vector3D up, out Matrix3x3D result)
+      public static void LookAtLH(ref Vector3 eye, ref Vector3 target, ref Vector3 up, out Matrix3x3 result)
       {
-         Vector3D xaxis, yaxis, zaxis;
-         Vector3D.Subtract(ref target, ref eye, out zaxis); zaxis.Normalize();
-         Vector3D.Cross(ref up, ref zaxis, out xaxis); xaxis.Normalize();
-         Vector3D.Cross(ref zaxis, ref xaxis, out yaxis);
+         Vector3 xaxis, yaxis, zaxis;
+         Vector3.Subtract(ref target, ref eye, out zaxis); zaxis.Normalize();
+         Vector3.Cross(ref up, ref zaxis, out xaxis); xaxis.Normalize();
+         Vector3.Cross(ref zaxis, ref xaxis, out yaxis);
 
-         result = Matrix3x3D.Identity;
+         result = Matrix3x3.Identity;
          result.M11 = xaxis.X; result.M21 = xaxis.Y; result.M31 = xaxis.Z;
          result.M12 = yaxis.X; result.M22 = yaxis.Y; result.M32 = yaxis.Z;
          result.M13 = zaxis.X; result.M23 = zaxis.Y; result.M33 = zaxis.Z;
@@ -1471,9 +1471,9 @@ namespace Adamantium.Mathematics
       /// <param name="target">The camera look-at target.</param>
       /// <param name="up">The camera's up vector.</param>
       /// <returns>The created look-at Matrix3x3D.</returns>
-      public static Matrix3x3D LookAtLH(Vector3D eye, Vector3D target, Vector3D up)
+      public static Matrix3x3 LookAtLH(Vector3 eye, Vector3 target, Vector3 up)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          LookAtLH(ref eye, ref target, ref up, out result);
          return result;
       }
@@ -1485,14 +1485,14 @@ namespace Adamantium.Mathematics
       /// <param name="target">The camera look-at target.</param>
       /// <param name="up">The camera's up vector.</param>
       /// <param name="result">When the method completes, contains the created look-at Matrix3x3D.</param>
-      public static void LookAtRH(ref Vector3D eye, ref Vector3D target, ref Vector3D up, out Matrix3x3D result)
+      public static void LookAtRH(ref Vector3 eye, ref Vector3 target, ref Vector3 up, out Matrix3x3 result)
       {
-         Vector3D xaxis, yaxis, zaxis;
-         Vector3D.Subtract(ref eye, ref target, out zaxis); zaxis.Normalize();
-         Vector3D.Cross(ref up, ref zaxis, out xaxis); xaxis.Normalize();
-         Vector3D.Cross(ref zaxis, ref xaxis, out yaxis);
+         Vector3 xaxis, yaxis, zaxis;
+         Vector3.Subtract(ref eye, ref target, out zaxis); zaxis.Normalize();
+         Vector3.Cross(ref up, ref zaxis, out xaxis); xaxis.Normalize();
+         Vector3.Cross(ref zaxis, ref xaxis, out yaxis);
 
-         result = Matrix3x3D.Identity;
+         result = Matrix3x3.Identity;
          result.M11 = xaxis.X; result.M21 = xaxis.Y; result.M31 = xaxis.Z;
          result.M12 = yaxis.X; result.M22 = yaxis.Y; result.M32 = yaxis.Z;
          result.M13 = zaxis.X; result.M23 = zaxis.Y; result.M33 = zaxis.Z;
@@ -1505,9 +1505,9 @@ namespace Adamantium.Mathematics
       /// <param name="target">The camera look-at target.</param>
       /// <param name="up">The camera's up vector.</param>
       /// <returns>The created look-at Matrix3x3D.</returns>
-      public static Matrix3x3D LookAtRH(Vector3D eye, Vector3D target, Vector3D up)
+      public static Matrix3x3 LookAtRH(Vector3 eye, Vector3 target, Vector3 up)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          LookAtRH(ref eye, ref target, ref up, out result);
          return result;
       }
@@ -1517,7 +1517,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="scale">Scaling factor for all three axes.</param>
       /// <param name="result">When the method completes, contains the created scaling Matrix3x3D.</param>
-      public static void Scaling(ref Vector3D scale, out Matrix3x3D result)
+      public static void Scaling(ref Vector3 scale, out Matrix3x3 result)
       {
          Scaling(scale.X, scale.Y, scale.Z, out result);
       }
@@ -1527,9 +1527,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="scale">Scaling factor for all three axes.</param>
       /// <returns>The created scaling Matrix3x3D.</returns>
-      public static Matrix3x3D Scaling(Vector3D scale)
+      public static Matrix3x3 Scaling(Vector3 scale)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          Scaling(ref scale, out result);
          return result;
       }
@@ -1541,9 +1541,9 @@ namespace Adamantium.Mathematics
       /// <param name="y">Scaling factor that is applied along the y-axis.</param>
       /// <param name="z">Scaling factor that is applied along the z-axis.</param>
       /// <param name="result">When the method completes, contains the created scaling Matrix3x3D.</param>
-      public static void Scaling(double x, double y, double z, out Matrix3x3D result)
+      public static void Scaling(double x, double y, double z, out Matrix3x3 result)
       {
-         result = Matrix3x3D.Identity;
+         result = Matrix3x3.Identity;
          result.M11 = x;
          result.M22 = y;
          result.M33 = z;
@@ -1556,9 +1556,9 @@ namespace Adamantium.Mathematics
       /// <param name="y">Scaling factor that is applied along the y-axis.</param>
       /// <param name="z">Scaling factor that is applied along the z-axis.</param>
       /// <returns>The created scaling Matrix3x3D.</returns>
-      public static Matrix3x3D Scaling(double x, double y, double z)
+      public static Matrix3x3 Scaling(double x, double y, double z)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          Scaling(x, y, z, out result);
          return result;
       }
@@ -1568,9 +1568,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="scale">The uniform scale that is applied along all axis.</param>
       /// <param name="result">When the method completes, contains the created scaling Matrix3x3D.</param>
-      public static void Scaling(double scale, out Matrix3x3D result)
+      public static void Scaling(double scale, out Matrix3x3 result)
       {
-         result = Matrix3x3D.Identity;
+         result = Matrix3x3.Identity;
          result.M11 = result.M22 = result.M33 = scale;
       }
 
@@ -1579,9 +1579,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="scale">The uniform scale that is applied along all axis.</param>
       /// <returns>The created scaling Matrix3x3D.</returns>
-      public static Matrix3x3D Scaling(double scale)
+      public static Matrix3x3 Scaling(double scale)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          Scaling(scale, out result);
          return result;
       }
@@ -1591,12 +1591,12 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="angle">Angle of rotation in radians. Angles are measured clockwise when looking along the rotation axis toward the origin.</param>
       /// <param name="result">When the method completes, contains the created rotation Matrix3x3D.</param>
-      public static void RotationX(double angle, out Matrix3x3D result)
+      public static void RotationX(double angle, out Matrix3x3 result)
       {
          double cos = (double)Math.Cos(angle);
          double sin = (double)Math.Sin(angle);
 
-         result = Matrix3x3D.Identity;
+         result = Matrix3x3.Identity;
          result.M22 = cos;
          result.M23 = sin;
          result.M32 = -sin;
@@ -1608,9 +1608,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="angle">Angle of rotation in radians. Angles are measured clockwise when looking along the rotation axis toward the origin.</param>
       /// <returns>The created rotation Matrix3x3D.</returns>
-      public static Matrix3x3D RotationX(double angle)
+      public static Matrix3x3 RotationX(double angle)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          RotationX(angle, out result);
          return result;
       }
@@ -1620,12 +1620,12 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="angle">Angle of rotation in radians. Angles are measured clockwise when looking along the rotation axis toward the origin.</param>
       /// <param name="result">When the method completes, contains the created rotation Matrix3x3D.</param>
-      public static void RotationY(double angle, out Matrix3x3D result)
+      public static void RotationY(double angle, out Matrix3x3 result)
       {
          double cos = (double)Math.Cos(angle);
          double sin = (double)Math.Sin(angle);
 
-         result = Matrix3x3D.Identity;
+         result = Matrix3x3.Identity;
          result.M11 = cos;
          result.M13 = -sin;
          result.M31 = sin;
@@ -1637,9 +1637,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="angle">Angle of rotation in radians. Angles are measured clockwise when looking along the rotation axis toward the origin.</param>
       /// <returns>The created rotation Matrix3x3D.</returns>
-      public static Matrix3x3D RotationY(double angle)
+      public static Matrix3x3 RotationY(double angle)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          RotationY(angle, out result);
          return result;
       }
@@ -1649,12 +1649,12 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="angle">Angle of rotation in radians. Angles are measured clockwise when looking along the rotation axis toward the origin.</param>
       /// <param name="result">When the method completes, contains the created rotation Matrix3x3D.</param>
-      public static void RotationZ(double angle, out Matrix3x3D result)
+      public static void RotationZ(double angle, out Matrix3x3 result)
       {
          double cos = (double)Math.Cos(angle);
          double sin = (double)Math.Sin(angle);
 
-         result = Matrix3x3D.Identity;
+         result = Matrix3x3.Identity;
          result.M11 = cos;
          result.M12 = sin;
          result.M21 = -sin;
@@ -1666,9 +1666,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="angle">Angle of rotation in radians. Angles are measured clockwise when looking along the rotation axis toward the origin.</param>
       /// <returns>The created rotation Matrix3x3D.</returns>
-      public static Matrix3x3D RotationZ(double angle)
+      public static Matrix3x3 RotationZ(double angle)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          RotationZ(angle, out result);
          return result;
       }
@@ -1679,7 +1679,7 @@ namespace Adamantium.Mathematics
       /// <param name="axis">The axis around which to rotate. This parameter is assumed to be normalized.</param>
       /// <param name="angle">Angle of rotation in radians. Angles are measured clockwise when looking along the rotation axis toward the origin.</param>
       /// <param name="result">When the method completes, contains the created rotation Matrix3x3D.</param>
-      public static void RotationAxis(ref Vector3D axis, double angle, out Matrix3x3D result)
+      public static void RotationAxis(ref Vector3 axis, double angle, out Matrix3x3 result)
       {
          double x = axis.X;
          double y = axis.Y;
@@ -1693,7 +1693,7 @@ namespace Adamantium.Mathematics
          double xz = x * z;
          double yz = y * z;
 
-         result = Matrix3x3D.Identity;
+         result = Matrix3x3.Identity;
          result.M11 = xx + (cos * (1.0f - xx));
          result.M12 = (xy - (cos * xy)) + (sin * z);
          result.M13 = (xz - (cos * xz)) - (sin * y);
@@ -1711,9 +1711,9 @@ namespace Adamantium.Mathematics
       /// <param name="axis">The axis around which to rotate. This parameter is assumed to be normalized.</param>
       /// <param name="angle">Angle of rotation in radians. Angles are measured clockwise when looking along the rotation axis toward the origin.</param>
       /// <returns>The created rotation Matrix3x3D.</returns>
-      public static Matrix3x3D RotationAxis(Vector3D axis, double angle)
+      public static Matrix3x3 RotationAxis(Vector3 axis, double angle)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          RotationAxis(ref axis, angle, out result);
          return result;
       }
@@ -1723,7 +1723,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="rotation">The quaternion to use to build the Matrix3x3D.</param>
       /// <param name="result">The created rotation Matrix3x3D.</param>
-      public static void RotationQuaternion(ref QuaternionD rotation, out Matrix3x3D result)
+      public static void RotationQuaternion(ref Quaternion rotation, out Matrix3x3 result)
       {
          double xx = rotation.X * rotation.X;
          double yy = rotation.Y * rotation.Y;
@@ -1735,7 +1735,7 @@ namespace Adamantium.Mathematics
          double yz = rotation.Y * rotation.Z;
          double xw = rotation.X * rotation.W;
 
-         result = Matrix3x3D.Identity;
+         result = Matrix3x3.Identity;
          result.M11 = 1.0f - (2.0f * (yy + zz));
          result.M12 = 2.0f * (xy + zw);
          result.M13 = 2.0f * (zx - yw);
@@ -1752,9 +1752,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="rotation">The quaternion to use to build the Matrix3x3D.</param>
       /// <returns>The created rotation Matrix3x3D.</returns>
-      public static Matrix3x3D RotationQuaternion(QuaternionD rotation)
+      public static Matrix3x3 RotationQuaternion(Quaternion rotation)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          RotationQuaternion(ref rotation, out result);
          return result;
       }
@@ -1766,10 +1766,10 @@ namespace Adamantium.Mathematics
       /// <param name="pitch">Pitch around the x-axis, in radians.</param>
       /// <param name="roll">Roll around the z-axis, in radians.</param>
       /// <param name="result">When the method completes, contains the created rotation Matrix3x3D.</param>
-      public static void RotationYawPitchRoll(double yaw, double pitch, double roll, out Matrix3x3D result)
+      public static void RotationYawPitchRoll(double yaw, double pitch, double roll, out Matrix3x3 result)
       {
-         QuaternionD quaternion = new QuaternionD();
-         QuaternionD.RotationYawPitchRoll(yaw, pitch, roll, out quaternion);
+         Quaternion quaternion = new Quaternion();
+         Quaternion.RotationYawPitchRoll(yaw, pitch, roll, out quaternion);
          RotationQuaternion(ref quaternion, out result);
       }
 
@@ -1780,9 +1780,9 @@ namespace Adamantium.Mathematics
       /// <param name="pitch">Pitch around the x-axis, in radians.</param>
       /// <param name="roll">Roll around the z-axis, in radians.</param>
       /// <returns>The created rotation Matrix3x3D.</returns>
-      public static Matrix3x3D RotationYawPitchRoll(double yaw, double pitch, double roll)
+      public static Matrix3x3 RotationYawPitchRoll(double yaw, double pitch, double roll)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          RotationYawPitchRoll(yaw, pitch, roll, out result);
          return result;
       }
@@ -1793,9 +1793,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first Matrix3x3D to add.</param>
       /// <param name="right">The second Matrix3x3D to add.</param>
       /// <returns>The sum of the two matrices.</returns>
-      public static Matrix3x3D operator +(Matrix3x3D left, Matrix3x3D right)
+      public static Matrix3x3 operator +(Matrix3x3 left, Matrix3x3 right)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          Add(ref left, ref right, out result);
          return result;
       }
@@ -1805,7 +1805,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The Matrix3x3D to assert (unchanged).</param>
       /// <returns>The asserted (unchanged) Matrix3x3D.</returns>
-      public static Matrix3x3D operator +(Matrix3x3D value)
+      public static Matrix3x3 operator +(Matrix3x3 value)
       {
          return value;
       }
@@ -1816,9 +1816,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first Matrix3x3D to subtract.</param>
       /// <param name="right">The second Matrix3x3D to subtract.</param>
       /// <returns>The difference between the two matrices.</returns>
-      public static Matrix3x3D operator -(Matrix3x3D left, Matrix3x3D right)
+      public static Matrix3x3 operator -(Matrix3x3 left, Matrix3x3 right)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          Subtract(ref left, ref right, out result);
          return result;
       }
@@ -1828,9 +1828,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="value">The Matrix3x3D to negate.</param>
       /// <returns>The negated Matrix3x3D.</returns>
-      public static Matrix3x3D operator -(Matrix3x3D value)
+      public static Matrix3x3 operator -(Matrix3x3 value)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          Negate(ref value, out result);
          return result;
       }
@@ -1841,9 +1841,9 @@ namespace Adamantium.Mathematics
       /// <param name="right">The Matrix3x3D to scale.</param>
       /// <param name="left">The amount by which to scale.</param>
       /// <returns>The scaled Matrix3x3D.</returns>
-      public static Matrix3x3D operator *(double left, Matrix3x3D right)
+      public static Matrix3x3 operator *(double left, Matrix3x3 right)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          Multiply(ref right, left, out result);
          return result;
       }
@@ -1854,9 +1854,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The Matrix3x3D to scale.</param>
       /// <param name="right">The amount by which to scale.</param>
       /// <returns>The scaled Matrix3x3D.</returns>
-      public static Matrix3x3D operator *(Matrix3x3D left, double right)
+      public static Matrix3x3 operator *(Matrix3x3 left, double right)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          Multiply(ref left, right, out result);
          return result;
       }
@@ -1867,9 +1867,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first Matrix3x3D to multiply.</param>
       /// <param name="right">The second Matrix3x3D to multiply.</param>
       /// <returns>The product of the two matrices.</returns>
-      public static Matrix3x3D operator *(Matrix3x3D left, Matrix3x3D right)
+      public static Matrix3x3 operator *(Matrix3x3 left, Matrix3x3 right)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          Multiply(ref left, ref right, out result);
          return result;
       }
@@ -1880,9 +1880,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The Matrix3x3D to scale.</param>
       /// <param name="right">The amount by which to scale.</param>
       /// <returns>The scaled Matrix3x3D.</returns>
-      public static Matrix3x3D operator /(Matrix3x3D left, double right)
+      public static Matrix3x3 operator /(Matrix3x3 left, double right)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          Divide(ref left, right, out result);
          return result;
       }
@@ -1893,9 +1893,9 @@ namespace Adamantium.Mathematics
       /// <param name="left">The first Matrix3x3D to divide.</param>
       /// <param name="right">The second Matrix3x3D to divide.</param>
       /// <returns>The quotient of the two matrices.</returns>
-      public static Matrix3x3D operator /(Matrix3x3D left, Matrix3x3D right)
+      public static Matrix3x3 operator /(Matrix3x3 left, Matrix3x3 right)
       {
-         Matrix3x3D result;
+         Matrix3x3 result;
          Divide(ref left, ref right, out result);
          return result;
       }
@@ -1907,7 +1907,7 @@ namespace Adamantium.Mathematics
       /// <param name="right">The second value to compare.</param>
       /// <returns><c>true</c> if <paramref name="left"/> has the same value as <paramref name="right"/>; otherwise, <c>false</c>.</returns>
       [MethodImpl(MethodImplOptions.AggressiveInlining)]
-      public static bool operator ==(Matrix3x3D left, Matrix3x3D right)
+      public static bool operator ==(Matrix3x3 left, Matrix3x3 right)
       {
          return left.Equals(ref right);
       }
@@ -1919,7 +1919,7 @@ namespace Adamantium.Mathematics
       /// <param name="right">The second value to compare.</param>
       /// <returns><c>true</c> if <paramref name="left"/> has a different value than <paramref name="right"/>; otherwise, <c>false</c>.</returns>
       [MethodImpl(MethodImplOptions.AggressiveInlining)]
-      public static bool operator !=(Matrix3x3D left, Matrix3x3D right)
+      public static bool operator !=(Matrix3x3 left, Matrix3x3 right)
       {
          return !left.Equals(ref right);
       }
@@ -1928,9 +1928,9 @@ namespace Adamantium.Mathematics
       /// Convert the 3x3 Matrix4x4D to a 4x4 Matrix4x4D.
       /// </summary>
       /// <returns>A 4x4 Matrix4x4D with zero translation and M44=1</returns>
-      public static explicit operator Matrix4x4D(Matrix3x3D Value)
+      public static explicit operator Matrix4x4(Matrix3x3 Value)
       {
-         return new Matrix4x4D(
+         return new Matrix4x4(
              Value.M11, Value.M12, Value.M13, 0,
              Value.M21, Value.M22, Value.M23, 0,
              Value.M31, Value.M32, Value.M33, 0,
@@ -1942,9 +1942,9 @@ namespace Adamantium.Mathematics
       /// Convert the 4x4 Matrix4x4D to a 3x3 Matrix4x4D.
       /// </summary>
       /// <returns>A 3x3 Matrix4x4D</returns>
-      public static explicit operator Matrix3x3D(Matrix4x4D Value)
+      public static explicit operator Matrix3x3(Matrix4x4 Value)
       {
-         return new Matrix3x3D(
+         return new Matrix3x3(
              Value.M11, Value.M12, Value.M13,
              Value.M21, Value.M22, Value.M23,
              Value.M31, Value.M32, Value.M33
@@ -2039,13 +2039,13 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
-      /// Determines whether the specified <see cref="Matrix3x3D"/> is equal to this instance.
+      /// Determines whether the specified <see cref="Matrix3x3"/> is equal to this instance.
       /// </summary>
-      /// <param name="other">The <see cref="Matrix3x3D"/> to compare with this instance.</param>
+      /// <param name="other">The <see cref="Matrix3x3"/> to compare with this instance.</param>
       /// <returns>
-      /// <c>true</c> if the specified <see cref="Matrix3x3D"/> is equal to this instance; otherwise, <c>false</c>.
+      /// <c>true</c> if the specified <see cref="Matrix3x3"/> is equal to this instance; otherwise, <c>false</c>.
       /// </returns>
-      public bool Equals(ref Matrix3x3D other)
+      public bool Equals(ref Matrix3x3 other)
       {
          return (MathHelper.NearEqual(other.M11, M11) &&
              MathHelper.NearEqual(other.M12, M12) &&
@@ -2059,22 +2059,22 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
-      /// Determines whether the specified <see cref="Matrix3x3D"/> is equal to this instance.
+      /// Determines whether the specified <see cref="Matrix3x3"/> is equal to this instance.
       /// </summary>
-      /// <param name="other">The <see cref="Matrix3x3D"/> to compare with this instance.</param>
+      /// <param name="other">The <see cref="Matrix3x3"/> to compare with this instance.</param>
       /// <returns>
-      /// <c>true</c> if the specified <see cref="Matrix3x3D"/> is equal to this instance; otherwise, <c>false</c>.
+      /// <c>true</c> if the specified <see cref="Matrix3x3"/> is equal to this instance; otherwise, <c>false</c>.
       /// </returns>
       [MethodImpl(MethodImplOptions.AggressiveInlining)]
-      public bool Equals(Matrix3x3D other)
+      public bool Equals(Matrix3x3 other)
       {
          return Equals(ref other);
       }
 
       /// <summary>
-      /// Determines whether the specified <see cref="Matrix3x3D"/> are equal.
+      /// Determines whether the specified <see cref="Matrix3x3"/> are equal.
       /// </summary>
-      public static bool Equals(ref Matrix3x3D a, ref Matrix3x3D b)
+      public static bool Equals(ref Matrix3x3 a, ref Matrix3x3 b)
       {
          return
              MathHelper.NearEqual(a.M11, b.M11) &&
@@ -2100,10 +2100,10 @@ namespace Adamantium.Mathematics
       /// </returns>
       public override bool Equals(object value)
       {
-         if (!(value is Matrix3x3D))
+         if (!(value is Matrix3x3))
             return false;
 
-         var strongValue = (Matrix3x3D)value;
+         var strongValue = (Matrix3x3)value;
          return Equals(ref strongValue);
       }
 

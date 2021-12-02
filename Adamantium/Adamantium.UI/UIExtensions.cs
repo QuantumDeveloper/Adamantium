@@ -38,21 +38,21 @@ namespace Adamantium.UI
          return visualComponent.VisualParent as T;
       }
 
-      public static Vector2D PointToClient(this IUIComponent visualComponent, Vector2D point)
+      public static Vector2 PointToClient(this IUIComponent visualComponent, Vector2 point)
       {
          var pair = GetRootAndAbsolutePosition(visualComponent);
          return pair.Key.PointToClient(point + pair.Value);
       }
 
-      public static Vector2D PointToScreen(this IUIComponent visualComponent, Vector2D point)
+      public static Vector2 PointToScreen(this IUIComponent visualComponent, Vector2 point)
       {
          var pair = GetRootAndAbsolutePosition(visualComponent);
          return pair.Key.PointToScreen(point + pair.Value);
       }
 
-      private static KeyValuePair<IRootVisualComponent, Vector2D> GetRootAndAbsolutePosition(this IUIComponent visualComponent)
+      private static KeyValuePair<IRootVisualComponent, Vector2> GetRootAndAbsolutePosition(this IUIComponent visualComponent)
       {
-         Vector2D p = new Vector2D();
+         Vector2 p = new Vector2();
 
          while (!(visualComponent is IRootVisualComponent))
          {
@@ -66,7 +66,7 @@ namespace Adamantium.UI
             }
          }
 
-         return new KeyValuePair<IRootVisualComponent, Vector2D>((IRootVisualComponent)visualComponent, p);
+         return new KeyValuePair<IRootVisualComponent, Vector2>((IRootVisualComponent)visualComponent, p);
       } 
    }
 }

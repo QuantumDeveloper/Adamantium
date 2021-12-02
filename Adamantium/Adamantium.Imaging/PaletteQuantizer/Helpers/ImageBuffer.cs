@@ -334,7 +334,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
 
         #region | Generic methods |
 
-        private void ProcessInParallel(ICollection<Vector2D> path, Action<LineTask> process, Int32 parallelTaskCount = 4)
+        private void ProcessInParallel(ICollection<Vector2> path, Action<LineTask> process, Int32 parallelTaskCount = 4)
         {
             // checks parameters
             Guard.CheckNull(process, "process");
@@ -362,7 +362,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
 
         #region | Processing methods |
 
-        private void ProcessPerPixelBase(IList<Vector2D> path, Delegate processingAction, Int32 parallelTaskCount = 4)
+        private void ProcessPerPixelBase(IList<Vector2> path, Delegate processingAction, Int32 parallelTaskCount = 4)
         {
             // checks parameters
             Guard.CheckNull(path, "path");
@@ -409,12 +409,12 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
             ProcessInParallel(path, processPerPixel, parallelTaskCount);
         }
 
-        public void ProcessPerPixel(IList<Vector2D> path, ProcessPixelFunction processPixelFunction, Int32 parallelTaskCount = 4)
+        public void ProcessPerPixel(IList<Vector2> path, ProcessPixelFunction processPixelFunction, Int32 parallelTaskCount = 4)
         {
             ProcessPerPixelBase(path, processPixelFunction, parallelTaskCount);
         }
 
-        public void ProcessPerPixelAdvanced(IList<Vector2D> path, ProcessPixelAdvancedFunction processPixelAdvancedFunction, Int32 parallelTaskCount = 4)
+        public void ProcessPerPixelAdvanced(IList<Vector2> path, ProcessPixelAdvancedFunction processPixelAdvancedFunction, Int32 parallelTaskCount = 4)
         {
             ProcessPerPixelBase(path, processPixelAdvancedFunction, parallelTaskCount);
         }
@@ -423,7 +423,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
 
         #region | Transformation functions |
 
-        private void TransformPerPixelBase(ImageBuffer target, IList<Vector2D> path, Delegate transformAction, Int32 parallelTaskCount = 4)
+        private void TransformPerPixelBase(ImageBuffer target, IList<Vector2> path, Delegate transformAction, Int32 parallelTaskCount = 4)
         {
             // checks parameters
             Guard.CheckNull(path, "path");
@@ -494,12 +494,12 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
             ProcessInParallel(path, transformPerPixel, parallelTaskCount);
         }
 
-        public void TransformPerPixel(ImageBuffer target, IList<Vector2D> path, TransformPixelFunction transformPixelFunction, Int32 parallelTaskCount = 4)
+        public void TransformPerPixel(ImageBuffer target, IList<Vector2> path, TransformPixelFunction transformPixelFunction, Int32 parallelTaskCount = 4)
         {
             TransformPerPixelBase(target, path, transformPixelFunction, parallelTaskCount);
         }
 
-        public void TransformPerPixelAdvanced(ImageBuffer target, IList<Vector2D> path, TransformPixelAdvancedFunction transformPixelAdvancedFunction, Int32 parallelTaskCount = 4)
+        public void TransformPerPixelAdvanced(ImageBuffer target, IList<Vector2> path, TransformPixelAdvancedFunction transformPixelAdvancedFunction, Int32 parallelTaskCount = 4)
         {
             TransformPerPixelBase(target, path, transformPixelAdvancedFunction, parallelTaskCount);
         }

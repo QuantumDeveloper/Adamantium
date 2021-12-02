@@ -84,7 +84,7 @@ namespace Adamantium.UI.Controls.Primitives
       {
       }
 
-      private Vector2D dragStartPoint;
+      private Vector2 dragStartPoint;
 
       public void CancelDrag()
       {

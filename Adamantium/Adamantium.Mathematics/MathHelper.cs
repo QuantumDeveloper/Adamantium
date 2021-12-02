@@ -84,7 +84,7 @@ namespace Adamantium.Mathematics
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool NearEqual(Vector3D a, Vector3D b)
+        public static bool NearEqual(Vector3 a, Vector3 b)
         {
             return WithinEpsilon(a, b, ZeroToleranceD);
         }
@@ -156,12 +156,12 @@ namespace Adamantium.Mathematics
             return WithinEpsilon(a.X, b.X, epsilon) && WithinEpsilon(a.Y, b.Y, epsilon) && WithinEpsilon(a.Z, b.Z, epsilon);
         }
 
-        public static bool WithinEpsilon(Vector3D a, Vector3D b, double epsilon)
+        public static bool WithinEpsilon(Vector3 a, Vector3 b, double epsilon)
         {
             return WithinEpsilon(a.X, b.X, epsilon) && WithinEpsilon(a.Y, b.Y, epsilon) && WithinEpsilon(a.Z, b.Z, epsilon);
         }
         
-        public static bool WithinEpsilon(Vector2D a, Vector2D b, double epsilon)
+        public static bool WithinEpsilon(Vector2 a, Vector2 b, double epsilon)
         {
             return WithinEpsilon(a.X, b.X, epsilon) && WithinEpsilon(a.Y, b.Y, epsilon);
         }
@@ -484,7 +484,7 @@ namespace Adamantium.Mathematics
             return v0.X * v1.Y - v0.Y * v1.X;
         }
         
-        public static double Cross2D(Vector2D v0, Vector2D v1)
+        public static double Cross2D(Vector2 v0, Vector2 v1)
         {
             return v0.X * v1.Y - v0.Y * v1.X;
         }
@@ -522,16 +522,16 @@ namespace Adamantium.Mathematics
             return angle;
         }
 
-        public static Double AngleBetween(Vector2D vector0, Vector2D vector1, Vector2D vector3, Vector2D vector4)
+        public static Double AngleBetween(Vector2 vector0, Vector2 vector1, Vector2 vector3, Vector2 vector4)
         {
             // find vectors
-            Vector2D v1 = vector1 - vector0;
-            Vector2D v2 = vector4 - vector3;
+            Vector2 v1 = vector1 - vector0;
+            Vector2 v2 = vector4 - vector3;
 
             var len1 = v1.Length();
             var len2 = v2.Length();
 
-            var dot = Vector2D.Dot(v1, v2);
+            var dot = Vector2.Dot(v1, v2);
             double cos = dot / len1 / len2;
 
             var cross = Cross2D(v1, v2);
@@ -553,7 +553,7 @@ namespace Adamantium.Mathematics
             float angle = 0;
             if (is360Degrees)
             {
-                var dot = Vector2D.Dot(s1.DirectionNormalized, s2.DirectionNormalized);
+                var dot = Vector2.Dot(s1.DirectionNormalized, s2.DirectionNormalized);
                 var determinant = Determinant(s1.DirectionNormalized, s2.DirectionNormalized);
                 angle = (float)Math.Atan2(determinant, dot);
                 angle = RadiansToDegrees(angle);
@@ -564,7 +564,7 @@ namespace Adamantium.Mathematics
             }
             else
             {
-                var dot = Vector2D.Dot(s1.DirectionNormalized, s2.DirectionNormalized);
+                var dot = Vector2.Dot(s1.DirectionNormalized, s2.DirectionNormalized);
                 angle = (float)Math.Acos(dot);
             }
 
@@ -576,12 +576,12 @@ namespace Adamantium.Mathematics
             return v1.X * v2.Y - v1.Y * v2.X;
         }
 
-        public static double Determinant(Vector3D v1, Vector3D v2)
+        public static double Determinant(Vector3 v1, Vector3 v2)
         {
             return v1.X * v2.Y - v1.Y * v2.X;
         }
         
-        public static double Determinant(Vector2D v1, Vector2D v2)
+        public static double Determinant(Vector2 v1, Vector2 v2)
         {
             return v1.X * v2.Y - v1.Y * v2.X;
         }
@@ -597,7 +597,7 @@ namespace Adamantium.Mathematics
 
         }
 
-        public static bool IsClockwise(Vector2D point0, Vector2D point1, Vector2D point2, Vector3F viewVector)
+        public static bool IsClockwise(Vector2 point0, Vector2 point1, Vector2 point2, Vector3F viewVector)
         {
             var edge0 = point1 - point0;
             var edge1 = point2 - point0;
@@ -650,21 +650,21 @@ namespace Adamantium.Mathematics
             return ((radians * 180.0) / System.Math.PI);
         }
         
-        public static double Dot(Vector2D v1, Vector2D v2)
+        public static double Dot(Vector2 v1, Vector2 v2)
         {
             return (v1.X * v2.X + v1.Y * v2.Y);
         }
         
-        public static Vector2D LineSegmentToVector(Vector2D start, Vector2D end)
+        public static Vector2 LineSegmentToVector(Vector2 start, Vector2 end)
         {
-            return new Vector2D(end.X - start.X, end.Y - start.Y);
+            return new Vector2(end.X - start.X, end.Y - start.Y);
         }
 
         // find angle in degrees between to segments
-        public static double DetermineAngleInDegrees(Vector2D v1Start, Vector2D v1End, Vector2D v2Start, Vector2D v2End)
+        public static double DetermineAngleInDegrees(Vector2 v1Start, Vector2 v1End, Vector2 v2Start, Vector2 v2End)
         {
-            Vector2D v1 = LineSegmentToVector(v1Start, v1End);
-            Vector2D v2 = LineSegmentToVector(v2Start, v2End);
+            Vector2 v1 = LineSegmentToVector(v1Start, v1End);
+            Vector2 v2 = LineSegmentToVector(v2Start, v2End);
 
             double dot = Dot(v1, v2);
 
@@ -685,7 +685,7 @@ namespace Adamantium.Mathematics
             return RadiansToDegrees(rad);
         }
 
-        public static double Distance(Vector2D v1, Vector2D v2)
+        public static double Distance(Vector2 v1, Vector2 v2)
         {
             //return Math.Sqrt(System.Math.Pow(v2.X - v1.X, 2) + System.Math.Pow(v2.Y - v1.Y, 2));
             return Math.Sqrt((v2.X - v1.X) * (v2.X - v1.X) + (v2.Y - v1.Y) * (v2.Y - v1.Y));
@@ -697,7 +697,7 @@ namespace Adamantium.Mathematics
             return Math.Sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
         }
         
-        public static double DistanceToPoint(Vector2D start, Vector2D end, Vector2D point)
+        public static double DistanceToPoint(Vector2 start, Vector2 end, Vector2 point)
         {
             double dStart = Distance(point, start);
             double dEnd = Distance(point, end);
@@ -731,7 +731,7 @@ namespace Adamantium.Mathematics
             }
         }
 
-        public static double PointToLineDistance(Vector2D start, Vector2D end, Vector2D point)
+        public static double PointToLineDistance(Vector2 start, Vector2 end, Vector2 point)
         {
             double res = 0;
             
@@ -765,12 +765,12 @@ namespace Adamantium.Mathematics
         /// <param name="start">Start of line</param>
         /// <param name="end">End of line</param>
         /// <returns>Positive value if on the right of line, negative if on the left</returns>
-        private static double DeterminePointPosition (Vector2D point, Vector2D start, Vector2D end)
+        private static double DeterminePointPosition (Vector2 point, Vector2 start, Vector2 end)
         {
             return (point.X - end.X) * (start.Y - end.Y) - (start.X - end.X) * (point.Y - end.Y);
         }
 
-        public static bool IsPointInTriangle (Vector2D pt, Vector2D v1, Vector2D v2, Vector2D v3)
+        public static bool IsPointInTriangle (Vector2 pt, Vector2 v1, Vector2 v2, Vector2 v3)
         {
             double d1 = DeterminePointPosition(pt, v1, v2);
             double d2 = DeterminePointPosition(pt, v2, v3);
@@ -782,7 +782,7 @@ namespace Adamantium.Mathematics
             return !(hasNeg && hasPos);
         }
 
-        public static bool IsPointInShape(Vector2D pt, List<LineSegment2D> shape)
+        public static bool IsPointInShape(Vector2 pt, List<LineSegment2D> shape)
         {
             bool? side = null;
             
@@ -802,17 +802,17 @@ namespace Adamantium.Mathematics
             return true;
         }
         
-        public static List<Vector2D> GetBSpline2(List<Vector2D> controlPoints, uint resolution)
+        public static List<Vector2> GetBSpline2(List<Vector2> controlPoints, uint resolution)
         {
             if (controlPoints == null ||
                 controlPoints.Count < 3 ||
                 resolution < 2)
             {
                 // just return empty list
-                return new List<Vector2D>();
+                return new List<Vector2>();
             }
 
-            var curvePoints = new List<Vector2D>();
+            var curvePoints = new List<Vector2>();
 
             var start = 1;
             var end = controlPoints.Count - 1;
@@ -836,7 +836,7 @@ namespace Adamantium.Mathematics
             return curvePoints;
         }
 
-        private static Vector2D curve(List<Vector2D> controlPoints, int index, double u)
+        private static Vector2 curve(List<Vector2> controlPoints, int index, double u)
         {
             return (blend03(u) * controlPoints[index - 1] + blend13(u) * controlPoints[index] + blend23(u) * controlPoints[index + 1]);
         }
@@ -856,18 +856,18 @@ namespace Adamantium.Mathematics
             return ((u * u) / 2);
         }
 
-        public static List<Vector2D> GetQuadraticBezier(Vector2D start, Vector2D control, Vector2D end, uint sampleRate)
+        public static List<Vector2> GetQuadraticBezier(Vector2 start, Vector2 control, Vector2 end, uint sampleRate)
         {
-            if (sampleRate < 2) return new List<Vector2D>() { start, control, end };
+            if (sampleRate < 2) return new List<Vector2>() { start, control, end };
             
-            var bezierPoints = new List<Vector2D>();
+            var bezierPoints = new List<Vector2>();
 
             var t = 1.0 / sampleRate;
 
             for (double d = 0; d <= 1; d = Math.Round(d + t, 4))
             {
                 var point = Math.Pow(1 - d, 2) * start + 2 * d * (1 - d) * control + Math.Pow(d, 2) * end;
-                point = new Vector2D(Math.Round(point.X, 4), Math.Round(point.Y, 4));
+                point = new Vector2(Math.Round(point.X, 4), Math.Round(point.Y, 4));
                 bezierPoints.Add(point);
             }
             
@@ -880,11 +880,11 @@ namespace Adamantium.Mathematics
             return bezierPoints;
         }
         
-        public static List<Vector2D> GetCubicBezier(Vector2D start, Vector2D control1, Vector2D control2, Vector2D end, uint sampleRate)
+        public static List<Vector2> GetCubicBezier(Vector2 start, Vector2 control1, Vector2 control2, Vector2 end, uint sampleRate)
         {
-            if (sampleRate < 2) return new List<Vector2D>() { start, control1, control2, end };
+            if (sampleRate < 2) return new List<Vector2>() { start, control1, control2, end };
             
-            var bezierPoints = new List<Vector2D>();
+            var bezierPoints = new List<Vector2>();
 
             var t = 1.0 / sampleRate;
 
@@ -894,7 +894,7 @@ namespace Adamantium.Mathematics
                                     3 * d * Math.Pow(1 - d, 2) * control1 +
                                     3 * Math.Pow(d, 2) * (1 - d) * control2 +
                                     Math.Pow(d, 3) * end;
-                point = new Vector2D(Math.Round(point.X, 4), Math.Round(point.Y, 4));
+                point = new Vector2(Math.Round(point.X, 4), Math.Round(point.Y, 4));
                 bezierPoints.Add(point);
             }
 
@@ -907,9 +907,9 @@ namespace Adamantium.Mathematics
             return bezierPoints;
         }
         
-        private static (double startAngle, double sweepAngle, Vector2D center) GetArcData(Vector2D start, Vector2D end, double radius, bool clockwise = true)
+        private static (double startAngle, double sweepAngle, Vector2 center) GetArcData(Vector2 start, Vector2 end, double radius, bool clockwise = true)
         {
-            var d = new Vector2D((end.X - start.X) * 0.5, (end.Y - start.Y) * 0.5);
+            var d = new Vector2((end.X - start.X) * 0.5, (end.Y - start.Y) * 0.5);
             var a = d.Length();
             
             if (a > radius) radius = a; //return null;
@@ -923,12 +923,12 @@ namespace Adamantium.Mathematics
             var startAngle = Math.Atan2(start.Y - oy, start.X - ox) * 180.0 / Math.PI;
             var sweepAngle = side * 2.0 * Math.Asin(a / radius) * 180.0 / Math.PI;
 
-            return (startAngle, sweepAngle, new Vector2D(ox, oy));
+            return (startAngle, sweepAngle, new Vector2(ox, oy));
         }
 
-        public static List<Vector2D> GetArcPoints(Vector2D start, Vector2D end, double radius, bool convex, double sampleRate)
+        public static List<Vector2> GetArcPoints(Vector2 start, Vector2 end, double radius, bool convex, double sampleRate)
         {
-            var points = new List<Vector2D>();
+            var points = new List<Vector2>();
 
             var (arcStartAngle, arcSweepAngle, arcCenter) = GetArcData(start, end, radius, convex);
 
@@ -942,7 +942,7 @@ namespace Adamantium.Mathematics
             for (double angle = DegreesToRadians(startAngle); compare(angle); angle += sampleRate) //You are using radians so you will have to increase by a very small amount
             {
                 //This will have the coordinates  you want to draw a point at
-                var point = new Vector2D(arcCenter.X + radius * Math.Cos(angle),
+                var point = new Vector2(arcCenter.X + radius * Math.Cos(angle),
                     arcCenter.Y + radius * Math.Sin(angle));
                 point.X = Math.Round(point.X, 4);
                 point.Y = Math.Round(point.Y, 4);

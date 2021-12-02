@@ -103,7 +103,7 @@ namespace Adamantium.Engine.Graphics
                     for (int i = 0; i < mesh.Positions.Length; ++i)
                     {
                         var position = mesh.Positions[i];
-                        var uv = new Vector2D(
+                        var uv = new Vector2(
                            0.5f + (position.X - center.X) / (2 * radiusX),
                            0.5f - (position.Y - center.Y) / (2 * radiusY));
                         uvs.Add(uv);

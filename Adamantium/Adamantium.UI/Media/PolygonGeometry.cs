@@ -22,13 +22,13 @@ namespace Adamantium.UI.Media
             throw new System.NotImplementedException();
         }
 
-        public PolygonGeometry(IEnumerable<Vector2D> points, FillRule fillRule)
+        public PolygonGeometry(IEnumerable<Vector2> points, FillRule fillRule)
         {
             FillRule = fillRule;
             GenerateGeometry(points);
         }
 
-        internal void GenerateGeometry(IEnumerable<Vector2D> points)
+        internal void GenerateGeometry(IEnumerable<Vector2> points)
         {
             var polygonItem = new PolygonItem(points);
             var polygon = new Polygon();

@@ -19,7 +19,7 @@ namespace Adamantium.UI.Media
          public LineSegment2D TopSegment;
          public LineSegment2D GeometrySegment;
          public LineSegment2D BottomSegment;
-         public Vector2D? ZeroLengthDirection;
+         public Vector2? ZeroLengthDirection;
       }
 
       public StrokeGeometry()
@@ -51,7 +51,7 @@ namespace Adamantium.UI.Media
          
 
          points = testSegs.ToArray();
-         var zeroLineDir = new LineSegment2D(new Vector2D(0, 0), new Vector2D(0.3, 1)).DirectionNormalized;
+         var zeroLineDir = new LineSegment2D(new Vector2(0, 0), new Vector2(0.3, 1)).DirectionNormalized;
          // for test purposes end
 
          // sanitize geometry - remove equal points
@@ -86,21 +86,21 @@ namespace Adamantium.UI.Media
          }
 
          //if (polygon.Polygons.Count <= 0) return;
-         var rect = new Vector2D[]
+         var rect = new Vector2[]
          {
-            new Vector2D(100, 100),
-            new Vector2D(300, 100),
-            new Vector2D(300, 300),
-            new Vector2D(100, 300),
+            new Vector2(100, 100),
+            new Vector2(300, 100),
+            new Vector2(300, 300),
+            new Vector2(100, 300),
          };
          var polygonItem = new PolygonItem(rect);
          
-         var rect2 = new Vector2D[]
+         var rect2 = new Vector2[]
          {
-            new Vector2D(150, 150),
-            new Vector2D(200, 150),
-            new Vector2D(200, 250),
-            new Vector2D(150, 250),
+            new Vector2(150, 150),
+            new Vector2(200, 150),
+            new Vector2(200, 250),
+            new Vector2(150, 250),
          };
          var polygonItem2 = new PolygonItem(rect2);
          polygon.AddItems(polygonItem, polygonItem2);
@@ -139,8 +139,8 @@ namespace Adamantium.UI.Media
                else break;
             }
 
-            var start = (Vector2D)points[i];
-            var end = (Vector2D)points[next];
+            var start = (Vector2)points[i];
+            var end = (Vector2)points[next];
 
             length += (end - start).Length();
          }
@@ -162,7 +162,7 @@ namespace Adamantium.UI.Media
          var dashGeometry = new List<Vector3F>();
          bool goOn = true;
 
-         var currentPoint = GetPointAlongGeometry(points, 0, (Vector2D)points[0], offset, isGeometryClosed, out var currentSegmentIndex, out var intermediatePointIndices, out var pathLength);
+         var currentPoint = GetPointAlongGeometry(points, 0, (Vector2)points[0], offset, isGeometryClosed, out var currentSegmentIndex, out var intermediatePointIndices, out var pathLength);
 
          do
          {
@@ -247,7 +247,7 @@ namespace Adamantium.UI.Media
          return dashesGeometry;
       }
 
-      private Vector2D GetPointAlongGeometry(Vector3F[] points, int startSegmentIndex, Vector2D startPoint, double offsetFromStartPoint, bool isGeometryClosed, out int segmentIndex, out List<int> intermediatePointIndices, out double pathLength)
+      private Vector2 GetPointAlongGeometry(Vector3F[] points, int startSegmentIndex, Vector2 startPoint, double offsetFromStartPoint, bool isGeometryClosed, out int segmentIndex, out List<int> intermediatePointIndices, out double pathLength)
       {
          segmentIndex = startSegmentIndex;
          intermediatePointIndices = new List<int>();
@@ -262,8 +262,8 @@ namespace Adamantium.UI.Media
 
          // index of start point of segment on which lies the point with desired offset
          var index = startSegmentIndex;
-         Vector2D segmentStart;
-         Vector2D segmentEnd;
+         Vector2 segmentStart;
+         Vector2 segmentEnd;
 
          bool useStartPoint = true;
          
@@ -299,8 +299,8 @@ namespace Adamantium.UI.Media
             if (nextIndex == points.Length) nextIndex = 0;
             if (nextIndex == -1) nextIndex = points.Length - 1;
 
-            segmentStart = useStartPoint ? startPoint : (Vector2D)points[index];
-            segmentEnd = (Vector2D)points[nextIndex];
+            segmentStart = useStartPoint ? startPoint : (Vector2)points[index];
+            segmentEnd = (Vector2)points[nextIndex];
 
             // use start point only at the start of new 'path', so use it only once
             if (useStartPoint) useStartPoint = false;
@@ -334,7 +334,7 @@ namespace Adamantium.UI.Media
          return GetPointAlongSegment(segmentStart, segmentEnd, offsetFromStartPoint);
       }
 
-      private Vector2D GetPointAlongSegment(Vector2D start, Vector2D end, double offsetFromStartOfSegment)
+      private Vector2 GetPointAlongSegment(Vector2 start, Vector2 end, double offsetFromStartOfSegment)
       {
          var segment = new LineSegment2D(start, end);
 
@@ -350,7 +350,7 @@ namespace Adamantium.UI.Media
       /// <param name="pen">Stroke's pen</param>
       /// <param name="isGeometryClosed">Is geometry closed (like triangle, square etc.) or is it just a line</param>
       /// <param name="zeroLengthLineDirection">Direction for the case of zero length line</param>
-      private List<PolygonItem> GenerateStroke(Vector3F[] points, Pen pen, bool isGeometryClosed, Vector2D? zeroLengthLineDirection = null)
+      private List<PolygonItem> GenerateStroke(Vector3F[] points, Pen pen, bool isGeometryClosed, Vector2? zeroLengthLineDirection = null)
       {
          // check if geometry is valid
          if (points.Length < 2) return null;
@@ -362,21 +362,21 @@ namespace Adamantium.UI.Media
          if (points.Length == 2 && points[0] == points[1])
          {
             // if there is no direction for zero length line - set it to default value of (1,0)
-            if (zeroLengthLineDirection == null) zeroLengthLineDirection = new Vector2D(1, 0);
+            if (zeroLengthLineDirection == null) zeroLengthLineDirection = new Vector2(1, 0);
             var zeroLengthLineDirectionNormalized = zeroLengthLineDirection.Value;
             zeroLengthLineDirectionNormalized.Normalize();
 
             // compute normal to zero length line based on zero length line direction
-            var zeroLengthLineNormal = new Vector2D(-zeroLengthLineDirection.Value.Y, zeroLengthLineDirection.Value.X);
+            var zeroLengthLineNormal = new Vector2(-zeroLengthLineDirection.Value.Y, zeroLengthLineDirection.Value.X);
             
             // generate top and bottom segments
-            var startTopBottomPoints = GenerateTopBottomPoints((Vector2D)points[0], pen.Thickness, zeroLengthLineNormal);
-            var endTopBottomPoints = GenerateTopBottomPoints((Vector2D)points[1], pen.Thickness, zeroLengthLineNormal);
+            var startTopBottomPoints = GenerateTopBottomPoints((Vector2)points[0], pen.Thickness, zeroLengthLineNormal);
+            var endTopBottomPoints = GenerateTopBottomPoints((Vector2)points[1], pen.Thickness, zeroLengthLineNormal);
 
             var strokeSegment = new StrokeSegment
             {
                TopSegment = new LineSegment2D(startTopBottomPoints[0], endTopBottomPoints[0]),
-               GeometrySegment = new LineSegment2D((Vector2D)points[0], (Vector2D)points[1]),
+               GeometrySegment = new LineSegment2D((Vector2)points[0], (Vector2)points[1]),
                BottomSegment = new LineSegment2D(startTopBottomPoints[1], endTopBottomPoints[1]),
                ZeroLengthDirection = zeroLengthLineDirectionNormalized
             };
@@ -398,12 +398,12 @@ namespace Adamantium.UI.Media
                   nextIndex = 0;
                }
 
-               var topBottomSegments = GenerateTopBottomSegments((Vector2D)points[i], (Vector2D)points[nextIndex], pen.Thickness);
+               var topBottomSegments = GenerateTopBottomSegments((Vector2)points[i], (Vector2)points[nextIndex], pen.Thickness);
 
                var strokeSegment = new StrokeSegment
                {
                   TopSegment = topBottomSegments[0],
-                  GeometrySegment = new LineSegment2D((Vector2D)points[i], (Vector2D)points[nextIndex]),
+                  GeometrySegment = new LineSegment2D((Vector2)points[i], (Vector2)points[nextIndex]),
                   BottomSegment = topBottomSegments[1],
                   ZeroLengthDirection = null
                };
@@ -453,9 +453,9 @@ namespace Adamantium.UI.Media
       /// <param name="capDirection">Direction in which cap should be drawn</param>
       /// <param name="thickness">Thickness of the stroke</param>
       /// <returns>Points of the cap's outline</returns>
-      private PolygonItem GenerateCap(PenLineCap capType, Vector2D geometryBasePoint, Vector2D capBasePoint1, Vector2D capBasePoint2, Vector2D capDirection, double thickness)
+      private PolygonItem GenerateCap(PenLineCap capType, Vector2 geometryBasePoint, Vector2 capBasePoint1, Vector2 capBasePoint2, Vector2 capDirection, double thickness)
       {
-         var polygonPoints = new List<Vector2D>();
+         var polygonPoints = new List<Vector2>();
 
          switch (capType)
          {
@@ -535,7 +535,7 @@ namespace Adamantium.UI.Media
       /// <param name="endPoint">End point of geomentry segment</param>
       /// <param name="thickness">Thickness of the stroke</param>
       /// <returns>Array of two stroke outline segments</returns>
-      private LineSegment2D[] GenerateTopBottomSegments(Vector2D startPoint, Vector2D endPoint, double thickness)
+      private LineSegment2D[] GenerateTopBottomSegments(Vector2 startPoint, Vector2 endPoint, double thickness)
       {
          var normal = GenerateNormalToSegment(startPoint, endPoint);
 
@@ -555,7 +555,7 @@ namespace Adamantium.UI.Media
       /// <param name="thickness">Thickness of the stroke</param>
       /// <param name="normal">Normal to geometry point</param>
       /// <returns>Array of two stroke outline points</returns>
-      private Vector2D[] GenerateTopBottomPoints(Vector2D point, double thickness, Vector2D normal)
+      private Vector2[] GenerateTopBottomPoints(Vector2 point, double thickness, Vector2 normal)
       {
          return new[]
          {
@@ -570,10 +570,10 @@ namespace Adamantium.UI.Media
       /// <param name="startPoint">Start point of segment</param>
       /// <param name="endPoint">End point of segment</param>
       /// <returns>Normal to segment</returns>
-      private Vector2D GenerateNormalToSegment(Vector2D startPoint, Vector2D endPoint)
+      private Vector2 GenerateNormalToSegment(Vector2 startPoint, Vector2 endPoint)
       {
          var dir = endPoint - startPoint;
-         var normal = new Vector2D(-dir.Y, dir.X);
+         var normal = new Vector2(-dir.Y, dir.X);
          normal.Normalize();
 
          return RoundVector2D(normal, doublePrecision);
@@ -585,9 +585,9 @@ namespace Adamantium.UI.Media
       /// <param name="vector">Vector to be rounded</param>
       /// <param name="precision">Precision to round with</param>
       /// <returns>Rounded vector</returns>
-      private Vector2D RoundVector2D(Vector2D vector, int precision)
+      private Vector2 RoundVector2D(Vector2 vector, int precision)
       {
-         return new Vector2D(Math.Round(vector.X, precision), Math.Round(vector.Y, precision));
+         return new Vector2(Math.Round(vector.X, precision), Math.Round(vector.Y, precision));
       }
 
       /// <summary>
@@ -605,7 +605,7 @@ namespace Adamantium.UI.Media
 
          for (var i = 0; i < strokeSegments.Count; i++)
          {
-            var polygonPoints = new List<Vector2D>
+            var polygonPoints = new List<Vector2>
             {
                strokeSegments[i].TopSegment.Start,
                strokeSegments[i].TopSegment.End,
@@ -632,7 +632,7 @@ namespace Adamantium.UI.Media
             var left = new LineSegment2D();
             var right = new LineSegment2D();
             var center = strokeSegments[i].GeometrySegment.End;
-            var joinPoints = new List<Vector2D>();
+            var joinPoints = new List<Vector2>();
             
             if (angle < 180)
             {
@@ -660,7 +660,7 @@ namespace Adamantium.UI.Media
                   {
                      joinPoints.Add(center);
                      joinPoints.Add(left.End);
-                     joinPoints.Add(RoundVector2D((Vector2D) intersection, doublePrecision));
+                     joinPoints.Add(RoundVector2D((Vector2) intersection, doublePrecision));
                      joinPoints.Add(right.Start);
                   }
 
@@ -672,7 +672,7 @@ namespace Adamantium.UI.Media
 
                   if (intersection != null)
                   {
-                     var roundPoints = MathHelper.GetQuadraticBezier(left.End, (Vector2D)intersection, right.Start, BezierSampleRate);
+                     var roundPoints = MathHelper.GetQuadraticBezier(left.End, (Vector2)intersection, right.Start, BezierSampleRate);
                      joinPoints.Add(center);
                      joinPoints.AddRange(roundPoints);
                   }
@@ -689,7 +689,7 @@ namespace Adamantium.UI.Media
          return polygonItems;
       }
       
-      private void RemoveCollinearSegments(List<Vector2D> strokeOutline, bool isClosedGeometry)
+      private void RemoveCollinearSegments(List<Vector2> strokeOutline, bool isClosedGeometry)
       {
          // collinear segments are only possible if there are 3 or more points in outline
          if (strokeOutline.Count < 3) return;

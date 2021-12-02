@@ -33,77 +33,77 @@ using System.Runtime.InteropServices;
 namespace Adamantium.Mathematics
 {
     [StructLayout(LayoutKind.Sequential)]
-    public struct Vector3D : IEquatable<Vector3D>, IFormattable
+    public struct Vector3 : IEquatable<Vector3>, IFormattable
     {
         /// <summary>
-        /// The size of the <see cref="Vector3D"/> type, in bytes.
+        /// The size of the <see cref="Vector3"/> type, in bytes.
         /// </summary>
-        public static readonly int SizeInBytes = Marshal.SizeOf(typeof(Vector3D));
+        public static readonly int SizeInBytes = Marshal.SizeOf(typeof(Vector3));
 
         /// <summary>
-        /// A <see cref="Vector3D"/> with all of its components set to zero.
+        /// A <see cref="Vector3"/> with all of its components set to zero.
         /// </summary>
-        public static readonly Vector3D Zero = new Vector3D();
+        public static readonly Vector3 Zero = new Vector3();
 
         /// <summary>
-        /// The X unit <see cref="Vector3D"/> (1, 0, 0).
+        /// The X unit <see cref="Vector3"/> (1, 0, 0).
         /// </summary>
-        public static readonly Vector3D UnitX = new Vector3D(1.0f, 0.0f, 0.0f);
+        public static readonly Vector3 UnitX = new Vector3(1.0f, 0.0f, 0.0f);
 
         /// <summary>
-        /// The Y unit <see cref="Vector3D"/> (0, 1, 0).
+        /// The Y unit <see cref="Vector3"/> (0, 1, 0).
         /// </summary>
-        public static readonly Vector3D UnitY = new Vector3D(0.0f, 1.0f, 0.0f);
+        public static readonly Vector3 UnitY = new Vector3(0.0f, 1.0f, 0.0f);
 
         /// <summary>
-        /// The Z unit <see cref="Vector3D"/> (0, 0, 1).
+        /// The Z unit <see cref="Vector3"/> (0, 0, 1).
         /// </summary>
-        public static readonly Vector3D UnitZ = new Vector3D(0.0f, 0.0f, 1.0f);
+        public static readonly Vector3 UnitZ = new Vector3(0.0f, 0.0f, 1.0f);
 
         /// <summary>
-        /// A <see cref="Vector3D"/> with all of its components set to one.
+        /// A <see cref="Vector3"/> with all of its components set to one.
         /// </summary>
-        public static readonly Vector3D One = new Vector3D(1.0f, 1.0f, 1.0f);
+        public static readonly Vector3 One = new Vector3(1.0f, 1.0f, 1.0f);
 
         /// <summary>
-        /// A unit <see cref="Vector3D"/> designating up (0, 1, 0).
+        /// A unit <see cref="Vector3"/> designating up (0, 1, 0).
         /// </summary>
-        public static readonly Vector3D Up = new Vector3D(0.0f, 1.0f, 0.0f);
+        public static readonly Vector3 Up = new Vector3(0.0f, 1.0f, 0.0f);
 
         /// <summary>
-        /// A unit <see cref="Vector3D"/> designating down (0, -1, 0).
+        /// A unit <see cref="Vector3"/> designating down (0, -1, 0).
         /// </summary>
-        public static readonly Vector3D Down = new Vector3D(0.0f, -1.0f, 0.0f);
+        public static readonly Vector3 Down = new Vector3(0.0f, -1.0f, 0.0f);
 
         /// <summary>
-        /// A unit <see cref="Vector3D"/> designating left (-1, 0, 0).
+        /// A unit <see cref="Vector3"/> designating left (-1, 0, 0).
         /// </summary>
-        public static readonly Vector3D Left = new Vector3D(-1.0f, 0.0f, 0.0f);
+        public static readonly Vector3 Left = new Vector3(-1.0f, 0.0f, 0.0f);
 
         /// <summary>
-        /// A unit <see cref="Vector3D"/> designating right (1, 0, 0).
+        /// A unit <see cref="Vector3"/> designating right (1, 0, 0).
         /// </summary>
-        public static readonly Vector3D Right = new Vector3D(1.0f, 0.0f, 0.0f);
+        public static readonly Vector3 Right = new Vector3(1.0f, 0.0f, 0.0f);
 
         /// <summary>
-        /// A unit <see cref="Vector3D"/> designating forward in a right-handed coordinate system (0, 0, -1).
+        /// A unit <see cref="Vector3"/> designating forward in a right-handed coordinate system (0, 0, -1).
         /// </summary>
-        public static readonly Vector3D ForwardRH = new Vector3D(0.0f, 0.0f, -1.0f);
+        public static readonly Vector3 ForwardRH = new Vector3(0.0f, 0.0f, -1.0f);
 
         /// <summary>
-        /// A unit <see cref="Vector3D"/> designating forward in a left-handed coordinate system (0, 0, 1).
+        /// A unit <see cref="Vector3"/> designating forward in a left-handed coordinate system (0, 0, 1).
         /// </summary>
-        public static readonly Vector3D ForwardLH = new Vector3D(0.0f, 0.0f, 1.0f);
+        public static readonly Vector3 ForwardLH = new Vector3(0.0f, 0.0f, 1.0f);
 
         /// <summary>
-        /// A unit <see cref="Vector3D"/> designating backward in a right-handed coordinate system (0, 0, 1).
+        /// A unit <see cref="Vector3"/> designating backward in a right-handed coordinate system (0, 0, 1).
         /// </summary>
-        public static readonly Vector3D BackwardRH = new Vector3D(0.0f, 0.0f, 1.0f);
+        public static readonly Vector3 BackwardRH = new Vector3(0.0f, 0.0f, 1.0f);
 
         /// <summary>
-        /// A unit <see cref="Vector3D"/> designating backward in a left-handed coordinate system (0, 0, -1).
+        /// A unit <see cref="Vector3"/> designating backward in a left-handed coordinate system (0, 0, -1).
         /// </summary>
-        public static readonly Vector3D BackwardLH = new Vector3D(0.0f, 0.0f, -1.0f);
+        public static readonly Vector3 BackwardLH = new Vector3(0.0f, 0.0f, -1.0f);
 
         /// <summary>
         /// The X component of the vector.
@@ -121,10 +121,10 @@ namespace Adamantium.Mathematics
         public double Z;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="Vector3D"/> struct.
+        /// Initializes a new instance of the <see cref="Vector3"/> struct.
         /// </summary>
         /// <param name="value">The value that will be assigned to all components.</param>
-        public Vector3D(double value)
+        public Vector3(double value)
         {
             X = value;
             Y = value;
@@ -132,12 +132,12 @@ namespace Adamantium.Mathematics
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="Vector3D"/> struct.
+        /// Initializes a new instance of the <see cref="Vector3"/> struct.
         /// </summary>
         /// <param name="x">Initial value for the X component of the vector.</param>
         /// <param name="y">Initial value for the Y component of the vector.</param>
         /// <param name="z">Initial value for the Z component of the vector.</param>
-        public Vector3D(double x, double y, double z)
+        public Vector3(double x, double y, double z)
         {
             X = x;
             Y = y;
@@ -145,11 +145,11 @@ namespace Adamantium.Mathematics
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="Vector3D"/> struct.
+        /// Initializes a new instance of the <see cref="Vector3"/> struct.
         /// </summary>
         /// <param name="x">Initial value for the X component of the vector.</param>
         /// <param name="y">Initial value for the Y component of the vector.</param>
-        public Vector3D(double x, double y)
+        public Vector3(double x, double y)
         {
             X = x;
             Y = y;
@@ -157,11 +157,11 @@ namespace Adamantium.Mathematics
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="Vector3D"/> struct.
+        /// Initializes a new instance of the <see cref="Vector3"/> struct.
         /// </summary>
         /// <param name="value">A vector containing the values with which to initialize the X and Y components.</param>
         /// <param name="z">Initial value for the Z component of the vector.</param>
-        public Vector3D(Vector2D value, double z)
+        public Vector3(Vector2 value, double z)
         {
             X = value.X;
             Y = value.Y;
@@ -169,12 +169,12 @@ namespace Adamantium.Mathematics
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="Vector3D"/> struct.
+        /// Initializes a new instance of the <see cref="Vector3"/> struct.
         /// </summary>
         /// <param name="values">The values to assign to the X, Y, and Z components of the vector. This must be an array with three elements.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="values"/> is <c>null</c>.</exception>
         /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="values"/> contains more or less than three elements.</exception>
-        public Vector3D(double[] values)
+        public Vector3(double[] values)
         {
             if (values == null)
                 throw new ArgumentNullException("values");
@@ -240,7 +240,7 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <returns>The length of the vector.</returns>
         /// <remarks>
-        /// <see cref="Vector3D.LengthSquared"/> may be preferred when only the relative length is needed
+        /// <see cref="Vector3.LengthSquared"/> may be preferred when only the relative length is needed
         /// and speed is of the essence.
         /// </remarks>
         public double Length()
@@ -253,7 +253,7 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <returns>The squared length of the vector.</returns>
         /// <remarks>
-        /// This method may be preferred to <see cref="Vector3D.Length"/> when only a relative length is needed
+        /// This method may be preferred to <see cref="Vector3.Length"/> when only a relative length is needed
         /// and speed is of the essence.
         /// </remarks>
         public double LengthSquared()
@@ -291,9 +291,9 @@ namespace Adamantium.Mathematics
         /// <param name="left">The first vector to add.</param>
         /// <param name="right">The second vector to add.</param>
         /// <param name="result">When the method completes, contains the sum of the two vectors.</param>
-        public static void Add(ref Vector3D left, ref Vector3D right, out Vector3D result)
+        public static void Add(ref Vector3 left, ref Vector3 right, out Vector3 result)
         {
-            result = new Vector3D(left.X + right.X, left.Y + right.Y, left.Z + right.Z);
+            result = new Vector3(left.X + right.X, left.Y + right.Y, left.Z + right.Z);
         }
 
         /// <summary>
@@ -302,9 +302,9 @@ namespace Adamantium.Mathematics
         /// <param name="left">The first vector to add.</param>
         /// <param name="right">The second vector to add.</param>
         /// <param name="result">When the method completes, contains the sum of the two vectors.</param>
-        public static void Add(ref Vector3D left, ref Vector3F right, out Vector3D result)
+        public static void Add(ref Vector3 left, ref Vector3F right, out Vector3 result)
         {
-            result = new Vector3D(left.X + right.X, left.Y + right.Y, left.Z + right.Z);
+            result = new Vector3(left.X + right.X, left.Y + right.Y, left.Z + right.Z);
         }
 
         /// <summary>
@@ -313,9 +313,9 @@ namespace Adamantium.Mathematics
         /// <param name="left">The first vector to add.</param>
         /// <param name="right">The second vector to add.</param>
         /// <param name="result">When the method completes, contains the sum of the two vectors.</param>
-        public static void Add(ref Vector3F left, ref Vector3D right, out Vector3D result)
+        public static void Add(ref Vector3F left, ref Vector3 right, out Vector3 result)
         {
-            result = new Vector3D(left.X + right.X, left.Y + right.Y, left.Z + right.Z);
+            result = new Vector3(left.X + right.X, left.Y + right.Y, left.Z + right.Z);
         }
 
         /// <summary>
@@ -324,9 +324,9 @@ namespace Adamantium.Mathematics
         /// <param name="left">The first vector to add.</param>
         /// <param name="right">The second vector to add.</param>
         /// <returns>The sum of the two vectors.</returns>
-        public static Vector3D Add(Vector3D left, Vector3D right)
+        public static Vector3 Add(Vector3 left, Vector3 right)
         {
-            return new Vector3D(left.X + right.X, left.Y + right.Y, left.Z + right.Z);
+            return new Vector3(left.X + right.X, left.Y + right.Y, left.Z + right.Z);
         }
 
         /// <summary>
@@ -335,9 +335,9 @@ namespace Adamantium.Mathematics
         /// <param name="left">The input vector</param>
         /// <param name="right">The scalar value to be added to elements</param>
         /// <param name="result">The vector with added scalar for each element.</param>
-        public static void Add(ref Vector3D left, ref double right, out Vector3D result)
+        public static void Add(ref Vector3 left, ref double right, out Vector3 result)
         {
-            result = new Vector3D(left.X + right, left.Y + right, left.Z + right);
+            result = new Vector3(left.X + right, left.Y + right, left.Z + right);
         }
 
         /// <summary>
@@ -346,9 +346,9 @@ namespace Adamantium.Mathematics
         /// <param name="left">The input vector</param>
         /// <param name="right">The scalar value to be added to elements</param>
         /// <returns>The vector with added scalar for each element.</returns>
-        public static Vector3D Add(Vector3D left, double right)
+        public static Vector3 Add(Vector3 left, double right)
         {
-            return new Vector3D(left.X + right, left.Y + right, left.Z + right);
+            return new Vector3(left.X + right, left.Y + right, left.Z + right);
         }
 
         /// <summary>
@@ -358,9 +358,9 @@ namespace Adamantium.Mathematics
         /// <param name="right">The second vector to subtract.</param>
         /// <param name="result">When the method completes, contains the difference of the two vectors.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Subtract(ref Vector3D left, ref Vector3D right, out Vector3D result)
+        public static void Subtract(ref Vector3 left, ref Vector3 right, out Vector3 result)
         {
-            result = new Vector3D(left.X - right.X, left.Y - right.Y, left.Z - right.Z);
+            result = new Vector3(left.X - right.X, left.Y - right.Y, left.Z - right.Z);
         }
 
         /// <summary>
@@ -370,9 +370,9 @@ namespace Adamantium.Mathematics
         /// <param name="right">The second vector to subtract.</param>
         /// <returns>The difference of the two vectors.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Vector3D Subtract(Vector3D left, Vector3D right)
+        public static Vector3 Subtract(Vector3 left, Vector3 right)
         {
-            return new Vector3D(left.X - right.X, left.Y - right.Y, left.Z - right.Z);
+            return new Vector3(left.X - right.X, left.Y - right.Y, left.Z - right.Z);
         }
 
         /// <summary>
@@ -382,9 +382,9 @@ namespace Adamantium.Mathematics
         /// <param name="right">The scalar value to be subtraced from elements</param>
         /// <param name="result">The vector with subtracted scalar for each element.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Subtract(ref Vector3D left, ref double right, out Vector3D result)
+        public static void Subtract(ref Vector3 left, ref double right, out Vector3 result)
         {
-            result = new Vector3D(left.X - right, left.Y - right, left.Z - right);
+            result = new Vector3(left.X - right, left.Y - right, left.Z - right);
         }
 
         /// <summary>
@@ -394,9 +394,9 @@ namespace Adamantium.Mathematics
         /// <param name="right">The scalar value to be subtraced from elements</param>
         /// <returns>The vector with subtracted scalar for each element.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Vector3D Subtract(Vector3D left, double right)
+        public static Vector3 Subtract(Vector3 left, double right)
         {
-            return new Vector3D(left.X - right, left.Y - right, left.Z - right);
+            return new Vector3(left.X - right, left.Y - right, left.Z - right);
         }
 
         /// <summary>
@@ -406,9 +406,9 @@ namespace Adamantium.Mathematics
         /// <param name="right">The input vector.</param>
         /// <param name="result">The vector with subtracted scalar for each element.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Subtract(ref double left, ref Vector3D right, out Vector3D result)
+        public static void Subtract(ref double left, ref Vector3 right, out Vector3 result)
         {
-            result = new Vector3D(left - right.X, left - right.Y, left - right.Z);
+            result = new Vector3(left - right.X, left - right.Y, left - right.Z);
         }
 
         /// <summary>
@@ -418,9 +418,9 @@ namespace Adamantium.Mathematics
         /// <param name="right">The input vector.</param>
         /// <returns>The vector with subtracted scalar for each element.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Vector3D Subtract(double left, Vector3D right)
+        public static Vector3 Subtract(double left, Vector3 right)
         {
-            return new Vector3D(left - right.X, left - right.Y, left - right.Z);
+            return new Vector3(left - right.X, left - right.Y, left - right.Z);
         }
 
         /// <summary>
@@ -429,9 +429,9 @@ namespace Adamantium.Mathematics
         /// <param name="value">The vector to scale.</param>
         /// <param name="scale">The amount by which to scale the vector.</param>
         /// <param name="result">When the method completes, contains the scaled vector.</param>
-        public static void Multiply(ref Vector3D value, double scale, out Vector3D result)
+        public static void Multiply(ref Vector3 value, double scale, out Vector3 result)
         {
-            result = new Vector3D(value.X * scale, value.Y * scale, value.Z * scale);
+            result = new Vector3(value.X * scale, value.Y * scale, value.Z * scale);
         }
 
         /// <summary>
@@ -440,9 +440,9 @@ namespace Adamantium.Mathematics
         /// <param name="value">The vector to scale.</param>
         /// <param name="scale">The amount by which to scale the vector.</param>
         /// <returns>The scaled vector.</returns>
-        public static Vector3D Multiply(Vector3D value, double scale)
+        public static Vector3 Multiply(Vector3 value, double scale)
         {
-            return new Vector3D(value.X * scale, value.Y * scale, value.Z * scale);
+            return new Vector3(value.X * scale, value.Y * scale, value.Z * scale);
         }
 
         /// <summary>
@@ -451,9 +451,9 @@ namespace Adamantium.Mathematics
         /// <param name="left">The first vector to multiply.</param>
         /// <param name="right">The second vector to multiply.</param>
         /// <param name="result">When the method completes, contains the multiplied vector.</param>
-        public static void Multiply(ref Vector3D left, ref Vector3D right, out Vector3D result)
+        public static void Multiply(ref Vector3 left, ref Vector3 right, out Vector3 result)
         {
-            result = new Vector3D(left.X * right.X, left.Y * right.Y, left.Z * right.Z);
+            result = new Vector3(left.X * right.X, left.Y * right.Y, left.Z * right.Z);
         }
 
         /// <summary>
@@ -462,9 +462,9 @@ namespace Adamantium.Mathematics
         /// <param name="left">The first vector to Multiply.</param>
         /// <param name="right">The second vector to multiply.</param>
         /// <returns>The multiplied vector.</returns>
-        public static Vector3D Multiply(Vector3D left, Vector3D right)
+        public static Vector3 Multiply(Vector3 left, Vector3 right)
         {
-            return new Vector3D(left.X * right.X, left.Y * right.Y, left.Z * right.Z);
+            return new Vector3(left.X * right.X, left.Y * right.Y, left.Z * right.Z);
         }
 
         /// <summary>
@@ -473,9 +473,9 @@ namespace Adamantium.Mathematics
         /// <param name="value">The vector to scale.</param>
         /// <param name="scale">The amount by which to scale the vector.</param>
         /// <param name="result">When the method completes, contains the scaled vector.</param>
-        public static void Divide(ref Vector3D value, double scale, out Vector3D result)
+        public static void Divide(ref Vector3 value, double scale, out Vector3 result)
         {
-            result = new Vector3D(value.X / scale, value.Y / scale, value.Z / scale);
+            result = new Vector3(value.X / scale, value.Y / scale, value.Z / scale);
         }
 
         /// <summary>
@@ -484,9 +484,9 @@ namespace Adamantium.Mathematics
         /// <param name="value">The vector to scale.</param>
         /// <param name="scale">The amount by which to scale the vector.</param>
         /// <returns>The scaled vector.</returns>
-        public static Vector3D Divide(Vector3D value, double scale)
+        public static Vector3 Divide(Vector3 value, double scale)
         {
-            return new Vector3D(value.X / scale, value.Y / scale, value.Z / scale);
+            return new Vector3(value.X / scale, value.Y / scale, value.Z / scale);
         }
 
         /// <summary>
@@ -495,9 +495,9 @@ namespace Adamantium.Mathematics
         /// <param name="scale">The amount by which to scale the vector.</param>
         /// <param name="value">The vector to scale.</param>
         /// <param name="result">When the method completes, contains the scaled vector.</param>
-        public static void Divide(double scale, ref Vector3D value, out Vector3D result)
+        public static void Divide(double scale, ref Vector3 value, out Vector3 result)
         {
-            result = new Vector3D(scale / value.X, scale / value.Y, scale / value.Z);
+            result = new Vector3(scale / value.X, scale / value.Y, scale / value.Z);
         }
 
         /// <summary>
@@ -506,9 +506,9 @@ namespace Adamantium.Mathematics
         /// <param name="value">The vector to scale.</param>
         /// <param name="scale">The amount by which to scale the vector.</param>
         /// <returns>The scaled vector.</returns>
-        public static Vector3D Divide(double scale, Vector3D value)
+        public static Vector3 Divide(double scale, Vector3 value)
         {
-            return new Vector3D(scale / value.X, scale / value.Y, scale / value.Z);
+            return new Vector3(scale / value.X, scale / value.Y, scale / value.Z);
         }
 
         /// <summary>
@@ -516,9 +516,9 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="value">The vector to negate.</param>
         /// <param name="result">When the method completes, contains a vector facing in the opposite direction.</param>
-        public static void Negate(ref Vector3D value, out Vector3D result)
+        public static void Negate(ref Vector3 value, out Vector3 result)
         {
-            result = new Vector3D(-value.X, -value.Y, -value.Z);
+            result = new Vector3(-value.X, -value.Y, -value.Z);
         }
 
         /// <summary>
@@ -526,39 +526,39 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="value">The vector to negate.</param>
         /// <returns>A vector facing in the opposite direction.</returns>
-        public static Vector3D Negate(Vector3D value)
+        public static Vector3 Negate(Vector3 value)
         {
-            return new Vector3D(-value.X, -value.Y, -value.Z);
+            return new Vector3(-value.X, -value.Y, -value.Z);
         }
 
         /// <summary>
-        /// Returns a <see cref="Vector3D"/> containing the 3D Cartesian coordinates of a point specified in Barycentric coordinates relative to a 3D triangle.
+        /// Returns a <see cref="Vector3"/> containing the 3D Cartesian coordinates of a point specified in Barycentric coordinates relative to a 3D triangle.
         /// </summary>
-        /// <param name="value1">A <see cref="Vector3D"/> containing the 3D Cartesian coordinates of vertex 1 of the triangle.</param>
-        /// <param name="value2">A <see cref="Vector3D"/> containing the 3D Cartesian coordinates of vertex 2 of the triangle.</param>
-        /// <param name="value3">A <see cref="Vector3D"/> containing the 3D Cartesian coordinates of vertex 3 of the triangle.</param>
+        /// <param name="value1">A <see cref="Vector3"/> containing the 3D Cartesian coordinates of vertex 1 of the triangle.</param>
+        /// <param name="value2">A <see cref="Vector3"/> containing the 3D Cartesian coordinates of vertex 2 of the triangle.</param>
+        /// <param name="value3">A <see cref="Vector3"/> containing the 3D Cartesian coordinates of vertex 3 of the triangle.</param>
         /// <param name="amount1">Barycentric coordinate b2, which expresses the weighting factor toward vertex 2 (specified in <paramref name="value2"/>).</param>
         /// <param name="amount2">Barycentric coordinate b3, which expresses the weighting factor toward vertex 3 (specified in <paramref name="value3"/>).</param>
         /// <param name="result">When the method completes, contains the 3D Cartesian coordinates of the specified point.</param>
-        public static void Barycentric(ref Vector3D value1, ref Vector3D value2, ref Vector3D value3, double amount1, double amount2, out Vector3D result)
+        public static void Barycentric(ref Vector3 value1, ref Vector3 value2, ref Vector3 value3, double amount1, double amount2, out Vector3 result)
         {
-            result = new Vector3D((value1.X + (amount1 * (value2.X - value1.X))) + (amount2 * (value3.X - value1.X)),
+            result = new Vector3((value1.X + (amount1 * (value2.X - value1.X))) + (amount2 * (value3.X - value1.X)),
                 (value1.Y + (amount1 * (value2.Y - value1.Y))) + (amount2 * (value3.Y - value1.Y)),
                 (value1.Z + (amount1 * (value2.Z - value1.Z))) + (amount2 * (value3.Z - value1.Z)));
         }
 
         /// <summary>
-        /// Returns a <see cref="Vector3D"/> containing the 3D Cartesian coordinates of a point specified in Barycentric coordinates relative to a 3D triangle.
+        /// Returns a <see cref="Vector3"/> containing the 3D Cartesian coordinates of a point specified in Barycentric coordinates relative to a 3D triangle.
         /// </summary>
-        /// <param name="value1">A <see cref="Vector3D"/> containing the 3D Cartesian coordinates of vertex 1 of the triangle.</param>
-        /// <param name="value2">A <see cref="Vector3D"/> containing the 3D Cartesian coordinates of vertex 2 of the triangle.</param>
-        /// <param name="value3">A <see cref="Vector3D"/> containing the 3D Cartesian coordinates of vertex 3 of the triangle.</param>
+        /// <param name="value1">A <see cref="Vector3"/> containing the 3D Cartesian coordinates of vertex 1 of the triangle.</param>
+        /// <param name="value2">A <see cref="Vector3"/> containing the 3D Cartesian coordinates of vertex 2 of the triangle.</param>
+        /// <param name="value3">A <see cref="Vector3"/> containing the 3D Cartesian coordinates of vertex 3 of the triangle.</param>
         /// <param name="amount1">Barycentric coordinate b2, which expresses the weighting factor toward vertex 2 (specified in <paramref name="value2"/>).</param>
         /// <param name="amount2">Barycentric coordinate b3, which expresses the weighting factor toward vertex 3 (specified in <paramref name="value3"/>).</param>
-        /// <returns>A new <see cref="Vector3D"/> containing the 3D Cartesian coordinates of the specified point.</returns>
-        public static Vector3D Barycentric(Vector3D value1, Vector3D value2, Vector3D value3, double amount1, double amount2)
+        /// <returns>A new <see cref="Vector3"/> containing the 3D Cartesian coordinates of the specified point.</returns>
+        public static Vector3 Barycentric(Vector3 value1, Vector3 value2, Vector3 value3, double amount1, double amount2)
         {
-            Vector3D result;
+            Vector3 result;
             Barycentric(ref value1, ref value2, ref value3, amount1, amount2, out result);
             return result;
         }
@@ -570,7 +570,7 @@ namespace Adamantium.Mathematics
         /// <param name="min">The minimum value.</param>
         /// <param name="max">The maximum value.</param>
         /// <param name="result">When the method completes, contains the clamped value.</param>
-        public static void Clamp(ref Vector3D value, ref Vector3D min, ref Vector3D max, out Vector3D result)
+        public static void Clamp(ref Vector3 value, ref Vector3 min, ref Vector3 max, out Vector3 result)
         {
             double x = value.X;
             x = (x > max.X) ? max.X : x;
@@ -584,7 +584,7 @@ namespace Adamantium.Mathematics
             z = (z > max.Z) ? max.Z : z;
             z = (z < min.Z) ? min.Z : z;
 
-            result = new Vector3D(x, y, z);
+            result = new Vector3(x, y, z);
         }
 
         /// <summary>
@@ -594,9 +594,9 @@ namespace Adamantium.Mathematics
         /// <param name="min">The minimum value.</param>
         /// <param name="max">The maximum value.</param>
         /// <returns>The clamped value.</returns>
-        public static Vector3D Clamp(Vector3D value, Vector3D min, Vector3D max)
+        public static Vector3 Clamp(Vector3 value, Vector3 min, Vector3 max)
         {
-            Vector3D result;
+            Vector3 result;
             Clamp(ref value, ref min, ref max, out result);
             return result;
         }
@@ -607,9 +607,9 @@ namespace Adamantium.Mathematics
         /// <param name="left">First source vector.</param>
         /// <param name="right">Second source vector.</param>
         /// <param name="result">When the method completes, contains he cross product of the two vectors.</param>
-        public static void Cross(ref Vector3D left, ref Vector3D right, out Vector3D result)
+        public static void Cross(ref Vector3 left, ref Vector3 right, out Vector3 result)
         {
-            result = new Vector3D(
+            result = new Vector3(
                 (left.Y * right.Z) - (left.Z * right.Y),
                 (left.Z * right.X) - (left.X * right.Z),
                 (left.X * right.Y) - (left.Y * right.X));
@@ -621,9 +621,9 @@ namespace Adamantium.Mathematics
         /// <param name="left">First source vector.</param>
         /// <param name="right">Second source vector.</param>
         /// <returns>The cross product of the two vectors.</returns>
-        public static Vector3D Cross(Vector3D left, Vector3D right)
+        public static Vector3 Cross(Vector3 left, Vector3 right)
         {
-            Vector3D result;
+            Vector3 result;
             Cross(ref left, ref right, out result);
             return result;
         }
@@ -635,10 +635,10 @@ namespace Adamantium.Mathematics
         /// <param name="value2">The second vector.</param>
         /// <param name="result">When the method completes, contains the distance between the two vectors.</param>
         /// <remarks>
-        /// <see cref="Vector3D.DistanceSquared(ref Vector3D, ref Vector3D, out double)"/> may be preferred when only the relative distance is needed
+        /// <see cref="Vector3.DistanceSquared(refVector3D, refVector3D, out double)"/> may be preferred when only the relative distance is needed
         /// and speed is of the essence.
         /// </remarks>
-        public static void Distance(ref Vector3D value1, ref Vector3D value2, out double result)
+        public static void Distance(ref Vector3 value1, ref Vector3 value2, out double result)
         {
             double x = value1.X - value2.X;
             double y = value1.Y - value2.Y;
@@ -654,10 +654,10 @@ namespace Adamantium.Mathematics
         /// <param name="value2">The second vector.</param>
         /// <returns>The distance between the two vectors.</returns>
         /// <remarks>
-        /// <see cref="Vector3D.DistanceSquared(Vector3D, Vector3D)"/> may be preferred when only the relative distance is needed
+        /// <see cref="Vector3.DistanceSquared(Vector3, Vector3)"/> may be preferred when only the relative distance is needed
         /// and speed is of the essence.
         /// </remarks>
-        public static double Distance(Vector3D value1, Vector3D value2)
+        public static double Distance(Vector3 value1, Vector3 value2)
         {
             double x = value1.X - value2.X;
             double y = value1.Y - value2.Y;
@@ -679,7 +679,7 @@ namespace Adamantium.Mathematics
         /// involves two square roots, which are computationally expensive. However, using distance squared 
         /// provides the same information and avoids calculating two square roots.
         /// </remarks>
-        public static void DistanceSquared(ref Vector3D value1, ref Vector3D value2, out double result)
+        public static void DistanceSquared(ref Vector3 value1, ref Vector3 value2, out double result)
         {
             double x = value1.X - value2.X;
             double y = value1.Y - value2.Y;
@@ -701,7 +701,7 @@ namespace Adamantium.Mathematics
         /// involves two square roots, which are computationally expensive. However, using distance squared 
         /// provides the same information and avoids calculating two square roots.
         /// </remarks>
-        public static double DistanceSquared(Vector3D value1, Vector3D value2)
+        public static double DistanceSquared(Vector3 value1, Vector3 value2)
         {
             double x = value1.X - value2.X;
             double y = value1.Y - value2.Y;
@@ -717,7 +717,7 @@ namespace Adamantium.Mathematics
         /// <param name="right">The right vector.</param>
         /// <param name="epsilon">The epsilon.</param>
         /// <returns><c>true</c> if left and right are near another 3D, <c>false</c> otherwise</returns>
-        public static bool NearEqual(Vector3D left, Vector3D right, Vector3D epsilon)
+        public static bool NearEqual(Vector3 left, Vector3 right, Vector3 epsilon)
         {
             return NearEqual(ref left, ref right, ref epsilon);
         }
@@ -729,7 +729,7 @@ namespace Adamantium.Mathematics
         /// <param name="right">The right vector.</param>
         /// <param name="epsilon">The epsilon.</param>
         /// <returns><c>true</c> if left and right are near another 3D, <c>false</c> otherwise</returns>
-        public static bool NearEqual(ref Vector3D left, ref Vector3D right, ref Vector3D epsilon)
+        public static bool NearEqual(ref Vector3 left, ref Vector3 right, ref Vector3 epsilon)
         {
             return MathHelper.WithinEpsilon(left.X, right.X, epsilon.X) &&
                     MathHelper.WithinEpsilon(left.Y, right.Y, epsilon.Y) &&
@@ -742,7 +742,7 @@ namespace Adamantium.Mathematics
         /// <param name="left">First source vector.</param>
         /// <param name="right">Second source vector.</param>
         /// <param name="result">When the method completes, contains the dot product of the two vectors.</param>
-        public static void Dot(ref Vector3D left, ref Vector3D right, out double result)
+        public static void Dot(ref Vector3 left, ref Vector3 right, out double result)
         {
             result = (left.X * right.X) + (left.Y * right.Y) + (left.Z * right.Z);
         }
@@ -753,7 +753,7 @@ namespace Adamantium.Mathematics
         /// <param name="left">First source vector.</param>
         /// <param name="right">Second source vector.</param>
         /// <returns>The dot product of the two vectors.</returns>
-        public static double Dot(Vector3D left, Vector3D right)
+        public static double Dot(Vector3 left, Vector3 right)
         {
             return (left.X * right.X) + (left.Y * right.Y) + (left.Z * right.Z);
         }
@@ -763,7 +763,7 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="value">The vector to normalize.</param>
         /// <param name="result">When the method completes, contains the normalized vector.</param>
-        public static void Normalize(ref Vector3D value, out Vector3D result)
+        public static void Normalize(ref Vector3 value, out Vector3 result)
         {
             result = value;
             result.Normalize();
@@ -774,7 +774,7 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="value">The vector to normalize.</param>
         /// <returns>The normalized vector.</returns>
-        public static Vector3D Normalize(Vector3D value)
+        public static Vector3 Normalize(Vector3 value)
         {
             value.Normalize();
             return value;
@@ -791,7 +791,7 @@ namespace Adamantium.Mathematics
         /// Passing <paramref name="amount"/> a value of 0 will cause <paramref name="start"/> to be returned; a value of 1 will cause <paramref name="end"/> to be returned. 
         /// </remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Lerp(ref Vector3D start, ref Vector3D end, double amount, out Vector3D result)
+        public static void Lerp(ref Vector3 start, ref Vector3 end, double amount, out Vector3 result)
         {
             result.X = MathHelper.Lerp(start.X, end.X, amount);
             result.Y = MathHelper.Lerp(start.Y, end.Y, amount);
@@ -809,9 +809,9 @@ namespace Adamantium.Mathematics
         /// Passing <paramref name="amount"/> a value of 0 will cause <paramref name="start"/> to be returned; a value of 1 will cause <paramref name="end"/> to be returned. 
         /// </remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Vector3D Lerp(Vector3D start, Vector3D end, double amount)
+        public static Vector3 Lerp(Vector3 start, Vector3 end, double amount)
         {
-            Vector3D result;
+            Vector3 result;
             Lerp(ref start, ref end, amount, out result);
             return result;
         }
@@ -823,7 +823,7 @@ namespace Adamantium.Mathematics
         /// <param name="end">End vector.</param>
         /// <param name="amount">Value between 0 and 1 indicating the weight of <paramref name="end"/>.</param>
         /// <param name="result">When the method completes, contains the cubic interpolation of the two vectors.</param>
-        public static void SmoothStep(ref Vector3D start, ref Vector3D end, double amount, out Vector3D result)
+        public static void SmoothStep(ref Vector3 start, ref Vector3 end, double amount, out Vector3 result)
         {
             amount = MathHelper.SmoothStep(amount);
             Lerp(ref start, ref end, amount, out result);
@@ -836,9 +836,9 @@ namespace Adamantium.Mathematics
         /// <param name="end">End vector.</param>
         /// <param name="amount">Value between 0 and 1 indicating the weight of <paramref name="end"/>.</param>
         /// <returns>The cubic interpolation of the two vectors.</returns>
-        public static Vector3D SmoothStep(Vector3D start, Vector3D end, double amount)
+        public static Vector3 SmoothStep(Vector3 start, Vector3 end, double amount)
         {
-            Vector3D result;
+            Vector3 result;
             SmoothStep(ref start, ref end, amount, out result);
             return result;
         }
@@ -852,7 +852,7 @@ namespace Adamantium.Mathematics
         /// <param name="tangent2">Second source tangent vector.</param>
         /// <param name="amount">Weighting factor.</param>
         /// <param name="result">When the method completes, contains the result of the Hermite spline interpolation.</param>
-        public static void Hermite(ref Vector3D value1, ref Vector3D tangent1, ref Vector3D value2, ref Vector3D tangent2, double amount, out Vector3D result)
+        public static void Hermite(ref Vector3 value1, ref Vector3 tangent1, ref Vector3 value2, ref Vector3 tangent2, double amount, out Vector3 result)
         {
             double squared = amount * amount;
             double cubed = amount * squared;
@@ -875,9 +875,9 @@ namespace Adamantium.Mathematics
         /// <param name="tangent2">Second source tangent vector.</param>
         /// <param name="amount">Weighting factor.</param>
         /// <returns>The result of the Hermite spline interpolation.</returns>
-        public static Vector3D Hermite(Vector3D value1, Vector3D tangent1, Vector3D value2, Vector3D tangent2, double amount)
+        public static Vector3 Hermite(Vector3 value1, Vector3 tangent1, Vector3 value2, Vector3 tangent2, double amount)
         {
-            Vector3D result;
+            Vector3 result;
             Hermite(ref value1, ref tangent1, ref value2, ref tangent2, amount, out result);
             return result;
         }
@@ -891,7 +891,7 @@ namespace Adamantium.Mathematics
         /// <param name="value4">The fourth position in the interpolation.</param>
         /// <param name="amount">Weighting factor.</param>
         /// <param name="result">When the method completes, contains the result of the Catmull-Rom interpolation.</param>
-        public static void CatmullRom(ref Vector3D value1, ref Vector3D value2, ref Vector3D value3, ref Vector3D value4, double amount, out Vector3D result)
+        public static void CatmullRom(ref Vector3 value1, ref Vector3 value2, ref Vector3 value3, ref Vector3 value4, double amount, out Vector3 result)
         {
             double squared = amount * amount;
             double cubed = amount * squared;
@@ -918,9 +918,9 @@ namespace Adamantium.Mathematics
         /// <param name="value4">The fourth position in the interpolation.</param>
         /// <param name="amount">Weighting factor.</param>
         /// <returns>A vector that is the result of the Catmull-Rom interpolation.</returns>
-        public static Vector3D CatmullRom(Vector3D value1, Vector3D value2, Vector3D value3, Vector3D value4, double amount)
+        public static Vector3 CatmullRom(Vector3 value1, Vector3 value2, Vector3 value3, Vector3 value4, double amount)
         {
-            Vector3D result;
+            Vector3 result;
             CatmullRom(ref value1, ref value2, ref value3, ref value4, amount, out result);
             return result;
         }
@@ -932,7 +932,7 @@ namespace Adamantium.Mathematics
         /// <param name="right">The second source vector.</param>
         /// <param name="result">When the method completes, contains an new vector composed of the largest components of the source vectors.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Max(ref Vector3D left, ref Vector3D right, out Vector3D result)
+        public static void Max(ref Vector3 left, ref Vector3 right, out Vector3 result)
         {
             result.X = (left.X > right.X) ? left.X : right.X;
             result.Y = (left.Y > right.Y) ? left.Y : right.Y;
@@ -945,9 +945,9 @@ namespace Adamantium.Mathematics
         /// <param name="left">The first source vector.</param>
         /// <param name="right">The second source vector.</param>
         /// <returns>A vector containing the largest components of the source vectors.</returns>
-        public static Vector3D Max(Vector3D left, Vector3D right)
+        public static Vector3 Max(Vector3 left, Vector3 right)
         {
-            Vector3D result;
+            Vector3 result;
             Max(ref left, ref right, out result);
             return result;
         }
@@ -959,7 +959,7 @@ namespace Adamantium.Mathematics
         /// <param name="right">The second source vector.</param>
         /// <param name="result">When the method completes, contains an new vector composed of the smallest components of the source vectors.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Min(ref Vector3D left, ref Vector3D right, out Vector3D result)
+        public static void Min(ref Vector3 left, ref Vector3 right, out Vector3 result)
         {
             result.X = (left.X < right.X) ? left.X : right.X;
             result.Y = (left.Y < right.Y) ? left.Y : right.Y;
@@ -973,9 +973,9 @@ namespace Adamantium.Mathematics
         /// <param name="right">The second source vector.</param>
         /// <returns>A vector containing the smallest components of the source vectors.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Vector3D Min(Vector3D left, Vector3D right)
+        public static Vector3 Min(Vector3 left, Vector3 right)
         {
-            Vector3D result;
+            Vector3 result;
             Min(ref left, ref right, out result);
             return result;
         }
@@ -992,12 +992,12 @@ namespace Adamantium.Mathematics
         /// <param name="maxZ">The maximum depth of the viewport.</param>
         /// <param name="worldViewProjection">The combined world-view-projection matrix.</param>
         /// <param name="result">When the method completes, contains the vector in screen space.</param>
-        public static void Project(ref Vector3D vector, double x, double y, double width, double height, double minZ, double maxZ, ref Matrix4x4D worldViewProjection, out Vector3D result)
+        public static void Project(ref Vector3 vector, double x, double y, double width, double height, double minZ, double maxZ, ref Matrix4x4 worldViewProjection, out Vector3 result)
         {
-            Vector3D v = new Vector3D();
+            Vector3 v = new Vector3();
             TransformCoordinate(ref vector, ref worldViewProjection, out v);
 
-            result = new Vector3D(((1.0f + v.X) * 0.5f * width) + x, ((1.0f - v.Y) * 0.5f * height) + y, (v.Z * (maxZ - minZ)) + minZ);
+            result = new Vector3(((1.0f + v.X) * 0.5f * width) + x, ((1.0f - v.Y) * 0.5f * height) + y, (v.Z * (maxZ - minZ)) + minZ);
         }
 
         /// <summary>
@@ -1012,9 +1012,9 @@ namespace Adamantium.Mathematics
         /// <param name="maxZ">The maximum depth of the viewport.</param>
         /// <param name="worldViewProjection">The combined world-view-projection matrix.</param>
         /// <returns>The vector in screen space.</returns>
-        public static Vector3D Project(Vector3D vector, double x, double y, double width, double height, double minZ, double maxZ, Matrix4x4D worldViewProjection)
+        public static Vector3 Project(Vector3 vector, double x, double y, double width, double height, double minZ, double maxZ, Matrix4x4 worldViewProjection)
         {
-            Vector3D result;
+            Vector3 result;
             Project(ref vector, x, y, width, height, minZ, maxZ, ref worldViewProjection, out result);
             return result;
         }
@@ -1031,11 +1031,11 @@ namespace Adamantium.Mathematics
         /// <param name="maxZ">The maximum depth of the viewport.</param>
         /// <param name="worldViewProjection">The combined world-view-projection matrix.</param>
         /// <param name="result">When the method completes, contains the vector in object space.</param>
-        public static void Unproject(ref Vector3D vector, double x, double y, double width, double height, double minZ, double maxZ, ref Matrix4x4D worldViewProjection, out Vector3D result)
+        public static void Unproject(ref Vector3 vector, double x, double y, double width, double height, double minZ, double maxZ, ref Matrix4x4 worldViewProjection, out Vector3 result)
         {
-            Vector3D v = new Vector3D();
-            Matrix4x4D matrix = new Matrix4x4D();
-            Matrix4x4D.Invert(ref worldViewProjection, out matrix);
+            Vector3 v = new Vector3();
+            Matrix4x4 matrix = new Matrix4x4();
+            Matrix4x4.Invert(ref worldViewProjection, out matrix);
 
             v.X = (((vector.X - x) / width) * 2.0f) - 1.0f;
             v.Y = -((((vector.Y - y) / height) * 2.0f) - 1.0f);
@@ -1056,9 +1056,9 @@ namespace Adamantium.Mathematics
         /// <param name="maxZ">The maximum depth of the viewport.</param>
         /// <param name="worldViewProjection">The combined world-view-projection matrix.</param>
         /// <returns>The vector in object space.</returns>
-        public static Vector3D Unproject(Vector3D vector, double x, double y, double width, double height, double minZ, double maxZ, Matrix4x4D worldViewProjection)
+        public static Vector3 Unproject(Vector3 vector, double x, double y, double width, double height, double minZ, double maxZ, Matrix4x4 worldViewProjection)
         {
-            Vector3D result;
+            Vector3 result;
             Unproject(ref vector, x, y, width, height, minZ, maxZ, ref worldViewProjection, out result);
             return result;
         }
@@ -1072,7 +1072,7 @@ namespace Adamantium.Mathematics
         /// <remarks>Reflect only gives the direction of a reflection off a surface, it does not determine 
         /// whether the original vector was close enough to the surface to hit it.</remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Reflect(ref Vector3D vector, ref Vector3D normal, out Vector3D result)
+        public static void Reflect(ref Vector3 vector, ref Vector3 normal, out Vector3 result)
         {
             double dot = (vector.X * normal.X) + (vector.Y * normal.Y) + (vector.Z * normal.Z);
 
@@ -1090,9 +1090,9 @@ namespace Adamantium.Mathematics
         /// <remarks>Reflect only gives the direction of a reflection off a surface, it does not determine 
         /// whether the original vector was close enough to the surface to hit it.</remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Vector3D Reflect(Vector3D vector, Vector3D normal)
+        public static Vector3 Reflect(Vector3 vector, Vector3 normal)
         {
-            Vector3D result;
+            Vector3 result;
             Reflect(ref vector, ref normal, out result);
             return result;
         }
@@ -1113,7 +1113,7 @@ namespace Adamantium.Mathematics
         /// </remarks>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="source"/> or <paramref name="destination"/> is <c>null</c>.</exception>
         /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="destination"/> is shorter in length than <paramref name="source"/>.</exception>
-        public static void Orthogonalize(Vector3D[] destination, params Vector3D[] source)
+        public static void Orthogonalize(Vector3[] destination, params Vector3[] source)
         {
             //Uses the modified Gram-Schmidt process.
             //q1 = m1
@@ -1131,11 +1131,11 @@ namespace Adamantium.Mathematics
 
             for (int i = 0; i < source.Length; ++i)
             {
-                Vector3D newvector = source[i];
+                Vector3 newvector = source[i];
 
                 for (int r = 0; r < i; ++r)
                 {
-                    newvector -= (Vector3D.Dot(destination[r], newvector) / Vector3D.Dot(destination[r], destination[r])) * destination[r];
+                    newvector -= (Vector3.Dot(destination[r], newvector) / Vector3.Dot(destination[r], destination[r])) * destination[r];
                 }
 
                 destination[i] = newvector;
@@ -1158,7 +1158,7 @@ namespace Adamantium.Mathematics
         /// </remarks>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="source"/> or <paramref name="destination"/> is <c>null</c>.</exception>
         /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="destination"/> is shorter in length than <paramref name="source"/>.</exception>
-        public static void Orthonormalize(Vector3D[] destination, params Vector3D[] source)
+        public static void Orthonormalize(Vector3[] destination, params Vector3[] source)
         {
             //Uses the modified Gram-Schmidt process.
             //Because we are making unit vectors, we can optimize the math for orthogonalization
@@ -1178,11 +1178,11 @@ namespace Adamantium.Mathematics
 
             for (int i = 0; i < source.Length; ++i)
             {
-                Vector3D newvector = source[i];
+                Vector3 newvector = source[i];
 
                 for (int r = 0; r < i; ++r)
                 {
-                    newvector -= Vector3D.Dot(destination[r], newvector) * destination[r];
+                    newvector -= Vector3.Dot(destination[r], newvector) * destination[r];
                 }
 
                 newvector.Normalize();
@@ -1195,8 +1195,8 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="vector">The vector to rotate.</param>
         /// <param name="rotation">The <see cref="QuaternionF"/> rotation to apply.</param>
-        /// <param name="result">When the method completes, contains the transformed <see cref="Vector4D"/>.</param>
-        public static void Transform(ref Vector3D vector, ref QuaternionF rotation, out Vector3D result)
+        /// <param name="result">When the method completes, contains the transformed <see cref="Vector4"/>.</param>
+        public static void Transform(ref Vector3 vector, ref QuaternionF rotation, out Vector3 result)
         {
             double x = rotation.X + rotation.X;
             double y = rotation.Y + rotation.Y;
@@ -1211,7 +1211,7 @@ namespace Adamantium.Mathematics
             double yz = rotation.Y * z;
             double zz = rotation.Z * z;
 
-            result = new Vector3D(
+            result = new Vector3(
                 ((vector.X * ((1.0f - yy) - zz)) + (vector.Y * (xy - wz))) + (vector.Z * (xz + wy)),
                 ((vector.X * (xy + wz)) + (vector.Y * ((1.0f - xx) - zz))) + (vector.Z * (yz - wx)),
                 ((vector.X * (xz - wy)) + (vector.Y * (yz + wx))) + (vector.Z * ((1.0f - xx) - yy)));
@@ -1222,10 +1222,10 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="vector">The vector to rotate.</param>
         /// <param name="rotation">The <see cref="QuaternionF"/> rotation to apply.</param>
-        /// <returns>The transformed <see cref="Vector4D"/>.</returns>
-        public static Vector3D Transform(Vector3D vector, QuaternionF rotation)
+        /// <returns>The transformed <see cref="Vector4"/>.</returns>
+        public static Vector3 Transform(Vector3 vector, QuaternionF rotation)
         {
-            Vector3D result;
+            Vector3 result;
             Transform(ref vector, ref rotation, out result);
             return result;
         }
@@ -1239,7 +1239,7 @@ namespace Adamantium.Mathematics
         /// This array may be the same array as <paramref name="source"/>.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="source"/> or <paramref name="destination"/> is <c>null</c>.</exception>
         /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="destination"/> is shorter in length than <paramref name="source"/>.</exception>
-        public static void Transform(Vector3D[] source, ref QuaternionF rotation, Vector3D[] destination)
+        public static void Transform(Vector3[] source, ref QuaternionF rotation, Vector3[] destination)
         {
             if (source == null)
                 throw new ArgumentNullException("source");
@@ -1273,7 +1273,7 @@ namespace Adamantium.Mathematics
 
             for (int i = 0; i < source.Length; ++i)
             {
-                destination[i] = new Vector3D(
+                destination[i] = new Vector3(
                     ((source[i].X * num1) + (source[i].Y * num2)) + (source[i].Z * num3),
                     ((source[i].X * num4) + (source[i].Y * num5)) + (source[i].Z * num6),
                     ((source[i].X * num7) + (source[i].Y * num8)) + (source[i].Z * num9));
@@ -1286,10 +1286,10 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="vector">The source vector.</param>
         /// <param name="transform">The transformation <see cref="Matrix3x3"/>.</param>
-        /// <param name="result">When the method completes, contains the transformed <see cref="Vector3D"/>.</param>
-        public static void Transform(ref Vector3D vector, ref Matrix3x3F transform, out Vector3D result)
+        /// <param name="result">When the method completes, contains the transformed <see cref="Vector3"/>.</param>
+        public static void Transform(ref Vector3 vector, ref Matrix3x3F transform, out Vector3 result)
         {
-            result = new Vector3D((vector.X * transform.M11) + (vector.Y * transform.M21) + (vector.Z * transform.M31),
+            result = new Vector3((vector.X * transform.M11) + (vector.Y * transform.M21) + (vector.Z * transform.M31),
                                     (vector.X * transform.M12) + (vector.Y * transform.M22) + (vector.Z * transform.M32),
                                     (vector.X * transform.M13) + (vector.Y * transform.M23) + (vector.Z * transform.M33)
                                 );
@@ -1300,36 +1300,36 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="vector">The source vector.</param>
         /// <param name="transform">The transformation <see cref="Matrix3x3"/>.</param>
-        /// <returns>The transformed <see cref="Vector3D"/>.</returns>
-        public static Vector3D Transform(Vector3D vector, Matrix3x3F transform)
+        /// <returns>The transformed <see cref="Vector3"/>.</returns>
+        public static Vector3 Transform(Vector3 vector, Matrix3x3F transform)
         {
-            Vector3D result;
+            Vector3 result;
             Transform(ref vector, ref transform, out result);
             return result;
         }
 
         /// <summary>
-        /// Transforms a 3D vector by the given <see cref="Matrix4x4D"/>.
+        /// Transforms a 3D vector by the given <see cref="Matrix4x4"/>.
         /// </summary>
         /// <param name="vector">The source vector.</param>
-        /// <param name="transform">The transformation <see cref="Matrix4x4D"/>.</param>
-        /// <param name="result">When the method completes, contains the transformed <see cref="Vector3D"/>.</param>
-        public static void Transform(ref Vector3D vector, ref Matrix4x4D transform, out Vector3D result)
+        /// <param name="transform">The transformation <see cref="Matrix4x4"/>.</param>
+        /// <param name="result">When the method completes, contains the transformed <see cref="Vector3"/>.</param>
+        public static void Transform(ref Vector3 vector, ref Matrix4x4 transform, out Vector3 result)
         {
-            Vector4D intermediate;
+            Vector4 intermediate;
             Transform(ref vector, ref transform, out intermediate);
-            result = (Vector3D)intermediate;
+            result = (Vector3)intermediate;
         }
 
         /// <summary>
-        /// Transforms a 3D vector by the given <see cref="Matrix4x4D"/>.
+        /// Transforms a 3D vector by the given <see cref="Matrix4x4"/>.
         /// </summary>
         /// <param name="vector">The source vector.</param>
-        /// <param name="transform">The transformation <see cref="Matrix4x4D"/>.</param>
-        /// <param name="result">When the method completes, contains the transformed <see cref="Vector4D"/>.</param>
-        public static void Transform(ref Vector3D vector, ref Matrix4x4D transform, out Vector4D result)
+        /// <param name="transform">The transformation <see cref="Matrix4x4"/>.</param>
+        /// <param name="result">When the method completes, contains the transformed <see cref="Vector4"/>.</param>
+        public static void Transform(ref Vector3 vector, ref Matrix4x4 transform, out Vector4 result)
         {
-            result = new Vector4D(
+            result = new Vector4(
                 (vector.X * transform.M11) + (vector.Y * transform.M21) + (vector.Z * transform.M31) + transform.M41,
                 (vector.X * transform.M12) + (vector.Y * transform.M22) + (vector.Z * transform.M32) + transform.M42,
                 (vector.X * transform.M13) + (vector.Y * transform.M23) + (vector.Z * transform.M33) + transform.M43,
@@ -1337,27 +1337,27 @@ namespace Adamantium.Mathematics
         }
 
         /// <summary>
-        /// Transforms a 3D vector by the given <see cref="Matrix4x4D"/>.
+        /// Transforms a 3D vector by the given <see cref="Matrix4x4"/>.
         /// </summary>
         /// <param name="vector">The source vector.</param>
-        /// <param name="transform">The transformation <see cref="Matrix4x4D"/>.</param>
-        /// <returns>The transformed <see cref="Vector4D"/>.</returns>
-        public static Vector4D Transform(Vector3D vector, Matrix4x4D transform)
+        /// <param name="transform">The transformation <see cref="Matrix4x4"/>.</param>
+        /// <returns>The transformed <see cref="Vector4"/>.</returns>
+        public static Vector4 Transform(Vector3 vector, Matrix4x4 transform)
         {
-            Vector4D result;
+            Vector4 result;
             Transform(ref vector, ref transform, out result);
             return result;
         }
 
         /// <summary>
-        /// Transforms an array of 3D vectors by the given <see cref="Matrix4x4D"/>.
+        /// Transforms an array of 3D vectors by the given <see cref="Matrix4x4"/>.
         /// </summary>
         /// <param name="source">The array of vectors to transform.</param>
-        /// <param name="transform">The transformation <see cref="Matrix4x4D"/>.</param>
+        /// <param name="transform">The transformation <see cref="Matrix4x4"/>.</param>
         /// <param name="destination">The array for which the transformed vectors are stored.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="source"/> or <paramref name="destination"/> is <c>null</c>.</exception>
         /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="destination"/> is shorter in length than <paramref name="source"/>.</exception>
-        public static void Transform(Vector3D[] source, ref Matrix4x4D transform, Vector4D[] destination)
+        public static void Transform(Vector3[] source, ref Matrix4x4 transform, Vector4[] destination)
         {
             if (source == null)
                 throw new ArgumentNullException("source");
@@ -1373,10 +1373,10 @@ namespace Adamantium.Mathematics
         }
 
         /// <summary>
-        /// Performs a coordinate transformation using the given <see cref="Matrix4x4D"/>.
+        /// Performs a coordinate transformation using the given <see cref="Matrix4x4"/>.
         /// </summary>
         /// <param name="coordinate">The coordinate vector to transform.</param>
-        /// <param name="transform">The transformation <see cref="Matrix4x4D"/>.</param>
+        /// <param name="transform">The transformation <see cref="Matrix4x4"/>.</param>
         /// <param name="result">When the method completes, contains the transformed coordinates.</param>
         /// <remarks>
         /// A coordinate transform performs the transformation with the assumption that the w component
@@ -1385,22 +1385,22 @@ namespace Adamantium.Mathematics
         /// therefore makes the vector homogeneous. The homogeneous vector is often preferred when working
         /// with coordinates as the w component can safely be ignored.
         /// </remarks>
-        public static void TransformCoordinate(ref Vector3D coordinate, ref Matrix4x4D transform, out Vector3D result)
+        public static void TransformCoordinate(ref Vector3 coordinate, ref Matrix4x4 transform, out Vector3 result)
         {
-            Vector4D vector = new Vector4D();
+            Vector4 vector = new Vector4();
             vector.X = (coordinate.X * transform.M11) + (coordinate.Y * transform.M21) + (coordinate.Z * transform.M31) + transform.M41;
             vector.Y = (coordinate.X * transform.M12) + (coordinate.Y * transform.M22) + (coordinate.Z * transform.M32) + transform.M42;
             vector.Z = (coordinate.X * transform.M13) + (coordinate.Y * transform.M23) + (coordinate.Z * transform.M33) + transform.M43;
             vector.W = 1f / ((coordinate.X * transform.M14) + (coordinate.Y * transform.M24) + (coordinate.Z * transform.M34) + transform.M44);
 
-            result = new Vector3D(vector.X * vector.W, vector.Y * vector.W, vector.Z * vector.W);
+            result = new Vector3(vector.X * vector.W, vector.Y * vector.W, vector.Z * vector.W);
         }
 
         /// <summary>
-        /// Performs a coordinate transformation using the given <see cref="Matrix4x4D"/>.
+        /// Performs a coordinate transformation using the given <see cref="Matrix4x4"/>.
         /// </summary>
         /// <param name="coordinate">The coordinate vector to transform.</param>
-        /// <param name="transform">The transformation <see cref="Matrix4x4D"/>.</param>
+        /// <param name="transform">The transformation <see cref="Matrix4x4"/>.</param>
         /// <returns>The transformed coordinates.</returns>
         /// <remarks>
         /// A coordinate transform performs the transformation with the assumption that the w component
@@ -1409,18 +1409,18 @@ namespace Adamantium.Mathematics
         /// therefore makes the vector homogeneous. The homogeneous vector is often preferred when working
         /// with coordinates as the w component can safely be ignored.
         /// </remarks>
-        public static Vector3D TransformCoordinate(Vector3D coordinate, Matrix4x4D transform)
+        public static Vector3 TransformCoordinate(Vector3 coordinate, Matrix4x4 transform)
         {
-            Vector3D result;
+            Vector3 result;
             TransformCoordinate(ref coordinate, ref transform, out result);
             return result;
         }
 
         /// <summary>
-        /// Performs a coordinate transformation on an array of vectors using the given <see cref="Matrix4x4D"/>.
+        /// Performs a coordinate transformation on an array of vectors using the given <see cref="Matrix4x4"/>.
         /// </summary>
         /// <param name="source">The array of coordinate vectors to transform.</param>
-        /// <param name="transform">The transformation <see cref="Matrix4x4D"/>.</param>
+        /// <param name="transform">The transformation <see cref="Matrix4x4"/>.</param>
         /// <param name="destination">The array for which the transformed vectors are stored.
         /// This array may be the same array as <paramref name="source"/>.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="source"/> or <paramref name="destination"/> is <c>null</c>.</exception>
@@ -1432,7 +1432,7 @@ namespace Adamantium.Mathematics
         /// therefore makes the vector homogeneous. The homogeneous vector is often preferred when working
         /// with coordinates as the w component can safely be ignored.
         /// </remarks>
-        public static void TransformCoordinate(Vector3D[] source, ref Matrix4x4D transform, Vector3D[] destination)
+        public static void TransformCoordinate(Vector3[] source, ref Matrix4x4 transform, Vector3[] destination)
         {
             if (source == null)
                 throw new ArgumentNullException("source");
@@ -1448,10 +1448,10 @@ namespace Adamantium.Mathematics
         }
 
         /// <summary>
-        /// Performs a normal transformation using the given <see cref="Matrix4x4D"/>.
+        /// Performs a normal transformation using the given <see cref="Matrix4x4"/>.
         /// </summary>
         /// <param name="normal">The normal vector to transform.</param>
-        /// <param name="transform">The transformation <see cref="Matrix4x4D"/>.</param>
+        /// <param name="transform">The transformation <see cref="Matrix4x4"/>.</param>
         /// <param name="result">When the method completes, contains the transformed normal.</param>
         /// <remarks>
         /// A normal transform performs the transformation with the assumption that the w component
@@ -1460,19 +1460,19 @@ namespace Adamantium.Mathematics
         /// apply. This is often preferred for normal vectors as normals purely represent direction
         /// rather than location because normal vectors should not be translated.
         /// </remarks>
-        public static void TransformNormal(ref Vector3D normal, ref Matrix4x4D transform, out Vector3D result)
+        public static void TransformNormal(ref Vector3 normal, ref Matrix4x4 transform, out Vector3 result)
         {
-            result = new Vector3D(
+            result = new Vector3(
                 (normal.X * transform.M11) + (normal.Y * transform.M21) + (normal.Z * transform.M31),
                 (normal.X * transform.M12) + (normal.Y * transform.M22) + (normal.Z * transform.M32),
                 (normal.X * transform.M13) + (normal.Y * transform.M23) + (normal.Z * transform.M33));
         }
 
         /// <summary>
-        /// Performs a normal transformation using the given <see cref="Matrix4x4D"/>.
+        /// Performs a normal transformation using the given <see cref="Matrix4x4"/>.
         /// </summary>
         /// <param name="normal">The normal vector to transform.</param>
-        /// <param name="transform">The transformation <see cref="Matrix4x4D"/>.</param>
+        /// <param name="transform">The transformation <see cref="Matrix4x4"/>.</param>
         /// <returns>The transformed normal.</returns>
         /// <remarks>
         /// A normal transform performs the transformation with the assumption that the w component
@@ -1481,18 +1481,18 @@ namespace Adamantium.Mathematics
         /// apply. This is often preferred for normal vectors as normals purely represent direction
         /// rather than location because normal vectors should not be translated.
         /// </remarks>
-        public static Vector3D TransformNormal(Vector3D normal, Matrix4x4D transform)
+        public static Vector3 TransformNormal(Vector3 normal, Matrix4x4 transform)
         {
-            Vector3D result;
+            Vector3 result;
             TransformNormal(ref normal, ref transform, out result);
             return result;
         }
 
         /// <summary>
-        /// Performs a normal transformation on an array of vectors using the given <see cref="Matrix4x4D"/>.
+        /// Performs a normal transformation on an array of vectors using the given <see cref="Matrix4x4"/>.
         /// </summary>
         /// <param name="source">The array of normal vectors to transform.</param>
-        /// <param name="transform">The transformation <see cref="Matrix4x4D"/>.</param>
+        /// <param name="transform">The transformation <see cref="Matrix4x4"/>.</param>
         /// <param name="destination">The array for which the transformed vectors are stored.
         /// This array may be the same array as <paramref name="source"/>.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="source"/> or <paramref name="destination"/> is <c>null</c>.</exception>
@@ -1504,7 +1504,7 @@ namespace Adamantium.Mathematics
         /// apply. This is often preferred for normal vectors as normals purely represent direction
         /// rather than location because normal vectors should not be translated.
         /// </remarks>
-        public static void TransformNormal(Vector3D[] source, ref Matrix4x4D transform, Vector3D[] destination)
+        public static void TransformNormal(Vector3[] source, ref Matrix4x4 transform, Vector3[] destination)
         {
             if (source == null)
                 throw new ArgumentNullException(nameof(source));
@@ -1526,9 +1526,9 @@ namespace Adamantium.Mathematics
         /// <param name="right">The second vector to add.</param>
         /// <returns>The sum of the two vectors.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Vector3D operator +(Vector3D left, Vector3D right)
+        public static Vector3 operator +(Vector3 left, Vector3 right)
         {
-            return new Vector3D(left.X + right.X, left.Y + right.Y, left.Z + right.Z);
+            return new Vector3(left.X + right.X, left.Y + right.Y, left.Z + right.Z);
         }
 
         /// <summary>
@@ -1538,9 +1538,9 @@ namespace Adamantium.Mathematics
         /// <param name="right">The second vector to add.</param>
         /// <returns>The sum of the two vectors.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Vector3D operator +(Vector3D left, Vector3F right)
+        public static Vector3 operator +(Vector3 left, Vector3F right)
         {
-            return new Vector3D(left.X + right.X, left.Y + right.Y, left.Z + right.Z);
+            return new Vector3(left.X + right.X, left.Y + right.Y, left.Z + right.Z);
         }
 
         /// <summary>
@@ -1550,21 +1550,21 @@ namespace Adamantium.Mathematics
         /// <param name="right">The second vector to add.</param>
         /// <returns>The sum of the two vectors.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Vector3D operator +(Vector3F left, Vector3D right)
+        public static Vector3 operator +(Vector3F left, Vector3 right)
         {
-            return new Vector3D(left.X + right.X, left.Y + right.Y, left.Z + right.Z);
+            return new Vector3(left.X + right.X, left.Y + right.Y, left.Z + right.Z);
         }
 
         /// <summary>
-        /// Multiplies a vector with another by performing component-wise multiplication equivalent to <see cref="Multiply(ref Vector3D,ref Vector3D,out Vector3D)"/>.
+        /// Multiplies a vector with another by performing component-wise multiplication equivalent to <see cref="Multiply(ref Vector3,ref Vector3,out Vector3)"/>.
         /// </summary>
         /// <param name="left">The first vector to multiply.</param>
         /// <param name="right">The second vector to multiply.</param>
         /// <returns>The multiplication of the two vectors.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Vector3D operator *(Vector3D left, Vector3D right)
+        public static Vector3 operator *(Vector3 left, Vector3 right)
         {
-            return new Vector3D(left.X * right.X, left.Y * right.Y, left.Z * right.Z);
+            return new Vector3(left.X * right.X, left.Y * right.Y, left.Z * right.Z);
         }
 
         /// <summary>
@@ -1573,7 +1573,7 @@ namespace Adamantium.Mathematics
         /// <param name="value">The vector to assert (unchanged).</param>
         /// <returns>The asserted (unchanged) vector.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Vector3D operator +(Vector3D value)
+        public static Vector3 operator +(Vector3 value)
         {
             return value;
         }
@@ -1585,9 +1585,9 @@ namespace Adamantium.Mathematics
         /// <param name="right">The second vector to subtract.</param>
         /// <returns>The difference of the two vectors.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Vector3D operator -(Vector3D left, Vector3D right)
+        public static Vector3 operator -(Vector3 left, Vector3 right)
         {
-            return new Vector3D(left.X - right.X, left.Y - right.Y, left.Z - right.Z);
+            return new Vector3(left.X - right.X, left.Y - right.Y, left.Z - right.Z);
         }
 
         /// <summary>
@@ -1596,9 +1596,9 @@ namespace Adamantium.Mathematics
         /// <param name="value">The vector to negate.</param>
         /// <returns>A vector facing in the opposite direction.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Vector3D operator -(Vector3D value)
+        public static Vector3 operator -(Vector3 value)
         {
-            return new Vector3D(-value.X, -value.Y, -value.Z);
+            return new Vector3(-value.X, -value.Y, -value.Z);
         }
 
         /// <summary>
@@ -1608,9 +1608,9 @@ namespace Adamantium.Mathematics
         /// <param name="scale">The amount by which to scale the vector.</param>
         /// <returns>The scaled vector.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Vector3D operator *(double scale, Vector3D value)
+        public static Vector3 operator *(double scale, Vector3 value)
         {
-            return new Vector3D(value.X * scale, value.Y * scale, value.Z * scale);
+            return new Vector3(value.X * scale, value.Y * scale, value.Z * scale);
         }
 
         /// <summary>
@@ -1620,9 +1620,9 @@ namespace Adamantium.Mathematics
         /// <param name="scale">The amount by which to scale the vector.</param>
         /// <returns>The scaled vector.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Vector3D operator *(Vector3D value, double scale)
+        public static Vector3 operator *(Vector3 value, double scale)
         {
-            return new Vector3D(value.X * scale, value.Y * scale, value.Z * scale);
+            return new Vector3(value.X * scale, value.Y * scale, value.Z * scale);
         }
 
         /// <summary>
@@ -1632,9 +1632,9 @@ namespace Adamantium.Mathematics
         /// <param name="scale">The amount by which to scale the vector.</param>
         /// <returns>The scaled vector.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Vector3D operator /(Vector3D value, double scale)
+        public static Vector3 operator /(Vector3 value, double scale)
         {
-            return new Vector3D(value.X / scale, value.Y / scale, value.Z / scale);
+            return new Vector3(value.X / scale, value.Y / scale, value.Z / scale);
         }
 
         /// <summary>
@@ -1644,9 +1644,9 @@ namespace Adamantium.Mathematics
         /// <param name="value">The vector to scale.</param>  
         /// <returns>The scaled vector.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Vector3D operator /(double scale, Vector3D value)
+        public static Vector3 operator /(double scale, Vector3 value)
         {
-            return new Vector3D(scale / value.X, scale / value.Y, scale / value.Z);
+            return new Vector3(scale / value.X, scale / value.Y, scale / value.Z);
         }
 
         /// <summary>
@@ -1656,9 +1656,9 @@ namespace Adamantium.Mathematics
         /// <param name="scale">The amount by which to scale the vector.</param>
         /// <returns>The scaled vector.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Vector3D operator /(Vector3D value, Vector3D scale)
+        public static Vector3 operator /(Vector3 value, Vector3 scale)
         {
-            return new Vector3D(value.X / scale.X, value.Y / scale.Y, value.Z / scale.Z);
+            return new Vector3(value.X / scale.X, value.Y / scale.Y, value.Z / scale.Z);
         }
 
         /// <summary>
@@ -1668,9 +1668,9 @@ namespace Adamantium.Mathematics
         /// <param name="scalar">The scalar value to be added on elements</param>
         /// <returns>The vector with added scalar for each element.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Vector3D operator +(Vector3D value, double scalar)
+        public static Vector3 operator +(Vector3 value, double scalar)
         {
-            return new Vector3D(value.X + scalar, value.Y + scalar, value.Z + scalar);
+            return new Vector3(value.X + scalar, value.Y + scalar, value.Z + scalar);
         }
 
         /// <summary>
@@ -1680,9 +1680,9 @@ namespace Adamantium.Mathematics
         /// <param name="scalar">The scalar value to be added on elements</param>
         /// <returns>The vector with added scalar for each element.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Vector3D operator +(double scalar, Vector3D value)
+        public static Vector3 operator +(double scalar, Vector3 value)
         {
-            return new Vector3D(scalar + value.X, scalar + value.Y, scalar + value.Z);
+            return new Vector3(scalar + value.X, scalar + value.Y, scalar + value.Z);
         }
 
         /// <summary>
@@ -1692,9 +1692,9 @@ namespace Adamantium.Mathematics
         /// <param name="scalar">The scalar value to be subtraced from elements</param>
         /// <returns>The vector with added scalar from each element.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Vector3D operator -(Vector3D value, double scalar)
+        public static Vector3 operator -(Vector3 value, double scalar)
         {
-            return new Vector3D(value.X - scalar, value.Y - scalar, value.Z - scalar);
+            return new Vector3(value.X - scalar, value.Y - scalar, value.Z - scalar);
         }
 
         /// <summary>
@@ -1704,9 +1704,9 @@ namespace Adamantium.Mathematics
         /// <param name="scalar">The scalar value to be subtraced from elements</param>
         /// <returns>The vector with subtraced scalar from each element.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Vector3D operator -(double scalar, Vector3D value)
+        public static Vector3 operator -(double scalar, Vector3 value)
         {
-            return new Vector3D(scalar - value.X, scalar - value.Y, scalar - value.Z);
+            return new Vector3(scalar - value.X, scalar - value.Y, scalar - value.Z);
         }
 
         /// <summary>
@@ -1716,7 +1716,7 @@ namespace Adamantium.Mathematics
         /// <param name="right">The second value to compare.</param>
         /// <returns><c>true</c> if <paramref name="left"/> has the same value as <paramref name="right"/>; otherwise, <c>false</c>.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool operator ==(Vector3D left, Vector3D right)
+        public static bool operator ==(Vector3 left, Vector3 right)
         {
             return left.Equals(ref right);
         }
@@ -1728,29 +1728,29 @@ namespace Adamantium.Mathematics
         /// <param name="right">The second value to compare.</param>
         /// <returns><c>true</c> if <paramref name="left"/> has a different value than <paramref name="right"/>; otherwise, <c>false</c>.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool operator !=(Vector3D left, Vector3D right)
+        public static bool operator !=(Vector3 left, Vector3 right)
         {
             return !left.Equals(ref right);
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Vector3D"/> to <see cref="Vector2D"/>.
+        /// Performs an explicit conversion from <see cref="Vector3"/> to <see cref="Vector2"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
-        public static explicit operator Vector2D(Vector3D value)
+        public static explicit operator Vector2(Vector3 value)
         {
-            return new Vector2D(value.X, value.Y);
+            return new Vector2(value.X, value.Y);
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Vector3D"/> to <see cref="Vector4D"/>.
+        /// Performs an explicit conversion from <see cref="Vector3"/> to <see cref="Vector4"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
-        public static explicit operator Vector4D(Vector3D value)
+        public static explicit operator Vector4(Vector3 value)
         {
-            return new Vector4D(value, 0.0f);
+            return new Vector4(value, 0.0f);
         }
 
         /// <summary>
@@ -1827,27 +1827,27 @@ namespace Adamantium.Mathematics
         }
 
         /// <summary>
-        /// Determines whether the specified <see cref="Vector3D"/> is equal to this instance.
+        /// Determines whether the specified <see cref="Vector3"/> is equal to this instance.
         /// </summary>
-        /// <param name="other">The <see cref="Vector3D"/> to compare with this instance.</param>
+        /// <param name="other">The <see cref="Vector3"/> to compare with this instance.</param>
         /// <returns>
-        /// 	<c>true</c> if the specified <see cref="Vector3D"/> is equal to this instance; otherwise, <c>false</c>.
+        /// 	<c>true</c> if the specified <see cref="Vector3"/> is equal to this instance; otherwise, <c>false</c>.
         /// </returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Equals(ref Vector3D other)
+        public bool Equals(ref Vector3 other)
         {
             return MathHelper.NearEqual(other, this);
         }
 
         /// <summary>
-        /// Determines whether the specified <see cref="Vector3D"/> is equal to this instance.
+        /// Determines whether the specified <see cref="Vector3"/> is equal to this instance.
         /// </summary>
-        /// <param name="other">The <see cref="Vector3D"/> to compare with this instance.</param>
+        /// <param name="other">The <see cref="Vector3"/> to compare with this instance.</param>
         /// <returns>
-        /// 	<c>true</c> if the specified <see cref="Vector3D"/> is equal to this instance; otherwise, <c>false</c>.
+        /// 	<c>true</c> if the specified <see cref="Vector3"/> is equal to this instance; otherwise, <c>false</c>.
         /// </returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Equals(Vector3D other)
+        public bool Equals(Vector3 other)
         {
             return Equals(ref other);
         }
@@ -1861,14 +1861,14 @@ namespace Adamantium.Mathematics
         /// </returns>
         public override bool Equals(object value)
         {
-            if (!(value is Vector3D))
+            if (!(value is Vector3))
                 return false;
 
-            var strongValue = (Vector3D)value;
+            var strongValue = (Vector3)value;
             return Equals(ref strongValue);
         }
 
-        public static implicit operator Vector3F(Vector3D value)
+        public static implicit operator Vector3F(Vector3 value)
         {
             return new Vector3F((float)value.X, (float)value.Y, (float)value.Z);
         }

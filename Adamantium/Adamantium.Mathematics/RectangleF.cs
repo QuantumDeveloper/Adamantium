@@ -59,18 +59,18 @@ namespace Adamantium.Mathematics
          };
       }
 
-      public static RectangleF FromPoints(Vector2D[] points)
+      public static RectangleF FromPoints(Vector2[] points)
       {
          if (points == null || points.Length == 0)
             throw new ArgumentNullException(nameof(points));
 
-         var minimum = new Vector2D(float.MaxValue);
-         var maximum = new Vector2D(float.MinValue);
+         var minimum = new Vector2(float.MaxValue);
+         var maximum = new Vector2(float.MinValue);
 
          for (int i = 0; i < points.Length; ++i)
          {
-            Vector2D.Min(ref minimum, ref points[i], out minimum);
-            Vector2D.Max(ref maximum, ref points[i], out maximum);
+            Vector2.Min(ref minimum, ref points[i], out minimum);
+            Vector2.Max(ref maximum, ref points[i], out maximum);
          }
 
          var rect = maximum - minimum;
@@ -213,7 +213,7 @@ namespace Adamantium.Mathematics
 
       /// <summary>Changes the position of the rectangle.</summary>
       /// <param name="amount">The values to adjust the position of the rectangle by.</param>
-      public void Offset(Vector2D amount)
+      public void Offset(Vector2 amount)
       {
          Offset((float)amount.X, (float)amount.Y);
       }
@@ -294,7 +294,7 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="point">Coordinate <see cref="Point"/>.</param>
       /// <returns><c>true</c> if <see cref="Point"/> is inside <see cref="RectangleF"/>, otherwise <c>false</c>.</returns>
-      public bool Contains(Vector2D point)
+      public bool Contains(Vector2 point)
       {
          return Contains((float)point.X, (float)point.Y);
       }

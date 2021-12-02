@@ -105,7 +105,7 @@ namespace Adamantium.Game.Playground
                 entity.AddComponent(meshComponent);
                 entity.AddComponent(meshRenderer);
                 entity.Transform.SetScaleFactor(textLayout.Scale);
-                entity.Transform.SetPosition(new Vector3D(0, 0, 1));
+                entity.Transform.SetPosition(new Vector3(0, 0, 1));
                 EntityWorld.AddEntity(entity);
             }
             catch (Exception e)
@@ -412,10 +412,10 @@ namespace Adamantium.Game.Playground
                 meshRenderer.Name = "Test";
                 testEntity.AddComponent(meshComponent);
                 testEntity.AddComponent(meshRenderer);
-                testEntity.Transform.Position = new Vector3D(0, 0, 6);
+                testEntity.Transform.Position = new Vector3(0, 0, 6);
                 
                 var textEntity = PrintText(typeface, font, 240, Colors.Beige, "hi all");
-                textEntity.Transform.Position = new Vector3D(0, 0, 6);
+                textEntity.Transform.Position = new Vector3(0, 0, 6);
 
                 /* // OUTLINES CHECK
                 List<Vector3F> vertexList;

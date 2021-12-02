@@ -6,6 +6,6 @@ namespace Adamantium.Fonts
     {
         public Vector2F Offset;
 
-        public Vector2D Advance;
+        public Vector2 Advance;
     }
 }

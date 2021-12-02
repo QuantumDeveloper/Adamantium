@@ -23,8 +23,8 @@ namespace Adamantium.EntityFramework.Components
         private float _stopAngle;
         private bool _isClockwise;
         private EllipseType _ellipseType;
-        private Vector3D _lineStart;
-        private Vector3D _lineEnd;
+        private Vector3 _lineStart;
+        private Vector3 _lineEnd;
 
         public MeshMetadata()
         { }
@@ -57,8 +57,8 @@ namespace Adamantium.EntityFramework.Components
             metadata.Thickness = 0.1f;
             metadata.TopDiameter = 0;
             metadata.BottomDiameter = 1;
-            metadata.LineStart = new Vector3D(-0.5f, 0, 0);
-            metadata.LineStart = new Vector3D(0.5f, 0, 0);
+            metadata.LineStart = new Vector3(-0.5f, 0, 0);
+            metadata.LineStart = new Vector3(0.5f, 0, 0);
             return metadata;
         }
 
@@ -189,13 +189,13 @@ namespace Adamantium.EntityFramework.Components
             set => SetProperty(ref _bottomDiameter, value);
         }
 
-        public Vector3D LineStart
+        public Vector3 LineStart
         {
             get => _lineStart;
             set => SetProperty(ref _lineStart, value);
         }
 
-        public Vector3D LineEnd
+        public Vector3 LineEnd
         {
             get => _lineEnd;
             set => SetProperty(ref _lineEnd, value);

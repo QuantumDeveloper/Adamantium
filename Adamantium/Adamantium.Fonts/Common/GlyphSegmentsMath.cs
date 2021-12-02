@@ -18,12 +18,12 @@ namespace Adamantium.Fonts.Common
             return MathHelper.DetermineAngleInDegrees(newSeg.Start, newSeg.End, next.Start, next.End);
         }
         
-        public static double GetDistanceToSegment(LineSegment2D segment, Vector2D point)
+        public static double GetDistanceToSegment(LineSegment2D segment, Vector2 point)
         {
             return point.DistanceToPoint(segment.Start, segment.End);
         }
 
-        public static double GetSignedDistanceToSegment(LineSegment2D segment, Vector2D point)
+        public static double GetSignedDistanceToSegment(LineSegment2D segment, Vector2 point)
         {
             var distance = GetDistanceToSegment(segment, point);
 
@@ -39,7 +39,7 @@ namespace Adamantium.Fonts.Common
             return distance;
         }
 
-        public static double GetSignedPseudoDistanceToSegment(LineSegment2D segment, Vector2D point)
+        public static double GetSignedPseudoDistanceToSegment(LineSegment2D segment, Vector2 point)
         {
             var distance = MathHelper.PointToLineDistance(segment.Start, segment.End, point);
 
@@ -55,9 +55,9 @@ namespace Adamantium.Fonts.Common
             return distance;
         }
         
-        public static double GetSignedDistanceToSegmentsJoint(List<LineSegment2D> closestSegments, Vector2D point, bool pseudo)
+        public static double GetSignedDistanceToSegmentsJoint(List<LineSegment2D> closestSegments, Vector2 point, bool pseudo)
         {
-            Func<LineSegment2D, Vector2D, double> SignedDistanceFunc = null;
+            Func<LineSegment2D, Vector2, double> SignedDistanceFunc = null;
 
             if (pseudo)
             {

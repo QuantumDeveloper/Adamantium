@@ -9,7 +9,7 @@ namespace Adamantium.UI.Input.Raw
          Int32 wheelDelta, 
          RawMouseEventType eventType, 
          IInputElement rootElement,
-         Vector2D position, 
+         Vector2 position, 
          InputModifiers modifiers, 
          MouseDevice device, 
          UInt32 timeStep)

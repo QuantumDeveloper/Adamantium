@@ -14,7 +14,7 @@ namespace Adamantium.Mathematics
         /// <summary>
         /// Collection of points, which describes this <see cref="PolygonItem"/>
         /// </summary>
-        public List<Vector2D> Points { get; }
+        public List<Vector2> Points { get; }
 
         /// <summary>
         /// Describing does this <see cref="PolygonItem"/> has self intersections
@@ -26,7 +26,7 @@ namespace Adamantium.Mathematics
         /// <summary>
         /// Collection of points in places, where it intersects itself
         /// </summary>
-        public List<Vector2D> SelfIntersectedPoints { get; }
+        public List<Vector2> SelfIntersectedPoints { get; }
 
         /// <summary>
         /// Collection of all segments in certain order describing polygon outline
@@ -42,36 +42,36 @@ namespace Adamantium.Mathematics
         /// Constructs <see cref="PolygonItem"/>
         /// </summary>
         /// <param name="points">polygon points</param>
-        public PolygonItem(IEnumerable<Vector2D> points)
+        public PolygonItem(IEnumerable<Vector2> points)
         {
-            SelfIntersectedPoints = new List<Vector2D>();
+            SelfIntersectedPoints = new List<Vector2>();
             SelfIntersectedSegments = new List<LineSegment2D>();
             Segments = new List<LineSegment2D>();
-            Points = new List<Vector2D>(points);
+            Points = new List<Vector2>(points);
             CalculateBoundingBox();
         }
         
-        public PolygonItem(Vector2D[] points)
+        public PolygonItem(Vector2[] points)
         {
-            SelfIntersectedPoints = new List<Vector2D>();
+            SelfIntersectedPoints = new List<Vector2>();
             SelfIntersectedSegments = new List<LineSegment2D>();
             Segments = new List<LineSegment2D>();
-            Points = new List<Vector2D>(points);
+            Points = new List<Vector2>(points);
             CalculateBoundingBox();
         }
         
         public PolygonItem(Vector3F[] points)
         {
-            var points2D = new Vector2D[points.Length];
+            var points2D = new Vector2[points.Length];
             for (var i = 0; i < points.Length; i++)
             {
-                points2D[i] = (Vector2D) points[i];
+                points2D[i] = (Vector2) points[i];
             }
             
-            SelfIntersectedPoints = new List<Vector2D>();
+            SelfIntersectedPoints = new List<Vector2>();
             SelfIntersectedSegments = new List<LineSegment2D>();
             Segments = new List<LineSegment2D>();
-            Points = new List<Vector2D>(points2D);
+            Points = new List<Vector2>(points2D);
             CalculateBoundingBox();
         }
 
@@ -144,7 +144,7 @@ namespace Adamantium.Mathematics
         /// </summary>
         /// <param name="intersectionPoints">Collection of intersection points for <see cref="PolygonItem"/> update</param>
         /// <param name="fillRule">Defines current triangulation rule to use (Even-Odd/Non-Zero)</param>
-        private void UpdatePolygonUsingInterPoints(List<Vector2D> intersectionPoints, FillRule fillRule)
+        private void UpdatePolygonUsingInterPoints(List<Vector2> intersectionPoints, FillRule fillRule)
         {
             if (intersectionPoints.Count <= 0) return;
             var tempSegments = new List<LineSegment2D>(Segments);
@@ -176,7 +176,7 @@ namespace Adamantium.Mathematics
             UpdatePoints();
         }
 
-        internal void RemoveInternalSegments(FillRule fillRule, List<Vector2D> interPoints)
+        internal void RemoveInternalSegments(FillRule fillRule, List<Vector2> interPoints)
         {
             //Remove all segments based on intersection points in case of Non-Zero rule
             if (fillRule != FillRule.NonZero || interPoints.Count <= 0) return;

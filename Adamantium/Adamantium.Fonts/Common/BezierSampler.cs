@@ -41,16 +41,16 @@ namespace Adamantium.Fonts.Common
             return sampledOutlines.ToArray();
         }
 
-        private static List<Vector2D> GenerateCubicOutlineFromSegment(OutlineSegment segment, byte rate)
+        private static List<Vector2> GenerateCubicOutlineFromSegment(OutlineSegment segment, byte rate)
         {
-            var sampledPoints = new List<Vector2D>();
+            var sampledPoints = new List<Vector2>();
 
             // If this is a line, then just return these points without modification
             if (segment.Points.Count == 2)
             {
                 foreach (var point in segment.Points)
                 {
-                    sampledPoints.Add(new Vector2D(Math.Round(point.X, 4), Math.Round(point.Y, 4)));
+                    sampledPoints.Add(new Vector2(Math.Round(point.X, 4), Math.Round(point.Y, 4)));
                 }
 
                 return sampledPoints;
@@ -72,7 +72,7 @@ namespace Adamantium.Fonts.Common
                                   3 * Math.Pow(d, 2) * (1 - d) * segment.Points[2].Y +
                                   Math.Pow(d, 3) * segment.Points[3].Y;
                 
-                    sampledPoints.Add(new Vector2D(Math.Round(bezierX, 4), Math.Round(bezierY, 4)));
+                    sampledPoints.Add(new Vector2(Math.Round(bezierX, 4), Math.Round(bezierY, 4)));
                 }
                 catch (Exception e)
                 {
@@ -107,7 +107,7 @@ namespace Adamantium.Fonts.Common
 
             var step = 1.0 / rate;
 
-            var points = new List<Vector2D>();
+            var points = new List<Vector2>();
 
             foreach (var segment in outline.Segments)
             {
@@ -139,14 +139,14 @@ namespace Adamantium.Fonts.Common
             return new SampledOutline(points.ToArray());
         }
 
-        private static Vector2D GetQuadraticCurvePoint(Vector2D begin, Vector2D control, Vector2D end, double t)
+        private static Vector2 GetQuadraticCurvePoint(Vector2 begin, Vector2 control, Vector2 end, double t)
         {
             var x = QuadraticEquation(begin.X, control.X, end.X, t);
             var y = QuadraticEquation(begin.Y, control.Y, end.Y, t);
             
             // Round results because if its double, we will get a lot of digits after point and this will negatively influence on triangulation results
             // 4 digits after point will be enough
-            return new Vector2D(Math.Round(x, 0, MidpointRounding.AwayFromZero), Math.Round(y, 0, MidpointRounding.AwayFromZero));
+            return new Vector2(Math.Round(x, 0, MidpointRounding.AwayFromZero), Math.Round(y, 0, MidpointRounding.AwayFromZero));
         }
         
         private static double QuadraticEquation(double begin, double control, double end, double t)

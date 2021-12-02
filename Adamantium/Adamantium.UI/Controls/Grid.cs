@@ -526,9 +526,9 @@ namespace Adamantium.UI.Controls
                for (int i = 1; i < rowSegments.Length; ++i)
                {
                   context.DrawRectangle(lineBrush,
-                     new Rect(new Vector2D(0, rowSegments[i].Offset), new Size(ActualWidth, 1)));
+                     new Rect(new Vector2(0, rowSegments[i].Offset), new Size(ActualWidth, 1)));
                   context.DrawRectangle(lineBrush,
-                     new Rect(new Vector2D(0, rowSegments[i].Offset + rowSegments[i].FullSize),
+                     new Rect(new Vector2(0, rowSegments[i].Offset + rowSegments[i].FullSize),
                         new Size(ActualWidth, 1)));
                }
             }
@@ -537,9 +537,9 @@ namespace Adamantium.UI.Controls
                for (int i = 1; i < colSegments.Length; ++i)
                {
                   context.DrawRectangle(lineBrush,
-                     new Rect(new Vector2D(colSegments[i].Offset, 0), new Size(1, ActualHeight)));
+                     new Rect(new Vector2(colSegments[i].Offset, 0), new Size(1, ActualHeight)));
                   context.DrawRectangle(lineBrush,
-                     new Rect(new Vector2D(colSegments[i].Offset + colSegments[i].FullSize, 0), new Size(1, ActualHeight)));
+                     new Rect(new Vector2(colSegments[i].Offset + colSegments[i].FullSize, 0), new Size(1, ActualHeight)));
                }
             }
          }

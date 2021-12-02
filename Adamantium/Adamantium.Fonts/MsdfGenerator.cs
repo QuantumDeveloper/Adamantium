@@ -148,7 +148,7 @@ namespace Adamantium.Fonts
             }
         }
         
-        private ColoredDistance GetColoredDistances(Vector2D point, double range)
+        private ColoredDistance GetColoredDistances(Vector2 point, double range)
         {
             double closestRedDistance = Double.MaxValue;
             double closestGreenDistance = Double.MaxValue;
@@ -292,7 +292,7 @@ namespace Adamantium.Fonts
                 {
                     // determine the closest segment to current sampling point
                     //var samplingPoint = new Vector2D(originalDimensions.X / size * (x + 0.5), originalDimensions.Y - (originalDimensions.Y / size * (y + 0.5)));
-                    var samplingPoint = new Vector2D((emSquare.Width / size * (x + 0.5)) + emSquare.X, emSquare.Height - (emSquare.Height / size * (y + 0.5)) + emSquare.Y);
+                    var samplingPoint = new Vector2((emSquare.Width / size * (x + 0.5)) + emSquare.X, emSquare.Height - (emSquare.Height / size * (y + 0.5)) + emSquare.Y);
 
                     if (samplingPoint.X >= (glyphBoundingRectangle.X - additionalSpace) && samplingPoint.X <= (glyphBoundingRectangle.Right + additionalSpace) &&
                         samplingPoint.Y >= (glyphBoundingRectangle.Y - additionalSpace) && samplingPoint.Y <= (glyphBoundingRectangle.Bottom + additionalSpace))

@@ -20,7 +20,7 @@ namespace Adamantium.Fonts.Common
             return $"X: {X}, Y: {Y}, IsControl: {IsControl}";
         }
 
-        public static implicit  operator Vector2D(OutlinePoint point)
+        public static implicit  operator Vector2(OutlinePoint point)
         {
             return new(point.X, point.Y);
         }

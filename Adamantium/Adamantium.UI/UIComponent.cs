@@ -25,13 +25,13 @@ namespace Adamantium.UI
         #region Adamantium properties
         
         public static readonly AdamantiumProperty LocationProperty = AdamantiumProperty.Register(nameof(Location),
-            typeof (Vector2D), typeof (UIComponent), new PropertyMetadata(Vector2D.Zero));
+            typeof (Vector2), typeof (UIComponent), new PropertyMetadata(Vector2.Zero));
 
         public static readonly AdamantiumProperty RotationProperty = AdamantiumProperty.Register(nameof(Rotation),
             typeof(Double), typeof(UIComponent), new PropertyMetadata((Double)0));
 
         public static readonly AdamantiumProperty ScaleProperty = AdamantiumProperty.Register(nameof(Scale),
-            typeof(Vector2D), typeof(UIComponent), new PropertyMetadata(Vector2D.One));
+            typeof(Vector2), typeof(UIComponent), new PropertyMetadata(Vector2.One));
 
         public static readonly AdamantiumProperty VisibilityProperty = AdamantiumProperty.Register(nameof(Visibility),
             typeof(Visibility), typeof(UIComponent),
@@ -483,15 +483,15 @@ namespace Adamantium.UI
 
         #region Properties
         
-        public Vector2D Location
+        public Vector2 Location
         {
-            get => GetValue<Vector2D>(LocationProperty);
+            get => GetValue<Vector2>(LocationProperty);
             set => SetValue(LocationProperty, value);
         }
 
-        public Vector2D Scale
+        public Vector2 Scale
         {
-            get => GetValue<Vector2D>(ScaleProperty);
+            get => GetValue<Vector2>(ScaleProperty);
             set => SetValue(ScaleProperty, value);
         }
 
@@ -1500,7 +1500,7 @@ namespace Adamantium.UI
 
       public Rect ClipRectangle { get; internal set; }
 
-      public Vector2D ClipPosition { get; set; }
+      public Vector2 ClipPosition { get; set; }
 
       private IUIComponent visualComponentParent;
 

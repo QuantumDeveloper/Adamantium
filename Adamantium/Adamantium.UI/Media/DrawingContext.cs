@@ -137,7 +137,7 @@ namespace Adamantium.UI.Media
          currentContainer?.AddItem(presentationItem);
       }
 
-      public void DrawLine(Vector2D start, Vector2D end, Pen pen)
+      public void DrawLine(Vector2 start, Vector2 end, Pen pen)
       {
          var geometry = new LineGeometry(start, end, pen.Thickness);
          
@@ -160,7 +160,7 @@ namespace Adamantium.UI.Media
          currentContainer?.AddItem(presentationItem);
       }
 
-      public void DrawPolyline(IEnumerable<Vector2D> points, Pen pen)
+      public void DrawPolyline(IEnumerable<Vector2> points, Pen pen)
       {
          var presentationItem = new UIPresentationItem();
          // StrokeGeometry strokeGeometry = new StrokeGeometry(pen, points, false);

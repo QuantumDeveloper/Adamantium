@@ -172,7 +172,7 @@ namespace Adamantium.Engine.Templates
             }
         }
 
-        private static void SetTransformation(Entity entity, Vector3D pos, Vector3F scale, QuaternionF rot)
+        private static void SetTransformation(Entity entity, Vector3 pos, Vector3F scale, QuaternionF rot)
         {
             var transform = new Transform();
             transform.Position = pos;

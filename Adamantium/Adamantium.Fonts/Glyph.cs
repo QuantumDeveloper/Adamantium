@@ -14,6 +14,7 @@ using Adamantium.Fonts.Tables.CFF;
 using Adamantium.Mathematics;
 using Adamantium.UI;
 using Matrix3x2 = Adamantium.Mathematics.Matrix3x2;
+using Vector2 = Adamantium.Mathematics.Vector2;
 
 namespace Adamantium.Fonts
 {
@@ -37,7 +38,7 @@ namespace Adamantium.Fonts
 
         public double   EmRelatedLeftSideBearingMultiplier { get; private set; }
         public double   EmRelatedAdvanceWidthMultiplier { get; private set; }
-        public Vector2D EmRelatedCenterToBaseLineMultiplier { get; private set; }
+        public Vector2 EmRelatedCenterToBaseLineMultiplier { get; private set; }
 
         public uint Index { get; }
         
@@ -100,9 +101,9 @@ namespace Adamantium.Fonts
             IsEmpty = isEmpty;
         }
 
-        public Vector2D[] GetTextureAtlasUVCoordinates(uint glyphTextureSize, uint atlasStartGlyphIndex, uint glyphCount)
+        public Vector2[] GetTextureAtlasUVCoordinates(uint glyphTextureSize, uint atlasStartGlyphIndex, uint glyphCount)
         {
-            var uv = new Vector2D[2];
+            var uv = new Vector2[2];
 
             var glyphsPerRow = (uint) Math.Ceiling(Math.Sqrt(glyphCount));
             var glyphsPerColumn = (uint) Math.Ceiling((double) glyphCount / glyphsPerRow);
@@ -117,8 +118,8 @@ namespace Adamantium.Fonts
             Size atlasSize = new Size(atlasDimensions.Width * glyphTextureSize,
                 atlasDimensions.Height * glyphTextureSize);
 
-            var uvStart = new Vector2D(startX / atlasSize.Width, startY / atlasSize.Height);
-            var uvEnd = new Vector2D((startX + glyphTextureSize) / atlasSize.Width,
+            var uvStart = new Vector2(startX / atlasSize.Width, startY / atlasSize.Height);
+            var uvEnd = new Vector2((startX + glyphTextureSize) / atlasSize.Width,
                 (startY + glyphTextureSize) / atlasSize.Height);
 
             uv[0] = uvStart;
@@ -184,7 +185,7 @@ namespace Adamantium.Fonts
             var emSquare = new Rectangle(0, 0, unitsPerEm, unitsPerEm);
             var diff = emSquare.Center - BoundingRectangle.Center;
 
-            EmRelatedCenterToBaseLineMultiplier = new Vector2D(diff.X / unitsPerEm, diff.Y / unitsPerEm);
+            EmRelatedCenterToBaseLineMultiplier = new Vector2(diff.X / unitsPerEm, diff.Y / unitsPerEm);
         }
         
         private void SplitOnSegments()
@@ -245,7 +246,7 @@ namespace Adamantium.Fonts
                             var prevPoint = segment.Points[1];
                             var halfPointX = (prevPoint.X + point.X) / 2;
                             var halfPointY = (prevPoint.Y + point.Y) / 2;
-                            var lastPoint = new Vector2D(halfPointX, halfPointY);
+                            var lastPoint = new Vector2(halfPointX, halfPointY);
                             segment.AddPoint(lastPoint);
                             segment = new OutlineSegment();
                             segment.AddPoint(lastPoint);
@@ -278,7 +279,7 @@ namespace Adamantium.Fonts
                     throw new OutlineException("First point of outline should not be control point");
                 }
                 
-                var segment = new List<Vector2D>();
+                var segment = new List<Vector2>();
                 
                 for (var index = 0; index < outline.Points.Count; index++)
                 {
@@ -288,7 +289,7 @@ namespace Adamantium.Fonts
                     if (!point.IsControl && segment.Count > 1) // segment is closed
                     {
                         outline.Segments.Add(new OutlineSegment(segment));
-                        segment = new List<Vector2D>();
+                        segment = new List<Vector2>();
                         segment.Add(point); // add the same non-control point as start of new segment
                     }
                 }
@@ -338,9 +339,9 @@ namespace Adamantium.Fonts
             sampledOutlinesCache[rate] = outlines;
         }
 
-        private Vector2D[] TransformPoints(IEnumerable<Vector2D> points, Matrix3x2 matrix)
+        private Vector2[] TransformPoints(IEnumerable<Vector2> points, Matrix3x2 matrix)
         {
-            var transformedPoints = new List<Vector2D>();
+            var transformedPoints = new List<Vector2>();
             foreach (var point in points)
             {
                 var transformed = Matrix3x2.TransformPoint(matrix, point);
@@ -418,13 +419,13 @@ namespace Adamantium.Fonts
 
         private struct DistancedPoint
         {
-            public DistancedPoint(Vector2D point, double distance)
+            public DistancedPoint(Vector2 point, double distance)
             {
                 Point = point;
                 Distance = distance;
             }
             
-            public Vector2D Point;
+            public Vector2 Point;
 
             public Double Distance;
         }
@@ -520,24 +521,24 @@ namespace Adamantium.Fonts
                 var currentSegment = mergedOutlinesSegments[currentIndex];
                 var nextSegment = mergedOutlinesSegments[nextIndex];
 
-                var hintedCurrentStart = new Vector2D();
-                var hintedCurrentEnd = new Vector2D();
+                var hintedCurrentStart = new Vector2();
+                var hintedCurrentEnd = new Vector2();
                 var hintedValue = 0.0;
                 
                 // vertical stem
                 if (currentSegment.Start.X == currentSegment.End.X)
                 {
                     hintedValue = Math.Round(currentSegment.Start.X);
-                    hintedCurrentStart = new Vector2D(hintedValue, currentSegment.Start.Y);
-                    hintedCurrentEnd = new Vector2D(hintedValue, currentSegment.End.Y);
+                    hintedCurrentStart = new Vector2(hintedValue, currentSegment.Start.Y);
+                    hintedCurrentEnd = new Vector2(hintedValue, currentSegment.End.Y);
                 }
                 
                 // horizontal stem
                 if (currentSegment.Start.Y == currentSegment.End.Y)
                 {
                     hintedValue = Math.Round(currentSegment.Start.Y);
-                    hintedCurrentStart = new Vector2D(currentSegment.Start.X, hintedValue);
-                    hintedCurrentEnd = new Vector2D(currentSegment.End.X, hintedValue);
+                    hintedCurrentStart = new Vector2(currentSegment.Start.X, hintedValue);
+                    hintedCurrentEnd = new Vector2(currentSegment.End.X, hintedValue);
                 }
                 
                 var hintedCurrentSegment = new LineSegment2D(hintedCurrentStart, hintedCurrentEnd);

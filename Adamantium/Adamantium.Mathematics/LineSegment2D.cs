@@ -2,7 +2,7 @@
 
 namespace Adamantium.Mathematics
 {
-    public struct LineSegment2D : IEquatable<LineSegment2D>
+    public readonly struct LineSegment2D //: IEquatable<LineSegment2D>
     {
         public override bool Equals(object obj)
         {
@@ -14,28 +14,28 @@ namespace Adamantium.Mathematics
             return HashCode.Combine(Start, End, Direction, DirectionNormalized);
         }
 
-        public Vector2D Start { get; }
+        public Vector2 Start { get; }
 
-        public Vector2D End { get; }
+        public Vector2 End { get; }
 
-        public Vector2D Direction { get; }
+        public Vector2 Direction { get; }
 
-        public Vector2D DirectionNormalized { get; }
+        public Vector2 DirectionNormalized { get; }
 
-        public LineSegment2D(Vector2D start, Vector2D end)
+        public LineSegment2D(Vector2 start, Vector2 end)
         {
             Start = start;
             End = end;
             Direction = end - start;
-            DirectionNormalized = Vector2D.Normalize(Direction);
+            DirectionNormalized = Vector2.Normalize(Direction);
         }
         
         public LineSegment2D(Vector3F start, Vector3F end)
         {
-            Start = (Vector2D)start;
-            End = (Vector2D)end;
+            Start = (Vector2)start;
+            End = (Vector2)end;
             Direction = End - Start;
-            DirectionNormalized = Vector2D.Normalize(Direction);
+            DirectionNormalized = Vector2.Normalize(Direction);
         }
 
         public bool Equals(LineSegment2D other)

@@ -15,15 +15,15 @@ namespace Adamantium.UI.Media
          throw new NotImplementedException();
       }
 
-      public Vector2D StartPosition { get; set; }
+      public Vector2 StartPosition { get; set; }
 
-      public Vector2D EndPosition { get; set; }
+      public Vector2 EndPosition { get; set; }
 
       public LineGeometry()
       {
       }
 
-      public LineGeometry(Vector2D startPoint, Vector2D endPoint, Double thickness)
+      public LineGeometry(Vector2 startPoint, Vector2 endPoint, Double thickness)
       {
          StartPosition = startPoint;
          EndPosition = endPoint;

@@ -49,57 +49,57 @@ namespace Adamantium.Engine.Graphics
                 var min = Math.Min(width, height);
                 ValidateCorners(ref corners, min);
 
-                var vertices = new List<Vector2D>();
+                var vertices = new List<Vector2>();
 
                 var halfWidth = width / 2;
                 var halfHeight = height / 2;
 
                 if (corners.TopLeft > 0)
                 {
-                    var radius = new Vector2D(corners.TopLeft);
+                    var radius = new Vector2(corners.TopLeft);
                     var centerX = -halfWidth + radius.X;
                     var centerY = -halfHeight + radius.Y;
-                    GenerateRoundCorner(tessellation, -180, new Vector2D(centerX, centerY), radius, vertices);
+                    GenerateRoundCorner(tessellation, -180, new Vector2(centerX, centerY), radius, vertices);
                 }
                 else
                 {
-                    vertices.Add(new Vector2D(-halfWidth, -halfHeight));
+                    vertices.Add(new Vector2(-halfWidth, -halfHeight));
                 }
 
                 if (corners.TopRight > 0)
                 {
-                    var radius = new Vector2D(corners.TopRight);
+                    var radius = new Vector2(corners.TopRight);
                     var centerX = halfWidth - radius.X;
                     var centerY = -halfHeight + radius.Y;
-                    GenerateRoundCorner(tessellation, 90, new Vector2D(centerX, centerY), radius, vertices);
+                    GenerateRoundCorner(tessellation, 90, new Vector2(centerX, centerY), radius, vertices);
                 }
                 else
                 {
-                    vertices.Add(new Vector2D(halfWidth, -halfHeight));
+                    vertices.Add(new Vector2(halfWidth, -halfHeight));
                 }
 
                 if (corners.BottomRight > 0)
                 {
-                    var radius = new Vector2D(corners.BottomRight);
+                    var radius = new Vector2(corners.BottomRight);
                     var centerX = halfWidth - radius.X;
                     var centerY = halfHeight - radius.Y;
-                    GenerateRoundCorner(tessellation, 0, new Vector2D(centerX, centerY), radius, vertices);
+                    GenerateRoundCorner(tessellation, 0, new Vector2(centerX, centerY), radius, vertices);
                 }
                 else
                 {
-                    vertices.Add(new Vector2D(halfWidth, halfHeight));
+                    vertices.Add(new Vector2(halfWidth, halfHeight));
                 }
 
                 if (corners.BottomLeft > 0)
                 {
-                    var radius = new Vector2D(corners.BottomLeft);
+                    var radius = new Vector2(corners.BottomLeft);
                     var centerX = -halfWidth + radius.X;
                     var centerY = halfHeight - radius.Y;
-                    GenerateRoundCorner(tessellation, -90, new Vector2D(centerX, centerY), radius, vertices);
+                    GenerateRoundCorner(tessellation, -90, new Vector2(centerX, centerY), radius, vertices);
                 }
                 else
                 {
-                    vertices.Add(new Vector2D(-halfWidth, halfHeight));
+                    vertices.Add(new Vector2(-halfWidth, halfHeight));
                 }
 
                 Mesh mesh = new Mesh();
@@ -175,9 +175,9 @@ namespace Adamantium.Engine.Graphics
             private static void GenerateRoundCorner(
                 int tessellation,
                 float startAngle,
-                Vector2D center,
-                Vector2D radius,
-                List<Vector2D> vertices)
+                Vector2 center,
+                Vector2 radius,
+                List<Vector2> vertices)
             {
                 var angleItem = -MathHelper.DegreesToRadians(rectangleSector / tessellation);
                 var angle = MathHelper.DegreesToRadians(startAngle);
@@ -188,7 +188,7 @@ namespace Adamantium.Engine.Graphics
                     angle += angleItem;
                     x = Math.Round(x, 3);
                     y = Math.Round(y, 3);
-                    vertices.Add(new Vector2D(x, y));
+                    vertices.Add(new Vector2(x, y));
                 }
             }
         }

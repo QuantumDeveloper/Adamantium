@@ -154,17 +154,17 @@ namespace Adamantium.UI
         public abstract IntPtr Handle { get; internal set; }
         public bool IsClosed { get; protected set; }
 
-        public abstract Vector2D PointToClient(Vector2D point);
-        public abstract Vector2D PointToScreen(Vector2D point);
+        public abstract Vector2 PointToClient(Vector2 point);
+        public abstract Vector2 PointToScreen(Vector2 point);
                 
-        internal Vector2D ScreenToClient(Vector2D p)
+        internal Vector2 ScreenToClient(Vector2 p)
         {
             var point = new NativePoint((int)p.X, (int)p.Y);
             Win32Interop.ScreenToClient(Handle, ref point);
             return point;
         }
 
-        internal Vector2D ClientToScreen(Vector2D p)
+        internal Vector2 ClientToScreen(Vector2 p)
         {
             var point = new NativePoint((int)p.X, (int)p.Y);
             Win32Interop.ClientToScreen(Handle, ref point);

@@ -16,15 +16,15 @@ namespace Adamantium.EntityFramework.Components
         private bool rotationDone = true;
         private double rotationDuration;
         private QuaternionF startingRotation;
-        private Vector3D lookAtRotationPoint;
+        private Vector3 lookAtRotationPoint;
         private int moveTime;
         private bool moveToObjectDone = true;
         private double moveToDuration = 0;
-        private Vector3D startingOffset;
-        private Vector3D endingPosition;
-        private Vector3D distance;
-        private Vector3D diameter;
-        private Vector3D center;
+        private Vector3 startingOffset;
+        private Vector3 endingPosition;
+        private Vector3 distance;
+        private Vector3 diameter;
+        private Vector3 center;
 
         public Single OrthoScaleFactor = 1;
 
@@ -213,7 +213,7 @@ namespace Adamantium.EntityFramework.Components
             startingOffset = Owner.Transform.Position;
             if (LookAtObject != null)
             {
-                diameter = (Vector3D)Forward * LookAtObject.GetDiameter() * Fov;
+                diameter = (Vector3)Forward * LookAtObject.GetDiameter() * Fov;
                 center = LookAtObject.GetCenterAbsolute() + diameter + Owner.Transform.Position - LookAtObject.GetLocalCenter();
             }
             Type = CameraType.Special;
@@ -244,7 +244,7 @@ namespace Adamantium.EntityFramework.Components
             moveToObjectDone = false;
             moveToDuration = 0;
             startingOffset = Owner.Transform.Position;
-            diameter = ((Vector3D) Forward * lookAtObject.GetDiameter() * Fov);
+            diameter = ((Vector3) Forward * lookAtObject.GetDiameter() * Fov);
             endingPosition = lookAtObject.GetCenterAbsolute() - diameter;
             Type = CameraType.Free;
         }
@@ -255,7 +255,7 @@ namespace Adamantium.EntityFramework.Components
             {
                 moveToDuration += gameTime.FrameTime * 1000;
                 var weight = (float)moveToDuration / moveTime;
-                Owner.Transform.Position = Vector3D.Lerp(startingOffset, endingPosition, weight);
+                Owner.Transform.Position = Vector3.Lerp(startingOffset, endingPosition, weight);
                 if (moveToDuration >= moveTime)
                 {
                     Owner.Transform.Position = endingPosition;
@@ -291,7 +291,7 @@ namespace Adamantium.EntityFramework.Components
                 {
                     Matrix4x4F rotMatrix = Matrix4x4F.RotationQuaternion(Rotation);
                     distance = center - Owner.Transform.Position;
-                    Owner.Transform.Position = (center) - new Vector3D(rotMatrix.M13, rotMatrix.M23, rotMatrix.M33) * distance.Length();
+                    Owner.Transform.Position = (center) - new Vector3(rotMatrix.M13, rotMatrix.M23, rotMatrix.M33) * distance.Length();
                     ViewMatrix = Matrix4x4F.LookToLH(Vector3F.Zero, -new Vector3F(rotMatrix.M13, rotMatrix.M23, rotMatrix.M33), new Vector3F(rotMatrix.M12, rotMatrix.M22, rotMatrix.M32));
                 }
             }
@@ -311,13 +311,13 @@ namespace Adamantium.EntityFramework.Components
 
                 Matrix4x4F rotMatrix = Matrix4x4F.RotationQuaternion(tmpRotation);
                 var center1 = Owner.Owner.GetCenterAbsolute();
-                Owner.Transform.Position = center1 - Vector3D.Multiply(new Vector3D(rotMatrix.M13, rotMatrix.M23, rotMatrix.M33), Radius);
+                Owner.Transform.Position = center1 - Vector3.Multiply(new Vector3(rotMatrix.M13, rotMatrix.M23, rotMatrix.M33), Radius);
 
                 if (LookAt != null)
                 {
                     ViewMatrix = Matrix4x4F.LookAtRH(
                         Vector3F.Zero,
-                        (Vector3D) LookAt - Owner.Transform.Position,
+                        (Vector3) LookAt - Owner.Transform.Position,
                         new Vector3F(rotMatrix.M12, rotMatrix.M22, rotMatrix.M32));
                 }
                 else
@@ -353,7 +353,7 @@ namespace Adamantium.EntityFramework.Components
         {
             if (Type == CameraType.Free)
             {
-                Owner.Transform.Position += Vector3D.Multiply(Right, relativeX);
+                Owner.Transform.Position += Vector3.Multiply(Right, relativeX);
             }
         }
 
@@ -362,7 +362,7 @@ namespace Adamantium.EntityFramework.Components
         {
             if (Type == CameraType.Free)
             {
-                Owner.Transform.Position += Vector3D.Multiply(Up, relativeY);
+                Owner.Transform.Position += Vector3.Multiply(Up, relativeY);
             }
         }
 
@@ -371,7 +371,7 @@ namespace Adamantium.EntityFramework.Components
         {
             if (Type == CameraType.Free)
             {
-                Owner.Transform.Position += Vector3D.Multiply(Forward, relativeZ);
+                Owner.Transform.Position += Vector3.Multiply(Forward, relativeZ);
             }
             else if (Type == CameraType.FirstPerson)
             {
@@ -467,7 +467,7 @@ namespace Adamantium.EntityFramework.Components
         }
 
         /// <inheritdoc />
-        public override void SetFreeCamera(Vector3D position, Vector3D lookAt, Vector3F up)
+        public override void SetFreeCamera(Vector3 position, Vector3 lookAt, Vector3F up)
         {
             DeleteThirdPersonConfig(); // sets camera type to Free here (inside method)
 
@@ -491,7 +491,7 @@ namespace Adamantium.EntityFramework.Components
         }
 
         /// <inheritdoc />
-        public override void SetFreePosition(Vector3D position)
+        public override void SetFreePosition(Vector3 position)
         {
             if (Type == CameraType.Free)
             {
@@ -500,7 +500,7 @@ namespace Adamantium.EntityFramework.Components
         }
 
         /// <inheritdoc />
-        public override void SetFreeLookAt(Vector3D lookAt)
+        public override void SetFreeLookAt(Vector3 lookAt)
         {
             if (Type == CameraType.Free)
             {
@@ -519,7 +519,7 @@ namespace Adamantium.EntityFramework.Components
         }
 
         /// <inheritdoc />
-        public override void SetFirstPersonCamera(Vector3D position, QuaternionF objectRotation, Double faceDistance)
+        public override void SetFirstPersonCamera(Vector3 position, QuaternionF objectRotation, Double faceDistance)
         {
             Type = CameraType.FirstPerson;
 
@@ -529,7 +529,7 @@ namespace Adamantium.EntityFramework.Components
         }
 
         /// <inheritdoc />
-        public override void SetFirstPersonPositionRotation(Vector3D position, QuaternionF objectRotation)
+        public override void SetFirstPersonPositionRotation(Vector3 position, QuaternionF objectRotation)
         {
             if (Type == CameraType.FirstPerson)
             {
@@ -540,7 +540,7 @@ namespace Adamantium.EntityFramework.Components
 
         /// <inheritdoc />
         public override void SetThirdPersonCamera(Entity hostObject, Vector3F initialRelRotation, CameraType desiredType,
-           Vector3D? lookAt = null, Double? distanceToObject = null)
+           Vector3? lookAt = null, Double? distanceToObject = null)
         {
             if (!desiredType.IsThirdPerson() || hostObject == Owner)
             {
@@ -582,7 +582,7 @@ namespace Adamantium.EntityFramework.Components
         }
 
         /// <inheritdoc />
-        public override void SetSpecialCamera(Vector3D lookAt)
+        public override void SetSpecialCamera(Vector3 lookAt)
         {
             Type = CameraType.Special;
 
@@ -599,7 +599,7 @@ namespace Adamantium.EntityFramework.Components
         }
 
         /// <inheritdoc />
-        public override void SetThirdPersonLookAt(Vector3D lookAt)
+        public override void SetThirdPersonLookAt(Vector3 lookAt)
         {
             if ((Type == CameraType.ThirdPersonFree) || (Type == CameraType.ThirdPersonFreeAlt))
             {

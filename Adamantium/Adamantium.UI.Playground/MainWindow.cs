@@ -59,12 +59,12 @@ namespace Adamantium.UI.Playground
 
             var polygon = new Polygon();
             polygon.Width = 100;
-            polygon.Points = new TrackingCollection<Vector2D>();
-            polygon.Points.Add(new Vector2D(10, 80));
-            polygon.Points.Add(new Vector2D(190, 80));
-            polygon.Points.Add(new Vector2D(30, 190));
-            polygon.Points.Add(new Vector2D(100, 10));
-            polygon.Points.Add(new Vector2D(170, 190));
+            polygon.Points = new TrackingCollection<Vector2>();
+            polygon.Points.Add(new Vector2(10, 80));
+            polygon.Points.Add(new Vector2(190, 80));
+            polygon.Points.Add(new Vector2(30, 190));
+            polygon.Points.Add(new Vector2(100, 10));
+            polygon.Points.Add(new Vector2(170, 190));
             polygon.Fill = Brushes.Crimson;
             polygon.FillRule = FillRule.EvenOdd;
             polygon.HorizontalAlignment = HorizontalAlignment.Left;

@@ -6,15 +6,15 @@ namespace Adamantium.Mathematics
     public static class Collision2D
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining|MethodImplOptions.AggressiveOptimization)]
-        public static bool IsPointOnSegment(ref LineSegment2D segment2D, ref Vector2D point)
+        public static bool IsPointOnSegment(ref LineSegment2D segment2D, ref Vector2 point)
         {
             var ab = segment2D.Direction.Length();
-            var ap = Vector2D.Subtract(point, segment2D.Start).Length();
-            var bp = Vector2D.Subtract(point, segment2D.End).Length();
+            var ap = Vector2.Subtract(point, segment2D.Start).Length();
+            var bp = Vector2.Subtract(point, segment2D.End).Length();
             return MathHelper.WithinEpsilon(ab, ap + bp, Polygon.Epsilon);
         }
 
-        public static bool SegmentSegmentIntersection(ref LineSegment2D segment1, ref LineSegment2D segment2, out Vector2D point)
+        public static bool SegmentSegmentIntersection(ref LineSegment2D segment1, ref LineSegment2D segment2, out Vector2 point)
         {
             var p = segment1.Start;
             var q = segment2.Start;
@@ -27,7 +27,7 @@ namespace Adamantium.Mathematics
 
             if (denominator == 0.0)
             {
-                point = Vector2D.Zero;
+                point = Vector2.Zero;
                 return false;
             }
 
@@ -38,7 +38,7 @@ namespace Adamantium.Mathematics
 
             if (t < 0 || t > 1 || u < 0 || u > 1)
             {
-                point = Vector2D.Zero;
+                point = Vector2.Zero;
                 return false;
             }
 
@@ -46,18 +46,18 @@ namespace Adamantium.Mathematics
             return true;
         }
 
-        public static bool RaySegmentIntersection(ref Ray2D ray, ref Vector2D start, ref Vector2D end, out Vector2D point)
+        public static bool RaySegmentIntersection(ref Ray2D ray, ref Vector2 start, ref Vector2 end, out Vector2 point)
         {
             var segment = new LineSegment2D(start, end);
             return RaySegmentIntersection(ref ray, ref segment, out point);
         }
 
-        public static bool RaySegmentIntersection(ref Ray2D ray, ref LineSegment2D segment2D, out Vector2D point)
+        public static bool RaySegmentIntersection(ref Ray2D ray, ref LineSegment2D segment2D, out Vector2 point)
         {
             var collinear = ray.Direction.IsCollinear(segment2D.Direction);
             if (collinear)
             {
-                point = Vector2D.Zero;
+                point = Vector2.Zero;
                 return false;
             }
 
@@ -72,7 +72,7 @@ namespace Adamantium.Mathematics
 
             if (denominator == 0.0f)
             {
-                point = Vector2D.Zero;
+                point = Vector2.Zero;
                 return false;
             }
 
@@ -106,7 +106,7 @@ namespace Adamantium.Mathematics
 
             if (t < 0 || u < 0 || u > 1)
             {
-                point = Vector2D.Zero;
+                point = Vector2.Zero;
                 return false;
             }
 
@@ -115,11 +115,11 @@ namespace Adamantium.Mathematics
         }
 
 
-        public static bool RaySegmentIntersection(ref Ray2D ray, ref LineSegment2D segment2D, out Vector2D point, out double distance)
+        public static bool RaySegmentIntersection(ref Ray2D ray, ref LineSegment2D segment2D, out Vector2 point, out double distance)
         {
             var collinear = ray.Direction.IsCollinear(segment2D.Direction);
             distance = float.PositiveInfinity;
-            point = Vector2D.Zero;
+            point = Vector2.Zero;
             if (collinear) return false;
             
             var p = ray.Origin;
@@ -133,7 +133,7 @@ namespace Adamantium.Mathematics
 
             if (MathHelper.IsZero(denominator))
             {
-                point = Vector2D.Zero;
+                point = Vector2.Zero;
                 return false;
             }
 
@@ -147,8 +147,8 @@ namespace Adamantium.Mathematics
             //If ray and line not intersecting, try to find out closest distance between them
             //and if distance is less than Epsilon, then we can say that ray intersects line
             //because distance is near zero
-            var a = Vector2D.Dot(segment2D.Start, segment2D.Direction);
-            var b = Vector2D.Dot(point, segment2D.Direction);
+            var a = Vector2.Dot(segment2D.Start, segment2D.Direction);
+            var b = Vector2.Dot(point, segment2D.Direction);
             distance = Math.Abs(b - a);
 
             if (t < 0 || t > 1 || u < 0 || u > 1)
@@ -158,7 +158,7 @@ namespace Adamantium.Mathematics
             return true;
         }
         
-        public static double Distance(Vector2D v1, Vector2D v2)
+        public static double Distance(Vector2 v1, Vector2 v2)
         {
             //return Math.Sqrt(Math.Pow(v2.X - v1.X, 2) + Math.Pow(v2.Y - v1.Y, 2));
             return Math.Sqrt((v2.X - v1.X) * (v2.X - v1.X) + (v2.Y - v1.Y) * (v2.Y - v1.Y));
@@ -170,7 +170,7 @@ namespace Adamantium.Mathematics
             return Math.Sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
         }
 
-        public static double DistanceToPoint(this Vector2D point, Vector2D start, Vector2D end)
+        public static double DistanceToPoint(this Vector2 point, Vector2 start, Vector2 end)
         {
             double dStart = Distance(point, start);
             double dEnd = Distance(point, end);
@@ -204,7 +204,7 @@ namespace Adamantium.Mathematics
             }
         }
         
-        public static double DistanceToPoint(this Vector2D point, Vector2D start, Vector2D end, out byte pointRelativePosition)
+        public static double DistanceToPoint(this Vector2 point, Vector2 start, Vector2 end, out byte pointRelativePosition)
         {
             double dStart = Distance(point, start);
             double dEnd = Distance(point, end);
@@ -241,7 +241,7 @@ namespace Adamantium.Mathematics
             }
         }
         
-        public static Vector2D? lineLineIntersection(Vector2D a, Vector2D b, Vector2D c, Vector2D d)
+        public static Vector2? lineLineIntersection(Vector2 a, Vector2 b, Vector2 c, Vector2 d)
         {
             // Line 'ab' represented as a1x + b1y = c1 
             double a1 = b.Y - a.Y;
@@ -263,7 +263,7 @@ namespace Adamantium.Mathematics
             
             double x = (b2 * c1 - b1 * c2) / determinant;
             double y = (a1 * c2 - a2 * c1) / determinant;
-            return new Vector2D(x, y);
+            return new Vector2(x, y);
         }
     }
 }

@@ -7,7 +7,7 @@ namespace Adamantium.UI.Input
       public MouseDevice MouseDevice { get; }
       
 
-      public Vector2D GetPosition(IInputElement relativeTo)
+      public Vector2 GetPosition(IInputElement relativeTo)
       {
          return MouseDevice.GetPosition(relativeTo);
       }

@@ -165,7 +165,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Ditherers
         /// <summary>
         /// See <see cref="IPathProvider.GetPointPath(int,int)"/> for more details.
         /// </summary>
-        public IList<Vector2D> GetPointPath(Int32 width, Int32 heigth)
+        public IList<Vector2> GetPointPath(Int32 width, Int32 heigth)
         {
             return GetPathProvider().GetPointPath(width, heigth);
         }
@@ -196,7 +196,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Ditherers
         /// Retrieves the path in which to traverse 
         /// </summary>
         /// <returns></returns>
-        public IList<Vector2D> GetPointPath()
+        public IList<Vector2> GetPointPath()
         {
             return null;
         }

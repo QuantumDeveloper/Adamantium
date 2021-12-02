@@ -24,7 +24,7 @@ namespace Adamantium.UI
         object Tag { get; set; }
         FrameworkComponent Parent { get; }
         IReadOnlyCollection<FrameworkComponent> LogicalChildrenCollection { get; }
-        Vector2D Scale { get; set; }
+        Vector2 Scale { get; set; }
         Double Rotation { get; set; }
 
         /// <summary>
