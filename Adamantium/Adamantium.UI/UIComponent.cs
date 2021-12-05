@@ -557,8 +557,8 @@ namespace Adamantium.UI
 
         public bool IsKeyboardFocused
         {
-            get => GetValue<bool>(IsMouseDirectlyOverProperty);
-            private set => SetValue(IsMouseDirectlyOverProperty, value);
+            get => GetValue<bool>(IsKeyboardFocusedProperty);
+            private set => SetValue(IsKeyboardFocusedProperty, value);
         }
 
         public String Uid

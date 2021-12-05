@@ -48,7 +48,14 @@ namespace Adamantium.UI.Media
 
       public Boolean IsEmpty()
       {
-         return Mesh.Positions.Length == 0;
+         return Mesh.Points.Length == 0;
       }
+
+      public void RecalculateBounds()
+      {
+         
+      }
+
+      protected internal abstract void ProcessGeometry();
    }
 }

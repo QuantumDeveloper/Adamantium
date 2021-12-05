@@ -114,7 +114,7 @@ namespace Adamantium.Mathematics
                 {
                     for (var j = 0; j < SelfIntersectedPoints.Count; j++)
                     {
-                        if (!Polygon.IsConnected(SelfIntersectedPoints[i], SelfIntersectedPoints[j], Segments,
+                        if (!PolygonHelper.IsConnectedInvariant(SelfIntersectedPoints[i], SelfIntersectedPoints[j], Segments,
                             out var correctSegment2D)) continue;
                         if (!SelfIntersectedSegments.Contains(correctSegment2D))
                         {
@@ -132,7 +132,7 @@ namespace Adamantium.Mathematics
         public void SplitOnSegments()
         {
             Segments.Clear();
-            var segments = Polygon.SplitOnSegments(Points);
+            var segments = PolygonHelper.SplitOnSegments(Points);
             if (segments != null)
             {
                 Segments.AddRange(segments);
@@ -151,7 +151,7 @@ namespace Adamantium.Mathematics
             for (var i = 0; i < intersectionPoints.Count; i++)
             {
                 var interPoint = intersectionPoints[i];
-                if (!Polygon.GetSegmentsFromPoint(tempSegments, interPoint, out var segments)) continue;
+                if (!PolygonHelper.GetSegmentsFromPoint(tempSegments, interPoint, out var segments)) continue;
                 
                 for (var j = 0; j < segments.Count; j++)
                 {
@@ -159,12 +159,12 @@ namespace Adamantium.Mathematics
                     var index = tempSegments.IndexOf(segment);
                     tempSegments.RemoveAt(index);
                     var seg1 = new LineSegment2D(segment.Start, interPoint);
-                    if (Polygon.InsertSegment(tempSegments, seg1, index))
+                    if (PolygonHelper.InsertSegment(tempSegments, seg1, index))
                     {
                         index++;
                     }
                     var seg2 = new LineSegment2D(interPoint, segment.End);
-                    Polygon.InsertSegment(tempSegments, seg2, index);
+                    PolygonHelper.InsertSegment(tempSegments, seg2, index);
                 }
             }
             
@@ -190,7 +190,7 @@ namespace Adamantium.Mathematics
                     if (MathHelper.WithinEpsilon(point1, point2, Polygon.Epsilon))
                     { continue; }
 
-                    if (Polygon.IsConnected(point1, point2, Segments, out var segment2D))
+                    if (PolygonHelper.IsConnectedInvariant(point1, point2, Segments, out var segment2D))
                     {
                         Segments.Remove(segment2D);
                     }
@@ -226,7 +226,7 @@ namespace Adamantium.Mathematics
             for (var i = 0; i < polygon.Points.Count; i++)
             {
                 var point = polygon.Points[i];
-                if (!Polygon.IsPointInsideArea(point, Segments))
+                if (!Collision2D.IsPointInsideArea(point, Segments))
                 {
                     break;
                 }

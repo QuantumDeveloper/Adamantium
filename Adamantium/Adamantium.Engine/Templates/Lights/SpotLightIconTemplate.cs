@@ -47,7 +47,7 @@ namespace Adamantium.Engine.Templates.Lights
             var triangulatedList = polygon.Fill();
             var spotLightIcon = new Mesh();
             spotLightIcon.MeshTopology = PrimitiveType.TriangleList;
-            spotLightIcon.SetPositions(triangulatedList);
+            spotLightIcon.SetPoints(triangulatedList);
             spotLightIcon.Optimize();
 
             float height = 0.1f;

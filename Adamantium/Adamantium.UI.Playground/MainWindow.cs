@@ -2,6 +2,7 @@ using Adamantium.Core.Collections;
 using Adamantium.Engine.Graphics;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Input;
 using Adamantium.UI.Media;
 using Polygon = Adamantium.UI.Controls.Polygon;
 using Rectangle = Adamantium.UI.Controls.Rectangle;
@@ -10,6 +11,7 @@ namespace Adamantium.UI.Playground
 {
     public class MainWindow : Window
     {
+        private Path path = null;
         public MainWindow()
         {
             Width = 1280;
@@ -72,14 +74,52 @@ namespace Adamantium.UI.Playground
             polygon.StrokeThickness = 20;
             polygon.Stroke = Brushes.Black;
             //polygon.StrokeDashArray = new TrackingCollection<double>() { 25, 15, 5 };
+
+            path = new Path();
+            path.HorizontalAlignment = HorizontalAlignment.Center;
+            path.VerticalAlignment = VerticalAlignment.Center;
+            CombinedGeometry geometry = new CombinedGeometry();
+            geometry.GeometryCombineMode = GeometryCombineMode.Xor;
+            geometry.Geometry1 = new RectangleGeometry(new Rect(0, 0, 450, 350), new CornerRadius(0));
+            //geometry.Geometry2 = new RectangleGeometry(new Rect(100, 100, 500, 400), new CornerRadius(0));
+            geometry.Geometry2 = new EllipseGeometry(new Rect(50, 50, 550, 350));
+            path.Data = geometry;
+            
+            KeyDown += OnKeyDown;
                 
             grid.Background = Brushes.White;
             //grid.Children.Add(rectangle);
             //grid.Children.Add(ellipse);
             //grid.Children.Add(line);
-            grid.Children.Add(polygon);
+            //grid.Children.Add(polygon);
+            grid.Children.Add(path);
 
             Content = grid;
+        }
+
+        private void OnKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.RightArrow)
+            {
+                var combined = path.Data as CombinedGeometry;
+                var mode = (int)combined.GeometryCombineMode;
+                if (mode == 3) mode = -1;
+
+                mode++;
+                combined.GeometryCombineMode = (GeometryCombineMode)mode;
+            }
+            
+            if (e.Key == Key.LeftArrow)
+            {
+                var combined = path.Data as CombinedGeometry;
+                var mode = (int)combined.GeometryCombineMode;
+                if (mode == 0) mode = 4;
+
+                mode--;
+                combined.GeometryCombineMode = (GeometryCombineMode)mode;
+            }
+            
+            path.InvalidateMeasure();
         }
     }
 }

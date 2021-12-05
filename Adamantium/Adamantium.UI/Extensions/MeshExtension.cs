@@ -11,7 +11,7 @@ namespace Adamantium.UI.Extensions
                 return null;
             }
 
-            int length = mesh.Positions.Length;
+            int length = mesh.Points.Length;
 
             var normals = mesh.Semantic & VertexSemantic.Normal;
             var colors = mesh.Semantic.HasFlag(VertexSemantic.Color);
@@ -21,7 +21,7 @@ namespace Adamantium.UI.Extensions
 
             for (int i = 0; i < length; i++)
             {
-                var vertex = new UIVertex() { Position = mesh.Positions[i] };
+                var vertex = new UIVertex() { Position = mesh.Points[i] };
                 if (normals > 0)
                 {
                     vertex.Normal = mesh.Normals[i];

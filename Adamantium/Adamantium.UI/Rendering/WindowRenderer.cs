@@ -166,7 +166,7 @@ namespace Adamantium.UI.Rendering
 
             foreach (var item in presentation.Items)
             {
-                //item.GeometryRenderer?.Draw(context.GraphicsDevice, component, projectionMatrix);
+                item.GeometryRenderer?.Draw(context.GraphicsDevice, component, projectionMatrix);
                 item.StrokeRenderer?.Draw(context.GraphicsDevice, component, projectionMatrix);
             }
         }

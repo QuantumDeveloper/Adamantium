@@ -18,6 +18,8 @@ namespace Adamantium.UI.Media
       public Vector2 StartPosition { get; set; }
 
       public Vector2 EndPosition { get; set; }
+      
+      public Double Thickness { get; set; }
 
       public LineGeometry()
       {
@@ -27,8 +29,12 @@ namespace Adamantium.UI.Media
       {
          StartPosition = startPoint;
          EndPosition = endPoint;
-
-         CreateLine(thickness);
+         Thickness = thickness;
+      }
+      
+      protected internal override void ProcessGeometry()
+      {
+         CreateLine(Thickness);
       }
 
       internal void CreateLine(Double thickness)

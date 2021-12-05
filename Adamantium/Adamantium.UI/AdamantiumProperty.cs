@@ -178,14 +178,14 @@ namespace Adamantium.UI
          if (metadata.DefaultValue != null)
          {
             if (!FindType(valueType, metadata.DefaultValue.GetType()))
-            throw new ArgumentException(
+               throw new ArgumentException(
                   "Default value is not of the same type as property type for PropertyName " + name);
          }
       }
 
-      private static bool FindType(Type typeToCompare, Type typeTosearch)
+      private static bool FindType(Type typeToCompare, Type typeToSearch)
       {
-         Type tmpType = typeTosearch;
+         Type tmpType = typeToSearch;
          while (tmpType != null)
          {
             if (tmpType == typeToCompare)
@@ -223,7 +223,6 @@ namespace Adamantium.UI
 
          return property;
       }
-
 
       public static AdamantiumProperty RegisterAttached(String name, Type propertyType, Type ownerType)
       {

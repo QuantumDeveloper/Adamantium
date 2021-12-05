@@ -143,6 +143,16 @@ namespace Adamantium.Mathematics
             return vertices;
         }
 
+        public List<Vector3F> FIllDirect(List<Vector2> points, List<LineSegment2D> segments)
+        {
+            MergedPoints.AddRange(points);
+            MergedSegments.AddRange(segments);
+            UpdateBoundingBox();
+            
+            var result = Triangulator.Triangulate(this);
+            return result;
+        }
+
         private List<Vector3F> TriangulatePolygonItem(PolygonItem item)
         {
             var itemCopy = item;
@@ -278,7 +288,7 @@ namespace Adamantium.Mathematics
                         continue;
                     }
 
-                    //Check if polygons are inside each other and if yes, then mark inner as a Hole
+                    //Check if polygons are inside each other
                     var intersectionResult = polygon1.IsCompletelyContains(polygon2);
                     
                     AddPolygonsPairsToList(polygon1, polygon2, intersectionResult);
@@ -308,7 +318,7 @@ namespace Adamantium.Mathematics
                 //Split existing segments on more segments on edge points
                 UpdatePolygonUsingSelfPoints(edgePoints);
 
-                // If Non-zero and smallest polygon is not a hole, lets find a list of points describing all possible
+                // If Non-zero, lets find a list of points describing all possible
                 // connections between smallest and biggest polygons and remove all segments,
                 // which connects any of two intersection points
                 if (FillRule == FillRule.NonZero && intersectionResult == ContainmentType.Intersects)
@@ -335,7 +345,7 @@ namespace Adamantium.Mathematics
                     if (MathHelper.WithinEpsilon(point1, point2, Epsilon))
                     { continue; }
 
-                    if (IsConnected(point1, point2, MergedSegments, out var segment2D))
+                    if (PolygonHelper.IsConnectedInvariant(point1, point2, MergedSegments, out var segment2D))
                     {
                         MergedSegments.Remove(segment2D);
                     }
@@ -382,7 +392,7 @@ namespace Adamantium.Mathematics
             for (var i = 0; i < polygon1.Points.Count; i++)
             {
                 var point = polygon1.Points[i];
-                if (IsPointInsideArea(point, polygon2.Segments) &&
+                if (Collision2D.IsPointInsideArea(point, polygon2.Segments) &&
                     !allIntersections.Contains(point))
                 {
                     allIntersections.Add(point);
@@ -391,7 +401,7 @@ namespace Adamantium.Mathematics
             for (var i = 0; i < polygon2.Points.Count; i++)
             {
                 var point = polygon2.Points[i];
-                if (IsPointInsideArea(point, polygon1.Segments) &&
+                if (Collision2D.IsPointInsideArea(point, polygon1.Segments) &&
                     !allIntersections.Contains(point))
                 {
                     allIntersections.Add(point);
@@ -400,7 +410,6 @@ namespace Adamantium.Mathematics
 
             return allIntersections;
         }
-
 
         /// <summary>
         /// Adds polygons to checklist to not process this polygon pair again
@@ -428,10 +437,10 @@ namespace Adamantium.Mathematics
         /// Sort points by its X component from smallest to largest
         /// </summary>
         /// <returns>New collection of </returns>
-        public List<Vector2> SortVertices()
+        public List<Vector2> SortPoints()
         {
             var sortedList = new List<Vector2>(MergedPoints);
-            sortedList.Sort(VerticalVertexComparer.Default);
+            sortedList.Sort(VerticalPointsComparer.Default);
             return sortedList;
         }
 
@@ -452,50 +461,6 @@ namespace Adamantium.Mathematics
         }
 
         /// <summary>
-        /// Checks if point is completely inside polygon, formed by segments
-        /// </summary>
-        /// <param name="point"></param>
-        /// <param name="area"></param>
-        /// <returns>True if point is completely inside polygon, otherwise false</returns>
-        internal static bool IsPointInsideArea(Vector2 point, List<LineSegment2D> area)
-        {
-            var rayLeft = new Ray2D(point, -Vector2.UnitX);
-            var rayDown = new Ray2D(point, -Vector2.UnitY);
-            var rayRight = new Ray2D(point, Vector2.UnitX);
-            var rayUp = new Ray2D(point, Vector2.UnitY);
-            var sides = IntersectionSides.None;
-            for (var i = 0; i < area.Count; i++)
-            {
-                var segment = area[i];
-                if (Collision2D.RaySegmentIntersection(ref rayLeft, ref segment, out var interPoint))
-                {
-                    sides |= IntersectionSides.Left;
-                }
-
-                if (Collision2D.RaySegmentIntersection(ref rayDown, ref segment, out interPoint))
-                {
-                    sides |= IntersectionSides.Down;
-                }
-
-                if (Collision2D.RaySegmentIntersection(ref rayRight, ref segment, out interPoint))
-                {
-                    sides |= IntersectionSides.Right;
-                }
-
-                if (Collision2D.RaySegmentIntersection(ref rayUp, ref segment, out interPoint))
-                {
-                    sides |= IntersectionSides.Up;
-                }
-
-                if (sides.HasFlag(IntersectionSides.All))
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        /// <summary>
         /// Updates segments for polygons using self Intersection points
         /// </summary>
         /// <param name="selfIntersectionPoints">Self intersection points</param>
@@ -510,7 +475,7 @@ namespace Adamantium.Mathematics
             for (var i = 0; i < selfIntersectionPoints.Count; i++)
             {
                 var interPoint = selfIntersectionPoints[i];
-                if (!GetSegmentsFromPoint(tempSegments, interPoint, out var segments)) continue;
+                if (!PolygonHelper.GetSegmentsFromPoint(tempSegments, interPoint, out var segments)) continue;
                 
                 for (var j = 0; j < segments.Count; j++)
                 {
@@ -525,21 +490,13 @@ namespace Adamantium.Mathematics
                     var index = tempSegments.IndexOf(segment);
                     tempSegments.RemoveAt(index);
                     var seg1 = new LineSegment2D(segment.Start, interPoint);
-                    //if (ContainsInInterPointsKeepHoles(seg1, selfIntersectionPoints, FillRule, PolygonsCopy))
+                    if (PolygonHelper.InsertSegment(tempSegments, seg1, index))
                     {
-                        if (InsertSegment(tempSegments, seg1, index))
-                        {
-                            index++;
-                        }
+                        index++;
                     }
 
                     var seg2 = new LineSegment2D(interPoint, segment.End);
-                    //if (ContainsInInterPointsKeepHoles(seg2, selfIntersectionPoints, FillRule, PolygonsCopy))
-                    {
-                        if (InsertSegment(tempSegments, seg2, index))
-                        {
-                        }
-                    }
+                    PolygonHelper.InsertSegment(tempSegments, seg2, index);
                 }
             }
             MergedSegments.Clear();
@@ -564,7 +521,7 @@ namespace Adamantium.Mathematics
             for (var i = 0; i < intersectionPoints.Count; i++)
             {
                 var interPoint = intersectionPoints[i];
-                if (!GetSegmentsFromPoint(tempSegments, interPoint, out var segments)) continue;
+                if (!PolygonHelper.GetSegmentsFromPoint(tempSegments, interPoint, out var segments)) continue;
                 
                 for (var j = 0; j < segments.Count; j++)
                 {
@@ -578,13 +535,13 @@ namespace Adamantium.Mathematics
                     var index = tempSegments.IndexOf(segment);
                     tempSegments.RemoveAt(index);
                     var seg1 = new LineSegment2D(segment.Start, interPoint);
-                    if (InsertSegment(tempSegments, seg1, index))
+                    if (PolygonHelper.InsertSegment(tempSegments, seg1, index))
                     {
                         index++;
                     }
 
                     var seg2 = new LineSegment2D(interPoint, segment.End);
-                    InsertSegment(tempSegments, seg2, index);
+                    PolygonHelper.InsertSegment(tempSegments, seg2, index);
                 }
             }
             MergedSegments.Clear();
@@ -617,177 +574,14 @@ namespace Adamantium.Mathematics
             }
         }
 
-        /// <summary>
-        /// Creates a collection of segments from a collection of points
-        /// </summary>
-        /// <param name="points"></param>
-        /// <returns>Collection of segments if at least 2 points present in collection, otherwise null</returns>
-        public static List<LineSegment2D> SplitOnSegments(List<Vector2> points)
-        {
-            if (points.Count <= 1) return new List<LineSegment2D>();
-            
-            var segments = new List<LineSegment2D>();
-            for (var i = 0; i < points.Count - 1; i++)
-            {
-                var segment = new LineSegment2D(points[i], points[i + 1]);
-                if (!IsSameStartEnd(ref segment))
-                {
-                    segments.Add(segment);
-                }
-            }
-
-            var seg = new LineSegment2D(points[^1], points[0]);
-                
-            if (!segments.Contains(seg))
-            {
-                //Add last segment
-                if (!IsSameStartEnd(ref seg))
-                {
-                    segments.Add(seg);
-                }
-            }
-            return segments;
-        }
-
-        /// <summary>
-        /// Inserts segment in collection of segments at specifies index
-        /// </summary>
-        /// <param name="segments">Segments collection</param>
-        /// <param name="segment2D">Segment to insert</param>
-        /// <param name="index">Index to insert at</param>
-        /// <returns>True if segment collection does not already has such segment, otherwise false</returns>
-        public static bool InsertSegment(List<LineSegment2D> segments, LineSegment2D segment2D, int index)
-        {
-            if (!segments.Contains(segment2D) && !IsSameStartEnd(ref segment2D))
-            {
-                segments.Insert(index, segment2D);
-                return true;
-            }
-            return false;
-        }
-
-        internal static bool IsSameStartEnd(ref LineSegment2D segment2D)
-        {
-            return segment2D.Start == segment2D.End;
-        }
-
-        /// <summary>
-        /// Checks if two points forms single segment in collection of segments
-        /// </summary>
-        /// <param name="start">Start segment point</param>
-        /// <param name="end">End segment point</param>
-        /// <param name="segments">Collection of segments</param>
-        /// <returns>True is points connected, otherwise false</returns>
-        public static bool IsConnected(Vector2 start, Vector2 end, List<LineSegment2D> segments)
-        {
-            return IsConnected(start, end, segments, out var segment2D);
-        }
-
-        /// <summary>
-        /// Checks if two points forms single segment in collection of segments and output correctly linked segment containing two points
-        /// </summary>
-        /// <param name="start">Start segment point</param>
-        /// <param name="end">End segment point</param>
-        /// <param name="segments">Collection of segments</param>
-        /// <param name="correctSegment2D">Correct segment from start and end points</param>
-        /// <returns>True is points connected, otherwise false</returns>
-        /// <remarks>
-        /// Segment could be connected not the same way as parameters. For ex. it could starts from end point and end in start point. 
-        /// This method will also check for such cases and will check for segments very close to each other (less then <see cref="Epsilon"/>) 
-        /// to 100% find correct segment
-        /// </remarks>
-        public static bool IsConnected(Vector2 start, Vector2 end, List<LineSegment2D> segments, out LineSegment2D correctSegment2D)
-        {
-            correctSegment2D = new LineSegment2D(start, end);
-            for (var i = 0; i < segments.Count; ++i)
-            {
-                var currentSegment = segments[i];
-                if (currentSegment.EqualsInvariant(ref correctSegment2D))
-                {
-                    correctSegment2D = currentSegment;
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        /// <summary>
-        /// Find all segments that lies on certain point in segments collection
-        /// </summary>
-        /// <param name="segments">Collection of segments</param>
-        /// <param name="point">point in 2D</param>
-        /// <param name="foundSegments">Collection of found segments</param>
-        /// <returns>True if at least one segment was found, otherwise false</returns>
-        public static bool GetSegmentsFromPoint(List<LineSegment2D> segments, Vector2 point, out List<LineSegment2D> foundSegments)
-        {
-            foundSegments = new List<LineSegment2D>();
-            for (var i = 0; i < segments.Count; ++i)
-            {
-                var s = segments[i];
-                if (Collision2D.IsPointOnSegment(ref s, ref point))
-                {
-                    foundSegments.Add(s);
-                }
-            }
-            return foundSegments.Count > 0;
-        }
-
-        /// <summary>
-        /// Check does collection of points forms a concave <see cref="PolygonItem"/>
-        /// </summary>
-        /// <param name="points">Collection of points to check</param>
-        /// <returns>True if polygon is concave, otherwise false</returns>
-        public static bool IsConcave(List<Vector3> points)
-        {
-            for (var i = 0; i < points.Count - 2; i++)
-            {
-                var p0 = points[i];
-                var p1 = points[i + 1];
-                var p2 = points[i + 2];
-
-                var vec0 = p0 - p1;
-                var vec1 = p2 - p1;
-                vec0.Normalize();
-                vec1.Normalize();
-
-                var angle = MathHelper.AngleBetween(vec0, vec1);
-                if (angle > 180)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        /// <summary>
-        /// Check does collection of segments forms a concave <see cref="PolygonItem"/>
-        /// </summary>
-        /// <param name="segments">Collection of segments to check</param>
-        /// <returns>True if polygon is concave, otherwise false</returns>
-        public static bool IsConcave(List<LineSegment2D> segments)
-        {
-            for (var i = 0; i < segments.Count - 1; i++)
-            {
-                var vec0 = segments[i].DirectionNormalized;
-                var vec1 = segments[i + 1].DirectionNormalized;
-
-                var angle = MathHelper.AngleBetween((Vector3F)vec0, (Vector3F)vec1);
-                if (angle > 180)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
+        
 
         /// <summary>
         /// Comparer here is for sorting vectors by its Y component from smallest to biggest value
         /// </summary>
-        private class VerticalVertexComparer : IComparer<Vector2>
+        private class VerticalPointsComparer : IComparer<Vector2>
         {
-            public static VerticalVertexComparer Default => new VerticalVertexComparer();
+            public static VerticalPointsComparer Default => new VerticalPointsComparer();
 
             public int Compare(Vector2 x, Vector2 y)
             {

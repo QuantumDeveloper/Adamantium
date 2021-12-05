@@ -54,7 +54,7 @@ namespace Adamantium.Mathematics
             var rayIntersectionPoints = new List<Vector2[]>();
             var interPoints = new List<Vector2>();
             
-            var sortedList = polygon.SortVertices();
+            var sortedList = polygon.SortPoints();
             var ray = new Ray2D(Vector2.Zero, Vector2.UnitX);
             var mostLeftPoint = polygon.HighestPoint.X;
             for (var i = 0; i < sortedList.Count; ++i)
@@ -108,7 +108,7 @@ namespace Adamantium.Mathematics
                     {
                         var upperPoint = upperInterPoints[j];
                         var lowerPoint = lowerInterPoints[k];
-                        if (Polygon.IsConnected(upperPoint, lowerPoint, polygon.MergedSegments))
+                        if (PolygonHelper.IsConnected(upperPoint, lowerPoint, polygon.MergedSegments))
                         {
                             startEndSegments.Add(new LineSegment2D(upperPoint, lowerPoint));
                         }

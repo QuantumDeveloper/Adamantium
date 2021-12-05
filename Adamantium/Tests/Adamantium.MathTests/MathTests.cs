@@ -17,7 +17,7 @@ namespace Adamantium.MathTests
             points.Add(new Vector3(20, 20, 0));
             points.Add(new Vector3(20, 0, 0));
             var timer = Stopwatch.StartNew();
-            Assert.IsTrue(Polygon.IsConcave(points), "polygon is not concave");
+            Assert.IsTrue(PolygonHelper.IsPolygonConcave(points), "polygon is not concave");
             timer.Stop();
         }
 
@@ -35,7 +35,7 @@ namespace Adamantium.MathTests
             polygon.AddItem(new PolygonItem(points));
 
             var timer = Stopwatch.StartNew();
-            Assert.IsTrue(Polygon.IsConcave(polygon.MergedSegments), "polygon is not concave");
+            Assert.IsTrue(PolygonHelper.IsPolygonConcave(polygon.MergedSegments), "polygon is not concave");
             timer.Stop();
         }
 
@@ -50,7 +50,7 @@ namespace Adamantium.MathTests
             points.Add(new Vector3(20, 0, 0));
             points.Add(new Vector3(0, 0, 0));
             var timer = Stopwatch.StartNew();
-            Assert.IsFalse(Polygon.IsConcave(points), "polygon is not convex");
+            Assert.IsFalse(PolygonHelper.IsPolygonConcave(points), "polygon is not convex");
             timer.Stop();
 
         }

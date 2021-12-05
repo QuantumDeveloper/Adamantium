@@ -54,6 +54,7 @@ namespace Adamantium.UI.Media
 
       public EllipseGeometry()
       {
+         IsClosed = true;
       }
 
       public EllipseGeometry(Rect rect, Double startAngle = 0, Double stopAngle = 360)
@@ -64,7 +65,8 @@ namespace Adamantium.UI.Media
          Center = rect.Center;
          StartAngle = startAngle;
          StopAngle = stopAngle;
-         CreateEllipse(rect, StartAngle, StopAngle);
+         IsClosed = true;
+         ProcessGeometry();
       }
 
       public EllipseGeometry(Vector2 center, Double radiusX, Double radiusY, Double startAngle = 0, Double stopAngle = 360) :
@@ -72,7 +74,7 @@ namespace Adamantium.UI.Media
       {
       }
 
-      public EllipseGeometry(Vector2 center, Double radiusX, Double radiusY, Double startAngle, Double stopAngle, Matrix4x4F transform)
+      public EllipseGeometry(Vector2 center, Double radiusX, Double radiusY, Double startAngle, Double stopAngle, Matrix4x4F transform) : this()
       {
          bounds = new Rect(center - new Vector2(radiusX, radiusY), new Size(radiusX * 2, radiusY * 2));
          Center = center;
@@ -80,10 +82,9 @@ namespace Adamantium.UI.Media
          RadiusY = radiusY;
          StartAngle = startAngle;
          StopAngle = stopAngle;
-         CreateEllipse(bounds, StartAngle, StopAngle);
       }
 
-      internal void CreateEllipse(Rect rect, Double startAngle = 0, Double stopAngle = 360)
+      private void CreateEllipse(Rect rect, Double startAngle = 0, Double stopAngle = 360)
       {
          bounds = rect;
          RadiusX = rect.Width / 2;
@@ -92,8 +93,8 @@ namespace Adamantium.UI.Media
          StartAngle = startAngle;
          StopAngle = stopAngle;
          
-         var translation = Matrix4x4F.Translation((float)rect.Width/2, (float)rect.Height/2, 0);
-         Mesh = Engine.Graphics.Shapes.Ellipse.GenerateGeometry(
+         var translation = Matrix4x4F.Translation((float)rect.Width/2 + (float)rect.X, (float)rect.Height/2 + (float)rect.Y, 0);
+         Mesh = Shapes.Ellipse.GenerateGeometry(
             GeometryType.Solid, 
             EllipseType.Sector,
             new Vector2F((float)rect.Width, (float)rect.Height), 
@@ -101,7 +102,7 @@ namespace Adamantium.UI.Media
             (float)StopAngle,
             transform: translation);
          
-         StrokeMesh = Engine.Graphics.Shapes.Ellipse.GenerateGeometry(
+         StrokeMesh = Shapes.Ellipse.GenerateGeometry(
             GeometryType.Outlined, 
             EllipseType.Sector,
             new Vector2F((float)rect.Width, (float)rect.Height), 
@@ -116,6 +117,11 @@ namespace Adamantium.UI.Media
       public override Geometry Clone()
       {
          return null;
+      }
+
+      protected internal override void ProcessGeometry()
+      {
+         CreateEllipse(bounds, StartAngle, StopAngle);
       }
    }
 }

@@ -33,13 +33,13 @@ namespace Adamantium.UI.Media
 
       private void GenerateStroke(Pen pen, Geometry geometry)
       {
-         if (geometry.StrokeMesh.Positions.Length == 0) return;
+         if (geometry.StrokeMesh.Points.Length == 0) return;
          
          pen.PenLineJoin = PenLineJoin.Round;
          //@TODO check concave zero length triangulation
          pen.StartLineCap = PenLineCap.Flat;
          pen.EndLineCap = PenLineCap.Flat;
-         var points = geometry.StrokeMesh.Positions;
+         var points = geometry.StrokeMesh.Points;
 
          // for test purposes start
          geometry.IsClosed = false;
@@ -107,7 +107,7 @@ namespace Adamantium.UI.Media
          
          polygon.FillRule = FillRule.NonZero;
          var vertices = polygon.Fill();
-         Mesh.SetPositions(vertices).Optimize();
+         Mesh.SetPoints(vertices).Optimize();
       }
 
       private List<Vector3F> GenerateDashes(Vector3F[] points, Pen pen, double offset, bool isGeometryClosed)
@@ -654,7 +654,7 @@ namespace Adamantium.UI.Media
                   break;
                case PenLineJoin.Miter:
                {
-                  var intersection = Collision2D.lineLineIntersection(left.Start, left.End, right.Start, right.End);
+                  var intersection = Collision2D.LineLineIntersection(left.Start, left.End, right.Start, right.End);
 
                   if (intersection != null)
                   {
@@ -668,7 +668,7 @@ namespace Adamantium.UI.Media
                }
                case PenLineJoin.Round:
                {
-                  var intersection = Collision2D.lineLineIntersection(left.Start, left.End, right.Start, right.End);
+                  var intersection = Collision2D.LineLineIntersection(left.Start, left.End, right.Start, right.End);
 
                   if (intersection != null)
                   {
@@ -741,6 +741,11 @@ namespace Adamantium.UI.Media
       public override Rect Bounds { get; }
       
       public override Geometry Clone()
+      {
+         throw new NotImplementedException();
+      }
+
+      protected internal override void ProcessGeometry()
       {
          throw new NotImplementedException();
       }

@@ -96,13 +96,13 @@ namespace Adamantium.Engine.Graphics
                         angle += angleItem;
                     }
 
-                    mesh.SetPositions(vertices).
+                    mesh.SetPoints(vertices).
                         GenerateBasicIndices().
                         Optimize();
 
-                    for (int i = 0; i < mesh.Positions.Length; ++i)
+                    for (int i = 0; i < mesh.Points.Length; ++i)
                     {
-                        var position = mesh.Positions[i];
+                        var position = mesh.Points[i];
                         var uv = new Vector2(
                            0.5f + (position.X - center.X) / (2 * radiusX),
                            0.5f - (position.Y - center.Y) / (2 * radiusY));
@@ -148,7 +148,7 @@ namespace Adamantium.Engine.Graphics
                         indices.Add(0);
                     }
 
-                    mesh.SetPositions(vertices).
+                    mesh.SetPoints(vertices).
                         SetIndices(indices);
                 }
 

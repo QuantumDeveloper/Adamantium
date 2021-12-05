@@ -179,7 +179,7 @@ namespace Adamantium.Mathematics
         /// <returns>The result of linear interpolation of values based on the amount.</returns>
         public static double Lerp(double from, double to, double amount)
         {
-            return (1 - amount) * from + amount * to;
+            return (1 - amount) * @from + amount * to;
         }
 
         /// <summary>
@@ -195,7 +195,7 @@ namespace Adamantium.Mathematics
         /// <returns>The result of linear interpolation of values based on the amount.</returns>
         public static float Lerp(float from, float to, float amount)
         {
-            return (1 - amount) * from + amount * to;
+            return (1 - amount) * @from + amount * to;
         }
 
         /// <summary>
@@ -211,7 +211,7 @@ namespace Adamantium.Mathematics
         /// <returns>The result of linear interpolation of values based on the amount.</returns>
         public static byte Lerp(byte from, byte to, float amount)
         {
-            return (byte)Lerp((float)from, (float)to, amount);
+            return (byte)Lerp((float)@from, (float)to, amount);
         }
 
         /// <summary>
@@ -647,7 +647,7 @@ namespace Adamantium.Mathematics
         // --- DIVER MATH ---
         public static double RadiansToDegrees(double radians)
         {
-            return ((radians * 180.0) / System.Math.PI);
+            return ((radians * 180.0) / Math.PI);
         }
         
         public static double Dot(Vector2 v1, Vector2 v2)
@@ -675,12 +675,12 @@ namespace Adamantium.Mathematics
 
             sbyte sign = cos < 0 ? (sbyte)-1 : (sbyte)1;
 
-            if (IsOne(System.Math.Abs(cos)))
+            if (IsOne(Math.Abs(cos)))
             {
                 cos = sign;
             }
 
-            double rad = System.Math.Acos(cos);
+            double rad = Math.Acos(cos);
 
             return RadiansToDegrees(rad);
         }
@@ -727,7 +727,7 @@ namespace Adamantium.Mathematics
 
                 double ret = (a * point.X + b * point.Y + c) / t;
 
-                return System.Math.Abs(ret);
+                return Math.Abs(ret);
             }
         }
 
@@ -954,5 +954,6 @@ namespace Adamantium.Mathematics
 
             return points;
         }
+
     }
 }

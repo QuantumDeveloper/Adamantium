@@ -285,7 +285,7 @@ namespace Adamantium.Engine.Graphics
                 {
                     mesh.MeshTopology = PrimitiveType.LineStrip;
                 }
-                mesh.SetPositions(vertices).
+                mesh.SetPoints(vertices).
                     SetUVs(0, uvs).
                     SetIndices(indices).
                     CalculateNormals().

@@ -351,7 +351,6 @@ namespace Adamantium.UI
          return (rect.X < Right) && (X < rect.Right) && (rect.Y < Bottom) && (Y < rect.Bottom);
       }
 
-      //TODO:replace sharpDX matrix with my own Matrix4x4F
       /// <summary>
       /// Returns the axis-aligned bounding box of a transformed rectangle.
       /// </summary>
@@ -359,7 +358,7 @@ namespace Adamantium.UI
       /// <returns>The bounding box</returns>
       public Rect TransformToAABB(Matrix4x4F matrix)
       {
-         var Vector2Ds = new[]
+         var points = new[]
          {
             Vector2F.TransformCoordinate(TopLeft, matrix),
             Vector2F.TransformCoordinate(TopRight, matrix),
@@ -372,7 +371,7 @@ namespace Adamantium.UI
          var top = double.MaxValue;
          var bottom = double.MinValue;
 
-         foreach (var p in Vector2Ds)
+         foreach (var p in points)
          {
             if (p.X < left) left = p.X;
             if (p.X > right) right = p.X;
@@ -383,7 +382,6 @@ namespace Adamantium.UI
          return new Rect(new Vector2(left, top), new Vector2(right, bottom));
       }
       
-
       /// <summary>
       /// Translates the rectangle by an offset.
       /// </summary>

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 namespace Adamantium.Mathematics
@@ -43,6 +44,8 @@ namespace Adamantium.Mathematics
             }
 
             point = p + r * t;
+            point.X = Math.Round(point.X, 4, MidpointRounding.AwayFromZero);
+            point.Y = Math.Round(point.Y, 4, MidpointRounding.AwayFromZero);
             return true;
         }
 
@@ -241,7 +244,7 @@ namespace Adamantium.Mathematics
             }
         }
         
-        public static Vector2? lineLineIntersection(Vector2 a, Vector2 b, Vector2 c, Vector2 d)
+        public static Vector2? LineLineIntersection(Vector2 a, Vector2 b, Vector2 c, Vector2 d)
         {
             // Line 'ab' represented as a1x + b1y = c1 
             double a1 = b.Y - a.Y;
@@ -264,6 +267,51 @@ namespace Adamantium.Mathematics
             double x = (b2 * c1 - b1 * c2) / determinant;
             double y = (a1 * c2 - a2 * c1) / determinant;
             return new Vector2(x, y);
+        }
+        
+        /// <summary>
+        /// Checks if point is completely inside polygon, formed by segments
+        /// </summary>
+        /// <param name="point"></param>
+        /// <param name="area"></param>
+        /// <returns>True if point is completely inside polygon, otherwise false</returns>
+        public static bool IsPointInsideArea(Vector2 point, IEnumerable<LineSegment2D> area)
+        {
+            var rayLeft = new Ray2D(point, -Vector2.UnitX);
+            var rayDown = new Ray2D(point, -Vector2.UnitY);
+            var rayRight = new Ray2D(point, Vector2.UnitX);
+            var rayUp = new Ray2D(point, Vector2.UnitY);
+            var sides = IntersectionSides.None;
+            
+            foreach (var a in area)
+            {
+                var segment = a;
+                if (RaySegmentIntersection(ref rayLeft, ref segment, out var interPoint))
+                {
+                    sides |= IntersectionSides.Left;
+                }
+
+                if (RaySegmentIntersection(ref rayDown, ref segment, out interPoint))
+                {
+                    sides |= IntersectionSides.Down;
+                }
+
+                if (RaySegmentIntersection(ref rayRight, ref segment, out interPoint))
+                {
+                    sides |= IntersectionSides.Right;
+                }
+
+                if (RaySegmentIntersection(ref rayUp, ref segment, out interPoint))
+                {
+                    sides |= IntersectionSides.Up;
+                }
+
+                if (sides.HasFlag(IntersectionSides.All))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
     }
 }

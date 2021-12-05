@@ -109,16 +109,16 @@ namespace Adamantium.Engine.Graphics
                     var polygon = new Mathematics.Polygon();
                     polygon.AddItem(new PolygonItem(vertices));
                     var points = polygon.Fill();
-                    mesh.SetPositions(points);
+                    mesh.SetPoints(points);
                 }
                 else
                 {
-                    mesh.SetPositions(vertices);
+                    mesh.SetPoints(vertices);
                 }
                 mesh.GenerateBasicIndices().Optimize();
 
                 var uvs = new List<Vector2F>();
-                foreach (var vertex in mesh.Positions)
+                foreach (var vertex in mesh.Points)
                 {
                     var u = vertex.X / width;
                     var v = vertex.Y / height;

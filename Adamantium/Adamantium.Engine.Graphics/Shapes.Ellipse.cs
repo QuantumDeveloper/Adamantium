@@ -117,7 +117,7 @@ namespace Adamantium.Engine.Graphics
                 
                 var mesh = new Mesh();
                 mesh.SetTopology(PrimitiveType.TriangleList).
-                    SetPositions(points).
+                    SetPoints(points).
                     SetUVs(0, uvs).
                     Optimize();
                 
@@ -160,6 +160,9 @@ namespace Adamantium.Engine.Graphics
                     float x = center.X + (radiusX * (float)Math.Cos(angle));
                     float y = center.Y + (radiusY * (float)Math.Sin(angle));
 
+                    x = (float)Math.Round(x, 4, MidpointRounding.ToZero);
+                    y = (float)Math.Round(y, 4, MidpointRounding.ToZero);
+
                     var vertex = new Vector3F(x, y, 0);
                     vertices.Add(vertex);
                     angle += angleItem;
@@ -172,7 +175,7 @@ namespace Adamantium.Engine.Graphics
 
                 Mesh mesh = new Mesh();
                 mesh.SetTopology(PrimitiveType.LineStrip).
-                    SetPositions(vertices).
+                    SetPoints(vertices).
                     GenerateBasicIndices();
                 return mesh;
             }

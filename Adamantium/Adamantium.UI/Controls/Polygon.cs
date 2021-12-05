@@ -42,7 +42,7 @@ namespace Adamantium.UI.Controls
             base.OnRender(context);
             
             context.BeginDraw(this);
-            Geometry geometry = new PolygonGeometry(Points, FillRule); 
+            Geometry geometry = new PolygonGeometry(Points, FillRule);
             context.DrawGeometry(Fill, geometry, GetPen());
             context.EndDraw(this);
         }

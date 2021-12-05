@@ -159,7 +159,7 @@ namespace Adamantium.MathTests
             }
             var highestPoint = new Vector2(minimum.X, maximum.Y);
             
-            var segments = Polygon.SplitOnSegments(points);
+            var segments = PolygonHelper.SplitOnSegments(points);
 
             for (var index = 0; index < points.Count-1; index++)
             {

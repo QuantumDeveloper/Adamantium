@@ -11,7 +11,7 @@ namespace Adamantium.Engine.Graphics
                 return null;
             }
 
-            int length = mesh.Positions.Length;
+            int length = mesh.Points.Length;
 
             var normals = mesh.Semantic & VertexSemantic.Normal;
             var colors = mesh.Semantic.HasFlag(VertexSemantic.Color);
@@ -25,7 +25,7 @@ namespace Adamantium.Engine.Graphics
 
             for (int i = 0; i < length; i++)
             {
-                var vertex = new MeshVertex() { Position = mesh.Positions[i] };
+                var vertex = new MeshVertex() { Position = mesh.Points[i] };
                 if (normals > 0)
                 {
                     vertex.Normal = mesh.Normals[i];
@@ -71,7 +71,7 @@ namespace Adamantium.Engine.Graphics
                 return null;
             }
 
-            int length = mesh.Positions.Length;
+            int length = mesh.Points.Length;
 
             var normals = mesh.Semantic.HasFlag(VertexSemantic.Normal);
             var texcoords0 = mesh.Semantic.HasFlag(VertexSemantic.UV0);
@@ -87,7 +87,7 @@ namespace Adamantium.Engine.Graphics
 
             for (int i = 0; i < length; ++i)
             {
-                var vertex = new SkinnedMeshVertex() { Position = mesh.Positions[i] };
+                var vertex = new SkinnedMeshVertex() { Position = mesh.Points[i] };
                 if (normals)
                 {
                     vertex.Normal = mesh.Normals[i];

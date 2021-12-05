@@ -20,6 +20,11 @@ namespace Adamantium.UI.Media
       {
          throw new NotImplementedException();
       }
+
+      protected internal override void ProcessGeometry()
+      {
+         throw new NotImplementedException();
+      }
    }
 
    public class StreamGeometryContext

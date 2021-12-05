@@ -111,7 +111,7 @@ namespace Adamantium.Engine.Templates.Lights
             timer.Stop();
             var pointLightIcon = new Mesh();
             pointLightIcon.MeshTopology = PrimitiveType.TriangleList;
-            pointLightIcon.SetPositions(triangulatedList);
+            pointLightIcon.SetPoints(triangulatedList);
             pointLightIcon.GenerateBasicIndices();
             pointLightIcon.Optimize();
 

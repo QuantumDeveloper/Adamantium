@@ -14,6 +14,7 @@ namespace Adamantium.UI.Media
 
       public RectangleGeometry()
       {
+         IsClosed = true;
       }
 
       public RectangleGeometry(RectangleGeometry copy)
@@ -23,9 +24,11 @@ namespace Adamantium.UI.Media
          CornerRadius = copy.CornerRadius;
       }
 
-      public RectangleGeometry(Rect size, CornerRadius corners)
+      public RectangleGeometry(Rect size, CornerRadius corners) : this()
       {
-         CreateRectangle(size, corners);
+         Rect = size;
+         CornerRadius = corners;
+         ProcessGeometry();
       }
 
       public CornerRadius CornerRadius
@@ -40,14 +43,15 @@ namespace Adamantium.UI.Media
          set => SetValue(RectProperty, value);
       }
 
-      internal void CreateRectangle(Rect rect, CornerRadius corners)
+      private void CreateRectangle(Rect rect, CornerRadius corners)
       {
          Rect = rect;
          bounds = rect;
          CornerRadius = corners;
 
-         var translation = Matrix4x4F.Translation((float)rect.Width/2, (float)rect.Height/2, 0);
-         Mesh = Engine.Graphics.Shapes.Rectangle.GenerateGeometry(
+         var translation = Matrix4x4F.Translation((float)rect.Width / 2 + (float)rect.X,
+            (float)rect.Height / 2 + (float)rect.Y, 0);
+         Mesh = Shapes.Rectangle.GenerateGeometry(
             GeometryType.Solid, 
             (float)rect.Width, 
             (float)rect.Height,
@@ -55,7 +59,7 @@ namespace Adamantium.UI.Media
             TesselationFactor, 
             translation);
          
-         StrokeMesh = Engine.Graphics.Shapes.Rectangle.GenerateGeometry(
+         StrokeMesh = Shapes.Rectangle.GenerateGeometry(
             GeometryType.Outlined, 
             (float)rect.Width, 
             (float)rect.Height,
@@ -71,6 +75,11 @@ namespace Adamantium.UI.Media
       public override Geometry Clone()
       {
          return new RectangleGeometry(this);
+      }
+
+      protected internal override void ProcessGeometry()
+      {
+         CreateRectangle(Rect, CornerRadius);
       }
    }
 }

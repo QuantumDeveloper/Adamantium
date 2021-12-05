@@ -99,7 +99,7 @@ namespace Adamantium.Engine.Graphics
 
                 var mesh = new Mesh();
                 mesh.SetTopology(PrimitiveType.LineStrip).
-                    SetPositions(vertices).
+                    SetPoints(vertices).
                     SetIndices(indices);
 
                 return mesh;

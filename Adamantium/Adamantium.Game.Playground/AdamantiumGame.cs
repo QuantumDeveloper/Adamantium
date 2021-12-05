@@ -219,7 +219,7 @@ namespace Adamantium.Game.Playground
             
             //subpixelsQuadList.AddRange(pixelsQuadList);
             pixelsQuadList.AddRange(subpixelsQuadList);
-            mesh.SetPositions(pixelsQuadList);
+            mesh.SetPoints(pixelsQuadList);
             
             //subpixelsColors.AddRange(pixelsColors);
             pixelsColors.AddRange(subpixelsColors);
@@ -335,7 +335,7 @@ namespace Adamantium.Game.Playground
 
             var mesh = new Mesh();
             mesh.MeshTopology = PrimitiveType.TriangleList;
-            mesh.SetPositions(quadList);
+            mesh.SetPoints(quadList);
             mesh.SetUVs(0, uvList);
             var meshComponent = new MeshData();
             meshComponent.Mesh = mesh;
@@ -404,7 +404,7 @@ namespace Adamantium.Game.Playground
                 
                 var mesh = new Mesh();
                 mesh.MeshTopology = PrimitiveType.TriangleList;
-                mesh.SetPositions(quadList);
+                mesh.SetPoints(quadList);
                 mesh.SetUVs(0, uvList);
                 var meshComponent = new MeshData();
                 meshComponent.Mesh = mesh;

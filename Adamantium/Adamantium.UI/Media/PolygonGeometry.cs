@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Adamantium.Core.Collections;
 using Adamantium.Engine.Core.Models;
 using Adamantium.Mathematics;
 
@@ -16,16 +17,23 @@ namespace Adamantium.UI.Media
             set => SetValue(FillRuleProperty, value);
         }
         
+        public TrackingCollection<Vector2> Points { get; set; }
+
         public override Rect Bounds { get; }
         public override Geometry Clone()
         {
             throw new System.NotImplementedException();
         }
 
+        protected internal override void ProcessGeometry()
+        {
+            GenerateGeometry(Points);
+        }
+
         public PolygonGeometry(IEnumerable<Vector2> points, FillRule fillRule)
         {
             FillRule = fillRule;
-            GenerateGeometry(points);
+            Points = new TrackingCollection<Vector2>(points);
         }
 
         internal void GenerateGeometry(IEnumerable<Vector2> points)
@@ -36,7 +44,7 @@ namespace Adamantium.UI.Media
             polygon.FillRule = FillRule;
             var result = polygon.Fill();
             Mesh = new Mesh();
-            Mesh.SetPositions(result).GenerateBasicIndices().Optimize();
+            Mesh.SetPoints(result).GenerateBasicIndices().Optimize();
             StrokeMesh = new Mesh();
             var lst = new List<Vector3F>();
             foreach (var point in points)
@@ -44,7 +52,7 @@ namespace Adamantium.UI.Media
                 lst.Add((Vector3F)point);
             }
 
-            StrokeMesh.SetPositions(lst);
+            StrokeMesh.SetPoints(lst);
         }
     }
 }

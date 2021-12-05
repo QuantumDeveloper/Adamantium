@@ -27,16 +27,16 @@ namespace Adamantium.Engine.Templates.Camera
             lensPoints.Add(new Vector2(0.24, -0.05));
 
             var polygon = new Polygon();
-            var cameraBase = new PolygonItem(rectangle.Positions);
-            var ell1 = new PolygonItem(ellipse1.Positions);
-            var ell2 = new PolygonItem(ellipse2.Positions);
+            var cameraBase = new PolygonItem(rectangle.Points);
+            var ell1 = new PolygonItem(ellipse1.Points);
+            var ell2 = new PolygonItem(ellipse2.Points);
             var lens = new PolygonItem(lensPoints);
             polygon.FillRule = FillRule.NonZero;
             polygon.AddItems(cameraBase, ell1,ell2,lens);
             var result = polygon.Fill();
 
             Mesh mesh = new Mesh();
-            mesh.SetPositions(result);
+            mesh.SetPoints(result);
             mesh.Optimize();
 
             var root = BuildSubEntity(owner, name, Colors.White, mesh, BoundingVolume.OrientedBox);

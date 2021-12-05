@@ -143,7 +143,7 @@ namespace Adamantium.Engine.Compiler.Converter.Parsers
                         vertex.Z = binaryReader.ReadSingle();
                         positions.Add(vertex);
                      }
-                     currentGeometry.SetPositions(positions);
+                     currentGeometry.SetPoints(positions);
                      currentMesh.Meshes.Add(currentGeometry);
                   }
                   else

@@ -115,6 +115,9 @@ namespace Adamantium.UI.Media
 
       public void DrawGeometry(Brush brush, Geometry geometry, Pen pen = null)
       {
+         if (geometry == null) return;
+         
+         geometry.ProcessGeometry();
          StrokeGeometry strokeGeometry = null;
          if (pen != null && pen.Thickness > 0.0)
          {
@@ -122,11 +125,8 @@ namespace Adamantium.UI.Media
          }
 
          var presentationItem = new UIPresentationItem();
-         if (geometry != null)
-         {
-            var uiRenderer = UIComponentRenderer.Create(GraphicsDevice, geometry.Mesh, brush);
-            presentationItem.GeometryRenderer = uiRenderer;
-         }
+         var uiRenderer = UIComponentRenderer.Create(GraphicsDevice, geometry.Mesh, brush);
+         presentationItem.GeometryRenderer = uiRenderer;
          
          if (strokeGeometry != null)
          {
