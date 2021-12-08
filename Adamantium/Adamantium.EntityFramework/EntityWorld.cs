@@ -15,6 +15,8 @@ namespace Adamantium.EntityFramework
         private List<Entity> rootEntities;
         private readonly Dictionary<Int64, Entity> availableEntities;
         private readonly Dictionary<String, EntityGroup> entitiesByGroup;
+        private readonly List<Entity> entitiesToAdd;
+        private readonly List<Entity> entitiesToRemove;
 
         public EntityWorld(IDependencyResolver container)
         {
@@ -23,11 +25,58 @@ namespace Adamantium.EntityFramework
             rootEntities = new List<Entity>();
             availableEntities = new Dictionary<long, Entity>();
             entitiesByGroup = new Dictionary<String, EntityGroup>();
+            entitiesToAdd = new List<Entity>();
+            entitiesToRemove = new List<Entity>();
 
             Services = container;
             System = new EntitySystem(this);
             SystemManager = Services.Resolve<SystemManager>();
             SystemManager.AddSystem(System);
+            System.FrameEnded += FrameEnded;
+        }
+
+        private void FrameEnded()
+        {
+            SyncEntities();
+        }
+        
+        private void SyncEntities()
+        {
+            if (entitiesToRemove.Count > 0)
+            {
+                foreach (var entity in entitiesToRemove)
+                {
+                    RemoveEntityInternal(entity);
+                }
+                entitiesToRemove.Clear();
+            }
+
+            if (entitiesToAdd.Count > 0)
+            {
+                foreach (var entity in entitiesToAdd)
+                {
+                    AddEntityInternal(entity);
+                }
+                entitiesToAdd.Clear();
+            }
+        }
+        
+        private void AddEntityInternal(Entity entity)
+        {
+            if (availableEntities.TryAdd(entity.Uid, entity))
+            {
+                rootEntities.Add(entity);
+                OnEntityAdded(entity);
+            }
+        }
+
+        private void RemoveEntityInternal(Entity entity)
+        {
+            if (availableEntities.Remove(entity.Uid))
+            {
+                rootEntities.Remove(entity);
+                OnEntityRemoved(entity);
+            }
         }
 
         public Entity[] RootEntities => rootEntities.ToArray();
@@ -56,45 +105,48 @@ namespace Adamantium.EntityFramework
             }
         }
 
-        public void AddEntity(Entity entity)
+        public void AddEntity(Entity root)
         {
-            if (entity == null)
+            if (root == null)
             {
                 return;
             }
 
             lock (syncObject)
             {
-                entity.TraverseByLayer(
-                    current =>
-                    {
-                        if (current.Owner == null && !rootEntities.Contains(current))
-                        {
-                            rootEntities.Add(current);
-                        }
-
-                        if (!availableEntities.ContainsKey(current.Uid))
-                        {
-                            availableEntities.Add(current.Uid, current);
-                            if (current.Owner == null)
-                            {
-                                AddEntityToProcessors(current);
-                            }
-                            OnEntityAdded(current);
-                        }
-                    }
-                );
+                if (availableEntities.ContainsKey(root.Uid)) return;
+                
+                entitiesToAdd.Add(root);
             }
         }
-
-        private void AddEntityToProcessors(Entity entity)
+        
+        public void RemoveEntity(Entity root)
         {
+            if (root == null)
+                return;
+
+            if (root.Owner == null && rootEntities.Contains(root))
+            {
+                rootEntities.Remove(root);
+            }
+
             lock (syncObject)
             {
-                foreach (var processor in System.Processors)
-                {
-                    processor.AddEntity(entity);
-                }
+                if (!availableEntities.ContainsKey(root.Uid)) return;
+                
+                root.Owner?.RemoveDependency(root);
+                entitiesToRemove.Add(root);
+            }
+        }
+        
+        public void RemoveEntities(IEnumerable<Entity> entities)
+        {
+            if (entities == null)
+                return;
+
+            foreach (var entity in entities)
+            {
+                RemoveEntity(entity);
             }
         }
 
@@ -112,39 +164,6 @@ namespace Adamantium.EntityFramework
                 AddEntity(entity);
             }
             return entity;
-        }
-
-        public void RemoveEntity(Entity entity)
-        {
-            if (entity == null)
-                return;
-
-            if (entity.Owner == null && rootEntities.Contains(entity))
-            {
-                rootEntities.Remove(entity);
-            }
-
-            lock (syncObject)
-            {
-                if (availableEntities.ContainsKey(entity.Uid))
-                {
-                    entity.Owner?.RemoveDependency(entity);
-                    availableEntities.Remove(entity.Uid);
-                    RemoveFromProcessors(entity);
-                    OnEntityRemoved(entity);
-                }
-            }
-        }
-
-        public void RemoveEntities(IEnumerable<Entity> entities)
-        {
-            if (entities == null)
-                return;
-
-            foreach (var entity in entities)
-            {
-                RemoveEntity(entity);
-            }
         }
 
         public T GetProcessor<T>() where T : EntityProcessor
@@ -169,20 +188,6 @@ namespace Adamantium.EntityFramework
 
         public event EventHandler<EntityEventArgs> EntityAdded;
         public event EventHandler<EntityEventArgs> EntityRemoved;
-
-        public void RemoveFromProcessors(Entity entity)
-        {
-            if (entity == null)
-                return;
-
-            lock (syncObject)
-            {
-                foreach (var system in System.Processors)
-                {
-                    system.RemoveEntity(entity);
-                }
-            }
-        }
 
         public T CreateProcessor<T>(params object[] args) where T : EntityProcessor
         {
@@ -314,27 +319,6 @@ namespace Adamantium.EntityFramework
             }
         }
 
-        public void RemoveFromGroup(Entity entity, string groupName)
-        {
-            if (string.IsNullOrEmpty(groupName))
-            {
-                throw new ArgumentNullException(nameof(groupName));
-            }
-
-            lock (syncObject)
-            {
-                EntityGroup group;
-                if (entitiesByGroup.TryGetValue(groupName, out group))
-                {
-                    group.Remove(entity);
-                }
-                else
-                {
-                    throw new Exception($"No entity group available with name {groupName}");
-                }
-            }
-        }
-
         public void AddToGroup(IEnumerable<Entity> entities, string groupName)
         {
             if (string.IsNullOrEmpty(groupName))
@@ -353,6 +337,27 @@ namespace Adamantium.EntityFramework
                 if (entitiesByGroup.TryGetValue(groupName, out group))
                 {
                     group.Add(entities);
+                }
+                else
+                {
+                    throw new Exception($"No entity group available with name {groupName}");
+                }
+            }
+        }
+        
+        public void RemoveFromGroup(Entity entity, string groupName)
+        {
+            if (string.IsNullOrEmpty(groupName))
+            {
+                throw new ArgumentNullException(nameof(groupName));
+            }
+
+            lock (syncObject)
+            {
+                EntityGroup group;
+                if (entitiesByGroup.TryGetValue(groupName, out group))
+                {
+                    group.Remove(entity);
                 }
                 else
                 {

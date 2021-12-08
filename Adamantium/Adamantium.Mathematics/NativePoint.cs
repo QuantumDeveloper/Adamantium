@@ -35,9 +35,9 @@ namespace Adamantium.Mathematics
       /// </summary>
       /// <param name="point">point to convert</param>
       /// <returns>returns new <see cref="Point"/></returns>
-      public static implicit operator Point(NativePoint point)
+      public static implicit operator Vector2(NativePoint point)
       {
-         return new Point(point.X, point.Y);
+         return new Vector2(point.X, point.Y);
       }
    }
 }

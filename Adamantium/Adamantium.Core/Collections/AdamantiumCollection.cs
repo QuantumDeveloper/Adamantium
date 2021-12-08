@@ -37,7 +37,7 @@ namespace Adamantium.Core.Collections
                     }
                     else
                     {
-                        items = new T[0];
+                        items = Array.Empty<T>();
                     }
                 }
             }
@@ -48,7 +48,7 @@ namespace Adamantium.Core.Collections
         /// </summary>
         public AdamantiumCollection()
         {
-            items = new T[0];
+            items = Array.Empty<T>();
         }
 
         /// <summary>
@@ -65,7 +65,7 @@ namespace Adamantium.Core.Collections
         /// Constructs <see cref="AdamantiumCollection{T}"/> using another IEnumerable collection
         /// </summary>
         /// <param name="items"></param>
-        public AdamantiumCollection(IEnumerable<T> items)
+        public AdamantiumCollection(IEnumerable<T> items) : this()
         {
             AddRange(items);
         }

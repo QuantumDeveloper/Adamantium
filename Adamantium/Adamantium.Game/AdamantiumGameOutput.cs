@@ -1,10 +1,12 @@
 ﻿using System;
 using Adamantium.Engine.Graphics;
+using Adamantium.Game.Events;
 using Adamantium.Game.GameInput;
 using Adamantium.Imaging;
 using Adamantium.UI;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Input;
+using Adamantium.UI.RoutedEvents;
 using Rectangle = Adamantium.Mathematics.Rectangle;
 
 namespace Adamantium.Game
@@ -13,11 +15,7 @@ namespace Adamantium.Game
     {
         private IWindow window;
 
-        public AdamantiumGameOutput(
-            IWindow window, 
-            SurfaceFormat pixelFormat, 
-            DepthFormat depthFormat, 
-            MSAALevel msaaLevel)
+        public AdamantiumGameOutput(IWindow window)
         {
             Initialize(new GameContext(window));
         }
@@ -29,6 +27,15 @@ namespace Adamantium.Game
 
         public override bool IsActive => window.IsActive;
 
+        public override WindowState State
+        {
+            get => window.State;
+            set
+            {
+                window.State = value;
+            }
+        }
+
         internal override bool CanHandle(GameContext gameContext)
         {
             return gameContext.ContextType == GameContextType.Window && window != null;
@@ -37,25 +44,34 @@ namespace Adamantium.Game
         protected override void InitializeInternal(GameContext context)
         {
             GameContext = context;
-            window = GameContext.Context as IWindow ?? throw new ArgumentException($"{nameof(context.Context)} should be of type RenderTargetPanel");
-            UIComponent = window as FrameworkComponent;
+            window = GameContext.Context as IWindow ?? throw new ArgumentException($"{nameof(context.Context)} should be of type {nameof(IWindow)}");
+            UiComponent = window as FrameworkComponent;
             window.ClientSizeChanged += WindowOnClientSizeChanged;
-            
+            window.StateChanged += WindowOnStateChanged;
+
             Description = new GameWindowDescription(PresenterType.Swapchain);
-            Width = (uint)window.Width;
-            Height = (uint)window.Height;
+            Width = (uint)window.ClientWidth;
+            Height = (uint)window.ClientHeight;
             Handle = window.Handle;
             ClientBounds = new Rectangle(0, 0, (int)Description.Width, (int)Description.Height);
             UpdateViewportAndScissor((uint)ClientBounds.Width, (uint)ClientBounds.Height);
             
             base.InitializeInternal(context);
         }
-        
+
+        private void WindowOnStateChanged(object sender, StateChangedEventArgs e)
+        {
+            State = window.State;
+            StateChanged?.Invoke(new WindowStatePayload(State));
+        }
+
         private void WindowOnClientSizeChanged(object sender, SizeChangedEventArgs e)
         {
-            Resize((uint)e.NewSize.Width, (uint)e.NewSize.Height);
+            Width = (uint)window.ClientWidth;
+            Height = (uint)window.ClientHeight;
+            Resize(Width, Height);
             ResizeRequested = true;
-            window.Measure(Size.Infinity);
+            window.Measure(new Size(Width, Height));
             window.Arrange(new Rect(window.DesiredSize));
         }
 

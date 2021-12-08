@@ -1,14 +1,16 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net5.0</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
     <Platforms>AnyCPU;x64</Platforms>
-    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies> <!-- This will copy all nuget references for this project to output and will let it correctly work when using from .targets files -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <Configurations>Debug;Release</Configurations>
+    <LangVersion>latestmajor</LangVersion> <!-- This will copy all nuget references for this project to output and will let it correctly work when using from .targets files -->
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="16.7.0" />
-    <PackageReference Include="protobuf-net" Version="3.0.52" />
+    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="16.11.0" />
+    <PackageReference Include="protobuf-net" Version="3.0.101" />
   </ItemGroup>
 
   <ItemGroup>

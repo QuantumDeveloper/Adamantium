@@ -10,15 +10,14 @@ namespace Adamantium.Engine.Graphics
     {
         public class Rectangle
         {
-            private const float rectSector = 90;
+            private const float rectangleSector = 90;
 
             public static Shape New(
                 GraphicsDevice device,
                 GeometryType type,
                 float width,
                 float height,
-                float radiusX = 0,
-                float radiusY = 0,
+                CornerRadius corners,
                 int tessellation = 20,
                 Matrix4x4F? transform = null
             )
@@ -27,8 +26,7 @@ namespace Adamantium.Engine.Graphics
                     type,
                     width,
                     height,
-                    radiusX,
-                    radiusY,
+                    corners,
                     tessellation,
                     transform);
                 return new Shape(device, geometry);
@@ -38,8 +36,7 @@ namespace Adamantium.Engine.Graphics
                 GeometryType type,
                 float width,
                 float height,
-                float radiusX = 0,
-                float radiusY = 0,
+                CornerRadius corners,
                 int tessellation = 20,
                 Matrix4x4F? transform = null)
             {
@@ -49,83 +46,79 @@ namespace Adamantium.Engine.Graphics
                     primitiveType = PrimitiveType.LineStrip;
                 }
 
-                if (radiusX < 0)
-                {
-                    radiusX = 0;
-                }
-                if (radiusY < 0)
-                {
-                    radiusY = 0;
-                }
+                var min = Math.Min(width, height);
+                ValidateCorners(ref corners, min);
 
-                if (radiusX > width / 2)
-                {
-                    radiusX = width / 2;
-                }
-
-                if (radiusY > height / 2)
-                {
-                    radiusY = height / 2;
-                }
-
-                List<Vector3F> vertices = new List<Vector3F>();
+                var vertices = new List<Vector2>();
 
                 var halfWidth = width / 2;
                 var halfHeight = height / 2;
 
-                if (radiusX > 0 && radiusY > 0)
+                if (corners.TopLeft > 0)
                 {
-                    Vector2F radius = new Vector2F(radiusX, radiusY);
-                    var centerX = -halfWidth + radiusX;
-                    var centerY = halfHeight - radiusY;
-                    GenerateRoundCorner(tessellation, -180, new Vector2F(centerX, centerY), radius, vertices);
-
-                    centerX = halfWidth - radiusX;
-                    centerY = halfHeight - radiusY;
-                    GenerateRoundCorner(tessellation, -270, new Vector2F(centerX, centerY), radius, vertices);
-
-                    centerY = -halfHeight + radiusY;
-                    GenerateRoundCorner(tessellation, 0, new Vector2F(centerX, centerY), radius, vertices);
-
-                    centerX = -halfWidth + radiusX;
-                    centerY = -halfHeight + radiusY;
-                    GenerateRoundCorner(tessellation, -90, new Vector2F(centerX, centerY), radius, vertices);
-
-                    if (type == GeometryType.Outlined)
-                    {
-                        vertices.Add(vertices[0]);
-                    }
+                    var radius = new Vector2(corners.TopLeft);
+                    var centerX = -halfWidth + radius.X;
+                    var centerY = -halfHeight + radius.Y;
+                    GenerateRoundCorner(tessellation, -180, new Vector2(centerX, centerY), radius, vertices);
                 }
                 else
                 {
-                    vertices.Add(new Vector3F(-halfWidth, -halfHeight));
-                    vertices.Add(new Vector3F(halfWidth, -halfHeight));
-                    vertices.Add(new Vector3F(halfWidth, halfHeight));
-                    vertices.Add(new Vector3F(-halfWidth, halfHeight));
-                    if (type == GeometryType.Outlined)
-                    {
-                        vertices.Add(new Vector3F(-halfWidth, -halfHeight));
-                    }
+                    vertices.Add(new Vector2(-halfWidth, -halfHeight));
                 }
 
-                var polygon = new Mathematics.Polygon();
-                polygon.Polygons.Add(new PolygonItem(vertices));
-                var points = polygon.Fill();
+                if (corners.TopRight > 0)
+                {
+                    var radius = new Vector2(corners.TopRight);
+                    var centerX = halfWidth - radius.X;
+                    var centerY = -halfHeight + radius.Y;
+                    GenerateRoundCorner(tessellation, 90, new Vector2(centerX, centerY), radius, vertices);
+                }
+                else
+                {
+                    vertices.Add(new Vector2(halfWidth, -halfHeight));
+                }
+
+                if (corners.BottomRight > 0)
+                {
+                    var radius = new Vector2(corners.BottomRight);
+                    var centerX = halfWidth - radius.X;
+                    var centerY = halfHeight - radius.Y;
+                    GenerateRoundCorner(tessellation, 0, new Vector2(centerX, centerY), radius, vertices);
+                }
+                else
+                {
+                    vertices.Add(new Vector2(halfWidth, halfHeight));
+                }
+
+                if (corners.BottomLeft > 0)
+                {
+                    var radius = new Vector2(corners.BottomLeft);
+                    var centerX = -halfWidth + radius.X;
+                    var centerY = halfHeight - radius.Y;
+                    GenerateRoundCorner(tessellation, -90, new Vector2(centerX, centerY), radius, vertices);
+                }
+                else
+                {
+                    vertices.Add(new Vector2(-halfWidth, halfHeight));
+                }
 
                 Mesh mesh = new Mesh();
                 mesh.MeshTopology = primitiveType;
                 if (type == GeometryType.Solid)
                 {
-                    mesh.SetPositions(points);
+                    var polygon = new Mathematics.Polygon();
+                    polygon.AddItem(new PolygonItem(vertices));
+                    var points = polygon.Fill();
+                    mesh.SetPoints(points);
                 }
                 else
                 {
-                    mesh.SetPositions(vertices);
+                    mesh.SetPoints(vertices);
                 }
                 mesh.GenerateBasicIndices().Optimize();
 
                 var uvs = new List<Vector2F>();
-                foreach (var vertex in mesh.Positions)
+                foreach (var vertex in mesh.Points)
                 {
                     var u = vertex.X / width;
                     var v = vertex.Y / height;
@@ -137,21 +130,65 @@ namespace Adamantium.Engine.Graphics
                 return mesh;
             }
 
+            private static void ValidateCorners(ref CornerRadius corners, float side)
+            {
+                if (corners.TopLeft < 0)
+                {
+                    corners.TopLeft = 0;
+                }
+                if (corners.TopRight < 0)
+                {
+                    corners.TopRight = 0;
+                }
+                if (corners.BottomRight < 0)
+                {
+                    corners.BottomRight = 0;
+                }
+                if (corners.BottomLeft < 0)
+                {
+                    corners.BottomLeft = 0;
+                }
+
+                var halfSize = side / 2;
+
+                if (corners.TopLeft > halfSize)
+                {
+                    corners.TopLeft = halfSize;
+                }
+                
+                if (corners.TopRight > halfSize)
+                {
+                    corners.TopRight = halfSize;
+                }
+                
+                if (corners.BottomRight > halfSize)
+                {
+                    corners.BottomRight = halfSize;
+                }
+                
+                if (corners.BottomLeft > halfSize)
+                {
+                    corners.BottomLeft = halfSize;
+                }
+            }
+
             private static void GenerateRoundCorner(
                 int tessellation,
                 float startAngle,
-                Vector2F center,
-                Vector2F radius,
-                List<Vector3F> vertices)
+                Vector2 center,
+                Vector2 radius,
+                List<Vector2> vertices)
             {
-                var angleItem = -MathHelper.DegreesToRadians(rectSector / tessellation);
+                var angleItem = -MathHelper.DegreesToRadians(rectangleSector / tessellation);
                 var angle = MathHelper.DegreesToRadians(startAngle);
-                for (int i = 0; i < tessellation; ++i)
+                for (int i = 0; i <= tessellation; ++i)
                 {
                     var x = center.X + (radius.X * (float) Math.Cos(angle));
-                    var y = center.Y + (radius.Y * (float) Math.Sin(angle));
+                    var y = center.Y - (radius.Y * (float) Math.Sin(angle));
                     angle += angleItem;
-                    vertices.Add(new Vector3F(x, y, 0));
+                    x = Math.Round(x, 3);
+                    y = Math.Round(y, 3);
+                    vertices.Add(new Vector2(x, y));
                 }
             }
         }

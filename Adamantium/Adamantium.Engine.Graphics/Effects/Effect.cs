@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using Adamantium.Core;
 using Adamantium.Engine.Compiler.Effects;
@@ -67,7 +68,6 @@ namespace Adamantium.Engine.Graphics.Effects
            : this(device, EffectData.Load(bytecode))
         {
         }
-
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Effect" /> class with the specified bytecode effect. See remarks.
@@ -180,7 +180,10 @@ namespace Adamantium.Engine.Graphics.Effects
 
                     var pass = new EffectPass(logger, this, technique, passRaw, name);
 
+                    var timer = Stopwatch.StartNew();
                     pass.Initialize(logger);
+                    timer.Stop();
+                    Console.WriteLine($"pass init time: {timer.ElapsedMilliseconds} ms");
 
                     // If this is a subpass, add it to the parent pass
                     if (passRaw.IsSubPass)

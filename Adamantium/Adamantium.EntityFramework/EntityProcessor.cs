@@ -11,11 +11,7 @@ namespace Adamantium.EntityFramework
         private readonly object syncObject = new Object();
 
         private Dictionary<Int64, Entity> availableEntities;
-        private List<Entity> activeEntities;
-        private Entity[] availables;
 
-        private readonly List<Entity> entitiesToAdd;
-        private readonly List<Entity> entitiesToRemove;
         private readonly long _uid;
 
         protected EntityWorld EntityWorld { get; private set; }
@@ -27,134 +23,26 @@ namespace Adamantium.EntityFramework
             EntityWorld = world;
             Services = EntityWorld.Services;
             availableEntities = new Dictionary<long, Entity>();
-            availables = new Entity[0];
-            activeEntities = new List<Entity>();
-            entitiesToAdd = new List<Entity>();
-            entitiesToRemove = new List<Entity>();
             _uid = UidGenerator.Generate();
             IsVisible = true;
             Enabled = true;
         }
-
-        public void AddEntity(Entity entity)
-        {
-            lock (syncObject)
-            {
-                entitiesToAdd.Add(entity);
-            }
-        }
-
-        public void AddEntities(IEnumerable<Entity> entities)
-        {
-            foreach (var entity in entities)
-            {
-                AddEntity(entity);
-            }
-        }
-
-        public void RemoveEntity(Entity entity)
-        {
-            lock (syncObject)
-            {
-                entitiesToRemove.Add(entity);
-            }
-        }
-
-        public void RemoveEntitites(IEnumerable<Entity> entities)
-        {
-            foreach (var entity in entities)
-            {
-                RemoveEntity(entity);
-            }
-        }
-
-        public Entity GetEntity(Int64 entityId)
-        {
-            availableEntities.TryGetValue(entityId, out Entity result);
-            return result;
-        }
-
-        protected virtual void OnEntityAdded(Entity entity)
-        {
-        }
-
-        protected virtual void OnEntityRemoved(Entity entity)
-        {
-        }
-
+        
         public virtual void Initialize()
         {
         }
 
-        public Entity[] Entities => availables;
+        public Entity[] Entities => EntityWorld.RootEntities;
 
-        private void SyncEntites()
+        public virtual void Reset()
         {
-            bool changesMade = false;
-
-            if (entitiesToRemove.Count > 0)
-            {
-                foreach (var entity in entitiesToRemove)
-                {
-                    RemoveEntityInternal(entity);
-                }
-                entitiesToRemove.Clear();
-                changesMade = true;
-            }
-
-            if (entitiesToAdd.Count > 0)
-            {
-                foreach (var entity in entitiesToAdd)
-                {
-                    AddEntityInternal(entity);
-                }
-                entitiesToAdd.Clear();
-                changesMade = true;
-            }
-
-            if (changesMade)
-            {
-                availables = activeEntities.ToArray();
-            }
-        }
-
-        private void AddEntityInternal(Entity entity)
-        {
-            if (!availableEntities.ContainsKey(entity.Uid))
-            {
-                availableEntities.Add(entity.Uid, entity);
-                activeEntities.Add(entity);
-                OnEntityAdded(entity);
-            }
-        }
-
-        private void RemoveEntityInternal(Entity entity)
-        {
-            if (availableEntities.ContainsKey(entity.Uid))
-            {
-                availableEntities.Remove(entity.Uid);
-                OnEntityRemoved(entity);
-            }
-        }
-
-        public void Reset()
-        {
-            lock (syncObject)
-            {
-                availableEntities.Clear();
-                entitiesToAdd.Clear();
-                entitiesToRemove.Clear();
-            }
         }
 
         public long Uid => _uid;
 
         public virtual void BeginUpdate()
         {
-            lock (syncObject)
-            {
-                SyncEntites();
-            }
+            
         }
 
         public virtual void Update(IGameTime gameTime)

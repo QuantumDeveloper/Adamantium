@@ -1,6 +1,7 @@
 ﻿using Adamantium.Mathematics;
 using Adamantium.UI.Input;
 using Adamantium.UI.Media;
+using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI.Controls.Primitives
 {
@@ -20,26 +21,26 @@ namespace Adamantium.UI.Controls.Primitives
 
       public event DragStartedEventHandler DragStarted
       {
-         add { AddHandler(DragStartedEvent, value);}
-         remove { RemoveHandler(DragStartedEvent, value);}
+         add => AddHandler(DragStartedEvent, value);
+         remove => RemoveHandler(DragStartedEvent, value);
       }
 
       public event DragEventHandler DragDelta
       {
-         add { AddHandler(DragDeltaEvent, value); }
-         remove { RemoveHandler(DragDeltaEvent, value); }
+         add => AddHandler(DragDeltaEvent, value);
+         remove => RemoveHandler(DragDeltaEvent, value);
       }
 
       public event DragCompletedEventHandler DragCompleted
       {
-         add { AddHandler(DragCompletedEvent, value); }
-         remove { RemoveHandler(DragCompletedEvent, value); }
+         add => AddHandler(DragCompletedEvent, value);
+         remove => RemoveHandler(DragCompletedEvent, value);
       }
 
       public bool IsDragging
       {
-         get {return GetValue<bool>(IsDraggingProperty); }
-         private set { SetValue(IsDraggingProperty, value);}
+         get => GetValue<bool>(IsDraggingProperty);
+         private set => SetValue(IsDraggingProperty, value);
       }
 
       static Thumb()
@@ -83,7 +84,7 @@ namespace Adamantium.UI.Controls.Primitives
       {
       }
 
-      private Point dragStartPoint;
+      private Vector2 dragStartPoint;
 
       public void CancelDrag()
       {
@@ -114,7 +115,7 @@ namespace Adamantium.UI.Controls.Primitives
          e.Handled = true;
          if (IsDragging && e.MouseDevice.LeftButton == MouseButtonState.Pressed)
          {
-            Point delta = e.GetPosition(this) - dragStartPoint;
+            var delta = e.GetPosition(this) - dragStartPoint;
             DragEventArgs args = new DragEventArgs(delta);
             args.RoutedEvent = DragDeltaEvent;
             RaiseEvent(args);
@@ -136,7 +137,7 @@ namespace Adamantium.UI.Controls.Primitives
          e.Handled = true;
          if (IsDragging)
          {
-            Point delta = e.GetPosition(this) - dragStartPoint;
+            var delta = e.GetPosition(this) - dragStartPoint;
             DragCompletedEventArgs args = new DragCompletedEventArgs(delta, false);
             args.RoutedEvent = DragCompletedEvent;
             RaiseEvent(args);
@@ -144,13 +145,13 @@ namespace Adamantium.UI.Controls.Primitives
          IsDragging = false;
       }
 
-      public override void OnRender(DrawingContext context)
+      protected override void OnRender(DrawingContext context)
       {
          if (!IsGeometryValid)
          {
             base.OnRender(context);
             context.BeginDraw(this);
-            context.DrawRectangle(this, Background, new Rect(new Size(ActualWidth, ActualHeight)));
+            context.DrawRectangle(Background, new Rect(new Size(ActualWidth, ActualHeight)));
             context.EndDraw(this);
          }
       }

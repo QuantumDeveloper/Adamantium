@@ -1,0 +1,70 @@
+namespace Adamantium.Fonts.Common
+{
+    public class TableNames
+    {
+        public const string cmap = "cmap";
+        public const string head = "head";
+        public const string hhea = "hhea";
+        public const string hmtx = "hmtx";
+        public const string maxp = "maxp";
+        public const string name = "name";
+        public const string OS2  = "OS/2";
+        public const string post = "post";
+        public const string cvt  = "cvt ";    
+        public const string fpgm = "fpgm";
+        public const string glyf = "glyf";
+        public const string loca = "loca";
+        public const string prep = "prep";
+        public const string CFF  = "CFF ";
+        public const string CFF2 = "CFF2";
+        public const string VORG = "VORG";
+        public const string EBDT = "EBDT";
+        public const string EBLC = "EBLC";
+        public const string gasp = "gasp";
+        public const string hdmx = "hdmx";
+        public const string kern = "kern";
+        public const string LTSH = "LTSH";
+        public const string PCLT = "PCLT";
+        public const string VDMX = "VDMX";
+        public const string vhea = "vhea";
+        public const string vmtx = "vmtx";
+        public const string BASE = "BASE";
+        public const string GDEF = "GDEF";
+        public const string GPOS = "GPOS";
+        public const string GSUB = "GSUB";
+        public const string EBSC = "EBSC";
+        public const string JSTF = "JSTF";
+        public const string MATH = "MATH";
+        public const string CBDT = "CBDT";
+        public const string CBLC = "CBLC";
+        public const string COLR = "COLR";
+        public const string CPAL = "CPAL";
+        public const string SVG  = "SVG ";
+        public const string sbix = "sbix";
+        public const string acnt = "acnt";
+        public const string avar = "avar";
+        public const string bdat = "bdat";
+        public const string bloc = "bloc";
+        public const string bsln = "bsln";
+        public const string cvar = "cvar";
+        public const string fdsc = "fdsc";
+        public const string feat = "feat";
+        public const string fmtx = "fmtx";
+        public const string fvar = "fvar";
+        public const string gvar = "gvar";
+        public const string hsty = "hsty";
+        public const string just = "just";
+        public const string lcar = "lcar";
+        public const string mort = "mort";
+        public const string morx = "morx";
+        public const string opbd = "opbd";
+        public const string prop = "prop";
+        public const string trak = "trak";
+        public const string Zapf = "Zapf";
+        public const string Silf = "Silf";
+        public const string Glat = "Glat";
+        public const string Gloc = "Gloc";
+        public const string Feat = "Feat";
+        public const string Sill = "Sill";
+    }
+}

@@ -1,4 +1,6 @@
-﻿namespace Adamantium.UI.Input
+﻿using Adamantium.UI.RoutedEvents;
+
+namespace Adamantium.UI.Input
 {
    public class InputEventArgs:RoutedEventArgs
    {

@@ -2,9 +2,11 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using Adamantium.Core;
 using Adamantium.Core.Collections;
+using Adamantium.Engine.Core.Effects;
 using Adamantium.Engine.Graphics.Effects;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
@@ -20,7 +22,7 @@ namespace Adamantium.Engine.Graphics
         private SurfaceKHR surface;
         private Pipeline graphicsPipeline;
         private CommandBuffer[] commandBuffers;
-        private Queue graphicsQueue;
+        internal Queue GraphicsQueue { get; private set; }
         private Queue resourceQueue;
         private Queue computeQueue;
         
@@ -39,6 +41,8 @@ namespace Adamantium.Engine.Graphics
         private TrackingCollection<Rect2D> scissors;
         private TrackingCollection<DynamicState> dynamicStates;
         
+        private readonly uint[] waitStages = {(uint) PipelineStageFlagBits.ColorAttachmentOutputBit};
+        
         private PipelineManager pipelineManager;
 
         internal Device LogicalDevice => MainDevice?.LogicalDevice;
@@ -55,6 +59,7 @@ namespace Adamantium.Engine.Graphics
             BlendStates = new BlendStatesCollection();
             RasterizerStates = new RasterizerStateCollection();
             DepthStencilStates = new DepthStencilStatesCollection();
+            
         }
 
         private GraphicsDevice(MainGraphicsDevice mainDevice)
@@ -88,14 +93,19 @@ namespace Adamantium.Engine.Graphics
             viewports = new TrackingCollection<Viewport>();
             scissors = new TrackingCollection<Rect2D>();
 
-            BlendState = BlendStates.Default;
-            RasterizerState = RasterizerStates.CullBackClipDisabled;
+            BlendState = BlendStates.Fonts;
+            //RasterizerState = RasterizerStates.CullBackClipDisabled;
+            RasterizerState = RasterizerStates.CullNoneClipDisabled;
             DepthStencilState = DepthStencilStates.Default;
+            SamplerStates = new SamplerStateCollection(this);
+            Sampler = SamplerStates.Default;
+            
+            ClearColor = Colors.CornflowerBlue;
 
             pipelineManager = new PipelineManager(this);
 
-            //BasicEffect = Effect.CompileFromFile(Path.Combine("Effects", "BasicEffect.fx"), this);
             BasicEffect = Effect.Load(Path.Combine("Effects", "BasicEffect.fx.compiled"), this);
+            //BasicEffect = Effect.Load(Path.Combine("HLSL", "BasicEffect.fx.compiled"), this);
         }
         
         public bool IsResourceLoaderDevice { get; }
@@ -105,6 +115,8 @@ namespace Adamantium.Engine.Graphics
         internal Semaphore[] ImageAvailableSemaphores { get; private set; }
         internal Semaphore[] RenderFinishedSemaphores { get; private set; }
         internal Fence[] InFlightFences { get; private set; }
+        
+        public PresenterState LastPresenterState { get; private set; }
 
         public event Action FrameFinished;
 
@@ -132,7 +144,13 @@ namespace Adamantium.Engine.Graphics
         
         public static DepthStencilStatesCollection DepthStencilStates { get; }
         
+        public SamplerStateCollection SamplerStates { get; internal set; }
+        
         public Effect BasicEffect { get; private set; }
+        
+        public Color ClearColor { get; set; }
+        
+        public SamplerState Sampler { get; set; }
 
         public BlendState BlendState
         {
@@ -350,13 +368,17 @@ namespace Adamantium.Engine.Graphics
         {
             var queueFamilyIndices = MainDevice.PhysicalDevice.FindQueueFamilies(surface);
 
-            var poolInfo = new CommandPoolCreateInfo();
-            poolInfo.QueueFamilyIndex = queueFamilyIndices.graphicsFamily.Value;
-            poolInfo.Flags = (uint)CommandPoolCreateFlagBits.ResetCommandBufferBit;
+            var poolInfo = new CommandPoolCreateInfo
+            {
+                QueueFamilyIndex = queueFamilyIndices.graphicsFamily.Value,
+                Flags = (uint) CommandPoolCreateFlagBits.ResetCommandBufferBit
+            };
             CommandPool = LogicalDevice.CreateCommandPool(poolInfo);
             
-            graphicsQueue = LogicalDevice.GetDeviceQueue(queueFamilyIndices.graphicsFamily.Value, 0);
-            resourceQueue = LogicalDevice.GetDeviceQueue(queueFamilyIndices.graphicsFamily.Value, 1);
+            GraphicsQueue = LogicalDevice.GetDeviceQueue(queueFamilyIndices.graphicsFamily.Value, 0);
+            uint queueIndex = (uint) (MainDevice.AvailableQueuesCount > 1 ? 1 : 0);
+            resourceQueue = LogicalDevice.GetDeviceQueue(queueFamilyIndices.graphicsFamily.Value, queueIndex);
+            //resourceQueue = LogicalDevice.GetDeviceQueue(queueFamilyIndices.graphicsFamily.Value, 0);
         }
 
         private void CreateGraphicsPresenter(PresentationParameters parameters)
@@ -406,7 +428,7 @@ namespace Adamantium.Engine.Graphics
             return LogicalDevice.CreateFramebuffer(info);
         }
 
-        public bool BeginDraw(Color clearColor, float depth = 1.0f, uint stencil = 0)
+        public bool BeginDraw(float depth = 1.0f, uint stencil = 0)
         {
             CanPresent = false;
             var renderFence = InFlightFences[CurrentFrame];
@@ -464,7 +486,7 @@ namespace Adamantium.Engine.Graphics
 
             ClearValue clearColorValue = new ClearValue();
             clearColorValue.Color = new ClearColorValue();
-            clearColorValue.Color.Float32 = clearColor.ToFloatArray();
+            clearColorValue.Color.Float32 = ClearColor.ToFloatArray();
 
             ClearValue clearDepthValue = new ClearValue();
             clearDepthValue.DepthStencil = new ClearDepthStencilValue();
@@ -473,7 +495,7 @@ namespace Adamantium.Engine.Graphics
 
             ClearValue clearColorValueResolve = new ClearValue();
             clearColorValueResolve.Color = new ClearColorValue();
-            clearColorValueResolve.Color.Float32 = clearColor.ToFloatArray();
+            clearColorValueResolve.Color.Float32 = ClearColor.ToFloatArray();
 
             renderPassInfo.PClearValues = new[] {clearColorValue, clearDepthValue, clearColorValueResolve};
             renderPassInfo.ClearValueCount = (uint) renderPassInfo.PClearValues.Length;
@@ -490,7 +512,6 @@ namespace Adamantium.Engine.Graphics
 
         public void EndDraw()
         {
-            
             var commandBuffer = commandBuffers[ImageIndex];
 
             commandBuffer.EndRenderPass();
@@ -501,12 +522,10 @@ namespace Adamantium.Engine.Graphics
                 throw new Exception("failed to record command buffer!");
             }
 
-            
-            
             var submitInfo = new SubmitInfo();
 
             Semaphore[] waitSemaphores = new[] {ImageAvailableSemaphores[CurrentFrame]};
-            uint[] waitStages = new[] {(uint) PipelineStageFlagBits.ColorAttachmentOutputBit};
+            
             submitInfo.WaitSemaphoreCount = 1;
             submitInfo.PWaitSemaphores = waitSemaphores;
             submitInfo.PWaitDstStageMask = waitStages;
@@ -529,9 +548,19 @@ namespace Adamantium.Engine.Graphics
             {
                 throw new Exception($"failed to reset fences. Result: {result}");
             }
+
+            if (MainDevice.AvailableQueuesCount == 1)
+            {
+                mutex.WaitOne();
+            }
             
-            result = graphicsQueue.QueueSubmit(1, submitInfos, renderFence);
-            graphicsQueue.QueueWaitIdle();
+            result = GraphicsQueue.QueueSubmit(1, submitInfos, renderFence);
+            GraphicsQueue.QueueWaitIdle();
+            
+            if (MainDevice.AvailableQueuesCount == 1)
+            {
+                mutex.ReleaseMutex();
+            }
 
             if (result != Result.Success)
             {
@@ -589,7 +618,6 @@ namespace Adamantium.Engine.Graphics
             var commandBuffer = commandBuffers[ImageIndex];
             commandBuffer.BindIndexBuffer(indexBuffer, 0, IndexType.Uint32);
         }
-
 
         public void Draw(uint vertexCount, uint instanceCount, uint firstVertex = 0, uint firstInstance = 0)
         {
@@ -689,15 +717,15 @@ namespace Adamantium.Engine.Graphics
             return sampler;
         }
 
-        public bool ResizePresenter(uint width = 0, uint height = 0)
+        public bool ResizePresenter(uint width = 1, uint height = 1)
         {
             bool ResizeFunc() => Presenter.Resize(width, height);
             return ResizePresenter(ResizeFunc);
         }
 
-        public bool ResizePresenter(uint width, uint height, uint buffersCount, SurfaceFormat surfaceFormat, DepthFormat depthFormat)
+        public bool ResizePresenter(PresentationParameters parameters)
         {
-            bool ResizeFunc() => Presenter.Resize(width, height, buffersCount, surfaceFormat, depthFormat);
+            bool ResizeFunc() => Presenter.Resize(parameters);
             return ResizePresenter(ResizeFunc);
         }
 
@@ -715,7 +743,7 @@ namespace Adamantium.Engine.Graphics
             return true;
         }
 
-        public void Present()
+        public void Present(PresentationParameters parameters)
         {
             if (!CanPresent)
             {
@@ -723,11 +751,11 @@ namespace Adamantium.Engine.Graphics
                 return;
             }
             
-            var presentResult = Presenter.Present();
-            if (presentResult == Result.SuboptimalKhr || presentResult == Result.ErrorOutOfDateKhr)
-            {
-                //ResizePresenter();
-            }
+            LastPresenterState = Presenter.Present();
+            // if (presentResult is Result.SuboptimalKhr or Result.ErrorOutOfDateKhr)
+            // {
+            //     ResizePresenter(parameters.Width, parameters.Height, parameters.BuffersCount, parameters.ImageFormat, parameters.DepthFormat);
+            // }
             
             UpdateCurrentFrameNumber();
         }

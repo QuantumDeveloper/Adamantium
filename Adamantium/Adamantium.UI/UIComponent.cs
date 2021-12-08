@@ -1,16 +1,43 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.Linq;
+using Adamantium.Core.Collections;
+using Adamantium.Mathematics;
+using Adamantium.UI.Controls;
 using Adamantium.UI.Input;
 using Adamantium.UI.Media;
+using Adamantium.UI.RoutedEvents;
 using Adamantium.UI.Windows.Input;
 
 namespace Adamantium.UI
 {
-    public class UIComponent : VisualComponent, IInputElement, IUIComponent
+    public class UIComponent : AdamantiumComponent, IInputElement
     {
+        private Size renderSize;
+        private Size? _previousMeasure;
+        private Rect? _previousArrange;
+        
+        protected bool sizeChanged;
+        protected Size previousRenderSize;
+        
         #region Adamantium properties
+        
+        public static readonly AdamantiumProperty LocationProperty = AdamantiumProperty.Register(nameof(Location),
+            typeof (Vector2), typeof (UIComponent), new PropertyMetadata(Vector2.Zero));
 
+        public static readonly AdamantiumProperty RotationProperty = AdamantiumProperty.Register(nameof(Rotation),
+            typeof(Double), typeof(UIComponent), new PropertyMetadata((Double)0));
+
+        public static readonly AdamantiumProperty ScaleProperty = AdamantiumProperty.Register(nameof(Scale),
+            typeof(Vector2), typeof(UIComponent), new PropertyMetadata(Vector2.One));
+
+        public static readonly AdamantiumProperty VisibilityProperty = AdamantiumProperty.Register(nameof(Visibility),
+            typeof(Visibility), typeof(UIComponent),
+            new PropertyMetadata(Visibility.Visible,
+                PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsArrange));
+      
         public static readonly AdamantiumProperty IsFocusedProperty =
          AdamantiumProperty.RegisterReadOnly(nameof(IsFocused),
             typeof(Boolean), typeof(UIComponent), new PropertyMetadata(false));
@@ -158,7 +185,6 @@ namespace Adamantium.UI
               RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UIComponent));
 
         #endregion
-
 
 
         #region Events
@@ -380,12 +406,6 @@ namespace Adamantium.UI
             remove => RemoveHandler(Keyboard.PreviewLostKeyboardFocusEvent, value);
         }
 
-        public event MouseButtonEventHandler PreviewMouseDoubcleClick
-        {
-            add => AddHandler(PreviewMouseDoubleClickEvent, value);
-            remove => RemoveHandler(PreviewMouseDoubleClickEvent, value);
-        }
-
         public event MouseEventHandler PreviewGotMouseCapture
         {
             add => AddHandler(Mouse.PreviewGotMouseCaptureEvent, value);
@@ -462,6 +482,30 @@ namespace Adamantium.UI
 
 
         #region Properties
+        
+        public Vector2 Location
+        {
+            get => GetValue<Vector2>(LocationProperty);
+            set => SetValue(LocationProperty, value);
+        }
+
+        public Vector2 Scale
+        {
+            get => GetValue<Vector2>(ScaleProperty);
+            set => SetValue(ScaleProperty, value);
+        }
+
+        public Double Rotation
+        {
+            get => GetValue<Double>(RotationProperty);
+            set => SetValue(RotationProperty, value);
+        }
+
+        public Visibility Visibility
+        {
+            get => GetValue<Visibility>(VisibilityProperty);
+            set => SetValue(VisibilityProperty, value);
+        }
 
         public Cursor Cursor
         {
@@ -513,8 +557,8 @@ namespace Adamantium.UI
 
         public bool IsKeyboardFocused
         {
-            get => GetValue<bool>(IsMouseDirectlyOverProperty);
-            private set => SetValue(IsMouseDirectlyOverProperty, value);
+            get => GetValue<bool>(IsKeyboardFocusedProperty);
+            private set => SetValue(IsKeyboardFocusedProperty, value);
         }
 
         public String Uid
@@ -549,6 +593,8 @@ namespace Adamantium.UI
 
         public UIComponent()
         {
+            VisualChildrenCollection = new TrackingCollection<IUIComponent>();
+            VisualChildrenCollection.CollectionChanged += VisualChildrenCollectionChanged;
         }
 
         static UIComponent()
@@ -1031,10 +1077,6 @@ namespace Adamantium.UI
             }
         }
 
-        protected Size previousRenderSize;
-        private Size renderSize;
-        protected bool sizeChanged;
-
         public void InvalidateMeasure()
         {
             var parent = this.GetVisualParent<UIComponent>();
@@ -1045,15 +1087,7 @@ namespace Adamantium.UI
             _previousMeasure = null;
             _previousArrange = null;
 
-            if (parent != null /*&& IsResizable((FrameworkElement)parent)*/)
-            {
-                parent.InvalidateMeasure();
-            }
-            //else
-            //{
-            //   var root = GetLayoutRoot();
-            //   root?.Item1.LayoutManager?.InvalidateMeasure(this, root.Item2);
-            //}
+            parent?.InvalidateMeasure();
         }
 
         public void InvalidateArrange()
@@ -1077,10 +1111,6 @@ namespace Adamantium.UI
         {
             return Double.IsNaN(control.Width) || Double.IsNaN(control.Height);
         }
-
-        private Size? _previousMeasure;
-
-        private Rect? _previousArrange;
 
         /// <summary>
         /// The default implementation of the control's measure pass.
@@ -1173,7 +1203,6 @@ namespace Adamantium.UI
             return finalSize;
         }
 
-
         /// <summary>
         /// Arranges the control and its children.
         /// </summary>
@@ -1202,6 +1231,12 @@ namespace Adamantium.UI
                 ArrangeCore(rect);
                 _previousArrange = rect;
             }
+            
+            if (VisualParent != null)
+            {
+                Location = Bounds.Location + VisualParent.Location;
+                ClipPosition = ClipRectangle.Location + VisualParent.Location;
+            }
         }
 
         /// <summary>
@@ -1218,13 +1253,15 @@ namespace Adamantium.UI
 
         public void Render(DrawingContext context)
         {
-            OnRender(context);
-            IsGeometryValid = true;
+            if (!IsGeometryValid)
+            {
+                OnRender(context);
+                IsGeometryValid = true;
+            }
         }
 
         /// <summary>
-        /// Tests whether any of a <see cref="Rect"/>'s properties incude nagative values,
-        /// a NaN or Infinity.
+        /// Tests whether any of a <see cref="Rect"/>'s properties include negative values, a NaN or Infinity.
         /// </summary>
         /// <param name="rect">The rect.</param>
         /// <returns>True if the rect is invalid; otherwise false.</returns>
@@ -1238,8 +1275,7 @@ namespace Adamantium.UI
         }
 
         /// <summary>
-        /// Tests whether any of a <see cref="Size"/>'s properties incude nagative values,
-        /// a NaN or Infinity.
+        /// Tests whether any of a <see cref="Size"/>'s properties include negative values, a NaN or Infinity.
         /// </summary>
         /// <param name="size">The size.</param>
         /// <returns>True if the size is invalid; otherwise false.</returns>
@@ -1259,7 +1295,6 @@ namespace Adamantium.UI
         {
             return new Size(Math.Max(size.Width, 0), Math.Max(size.Height, 0));
         }
-
 
         public void AddHandler(RoutedEvent routedEvent, Delegate handler, bool handledEventsToo = false)
         {
@@ -1322,8 +1357,8 @@ namespace Adamantium.UI
                 throw new NullReferenceException(nameof(e.RoutedEvent));
             }
 
-            e.Source = e.Source ?? this;
-            e.OriginalSource = e.OriginalSource ?? this;
+            e.Source ??= this;
+            e.OriginalSource ??= this;
 
             if (e.RoutedEvent != null)
             {
@@ -1375,7 +1410,7 @@ namespace Adamantium.UI
                 throw new ArgumentNullException(nameof(e));
             }
 
-            foreach (var element in GetBubbleEventRoute())
+            foreach (UIComponent element in GetBubbleEventRoute())
             {
                 e.Source = element;
                 element.RaiseDirectEvent(e);
@@ -1389,7 +1424,7 @@ namespace Adamantium.UI
                 throw new ArgumentNullException(nameof(e));
             }
 
-            foreach (var element in GetTunnelEventRoute())
+            foreach (UIComponent element in GetTunnelEventRoute())
             {
                 e.Source = element;
                 element.RaiseDirectEvent(e);
@@ -1397,7 +1432,7 @@ namespace Adamantium.UI
         }
 
 
-        public IEnumerable<UIComponent> GetBubbleEventRoute()
+        public IEnumerable<IUIComponent> GetBubbleEventRoute()
         {
             var element = this;
             while (element != null)
@@ -1407,7 +1442,7 @@ namespace Adamantium.UI
             }
         }
 
-        public IEnumerable<UIComponent> GetTunnelEventRoute()
+        public IEnumerable<IUIComponent> GetTunnelEventRoute()
         {
             return GetBubbleEventRoute().Reverse();
         }
@@ -1443,5 +1478,128 @@ namespace Adamantium.UI
         {
             throw new NotImplementedException();
         }
+
+        private void VisualChildrenCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+      {
+         switch (e.Action)
+         {
+               case NotifyCollectionChangedAction.Add:
+               foreach (UIComponent visual in e.NewItems)
+               {
+                  visual.SetVisualParent(this);
+               }
+               break;
+
+               case NotifyCollectionChangedAction.Remove:
+               foreach (UIComponent visual in e.OldItems)
+               {
+                  visual.SetVisualParent(null);
+               }
+               break;
+         }
+      }
+
+      public Rect Bounds { get; set; }
+
+      public Rect ClipRectangle { get; internal set; }
+
+      public Vector2 ClipPosition { get; set; }
+
+      private IUIComponent visualComponentParent;
+
+      public IUIComponent VisualParent => visualComponentParent;
+
+      public Int32 ZIndex { get; set; }
+
+      public IReadOnlyCollection<IUIComponent> GetVisualDescendants()
+      {
+          return VisualChildrenCollection.AsReadOnly();
+      }
+
+      public IReadOnlyCollection<IUIComponent> VisualChildren => VisualChildrenCollection.AsReadOnly();
+
+      protected TrackingCollection<IUIComponent> VisualChildrenCollection { get; private set; } 
+      
+      public bool IsAttachedToVisualTree { get; private set; }
+
+      protected void SetVisualParent(IUIComponent parent)
+      {
+         if (visualComponentParent == parent)
+         {
+            return;
+         }
+
+         var old = visualComponentParent;
+         visualComponentParent = parent;
+
+         if (IsAttachedToVisualTree)
+         {
+            var root = (this as IRootVisualComponent) ?? old.GetSelfAndVisualAncestors().OfType<IRootVisualComponent>().FirstOrDefault();
+            var e = new VisualTreeAttachmentEventArgs(root);
+            DetachedFromVisualTree(e);
+         }
+
+         if (visualComponentParent is IRootVisualComponent || visualComponentParent?.IsAttachedToVisualTree == true)
+         {
+            var root =  this.GetVisualAncestors().OfType<IRootVisualComponent>().FirstOrDefault();
+            var e = new VisualTreeAttachmentEventArgs(root);
+            AttachedToVisualTree(e);
+         }
+
+         OnVisualParentChanged(old, parent);
+      }
+
+      private void AttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+      {
+         IsAttachedToVisualTree = true;
+
+         OnAttachedToVisualTree(e);
+
+         // TODO: check if we need to call AttachedToVisualTree in chain
+         if (VisualChildren.Count > 0)
+         {
+            foreach (UIComponent visual in VisualChildren)
+            {
+               visual.AttachedToVisualTree(e);
+            }
+         }
+      }
+
+      private void DetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+      {
+         IsAttachedToVisualTree = false;
+
+         OnDetachedFromVisualTree(e);
+
+         // TODO: check if we need to call DetachedFromVisualTree in chain
+         if (VisualChildren.Count > 0)
+         {
+            foreach (UIComponent visual in VisualChildren)
+            {
+                visual.DetachedFromVisualTree(e);
+            }
+         }
+      }
+
+      protected virtual void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+      {
+         
+      }
+
+      protected virtual void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+      {
+         
+      }
+
+      protected void OnVisualParentChanged(IUIComponent oldParent, IUIComponent newParent)
+      {
+         VisualParentChanged?.Invoke(this, new VisualParentChangedEventArgs(oldParent, newParent));
+      }
+
+      public EventHandler<VisualParentChangedEventArgs> VisualParentChanged; 
+
+      protected virtual void OnRender(DrawingContext context)
+      {
+      }
     }
 }

@@ -17,16 +17,11 @@ namespace Adamantium.Imaging.Png
             compressor = new PNGCompressor();
         }
 
-        public Image Decode()
-        {
-            return Decode(PNGColorType.RGBA, 8);
-        }
-
-        private Image Decode(PNGColorType colorType = PNGColorType.RGBA, uint bitDepth = 8)
+        public Image Decode(PNGColorType colorType = PNGColorType.RGBA, uint bitDepth = 8)
         {
             PNGState state = new PNGState();
-            state.InfoRaw.ColorType = colorType;
-            state.InfoRaw.BitDepth = bitDepth;
+            state.ColorModeRaw.ColorType = colorType;
+            state.ColorModeRaw.BitDepth = bitDepth;
             return Decode(state);
         }
 
@@ -46,7 +41,7 @@ namespace Adamantium.Imaging.Png
             return GetSingleFrameImage(pngImage, state);
 
             // TODO: should move these code to another place
-            ////Premultiply alpha for formats, which does not support tansparency
+            ////Premultiply alpha for formats, which does not support transparency
             //for (int i = 0; i < rawBuffer.Length; i+=4)
             //{
             //    float alpha = rawBuffer[i + 3] / 255.0f;
@@ -77,7 +72,7 @@ namespace Adamantium.Imaging.Png
             for (int i = 0; i < pngImage.Frames.Count; i++)
             {
                 PNGFrame frame = pngImage.Frames[i];
-                var bytesPerPixel = (int)(PNGColorConvertion.GetBitsPerPixel(state.InfoRaw) / 8);
+                var bytesPerPixel = (int)(PNGColorConvertion.GetBitsPerPixel(state.ColorModeRaw) / 8);
                 if (bytesPerPixel == 0)
                 {
                     bytesPerPixel = 1;
@@ -153,7 +148,7 @@ namespace Adamantium.Imaging.Png
 
         private ImageDescription GetImageDescription(PNGState state, uint width, uint height)
         {
-            var bitsPerPixel = PNGColorConvertion.GetBitsPerPixel(state.InfoRaw);
+            var bitsPerPixel = PNGColorConvertion.GetBitsPerPixel(state.ColorModeRaw);
             ImageDescription descr = new ImageDescription();
             descr.Width = width;
             descr.Height = height;
@@ -179,21 +174,21 @@ namespace Adamantium.Imaging.Png
 
         private void ConvertColorsIfNeeded(PNGFrame frame, PNGState state)
         {
-            if (!state.DecoderSettings.ColorСonvert || state.InfoRaw == state.InfoPng.ColorMode)
+            if (!state.DecoderSettings.ColorСonvert || state.ColorModeRaw == state.InfoPng.ColorMode)
             {
                 /*same color type, no copying or converting of data needed*/
                 /*store the info_png color settings on the info_raw so that the info_raw still reflects what colortype
                 the raw image has to the end user*/
                 if (!state.DecoderSettings.ColorСonvert)
                 {
-                    state.InfoRaw = state.InfoPng.ColorMode;
+                    state.ColorModeRaw = state.InfoPng.ColorMode;
                 }
             }
             else
             {
                 /*color conversion needed; sort of copy of the data*/
-                if (!(state.InfoRaw.ColorType == PNGColorType.RGB || state.InfoRaw.ColorType == PNGColorType.RGBA)
-                    && state.InfoRaw.BitDepth != 8)
+                if (!(state.ColorModeRaw.ColorType == PNGColorType.RGB || state.ColorModeRaw.ColorType == PNGColorType.RGBA)
+                    && state.ColorModeRaw.BitDepth != 8)
                 {
                     /*unsupported color mode conversion*/
                     throw new PNGDecodeException(56);
@@ -202,10 +197,10 @@ namespace Adamantium.Imaging.Png
                 var width = (int)frame.Width;
                 var height = (int)frame.Height;
 
-                int rawBufferSize = (int)GetRawSizeLct(width, height, state.InfoRaw);
+                int rawBufferSize = (int)GetRawSizeLct(width, height, state.ColorModeRaw);
                 var outBuffer = new byte[rawBufferSize];
 
-                state.Error = PNGColorConvertion.Convert(outBuffer, frame.RawPixelBuffer, state.InfoRaw, state.InfoPng.ColorMode, width, height);
+                state.Error = PNGColorConvertion.Convert(outBuffer, frame.RawPixelBuffer, state.ColorModeRaw, state.InfoPng.ColorMode, width, height);
                 frame.RawPixelBuffer = outBuffer;
                 if (state.Error > 0)
                 {
@@ -231,7 +226,7 @@ namespace Adamantium.Imaging.Png
                 throw new PNGDecodeException(state.Error);
             }
 
-            if (CheckPixelOverflow(pngImage.Header.Width, pngImage.Header.Height, state.InfoPng.ColorMode, state.InfoRaw))
+            if (CheckPixelOverflow(pngImage.Header.Width, pngImage.Header.Height, state.InfoPng.ColorMode, state.ColorModeRaw))
             {
                 /*overflow possible due to amount of pixels*/
                 state.Error = 92;

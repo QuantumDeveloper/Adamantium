@@ -6,6 +6,8 @@ namespace Adamantium.UI.Controls
 {
    public abstract class Shape : FrameworkComponent
    {
+      protected Rect Rect;
+     
       protected Shape()
       {
       }
@@ -22,20 +24,16 @@ namespace Adamantium.UI.Controls
          AdamantiumProperty.Register(nameof(StrokeThickness),
             typeof (Double), typeof (Shape),
             new PropertyMetadata((Double) 0,
-               PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsRender, PropertyChangedCallback, CoerceStrokeThickness ));
+               PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsRender, CoerceStrokeThickness ));
 
       public static readonly AdamantiumProperty StrokeDashArrayProperty =
          AdamantiumProperty.Register(nameof(StrokeDashArray),
-            typeof (AdamantiumCollection<Double>), typeof (Shape), new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender));
+            typeof (TrackingCollection<Double>), typeof(Shape), new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender));
 
       public static readonly AdamantiumProperty StretchProperty = AdamantiumProperty.Register(nameof(Stretch),
          typeof (Stretch), typeof (Shape),
          new PropertyMetadata(Stretch.None,
             PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure|PropertyMetadataOptions.AffectsRender));
-
-      public static readonly AdamantiumProperty StrokeDashCapProperty =
-         AdamantiumProperty.Register(nameof(StrokeDashCap), typeof (PenLineCap), typeof (Shape),
-            new PropertyMetadata(PenLineCap.Flat, PropertyMetadataOptions.AffectsRender));
 
       public static readonly AdamantiumProperty StartLineCapProperty =
          AdamantiumProperty.Register(nameof(StartLineCap), typeof(PenLineCap), typeof(Shape),
@@ -44,55 +42,69 @@ namespace Adamantium.UI.Controls
       public static readonly AdamantiumProperty EndLineCapProperty =
          AdamantiumProperty.Register(nameof(EndLineCap), typeof(PenLineCap), typeof(Shape),
             new PropertyMetadata(PenLineCap.Flat, PropertyMetadataOptions.AffectsRender));
+      
+      public static readonly AdamantiumProperty StrokeLineJoinProperty =
+         AdamantiumProperty.Register(nameof(StrokeLineJoin), typeof(PenLineJoin), typeof(Shape),
+            new PropertyMetadata(PenLineJoin.Miter, PropertyMetadataOptions.AffectsRender));
+      
+      public static readonly AdamantiumProperty StrokeDashOffsetProperty =
+         AdamantiumProperty.Register(nameof(StrokeDashOffset), typeof(Double), typeof(Shape),
+            new PropertyMetadata(0d, PropertyMetadataOptions.AffectsRender));
 
       public Brush Fill
       {
-         get { return GetValue<Brush>(FillProperty); }
-         set { SetValue(FillProperty, value); }
+         get => GetValue<Brush>(FillProperty);
+         set => SetValue(FillProperty, value);
       }
 
       public Brush Stroke
       {
-         get { return GetValue<Brush>(StrokeProperty); }
-         set { SetValue(StrokeProperty, value); }
+         get => GetValue<Brush>(StrokeProperty);
+         set => SetValue(StrokeProperty, value);
       }
 
       public Double StrokeThickness
       {
-         get { return GetValue<Double>(StrokeThicknessProperty); }
-         set { SetValue(StrokeThicknessProperty, value); }
+         get => GetValue<Double>(StrokeThicknessProperty);
+         set => SetValue(StrokeThicknessProperty, value);
       }
 
-      public AdamantiumCollection<Double> StrokeDashArray
+      public TrackingCollection<Double> StrokeDashArray
       {
-         get { return GetValue<AdamantiumCollection<Double>>(StrokeDashArrayProperty); }
-         set { SetValue(StrokeDashArrayProperty, value); }
+         get => GetValue<TrackingCollection<Double>>(StrokeDashArrayProperty);
+         set => SetValue(StrokeDashArrayProperty, value);
       }
 
       public Stretch Stretch
       {
-         get { return GetValue<Stretch>(StretchProperty); }
-         set { SetValue(StretchProperty, value); }
+         get => GetValue<Stretch>(StretchProperty);
+         set => SetValue(StretchProperty, value);
       }
 
-      public PenLineCap StrokeDashCap
+      public PenLineCap StartLineCap
       {
-         get { return GetValue<PenLineCap>(StrokeDashCapProperty); }
-         set { SetValue(StrokeDashCapProperty, value);}
+         get => GetValue<PenLineCap>(StartLineCapProperty);
+         set => SetValue(StartLineCapProperty, value);
       }
 
-      public PenLineCap StartLineCap { get; set; }
-
-      public PenLineCap EndLineCap { get; set; }
-
-      public virtual Geometry RenderGeometry { get; private set; }
-
-
-      private static void PropertyChangedCallback(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs adamantiumPropertyChangedEventArgs)
+      public PenLineCap EndLineCap
       {
-
+         get => GetValue<PenLineCap>(EndLineCapProperty);
+         set => SetValue(EndLineCapProperty, value);
       }
 
+      public PenLineJoin StrokeLineJoin
+      {
+         get => GetValue<PenLineJoin>(StrokeLineJoinProperty);
+         set => SetValue(StrokeLineJoinProperty, value);
+      }
+
+      public Double StrokeDashOffset
+      {
+         get => GetValue<Double>(StrokeDashOffsetProperty);
+         set => SetValue(StrokeDashOffsetProperty, value);
+      }
+      
       private static object CoerceStrokeThickness(AdamantiumComponent adamantiumObject, object baseValue)
       {
          Double value = (Double) baseValue;
@@ -103,11 +115,21 @@ namespace Adamantium.UI.Controls
          return baseValue;
       }
 
+      protected Pen GetPen()
+      {
+         return new Pen(
+            Stroke,
+            StrokeThickness,
+            StrokeDashOffset,
+            StrokeDashArray,
+            StartLineCap,
+            EndLineCap);
+      }
+
       protected override Size MeasureOverride(Size availableSize)
       {
-         Rect shapeBounds = RenderGeometry.Bounds;
-         Size shapeSize = new Size(shapeBounds.Right, shapeBounds.Bottom);
-         Size desiredSize = new Size(availableSize.Width, availableSize.Height);
+         Size shapeSize = Rect.Size;
+         Size desiredSize = new Size(availableSize.Width, availableSize.Height).Deflate(new Thickness(StrokeThickness/2));
 
          if (double.IsInfinity(availableSize.Width))
          {
@@ -118,19 +140,26 @@ namespace Adamantium.UI.Controls
          {
             desiredSize.Height = shapeSize.Height;
          }
-
          
          if (double.IsNaN(Width) && HorizontalAlignment != HorizontalAlignment.Stretch)
          {
-            desiredSize.Width = 0;
+            desiredSize.Width = shapeSize.Width;
          }
-         
 
          if (double.IsNaN(Height) && VerticalAlignment != VerticalAlignment.Stretch)
          {
-            desiredSize.Height = 0;
+            desiredSize.Height = shapeSize.Height;
          }
-         
+
+         if (!double.IsNaN(Width))
+         {
+            desiredSize.Width = Width;
+         }
+
+         if (!double.IsNaN(Height))
+         {
+            desiredSize.Height = Height;
+         }
 
          switch (Stretch)
          {
@@ -148,13 +177,11 @@ namespace Adamantium.UI.Controls
                shapeSize.Height = Math.Max(desiredSize.Width, desiredSize.Height);
                break;
             default:
-               shapeSize = new Size(StrokeThickness, StrokeThickness);
+               shapeSize = desiredSize;
                break;
          }
-         _rect = new Rect(shapeSize);
+         Rect = new Rect(shapeSize);
          return new Size(shapeSize.Width, shapeSize.Height);
       }
-
-      protected Rect _rect;
    }
 }

@@ -13,11 +13,11 @@ namespace Adamantium.Engine.Templates.Lights
         public override Entity BuildEntity(Entity owner, string name)
         {
             float size = 0.2f;
-            var points = new List<Vector3F>();
-            points.Add(new Vector3F(-size, size, 0));
-            points.Add(new Vector3F(-size, 0, 0));
-            points.Add(new Vector3F(size, 0, 0));
-            points.Add(new Vector3F(size, .0f, 0));
+            var points = new List<Vector2>();
+            points.Add(new Vector2(-size, size));
+            points.Add(new Vector2(-size, 0));
+            points.Add(new Vector2(size, 0));
+            points.Add(new Vector2(size, 0));
 
             float range = 180;
             int tessellation = 20;
@@ -34,7 +34,7 @@ namespace Adamantium.Engine.Templates.Lights
             {
                 float x = center.X + (radiusX * (float)Math.Cos(angle));
                 float y = center.Y + (radiusY * (float)Math.Sin(angle));
-                var vertex = new Vector3F(x, y, 0);
+                var vertex = new Vector2(x, y);
 
                 points.Add(vertex);
 
@@ -43,16 +43,22 @@ namespace Adamantium.Engine.Templates.Lights
 
             PolygonItem item = new PolygonItem(points);
             Polygon polygon = new Polygon();
-            polygon.Polygons.Add(item);
+            polygon.AddItem(item);
             var triangulatedList = polygon.Fill();
             var spotLightIcon = new Mesh();
             spotLightIcon.MeshTopology = PrimitiveType.TriangleList;
-            spotLightIcon.SetPositions(triangulatedList);
+            spotLightIcon.SetPoints(triangulatedList);
             spotLightIcon.Optimize();
 
             float height = 0.1f;
             float raySize = 0.3f;
-            var centralRay = Shapes.Rectangle.GenerateGeometry(GeometryType.Solid, raySize, height, height/2, height/2, tessellation, Matrix4x4F.RotationZ(MathHelper.DegreesToRadians(90))*Matrix4x4F.Translation(new Vector3F(0, (-raySize / 2)-0.2f, 0)));
+            var centralRay = Shapes.Rectangle.GenerateGeometry(
+                GeometryType.Solid, 
+                raySize, 
+                height, 
+                new CornerRadius(height/2),
+                tessellation, 
+                Matrix4x4F.RotationZ(MathHelper.DegreesToRadians(90))*Matrix4x4F.Translation(new Vector3F(0, (-raySize / 2)-0.2f, 0)));
             var leftRay = centralRay.Clone(Matrix4x4F.RotationZ(MathHelper.DegreesToRadians(-45)) * Matrix4x4F.Translation(-size/2, 0, 0));
             var rightRay = centralRay.Clone(Matrix4x4F.RotationZ(MathHelper.DegreesToRadians(45)) * Matrix4x4F.Translation(size/2, 0, 0));
 

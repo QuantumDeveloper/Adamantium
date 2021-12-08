@@ -1,4 +1,5 @@
 ﻿using Adamantium.Mathematics;
+using Adamantium.UI.RoutedEvents;
 using Adamantium.UI.Windows.Input;
 using Adamantium.Win32;
 
@@ -84,7 +85,7 @@ namespace Adamantium.UI.Input
       public static MouseButtonState XButton1 => PrimaryDevice.XButton1;
       public static MouseButtonState XButton2 => PrimaryDevice.XButton2;
 
-      public static Point ScreenCoordinates
+      public static Vector2 ScreenCoordinates
       {
          get
          {
@@ -92,10 +93,10 @@ namespace Adamantium.UI.Input
             Win32Interop.GetCursorPos(out point);
             return point;
          }
-         set { Win32Interop.SetCursorPos((int)value.X, (int)value.Y); }
+         set => Win32Interop.SetCursorPos((int)value.X, (int)value.Y);
       }
 
-      public static Point GetPosition(IInputElement element)
+      public static Vector2 GetPosition(IInputElement element)
       {
          return PrimaryDevice.GetPosition(element);
       }

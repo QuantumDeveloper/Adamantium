@@ -11,8 +11,8 @@ namespace Adamantium.UI.Controls
 
       public Boolean LastChildFill
       {
-         get { return GetValue<Boolean>(LastFildFillProperty); }
-         set { SetValue(LastFildFillProperty, value);}
+         get => GetValue<Boolean>(LastFildFillProperty);
+         set => SetValue(LastFildFillProperty, value);
       }
 
       public static Dock GetDock(UIComponent element)

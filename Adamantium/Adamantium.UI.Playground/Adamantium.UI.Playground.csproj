@@ -2,19 +2,15 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net5.0</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
     <ApplicationIcon />
     <StartupObject />
-    <Platforms>AnyCPU;x64</Platforms>
-  </PropertyGroup>
-
-  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
-    <PlatformTarget>x64</PlatformTarget>
+    <Platforms>x64</Platforms>
+    <Configurations>Debug;Release</Configurations>
+    <LangVersion>latestmajor</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>
-    <Effect Include="Effects\UIEffect.fx" />
-    <Effect Include="Effects\BasicEffect.fx" />
     <Content Include="Textures\texture.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -29,7 +25,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Adamantium.Fonts\Adamantium.Fonts.csproj" />
     <ProjectReference Include="..\Adamantium.UI\Adamantium.UI.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Effect Include="Effects\BasicEffect.fx" />
+    <Effect Include="Effects\UIEffect.fx" />
   </ItemGroup>
 
   <Import Project="$(SolutionDir)Adamantium.targets" />

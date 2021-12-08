@@ -1,12 +1,13 @@
 ﻿using System;
 using Adamantium.UI.Media;
+using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI.Input
 {
    /// <summary>
    /// Interface for all elements, which takes user input
    /// </summary>
-   public interface IInputElement:IVisual
+   public interface IInputElement: IUIComponent
    {
       /// <summary>
       /// Define is element could receive focus

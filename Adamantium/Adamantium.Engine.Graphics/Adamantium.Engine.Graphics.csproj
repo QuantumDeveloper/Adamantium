@@ -1,16 +1,17 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net5.0</TargetFramework>
-    <Platforms>AnyCPU;x64</Platforms>
-    <LangVersion>preview</LangVersion>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <TargetFramework>net6.0</TargetFramework>
+    <Platforms>x64</Platforms>
+    <LangVersion>latestmajor</LangVersion>
+    <Configurations>Debug;Release</Configurations>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
@@ -32,6 +33,8 @@
   <ItemGroup>
     <Effect Include="HLSL\BasicEffect.fx" />
   </ItemGroup>
+
+  <Import Project="$(SolutionDir)Adamantium.targets" />
 
   <Import Project="$(SolutionDir)Adamantium.targets" />
 

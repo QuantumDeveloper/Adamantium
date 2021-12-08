@@ -1,12 +1,13 @@
 ﻿using Adamantium.Mathematics;
+using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI.Controls.Primitives
 {
    public class DragStartedEventArgs:RoutedEventArgs
    {
-      public Point Offset { get; }
+      public Vector2 Offset { get; }
 
-      public DragStartedEventArgs(Point offset)
+      public DragStartedEventArgs(Vector2 offset)
       {
          Offset = offset;
       }

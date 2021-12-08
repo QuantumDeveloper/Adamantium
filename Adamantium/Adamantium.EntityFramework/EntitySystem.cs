@@ -36,9 +36,10 @@ namespace Adamantium.EntityFramework
         public event EventHandler<EntityProcessorEventArgs> ProcessorAdded;
         public event EventHandler<EntityProcessorEventArgs> ProcessorRemoved;
 
+        public Action FrameEnded;
+
         private void OnProcessorAdded(EntityProcessor processor)
         {
-            processor?.AddEntities(EntityWorld.RootEntities);
             ProcessorAdded?.Invoke(this, new EntityProcessorEventArgs(processor));
         }
 
@@ -46,6 +47,11 @@ namespace Adamantium.EntityFramework
         {
             processor?.UnloadContent();
             ProcessorRemoved?.Invoke(this, new EntityProcessorEventArgs(processor));
+        }
+
+        private void OnFrameEnded()
+        {
+            FrameEnded?.Invoke();
         }
 
         public T GetProcessor<T>() where T : EntityProcessor
@@ -142,15 +148,21 @@ namespace Adamantium.EntityFramework
             base.Draw(gameTime);
             lock (syncObject)
             {
-                foreach (var handler in Processors)
+                foreach (var processor in Processors)
                 {
-                    if (handler.BeginDraw())
+                    if (processor.BeginDraw())
                     {
-                        handler.Draw(gameTime);
-                        handler.EndDraw();
+                        processor.Draw(gameTime);
+                        processor.EndDraw();
                     }
                 }
             }
+        }
+
+        public override void EndDraw()
+        {
+            base.EndDraw();
+            OnFrameEnded();
         }
 
         private void SyncProcessors()

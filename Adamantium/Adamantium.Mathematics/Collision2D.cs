@@ -1,41 +1,21 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace Adamantium.Mathematics
 {
     public static class Collision2D
     {
-        public static bool IsPointOnSegment(ref LineSegment segment, ref Vector3D point)
+        [MethodImpl(MethodImplOptions.AggressiveInlining|MethodImplOptions.AggressiveOptimization)]
+        public static bool IsPointOnSegment(ref LineSegment2D segment2D, ref Vector2 point)
         {
-            //Find cross product for (v3-v1)-(v2-v1) to tell if points v1,v2 and v3 are aligned.
-            //If it is so, then value should be near zero (less than Epsilon)
-            //This additional calculation gives more precision and exclude false positive results
-            //var cross = (v3.Y - v1.Y) * (v2.X - v1.X) - (v3.X - v1.X) * (v2.Y - v1.Y);
-            //if (MathHelper.IsZero(cross))
-            //    return false;
-
-            var v1 = segment.DirectionNormalized;
-            var v2 = Vector3D.Normalize(point - segment.Start);
-            var v3 = point - segment.End;
-
-            var v2v1 = Vector3D.Dot(v2, v1) - 1.0f;
-            if (MathHelper.NearEqual(v2v1, Polygon.Epsilon) && Vector3D.Dot(v3, v1) < 0)
-            {
-                return true;
-            }
-
-            //Second approach
-            var ab = segment.Direction.Length();
-            var ap = (point - segment.Start).Length();
-            var bp = (point - segment.End).Length();
-            if (MathHelper.WithinEpsilon(ab, ap + bp, Polygon.Epsilon))
-            {
-                return true;
-            }
-
-            return false;
+            var ab = segment2D.Direction.Length();
+            var ap = Vector2.Subtract(point, segment2D.Start).Length();
+            var bp = Vector2.Subtract(point, segment2D.End).Length();
+            return MathHelper.WithinEpsilon(ab, ap + bp, Polygon.Epsilon);
         }
 
-        public static bool SegmentSegmentIntersection(ref LineSegment segment1, ref LineSegment segment2, out Vector3D point)
+        public static bool SegmentSegmentIntersection(ref LineSegment2D segment1, ref LineSegment2D segment2, out Vector2 point)
         {
             var p = segment1.Start;
             var q = segment2.Start;
@@ -48,7 +28,7 @@ namespace Adamantium.Mathematics
 
             if (denominator == 0.0)
             {
-                point = Vector3D.Zero;
+                point = Vector2.Zero;
                 return false;
             }
 
@@ -57,55 +37,37 @@ namespace Adamantium.Mathematics
             var t = tNumerator / denominator;
             var u = uNumerator / denominator;
 
-            //if (MathHelper.NearEqual(t, 0) && t < 0)
-            //{
-            //    t = 0;
-            //}
-
-            //if (MathHelper.NearEqual(t, 1) && t > 1)
-            //{
-            //    t = 1;
-            //}
-
-            //if (MathHelper.NearEqual(u, 0) && u < 0)
-            //{
-            //    u = 0;
-            //}
-
-            //if (MathHelper.NearEqual(u, 1) && u > 1)
-            //{
-            //    u = 1;
-            //}
-
             if (t < 0 || t > 1 || u < 0 || u > 1)
             {
-                point = Vector3D.Zero;
+                point = Vector2.Zero;
                 return false;
             }
 
             point = p + r * t;
+            point.X = Math.Round(point.X, 4, MidpointRounding.AwayFromZero);
+            point.Y = Math.Round(point.Y, 4, MidpointRounding.AwayFromZero);
             return true;
         }
 
-        public static bool RaySegmentIntersection(ref Ray2D ray, ref Vector3D start, ref Vector3D end, out Vector3D point)
+        public static bool RaySegmentIntersection(ref Ray2D ray, ref Vector2 start, ref Vector2 end, out Vector2 point)
         {
-            var segment = new LineSegment(start, end);
+            var segment = new LineSegment2D(start, end);
             return RaySegmentIntersection(ref ray, ref segment, out point);
         }
 
-        public static bool RaySegmentIntersection(ref Ray2D ray, ref LineSegment segment, out Vector3D point)
+        public static bool RaySegmentIntersection(ref Ray2D ray, ref LineSegment2D segment2D, out Vector2 point)
         {
-            var collinear = MathHelper.IsCollinear((Vector3D)ray.Direction, segment.Direction);
+            var collinear = ray.Direction.IsCollinear(segment2D.Direction);
             if (collinear)
             {
-                point = Vector3D.Zero;
+                point = Vector2.Zero;
                 return false;
             }
 
-            var p = (Vector3D) ray.Origin;
-            var r = (Vector3D) ray.Direction;
-            var q = segment.Start;
-            var s = segment.Direction;
+            var p = ray.Origin;
+            var r = ray.Direction;
+            var q = segment2D.Start;
+            var s = segment2D.Direction;
             // t = (q − p) × s / (r × s)
             // u = (q − p) × r / (r × s)
 
@@ -113,7 +75,7 @@ namespace Adamantium.Mathematics
 
             if (denominator == 0.0f)
             {
-                point = Vector3D.Zero;
+                point = Vector2.Zero;
                 return false;
             }
 
@@ -147,7 +109,7 @@ namespace Adamantium.Mathematics
 
             if (t < 0 || u < 0 || u > 1)
             {
-                point = Vector3D.Zero;
+                point = Vector2.Zero;
                 return false;
             }
 
@@ -156,47 +118,198 @@ namespace Adamantium.Mathematics
         }
 
 
-        public static bool RaySegmentIntersection(ref Ray2D ray, ref LineSegment segment, out Vector3D point, out double distance)
+        public static bool RaySegmentIntersection(ref Ray2D ray, ref LineSegment2D segment2D, out Vector2 point, out double distance)
         {
-            bool collinear = MathHelper.IsCollinear(ray.Direction, (Vector2D)segment.DirectionNormalized);
+            var collinear = ray.Direction.IsCollinear(segment2D.Direction);
             distance = float.PositiveInfinity;
-            point = Vector3D.Zero;
-            if (!collinear)
+            point = Vector2.Zero;
+            if (collinear) return false;
+            
+            var p = ray.Origin;
+            var q = segment2D.Start;
+            var r = ray.Direction;
+            var s = segment2D.Direction;
+            // t = (q − p) × s / (r × s)
+            // u = (q − p) × r / (r × s)
+
+            var denominator = MathHelper.Determinant(r, s);
+
+            if (MathHelper.IsZero(denominator))
             {
-                var p = (Vector3D)ray.Origin;
-                var q = segment.Start;
-                var r = (Vector3D)ray.Direction;
-                var s = segment.Direction;
-                // t = (q − p) × s / (r × s)
-                // u = (q − p) × r / (r × s)
+                point = Vector2.Zero;
+                return false;
+            }
 
-                var denominator = MathHelper.Determinant(r, s);
+            var tNumerator = MathHelper.Determinant(q - p, s);
+            var uNumerator = MathHelper.Determinant(q - p, r);
 
-                if (MathHelper.IsZero(denominator))
+            var t = tNumerator / denominator;
+            var u = uNumerator / denominator;
+
+            point = p + r * t;
+            //If ray and line not intersecting, try to find out closest distance between them
+            //and if distance is less than Epsilon, then we can say that ray intersects line
+            //because distance is near zero
+            var a = Vector2.Dot(segment2D.Start, segment2D.Direction);
+            var b = Vector2.Dot(point, segment2D.Direction);
+            distance = Math.Abs(b - a);
+
+            if (t < 0 || t > 1 || u < 0 || u > 1)
+            {
+                return false;
+            }
+            return true;
+        }
+        
+        public static double Distance(Vector2 v1, Vector2 v2)
+        {
+            //return Math.Sqrt(Math.Pow(v2.X - v1.X, 2) + Math.Pow(v2.Y - v1.Y, 2));
+            return Math.Sqrt((v2.X - v1.X) * (v2.X - v1.X) + (v2.Y - v1.Y) * (v2.Y - v1.Y));
+        }
+        
+        public static double Distance(double x1, double y1, double x2, double y2)
+        {
+            //return Math.Sqrt(Math.Pow(x2 - x1, 2) + Math.Pow(y2 - y1, 2));
+            return Math.Sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
+        }
+
+        public static double DistanceToPoint(this Vector2 point, Vector2 start, Vector2 end)
+        {
+            double dStart = Distance(point, start);
+            double dEnd = Distance(point, end);
+            double dStartEnd = Distance(start, end);
+
+            if (dStart >= Distance(dEnd, dStartEnd, 0, 0))
+            {
+                return dEnd;
+            }
+            else if (dEnd >= Distance(dStart, dStartEnd, 0 ,0))
+            {
+                return dStart;
+            }
+            else
+            {
+                double a = end.Y - start.Y;
+                double b = start.X - end.X;
+                double c = -start.X * (end.Y - start.Y) + start.Y * (end.X - start.X);
+                double t = Distance(a, b, 0, 0);
+
+                if (c > 0)
                 {
-                    point = Vector3D.Zero;
-                    return false;
+                    a = -a;
+                    b = -b;
+                    c = -c;
                 }
 
-                var tNumerator = MathHelper.Determinant(q - p, s);
-                var uNumerator = MathHelper.Determinant(q - p, r);
+                double ret = (a * point.X + b * point.Y + c) / t;
 
-                var t = tNumerator / denominator;
-                var u = uNumerator / denominator;
+                return Math.Abs(ret);
+            }
+        }
+        
+        public static double DistanceToPoint(this Vector2 point, Vector2 start, Vector2 end, out byte pointRelativePosition)
+        {
+            double dStart = Distance(point, start);
+            double dEnd = Distance(point, end);
+            double dStartEnd = Distance(start, end);
 
-                point = p + r * t;
-                //If ray and line not intersecting, try to find out closest distance between them
-                //and if distance is less than Epsilon, then we can say that ray intersects line
-                //because distance is near zero
-                var a = Vector3D.Dot(segment.Start, segment.Direction);
-                var b = Vector3D.Dot(point, segment.Direction);
-                distance = Math.Abs(b - a);
+            if (dStart >= Distance(dEnd, dStartEnd, 0, 0))
+            {
+                pointRelativePosition = 2;
+                return Distance(point, end);
+            }
+            else if (dEnd >= Distance(dStart, dStartEnd, 0 ,0))
+            {
+                pointRelativePosition = 0;
+                return Distance(point, start);
+            }
+            else
+            {
+                pointRelativePosition = 1;
+                double a = end.Y - start.Y;
+                double b = start.X - end.X;
+                double c = -start.X * (end.Y - start.Y) + start.Y * (end.X - start.X);
+                double t = Distance(a, b, 0, 0);
 
-                if (t < 0 || t > 1 || u < 0 || u > 1)
+                if (c > 0)
                 {
-                    return false;
+                    a = -a;
+                    b = -b;
+                    c = -c;
                 }
-                return true;
+
+                double ret = (a * point.X + b * point.Y + c) / t;
+
+                return Math.Abs(ret);
+            }
+        }
+        
+        public static Vector2? LineLineIntersection(Vector2 a, Vector2 b, Vector2 c, Vector2 d)
+        {
+            // Line 'ab' represented as a1x + b1y = c1 
+            double a1 = b.Y - a.Y;
+            double b1 = a.X - b.X;
+            double c1 = a1 * (a.X) + b1 * (a.Y);
+  
+            // Line 'cd' represented as a2x + b2y = c2 
+            double a2 = d.Y - c.Y;
+            double b2 = c.X - d.X;
+            double c2 = a2 * (c.X) + b2 * (c.Y);
+  
+            double determinant = a1 * b2 - a2 * b1;
+  
+            if (determinant == 0)
+            {
+                // The lines are parallel 
+                return null;
+            }
+            
+            double x = (b2 * c1 - b1 * c2) / determinant;
+            double y = (a1 * c2 - a2 * c1) / determinant;
+            return new Vector2(x, y);
+        }
+        
+        /// <summary>
+        /// Checks if point is completely inside polygon, formed by segments
+        /// </summary>
+        /// <param name="point"></param>
+        /// <param name="area"></param>
+        /// <returns>True if point is completely inside polygon, otherwise false</returns>
+        public static bool IsPointInsideArea(Vector2 point, IEnumerable<LineSegment2D> area)
+        {
+            var rayLeft = new Ray2D(point, -Vector2.UnitX);
+            var rayDown = new Ray2D(point, -Vector2.UnitY);
+            var rayRight = new Ray2D(point, Vector2.UnitX);
+            var rayUp = new Ray2D(point, Vector2.UnitY);
+            var sides = IntersectionSides.None;
+            
+            foreach (var a in area)
+            {
+                var segment = a;
+                if (RaySegmentIntersection(ref rayLeft, ref segment, out var interPoint))
+                {
+                    sides |= IntersectionSides.Left;
+                }
+
+                if (RaySegmentIntersection(ref rayDown, ref segment, out interPoint))
+                {
+                    sides |= IntersectionSides.Down;
+                }
+
+                if (RaySegmentIntersection(ref rayRight, ref segment, out interPoint))
+                {
+                    sides |= IntersectionSides.Right;
+                }
+
+                if (RaySegmentIntersection(ref rayUp, ref segment, out interPoint))
+                {
+                    sides |= IntersectionSides.Up;
+                }
+
+                if (sides.HasFlag(IntersectionSides.All))
+                {
+                    return true;
+                }
             }
             return false;
         }

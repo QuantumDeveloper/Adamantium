@@ -8,8 +8,8 @@ namespace Adamantium.EntityFramework.ComponentsBasics
     {
         public Transform()
         {
-            InitialPosition = Vector3D.Zero;
-            Position = Vector3D.Zero;
+            InitialPosition = Vector3.Zero;
+            Position = Vector3.Zero;
             Rotation = QuaternionF.Identity;
             PivotRotation = QuaternionF.Identity;
             baseScale = Vector3F.One;
@@ -17,17 +17,17 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             TransformData = new Dictionary<CameraBase, TransformMetaData>();
         }
 
-        private Vector3D initialPosition;
-        private Vector3D position;
+        private Vector3 initialPosition;
+        private Vector3 position;
         private QuaternionF rotation;
         private Vector3F baseScale;
         private Vector3F scaleFactor;
-        private Vector3D pivot;
+        private Vector3 pivot;
         private QuaternionF pivotRotation;
 
         private readonly Dictionary<CameraBase, TransformMetaData> TransformData;
 
-        public Vector3F GetRelativePosition(Vector3D offset)
+        public Vector3F GetRelativePosition(Vector3 offset)
         {
             return Position - offset;
         }
@@ -72,7 +72,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             GetMetadata(camera).Enabled = enabled;
         }
 
-        public Vector3D Pivot
+        public Vector3 Pivot
         {
             get => pivot + Position;
             set
@@ -90,13 +90,13 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             set => SetProperty(ref pivotRotation, value);
         }
 
-        public Vector3D InitialPosition
+        public Vector3 InitialPosition
         {
             get => initialPosition;
             set => SetProperty(ref initialPosition, value);
         }
 
-        public Vector3D Position
+        public Vector3 Position
         {
             get => position;
             set => SetProperty(ref position, value);
@@ -138,7 +138,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
         {
             lock (this)
             {
-                var distanceVector = Vector3D.Multiply(direction, distance);
+                var distanceVector = Vector3.Multiply(direction, distance);
                 if (Owner == null && IsEnabled)
                 {
                     Position = distanceVector;
@@ -149,11 +149,11 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             }
         }
 
-        public void Move(Vector3F direction, Vector3D distance)
+        public void Move(Vector3F direction, Vector3 distance)
         {
             lock (this)
             {
-                var distanceVector = Vector3D.Multiply(direction, distance);
+                var distanceVector = Vector3.Multiply(direction, distance);
                 if (Owner == null && IsEnabled)
                 {
                     Position = distanceVector;
@@ -168,7 +168,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
         {
             lock (this)
             {
-                var distanceVector = Vector3D.Multiply(direction, distance);
+                var distanceVector = Vector3.Multiply(direction, distance);
                 if (Owner == null && IsEnabled)
                 {
                     Position += distanceVector;
@@ -183,7 +183,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
         {
             lock (this)
             {
-                var distanceVector = Vector3D.Multiply(GetRotationMatrix().Right, distance);
+                var distanceVector = Vector3.Multiply(GetRotationMatrix().Right, distance);
                 if (Owner == null && IsEnabled)
                 {
                     Position += distanceVector;
@@ -198,7 +198,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
         {
             lock (this)
             {
-                var distanceVector = Vector3D.Multiply(GetRotationMatrix().Up, distance);
+                var distanceVector = Vector3.Multiply(GetRotationMatrix().Up, distance);
                 if (Owner == null && IsEnabled)
                 {
                     Position += distanceVector;
@@ -213,7 +213,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
         {
             lock (this)
             {
-                var distanceVector = Vector3D.Multiply(GetRotationMatrix().Forward, distance);
+                var distanceVector = Vector3.Multiply(GetRotationMatrix().Forward, distance);
                 if (Owner == null && IsEnabled)
                 {
                     Position += distanceVector;
@@ -242,7 +242,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
         {
             lock (this)
             {
-                var distanceVector = Vector3D.Multiply(direction, distance);
+                var distanceVector = Vector3.Multiply(direction, distance);
                 if (Owner == null && IsEnabled)
                 {
                     Position += distanceVector;
@@ -257,7 +257,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
         {
             lock (this)
             {
-                var distanceVector = Vector3D.Multiply(direction, distance);
+                var distanceVector = Vector3.Multiply(direction, distance);
                 if (Owner == null && IsEnabled)
                 {
                     Pivot += distanceVector;
@@ -272,7 +272,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
         {
             lock (this)
             {
-                var distanceVector = Vector3D.Multiply(direction, distance);
+                var distanceVector = Vector3.Multiply(direction, distance);
                 if (Owner == null && IsEnabled)
                 {
                     Pivot += distanceVector;
@@ -283,7 +283,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             }
         }
 
-        public void SetPosition(Vector3D newPosition)
+        public void SetPosition(Vector3 newPosition)
         {
             lock (this)
             {
@@ -640,7 +640,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             }
         }
 
-        private void Move(Entity entity, Vector3D distance)
+        private void Move(Entity entity, Vector3 distance)
         {
             if (entity.Transform.IsEnabled)
             {
@@ -648,7 +648,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             }
         }
 
-        private void Translate(Entity entity, Vector3D distance)
+        private void Translate(Entity entity, Vector3 distance)
         {
             if (entity.Transform.IsEnabled)
             {
@@ -664,7 +664,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             }
         }
 
-        private void TranslatePivot(Entity entity, Vector3D distance)
+        private void TranslatePivot(Entity entity, Vector3 distance)
         {
             if (entity.Transform.IsEnabled)
             {
@@ -672,7 +672,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             }
         }
 
-        private void SetPivot(Entity entity, Vector3D position)
+        private void SetPivot(Entity entity, Vector3 position)
         {
             if (entity.Transform.IsEnabled)
             {
@@ -680,7 +680,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             }
         }
 
-        private void SetPosition(Entity entity, Vector3D newPosition)
+        private void SetPosition(Entity entity, Vector3 newPosition)
         {
             if (entity.Transform != null && entity.Transform.IsEnabled)
             {

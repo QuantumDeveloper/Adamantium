@@ -1,11 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net5.0</TargetFramework>
+        <TargetFramework>net6.0</TargetFramework>
 
         <IsPackable>false</IsPackable>
 
-        <Platforms>AnyCPU;x64</Platforms>
+        <Platforms>x64</Platforms>
+
+        <Configurations>Debug;Release</Configurations>
+
+        <LangVersion>latestmajor</LangVersion>
     </PropertyGroup>
 
     <ItemGroup>
@@ -15,9 +19,9 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="nunit" Version="3.12.0" />
-        <PackageReference Include="NUnit3TestAdapter" Version="4.0.0-alpha.1" />
-        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.8.0-preview-20200806-02" />
+        <PackageReference Include="nunit" Version="3.13.2" />
+        <PackageReference Include="NUnit3TestAdapter" Version="4.0.0" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.11.0" />
     </ItemGroup>
 
     <ItemGroup>

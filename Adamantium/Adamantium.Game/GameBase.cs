@@ -73,7 +73,7 @@ namespace Adamantium.Game
         protected GameBase(GameMode mode)
         {
             Mode = mode;
-            Services = new AdamantiumServiceLocator();
+            Services = AdamantiumServiceLocator.Current;
             GameTime = new GameTime();
             gameTimer = new PreciseTimer();
             contextsMapping = new Dictionary<Object, GameContext>();
@@ -304,7 +304,7 @@ namespace Adamantium.Game
 
         internal void OnStarted()
         {
-            Started?.Invoke(this, new EventArgs());
+            Started?.Invoke(this, EventArgs.Empty);
         }
 
         /// <summary>
@@ -622,7 +622,7 @@ namespace Adamantium.Game
         }
 
         /// <summary>
-        /// Called aftre EndScene to update all devices and resources to avoid resizing issues and black screens
+        /// Called after EndScene to update all devices and resources to avoid resizing issues and black screens
         /// </summary>
         protected virtual void MakePreparations()
         {

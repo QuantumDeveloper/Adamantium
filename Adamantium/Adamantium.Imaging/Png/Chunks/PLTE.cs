@@ -19,12 +19,12 @@ namespace Adamantium.Imaging.Png.Chunks
 
             bytes.AddRange(GetNameAsBytes());
             List<byte> palette = new List<byte>();
-            for (int i = 0; i != state.InfoRaw.PaletteSize; ++i)
+            for (int i = 0; i != state.ColorModeRaw.PaletteSize; ++i)
             {
                 /*add all channels except alpha channel*/
                 if (i % 4 != 3)
                 {
-                    palette.Add(state.InfoRaw.Palette[i]);
+                    palette.Add(state.ColorModeRaw.Palette[i]);
                 }
             }
             bytes.AddRange(palette);
@@ -35,7 +35,7 @@ namespace Adamantium.Imaging.Png.Chunks
         internal static PLTE FromState(PNGState state)
         {
             var plte = new PLTE();
-            plte.Palette = state.InfoRaw.Palette;
+            plte.Palette = state.ColorModeRaw.Palette;
             return plte;
         }
     }

@@ -4,6 +4,7 @@ using Adamantium.Engine.Graphics;
 using Adamantium.Imaging;
 using Adamantium.UI.Media;
 using Adamantium.UI.Media.Imaging;
+using Adamantium.UI.RoutedEvents;
 using Adamantium.Win32;
 
 namespace Adamantium.UI.Controls
@@ -37,20 +38,20 @@ namespace Adamantium.UI.Controls
 
       public SurfaceFormat PixelFormat
       {
-         get { return GetValue<SurfaceFormat>(PixelFormatProperty); }
-         set { SetValue(PixelFormatProperty, value);}
+         get => GetValue<SurfaceFormat>(PixelFormatProperty);
+         set => SetValue(PixelFormatProperty, value);
       }
       
       public Int32 PixelWidth
       {
-         get { return GetValue<Int32>(PixelWidthProperty); }
-         set { SetValue(PixelWidthProperty, value);}
+         get => GetValue<Int32>(PixelWidthProperty);
+         set => SetValue(PixelWidthProperty, value);
       }
 
       public Int32 PixelHeight
       {
-         get { return GetValue<Int32>(PixelHeightProperty); }
-         set { SetValue(PixelHeightProperty, value); }
+         get => GetValue<Int32>(PixelHeightProperty);
+         set => SetValue(PixelHeightProperty, value);
       }
 
       private static void RenderTargetParametersChanged(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
@@ -72,8 +73,8 @@ namespace Adamantium.UI.Controls
       /// </summary>
       public IntPtr Handle
       {
-         get { return GetValue<IntPtr>(HandleProperty); }
-         private set { SetValue(HandleProperty, value);}
+         get => GetValue<IntPtr>(HandleProperty);
+         private set => SetValue(HandleProperty, value);
       }
 
       private void UpdateOrCreateRenderTarget()
@@ -116,7 +117,7 @@ namespace Adamantium.UI.Controls
 
       public event EventHandler<RenderTargetEventArgs> RenderTargetInitialized;
 
-      public override void OnRender(DrawingContext context)
+      protected override void OnRender(DrawingContext context)
       {
          if (rendertarget != null)
          {
@@ -124,7 +125,7 @@ namespace Adamantium.UI.Controls
             if (sizeChanged)
             {
                context.BeginDraw(this);
-               context.DrawImage(this, rendertarget, Brushes.White, new Rect(Bounds.Size), 0.0, 0.0);
+               context.DrawImage(rendertarget, Brushes.White, new Rect(Bounds.Size), new CornerRadius(0));
                context.EndDraw(this);
                sizeChanged = false;
             }

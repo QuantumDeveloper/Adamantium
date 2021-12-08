@@ -3,58 +3,81 @@ using System.Collections.Generic;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.Mathematics;
-using Point = Adamantium.Mathematics.Point;
+using Adamantium.UI.Controls;
+using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI.Media
 {
-   public class LineGeometry:Geometry
+   public class LineGeometry : Geometry
    {
-      public override Rect Bounds { get; }
+      private Rect bounds;
+
+      public static readonly AdamantiumProperty StartPointProperty =
+         AdamantiumProperty.Register(nameof(StartPoint), typeof(Vector2), typeof(LineGeometry),
+            new PropertyMetadata(new Vector2(0), PropertyMetadataOptions.AffectsMeasure));
+      
+      public static readonly AdamantiumProperty EndPointProperty =
+         AdamantiumProperty.Register(nameof(EndPoint), typeof(Vector2), typeof(LineGeometry),
+            new PropertyMetadata(new Vector2(0), PropertyMetadataOptions.AffectsMeasure));
+      
+      public static readonly AdamantiumProperty ThicknessProperty =
+               AdamantiumProperty.Register(nameof(Thickness), typeof(Double), typeof(LineGeometry),
+                  new PropertyMetadata(0d, PropertyMetadataOptions.AffectsMeasure));
+
+      public override Rect Bounds => bounds;
+
+      public Vector2 StartPoint
+      {
+         get => GetValue<Vector2>(StartPointProperty);
+         set => SetValue(StartPointProperty, value);
+      }
+
+      public Vector2 EndPoint
+      {
+         get => GetValue<Vector2>(EndPointProperty);
+         set => SetValue(EndPointProperty, value);
+      }
+
+      public Double Thickness
+      {
+         get => GetValue<Double>(ThicknessProperty);
+         set => SetValue(ThicknessProperty, value);
+      }
+
+      public LineGeometry()
+      {
+      }
+
+      public LineGeometry(Vector2 startPoint, Vector2 endPoint, Double thickness) : this()
+      {
+         StartPoint = startPoint;
+         EndPoint = endPoint;
+         Thickness = thickness;
+         bounds = new Rect(startPoint, endPoint);
+      }
+
+      public override void RecalculateBounds()
+      {
+         bounds = new Rect(StartPoint, EndPoint);
+      }
+      
       public override Geometry Clone()
       {
          throw new NotImplementedException();
       }
 
-      public Point StartPosition { get; set; }
-
-      public Point EndPosition { get; set; }
-
-      public LineGeometry()
+      protected internal override void ProcessGeometry()
       {
-         PrimitiveType = PrimitiveType.TriangleStrip;
-         VertexArray = new List<VertexPositionTexture>();
-         IndicesArray = new List<int>();
-      }
-
-      public LineGeometry(Point startPoint, Point endPoint, Double thickness)
-      {
-         PrimitiveType = PrimitiveType.TriangleStrip;
-         VertexArray = new List<VertexPositionTexture>();
-         IndicesArray = new List<int>();
-         StartPosition = startPoint;
-         EndPosition = endPoint;
-
-         CreateLine(thickness);
+         CreateLine(Thickness);
       }
 
       internal void CreateLine(Double thickness)
       {
-         var point2 = EndPosition - StartPosition;
-         var cross = new Vector2F((float)point2.Y, (float)-point2.X) * -1;
-         cross.Normalize();
-         var p0 = StartPosition + cross * (float)thickness;
-         var p1 = EndPosition + cross * (float)thickness;
-
-         VertexArray.Add(new VertexPositionTexture(StartPosition, Vector2F.Zero));
-         VertexArray.Add(new VertexPositionTexture(EndPosition, new Vector2F(1, 0)));
-         VertexArray.Add(new VertexPositionTexture(new Vector3F(p0, 0), Vector2F.One));
-         VertexArray.Add(new VertexPositionTexture(new Vector3F(p1, 0), new Vector2F(0, 1)));
-
-         IndicesArray.Add(lastIndex++);
-         IndicesArray.Add(lastIndex++);
-         IndicesArray.Add(lastIndex++);
-         IndicesArray.Add(lastIndex++);
-         IndicesArray.Add(interrupt);
+         Mesh = Engine.Graphics.Shapes.Line.GenerateGeometry(
+            GeometryType.Solid, 
+            (Vector3F)StartPoint,
+            (Vector3F)EndPoint,
+            (float)thickness);
       }
    }
 }

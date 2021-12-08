@@ -1,7 +1,6 @@
-﻿using ProtoBuf.Meta;
-using System.Collections.Generic;
-using System.Diagnostics;
+﻿using System.Collections.Generic;
 using System.IO;
+using MessagePack;
 
 namespace Adamantium.Engine.Core.Effects
 {
@@ -9,17 +8,19 @@ namespace Adamantium.Engine.Core.Effects
     {
         public static readonly string CompiledExtension = "fx.compiled";
 
-        private static readonly RuntimeTypeModel Scheme;
+        //private static readonly RuntimeTypeModel Scheme;
 
         static EffectData()
         {
-            Scheme = RuntimeTypeModel.Create();
+            //Scheme = RuntimeTypeModel.Create();
             ConfigureSerializationScheme();
         }
 
         private static void ConfigureSerializationScheme()
         {
-            Scheme.AutoAddMissingTypes = true;
+            MessagePackSerializer.DefaultOptions = MessagePack.Resolvers.ContractlessStandardResolver.Options;
+            
+            /*Scheme.AutoAddMissingTypes = true;
             
             var compilerArgs = Scheme.Add(typeof(CompilerArguments),false);
             compilerArgs.AddField(1, "FilePath");
@@ -101,6 +102,7 @@ namespace Adamantium.Engine.Core.Effects
             effectData.AddField(2, "Description");
 
             Scheme.CompileInPlace();
+            */
         }
 
         public EffectData() { }
@@ -121,7 +123,8 @@ namespace Adamantium.Engine.Core.Effects
         /// <param name="stream">The stream.</param>
         public void Save(Stream stream)
         {
-            Scheme.Serialize(stream, this);
+            MessagePackSerializer.Serialize(stream, this);
+            //Scheme.Serialize(stream, this);
         }
 
         /// <summary>
@@ -130,8 +133,8 @@ namespace Adamantium.Engine.Core.Effects
         /// <param name="fileName">The output filename.</param>
         public void Save(string fileName)
         {
-            using (var stream = new FileStream(fileName, FileMode.Create, FileAccess.Write, FileShare.Write))
-                Save(stream);
+            using var stream = new FileStream(fileName, FileMode.Create, FileAccess.Write, FileShare.Write);
+            Save(stream);
         }
 
         /// <summary>
@@ -143,7 +146,8 @@ namespace Adamantium.Engine.Core.Effects
         /// </remarks>
         public static EffectData Load(Stream stream)
         {
-            var effect = (EffectData)Scheme.Deserialize(stream, null, typeof(EffectData));
+            //var effect = (EffectData)Scheme.Deserialize(stream, null, typeof(EffectData));
+            var effect = MessagePackSerializer.Deserialize<EffectData>(stream);
             return effect;
         }
 

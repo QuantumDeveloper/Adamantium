@@ -124,7 +124,7 @@ namespace Adamantium.Engine.Compiler.Converter.ConversionUtils
                   uv0.Add(geometryData.UV[indicesContainer.UV0[i]]);
                }
             }
-            mesh.SetPositions(positions);
+            mesh.SetPoints(positions);
             mesh.SetUVs(0, uv0);
             mesh.GenerateBasicIndices();
             constructedMesh.Meshes.Add(mesh);

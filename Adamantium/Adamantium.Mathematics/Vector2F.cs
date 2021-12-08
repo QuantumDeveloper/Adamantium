@@ -71,10 +71,7 @@ namespace Adamantium.Mathematics
       /// <summary>
       /// Gets a value indicting whether this instance is normalized.
       /// </summary>
-      public bool IsNormalized
-      {
-         get { return MathHelper.IsOne((X * X) + (Y * Y)); }
-      }
+      public bool IsNormalized => MathHelper.IsOne((X * X) + (Y * Y));
 
       /// <summary>
       /// Gets a value indicting whether this vector is zero
@@ -159,6 +156,12 @@ namespace Adamantium.Mathematics
       public float[] ToArray()
       {
          return new [] { X, Y };
+      }
+      
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
+      public bool IsCollinear(Vector2F vector)
+      {
+         return MathHelper.NearEqual(X * vector.Y, Y * vector.X);
       }
 
       /// <summary>

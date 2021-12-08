@@ -13,15 +13,15 @@ namespace Adamantium.UI.Controls
 
       public Int32 Rows
       {
-         get { return GetValue<Int32>(RowsProperty); }
-         set { SetValue(RowsProperty, value);}
+         get => GetValue<Int32>(RowsProperty);
+         set => SetValue(RowsProperty, value);
       }
 
 
       public Int32 Columns
       {
-         get { return GetValue<Int32>(ColumnsProperty); }
-         set { SetValue(ColumnsProperty, value); }
+         get => GetValue<Int32>(ColumnsProperty);
+         set => SetValue(ColumnsProperty, value);
       }
 
       public UniformGrid() { }

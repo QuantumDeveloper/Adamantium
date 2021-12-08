@@ -3,6 +3,7 @@ using Adamantium.Win32;
 using AdamantiumVulkan.Core;
 using System;
 using System.Diagnostics;
+using System.Threading.Tasks;
 using VulkanImage = AdamantiumVulkan.Core.Image;
 
 namespace Adamantium.Engine.Graphics
@@ -25,8 +26,7 @@ namespace Adamantium.Engine.Graphics
             CreateImageViews();
             CreateFramebuffers();
             BackBuffers = new Texture[BuffersCount];
-            var indices = GraphicsDevice.VulkanInstance.CurrentDevice.FindQueueFamilies(surface);
-            presentQueue = graphicsDevice.GetDeviceQueue(indices.presentFamily.Value, 0);
+            presentQueue = graphicsDevice.GraphicsQueue;
         }
 
         class SwapChainSupportDetails
@@ -151,7 +151,15 @@ namespace Adamantium.Engine.Graphics
             {
                 FramebufferCreateInfo framebufferInfo = new FramebufferCreateInfo();
                 framebufferInfo.RenderPass = RenderPass;
-                framebufferInfo.PAttachments = new [] { renderTarget, depthBuffer, imageViews[i] };
+                if (MSAALevel != MSAALevel.None)
+                {
+                    framebufferInfo.PAttachments = new [] { renderTarget, depthBuffer, imageViews[i] };
+                }
+                else
+                {
+                    framebufferInfo.PAttachments = new [] { imageViews[i], depthBuffer };
+                }
+                
                 framebufferInfo.AttachmentCount = (uint)framebufferInfo.PAttachments.Length;
                 framebufferInfo.Width = Width;
                 framebufferInfo.Height = Height;
@@ -202,23 +210,18 @@ namespace Adamantium.Engine.Graphics
 
         Extent2D ChooseSwapExtent(SurfaceCapabilitiesKHR capabilities)
         {
-            if (capabilities.CurrentExtent.Width != uint.MaxValue)
-            {
-                return capabilities.CurrentExtent;
-            }
-
-            Extent2D actualExtent = new Extent2D() { Width = Description.Width, Height = Description.Height };
-
+            var actualExtent = new Extent2D() { Width = Description.Width, Height = Description.Height };
+            
             actualExtent.Width = Math.Max(capabilities.MinImageExtent.Width, Math.Min(capabilities.MaxImageExtent.Width, actualExtent.Width));
             actualExtent.Height = Math.Max(capabilities.MinImageExtent.Height, Math.Min(capabilities.MaxImageExtent.Height, actualExtent.Height));
-
+            
             return actualExtent;
         }
 
         /// <summary>
         /// Present rendered image on screen
         /// </summary>
-        public override Result Present()
+        public override PresenterState Present()
         {
             Semaphore[] waitSemaphores = { GraphicsDevice.GetRenderFinishedSemaphoreForCurrentFrame() };
             var presentInfo = new PresentInfoKHR();
@@ -231,29 +234,21 @@ namespace Adamantium.Engine.Graphics
             presentInfo.PImageIndices = new [] { GraphicsDevice.ImageIndex };
 
             var result = presentQueue.QueuePresentKHR(presentInfo);
-            if (result != Result.Success)
+            if (result != Result.Success && result != Result.SuboptimalKhr)
             {
-                //MessageBox.Show("Failed to present swap chain image");
-                //throw new Exception();
                 Debug.WriteLine("Failed to present swap chain image");
             }
 
-            return result;
+            return ConvertState(result);;
         }
 
-
         /// <summary>
-        /// Resize graphics presenter bacbuffer according to width and height
+        /// Resize graphics presenter backbuffer according to width and height
         /// </summary>
-        /// <param name="width"></param>
-        /// <param name="height"></param>
-        /// <param name="buffersCount"></param>
-        /// <param name="format"></param>
-        /// <param name="depthFormat"></param>
-        /// <param name="flags"></param>
-        public override bool Resize(uint width, uint height, uint buffersCount, SurfaceFormat format, DepthFormat depthFormat)
+        /// <param name="parameters"></param>
+        public override bool Resize(PresentationParameters parameters)
         {
-            if (!base.Resize(width, height, buffersCount, format, depthFormat))
+            if (!base.Resize(parameters))
             {
                 return false;
             }
@@ -283,6 +278,7 @@ namespace Adamantium.Engine.Graphics
 
         private void RecreateSwapchain()
         {
+            var timer = Stopwatch.StartNew();
             CleanupSwapChain();
 
             CreateSwapchain();
@@ -290,7 +286,8 @@ namespace Adamantium.Engine.Graphics
             CreateDepthBuffer();
             CreateImageViews();
             CreateFramebuffers();
-            
+            timer.Stop();
+            Console.WriteLine($"Resize presenter time: {timer.ElapsedMilliseconds}");
         }
 
         protected override void CleanupSwapChain()
@@ -309,6 +306,15 @@ namespace Adamantium.Engine.Graphics
             RemoveAndDispose(ref renderTarget);
 
             swapchain?.Destroy(GraphicsDevice);
+        }
+        
+        public override void TakeScreenshot(String fileName, ImageFileType fileType)
+        {
+            Task.Factory.StartNew(() =>
+            {
+                // TODO: implement saving backbuffer to file
+                //framebuffers[GraphicsDevice.CurrentFrame].Save(fileName, fileType);
+            }, TaskCreationOptions.LongRunning);
         }
 
         public static implicit operator SwapchainKHR(SwapChainGraphicsPresenter presenter)
