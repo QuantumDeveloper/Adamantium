@@ -53,25 +53,28 @@ namespace Adamantium.UI.Media
          var zeroLineDir = new LineSegment2D(new Vector2(0, 0), new Vector2(1, 0)).DirectionNormalized;
          // for test purposes end
 
-         // sanitize geometry - remove equal points
-         var index = 0;
-         bool goOn = true;
-         var pointList = points.ToList();
-         do
+         // sanitize geometry - remove equal points (but not in case when there is a single line with zero length)
+         if (points.Length > 2)
          {
-            var nextIndex = index + 1;
-
-            if (index == pointList.Count - 1)
+            var index = 0;
+            var goOn = true;
+            var pointList = points.ToList();
+            do
             {
-               nextIndex = 0;
-               goOn = false;
-            }
+               var nextIndex = index + 1;
 
-            if (pointList[index] == pointList[nextIndex]) pointList.RemoveAt(nextIndex);
-            else index++;
-         } while (goOn);
+               if (index == pointList.Count - 1)
+               {
+                  nextIndex = 0;
+                  goOn = false;
+               }
 
-         points = pointList.ToArray();
+               if (pointList[index] == pointList[nextIndex]) pointList.RemoveAt(nextIndex);
+               else index++;
+            } while (goOn);
+
+            points = pointList.ToArray();
+         }
 
          List<PolygonItem> polygonItems;
          

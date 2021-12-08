@@ -75,9 +75,9 @@ namespace Adamantium.UI.Playground
             polygon.FillRule = FillRule.NonZero;
             polygon.HorizontalAlignment = HorizontalAlignment.Left;
             polygon.ClipToBounds = false;
-            polygon.StrokeThickness = 20;
+            polygon.StrokeThickness = 2;
             polygon.Stroke = Brushes.Black;
-            //polygon.StrokeDashArray = new TrackingCollection<double>() { 20, 10, 10, 10, 4, 20 };
+            polygon.StrokeDashArray = new TrackingCollection<double>() { 20, 10, 10, 10, 4, 20 };
 
             path = new Path();
             path.HorizontalAlignment = HorizontalAlignment.Center;
@@ -90,26 +90,12 @@ namespace Adamantium.UI.Playground
             path.Data = geometry;
             
             KeyDown += OnKeyDown;
-                
-            
-            var polygon2 = new Polygon();
-            polygon2.Width = 200;
-            polygon2.Points = new TrackingCollection<Vector2>();
-            polygon2.Points.Add(new Vector2(50, 65));
-            polygon2.Points.Add(new Vector2(550, 65));
-            polygon2.Fill = Brushes.Red;
-            polygon2.FillRule = FillRule.NonZero;
-            polygon2.HorizontalAlignment = HorizontalAlignment.Left;
-            polygon2.ClipToBounds = false;
-            polygon2.StrokeThickness = 20;
-            polygon2.Stroke = Brushes.Black;
 
             grid.Background = Brushes.White;
             grid.Children.Add(rectangle);
             grid.Children.Add(ellipse);
             //grid.Children.Add(line);
-            //grid.Children.Add(polygon);
-            //grid.Children.Add(polygon2);
+            grid.Children.Add(polygon);
             //grid.Children.Add(path);
 
             Content = grid;
