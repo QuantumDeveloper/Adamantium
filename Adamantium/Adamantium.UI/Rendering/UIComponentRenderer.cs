@@ -48,6 +48,14 @@ namespace Adamantium.UI.Rendering
             }
         }
 
+        protected override void Dispose(bool disposeManagedResources)
+        {
+            base.Dispose(disposeManagedResources);
+            
+            VertexBuffer?.Dispose();
+            IndexBuffer?.Dispose();
+        }
+
         public static UIComponentRenderer Create(GraphicsDevice device, Mesh mesh, Brush brush)
         {
             var renderer = new UIComponentRenderer();

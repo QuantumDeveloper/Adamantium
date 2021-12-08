@@ -23,8 +23,7 @@ namespace Adamantium.UI.Controls
 
       private static object StopAngleValueCallback(AdamantiumComponent adamantiumObject, object baseValue)
       {
-         var ellipse = adamantiumObject as Ellipse;
-         if (ellipse != null)
+         if (adamantiumObject is Ellipse ellipse)
          {
             var stopAngle = (Double)baseValue;
             if (stopAngle > 360.0)
@@ -43,8 +42,7 @@ namespace Adamantium.UI.Controls
 
       private static object StartAngleValueCallback(AdamantiumComponent adamantiumObject, object baseValue)
       {
-         var ellipse = adamantiumObject as Ellipse;
-         if (ellipse != null)
+         if (adamantiumObject is Ellipse ellipse)
          {
             var startAngle = (Double)baseValue;
             if (startAngle < 0)
@@ -84,6 +82,5 @@ namespace Adamantium.UI.Controls
             context.EndDraw(this);
          }
       }
-
    }
 }

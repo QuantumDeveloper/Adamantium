@@ -143,10 +143,7 @@ namespace Adamantium.UI.Rendering
         {
             if (component.Visibility != Visibility.Visible) return;
 
-            if (!component.IsGeometryValid)
-            {
-                component.Render(context);
-            }
+            component.Render(context);
 
             if (!context.GetPresentationForComponent(component, out var presentation)) return;
 

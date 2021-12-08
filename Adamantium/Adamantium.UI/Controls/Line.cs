@@ -22,9 +22,6 @@ namespace Adamantium.UI.Controls
       public static readonly AdamantiumProperty Y2Property = AdamantiumProperty.Register(nameof(Y2), typeof(Double),
          typeof(Line), new PropertyMetadata(0.0, PropertyMetadataOptions.AffectsMeasure));
 
-      public static readonly AdamantiumProperty LineThicknessProperty = AdamantiumProperty.Register(
-         nameof(LineThickness), typeof(Double),
-         typeof(Line), new PropertyMetadata(1.0, PropertyMetadataOptions.AffectsMeasure));
 
       public Double X1
       {
@@ -50,19 +47,13 @@ namespace Adamantium.UI.Controls
          set => SetValue(Y2Property, value);
       }
 
-      public Double LineThickness
-      {
-         get => GetValue<Double>(LineThicknessProperty);
-         set => SetValue(LineThicknessProperty, value);
-      }
-
       protected override Size MeasureOverride(Size availableSize)
       {
          var point1 = new Vector2(X1, Y1);
          var point2 = new Vector2(X2, Y2);
          var min = Vector2.Min(point1, point2);
          var max = Vector2.Max(point1, point2);
-         BoundingRectangle = new Rect(min, max);
+         Rect = new Rect(min, max);
          return base.MeasureOverride(availableSize);
       }
 

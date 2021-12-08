@@ -745,6 +745,11 @@ namespace Adamantium.UI.Media
          throw new NotImplementedException();
       }
 
+      public override void RecalculateBounds()
+      {
+         
+      }
+
       protected internal override void ProcessGeometry()
       {
          throw new NotImplementedException();

@@ -6,6 +6,8 @@ namespace Adamantium.UI.Media
 {
    public sealed class RectangleGeometry : Geometry
    {
+      private Rect bounds;
+      
       public static readonly AdamantiumProperty CornerRadiusProperty = AdamantiumProperty.Register(nameof(CornerRadius),
          typeof (CornerRadius), typeof (RectangleGeometry), new PropertyMetadata(new CornerRadius(0)));
 
@@ -68,13 +70,17 @@ namespace Adamantium.UI.Media
             translation);
       }
 
-      private Rect bounds;
 
       public override Rect Bounds => bounds;
 
       public override Geometry Clone()
       {
          return new RectangleGeometry(this);
+      }
+
+      public override void RecalculateBounds()
+      {
+         bounds = Rect;
       }
 
       protected internal override void ProcessGeometry()

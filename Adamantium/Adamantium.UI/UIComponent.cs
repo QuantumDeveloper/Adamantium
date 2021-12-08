@@ -1253,8 +1253,11 @@ namespace Adamantium.UI
 
         public void Render(DrawingContext context)
         {
-            OnRender(context);
-            IsGeometryValid = true;
+            if (!IsGeometryValid)
+            {
+                OnRender(context);
+                IsGeometryValid = true;
+            }
         }
 
         /// <summary>

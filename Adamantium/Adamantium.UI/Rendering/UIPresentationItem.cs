@@ -6,12 +6,31 @@ namespace Adamantium.UI.Rendering
 {
     internal class UIPresentationItem : DisposableObject
     {
-        public UIComponentRenderer GeometryRenderer { get; set; }
-        
-        public UIComponentRenderer StrokeRenderer { get; set; }
-        
+        private UIComponentRenderer geometryRenderer;
+        private UIComponentRenderer strokeRenderer;
+
+        public UIComponentRenderer GeometryRenderer
+        {
+            get => geometryRenderer;
+            set => geometryRenderer = ToDispose(value);
+        }
+
+        public UIComponentRenderer StrokeRenderer
+        {
+            get => strokeRenderer;
+            set => strokeRenderer = ToDispose(value);
+        }
+
         public Matrix4x4F Transform { get; set; }
         
         public Texture Texture { get; set; }
+
+        protected override void Dispose(bool disposeManagedResources)
+        {
+            base.Dispose(disposeManagedResources);
+            
+            GeometryRenderer?.Dispose();
+            StrokeRenderer?.Dispose();
+        }
     }
 }

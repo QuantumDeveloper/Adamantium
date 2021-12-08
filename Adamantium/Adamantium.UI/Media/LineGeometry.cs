@@ -3,35 +3,69 @@ using System.Collections.Generic;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.Mathematics;
+using Adamantium.UI.Controls;
+using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI.Media
 {
    public class LineGeometry : Geometry
    {
-      public override Rect Bounds { get; }
+      private Rect bounds;
 
-      public override Geometry Clone()
+      public static readonly AdamantiumProperty StartPointProperty =
+         AdamantiumProperty.Register(nameof(StartPoint), typeof(Vector2), typeof(LineGeometry),
+            new PropertyMetadata(new Vector2(0), PropertyMetadataOptions.AffectsMeasure));
+      
+      public static readonly AdamantiumProperty EndPointProperty =
+         AdamantiumProperty.Register(nameof(EndPoint), typeof(Vector2), typeof(LineGeometry),
+            new PropertyMetadata(new Vector2(0), PropertyMetadataOptions.AffectsMeasure));
+      
+      public static readonly AdamantiumProperty ThicknessProperty =
+               AdamantiumProperty.Register(nameof(Thickness), typeof(Double), typeof(LineGeometry),
+                  new PropertyMetadata(0d, PropertyMetadataOptions.AffectsMeasure));
+
+      public override Rect Bounds => bounds;
+
+      public Vector2 StartPoint
       {
-         throw new NotImplementedException();
+         get => GetValue<Vector2>(StartPointProperty);
+         set => SetValue(StartPointProperty, value);
       }
 
-      public Vector2 StartPosition { get; set; }
+      public Vector2 EndPoint
+      {
+         get => GetValue<Vector2>(EndPointProperty);
+         set => SetValue(EndPointProperty, value);
+      }
 
-      public Vector2 EndPosition { get; set; }
-      
-      public Double Thickness { get; set; }
+      public Double Thickness
+      {
+         get => GetValue<Double>(ThicknessProperty);
+         set => SetValue(ThicknessProperty, value);
+      }
 
       public LineGeometry()
       {
       }
 
-      public LineGeometry(Vector2 startPoint, Vector2 endPoint, Double thickness)
+      public LineGeometry(Vector2 startPoint, Vector2 endPoint, Double thickness) : this()
       {
-         StartPosition = startPoint;
-         EndPosition = endPoint;
+         StartPoint = startPoint;
+         EndPoint = endPoint;
          Thickness = thickness;
+         bounds = new Rect(startPoint, endPoint);
+      }
+
+      public override void RecalculateBounds()
+      {
+         bounds = new Rect(StartPoint, EndPoint);
       }
       
+      public override Geometry Clone()
+      {
+         throw new NotImplementedException();
+      }
+
       protected internal override void ProcessGeometry()
       {
          CreateLine(Thickness);
@@ -41,8 +75,8 @@ namespace Adamantium.UI.Media
       {
          Mesh = Engine.Graphics.Shapes.Line.GenerateGeometry(
             GeometryType.Solid, 
-            (Vector3F)StartPosition,
-            (Vector3F)EndPosition,
+            (Vector3F)StartPoint,
+            (Vector3F)EndPoint,
             (float)thickness);
       }
    }

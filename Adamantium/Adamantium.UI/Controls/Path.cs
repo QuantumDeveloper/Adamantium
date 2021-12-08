@@ -1,4 +1,3 @@
-using Adamantium.Mathematics;
 using Adamantium.UI.Media;
 
 namespace Adamantium.UI.Controls
@@ -8,16 +7,22 @@ namespace Adamantium.UI.Controls
         public static readonly AdamantiumProperty DataProperty =
             AdamantiumProperty.Register(nameof(Data), typeof(Geometry), typeof(Path));
 
+        public Path()
+        {
+        }
+
         public Geometry Data
         {
             get => GetValue<Geometry>(DataProperty);
             set => SetValue(DataProperty, value);
         }
-        
+
         protected override Size MeasureOverride(Size availableSize)
         {
-            //var bounds = Data.
-            BoundingRectangle = new Rect(new Vector2(0), new Vector2(500, 400));
+            if (Data != null)
+            {
+                Rect = Data.Bounds;
+            }
             return base.MeasureOverride(availableSize);
         }
 

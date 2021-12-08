@@ -21,6 +21,11 @@ namespace Adamantium.UI.Media
          throw new NotImplementedException();
       }
 
+      public override void RecalculateBounds()
+      {
+         throw new NotImplementedException();
+      }
+
       protected internal override void ProcessGeometry()
       {
          throw new NotImplementedException();

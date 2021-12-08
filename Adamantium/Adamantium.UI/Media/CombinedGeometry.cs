@@ -12,7 +12,9 @@ namespace Adamantium.UI.Media
 {
     public class CombinedGeometry : Geometry
     {
-        public override Rect Bounds { get; }
+        private Rect bounds;
+
+        public override Rect Bounds => bounds;
         
         public override Geometry Clone()
         {
@@ -68,6 +70,11 @@ namespace Adamantium.UI.Media
         private readonly List<LineSegment2D> mergedSegments = new List<LineSegment2D>();
         private readonly List<Vector2> mergedPoints = new List<Vector2>();
         private readonly HashSet<Vector2> mergedPointsHash = new HashSet<Vector2>();
+
+        public override void RecalculateBounds()
+        {
+            
+        }
 
         protected internal override void ProcessGeometry()
         {

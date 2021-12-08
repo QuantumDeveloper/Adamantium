@@ -7,10 +7,9 @@ namespace Adamantium.UI.Controls
    public abstract class Shape : FrameworkComponent
    {
       protected Rect Rect;
-      
+     
       protected Shape()
       {
-         BoundingRectangle = new Rect();
       }
 
       public static readonly AdamantiumProperty FillProperty = AdamantiumProperty.Register(nameof(Fill),
@@ -106,8 +105,6 @@ namespace Adamantium.UI.Controls
          set => SetValue(StrokeDashOffsetProperty, value);
       }
       
-      protected Rect BoundingRectangle { get; set; }
-
       private static object CoerceStrokeThickness(AdamantiumComponent adamantiumObject, object baseValue)
       {
          Double value = (Double) baseValue;
@@ -131,7 +128,7 @@ namespace Adamantium.UI.Controls
 
       protected override Size MeasureOverride(Size availableSize)
       {
-         Size shapeSize = BoundingRectangle.Size;
+         Size shapeSize = Rect.Size;
          Size desiredSize = new Size(availableSize.Width, availableSize.Height).Deflate(new Thickness(StrokeThickness/2));
 
          if (double.IsInfinity(availableSize.Width))

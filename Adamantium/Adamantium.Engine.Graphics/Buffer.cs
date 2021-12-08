@@ -437,7 +437,6 @@ namespace Adamantium.Engine.Graphics
         /// <param name="bufferSize">Size of the buffer in bytes.</param>
         /// <param name="elementSize">Size of an element in the buffer.</param>
         /// <param name="bufferFlags">The buffer flags to specify the type of buffer.</param>
-        /// <param name="viewFormat">The view format must be specified if the buffer is declared as a shared resource view.</param>
         /// <param name="memoryFlags">The memoryFlags.</param>
         /// <returns>An instance of a new <see cref="Buffer" /></returns>
         /// <msdn-id>ff476501</msdn-id>
@@ -455,7 +454,6 @@ namespace Adamantium.Engine.Graphics
         /// <typeparam name="T">Type of the buffer, to get the sizeof from.</typeparam>
         /// <param name="value">The initial value of this buffer.</param>
         /// <param name="bufferFlags">The buffer flags to specify the type of buffer.</param>
-        /// <param name="viewFormat">The view format must be specified if the buffer is declared as a shared resource view.</param>
         /// <param name="memoryFlags">The memoryFlags.</param>
         /// <returns>An instance of a new <see cref="Buffer" /></returns>
         /// <msdn-id>ff476501</msdn-id>
@@ -502,7 +500,6 @@ namespace Adamantium.Engine.Graphics
         /// <param name="device">The <see cref="GraphicsDevice"/>.</param>
         /// <param name="initialValue">The initial value of this buffer.</param>
         /// <param name="bufferFlags">The buffer flags to specify the type of buffer.</param>
-        /// <param name="viewFormat">The view format must be specified if the buffer is declared as a shared resource view.</param>
         /// <param name="memoryFlags">The memoryFlags.</param>
         /// <returns>An instance of a new <see cref="Buffer" /></returns>
         /// <msdn-id>ff476501</msdn-id>
@@ -532,7 +529,6 @@ namespace Adamantium.Engine.Graphics
         /// <param name="initialValue">The initial value of this buffer.</param>
         /// <param name="elementSize">Size of an element. Must be equal to 2 or 4 for an index buffer, or to the size of a struct for a structured/typed buffer. Can be set to 0 for other buffers.</param>
         /// <param name="bufferFlags">The buffer flags to specify the type of buffer.</param>
-        /// <param name="viewFormat">The view format must be specified if the buffer is declared as a shared resource view.</param>
         /// <param name="memoryFlags">The memoryFlags.</param>
         /// <returns>An instance of a new <see cref="Buffer" /></returns>
         /// <msdn-id>ff476501</msdn-id>
@@ -559,7 +555,6 @@ namespace Adamantium.Engine.Graphics
         /// </summary>
         /// <param name="device">The <see cref="GraphicsDevice"/>.</param>
         /// <param name="dataPointer">The data pointer.</param>
-        /// <param name="elementSize">Size of the element.</param>
         /// <param name="bufferFlags">The buffer flags to specify the type of buffer.</param>
         /// <param name="memoryFlags">The memoryFlags.</param>
         /// <returns>An instance of a new <see cref="Buffer" /></returns>
@@ -576,9 +571,7 @@ namespace Adamantium.Engine.Graphics
         /// </summary>
         /// <param name="device">The <see cref="GraphicsDevice"/>.</param>
         /// <param name="dataPointer">The data pointer.</param>
-        /// <param name="elementSize">Size of the element.</param>
         /// <param name="bufferFlags">The buffer flags to specify the type of buffer.</param>
-        /// <param name="viewFormat">The view format must be specified if the buffer is declared as a shared resource view.</param>
         /// <param name="memoryFlags">The memoryFlags.</param>
         /// <returns>An instance of a new <see cref="Buffer" /></returns>
         /// <msdn-id>ff476501</msdn-id>
@@ -593,113 +586,11 @@ namespace Adamantium.Engine.Graphics
         {
             return buffer.VulkanBuffer;
         }
-    }
-
-    /// <summary>
-    /// A buffer with typed information.
-    /// </summary>
-    /// <typeparam name="T">Type of an element of this buffer.</typeparam>
-    public class Buffer<T> : Buffer where T : struct
-    {
-        internal Buffer(GraphicsDevice device, BufferUsageFlags bufferFlags, DataPointer dataPointer, MemoryPropertyFlags memoryFlags, SharingMode sharingMode = SharingMode.Exclusive)
-           : base(device, bufferFlags, dataPointer, memoryFlags, sharingMode)
+        
+        protected override void Dispose(bool disposeManagedResources)
         {
-        }
-
-        internal Buffer(GraphicsDevice device, BufferCreateInfo bufferInfo, uint count, MemoryPropertyFlags memoryFlags)
-           : base(device, bufferInfo, count, memoryFlags)
-        {
-        }
-
-        /// <summary>
-        /// Gets the content of this texture to an array of data.
-        /// </summary>
-        /// <returns>An array of data.</returns>
-        /// <msdn-id>ff476457</msdn-id>
-        ///   <unmanaged>HRESULT ID3D11DeviceContext::Map([In] ID3D11Resource* pResource,[In] unsigned int Subresource,[In] D3D11_MAP MapType,[In] D3D11_MAP_FLAG MapFlags,[Out] D3D11_MAPPED_SUBRESOURCE* pMappedResource)</unmanaged>
-        ///   <unmanaged-short>ID3D11DeviceContext::Map</unmanaged-short>
-        /// <remarks>This method is only working when called from the main thread that is accessing the main <see cref="GraphicsDevice" />.
-        /// This method creates internally a staging resource if this texture is not already a staging resource, copies to it and map it to memory. Use method with explicit staging resource
-        /// for optimal performances.</remarks>
-        public T[] GetData()
-        {
-            return GetData<T>();
-        }
-
-        /// <summary>
-        /// Copies the content of a single structure data from CPU memory to this buffer into GPU memory.
-        /// </summary>
-        /// <param name="fromData">The data to copy from.</param>
-        /// <param name="offsetInBytes">The offset in bytes to write to.</param>
-        /// <param name="options">Buffer data behavior.</param>
-        /// <exception cref="System.ArgumentException"></exception>
-        /// <remarks>
-        /// This method is only working when called from the main thread that is accessing the main <see cref="GraphicsDevice"/>. See the unmanaged documentation about Map/UnMap for usage and restrictions.
-        /// </remarks>
-        /// <msdn-id>ff476457</msdn-id>
-        /// <unmanaged>HRESULT ID3D11DeviceContext::Map([In] ID3D11Resource* pResource,[In] unsigned int Subresource,[In] D3D11_MAP MapType,[In] D3D11_MAP_FLAG MapFlags,[Out] D3D11_MAPPED_SUBRESOURCE* pMappedResource)</unmanaged>
-        /// <unmanaged-short>ID3D11DeviceContext::Map</unmanaged-short>
-        public void SetData(ref T fromData, uint offsetInBytes = 0)
-        {
-            base.SetData(ref fromData, offsetInBytes);
-        }
-
-        /// <summary>
-        /// Copies the content an array of data from CPU memory to this buffer into GPU memory.
-        /// </summary>
-        /// <param name="fromData">The data to copy from.</param>
-        /// <param name="startIndex">Index to start copying from.</param>
-        /// <param name="elementCount">Number of elements to copy.</param>
-        /// <param name="offsetInBytes">The offset in bytes to write to.</param>
-        /// <param name="options">Buffer data behavior.</param>
-        /// <remarks>
-        /// This method is only working when called from the main thread that is accessing the main <see cref="GraphicsDevice"/>. See the unmanaged documentation about Map/UnMap for usage and restrictions.
-        /// </remarks>
-        /// <msdn-id>ff476457</msdn-id>
-        /// <unmanaged>HRESULT ID3D11DeviceContext::Map([In] ID3D11Resource* pResource,[In] unsigned int Subresource,[In] D3D11_MAP MapType,[In] D3D11_MAP_FLAG MapFlags,[Out] D3D11_MAPPED_SUBRESOURCE* pMappedResource)</unmanaged>
-        /// <unmanaged-short>ID3D11DeviceContext::Map</unmanaged-short>
-        public void SetData(T[] fromData, uint startIndex = 0, uint elementCount = 0, uint offsetInBytes = 0)
-        {
-            base.SetData(fromData, startIndex, elementCount, offsetInBytes);
-        }
-
-        /// <summary>
-        /// Copies the content of a single structure data from CPU memory to this buffer into GPU memory.
-        /// </summary>
-        /// <param name="device">The <see cref="GraphicsDevice"/>.</param>
-        /// <param name="fromData">The data to copy from.</param>
-        /// <param name="offsetInBytes">The offset in bytes to write to.</param>
-        /// <param name="options">Buffer data behavior.</param>
-        /// <exception cref="System.ArgumentException"></exception>
-        /// <remarks>
-        /// This method is only working when called from the main thread that is accessing the main <see cref="GraphicsDevice"/>. See the unmanaged documentation about Map/UnMap for usage and restrictions.
-        /// </remarks>
-        /// <msdn-id>ff476457</msdn-id>
-        /// <unmanaged>HRESULT ID3D11DeviceContext::Map([In] ID3D11Resource* pResource,[In] unsigned int Subresource,[In] D3D11_MAP MapType,[In] D3D11_MAP_FLAG MapFlags,[Out] D3D11_MAPPED_SUBRESOURCE* pMappedResource)</unmanaged>
-        /// <unmanaged-short>ID3D11DeviceContext::Map</unmanaged-short>
-        public void SetData(GraphicsDevice device, ref T fromData, uint offsetInBytes = 0)
-        {
-            base.SetData(device, ref fromData, offsetInBytes);
-        }
-
-        /// <summary>
-        /// Copies the content an array of data from CPU memory to this buffer into GPU memory.
-        /// </summary>
-        /// <param name="device">The <see cref="GraphicsDevice"/>.</param>
-        /// <param name="fromData">The data to copy from.</param>
-        /// <param name="startIndex">Buffer index to begin copying from.</param>
-        /// <param name="elementCount">Number of elements to copy.</param>
-        /// <param name="offsetInBytes">The offset in bytes to write to.</param>
-        /// <param name="options">Buffer data behavior.</param>
-        /// <remarks>
-        /// This method is only working when called from the main thread that is accessing the main <see cref="GraphicsDevice"/>. See the unmanaged documentation about Map/UnMap for usage and restrictions.
-        /// </remarks>
-        /// <msdn-id>ff476457</msdn-id>
-        /// <unmanaged>HRESULT ID3D11DeviceContext::Map([In] ID3D11Resource* pResource,[In] unsigned int Subresource,[In] D3D11_MAP MapType,[In] D3D11_MAP_FLAG MapFlags,[Out] D3D11_MAPPED_SUBRESOURCE* pMappedResource)</unmanaged>
-        /// <unmanaged-short>ID3D11DeviceContext::Map</unmanaged-short>
-        public void SetData(GraphicsDevice device, T[] fromData, uint startIndex = 0, uint elementCount = 0, uint offsetInBytes = 0)
-        {
-            base.SetData(device, fromData, startIndex, elementCount, offsetInBytes);
+            VulkanBuffer?.Destroy(GraphicsDevice);
+            BufferMemory?.FreeMemory(GraphicsDevice);
         }
     }
 }

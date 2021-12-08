@@ -52,7 +52,7 @@ namespace Adamantium.UI.Playground
             line.Y1 = 20;
             line.X2 = 500;
             line.Y2 = 300;
-            line.LineThickness = 4;
+            line.StrokeThickness = 4;
             line.Width = 500;
             line.Height = 350;
             line.VerticalAlignment = VerticalAlignment.Center;

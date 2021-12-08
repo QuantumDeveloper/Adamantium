@@ -1,9 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Models;
-using Adamantium.Engine.Graphics;
-using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.RoutedEvents;
 
@@ -15,17 +11,12 @@ namespace Adamantium.UI.Media
       
       internal Mesh StrokeMesh { get; set; }
       
-      protected Int32 TesselationFactor { get; set; } = 20;
+      protected Int32 TesselationFactor { get; set; }
 
       public static readonly AdamantiumProperty TransformProperty = AdamantiumProperty.Register(nameof(Transform),
          typeof(Transform), 
          typeof(Geometry),
-         new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender, TransformChanged));
-
-      private static void TransformChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
-      {
-         
-      }
+         new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender));
 
       public Transform Transform
       {
@@ -35,14 +26,14 @@ namespace Adamantium.UI.Media
 
       public bool IsClosed { get; set; }
 
-      internal Geometry()
+      protected Geometry()
       {
          Mesh = new Mesh();
-         Transformation = Matrix4x4F.Identity;
+         StrokeMesh = new Mesh();
+         TesselationFactor = 20;
       }
      
       public abstract Rect Bounds { get; }
-      public Matrix4x4F Transformation { get; set; }
 
       public abstract Geometry Clone();
 
@@ -51,11 +42,14 @@ namespace Adamantium.UI.Media
          return Mesh.Points.Length == 0;
       }
 
-      public void RecalculateBounds()
-      {
-         
-      }
+      public abstract void RecalculateBounds();
 
       protected internal abstract void ProcessGeometry();
+
+      protected override void OnPropertyChanged(AdamantiumPropertyChangedEventArgs e)
+      {
+         base.OnPropertyChanged(e);
+         RecalculateBounds();
+      }
    }
 }

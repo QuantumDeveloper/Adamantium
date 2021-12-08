@@ -12,6 +12,11 @@ namespace Adamantium.Engine.Core.Models
 
         public Mesh()
         {
+            Initialize();
+        }
+
+        private void Initialize()
+        {
             MeshTopology = PrimitiveType.TriangleList;
             UpAxis = UpAxis.Y_DOWN_RH;
 
@@ -464,6 +469,11 @@ namespace Adamantium.Engine.Core.Models
             IsModified = true;
 
             return this;
+        }
+
+        public void Clear()
+        {
+            Initialize();
         }
 
         public Mesh Clone()
@@ -1076,6 +1086,5 @@ namespace Adamantium.Engine.Core.Models
 
             return this;
         }
-
     }
 }
