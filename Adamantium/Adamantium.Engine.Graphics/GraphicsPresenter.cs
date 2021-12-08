@@ -90,44 +90,19 @@ namespace Adamantium.Engine.Graphics
         /// </summary>
         public bool Resize(UInt32 width = 0, UInt32 height = 0)
         {
-            return Resize(width, height, BuffersCount, Description.ImageFormat, DepthFormat);
+            Description.Width = width;
+            Description.Height = height;
+            return Resize(Description);
         }
 
         /// <summary>
         /// Resize graphics presenter backbuffer according to width and height
         /// </summary>
-        /// <param name="width"></param>
-        /// <param name="height"></param>
-        /// <param name="buffersCount"></param>
-        /// <param name="pixelFormat"></param>
-        /// <param name="depthFormat"></param>
-        public virtual bool Resize(UInt32 width, UInt32 height, uint buffersCount, SurfaceFormat pixelFormat, DepthFormat depthFormat)
+        /// <param name="parameters"></param>
+        public virtual bool Resize(PresentationParameters parameters)
         {
-            bool updateDepthStencil = false;
-            if (Description.DepthFormat != depthFormat || (Description.Width != width || Description.Height != height))
-            {
-                Description.DepthFormat = depthFormat;
-                updateDepthStencil = true;
-            }
-
-            //if (Description.BackBufferWidth == width && Description.BackBufferHeight == height &&
-            //    Description.BuffersCount == buffersCount && Description.PixelFormat == pixelFormat
-            //    && Description.Flags == flags)
-            //{
-            //   return false;
-            //}
-
-            Description.Width = width;
-            Description.Height = height;
-            Description.ImageFormat = pixelFormat;
-            Description.BuffersCount = buffersCount;
-
-            if (updateDepthStencil)
-            {
-                //RemoveAndDispose(ref depthBuffer);
-                //CreateDepthBuffer();
-            }
-
+            Description = parameters.Clone();
+            
             CreateViewPort();
 
             return true;
@@ -139,7 +114,7 @@ namespace Adamantium.Engine.Graphics
             colorAttachment.Format = ImageFormat;
             colorAttachment.Samples = (SampleCountFlagBits)MSAALevel;
             colorAttachment.LoadOp = AttachmentLoadOp.Clear;
-            colorAttachment.StoreOp = MSAALevel > MSAALevel.None ? AttachmentStoreOp.Store : AttachmentStoreOp.DontCare;
+            colorAttachment.StoreOp = MSAALevel == MSAALevel.None ? AttachmentStoreOp.Store : AttachmentStoreOp.DontCare;
             colorAttachment.StencilLoadOp = AttachmentLoadOp.DontCare;
             colorAttachment.StencilStoreOp = AttachmentStoreOp.DontCare;
             colorAttachment.InitialLayout = ImageLayout.Undefined;
@@ -149,7 +124,7 @@ namespace Adamantium.Engine.Graphics
             depthAttachment.Format = (Format)DepthFormat;
             depthAttachment.Samples = (SampleCountFlagBits)MSAALevel;
             depthAttachment.LoadOp = AttachmentLoadOp.Clear;
-            depthAttachment.StoreOp = MSAALevel > MSAALevel.None ? AttachmentStoreOp.Store : AttachmentStoreOp.DontCare;
+            depthAttachment.StoreOp = MSAALevel == MSAALevel.None ? AttachmentStoreOp.Store : AttachmentStoreOp.DontCare;
             depthAttachment.StencilLoadOp = AttachmentLoadOp.DontCare;
             depthAttachment.StencilStoreOp = AttachmentStoreOp.DontCare;
             depthAttachment.InitialLayout = ImageLayout.Undefined;
@@ -182,7 +157,7 @@ namespace Adamantium.Engine.Graphics
             subpass.ColorAttachmentCount = 1;
             subpass.PColorAttachments = new[] { colorAttachmentRef };
             subpass.PDepthStencilAttachment = depthAttachmentRef;
-            if (MSAALevel > MSAALevel.None)
+            if (MSAALevel != MSAALevel.None)
             {
                 subpass.PResolveAttachments = new[] {colorAttachmentResolveRef};
             }
@@ -195,7 +170,16 @@ namespace Adamantium.Engine.Graphics
             subpassDependency.DstStageMask = (uint) PipelineStageFlagBits.ColorAttachmentOutputBit;
             subpassDependency.DstAccessMask = (uint)(AccessFlagBits.ColorAttachmentReadBit | AccessFlagBits.ColorAttachmentWriteBit);
 
-            var attachments = new [] { colorAttachment, depthAttachment, colorAttachmentResolve}; 
+            AttachmentDescription[] attachments = null;
+            if (MSAALevel != MSAALevel.None)
+            {
+                attachments = new[] { colorAttachment, depthAttachment, colorAttachmentResolve };
+            }
+            else
+            {
+                attachments = new [] { colorAttachmentResolve, depthAttachment};
+            }
+            
             var renderPassInfo = new RenderPassCreateInfo();
             renderPassInfo.AttachmentCount = (uint)attachments.Length;
             renderPassInfo.PAttachments = attachments;
@@ -215,14 +199,39 @@ namespace Adamantium.Engine.Graphics
         /// <summary>
         /// Present rendered image on screen
         /// </summary>
-        public abstract Result Present();
+        public abstract PresenterState Present();
+        
+        protected PresenterState ConvertState(Result result)
+        {
+            switch (result)
+            {
+                case Result.Success:
+                    return PresenterState.Success;
+                case Result.SuboptimalKhr:
+                    return PresenterState.Suboptimal;
+                case Result.ErrorDeviceLost:
+                    return PresenterState.DeviceLost;
+                case Result.ErrorOutOfHostMemory:
+                    return PresenterState.OutOfHostMemory;
+                case Result.ErrorOutOfDeviceMemory:
+                    return PresenterState.OutOfDeviceMemory;
+                case Result.ErrorOutOfDateKhr:
+                    return PresenterState.OutOfDate;
+                case Result.ErrorSurfaceLostKhr:
+                    return PresenterState.SurfaceLost;
+                case Result.ErrorFullScreenExclusiveModeLostExt:
+                    return PresenterState.FullScreenExclusiveModeLost;
+                default:
+                    return PresenterState.Unknown;
+            }
+        }
 
         /// <summary>
         /// Takes screenshot from current backbuffer frame
         /// </summary>
         /// <param name="fileName">File path for image to save</param>
         /// <param name="fileType">Type of the saving image</param>
-        public void TakeScreenshot(String fileName, ImageFileType fileType)
+        public virtual void TakeScreenshot(String fileName, ImageFileType fileType)
         {
             Task.Factory.StartNew(() =>
             {

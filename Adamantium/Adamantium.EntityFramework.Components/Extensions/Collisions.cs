@@ -481,8 +481,8 @@ namespace Adamantium.EntityFramework.Components.Extensions
                     {
                         if (meshData.Mesh.Indices[i - 1] != -1 && meshData.Mesh.Indices[i] != -1)
                         {
-                            var position0 = meshData.Mesh.Positions[meshData.Mesh.Indices[i - 1]];
-                            var position1 = meshData.Mesh.Positions[meshData.Mesh.Indices[i]];
+                            var position0 = meshData.Mesh.Points[meshData.Mesh.Indices[i - 1]];
+                            var position1 = meshData.Mesh.Points[meshData.Mesh.Indices[i]];
                             intersects = ray.Intersects(ref position0, ref position1, limitDistance, out _, out point);
                             if (intersects)
                                 break;
@@ -492,10 +492,10 @@ namespace Adamantium.EntityFramework.Components.Extensions
                 else
                 {
                     int increment = meshData.Mesh.MeshTopology == PrimitiveType.LineStrip ? 1 : 2;
-                    for (int i = 1; i < meshData.Mesh.Positions.Length; i += increment)
+                    for (int i = 1; i < meshData.Mesh.Points.Length; i += increment)
                     {
-                        var position0 = meshData.Mesh.Positions[i - 1];
-                        var position1 = meshData.Mesh.Positions[i];
+                        var position0 = meshData.Mesh.Points[i - 1];
+                        var position1 = meshData.Mesh.Points[i];
                         intersects = ray.Intersects(ref position0, ref position1, limitDistance, out _, out point);
                         if (intersects)
                             break;
@@ -512,9 +512,9 @@ namespace Adamantium.EntityFramework.Components.Extensions
                 {
                     for (int i = 3; i < indices.Length; i += increment)
                     {
-                        var vertex1 = geometry.Positions[indices[i - 2]];
-                        var vertex2 = geometry.Positions[indices[i - 1]];
-                        var vertex3 = geometry.Positions[indices[i]];
+                        var vertex1 = geometry.Points[indices[i - 2]];
+                        var vertex2 = geometry.Points[indices[i - 1]];
+                        var vertex3 = geometry.Points[indices[i]];
                         intersects = ray.Intersects(ref vertex1, ref vertex2, ref vertex3, out point);
                         if (intersects)
                             break;
@@ -522,11 +522,11 @@ namespace Adamantium.EntityFramework.Components.Extensions
                 }
                 else
                 {
-                    for (int i = 2; i < geometry.Positions.Length; i += increment)
+                    for (int i = 2; i < geometry.Points.Length; i += increment)
                     {
-                        var vertex1 = geometry.Positions[indices[i - 2]];
-                        var vertex2 = geometry.Positions[indices[i - 1]];
-                        var vertex3 = geometry.Positions[indices[i]];
+                        var vertex1 = geometry.Points[indices[i - 2]];
+                        var vertex2 = geometry.Points[indices[i - 1]];
+                        var vertex3 = geometry.Points[indices[i]];
                         intersects = ray.Intersects(ref vertex1, ref vertex2, ref vertex3, out point);
                         if (intersects)
                             break;

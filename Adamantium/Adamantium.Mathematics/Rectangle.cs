@@ -56,6 +56,21 @@ namespace Adamantium.Mathematics
          Right = x + width;
          Bottom = y + height;
       }
+      
+      /// <summary>
+      /// Initializes a new instance of the <see cref="Rectangle"/> struct.
+      /// </summary>
+      /// <param name="x">The left.</param>
+      /// <param name="y">The top.</param>
+      /// <param name="right">The width.</param>
+      /// <param name="bottom">The height.</param>
+      // public Rectangle(int x, int y, int right, int bottom)
+      // {
+      //    Left = x;
+      //    Top = y;
+      //    Right = right;
+      //    Bottom = bottom;
+      // }
 
       /// <summary>
       /// Gets or sets the X position.
@@ -63,10 +78,7 @@ namespace Adamantium.Mathematics
       /// <value>The X position.</value>
       public int X
       {
-         get
-         {
-            return Left;
-         }
+         get => Left;
          set
          {
             Right = value + Width;
@@ -80,10 +92,7 @@ namespace Adamantium.Mathematics
       /// <value>The Y position.</value>
       public int Y
       {
-         get
-         {
-            return Top;
-         }
+         get => Top;
          set
          {
             Bottom = value + Height;
@@ -97,8 +106,8 @@ namespace Adamantium.Mathematics
       /// <value>The width.</value>
       public int Width
       {
-         get { return Right - Left; }
-         set { Right = Left + value; }
+         get => Right - Left;
+         set => Right = Left + value;
       }
 
       /// <summary>
@@ -107,8 +116,8 @@ namespace Adamantium.Mathematics
       /// <value>The height.</value>
       public int Height
       {
-         get { return Bottom - Top; }
-         set { Bottom = Top + value; }
+         get => Bottom - Top;
+         set => Bottom = Top + value;
       }
 
       /// <summary>
@@ -117,7 +126,7 @@ namespace Adamantium.Mathematics
       /// <value>
       /// The center.
       /// </value>
-      public Point Center => new Point(X + (Width / 2), Y + (Height / 2));
+      public Vector2 Center => new Vector2(X + (Width / 2), Y + (Height / 2));
 
 
       /// <summary>
@@ -126,10 +135,7 @@ namespace Adamantium.Mathematics
       /// <value>The size of the rectangle.</value>
       public SizeF Size
       {
-         get
-         {
-            return new SizeF(Width, Height);
-         }
+         get => new SizeF(Width, Height);
          set
          {
             Width = (int)value.Width;
@@ -177,8 +183,7 @@ namespace Adamantium.Mathematics
       /// <param name="value">The rectangle to evaluate.</param>
       public bool Contains(Rectangle value)
       {
-         bool result;
-         Contains(ref value, out result);
+         Contains(ref value, out var result);
          return result;
       }
 
@@ -205,8 +210,7 @@ namespace Adamantium.Mathematics
       /// <param name="value">The rectangle to evaluate.</param>
       public bool Intersects(Rectangle value)
       {
-         bool result;
-         Intersects(ref value, out result);
+         Intersects(ref value, out var result);
          return result;
       }
 
@@ -220,6 +224,11 @@ namespace Adamantium.Mathematics
          result = value.X < Right && X < value.Right && value.Y < Bottom && Y < value.Bottom;
       }
 
+      public static Rectangle FromCorners(int x, int y, int right, int bottom)
+      {
+         return new Rectangle(x, y, right - x, bottom - y);
+      }
+
       /// <summary>
       /// Creates a rectangle defining the area where one rectangle overlaps with another rectangle.
       /// </summary>
@@ -228,8 +237,7 @@ namespace Adamantium.Mathematics
       /// <returns>The intersection rectangle.</returns>
       public static Rectangle Intersect(Rectangle value1, Rectangle value2)
       {
-         Rectangle result;
-         Intersect(ref value1, ref value2, out result);
+         Intersect(ref value1, ref value2, out var result);
          return result;
       }
 
@@ -261,8 +269,7 @@ namespace Adamantium.Mathematics
       /// <returns>The union rectangle.</returns>
       public static Rectangle Union(Rectangle value1, Rectangle value2)
       {
-         Rectangle result;
-         Union(ref value1, ref value2, out result);
+         Union(ref value1, ref value2, out var result);
          return result;
       }
 

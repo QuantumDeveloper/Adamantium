@@ -12,11 +12,7 @@ namespace Adamantium.Engine.Graphics
         {
             QueueFamilyIndices indices = new QueueFamilyIndices();
 
-            uint queueFamilyCount = 0;
-            device.GetPhysicalDeviceQueueFamilyProperties(ref queueFamilyCount, null);
-
-            var queueFamilies = new QueueFamilyProperties[queueFamilyCount];
-            device.GetPhysicalDeviceQueueFamilyProperties(ref queueFamilyCount, queueFamilies);
+            var queueFamilies = device.GetQueueFamilyProperties();
 
             uint i = 0;
             foreach (var queueFamily in queueFamilies)

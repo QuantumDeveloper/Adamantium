@@ -34,12 +34,6 @@ namespace Adamantium.Engine.Graphics
         public readonly RasterizerState CullNoneClipEnabled;
 
         /// <summary>
-        /// Built-in rasterizer state object with settings for culling primitives with clockwise winding order (front facing).
-        /// DepthClip enabled
-        /// </summary>
-        public readonly RasterizerState CullBackScissorOnClipEnabled;
-
-        /// <summary>
         /// Built-in rasterizer state object with settings for culling primitives with clockwise winding order (front facing)
         /// and with disabled depth clipping
         /// </summary>
@@ -78,7 +72,6 @@ namespace Adamantium.Engine.Graphics
         /// <summary>
         /// Initializes a new instance of the <see cref="RasterizerStateCollection" /> class.
         /// </summary>
-        /// <param name="graphicsDevice">The device.</param>
         internal RasterizerStateCollection()
         {
             WireFrameCullBackClipEnabled = Add(RasterizerState.New(nameof(WireFrameCullBackClipEnabled), CullModeFlagBits.BackBit, PolygonMode.Line, FrontFace.Clockwise, true));

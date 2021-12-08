@@ -71,7 +71,7 @@ namespace Adamantium.Engine.Graphics
 
                 var mesh = new Mesh();
                 mesh.SetTopology(primitiveType).
-                    SetPositions(vertexArray).
+                    SetPoints(vertexArray).
                     SetUVs(0, uvs).
                     SetIndices(indicesArray).
                     CalculateNormals();
@@ -90,7 +90,7 @@ namespace Adamantium.Engine.Graphics
                 int[] indices = {0, 1};
 
                 Mesh mesh = new Mesh();
-                mesh.SetTopology(primitiveType).SetPositions(positions).SetIndices(indices);
+                mesh.SetTopology(primitiveType).SetPoints(positions).SetIndices(indices);
 
                 return mesh;
             }

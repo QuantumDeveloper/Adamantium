@@ -26,7 +26,7 @@ namespace Adamantium.EntityFramework.Components.Extensions
             camera?.SetThirdPersonCamera(owner, Vector3F.Zero, CameraType.ThirdPersonFree);
         }
 
-        public static Vector3D GetCenterAbsolute(this Entity owner)
+        public static Vector3 GetCenterAbsolute(this Entity owner)
         {
             var collision = owner.GetComponent<Collider>();
             if (collision == null)
@@ -94,7 +94,7 @@ namespace Adamantium.EntityFramework.Components.Extensions
             return owner.Transform.GetRelativePosition(camera.GetOwnerPosition());
         }
 
-        public static Vector3D GetOwnerPosition(this IEntityOwner component)
+        public static Vector3 GetOwnerPosition(this IEntityOwner component)
         {
             return component.Owner.Transform.Position;
         }
@@ -104,14 +104,14 @@ namespace Adamantium.EntityFramework.Components.Extensions
             return component.Owner.Transform.Rotation;
         }
 
-        public static Vector3D GetPositionForNewObject(this Entity owner, CameraBase camera)
+        public static Vector3 GetPositionForNewObject(this Entity owner, CameraBase camera)
         {
-            return camera.GetOwnerPosition() + (owner.GetDiameter() * (Vector3D)camera.Forward * camera.Fov);
+            return camera.GetOwnerPosition() + (owner.GetDiameter() * (Vector3)camera.Forward * camera.Fov);
         }
 
-        public static Vector3D GetPositionForNewObject(this Entity owner, CameraBase camera, double diameter)
+        public static Vector3 GetPositionForNewObject(this Entity owner, CameraBase camera, double diameter)
         {
-            return camera.GetOwnerPosition() + (diameter * (Vector3D)camera.Forward * (camera.Fov/4));
+            return camera.GetOwnerPosition() + (diameter * (Vector3)camera.Forward * (camera.Fov/4));
         }
     }
 }

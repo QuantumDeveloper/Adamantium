@@ -2,16 +2,19 @@
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-        <TargetFramework>net5.0</TargetFramework>
+        <TargetFramework>net6.0</TargetFramework>
+        <Platforms>x64</Platforms>
+        <Configurations>Debug;Release</Configurations>
+        <LangVersion>latestmajor</LangVersion>
+    </PropertyGroup>
+
+    <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
+      <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     </PropertyGroup>
 
     <ItemGroup>
       <ProjectReference Include="..\Adamantium.Engine\Adamantium.Engine.csproj" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <Effect Include="Effects\BasicEffect.fx" />
-      <Effect Include="Effects\UIEffect.fx" />
+      <ProjectReference Include="..\Adamantium.Fonts\Adamantium.Fonts.csproj" />
     </ItemGroup>
 
     <ItemGroup>
@@ -40,9 +43,6 @@
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
       <None Remove="Models\F15C\F-15C_Eagle.obj" />
-      <Content Include="Models\F15C\F-15C_Eagle.obj">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </Content>
       <None Remove="Models\F15C\Body 1.png" />
       <Content Include="Models\F15C\Body 1.png">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -115,6 +115,47 @@
       <Content Include="Models\F15C\weapons.png">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
+      <None Remove="Fonts\WoffFonts\Sarabun-Regular.woff2" />
+      <Content Include="Fonts\WoffFonts\Sarabun-Regular.woff2">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Fonts\TTFFonts\Sarabun-Regular.ttf" />
+      <Content Include="Fonts\TTFFonts\Sarabun-Regular.ttf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Fonts\OTFFonts\CFF2\SourceHanSerifVFProtoJP.otf" />
+      <Content Include="Fonts\OTFFonts\CFF2\SourceHanSerifVFProtoJP.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Fonts\OTFFonts\CFF2\AdobeVFPrototype.otf" />
+      <Content Include="Fonts\OTFFonts\CFF2\AdobeVFPrototype.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Fonts\OTFFonts\SourceSans3-Regular.otf" />
+      <Content Include="Fonts\OTFFonts\SourceSans3-Regular.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Textures\sdf.png" />
+      <None Remove="Fonts\OTFFonts\Japan\NotoSansCJKjp-Light.otf" />
+      <Content Include="Fonts\OTFFonts\Japan\NotoSansCJKjp-Light.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Fonts\OTFFonts\GlametrixLight-0zjo.otf" />
+      <Content Include="Fonts\OTFFonts\GlametrixLight-0zjo.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Fonts\OTFFonts\CFF\Quicksand-Regular.otf" />
+      <Content Include="Fonts\OTFFonts\CFF\Quicksand-Regular.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Fonts" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Effect Include="Effects\BasicEffect.fx" />
     </ItemGroup>
 
     <Import Project="$(SolutionDir)Adamantium.targets" />

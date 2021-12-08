@@ -6,14 +6,14 @@ namespace Adamantium.Imaging.PaletteQuantizer.PathProviders
 {
     public class StandardPathProvider : IPathProvider
     {
-        public IList<Point> GetPointPath(Int32 width, Int32 height)
+        public IList<Vector2> GetPointPath(Int32 width, Int32 height)
         {
-            List<Point> result = new List<Point>(width*height);
+            var result = new List<Vector2>(width*height);
 
             for (Int32 y = 0; y < height; y++)
             for (Int32 x = 0; x < width; x++)
             {
-                Point point = new Point(x, y);
+                var point = new Vector2(x, y);
                 result.Add(point);
             }
 

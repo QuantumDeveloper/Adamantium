@@ -15,20 +15,20 @@ namespace Adamantium.UI.Controls
 
       public Double MaxWidth
       {
-         get { return GetValue<Double>(MaxWidthProperty); }
-         set { SetValue(MaxWidthProperty, value); }
+         get => GetValue<Double>(MaxWidthProperty);
+         set => SetValue(MaxWidthProperty, value);
       }
 
       public Double MinWidth
       {
-         get { return GetValue<Double>(MinWidthProperty); }
-         set { SetValue(MinWidthProperty, value); }
+         get => GetValue<Double>(MinWidthProperty);
+         set => SetValue(MinWidthProperty, value);
       }
 
       public GridLength Width
       {
-         get { return GetValue<GridLength>(WidthProperty); }
-         set { SetValue(WidthProperty, value); }
+         get => GetValue<GridLength>(WidthProperty);
+         set => SetValue(WidthProperty, value);
       }
 
       public Double ActualWidth { get; internal set; }

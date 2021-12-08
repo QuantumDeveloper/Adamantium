@@ -2184,7 +2184,7 @@ namespace Adamantium.Mathematics
             result.M33 = zRange;
             result.M41 = (left + right) / (left - right);
             result.M42 = (top + bottom) / (top - bottom);
-            result.M43 = -znear * zRange;
+            result.M43 = znear / (znear - zfar);
 
             return result;
         }
@@ -2395,27 +2395,44 @@ namespace Adamantium.Mathematics
             PerspectiveFovRH(fov, aspect, znear, zfar, out result);
             return result;
         }
+
+        public static Matrix4x4F PerspectiveFovX(float fov, float aspect, float zNear, float zFar)
+        {
+            float e = 1.0f / (float)Math.Tan(MathHelper.DegreesToRadians(fov / 2.0f));
+            float aspectInv = 1.0f / aspect;
+            float fovX = 2.0f * (float)Math.Atan(aspectInv / e);
+            float xScale = 1.0f / (float)Math.Tan(0.5f * fovX);
+            float yScale = xScale / aspectInv;
+            var result = Identity;
+            result.M11 = xScale;
+            result.M22 = yScale;
+            result.M33 = zFar / (zFar - zNear);
+            result.M34 = 1.0f;
+            result.M43 = -(zNear * zFar) / (zFar - zNear);
+
+            return result;
+        }
         
         /// <summary>
         /// Creates a right-handed, perspective projection matrix for Vulkan based on a field of view.
         /// </summary>
         /// <param name="fov">Field of view in the y direction, in radians.</param>
         /// <param name="aspect">Aspect ratio, defined as view space width divided by height.</param>
-        /// <param name="znear">Minimum z-value of the viewing volume.</param>
-        /// <param name="zfar">Maximum z-value of the viewing volume.</param>
+        /// <param name="zNear">Minimum z-value of the viewing volume.</param>
+        /// <param name="zFar">Maximum z-value of the viewing volume.</param>
         /// <returns>The created projection matrix.</returns>
-        public static Matrix4x4F PerspectiveFov(float fov, float aspect, float znear, float zfar)
+        public static Matrix4x4F PerspectiveFovY(float fov, float aspect, float zNear, float zFar)
         {
             Matrix4x4F result;
             float yScale = (float)(1.0f / Math.Tan(fov * 0.5f));
-            float q = zfar / (znear - zfar);
+            float q = zFar / (zFar - zNear);
 
-            result = new Matrix4x4F();
-            result.M11 = -yScale / aspect;
+            result = Identity;
+            result.M11 = yScale / aspect;
             result.M22 = yScale;
             result.M33 = q;
-            result.M34 = -1.0f;
-            result.M43 = q * znear;
+            result.M34 = 1.0f;
+            result.M43 = -(zNear * zFar) / (zFar - zNear);
             return result;
         }
         

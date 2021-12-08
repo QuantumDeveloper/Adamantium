@@ -22,7 +22,12 @@ namespace Adamantium.Engine.Templates.Lights
             float range = 360;
             float angleItem = range / 8;
             float angle = startAngle;
-            var ray = Shapes.Rectangle.GenerateGeometry(GeometryType.Solid, raySize, height, height / 2, height / 2, tessellation, Matrix4x4F.Translation(new Vector3F((raySize / 2) + 0.3f, 0, 0)));
+            var ray = Shapes.Rectangle.GenerateGeometry(GeometryType.Solid, 
+                raySize, 
+                height,
+                new CornerRadius(height / 2), 
+                tessellation,
+                Matrix4x4F.Translation(new Vector3F((raySize / 2) + 0.3f, 0, 0)));
             for (int i = 0; i < 8; i++)
             {
                 meshes.Add(ray.Clone(Matrix4x4F.RotationZ(MathHelper.DegreesToRadians(angle))));

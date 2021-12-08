@@ -501,7 +501,7 @@ namespace Adamantium.Imaging
             if (flipOtions == FlipBufferOptions.FlipVertically)
             {
                 int offset = 0;
-                for (uint i = height - 1; i >= 0; --i)
+                for (int i = (int)height - 1; i >= 0; --i)
                 {
                     System.Buffer.BlockCopy(buffer, (int)i * rowStride, flipped, offset, rowStride);
                     offset += rowStride;
@@ -509,11 +509,10 @@ namespace Adamantium.Imaging
             }
             else if (flipOtions == FlipBufferOptions.FlipHorizontally)
             {
-                int offset;
                 for (int i = 0; i < height; ++i)
                 {
                     var originalOffset = i * rowStride;
-                    offset = ((i + 1) * rowStride) - pixelSize;
+                    var offset = ((i + 1) * rowStride) - pixelSize;
                     for (int k = 0; k < width; ++k)
                     {
                         System.Buffer.BlockCopy(buffer, originalOffset, flipped, offset, pixelSize);
@@ -525,7 +524,7 @@ namespace Adamantium.Imaging
             else
             {
                 int rowOffset = 0;
-                for (uint i = height - 1; i >= 0; --i)
+                for (int i = (int)height - 1; i >= 0; --i)
                 {
                     System.Buffer.BlockCopy(buffer, (int)i * rowStride, flipped, rowOffset, rowStride);
                     var originalOffset = i * rowStride;

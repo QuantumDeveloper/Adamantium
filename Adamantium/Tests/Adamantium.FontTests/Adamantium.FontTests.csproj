@@ -1,0 +1,176 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+
+        <IsPackable>false</IsPackable>
+
+        <Platforms>x64</Platforms>
+
+        <Configurations>Debug;Release</Configurations>
+
+        <LangVersion>latestmajor</LangVersion>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="NUnit" Version="3.13.2" />
+        <PackageReference Include="NUnit3TestAdapter" Version="4.0.0" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.11.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\Adamantium.Fonts\Adamantium.Fonts.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Content Include="OTFFonts\CFF2\SourceHanSerifVFProtoJP.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <Content Include="OTFFonts\CFF\Glametrix-oj9A.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <Content Include="OTFFonts\CFF\Quicksand-Regular.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <Content Include="OTFFonts\SourceSans3-Regular.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <Content Include="OTFFonts\SourceSerif4Caption-Semibold.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="OTFFonts\customfont.otf" />
+      <Content Include="OTFFonts\CFF2\AdobeVFPrototype.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <Content Include="OTFFonts\customfont.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="OTFFonts\Glametrix-oj9A.otf" />
+      <None Remove="OTFFonts\GlametrixBold-4dW6.otf" />
+      <Content Include="OTFFonts\GlametrixBold-4dW6.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="OTFFonts\GlametrixLight-0zjo.otf" />
+      <Content Include="OTFFonts\GlametrixLight-0zjo.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="OTFFonts\GreatVibes-Regular.otf" />
+      <Content Include="OTFFonts\GreatVibes-Regular.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="OTFFonts\Poppins-Medium.otf" />
+      <Content Include="OTFFonts\Poppins-Medium.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="OTFFonts\CFF2\SourceSans3-Regular.otf" />
+      <None Remove="OTFFonts\AdobeVFPrototype.otf" />
+      <None Remove="OTFFonts\FDArrayTest257.otf" />
+      <Content Include="OTFFonts\FDArrayTest257.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="OTFFonts\FontCollections\ASANA.TTC" />
+      <Content Include="OTFFonts\FontCollections\ASANA.TTC">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="OTFFonts\FontCollections\NotoSansCJK-Regular.ttc" />
+      <Content Include="OTFFonts\FontCollections\NotoSansCJK-Regular.ttc">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="OTFFonts\Crimson-Italic.otf" />
+      <Content Include="OTFFonts\Crimson-Italic.otf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="OTFFonts\CFF2\SourceSerif4Caption-Semibold.otf" />
+      <None Remove="OTFFonts\FontCollections\SourceHanSerifVFProtoJP.otf" />
+      <None Remove="OTFFonts\Quicksand-Regular.otf" />
+      <None Remove="WoffFonts\Sarabun-Regular.woff" />
+      <Content Include="WoffFonts\Sarabun-Regular.woff">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="WoffFonts\Sarabun-Regular.woff2" />
+      <Content Include="WoffFonts\Sarabun-Regular.woff2">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="TTFFonts\SourceSans3-Black.ttf" />
+      <Content Include="TTFFonts\SourceSans3-Black.ttf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="TTFFonts\SourceSans3-BlackIt.ttf" />
+      <Content Include="TTFFonts\SourceSans3-BlackIt.ttf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="TTFFonts\SourceSans3-Bold.ttf" />
+      <Content Include="TTFFonts\SourceSans3-Bold.ttf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="TTFFonts\SourceSans3-BoldIt.ttf" />
+      <Content Include="TTFFonts\SourceSans3-BoldIt.ttf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="TTFFonts\SourceSans3-ExtraLight.ttf" />
+      <Content Include="TTFFonts\SourceSans3-ExtraLight.ttf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="TTFFonts\SourceSans3-ExtraLightIt.ttf" />
+      <Content Include="TTFFonts\SourceSans3-ExtraLightIt.ttf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="TTFFonts\SourceSans3-It.ttf" />
+      <Content Include="TTFFonts\SourceSans3-It.ttf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="TTFFonts\SourceSans3-Light.ttf" />
+      <Content Include="TTFFonts\SourceSans3-Light.ttf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="TTFFonts\SourceSans3-LightIt.ttf" />
+      <Content Include="TTFFonts\SourceSans3-LightIt.ttf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="TTFFonts\SourceSans3-Regular.ttf" />
+      <Content Include="TTFFonts\SourceSans3-Regular.ttf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="TTFFonts\SourceSans3-Semibold.ttf" />
+      <Content Include="TTFFonts\SourceSans3-Semibold.ttf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="TTFFonts\SourceSans3-SemiboldIt.ttf" />
+      <Content Include="TTFFonts\SourceSans3-SemiboldIt.ttf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="WoffFonts\Commissioner.woff2" />
+      <Content Include="WoffFonts\Commissioner.woff2">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="WoffFonts\Asana.woff2" />
+      <Content Include="WoffFonts\Asana.woff2">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="WoffFonts\RobotoSlab-VariableFont_wght.woff2" />
+      <Content Include="WoffFonts\RobotoSlab-VariableFont_wght.woff2">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="TTFFonts\Sarabun-Regular.ttf" />
+      <Content Include="TTFFonts\Sarabun-Regular.ttf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="TTFFonts\PlayfairDisplay-Regular.ttf" />
+      <Content Include="TTFFonts\PlayfairDisplay-Regular.ttf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="WoffFonts\WOFF2Collection\ASANA.woff2" />
+      <Content Include="WoffFonts\WOFF2Collection\ASANA.woff2">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="WoffFonts\WOFF2Collection\NotoSansCJK-Regular.woff2" />
+      <Content Include="WoffFonts\WOFF2Collection\NotoSansCJK-Regular.woff2">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="TTFFonts" />
+    </ItemGroup>
+
+</Project>

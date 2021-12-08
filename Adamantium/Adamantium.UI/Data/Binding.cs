@@ -19,10 +19,7 @@ namespace Adamantium.UI.Data
 
       public PropertyPath Path
       {
-         get
-         {
-            return path;
-         }
+         get => path;
          set
          {
             path = value;

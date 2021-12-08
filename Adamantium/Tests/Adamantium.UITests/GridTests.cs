@@ -47,8 +47,7 @@ namespace Adamantium.UITests
          rectangle.Stretch = Stretch.None;
          rectangle.HorizontalAlignment = HorizontalAlignment.Center;
          rectangle.VerticalAlignment = VerticalAlignment.Stretch;
-         rectangle.RadiusX = 5;
-         rectangle.RadiusY = 5;
+         rectangle.CornerRadius = new CornerRadius(5);
          rectangle.StrokeThickness = 2;
          rectangle.MinWidth = 15;
          rectangle.MinHeight = 15;
@@ -146,8 +145,7 @@ namespace Adamantium.UITests
          Rectangle rectN = new Rectangle();
          rectN.Width = 50;
          rectN.Height = 20;
-         rectN.RadiusX = 4;
-         rectN.RadiusY = 4;
+         rectN.CornerRadius = new CornerRadius(4);
          rectN.Fill = Brushes.Red;
          rectN.HorizontalAlignment = HorizontalAlignment.Center;
          rectN.VerticalAlignment = VerticalAlignment.Center;

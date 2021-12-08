@@ -80,7 +80,7 @@ namespace Adamantium.Engine.Graphics
 
                     var mesh = new Mesh();
                     mesh.SetTopology(PrimitiveType.TriangleList).
-                        SetPositions(vertices).
+                        SetPoints(vertices).
                         SetUVs(0, uvs).
                         SetIndices(indices).
                         CalculateNormals();
@@ -361,7 +361,7 @@ namespace Adamantium.Engine.Graphics
 
                     var mesh = new Mesh();
                     mesh.SetTopology(PrimitiveType).
-                        SetPositions(vertices).
+                        SetPoints(vertices).
                         SetUVs(0, uvs).
                         SetIndices(indexList.ToArray()).
                         CalculateNormals();
@@ -532,7 +532,7 @@ namespace Adamantium.Engine.Graphics
 
                     var mesh = Cube.GenerateGeometry(GeometryType.Solid, diameter, diameter, diameter, tessellation, null);
 
-                    var vertices = mesh.Positions;
+                    var vertices = mesh.Points;
                     var radius = diameter / 2;
 
                     for (int i = 0; i < vertices.Length; i++)
@@ -570,7 +570,7 @@ namespace Adamantium.Engine.Graphics
                         vertices[i] = position;
                     }
 
-                    mesh.SetPositions(vertices).
+                    mesh.SetPoints(vertices).
                         CalculateNormals();
 
                     return mesh;
@@ -624,7 +624,7 @@ namespace Adamantium.Engine.Graphics
 
                 Mesh mesh = new Mesh();
                 mesh.MeshTopology = primitiveType;
-                mesh.SetPositions(vertices);
+                mesh.SetPoints(vertices);
                 mesh.SetIndices(indices);
 
                 return mesh;

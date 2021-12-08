@@ -1,15 +1,18 @@
-﻿namespace Adamantium.UI
+﻿using System;
+using Adamantium.EntityFramework.ComponentsBasics;
+using Adamantium.UI.RoutedEvents;
+
+namespace Adamantium.UI
 {
    /// <summary>
    /// Interface for getting/setting <see cref="AdamantiumProperty"/> values on an object.
    /// </summary>
-   public interface IAdamantiumComponent
+   public interface IAdamantiumComponent : IComponent
    {
       /// <summary>
       /// The parent object that inherited values are inherited from.
       /// </summary>
       IAdamantiumComponent InheritanceParent { get; }
-
 
       /// <summary>
       /// Clear <see cref="AdamantiumProperty"/>`s local value
@@ -52,7 +55,17 @@
       /// <param name="property">The property.</param>
       /// <param name="value">The value.</param>
       void SetValue(AdamantiumProperty property, object value);
-
       
+      /// <summary>
+      /// Sets a <see cref="AdamantiumProperty"/> value.
+      /// </summary>
+      /// <param name="property">The property.</param>
+      /// <param name="value">New value.</param>
+      void SetCurrentValue(AdamantiumProperty property, object value);
+
+      /// <summary>
+      /// Fires when value on <see cref="AdamantiumProperty"/> was changed
+      /// </summary>
+      event EventHandler<AdamantiumPropertyChangedEventArgs> PropertyChanged;
    }
 }

@@ -1,6 +1,5 @@
 ﻿using System.Globalization;
 using Adamantium.Mathematics;
-using Point = Adamantium.Mathematics.Point;
 
 namespace Adamantium.UI
 {
@@ -46,7 +45,7 @@ namespace Adamantium.UI
       /// </summary>
       /// <param name="position">The position of the rectangle.</param>
       /// <param name="size">The size of the rectangle.</param>
-      public Rect(Point position, Size size)
+      public Rect(Vector2 position, Size size)
       {
          X = position.X;
          Y = position.Y;
@@ -59,7 +58,7 @@ namespace Adamantium.UI
       /// </summary>
       /// <param name="topLeft">The top left position of the rectangle.</param>
       /// <param name="bottomRight">The bottom right position of the rectangle.</param>
-      public Rect(Point topLeft, Point bottomRight)
+      public Rect(Vector2 topLeft, Vector2 bottomRight)
       {
          X = topLeft.X;
          Y = topLeft.Y;
@@ -90,7 +89,7 @@ namespace Adamantium.UI
       /// <summary>
       /// Gets the position of the rectangle.
       /// </summary>
-      public Point Location => new Point(X, Y);
+      public Vector2 Location => new Vector2(X, Y);
 
       /// <summary>
       /// Gets the size of the rectangle.
@@ -108,29 +107,29 @@ namespace Adamantium.UI
       public double Bottom => Y + Height;
 
       /// <summary>
-      /// Gets the top left point of the rectangle.
+      /// Gets the top left Vector2D of the rectangle.
       /// </summary>
-      public Point TopLeft => new Point(X, Y);
+      public Vector2 TopLeft => new Vector2(X, Y);
 
       /// <summary>
-      /// Gets the top right point of the rectangle.
+      /// Gets the top right Vector2D of the rectangle.
       /// </summary>
-      public Point TopRight => new Point(Right, Y);
+      public Vector2 TopRight => new Vector2(Right, Y);
 
       /// <summary>
-      /// Gets the bottom left point of the rectangle.
+      /// Gets the bottom left Vector2D of the rectangle.
       /// </summary>
-      public Point BottomLeft => new Point(X, Bottom);
+      public Vector2 BottomLeft => new Vector2(X, Bottom);
 
       /// <summary>
-      /// Gets the bottom right point of the rectangle.
+      /// Gets the bottom right Vector2D of the rectangle.
       /// </summary>
-      public Point BottomRight => new Point(Right, Bottom);
+      public Vector2 BottomRight => new Vector2(Right, Bottom);
 
       /// <summary>
-      /// Gets the center point of the rectangle.
+      /// Gets the center Vector2D of the rectangle.
       /// </summary>
-      public Point Center => new Point(X + (Width / 2), Y + (Height / 2));
+      public Vector2 Center => new Vector2(X + (Width / 2), Y + (Height / 2));
 
       /// <summary>
       /// Gets a value that indicates whether the rectangle is empty.
@@ -165,7 +164,7 @@ namespace Adamantium.UI
       /// <param name="rect">The rectangle.</param>
       /// <param name="scale">The vector scale.</param>
       /// <returns>The scaled rectangle.</returns>
-      public static Rect operator *(Rect rect, Vector2D scale)
+      public static Rect operator *(Rect rect, Vector2 scale)
       {
          return new Rect(
              rect.X * scale.X,
@@ -195,7 +194,7 @@ namespace Adamantium.UI
       /// <param name="rect">The rectangle.</param>
       /// <param name="scale">The vector scale.</param>
       /// <returns>The scaled rectangle.</returns>
-      public static Rect operator /(Rect rect, Vector2D scale)
+      public static Rect operator /(Rect rect, Vector2 scale)
       {
          return new Rect(
              rect.X / scale.X,
@@ -205,11 +204,11 @@ namespace Adamantium.UI
       }
 
       /// <summary>
-      /// Determines whether a points in in the bounds of the rectangle.
+      /// Determines whether a Vector2Ds in in the bounds of the rectangle.
       /// </summary>
-      /// <param name="p">The point.</param>
-      /// <returns>true if the point is in the bounds of the rectangle; otherwise false.</returns>
-      public bool Contains(Point p)
+      /// <param name="p">The Vector2D.</param>
+      /// <returns>true if the Vector2D is in the bounds of the rectangle; otherwise false.</returns>
+      public bool Contains(Vector2 p)
       {
          return p.X >= X && p.X < X + Width &&
                 p.Y >= Y && p.Y < Y + Height;
@@ -236,7 +235,7 @@ namespace Adamantium.UI
       /// <returns>The inflated rectangle.</returns>
       public Rect Inflate(double thickness)
       {
-         return new Rect(new Point(X - thickness, Y - thickness), Size.Inflate(new Thickness(thickness)));
+         return new Rect(new Vector2(X - thickness, Y - thickness), Size.Inflate(new Thickness(thickness)));
       }
 
       /// <summary>
@@ -247,7 +246,7 @@ namespace Adamantium.UI
       public Rect Inflate(Thickness thickness)
       {
          return new Rect(
-             new Point(X - thickness.Left, Y - thickness.Top),
+             new Vector2(X - thickness.Left, Y - thickness.Top),
              Size.Inflate(thickness));
       }
 
@@ -271,7 +270,7 @@ namespace Adamantium.UI
       public Rect Deflate(Thickness thickness)
       {
          return new Rect(
-             new Point(X + thickness.Left, Y + thickness.Top),
+             new Vector2(X + thickness.Left, Y + thickness.Top),
              Size.Deflate(thickness));
       }
 
@@ -352,7 +351,6 @@ namespace Adamantium.UI
          return (rect.X < Right) && (X < rect.Right) && (rect.Y < Bottom) && (Y < rect.Bottom);
       }
 
-      //TODO:replace sharpDX matrix with my own Matrix4x4F
       /// <summary>
       /// Returns the axis-aligned bounding box of a transformed rectangle.
       /// </summary>
@@ -381,16 +379,15 @@ namespace Adamantium.UI
             if (p.Y > bottom) bottom = p.Y;
          }
 
-         return new Rect(new Point(left, top), new Point(right, bottom));
+         return new Rect(new Vector2(left, top), new Vector2(right, bottom));
       }
       
-
       /// <summary>
       /// Translates the rectangle by an offset.
       /// </summary>
       /// <param name="offset">The offset.</param>
       /// <returns>The translated rectangle.</returns>
-      public Rect Translate(Vector2D offset)
+      public Rect Translate(Vector2 offset)
       {
          return new Rect(Location + offset, Size);
       }

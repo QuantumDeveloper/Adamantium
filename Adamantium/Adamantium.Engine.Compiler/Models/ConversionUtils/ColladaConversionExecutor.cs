@@ -282,7 +282,7 @@ namespace Adamantium.Engine.Compiler.Converter.ConversionUtils
                     }
                 }
 
-                rawMesh.SetPositions(rawGeometry.Positions);
+                rawMesh.SetPoints(rawGeometry.Positions);
                 rawMesh.SetUVs(0, rawGeometry.UV0);
                 rawMesh.SetUVs(1, rawGeometry.UV1);
                 rawMesh.SetUVs(2, rawGeometry.UV2);

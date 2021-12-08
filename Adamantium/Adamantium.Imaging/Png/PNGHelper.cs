@@ -18,10 +18,20 @@ namespace Adamantium.Imaging.Png
 
         public static void SaveToStream(Image img, PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream)
         {
-            PNGColorType colorType = PNGColorType.RGB;
-            if (description.Format.SizeOfInBytes() == 4)
+            PNGColorType colorType;
+
+            var colorFormat = description.Format.SizeOfInBytes();
+            switch (colorFormat)
             {
-                colorType = PNGColorType.RGBA;
+                case 1:
+                    colorType = PNGColorType.Grey;
+                    break;
+                case 4:
+                    colorType = PNGColorType.RGBA;
+                    break;
+                default:
+                    colorType = PNGColorType.RGBA;
+                    break;
             }
 
             PNGEncoder encoder = new PNGEncoder(imageStream);
@@ -30,8 +40,9 @@ namespace Adamantium.Imaging.Png
             state.EncoderSettings.UseLZ77 = true;
             state.InfoPng.InterlaceMethod = InterlaceMethod.None;
             state.EncoderSettings.FilterStrategy = FilterStrategy.MinSum;
-            state.InfoRaw.ColorType = colorType;
-            state.InfoRaw.BitDepth = (uint)description.Format.SizeOfInBits() / (uint)description.Format.SizeOfInBytes();
+            state.EncoderSettings.AutoConvert = true;
+            state.ColorModeRaw.ColorType = colorType;
+            state.ColorModeRaw.BitDepth = (uint)description.Format.SizeOfInBits() / (uint)description.Format.SizeOfInBytes();
 
             state.InfoPng.FramesCount = (uint)count;
             if (img.DefaultImage != null)

@@ -15,12 +15,12 @@ namespace Adamantium.Engine.Templates.Lights
             var indices = new List<int>();
             List<Vector3F> directions = new List<Vector3F>();
             int lastIndex = 0;
-            for (int i = 0; i < ellipse.Positions.Length - 1; i++)
+            for (int i = 0; i < ellipse.Points.Length - 1; i++)
             {
                 if (i % 2 != 0)
                     continue;
 
-                var lineStart = ellipse.Positions[i];
+                var lineStart = ellipse.Points[i];
                 var lineEnd = lineStart + Vector3F.ForwardRH * 3;
                 directions.Add(lineStart);
                 directions.Add(lineEnd);
@@ -29,7 +29,7 @@ namespace Adamantium.Engine.Templates.Lights
                 indices.Add(-1);
             }
             var directionsMesh = new Mesh();
-            directionsMesh.SetPositions(directions);
+            directionsMesh.SetPoints(directions);
             directionsMesh.SetIndices(indices);
             MergeInstance instance = new MergeInstance(directionsMesh, Matrix4x4F.Identity, false);
             ellipse.Merge(new[] { instance });

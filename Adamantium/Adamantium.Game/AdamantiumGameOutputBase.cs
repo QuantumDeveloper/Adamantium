@@ -15,7 +15,7 @@ namespace Adamantium.Game
         
         public override GameWindowDescription Description { get; protected set; }
 
-        protected FrameworkComponent UIComponent { get; set; }
+        protected FrameworkComponent UiComponent { get; set; }
 
         protected static readonly Dictionary<Key, Keys> TranslationKeys;
         protected static readonly Dictionary<MouseButtons, GameMouseButtons> MouseTranslationKeys;
@@ -217,12 +217,12 @@ namespace Adamantium.Game
         
         protected virtual void InitializeInternal(GameContext context)
         {
-            UIComponent.KeyDown += WindowOnKeyDown;
-            UIComponent.KeyUp += WindowOnKeyUp;
-            UIComponent.MouseDown += OnMouseDown;
-            UIComponent.MouseUp += OnMouseUp;
-            UIComponent.MouseWheel += OnMouseWheel;
-            UIComponent.RawMouseMove += OnMouseMove;
+            UiComponent.KeyDown += WindowOnKeyDown;
+            UiComponent.KeyUp += WindowOnKeyUp;
+            UiComponent.MouseDown += OnMouseDown;
+            UiComponent.MouseUp += OnMouseUp;
+            UiComponent.MouseWheel += OnMouseWheel;
+            UiComponent.RawMouseMove += OnMouseMove;
         }
 
         public override object NativeWindow => GameContext.Context;
@@ -239,49 +239,49 @@ namespace Adamantium.Game
                 switch (value)
                 {
                     case GameWindowCursor.Arrow:
-                        UIComponent.Cursor = Cursors.Arrow;
+                        UiComponent.Cursor = Cursors.Arrow;
                         break;
                     case GameWindowCursor.AppStarting:
-                        UIComponent.Cursor = Cursors.AppStarting;
+                        UiComponent.Cursor = Cursors.AppStarting;
                         break;
                     case GameWindowCursor.CrossHair:
-                        UIComponent.Cursor = Cursors.Crosshair;
+                        UiComponent.Cursor = Cursors.Crosshair;
                         break;
                     case GameWindowCursor.Hand:
-                        UIComponent.Cursor = Cursors.Hand;
+                        UiComponent.Cursor = Cursors.Hand;
                         break;
                     case GameWindowCursor.Help:
-                        UIComponent.Cursor = Cursors.Help;
+                        UiComponent.Cursor = Cursors.Help;
                         break;
                     case GameWindowCursor.IBeam:
-                        UIComponent.Cursor = Cursors.IBeam;
+                        UiComponent.Cursor = Cursors.IBeam;
                         break;
                     case GameWindowCursor.No:
-                        UIComponent.Cursor = Cursors.No;
+                        UiComponent.Cursor = Cursors.No;
                         break;
                     case GameWindowCursor.None:
-                        UIComponent.Cursor = Cursors.None;
+                        UiComponent.Cursor = Cursors.None;
                         break;
                     case GameWindowCursor.SizeAll:
-                        UIComponent.Cursor = Cursors.SizeAll;
+                        UiComponent.Cursor = Cursors.SizeAll;
                         break;
                     case GameWindowCursor.SizeNWSE:
-                        UIComponent.Cursor = Cursors.SizeNWSE;
+                        UiComponent.Cursor = Cursors.SizeNWSE;
                         break;
                     case GameWindowCursor.SizeEWE:
-                        UIComponent.Cursor = Cursors.SizeEWE;
+                        UiComponent.Cursor = Cursors.SizeEWE;
                         break;
                     case GameWindowCursor.SizeNESW:
-                        UIComponent.Cursor = Cursors.SizeNESW;
+                        UiComponent.Cursor = Cursors.SizeNESW;
                         break;
                     case GameWindowCursor.SizeNS:
-                        UIComponent.Cursor = Cursors.SizeNS;
+                        UiComponent.Cursor = Cursors.SizeNS;
                         break;
                     case GameWindowCursor.UpArrow:
-                        UIComponent.Cursor = Cursors.UpArrow;
+                        UiComponent.Cursor = Cursors.UpArrow;
                         break;
                     case GameWindowCursor.Wait:
-                        UIComponent.Cursor = Cursors.Wait;
+                        UiComponent.Cursor = Cursors.Wait;
                         break;
                 }
             }
@@ -290,7 +290,7 @@ namespace Adamantium.Game
         /// <summary>
         /// Defines is <see cref="GameOutput"/> currently displayed
         /// </summary>
-        public override bool IsVisible => UIComponent.Visibility == Visibility.Visible;
+        public override bool IsVisible => UiComponent.Visibility == Visibility.Visible;
 
         internal override void Resize(uint width, uint height)
         {

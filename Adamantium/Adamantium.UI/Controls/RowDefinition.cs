@@ -16,20 +16,20 @@ namespace Adamantium.UI.Controls
 
       public Double MaxHeight
       {
-         get { return GetValue<Double>(MaxHeightProperty); }
-         set { SetValue(MaxHeightProperty, value); }
+         get => GetValue<Double>(MaxHeightProperty);
+         set => SetValue(MaxHeightProperty, value);
       }
 
       public Double MinHeight
       {
-         get { return GetValue<Double>(MinHeightProperty); }
-         set { SetValue(MinHeightProperty, value); }
+         get => GetValue<Double>(MinHeightProperty);
+         set => SetValue(MinHeightProperty, value);
       }
 
       public GridLength Height
       {
-         get { return GetValue<GridLength>(HeightProperty); }
-         set { SetValue(HeightProperty, value); }
+         get => GetValue<GridLength>(HeightProperty);
+         set => SetValue(HeightProperty, value);
       }
 
       public Double ActualHeight { get; internal set; }

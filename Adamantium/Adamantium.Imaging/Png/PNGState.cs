@@ -6,7 +6,7 @@
         {
             DecoderSettings = new PNGDecoderSettings();
             EncoderSettings = new PNGEncoderSettings();
-            InfoRaw = new PNGColorMode();
+            ColorModeRaw = new PNGColorMode();
             InfoPng = new PNGInfo();
         }
 
@@ -14,7 +14,7 @@
 
         public PNGEncoderSettings EncoderSettings { get; set; }
 
-        public PNGColorMode InfoRaw { get; set; }
+        public PNGColorMode ColorModeRaw { get; set; }
 
         public PNGInfo InfoPng { get; set; }
 
@@ -22,7 +22,7 @@
 
         public static bool operator ==(PNGState left, PNGState right)
         {
-            if (left.DecoderSettings == right.DecoderSettings && left.InfoRaw == right.InfoRaw
+            if (left.DecoderSettings == right.DecoderSettings && left.ColorModeRaw == right.ColorModeRaw
                 && left.InfoPng == right.InfoPng && left.Error == right.Error)
             {
                 return true;

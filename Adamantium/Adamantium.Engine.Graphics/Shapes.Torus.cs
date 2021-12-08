@@ -100,7 +100,7 @@ namespace Adamantium.Engine.Graphics
 
                 var mesh = new Mesh();
                 mesh.MeshTopology = PrimitiveType.TriangleList;
-                mesh.SetPositions(vertices);
+                mesh.SetPoints(vertices);
                 mesh.SetUVs(0, uvs);
                 mesh.SetIndices(indices);
                 mesh.CalculateNormals();
@@ -132,13 +132,13 @@ namespace Adamantium.Engine.Graphics
                 {
                     for (int j = 0; j < meshes.Count; ++j)
                     {
-                        vertices.Add(meshes[j].Positions[i]);
+                        vertices.Add(meshes[j].Points[i]);
                         indices.Add(lastIndex++);
                     }
                     indices.Add(Shape.PrimitiveRestartValue);
                 }
                 var m = new Mesh();
-                m.SetPositions(vertices).SetIndices(indices);
+                m.SetPoints(vertices).SetIndices(indices);
                 meshes.Add(m);
 
                 var mesh = new Mesh();

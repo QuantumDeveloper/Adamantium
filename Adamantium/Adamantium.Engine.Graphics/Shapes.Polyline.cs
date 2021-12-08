@@ -70,7 +70,7 @@ namespace Adamantium.Engine.Graphics
 
                 var mesh = new Mesh();
                 mesh.SetTopology(primitiveType).
-                    SetPositions(vertexArray).
+                    SetPoints(vertexArray).
                     SetUVs(0, uvs).
                     SetIndices(indicesArray).
                     ApplyTransform(transform);

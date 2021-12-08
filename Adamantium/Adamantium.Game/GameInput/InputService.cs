@@ -148,6 +148,11 @@ namespace Adamantium.Game.GameInput
             IsWindowAvailable = false;
         }
 
+        public KeyboardInput[] GetKeyboardInputs()
+        {
+            return KeyboadInputs.ToArray();
+        }
+        
         internal List<KeyboardInput> KeyboadInputs { get; private set; }
 
         internal List<MouseInput> MouseInputs { get; private set; }

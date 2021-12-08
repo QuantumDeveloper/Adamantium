@@ -11,6 +11,7 @@ using Adamantium.Engine.Services;
 using Adamantium.Engine.Templates;
 using Adamantium.EntityFramework;
 using Adamantium.Mathematics;
+using Vector3 = Adamantium.Mathematics.Vector3;
 
 namespace Adamantium.Engine
 {
@@ -30,7 +31,7 @@ namespace Adamantium.Engine
          var camera = contentManager.ServiceProvider.Resolve<CameraService>().Cameras.FirstOrDefault();
          if (parameters.AssetName.EndsWith(".aemf"))
          {
-            return await entityWorld.CreateEntityFromTemplate(new EntityLoadTemplate(parameters.AssetPath, contentManager, graphicsDevice, Vector3D.Zero));
+            return await entityWorld.CreateEntityFromTemplate(new EntityLoadTemplate(parameters.AssetPath, contentManager, graphicsDevice, Vector3.Zero));
          }
          else
          {

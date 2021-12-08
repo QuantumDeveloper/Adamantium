@@ -9,6 +9,7 @@ using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
 using Adamantium.Game;
 using Adamantium.Game.GameInput;
+using Adamantium.Imaging;
 using Adamantium.Mathematics;
 using Adamantium.Win32;
 using AdamantiumVulkan.Core;
@@ -21,9 +22,11 @@ namespace Adamantium.Engine.Processors
 {
     public class ForwardRenderingProcessor : RenderProcessor
     {
-        private Sampler textureSampler;
-        private Texture defaultTexture;
-        
+        private Sampler smallGlyphTextureSampler;
+        private Sampler largeGlyphTextureSampler;
+        private Texture mtsdfTexture;
+        private Texture testTexture;
+
         public ForwardRenderingProcessor(EntityWorld world, GameOutput window) : base(world, window)
         {
             //DeferredDevice = GraphicsDevice.CreateDeferred();
@@ -241,11 +244,11 @@ namespace Adamantium.Engine.Processors
             decals[7] = new Vector3F(0, voxelSize, 0);
         }
         
-        Sampler CreateTextureSampler()
+        Sampler CreateTextureSampler(bool mtsdf)
         {
             SamplerCreateInfo samplerInfo = new SamplerCreateInfo();
-            samplerInfo.MagFilter = Filter.Linear;
-            samplerInfo.MinFilter = Filter.Linear;
+            samplerInfo.MagFilter = mtsdf ? Filter.Linear : Filter.Nearest;
+            samplerInfo.MinFilter = mtsdf ? Filter.Linear : Filter.Nearest;
             samplerInfo.AddressModeU = SamplerAddressMode.Repeat;
             samplerInfo.AddressModeV = SamplerAddressMode.Repeat;
             samplerInfo.AddressModeW = SamplerAddressMode.Repeat;
@@ -255,15 +258,21 @@ namespace Adamantium.Engine.Processors
             samplerInfo.UnnormalizedCoordinates = false;
             samplerInfo.CompareEnable = false;
             samplerInfo.CompareOp = CompareOp.Always;
-            samplerInfo.MipmapMode = SamplerMipmapMode.Linear;
+            samplerInfo.MipmapMode = mtsdf ? SamplerMipmapMode.Linear : SamplerMipmapMode.Nearest;
 
             return GraphicsDevice.CreateSampler(samplerInfo);
         }
 
         private void CreateResources()
         {
-            textureSampler = CreateTextureSampler();
-            defaultTexture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "texture.png"));
+            smallGlyphTextureSampler = CreateTextureSampler(false);
+            largeGlyphTextureSampler = CreateTextureSampler(true);
+            //defaultTexture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "texture.png"));
+            //defaultTexture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "sdf.png"));
+            mtsdfTexture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "mtsdf.png"));
+            testTexture = Texture.Load(GraphicsDevice, Path.Combine("Textures", "texture.png"));
+            
+            //defaultTexture.Save(Path.Combine("Textures", "subpixel.png"), ImageFileType.Png);
             //DeferredDevice.SetTargets(null);
 
             //var vbFlags = BufferFlags.VertexBuffer | BufferFlags.StreamOutput;
@@ -386,7 +395,7 @@ namespace Adamantium.Engine.Processors
 
             if (base.BeginDraw())
             {
-                if (GraphicsDevice.BeginDraw(Colors.CornflowerBlue, 1.0f, 0))
+                if (GraphicsDevice.BeginDraw(1.0f, 0))
                 {
                     GraphicsDevice.SetViewports(Window.Viewport);
                     GraphicsDevice.SetScissors(Window.Scissor);
@@ -402,8 +411,6 @@ namespace Adamantium.Engine.Processors
         public override void Draw(IGameTime gameTime)
         {
             base.Draw(gameTime);
-            GraphicsDevice.SetViewports(Window.Viewport);
-            GraphicsDevice.SetScissors(Window.Scissor);
             //GraphicsDevice.RasterizerState = GraphicsDevice.RasterizerStates.CullNoneClipDisabled;
             if (ActiveCamera == null)
             {
@@ -464,24 +471,27 @@ namespace Adamantium.Engine.Processors
                                     foreach (var component in renderers)
                                     {
                                         var material = current.GetComponent<Material>();
-                                        var wvp = transformation.WorldMatrix *ActiveCamera.ViewMatrix * ActiveCamera.ProjectionMatrix;
+                                        //var wvp = transformation.WorldMatrix *ActiveCamera.ViewMatrix * ActiveCamera.ProjectionMatrix;
+                                        //var orthoProj = Matrix4x4F.OrthoOffCenter(0, Window.Width, 0, Window.Height, 1f, 100000f);
+                                        var wvp = transformation.WorldMatrix * ActiveCamera.UiProjection;
+                                        //var wvp = transformation.WorldMatrix * Matrix4x4F.Scaling(1, -1, 1) * Matrix4x4F.Scaling(2.0f / Window.Width, 2.0f/Window.Height, 1.0f / (100000f - 1f));
                                         GraphicsDevice.BasicEffect.Parameters["wvp"].SetValue(wvp);
+                                        GraphicsDevice.BasicEffect.Parameters["meshColor"].SetValue(Colors.Black.ToVector3());
+                                        GraphicsDevice.BasicEffect.Parameters["transparency"].SetValue(0.5f);
                                         //GraphicsDevice.BasicEffect.Parameters["worldMatrix"].SetValue(transformation.WorldMatrix);
                                         //GraphicsDevice.BasicEffec.SetValue(Matrix4x4F.Transpose(Matrix4x4F.Invert(transformation.WorldMatrix)));
                                         
                                         //DeferredDevice.RasterizerState = DeferredDevice.RasterizerStates.Default;
                                         //DeferredDevice.SetRasterizerState(DeferredDevice.RasterizerStates.CullBackClipDisabled);
-                                        
-                                        GraphicsDevice.BasicEffect.Parameters["sampleType"].SetResource(textureSampler);
 
                                         if (material?.Texture != null)
                                         {
                                             GraphicsDevice.BasicEffect.Parameters["shaderTexture"].SetResource(material.Texture);
                                         }
-                                        else
+                                        /*else
                                         {
                                             GraphicsDevice.BasicEffect.Parameters["shaderTexture"].SetResource(defaultTexture);
-                                        }
+                                        }*/
 
                                         if (component is SkinnedMeshRenderer)
                                         {
@@ -491,7 +501,40 @@ namespace Adamantium.Engine.Processors
 
                                         if (component is MeshRenderer)
                                         {
-                                            GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Textured"].Apply();
+                                            material = current.GetComponent<Material>();
+                                            GraphicsDevice.ClearColor = Colors.CornflowerBlue;
+                                            transformation.WorldMatrix = Matrix4x4F.Translation(current.Transform.Position);
+                                            wvp = transformation.WorldMatrix * ActiveCamera.UiProjection;
+                                            GraphicsDevice.BasicEffect.Parameters["wvp"].SetValue(wvp);
+                                            GraphicsDevice.BasicEffect.Parameters["shaderTexture"].SetResource(mtsdfTexture);
+
+                                            if (component.Name == "SmallGlyph")
+                                            {
+                                                GraphicsDevice.BasicEffect.Parameters["foregroundColor"].SetValue(material.AmbientColor);
+                                                GraphicsDevice.BasicEffect.Parameters["sampleType"].SetResource(smallGlyphTextureSampler);
+                                                GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["SmallGlyph"].Apply();
+                                            }
+                                            else if (component.Name == "LargeGlyph")
+                                            {
+                                                GraphicsDevice.BasicEffect.Parameters["foregroundColor"].SetValue(material.AmbientColor);
+                                                GraphicsDevice.BasicEffect.Parameters["sampleType"].SetResource(largeGlyphTextureSampler);
+                                                GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["LargeGlyph"].Apply();
+                                            }
+                                            else if (component.Name == "Test")
+                                            {
+                                                GraphicsDevice.BasicEffect.Parameters["shaderTexture"].SetResource(testTexture);
+                                                GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Textured"].Apply();
+                                            }
+                                            else
+                                            {
+                                                GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["VertexColored"].Apply();
+                                            }
+                                            
+                                            
+                                            //GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Colored"].Apply();
+                                            //GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["VertexColored"].Apply();
+                                            //GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["MSDF"].Apply();
+                                            //GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Textured"].Apply();
 
                                             //BasicEffect.Techniques["MeshVertex"].Passes["DirectionalLight"].Apply();
                                             component.Draw(GraphicsDevice, gameTime);

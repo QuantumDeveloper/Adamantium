@@ -52,15 +52,10 @@ namespace Adamantium.Engine.Graphics
       /// <summary>
       /// Resize graphics presenter bacbuffer according to width and height
       /// </summary>
-      /// <param name="width"></param>
-      /// <param name="height"></param>
-      /// <param name="buffersCount"></param>
-      /// <param name="depthFormat"></param>
-      /// <param name="flags"></param>
-      /// <param name="pixelFormat"></param>
-      public override bool Resize(uint width, uint height, uint buffersCount, SurfaceFormat pixelFormat, DepthFormat depthFormat/*, SwapChainFlags flags = SwapChainFlags.None*/)
+      /// <param name="parameters"></param>
+      public override bool Resize(PresentationParameters parameters)
       {
-         if (!base.Resize(width, height, buffersCount, pixelFormat, depthFormat/*, flags*/))
+         if (!base.Resize(parameters))
          {
             return false;
          }
@@ -85,9 +80,9 @@ namespace Adamantium.Engine.Graphics
       /// <summary>
       /// Present rendered image on screen
       /// </summary>
-      public override Result Present()
+      public override PresenterState Present()
       {
-         return Result.Success;
+         return PresenterState.Success;
          //if (isShared)
          //{
          //   GraphicsDevice.ResolveSubresource(backbuffer, 0, sharedTexture, 0, Description.PixelFormat);

@@ -22,12 +22,12 @@ namespace Adamantium.Engine.Tools
         private const string RightUpManipulatorName = "RightUpManipulator";
         private const string CentralManipulatorName = "CentralManipulator";
 
-        private Vector3D rightPos;
-        private Vector3D upPos;
-        private Vector3D forwardPos;
-        private Vector3D rightUpPos;
-        private Vector3D rightForwardPos;
-        private Vector3D upForwardPos;
+        private Vector3 rightPos;
+        private Vector3 upPos;
+        private Vector3 forwardPos;
+        private Vector3 rightUpPos;
+        private Vector3 rightForwardPos;
+        private Vector3 upForwardPos;
 
         private readonly Entity rightManipulator;
         private readonly Entity upManipulator;
@@ -335,12 +335,12 @@ namespace Adamantium.Engine.Tools
             }
         }
 
-        private Vector3D CalculateManipulatorPosition(double scale, float scaleSign, float baseScale, Vector3D axis)
+        private Vector3 CalculateManipulatorPosition(double scale, float scaleSign, float baseScale, Vector3 axis)
         {
-            return CalculateManipulatorPosition(scale, scaleSign, baseScale, Vector3D.Zero, axis);
+            return CalculateManipulatorPosition(scale, scaleSign, baseScale, Vector3.Zero, axis);
         }
 
-        private Vector3D CalculateManipulatorPosition(double scale, float scaleSign, float baseScale, Vector3D initialPosition, Vector3D axis)
+        private Vector3 CalculateManipulatorPosition(double scale, float scaleSign, float baseScale, Vector3 initialPosition, Vector3 axis)
         {
             scale *= scaleSign;
             if (scaleSign > 0)
@@ -352,11 +352,11 @@ namespace Adamantium.Engine.Tools
                 scale += ScaleToolLength;
             }
             scale *= toolScale * baseScale;
-            Vector3D newPos = axis * scale + initialPosition;
+            Vector3 newPos = axis * scale + initialPosition;
             return newPos;
         }
 
-        private Vector3D CalculateManipulatorPositionEx(float scaleSign, float baseScale, Vector3D initialPosition, Vector3D axis)
+        private Vector3 CalculateManipulatorPositionEx(float scaleSign, float baseScale, Vector3 initialPosition, Vector3 axis)
         {
             double scale = 0;
             if (scaleSign < 0)
@@ -365,7 +365,7 @@ namespace Adamantium.Engine.Tools
             }
             
             scale *= toolScale * baseScale;
-            Vector3D newPos = axis * scale + initialPosition;
+            Vector3 newPos = axis * scale + initialPosition;
             return newPos;
         }
 

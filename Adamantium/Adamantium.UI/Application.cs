@@ -5,10 +5,12 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using Adamantium.Core.DependencyInjection;
+using Adamantium.Core.Events;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.Engine.Graphics.Effects;
 using Adamantium.EntityFramework;
+using Adamantium.UI.AggregatorEvents;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Input;
 using Adamantium.UI.MacOS;
@@ -17,11 +19,15 @@ using Adamantium.UI.Threading;
 using Adamantium.UI.Windows;
 using AdamantiumVulkan;
 using AdamantiumVulkan.Core;
+using UnhandledExceptionEventArgs = Adamantium.UI.RoutedEvents.UnhandledExceptionEventArgs;
+using UnhandledExceptionEventHandler = Adamantium.UI.RoutedEvents.UnhandledExceptionEventHandler;
 
 namespace Adamantium.UI
 {
     public abstract class Application : AdamantiumComponent, IService
     {
+        //private Mutex mutex = new Mutex(false, "adamantiumMutex");
+        
         public IWindow MainWindow
         {
             get => mainWindow;
@@ -30,9 +36,12 @@ namespace Adamantium.UI
                 if (mainWindow != null)
                 {
                     mainWindow.Closed -= MainWindow_Closed;
-                    mainWindow.Closed += MainWindow_Closed;
                 }
                 mainWindow = value;
+                if (mainWindow != null)
+                {
+                    mainWindow.Closed += MainWindow_Closed;
+                }
             }
         }
 
@@ -46,8 +55,7 @@ namespace Adamantium.UI
         internal IDependencyResolver Services { get; set; }
 
         private EntityWorld entityWorld;
-        private Dictionary<IWindow, UIRenderProcessor> windowToSystem;
-        private Dictionary<IWindow, GraphicsDevice> windowToDevices;
+        private Dictionary<IWindow, WindowProcessor> windowToSystem;
 
         private ApplicationTime appTime;
         private TimeSpan totalTime;
@@ -63,6 +71,8 @@ namespace Adamantium.UI
         private Thread renderThread;
         private CancellationTokenSource cancellationTokenSource;
 
+        private IEventAggregator eventAggregator;
+
         static Application()
         {
             WindowsPlatform.Initialize();
@@ -71,12 +81,11 @@ namespace Adamantium.UI
         protected Application()
         {
             Current = this;
-            
+            var d = Dispatcher.CurrentDispatcher;
             VulkanDllMap.Register();
             ShutDownMode = ShutDownMode.OnMainWindowClosed;
             systemManager = new ApplicationSystemManager(this);
-            windowToSystem = new Dictionary<IWindow, UIRenderProcessor>();
-            windowToDevices = new Dictionary<IWindow, GraphicsDevice>();
+            windowToSystem = new Dictionary<IWindow, WindowProcessor>();
             addedWindows = new List<IWindow>();
             closedWindows = new List<IWindow>();
             Windows = new WindowCollection();
@@ -84,10 +93,11 @@ namespace Adamantium.UI
             Windows.WindowRemoved += WindowRemoved;
             appTime = new ApplicationTime();
             preciseTimer = new PreciseTimer();
-            Services = new AdamantiumServiceLocator();
+            Services = AdamantiumServiceLocator.Current;
             Services.RegisterInstance<IService>(this);
             Services.RegisterInstance<SystemManager>(systemManager);
             entityWorld = new EntityWorld(Services);
+            eventAggregator = Services.Resolve<IEventAggregator>();
             Initialize();
             renderThread = new Thread(RenderThread);
         }
@@ -112,33 +122,15 @@ namespace Adamantium.UI
         
         public static Application Current { get; private set; }
 
-        public bool IsRunning => !(cancellationTokenSource?.IsCancellationRequested == true);
+        public bool IsRunning => cancellationTokenSource?.IsCancellationRequested != true;
         public bool IsPaused { get; private set; }
 
         protected void OnWindowAdded(IWindow window)
         {
-            var @params = new PresentationParameters(
-                PresenterType.Swapchain,
-                (uint)window.ClientWidth,
-                (uint)window.ClientHeight,
-                window.SurfaceHandle,
-                MSAALevel.X4
-                )
-            {
-                HInstanceHandle = Process.GetCurrentProcess().Handle
-            };
-            
-            var device = MainGraphicsDevice.CreateRenderDevice(@params);
-            device.AddDynamicStates(DynamicState.Viewport, DynamicState.Scissor);
-
-            windowToDevices[window] = device;
-
-            var transformProcessor = new UITransformProcessor(entityWorld);
-            var renderProcessor = new UIRenderProcessor(entityWorld, device);
+            var renderProcessor = new WindowProcessor(entityWorld, window, MainGraphicsDevice);
             var entity = new Entity();
             entity.AddComponent(window);
             entityWorld.AddEntity(entity);
-            entityWorld.AddProcessor(transformProcessor);
             entityWorld.AddProcessor(renderProcessor);
 
             windowToSystem.Add(window, renderProcessor);
@@ -156,9 +148,6 @@ namespace Adamantium.UI
             processor.UnloadContent();
             entityWorld.RemoveProcessor(processor);
             windowToSystem.Remove(window);
-            var device = windowToDevices[window];
-            device?.Dispose();
-            windowToDevices.Remove(window);
 
             if (window == MainWindow)
             {
@@ -203,26 +192,25 @@ namespace Adamantium.UI
         {
             if (cancellationTokenSource != null) return;
 
-            if (window == null) throw new ArgumentNullException($"{nameof(window)}");
-
-            MainWindow = window;
+            MainWindow = window ?? throw new ArgumentNullException($"{nameof(window)}");
             MainWindow.Show();
             Windows.Add(window);
             
             Run();
         }
-
+        
         protected void RunUpdateDrawBlock()
         {
             try
             {
                 var frameTime = preciseTimer.GetElapsedTime();
                 ProcessPendingWindows();
+                //mutex.WaitOne();
                 Update(appTime);
                 BeginScene();
                 Draw(appTime);
                 EndScene();
-
+                //mutex.ReleaseMutex();
                 UpdateGameTime(frameTime);
                 CalculateFps(frameTime);
                 
@@ -327,16 +315,14 @@ namespace Adamantium.UI
 
         protected void EndScene()
         {
-
         }
 
         protected void Initialize()
         {
             MainGraphicsDevice = MainGraphicsDevice.Create("Adamantium Engine", true);
-            //GraphicsDevice.BlendState = GraphicsDevice.BlendStates.AlphaBlend;
-            //GraphicsDevice.RasterizerState = GraphicsDevice.RasterizerStates.CullNoneClipEnabled;
-            //GraphicsDevice.DepthStencilState = GraphicsDevice.DepthStencilStates.DepthEnableGreaterEqual;
             Services.RegisterInstance<GraphicsDevice>(MainGraphicsDevice);
+
+            eventAggregator.GetEvent<WindowAddedEvent>().Subscribe(OnWindowAdded, ThreadOption.UIThread);
             Initialized?.Invoke(this, EventArgs.Empty);
         }
 
@@ -357,7 +343,7 @@ namespace Adamantium.UI
             if (!IsPaused)
             {
                 IsPaused = true;
-                Paused?.Invoke(this, new EventArgs());
+                Paused?.Invoke(this, EventArgs.Empty);
             }
         }
 
@@ -369,7 +355,7 @@ namespace Adamantium.UI
             if (IsPaused)
             {
                 IsPaused = false;
-                Resumed?.Invoke(this, new EventArgs());
+                Resumed?.Invoke(this, EventArgs.Empty);
             }
         }
 

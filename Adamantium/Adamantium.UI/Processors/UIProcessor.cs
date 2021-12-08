@@ -12,34 +12,34 @@ namespace Adamantium.UI.Processors
         {
         }
 
-        public void TraverseInDepth(IVisual visualElement, Action<IVisual> action)
+        public void TraverseInDepth(IUIComponent visualComponentElement, Action<IUIComponent> action)
         {
-            var stack = new Stack<IVisual>();
-            stack.Push(visualElement);
+            var stack = new Stack<IUIComponent>();
+            stack.Push(visualComponentElement);
             while (stack.Count > 0)
             {
                 var control = stack.Pop();
 
                 action(control);
 
-                foreach (var visual in control.GetVisualDescends())
+                foreach (var visual in control.GetVisualDescendants())
                 {
                     stack.Push(visual as FrameworkComponent);
                 }
             }
         }
 
-        public void TraverseByLayer(IVisual visualElement, Action<IVisual> action)
+        public void TraverseByLayer(IUIComponent visualComponentElement, Action<IUIComponent> action)
         {
-            var queue = new Queue<IVisual>();
-            queue.Enqueue(visualElement);
+            var queue = new Queue<IUIComponent>();
+            queue.Enqueue(visualComponentElement);
             while (queue.Count > 0)
             {
                 var control = queue.Dequeue();
 
                 action(control);
 
-                foreach (var visual in control.GetVisualDescends())
+                foreach (var visual in control.GetVisualDescendants())
                 {
                     queue.Enqueue(visual);
                 }

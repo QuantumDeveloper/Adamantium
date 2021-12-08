@@ -87,8 +87,8 @@ namespace Adamantium.Engine.Services
             game.EntityWorld.AddToGroup(PointLightTool.Tool, "Lights");
             game.EntityWorld.AddToGroup(DirectionalLightTool.Tool, "Lights");
 
-            Task.Run(() => CreateLightsIcons());
-            Task.Run(() => CreateLightsVisual());
+            //Task.Run(() => CreateLightsIcons());
+            //Task.Run(() => CreateLightsVisual());
         }
 
         public void Update()

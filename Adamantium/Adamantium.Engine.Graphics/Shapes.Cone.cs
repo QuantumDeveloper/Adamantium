@@ -154,7 +154,7 @@ namespace Adamantium.Engine.Graphics
 
                 var mesh = new Mesh();
                 mesh.SetTopology(primitiveType).
-                    SetPositions(positions).
+                    SetPoints(positions).
                     SetIndices(indices).
                     SetUVs(0, uvs).
                     Optimize().
@@ -206,7 +206,7 @@ namespace Adamantium.Engine.Graphics
                 indices.Add(indices[quarterIndex + halfIndex]);
 
                 var mesh = new Mesh();
-                mesh.SetPositions(vertices).
+                mesh.SetPoints(vertices).
                     SetIndices(indices).
                     SetTopology(primitiveType);
 

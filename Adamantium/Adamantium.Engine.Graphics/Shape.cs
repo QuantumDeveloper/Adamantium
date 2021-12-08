@@ -33,13 +33,13 @@ namespace Adamantium.Engine.Graphics
             Mesh = mesh;
             GraphicsDevice = device;
 
-            int length = mesh.Positions.Length;
+            int length = mesh.Points.Length;
 
             var vertices = new MeshVertex[length];
 
             for (int i = 0; i < length; i++)
             {
-                var vertex = new MeshVertex() { Position = mesh.Positions[i] };
+                var vertex = new MeshVertex() { Position = mesh.Points[i] };
                 if (mesh.IsNormalsPresent)
                 {
                     vertex.Normal = mesh.Normals[i];

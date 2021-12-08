@@ -18,20 +18,20 @@ namespace Adamantium.UI.Controls
 
       public Orientation Orientation
       {
-         get { return GetValue<Orientation>(OrientationProperty); }
-         set { SetValue(OrientationProperty, value); }
+         get => GetValue<Orientation>(OrientationProperty);
+         set => SetValue(OrientationProperty, value);
       }
 
       public Double ItemWidth
       {
-         get { return GetValue<Double>(ItemWidthProperty); }
-         set { SetValue(ItemWidthProperty, value); }
+         get => GetValue<Double>(ItemWidthProperty);
+         set => SetValue(ItemWidthProperty, value);
       }
 
       public Double ItemHeight
       {
-         get { return GetValue<Double>(ItemHeightProperty); }
-         set { SetValue(ItemHeightProperty, value); }
+         get => GetValue<Double>(ItemHeightProperty);
+         set => SetValue(ItemHeightProperty, value);
       }
 
       public WrapPanel()

@@ -13,33 +13,30 @@ namespace Adamantium.Engine.Templates.Camera
     {
         public Entity BuildEntity(Entity owner, string name)
         {
-            var rectangle = Shapes.Rectangle.GenerateGeometry(GeometryType.Outlined, 0.5f, 0.3f, 0.05f, 0.05f, 10);
+            var rectangle = Shapes.Rectangle.GenerateGeometry(GeometryType.Outlined, 0.5f, 0.3f, new CornerRadius(0.05f), 10);
             
             var ellipse1 = Shapes.Ellipse.GenerateGeometry(GeometryType.Outlined, EllipseType.EdgeToEdge, new Vector2F(0.3f), 0, 360, true, 40, Matrix4x4F.Translation(-0.25f, 0.15f, 0));
             var ellipse2 = ellipse1.Clone(Matrix4x4F.Translation(0.24f, 0.12f, 0));
 
-            var lensPoints = new List<Vector3D>();
-            lensPoints.Add(new Vector3D(0.24, 0.05, 0));
-            lensPoints.Add(new Vector3D(0.3, 0.1, 0));
-            lensPoints.Add(new Vector3D(0.4, 0.1, 0));
-            lensPoints.Add(new Vector3D(0.4, -0.1, 0));
-            lensPoints.Add(new Vector3D(0.3, -0.1, 0));
-            lensPoints.Add(new Vector3D(0.24, -0.05, 0));
+            var lensPoints = new List<Vector2>();
+            lensPoints.Add(new Vector2(0.24, 0.05));
+            lensPoints.Add(new Vector2(0.3, 0.1));
+            lensPoints.Add(new Vector2(0.4, 0.1));
+            lensPoints.Add(new Vector2(0.4, -0.1));
+            lensPoints.Add(new Vector2(0.3, -0.1));
+            lensPoints.Add(new Vector2(0.24, -0.05));
 
             var polygon = new Polygon();
-            var cameraBase = new PolygonItem(rectangle.Positions.ToList());
-            var ell1 = new PolygonItem(ellipse1.Positions.ToList());
-            var ell2 = new PolygonItem(ellipse2.Positions.ToList());
+            var cameraBase = new PolygonItem(rectangle.Points);
+            var ell1 = new PolygonItem(ellipse1.Points);
+            var ell2 = new PolygonItem(ellipse2.Points);
             var lens = new PolygonItem(lensPoints);
             polygon.FillRule = FillRule.NonZero;
-            polygon.Polygons.Add(cameraBase);
-            polygon.Polygons.Add(ell1);
-            polygon.Polygons.Add(ell2);
-            polygon.Polygons.Add(lens);
+            polygon.AddItems(cameraBase, ell1,ell2,lens);
             var result = polygon.Fill();
 
             Mesh mesh = new Mesh();
-            mesh.SetPositions(result);
+            mesh.SetPoints(result);
             mesh.Optimize();
 
             var root = BuildSubEntity(owner, name, Colors.White, mesh, BoundingVolume.OrientedBox);

@@ -18,20 +18,20 @@ namespace Adamantium.UI.Controls
 
       public String SharedSizeGroup
       {
-         get { return GetValue<String>(SharedSizeGroupProperty); }
-         set { SetValue(SharedSizeGroupProperty, value); }
+         get => GetValue<String>(SharedSizeGroupProperty);
+         set => SetValue(SharedSizeGroupProperty, value);
       }
 
       public Double Margin
       {
-         get { return GetValue<Double>(MarginProperty); }
-         set { SetValue(MarginProperty, value); }
+         get => GetValue<Double>(MarginProperty);
+         set => SetValue(MarginProperty, value);
       }
 
       public HalfThickness Padding
       {
-         get { return GetValue<HalfThickness>(PaddingProperty); }
-         set { SetValue(PaddingProperty, value); }
+         get => GetValue<HalfThickness>(PaddingProperty);
+         set => SetValue(PaddingProperty, value);
       }
 
       internal Double Offset { get; set; }

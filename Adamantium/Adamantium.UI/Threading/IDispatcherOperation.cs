@@ -5,7 +5,7 @@ namespace Adamantium.UI.Threading
 {
     public interface IDispatcherOperation
     {
-        Action Action { get; }
+        Delegate Action { get; }
         
         DispatcherPriority Priority { get; }
 

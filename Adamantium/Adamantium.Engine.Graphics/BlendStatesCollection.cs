@@ -49,8 +49,11 @@ namespace Adamantium.Engine.Graphics
         /// </summary>
         public readonly BlendState Default;
 
+        public readonly BlendState Fonts;
+
         internal BlendStatesCollection()
         {
+            Fonts = Add(BlendState.New(nameof(Fonts), true, BlendFactor.SrcAlpha, BlendFactor.OneMinusSrcAlpha, BlendOp.Add, DefaultColorWriteMask));
             Additive = Add(BlendState.New(nameof(Additive), true, BlendFactor.SrcAlpha, BlendFactor.One, BlendOp.Add, DefaultColorWriteMask));
             LightMap = Add(BlendState.New(nameof(LightMap), true, BlendFactor.One, BlendFactor.One, BlendOp.Add, DefaultColorWriteMask));
             AlphaBlend = Add(BlendState.New(nameof(AlphaBlend), true, BlendFactor.One, BlendFactor.OneMinusSrcAlpha, BlendOp.Add, DefaultColorWriteMask));

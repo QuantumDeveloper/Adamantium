@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Threading;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Content;
 using Adamantium.Engine.Graphics;
@@ -45,12 +46,19 @@ namespace Adamantium.Engine.Processors
             Window = window;
             Window.ParametersChanging += Window_ParametersChanging;
             Window.ParametersChanged += Window_ParametersChanged;
+            Window.StateChanged += StateChanged;
             LightService = world.Services.Resolve<LightService>();
             InputService = world.Services.Resolve<InputService>();
             CameraService = EntityWorld.Services.Resolve<CameraService>();
             ToolsService = EntityWorld.Services.Resolve<ToolsService>();
+
 //            BasicEffect = Effect.Load(@"Content\Effects\BasicEffect.fx.compiled", GraphicsDevice);
 //            SpriteBatch = new SpriteBatch(DeferredDevice, 25000);
+        }
+
+        private void StateChanged(WindowStatePayload obj)
+        {
+            
         }
 
         private void Window_ParametersChanged(GameOutputParametersPayload payload)
@@ -93,8 +101,20 @@ namespace Adamantium.Engine.Processors
         public virtual void CreateSystemResources()
         { }
 
+        public override bool BeginDraw()
+        {
+            //return Window.IsVisible;
+            return IsVisible;
+        }
+
+        private AutoResetEvent pauseEvent = new AutoResetEvent(false);
         public override void Draw(IGameTime gameTime)
         {
+            if (!Window.IsVisible)
+            {
+                pauseEvent.WaitOne();
+            }
+            
             base.Draw(gameTime);
             GameTime = gameTime;
 

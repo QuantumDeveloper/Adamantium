@@ -63,7 +63,7 @@ namespace Adamantium.Engine.Templates.Tools
             BuildSubEntity(root, "RightOrbit", rightOrbit, Colors.Red);
             BuildSubEntity(root, "UpOrbit", upOrbit, Colors.Green);
 
-            var centralRectangle = Shapes.Rectangle.GenerateGeometry(GeometryType.Outlined, axisLength / 5, axisLength / 5, 0, 0);
+            var centralRectangle = Shapes.Rectangle.GenerateGeometry(GeometryType.Outlined, axisLength / 5, axisLength / 5, new CornerRadius(0), 0);
             BuildSubEntity(root, "CentralManipulator", centralRectangle, Colors.Turquoise, BoundingVolume.OrientedBox);
 
             return root;

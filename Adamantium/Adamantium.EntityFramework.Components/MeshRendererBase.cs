@@ -78,7 +78,7 @@ namespace Adamantium.EntityFramework.Components
             if (IsWireFrame)
             {
                 prevRasterState = graphicsContext.RasterizerState;
-                graphicsContext.RasterizerState = GraphicsDevice.RasterizerStates.WireFrameCullNoneClipEnabled;
+                graphicsContext.RasterizerState = GraphicsDevice.RasterizerStates.WireFrameCullNoneClipDisabled;
             }
 
             if (MeshData.Mesh.HasIndices)

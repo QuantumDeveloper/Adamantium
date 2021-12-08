@@ -26,6 +26,15 @@ namespace Adamantium.UI.Threading
             AddOperation(operation);
             return operation.Task;
         }
+        
+        public Task InvokeAsync(Delegate method, object args, int numArgs)
+        {
+            if (method == null) throw new ArgumentNullException(nameof(method));
+            
+            var operation = new DispatcherOperation(method, args, numArgs);
+            AddOperation(operation);
+            return operation.Task;
+        }
 
         public void Execute()
         {

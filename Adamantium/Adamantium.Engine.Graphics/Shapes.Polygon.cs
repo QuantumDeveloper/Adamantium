@@ -78,7 +78,7 @@ namespace Adamantium.Engine.Graphics
 
                 var mesh = new Mesh();
                 mesh.SetTopology(PrimitiveType.TriangleList).
-                    SetPositions(vertices).
+                    SetPoints(vertices).
                     SetUVs(0, uvs).
                     SetIndices(indices).
                     CalculateNormals();
@@ -108,7 +108,7 @@ namespace Adamantium.Engine.Graphics
 
                 var mesh = new Mesh();
                 mesh.SetTopology(PrimitiveType.LineStrip).
-                    SetPositions(vertices).
+                    SetPoints(vertices).
                     SetIndices(indices);
 
                 return mesh;

@@ -15,7 +15,7 @@ namespace Adamantium.Mathematics
       /// Gets the identity matrix.
       /// </summary>
       /// <value>The identity matrix.</value>
-      public readonly static Matrix3x2F Identity = new Matrix3x2F(1, 0, 0, 1, 0, 0);
+      public static readonly Matrix3x2F Identity = new Matrix3x2F(1, 0, 0, 1, 0, 0);
 
       /// <summary>
       /// Element (1,1)

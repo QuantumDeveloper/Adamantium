@@ -38,7 +38,7 @@ namespace Adamantium.EntityFramework
 
         private Entity owner;
         private readonly Int64 uid;
-        private bool _isEnabled;
+        private bool isEnabled;
         private bool isSelected;
         private string name;
         private readonly TrackingCollection<Entity> dependencies;
@@ -63,10 +63,10 @@ namespace Adamantium.EntityFramework
 
         public bool IsEnabled
         {
-            get => _isEnabled;
+            get => isEnabled;
             set
             {
-                if (SetProperty(ref _isEnabled, value))
+                if (SetProperty(ref isEnabled, value))
                 {
                     EnabledChanged?.Invoke(this, new StateEventArgs(value));
                 }

@@ -5,6 +5,10 @@ float transparency;
 sampler sampleType;
 //[[vk::binding(2)]] 
 Texture2D shaderTexture;
+float gamma;
+float4 foregroundColor;
+float4 backgroundColor;
+uint atlasSize;
 
 struct TexturedVertexInputType
 {
@@ -79,6 +83,87 @@ float4 BasicColored_PS(PS_OUTPUT_BASIC input) : SV_TARGET
     return color;
 }
 
+float4 BasicVertexColored_PS(PS_OUTPUT_BASIC input) : SV_TARGET
+{
+    return input.color;
+}
+
+float median(float a, float b, float c)
+{
+    return max(min(a,b), min(max(a,b), c));
+}
+
+float4 MSDF_PS(PS_OUTPUT_BASIC input) : SV_TARGET
+{
+    float3 sample = shaderTexture.Sample(sampleType, input.uv).rgb;
+    int2 sz;
+    shaderTexture.GetDimensions(sz.x, sz.y);
+    float dx = ddx( input.uv.x ) * sz.x;
+    float dy = ddy( input.uv.y ) * sz.y;
+    float toPixels = 5.0 * rsqrt( dx * dx + dy * dy );
+    float sigDist = median( sample.r, sample.g, sample.b ) - 0.5;
+    float opacity = clamp( sigDist * toPixels + 0.5, 0.0, 1.0 );
+    
+    float4 color = float4(foregroundColor.r, foregroundColor.g, foregroundColor.b, opacity);
+    
+    return color;
+}
+
+float4 EncodedToBrightness(float4 encoded)
+{
+    return pow(encoded, gamma);
+}
+        
+float4 BrightnessToEncoded(float4 brightness)
+{
+    return pow(brightness, 1.0 / gamma);
+}
+
+float GetRebalancedSubpixel(float mostLeft, float leastLeft, float current, float leastRight, float mostRight)
+{
+    return (mostLeft / 9.0) +
+           ((leastLeft * 2.0) / 9.0) +
+           ((current * 3.0) / 9.0) +
+           ((leastRight * 2.0) / 9.0) +
+           (mostRight / 9.0);
+}
+
+float4 Subpixel_PS(PS_OUTPUT_BASIC input) : SV_TARGET
+{
+    float pixelStep = 1.0 / atlasSize;
+    float2 leftPos = float2(input.uv.x - pixelStep, input.uv.y);
+    float2 rightPos = float2(input.uv.x + pixelStep, input.uv.y);
+
+    float4 leftPixel = shaderTexture.Sample(sampleType, leftPos);
+    float4 currentPixel = shaderTexture.Sample(sampleType, input.uv);
+    float4 rightPixel = shaderTexture.Sample(sampleType, rightPos);
+
+    leftPixel = EncodedToBrightness(leftPixel);
+    currentPixel = EncodedToBrightness(currentPixel);
+    rightPixel = EncodedToBrightness(rightPixel);    
+
+    float redDist = GetRebalancedSubpixel(leftPixel.g, leftPixel.b, currentPixel.r, currentPixel.g, currentPixel.b);
+    float greenDist = GetRebalancedSubpixel(leftPixel.b, currentPixel.r, currentPixel.g, currentPixel.b, rightPixel.r);
+    float blueDist = GetRebalancedSubpixel(currentPixel.r, currentPixel.g, currentPixel.b, rightPixel.r, rightPixel.g);
+
+    float4 linearForegroundColor = EncodedToBrightness(foregroundColor);
+    float4 linearBackgroundColor = EncodedToBrightness(backgroundColor);    
+    
+    float blendedRed   = redDist * linearForegroundColor.r + (1.0 - redDist) * linearBackgroundColor.r;
+    float blendedGreen = greenDist * linearForegroundColor.g + (1.0 - greenDist) * linearBackgroundColor.g;
+    float blendedBlue  = blueDist * linearForegroundColor.b + (1.0 - blueDist) * linearBackgroundColor.b;
+    //float blendedAlpha = currentPixel.a * linearForegroundColor.a + (1.0 - currentPixel.a) * linearBackgroundColor.a;
+    
+    float4 color = BrightnessToEncoded(float4(blendedRed, blendedGreen, blendedBlue, currentPixel.a));
+    
+    return color;
+}
+
+float4 BasicTextured_PS(PS_OUTPUT_BASIC input) : SV_TARGET
+{
+    float4 color = shaderTexture.Sample(sampleType, input.uv);
+    return color;
+}
 technique10 Render
 {
 	pass Textured
@@ -96,5 +181,40 @@ technique10 Basic
         Profile = 5.1;
         VertexShader = Basic_VS;
         PixelShader = BasicColored_PS;
+    }
+    
+    pass Textured
+        {
+            Profile = 5.1;
+            VertexShader = Basic_VS;
+            PixelShader = BasicTextured_PS;
+        }
+        
+    pass Colored
+        {
+            Profile = 5.1;
+            VertexShader = Basic_VS;
+            PixelShader = BasicColored_PS;
+        }
+        
+    pass VertexColored
+    {
+        Profile = 5.1;
+        VertexShader = Basic_VS;
+        PixelShader = BasicVertexColored_PS;
+    }
+
+    pass MSDF
+    {
+        Profile = 5.1;
+        VertexShader = Basic_VS;
+        PixelShader = MSDF_PS;
+    }
+    
+    pass Subpixel
+    {
+        Profile = 5.1;
+        VertexShader = Basic_VS;
+        PixelShader = Subpixel_PS;
     }
 }

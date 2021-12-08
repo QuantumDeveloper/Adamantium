@@ -28,8 +28,8 @@ namespace Adamantium.Mathematics
       /// <param name="maximum">The maximum vertex of the bounding box.</param>
       public BoundingBox(Vector3F minimum, Vector3F maximum)
       {
-         this.Minimum = minimum;
-         this.Maximum = maximum;
+         Minimum = minimum;
+         Maximum = maximum;
       }
 
       /// <summary>

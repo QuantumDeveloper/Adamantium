@@ -62,13 +62,7 @@ namespace Adamantium.Imaging
         /// <param name="arrayOrDepthSlice">For 3D image, the parameter is the Z slice, otherwise it is an index into the texture array.</param>
         /// <param name="mipIndex">The mip map slice index.</param>
         /// <returns>A <see cref="PixelBuffer"/>.</returns>
-        public PixelBuffer this[int arrayOrDepthSlice, int mipIndex]
-        {
-            get
-            {
-                return this.image.GetPixelBuffer(arrayOrDepthSlice, mipIndex);
-            }
-        }
+        public PixelBuffer this[int arrayOrDepthSlice, int mipIndex] => image.GetPixelBuffer(arrayOrDepthSlice, mipIndex);
 
         /// <summary>
         /// Gets the pixel buffer for the specified array/z slice and mipmap level.

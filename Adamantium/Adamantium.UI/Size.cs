@@ -93,23 +93,23 @@ namespace Adamantium.UI
       }
 
       /// <summary>
-      /// Multiply <see cref="Size"/> by a <see cref="Vector2D"/>
+      /// Multiply <see cref="Size"/> by a <see cref="Vector2"/>
       /// </summary>
       /// <param name="size">size</param>
       /// <param name="scale">scale factor</param>
       /// <returns>returns scaled Size</returns>
-      public static Size operator *(Size size, Vector2D scale)
+      public static Size operator *(Size size, Vector2 scale)
       {
          return new Size(size.Width * scale.X, size.Height * scale.Y);
       }
 
       /// <summary>
-      /// Divide <see cref="Size"/> by a <see cref="Vector2D"/>
+      /// Divide <see cref="Size"/> by a <see cref="Vector2"/>
       /// </summary>
       /// <param name="size">size</param>
       /// <param name="scale">scale factor</param>
       /// <returns>returns scaled Size</returns>
-      public static Size operator /(Size size, Vector2D scale)
+      public static Size operator /(Size size, Vector2 scale)
       {
          return new Size(size.Width / scale.X, size.Height / scale.Y);
       }
@@ -157,9 +157,9 @@ namespace Adamantium.UI
       /// </summary>
       /// <param name="size"></param>
       /// <returns></returns>
-      public static implicit operator Point(Size size)
+      public static implicit operator Vector2(Size size)
       {
-         return new Point(size.Width, size.Height);
+         return new Vector2(size.Width, size.Height);
       }
 
       /// <summary>

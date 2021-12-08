@@ -22,9 +22,9 @@ namespace Adamantium.Engine.Services
          PerlinNoise.SetSeed(seed);
          uint octaveCount = (uint)Math.Floor(Math.Log(size + 1, 2));
 
-         for (int i = 0; i < geometry.Positions.Length; ++i)
+         for (int i = 0; i < geometry.Points.Length; ++i)
          {
-            float noise = PerlinNoise.GetMultioctave3DNoiseValue(geometry.Positions[i], modifiers, 0, octaveCount);
+            float noise = PerlinNoise.GetMultioctave3DNoiseValue(geometry.Points[i], modifiers, 0, octaveCount);
 
             if ((noise < randomizer.NextFloat(-0.5f, -0.7f)) || (noise > randomizer.NextFloat(0.5f, 0.7f)))
             {
@@ -37,8 +37,8 @@ namespace Adamantium.Engine.Services
                noise *= 0.05f * (float)Math.Pow(1.5f, (Math.Abs(0.0f - noise)));
             }
 
-            geometry.Positions[i] += geometry.Normals[i] * noise;
-            geometry.Normals[i] = Vector3F.Normalize(geometry.Positions[i]);
+            geometry.Points[i] += geometry.Normals[i] * noise;
+            geometry.Normals[i] = Vector3F.Normalize(geometry.Points[i]);
          }
 
 

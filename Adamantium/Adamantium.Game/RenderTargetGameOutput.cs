@@ -7,12 +7,13 @@ using Adamantium.Imaging;
 using Adamantium.UI;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Input;
+using Adamantium.UI.RoutedEvents;
 using Rectangle = Adamantium.Mathematics.Rectangle;
 
 namespace Adamantium.Game
 {
     /// <summary>
-    /// Represents <see cref="GameOutput"/> based on <see cref="Window"/> 
+    /// Represents <see cref="GameOutput"/> based on <see cref="WindowBase"/> 
     /// </summary>
     public class RenderTargetGameOutput : AdamantiumGameOutputBase
     {
@@ -41,7 +42,7 @@ namespace Adamantium.Game
             
             GameContext = context;
             nativeWindow = (RenderTargetPanel)GameContext.Context;
-            UIComponent = nativeWindow;
+            UiComponent = nativeWindow;
             nativeWindow.RenderTargetChanged += NativeWindow_RenderTargetChanged;
             nativeWindow.GotFocus += NativeWindow_GotFocus;
             nativeWindow.LostFocus += NativeWindow_LostFocus;
@@ -79,7 +80,9 @@ namespace Adamantium.Game
         /// </summary>
         public override object NativeWindow => nativeWindow;
 
-        public override bool IsActive => UIComponent.IsFocused;
+        public override bool IsActive => UiComponent.IsFocused;
+        
+        public override WindowState State { get; set; }
 
         internal override bool CanHandle(GameContext gameContext)
         {

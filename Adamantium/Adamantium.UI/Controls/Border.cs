@@ -10,8 +10,8 @@ namespace Adamantium.UI.Controls
          new PropertyMetadata(Brushes.Transparent, PropertyMetadataOptions.AffectsRender));
 
       public static readonly AdamantiumProperty CornerRadiusProperty = AdamantiumProperty.Register(nameof(CornerRadius),
-         typeof (Thickness), typeof (Border),
-         new PropertyMetadata(default(Thickness), PropertyMetadataOptions.AffectsMeasure));
+         typeof (CornerRadius), typeof (Border),
+         new PropertyMetadata(default(CornerRadius), PropertyMetadataOptions.AffectsMeasure));
 
       public static readonly AdamantiumProperty BorderThicknessProperty =
          AdamantiumProperty.Register(nameof(BorderThickness),
@@ -24,26 +24,26 @@ namespace Adamantium.UI.Controls
 
       public Brush BorderBrush
       {
-         get { return GetValue<Brush>(BorderBrushProperty); }
-         set { SetValue(BorderBrushProperty, value); }
+         get => GetValue<Brush>(BorderBrushProperty);
+         set => SetValue(BorderBrushProperty, value);
       }
 
       public Brush Background
       {
-         get { return GetValue<Brush>(BackgroundProperty); }
-         set { SetValue(BackgroundProperty, value); }
+         get => GetValue<Brush>(BackgroundProperty);
+         set => SetValue(BackgroundProperty, value);
       }
 
-      public Thickness CornerRadius
+      public CornerRadius CornerRadius
       {
-         get { return GetValue<Thickness>(CornerRadiusProperty); }
-         set { SetValue(CornerRadiusProperty, value); }
+         get => GetValue<CornerRadius>(CornerRadiusProperty);
+         set => SetValue(CornerRadiusProperty, value);
       }
 
       public Thickness BorderThickness
       {
-         get { return GetValue<Thickness>(BorderThicknessProperty); }
-         set { SetValue(BorderThicknessProperty, value); }
+         get => GetValue<Thickness>(BorderThicknessProperty);
+         set => SetValue(BorderThicknessProperty, value);
       }
 
       public Border()
@@ -77,50 +77,48 @@ namespace Adamantium.UI.Controls
          return finalSize;
       }
 
-      public override void OnRender(DrawingContext context)
+      protected override void OnRender(DrawingContext context)
       {
          var size = new Size(ActualWidth, ActualHeight);
          var borderThickness = BorderThickness;
          var cornerRadius = CornerRadius;
          base.OnRender(context);
          StreamGeometry geometry = new StreamGeometry();
-         geometry.context.BeginFigure(new Point(cornerRadius.Left, 0));
+         
+         geometry.context.BeginFigure(new Vector2(cornerRadius.TopLeft, 0));
 
 
-         geometry.context.LineTo(new Point(size.Width - cornerRadius.Right, 0), borderThickness.Top);
-         if (cornerRadius.Top > 0.0)
-         {
-            geometry.context.QuadraticBezier(new Point(size.Width - cornerRadius.Right, 0), new Point(size.Width, 0),
-               new Point(size.Width, cornerRadius.Top), borderThickness.Right);
-         }
-         geometry.context.LineTo(new Point(size.Width, size.Height - cornerRadius.Right), BorderThickness.Right);
-         if (cornerRadius.Right > 0.0)
-         {
-            geometry.context.QuadraticBezier(new Point(size.Width, size.Height - cornerRadius.Right), new Point(size),
-               new Point(size.Width - cornerRadius.Right, size.Height), borderThickness.Right);
-         }
-         geometry.context.LineTo(new Point(cornerRadius.Bottom, size.Height), BorderThickness.Bottom);
-         if (cornerRadius.Bottom > 0.0)
-         {
-            geometry.context.QuadraticBezier(new Point(cornerRadius.Bottom, size.Height), new Point(0, size.Height),
-               new Point(0, size.Height - cornerRadius.Bottom), borderThickness.Bottom);
-         }
-         geometry.context.LineTo(new Point(0, cornerRadius.Left), borderThickness.Left);
-         if (cornerRadius.Left > 0.0)
-         {
-            geometry.context.QuadraticBezier(new Point(0, cornerRadius.Left), new Point(0, 0),
-               new Point(cornerRadius.Left, 0), borderThickness.Left);
-         }
+         // geometry.context.LineTo(new Point(size.Width - cornerRadius.TopRight, 0), borderThickness.Top);
+         // if (cornerRadius.TopRight > 0.0)
+         // {
+         //    geometry.context.QuadraticBezier(new Point(size.Width - cornerRadius.Right, 0), new Point(size.Width, 0),
+         //       new Point(size.Width, cornerRadius.Top), borderThickness.Right);
+         // }
+         // geometry.context.LineTo(new Point(size.Width, size.Height - cornerRadius.Right), BorderThickness.Right);
+         // if (cornerRadius.Right > 0.0)
+         // {
+         //    geometry.context.QuadraticBezier(new Point(size.Width, size.Height - cornerRadius.Right), new Point(size),
+         //       new Point(size.Width - cornerRadius.Right, size.Height), borderThickness.Right);
+         // }
+         // geometry.context.LineTo(new Point(cornerRadius.Bottom, size.Height), BorderThickness.Bottom);
+         // if (cornerRadius.Bottom > 0.0)
+         // {
+         //    geometry.context.QuadraticBezier(new Point(cornerRadius.Bottom, size.Height), new Point(0, size.Height),
+         //       new Point(0, size.Height - cornerRadius.Bottom), borderThickness.Bottom);
+         // }
+         // geometry.context.LineTo(new Point(0, cornerRadius.Left), borderThickness.Left);
+         // if (cornerRadius.Left > 0.0)
+         // {
+         //    geometry.context.QuadraticBezier(new Point(0, cornerRadius.Left), new Point(0, 0),
+         //       new Point(cornerRadius.Left, 0), borderThickness.Left);
+         // }
 
-
-
-         geometry.VertexArray = geometry.context.VertexArray;
-         geometry.IndicesArray = geometry.context.IndicesArray;
-
+         
          context.BeginDraw(this);
-         context.DrawGeometry(this, BorderBrush, null, geometry);
-         context.DrawRectangle(this, Background, new Rect(new Point(BorderThickness.Left, BorderThickness.Top), RenderSize.Deflate(BorderThickness)), CornerRadius);
+         context.DrawGeometry(BorderBrush, geometry);
+         context.DrawRectangle(Background, new Rect(new Vector2(BorderThickness.Left, BorderThickness.Top), RenderSize.Deflate(BorderThickness)), CornerRadius);
          context.EndDraw(this);
+         
       }
    }
 }

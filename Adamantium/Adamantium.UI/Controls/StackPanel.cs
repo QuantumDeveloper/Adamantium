@@ -10,8 +10,8 @@ namespace Adamantium.UI.Controls
 
       public Orientation Orientation
       {
-         get { return GetValue<Orientation>(OrientationProperty); }
-         set { SetValue(OrientationProperty, value); }
+         get => GetValue<Orientation>(OrientationProperty);
+         set => SetValue(OrientationProperty, value);
       }
 
       protected override Size MeasureOverride(Size availableSize)

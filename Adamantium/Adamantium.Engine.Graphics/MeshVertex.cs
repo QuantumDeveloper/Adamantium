@@ -46,7 +46,7 @@ namespace Adamantium.Engine.Graphics
           BiTangent = bitangent;
        }
 
-       /// <summary>
+        /// <summary>
         /// XYZ position.
         /// </summary>
         [VertexInputElement("SV_POSITION")] public Vector3F Position;

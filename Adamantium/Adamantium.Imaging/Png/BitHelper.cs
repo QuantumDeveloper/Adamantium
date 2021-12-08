@@ -34,7 +34,6 @@ namespace Adamantium.Imaging.Png
             {
                 result <<= 1;
                 result |= ReadBitFromReversedStream(ref bitPointer, data);
-                ++bitPointer;
             }
             return result;
         }

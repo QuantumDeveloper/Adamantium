@@ -120,7 +120,7 @@ namespace Adamantium.EntityFramework.Components
 
         protected void CreateVertexData(GraphicsDevice renderContext)
         {
-            int length = Geometry.Positions.Length;
+            int length = Geometry.Points.Length;
 
             var normals = Geometry.Semantic.HasFlag(VertexSemantic.Normal);
             var texcoords0 = Geometry.Semantic.HasFlag(VertexSemantic.UV0);
@@ -133,7 +133,7 @@ namespace Adamantium.EntityFramework.Components
 
             for (int i = 0; i < length; ++i)
             {
-                var vertex = new MeshVertex() { Position = Geometry.Positions[i] };
+                var vertex = new MeshVertex() { Position = Geometry.Points[i] };
                 if (normals)
                 {
                     vertex.Normal = Geometry.Normals[i];

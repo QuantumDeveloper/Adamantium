@@ -2,6 +2,7 @@
 using Adamantium.Mathematics;
 using System;
 using System.Diagnostics;
+using System.Linq;
 
 namespace Adamantium.Engine.Core.Models
 {
@@ -11,24 +12,29 @@ namespace Adamantium.Engine.Core.Models
 
         public Mesh()
         {
+            Initialize();
+        }
+
+        private void Initialize()
+        {
             MeshTopology = PrimitiveType.TriangleList;
             UpAxis = UpAxis.Y_DOWN_RH;
 
-            Positions = new Vector3F[0];
-            Colors = new Color[0];
-            Normals = new Vector3F[0];
-            UV0 = new Vector2F[0];
-            UV1 = new Vector2F[0];
-            UV2 = new Vector2F[0];
-            UV3 = new Vector2F[0];
-            Tangents = new Vector4F[0];
-            BiTangents = new Vector3F[0];
-            BoneWeights = new Vector4F[0];
-            BoneIndices = new Vector4F[0];
-            Indices = new int[0];
+            Points = Array.Empty<Vector3F>();
+            Colors = Array.Empty<Color>();
+            Normals = Array.Empty<Vector3F>();
+            UV0 = Array.Empty<Vector2F>();
+            UV1 = Array.Empty<Vector2F>();
+            UV2 = Array.Empty<Vector2F>();
+            UV3 = Array.Empty<Vector2F>();
+            Tangents = Array.Empty<Vector4F>();
+            BiTangents = Array.Empty<Vector3F>();
+            BoneWeights = Array.Empty<Vector4F>();
+            BoneIndices = Array.Empty<Vector4F>();
+            Indices = Array.Empty<int>();
         }
 
-        public Vector3F[] Positions { get; private set; }
+        public Vector3F[] Points { get; private set; }
 
         public Color[] Colors { get; private set; }
 
@@ -51,6 +57,8 @@ namespace Adamantium.Engine.Core.Models
         public Vector4F[] BoneWeights { get; private set; }
 
         public int[] Indices { get; private set; }
+        
+        public LineSegment2D[] Segments { get; private set; }
 
         public Bounds Bounds { get; private set; }
 
@@ -96,14 +104,14 @@ namespace Adamantium.Engine.Core.Models
             return this;
         }
 
-        public Mesh SetPositions(List<Vector3F> inPositions, bool updateBoundingBox = true)
+        public Mesh SetPoints(List<Vector3F> inPositions, bool updateBoundingBox = true)
         {
             if (inPositions == null || inPositions.Count == 0)
             {
                 return this;
             }
 
-            Positions = inPositions.ToArray();
+            Points = inPositions.ToArray();
             if (updateBoundingBox)
             {
                 CalculateBoundingVolumes();
@@ -114,15 +122,25 @@ namespace Adamantium.Engine.Core.Models
             return this;
         }
 
-        public Mesh SetPositions(Vector3F[] inPositions, bool updateBoundingBox = true)
+        public Mesh SetPoints(List<Vector2> inPositions, bool updateBoundingBox = true)
+        {
+            var positions = new Vector3F[inPositions.Count];
+            for (int i = 0; i < inPositions.Count; ++i)
+            {
+                positions[i] = new Vector3F(inPositions[i]);
+            }
+            return SetPoints(positions, updateBoundingBox);
+        }
+
+        public Mesh SetPoints(Vector3F[] inPositions, bool updateBoundingBox = true)
         {
             if (inPositions == null || inPositions.Length == 0)
             {
                 return this;
             }
 
-            Positions = new Vector3F[inPositions.Length];
-            inPositions.CopyTo(Positions, 0);
+            Points = new Vector3F[inPositions.Length];
+            inPositions.CopyTo(Points, 0);
             if (updateBoundingBox)
             {
                 CalculateBoundingVolumes();
@@ -352,10 +370,10 @@ namespace Adamantium.Engine.Core.Models
 
         public Mesh Merge(MergeInstance[] instances, bool forceOptimization = false)
         {
-            List<Vector3F> positions = new List<Vector3F>(Positions);
+            List<Vector3F> positions = new List<Vector3F>(Points);
             List<Vector2F> uv0 = new List<Vector2F>(UV0);
             List<int> indices = new List<int>(Indices);
-            int indexShift = Positions.Length;
+            int indexShift = Points.Length;
             foreach (MergeInstance instance in instances)
             {
                 if (instance?.Mesh == null)
@@ -368,7 +386,7 @@ namespace Adamantium.Engine.Core.Models
                     instance.Mesh.Optimize();
                 }
 
-                Vector3F[] transformed = instance.Mesh.Positions;
+                Vector3F[] transformed = instance.Mesh.Points;
                 if (instance.ApplyTransform)
                 {
                     transformed = ApplyTransform(transformed, instance.Transform);
@@ -381,7 +399,7 @@ namespace Adamantium.Engine.Core.Models
 
                 positions.AddRange(transformed);
                 uv0.AddRange(instance.Mesh.UV0);
-                var instancePositions = instance.Mesh.Positions;
+                var instancePositions = instance.Mesh.Points;
                 int startIndex = indices.Count;
                 indices.AddRange(instance.Mesh.Indices);
                 if (MeshTopology == PrimitiveType.LineStrip || MeshTopology == PrimitiveType.TriangleStrip)
@@ -392,11 +410,11 @@ namespace Adamantium.Engine.Core.Models
                 indexShift += instancePositions.Length;
             }
 
-            SetPositions(positions);
+            SetPoints(positions);
             SetUVs(0, uv0);
             SetIndices(indices);
 
-            if (!forceOptimization)
+            if (forceOptimization)
             {
                 Optimize();
             }
@@ -436,12 +454,12 @@ namespace Adamantium.Engine.Core.Models
             }
 
             var transformMatrix = transform.Value;
-
-            for (int i = 0; i < Positions.Length; i++)
+            
+            for (int i = 0; i < Points.Length; i++)
             {
-                var position = Positions[i];
+                var position = Points[i];
                 Vector3F.TransformCoordinate(ref position, ref transformMatrix, out position);
-                Positions[i] = position;
+                Points[i] = position;
             }
             
             CalculateNormals();
@@ -451,6 +469,11 @@ namespace Adamantium.Engine.Core.Models
             IsModified = true;
 
             return this;
+        }
+
+        public void Clear()
+        {
+            Initialize();
         }
 
         public Mesh Clone()
@@ -463,8 +486,8 @@ namespace Adamantium.Engine.Core.Models
             Mesh clonedMesh = new Mesh();
             clonedMesh.MeshTopology = MeshTopology;
 
-            clonedMesh.Positions = new Vector3F[Positions.Length];
-            Positions.CopyTo(clonedMesh.Positions, 0);
+            clonedMesh.Points = new Vector3F[Points.Length];
+            Points.CopyTo(clonedMesh.Points, 0);
 
             clonedMesh.Indices = new int[Indices.Length];
             Indices.CopyTo(clonedMesh.Indices, 0);
@@ -552,7 +575,7 @@ namespace Adamantium.Engine.Core.Models
                     continue;
                 }
 
-                var position = Positions[index];
+                var position = Points[index];
                 Vector2F uv0 = UV0 != null && UV0.Length - 1 >= index ? UV0[index] : Vector2F.Zero;
                 Vector2F uv1 = UV1 != null && UV1.Length - 1 >= index ? UV1[index] : Vector2F.Zero;
                 Vector2F uv2 = UV2 != null && UV2.Length - 1 >= index ? UV2[index] : Vector2F.Zero;
@@ -606,7 +629,7 @@ namespace Adamantium.Engine.Core.Models
 
             vertexDict.Clear();
 
-            Positions = optimizedPositions.ToArray();
+            Points = optimizedPositions.ToArray();
             Indices = indices.ToArray();
 
             if (Semantic.HasFlag(VertexSemantic.UV0))
@@ -655,21 +678,26 @@ namespace Adamantium.Engine.Core.Models
 
         public Mesh CalculateBoundingVolumes()
         {
-            Bounds = Bounds.FromPoints(Positions);
+            if (Points.Length == 0)
+            {
+                return this;
+            }
+            
+            Bounds = Bounds.FromPoints(Points);
 
             return this;
         }
 
         public Mesh CalculateNormals(bool smoothNormals = true)
         {
-            if (MeshTopology != PrimitiveType.TriangleList || Positions.Length < 3 || Indices.Length % 3 != 0)
+            if (MeshTopology != PrimitiveType.TriangleList || Points.Length < 3 || Indices.Length % 3 != 0)
                 return this;
             
-            Vector3F[] normalsNew = new Vector3F[Positions.Length];
+            Vector3F[] normalsNew = new Vector3F[Points.Length];
             for (int i = 0; i < Indices.Length; i += 3)
             {
-                var v0 = Positions[Indices[i + 1]] - Positions[Indices[i]];
-                var v1 = Positions[Indices[i + 2]] - Positions[Indices[i]];
+                var v0 = Points[Indices[i + 1]] - Points[Indices[i]];
+                var v1 = Points[Indices[i + 2]] - Points[Indices[i]];
                 var n = Vector3F.Cross(v0, v1);
                 if (smoothNormals)
                 {
@@ -700,17 +728,17 @@ namespace Adamantium.Engine.Core.Models
         {
             if (MeshTopology == PrimitiveType.TriangleList && Semantic.HasFlag(VertexSemantic.UV0) && Semantic.HasFlag(VertexSemantic.Position))
             {
-                Vector3F[] tan1 = new Vector3F[Positions.Length];
-                Vector3F[] tan2 = new Vector3F[Positions.Length];
+                Vector3F[] tan1 = new Vector3F[Points.Length];
+                Vector3F[] tan2 = new Vector3F[Points.Length];
                 for (int i = 0; i < Indices.Length; i += 3)
                 {
                     int index0 = Indices[i];
                     int index1 = Indices[i + 1];
                     int index2 = Indices[i + 2];
 
-                    Vector3F v1 = Positions[index0];
-                    Vector3F v2 = Positions[index1];
-                    Vector3F v3 = Positions[index2];
+                    Vector3F v1 = Points[index0];
+                    Vector3F v2 = Points[index1];
+                    Vector3F v3 = Points[index2];
 
                     Vector2F uv1 = UV0[index0];
                     Vector2F uv2 = UV0[index1];
@@ -739,9 +767,9 @@ namespace Adamantium.Engine.Core.Models
                     tan2[index2] += vDirection;
                 }
 
-                Vector4F[] tangentArray = new Vector4F[Positions.Length];
-                Vector3F[] bitangentArray = new Vector3F[Positions.Length];
-                for (int k = 0; k < Positions.Length; k++)
+                Vector4F[] tangentArray = new Vector4F[Points.Length];
+                Vector3F[] bitangentArray = new Vector3F[Points.Length];
+                for (int k = 0; k < Points.Length; k++)
                 {
                     Vector3F normal = Normals[k];
 
@@ -771,10 +799,10 @@ namespace Adamantium.Engine.Core.Models
             var assembledPositions = new List<Vector3F>();
             for (int i = 0; i < positionIndices.Count; i++)
             {
-                assembledPositions.Add(Positions[positionIndices[i]]);
+                assembledPositions.Add(Points[positionIndices[i]]);
             }
 
-            Positions = assembledPositions.ToArray();
+            Points = assembledPositions.ToArray();
             IsModified = true;
             
             return this;
@@ -891,6 +919,12 @@ namespace Adamantium.Engine.Core.Models
             return this;
         }
 
+        public Mesh SplitOnSegments(bool isContourClosed)
+        {
+            Segments = PolygonHelper.SplitOnSegments(Points, isContourClosed);
+            return this;
+        }
+
         public Mesh GenerateBasicIndices()
         {
             if (!Semantic.HasFlag(VertexSemantic.Position))
@@ -898,14 +932,14 @@ namespace Adamantium.Engine.Core.Models
                 return this;
             }
 
-            int indicesCount = Positions.Length;
+            int indicesCount = Points.Length;
             if (MeshTopology == PrimitiveType.LineStrip || MeshTopology == PrimitiveType.TriangleStrip)
             {
                 indicesCount++;
             }
 
             Indices = new int[indicesCount];
-            for (int i = 0; i < Positions.Length; i++)
+            for (int i = 0; i < Points.Length; i++)
             {
                 Indices[i] = i;
             }
@@ -944,15 +978,15 @@ namespace Adamantium.Engine.Core.Models
                     switch (destinationUpAxis)
                     {
                         case UpAxis.Y_UP_RH:
-                            for (int i = 0; i < Positions.Length; i++)
+                            for (int i = 0; i < Points.Length; i++)
                             {
-                                position = Positions[i];
+                                position = Points[i];
                                 //Меняем позиции вершин
                                 var z = -position.Y;
                                 position.Y = position.Z;
                                 position.Z = z;
 
-                                Positions[i] = position;
+                                Points[i] = position;
 
                                 ConvertUVs(i);
                             }
@@ -960,29 +994,29 @@ namespace Adamantium.Engine.Core.Models
                             break;
 
                         case UpAxis.Y_UP_LH:
-                            for (int i = 0; i < Positions.Length; i++)
+                            for (int i = 0; i < Points.Length; i++)
                             {
-                                position = Positions[i];
+                                position = Points[i];
                                 //Меняем позиции вершин
                                 var z = position.Y;
                                 position.Y = position.Z;
                                 position.Z = z;
-                                Positions[i] = position;
+                                Points[i] = position;
 
                                 ConvertUVs(i);
                             }
                             ReverseWinding();
                             break;
                         case UpAxis.Y_DOWN_RH:
-                            for (int i = 0; i < Positions.Length; i++)
+                            for (int i = 0; i < Points.Length; i++)
                             {
-                                position = Positions[i];
+                                position = Points[i];
                                 //Меняем позиции вершин
                                 
                                 var z = position.Y;
                                 position.Y = position.Z;
                                 position.Z = z;
-                                Positions[i] = position;
+                                Points[i] = position;
                                 
                                 ConvertUVs(i);
                             }
@@ -995,19 +1029,19 @@ namespace Adamantium.Engine.Core.Models
                     switch (destinationUpAxis)
                     {
                         case UpAxis.Y_UP_LH:
-                            for (int i = 0; i < Positions.Length; i++)
+                            for (int i = 0; i < Points.Length; i++)
                             {
-                                position = Positions[i];
+                                position = Points[i];
                                 //Меняем позиции вершин
                                 position.Z = -position.Z;
-                                Positions[i] = position;
+                                Points[i] = position;
 
                                 ConvertUVs(i);
                             }
                             ReverseWinding();
                             break;
                         case UpAxis.Y_DOWN_RH:
-                            for (int i = 0; i < Positions.Length; i++)
+                            for (int i = 0; i < Points.Length; i++)
                             {
                                 // position = Positions[i];
                                 // //Меняем позиции вершин
@@ -1057,6 +1091,5 @@ namespace Adamantium.Engine.Core.Models
 
             return this;
         }
-
     }
 }

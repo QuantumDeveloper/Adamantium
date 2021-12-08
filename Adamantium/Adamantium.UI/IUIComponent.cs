@@ -1,13 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using Adamantium.EntityFramework.ComponentsBasics;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Input;
 using Adamantium.UI.Media;
+using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI
 {
-    public interface IUIComponent : IVisual
+    public interface IUIComponent : IAdamantiumComponent, IComponent
     {
         event MouseButtonEventHandler RawMouseDown;
         event MouseButtonEventHandler RawMouseUp;
@@ -44,7 +47,7 @@ namespace Adamantium.UI
         event KeyEventHandler PreviewKeyUp;
         event KeyboardGotFocusEventHandler PreviewGotKeyboardFocus;
         event KeyboardFocusChangedEventHandler PreviewLostKeyboardFocus;
-        event MouseButtonEventHandler PreviewMouseDoubcleClick;
+        event MouseButtonEventHandler PreviewMouseDoubleClick;
         event MouseEventHandler PreviewGotMouseCapture;
         event MouseEventHandler PreviewLostMouseCapture;
         event MouseButtonEventHandler PreviewMouseDown;
@@ -56,7 +59,7 @@ namespace Adamantium.UI
         event MouseWheelEventHandler PreviewMouseWheel;
         event MouseEventHandler PreviewMouseMove;
         event TextInputEventHandler PreviewTextInput;
-        event MouseButtonEventHandler PreviewMouseDoubleClick;
+        
         Cursor Cursor { get; set; }
         Boolean ClipToBounds { get; set; }
         Double Opacity { get; set; }
@@ -75,25 +78,20 @@ namespace Adamantium.UI
         bool IsGeometryValid { get; }
         Size DesiredSize { get; }
         Size RenderSize { get; set; }
-        Point Location { get; set; }
-        Vector2D Scale { get; set; }
+        Vector2 Location { get; set; }
+        Vector2 Scale { get; set; }
         Double Rotation { get; set; }
         Visibility Visibility { get; set; }
         Rect Bounds { get; set; }
         Rect ClipRectangle { get; }
-        Point ClipPosition { get; set; }
-        IVisual VisualParent { get; }
+        Vector2 ClipPosition { get; set; }
+        IUIComponent VisualParent { get; }
         Int32 ZIndex { get; set; }
         bool IsAttachedToVisualTree { get; }
 
-        /// <summary>
-        /// Gets or sets the parent object that inherited <see cref="AdamantiumProperty"/> values
-        /// are inherited from.
-        /// </summary>
-        /// <value>
-        /// The inheritance parent.
-        /// </value>
-        AdamantiumComponent InheritanceParent { get; set; }
+        IReadOnlyCollection<IUIComponent> GetVisualDescendants();
+        
+        IReadOnlyCollection<IUIComponent> VisualChildren { get; }
 
         void InvalidateMeasure();
         void InvalidateArrange();
@@ -125,71 +123,11 @@ namespace Adamantium.UI
         bool CaptureStylus();
         bool Focus();
         void RaiseEvent(RoutedEventArgs e);
-        IEnumerable<UIComponent> GetBubbleEventRoute();
-        IEnumerable<UIComponent> GetTunnelEventRoute();
+        IEnumerable<IUIComponent> GetBubbleEventRoute();
+        IEnumerable<IUIComponent> GetTunnelEventRoute();
         void RemoveHandler(RoutedEvent routedEvent, Delegate handler);
         void ReleaseMouseCapture();
         void ReleaseStylusCapture();
-        void OnRender(DrawingContext context);
 
-        /// <summary>
-        /// Fires when value on <see cref="AdamantiumProperty"/> was changed
-        /// </summary>
-        event EventHandler<AdamantiumPropertyChangedEventArgs> PropertyChanged;
-
-        /// <summary>
-        /// Gets or sets the value of a <see cref="AdamantiumProperty"/>
-        /// </summary>
-        /// <param name="property"><see cref="AdamantiumProperty"/></param>
-        object this[AdamantiumProperty property] { get; set; }
-
-        /// <summary>
-        /// Clears a <see cref="AdamantiumProperty"/>'s local value.
-        /// </summary>
-        /// <param name="property">The property.</param>
-        void ClearValue(AdamantiumProperty property);
-
-        /// <summary>
-        /// Gets a <see cref="AdamantiumProperty"/> value.
-        /// </summary>
-        /// <param name="property">The property.</param>
-        /// <returns>The value.</returns>
-        object GetValue(AdamantiumProperty property);
-
-        /// <summary>
-        /// Gets a <see cref="AdamantiumProperty"/> value.
-        /// </summary>
-        /// <typeparam name="T">The type of the property.</typeparam>
-        /// <param name="property">The property.</param>
-        /// <returns>The value.</returns>
-        T GetValue<T>(AdamantiumProperty property);
-
-        /// <summary>
-        /// Check if <see cref="AdamantiumProperty"/> is registered.
-        /// </summary>
-        /// <param name="property">The property.</param>
-        /// <returns>True if property registered, otherwise - false</returns>
-        bool IsRegistered(AdamantiumProperty property);
-
-        /// <summary>
-        /// Checks whether a <see cref="AdamantiumProperty"/> is set on this object.
-        /// </summary>
-        /// <param name="property">Adamantium property.</param>
-        /// <returns>True if the property is set, otherwise false.</returns>
-        bool IsSet(AdamantiumProperty property);
-
-        /// <summary>
-        /// Sets a <see cref="AdamantiumProperty"/> value.
-        /// </summary>
-        /// <param name="property">The property.</param>
-        /// <param name="value">New value.</param>
-        void SetValue(AdamantiumProperty property, object value);
-
-        /// <summary>
-        /// Sets a <see cref="AdamantiumProperty"/> value.
-        /// </summary>
-        /// <param name="property">The property.</param>
-        /// <param name="value">New value.</param>
-        void SetCurrentValue(AdamantiumProperty property, object value);
     }
 }

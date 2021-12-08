@@ -1237,9 +1237,9 @@ namespace Adamantium.Mathematics
             return left.Equals(ref right);
         }
 
-        public static implicit operator QuaternionD(QuaternionF orientation)
+        public static implicit operator Quaternion(QuaternionF orientation)
         {
-            return new QuaternionD(orientation.X, orientation.Y, orientation.Z, orientation.W);
+            return new Quaternion(orientation.X, orientation.Y, orientation.Z, orientation.W);
         }
 
         /// <summary>

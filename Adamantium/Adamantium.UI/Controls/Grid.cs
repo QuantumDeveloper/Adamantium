@@ -4,6 +4,7 @@ using System.Collections.Specialized;
 using System.Diagnostics;
 using Adamantium.Mathematics;
 using Adamantium.UI.Media;
+using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI.Controls
 {
@@ -39,8 +40,8 @@ namespace Adamantium.UI.Controls
 
       public Boolean ShowGridLines
       {
-         get { return GetValue<Boolean>(ShowGridLinesProperty); }
-         set { SetValue(ShowGridLinesProperty, value); }
+         get => GetValue<Boolean>(ShowGridLinesProperty);
+         set => SetValue(ShowGridLinesProperty, value);
       }
 
       public static Int32 GetColumn(AdamantiumComponent element)
@@ -85,26 +86,26 @@ namespace Adamantium.UI.Controls
 
       public Boolean IndividualRowSpacing
       {
-         get { return GetValue<Boolean>(IndividualRowSpacingProperty); }
-         set { SetValue(IndividualRowSpacingProperty, value);}
+         get => GetValue<Boolean>(IndividualRowSpacingProperty);
+         set => SetValue(IndividualRowSpacingProperty, value);
       }
 
       public Boolean IndividualColumnSpacing
       {
-         get { return GetValue<Boolean>(IndividualColumnSpacingProperty); }
-         set { SetValue(IndividualColumnSpacingProperty, value); }
+         get => GetValue<Boolean>(IndividualColumnSpacingProperty);
+         set => SetValue(IndividualColumnSpacingProperty, value);
       }
 
       public Double RowSpacing
       {
-         get { return GetValue<Double>(RowSpacingProperty); }
-         set { SetValue(RowSpacingProperty, value); }
+         get => GetValue<Double>(RowSpacingProperty);
+         set => SetValue(RowSpacingProperty, value);
       }
 
       public Double ColumnSpacing
       {
-         get { return GetValue<Double>(ColumnSpacingProperty); }
-         set { SetValue(ColumnSpacingProperty, value); }
+         get => GetValue<Double>(ColumnSpacingProperty);
+         set => SetValue(ColumnSpacingProperty, value);
       }
 
 
@@ -210,53 +211,6 @@ namespace Adamantium.UI.Controls
 
       private Size childSize;
       Stopwatch measureTimer;
-
-      public override void OnRender(DrawingContext context)
-      {
-         context.BeginDraw(this);
-         context.DrawRectangle(this, Background, new Rect(new Size(ActualWidth, ActualHeight)));
-         if (ShowGridLines && rowSegments != null)
-         {
-            var lineBrush = Brushes.Black;
-            
-            //for (int i = 1; i < RowDefinitions.Count; ++i)
-            //{
-            //   context.DrawRectangle(this, lineBrush,
-            //      new Rect(new Point(0, RowDefinitions[i].Offset), new Size(ActualWidth, 1)));
-            //   context.DrawRectangle(this, lineBrush,
-            //      new Rect(new Point(0, RowDefinitions[i].Offset+ RowDefinitions[i].ActualHeight), new Size(ActualWidth, 1)));
-            //}
-            //for (int i = 1; i < ColumnDefinitions.Count; ++i)
-            //{
-            //   context.DrawRectangle(this, lineBrush,
-            //      new Rect(new Point(ColumnDefinitions[i].Offset, 0), new Size(1, ActualHeight)));
-            //}
-
-            if (rowSegments.Length > 1)
-            {
-               for (int i = 1; i < rowSegments.Length; ++i)
-               {
-                  context.DrawRectangle(this, lineBrush,
-                     new Rect(new Point(0, rowSegments[i].Offset), new Size(ActualWidth, 1)));
-                  context.DrawRectangle(this, lineBrush,
-                     new Rect(new Point(0, rowSegments[i].Offset + rowSegments[i].FullSize),
-                        new Size(ActualWidth, 1)));
-               }
-            }
-            if (colSegments.Length > 0)
-            {
-               for (int i = 1; i < colSegments.Length; ++i)
-               {
-                  context.DrawRectangle(this, lineBrush,
-                     new Rect(new Point(colSegments[i].Offset, 0), new Size(1, ActualHeight)));
-                  context.DrawRectangle(this, lineBrush,
-                     new Rect(new Point(colSegments[i].Offset + colSegments[i].FullSize, 0), new Size(1, ActualHeight)));
-               }
-            }
-         }
-         context.EndDraw(this);
-      }
-
 
       /*
       * Algorithm main goal to measure each logical element only once to speedup Measure and Arrange passes and skip unneccessary calculations
@@ -541,8 +495,55 @@ namespace Adamantium.UI.Controls
                index++;
             }
          }
+         
          //Debug.WriteLine("Grid arrange time = " + arrangeTimer.ElapsedMilliseconds);
          return finalSize;
+      }
+      
+      protected override void OnRender(DrawingContext context)
+      {
+         context.BeginDraw(this);
+         context.DrawRectangle(Background, new Rect(new Size(ActualWidth, ActualHeight)));
+         if (ShowGridLines && rowSegments != null)
+         {
+            var lineBrush = Brushes.Black;
+            
+            //for (int i = 1; i < RowDefinitions.Count; ++i)
+            //{
+            //   context.DrawRectangle(this, lineBrush,
+            //      new Rect(new Point(0, RowDefinitions[i].Offset), new Size(ActualWidth, 1)));
+            //   context.DrawRectangle(this, lineBrush,
+            //      new Rect(new Point(0, RowDefinitions[i].Offset+ RowDefinitions[i].ActualHeight), new Size(ActualWidth, 1)));
+            //}
+            //for (int i = 1; i < ColumnDefinitions.Count; ++i)
+            //{
+            //   context.DrawRectangle(this, lineBrush,
+            //      new Rect(new Point(ColumnDefinitions[i].Offset, 0), new Size(1, ActualHeight)));
+            //}
+
+            if (rowSegments.Length > 1)
+            {
+               for (int i = 1; i < rowSegments.Length; ++i)
+               {
+                  context.DrawRectangle(lineBrush,
+                     new Rect(new Vector2(0, rowSegments[i].Offset), new Size(ActualWidth, 1)));
+                  context.DrawRectangle(lineBrush,
+                     new Rect(new Vector2(0, rowSegments[i].Offset + rowSegments[i].FullSize),
+                        new Size(ActualWidth, 1)));
+               }
+            }
+            if (colSegments.Length > 0)
+            {
+               for (int i = 1; i < colSegments.Length; ++i)
+               {
+                  context.DrawRectangle(lineBrush,
+                     new Rect(new Vector2(colSegments[i].Offset, 0), new Size(1, ActualHeight)));
+                  context.DrawRectangle(lineBrush,
+                     new Rect(new Vector2(colSegments[i].Offset + colSegments[i].FullSize, 0), new Size(1, ActualHeight)));
+               }
+            }
+         }
+         context.EndDraw(this);
       }
 
       private double GetArrangeSize(GridSegment[] segments, int start, int count)
@@ -660,8 +661,7 @@ namespace Adamantium.UI.Controls
          if (groupIndex> MaxGroupIndex)
             return;
 
-         if (!cellsDictionary.ContainsKey(groupIndex))
-         return;
+         if (!cellsDictionary.ContainsKey(groupIndex)) return;
 
          var list = cellsDictionary[groupIndex];
          foreach (var cell in list)
@@ -840,11 +840,6 @@ namespace Adamantium.UI.Controls
                if (segment[i].IsStar)
                {
                   segment[i].MeasuredSize = Math.Max(((finalAvailableSize/allStars)*segment[i].Stars), 0);
-                  
-                  if (segment[i].MeasuredSize <= 0)
-                  {
-                     int x = 0;
-                  }
                }
             }
          }
@@ -956,11 +951,10 @@ namespace Adamantium.UI.Controls
 
          public override bool Equals(object obj)
          {
-            SpanData sk = obj as SpanData;
-            return sk != null
-                   && sk.Segments == Segments
-                   && sk.Start == Start
-                   && sk.Count == Count;
+            return obj is SpanData sd
+                   && sd.Segments == Segments
+                   && sd.Start == Start
+                   && sd.Count == Count;
          }
       }
    }

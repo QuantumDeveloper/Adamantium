@@ -31,7 +31,6 @@ namespace Adamantium.Engine.Core.Effects
          /// </summary>
          public Pipeline Pipeline;
 
-
          /// <summary>
          /// Clones this instance.
          /// </summary>

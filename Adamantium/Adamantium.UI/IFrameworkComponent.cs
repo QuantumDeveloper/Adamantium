@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Input;
+using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI
 {
@@ -23,7 +24,7 @@ namespace Adamantium.UI
         object Tag { get; set; }
         FrameworkComponent Parent { get; }
         IReadOnlyCollection<FrameworkComponent> LogicalChildrenCollection { get; }
-        Vector2D Scale { get; set; }
+        Vector2 Scale { get; set; }
         Double Rotation { get; set; }
 
         /// <summary>

@@ -2,6 +2,7 @@
 using System.Threading;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.MacOS;
+using Adamantium.UI.Controls;
 using Adamantium.UI.MacOS;
 
 namespace Adamantium.UI.Threading
@@ -22,7 +23,7 @@ namespace Adamantium.UI.Threading
             MacOSInterop.RunApplication(app);
         }
 
-        public void AddWindow(MacOSWindow window)
+        public void AddWindow(IWindow window)
         {
             if (window == null) return;
             

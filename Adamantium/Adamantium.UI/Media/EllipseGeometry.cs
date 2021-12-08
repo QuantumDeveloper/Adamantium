@@ -1,98 +1,88 @@
 ﻿using System;
-using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.Mathematics;
-using Point = Adamantium.Mathematics.Point;
 
 namespace Adamantium.UI.Media
 {
    public sealed class EllipseGeometry : Geometry
    {
+      private Rect bounds;
+      
       public static readonly AdamantiumProperty RadiusXProperty = AdamantiumProperty.Register(nameof(RadiusX),
-         typeof(Double), typeof(EllipseGeometry), new PropertyMetadata((Double)0));
+         typeof(Double), typeof(EllipseGeometry), new PropertyMetadata((Double)0, PropertyMetadataOptions.AffectsMeasure));
 
       public static readonly AdamantiumProperty RadiusYProperty = AdamantiumProperty.Register(nameof(RadiusY),
-         typeof(Double), typeof(EllipseGeometry), new PropertyMetadata((Double)0));
+         typeof(Double), typeof(EllipseGeometry), new PropertyMetadata((Double)0, PropertyMetadataOptions.AffectsMeasure));
 
       public static readonly AdamantiumProperty CenterProperty = AdamantiumProperty.Register(nameof(Center),
-         typeof(Point), typeof(EllipseGeometry), new PropertyMetadata(Point.Zero));
+         typeof(Vector2), typeof(EllipseGeometry), new PropertyMetadata(Vector2.Zero, PropertyMetadataOptions.AffectsArrange));
 
       public static readonly AdamantiumProperty StartAngleProperty = AdamantiumProperty.Register(nameof(StartAngle),
-         typeof(Double), typeof(EllipseGeometry), new PropertyMetadata((Double)0));
+         typeof(Double), typeof(EllipseGeometry), new PropertyMetadata((Double)0, PropertyMetadataOptions.AffectsRender));
 
       public static readonly AdamantiumProperty StopAngleProperty = AdamantiumProperty.Register(nameof(StopAngle),
-         typeof(Double), typeof(EllipseGeometry), new PropertyMetadata((Double)360));
+         typeof(Double), typeof(EllipseGeometry), new PropertyMetadata((Double)360, PropertyMetadataOptions.AffectsRender));
 
 
       public Double RadiusX
       {
-         get { return GetValue<Double>(RadiusXProperty); }
-         set { SetValue(RadiusXProperty, value); }
+         get => GetValue<Double>(RadiusXProperty);
+         set => SetValue(RadiusXProperty, value);
       }
 
       public Double RadiusY
       {
-         get { return GetValue<Double>(RadiusYProperty); }
-         set { SetValue(RadiusYProperty, value); }
+         get => GetValue<Double>(RadiusYProperty);
+         set => SetValue(RadiusYProperty, value);
       }
 
       public Double StartAngle
       {
-         get { return GetValue<Double>(StartAngleProperty); }
-         set { SetValue(StartAngleProperty, value); }
+         get => GetValue<Double>(StartAngleProperty);
+         set => SetValue(StartAngleProperty, value);
       }
 
       public Double StopAngle
       {
-         get { return GetValue<Double>(StopAngleProperty); }
-         set { SetValue(StopAngleProperty, value); }
+         get => GetValue<Double>(StopAngleProperty);
+         set => SetValue(StopAngleProperty, value);
       }
 
-      public Point Center
+      public Vector2 Center
       {
-         get { return GetValue<Point>(CenterProperty); }
-         set { SetValue(CenterProperty, value); }
+         get => GetValue<Vector2>(CenterProperty);
+         set => SetValue(CenterProperty, value);
       }
 
       public EllipseGeometry()
       {
-         PrimitiveType = PrimitiveType.TriangleStrip;
+         IsClosed = true;
+         TesselationFactor = 80;
       }
 
-      public EllipseGeometry(Rect rect, Double startAngle = 0, Double stopAngle = 360)
+      public EllipseGeometry(Rect rect, Double startAngle = 0, Double stopAngle = 360) : this()
       {
          bounds = rect;
-         RadiusX = bounds.Width/2;
-         RadiusY = bounds.Height/2;
+         RadiusX = rect.Width/2;
+         RadiusY = rect.Height/2;
          Center = rect.Center;
          StartAngle = startAngle;
          StopAngle = stopAngle;
-         CreateEllipse(rect, StartAngle, StopAngle);
+         IsClosed = true;
+         ProcessGeometry();
       }
 
-      public EllipseGeometry(Point center, Double radiusX, Double radiusY, Double startAngle = 0, Double stopAngle = 360)
+      public EllipseGeometry(Vector2 center, Double radiusX, Double radiusY, Double startAngle, Double stopAngle) : this()
       {
-         bounds = new Rect(center - new Point(radiusX, radiusY), new Size(radiusX*2, radiusY*2));
+         bounds = new Rect(center - new Vector2(radiusX, radiusY), new Size(radiusX * 2, radiusY * 2));
          Center = center;
          RadiusX = radiusX;
          RadiusY = radiusY;
          StartAngle = startAngle;
          StopAngle = stopAngle;
-         CreateEllipse(bounds, StartAngle, StopAngle);
       }
 
-      public EllipseGeometry(Point center, Double radiusX, Double radiusY, Double startAngle, Double stopAngle, Matrix4x4F transform)
-      {
-         bounds = new Rect(center - new Point(radiusX, radiusY), new Size(radiusX * 2, radiusY * 2));
-         Center = center;
-         RadiusX = radiusX;
-         RadiusY = radiusY;
-         StartAngle = startAngle;
-         StopAngle = stopAngle;
-         CreateEllipse(bounds, StartAngle, StopAngle);
-      }
-
-      internal void CreateEllipse(Rect rect, Double startAngle = 0, Double stopAngle = 360)
+      private void CreateEllipse(Rect rect, Double startAngle = 0, Double stopAngle = 360)
       {
          bounds = rect;
          RadiusX = rect.Width / 2;
@@ -100,59 +90,49 @@ namespace Adamantium.UI.Media
          Center = rect.Center;
          StartAngle = startAngle;
          StopAngle = stopAngle;
-         VertexArray.Clear();
-         IndicesArray.Clear();
-         FilledEllipse(Center, RadiusX, RadiusY, startAngle, stopAngle);
-      }
-
-      private void FilledEllipse(Point center, Double radiusX, Double radiusY, Double startAngle, Double stopAngle)
-      {
-         double x1 = center.X + (radiusX * Math.Cos(startAngle));
-         double y1 = center.Y + (radiusY * Math.Sin(startAngle));
-
-         for (double i = startAngle; i <= stopAngle; i++)
+         
+         var translation = Matrix4x4F.Translation((float)rect.Width/2 + (float)rect.X, (float)rect.Height/2 + (float)rect.Y, 0);
+         if (Transform != null)
          {
-            double angle = Math.PI * 2 / 360 * (i + 1);
-
-            double x2 = center.X + (radiusX * Math.Cos(angle));
-            double y2 = center.Y + (radiusY * Math.Sin(angle));
-
-            var vertex1 = new VertexPositionTexture(new Vector3D(center.X, center.Y, 0), Vector2D.Zero);
-            var vertex2 = new VertexPositionTexture(new Vector3D(x1, y1, 0), Vector2D.Zero);
-            var vertex3 = new VertexPositionTexture(new Vector3D(x2, y2, 0), Vector2D.Zero);
-
-            vertex1.UV = new Vector2D(0.5 + (vertex1.Position.X - center.X) / (2 * radiusX),
-               0.5f - (vertex1.Position.Y - center.Y) / (2 * radiusY));
-            vertex2.UV = new Vector2D(0.5 + (vertex2.Position.X - center.X) / (2 * radiusX),
-               0.5f - (vertex2.Position.Y - center.Y) / (2 * radiusY));
-            vertex3.UV = new Vector2D(0.5 + (vertex3.Position.X - center.X) / (2 * radiusX),
-               0.5f - (vertex3.Position.Y - center.Y) / (2 * radiusY));
-
-            VertexArray.Add(vertex1);
-            VertexArray.Add(vertex2);
-            VertexArray.Add(vertex3);
-
-            y1 = y2;
-            x1 = x2;
+            var matrix = Transform.Matrix;
+            var translate = matrix.TranslationVector;
+            translate += translation.TranslationVector;
+            matrix.TranslationVector = translate;
          }
-
-         Optimize();
+         Mesh = Shapes.Ellipse.GenerateGeometry(
+            GeometryType.Solid, 
+            EllipseType.Sector,
+            new Vector2F((float)rect.Width, (float)rect.Height), 
+            (float)StartAngle, 
+            (float)StopAngle,
+            tessellation: TesselationFactor,
+            transform: translation);
+         
+         StrokeMesh = Shapes.Ellipse.GenerateGeometry(
+            GeometryType.Outlined, 
+            EllipseType.Sector,
+            new Vector2F((float)rect.Width, (float)rect.Height), 
+            (float)StartAngle, 
+            (float)StopAngle,
+            tessellation: TesselationFactor,
+            transform: translation);
       }
 
-      private void Optimize()
-      {
-         VertexPositionTexture[] newGeometry = null;
-         IndicesArray.AddRange(OptimizeShape(VertexArray.ToArray(), out newGeometry));
-         VertexArray.Clear();
-         VertexArray.AddRange(newGeometry);
-      }
-
-      private Rect bounds;
       public override Rect Bounds => bounds;
 
       public override Geometry Clone()
       {
          return null;
+      }
+
+      public override void RecalculateBounds()
+      {
+         bounds = new Rect(Center - new Vector2(RadiusX, RadiusY), new Size(RadiusX * 2, RadiusY * 2));
+      }
+
+      protected internal override void ProcessGeometry()
+      {
+         CreateEllipse(Bounds, StartAngle, StopAngle);
       }
    }
 }

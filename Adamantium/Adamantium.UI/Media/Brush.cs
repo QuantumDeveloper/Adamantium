@@ -10,8 +10,8 @@ namespace Adamantium.UI.Media
 
       public Double Opacity
       {
-         get { return GetValue<Double>(OpacityProperty); }
-         set { SetValue(OpacityProperty, value);}
+         get => GetValue<Double>(OpacityProperty);
+         set => SetValue(OpacityProperty, value);
       }
 
       //public static Brush Parse(string brush)

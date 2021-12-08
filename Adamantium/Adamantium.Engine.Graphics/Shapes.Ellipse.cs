@@ -54,7 +54,7 @@ namespace Adamantium.Engine.Graphics
                 if (startAngle < 0) startAngle = 0;
                 if (stopAngle > 360) stopAngle = 360;
                 
-                List<Vector3F> vertices = new List<Vector3F>();
+                var vertices = new List<Vector2>();
                 List<Vector2F> uvs = new List<Vector2F>();
                 Vector3F center = Vector3F.Zero;
                 float radiusX = diameter.X / 2;
@@ -74,15 +74,19 @@ namespace Adamantium.Engine.Graphics
 
                 if (ellipseType == EllipseType.Sector && range < 360)
                 {
-                    vertices.Add(Vector3F.Zero);
+                    vertices.Add(Vector2.Zero);
                 }
 
                 for (int i = 0; i < tessellation; ++i)
                 {
                     var angleItem = MathHelper.DegreesToRadians(currentAngle * sign);
-                    float x = center.X + (radiusX * (float)Math.Cos(angleItem));
-                    float y = center.Y + (radiusY * (float)Math.Sin(angleItem));
-                    var vertex = new Vector3F(x, y, 0);
+                    double x = center.X + (radiusX * Math.Cos(angleItem));
+                    Double y = center.Y + (radiusY * Math.Sin(angleItem));
+                    
+                    x = Math.Round(x, 4);
+                    y = Math.Round(y, 4);
+                    
+                    var vertex = new Vector2(x, y);
                         
                     vertices.Add(vertex);
 
@@ -99,7 +103,7 @@ namespace Adamantium.Engine.Graphics
                 }
 
                 var polygon = new Mathematics.Polygon();
-                polygon.Polygons.Add(new PolygonItem(vertices));
+                polygon.AddItem(new PolygonItem(vertices));
                 var points = polygon.Fill();
 
                 for (int i = 0; i < points.Count; ++i)
@@ -113,7 +117,7 @@ namespace Adamantium.Engine.Graphics
                 
                 var mesh = new Mesh();
                 mesh.SetTopology(PrimitiveType.TriangleList).
-                    SetPositions(points).
+                    SetPoints(points).
                     SetUVs(0, uvs).
                     Optimize();
                 
@@ -151,10 +155,13 @@ namespace Adamantium.Engine.Graphics
                     vertices.Add(center);
                 }
                 
-                for (int i = 0; i <= tessellation; ++i)
+                for (int i = 0; i < tessellation; ++i)
                 {
                     float x = center.X + (radiusX * (float)Math.Cos(angle));
                     float y = center.Y + (radiusY * (float)Math.Sin(angle));
+
+                    x = (float)Math.Round(x, 4, MidpointRounding.ToZero);
+                    y = (float)Math.Round(y, 4, MidpointRounding.ToZero);
 
                     var vertex = new Vector3F(x, y, 0);
                     vertices.Add(vertex);
@@ -168,7 +175,7 @@ namespace Adamantium.Engine.Graphics
 
                 Mesh mesh = new Mesh();
                 mesh.SetTopology(PrimitiveType.LineStrip).
-                    SetPositions(vertices).
+                    SetPoints(vertices).
                     GenerateBasicIndices();
                 return mesh;
             }

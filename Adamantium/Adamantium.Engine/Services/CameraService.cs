@@ -157,7 +157,7 @@ namespace Adamantium.Engine.Services
         private void CreateCameraForWindowInternal(GameOutput window)
         {
             var camera = CreateCamera(window.Width, window.Height, $"Main camera for {window.Name}");
-            camera.Owner.Transform.Position = new Vector3D(0,0,-20);
+            camera.Owner.Transform.Position = new Vector3(0,0,-20);
             AddCamera(window, camera);
             //if (window.IsActive)
             {
@@ -179,10 +179,10 @@ namespace Adamantium.Engine.Services
 
         private Camera CreateCamera(uint width, uint height, string name)
         {
-            Vector3D position = Vector3D.Zero;
+            Vector3 position = Vector3.Zero;
             if (UserControlledCamera != null)
             {
-                position = (CameraIcon.GetDiameter() * 2 * (Vector3D)UserControlledCamera.Forward) + UserControlledCamera.GetOwnerPosition();
+                position = (CameraIcon.GetDiameter() * 2 * (Vector3)UserControlledCamera.Forward) + UserControlledCamera.GetOwnerPosition();
             }
             
             var entity = new CameraTemplate().BuildEntity(null, name, position, Vector3F.ForwardLH, Vector3F.Up, width, height, DefaultZNear, DefaultZFar);
@@ -191,7 +191,7 @@ namespace Adamantium.Engine.Services
 
         private Camera CreateCamera(uint width, uint height, float znear, float zfar, string name)
         {
-            var entity = new CameraTemplate().BuildEntity(null, name, Vector3D.Zero, Vector3F.ForwardLH, Vector3F.Up, width, height, znear, zfar);
+            var entity = new CameraTemplate().BuildEntity(null, name, Vector3.Zero, Vector3F.ForwardLH, Vector3F.Up, width, height, znear, zfar);
             return entity.GetComponent<Camera>();
         }
 

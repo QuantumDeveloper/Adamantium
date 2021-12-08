@@ -1,4 +1,6 @@
-﻿namespace Adamantium.Game.Playground
+﻿using Adamantium.Engine.Graphics;
+
+namespace Adamantium.Game.Playground
 {
     using Game = Adamantium.Engine.Game;
 

@@ -72,18 +72,18 @@ namespace Adamantium.Mathematics
             return new OrientedBoundingBox(center, halfExtent, QuaternionF.Identity);
         }
 
-        public static OrientedBoundingBox FromPoints(Vector3D[] points)
+        public static OrientedBoundingBox FromPoints(Vector3[] points)
         {
             if (points == null || points.Length == 0)
                 throw new ArgumentNullException(nameof(points));
 
-            Vector3D minimum = new Vector3D(float.MaxValue);
-            Vector3D maximum = new Vector3D(float.MinValue);
+            Vector3 minimum = new Vector3(float.MaxValue);
+            Vector3 maximum = new Vector3(float.MinValue);
 
             for (int i = 0; i < points.Length; ++i)
             {
-                Vector3D.Min(ref minimum, ref points[i], out minimum);
-                Vector3D.Max(ref maximum, ref points[i], out maximum);
+                Vector3.Min(ref minimum, ref points[i], out minimum);
+                Vector3.Max(ref maximum, ref points[i], out maximum);
             }
 
             var center = minimum + (maximum - minimum) / 2f;

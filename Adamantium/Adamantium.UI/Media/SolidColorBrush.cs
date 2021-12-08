@@ -14,8 +14,8 @@ namespace Adamantium.UI.Media
 
       public Color Color
       {
-         get { return GetValue<Color>(ColorProperty); }
-         set { SetValue(ColorProperty, value);}
+         get => GetValue<Color>(ColorProperty);
+         set => SetValue(ColorProperty, value);
       }
 
    }

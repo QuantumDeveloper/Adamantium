@@ -19,12 +19,12 @@ namespace Adamantium.Imaging.Png.Chunks
         {
             var bytes = new List<byte>();
             bytes.AddRange(GetNameAsBytes());
-            if (state.InfoRaw.ColorType == PNGColorType.Grey || state.InfoRaw.ColorType == PNGColorType.GreyAlpha)
+            if (state.ColorModeRaw.ColorType == PNGColorType.Grey || state.ColorModeRaw.ColorType == PNGColorType.GreyAlpha)
             {
                 bytes.Add((byte)(BackgroundR >> 8));
                 bytes.Add((byte)(BackgroundR & 255));
             }
-            else if (state.InfoRaw.ColorType == PNGColorType.RGB || state.InfoRaw.ColorType == PNGColorType.RGBA)
+            else if (state.ColorModeRaw.ColorType == PNGColorType.RGB || state.ColorModeRaw.ColorType == PNGColorType.RGBA)
             {
                 bytes.Add((byte)(BackgroundR >> 8));
                 bytes.Add((byte)(BackgroundR & 255));
@@ -33,7 +33,7 @@ namespace Adamantium.Imaging.Png.Chunks
                 bytes.Add((byte)(BackgroundB >> 8));
                 bytes.Add((byte)(BackgroundB & 255));
             }
-            else if (state.InfoRaw.ColorType == PNGColorType.Palette)
+            else if (state.ColorModeRaw.ColorType == PNGColorType.Palette)
             {
                 bytes.Add((byte)(BackgroundR & 255)); /*palette index*/
             }

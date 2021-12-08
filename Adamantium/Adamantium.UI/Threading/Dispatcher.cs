@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Adamantium.Core.DependencyInjection;
@@ -24,6 +23,7 @@ namespace Adamantium.UI.Threading
         {
             dispatchers = new Dictionary<DispatcherContext, Dispatcher>();
             CurrentDispatcher = new Dispatcher(AdamantiumServiceLocator.Current.Resolve<IApplicationPlatform>());
+            SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(CurrentDispatcher));
         }
 
         private void SetContext()
@@ -109,9 +109,24 @@ namespace Adamantium.UI.Threading
             }
         }
 
+        public void Invoke(Action action, DispatcherPriority priority = DispatcherPriority.Normal)
+        {
+            action?.Invoke();
+        }
+
+        public void Invoke(Delegate action, object args)
+        {
+            action?.DynamicInvoke(args);
+        }
+
         public Task InvokeAsync(Action action, DispatcherPriority priority = DispatcherPriority.Normal)
         {
             return executor.InvokeAsync(action, priority);
+        }
+
+        public Task InvokeAsync(Delegate action, object args)
+        {
+            return executor.InvokeAsync(action, args, 1);
         }
 
         public static void Attach(Dispatcher dispatcher)

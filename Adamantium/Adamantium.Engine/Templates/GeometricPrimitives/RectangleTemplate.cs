@@ -8,24 +8,20 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
 {
     public class RectangleTemplate : PrimitiveTemplate
     {
-        private float width,
-            height,
-            radiusX,
-            radiusY;
+        private float width, height;
+        private CornerRadius corners;
 
         public RectangleTemplate(
             GeometryType geometryType,
             float width = 2,
             float height = 1,
-            float radiusX = 0,
-            float radiusY = 0,
+            CornerRadius corners = default,
             int tessellation = 20,
             Matrix4x4F? transform = null) : base(geometryType, tessellation, transform)
         {
             this.width = width;
             this.height = height;
-            this.radiusX = radiusX;
-            this.radiusY = radiusY;
+            this.corners = corners;
         }
 
         protected override void FillMetadata(
@@ -35,8 +31,7 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
             metadata.ShapeType = ShapeType.Rectangle;
             metadata.Width = width;
             metadata.Height = height;
-            metadata.RadiusX = radiusX;
-            metadata.RadiusY = radiusY;
+            metadata.Corners = corners;
             metadata.TessellationFactor = Tessellation;
         }
 
@@ -46,8 +41,7 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
                 GeometryType, 
                 width, 
                 height, 
-                radiusX, 
-                radiusY,
+                corners, 
                 Tessellation, 
                 Transform);
             return Task.FromResult(BuildEntityFromPrimitive(owner, geometry));
