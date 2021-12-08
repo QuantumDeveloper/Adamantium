@@ -144,7 +144,7 @@ namespace Adamantium.Mathematics
             {
                 // a or b is zero or both are extremely close to it
                 // relative error is less meaningful here
-                return diff < epsilon;
+                return diff <= epsilon;
             }
 
             // use relative error
