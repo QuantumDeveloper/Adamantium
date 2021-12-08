@@ -39,6 +39,12 @@ namespace Adamantium.UI.Media
 
         public override void RecalculateBounds()
         {
+            if (Points.Count == 0)
+            {
+                bounds = Rect.Empty;
+                return;
+            }
+            
             var maxX = Points.Select(x=>x.X).Max();
             var maxY = Points.Select(y=>y.Y).Max();
             var minX = Points.Select(x => x.X).Min();
