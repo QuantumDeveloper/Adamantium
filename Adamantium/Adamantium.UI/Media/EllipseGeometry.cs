@@ -63,8 +63,8 @@ namespace Adamantium.UI.Media
       public EllipseGeometry(Rect rect, Double startAngle = 0, Double stopAngle = 360) : this()
       {
          bounds = rect;
-         RadiusX = Bounds.Width/2;
-         RadiusY = Bounds.Height/2;
+         RadiusX = rect.Width/2;
+         RadiusY = rect.Height/2;
          Center = rect.Center;
          StartAngle = startAngle;
          StopAngle = stopAngle;
@@ -127,7 +127,7 @@ namespace Adamantium.UI.Media
 
       public override void RecalculateBounds()
       {
-         throw new NotImplementedException();
+         bounds = new Rect(Center - new Vector2(RadiusX, RadiusY), new Size(RadiusX * 2, RadiusY * 2));
       }
 
       protected internal override void ProcessGeometry()

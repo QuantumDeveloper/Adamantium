@@ -678,6 +678,11 @@ namespace Adamantium.Engine.Core.Models
 
         public Mesh CalculateBoundingVolumes()
         {
+            if (Points.Length == 0)
+            {
+                return this;
+            }
+            
             Bounds = Bounds.FromPoints(Points);
 
             return this;

@@ -148,7 +148,6 @@ namespace Adamantium.UI.Windows
         {
             if (messageTable.TryGetValue(msg, out var handler))
             {
-                Debug.WriteLine((WindowMessages)msg);
                 return handler((WindowMessages)msg, wParam, lParam, out handled);
             }
 

@@ -9,11 +9,14 @@ namespace Adamantium.UI.Media
    public class StrokeGeometry : Geometry
    {
       private Rect bounds;
-      private int lastIndex = 0;
-      private const int interrupt = -1;
       private int doublePrecision = 4;
+      
+      private Geometry geometry;
+      private Pen pen;
       public uint BezierSampleRate { get; set; } = 15;
       public double ArcSampleRate { get; set; } = 0.1;
+
+      public override Rect Bounds => bounds;
 
       private struct StrokeSegment
       {
@@ -35,7 +38,19 @@ namespace Adamantium.UI.Media
 
       public StrokeGeometry(Pen pen, Geometry geometry)
       {
+         this.pen = pen;
+         this.geometry = geometry;
+         ProcessGeometry();
+      }
+      
+      protected internal override void ProcessGeometry()
+      {
          GenerateStroke(pen, geometry);
+      }
+      
+      public override void RecalculateBounds()
+      {
+         bounds = geometry.Bounds.Inflate(pen.Thickness);
       }
 
       private void GenerateStroke(Pen pen, Geometry geometry)
@@ -806,68 +821,7 @@ namespace Adamantium.UI.Media
          return polygonItems;
       }
       
-      private void RemoveCollinearSegments(List<Vector2> strokeOutline, bool isClosedGeometry)
-      {
-         // collinear segments are only possible if there are 3 or more points in outline
-         if (strokeOutline.Count < 3) return;
-         
-         // due to floating point numbers calculation precision issues we will evaluate against small epsilon, not zero further in the algorithm
-         var epsilon = 0.001;
-         var i = 1;
-
-         do
-         {
-            if (i == strokeOutline.Count) i = 0;
-
-            var prevIndex = i - 1;
-            var nextIndex = i + 1;
-
-            if (i == 0)
-            {
-               prevIndex = strokeOutline.Count - 1;
-            }
-            else if (i == strokeOutline.Count - 1)
-            {
-               if (!isClosedGeometry) break;
-               nextIndex = 0;
-            }
-
-            // zero length line case
-            if (strokeOutline[prevIndex] == strokeOutline[i] ||
-                strokeOutline[i] == strokeOutline[nextIndex])
-            {
-               strokeOutline.RemoveAt(i);
-               continue;
-            }
-
-            var currentSegment = new LineSegment2D(strokeOutline[prevIndex], strokeOutline[i]);
-            var nextSegment = new LineSegment2D(strokeOutline[i], strokeOutline[nextIndex]);
-            var angle = MathHelper.AngleBetween(currentSegment, nextSegment);
-            
-            if (Math.Abs(0 - angle) <= epsilon ||
-                Math.Abs(360 - angle) <= epsilon)
-            {
-               strokeOutline.RemoveAt(i);
-               continue;
-            }
-            
-            i++;
-         } while (i != 1);
-      }
-
-      public override Rect Bounds { get; }
-      
       public override Geometry Clone()
-      {
-         throw new NotImplementedException();
-      }
-
-      public override void RecalculateBounds()
-      {
-         
-      }
-
-      protected internal override void ProcessGeometry()
       {
          throw new NotImplementedException();
       }

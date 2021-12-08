@@ -36,7 +36,7 @@ namespace Adamantium.UI.Playground
             rectangle.StrokeThickness = 5;
             rectangle.StrokeDashOffset = -10;
             rectangle.ClipToBounds = false;
-            //rectangle.StrokeDashArray = new TrackingCollection<double>() { 0, 5 };
+            rectangle.StrokeDashArray = new TrackingCollection<double>() { 0, 5 };
 
             ellipse = new Ellipse();
             ellipse.Width = 150;
@@ -48,7 +48,7 @@ namespace Adamantium.UI.Playground
             ellipse.Margin = new Thickness(1, 0, 0, 1);
             ellipse.StrokeThickness = 5;
             ellipse.Stroke = Brushes.Green;
-            //ellipse.StrokeDashArray = new TrackingCollection<double>() { 12, 5 };
+            ellipse.StrokeDashArray = new TrackingCollection<double>() { 12, 5 };
 
             var line = new Line();
             line.X1 = 50;
@@ -86,7 +86,7 @@ namespace Adamantium.UI.Playground
             CombinedGeometry geometry = new CombinedGeometry();
             geometry.GeometryCombineMode = GeometryCombineMode.Xor;
             geometry.Geometry1 = new RectangleGeometry(new Rect(0, 0, 450, 350), new CornerRadius(0));
-            //geometry.Geometry2 = new RectangleGeometry(new Rect(100, 100, 500, 400), new CornerRadius(0));
+            geometry.Geometry2 = new RectangleGeometry(new Rect(100, 100, 500, 400), new CornerRadius(0));
             geometry.Geometry2 = new EllipseGeometry(new Rect(50, 50, 550, 350));
             path.Data = geometry;
             
