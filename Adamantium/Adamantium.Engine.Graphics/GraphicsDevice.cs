@@ -54,6 +54,10 @@ namespace Adamantium.Engine.Graphics
         private Mutex mutex;
         private static string MutextGuid = Guid.NewGuid().ToString();
         
+        private Semaphore[] waitSemaphoresArray = new Semaphore[1];
+        private Semaphore[] signalSemaphoresArray = new Semaphore[1];
+        private CommandBuffer[] commandBuffersArray = new CommandBuffer[1];
+        
         static GraphicsDevice()
         {
             BlendStates = new BlendStatesCollection();
@@ -522,21 +526,23 @@ namespace Adamantium.Engine.Graphics
                 throw new Exception("failed to record command buffer!");
             }
 
+            commandBuffersArray[0] = commandBuffer;
+
             var submitInfo = new SubmitInfo();
 
-            Semaphore[] waitSemaphores = new[] {ImageAvailableSemaphores[CurrentFrame]};
+            waitSemaphoresArray[0] = ImageAvailableSemaphores[CurrentFrame];
             
-            submitInfo.WaitSemaphoreCount = 1;
-            submitInfo.PWaitSemaphores = waitSemaphores;
+            submitInfo.WaitSemaphoreCount = (uint)waitSemaphoresArray.Length;
+            submitInfo.PWaitSemaphores = waitSemaphoresArray;
             submitInfo.PWaitDstStageMask = waitStages;
 
-            submitInfo.CommandBufferCount = 1;
-            submitInfo.PCommandBuffers = new[] {commandBuffer};
+            submitInfo.CommandBufferCount = (uint)commandBuffersArray.Length;
+            submitInfo.PCommandBuffers = commandBuffersArray;
 
-            Semaphore[] signalSemaphores = new[] {RenderFinishedSemaphores[CurrentFrame]};
+            signalSemaphoresArray[0] = RenderFinishedSemaphores[CurrentFrame];
 
-            submitInfo.SignalSemaphoreCount = 1;
-            submitInfo.PSignalSemaphores = signalSemaphores;
+            submitInfo.SignalSemaphoreCount = (uint)signalSemaphoresArray.Length;
+            submitInfo.PSignalSemaphores = signalSemaphoresArray;
 
             submitInfos[0] = submitInfo;
 
@@ -555,7 +561,7 @@ namespace Adamantium.Engine.Graphics
             }
             
             result = GraphicsQueue.QueueSubmit(1, submitInfos, renderFence);
-            GraphicsQueue.QueueWaitIdle();
+            LogicalDevice.WaitForFences(1, renderFence, true, ulong.MaxValue);
             
             if (MainDevice.AvailableQueuesCount == 1)
             {
