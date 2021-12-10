@@ -86,7 +86,7 @@ namespace Adamantium.Engine.Graphics.Effects
             appliesCounter = 0;
         }
 
-        internal void ClearDescriptorsCache()
+        private void ClearDescriptorsCache()
         {
             foreach (var entrySet in descriptorEntrySets)
             {
@@ -96,7 +96,7 @@ namespace Adamantium.Engine.Graphics.Effects
             descriptorEntrySets.Clear();
         }
 
-        internal void ClearLayoutBindings()
+        private void ClearLayoutBindings()
         {
             foreach (var binding in layoutBindings)
             {
@@ -104,6 +104,15 @@ namespace Adamantium.Engine.Graphics.Effects
             }
             
             layoutBindings.Clear();
+        }
+
+        private void ClearWriteDescriptorSets()
+        {
+            foreach (var descriptorSet in writeDescriptorSets)
+            {
+                descriptorSet.Dispose();
+            }
+            writeDescriptorSets.Clear();
         }
 
         /// <summary>
@@ -176,7 +185,7 @@ namespace Adamantium.Engine.Graphics.Effects
 
             //TODO: here we need to setup graphics/compute pipeline for current EffectPass before rendering begins
             //and then update all descriptors for each stage
-            writeDescriptorSets.Clear();
+            ClearWriteDescriptorSets();
 
             // ----------------------------------------------
             // Iterate on each stage to setup all inputs
@@ -878,11 +887,6 @@ namespace Adamantium.Engine.Graphics.Effects
 
         #region Nested type: PipelineBlock
 
-        private struct PipelineBlock
-        {
-            
-        }
-
         private struct ParameterBinding
         {
             public ParameterBinding(EffectParameter parameter, int slot)
@@ -898,6 +902,7 @@ namespace Adamantium.Engine.Graphics.Effects
 
         protected override void Dispose(bool disposeManagedResources)
         {
+            ClearWriteDescriptorSets();
             ClearLayoutBindings();
             descriptorSetLayout?.Destroy(graphicsDevice);
             PipelineLayout?.Destroy(graphicsDevice);

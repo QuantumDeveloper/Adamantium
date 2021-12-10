@@ -16,7 +16,9 @@ namespace Adamantium.Engine.Graphics
         private ImageView[] imageViews;
         private Framebuffer[] framebuffers;
         private Queue presentQueue;
-        
+        private SwapchainKHR[] swapchains;
+        private uint[] imageIndices;
+        private Semaphore[] waitSemaphores;
 
         public SwapChainGraphicsPresenter(GraphicsDevice graphicsDevice, PresentationParameters description, string name = "") : base(graphicsDevice, description, name)
         {
@@ -27,6 +29,9 @@ namespace Adamantium.Engine.Graphics
             CreateFramebuffers();
             BackBuffers = new Texture[BuffersCount];
             presentQueue = graphicsDevice.GraphicsQueue;
+            swapchains = new SwapchainKHR[1];
+            imageIndices = new uint[1];
+            waitSemaphores = new Semaphore[1];
         }
 
         class SwapChainSupportDetails
@@ -223,15 +228,16 @@ namespace Adamantium.Engine.Graphics
         /// </summary>
         public override PresenterState Present()
         {
-            Semaphore[] waitSemaphores = { GraphicsDevice.GetRenderFinishedSemaphoreForCurrentFrame() };
-            var presentInfo = new PresentInfoKHR();
+            waitSemaphores[0] = GraphicsDevice.GetRenderFinishedSemaphoreForCurrentFrame();
+            swapchains[0] = swapchain;
+            imageIndices[0] = GraphicsDevice.ImageIndex;
 
+            var presentInfo = new PresentInfoKHR();
             presentInfo.WaitSemaphoreCount = 1;
             presentInfo.PWaitSemaphores = waitSemaphores;
-            SwapchainKHR[] swapchains = { swapchain };
             presentInfo.SwapchainCount = 1;
             presentInfo.PSwapchains = swapchains;
-            presentInfo.PImageIndices = new [] { GraphicsDevice.ImageIndex };
+            presentInfo.PImageIndices = imageIndices;
 
             var result = presentQueue.QueuePresentKHR(presentInfo);
             if (result != Result.Success && result != Result.SuboptimalKhr)
