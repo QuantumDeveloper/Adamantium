@@ -34,8 +34,10 @@ namespace Adamantium.UI.Playground
             rectangle.Margin = new Thickness(0, 0, 1, 0);
             rectangle.Stroke = Brushes.CornflowerBlue;
             rectangle.StrokeThickness = 5;
-            rectangle.StrokeDashOffset = -10;
+            rectangle.StrokeDashOffset = 10;
             rectangle.ClipToBounds = false;
+            rectangle.StartLineCap = PenLineCap.ConvexRound;
+            rectangle.EndLineCap = PenLineCap.ConvexRound;
             rectangle.StrokeDashArray = new TrackingCollection<double>() { 0, 5 };
 
             ellipse = new Ellipse();
@@ -66,7 +68,7 @@ namespace Adamantium.UI.Playground
 
             polygon = new Polygon();
             polygon.Width = 200;
-            polygon.Points = new TrackingCollection<Vector2>();
+            polygon.Points = new PointsCollection();
             polygon.Points.Add(new Vector2(10, 80));
             polygon.Points.Add(new Vector2(190, 80));
             polygon.Points.Add(new Vector2(30, 190));
@@ -83,21 +85,39 @@ namespace Adamantium.UI.Playground
             path = new Path();
             path.HorizontalAlignment = HorizontalAlignment.Center;
             path.VerticalAlignment = VerticalAlignment.Center;
+            path.StrokeThickness = 2;
+            path.Stroke = Brushes.Red;
+            path.StrokeLineJoin = PenLineJoin.Miter;
             CombinedGeometry geometry = new CombinedGeometry();
             geometry.GeometryCombineMode = GeometryCombineMode.Xor;
             geometry.Geometry1 = new RectangleGeometry(new Rect(0, 0, 450, 350), new CornerRadius(0));
             geometry.Geometry2 = new RectangleGeometry(new Rect(100, 100, 500, 400), new CornerRadius(0));
             geometry.Geometry2 = new EllipseGeometry(new Rect(50, 50, 550, 350));
-            path.Data = geometry;
+            //path.Data = geometry;
+            var pathGeometry = new PathGeometry(path.GetPen());
+            var pathFigure = new PathFigure();
+            pathFigure.StartPoint = new Vector2(10, 10);
+            var segment = new PolylineSegment();
+            segment.Points = new PointsCollection();
+            segment.Points.Add(new Vector2(100, 10));
+            segment.Points.Add(new Vector2(200, 100));
+            pathFigure.Segments = new PathSegmentCollection();
+            pathFigure.Segments.Add(segment);
+            
+            //segment.Points.Add(new Vector2(205, 50));
+            pathGeometry.Figures = new PathFigureCollection();
+            pathGeometry.Figures.Add(pathFigure);
+            
+            path.Data = pathGeometry;
             
             KeyDown += OnKeyDown;
 
             grid.Background = Brushes.White;
             grid.Children.Add(rectangle);
             grid.Children.Add(ellipse);
-            //grid.Children.Add(line);
+            grid.Children.Add(line);
             grid.Children.Add(polygon);
-            //grid.Children.Add(path);
+            grid.Children.Add(path);
 
             Content = grid;
         }
@@ -118,15 +138,15 @@ namespace Adamantium.UI.Playground
                 combined.GeometryCombineMode = (GeometryCombineMode)mode;
             }
             
-            if (e.Key == Key.LeftArrow)
-            {
-                var combined = path.Data as CombinedGeometry;
-                var mode = (int)combined.GeometryCombineMode;
-                if (mode == 0) mode = 4;
-
-                mode--;
-                combined.GeometryCombineMode = (GeometryCombineMode)mode;
-            }
+            // if (e.Key == Key.LeftArrow)
+            // {
+            //     var combined = path.Data as CombinedGeometry;
+            //     var mode = (int)combined.GeometryCombineMode;
+            //     if (mode == 0) mode = 4;
+            //
+            //     mode--;
+            //     combined.GeometryCombineMode = (GeometryCombineMode)mode;
+            // }
 
             if (e.Key == Key.UpArrow)
             {
@@ -140,7 +160,21 @@ namespace Adamantium.UI.Playground
                 Console.WriteLine($"OFFSET: {polygon.StrokeDashOffset}");
             }
 
-            path.InvalidateMeasure();
+            if (e.Key == Key.LeftArrow)
+            {
+                polygon.FillRule = FillRule.EvenOdd;
+                var geom = path.Data as PathGeometry;
+                var segment = new CubicBezierSegment();
+                segment.ControlPoint1 = new Vector2(100, 200);
+                segment.ControlPoint2 = new Vector2(200, 100);
+                segment.Point = new Vector2(10, 10);
+                geom.Figures[0].Segments.Add(segment);
+            }
+
+            if (e.Key == Key.RightArrow)
+            {
+                polygon.FillRule = FillRule.NonZero;
+            }
         }
     }
 }

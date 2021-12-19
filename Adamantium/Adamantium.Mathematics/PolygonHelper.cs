@@ -232,5 +232,34 @@ namespace Adamantium.Mathematics
 
             return false;
         }
+        
+        public static List<LineSegment2D> OrderSegments(List<LineSegment2D> mergedSegments)
+        {
+            for (int i = 0; i < mergedSegments.Count; ++i)
+            {
+                var segment = mergedSegments[i];
+                var start = Vector2.Round(segment.Start, 4);
+                var end = Vector2.Round(segment.End, 4);
+                mergedSegments[i] = new LineSegment2D(start, end);
+            }
+            
+            var currentSegment = mergedSegments[0];
+            var orderedSegments = new List<LineSegment2D>();
+            orderedSegments.Add(currentSegment);
+            var cnt = mergedSegments.Count;
+            for (int i = 0; i < cnt; ++i)
+            {
+                if (IsConnected(currentSegment.Start, currentSegment.End, mergedSegments, out var nextSegment))
+                {
+                    if (!orderedSegments.Contains(nextSegment))
+                    {
+                        orderedSegments.Add(nextSegment);
+                        currentSegment = nextSegment;
+                    }
+                }
+            }
+
+            return orderedSegments;
+        }
     }
 }

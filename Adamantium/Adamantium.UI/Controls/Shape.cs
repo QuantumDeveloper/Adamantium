@@ -115,7 +115,7 @@ namespace Adamantium.UI.Controls
          return baseValue;
       }
 
-      protected Pen GetPen()
+      public Pen GetPen()
       {
          return new Pen(
             Stroke,
@@ -123,7 +123,8 @@ namespace Adamantium.UI.Controls
             StrokeDashOffset,
             StrokeDashArray,
             StartLineCap,
-            EndLineCap);
+            EndLineCap,
+            StrokeLineJoin);
       }
 
       protected override Size MeasureOverride(Size availableSize)

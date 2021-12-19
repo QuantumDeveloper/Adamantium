@@ -176,9 +176,13 @@ namespace Adamantium.Mathematics
             UpdatePoints();
         }
 
-        internal void RemoveInternalSegments(FillRule fillRule, List<Vector2> interPoints)
+        /// <summary>
+        /// Remove all segments based on intersection points in case of Non-Zero rule
+        /// </summary>
+        /// <param name="fillRule"></param>
+        /// <param name="interPoints"></param>
+        private void RemoveInternalSegments(FillRule fillRule, List<Vector2> interPoints)
         {
-            //Remove all segments based on intersection points in case of Non-Zero rule
             if (fillRule != FillRule.NonZero || interPoints.Count <= 0) return;
             
             for (var i = 0; i < interPoints.Count; i++)

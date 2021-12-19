@@ -19,10 +19,6 @@ namespace Adamantium.UI.Media
       public static readonly AdamantiumProperty EndPointProperty =
          AdamantiumProperty.Register(nameof(EndPoint), typeof(Vector2), typeof(LineGeometry),
             new PropertyMetadata(new Vector2(0), PropertyMetadataOptions.AffectsMeasure));
-      
-      public static readonly AdamantiumProperty ThicknessProperty =
-               AdamantiumProperty.Register(nameof(Thickness), typeof(Double), typeof(LineGeometry),
-                  new PropertyMetadata(0d, PropertyMetadataOptions.AffectsMeasure));
 
       public override Rect Bounds => bounds;
 
@@ -38,21 +34,14 @@ namespace Adamantium.UI.Media
          set => SetValue(EndPointProperty, value);
       }
 
-      public Double Thickness
-      {
-         get => GetValue<Double>(ThicknessProperty);
-         set => SetValue(ThicknessProperty, value);
-      }
-
       public LineGeometry()
       {
       }
 
-      public LineGeometry(Vector2 startPoint, Vector2 endPoint, Double thickness) : this()
+      public LineGeometry(Vector2 startPoint, Vector2 endPoint) : this()
       {
          StartPoint = startPoint;
          EndPoint = endPoint;
-         Thickness = thickness;
          bounds = new Rect(startPoint, endPoint);
       }
 
@@ -68,16 +57,12 @@ namespace Adamantium.UI.Media
 
       protected internal override void ProcessGeometry()
       {
-         CreateLine(Thickness);
+         CreateLine();
       }
 
-      internal void CreateLine(Double thickness)
+      private void CreateLine()
       {
-         Mesh = Engine.Graphics.Shapes.Line.GenerateGeometry(
-            GeometryType.Solid, 
-            (Vector3F)StartPoint,
-            (Vector3F)EndPoint,
-            (float)thickness);
+         OutlineMesh.SetPoints(new [] { (Vector3F)StartPoint, (Vector3F)EndPoint });
       }
    }
 }

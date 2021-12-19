@@ -117,8 +117,8 @@ namespace Adamantium.Engine.Graphics
 
                 if (jointindices && jointWeights)
                 {
-                    vertex.JointIndices = mesh.BoneIndices[i];
-                    vertex.JointWeights = mesh.BoneWeights[i];
+                    vertex.JointIndices = mesh.JointIndices[i];
+                    vertex.JointWeights = mesh.JointWeights[i];
                 }
                 vertices[i] = vertex;
             }

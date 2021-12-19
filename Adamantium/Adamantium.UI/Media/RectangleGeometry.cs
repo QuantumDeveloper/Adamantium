@@ -30,7 +30,6 @@ namespace Adamantium.UI.Media
       {
          Rect = size;
          CornerRadius = corners;
-         ProcessGeometry();
       }
 
       public CornerRadius CornerRadius
@@ -61,7 +60,7 @@ namespace Adamantium.UI.Media
             TesselationFactor, 
             translation);
          
-         StrokeMesh = Shapes.Rectangle.GenerateGeometry(
+         OutlineMesh = Shapes.Rectangle.GenerateGeometry(
             GeometryType.Outlined, 
             (float)rect.Width, 
             (float)rect.Height,

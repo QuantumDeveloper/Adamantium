@@ -133,6 +133,7 @@ namespace Adamantium.Core.Collections
             {
                 if (currentIndex > 0)
                 {
+                    OnClearing();
                     ClearItems();
                     OnClear();
                 }
@@ -377,6 +378,8 @@ namespace Adamantium.Core.Collections
         protected virtual void OnSet(int index, T oldItem, T newItem) { }
 
         protected virtual void OnRemoveItem(int index, T item) { }
+        
+        protected virtual void OnClearing() { }
 
         protected virtual void OnClear() { }
 

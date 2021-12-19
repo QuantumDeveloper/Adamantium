@@ -71,6 +71,7 @@ namespace Adamantium.UI.Media
       public void DrawEllipse(Rect destinationRect, Brush brush, Double startAngle, Double stopAngle, Pen pen = null)
       {
          var ellipse = new EllipseGeometry(destinationRect, startAngle, stopAngle);
+         ellipse.ProcessGeometry();
          StrokeGeometry stroke = null;
          if (pen != null && pen.Thickness > 0.0)
          {
@@ -82,7 +83,7 @@ namespace Adamantium.UI.Media
          var uiRenderer = UIComponentRenderer.Create(GraphicsDevice, ellipse.Mesh, brush);
          presentationItem.GeometryRenderer = uiRenderer;
 
-         if (stroke != null)
+         if (stroke != null && stroke.Mesh.HasPoints)
          {
             var strokeRenderer = UIComponentRenderer.Create(GraphicsDevice, stroke?.Mesh, pen?.Brush);
             presentationItem.StrokeRenderer = strokeRenderer;
@@ -94,6 +95,7 @@ namespace Adamantium.UI.Media
       public void DrawRectangle(Brush brush, Rect rect, CornerRadius corners, Pen pen = null)
       {
          var rectangle = new RectangleGeometry(rect, corners);
+         rectangle.ProcessGeometry();
          StrokeGeometry strokeGeometry = null;
          if (pen != null && pen.Thickness > 0.0)
          {
@@ -104,7 +106,7 @@ namespace Adamantium.UI.Media
          var uiRenderer = UIComponentRenderer.Create(GraphicsDevice, rectangle.Mesh, brush);
          presentationItem.GeometryRenderer = uiRenderer;
 
-         if (strokeGeometry != null)
+         if (strokeGeometry != null && strokeGeometry.Mesh.HasPoints)
          {
             var strokeRenderer = UIComponentRenderer.Create(GraphicsDevice, strokeGeometry?.Mesh, pen?.Brush);
             presentationItem.StrokeRenderer = strokeRenderer;
@@ -128,7 +130,7 @@ namespace Adamantium.UI.Media
          var uiRenderer = UIComponentRenderer.Create(GraphicsDevice, geometry.Mesh, brush);
          presentationItem.GeometryRenderer = uiRenderer;
          
-         if (strokeGeometry != null)
+         if (strokeGeometry != null && strokeGeometry.Mesh.Points.Length > 0)
          {
             var strokeRenderer = UIComponentRenderer.Create(GraphicsDevice, strokeGeometry?.Mesh, pen?.Brush);
             presentationItem.StrokeRenderer = strokeRenderer;
@@ -139,7 +141,8 @@ namespace Adamantium.UI.Media
 
       public void DrawLine(Vector2 start, Vector2 end, Pen pen)
       {
-         var geometry = new LineGeometry(start, end, pen.Thickness);
+         var geometry = new LineGeometry(start, end);
+         geometry.ProcessGeometry();
          
          StrokeGeometry strokeGeometry = null;
          if (pen != null && pen.Thickness > 0.0)

@@ -161,8 +161,8 @@ namespace Adamantium.Engine.Compiler.Converter.Converters
             SceneData.Controller controller;
             if (SceneDataContainer.Controllers.TryGetValue(meshId, out controller))
             {
-               mesh.SetBoneIndices(controller.BoneIndices);
-               mesh.SetBoneWeights(controller.BoneWeights);
+               mesh.SetJointIndices(controller.BoneIndices);
+               mesh.SetJointWeights(controller.BoneWeights);
             }
 
             //Собираем геометрию на основании этих индексов
