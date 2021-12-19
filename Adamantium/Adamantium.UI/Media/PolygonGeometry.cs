@@ -16,7 +16,7 @@ namespace Adamantium.UI.Media
             new PropertyMetadata(FillRule.EvenOdd, PropertyMetadataOptions.AffectsRender));
         
         public static readonly AdamantiumProperty PointsProperty = AdamantiumProperty.Register(nameof(FillRule),
-            typeof(TrackingCollection<Vector2>), typeof(PolygonGeometry),
+            typeof(PointsCollection), typeof(PolygonGeometry),
             new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender));
 
         public FillRule FillRule
@@ -25,13 +25,14 @@ namespace Adamantium.UI.Media
             set => SetValue(FillRuleProperty, value);
         }
 
-        public TrackingCollection<Vector2> Points
+        public PointsCollection Points
         {
-            get => GetValue<TrackingCollection<Vector2>>(PointsProperty);
+            get => GetValue<PointsCollection>(PointsProperty);
             set => SetValue(PointsProperty, value);
         }
 
         public override Rect Bounds => bounds;
+        
         public override Geometry Clone()
         {
             throw new System.NotImplementedException();
@@ -65,7 +66,7 @@ namespace Adamantium.UI.Media
         public PolygonGeometry(IEnumerable<Vector2> points, FillRule fillRule)
         {
             FillRule = fillRule;
-            Points = new TrackingCollection<Vector2>(points);
+            Points = new PointsCollection(points);
         }
 
         internal void GenerateGeometry(IEnumerable<Vector2> points)
@@ -79,14 +80,28 @@ namespace Adamantium.UI.Media
             
             Mesh = new Mesh();
             Mesh.SetPoints(result).GenerateBasicIndices().Optimize();
-            StrokeMesh = new Mesh();
-            var lst = new List<Vector3F>();
-            foreach (var point in geometryPoints)
+            var strokePoints = new List<Vector3F>();
+            if (FillRule == FillRule.NonZero)
             {
-                lst.Add((Vector3F)point);
-            }
+                polygonItem = new PolygonItem(geometryPoints);
+                polygonItem.SplitOnSegments();
+                polygonItem.CheckForSelfIntersection(FillRule.NonZero);
+                var orderedSegments = PolygonHelper.OrderSegments(polygonItem.Segments);
 
-            StrokeMesh.SetPoints(lst);
+                for (int i = 0; i < orderedSegments.Count; ++i)
+                {
+                    strokePoints.Add((Vector3F)orderedSegments[i].Start);
+                }
+            }
+            else
+            {
+                foreach (var point in geometryPoints)
+                {
+                    strokePoints.Add((Vector3F)point);
+                }
+            }
+            
+            OutlineMesh.SetPoints(strokePoints);
         }
     }
 }

@@ -86,9 +86,7 @@ namespace Adamantium.UI
 
          while (ownerType != null)
          {
-            PropertyMetadata result;
-
-            if (defaultValues.TryGetValue(ownerType, out result))
+            if (defaultValues.TryGetValue(ownerType, out var result))
             {
                return result;
             }

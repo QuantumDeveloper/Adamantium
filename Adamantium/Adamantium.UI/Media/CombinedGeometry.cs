@@ -84,8 +84,8 @@ namespace Adamantium.UI.Media
             mergedPointsHash.Clear();
             Mesh = new Mesh();
             
-            Geometry1.StrokeMesh.SplitOnSegments(Geometry1.IsClosed);
-            Geometry2.StrokeMesh.SplitOnSegments(Geometry2.IsClosed);
+            Geometry1.OutlineMesh.SplitOnSegments(Geometry1.IsClosed);
+            Geometry2.OutlineMesh.SplitOnSegments(Geometry2.IsClosed);
             
             /*
             var polygon = new Polygon();
@@ -103,7 +103,7 @@ namespace Adamantium.UI.Media
                 MergeSegments();
                 
                 var edgePoints = new List<Vector2>();
-                FindEdgeIntersectionPoints(Geometry1.StrokeMesh, Geometry2.StrokeMesh, out edgePoints);
+                FindEdgeIntersectionPoints(Geometry1.OutlineMesh, Geometry2.OutlineMesh, out edgePoints);
                 
                 for (var k = 0; k < edgePoints.Count; ++k)
                 {
@@ -117,12 +117,12 @@ namespace Adamantium.UI.Media
                 
                 if (GeometryCombineMode == GeometryCombineMode.Union)
                 {
-                    var intersections = FindAllPossibleIntersections(Geometry1.StrokeMesh, Geometry2.StrokeMesh, edgePoints);
+                    var intersections = FindAllPossibleIntersections(Geometry1.OutlineMesh, Geometry2.OutlineMesh, edgePoints);
                     RemoveInternalSegments(intersections);
                 }
                 else if (GeometryCombineMode == GeometryCombineMode.Intersect)
                 {
-                    var intersections = FindAllPossibleIntersections(Geometry1.StrokeMesh, Geometry2.StrokeMesh, edgePoints);
+                    var intersections = FindAllPossibleIntersections(Geometry1.OutlineMesh, Geometry2.OutlineMesh, edgePoints);
                     var segments = FindIntersectedSegments(intersections);
                     mergedPoints.Clear();
                     mergedPoints.AddRange(intersections);
@@ -131,15 +131,15 @@ namespace Adamantium.UI.Media
                 }
                 else if (GeometryCombineMode == GeometryCombineMode.Exclude)
                 {
-                    var intersections = FindGeometry1Intersections(Geometry1.StrokeMesh, Geometry2.StrokeMesh, edgePoints);
+                    var intersections = FindGeometryIntersections(Geometry1.OutlineMesh, Geometry2.OutlineMesh, edgePoints);
                     
                     var pointsToRemove = new List<Vector2>();
-                    foreach (var meshPoint in Geometry2.StrokeMesh.Points)
+                    foreach (var meshPoint in Geometry2.OutlineMesh.Points)
                     {
                         pointsToRemove.Add((Vector2)meshPoint);
                     }
 
-                    var intersections2 = FindGeometry1Intersections(Geometry2.StrokeMesh, Geometry1.StrokeMesh,
+                    var intersections2 = FindGeometryIntersections(Geometry2.OutlineMesh, Geometry1.OutlineMesh,
                         new List<Vector2>());
                     pointsToRemove.AddRange(intersections2);
                     pointsToRemove.AddRange(edgePoints);
@@ -153,10 +153,8 @@ namespace Adamantium.UI.Media
                 }
             }
             
-            
-
-            StrokeMesh = new Mesh();
-            StrokeMesh.SetPoints(mergedPoints);
+            OutlineMesh = new Mesh();
+            OutlineMesh.SetPoints(mergedPoints);
             
             var polygon = new Polygon();
             polygon.FillRule = FillRule.NonZero;
@@ -165,74 +163,35 @@ namespace Adamantium.UI.Media
 
             if (GeometryCombineMode != GeometryCombineMode.Xor)
             {
-                OrderSegmentsAndPoints();
-            }
-
-            // TODO: fix issue with merged segments/points for XOR combine mode
-            StrokeMesh = new Mesh();
-            StrokeMesh.SetPoints(mergedPoints);
-
-            /*
-            mergedPoints.Add(mergedPoints[0]);
-            Mesh.SetPoints(mergedPoints);
-            Mesh.SetTopology(PrimitiveType.LineStrip);
-            */
-        }
-
-        private Vector2 RoundVector(Vector2 input)
-        {
-            input.X = Math.Round(input.X, 4, MidpointRounding.AwayFromZero);
-            input.Y = Math.Round(input.Y, 4, MidpointRounding.AwayFromZero);
-            return input;
-        }
-
-        private void OrderSegmentsAndPoints()
-        {
-            for (int i = 0; i < mergedSegments.Count; ++i)
-            {
-                var segment = mergedSegments[i];
-                var start = RoundVector(segment.Start);
-                var end = RoundVector(segment.End);
-                mergedSegments[i] = new LineSegment2D(start, end);
-            }
-            
-            var currentSegment = mergedSegments[0];
-            var orderedSegments = new List<LineSegment2D>();
-            orderedSegments.Add(currentSegment);
-            var cnt = mergedSegments.Count;
-            for (int i = 0; i < cnt; ++i)
-            {
-                if (PolygonHelper.IsConnected(currentSegment.Start, currentSegment.End, mergedSegments, out var nextSegment))
+                var ordered = PolygonHelper.OrderSegments(mergedSegments);
+                
+                mergedSegments.Clear();
+                mergedSegments.AddRange(ordered);
+                
+                mergedPoints.Clear();
+                foreach (var segment in mergedSegments)
                 {
-                    if (!orderedSegments.Contains(nextSegment))
-                    {
-                        orderedSegments.Add(nextSegment);
-                        currentSegment = nextSegment;
-                    }
+                    mergedPoints.Add(segment.Start);
                 }
             }
 
-            mergedSegments.Clear();
-            mergedSegments.AddRange(orderedSegments);
-            mergedPoints.Clear();
-            foreach (var segment in mergedSegments)
-            {
-                mergedPoints.Add(segment.Start);
-            }
+            // TODO: fix issue with merged segments/points for XOR combine mode
+            OutlineMesh = new Mesh();
+            OutlineMesh.SetPoints(mergedPoints);
         }
 
         private void MergePoints()
         {
             mergedPoints.Clear();
-            for (int i = 0; i < Geometry1.StrokeMesh.Points.Length; i++)
+            for (int i = 0; i < Geometry1.OutlineMesh.Points.Length; i++)
             {
-                var point = (Vector2)Geometry1.StrokeMesh.Points[i];
+                var point = (Vector2)Geometry1.OutlineMesh.Points[i];
                 mergedPoints.Add(point);
             }
             
-            for (int i = 0; i < Geometry2.StrokeMesh.Points.Length; i++)
+            for (int i = 0; i < Geometry2.OutlineMesh.Points.Length; i++)
             {
-                var point = (Vector2)Geometry2.StrokeMesh.Points[i];
+                var point = (Vector2)Geometry2.OutlineMesh.Points[i];
                 mergedPoints.Add(point);
             }
         }
@@ -240,8 +199,8 @@ namespace Adamantium.UI.Media
         private void MergeSegments()
         {
             mergedSegments.Clear();
-            mergedSegments.AddRange(Geometry1.StrokeMesh.Segments);
-            mergedSegments.AddRange(Geometry2.StrokeMesh.Segments);
+            mergedSegments.AddRange(Geometry1.OutlineMesh.Segments);
+            mergedSegments.AddRange(Geometry2.OutlineMesh.Segments);
         }
         
         private bool CheckGeometryIntersections()
@@ -403,19 +362,10 @@ namespace Adamantium.UI.Media
             return allIntersections;
         }
         
-        private List<Vector2> FindGeometry1Intersections(Mesh mesh1, Mesh mesh2, List<Vector2> edgePoints)
+        private List<Vector2> FindGeometryIntersections(Mesh mesh1, Mesh mesh2, List<Vector2> edgePoints)
         {
             var allIntersections = new List<Vector2>(edgePoints);
 
-            // for (var i = 0; i < mesh1.Points.Length; i++)
-            // {
-            //     var point = (Vector2)mesh1.Points[i];
-            //     if (Collision2D.IsPointInsideArea(point, mesh2.Segments) &&
-            //         !allIntersections.Contains(point))
-            //     {
-            //         allIntersections.Add(point);
-            //     }
-            // }
             for (var i = 0; i < mesh2.Points.Length; i++)
             {
                 var point = (Vector2)mesh2.Points[i];

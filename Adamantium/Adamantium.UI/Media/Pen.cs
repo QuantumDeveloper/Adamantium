@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using Adamantium.Core.Collections;
-using Adamantium.Mathematics;
 
 namespace Adamantium.UI.Media
 {

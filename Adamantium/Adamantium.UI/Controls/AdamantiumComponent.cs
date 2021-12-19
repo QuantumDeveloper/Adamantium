@@ -6,7 +6,7 @@ using Adamantium.UI.Threading;
 
 namespace Adamantium.UI.Controls
 {
-    public class AdamantiumComponent : IAdamantiumComponent
+    public abstract class AdamantiumComponent : IAdamantiumComponent
     {
         public long Uid { get; set; }
 
@@ -14,7 +14,7 @@ namespace Adamantium.UI.Controls
 
         private AdamantiumComponent inheritanceParent;
 
-        public AdamantiumComponent()
+        protected AdamantiumComponent()
         {
             var list = AdamantiumPropertyMap.GetRegistered(this);
 
@@ -58,11 +58,21 @@ namespace Adamantium.UI.Controls
         public event EventHandler<AdamantiumPropertyChangedEventArgs> PropertyChanged;
 
         /// <summary>
+        /// Fires when some <see cref="AdamantiumProperty"/> was updated to 
+        /// </summary>
+        public event EventHandler<ComponentUpdatedEventArgs> ComponentUpdated;
+
+        /// <summary>
         /// Called when <see cref="AdamantiumProperty"/> changes on the object.
         /// </summary>
         /// <param name="e"></param>
         protected virtual void OnPropertyChanged(AdamantiumPropertyChangedEventArgs e)
         {
+        }
+
+        protected void RaiseComponentUpdated()
+        {
+            ComponentUpdated?.Invoke(this, new ComponentUpdatedEventArgs(this));
         }
 
         protected void RaisePropertyChanged(AdamantiumProperty property, object oldValue, object newValue)
@@ -80,6 +90,7 @@ namespace Adamantium.UI.Controls
                 property.OnChanged(e);
 
                 PropertyChanged?.Invoke(this, e);
+                RaiseComponentUpdated();
             }
             catch (Exception exception)
             {

@@ -1,6 +1,8 @@
-﻿namespace Adamantium.UI.RoutedEvents
+﻿using System;
+
+namespace Adamantium.UI.RoutedEvents
 {
-   public struct AdamantiumPropertyChangedEventArgs
+   public class AdamantiumPropertyChangedEventArgs : EventArgs
    {
       public AdamantiumPropertyChangedEventArgs(AdamantiumProperty property, object oldValue, object newValue)
       {

@@ -77,7 +77,7 @@ namespace Adamantium.Core.Collections
             if (CollectionChanged != null)
             {
                 var e = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, items, index);
-                CollectionChanged(this, e);
+                CollectionChanged.Invoke(this, e);
             }
 
             NotifyCountChanged();
@@ -98,6 +98,11 @@ namespace Adamantium.Core.Collections
             NotifyCountChanged();
         }
 
+        protected void NotifyCollectionChanged(NotifyCollectionChangedAction action, IList items)
+        {
+            var e = new NotifyCollectionChangedEventArgs(action, items);
+            CollectionChanged?.Invoke(this, e);
+        }
 
         protected override void OnInsert(int index, T item)
         {

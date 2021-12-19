@@ -3,6 +3,7 @@ using Adamantium.Mathematics;
 using System;
 using System.Diagnostics;
 using System.Linq;
+using Adamantium.Core.Collections;
 
 namespace Adamantium.Engine.Core.Models
 {
@@ -29,10 +30,16 @@ namespace Adamantium.Engine.Core.Models
             UV3 = Array.Empty<Vector2F>();
             Tangents = Array.Empty<Vector4F>();
             BiTangents = Array.Empty<Vector3F>();
-            BoneWeights = Array.Empty<Vector4F>();
-            BoneIndices = Array.Empty<Vector4F>();
+            JointWeights = Array.Empty<Vector4F>();
+            JointIndices = Array.Empty<Vector4F>();
             Indices = Array.Empty<int>();
+
+            Layers = new AdamantiumCollection<Vector3F[]>();
         }
+
+        public int LayersCount => Layers.Count;
+        
+        public AdamantiumCollection<Vector3F[]> Layers { get; private set; }
 
         public Vector3F[] Points { get; private set; }
 
@@ -52,9 +59,9 @@ namespace Adamantium.Engine.Core.Models
 
         public Vector3F[] BiTangents { get; private set; }
 
-        public Vector4F[] BoneIndices { get; private set; }
+        public Vector4F[] JointIndices { get; private set; }
 
-        public Vector4F[] BoneWeights { get; private set; }
+        public Vector4F[] JointWeights { get; private set; }
 
         public int[] Indices { get; private set; }
         
@@ -98,20 +105,76 @@ namespace Adamantium.Engine.Core.Models
 
         public bool HasIndices => Indices.Length > 0;
 
+        public bool HasPoints => Points.Length > 0;
+
         public Mesh SetTopology(PrimitiveType topology)
         {
             MeshTopology = topology;
             return this;
         }
 
-        public Mesh SetPoints(List<Vector3F> inPositions, bool updateBoundingBox = true)
+        public void AddLayer(IEnumerable<Vector3F> inPoints)
         {
-            if (inPositions == null || inPositions.Count == 0)
-            {
-                return this;
-            }
+            var points = inPoints as Vector3F[] ?? inPoints?.ToArray();
+            
+            if (inPoints == null || points.Length == 0) return;
+            
+            Layers.Add(points.ToArray());
+        }
+        
+        public void AddLayer(IEnumerable<Vector2> inPoints)
+        {
+            var points = inPoints as Vector2[] ?? inPoints?.ToArray();
+            if (points == null || points.Length == 0) return;
 
-            Points = inPositions.ToArray();
+            var tmpPoints = new Vector3F[points.Length];
+            for (int i = 0; i < points.Length; ++i)
+            {
+                tmpPoints[i] = (Vector3F)points[i];
+            }
+            
+            Layers.Add(tmpPoints);
+        }
+
+        public Vector3F[] GetLayer(int layer)
+        {
+            if (layer >= LayersCount) return Array.Empty<Vector3F>();
+            
+            return Layers[layer];
+        }
+        
+        public Mesh SetPoints(IEnumerable<Vector2> points, bool updateBoundingBox = true)
+        {
+            if (points == null) return this;
+
+            var enumerable = points as Vector2[] ?? points.ToArray();
+            Points = new Vector3F[enumerable.Length];
+
+            for (var index = 0; index < enumerable.Length; index++)
+            {
+                Points[index] = (Vector3F)enumerable[index];
+            }
+            
+            Layers?.Clear();
+            Layers?.Add(Points);
+            
+            if (updateBoundingBox)
+            {
+                CalculateBoundingVolumes();
+            }
+            Semantic |= VertexSemantic.Position;
+            IsModified = true;
+
+            return this;
+        }
+        
+        public Mesh SetPoints(IEnumerable<Vector3F> points, bool updateBoundingBox = true)
+        {
+            if (points == null) return this;
+            
+            Points = points.ToArray();
+            Layers?.Clear();
+            Layers?.Add(Points);
             if (updateBoundingBox)
             {
                 CalculateBoundingVolumes();
@@ -122,141 +185,66 @@ namespace Adamantium.Engine.Core.Models
             return this;
         }
 
-        public Mesh SetPoints(List<Vector2> inPositions, bool updateBoundingBox = true)
+        public Mesh SetIndices(IEnumerable<int> indices)
         {
-            var positions = new Vector3F[inPositions.Count];
-            for (int i = 0; i < inPositions.Count; ++i)
-            {
-                positions[i] = new Vector3F(inPositions[i]);
-            }
-            return SetPoints(positions, updateBoundingBox);
-        }
+            if (indices == null) return this;
 
-        public Mesh SetPoints(Vector3F[] inPositions, bool updateBoundingBox = true)
-        {
-            if (inPositions == null || inPositions.Length == 0)
-            {
-                return this;
-            }
-
-            Points = new Vector3F[inPositions.Length];
-            inPositions.CopyTo(Points, 0);
-            if (updateBoundingBox)
-            {
-                CalculateBoundingVolumes();
-            }
-            Semantic |= VertexSemantic.Position;
+            Indices = indices as int[] ?? indices.ToArray();
             IsModified = true;
 
             return this;
         }
 
-        public Mesh SetIndices(List<int> indices)
+        public Mesh SetNormals(IEnumerable<Vector3F> inNormals)
         {
-            if (indices == null || indices.Count == 0)
+            if (inNormals == null)
             {
                 return this;
             }
 
-            Indices = indices.ToArray();
-            IsModified = true;
-
-            return this;
-        }
-
-        public Mesh SetIndices(int[] indices)
-        {
-            if (indices == null || indices.Length == 0)
-            {
-                return this;
-            }
-
-            Indices = new int[indices.Length];
-            indices.CopyTo(Indices, 0);
-            IsModified = true;
-
-            return this;
-        }
-
-        public Mesh SetNormals(List<Vector3F> inNormals)
-        {
-            if (inNormals == null || inNormals.Count == 0)
-            {
-                return this;
-            }
-
-            return SetNormals(inNormals.ToArray());
-        }
-
-        public Mesh SetNormals(Vector3F[] inNormals)
-        {
-            if (inNormals == null || inNormals.Length == 0)
-            {
-                return this;
-            }
-
-            Normals = new Vector3F[inNormals.Length];
-            inNormals.CopyTo(Normals, 0);
+            Normals = inNormals as Vector3F[] ?? inNormals.ToArray();
             Semantic |= VertexSemantic.Normal;
             IsModified = true;
 
             return this;
         }
 
-        public Mesh SetColors(List<Color> inColors)
+        public Mesh SetColors(IEnumerable<Color> inColors)
         {
-            if (inColors == null || inColors.Count == 0)
-            {
-                return this;
-            }
+            if (inColors == null) return this;
 
-            Colors = inColors.ToArray();
+            Colors = inColors as Color[] ?? inColors.ToArray();
             Semantic |= VertexSemantic.Color;
             IsModified = true;
 
             return this;
         }
 
-        public Mesh SetUVs(int channel, List<Vector2F> uvs)
+        public Mesh SetUVs(int channel, IEnumerable<Vector2F> uvs)
         {
-            if (uvs == null || uvs.Count == 0)
-            {
-                return this;
-            }
-
-            return SetUVs(channel, uvs.ToArray());
-        }
-
-        public Mesh SetUVs(int channel, Vector2F[] uvs)
-        {
-            if (uvs == null || uvs.Length == 0)
-            {
-                return this;
-            }
+            if (uvs == null) return this;
+            
+            var uv = uvs as Vector2F[] ?? uvs.ToArray();
 
             switch (channel)
             {
                 case 0:
-                    UV0 = new Vector2F[uvs.Length];
-                    uvs.CopyTo(UV0, 0);
+                    UV0 = uv;
                     IsModified = true;
                     Semantic |= VertexSemantic.UV0;
                     break;
                 case 1:
-                    UV1 = new Vector2F[uvs.Length];
-                    uvs.CopyTo(UV1, 0);
+                    UV1 = uv;
                     IsModified = true;
                     Semantic |= VertexSemantic.UV1;
                     break;
                 case 2:
-                    UV2 = new Vector2F[uvs.Length];
-                    uvs.CopyTo(UV2, 0);
+                    UV2 = uv;
                     IsModified = true;
                     Semantic |= VertexSemantic.UV2;
                     break;
                 case 3:
-                    UV3 = new Vector2F[uvs.Length];
-                    uvs.CopyTo(UV3, 0);
+                    UV3 = uv;
                     IsModified = true;
                     Semantic |= VertexSemantic.UV3;
                     break;
@@ -265,40 +253,33 @@ namespace Adamantium.Engine.Core.Models
             return this;
         }
 
-        public void SetTangents(List<Vector4F> inTangents)
+        public Mesh SetTangents(IEnumerable<Vector4F> inTangents)
         {
-            if (inTangents == null || inTangents.Count == 0)
-            {
-                return;
-            }
-
-            Tangents = inTangents.ToArray();
-            //Semantic |= VertexSemantic.TangentBiNormal;
+            if (inTangents == null) return this;
+            
+            Tangents = inTangents as Vector4F[] ?? inTangents.ToArray();
+            Semantic |= VertexSemantic.TangentBiNormal;
             IsModified = true;
+
+            return this;
         }
 
-        public Mesh SetBoneIndices(List<Vector4F> inBoneIndices)
+        public Mesh SetJointIndices(IEnumerable<Vector4F> inJointIndices)
         {
-            if (inBoneIndices == null || inBoneIndices.Count == 0)
-            {
-                return this;
-            }
-
-            BoneIndices = inBoneIndices.ToArray();
+            if (inJointIndices == null) return this;
+            
+            JointIndices = inJointIndices as Vector4F[] ?? inJointIndices.ToArray();
             Semantic |= VertexSemantic.JointIndices;
             IsModified = true;
 
             return this;
         }
 
-        public Mesh SetBoneWeights(List<Vector4F> inBoneWeights)
+        public Mesh SetJointWeights(IEnumerable<Vector4F> inJointWeights)
         {
-            if (inBoneWeights == null || inBoneWeights.Count == 0)
-            {
-                return this;
-            }
+            if (inJointWeights == null) return this;
 
-            BoneWeights = inBoneWeights.ToArray();
+            JointWeights = inJointWeights as Vector4F[] ?? inJointWeights.ToArray();
             Semantic |= VertexSemantic.JointWeights;
             IsModified = true;
 
@@ -334,10 +315,10 @@ namespace Adamantium.Engine.Core.Models
             return this;
         }
 
-        public Mesh ClearBones()
+        public Mesh ClearJoints()
         {
-            BoneIndices = null;
-            BoneWeights = null;
+            JointIndices = null;
+            JointWeights = null;
             Semantic &= ~VertexSemantic.JointIndices & ~VertexSemantic.JointWeights;
 
             return this;
@@ -347,6 +328,13 @@ namespace Adamantium.Engine.Core.Models
         {
             Colors = null;
             Semantic &= ~VertexSemantic.Color;
+
+            return this;
+        }
+
+        public Mesh ClearLayers()
+        {
+            Layers?.Clear();
 
             return this;
         }
@@ -521,11 +509,11 @@ namespace Adamantium.Engine.Core.Models
                 CalculateBoundingVolumes();
             }
 
-            clonedMesh.BoneIndices = new Vector4F[BoneIndices.Length];
-            BoneIndices.CopyTo(clonedMesh.BoneIndices, 0);
+            clonedMesh.JointIndices = new Vector4F[JointIndices.Length];
+            JointIndices.CopyTo(clonedMesh.JointIndices, 0);
 
-            clonedMesh.BoneWeights = new Vector4F[BoneWeights.Length];
-            BoneWeights.CopyTo(clonedMesh.BoneWeights, 0);
+            clonedMesh.JointWeights = new Vector4F[JointWeights.Length];
+            JointWeights.CopyTo(clonedMesh.JointWeights, 0);
 
             clonedMesh.IsOptimized = IsOptimized;
             clonedMesh.IsModified = true;
@@ -556,14 +544,14 @@ namespace Adamantium.Engine.Core.Models
             var vertexDict = new Dictionary<Vertex, int>();
 
             int uniqueIndex = 0;
-            List<Vector3F> optimizedPositions = new List<Vector3F>();
-            List<Vector2F> optimizedUV0 = new List<Vector2F>();
-            List<Vector2F> optimizedUV1 = new List<Vector2F>();
-            List<Vector2F> optimizedUV2 = new List<Vector2F>();
-            List<Vector2F> optimizedUV3 = new List<Vector2F>();
-            List<Color> optimizedColors = new List<Color>();
-            List<Vector4F> optimizedBoneIndices = new List<Vector4F>();
-            List<Vector4F> optimizedBoneWeights = new List<Vector4F>();
+            var optimizedPositions = new List<Vector3F>();
+            var optimizedUV0 = new List<Vector2F>();
+            var optimizedUV1 = new List<Vector2F>();
+            var optimizedUV2 = new List<Vector2F>();
+            var optimizedUV3 = new List<Vector2F>();
+            var optimizedColors = new List<Color>();
+            var optimizedBoneIndices = new List<Vector4F>();
+            var optimizedBoneWeights = new List<Vector4F>();
 
             List<int> indices = new List<int>();
 
@@ -576,13 +564,13 @@ namespace Adamantium.Engine.Core.Models
                 }
 
                 var position = Points[index];
-                Vector2F uv0 = UV0 != null && UV0.Length - 1 >= index ? UV0[index] : Vector2F.Zero;
-                Vector2F uv1 = UV1 != null && UV1.Length - 1 >= index ? UV1[index] : Vector2F.Zero;
-                Vector2F uv2 = UV2 != null && UV2.Length - 1 >= index ? UV2[index] : Vector2F.Zero;
-                Vector2F uv3 = UV3 != null && UV3.Length - 1 >= index ? UV3[index] : Vector2F.Zero;
+                var uv0 = UV0 != null && UV0.Length - 1 >= index ? UV0[index] : Vector2F.Zero;
+                var uv1 = UV1 != null && UV1.Length - 1 >= index ? UV1[index] : Vector2F.Zero;
+                var uv2 = UV2 != null && UV2.Length - 1 >= index ? UV2[index] : Vector2F.Zero;
+                var uv3 = UV3 != null && UV3.Length - 1 >= index ? UV3[index] : Vector2F.Zero;
                 Color color = Colors != null && Colors.Length - 1 >= index ? Colors[index] : Mathematics.Colors.White;
-                Vector4F jointIndex = BoneIndices != null && BoneIndices.Length - 1 >= index ? BoneIndices[index] : Vector4F.Zero;
-                Vector4F jointWeight = BoneWeights != null && BoneWeights.Length - 1 >= index ? BoneWeights[index] : Vector4F.Zero;
+                Vector4F jointIndex = JointIndices != null && JointIndices.Length - 1 >= index ? JointIndices[index] : Vector4F.Zero;
+                Vector4F jointWeight = JointWeights != null && JointWeights.Length - 1 >= index ? JointWeights[index] : Vector4F.Zero;
                 var vertex = new Vertex(position, uv0, uv1, uv2, uv3, color, jointIndex, jointWeight);
                 
                 if (!vertexDict.ContainsKey(vertex))
@@ -654,11 +642,11 @@ namespace Adamantium.Engine.Core.Models
             }
             if (Semantic.HasFlag(VertexSemantic.JointIndices))
             {
-                BoneIndices = optimizedBoneIndices.ToArray();
+                JointIndices = optimizedBoneIndices.ToArray();
             }
             if (Semantic.HasFlag(VertexSemantic.JointWeights))
             {
-                BoneWeights = optimizedBoneWeights.ToArray();
+                JointWeights = optimizedBoneWeights.ToArray();
             }
 
             CalculateBoundingVolumes();
@@ -889,12 +877,12 @@ namespace Adamantium.Engine.Core.Models
             var assembledBoneWeights = new List<Vector4F>();
             for (int i = 0; i < positionIndices.Count; i++)
             {
-                assembledBoneIndices.Add(BoneIndices[positionIndices[i]]);
-                assembledBoneWeights.Add(BoneWeights[positionIndices[i]]);
+                assembledBoneIndices.Add(JointIndices[positionIndices[i]]);
+                assembledBoneWeights.Add(JointWeights[positionIndices[i]]);
             }
 
-            BoneIndices = assembledBoneIndices.ToArray();
-            BoneWeights = assembledBoneWeights.ToArray();
+            JointIndices = assembledBoneIndices.ToArray();
+            JointWeights = assembledBoneWeights.ToArray();
             IsModified = true;
             
             return this;

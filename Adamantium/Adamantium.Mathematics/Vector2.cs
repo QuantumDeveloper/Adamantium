@@ -1379,6 +1379,14 @@ namespace Adamantium.Mathematics
       {
          return new(scalar - value.X, scalar - value.Y);
       }
+      
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
+      public static Vector2 Round(Vector2 value, int digits)
+      {
+         value.X = Math.Round(value.X, digits, MidpointRounding.AwayFromZero);
+         value.Y = Math.Round(value.Y, digits, MidpointRounding.AwayFromZero);
+         return value;
+      }
 
       /// <summary>
       /// Tests for equality between two objects.

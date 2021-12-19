@@ -1,4 +1,7 @@
-﻿using System.Globalization;
+﻿using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
 using Adamantium.Mathematics;
 
 namespace Adamantium.UI
@@ -405,6 +408,24 @@ namespace Adamantium.UI
              Y,
              Width,
              Height);
+      }
+      
+      public static Rect FromPoints(IEnumerable<Vector2> inPoints)
+      {
+         ArgumentNullException.ThrowIfNull(inPoints);
+
+         var points = inPoints as Vector2[] ?? inPoints.ToArray();
+         var minimum = new Vector2(float.MaxValue);
+         var maximum = new Vector2(float.MinValue);
+
+         for (int i = 0; i < points.Length; ++i)
+         {
+            Vector2.Min(ref minimum, ref points[i], out minimum);
+            Vector2.Max(ref maximum, ref points[i], out maximum);
+         }
+
+         var rect = maximum - minimum;
+         return new Rect(minimum.X, minimum.Y, rect.X, rect.Y);
       }
    }
 }

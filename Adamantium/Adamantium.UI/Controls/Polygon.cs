@@ -17,7 +17,7 @@ namespace Adamantium.UI.Controls
         private PolygonGeometry geometry { get; set; }
         
         public static readonly AdamantiumProperty PointsProperty = AdamantiumProperty.Register(nameof(Points),
-            typeof(TrackingCollection<Vector2>), typeof(Polygon),
+            typeof(PointsCollection), typeof(Polygon),
             new PropertyMetadata(null,
                 PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure |
                 PropertyMetadataOptions.AffectsArrange | PropertyMetadataOptions.AffectsRender, PointsChangedCallback));
@@ -56,9 +56,9 @@ namespace Adamantium.UI.Controls
             InvalidateMeasure();
         }
 
-        public TrackingCollection<Vector2> Points
+        public PointsCollection Points
         {
-            get => GetValue<TrackingCollection<Vector2>>(PointsProperty);
+            get => GetValue<PointsCollection>(PointsProperty);
             set => SetValue(PointsProperty, value);
         }
         

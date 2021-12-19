@@ -1,4 +1,5 @@
 ﻿using System;
+using Adamantium.Core.Collections;
 using Adamantium.Engine.Core.Models;
 using Adamantium.UI.Controls;
 using Adamantium.UI.RoutedEvents;
@@ -9,7 +10,7 @@ namespace Adamantium.UI.Media
    {
       internal Mesh Mesh { get; set; }
       
-      internal Mesh StrokeMesh { get; set; }
+      internal Mesh OutlineMesh { get; set; }
       
       protected Int32 TesselationFactor { get; set; }
 
@@ -29,7 +30,7 @@ namespace Adamantium.UI.Media
       protected Geometry()
       {
          Mesh = new Mesh();
-         StrokeMesh = new Mesh();
+         OutlineMesh = new Mesh();
          TesselationFactor = 20;
       }
      

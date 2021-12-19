@@ -69,7 +69,6 @@ namespace Adamantium.UI.Media
          StartAngle = startAngle;
          StopAngle = stopAngle;
          IsClosed = true;
-         ProcessGeometry();
       }
 
       public EllipseGeometry(Vector2 center, Double radiusX, Double radiusY, Double startAngle, Double stopAngle) : this()
@@ -108,7 +107,7 @@ namespace Adamantium.UI.Media
             tessellation: TesselationFactor,
             transform: translation);
          
-         StrokeMesh = Shapes.Ellipse.GenerateGeometry(
+         OutlineMesh = Shapes.Ellipse.GenerateGeometry(
             GeometryType.Outlined, 
             EllipseType.Sector,
             new Vector2F((float)rect.Width, (float)rect.Height), 

@@ -1596,7 +1596,7 @@ namespace Adamantium.UI
          VisualParentChanged?.Invoke(this, new VisualParentChangedEventArgs(oldParent, newParent));
       }
 
-      public EventHandler<VisualParentChangedEventArgs> VisualParentChanged; 
+      public EventHandler<VisualParentChangedEventArgs> VisualParentChanged;
 
       protected virtual void OnRender(DrawingContext context)
       {
