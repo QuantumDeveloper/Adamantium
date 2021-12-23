@@ -9,6 +9,9 @@ namespace Adamantium.UI.Media;
 public sealed class PathFigure : AdamantiumComponent
 {
     public static readonly AdamantiumProperty IsClosedProperty = AdamantiumProperty.Register(nameof(IsClosed),
+        typeof(bool), typeof(PathFigure), new PropertyMetadata(false, PropertyMetadataOptions.AffectsRender));
+
+    public static readonly AdamantiumProperty IsFilledProperty = AdamantiumProperty.Register(nameof(IsFilled),
         typeof(bool), typeof(PathFigure), new PropertyMetadata(true, PropertyMetadataOptions.AffectsRender));
     
     public static readonly AdamantiumProperty StartPointProperty = AdamantiumProperty.Register(nameof(StartPoint),
@@ -54,8 +57,11 @@ public sealed class PathFigure : AdamantiumComponent
         foreach (var segment in Segments)
         {
             var pts = segment.ProcessSegment(currentPoint);
-            currentPoint = pts[^1];
-            Points.AddRange(pts);
+            if (pts.Length > 0)
+            {
+                currentPoint = pts[^1];
+                Points.AddRange(pts);
+            }
         }
 
         isSegmentProcessed = true;
@@ -65,6 +71,12 @@ public sealed class PathFigure : AdamantiumComponent
     {
         get => GetValue<bool>(IsClosedProperty);
         set => SetValue(IsClosedProperty, value);
+    }
+    
+    public bool IsFilled
+    {
+        get => GetValue<bool>(IsFilledProperty);
+        set => SetValue(IsFilledProperty, value);
     }
 
     public Vector2 StartPoint

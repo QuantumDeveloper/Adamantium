@@ -64,8 +64,6 @@ public class StrokeGeometry : Geometry
          
       //@TODO check concave zero length triangulation
 
-      // for test purposes start
-      geometry.IsClosed = true;
       var zeroLineDir = new LineSegment2D(new Vector2(0, 0), new Vector2(1, 0)).DirectionNormalized;
       // for test purposes end
 
@@ -519,7 +517,7 @@ public class StrokeGeometry : Geometry
    private List<PolygonItem> GenerateStroke(Vector3F[] points, Pen pen, bool isGeometryClosed, Vector2? zeroLengthLineDirection = null)
    {
       // check if geometry is valid
-      if (points.Length < 2) return null;
+      if (points.Length < 2) return new List<PolygonItem>();
 
       var polygonItems = new List<PolygonItem>();
       var strokeSegments = new List<StrokeSegment>();

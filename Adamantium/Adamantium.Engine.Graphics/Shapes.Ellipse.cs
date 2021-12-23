@@ -137,7 +137,7 @@ namespace Adamantium.Engine.Graphics
                 float radiusX = diameter.X / 2;
                 float radiusY = diameter.Y / 2;
 
-                float range = stopAngle - startAngle;
+                float range = Math.Abs(stopAngle) - Math.Abs(startAngle);
                 float angle = range / tessellation;
 
                 float sign = 1;
@@ -150,11 +150,6 @@ namespace Adamantium.Engine.Graphics
                 startAngle = MathHelper.DegreesToRadians(startAngle);
                 angle = startAngle * sign;
 
-                if (range < 360 && ellipseType == EllipseType.Sector)
-                {
-                    vertices.Add(center);
-                }
-                
                 for (int i = 0; i < tessellation; ++i)
                 {
                     float x = center.X + (radiusX * (float)Math.Cos(angle));

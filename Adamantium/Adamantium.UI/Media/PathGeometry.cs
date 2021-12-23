@@ -106,6 +106,8 @@ public class PathGeometry : Geometry
         var polygon = new Polygon();
         foreach (var polygonItem in figureToPolygon)
         {
+            if (polygonItem.Key.IsFilled) continue;
+            
             polygon.AddItem(polygonItem.Value);
         }
 

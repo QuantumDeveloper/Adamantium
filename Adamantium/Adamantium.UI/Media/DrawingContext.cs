@@ -127,10 +127,13 @@ namespace Adamantium.UI.Media
          }
 
          var presentationItem = new UIPresentationItem();
-         var uiRenderer = UIComponentRenderer.Create(GraphicsDevice, geometry.Mesh, brush);
-         presentationItem.GeometryRenderer = uiRenderer;
-         
-         if (strokeGeometry != null && strokeGeometry.Mesh.Points.Length > 0)
+         if (geometry.Mesh.HasPoints)
+         {
+            var uiRenderer = UIComponentRenderer.Create(GraphicsDevice, geometry.Mesh, brush);
+            presentationItem.GeometryRenderer = uiRenderer;
+         }
+
+         if (strokeGeometry != null && strokeGeometry.Mesh.HasPoints)
          {
             var strokeRenderer = UIComponentRenderer.Create(GraphicsDevice, strokeGeometry?.Mesh, pen?.Brush);
             presentationItem.StrokeRenderer = strokeRenderer;
