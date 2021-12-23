@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using Enumerable = System.Linq.Enumerable;
 
 namespace Adamantium.Mathematics
 {
@@ -612,10 +613,7 @@ namespace Adamantium.Mathematics
 
         public static QuaternionF GetRotationFromMatrix(Matrix4x4F matrix)
         {
-            Vector3F scale;
-            Vector3F pos;
-            QuaternionF orientation;
-            matrix.Decompose(out scale, out orientation, out pos);
+            matrix.Decompose(out var scale, out var orientation, out var pos);
             return orientation;
         }
 
@@ -802,10 +800,32 @@ namespace Adamantium.Mathematics
             return true;
         }
         
-        public static List<Vector2> GetBSpline2(List<Vector2> controlPoints, uint resolution)
+        public static List<Vector2> GetBSpline2(IEnumerable<Vector2> controlPoints, uint resolution)
         {
-            if (controlPoints == null ||
-                controlPoints.Count < 3 ||
+            static Vector2 Curve(Vector2[] controlPoints, int index, double u)
+            {
+                return (Blend03(u) * controlPoints[index - 1] + Blend13(u) * controlPoints[index] + Blend23(u) * controlPoints[index + 1]);
+            }
+
+            static double Blend03(double u)
+            {
+                return ((1 - u) * (1 - u) / 2.0);
+            }
+
+            static double Blend13(double u)
+            {
+                return (-(u * u) + u + 0.5);
+            }
+
+            static double Blend23(double u)
+            {
+                return ((u * u) / 2);
+            }
+
+            if (controlPoints == null) return new List<Vector2>();
+            
+            var points = controlPoints as Vector2[] ?? Enumerable.ToArray(controlPoints);
+            if (points.Length < 3 ||
                 resolution < 2)
             {
                 // just return empty list
@@ -815,7 +835,7 @@ namespace Adamantium.Mathematics
             var curvePoints = new List<Vector2>();
 
             var start = 1;
-            var end = controlPoints.Count - 1;
+            var end = points.Length - 1;
 
             for (var i = start; i < end; ++i)
             {
@@ -823,37 +843,17 @@ namespace Adamantium.Mathematics
 
                 for (double u = 0.0; u < 1.0; u += uDelta)
                 {
-                    curvePoints.Add(curve(controlPoints, i, u));
+                    curvePoints.Add(Curve(points, i, u));
                 }
 
                 // add last curve point
                 if (i == end - 1)
                 {
-                    curvePoints.Add(curve(controlPoints, i, 1));
+                    curvePoints.Add(Curve(points, i, 1));
                 }
             }
 
             return curvePoints;
-        }
-
-        private static Vector2 curve(List<Vector2> controlPoints, int index, double u)
-        {
-            return (blend03(u) * controlPoints[index - 1] + blend13(u) * controlPoints[index] + blend23(u) * controlPoints[index + 1]);
-        }
-
-        private static double blend03(double u)
-        {
-            return ((1 - u) * (1 - u) / 2.0);
-        }
-
-        private static double blend13(double u)
-        {
-            return (-(u * u) + u + 0.5);
-        }
-
-        private static double blend23(double u)
-        {
-            return ((u * u) / 2);
         }
 
         public static List<Vector2> GetQuadraticBezier(Vector2 start, Vector2 control, Vector2 end, uint sampleRate)
