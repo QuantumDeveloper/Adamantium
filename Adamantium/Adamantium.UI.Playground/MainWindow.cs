@@ -85,8 +85,8 @@ namespace Adamantium.UI.Playground
             polygon.StrokeDashArray = new TrackingCollection<double>() { 20, 10, 10, 10, 4, 20 };
 
             path = new Path();
-            path.HorizontalAlignment = HorizontalAlignment.Center;
-            path.VerticalAlignment = VerticalAlignment.Center;
+            path.HorizontalAlignment = HorizontalAlignment.Stretch;
+            path.VerticalAlignment = VerticalAlignment.Stretch;
             path.StrokeThickness = 6;
             path.Stroke = Brushes.Red;
             path.StrokeLineJoin = PenLineJoin.Miter;
@@ -123,7 +123,7 @@ namespace Adamantium.UI.Playground
             bSplineSegment.Points.Add(new Vector2(250, 350));
             bSplineSegment.Points.Add(new Vector2(270, 300));
             bSplineSegment.Points.Add(new Vector2(290, 390));
-            //pathFigure.Segments.Add(bSplineSegment);
+            pathFigure.Segments.Add(bSplineSegment);
             lineSegment = new LineSegment();
             lineSegment.Point = new Vector2(300, 200);
             //pathFigure.Segments.Add(lineSegment);

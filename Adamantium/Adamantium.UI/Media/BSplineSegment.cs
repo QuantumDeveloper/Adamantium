@@ -10,7 +10,7 @@ public class BSplineSegment : PolylineSegment
     }
     
     public static readonly AdamantiumProperty SampleRateProperty =
-        AdamantiumProperty.Register(nameof(SampleRate), typeof(UInt32), typeof(BezierSegmentBase),
+        AdamantiumProperty.Register(nameof(SampleRate), typeof(UInt32), typeof(BSplineSegment),
             new PropertyMetadata((uint)20, PropertyMetadataOptions.AffectsMeasure));
 
     public UInt32 SampleRate
