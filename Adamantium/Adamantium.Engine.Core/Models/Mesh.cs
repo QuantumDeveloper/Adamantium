@@ -10,10 +10,12 @@ namespace Adamantium.Engine.Core.Models
     public class Mesh
     {
         private const int StripIndicesSeparator = -1;
+        private MeshLayer defaultMeshLayer; 
 
         public Mesh()
         {
             Initialize();
+            defaultMeshLayer = new MeshLayer();
         }
 
         private void Initialize()
@@ -34,12 +36,12 @@ namespace Adamantium.Engine.Core.Models
             JointIndices = Array.Empty<Vector4F>();
             Indices = Array.Empty<int>();
 
-            Layers = new AdamantiumCollection<Vector3F[]>();
+            Layers = new AdamantiumCollection<MeshLayer>();
         }
 
         public int LayersCount => Layers.Count;
         
-        public AdamantiumCollection<Vector3F[]> Layers { get; private set; }
+        public AdamantiumCollection<MeshLayer> Layers { get; private set; }
 
         public Vector3F[] Points { get; private set; }
 
@@ -97,7 +99,7 @@ namespace Adamantium.Engine.Core.Models
 
         public bool IsAnimationPresent => Semantic.HasFlag(VertexSemantic.JointIndices) &&
                                           Semantic.HasFlag(VertexSemantic.JointWeights);
-
+        
         public void AcceptChanges()
         {
             IsModified = false;
@@ -113,16 +115,16 @@ namespace Adamantium.Engine.Core.Models
             return this;
         }
 
-        public void AddLayer(IEnumerable<Vector3F> inPoints)
+        public void AddLayer(IEnumerable<Vector3F> inPoints, bool isGeometryClosed)
         {
             var points = inPoints as Vector3F[] ?? inPoints?.ToArray();
             
             if (inPoints == null || points.Length == 0) return;
             
-            Layers.Add(points.ToArray());
+            Layers.Add(new MeshLayer(points, isGeometryClosed));
         }
         
-        public void AddLayer(IEnumerable<Vector2> inPoints)
+        public void AddLayer(IEnumerable<Vector2> inPoints, bool isGeometryClosed)
         {
             var points = inPoints as Vector2[] ?? inPoints?.ToArray();
             if (points == null || points.Length == 0) return;
@@ -133,12 +135,12 @@ namespace Adamantium.Engine.Core.Models
                 tmpPoints[i] = (Vector3F)points[i];
             }
             
-            Layers.Add(tmpPoints);
+            Layers.Add(new MeshLayer(tmpPoints, isGeometryClosed));
         }
 
-        public Vector3F[] GetLayer(int layer)
+        public MeshLayer GetLayer(int layer)
         {
-            if (layer >= LayersCount) return Array.Empty<Vector3F>();
+            if (layer >= LayersCount) return defaultMeshLayer;
             
             return Layers[layer];
         }
@@ -156,7 +158,7 @@ namespace Adamantium.Engine.Core.Models
             }
             
             Layers?.Clear();
-            Layers?.Add(Points);
+            Layers?.Add(new MeshLayer(Points, true));
             
             if (updateBoundingBox)
             {
@@ -174,7 +176,7 @@ namespace Adamantium.Engine.Core.Models
             
             Points = points.ToArray();
             Layers?.Clear();
-            Layers?.Add(Points);
+            Layers?.Add(new MeshLayer(Points, true));
             if (updateBoundingBox)
             {
                 CalculateBoundingVolumes();

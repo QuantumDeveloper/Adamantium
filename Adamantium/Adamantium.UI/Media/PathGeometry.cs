@@ -93,14 +93,7 @@ public class PathGeometry : Geometry
             var polygonItem = new PolygonItem(figure.Points);
             figureToPolygon[figure] = polygonItem;
             var outlinePoints = figure.Points.ToArray();
-            if (figure.IsClosed)
-            {
-                outlines[figure] = outlinePoints;
-            }
-            else
-            {
-                outlines[figure] = outlinePoints[0..^1];
-            }
+            outlines[figure] = outlinePoints;
         }
         
         var polygon = new Polygon();
@@ -116,7 +109,7 @@ public class PathGeometry : Geometry
 
         foreach (var outline in outlines)
         {
-            OutlineMesh.AddLayer(outline.Value);
+            OutlineMesh.AddLayer(outline.Value, outline.Key.IsClosed);
         }
     }
 }

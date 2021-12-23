@@ -46,8 +46,8 @@ public class StrokeGeometry : Geometry
       var strokes = new List<Vector3F>();
       for (var i = 0; i < geometry.OutlineMesh.Layers.Count; i++)
       {
-         var points = geometry.OutlineMesh.GetLayer(i);
-         strokes.AddRange(GenerateStroke(points)); 
+         var layer = geometry.OutlineMesh.GetLayer(i);
+         strokes.AddRange(GenerateStroke(layer.Points, layer.IsGeometryClosed)); 
       }
 
       Mesh.SetPoints(strokes);
@@ -58,7 +58,7 @@ public class StrokeGeometry : Geometry
       bounds = geometry.Bounds.Inflate(pen.Thickness);
    }
 
-   private List<Vector3F> GenerateStroke(Vector3F[] points)
+   private List<Vector3F> GenerateStroke(Vector3F[] points, bool isGeometryClosed)
    {
       if (points == null || points.Length == 0) return new List<Vector3F>();
          
@@ -94,11 +94,11 @@ public class StrokeGeometry : Geometry
          
       if (pen.DashStrokeArray == null || pen.DashStrokeArray.Count == 0)
       {
-         polygonItems = GenerateStroke(points, pen, geometry.IsClosed, zeroLineDir);
+         polygonItems = GenerateStroke(points, pen, isGeometryClosed, zeroLineDir);
       }
       else
       {
-         polygonItems = GenerateDashes(points, pen, geometry.IsClosed);
+         polygonItems = GenerateDashes(points, pen, isGeometryClosed);
       }
 
       var vertices = new List<Vector3F>();
