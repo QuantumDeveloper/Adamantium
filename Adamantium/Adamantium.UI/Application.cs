@@ -218,6 +218,7 @@ namespace Adamantium.UI
             }
             catch (Exception ex)
             {
+                Console.WriteLine(ex);
                 UnhandledException?.Invoke(this, new UnhandledExceptionEventArgs(ex));
             }
         }

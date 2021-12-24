@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using Enumerable = System.Linq.Enumerable;
 
@@ -855,6 +856,148 @@ namespace Adamantium.Mathematics
 
             return curvePoints;
         }
+        
+        public static Vector2[] GetNurbsCurve(IEnumerable<Vector2> points, int degree, bool isUniform, double stepSize)
+    {
+        var result = new List<Vector2>();
+        var hash = new HashSet<Vector2>();
+        var pointsArray = points as Vector2[] ?? points.ToArray();
+        
+        var knots = CalculateKnots(degree, pointsArray.Length, isUniform);
+
+        for (double i = 0; i < 1; i += stepSize)
+        {
+            var point = RationalBSplinePoint(pointsArray, degree, knots, i);
+            if (!hash.Contains(point))
+            {
+                hash.Add(point);
+                result.Add(point);
+            }
+        }
+
+        return result.ToArray();
+    }
+    
+    private static Vector2 RationalBSplinePoint(Vector2[] points, int degree, double[] knots, double t)
+    {
+        double x = 0, y = 0;
+        double rationalWeight = 0d;
+
+        for (int i = 0; i < points.Length; i++)
+        {
+            double temp = Nip(i, degree, knots, t);
+            rationalWeight += temp;
+        }
+
+        for (int i = 0; i < points.Length; i++)
+        {
+            double temp = Nip(i, degree, knots, t);
+            x += points[i].X * temp / rationalWeight;
+            y += points[i].Y * temp / rationalWeight;
+        }
+
+        return new Vector2(x, y);
+    }
+
+    /// <summary>
+    /// This code is translated to C# from the original C++  code given on page 74-75 in "The NURBS Book" by Les Piegl and Wayne Tiller 
+    /// </summary>
+    /// <param name="i">Current control pont</param>
+    /// <param name="p">The piecewise polynomial degree</param>
+    /// <param name="u">The knot vector</param>
+    /// <param name="t">The value of the current curve point. Valid range from 0 <= u <= 1 </param>
+    /// <returns>N_{i,p}(u)</returns>
+    private static double Nip(int i, int p, double[] u, double t)
+    {
+        double[] N = new double[p + 1];
+        double saved, temp;
+
+        int m = u.Length - 1;
+        if ((i == 0 && t == u[0]) || (i == (m - p - 1) && t == u[m]))
+            return 1;
+
+        if (t < u[i] || t >= u[i + p + 1])
+            return 0;
+
+        for (int j = 0; j <= p; j++)
+        {
+            if (t >= u[i + j] && t < u[i + j + 1])
+                N[j] = 1d;
+            else
+                N[j] = 0d;
+        }
+
+        for (int k = 1; k <= p; k++)
+        {
+            if (N[0] == 0)
+                saved = 0d;
+            else
+                saved = ((t - u[i]) * N[0]) / (u[i + k] - u[i]);
+
+            for (int j = 0; j < p - k + 1; j++)
+            {
+                double Uleft = u[i + j + 1];
+                double Uright = u[i + j + k + 1];
+
+                if (N[j + 1] == 0)
+                {
+                    N[j] = saved;
+                    saved = 0d;
+                }
+                else
+                {
+                    temp = N[j + 1] / (Uright - Uleft);
+                    N[j] = saved + (Uright - t) * temp;
+                    saved = (t - Uleft) * temp;
+                }
+            }
+        }
+        return N[0];
+    }
+    private static double[] CalculateKnots(int degree, int controlPointCount, bool isUniform)
+    {
+        if (degree + 1 > controlPointCount || controlPointCount == 0)
+            return Array.Empty<double>();
+
+        int n = controlPointCount;
+        int m = n + degree + 1;
+        int divisor = m - 1 - 2 * degree;
+
+        var knots = new List<Double>();
+
+        if (isUniform)
+        {
+            knots.Add(0);
+            for (int i = 1; i < m; i++)
+            {
+                if (i >= m - 1)
+                    knots.Add(1);
+                else
+                {
+                    double dividend = m-1;
+                    knots.Add(i/dividend);
+                }
+            }
+        }
+        else
+        {
+            knots.Add(0);
+            for (int i = 1; i < m; i++)
+            {
+                if (i <= degree)
+                    knots.Add(0);
+                else if (i >= m - degree - 1)
+                    knots.Add(1);
+                else
+                {
+                    double dividend = i - degree;
+                    knots.Add(dividend/divisor);
+                }
+            }
+        }
+
+        return knots.ToArray();
+    }
 
         public static List<Vector2> GetQuadraticBezier(Vector2 start, Vector2 control, Vector2 end, uint sampleRate)
         {

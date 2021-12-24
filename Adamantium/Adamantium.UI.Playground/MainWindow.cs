@@ -117,12 +117,15 @@ namespace Adamantium.UI.Playground
             //pathFigure.Segments.Add(lineSegment);
             //pathFigure.Segments.Add(arcSegment);
 
-            var bSplineSegment = new BSplineSegment();
+            var bSplineSegment = new NurbsSegment();
             bSplineSegment.Points = new PointsCollection();
             bSplineSegment.Points.Add(new Vector2(150, 100));
             bSplineSegment.Points.Add(new Vector2(250, 350));
             bSplineSegment.Points.Add(new Vector2(270, 300));
             bSplineSegment.Points.Add(new Vector2(290, 390));
+            bSplineSegment.IsUniform = false;
+            bSplineSegment.UseCustomDegree = true;
+            bSplineSegment.CustomDegree = 5;
             pathFigure.Segments.Add(bSplineSegment);
             lineSegment = new LineSegment();
             lineSegment.Point = new Vector2(300, 200);
@@ -180,29 +183,33 @@ namespace Adamantium.UI.Playground
                 // ++polygon.StrokeDashOffset;
                 // Console.WriteLine($"OFFSET: {polygon.StrokeDashOffset}");
                 arcSegment.RotationAngle++;
+                var geom = path.Data as PathGeometry;
+                var nurbs = geom.Figures[0].Segments[0] as NurbsSegment;
+                nurbs.IsUniform = true;
             }
 
             if (e.Key == Key.DownArrow)
             {
                 arcSegment.RotationAngle--;
-                // --polygon.StrokeDashOffset;
-                // Console.WriteLine($"OFFSET: {polygon.StrokeDashOffset}");
+                var geom = path.Data as PathGeometry;
+                var nurbs = geom.Figures[0].Segments[0] as NurbsSegment;
+                nurbs.IsUniform = false;
             }
 
             if (e.Key == Key.LeftArrow)
             {
                 //polygon.FillRule = FillRule.EvenOdd;
-                // var geom = path.Data as PathGeometry;
-                // var segment = new CubicBezierSegment();
-                // segment.ControlPoint1 = new Vector2(100, 200);
-                // segment.ControlPoint2 = new Vector2(200, 100);
-                // segment.Point = new Vector2(10, 10);
-                // geom.Figures[0].Segments.Add(segment);
+                var geom = path.Data as PathGeometry;
+                var nurbs = geom.Figures[0].Segments[0] as NurbsSegment;
+                nurbs.CustomDegree--;
             }
 
             if (e.Key == Key.RightArrow)
             {
                 polygon.FillRule = FillRule.NonZero;
+                var geom = path.Data as PathGeometry;
+                var nurbs = geom.Figures[0].Segments[0] as NurbsSegment;
+                nurbs.CustomDegree++;
             }
         }
     }
