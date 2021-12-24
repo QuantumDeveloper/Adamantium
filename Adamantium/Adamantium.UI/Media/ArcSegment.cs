@@ -73,89 +73,86 @@ public class ArcSegment : PathSegment
             Size.Height, 
             RotationAngle, 
             IsLargeArc,
-            SweepDirection == SweepDirection.Clockwise, 
+            SweepDirection == SweepDirection.CounterClockwise, 
             tessellationFactor);
     }
 
     private Vector2[] GetArcPoints(Vector2 pt1, Vector2 pt2,
         double radiusX, double radiusY, double rotationAngle,
-        bool isLargeArc, bool isClockwise,
+        bool isLargeArc, bool isCounterclockwise,
         double tolerance)
     {
-        if (radiusX == 0 || radiusY == 0) return new[] { pt1, pt2 };
+        var points = new List<Vector2>();
+
+        // Adjust for different radii and rotation angle
+        var rotation = Matrix3x2.Rotation(-MathHelper.DegreesToRadians(rotationAngle));
+        var scale = Matrix3x2.Scaling(radiusY / radiusX, 1);
+        var transform = rotation * scale;
+        pt1 = Matrix3x2.TransformPoint(transform, pt1);
+        pt2 = Matrix3x2.TransformPoint(transform, pt2);
 
         // Get info about chord that connects both points
-        var midPoint = (pt1 + pt2) / 2;
-        var direction = pt2 - pt1;
-        double halfChord = direction.Length() / 2;
+        var midPoint = new Vector2((pt1.X + pt2.X) / 2.0, (pt1.Y + pt2.Y) / 2.0);
+        var chord = pt2 - pt1;
+        var halfChord = chord.Length() / 2.0;
 
-        if (radiusX < halfChord)
+        if (radiusY < halfChord)
         {
-            radiusY = radiusY / radiusX * halfChord;
-            radiusX = halfChord;
+          var radiusRatio = radiusY / radiusX;
+          radiusY = halfChord;
+          radiusX = radiusY * radiusRatio;
         }
 
-        var radius = new Vector2(radiusX, radiusY);
-        
         // Get vector from chord to center
-        Vector2 vectRotated;
+        var chordNormal = isLargeArc == isCounterclockwise ? new Vector2(-chord.Y, chord.X) : new Vector2(chord.Y, -chord.X);
 
-        if (isLargeArc && isClockwise)
-            vectRotated = new Vector2(direction.Y, -direction.X);
-        else
-            vectRotated = new Vector2(-direction.Y, direction.X);
-
-        vectRotated.Normalize();
-        
-        direction.Normalize();
+        chordNormal.Normalize();
 
         // Distance from chord to center 
-        double centerDistance = Math.Sqrt(radiusY * radiusY - halfChord * halfChord);
+        var centerDistance = Math.Sqrt(radiusY * radiusY - halfChord * halfChord);
 
-        Vector2 center = midPoint;
-        
         // Calculate center point
-        //center = midPoint + centerDistance * vectRotated;
+        var center = midPoint + centerDistance * chordNormal;
 
         // Get angles from center to the two points
-        double angle1 = Math.Atan2(pt1.Y - center.Y, pt1.X - center.X);
-        double angle2 = Math.Atan2(pt2.Y - center.Y, pt2.X - center.X);
+        var angle1 = Math.Atan2(pt1.Y - center.Y, pt1.X - center.X);
+        var angle2 = Math.Atan2(pt2.Y - center.Y, pt2.X - center.X);
 
-        if (isLargeArc && (Math.Abs(angle2 - angle1) <= Math.PI))
+        if (Math.Abs(angle2 - angle1) < Math.PI)
         {
-            if (angle1 < angle2)
-                angle1 += 2 * Math.PI;
-            else
-                angle2 += 2 * Math.PI;
+            if (isLargeArc)
+            {
+                if (angle1 < angle2) angle1 += 2 * Math.PI;
+                else angle2 += 2 * Math.PI;
+            }
         }
+        else if (Math.Abs(angle2 - angle1) == Math.PI)
+        {
+            if (isCounterclockwise) (angle1, angle2) = (angle2, angle1);
+            else
+            {
+                if (angle1 < angle2) angle1 += 2 * Math.PI;
+                else angle2 += 2 * Math.PI;
+            }
+        }
+
+        // Invert matrix for final point calculation
+        transform.Invert();
 
         // Calculate number of points for polyline approximation
-        int max = (int)((4 * (radius.X + radius.Y) * Math.Abs(angle2 - angle1) / (2 * Math.PI)) / tolerance);
+        var max = (int)((4 * (radiusX + radiusY) * Math.Abs(angle2 - angle1) / (2 * Math.PI)) / tolerance);
 
-        var points = new List<Vector2>();
-        for (int i = 0; i <= max; i++)
+        // Loop through the points
+        for (var i = 0; i <= max; i++)
         {
-            double angle = ((max - i) * angle1 + i * angle2) / max;
-            double x = center.X - radius.X * Math.Cos(angle);
-            double y = center.Y - radius.Y * Math.Sin(angle);
-        
+            var angle = ((max - i) * angle1 + i * angle2) / max;
+            var x = center.X + radiusY * Math.Cos(angle);
+            var y = center.Y + radiusY * Math.Sin(angle);
+
             // Transform the point back
-            var pt = new Vector3(x, y, 0);
-            //var pt = Vector3.TransformCoordinate(new Vector3(x, y, 0), matrix);
-            points.Add(Vector2.Round((Vector2)pt, 2));
+            var pt = Matrix3x2.TransformPoint(transform, new Vector2(x, y));
+            points.Add(pt);
         }
-
-        var rect = Rect.FromPoints(points);
-        var matrix = Matrix4x4.Translation(new Vector3(-rect.X, -rect.Bottom , 0)) * Matrix4x4.RotationX(MathHelper.DegreesToRadians(-rotationAngle)) * Matrix4x4.Translation(new Vector3(rect.X, rect.Bottom , 0));
-        for (int i = 0; i < points.Count; i++)
-        {
-            points[i] = (Vector2)Vector3.TransformCoordinate((Vector3)points[i], matrix);
-        }
-
-        // foreach (var point in result.Points)
-        // {
-        //     points.Add((Vector2)point);
-        // }
         
         return points.ToArray();
     }
