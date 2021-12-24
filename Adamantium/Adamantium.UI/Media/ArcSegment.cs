@@ -136,8 +136,8 @@ public class ArcSegment : PathSegment
         for (int i = 0; i <= max; i++)
         {
             double angle = ((max - i) * angle1 + i * angle2) / max;
-            double x = center.X + radius.X * Math.Cos(angle);
-            double y = center.Y + radius.Y * Math.Sin(angle);
+            double x = center.X - radius.X * Math.Cos(angle);
+            double y = center.Y - radius.Y * Math.Sin(angle);
         
             // Transform the point back
             var pt = new Vector3(x, y, 0);
