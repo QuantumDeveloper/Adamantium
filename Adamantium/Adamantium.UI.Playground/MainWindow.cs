@@ -99,7 +99,7 @@ namespace Adamantium.UI.Playground
             var pathGeometry = new PathGeometry(path.GetPen());
             pathGeometry.IsClosed = false;
             var pathFigure = new PathFigure();
-            pathFigure.StartPoint = new Vector2(200, 350);
+            pathFigure.StartPoint = new Vector2(200, 250);
             pathFigure.Segments = new PathSegmentCollection();
             // var segment = new PolylineSegment();
             // segment.Points = new PointsCollection();
@@ -107,15 +107,20 @@ namespace Adamantium.UI.Playground
             // segment.Points.Add(new Vector2(200, 100));
             // pathFigure.Segments.Add(segment);
             var lineSegment = new LineSegment();
-            lineSegment.Point = new Vector2(200, 350);
+            lineSegment.Point = new Vector2(800, 800);
             arcSegment = new ArcSegment();
-            arcSegment.Point = new Vector2(400, 150);
-            arcSegment.Size = new Size(1, 2);
+            arcSegment.Point = new Vector2(300, 270);
+            arcSegment.Size = new Size(100, 50);
             arcSegment.RotationAngle = 0;
             arcSegment.IsLargeArc = true;
-            arcSegment.SweepDirection = SweepDirection.CounterClockwise;
+            arcSegment.SweepDirection = SweepDirection.Clockwise;
+            
+            var lineSegment2 = new LineSegment();
+            lineSegment.Point = new Vector2(1000, 850);
+            
             //pathFigure.Segments.Add(lineSegment);
-            //pathFigure.Segments.Add(arcSegment);
+            pathFigure.Segments.Add(arcSegment);
+            //pathFigure.Segments.Add(lineSegment2);
 
             var bSplineSegment = new NurbsSegment();
             bSplineSegment.Points = new PointsCollection();
@@ -126,13 +131,13 @@ namespace Adamantium.UI.Playground
             bSplineSegment.IsUniform = false;
             bSplineSegment.UseCustomDegree = true;
             bSplineSegment.CustomDegree = 5;
-            pathFigure.Segments.Add(bSplineSegment);
+            //pathFigure.Segments.Add(bSplineSegment);
             lineSegment = new LineSegment();
             lineSegment.Point = new Vector2(300, 200);
             //pathFigure.Segments.Add(lineSegment);
             lineSegment = new LineSegment();
             lineSegment.Point = new Vector2(400, 200);
-            pathFigure.Segments.Add(lineSegment);
+            //pathFigure.Segments.Add(lineSegment);
             
             //segment.Points.Add(new Vector2(205, 50));
             pathGeometry.Figures = new PathFigureCollection();
