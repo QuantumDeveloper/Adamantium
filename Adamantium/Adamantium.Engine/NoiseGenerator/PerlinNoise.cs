@@ -17,12 +17,12 @@ namespace Noise
       public static int mZ;
 
       // gradients' set
-      public static List<Vector3F> gradientSet;
+      public static List<Vector3> gradientSet;
 
       static PerlinNoise()
       {
          permutationTable = new int[permutationTableSize];
-         gradientSet = new List<Vector3F>();
+         gradientSet = new List<Vector3>();
 
          // fill the gradients' set
          for (int x = -1; x <= 1; ++x) // from -1 to 1
@@ -33,7 +33,7 @@ namespace Noise
                {
                   if ((x != 0) || (y != 0) || (z != 0))
                   {
-                     gradientSet.Add(new Vector3F(x, y, z));
+                     gradientSet.Add(new Vector3(x, y, z));
                   }
                }
             }
@@ -63,7 +63,7 @@ namespace Noise
          }
       }
 
-      private static Vector3F GetGradient(int x, int y, int z, bool isLessGradients = false)
+      private static Vector3 GetGradient(int x, int y, int z, bool isLessGradients = false)
       {
          // pick random cell in permutation table (cells 0 to 'permutationTableSize')
          int index = (int)((x * mX) ^ (y * mY) + z * mZ + (mX * mY * mZ)) & (permutationTableSize - 1);
@@ -83,23 +83,23 @@ namespace Noise
 
             switch (index)
             {
-               case 0: return new Vector3F(0, 1, 1);
-               case 1: return new Vector3F(0, 1, -1);
-               case 2: return new Vector3F(0, -1, 1);
-               case 3: return new Vector3F(0, -1, -1);
-               case 4: return new Vector3F(1, 0, 1);
-               case 5: return new Vector3F(1, 0, -1);
-               case 6: return new Vector3F(-1, 0, 1);
-               case 7: return new Vector3F(-1, 0, -1);
-               case 8: return new Vector3F(1, 1, 0);
-               case 9: return new Vector3F(1, -1, 0);
-               case 10: return new Vector3F(-1, 1, 0);
-               default: return new Vector3F(-1, -1, 0);
+               case 0: return new Vector3(0, 1, 1);
+               case 1: return new Vector3(0, 1, -1);
+               case 2: return new Vector3(0, -1, 1);
+               case 3: return new Vector3(0, -1, -1);
+               case 4: return new Vector3(1, 0, 1);
+               case 5: return new Vector3(1, 0, -1);
+               case 6: return new Vector3(-1, 0, 1);
+               case 7: return new Vector3(-1, 0, -1);
+               case 8: return new Vector3(1, 1, 0);
+               case 9: return new Vector3(1, -1, 0);
+               case 10: return new Vector3(-1, 1, 0);
+               default: return new Vector3(-1, -1, 0);
             }
          }
       }
 
-      private static int FastFloor(float d)
+      private static int FastFloor(double d)
       {
          int res = (int)d;
 
@@ -114,9 +114,9 @@ namespace Noise
          return res;
       }
 
-      private static float FastPow(float value, uint pow)
+      private static double FastPow(double value, uint pow)
       {
-         float powOfValue = 1;
+         double powOfValue = 1;
 
          for (uint i = 0; i < pow; ++i)
          {
@@ -126,22 +126,22 @@ namespace Noise
          return powOfValue;
       }
 
-      private static float BlendingCurve(float d)
+      private static double BlendingCurve(double d)
       {
          return (d * d * d * (d * (d * 6.0f - 15.0f) + 10.0f));
       }
 
-      private static float Interpolation(float a, float b, float t)
+      private static double Interpolation(double a, double b, double t)
       {
          return ((1.0f - t) * a + t * b);
       }
 
-      public static float Get3DNoiseValue(Vector3F point)
+      public static double Get3DNoiseValue(Vector3 point)
       {
          return Get3DNoiseValue(point.X, point.Y, point.Z);
       }
 
-      public static float Get3DNoiseValue(float x, float y, float z)
+      public static double Get3DNoiseValue(double x, double y, double z)
       {
          // find unit grid cell containing point
          int floorX = FastFloor(x);
@@ -149,55 +149,55 @@ namespace Noise
          int floorZ = FastFloor(z);
 
          // get relative XYZ coordinates of point in cell
-         float relX = x - floorX;
-         float relY = y - floorY;
-         float relZ = z - floorZ;
+         var relX = x - floorX;
+         var relY = y - floorY;
+         var relZ = z - floorZ;
 
          //gradients of cube vertices
-         Vector3F g000 = GetGradient(floorX, floorY, floorZ);
-         Vector3F g001 = GetGradient(floorX, floorY, floorZ + 1);
-         Vector3F g010 = GetGradient(floorX, floorY + 1, floorZ);
-         Vector3F g011 = GetGradient(floorX, floorY + 1, floorZ + 1);
-         Vector3F g100 = GetGradient(floorX + 1, floorY, floorZ);
-         Vector3F g101 = GetGradient(floorX + 1, floorY, floorZ + 1);
-         Vector3F g110 = GetGradient(floorX + 1, floorY + 1, floorZ);
-         Vector3F g111 = GetGradient(floorX + 1, floorY + 1, floorZ + 1);
+         var g000 = GetGradient(floorX, floorY, floorZ);
+         var g001 = GetGradient(floorX, floorY, floorZ + 1);
+         var g010 = GetGradient(floorX, floorY + 1, floorZ);
+         var g011 = GetGradient(floorX, floorY + 1, floorZ + 1);
+         var g100 = GetGradient(floorX + 1, floorY, floorZ);
+         var g101 = GetGradient(floorX + 1, floorY, floorZ + 1);
+         var g110 = GetGradient(floorX + 1, floorY + 1, floorZ);
+         var g111 = GetGradient(floorX + 1, floorY + 1, floorZ + 1);
 
          // noise contribution from each of the eight corner
-         float n000 = Vector3F.Dot(g000, new Vector3F(relX, relY, relZ));
-         float n100 = Vector3F.Dot(g100, new Vector3F(relX - 1, relY, relZ));
-         float n010 = Vector3F.Dot(g010, new Vector3F(relX, relY - 1, relZ));
-         float n110 = Vector3F.Dot(g110, new Vector3F(relX - 1, relY - 1, relZ));
-         float n001 = Vector3F.Dot(g001, new Vector3F(relX, relY, relZ - 1));
-         float n101 = Vector3F.Dot(g101, new Vector3F(relX - 1, relY, relZ - 1));
-         float n011 = Vector3F.Dot(g011, new Vector3F(relX, relY - 1, relZ - 1));
-         float n111 = Vector3F.Dot(g111, new Vector3F(relX - 1, relY - 1, relZ - 1));
+         var n000 = Vector3.Dot(g000, new Vector3(relX, relY, relZ));
+         var n100 = Vector3.Dot(g100, new Vector3(relX - 1, relY, relZ));
+         var n010 = Vector3.Dot(g010, new Vector3(relX, relY - 1, relZ));
+         var n110 = Vector3.Dot(g110, new Vector3(relX - 1, relY - 1, relZ));
+         var n001 = Vector3.Dot(g001, new Vector3(relX, relY, relZ - 1));
+         var n101 = Vector3.Dot(g101, new Vector3(relX - 1, relY, relZ - 1));
+         var n011 = Vector3.Dot(g011, new Vector3(relX, relY - 1, relZ - 1));
+         var n111 = Vector3.Dot(g111, new Vector3(relX - 1, relY - 1, relZ - 1));
 
          // compute the fade curve value for each x, y, z
-         float u = BlendingCurve(relX);
-         float v = BlendingCurve(relY);
-         float w = BlendingCurve(relZ);
+         var u = BlendingCurve(relX);
+         var v = BlendingCurve(relY);
+         var w = BlendingCurve(relZ);
 
          // interpolate along x the contribution from each of the corners
-         float nx00 = Interpolation(n000, n100, u);
-         float nx01 = Interpolation(n001, n101, u);
-         float nx10 = Interpolation(n010, n110, u);
-         float nx11 = Interpolation(n011, n111, u);
+         var nx00 = Interpolation(n000, n100, u);
+         var nx01 = Interpolation(n001, n101, u);
+         var nx10 = Interpolation(n010, n110, u);
+         var nx11 = Interpolation(n011, n111, u);
 
          // interpolate the four results along y
-         float nxy0 = Interpolation(nx00, nx10, v);
-         float nxy1 = Interpolation(nx01, nx11, v);
+         double nxy0 = Interpolation(nx00, nx10, v);
+         double nxy1 = Interpolation(nx01, nx11, v);
 
          // interpolate the two last results along z
-         float nxyz = Interpolation(nxy0, nxy1, w);
+         double nxyz = Interpolation(nxy0, nxy1, w);
 
          return nxyz;
       }
 
       // w = pers
-      public static float GetMultioctave3DNoiseValue(Vector3F point, Vector4F modifiers, uint startOctaveNumber, uint octaveCount)
+      public static double GetMultioctave3DNoiseValue(Vector3 point, Vector4 modifiers, uint startOctaveNumber, uint octaveCount)
       {
-         float res = 0;
+         double res = 0;
          
          for (uint i = startOctaveNumber; i < (startOctaveNumber + octaveCount); ++i)
          {
@@ -209,23 +209,23 @@ namespace Noise
          return res;
       }
 
-      public static float GetMultioctave3DNoiseValueFromSphere(Vector3F point, Vector4F modifiers, uint startOctaveNumber, uint octaveCount, uint radius)
+      public static double GetMultioctave3DNoiseValueFromSphere(Vector3F point, Vector4 modifiers, uint startOctaveNumber, uint octaveCount, uint radius)
       {
          // convert to sphere coordinates
-         float d = FastPow(point.X, 2) + FastPow(point.Y, 2) + FastPow(point.Z, 2);
+         double d = FastPow(point.X, 2) + FastPow(point.Y, 2) + FastPow(point.Z, 2);
 
-         d = (float)Math.Sqrt(d);
+         d = Math.Sqrt(d);
 
-         float zd = point.Z / d;
+         double zd = point.Z / d;
 
-         float theta = (float)Math.Acos(zd);
-         float phi = (float)Math.Atan2(point.Y, point.X);
+         double theta = Math.Acos(zd);
+         double phi = Math.Atan2(point.Y, point.X);
 
-         float sx = radius * (float)Math.Sin(theta) * (float)Math.Cos(phi);
-         float sy = radius * (float)Math.Sin(theta) * (float)Math.Sin(phi);
-         float sz = radius * (float)Math.Cos(theta);
+         double sx = radius * Math.Sin(theta) * Math.Cos(phi);
+         double sy = radius * Math.Sin(theta) * Math.Sin(phi);
+         double sz = radius * Math.Cos(theta);
 
-         Vector3F spherePoint = new Vector3F(sx, sy, sz);
+         var spherePoint = new Vector3(sx, sy, sz);
 
          return GetMultioctave3DNoiseValue(spherePoint, modifiers, startOctaveNumber, octaveCount);
       }
@@ -234,14 +234,14 @@ namespace Noise
 
 //private void generateButton_Click(object sender, RoutedEventArgs e)
 //{
-//   rawtile = new List<float[,]>();
+//   rawtile = new List<double[,]>();
 //   size = Convert.ToInt32(powOf2TextBox.Text);
 //   int half_size = size / 2;
 //   pow = (int)Math.Floor(Math.Log(size, 2));
 
 //   for (int i = 0; i < plainCnt; ++i)
 //   {
-//      rawtile.Add(new float[size, size]);
+//      rawtile.Add(new double[size, size]);
 //   }
 
 //   var watch = System.Diagnostics.Stopwatch.StartNew();

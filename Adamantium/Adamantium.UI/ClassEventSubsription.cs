@@ -1,9 +1,8 @@
 ﻿using System;
 
-namespace Adamantium.UI
+namespace Adamantium.UI;
+
+internal class ClassEventSubsription : EventSubscription
 {
-   internal class ClassEventSubsription : EventSubscription
-   {
-      public Type TargetType { get; set; }
-   }
+   public Type TargetType { get; set; }
 }

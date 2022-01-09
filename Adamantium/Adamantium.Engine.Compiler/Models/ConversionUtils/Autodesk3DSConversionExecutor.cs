@@ -1,7 +1,7 @@
 ﻿using Adamantium.Engine.Compiler.Converter.Configs;
 using Adamantium.Engine.Core.Models;
 
-namespace Adamantium.Engine.Compiler.Converter.ConversionUtils
+namespace Adamantium.Engine.Compiler.Models.ConversionUtils
 {
    internal class Autodesk3DSConversionExecutor:ConversionExecutorBase
    {

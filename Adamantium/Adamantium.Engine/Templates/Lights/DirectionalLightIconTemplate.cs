@@ -11,7 +11,7 @@ namespace Adamantium.Engine.Templates.Lights
         public override Entity BuildEntity(Entity owner, string name)
         {
             int tessellation = 20;
-            var diameter = new Vector2F(0.4f);
+            var diameter = new Vector2(0.4);
 
             float height = 0.1f;
             float raySize = 0.3f;
@@ -27,17 +27,17 @@ namespace Adamantium.Engine.Templates.Lights
                 height,
                 new CornerRadius(height / 2), 
                 tessellation,
-                Matrix4x4F.Translation(new Vector3F((raySize / 2) + 0.3f, 0, 0)));
+                Matrix4x4.Translation(new Vector3((raySize / 2) + 0.3f, 0, 0)));
             for (int i = 0; i < 8; i++)
             {
-                meshes.Add(ray.Clone(Matrix4x4F.RotationZ(MathHelper.DegreesToRadians(angle))));
+                meshes.Add(ray.Clone(Matrix4x4.RotationZ(MathHelper.DegreesToRadians(angle))));
                 angle += angleItem;
             }
 
             MergeInstance[] instances = new MergeInstance[meshes.Count];
             for (int i = 0; i < instances.Length; i++)
             {
-                var inst = new MergeInstance(meshes[i], Matrix4x4F.Identity, false);
+                var inst = new MergeInstance(meshes[i], Matrix4x4.Identity, false);
                 instances[i] = inst;
             }
 

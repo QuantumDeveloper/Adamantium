@@ -202,8 +202,7 @@ namespace Adamantium.Engine.Services
                 foreach (var light in lights)
                 {
                     var transform = light.Owner.Transform.GetMetadata(camera);
-                    Vector3F point;
-                    var billboard = Matrix4x4F.BillboardLH(transform.RelativePosition, Vector3F.Zero, transform.WorldMatrix.Up, camera.Forward);
+                    var billboard = Matrix4x4F.BillboardLH(transform.RelativePosition, Vector3F.Zero, transform.WorldMatrixF.Up, camera.Forward);
                     var rotation = MathHelper.GetRotationFromMatrix(billboard);
                     var world = Matrix4x4F.RotationQuaternion(rotation) * Matrix4x4F.Translation(transform.RelativePosition);
                     var ray = Collisions.CalculateRay(cursorPosition, camera, world, projectionMatrix, true);
@@ -211,10 +210,11 @@ namespace Adamantium.Engine.Services
                     var collision = GetColliderForLightType(light);
                     if (collision != null)
                     {
+                        Vector3F point;
                         var intersects = collision.Intersects(ref ray, out point);
                         if (intersects)
                         {
-                            collisionResult.ValidateAndSetValues(light.Owner, point, true);
+                            collisionResult.ValidateAndSetValues(light.Owner, (Vector3)point, true);
                         }
                     }
                 }

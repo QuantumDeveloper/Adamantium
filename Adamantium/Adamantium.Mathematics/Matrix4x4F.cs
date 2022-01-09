@@ -3244,6 +3244,27 @@ namespace Adamantium.Mathematics
             return !left.Equals(ref right);
         }
 
+        public static explicit operator Matrix4x4(Matrix4x4F matrixF)
+        {
+            return new Matrix4x4(
+                matrixF.M11, 
+                matrixF.M12, 
+                matrixF.M13, 
+                matrixF.M14, 
+                matrixF.M21, 
+                matrixF.M22, 
+                matrixF.M23,
+                matrixF.M24, 
+                matrixF.M31, 
+                matrixF.M32, 
+                matrixF.M33, 
+                matrixF.M34, 
+                matrixF.M41, 
+                matrixF.M42, 
+                matrixF.M43,
+                matrixF.M44);
+        }
+
         /// <summary>
         /// Returns a <see cref="System.String"/> that represents this instance.
         /// </summary>

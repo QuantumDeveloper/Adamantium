@@ -1,28 +1,27 @@
 using System.Collections.Generic;
 
-namespace Adamantium.UI.Rendering
+namespace Adamantium.UI.Rendering;
+
+internal class UIPresentationContainer
 {
-    internal class UIPresentationContainer
+    public List<UIPresentationItem> Items { get; }
+
+    public UIPresentationContainer()
     {
-        public List<UIPresentationItem> Items { get; }
+        Items = new List<UIPresentationItem>();
+    }
 
-        public UIPresentationContainer()
-        {
-            Items = new List<UIPresentationItem>();
-        }
-
-        public void AddItem(UIPresentationItem item)
-        {
-            Items.Add(item);
-        }
+    public void AddItem(UIPresentationItem item)
+    {
+        Items.Add(item);
+    }
         
-        public void DisposeAndClearItems()
+    public void DisposeAndClearItems()
+    {
+        for (int i = 0; i < Items.Count; i++)
         {
-            for (int i = 0; i < Items.Count; i++)
-            {
-                Items[i].Dispose();
-            }
-            Items.Clear();
+            Items[i].Dispose();
         }
+        Items.Clear();
     }
 }

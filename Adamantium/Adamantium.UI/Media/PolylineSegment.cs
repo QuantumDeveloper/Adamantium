@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Collections.Specialized;
 using Adamantium.UI.Controls;
 using Adamantium.UI.RoutedEvents;
@@ -6,6 +7,17 @@ namespace Adamantium.UI.Media;
 
 public class PolylineSegment : PathSegment
 {
+    public PolylineSegment()
+    {
+        
+    }
+
+    public PolylineSegment(IEnumerable<Vector2> points, bool isStroked)
+    {
+        Points = new PointsCollection(points);
+        IsStroked = isStroked;
+    }
+    
     public static readonly AdamantiumProperty PointsProperty =
         AdamantiumProperty.Register(nameof(Points), typeof(PointsCollection), typeof(PolylineSegment),
             new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure, PointsChangedCallback));

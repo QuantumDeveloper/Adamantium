@@ -13,9 +13,9 @@ namespace Adamantium.Engine.Graphics
             public static Shape New(
                 GraphicsDevice device,
                 GeometryType geometryType,
-                Vector2F diameter,
+                Vector2 diameter,
                 int tessellation = 36,
-                Matrix4x4F? transform = null)
+                Matrix4x4? transform = null)
             {
                 var geometry = GenerateGeometry(geometryType, diameter, tessellation, transform);
                 return new Shape(device, geometry);
@@ -23,9 +23,9 @@ namespace Adamantium.Engine.Graphics
 
             public static Mesh GenerateGeometry(
                 GeometryType geometryType,
-                Vector2F diameter,
+                Vector2 diameter,
                 int tessellation = 40,
-                Matrix4x4F? transform = null)
+                Matrix4x4? transform = null)
             {
                 if (tessellation < 3)
                 {
@@ -49,21 +49,21 @@ namespace Adamantium.Engine.Graphics
 
             private static Mesh GenerateSolidGeometry(Vector2F diameter, int tessellation = 36)
             {
-                List<Vector3F> vertices = new List<Vector3F>();
-                List<Vector2F> uvs = new List<Vector2F>();
-                List<int> indices = new List<int>();
-                Vector3F center = Vector3F.Zero;
+                var vertices = new List<Vector3>();
+                var uvs = new List<Vector2F>();
+                var indices = new List<int>();
+                var center = Vector3.Zero;
 
                 for (int i = 0; i < tessellation; ++i)
                 {
                     float angle = (float)Math.PI * 2 / tessellation * i;
 
-                    float x = center.X + diameter.X * (float)Math.Cos(angle);
-                    float y = center.Y + diameter.Y * (float)Math.Sin(angle);
-                    vertices.Add(new Vector3F(x, y, 0));
+                    var x = center.X + diameter.X * (float)Math.Cos(angle);
+                    var y = center.Y + diameter.Y * (float)Math.Sin(angle);
+                    vertices.Add(new Vector3(x, y, 0));
                     var uv = new Vector2F(
-                       0.5f + (center.X - x) / (2 * diameter.X),
-                       0.5f + (center.Y - y) / (2 * diameter.Y));
+                       0.5f + (float)((center.X - x) / (2 * diameter.X)),
+                       0.5f + (float)((center.Y - y) / (2 * diameter.Y)));
                     uvs.Add(uv);
                 }
 
@@ -90,19 +90,18 @@ namespace Adamantium.Engine.Graphics
                 Vector2F diameter,
                 int tessellation = 36)
             {
-
-                List<Vector3F> vertices = new List<Vector3F>();
-                List<int> indices = new List<int>();
-                Vector3F center = Vector3F.Zero;
+                var vertices = new List<Vector3>();
+                var indices = new List<int>();
+                var center = Vector3.Zero;
                 int lastIndex = 0;
 
                 for (int i = 0; i <= tessellation; ++i)
                 {
                     float angle = (float)Math.PI * 2 / tessellation * i;
 
-                    float x = center.X + diameter.X * (float)Math.Cos(angle);
-                    float y = center.Y + diameter.Y * (float)Math.Sin(angle);
-                    vertices.Add(new Vector3F(x, y, 0));
+                    var x = center.X + diameter.X * (float)Math.Cos(angle);
+                    var y = center.Y + diameter.Y * (float)Math.Sin(angle);
+                    vertices.Add(new Vector3(x, y, 0));
                     indices.Add(lastIndex++);
                 }
 

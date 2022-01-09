@@ -10,10 +10,10 @@ namespace Adamantium.Engine.Templates.Lights
     {
         public override Entity BuildEntity(Entity owner, string name)
         {
-            var ellipse = Shapes.Ellipse.GenerateGeometry(GeometryType.Outlined, EllipseType.EdgeToEdge, new Vector2F(2), 0, 360, true, 40);
+            var ellipse = Shapes.Ellipse.GenerateGeometry(GeometryType.Outlined, EllipseType.EdgeToEdge, new Vector2(2), 0, 360, true, 40);
 
             var indices = new List<int>();
-            List<Vector3F> directions = new List<Vector3F>();
+            var directions = new List<Vector3>();
             int lastIndex = 0;
             for (int i = 0; i < ellipse.Points.Length - 1; i++)
             {
@@ -21,7 +21,7 @@ namespace Adamantium.Engine.Templates.Lights
                     continue;
 
                 var lineStart = ellipse.Points[i];
-                var lineEnd = lineStart + Vector3F.ForwardRH * 3;
+                var lineEnd = lineStart + Vector3.ForwardRH * 3;
                 directions.Add(lineStart);
                 directions.Add(lineEnd);
                 indices.Add(lastIndex++);
@@ -31,7 +31,7 @@ namespace Adamantium.Engine.Templates.Lights
             var directionsMesh = new Mesh();
             directionsMesh.SetPoints(directions);
             directionsMesh.SetIndices(indices);
-            MergeInstance instance = new MergeInstance(directionsMesh, Matrix4x4F.Identity, false);
+            MergeInstance instance = new MergeInstance(directionsMesh, Matrix4x4.Identity, false);
             ellipse.Merge(new[] { instance });
 
             return BuildSubEntity(owner, name, Colors.Yellow, ellipse, BoundingVolume.OrientedBox);

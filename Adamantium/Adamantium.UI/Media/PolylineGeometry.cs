@@ -39,7 +39,7 @@ public class PolylineGeometry : Geometry
         bounds = Rect.FromPoints(Points);
     }
 
-    protected internal override void ProcessGeometry()
+    protected internal override void ProcessGeometryCore()
     {
         OutlineMesh.SetPoints(Points);
     }

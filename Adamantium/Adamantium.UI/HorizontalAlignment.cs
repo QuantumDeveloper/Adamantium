@@ -1,10 +1,9 @@
-﻿namespace Adamantium.UI
+﻿namespace Adamantium.UI;
+
+public enum HorizontalAlignment
 {
-   public enum HorizontalAlignment
-   {
-      Center = 0,
-      Left = 1,
-      Right = 2,
-      Stretch = 3
-   }
+   Center = 0,
+   Left = 1,
+   Right = 2,
+   Stretch = 3
 }

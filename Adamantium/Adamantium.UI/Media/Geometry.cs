@@ -1,56 +1,99 @@
 ﻿using System;
-using Adamantium.Core.Collections;
 using Adamantium.Engine.Core.Models;
 using Adamantium.UI.Controls;
 using Adamantium.UI.RoutedEvents;
 
-namespace Adamantium.UI.Media
+namespace Adamantium.UI.Media;
+
+public abstract class Geometry : AdamantiumComponent
 {
-   public abstract class Geometry : AdamantiumComponent
+   private bool IsProcessed { get; set; }
+      
+   internal Mesh Mesh { get; set; }
+      
+   internal Mesh OutlineMesh { get; set; }
+      
+   protected Int32 TesselationFactor { get; set; }
+
+   public static readonly AdamantiumProperty TransformProperty = AdamantiumProperty.Register(nameof(Transform),
+      typeof(Transform), 
+      typeof(Geometry),
+      new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure, TransformChangedCallback));
+
+   private static void TransformChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
    {
-      internal Mesh Mesh { get; set; }
-      
-      internal Mesh OutlineMesh { get; set; }
-      
-      protected Int32 TesselationFactor { get; set; }
-
-      public static readonly AdamantiumProperty TransformProperty = AdamantiumProperty.Register(nameof(Transform),
-         typeof(Transform), 
-         typeof(Geometry),
-         new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender));
-
-      public Transform Transform
+      if (a is Geometry geometry)
       {
-         get => GetValue<Transform>(TransformProperty);
-         set => SetValue(TransformProperty, value);
-      }
+         if (e.OldValue is Transform transform)
+         {
+            transform.PropertyChanged -= geometry.TransformOnPropertyChanged;
+         }
 
-      public bool IsClosed { get; set; }
-
-      protected Geometry()
-      {
-         Mesh = new Mesh();
-         OutlineMesh = new Mesh();
-         TesselationFactor = 20;
+         if (e.NewValue is Transform transform1)
+         {
+            transform1.PropertyChanged += geometry.TransformOnPropertyChanged;
+         }
       }
+   }
+
+   private void TransformOnPropertyChanged(object? sender, AdamantiumPropertyChangedEventArgs e)
+   {
+      InvalidateGeometry();
+      RaiseComponentUpdated();
+   }
+
+   public Transform Transform
+   {
+      get => GetValue<Transform>(TransformProperty);
+      set => SetValue(TransformProperty, value);
+   }
+
+   public bool IsClosed { get; set; }
+
+   protected Geometry()
+   {
+      Mesh = new Mesh();
+      OutlineMesh = new Mesh();
+      TesselationFactor = 20;
+   }
      
-      public abstract Rect Bounds { get; }
+   public abstract Rect Bounds { get; }
 
-      public abstract Geometry Clone();
+   public abstract Geometry Clone();
 
-      public Boolean IsEmpty()
+   public Boolean IsEmpty()
+   {
+      return Mesh.Points.Length == 0;
+   }
+
+   public abstract void RecalculateBounds();
+
+   protected internal void ProcessGeometry()
+   {
+      if (!IsProcessed)
       {
-         return Mesh.Points.Length == 0;
-      }
-
-      public abstract void RecalculateBounds();
-
-      protected internal abstract void ProcessGeometry();
-
-      protected override void OnPropertyChanged(AdamantiumPropertyChangedEventArgs e)
-      {
-         base.OnPropertyChanged(e);
+         ProcessGeometryCore();
+         if (Transform != null)
+         {
+            var matrix = Transform.Matrix;
+            Mesh.ApplyTransform(matrix);
+            OutlineMesh.ApplyTransform(matrix);
+         }
          RecalculateBounds();
+         IsProcessed = true;
       }
+   }
+
+   public void InvalidateGeometry()
+   {
+      IsProcessed = false;
+   }
+   
+   protected internal abstract void ProcessGeometryCore();
+
+   protected override void OnComponentUpdated()
+   {
+      base.OnComponentUpdated();
+      InvalidateGeometry();
    }
 }

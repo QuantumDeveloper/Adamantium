@@ -113,11 +113,12 @@ namespace Adamantium.Engine.Tools
 
         public abstract void Process(Entity targetEntity, CameraService cameraService, InputService inputService);
 
-        protected bool GetRayPlaneIntersectionPoint(Camera camera, InputService inputService, out Vector3F intersectionPoint)
+        protected bool GetRayPlaneIntersectionPoint(Camera camera, InputService inputService, out Vector3 intersectionPoint)
         {
             var p = new Plane(toolIntersectionResult.IntersectionPoint, camera.Forward);
             var ray = Collisions.CalculateRay(inputService.VirtualPosition, camera, Matrix4x4F.Identity);
-            var intersects = ray.Intersects(ref p, out intersectionPoint);
+            var intersects = ray.Intersects(ref p, out Vector3F interPoint);
+            intersectionPoint = (Vector3)interPoint;
             if (previousCoordinates == intersectionPoint)
             {
                 return false;
@@ -141,7 +142,7 @@ namespace Adamantium.Engine.Tools
         protected virtual void UpdateAxisVisibility(Entity current, Camera camera)
         {
             float dotProduct = 0;
-            var transform = current.GetActualMatrix(camera);
+            var transform = current.GetActualMatrixF(camera);
             if (current.Name == "RightAxisManipulator")
             {
                 dotProduct = Math.Abs(Vector3F.Dot(Vector3F.Normalize(transform.Right), camera.Forward));

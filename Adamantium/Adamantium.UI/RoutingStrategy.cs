@@ -1,9 +1,8 @@
-﻿namespace Adamantium.UI
+﻿namespace Adamantium.UI;
+
+public enum RoutingStrategy
 {
-   public enum RoutingStrategy
-   {
-      Tunnel = 0,
-      Bubble = 1,
-      Direct = 2
-   }
+   Tunnel = 0,
+   Bubble = 1,
+   Direct = 2
 }

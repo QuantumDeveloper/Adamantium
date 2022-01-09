@@ -1,13 +1,12 @@
-﻿namespace Adamantium.UI.Input
+﻿namespace Adamantium.UI.Input;
+
+public enum NavigationMethod
 {
-   public enum NavigationMethod
-   {
-      Unspecified,
+   Unspecified,
 
-      Directional,
+   Directional,
 
-      Tab,
+   Tab,
 
-      Mouse,
-   }
+   Mouse,
 }

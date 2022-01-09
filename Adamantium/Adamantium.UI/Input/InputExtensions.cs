@@ -3,109 +3,108 @@ using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Mathematics;
 
-namespace Adamantium.UI.Input
+namespace Adamantium.UI.Input;
+
+public static class InputExtensions
 {
-   public static class InputExtensions
+   public static IInputElement HitTest(this IInputElement root, Vector2 p)
    {
-      public static IInputElement HitTest(this IInputElement root, Vector2 p)
+      return root.GetInputElementsAt(p).FirstOrDefault();
+   }
+
+   public static IEnumerable<IInputElement> GetInputElementsAt(this IInputElement root, Vector2 p)
+   {
+         
+      List<IInputElement> elements = new List<IInputElement>();
+      Stack<IInputElement> stack = new Stack<IInputElement>();
+
+      stack.Push((UIComponent)root);
+
+      while (stack.Count > 0)
       {
-         return root.GetInputElementsAt(p).FirstOrDefault();
-      }
+         var current = stack.Pop();
 
-      public static IEnumerable<IInputElement> GetInputElementsAt(this IInputElement root, Vector2 p)
-      {
-         
-         List<IInputElement> elements = new List<IInputElement>();
-         Stack<IInputElement> stack = new Stack<IInputElement>();
-
-         stack.Push((UIComponent)root);
-
-         while (stack.Count > 0)
-         {
-            var current = stack.Pop();
-
-            if (
-               current.ClipRectangle.Contains(p) &&
-               current.Visibility == Visibility.Visible &&
-               current.IsEnabled &&
-               current.IsHitTestVisible)
-            {
-               p -= current.ClipRectangle.Location;
-               
-               if (current.VisualChildren.Any())
-               {
-                  foreach (var child in ZSort(current.VisualChildren.OfType<IInputElement>().Reverse()))
-                  {
-                     if (
-                        child.ClipRectangle.Contains(p) &&
-                        child.Visibility == Visibility.Visible &&
-                        child.IsEnabled &&
-                        child.IsHitTestVisible)
-                     {
-                        stack.Push((UIComponent) child);
-                     }
-                  }
-               }
-               elements.Add(current);
-            }
-         }
-         
-         elements.Reverse();
-         return elements;
-         
-         
-         /*
          if (
-            root.ClipRectangle.Contains(p) &&
-            root.Visibility == Visibility.Visible &&
-            root.IsEnabled &&
-            root.IsHitTestVisible)
+            current.ClipRectangle.Contains(p) &&
+            current.Visibility == Visibility.Visible &&
+            current.IsEnabled &&
+            current.IsHitTestVisible)
          {
-            p -= root.ClipRectangle.Location;
-            if (root.VisualChildren.Any())
+            p -= current.ClipRectangle.Location;
+               
+            if (current.VisualChildren.Any())
             {
-               foreach (var child in ZSort(root.VisualChildren.OfType<IInputElement>()))
+               foreach (var child in ZSort(current.VisualChildren.OfType<IInputElement>().Reverse()))
                {
-                  foreach (var result in child.GetInputElementsAt(p))
+                  if (
+                     child.ClipRectangle.Contains(p) &&
+                     child.Visibility == Visibility.Visible &&
+                     child.IsEnabled &&
+                     child.IsHitTestVisible)
                   {
-                     yield return result;
+                     stack.Push((UIComponent) child);
                   }
                }
             }
-
-            yield return root;
+            elements.Add(current);
          }
-         */
       }
-
-      private static IEnumerable<IInputElement> ZSort(IEnumerable<IInputElement> elements)
+         
+      elements.Reverse();
+      return elements;
+         
+         
+      /*
+      if (
+         root.ClipRectangle.Contains(p) &&
+         root.Visibility == Visibility.Visible &&
+         root.IsEnabled &&
+         root.IsHitTestVisible)
       {
-         return elements.Select((element, index) => new ZOrderedElement
+         p -= root.ClipRectangle.Location;
+         if (root.VisualChildren.Any())
          {
-            Element = element,
-            Index = index,
-            ZIndex = element.ZIndex
-         }).OrderBy(x => x, null).Select(x => x.Element);
+            foreach (var child in ZSort(root.VisualChildren.OfType<IInputElement>()))
+            {
+               foreach (var result in child.GetInputElementsAt(p))
+               {
+                  yield return result;
+               }
+            }
+         }
+
+         yield return root;
       }
+      */
+   }
 
-      private class ZOrderedElement : IComparable<ZOrderedElement>
+   private static IEnumerable<IInputElement> ZSort(IEnumerable<IInputElement> elements)
+   {
+      return elements.Select((element, index) => new ZOrderedElement
       {
-         public IInputElement Element { get; set; }
-         public int Index { get; set; }
-         public int ZIndex { get; set; }
+         Element = element,
+         Index = index,
+         ZIndex = element.ZIndex
+      }).OrderBy(x => x, null).Select(x => x.Element);
+   }
 
-         public int CompareTo(ZOrderedElement other)
+   private class ZOrderedElement : IComparable<ZOrderedElement>
+   {
+      public IInputElement Element { get; set; }
+      public int Index { get; set; }
+      public int ZIndex { get; set; }
+
+      public int CompareTo(ZOrderedElement other)
+      {
+         var z = other.ZIndex - ZIndex;
+
+         if (z != 0)
          {
-            var z = other.ZIndex - ZIndex;
-
-            if (z != 0)
-            {
-               return z;
-            }
-            else
-            {
-               return other.Index - Index;
-            }
+            return z;
+         }
+         else
+         {
+            return other.Index - Index;
          }
       }
    }

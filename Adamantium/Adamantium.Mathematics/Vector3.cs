@@ -558,8 +558,7 @@ namespace Adamantium.Mathematics
         /// <returns>A new <see cref="Vector3"/> containing the 3D Cartesian coordinates of the specified point.</returns>
         public static Vector3 Barycentric(Vector3 value1, Vector3 value2, Vector3 value3, double amount1, double amount2)
         {
-            Vector3 result;
-            Barycentric(ref value1, ref value2, ref value3, amount1, amount2, out result);
+            Barycentric(ref value1, ref value2, ref value3, amount1, amount2, out var result);
             return result;
         }
 
@@ -596,8 +595,7 @@ namespace Adamantium.Mathematics
         /// <returns>The clamped value.</returns>
         public static Vector3 Clamp(Vector3 value, Vector3 min, Vector3 max)
         {
-            Vector3 result;
-            Clamp(ref value, ref min, ref max, out result);
+            Clamp(ref value, ref min, ref max, out var result);
             return result;
         }
 
@@ -623,8 +621,7 @@ namespace Adamantium.Mathematics
         /// <returns>The cross product of the two vectors.</returns>
         public static Vector3 Cross(Vector3 left, Vector3 right)
         {
-            Vector3 result;
-            Cross(ref left, ref right, out result);
+            Cross(ref left, ref right, out var result);
             return result;
         }
 
@@ -811,8 +808,7 @@ namespace Adamantium.Mathematics
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Vector3 Lerp(Vector3 start, Vector3 end, double amount)
         {
-            Vector3 result;
-            Lerp(ref start, ref end, amount, out result);
+            Lerp(ref start, ref end, amount, out var result);
             return result;
         }
 
@@ -838,8 +834,7 @@ namespace Adamantium.Mathematics
         /// <returns>The cubic interpolation of the two vectors.</returns>
         public static Vector3 SmoothStep(Vector3 start, Vector3 end, double amount)
         {
-            Vector3 result;
-            SmoothStep(ref start, ref end, amount, out result);
+            SmoothStep(ref start, ref end, amount, out var result);
             return result;
         }
 
@@ -877,8 +872,7 @@ namespace Adamantium.Mathematics
         /// <returns>The result of the Hermite spline interpolation.</returns>
         public static Vector3 Hermite(Vector3 value1, Vector3 tangent1, Vector3 value2, Vector3 tangent2, double amount)
         {
-            Vector3 result;
-            Hermite(ref value1, ref tangent1, ref value2, ref tangent2, amount, out result);
+            Hermite(ref value1, ref tangent1, ref value2, ref tangent2, amount, out var result);
             return result;
         }
 
@@ -920,8 +914,7 @@ namespace Adamantium.Mathematics
         /// <returns>A vector that is the result of the Catmull-Rom interpolation.</returns>
         public static Vector3 CatmullRom(Vector3 value1, Vector3 value2, Vector3 value3, Vector3 value4, double amount)
         {
-            Vector3 result;
-            CatmullRom(ref value1, ref value2, ref value3, ref value4, amount, out result);
+            CatmullRom(ref value1, ref value2, ref value3, ref value4, amount, out var result);
             return result;
         }
 
@@ -947,8 +940,7 @@ namespace Adamantium.Mathematics
         /// <returns>A vector containing the largest components of the source vectors.</returns>
         public static Vector3 Max(Vector3 left, Vector3 right)
         {
-            Vector3 result;
-            Max(ref left, ref right, out result);
+            Max(ref left, ref right, out var result);
             return result;
         }
 
@@ -975,8 +967,7 @@ namespace Adamantium.Mathematics
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Vector3 Min(Vector3 left, Vector3 right)
         {
-            Vector3 result;
-            Min(ref left, ref right, out result);
+            Min(ref left, ref right, out var result);
             return result;
         }
 
@@ -1014,8 +1005,7 @@ namespace Adamantium.Mathematics
         /// <returns>The vector in screen space.</returns>
         public static Vector3 Project(Vector3 vector, double x, double y, double width, double height, double minZ, double maxZ, Matrix4x4 worldViewProjection)
         {
-            Vector3 result;
-            Project(ref vector, x, y, width, height, minZ, maxZ, ref worldViewProjection, out result);
+            Project(ref vector, x, y, width, height, minZ, maxZ, ref worldViewProjection, out var result);
             return result;
         }
 
@@ -1058,8 +1048,7 @@ namespace Adamantium.Mathematics
         /// <returns>The vector in object space.</returns>
         public static Vector3 Unproject(Vector3 vector, double x, double y, double width, double height, double minZ, double maxZ, Matrix4x4 worldViewProjection)
         {
-            Vector3 result;
-            Unproject(ref vector, x, y, width, height, minZ, maxZ, ref worldViewProjection, out result);
+            Unproject(ref vector, x, y, width, height, minZ, maxZ, ref worldViewProjection, out var result);
             return result;
         }
 
@@ -1092,8 +1081,7 @@ namespace Adamantium.Mathematics
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Vector3 Reflect(Vector3 vector, Vector3 normal)
         {
-            Vector3 result;
-            Reflect(ref vector, ref normal, out result);
+            Reflect(ref vector, ref normal, out var result);
             return result;
         }
 
@@ -1196,7 +1184,7 @@ namespace Adamantium.Mathematics
         /// <param name="vector">The vector to rotate.</param>
         /// <param name="rotation">The <see cref="QuaternionF"/> rotation to apply.</param>
         /// <param name="result">When the method completes, contains the transformed <see cref="Vector4"/>.</param>
-        public static void Transform(ref Vector3 vector, ref QuaternionF rotation, out Vector3 result)
+        public static void Transform(ref Vector3 vector, ref Quaternion rotation, out Vector3 result)
         {
             double x = rotation.X + rotation.X;
             double y = rotation.Y + rotation.Y;
@@ -1223,10 +1211,9 @@ namespace Adamantium.Mathematics
         /// <param name="vector">The vector to rotate.</param>
         /// <param name="rotation">The <see cref="QuaternionF"/> rotation to apply.</param>
         /// <returns>The transformed <see cref="Vector4"/>.</returns>
-        public static Vector3 Transform(Vector3 vector, QuaternionF rotation)
+        public static Vector3 Transform(Vector3 vector, Quaternion rotation)
         {
-            Vector3 result;
-            Transform(ref vector, ref rotation, out result);
+            Transform(ref vector, ref rotation, out var result);
             return result;
         }
 
@@ -1239,7 +1226,7 @@ namespace Adamantium.Mathematics
         /// This array may be the same array as <paramref name="source"/>.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="source"/> or <paramref name="destination"/> is <c>null</c>.</exception>
         /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="destination"/> is shorter in length than <paramref name="source"/>.</exception>
-        public static void Transform(Vector3[] source, ref QuaternionF rotation, Vector3[] destination)
+        public static void Transform(Vector3[] source, ref Quaternion rotation, Vector3[] destination)
         {
             if (source == null)
                 throw new ArgumentNullException("source");
@@ -1303,8 +1290,7 @@ namespace Adamantium.Mathematics
         /// <returns>The transformed <see cref="Vector3"/>.</returns>
         public static Vector3 Transform(Vector3 vector, Matrix3x3F transform)
         {
-            Vector3 result;
-            Transform(ref vector, ref transform, out result);
+            Transform(ref vector, ref transform, out var result);
             return result;
         }
 
@@ -1316,8 +1302,7 @@ namespace Adamantium.Mathematics
         /// <param name="result">When the method completes, contains the transformed <see cref="Vector3"/>.</param>
         public static void Transform(ref Vector3 vector, ref Matrix4x4 transform, out Vector3 result)
         {
-            Vector4 intermediate;
-            Transform(ref vector, ref transform, out intermediate);
+            Transform(ref vector, ref transform, out Vector4 intermediate);
             result = (Vector3)intermediate;
         }
 
@@ -1344,8 +1329,7 @@ namespace Adamantium.Mathematics
         /// <returns>The transformed <see cref="Vector4"/>.</returns>
         public static Vector4 Transform(Vector3 vector, Matrix4x4 transform)
         {
-            Vector4 result;
-            Transform(ref vector, ref transform, out result);
+            Transform(ref vector, ref transform, out Vector4 result);
             return result;
         }
 
@@ -1411,9 +1395,17 @@ namespace Adamantium.Mathematics
         /// </remarks>
         public static Vector3 TransformCoordinate(Vector3 coordinate, Matrix4x4 transform)
         {
-            Vector3 result;
-            TransformCoordinate(ref coordinate, ref transform, out result);
+            TransformCoordinate(ref coordinate, ref transform, out var result);
             return result;
+        }
+
+        public static Vector3 Round(Vector3 vector, int precision)
+        {
+            vector.X = Math.Round(vector.X, precision, MidpointRounding.AwayFromZero);
+            vector.Y = Math.Round(vector.Y, precision, MidpointRounding.AwayFromZero);
+            vector.Z = Math.Round(vector.Z, precision, MidpointRounding.AwayFromZero);
+
+            return vector;
         }
 
         /// <summary>
@@ -1483,8 +1475,7 @@ namespace Adamantium.Mathematics
         /// </remarks>
         public static Vector3 TransformNormal(Vector3 normal, Matrix4x4 transform)
         {
-            Vector3 result;
-            TransformNormal(ref normal, ref transform, out result);
+            TransformNormal(ref normal, ref transform, out var result);
             return result;
         }
 
@@ -1872,6 +1863,5 @@ namespace Adamantium.Mathematics
         {
             return new Vector3F((float)value.X, (float)value.Y, (float)value.Z);
         }
-
     }
 }

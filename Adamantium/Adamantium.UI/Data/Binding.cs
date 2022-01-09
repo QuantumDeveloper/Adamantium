@@ -2,44 +2,43 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 
-namespace Adamantium.UI.Data
+namespace Adamantium.UI.Data;
+
+public class Binding:BindingBase
 {
-   public class Binding:BindingBase
+   public Binding()
+   { }
+
+   public Binding(string path)
    {
-      public Binding()
-      { }
+      Path = new PropertyPath(path);
+   }
 
-      public Binding(string path)
+   internal bool PropertyPathChanged;
+   private PropertyPath path;
+
+   public PropertyPath Path
+   {
+      get => path;
+      set
       {
-         Path = new PropertyPath(path);
+         path = value;
+         PropertyPathChanged = true;
       }
+   }
 
-      internal bool PropertyPathChanged;
-      private PropertyPath path;
+   public bool IsAsync { get; set; }
+   public BindingMode Mode { get; set; }
+   public object Source { get; set; }
+   public IValueConverter Converter { get; set; }
+   public object ConverterParameter { get; set; }
 
-      public PropertyPath Path
-      {
-         get => path;
-         set
-         {
-            path = value;
-            PropertyPathChanged = true;
-         }
-      }
-
-      public bool IsAsync { get; set; }
-      public BindingMode Mode { get; set; }
-      public object Source { get; set; }
-      public IValueConverter Converter { get; set; }
-      public object ConverterParameter { get; set; }
-
-      public override object Clone()
-      {
-         ReadOnlyObservableCollection<Int32> col = new ReadOnlyObservableCollection<int>(new ObservableCollection<int>(new List<int>() {15}));
+   public override object Clone()
+   {
+      ReadOnlyObservableCollection<Int32> col = new ReadOnlyObservableCollection<int>(new ObservableCollection<int>(new List<int>() {15}));
          
-         return null; 
-      }
+      return null; 
+   }
 
       
-   }
 }

@@ -947,7 +947,18 @@ namespace Adamantium.Mathematics
         public static OrientedBoundingBox Merge(ref OrientedBoundingBox obb1, Vector3F[] corners)
         {
             var corners1 = obb1.GetCorners();
-            Vector3F[] points = new Vector3F[16];
+            var points = new Vector3F[16];
+            Array.Copy(corners1, points, 8);
+            Array.Copy(corners, 0, points, 8, 8);
+
+            return FromPoints(points);
+
+        }
+        
+        public static OrientedBoundingBox Merge(ref OrientedBoundingBox obb1, Vector3[] corners)
+        {
+            var corners1 = obb1.GetCorners();
+            var points = new Vector3[16];
             Array.Copy(corners1, points, 8);
             Array.Copy(corners, 0, points, 8, 8);
 

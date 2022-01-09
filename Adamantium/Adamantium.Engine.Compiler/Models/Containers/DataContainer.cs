@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using Adamantium.Engine.Compiler.Converter.ConversionUtils;
+using Adamantium.Engine.Compiler.Models.ConversionUtils;
 using Adamantium.Engine.Core.Models;
 
 namespace Adamantium.Engine.Compiler.Converter.Containers

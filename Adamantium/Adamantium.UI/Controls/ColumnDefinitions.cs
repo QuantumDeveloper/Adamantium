@@ -1,12 +1,11 @@
 ﻿using Adamantium.Core.Collections;
 
-namespace Adamantium.UI.Controls
+namespace Adamantium.UI.Controls;
+
+public class ColumnDefinitions:TrackingCollection<ColumnDefinition>
 {
-   public class ColumnDefinitions:TrackingCollection<ColumnDefinition>
+   public ColumnDefinitions()
    {
-      public ColumnDefinitions()
-      {
          
-      }
    }
 }

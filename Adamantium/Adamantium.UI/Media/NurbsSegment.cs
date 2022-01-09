@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Adamantium.UI.Controls;
 using Adamantium.UI.RoutedEvents;
 
@@ -6,6 +7,20 @@ namespace Adamantium.UI.Media;
 
 public class NurbsSegment : BSplineSegment
 {
+    public NurbsSegment()
+    {
+        
+    }
+
+    public NurbsSegment(IEnumerable<Vector2> points, bool isUniform, bool useCustomDegree, int degree, bool isStroked)
+    {
+        Points = new PointsCollection(points);
+        IsUniform = isUniform;
+        UseCustomDegree = useCustomDegree;
+        CustomDegree = degree;
+        IsStroked = isStroked;
+    }
+    
     public static readonly AdamantiumProperty IsUniformProperty =
         AdamantiumProperty.Register(nameof(IsUniform), typeof(bool), typeof(NurbsSegment),
             new PropertyMetadata(false, PropertyMetadataOptions.AffectsRender));
@@ -79,8 +94,9 @@ public class NurbsSegment : BSplineSegment
         {
             degree = CustomDegree;
         }
-        
-        return MathHelper.GetNurbsCurve(points, degree, IsUniform, 1.0/SampleRate);
+
+        var rate = CalculatePointsLength(Points);
+        return MathHelper.GetNurbsCurve(points, degree, IsUniform, 1.0/rate);
     }
 
     

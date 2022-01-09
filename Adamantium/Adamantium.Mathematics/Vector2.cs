@@ -22,17 +22,17 @@ namespace Adamantium.Mathematics
       /// <summary>
       /// The X unit <see cref="Vector2"/> (1, 0).
       /// </summary>
-      public static readonly Vector2 UnitX = new(1.0f, 0.0f);
+      public static readonly Vector2 UnitX = new(1.0, 0.0);
 
       /// <summary>
       /// The Y unit <see cref="Vector2"/> (0, 1).
       /// </summary>
-      public static readonly Vector2 UnitY = new(0.0f, 1.0f);
+      public static readonly Vector2 UnitY = new(0.0, 1.0);
 
       /// <summary>
       /// A <see cref="Vector2"/> with all of its components set to one.
       /// </summary>
-      public static readonly Vector2 One = new(1.0f, 1.0f);
+      public static readonly Vector2 One = new(1.0, 1.0);
 
       public double X;
 
@@ -284,6 +284,18 @@ namespace Adamantium.Mathematics
       public static Vector2 Subtract(double left, Vector2 right)
       {
          return new(left - right.X, left - right.Y);
+      }
+      
+      /// <summary>
+      /// Find normal to a vector.
+      /// </summary>
+      /// <param name="value">The vector to scale.</param>
+      /// <param name="scale">The amount by which to scale the vector.</param>
+      /// <param name="result">When the method completes, contains the scaled vector.</param>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
+      public static Vector2 Cross(ref Vector2 value)
+      {
+         return new Vector2(value.Y, -value.X);
       }
 
       /// <summary>
@@ -1381,11 +1393,19 @@ namespace Adamantium.Mathematics
       }
       
       [MethodImpl(MethodImplOptions.AggressiveInlining)]
-      public static Vector2 Round(Vector2 value, int digits)
+      public static Vector2 Round(Vector2 value, int precision)
       {
-         value.X = Math.Round(value.X, digits, MidpointRounding.AwayFromZero);
-         value.Y = Math.Round(value.Y, digits, MidpointRounding.AwayFromZero);
+         value.X = Math.Round(value.X, precision, MidpointRounding.AwayFromZero);
+         value.Y = Math.Round(value.Y, precision, MidpointRounding.AwayFromZero);
          return value;
+      }
+      
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
+      public static Vector2 Round(double x, double y, int digits)
+      {
+         x = Math.Round(x, digits, MidpointRounding.AwayFromZero);
+         y = Math.Round(y, digits, MidpointRounding.AwayFromZero);
+         return new Vector2(x, y);
       }
 
       /// <summary>

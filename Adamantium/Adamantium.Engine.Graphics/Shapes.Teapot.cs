@@ -55,150 +55,150 @@ namespace Adamantium.Engine.Graphics
 
 
             // Static array defines the control point positions that make up the teapot.
-            private static readonly Vector3F[] TeapotControlPoints = {
-                    new Vector3F(0, 0.345f, -0.05f),
-                    new Vector3F(-0.028f, 0.345f, -0.05f),
-                    new Vector3F(-0.05f, 0.345f, -0.028f),
-                    new Vector3F(-0.05f, 0.345f, -0),
-                    new Vector3F(0, 0.3028125f, -0.334375f),
-                    new Vector3F(-0.18725f, 0.3028125f, -0.334375f),
-                    new Vector3F(-0.334375f, 0.3028125f, -0.18725f),
-                    new Vector3F(-0.334375f, 0.3028125f, -0),
-                    new Vector3F(0, 0.3028125f, -0.359375f),
-                    new Vector3F(-0.20125f, 0.3028125f, -0.359375f),
-                    new Vector3F(-0.359375f, 0.3028125f, -0.20125f),
-                    new Vector3F(-0.359375f, 0.3028125f, -0),
-                    new Vector3F(0, 0.27f, -0.375f),
-                    new Vector3F(-0.21f, 0.27f, -0.375f),
-                    new Vector3F(-0.375f, 0.27f, -0.21f),
-                    new Vector3F(-0.375f, 0.27f, -0),
-                    new Vector3F(0, 0.13875f, -0.4375f),
-                    new Vector3F(-0.245f, 0.13875f, -0.4375f),
-                    new Vector3F(-0.4375f, 0.13875f, -0.245f),
-                    new Vector3F(-0.4375f, 0.13875f, -0),
-                    new Vector3F(0, 0.007499993f, -0.5f),
-                    new Vector3F(-0.28f, 0.007499993f, -0.5f),
-                    new Vector3F(-0.5f, 0.007499993f, -0.28f),
-                    new Vector3F(-0.5f, 0.007499993f, -0),
-                    new Vector3F(0, -0.105f, -0.5f),
-                    new Vector3F(-0.28f, -0.105f, -0.5f),
-                    new Vector3F(-0.5f, -0.105f, -0.28f),
-                    new Vector3F(-0.5f, -0.105f, -0),
-                    new Vector3F(0, -0.105f, 0.5f),
-                    new Vector3F(0, -0.2175f, -0.5f),
-                    new Vector3F(-0.28f, -0.2175f, -0.5f),
-                    new Vector3F(-0.5f, -0.2175f, -0.28f),
-                    new Vector3F(-0.5f, -0.2175f, -0),
-                    new Vector3F(0, -0.27375f, -0.375f),
-                    new Vector3F(-0.21f, -0.27375f, -0.375f),
-                    new Vector3F(-0.375f, -0.27375f, -0.21f),
-                    new Vector3F(-0.375f, -0.27375f, -0),
-                    new Vector3F(0, -0.2925f, -0.375f),
-                    new Vector3F(-0.21f, -0.2925f, -0.375f),
-                    new Vector3F(-0.375f, -0.2925f, -0.21f),
-                    new Vector3F(-0.375f, -0.2925f, -0),
-                    new Vector3F(0, 0.17625f, 0.4f),
-                    new Vector3F(-0.075f, 0.17625f, 0.4f),
-                    new Vector3F(-0.075f, 0.2325f, 0.375f),
-                    new Vector3F(0, 0.2325f, 0.375f),
-                    new Vector3F(0, 0.17625f, 0.575f),
-                    new Vector3F(-0.075f, 0.17625f, 0.575f),
-                    new Vector3F(-0.075f, 0.2325f, 0.625f),
-                    new Vector3F(0, 0.2325f, 0.625f),
-                    new Vector3F(0, 0.17625f, 0.675f),
-                    new Vector3F(-0.075f, 0.17625f, 0.675f),
-                    new Vector3F(-0.075f, 0.2325f, 0.75f),
-                    new Vector3F(0, 0.2325f, 0.75f),
-                    new Vector3F(0, 0.12f, 0.675f),
-                    new Vector3F(-0.075f, 0.12f, 0.675f),
-                    new Vector3F(-0.075f, 0.12f, 0.75f),
-                    new Vector3F(0, 0.12f, 0.75f),
-                    new Vector3F(0, 0.06375f, 0.675f),
-                    new Vector3F(-0.075f, 0.06375f, 0.675f),
-                    new Vector3F(-0.075f, 0.007499993f, 0.75f),
-                    new Vector3F(0, 0.007499993f, 0.75f),
-                    new Vector3F(0, -0.04875001f, 0.625f),
-                    new Vector3F(-0.075f, -0.04875001f, 0.625f),
-                    new Vector3F(-0.075f, -0.09562501f, 0.6625f),
-                    new Vector3F(0, -0.09562501f, 0.6625f),
-                    new Vector3F(-0.075f, -0.105f, 0.5f),
-                    new Vector3F(-0.075f, -0.18f, 0.475f),
-                    new Vector3F(0, -0.18f, 0.475f),
-                    new Vector3F(0, 0.02624997f, -0.425f),
-                    new Vector3F(-0.165f, 0.02624997f, -0.425f),
-                    new Vector3F(-0.165f, -0.18f, -0.425f),
-                    new Vector3F(0, -0.18f, -0.425f),
-                    new Vector3F(0, 0.02624997f, -0.65f),
-                    new Vector3F(-0.165f, 0.02624997f, -0.65f),
-                    new Vector3F(-0.165f, -0.12375f, -0.775f),
-                    new Vector3F(0, -0.12375f, -0.775f),
-                    new Vector3F(0, 0.195f, -0.575f),
-                    new Vector3F(-0.0625f, 0.195f, -0.575f),
-                    new Vector3F(-0.0625f, 0.17625f, -0.6f),
-                    new Vector3F(0, 0.17625f, -0.6f),
-                    new Vector3F(0, 0.27f, -0.675f),
-                    new Vector3F(-0.0625f, 0.27f, -0.675f),
-                    new Vector3F(-0.0625f, 0.27f, -0.825f),
-                    new Vector3F(0, 0.27f, -0.825f),
-                    new Vector3F(0, 0.28875f, -0.7f),
-                    new Vector3F(-0.0625f, 0.28875f, -0.7f),
-                    new Vector3F(-0.0625f, 0.2934375f, -0.88125f),
-                    new Vector3F(0, 0.2934375f, -0.88125f),
-                    new Vector3F(0, 0.28875f, -0.725f),
-                    new Vector3F(-0.0375f, 0.28875f, -0.725f),
-                    new Vector3F(-0.0375f, 0.298125f, -0.8625f),
-                    new Vector3F(0, 0.298125f, -0.8625f),
-                    new Vector3F(0, 0.27f, -0.7f),
-                    new Vector3F(-0.0375f, 0.27f, -0.7f),
-                    new Vector3F(-0.0375f, 0.27f, -0.8f),
-                    new Vector3F(0, 0.27f, -0.8f),
-                    new Vector3F(0, 0.4575f, -0),
-                    new Vector3F(0, 0.4575f, -0.2f),
-                    new Vector3F(-0.1125f, 0.4575f, -0.2f),
-                    new Vector3F(-0.2f, 0.4575f, -0.1125f),
-                    new Vector3F(-0.2f, 0.4575f, -0),
-                    new Vector3F(0, 0.3825f, -0),
-                    new Vector3F(0, 0.27f, -0.35f),
-                    new Vector3F(-0.196f, 0.27f, -0.35f),
-                    new Vector3F(-0.35f, 0.27f, -0.196f),
-                    new Vector3F(-0.35f, 0.27f, -0),
-                    new Vector3F(0, 0.3075f, -0.1f),
-                    new Vector3F(-0.056f, 0.3075f, -0.1f),
-                    new Vector3F(-0.1f, 0.3075f, -0.056f),
-                    new Vector3F(-0.1f, 0.3075f, -0),
-                    new Vector3F(0, 0.3075f, -0.325f),
-                    new Vector3F(-0.182f, 0.3075f, -0.325f),
-                    new Vector3F(-0.325f, 0.3075f, -0.182f),
-                    new Vector3F(-0.325f, 0.3075f, -0),
-                    new Vector3F(0, 0.27f, -0.325f),
-                    new Vector3F(-0.182f, 0.27f, -0.325f),
-                    new Vector3F(-0.325f, 0.27f, -0.182f),
-                    new Vector3F(-0.325f, 0.27f, -0),
-                    new Vector3F(0, -0.33f, -0),
-                    new Vector3F(-0.1995f, -0.33f, -0.35625f),
-                    new Vector3F(0, -0.31125f, -0.375f),
-                    new Vector3F(0, -0.33f, -0.35625f),
-                    new Vector3F(-0.35625f, -0.33f, -0.1995f),
-                    new Vector3F(-0.375f, -0.31125f, -0),
-                    new Vector3F(-0.35625f, -0.33f, -0),
-                    new Vector3F(-0.21f, -0.31125f, -0.375f),
-                    new Vector3F(-0.375f, -0.31125f, -0.21f),
+            private static readonly Vector3[] TeapotControlPoints = {
+                    new (0, 0.345f, -0.05f),
+                    new (-0.028f, 0.345f, -0.05f),
+                    new (-0.05f, 0.345f, -0.028f),
+                    new (-0.05f, 0.345f, -0),
+                    new (0, 0.3028125f, -0.334375f),
+                    new (-0.18725f, 0.3028125f, -0.334375f),
+                    new (-0.334375f, 0.3028125f, -0.18725f),
+                    new (-0.334375f, 0.3028125f, -0),
+                    new (0, 0.3028125f, -0.359375f),
+                    new (-0.20125f, 0.3028125f, -0.359375f),
+                    new (-0.359375f, 0.3028125f, -0.20125f),
+                    new (-0.359375f, 0.3028125f, -0),
+                    new (0, 0.27f, -0.375f),
+                    new (-0.21f, 0.27f, -0.375f),
+                    new (-0.375f, 0.27f, -0.21f),
+                    new (-0.375f, 0.27f, -0),
+                    new (0, 0.13875f, -0.4375f),
+                    new (-0.245f, 0.13875f, -0.4375f),
+                    new (-0.4375f, 0.13875f, -0.245f),
+                    new (-0.4375f, 0.13875f, -0),
+                    new (0, 0.007499993f, -0.5f),
+                    new (-0.28f, 0.007499993f, -0.5f),
+                    new (-0.5f, 0.007499993f, -0.28f),
+                    new (-0.5f, 0.007499993f, -0),
+                    new (0, -0.105f, -0.5f),
+                    new (-0.28f, -0.105f, -0.5f),
+                    new (-0.5f, -0.105f, -0.28f),
+                    new (-0.5f, -0.105f, -0),
+                    new (0, -0.105f, 0.5f),
+                    new (0, -0.2175f, -0.5f),
+                    new (-0.28f, -0.2175f, -0.5f),
+                    new (-0.5f, -0.2175f, -0.28f),
+                    new (-0.5f, -0.2175f, -0),
+                    new (0, -0.27375f, -0.375f),
+                    new (-0.21f, -0.27375f, -0.375f),
+                    new (-0.375f, -0.27375f, -0.21f),
+                    new (-0.375f, -0.27375f, -0),
+                    new (0, -0.2925f, -0.375f),
+                    new (-0.21f, -0.2925f, -0.375f),
+                    new (-0.375f, -0.2925f, -0.21f),
+                    new (-0.375f, -0.2925f, -0),
+                    new (0, 0.17625f, 0.4f),
+                    new (-0.075f, 0.17625f, 0.4f),
+                    new (-0.075f, 0.2325f, 0.375f),
+                    new (0, 0.2325f, 0.375f),
+                    new (0, 0.17625f, 0.575f),
+                    new (-0.075f, 0.17625f, 0.575f),
+                    new (-0.075f, 0.2325f, 0.625f),
+                    new (0, 0.2325f, 0.625f),
+                    new (0, 0.17625f, 0.675f),
+                    new (-0.075f, 0.17625f, 0.675f),
+                    new (-0.075f, 0.2325f, 0.75f),
+                    new (0, 0.2325f, 0.75f),
+                    new (0, 0.12f, 0.675f),
+                    new (-0.075f, 0.12f, 0.675f),
+                    new (-0.075f, 0.12f, 0.75f),
+                    new (0, 0.12f, 0.75f),
+                    new (0, 0.06375f, 0.675f),
+                    new (-0.075f, 0.06375f, 0.675f),
+                    new (-0.075f, 0.007499993f, 0.75f),
+                    new (0, 0.007499993f, 0.75f),
+                    new (0, -0.04875001f, 0.625f),
+                    new (-0.075f, -0.04875001f, 0.625f),
+                    new (-0.075f, -0.09562501f, 0.6625f),
+                    new (0, -0.09562501f, 0.6625f),
+                    new (-0.075f, -0.105f, 0.5f),
+                    new (-0.075f, -0.18f, 0.475f),
+                    new (0, -0.18f, 0.475f),
+                    new (0, 0.02624997f, -0.425f),
+                    new (-0.165f, 0.02624997f, -0.425f),
+                    new (-0.165f, -0.18f, -0.425f),
+                    new (0, -0.18f, -0.425f),
+                    new (0, 0.02624997f, -0.65f),
+                    new (-0.165f, 0.02624997f, -0.65f),
+                    new (-0.165f, -0.12375f, -0.775f),
+                    new (0, -0.12375f, -0.775f),
+                    new (0, 0.195f, -0.575f),
+                    new (-0.0625f, 0.195f, -0.575f),
+                    new (-0.0625f, 0.17625f, -0.6f),
+                    new (0, 0.17625f, -0.6f),
+                    new (0, 0.27f, -0.675f),
+                    new (-0.0625f, 0.27f, -0.675f),
+                    new (-0.0625f, 0.27f, -0.825f),
+                    new (0, 0.27f, -0.825f),
+                    new (0, 0.28875f, -0.7f),
+                    new (-0.0625f, 0.28875f, -0.7f),
+                    new (-0.0625f, 0.2934375f, -0.88125f),
+                    new (0, 0.2934375f, -0.88125f),
+                    new (0, 0.28875f, -0.725f),
+                    new (-0.0375f, 0.28875f, -0.725f),
+                    new (-0.0375f, 0.298125f, -0.8625f),
+                    new (0, 0.298125f, -0.8625f),
+                    new (0, 0.27f, -0.7f),
+                    new (-0.0375f, 0.27f, -0.7f),
+                    new (-0.0375f, 0.27f, -0.8f),
+                    new (0, 0.27f, -0.8f),
+                    new (0, 0.4575f, -0),
+                    new (0, 0.4575f, -0.2f),
+                    new (-0.1125f, 0.4575f, -0.2f),
+                    new (-0.2f, 0.4575f, -0.1125f),
+                    new (-0.2f, 0.4575f, -0),
+                    new (0, 0.3825f, -0),
+                    new (0, 0.27f, -0.35f),
+                    new (-0.196f, 0.27f, -0.35f),
+                    new (-0.35f, 0.27f, -0.196f),
+                    new (-0.35f, 0.27f, -0),
+                    new (0, 0.3075f, -0.1f),
+                    new (-0.056f, 0.3075f, -0.1f),
+                    new (-0.1f, 0.3075f, -0.056f),
+                    new (-0.1f, 0.3075f, -0),
+                    new (0, 0.3075f, -0.325f),
+                    new (-0.182f, 0.3075f, -0.325f),
+                    new (-0.325f, 0.3075f, -0.182f),
+                    new (-0.325f, 0.3075f, -0),
+                    new (0, 0.27f, -0.325f),
+                    new (-0.182f, 0.27f, -0.325f),
+                    new (-0.325f, 0.27f, -0.182f),
+                    new (-0.325f, 0.27f, -0),
+                    new (0, -0.33f, -0),
+                    new (-0.1995f, -0.33f, -0.35625f),
+                    new (0, -0.31125f, -0.375f),
+                    new (0, -0.33f, -0.35625f),
+                    new (-0.35625f, -0.33f, -0.1995f),
+                    new (-0.375f, -0.31125f, -0),
+                    new (-0.35625f, -0.33f, -0),
+                    new (-0.21f, -0.31125f, -0.375f),
+                    new (-0.375f, -0.31125f, -0.21f),
              };
 
 
             // Tessellates the specified bezier patch.
             private static void TessellatePatch(
                 GeometryType geometryType,
-                List<Vector3F> vertices, 
+                List<Vector3> vertices, 
                 List<Vector2F> uvs, 
                 List<int> indices, 
                 ref TeapotPatch patch, 
                 int tessellation, 
-                Vector3F scale, 
+                Vector3 scale, 
                 bool isMirrored)
             {
                 // Look up the 16 control points for this patch.
-                var controlPoints = new Vector3F[16];
+                var controlPoints = new Vector3[16];
 
                 for (int i = 0; i < 16; i++)
                 {
@@ -232,9 +232,9 @@ namespace Adamantium.Engine.Graphics
             public static Shape New(
                 GraphicsDevice device, 
                 GeometryType geometryType, 
-                float size = 1.0f, 
+                double size = 1.0, 
                 int tessellation = 8, 
-                Matrix4x4F? transform = null)
+                Matrix4x4? transform = null)
             {
                 var geometry = GenerateGeometry(geometryType, size, tessellation, transform);
                 return new Shape(device, geometry);
@@ -242,23 +242,23 @@ namespace Adamantium.Engine.Graphics
 
             public static Mesh GenerateGeometry(
                 GeometryType geometryType, 
-                float size = 1.0f, 
+                double size = 1.0, 
                 int tessellation = 8, 
-                Matrix4x4F? transform = null)
+                Matrix4x4? transform = null)
             {
-                var vertices = new List<Vector3F>();
+                var vertices = new List<Vector3>();
                 var uvs = new List<Vector2F>();
                 var indices = new List<int>();
 
                 if (tessellation < 1)
                     throw new ArgumentOutOfRangeException(nameof(tessellation), "tessellation must be > 0");
 
-                var scaleVector = new Vector3F(size, size, size);
+                var scaleVector = new Vector3(size, size, size);
                 var scaleNegateX = scaleVector;
                 scaleNegateX.X = -scaleNegateX.X;
                 var scaleNegateZ = scaleVector;
                 scaleNegateZ.Z = -scaleNegateZ.Z;
-                var scaleNegateXZ = new Vector3F(-size, size, -size);
+                var scaleNegateXZ = new Vector3(-size, size, -size);
 
                 for (int i = 0; i < TeapotPatches.Length; i++)
                 {
@@ -298,7 +298,7 @@ namespace Adamantium.Engine.Graphics
             // returning the value at the specified time (t ranges 0 to 1).
             // This template implementation can be used to interpolate Vector3F,
             // float, or any other types that define suitable * and + operators.
-            public static Vector3F CubicInterpolate(ref Vector3F p1, ref Vector3F p2, ref Vector3F p3, ref Vector3F p4, float t)
+            public static Vector3 CubicInterpolate(ref Vector3 p1, ref Vector3 p2, ref Vector3 p3, ref Vector3 p4, float t)
             {
                 var t2 = t * t;
                 var onet2 = (1 - t) * (1 - t);
@@ -311,7 +311,7 @@ namespace Adamantium.Engine.Graphics
 
             // Computes the tangent of a cubic bezier curve at the specified time.
             // Template supports Vector3F, float, or any other types with * and + operators.
-            private static Vector3F CubicTangent(ref Vector3F p1, ref Vector3F p2, ref Vector3F p3, ref Vector3F p4, float t)
+            private static Vector3 CubicTangent(ref Vector3 p1, ref Vector3 p2, ref Vector3 p3, ref Vector3 p4, float t)
             {
                 var t2 = t * t;
                 return p1 * (-1 + 2 * t - t2) +
@@ -323,7 +323,7 @@ namespace Adamantium.Engine.Graphics
             // Creates vertices for a patch that is tessellated at the specified level.
             // Calls the specified outputVertex function for each generated vertex,
             // passing the position, normal, and texture coordinate as parameters.
-            private static void CreatePatchVertices(Vector3F[] patch, int tessellation, bool isMirrored, List<Vector3F> positions, List<Vector2F> uvs)
+            private static void CreatePatchVertices(Vector3[] patch, int tessellation, bool isMirrored, List<Vector3> positions, List<Vector2F> uvs)
             {
                 for (int i = 0; i <= tessellation; i++)
                 {
@@ -356,9 +356,9 @@ namespace Adamantium.Engine.Graphics
                         var tangent2 = CubicTangent(ref q1, ref q2, ref q3, ref q4, u);
 
                         // Cross the two tangent vectors to compute the normal.
-                        var normal = Vector3F.Cross(tangent1, tangent2);
+                        var normal = Vector3.Cross(tangent1, tangent2);
 
-                        if (!Vector3F.NearEqual(normal, Vector3F.Zero, new Vector3F(1e-7f)))
+                        if (!Vector3.NearEqual(normal, Vector3.Zero, new Vector3(1e-7f)))
                         {
                             normal.Normalize();
 

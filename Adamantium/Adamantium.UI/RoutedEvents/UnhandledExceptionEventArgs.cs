@@ -1,14 +1,13 @@
 ﻿using System;
 
-namespace Adamantium.UI.RoutedEvents
-{
-   public class UnhandledExceptionEventArgs:EventArgs
-   {
-      public Exception Exception { get; }
+namespace Adamantium.UI.RoutedEvents;
 
-      public UnhandledExceptionEventArgs(Exception exception)
-      {
-         Exception = exception;
-      }
+public class UnhandledExceptionEventArgs:EventArgs
+{
+   public Exception Exception { get; }
+
+   public UnhandledExceptionEventArgs(Exception exception)
+   {
+      Exception = exception;
    }
 }

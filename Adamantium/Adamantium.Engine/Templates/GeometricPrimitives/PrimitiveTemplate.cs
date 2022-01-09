@@ -11,13 +11,13 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
     public abstract class PrimitiveTemplate : IEntityTemplate
     {
         protected int Tessellation { get; }
-        protected Matrix4x4F? Transform { get; }
+        protected Matrix4x4? Transform { get; }
         protected GeometryType GeometryType { get; }
 
         protected PrimitiveTemplate(
             GeometryType geometryType,
             int tessellation,
-            Matrix4x4F? transform = null)
+            Matrix4x4? transform = null)
         {
             Tessellation = tessellation;
             Transform = transform;

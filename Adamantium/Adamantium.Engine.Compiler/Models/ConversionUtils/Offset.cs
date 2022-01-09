@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Adamantium.Engine.Compiler.Converter.ConversionUtils
+namespace Adamantium.Engine.Compiler.Models.ConversionUtils
 {
    //Класс для хранения данных оффсета геометрии
    public class Offset

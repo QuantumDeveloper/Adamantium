@@ -2,12 +2,12 @@ namespace Adamantium.Engine.Graphics
 {
     public struct CornerRadius
     {
-        public CornerRadius(float value)
+        public CornerRadius(double value)
         {
             TopLeft = TopRight = BottomRight = BottomLeft = value;
         }
 
-        public CornerRadius(float topLeft, float topRight, float bottomRight, float bottomLeft)
+        public CornerRadius(double topLeft, double topRight, double bottomRight, double bottomLeft)
         {
             TopLeft = topLeft;
             TopRight = topRight;
@@ -15,13 +15,13 @@ namespace Adamantium.Engine.Graphics
             BottomLeft = bottomLeft;
         }
         
-        public float TopLeft;
+        public double TopLeft;
 
-        public float TopRight;
+        public double TopRight;
 
-        public float BottomRight;
+        public double BottomRight;
 
-        public float BottomLeft;
+        public double BottomLeft;
         
         public override string ToString()
         {

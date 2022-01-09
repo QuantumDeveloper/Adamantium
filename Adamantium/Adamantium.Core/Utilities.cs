@@ -6,6 +6,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
+using Adamantium.Mathematics;
 
 namespace Adamantium.Core
 {
@@ -157,14 +158,11 @@ namespace Adamantium.Core
 
         public static void Swap<T>(ref T elem1, ref T elem2)
         {
-            var tmp = elem1;
-            elem1 = elem2;
-            elem2 = tmp;
+            (elem1, elem2) = (elem2, elem1);
         }
 
         public static ushort ToLittleEndian(byte left, byte right)
         {
-            var res = BitConverter.ToUInt16(new byte[] { right, left }, 0);
             var result = (ushort)(right | left << 8);
             return result;
         }
@@ -368,7 +366,6 @@ namespace Adamantium.Core
 
         public static bool IsTypeInheritFrom(Type type, Type baseType)
         {
-            //var baseType = Type.GetType(baseTypeString);
             return baseType is not null && baseType.IsAssignableFrom(type);
         }
 
@@ -390,6 +387,28 @@ namespace Adamantium.Core
             hash ^= hash >> 17;
             hash += hash << 5;
             return unchecked((int)hash);
+        }
+        
+        public static Vector2[] ToVector2(IEnumerable<Vector3> array)
+        {
+            var collection = new List<Vector2>();
+            foreach (var vector in array)
+            {
+                collection.Add((Vector2)vector);
+            }
+
+            return collection.ToArray();
+        }
+
+        public static Vector3[] ToVector3(IEnumerable<Vector2> array)
+        {
+            var collection = new List<Vector3>();
+            foreach (var vector in array)
+            {
+                collection.Add((Vector3)vector);
+            }
+
+            return collection.ToArray();
         }
     }
 }

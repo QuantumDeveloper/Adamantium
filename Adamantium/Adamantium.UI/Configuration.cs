@@ -1,29 +1,28 @@
 using System.Runtime.InteropServices;
 
-namespace Adamantium.UI
+namespace Adamantium.UI;
+
+public class Configuration
 {
-    public class Configuration
-    {
-        public static Platform Platform { get; }
+    public static Platform Platform { get; }
         
-        static Configuration()
+    static Configuration()
+    {
+        if (RuntimeInformation.IsOSPlatform((OSPlatform.Windows)))
         {
-            if (RuntimeInformation.IsOSPlatform((OSPlatform.Windows)))
-            {
-                Platform = Platform.Windows;
-            }
-            else if (RuntimeInformation.IsOSPlatform((OSPlatform.OSX)))
-            {
-                Platform = Platform.OSX;
-            }
-            else if (RuntimeInformation.IsOSPlatform((OSPlatform.Linux)))
-            {
-                Platform = Platform.Linux;
-            }
-            else if (RuntimeInformation.IsOSPlatform((OSPlatform.FreeBSD)))
-            {
-                Platform = Platform.FreeBSD;
-            }
+            Platform = Platform.Windows;
+        }
+        else if (RuntimeInformation.IsOSPlatform((OSPlatform.OSX)))
+        {
+            Platform = Platform.OSX;
+        }
+        else if (RuntimeInformation.IsOSPlatform((OSPlatform.Linux)))
+        {
+            Platform = Platform.Linux;
+        }
+        else if (RuntimeInformation.IsOSPlatform((OSPlatform.FreeBSD)))
+        {
+            Platform = Platform.FreeBSD;
         }
     }
 }

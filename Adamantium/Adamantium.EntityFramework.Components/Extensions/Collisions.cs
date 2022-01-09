@@ -167,15 +167,15 @@ namespace Adamantium.EntityFramework.Components.Extensions
                limitDistance);
         }
 
-        private static (bool Intersects, Vector3F Point) Intersects(
+        private static (bool Intersects, Vector3 Point) Intersects(
            this Entity owner,
            Ray ray,
            Matrix4x4F worldTransform,
            CollisionMode collisionMode,
            float limitDistance)
         {
-            Vector3F interPoint = Vector3F.Zero;
-            Vector3F point = Vector3F.Zero;
+            var interPoint = Vector3F.Zero;
+            var point = Vector3F.Zero;
             bool intersects = false;
 
             switch (collisionMode)
@@ -205,7 +205,7 @@ namespace Adamantium.EntityFramework.Components.Extensions
             {
                 interPoint = Vector3F.TransformCoordinate(point, worldTransform);
             }
-            return (intersects, interPoint);
+            return (intersects, (Vector3)interPoint);
         }
 
         private static CollisionResult FindFirstAvailableCollider(
@@ -231,8 +231,8 @@ namespace Adamantium.EntityFramework.Components.Extensions
                     {
                         continue;
                     }
-                    var ray = CalculateRay(cursorPosition, camera, transformData.WorldMatrix, projectionMatrix, useViewMatrix, reverseDepth);
-                    var result = Intersects(current, ray, transformData.WorldMatrix, CollisionMode.FirstAvailableCollider, 0);
+                    var ray = CalculateRay(cursorPosition, camera, transformData.WorldMatrixF, projectionMatrix, useViewMatrix, reverseDepth);
+                    var result = Intersects(current, ray, transformData.WorldMatrixF, CollisionMode.FirstAvailableCollider, 0);
                     if (result.Intersects)
                     {
                         collisionResult.ValidateAndSetValues(current, result.Point, true);
@@ -266,8 +266,8 @@ namespace Adamantium.EntityFramework.Components.Extensions
                     {
                         return;
                     }
-                    var ray = CalculateRay(cursorPosition, camera, transformData.WorldMatrix, projectionMatrix, useViewMatrix, reverseDepth);
-                    var result = Intersects(current, ray, transformData.WorldMatrix, CollisionMode.IgnoreNonGeometryParts, 0);
+                    var ray = CalculateRay(cursorPosition, camera, transformData.WorldMatrixF, projectionMatrix, useViewMatrix, reverseDepth);
+                    var result = Intersects(current, ray, transformData.WorldMatrixF, CollisionMode.IgnoreNonGeometryParts, 0);
                     if (result.Intersects)
                     {
                         collisionResult.ValidateAndSetValues(current, result.Point, true);
@@ -301,8 +301,8 @@ namespace Adamantium.EntityFramework.Components.Extensions
                     {
                         continue;
                     }
-                    var ray = CalculateRay(cursorPosition, camera, transformData.WorldMatrix, projectionMatrix, useViewMatrix, reverseDepth);
-                    var result = Intersects(current, ray, transformData.WorldMatrix, CollisionMode.IgnoreNonGeometryParts, limitDistance);
+                    var ray = CalculateRay(cursorPosition, camera, transformData.WorldMatrixF, projectionMatrix, useViewMatrix, reverseDepth);
+                    var result = Intersects(current, ray, transformData.WorldMatrixF, CollisionMode.IgnoreNonGeometryParts, limitDistance);
                     if (result.Intersects)
                     {
                         intersectionPresent = true;
@@ -324,8 +324,8 @@ namespace Adamantium.EntityFramework.Components.Extensions
                         {
                             return;
                         }
-                        var ray = CalculateRay(cursorPosition, camera, transformData.WorldMatrix, projectionMatrix, useViewMatrix);
-                        var result = Intersects(current, ray, transformData.WorldMatrix, CollisionMode.HighestPrecision, limitDistance);
+                        var ray = CalculateRay(cursorPosition, camera, transformData.WorldMatrixF, projectionMatrix, useViewMatrix);
+                        var result = Intersects(current, ray, transformData.WorldMatrixF, CollisionMode.HighestPrecision, limitDistance);
                         if (result.Intersects)
                         {
                             collisionResult.ValidateAndSetValues(current, result.Point, true);
@@ -357,8 +357,8 @@ namespace Adamantium.EntityFramework.Components.Extensions
                         {
                             return;
                         }
-                        var ray = CalculateRay(cursorPosition, camera, transformData.WorldMatrix, projectionMatrix, useViewMatrix, reverseDepth);
-                        var result = Intersects(current, ray, transformData.WorldMatrix, collisionMode, limitDistance);
+                        var ray = CalculateRay(cursorPosition, camera, transformData.WorldMatrixF, projectionMatrix, useViewMatrix, reverseDepth);
+                        var result = Intersects(current, ray, transformData.WorldMatrixF, collisionMode, limitDistance);
                         if (result.Intersects)
                         {
                             collisionResult.ValidateAndSetValues(current, result.Point, true);
@@ -402,8 +402,8 @@ namespace Adamantium.EntityFramework.Components.Extensions
 
                         if (containsCollider)
                         {
-                            var ray = CalculateRay(cursorPosition, camera, transformData.WorldMatrix, projectionMatrix, useViewMatrix, reverseDepth);
-                            var result = Intersects(current, ray, transformData.WorldMatrix, collisionMode, limitDistance);
+                            var ray = CalculateRay(cursorPosition, camera, transformData.WorldMatrixF, projectionMatrix, useViewMatrix, reverseDepth);
+                            var result = Intersects(current, ray, transformData.WorldMatrixF, collisionMode, limitDistance);
                             if (result.Intersects)
                             {
                                 collisionResult.ValidateAndSetValues(current, result.Point, true);
@@ -481,8 +481,8 @@ namespace Adamantium.EntityFramework.Components.Extensions
                     {
                         if (meshData.Mesh.Indices[i - 1] != -1 && meshData.Mesh.Indices[i] != -1)
                         {
-                            var position0 = meshData.Mesh.Points[meshData.Mesh.Indices[i - 1]];
-                            var position1 = meshData.Mesh.Points[meshData.Mesh.Indices[i]];
+                            var position0 = (Vector3F)meshData.Mesh.Points[meshData.Mesh.Indices[i - 1]];
+                            var position1 = (Vector3F)meshData.Mesh.Points[meshData.Mesh.Indices[i]];
                             intersects = ray.Intersects(ref position0, ref position1, limitDistance, out _, out point);
                             if (intersects)
                                 break;
@@ -494,8 +494,8 @@ namespace Adamantium.EntityFramework.Components.Extensions
                     int increment = meshData.Mesh.MeshTopology == PrimitiveType.LineStrip ? 1 : 2;
                     for (int i = 1; i < meshData.Mesh.Points.Length; i += increment)
                     {
-                        var position0 = meshData.Mesh.Points[i - 1];
-                        var position1 = meshData.Mesh.Points[i];
+                        var position0 = (Vector3F)meshData.Mesh.Points[i - 1];
+                        var position1 = (Vector3F)meshData.Mesh.Points[i];
                         intersects = ray.Intersects(ref position0, ref position1, limitDistance, out _, out point);
                         if (intersects)
                             break;
@@ -512,9 +512,9 @@ namespace Adamantium.EntityFramework.Components.Extensions
                 {
                     for (int i = 3; i < indices.Length; i += increment)
                     {
-                        var vertex1 = geometry.Points[indices[i - 2]];
-                        var vertex2 = geometry.Points[indices[i - 1]];
-                        var vertex3 = geometry.Points[indices[i]];
+                        var vertex1 = (Vector3F)geometry.Points[indices[i - 2]];
+                        var vertex2 = (Vector3F)geometry.Points[indices[i - 1]];
+                        var vertex3 = (Vector3F)geometry.Points[indices[i]];
                         intersects = ray.Intersects(ref vertex1, ref vertex2, ref vertex3, out point);
                         if (intersects)
                             break;
@@ -524,9 +524,9 @@ namespace Adamantium.EntityFramework.Components.Extensions
                 {
                     for (int i = 2; i < geometry.Points.Length; i += increment)
                     {
-                        var vertex1 = geometry.Points[indices[i - 2]];
-                        var vertex2 = geometry.Points[indices[i - 1]];
-                        var vertex3 = geometry.Points[indices[i]];
+                        var vertex1 = (Vector3F)geometry.Points[indices[i - 2]];
+                        var vertex2 = (Vector3F)geometry.Points[indices[i - 1]];
+                        var vertex3 = (Vector3F)geometry.Points[indices[i]];
                         intersects = ray.Intersects(ref vertex1, ref vertex2, ref vertex3, out point);
                         if (intersects)
                             break;

@@ -1,9 +1,8 @@
 ﻿using System;
 
-namespace Adamantium.UI.RoutedEvents
+namespace Adamantium.UI.RoutedEvents;
+
+public class WindowClosingEventArgs : EventArgs
 {
-    public class WindowClosingEventArgs : EventArgs
-    {
-        public bool Cancel { get; set; }
-    }
+    public bool Cancel { get; set; }
 }

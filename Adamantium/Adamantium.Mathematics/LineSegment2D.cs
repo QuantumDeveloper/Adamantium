@@ -30,7 +30,7 @@ namespace Adamantium.Mathematics
             DirectionNormalized = Vector2.Normalize(Direction);
         }
         
-        public LineSegment2D(Vector3F start, Vector3F end)
+        public LineSegment2D(Vector3 start, Vector3 end)
         {
             Start = (Vector2)start;
             End = (Vector2)end;

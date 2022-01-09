@@ -56,17 +56,17 @@ namespace Adamantium.Engine
                     return await CreateSphere(entityWorld, camera, geometryType, (SphereType) primitiveType, owner,
                         initialPosition, 1, tess);
                 case ShapeType.Polygon:
-                    return await CreatePolygon(entityWorld, camera, geometryType, Vector2F.One, owner, initialPosition);
+                    return await CreatePolygon(entityWorld, camera, geometryType, Vector2.One, owner, initialPosition);
                 case ShapeType.Rectangle:
                     return await CreateRectangle(entityWorld, camera, geometryType, owner, initialPosition);
                 case ShapeType.Ellipse:
-                    return await CreateEllipse(entityWorld, camera, geometryType, EllipseType.EdgeToEdge, Vector2F.One,
+                    return await CreateEllipse(entityWorld, camera, geometryType, EllipseType.EdgeToEdge, Vector2.One,
                         owner, initialPosition);
                 case ShapeType.Arc:
-                    return await CreateArc(entityWorld, camera, geometryType, Vector2F.One, owner, initialPosition);
+                    return await CreateArc(entityWorld, camera, geometryType, Vector2.One, owner, initialPosition);
                 case ShapeType.Line:
-                    return await CreateLine(entityWorld, camera, geometryType, new Vector3F(-0.5f, 0, 0),
-                        new Vector3F(0.5f, 0, 0), owner, initialPosition);
+                    return await CreateLine(entityWorld, camera, geometryType, new Vector3(-0.5, 0, 0),
+                        new Vector3(0.5, 0, 0), owner, initialPosition);
             }
 
             return null;
@@ -98,7 +98,7 @@ namespace Adamantium.Engine
             float width = 1,
             float length = 1,
             int tesselation = 1,
-            Matrix4x4F? transform = null)
+            Matrix4x4? transform = null)
         {
             var template = new PlaneTemplate(geometryType, width, length, tesselation, transform);
             var primitive = await entityWorld.CreateEntityFromTemplate(template, owner, "Plane", false);
@@ -115,7 +115,7 @@ namespace Adamantium.Engine
             float height = 1,
             float depth = 1,
             int tesselation = 1,
-            Matrix4x4F? transform = null)
+            Matrix4x4? transform = null)
         {
             var template = new CubeTemplate(geometryType, width, height, depth, tesselation, transform);
             var primitive = await entityWorld.CreateEntityFromTemplate(template, owner, "Cube", false);
@@ -131,7 +131,7 @@ namespace Adamantium.Engine
             float diameter = 1,
             float thickness = 0.33333f,
             int tesselation = 3,
-            Matrix4x4F? transform = null)
+            Matrix4x4? transform = null)
         {
             var template = new TorusTemplate(geometryType, diameter, thickness, tesselation, transform);
             var primitive = await entityWorld.CreateEntityFromTemplate(template, owner, "Torus", false);
@@ -147,7 +147,7 @@ namespace Adamantium.Engine
             float diameter = 1,
             float height = 1,
             int tesselation = 32,
-            Matrix4x4F? transform = null)
+            Matrix4x4? transform = null)
         {
             var template = new CylinderTemplate(geometryType, height, diameter, tesselation, transform);
             var primitive = await entityWorld.CreateEntityFromTemplate(template, owner, "Cylinder", false);
@@ -164,7 +164,7 @@ namespace Adamantium.Engine
             float height = 1f,
             float thickness = 0.01f,
             int tesselation = 32,
-            Matrix4x4F? transform = null)
+            Matrix4x4? transform = null)
         {
             var template = new TubeTemplate(geometryType, diameter, height, thickness, tesselation, transform);
             var primitive = await entityWorld.CreateEntityFromTemplate(template, owner, "Tube", false);
@@ -181,7 +181,7 @@ namespace Adamantium.Engine
             float topDiameter = 0f,
             float bottomDiameter = 1f,
             int tesselation = 32,
-            Matrix4x4F? transform = null)
+            Matrix4x4? transform = null)
         {
             var template = new ConeTemplate(geometryType, topDiameter, bottomDiameter, height, tesselation, transform);
             var primitive = await entityWorld.CreateEntityFromTemplate(template, owner, "Cone", false);
@@ -195,7 +195,7 @@ namespace Adamantium.Engine
             Vector3? initialPosition = null,
             float size = 1,
             int tesselation = 8,
-            Matrix4x4F? transform = null)
+            Matrix4x4? transform = null)
         {
             var template = new TeapotTemplate(size, tesselation, transform);
             var primitive = await entityWorld.CreateEntityFromTemplate(template, owner, "Teapot", false);
@@ -211,7 +211,7 @@ namespace Adamantium.Engine
             Vector3? initialPosition = null,
             float diameter = 1,
             int tesselation = 3,
-            Matrix4x4F? transform = null)
+            Matrix4x4? transform = null)
         {
             string name;
             switch (sphereType)
@@ -241,7 +241,7 @@ namespace Adamantium.Engine
             float height = 1f,
             float radius = 1f,
             int tesselation = 40,
-            Matrix4x4F? transform = null)
+            Matrix4x4? transform = null)
         {
             var template = new CapsuleTemplate(geometryType, radius, height, tesselation, transform);
             var primitive = await entityWorld.CreateEntityFromTemplate(template, owner, "Capsule", false);
@@ -252,11 +252,11 @@ namespace Adamantium.Engine
             EntityWorld entityWorld,
             Camera camera,
             GeometryType geometryType,
-            Vector2F diameter,
+            Vector2 diameter,
             Entity owner = null,
             Vector3? initialPosition = null,
             int tesselation = 40,
-            Matrix4x4F? transform = null)
+            Matrix4x4? transform = null)
         {
             var template = new PolygonTemplate(geometryType, diameter, tesselation, transform);
             var primitive = await entityWorld.CreateEntityFromTemplate(template, owner, "Polygon", false);
@@ -273,7 +273,7 @@ namespace Adamantium.Engine
             float height = 1,
             CornerRadius corners = default,
             int tesselation = 40,
-            Matrix4x4F? transform = null)
+            Matrix4x4? transform = null)
         {
             var template = new RectangleTemplate(geometryType, width, height, corners, tesselation, transform);
             var primitive = await entityWorld.CreateEntityFromTemplate(template, owner, "Rectangle", false);
@@ -285,14 +285,14 @@ namespace Adamantium.Engine
             Camera camera,
             GeometryType geometryType,
             EllipseType ellipseType,
-            Vector2F diameter,
+            Vector2 diameter,
             Entity owner = null,
             Vector3? initialPosition = null,
             float startAngle = 0,
             float stopAngle = 360,
             bool isClockwise = true,
             int tesselation = 40,
-            Matrix4x4F? transform = null)
+            Matrix4x4? transform = null)
         {
             var template = new EllipseTemplate(geometryType, ellipseType, diameter, startAngle, stopAngle, isClockwise, tesselation, transform);
             var primitive = await entityWorld.CreateEntityFromTemplate(template, owner, "Ellipse", false);
@@ -303,7 +303,7 @@ namespace Adamantium.Engine
             EntityWorld entityWorld,
             Camera camera,
             GeometryType geometryType,
-            Vector2F diameter,
+            Vector2 diameter,
             Entity owner = null,
             Vector3? initialPosition = null,
             float thickness = 0.1f,
@@ -311,7 +311,7 @@ namespace Adamantium.Engine
             float stopAngle = 360,
             bool isClockwise = true,
             int tesselation = 40,
-            Matrix4x4F? transform = null)
+            Matrix4x4? transform = null)
         {
             var template = new ArcTemplate(geometryType, diameter, thickness, startAngle, stopAngle, isClockwise, tesselation, transform);
             var primitive = await entityWorld.CreateEntityFromTemplate(template, owner, "Arc", false);
@@ -322,12 +322,12 @@ namespace Adamantium.Engine
             EntityWorld entityWorld,
             Camera camera,
             GeometryType geometryType,
-            Vector3F startPoint,
-            Vector3F endPoint,
+            Vector3 startPoint,
+            Vector3 endPoint,
             Entity owner = null,
             Vector3? initialPosition = null,
             float thickness = 0.1f,
-            Matrix4x4F? transform = null)
+            Matrix4x4? transform = null)
         {
             var template = new LineTemplate(geometryType, startPoint, endPoint, thickness, transform);
             var primitive = await entityWorld.CreateEntityFromTemplate(template, owner, "Line", false);

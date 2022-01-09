@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Models;
 
-namespace Adamantium.Engine.Compiler.Converter.ConversionUtils
+namespace Adamantium.Engine.Compiler.Models.ConversionUtils
 {
    //Класс используется для хранения индексов строк вершин, нормалей и текстурных координат 
    //для использования их при сборке геометрии в правильном порядке

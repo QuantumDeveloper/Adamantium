@@ -14,18 +14,18 @@ namespace Adamantium.Engine.Graphics
             private class UVSphere
             {
                 public static Mesh GenerateGeometry(
-                    float diameter = 1.0f,
+                    double diameter = 1.0,
                     int tessellation = 40)
                 {
 
                     int verticalSegments = tessellation;
                     int horizontalSegments = tessellation * 2;
 
-                    var vertices = new Vector3F[(verticalSegments + 1) * (horizontalSegments + 1)];
+                    var vertices = new Vector3[(verticalSegments + 1) * (horizontalSegments + 1)];
                     var uvs = new Vector2F[(verticalSegments + 1) * (horizontalSegments + 1)];
                     var indices = new int[verticalSegments * (horizontalSegments + 1) * 6];
 
-                    float radius = diameter / 2;
+                    var radius = diameter / 2;
 
                     int vertexCount = 0;
                     // Create rings of vertices at progressively higher latitudes.
@@ -49,7 +49,7 @@ namespace Adamantium.Engine.Graphics
                             dx *= dxz;
                             dz *= dxz;
 
-                            var normal = new Vector3F(dx, dy, dz);
+                            var normal = new Vector3(dx, dy, dz);
                             var textureCoordinate = new Vector2F(1.0f - u, 1.0f - v);
 
                             vertices[vertexCount] = normal * radius;
@@ -97,15 +97,15 @@ namespace Adamantium.Engine.Graphics
                 // Geodesic sphere
                 //--------------------------------------------------------------------------------------
 
-                private static readonly Vector3F[] OctahedronVertices =
+                private static readonly Vector3[] OctahedronVertices =
                 {
                     // when looking down the negative z-axis (into the screen)
-                    new Vector3F(0, 1, 0), // 0 top
-                    new Vector3F(0, 0, -1), // 1 front
-                    new Vector3F(1, 0, 0), // 2 right
-                    new Vector3F(0, 0, 1), // 3 back
-                    new Vector3F(-1, 0, 0), // 4 left
-                    new Vector3F(0, -1, 0), // 5 bottom
+                    new Vector3(0, 1, 0), // 0 top
+                    new Vector3(0, 0, -1), // 1 front
+                    new Vector3(1, 0, 0), // 2 right
+                    new Vector3(0, 0, 1), // 3 back
+                    new Vector3(-1, 0, 0), // 4 left
+                    new Vector3(0, -1, 0), // 5 bottom
                 };
 
                 private static readonly int[] OctahedronIndices = new int[]
@@ -120,11 +120,11 @@ namespace Adamantium.Engine.Graphics
                     5, 1, 2, // bottom front-right face
                 };
 
-                private List<Vector3F> vertexPositions;
+                private List<Vector3> vertexPositions;
 
                 private List<int> indexList;
 
-                private List<Vector3F> vertices;
+                private List<Vector3> vertices;
                 private List<Vector2F> uvs;
 
                 private unsafe int* indices;
@@ -141,7 +141,7 @@ namespace Adamantium.Engine.Graphics
                 /// <param name="tessellation">The tessellation.</param>
                 /// <returns>A <see cref="Mesh"/> containing all necesseray info in raw format.</returns>
                 public static Mesh GenerateGeometry(
-                    float diameter = 1.0f,
+                    double diameter = 1.0f,
                     int tessellation = 3)
                 {
                     var sphere = new GeoSphere();
@@ -155,15 +155,15 @@ namespace Adamantium.Engine.Graphics
                 /// <param name="tessellation">The tessellation.</param>
                 /// <returns>A Geodesic sphere.</returns>
                 private unsafe Mesh GenerateSphere(
-                    float diameter = 1.0f,
+                    double diameter = 1.0f,
                     int tessellation = 3)
                 {
                     subdividedEdges = new Dictionary<UndirectedEdge, int>();
 
-                    float radius = diameter / 2.0f;
+                    var radius = diameter / 2.0;
 
                     // Start with an octahedron; copy the data into the vertex/index collection.
-                    vertexPositions = new List<Vector3F>(OctahedronVertices);
+                    vertexPositions = new List<Vector3>(OctahedronVertices);
                     indexList = new List<int>(OctahedronIndices);
                     uvs = new List<Vector2F>();
 
@@ -191,9 +191,9 @@ namespace Adamantium.Engine.Graphics
                             int iv2 = indexList[iTriangle * 3 + 1];
 
                             // Get the new vertices
-                            Vector3F v01; // vertex on the midpoint of v0 and v1
-                            Vector3F v12; // ditto v1 and v2
-                            Vector3F v20; // ditto v2 and v0
+                            Vector3 v01; // vertex on the midpoint of v0 and v1
+                            Vector3 v12; // ditto v1 and v2
+                            Vector3 v20; // ditto v2 and v0
                             int iv01; // index of v01
                             int iv12; // index of v12
                             int iv20; // index of v20
@@ -238,7 +238,7 @@ namespace Adamantium.Engine.Graphics
                     }
 
                     // Now that we've completed subdivision, fill in the final vertex collection
-                    vertices = new List<Vector3F>(vertexPositions.Count);
+                    vertices = new List<Vector3>(vertexPositions.Count);
                     for (int i = 0; i < vertexPositions.Count; i++)
                     {
                         var vertexValue = vertexPositions[i];
@@ -413,7 +413,7 @@ namespace Adamantium.Engine.Graphics
 
                                 // Calculate the texcoords for the new pole vertex, add it to the vertices and update the index
                                 var newPoleUV = poleUV;
-                                newPoleUV.X = (vertices[*pOtherIndex0].X + vertices[*pOtherIndex1].X) * 0.5f;
+                                newPoleUV.X = (float)(vertices[*pOtherIndex0].X + vertices[*pOtherIndex1].X) * 0.5f;
                                 newPoleUV.Y = poleUV.Y;
 
                                 if (!overwrittenPoleVertex)
@@ -440,7 +440,7 @@ namespace Adamantium.Engine.Graphics
                 private void DivideEdge(
                     int i0,
                     int i1,
-                    out Vector3F outVertex,
+                    out Vector3 outVertex,
                     out int outIndex)
                 {
                     var edge = new UndirectedEdge(i0, i1);
@@ -522,7 +522,7 @@ namespace Adamantium.Engine.Graphics
             private class CubeSphere
             {
                 public static Mesh GenerateGeometry(
-                    float diameter,
+                    double diameter,
                     int tessellation = 3)
                 {
                     if (diameter <= 0)
@@ -562,7 +562,7 @@ namespace Adamantium.Engine.Graphics
                         theta = Math.Acos(z / d);
                         phi = Math.Atan2(y, x);
 
-                        Vector3F position = new Vector3F();
+                        var position = new Vector3();
                         position.X = (float) (radius * Math.Sin(theta) * Math.Cos(phi));
                         position.Y = (float) (radius * Math.Sin(theta) * Math.Sin(phi));
                         position.Z = (float) (radius * Math.Cos(theta));
@@ -578,24 +578,24 @@ namespace Adamantium.Engine.Graphics
             }
 
             public static Mesh GenerateOutlinedGeometry(
-                float diameter = 1.0f,
+                double diameter = 1.0,
                 int tessellation = 40)
             {
-                PrimitiveType primitiveType = PrimitiveType.LineStrip;
+                var primitiveType = PrimitiveType.LineStrip;
 
-                List<Vector3F> vertices = new List<Vector3F>();
-                List<int> indices = new List<int>();
-                Vector3F center = Vector3F.Zero;
+                var vertices = new List<Vector3>();
+                var indices = new List<int>();
+                var center = Vector3.Zero;
                 int lastIndex = 0;
-                float bottomRadius = diameter / 2;
+                double bottomRadius = diameter / 2;
 
                 for (int i = 0; i <= tessellation; ++i)
                 {
                     float angle = (float) Math.PI * 2 / tessellation * i;
 
-                    float x = center.X + bottomRadius * (float) Math.Cos(angle);
-                    float y = center.Y + bottomRadius * (float) Math.Sin(angle);
-                    vertices.Add(new Vector3F(x, 0, y));
+                    var x = center.X + bottomRadius * (float) Math.Cos(angle);
+                    var y = center.Y + bottomRadius * (float) Math.Sin(angle);
+                    vertices.Add(new Vector3(x, 0, y));
                     indices.Add(lastIndex++);
                 }
                 indices.Add(Shape.PrimitiveRestartValue);
@@ -604,9 +604,9 @@ namespace Adamantium.Engine.Graphics
                 {
                     float angle = (float) Math.PI * 2 / tessellation * i;
 
-                    float x = center.X + bottomRadius * (float) Math.Cos(angle);
-                    float y = center.Y + bottomRadius * (float) Math.Sin(angle);
-                    vertices.Add(new Vector3F(x, y, 0));
+                    var x = center.X + bottomRadius * (float) Math.Cos(angle);
+                    var y = center.Y + bottomRadius * (float) Math.Sin(angle);
+                    vertices.Add(new Vector3(x, y, 0));
                     indices.Add(lastIndex++);
                 }
 
@@ -616,9 +616,9 @@ namespace Adamantium.Engine.Graphics
                 {
                     float angle = (float) Math.PI * 2 / tessellation * i;
 
-                    float x = center.X + bottomRadius * (float) Math.Cos(angle);
-                    float y = center.Y + bottomRadius * (float) Math.Sin(angle);
-                    vertices.Add(new Vector3F(0, x, y));
+                    var x = center.X + bottomRadius * (float) Math.Cos(angle);
+                    var y = center.Y + bottomRadius * (float) Math.Sin(angle);
+                    vertices.Add(new Vector3(0, x, y));
                     indices.Add(lastIndex++);
                 }
 
@@ -636,7 +636,6 @@ namespace Adamantium.Engine.Graphics
             /// <param name="device">The device.</param>
             /// <param name="diameter">The diameter.</param>
             /// <param name="tessellation">The tessellation.</param>
-            /// <param name="toRightHanded">if set to <c>true</c> vertices and indices will be transformed to left handed. Default is true.</param>
             /// <returns>A sphere primitive.</returns>
             /// <exception cref="System.ArgumentOutOfRangeException">tessellation;Must be >= 3</exception>
             public static Shape New(
@@ -645,10 +644,9 @@ namespace Adamantium.Engine.Graphics
                 SphereType sphereType,
                 float diameter = 1.0f,
                 int tessellation = 8,
-                Matrix4x4F? transform = null,
-                bool toRightHanded = false)
+                Matrix4x4? transform = null)
             {
-                var geometry = GenerateGeometry(geometryType, sphereType, diameter, tessellation, transform, toRightHanded);
+                var geometry = GenerateGeometry(geometryType, sphereType, diameter, tessellation, transform);
                 // Create the primitive object.
                 return new Shape(device, geometry);
             }
@@ -656,10 +654,9 @@ namespace Adamantium.Engine.Graphics
             public static Mesh GenerateGeometry(
                 GeometryType geometryType,
                 SphereType sphereType,
-                float diameter = 1.0f,
+                double diameter = 1.0f,
                 int tessellation = 40,
-                Matrix4x4F? transform = null,
-                bool toRightHanded = false)
+                Matrix4x4? transform = null)
             {
                 if (tessellation < 3 && sphereType != SphereType.GeoSphere)
                 {

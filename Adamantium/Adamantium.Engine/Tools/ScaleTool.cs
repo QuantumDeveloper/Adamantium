@@ -105,8 +105,7 @@ namespace Adamantium.Engine.Tools
             if (IsLocked)
             {
                 HighlightSelectedTool(true);
-                Vector3F interPoint;
-                var intersects = GetRayPlaneIntersectionPoint(camera, inputService, out interPoint);
+                var intersects = GetRayPlaneIntersectionPoint(camera, inputService, out var interPoint);
                 if (intersects)
                 {
                     TransformEntityScale(targetEntity, camera, interPoint);
@@ -132,7 +131,7 @@ namespace Adamantium.Engine.Tools
             {
                 if (!float.IsNaN(_scale.X) && !float.IsInfinity(_scale.X))
                 {
-                    var left = Vector3F.Normalize(selectedTool.GetActualMatrix(camera).Left);
+                    var left = Vector3.Normalize(selectedTool.GetActualMatrix(camera).Left);
                     var angle = Vector3F.Dot(camera.Backward, left);
                     _scale.X = CheckScale(_scale.X, angle);
                     targetEntity.TraverseInDepth(
@@ -152,7 +151,7 @@ namespace Adamantium.Engine.Tools
             {
                 if (!float.IsNaN(_scale.Y) && !float.IsInfinity(_scale.Y))
                 {
-                    var up = Vector3F.Normalize(selectedTool.GetActualMatrix(camera).Down);
+                    var up = Vector3F.Normalize(selectedTool.GetActualMatrixF(camera).Down);
                     var angle = Vector3F.Dot(camera.Backward, up);
                     _scale.Y = CheckScale(_scale.Y, angle);
                     targetEntity.TraverseInDepth(
@@ -175,7 +174,7 @@ namespace Adamantium.Engine.Tools
             {
                 if (!float.IsNaN(_scale.Z) && !float.IsInfinity(_scale.Z))
                 {
-                    var backward = Vector3F.Normalize(selectedTool.GetActualMatrix(camera).Forward);
+                    var backward = Vector3F.Normalize(selectedTool.GetActualMatrixF(camera).Forward);
                     var angle = Vector3F.Dot(camera.Backward, backward);
                     _scale.Z = CheckScale(_scale.Z, angle);
                     targetEntity.TraverseInDepth(
@@ -197,7 +196,7 @@ namespace Adamantium.Engine.Tools
             {
                 if (!float.IsNaN(_scale.X) && !float.IsInfinity(_scale.X))
                 {
-                    var right = Vector3F.Normalize(selectedTool.GetActualMatrix(camera).Up);
+                    var right = Vector3F.Normalize(selectedTool.GetActualMatrixF(camera).Up);
                     var angle = Vector3F.Dot(camera.Backward, right);
                     var averageScale = (_scale.X + _scale.Z) / 2;
                     //averageScale = CheckScale(averageScale, angle);
@@ -232,7 +231,7 @@ namespace Adamantium.Engine.Tools
             {
                 if (!float.IsNaN(_scale.X) && !float.IsInfinity(_scale.X))
                 {
-                    var right = Vector3F.Normalize(selectedTool.GetActualMatrix(camera).Right);
+                    var right = Vector3F.Normalize(selectedTool.GetActualMatrixF(camera).Right);
                     var angle = Vector3F.Dot(camera.Backward, right);
                     var averageScale = (_scale.Y + _scale.Z) / 2;
                     //averageScale = CheckScale(averageScale, angle);
@@ -268,7 +267,7 @@ namespace Adamantium.Engine.Tools
                 if (!float.IsNaN(_scale.X) && !float.IsInfinity(_scale.X))
                 {
                     var right = Vector3F.Normalize(
-                        selectedTool.GetActualMatrix(camera).Forward);
+                        selectedTool.GetActualMatrixF(camera).Forward);
                     var angle = Vector3F.Dot(camera.Backward, right);
                     var averageScale = (_scale.X + _scale.Y) / 2;
                     //averageScale = CheckScale(averageScale, angle);
@@ -304,7 +303,7 @@ namespace Adamantium.Engine.Tools
             {
                 var average = Vector3F.Average(_scale);
 
-                var forward = Vector3F.Normalize(selectedTool.GetActualMatrix(camera).Backward);
+                var forward = Vector3F.Normalize(selectedTool.GetActualMatrixF(camera).Backward);
                 var angle = Vector3F.Dot(camera.Forward, forward);
                 //average = CheckScale(average, angle);
 

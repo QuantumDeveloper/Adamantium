@@ -1,16 +1,15 @@
 ﻿using Adamantium.UI.RoutedEvents;
 
-namespace Adamantium.UI.Input
-{
-   public class KeyboardFocusChangedEventArgs:RoutedEventArgs
-   {
-      public IInputElement OldFocus { get; private set; }
-      public IInputElement NewFocus { get; private set; }
+namespace Adamantium.UI.Input;
 
-      public KeyboardFocusChangedEventArgs(IInputElement oldFocus, IInputElement newFocus)
-      {
-         OldFocus = oldFocus;
-         NewFocus = newFocus;
-      }
+public class KeyboardFocusChangedEventArgs:RoutedEventArgs
+{
+   public IInputElement OldFocus { get; private set; }
+   public IInputElement NewFocus { get; private set; }
+
+   public KeyboardFocusChangedEventArgs(IInputElement oldFocus, IInputElement newFocus)
+   {
+      OldFocus = oldFocus;
+      NewFocus = newFocus;
    }
 }

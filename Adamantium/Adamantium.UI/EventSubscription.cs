@@ -1,10 +1,9 @@
 ﻿using System;
 
-namespace Adamantium.UI
+namespace Adamantium.UI;
+
+internal class EventSubscription
 {
-   internal class EventSubscription
-   {
-      public Delegate Handler { get; set; }
-      public bool HandledEeventToo { get; set; }
-   }
+   public Delegate Handler { get; set; }
+   public bool HandledEeventToo { get; set; }
 }

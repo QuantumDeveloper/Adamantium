@@ -1,22 +1,29 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using Adamantium.Engine.Core.Models;
 using Adamantium.Engine.Graphics;
 using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
 using Adamantium.Mathematics;
 
-namespace Adamantium.Engine.Templates.Camera
+namespace Adamantium.Engine.Templates.CameraTemplates
 {
     public class CameraIconTemplate
     {
         public Entity BuildEntity(Entity owner, string name)
         {
             var rectangle = Shapes.Rectangle.GenerateGeometry(GeometryType.Outlined, 0.5f, 0.3f, new CornerRadius(0.05f), 10);
-            
-            var ellipse1 = Shapes.Ellipse.GenerateGeometry(GeometryType.Outlined, EllipseType.EdgeToEdge, new Vector2F(0.3f), 0, 360, true, 40, Matrix4x4F.Translation(-0.25f, 0.15f, 0));
-            var ellipse2 = ellipse1.Clone(Matrix4x4F.Translation(0.24f, 0.12f, 0));
+
+            var ellipse1 = Shapes.Ellipse.GenerateGeometry(
+                GeometryType.Outlined, 
+                EllipseType.EdgeToEdge,
+                new Vector2(0.3f), 
+                0, 
+                360, 
+                true, 
+                40, 
+                Matrix4x4.Translation(-0.25f, 0.15f, 0));
+            var ellipse2 = ellipse1.Clone(Matrix4x4.Translation(0.24, 0.12, 0));
 
             var lensPoints = new List<Vector2>();
             lensPoints.Add(new Vector2(0.24, 0.05));

@@ -39,7 +39,7 @@ namespace Adamantium.Engine
             var scene = converter.ImportFileAsync(parameters.AssetPath);
             timer.Stop();
             //MessageBox.Show("Time: "+timer.Elapsed);
-            var initialPosition = Vector3F.Zero;
+            var initialPosition = Vector3.Zero;
             return await entityWorld.CreateEntityFromTemplate(new EntityImportTemplate(scene, contentManager, initialPosition));
          }
       }

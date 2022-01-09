@@ -1,9 +1,8 @@
 using Adamantium.Core.Events;
 
-namespace Adamantium.UI.AggregatorEvents
+namespace Adamantium.UI.AggregatorEvents;
+
+public class WindowAddedEvent : BasicAggregatorEvent<WindowBase>
 {
-    public class WindowAddedEvent : BasicAggregatorEvent<WindowBase>
-    {
         
-    }
 }

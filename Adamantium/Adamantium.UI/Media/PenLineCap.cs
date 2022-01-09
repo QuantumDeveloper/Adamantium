@@ -1,12 +1,11 @@
-﻿namespace Adamantium.UI.Media
+﻿namespace Adamantium.UI.Media;
+
+public enum PenLineCap
 {
-   public enum PenLineCap
-   {
-      Flat,
-      Square,
-      ConvexTriangle,
-      ConcaveTriangle,
-      ConvexRound,
-      ConcaveRound
-   }
+   Flat,
+   Square,
+   ConvexTriangle,
+   ConcaveTriangle,
+   ConvexRound,
+   ConcaveRound
 }

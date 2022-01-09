@@ -19,7 +19,7 @@ namespace Adamantium.Engine.Graphics
                 float height,
                 CornerRadius corners,
                 int tessellation = 20,
-                Matrix4x4F? transform = null
+                Matrix4x4? transform = null
             )
             {
                 var geometry = GenerateGeometry(
@@ -34,11 +34,11 @@ namespace Adamantium.Engine.Graphics
 
             public static Mesh GenerateGeometry(
                 GeometryType type,
-                float width,
-                float height,
+                double width,
+                double height,
                 CornerRadius corners,
                 int tessellation = 20,
-                Matrix4x4F? transform = null)
+                Matrix4x4? transform = null)
             {
                 var primitiveType = PrimitiveType.TriangleList;
                 if (type == GeometryType.Outlined)
@@ -115,13 +115,14 @@ namespace Adamantium.Engine.Graphics
                 {
                     mesh.SetPoints(vertices);
                 }
-                mesh.GenerateBasicIndices().Optimize();
+                //mesh.GenerateBasicIndices().Optimize();
+                mesh.GenerateBasicIndices();
 
                 var uvs = new List<Vector2F>();
                 foreach (var vertex in mesh.Points)
                 {
-                    var u = vertex.X / width;
-                    var v = vertex.Y / height;
+                    var u = (float)(vertex.X / width);
+                    var v = (float)(vertex.Y / height);
                     uvs.Add(new Vector2F(u, v));
                 }
                 
@@ -130,7 +131,25 @@ namespace Adamantium.Engine.Graphics
                 return mesh;
             }
 
-            private static void ValidateCorners(ref CornerRadius corners, float side)
+            private static void GenerateRoundCorner(
+                int tessellation,
+                float startAngle,
+                Vector2 center,
+                Vector2 radius,
+                List<Vector2> vertices)
+            {
+                var angleItem = -MathHelper.DegreesToRadians(rectangleSector / tessellation);
+                var angle = MathHelper.DegreesToRadians(startAngle);
+                for (int i = 0; i <= tessellation; ++i)
+                {
+                    var x = center.X + (radius.X * Math.Cos(angle));
+                    var y = center.Y - (radius.Y * Math.Sin(angle));
+                    angle += angleItem;
+                    vertices.Add( Vector2.Round(x, y, 3));
+                }
+            }
+            
+            private static void ValidateCorners(ref CornerRadius corners, double side)
             {
                 if (corners.TopLeft < 0)
                 {
@@ -169,26 +188,6 @@ namespace Adamantium.Engine.Graphics
                 if (corners.BottomLeft > halfSize)
                 {
                     corners.BottomLeft = halfSize;
-                }
-            }
-
-            private static void GenerateRoundCorner(
-                int tessellation,
-                float startAngle,
-                Vector2 center,
-                Vector2 radius,
-                List<Vector2> vertices)
-            {
-                var angleItem = -MathHelper.DegreesToRadians(rectangleSector / tessellation);
-                var angle = MathHelper.DegreesToRadians(startAngle);
-                for (int i = 0; i <= tessellation; ++i)
-                {
-                    var x = center.X + (radius.X * (float) Math.Cos(angle));
-                    var y = center.Y - (radius.Y * (float) Math.Sin(angle));
-                    angle += angleItem;
-                    x = Math.Round(x, 3);
-                    y = Math.Round(y, 3);
-                    vertices.Add(new Vector2(x, y));
                 }
             }
         }

@@ -79,7 +79,12 @@ namespace Adamantium.EntityFramework.Components.Extensions
             return Vector3F.Max(collision.Bounds.Size);
         }
 
-        public static Matrix4x4F GetActualMatrix(this Entity owner, CameraBase camera)
+        public static Matrix4x4F GetActualMatrixF(this Entity owner, CameraBase camera)
+        {
+            return owner.Transform.GetMetadata(camera).WorldMatrixF;
+        }
+        
+        public static Matrix4x4 GetActualMatrix(this Entity owner, CameraBase camera)
         {
             return owner.Transform.GetMetadata(camera).WorldMatrix;
         }

@@ -13,13 +13,13 @@ namespace Adamantium.Engine.Graphics
             public static Shape New(
                 GraphicsDevice graphicsDevice,
                 GeometryType shapeType,
-                Vector2F diameter,
+                Vector2 diameter,
                 float thickness,
                 float startAngle = 0,
                 float stopAngle = 360,
                 bool isClockWise = true,
                 int tessellation = 36,
-                Matrix4x4F? transform = null)
+                Matrix4x4? transform = null)
             {
                 var mesh = GenerateGeometry(
                     shapeType, 
@@ -36,13 +36,13 @@ namespace Adamantium.Engine.Graphics
 
         public static Mesh GenerateGeometry(
                GeometryType shapeType,
-               Vector2F diameter,
-               float thickness,
+               Vector2 diameter,
+               double thickness,
                float startAngle = 0,
                float stopAngle = 360,
                bool isClockWise = true,
                int tessellation = 36,
-               Matrix4x4F? transform = null)
+               Matrix4x4? transform = null)
             {
                 if (Math.Abs(stopAngle - startAngle) > 360)
                 {
@@ -55,12 +55,12 @@ namespace Adamantium.Engine.Graphics
                     primitiveType = PrimitiveType.LineStrip;
                 }
 
-                List<Vector2F> uvs = new List<Vector2F>();
-                List<Vector3F> vertices = new List<Vector3F>();
-                List<int> indices = new List<int>();
-                Vector2F center = Vector2F.Zero;
-                float radiusX = diameter.X / 2;
-                float radiusY = diameter.Y / 2;
+                var uvs = new List<Vector2F>();
+                var vertices = new List<Vector3>();
+                var indices = new List<int>();
+                var center = Vector2.Zero;
+                double radiusX = diameter.X / 2;
+                double radiusY = diameter.Y / 2;
 
                 if (thickness >= radiusX)
                 {
@@ -80,9 +80,9 @@ namespace Adamantium.Engine.Graphics
                 startAngle = MathHelper.DegreesToRadians(startAngle);
                 angle = startAngle * sign;
 
-                Vector3F vertex = Vector3F.Zero;
+                var vertex = Vector3.Zero;
 
-                Mesh mesh = new Mesh();
+                var mesh = new Mesh();
                 mesh.MeshTopology = primitiveType;
 
                 if (shapeType == GeometryType.Solid)
@@ -160,10 +160,10 @@ namespace Adamantium.Engine.Graphics
                 return mesh;
             }
 
-            private static Vector3F CreatePoint(Vector2F center, float radiusX, float radiusY, float thickness, float angle)
+            private static Vector3 CreatePoint(Vector2 center, double radiusX, double radiusY, double thickness, float angle)
             {
-                float x = center.X + ((radiusX - thickness) * (float)Math.Cos(angle));
-                float y = center.Y + ((radiusY - thickness) * (float)Math.Sin(angle));
+                var x = center.X + ((radiusX - thickness) * (float)Math.Cos(angle));
+                var y = center.Y + ((radiusY - thickness) * (float)Math.Sin(angle));
                 if (Math.Abs(x) < Mathematics.Polygon.Epsilon)
                 {
                     x = 0;
@@ -172,7 +172,7 @@ namespace Adamantium.Engine.Graphics
                 {
                     y = 0;
                 }
-                var vertex = new Vector3F(x, y, 0);
+                var vertex = new Vector3(x, y, 0);
                 return vertex;
             }
         }

@@ -1,4 +1,4 @@
-﻿namespace Adamantium.Engine.Compiler.Converter.ConversionUtils
+﻿namespace Adamantium.Engine.Compiler.Models.ConversionUtils
 {
    /// <summary>
    /// Desrbibes chunk code for parsing 3DS file format

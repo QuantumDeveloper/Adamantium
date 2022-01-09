@@ -15,21 +15,21 @@ namespace Adamantium.Engine.Graphics
 
             public static Mesh GenerateGeometry(
                 GeometryType geometryType, 
-                float width, 
-                float length, 
+                double width, 
+                double length, 
                 int tessellation = 1, 
-                Matrix4x4F? transform = null)
+                Matrix4x4? transform = null)
             {
                 return GenerateGeometry(geometryType, width, length, tessellation, Vector2F.One, transform);
             }
 
             public static Mesh GenerateGeometry(
                 GeometryType geometryType, 
-                float width, 
-                float length, 
+                double width, 
+                double length, 
                 int tessellation, 
                 Vector2F uvFactor, 
-                Matrix4x4F? transform = null)
+                Matrix4x4? transform = null)
             {
                 if (width <= 0)
                 {
@@ -62,13 +62,13 @@ namespace Adamantium.Engine.Graphics
             }
 
             private static Mesh GenerateSolidGeometry(
-                float width,
-                float length,
+                double width,
+                double length,
                 int tessellation,
                 Vector2F uvFactor)
             {
                 var lineWidth = tessellation + 1;
-                var vertices = new Vector3F[lineWidth * lineWidth];
+                var vertices = new Vector3[lineWidth * lineWidth];
                 var uvs = new Vector2F[lineWidth * lineWidth];
 
                 var sizeX = width / 2;
@@ -83,7 +83,7 @@ namespace Adamantium.Engine.Graphics
                 {
                     for (int x = 0; x < lineWidth; ++x)
                     {
-                        Vector3F pos = new Vector3F(-sizeX + deltaX * x, 0, -sizeZ + deltaZ * z);
+                        var pos = new Vector3(-sizeX + deltaX * x, 0, -sizeZ + deltaZ * z);
                         var uv = new Vector2F(1.0f - (1.0f * x / tessellation * uvFactor.X), 1.0f * z / tessellation * uvFactor.Y);
                         vertices[vertexCount] = pos;
                         uvs[vertexCount] = uv;
@@ -129,17 +129,17 @@ namespace Adamantium.Engine.Graphics
             }
 
             private static Mesh GenerateOutlinedGeometry(
-                float width,
-                float length)
+                double width,
+                double length)
             {
                 var startPositionX = width / 2;
                 var startPositionY = length / 2;
 
-                var vertices = new List<Vector3F>();
-                vertices.Add(new Vector3F(-startPositionX, -startPositionY, 0));
-                vertices.Add(new Vector3F(startPositionX, -startPositionY, 0));
-                vertices.Add(new Vector3F(startPositionX, startPositionY, 0));
-                vertices.Add(new Vector3F(-startPositionX, startPositionY, 0));
+                var vertices = new List<Vector3>();
+                vertices.Add(new Vector3(-startPositionX, -startPositionY, 0));
+                vertices.Add(new Vector3(startPositionX, -startPositionY, 0));
+                vertices.Add(new Vector3(startPositionX, startPositionY, 0));
+                vertices.Add(new Vector3(-startPositionX, startPositionY, 0));
 
                 var mesh = new Mesh();
                 mesh.SetTopology(PrimitiveType.LineStrip).
@@ -156,7 +156,7 @@ namespace Adamantium.Engine.Graphics
                 float length, 
                 int tessellation, 
                 Vector2F uvFactor, 
-                Matrix4x4F? transform = null)
+                Matrix4x4? transform = null)
             {
                 var geometry = GenerateGeometry(geometryType, width, length, tessellation, uvFactor, transform);
                 return new Shape(device, geometry);

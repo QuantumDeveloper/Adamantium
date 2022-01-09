@@ -2,6 +2,17 @@ namespace Adamantium.UI.Media;
 
 public class LineSegment : PathSegment
 {
+    public LineSegment()
+    {
+        
+    }
+
+    public LineSegment(Vector2 point, bool isStroked)
+    {
+        Point = point;
+        IsStroked = isStroked;
+    }
+    
     public static readonly AdamantiumProperty PointProperty =
         AdamantiumProperty.Register(nameof(Point), typeof(Vector2), typeof(LineSegment),
             new PropertyMetadata(Vector2.Zero, PropertyMetadataOptions.AffectsMeasure));

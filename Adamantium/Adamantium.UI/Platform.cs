@@ -1,10 +1,9 @@
-namespace Adamantium.UI
+namespace Adamantium.UI;
+
+public enum Platform
 {
-    public enum Platform
-    {
-        Windows,
-        OSX,
-        Linux,
-        FreeBSD
-    }
+    Windows,
+    OSX,
+    Linux,
+    FreeBSD
 }

@@ -1,9 +1,8 @@
-﻿namespace Adamantium.UI.Controls
+﻿namespace Adamantium.UI.Controls;
+
+public enum GridResizeBehavior
 {
-   public enum GridResizeBehavior
-   {
-      PreviousAndNext = 1,
-      PreviousAndCurrent = 2,
-      CurrentAndNext = 3
-   }
+   PreviousAndNext = 1,
+   PreviousAndCurrent = 2,
+   CurrentAndNext = 3
 }

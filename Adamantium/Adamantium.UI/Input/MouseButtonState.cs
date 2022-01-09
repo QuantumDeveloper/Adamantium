@@ -1,8 +1,7 @@
-﻿namespace Adamantium.UI.Input
+﻿namespace Adamantium.UI.Input;
+
+public enum MouseButtonState
 {
-   public enum MouseButtonState
-   {
-      Pressed = 0,
-      Relesed = 1
-   }
+   Pressed = 0,
+   Relesed = 1
 }

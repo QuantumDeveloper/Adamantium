@@ -1,4 +1,4 @@
-using System;
+using System.Collections.Generic;
 
 namespace Adamantium.UI.Media;
 
@@ -8,21 +8,30 @@ public class BSplineSegment : PolylineSegment
     {
         
     }
-    
-    public static readonly AdamantiumProperty SampleRateProperty =
-        AdamantiumProperty.Register(nameof(SampleRate), typeof(UInt32), typeof(BSplineSegment),
-            new PropertyMetadata((uint)20, PropertyMetadataOptions.AffectsMeasure));
 
-    public UInt32 SampleRate
+    public BSplineSegment(IEnumerable<Vector2> points, bool isStroked)
     {
-        get => GetValue<UInt32>(SampleRateProperty);
-        set => SetValue(SampleRateProperty, value);
+        Points = new PointsCollection(points);
+        IsStroked = isStroked;
     }
     
     internal override Vector2[] ProcessSegment(Vector2 currentPoint)
     {
         var points = new PointsCollection { currentPoint };
         points.AddRange(Points);
-        return MathHelper.GetBSpline2(points, SampleRate).ToArray();
+        var rate = CalculatePointsLength(points);
+        return MathHelper.GetBSpline2(points, (uint)rate).ToArray();
+    }
+    
+    protected double CalculatePointsLength(PointsCollection points)
+    {
+        double cumulativeLength = 0;
+        for (int i = 0; i < points.Count - 1; i++)
+        {
+            var vector = points[i + 1] - points[i];
+            cumulativeLength += vector.Length();
+        }
+
+        return cumulativeLength / points.Count;
     }
 }

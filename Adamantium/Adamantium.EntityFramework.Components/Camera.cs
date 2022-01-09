@@ -47,8 +47,8 @@ namespace Adamantium.EntityFramework.Components
             IsDepthInversed = !inverseDepth;
             Rotation = QuaternionF.Identity;
 
-            LookAt = Vector3F.ForwardLH;
-            Up = -Vector3F.UnitY;
+            LookAt = Vector3.ForwardLH;
+            Up = -Vector3.UnitY;
             Velocity = 1;
             CurrentVelocity = 0;
             WheelVelocity = 1;
@@ -82,7 +82,7 @@ namespace Adamantium.EntityFramework.Components
         /// <param name="zfar">Distance to far plane</param>
         /// <param name="inverseDepth">Is depth should be inverted</param>
         /// <remarks>If <paramref name="inverseDepth"/> is true, then znear and zfar will be swap when creating projection matrix</remarks>
-        public Camera(Vector3F lookAt, Vector3F up, Single fov, UInt32 width, UInt32 height,
+        public Camera(Vector3 lookAt, Vector3 up, Single fov, UInt32 width, UInt32 height,
            Single znear, Single zfar, bool inverseDepth = true)
         {
             IsDepthInversed = inverseDepth;
@@ -197,9 +197,9 @@ namespace Adamantium.EntityFramework.Components
 
         private void GetAxisFromViewMatrix()
         {
-            Right = new Vector3F(ViewMatrix.M11, ViewMatrix.M21, ViewMatrix.M31);
-            Up = new Vector3F(ViewMatrix.M12, ViewMatrix.M22, ViewMatrix.M32);
-            Forward = new Vector3F(ViewMatrix.M13, ViewMatrix.M23, ViewMatrix.M33);
+            Right = new Vector3(ViewMatrix.M11, ViewMatrix.M21, ViewMatrix.M31);
+            Up = new Vector3(ViewMatrix.M12, ViewMatrix.M22, ViewMatrix.M32);
+            Forward = new Vector3(ViewMatrix.M13, ViewMatrix.M23, ViewMatrix.M33);
         }
 
         /// <inheritdoc />
@@ -467,7 +467,7 @@ namespace Adamantium.EntityFramework.Components
         }
 
         /// <inheritdoc />
-        public override void SetFreeCamera(Vector3 position, Vector3 lookAt, Vector3F up)
+        public override void SetFreeCamera(Vector3 position, Vector3 lookAt, Vector3 up)
         {
             DeleteThirdPersonConfig(); // sets camera type to Free here (inside method)
 

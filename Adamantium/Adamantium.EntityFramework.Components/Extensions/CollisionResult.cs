@@ -12,7 +12,7 @@ namespace Adamantium.EntityFramework.Components.Extensions
     {
         public float? Distance { get; private set; }
         public Entity Entity { get; set; }
-        public Vector3F IntersectionPoint { get; set; }
+        public Vector3 IntersectionPoint { get; set; }
         public bool Intersects { get; set; }
 
         public CompareOrder CompareOrder { get; set; }
@@ -27,7 +27,7 @@ namespace Adamantium.EntityFramework.Components.Extensions
 
         public void ValidateAndSetValues(
             Entity entity,
-            Vector3F interPoint,
+            Vector3 interPoint,
             bool intersects)
         {
             if (!intersects)

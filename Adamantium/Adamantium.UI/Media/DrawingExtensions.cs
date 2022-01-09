@@ -1,7 +1,6 @@
-﻿namespace Adamantium.UI.Media
+﻿namespace Adamantium.UI.Media;
+
+public static class DrawingExtensions
 {
-   public static class DrawingExtensions
-   {
       
-   }
 }

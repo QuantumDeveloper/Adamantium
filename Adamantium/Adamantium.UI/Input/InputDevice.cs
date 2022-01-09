@@ -1,7 +1,6 @@
-﻿namespace Adamantium.UI.Input
+﻿namespace Adamantium.UI.Input;
+
+public abstract class InputDevice
 {
-   public abstract class InputDevice
-   {
-      public abstract IInputElement TargetElement { get; protected set; }
-   }
+   public abstract IInputElement TargetElement { get; protected set; }
 }

@@ -33,8 +33,8 @@ namespace Adamantium.Mathematics
       /// <param name="radius">The radius of the sphere.</param>
       public BoundingSphere(Vector3F center, float radius)
       {
-         this.Center = center;
-         this.Radius = radius;
+         Center = center;
+         Radius = radius;
       }
 
       /// <summary>

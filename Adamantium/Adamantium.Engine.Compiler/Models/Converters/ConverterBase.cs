@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Adamantium.Engine.Compiler.Converter.Configs;
-using Adamantium.Engine.Compiler.Converter.ConversionUtils;
 using Adamantium.Engine.Compiler.Converter.Parsers;
+using Adamantium.Engine.Compiler.Models.ConversionUtils;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Models;
 using Adamantium.Mathematics;
@@ -291,77 +291,6 @@ namespace Adamantium.Engine.Compiler.Converter.Converters
             geometryData.Bitangents.AddRange(bitangentArray);
             geometryData.Tangents.AddRange(tangentArray);
             geometryData.Semantic |= VertexSemantic.TangentBiNormal;
-         }
-      }
-
-      //Конвертировать меш из одной системы координат в другую и изменить UP вектор
-      public void ChangeCoordinateSystem(SceneData.Geometry geometry)
-      {
-         var convertFrom = UpAxis;
-         UpAxis convertTo = UpAxis.Y_UP_LH;
-         if (Config.ConvertToRHDirectX || Config.ConvertToOGL)
-         {
-            convertTo = UpAxis.Y_UP_RH;
-         }
-         Vector3F position;
-         if (convertTo != convertFrom)
-         {
-            switch (convertFrom)
-            {
-               case UpAxis.Z_UP:
-                  switch (convertTo)
-                  {
-                     case UpAxis.Y_UP_RH:
-                        for (int i = 0; i < geometry.Positions.Count; i++)
-                        {
-                           position = geometry.Positions[i];
-                           //Меняем позиции вершин
-                           var z = -position.Y;
-                           position.Y = position.Z;
-                           position.Z = z;
-
-                           geometry.Positions[i] = position;
-
-                           ConvertUVs(geometry, i);
-                        }
-                        ChangeDrawOrder(geometry);
-                        break;
-
-                     case UpAxis.Y_UP_LH:
-                        for (int i = 0; i < geometry.Positions.Count; i++)
-                        {
-                           position = geometry.Positions[i];
-                           //Меняем позиции вершин
-                           var z = position.Y;
-                           position.Y = position.Z;
-                           position.Z = z;
-                           geometry.Positions[i] = position;
-
-                           ConvertUVs(geometry, i);
-                        }
-                        ChangeDrawOrder(geometry);
-                        break;
-                  }
-                  break;
-
-               case UpAxis.Y_UP_RH:
-                  switch (convertTo)
-                  {
-                     case UpAxis.Y_UP_LH:
-                        for (int i = 0; i < geometry.Positions.Count; i++)
-                        {
-                           position = geometry.Positions[i];
-                           //Меняем позиции вершин
-                           position.Z = -position.Z;
-                           geometry.Positions[i] = position;
-
-                           ConvertUVs(geometry, i);
-                        }
-                        ChangeDrawOrder(geometry);
-                        break;
-                  }
-                  break;
-            }
          }
       }
 

@@ -1,6 +1,8 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
+using Adamantium.Core;
 using Adamantium.Engine.Core;
 using Adamantium.UI.Controls;
 using Adamantium.UI.RoutedEvents;
@@ -13,13 +15,11 @@ public class PathGeometry : Geometry
     private readonly Dictionary<PathFigure, PolygonItem> figureToPolygon;
     private Dictionary<PathFigure, Vector2[]> outlines;
     private Rect bounds;
-    private Pen pen;
     
-    public PathGeometry(Pen pen)
+    public PathGeometry()
     {
         figureToPolygon = new Dictionary<PathFigure, PolygonItem>();
         outlines = new Dictionary<PathFigure, Vector2[]>();
-        this.pen = pen;
     }
 
     public static readonly AdamantiumProperty FillRuleProperty = AdamantiumProperty.Register(nameof(FillRule),
@@ -66,6 +66,8 @@ public class PathGeometry : Geometry
 
     public override void RecalculateBounds()
     {
+        if (Figures == null) return;
+        
         var points = new List<Vector2>();
         foreach (var figure in Figures)
         {
@@ -82,10 +84,10 @@ public class PathGeometry : Geometry
         bounds = new Rect(new Vector2(minX, minY), new Vector2(maxX, maxY));
     }
 
-    protected internal override void ProcessGeometry()
+    protected internal override void ProcessGeometryCore()
     {
         figureToPolygon.Clear();
-        OutlineMesh.ClearLayers();
+        OutlineMesh.ClearContours();
         
         foreach (var figure in Figures)
         {
@@ -99,7 +101,7 @@ public class PathGeometry : Geometry
         var polygon = new Polygon();
         foreach (var polygonItem in figureToPolygon)
         {
-            if (polygonItem.Key.IsFilled) continue;
+            if (!polygonItem.Key.IsFilled) continue;
             
             polygon.AddItem(polygonItem.Value);
         }
@@ -109,7 +111,12 @@ public class PathGeometry : Geometry
 
         foreach (var outline in outlines)
         {
-            OutlineMesh.AddLayer(outline.Value, outline.Key.IsClosed);
+            OutlineMesh.AddContour(Utilities.ToVector3(outline.Value), outline.Key.IsClosed);
         }
+    }
+
+    public static PathGeometry Parse(string geometry)
+    {
+        return null;
     }
 }

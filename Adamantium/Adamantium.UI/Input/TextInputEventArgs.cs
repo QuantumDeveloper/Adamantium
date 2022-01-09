@@ -1,14 +1,13 @@
 ﻿using Adamantium.UI.RoutedEvents;
 
-namespace Adamantium.UI.Input
-{
-   public class TextInputEventArgs:RoutedEventArgs
-   {
-      public string Text { get; private set; }
+namespace Adamantium.UI.Input;
 
-      public TextInputEventArgs(string text)
-      {
-         Text = text;
-      }
+public class TextInputEventArgs:RoutedEventArgs
+{
+   public string Text { get; private set; }
+
+   public TextInputEventArgs(string text)
+   {
+      Text = text;
    }
 }

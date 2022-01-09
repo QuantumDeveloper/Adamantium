@@ -16,7 +16,7 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
             float width,
             float length,
             int tessellation = 1,
-            Matrix4x4F? transform = null) : base(geometryType, tessellation, transform)
+            Matrix4x4? transform = null) : base(geometryType, tessellation, transform)
         {
             this.width = width;
             this.length = length;

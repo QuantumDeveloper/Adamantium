@@ -1,9 +1,8 @@
 ﻿using System;
 
-namespace Adamantium.UI
+namespace Adamantium.UI;
+
+public interface IName
 {
-   public interface IName
-   {
-      String Name { get; set; }
-   }
+   String Name { get; set; }
 }

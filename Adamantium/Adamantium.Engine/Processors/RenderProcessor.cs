@@ -207,7 +207,7 @@ namespace Adamantium.Engine.Processors
             var geometries = current.GetComponents<MeshRendererBase>();
             foreach (var component in geometries)
             {
-                var world = transformation.WorldMatrix;
+                var world = transformation.WorldMatrixF;
                 var wvp = world * ActiveCamera.ViewMatrix * ActiveCamera.ProjectionMatrix;
                 Matrix4x4F inverseViewProjection = Matrix4x4F.Invert(ActiveCamera.ViewMatrix * ActiveCamera.ProjectionMatrix);
 //                BasicEffect.Parameters["wvp"].SetValue(wvp);
@@ -254,7 +254,7 @@ namespace Adamantium.Engine.Processors
             var geometries = current.GetComponents<MeshRendererBase>();
             foreach (var component in geometries)
             {
-                var world = transformation.WorldMatrix;
+                var world = transformation.WorldMatrixF;
                 var wvp = world * ActiveCamera.UiProjection;
 //                BasicEffect.Parameters["wvp"].SetValue(wvp);
                 

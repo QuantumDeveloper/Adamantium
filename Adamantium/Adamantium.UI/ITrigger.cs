@@ -1,8 +1,7 @@
-﻿namespace Adamantium.UI
+﻿namespace Adamantium.UI;
+
+public interface ITrigger
 {
-   public interface ITrigger
-   {
-      SetterCollection Setters { get; set; }
-      void Apply(FrameworkComponent control);
-   }
+   SetterCollection Setters { get; set; }
+   void Apply(FrameworkComponent control);
 }

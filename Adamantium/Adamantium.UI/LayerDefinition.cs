@@ -1,8 +1,7 @@
-﻿namespace Adamantium.UI
+﻿namespace Adamantium.UI;
+
+public enum LayerDefinition
 {
-   public enum LayerDefinition
-   {
-      Transform,
-      Render
-   }
+   Transform,
+   Render
 }

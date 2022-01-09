@@ -1,9 +1,8 @@
-namespace Adamantium.UI.Controls
+namespace Adamantium.UI.Controls;
+
+public enum WindowState
 {
-    public enum WindowState
-    {
-        Normal,
-        Minimized,
-        Maximized
-    }
+    Normal,
+    Minimized,
+    Maximized
 }

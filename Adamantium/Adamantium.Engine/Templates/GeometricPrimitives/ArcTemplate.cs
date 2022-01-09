@@ -8,21 +8,21 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
 {
     public class ArcTemplate : PrimitiveTemplate
     {
-        private float thickness;
-        private Vector2F diameter;
+        private double thickness;
+        private Vector2 diameter;
         private float startAngle = 0;
         private float stopAngle = 360;
         private bool isClockwise = true;
 
         public ArcTemplate(
             GeometryType geometryType,
-            Vector2F diameter,
+            Vector2 diameter,
             float thickness,
             float startAngle = 0,
             float stopAngle = 360,
             bool isClockwise = true,
             int tessellation = 40,
-            Matrix4x4F? transform = null) : base(geometryType, tessellation, transform)
+            Matrix4x4? transform = null) : base(geometryType, tessellation, transform)
         {
             this.diameter = diameter;
             this.thickness = thickness;

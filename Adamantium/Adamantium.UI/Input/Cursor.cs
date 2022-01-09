@@ -4,59 +4,58 @@ using System.Runtime.InteropServices;
 using Adamantium.MacOS;
 using Adamantium.Win32;
 
-namespace Adamantium.UI.Input
+namespace Adamantium.UI.Input;
+
+/// <summary>
+/// Represents class which holds an instance of Win32 cursor
+/// </summary>
+public sealed class Cursor
 {
+   public IntPtr CursorHandle { get; private set; }
+
    /// <summary>
-   /// Represents class which holds an instance of Win32 cursor
+   /// Specifies a new instance of cursor class from a .cur or .ani file
    /// </summary>
-   public sealed class Cursor
+   /// <param name="cursorFile"></param>
+   public Cursor(String cursorFile)
    {
-      public IntPtr CursorHandle { get; private set; }
+      LoadCursorFromFile(cursorFile);
+   }
 
-      /// <summary>
-      /// Specifies a new instance of cursor class from a .cur or .ani file
-      /// </summary>
-      /// <param name="cursorFile"></param>
-      public Cursor(String cursorFile)
+   internal Cursor(IntPtr cursorHandle)
+   {
+      CursorHandle = cursorHandle;
+   }
+
+   public static Cursor Default => New();
+
+   internal static Cursor New()
+   {
+      if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
       {
-         LoadCursorFromFile(cursorFile);
+         return new Cursor(Win32Interop.LoadCursor(IntPtr.Zero, NativeCursors.Arrow));
       }
-
-      internal Cursor(IntPtr cursorHandle)
+      else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
       {
-         CursorHandle = cursorHandle;
+         return new Cursor(MacOSInterop.Cursor.SetCursorType((uint)MacOSCursorType.CrosshairCursor));
       }
+      throw new NotImplementedException($"Cursor is not implemented for {RuntimeInformation.OSDescription}");
+   }
 
-      public static Cursor Default => New();
-
-      internal static Cursor New()
+   internal void LoadCursorFromFile(String cursorFile)
+   {
+      if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
       {
-         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+         CursorHandle = Win32Interop.LoadCursorFromFile(cursorFile);
+         if (CursorHandle == IntPtr.Zero)
          {
-            return new Cursor(Win32Interop.LoadCursor(IntPtr.Zero, NativeCursors.Arrow));
+            var err = Marshal.GetLastWin32Error();
+            throw new Win32Exception(err);
          }
-         else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-         {
-            return new Cursor(MacOSInterop.Cursor.SetCursorType((uint)MacOSCursorType.CrosshairCursor));
-         }
-         throw new NotImplementedException($"Cursor is not implemented for {RuntimeInformation.OSDescription}");
       }
-
-      internal void LoadCursorFromFile(String cursorFile)
+      else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
       {
-         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-         {
-            CursorHandle = Win32Interop.LoadCursorFromFile(cursorFile);
-            if (CursorHandle == IntPtr.Zero)
-            {
-               var err = Marshal.GetLastWin32Error();
-               throw new Win32Exception(err);
-            }
-         }
-         else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-         {
             
-         }
       }
    }
 }

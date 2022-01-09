@@ -1,4 +1,4 @@
-﻿namespace Adamantium.Engine.Compiler.Converter.ConversionUtils
+﻿namespace Adamantium.Engine.Compiler.Models.ConversionUtils
 {
    /*
    Information about 3ds file structure was taken from http://www.quantumg.net/3ds-info.txt

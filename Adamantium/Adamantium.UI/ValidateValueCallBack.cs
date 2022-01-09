@@ -1,4 +1,3 @@
-﻿namespace Adamantium.UI
-{
-   public delegate bool ValidateValueCallBack(object value);
-}
+﻿namespace Adamantium.UI;
+
+public delegate bool ValidateValueCallBack(object value);

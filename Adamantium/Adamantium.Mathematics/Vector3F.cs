@@ -1930,7 +1930,7 @@ namespace Adamantium.Mathematics
             return Equals(ref strongValue);
         }
 
-        public static implicit operator Vector3(Vector3F value)
+        public static explicit operator Vector3(Vector3F value)
         {
             return new Vector3(value.X, value.Y, value.Z);
         }

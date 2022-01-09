@@ -2,6 +2,19 @@ namespace Adamantium.UI.Media;
 
 public class CubicBezierSegment : BezierSegmentBase
 {
+    public CubicBezierSegment()
+    {
+        
+    }
+
+    public CubicBezierSegment(Vector2 controlPoint1, Vector2 controlPoint2, Vector2 point, bool isStroked)
+    {
+        ControlPoint1 = controlPoint1;
+        ControlPoint2 = controlPoint2;
+        Point = point;
+        IsStroked = isStroked;
+    }
+    
     public static readonly AdamantiumProperty ControlPoint1Property =
         AdamantiumProperty.Register(nameof(ControlPoint1), typeof(Vector2), typeof(CubicBezierSegment),
             new PropertyMetadata(Vector2.Zero, PropertyMetadataOptions.AffectsMeasure));
@@ -24,6 +37,7 @@ public class CubicBezierSegment : BezierSegmentBase
     
     internal override Vector2[] ProcessSegment(Vector2 currentPoint)
     {
-        return MathHelper.GetCubicBezier(currentPoint, ControlPoint1, ControlPoint2, Point, SampleRate).ToArray();
+        var rate = CalculatePointsLength(new[] { currentPoint, ControlPoint1, ControlPoint2, Point });
+        return MathHelper.GetCubicBezier(currentPoint, ControlPoint1, ControlPoint2, Point, (uint)rate).ToArray();
     }
 }

@@ -8,15 +8,15 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
 {
     public class TubeTemplate : PrimitiveTemplate
     {
-        private float diameter, height, thickness;
+        private double diameter, height, thickness;
 
         public TubeTemplate(
             GeometryType geometryType,
-            float diameter,
-            float height,
-            float thickness,
+            double diameter,
+            double height,
+            double thickness,
             int tessellation = 3,
-            Matrix4x4F? transform = null) : base(geometryType, tessellation, transform)
+            Matrix4x4? transform = null) : base(geometryType, tessellation, transform)
         {
             this.diameter = diameter;
             this.height = height;

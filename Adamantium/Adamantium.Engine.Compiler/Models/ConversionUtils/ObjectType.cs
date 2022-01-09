@@ -1,4 +1,4 @@
-﻿namespace Adamantium.Engine.Compiler.Converter.ConversionUtils
+﻿namespace Adamantium.Engine.Compiler.Models.ConversionUtils
 {
    /// <summary>
    /// Describes a concrete type of object present in obj file format.

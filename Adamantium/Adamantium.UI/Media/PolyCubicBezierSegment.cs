@@ -7,6 +7,17 @@ namespace Adamantium.UI.Media;
 
 public class PolyCubicBezierSegment : PathSegment
 {
+    public PolyCubicBezierSegment()
+    {
+        
+    }
+
+    public PolyCubicBezierSegment(IEnumerable<Vector2> points, bool isStroked)
+    {
+        Points = new PointsCollection(points);
+        IsStroked = isStroked;
+    }
+    
     public static readonly AdamantiumProperty PointsProperty =
         AdamantiumProperty.Register(nameof(Points), typeof(PointsCollection), typeof(PolylineSegment),
             new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure, PointsChangedCallback));
@@ -15,12 +26,14 @@ public class PolyCubicBezierSegment : PathSegment
     {
         if (a is PolyCubicBezierSegment segment)
         {
-            if (e.OldValue is PointsCollection collection1) collection1.CollectionChanged -= segment.PointsOnCollectionChanged;
-            
-            if (e.NewValue is PointsCollection collection2) collection2.CollectionChanged += segment.PointsOnCollectionChanged;
+            if (e.OldValue is PointsCollection collection1)
+                collection1.CollectionChanged -= segment.PointsOnCollectionChanged;
+
+            if (e.NewValue is PointsCollection collection2)
+                collection2.CollectionChanged += segment.PointsOnCollectionChanged;
         }
     }
-    
+
     public PointsCollection Points
     {
         get => GetValue<PointsCollection>(PointsProperty);
@@ -31,11 +44,11 @@ public class PolyCubicBezierSegment : PathSegment
     {
         RaiseComponentUpdated();
     }
-    
+
     internal override Vector2[] ProcessSegment(Vector2 currentPoint)
     {
         var bezierPoints = new List<CubicBezierPoint>();
-        for (int i = 0; i < Points.Count; i+=3)
+        for (int i = 0; i < Points.Count; i += 3)
         {
             var c1 = Points[i];
             var c2 = Points[i + 1];
@@ -44,10 +57,16 @@ public class PolyCubicBezierSegment : PathSegment
             currentPoint = p3;
         }
 
+
         var points = new List<Vector2>();
         foreach (var bezierPoint in bezierPoints)
         {
-            var result = MathHelper.GetCubicBezier(bezierPoint.Point1, bezierPoint.ControlPoint1, bezierPoint.ControlPoint2, bezierPoint.Point2, 20);
+            var result = MathHelper.GetCubicBezier(
+                bezierPoint.Point1,
+                bezierPoint.ControlPoint1,
+                bezierPoint.ControlPoint2,
+                bezierPoint.Point2,
+                20);
             points.AddRange(result);
         }
 

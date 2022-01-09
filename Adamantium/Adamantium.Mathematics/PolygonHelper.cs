@@ -34,11 +34,11 @@ namespace Adamantium.Mathematics
         /// <param name="inPoints"></param>
         /// <param name="isContourClosed"></param>
         /// <returns>Collection of segments if at least 2 points present in collection, otherwise null</returns>
-        public static List<LineSegment2D> SplitOnSegments(IEnumerable<Vector2> inPoints, bool isContourClosed = true)
+        public static LineSegment2D[] SplitOnSegments(IEnumerable<Vector2> inPoints, bool isContourClosed = true)
         {
             var points = inPoints as Vector2[] ?? inPoints.ToArray();
-            
-            if (points.Length <= 1) return new List<LineSegment2D>();
+
+            if (points.Length <= 1) return Array.Empty<LineSegment2D>();
             
             var segments = new List<LineSegment2D>();
             for (var i = 0; i < points.Length - 1; i++)
@@ -60,7 +60,7 @@ namespace Adamantium.Mathematics
                     segments.Add(seg);
                 }
             }
-            return segments;
+            return segments.ToArray();
         }
 
         /// <summary>
@@ -69,9 +69,9 @@ namespace Adamantium.Mathematics
         /// <param name="inPoints"></param>
         /// <param name="isContourClosed"></param>
         /// <returns>Collection of segments if at least 2 points present in collection, otherwise null</returns>
-        public static LineSegment2D[] SplitOnSegments(IEnumerable<Vector3F> inPoints, bool isContourClosed = true)
+        public static LineSegment2D[] SplitOnSegments(IEnumerable<Vector3> inPoints, bool isContourClosed = true)
         {
-            var points = inPoints as Vector3F[] ?? inPoints.ToArray();
+            var points = inPoints as Vector3[] ?? inPoints.ToArray();
 
             if (points.Length <= 1) return Array.Empty<LineSegment2D>();
             
@@ -169,12 +169,12 @@ namespace Adamantium.Mathematics
         /// <param name="point">point in 2D</param>
         /// <param name="foundSegments">Collection of found segments</param>
         /// <returns>True if at least one segment was found, otherwise false</returns>
-        public static bool GetSegmentsFromPoint(List<LineSegment2D> segments, Vector2 point, out List<LineSegment2D> foundSegments)
+        public static bool GetSegmentsFromPoint(IEnumerable<LineSegment2D> segments, Vector2 point, out List<LineSegment2D> foundSegments)
         {
             foundSegments = new List<LineSegment2D>();
-            for (var i = 0; i < segments.Count; ++i)
+            foreach (var segment in segments)
             {
-                var s = segments[i];
+                var s = segment;
                 if (Collision2D.IsPointOnSegment(ref s, ref point))
                 {
                     foundSegments.Add(s);
@@ -235,13 +235,18 @@ namespace Adamantium.Mathematics
         
         public static List<LineSegment2D> OrderSegments(List<LineSegment2D> mergedSegments)
         {
-            for (int i = 0; i < mergedSegments.Count; ++i)
+            if (mergedSegments == null || mergedSegments.Count == 0)
             {
-                var segment = mergedSegments[i];
-                var start = Vector2.Round(segment.Start, 4);
-                var end = Vector2.Round(segment.End, 4);
-                mergedSegments[i] = new LineSegment2D(start, end);
+                return new List<LineSegment2D>();
             }
+                
+            // for (int i = 0; i < mergedSegments.Count; ++i)
+            // {
+            //     var segment = mergedSegments[i];
+            //     var start = Vector2.Round(segment.Start, 4);
+            //     var end = Vector2.Round(segment.End, 4);
+            //     mergedSegments[i] = new LineSegment2D(start, end);
+            // }
             
             var currentSegment = mergedSegments[0];
             var orderedSegments = new List<LineSegment2D>();
@@ -260,6 +265,110 @@ namespace Adamantium.Mathematics
             }
 
             return orderedSegments;
+        }
+        
+        public static List<SegmentGroup> GetSegmentGroups(List<LineSegment2D> mergedSegments)
+        {
+            if (mergedSegments is not { Count: > 1 })
+            {
+                return new List<SegmentGroup>();
+            }
+
+            var segmentGroups = new List<SegmentGroup>();
+            var currentGroup = new SegmentGroup();
+            segmentGroups.Add(currentGroup);
+            
+            var cnt = mergedSegments.Count;
+            int startIndex = 0;
+            
+            for (int i = 0; i < cnt - 1; i++)
+            {
+                var current = mergedSegments[i];
+                var next = mergedSegments[i + 1];
+                if (current.End != next.Start)
+                {
+                    startIndex = i+1;
+                    break;
+                }
+            }
+
+            bool wasRestarted = false;
+            int nextIndex = startIndex + 1;
+            for (int currentIndex = startIndex; ;)
+            {
+                if (nextIndex >= mergedSegments.Count)
+                {
+                    currentIndex = 0;
+                    nextIndex = 1;
+                    wasRestarted = true;
+                    continue;
+                }
+                
+                var current = mergedSegments[currentIndex];
+                var next = mergedSegments[nextIndex];
+                if (current.End == next.Start)
+                {
+                    currentGroup.Segments.Add(current);
+                }
+                else
+                {
+                    currentGroup.Segments.Add(current);
+                    currentGroup = new SegmentGroup();
+                    segmentGroups.Add(currentGroup);
+                }
+            
+                currentIndex++;
+                nextIndex++;
+                if (nextIndex >= mergedSegments.Count && !wasRestarted)
+                {
+                    nextIndex = 0;
+                    current = mergedSegments[currentIndex];
+                    next = mergedSegments[nextIndex];
+                    if (current.End == next.Start)
+                    {
+                        currentGroup.Segments.Add(current);
+                    }
+                    else
+                    {
+                        currentGroup.Segments.Add(current);
+                        currentGroup = new SegmentGroup();
+                        segmentGroups.Add(currentGroup);
+                    }
+                    currentIndex = 0;
+                    nextIndex = currentIndex + 1;
+                }
+                
+                if (currentIndex == startIndex) break;
+            }
+
+            // for (int  i = 0; i< mergedSegments.Count - 1; i++)
+            // {
+            //     var current = mergedSegments[i];
+            //     var next = mergedSegments[i + 1];
+            //     if (current.End == next.Start)
+            //     {
+            //         currentGroup.Segments.Add(current);
+            //     }
+            //     else
+            //     {
+            //         currentGroup.Segments.Add(current);
+            //         currentGroup = new SegmentGroup();
+            //         segmentGroups.Add(currentGroup);
+            //     }
+            //
+            // }
+            
+            var current1 = mergedSegments[^1];
+            var next1 = mergedSegments[0];
+            if (current1.End == next1.Start)
+            {
+                if (!currentGroup.Segments.Contains(current1))
+                {
+                    currentGroup.Segments.Add(current1);
+                }
+            }
+
+            return segmentGroups;
         }
     }
 }

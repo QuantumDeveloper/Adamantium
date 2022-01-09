@@ -5,43 +5,42 @@ using System.Text;
 using Adamantium.Engine.Graphics;
 using Adamantium.UI.RoutedEvents;
 
-namespace Adamantium.UI.Controls
+namespace Adamantium.UI.Controls;
+
+public interface IWindow : IRootVisualComponent, IFrameworkComponent
 {
-    public interface IWindow : IRootVisualComponent, IFrameworkComponent
-    {
-        void Show();
-        void Close();
-        void Hide();
+    void Show();
+    void Close();
+    void Hide();
         
-        bool IsActive { get; }
+    bool IsActive { get; }
 
-        IntPtr Handle { get; }
-        bool IsClosed { get; }
+    IntPtr Handle { get; }
+    bool IsClosed { get; }
 
-        Double ClientWidth { get; set; }
+    Double ClientWidth { get; set; }
 
-        Double ClientHeight { get; set; }
+    Double ClientHeight { get; set; }
 
-        IntPtr SurfaceHandle { get; }
+    IntPtr SurfaceHandle { get; }
         
-        double Left { get; set; }
+    double Left { get; set; }
         
-        double Top { get; set; }
+    double Top { get; set; }
         
-        string Title { get; set; }
+    string Title { get; set; }
         
-        MSAALevel MSAALevel { get; set; }
+    MSAALevel MSAALevel { get; set; }
         
-        WindowState State { get; set; }
+    WindowState State { get; set; }
 
-        public void Render();
+    public void Render();
 
-        public void Update();
+    public void Update();
         
-        event SizeChangedEventHandler ClientSizeChanged;
-        event EventHandler<WindowClosingEventArgs> Closing;
-        event EventHandler<EventArgs> Closed;
-        event MSAALeveChangedHandler MSAALevelChanged;
-        event StateChangedHandler StateChanged;
-    }
+    event SizeChangedEventHandler ClientSizeChanged;
+    event EventHandler<WindowClosingEventArgs> Closing;
+    event EventHandler<EventArgs> Closed;
+    event MSAALeveChangedHandler MSAALevelChanged;
+    event StateChangedHandler StateChanged;
 }

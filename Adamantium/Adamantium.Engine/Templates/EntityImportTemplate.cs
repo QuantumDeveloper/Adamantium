@@ -20,7 +20,7 @@ namespace Adamantium.Engine.Templates
         private SceneData sceneData;
         private IContentManager contentManager;
 
-        private Vector3F initialPosition;
+        private Vector3 initialPosition;
         //private EntityFramework.Components.Camera camera;
 
         public EntityImportTemplate(SceneData sceneData, IContentManager manager, EntityFramework.Components.Camera camera)
@@ -30,7 +30,7 @@ namespace Adamantium.Engine.Templates
             //this.camera = camera;
         }
         
-        public EntityImportTemplate(SceneData sceneData, IContentManager manager, Vector3F initialPosition)
+        public EntityImportTemplate(SceneData sceneData, IContentManager manager, Vector3 initialPosition)
         {
             this.sceneData = sceneData;
             contentManager = manager;
@@ -89,12 +89,12 @@ namespace Adamantium.Engine.Templates
                             count++;
                             WriteMeshData(entityPart, mesh);
 
-                            SetTransformation(entityPart, currentMesh.Position,
+                            SetTransformation(entityPart, (Vector3)currentMesh.Position,
                                currentMesh.Scale * new Vector3F(sceneData.Units.Value), currentMesh.Rotation);
                         }
                     }
 
-                    SetTransformation(entity, currentMesh.Position, currentMesh.Scale * new Vector3F(sceneData.Units.Value),
+                    SetTransformation(entity, (Vector3)currentMesh.Position, currentMesh.Scale * new Vector3F(sceneData.Units.Value),
                        currentMesh.Rotation);
 
                     if (sceneData.Controllers.ContainsKey(currentMesh.ID))
