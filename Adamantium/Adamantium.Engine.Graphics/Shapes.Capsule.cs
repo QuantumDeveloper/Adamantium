@@ -27,7 +27,7 @@ namespace Adamantium.Engine.Graphics
                 float height = 1.0f,
                 float diameter = 1.0f,
                 int tessellation = 16,
-                Matrix4x4F? transform = null)
+                Matrix4x4? transform = null)
             {
                 var geometry = GenerateGeometry(geometryType, height, diameter, tessellation, transform);
                 return new Shape(device, geometry);
@@ -35,10 +35,10 @@ namespace Adamantium.Engine.Graphics
 
             public static Mesh GenerateGeometry(
                 GeometryType geometryType,
-                float height,
-                float diameter,
+                double height,
+                double diameter,
                 int tessellation = 40,
-                Matrix4x4F? transform = null)
+                Matrix4x4? transform = null)
             {
                 if (tessellation < 8)
                 {
@@ -61,14 +61,14 @@ namespace Adamantium.Engine.Graphics
             }
 
             private static Mesh GenerateSolidGeometry(
-                float height,
-                float radius,
+                double height,
+                double radius,
                 int tessellation = 40)
             {
-                PrimitiveType primitiveType = PrimitiveType.TriangleList;
-                List<Vector3F> vertices = new List<Vector3F>();
-                List<Vector2F> uvs = new List<Vector2F>();
-                List<int> indices = new List<int>();
+                var primitiveType = PrimitiveType.TriangleList;
+                var vertices = new List<Vector3>();
+                var uvs = new List<Vector2F>();
+                var indices = new List<int>();
                 if (tessellation < 3)
                     tessellation = 3;
 
@@ -82,7 +82,7 @@ namespace Adamantium.Engine.Graphics
                 for (int i = 0; i < verticalSegments; i++)
                 {
                     float v;
-                    float deltaY;
+                    double deltaY;
                     float latitude;
                     if (i < verticalSegments / 2)
                     {
@@ -113,9 +113,9 @@ namespace Adamantium.Engine.Graphics
                         dx *= dxz;
                         dz *= dxz;
 
-                        var normal = new Vector3F(dx, dy, dz);
+                        var normal = new Vector3(dx, dy, dz);
                         var uv = new Vector2F(1.0f - (u * uScale), 1.0f - (v * vScale));
-                        var position = radius * normal + new Vector3F(0, deltaY, 0);
+                        var position = radius * normal + new Vector3(0, deltaY, 0);
                         vertices.Add(position);
                         uvs.Add(uv);
                     }
@@ -152,25 +152,25 @@ namespace Adamantium.Engine.Graphics
             }
 
             private static Mesh GenerateOutlinedGeometry(
-                float height,
-                float radius,
+                double height,
+                double radius,
                 int tessellation = 40)
             {
-                PrimitiveType primitiveType = PrimitiveType.LineStrip;
-                List<Vector3F> vertices = new List<Vector3F>();
-                List<int> indices = new List<int>();
-                Vector3F center = Vector3F.Zero;
+                var primitiveType = PrimitiveType.LineStrip;
+                var vertices = new List<Vector3>();
+                var indices = new List<int>();
+                var center = Vector3F.Zero;
                 int lastIndex = 0;
-                var topOffset = Vector3F.UnitY * height / 2;
+                var topOffset = Vector3.UnitY * height / 2;
 
                 //draw top hemicircle
                 for (int i = 0; i <= tessellation / 2; ++i)
                 {
                     float angle = (float) Math.PI * 2 / tessellation * i;
 
-                    float x = topOffset.X + radius * (float) Math.Cos(angle);
-                    float y = topOffset.Y + radius * (float) Math.Sin(angle);
-                    vertices.Add(new Vector3F(x, y, 0));
+                    var x = topOffset.X + radius * (float) Math.Cos(angle);
+                    var y = topOffset.Y + radius * (float) Math.Sin(angle);
+                    vertices.Add(new Vector3(x, y, 0));
                     indices.Add(lastIndex++);
                 }
 
@@ -179,9 +179,9 @@ namespace Adamantium.Engine.Graphics
                 {
                     float angle = (float) Math.PI * 2 / tessellation * i;
 
-                    float x = -topOffset.X + radius * (float) Math.Cos(angle);
-                    float y = -topOffset.Y + radius * (float) Math.Sin(angle);
-                    vertices.Add(new Vector3F(x, y, 0));
+                    var x = -topOffset.X + radius * (float) Math.Cos(angle);
+                    var y = -topOffset.Y + radius * (float) Math.Sin(angle);
+                    vertices.Add(new Vector3(x, y, 0));
                     indices.Add(lastIndex++);
                 }
 
@@ -189,12 +189,12 @@ namespace Adamantium.Engine.Graphics
                 indices.Add(Shape.PrimitiveRestartValue);
                 var startPos = vertices.Count;
 
-                QuaternionF rot = QuaternionF.RotationAxis(Vector3F.UnitY, MathHelper.DegreesToRadians(90));
-                Matrix4x4F rotMatrix = Matrix4x4F.RotationQuaternion(rot);
-                var secondPart = new List<Vector3F>();
+                var rot = Quaternion.RotationAxis(Vector3.UnitY, MathHelper.DegreesToRadians(90));
+                var rotMatrix = Matrix4x4.RotationQuaternion(rot);
+                var secondPart = new List<Vector3>();
                 for (int i = 0; i < vertices.Count; i++)
                 {
-                    var pos = Vector3F.TransformCoordinate(vertices[i], rotMatrix);
+                    var pos = Vector3.TransformCoordinate(vertices[i], rotMatrix);
                     secondPart.Add(pos);
                     indices.Add(lastIndex++);
                 }
@@ -209,10 +209,10 @@ namespace Adamantium.Engine.Graphics
                 {
                     float angle = (float) Math.PI * 2 / tessellation * i;
 
-                    float x = center.X + radius * (float) Math.Cos(angle);
-                    float y = center.Y + radius * (float) Math.Sin(angle);
+                    var x = center.X + radius * (float) Math.Cos(angle);
+                    var y = center.Y + radius * (float) Math.Sin(angle);
 
-                    vertices.Add(new Vector3F(x, -topOffset.Y, y));
+                    vertices.Add(new Vector3(x, -topOffset.Y, y));
                     indices.Add(lastIndex++);
                 }
 
@@ -222,10 +222,10 @@ namespace Adamantium.Engine.Graphics
                 {
                     float angle = (float) Math.PI * 2 / tessellation * i;
 
-                    float x = center.X + radius * (float) Math.Cos(angle);
-                    float y = center.Y + radius * (float) Math.Sin(angle);
+                    var x = center.X + radius * (float) Math.Cos(angle);
+                    var y = center.Y + radius * (float) Math.Sin(angle);
 
-                    vertices.Add(new Vector3F(x, topOffset.Y, y));
+                    vertices.Add(new Vector3(x, topOffset.Y, y));
                     indices.Add(lastIndex++);
                 }
 

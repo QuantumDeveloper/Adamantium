@@ -16,7 +16,7 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
             float diameter,
             float height,
             int tessellation = 3,
-            Matrix4x4F? transform = null) : base(geometryType, tessellation, transform)
+            Matrix4x4? transform = null) : base(geometryType, tessellation, transform)
         {
             this.diameter = diameter;
             this.height = height;

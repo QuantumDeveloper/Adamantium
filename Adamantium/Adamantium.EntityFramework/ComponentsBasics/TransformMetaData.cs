@@ -9,15 +9,18 @@ namespace Adamantium.EntityFramework.ComponentsBasics
         public TransformMetaData()
         {
             Enabled = true;
-            WorldMatrix = Matrix4x4F.Identity;
             Scale = Vector3F.One;
+            WorldMatrixF = Matrix4x4F.Identity;
+            WorldMatrix = Matrix4x4.Identity;
         }
 
         public CameraBase Camera { get; set; }
 
         public Vector3F RelativePosition { get; set; }
 
-        public Matrix4x4F WorldMatrix { get; set; }
+        public Matrix4x4F WorldMatrixF { get; set; }
+        
+        public Matrix4x4 WorldMatrix { get; set; }
 
         public QuaternionF Rotation { get; set; }
 

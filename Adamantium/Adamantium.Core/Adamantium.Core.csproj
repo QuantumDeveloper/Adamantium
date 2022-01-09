@@ -15,4 +15,8 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
+  </ItemGroup>
+
 </Project>

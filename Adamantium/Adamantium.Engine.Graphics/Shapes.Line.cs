@@ -11,10 +11,10 @@ namespace Adamantium.Engine.Graphics
         {
             public static Mesh GenerateGeometry(
                 GeometryType geometryType, 
-                Vector3F startPoint, 
-                Vector3F endPoint, 
-                float thickness, 
-                Matrix4x4F? transform = null)
+                Vector3 startPoint, 
+                Vector3 endPoint, 
+                double thickness, 
+                Matrix4x4? transform = null)
             {
                 Mesh mesh;
                 if (geometryType == GeometryType.Solid)
@@ -31,17 +31,17 @@ namespace Adamantium.Engine.Graphics
                 return mesh;
             }
 
-            public static Mesh GenerateSolidGeometry(Vector3F startPoint, Vector3F endPoint, float thickness)
+            public static Mesh GenerateSolidGeometry(Vector3 startPoint, Vector3 endPoint, double thickness)
             {
-                PrimitiveType primitiveType = PrimitiveType.TriangleStrip;
+                var primitiveType = PrimitiveType.TriangleStrip;
 
-                var vertexArray = new List<Vector3F>();
+                var vertexArray = new List<Vector3>();
                 var indicesArray = new List<int>();
                 var interrupt = -1;
                 var lastIndex = 0;
 
                 var direction = endPoint - startPoint;
-                var normal = new Vector3F(-direction.Y, direction.X);
+                var normal = new Vector3(-direction.Y, direction.X);
                 normal.Normalize();
                 var p0 = startPoint - normal * (thickness * 0.5f);
                 var p1 = endPoint - normal * (thickness * 0.5f);
@@ -79,11 +79,11 @@ namespace Adamantium.Engine.Graphics
                 return mesh;
             }
 
-            public static Mesh GenerateOutlinedGeometry(Vector3F startPoint, Vector3F endPoint)
+            public static Mesh GenerateOutlinedGeometry(Vector3 startPoint, Vector3 endPoint)
             {
-                PrimitiveType primitiveType = PrimitiveType.LineStrip;
+                var primitiveType = PrimitiveType.LineStrip;
 
-                Vector3F[] positions = new Vector3F[2];
+                var positions = new Vector3[2];
                 positions[0] = startPoint;
                 positions[1] = endPoint;
 
@@ -98,10 +98,10 @@ namespace Adamantium.Engine.Graphics
             public static Shape New(
                 GraphicsDevice device,
                 GeometryType geometryType,
-                Vector3F startPoint,
-                Vector3F endPoint,
+                Vector3 startPoint,
+                Vector3 endPoint,
                 float thickness,
-                Matrix4x4F? transform = null)
+                Matrix4x4? transform = null)
             {
                 var geometry = GenerateGeometry(geometryType, startPoint, endPoint, thickness, transform);
                 return new Shape(device, geometry);

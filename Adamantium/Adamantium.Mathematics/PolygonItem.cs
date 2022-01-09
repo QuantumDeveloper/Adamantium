@@ -7,6 +7,7 @@ namespace Adamantium.Mathematics
     /// </summary>
     public class PolygonItem
     {
+        public const int DigitsAfterPoint = 4;
         /// <summary>
         /// Polygon item name
         /// </summary>
@@ -14,67 +15,58 @@ namespace Adamantium.Mathematics
         /// <summary>
         /// Collection of points, which describes this <see cref="PolygonItem"/>
         /// </summary>
-        public List<Vector2> Points { get; }
+        public List<Vector2> Points { get; private set; }
 
         /// <summary>
         /// Describing does this <see cref="PolygonItem"/> has self intersections
         /// </summary>
         public bool HasSelfIntersections => SelfIntersectedPoints.Count > 0;
 
-        public RectangleF BoundingBox { get; internal set; }
+        public RectangleF BoundingBox { get; private set; }
 
         /// <summary>
         /// Collection of points in places, where it intersects itself
         /// </summary>
-        public List<Vector2> SelfIntersectedPoints { get; }
+        public List<Vector2> SelfIntersectedPoints { get; private set; }
 
         /// <summary>
         /// Collection of all segments in certain order describing polygon outline
         /// </summary>
-        public List<LineSegment2D> Segments { get; }
+        public List<LineSegment2D> Segments { get; private set; }
 
         /// <summary>
         /// Collection of segments, which were formed by self intersections
         /// </summary>
-        public List<LineSegment2D> SelfIntersectedSegments { get; }
+        public List<LineSegment2D> SelfIntersectedSegments { get; private set; }
 
+        public PolygonItem(IEnumerable<Vector3> points)
+        {
+            var pts = new List<Vector2>();
+            foreach (var point in points)
+            {
+                pts.Add((Vector2)point);
+            }
+            Initialize(pts);
+        }
+        
         /// <summary>
         /// Constructs <see cref="PolygonItem"/>
         /// </summary>
         /// <param name="points">polygon points</param>
         public PolygonItem(IEnumerable<Vector2> points)
         {
-            SelfIntersectedPoints = new List<Vector2>();
-            SelfIntersectedSegments = new List<LineSegment2D>();
-            Segments = new List<LineSegment2D>();
-            Points = new List<Vector2>(points);
-            CalculateBoundingBox();
-        }
-        
-        public PolygonItem(Vector2[] points)
-        {
-            SelfIntersectedPoints = new List<Vector2>();
-            SelfIntersectedSegments = new List<LineSegment2D>();
-            Segments = new List<LineSegment2D>();
-            Points = new List<Vector2>(points);
-            CalculateBoundingBox();
-        }
-        
-        public PolygonItem(Vector3F[] points)
-        {
-            var points2D = new Vector2[points.Length];
-            for (var i = 0; i < points.Length; i++)
-            {
-                points2D[i] = (Vector2) points[i];
-            }
-            
-            SelfIntersectedPoints = new List<Vector2>();
-            SelfIntersectedSegments = new List<LineSegment2D>();
-            Segments = new List<LineSegment2D>();
-            Points = new List<Vector2>(points2D);
-            CalculateBoundingBox();
+            Initialize(points);
         }
 
+        private void Initialize(IEnumerable<Vector2> points)
+        {
+            SelfIntersectedPoints = new List<Vector2>();
+            SelfIntersectedSegments = new List<LineSegment2D>();
+            Segments = new List<LineSegment2D>();
+            Points = new List<Vector2>(points);
+            CalculateBoundingBox();
+        }
+        
         private void CalculateBoundingBox()
         {
             if (Points.Count > 0)
@@ -127,7 +119,7 @@ namespace Adamantium.Mathematics
         }
 
         /// <summary>
-        /// Split <see cref="PolygonItem"/> points on segmnets describing polygone outline
+        /// Split <see cref="PolygonItem"/> points on segments describing polygon outline
         /// </summary>
         public void SplitOnSegments()
         {

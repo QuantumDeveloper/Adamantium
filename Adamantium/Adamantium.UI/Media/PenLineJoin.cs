@@ -1,9 +1,8 @@
-﻿namespace Adamantium.UI.Media
+﻿namespace Adamantium.UI.Media;
+
+public enum PenLineJoin
 {
-   public enum PenLineJoin
-   {
-      Bevel,
-      Miter,
-      Round
-   }
+   Bevel,
+   Miter,
+   Round
 }

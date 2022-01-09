@@ -13,7 +13,7 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
         public TeapotTemplate(
             float size,
             int tessellation = 1,
-            Matrix4x4F? transform = null) : base(GeometryType.Solid, tessellation, transform)
+            Matrix4x4? transform = null) : base(GeometryType.Solid, tessellation, transform)
         {
             this.size = size;
         }

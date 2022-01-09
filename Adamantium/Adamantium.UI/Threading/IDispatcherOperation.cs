@@ -1,16 +1,15 @@
 ﻿using System;
 using System.Threading.Tasks;
 
-namespace Adamantium.UI.Threading
+namespace Adamantium.UI.Threading;
+
+public interface IDispatcherOperation
 {
-    public interface IDispatcherOperation
-    {
-        Delegate Action { get; }
+    Delegate Action { get; }
         
-        DispatcherPriority Priority { get; }
+    DispatcherPriority Priority { get; }
 
-        void Run();
+    void Run();
 
-        Task Task { get; }
-    }
+    Task Task { get; }
 }

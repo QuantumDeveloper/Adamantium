@@ -28,8 +28,8 @@ namespace Adamantium.Mathematics
         /// <param name="direction">The normalized direction of the ray.</param>
         public Ray(Vector3F position, Vector3F direction)
         {
-            this.Position = position;
-            this.Direction = direction;
+            Position = position;
+            Direction = direction;
         }
 
         /// <summary>
@@ -49,8 +49,7 @@ namespace Adamantium.Mathematics
         /// <returns>Whether the two objects intersected.</returns>
         public bool Intersects(ref Ray ray)
         {
-            Vector3F point;
-            return Collision.RayIntersectsRay(ref this, ref ray, out point);
+            return Collision.RayIntersectsRay(ref this, ref ray, out _);
         }
 
         /// <summary>
@@ -72,8 +71,7 @@ namespace Adamantium.Mathematics
         /// <returns>Whether the two objects intersected.</returns>
         public bool Intersects(ref Plane plane)
         {
-            float distance;
-            return Collision.RayIntersectsPlane(ref this, ref plane, out distance);
+            return Collision.RayIntersectsPlane(ref this, ref plane, out float _);
         }
 
         /// <summary>
@@ -109,8 +107,7 @@ namespace Adamantium.Mathematics
         /// <returns>Whether the two objects intersected.</returns>
         public bool Intersects(ref Vector3F vertex1, ref Vector3F vertex2, ref Vector3F vertex3)
         {
-            float distance;
-            return Collision.RayIntersectsTriangle(ref this, ref vertex1, ref vertex2, ref vertex3, out distance);
+            return Collision.RayIntersectsTriangle(ref this, ref vertex1, ref vertex2, ref vertex3, out float _);
         }
 
         public bool Intersects(ref Vector3F lineStart, ref Vector3F lineEnd, float limitDistance, out float distance, out Vector3F point)
@@ -158,8 +155,7 @@ namespace Adamantium.Mathematics
         /// <returns>Whether the two objects intersected.</returns>
         public bool Intersects(ref BoundingBox box)
         {
-            float distance;
-            return Collision.RayIntersectsBox(ref this, ref box, out distance);
+            return Collision.RayIntersectsBox(ref this, ref box, out float _);
         }
 
         /// <summary>
@@ -203,8 +199,7 @@ namespace Adamantium.Mathematics
         /// <returns>Whether the two objects intersected.</returns>
         public bool Intersects(ref BoundingSphere sphere)
         {
-            float distance;
-            return Collision.RayIntersectsSphere(ref this, ref sphere, out distance);
+            return Collision.RayIntersectsSphere(ref this, ref sphere, out float _);
         }
 
         /// <summary>

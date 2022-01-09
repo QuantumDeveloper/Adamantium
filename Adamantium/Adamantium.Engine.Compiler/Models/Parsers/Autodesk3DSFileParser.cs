@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using Adamantium.Engine.Compiler.Converter.Configs;
 using Adamantium.Engine.Compiler.Converter.Containers;
-using Adamantium.Engine.Compiler.Converter.ConversionUtils;
+using Adamantium.Engine.Compiler.Models.ConversionUtils;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Models;
 using Adamantium.Mathematics;
@@ -134,10 +134,10 @@ namespace Adamantium.Engine.Compiler.Converter.Parsers
                   {
                      currentGeometry = new Mesh();
                      currentGeometry.MeshTopology = PrimitiveType.TriangleList;
-                     List<Vector3F> positions = new List<Vector3F>();
+                     var positions = new List<Vector3>();
                      for (int x = 0; x < vertexCount; x++)
                      {
-                        Vector3F vertex;
+                        Vector3 vertex;
                         vertex.X = binaryReader.ReadSingle();
                         vertex.Y = binaryReader.ReadSingle();
                         vertex.Z = binaryReader.ReadSingle();
@@ -168,7 +168,7 @@ namespace Adamantium.Engine.Compiler.Converter.Parsers
                         indices.Add(index);
                         var faceFlags = binaryReader.ReadUInt16();
                      }
-                     currentGeometry.AssemblePositions(indices);
+                     currentGeometry.AssemblePoints(indices);
                   }
                   break;
 

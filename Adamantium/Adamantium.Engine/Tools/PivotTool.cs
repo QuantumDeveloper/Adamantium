@@ -13,7 +13,7 @@ namespace Adamantium.Engine.Tools
     {
         private Vector3F toolDelta;
         private float limitDistance = 0.06f;
-        private Vector3F lastCoordinates;
+        private Vector3 lastCoordinates;
 
         private const string MoveRightAxisName = "MoveRight";
         private const string MoveUpAxisName = "MoveUp";
@@ -121,8 +121,7 @@ namespace Adamantium.Engine.Tools
             if (IsLocked && Enabled)
             {
                 HighlightSelectedTool(true);
-                Vector3F interPoint;
-                var intersects = GetRayPlaneIntersectionPoint(camera, inputService, out interPoint);
+                var intersects = GetRayPlaneIntersectionPoint(camera, inputService, out var interPoint);
                 if (intersects)
                 {
                     Tool.TraverseByLayer(
@@ -141,7 +140,7 @@ namespace Adamantium.Engine.Tools
         protected override void UpdateAxisVisibility(Entity current, Camera camera)
         {
             float dotProduct = 0;
-            var transform = current.GetActualMatrix(camera);
+            var transform = current.GetActualMatrixF(camera);
             if (current == moveRightManipulator)
             {
                 dotProduct = Math.Abs(Vector3F.Dot(Vector3F.Normalize(transform.Right), camera.Forward));
@@ -176,17 +175,17 @@ namespace Adamantium.Engine.Tools
             }
         }
 
-        private void TransformEntityPivot(Entity entityToTransform, Camera camera, Vector3F rayPlaneInterPoint)
+        private void TransformEntityPivot(Entity entityToTransform, Camera camera, Vector3 rayPlaneInterPoint)
         {
-            var center = Tool.GetRelativePosition(camera);
-            Vector3F start = lastCoordinates - center;
-            Vector3F end = rayPlaneInterPoint - center;
+            var center = (Vector3)Tool.GetRelativePosition(camera);
+            var start = lastCoordinates - center;
+            var end = rayPlaneInterPoint - center;
 
-            float radians = MathHelper.AngleBetween(Vector3F.Normalize(start), Vector3F.Normalize(end), camera.Forward);
+            var radians = MathHelper.AngleBetween(Vector3.Normalize(start), Vector3.Normalize(end), (Vector3)camera.Forward);
 
             var absolute = camera.GetOwnerPosition() + rayPlaneInterPoint + toolDelta;
             var distance = absolute - selectedTool.Transform.Position;
-            var world = Matrix4x4F.RotationQuaternion(entityToTransform.Transform.PivotRotation);
+            var world = Matrix4x4.RotationQuaternion(entityToTransform.Transform.PivotRotation);
             if (selectedTool == moveRight || selectedTool == moveRightManipulator)
             {
                 entityToTransform.Transform.TranslatePivot(world.Right, distance.X);
@@ -201,7 +200,7 @@ namespace Adamantium.Engine.Tools
             }
             else if (selectedTool == centralManipulator)
             {
-                entityToTransform.Transform.TranslatePivot(Vector3F.Normalize(Vector3F.One), distance);
+                entityToTransform.Transform.TranslatePivot(Vector3.Normalize(Vector3.One), distance);
             }
 
             if (selectedTool == rotateRightOrbit)

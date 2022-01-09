@@ -7,6 +7,7 @@ using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.Engine.Graphics.Effects;
 using Adamantium.Engine.Templates.Camera;
+using Adamantium.Engine.Templates.CameraTemplates;
 using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
 using Adamantium.EntityFramework.Components.Extensions;
@@ -185,13 +186,13 @@ namespace Adamantium.Engine.Services
                 position = (CameraIcon.GetDiameter() * 2 * (Vector3)UserControlledCamera.Forward) + UserControlledCamera.GetOwnerPosition();
             }
             
-            var entity = new CameraTemplate().BuildEntity(null, name, position, Vector3F.ForwardLH, Vector3F.Up, width, height, DefaultZNear, DefaultZFar);
+            var entity = new CameraTemplate().BuildEntity(null, name, position, Vector3.ForwardLH, -Vector3.Up, width, height, DefaultZNear, DefaultZFar);
             return entity.GetComponent<Camera>();
         }
 
         private Camera CreateCamera(uint width, uint height, float znear, float zfar, string name)
         {
-            var entity = new CameraTemplate().BuildEntity(null, name, Vector3.Zero, Vector3F.ForwardLH, Vector3F.Up, width, height, znear, zfar);
+            var entity = new CameraTemplate().BuildEntity(null, name, Vector3.Zero, Vector3.ForwardLH, -Vector3.Up, width, height, znear, zfar);
             return entity.GetComponent<Camera>();
         }
 
@@ -409,7 +410,6 @@ namespace Adamantium.Engine.Services
                     }
 
                     var transform = currentCamera.Owner.Transform.GetMetadata(camera);
-                    Vector3F point;
                     var billboard = Matrix4x4F.BillboardLH(transform.RelativePosition, Vector3F.Zero, camera.Up, camera.Forward);
                     var rotation = MathHelper.GetRotationFromMatrix(billboard);
                     var world = Matrix4x4F.RotationQuaternion(rotation) * Matrix4x4F.Translation(transform.RelativePosition);
@@ -418,10 +418,11 @@ namespace Adamantium.Engine.Services
                     var collision = CameraIcon.GetComponent<Collider>();
                     if (collision != null)
                     {
+                        Vector3F point;
                         var intersects = collision.Intersects(ref ray, out point);
                         if (intersects)
                         {
-                            collisionResult.ValidateAndSetValues(currentCamera.Owner, point, true);
+                            collisionResult.ValidateAndSetValues(currentCamera.Owner, (Vector3)point, true);
                         }
                     }
                 }
@@ -492,7 +493,7 @@ namespace Adamantium.Engine.Services
                 }
 
                 var transform = SelectedCamera.Transform.GetMetadata(camera);
-                var world = Matrix4x4F.RotationQuaternion(camera.Rotation) * transform.WorldMatrix;
+                var world = Matrix4x4F.RotationQuaternion(camera.Rotation) * transform.WorldMatrixF;
                 effect.Parameters["transparency"].SetValue(1.0f);
                 effect.Parameters["worldMatrix"].SetValue(world);
                 effect.Parameters["wvp"].SetValue(world * view * proj);

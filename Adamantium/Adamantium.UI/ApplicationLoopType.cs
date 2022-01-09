@@ -1,8 +1,7 @@
-﻿namespace Adamantium.UI
+﻿namespace Adamantium.UI;
+
+public enum ApplicationLoopType
 {
-   public enum ApplicationLoopType
-   {
-      Update,
-      Draw
-   }
+   Update,
+   Draw
 }

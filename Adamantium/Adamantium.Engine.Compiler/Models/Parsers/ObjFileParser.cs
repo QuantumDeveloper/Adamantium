@@ -5,7 +5,7 @@ using System.IO;
 using System.Linq;
 using Adamantium.Engine.Compiler.Converter.Configs;
 using Adamantium.Engine.Compiler.Converter.Containers;
-using Adamantium.Engine.Compiler.Converter.ConversionUtils;
+using Adamantium.Engine.Compiler.Models.ConversionUtils;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Models;
 using Adamantium.Mathematics;
@@ -72,10 +72,10 @@ namespace Adamantium.Engine.Compiler.Converter.Parsers
 
         private void ParseGeometry()
         {
-            List<Vector3F> positions = new List<Vector3F>();
-            List<Vector3F> normals = new List<Vector3F>();
-            List<Vector2F> uvs = new List<Vector2F>();
-            positions.Add(Vector3F.Zero);
+            var positions = new List<Vector3>();
+            var normals = new List<Vector3F>();
+            var uvs = new List<Vector2F>();
+            positions.Add(Vector3.Zero);
             normals.Add(Vector3F.Zero);
             uvs.Add(Vector2F.Zero);
             ObjMeshData geometryData = null;
@@ -127,7 +127,7 @@ namespace Adamantium.Engine.Compiler.Converter.Parsers
                     }
                     String values = line.Substring(POSITION.Length).Trim(' ');
                     var v = ParseNumericString(values);
-                    positions.Add(new Vector3F(v));
+                    positions.Add(new Vector3(v));
                     _lastParsedStep = ParsedStep.Position;
                 }
 
@@ -139,7 +139,7 @@ namespace Adamantium.Engine.Compiler.Converter.Parsers
                         offsetIndex++;
                     }
                     String values = line.Substring(NORMAL.Length);
-                    var n = ParseNumericString(values);
+                    var n = ParseNumericStringFloat(values);
                     normals.Add(new Vector3F(n));
                     _lastParsedStep = ParsedStep.Normal;
                 }
@@ -152,7 +152,7 @@ namespace Adamantium.Engine.Compiler.Converter.Parsers
                         offsetIndex++;
                     }
                     String values = line.Substring(UV.Length);
-                    var uv = ParseNumericString(values);
+                    var uv = ParseNumericStringFloat(values);
                     uvs.Add(new Vector2F(uv[0], uv[1]));
                     _lastParsedStep = ParsedStep.UV;
                 }
@@ -218,9 +218,16 @@ namespace Adamantium.Engine.Compiler.Converter.Parsers
             dataContainer.Modules |= Modules.Geometry;
         }
 
-        private float[] ParseNumericString(string values)
+        private double[] ParseNumericString(string values)
         {
-            return values.Split(' ').Where(s => !string.IsNullOrEmpty(s)).Select(s => float.Parse(s, CultureInfo.InvariantCulture.NumberFormat)).ToArray();
+            return values.Split(' ').Where(s => !string.IsNullOrEmpty(s))
+                .Select(s => double.Parse(s, CultureInfo.InvariantCulture.NumberFormat)).ToArray();
+        }
+        
+        private float[] ParseNumericStringFloat(string values)
+        {
+            return values.Split(' ').Where(s => !string.IsNullOrEmpty(s))
+                .Select(s => float.Parse(s, CultureInfo.InvariantCulture.NumberFormat)).ToArray();
         }
 
         private VertexSemantic GetSemantic(Offset offset)

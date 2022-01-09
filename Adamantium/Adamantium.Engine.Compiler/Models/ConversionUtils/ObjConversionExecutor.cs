@@ -6,7 +6,7 @@ using Adamantium.Engine.Compiler.Converter.Containers;
 using Adamantium.Engine.Core.Models;
 using Adamantium.Mathematics;
 
-namespace Adamantium.Engine.Compiler.Converter.ConversionUtils
+namespace Adamantium.Engine.Compiler.Models.ConversionUtils
 {
    internal class ObjConversionExecutor:ConversionExecutorBase
    {
@@ -89,7 +89,7 @@ namespace Adamantium.Engine.Compiler.Converter.ConversionUtils
                {
                   parent = model.CreateMesh(parent, "", names[i]);
                }
-               meshName = names[names.Length - 1];
+               meshName = names[^1];
                constructedMesh = model.GetModelByName(meshName);
             }
             else
@@ -112,8 +112,8 @@ namespace Adamantium.Engine.Compiler.Converter.ConversionUtils
             //Собираем вершины в таком порядке, в котором они должны идти
             //то есть достаём из tempMesh.Vertices координаты вершин не по порядку как они заисаны в файле,
             //а в том порядке, в котором они записаны в IndicesContainer.Vertices (в таком случае наборы коодинат могут повторяться)
-            List<Vector3F> positions = new List<Vector3F>();
-            List<Vector2F> uv0 = new List<Vector2F>();
+            var positions = new List<Vector3>();
+            var uv0 = new List<Vector2F>();
             for (int i = 0; i < indicesContainer.Positions.Count; i++)
             {
                var position = geometryData.Positions[indicesContainer.Positions[i]];

@@ -93,7 +93,7 @@ namespace Adamantium.Engine.Tools
                 ref relativePosition,
                 out world);
             var metadata = current.Transform.GetMetadata(camera);
-            metadata.WorldMatrix = world;
+            metadata.WorldMatrixF = world;
             metadata.RelativePosition = relativePosition;
         }
 
@@ -133,34 +133,34 @@ namespace Adamantium.Engine.Tools
             float dotProduct = 0;
             if (current == rightAxisManipulator)
             {
-                dotProduct = Math.Abs(Vector3F.Dot(Vector3F.Normalize(transformData.WorldMatrix.Right), Vector3F.ForwardLH));
+                dotProduct = Math.Abs(Vector3F.Dot(Vector3F.Normalize(transformData.WorldMatrixF.Right), Vector3F.ForwardLH));
                 transformData.Enabled = !(dotProduct >= 0.85);
             }
 
             else if (current == leftAxisManipulator)
             {
-                dotProduct = Math.Abs(Vector3F.Dot(Vector3F.Normalize(transformData.WorldMatrix.Left), Vector3F.ForwardLH));
+                dotProduct = Math.Abs(Vector3F.Dot(Vector3F.Normalize(transformData.WorldMatrixF.Left), Vector3F.ForwardLH));
                 transformData.Enabled = !(dotProduct >= 0.85);
             }
 
             else if (current == upAxisManipulator)
             {
-                dotProduct = Math.Abs(Vector3F.Dot(Vector3F.Normalize(transformData.WorldMatrix.Up), Vector3F.ForwardLH));
+                dotProduct = Math.Abs(Vector3F.Dot(Vector3F.Normalize(transformData.WorldMatrixF.Up), Vector3F.ForwardLH));
                 transformData.Enabled = !(dotProduct >= 0.85);
             }
             else if (current == downAxisManipulator)
             {
-                dotProduct = Math.Abs(Vector3F.Dot(Vector3F.Normalize(transformData.WorldMatrix.Down), Vector3F.ForwardLH));
+                dotProduct = Math.Abs(Vector3F.Dot(Vector3F.Normalize(transformData.WorldMatrixF.Down), Vector3F.ForwardLH));
                 transformData.Enabled = !(dotProduct >= 0.85);
             }
             else if (current == forwardAxisManipulator)
             {
-                dotProduct = Math.Abs(Vector3F.Dot(Vector3F.Normalize(transformData.WorldMatrix.Backward), Vector3F.ForwardLH));
+                dotProduct = Math.Abs(Vector3F.Dot(Vector3F.Normalize(transformData.WorldMatrixF.Backward), Vector3F.ForwardLH));
                 transformData.Enabled = !(dotProduct >= 0.85);
             }
             else if (current == backwardAxisManipulator)
             {
-                dotProduct = Math.Abs(Vector3F.Dot(Vector3F.Normalize(transformData.WorldMatrix.Forward), Vector3F.ForwardLH));
+                dotProduct = Math.Abs(Vector3F.Dot(Vector3F.Normalize(transformData.WorldMatrixF.Forward), Vector3F.ForwardLH));
                 transformData.Enabled = !(dotProduct >= 0.85);
             }
         }

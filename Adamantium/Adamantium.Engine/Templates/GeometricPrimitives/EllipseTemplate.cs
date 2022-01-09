@@ -9,7 +9,7 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
     public class EllipseTemplate : PrimitiveTemplate
     {
         private EllipseType ellipseType;
-        private Vector2F diameter;
+        private Vector2 diameter;
         private float startAngle;
         private float stopAngle;
 
@@ -18,12 +18,12 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
         public EllipseTemplate(
             GeometryType geometryType,
             EllipseType ellipseType,
-            Vector2F diameter,
+            Vector2 diameter,
             float startAngle = 0,
             float stopAngle = 360,
             bool isClockwise = true,
             int tessellation = 40,
-            Matrix4x4F? transform = null) : base(geometryType, tessellation, transform)
+            Matrix4x4? transform = null) : base(geometryType, tessellation, transform)
         {
             this.diameter = diameter;
             this.ellipseType = ellipseType;

@@ -196,7 +196,7 @@ namespace Adamantium.Engine.Tools
         {
             var scale = new Vector3F(CurrentLight.Range);
             var position = targetEntity.Transform.Position;
-            var rot = targetEntity.Transform.GetRotationMatrix();
+            var rot = targetEntity.Transform.GetRotationMatrixF();
 
             var rightPos = position + (((scale.X) / 2 - 0.5f * toolScale) * rot.Right);
             var forwardPos = position + ((scale.X / 2 - 0.5f * toolScale) * rot.Forward);

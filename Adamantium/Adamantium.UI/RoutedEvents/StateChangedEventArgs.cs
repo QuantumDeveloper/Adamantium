@@ -1,14 +1,13 @@
 using Adamantium.UI.Controls;
 
-namespace Adamantium.UI.RoutedEvents
+namespace Adamantium.UI.RoutedEvents;
+
+public class StateChangedEventArgs : RoutedEventArgs
 {
-    public class StateChangedEventArgs : RoutedEventArgs
+    public StateChangedEventArgs(WindowState state)
     {
-        public StateChangedEventArgs(WindowState state)
-        {
-            State = state;
-        }
-        
-        public WindowState State { get; }
+        State = state;
     }
+        
+    public WindowState State { get; }
 }

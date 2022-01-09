@@ -1,90 +1,87 @@
-﻿using System;
-using Adamantium.Engine.Graphics;
-using Adamantium.Mathematics;
+﻿using Adamantium.Engine.Graphics;
 
-namespace Adamantium.UI.Media
+namespace Adamantium.UI.Media;
+
+public sealed class RectangleGeometry : Geometry
 {
-   public sealed class RectangleGeometry : Geometry
-   {
-      private Rect bounds;
+   private Rect bounds;
       
-      public static readonly AdamantiumProperty CornerRadiusProperty = AdamantiumProperty.Register(nameof(CornerRadius),
-         typeof (CornerRadius), typeof (RectangleGeometry), new PropertyMetadata(new CornerRadius(0)));
+   public static readonly AdamantiumProperty CornerRadiusProperty = AdamantiumProperty.Register(nameof(CornerRadius),
+      typeof (CornerRadius), typeof (RectangleGeometry), new PropertyMetadata(new CornerRadius(0)));
 
-      public static readonly AdamantiumProperty RectProperty = AdamantiumProperty.Register(nameof(Rect),
-         typeof(Rect), typeof(RectangleGeometry), new PropertyMetadata(Rect.Empty));
+   public static readonly AdamantiumProperty RectProperty = AdamantiumProperty.Register(nameof(Rect),
+      typeof(Rect), typeof(RectangleGeometry), new PropertyMetadata(Rect.Empty));
 
-      public RectangleGeometry()
-      {
-         IsClosed = true;
-      }
+   public RectangleGeometry()
+   {
+      IsClosed = true;
+   }
 
-      public RectangleGeometry(RectangleGeometry copy)
-      {
-         Mesh = copy.Mesh;
-         Rect = copy.Rect;
-         CornerRadius = copy.CornerRadius;
-      }
+   public RectangleGeometry(RectangleGeometry copy)
+   {
+      Mesh = copy.Mesh;
+      Rect = copy.Rect;
+      CornerRadius = copy.CornerRadius;
+   }
 
-      public RectangleGeometry(Rect size, CornerRadius corners) : this()
-      {
-         Rect = size;
-         CornerRadius = corners;
-      }
+   public RectangleGeometry(Rect size, CornerRadius corners) : this()
+   {
+      Rect = size;
+      CornerRadius = corners;
+   }
 
-      public CornerRadius CornerRadius
-      {
-         get => GetValue<CornerRadius>(CornerRadiusProperty);
-         set => SetValue(CornerRadiusProperty, value);
-      }
+   public CornerRadius CornerRadius
+   {
+      get => GetValue<CornerRadius>(CornerRadiusProperty);
+      set => SetValue(CornerRadiusProperty, value);
+   }
 
-      public Rect Rect
-      {
-         get => GetValue<Rect>(RectProperty);
-         set => SetValue(RectProperty, value);
-      }
+   public Rect Rect
+   {
+      get => GetValue<Rect>(RectProperty);
+      set => SetValue(RectProperty, value);
+   }
 
-      private void CreateRectangle(Rect rect, CornerRadius corners)
-      {
-         Rect = rect;
-         bounds = rect;
-         CornerRadius = corners;
+   private void CreateRectangle(Rect rect, CornerRadius corners)
+   {
+      Rect = rect;
+      bounds = rect;
+      CornerRadius = corners;
 
-         var translation = Matrix4x4F.Translation((float)rect.Width / 2 + (float)rect.X,
-            (float)rect.Height / 2 + (float)rect.Y, 0);
-         Mesh = Shapes.Rectangle.GenerateGeometry(
-            GeometryType.Solid, 
-            (float)rect.Width, 
-            (float)rect.Height,
-            CornerRadius, 
-            TesselationFactor, 
-            translation);
+      var translation = Matrix4x4.Translation((float)rect.Width / 2 + (float)rect.X,
+         (float)rect.Height / 2 + (float)rect.Y, 0);
+      Mesh = Shapes.Rectangle.GenerateGeometry(
+         GeometryType.Solid, 
+         (float)rect.Width, 
+         (float)rect.Height,
+         CornerRadius, 
+         TesselationFactor, 
+         translation);
          
-         OutlineMesh = Shapes.Rectangle.GenerateGeometry(
-            GeometryType.Outlined, 
-            (float)rect.Width, 
-            (float)rect.Height,
-            CornerRadius, 
-            TesselationFactor, 
-            translation);
-      }
+      OutlineMesh = Shapes.Rectangle.GenerateGeometry(
+         GeometryType.Outlined, 
+         (float)rect.Width, 
+         (float)rect.Height,
+         CornerRadius, 
+         TesselationFactor, 
+         translation);
+   }
 
 
-      public override Rect Bounds => bounds;
+   public override Rect Bounds => bounds;
 
-      public override Geometry Clone()
-      {
-         return new RectangleGeometry(this);
-      }
+   public override Geometry Clone()
+   {
+      return new RectangleGeometry(this);
+   }
 
-      public override void RecalculateBounds()
-      {
-         bounds = Rect;
-      }
+   public override void RecalculateBounds()
+   {
+      bounds = Rect.FromPoints(OutlineMesh.Points);
+   }
 
-      protected internal override void ProcessGeometry()
-      {
-         CreateRectangle(Rect, CornerRadius);
-      }
+   protected internal override void ProcessGeometryCore()
+   {
+      CreateRectangle(Rect, CornerRadius);
    }
 }

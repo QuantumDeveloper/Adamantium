@@ -1,8 +1,7 @@
 ﻿using Adamantium.Core.Collections;
 
-namespace Adamantium.UI
+namespace Adamantium.UI;
+
+public class TriggerCollection:AdamantiumCollection<ITrigger>
 {
-   public class TriggerCollection:AdamantiumCollection<ITrigger>
-   {
-   }
 }

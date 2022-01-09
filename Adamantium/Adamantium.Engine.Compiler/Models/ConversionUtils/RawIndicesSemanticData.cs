@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Models;
 
-namespace Adamantium.Engine.Compiler.Converter.ConversionUtils
+namespace Adamantium.Engine.Compiler.Models.ConversionUtils
 {
     public class RawIndicesSemanticData
     {

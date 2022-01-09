@@ -4,8 +4,8 @@ using System.IO;
 using Adamantium.Engine.Compiler.Converter.Configs;
 using Adamantium.Engine.Compiler.Converter.Containers;
 using Adamantium.Engine.Core.Models;
-using Adamantium.Engine.Compiler.Converter.ConversionUtils;
 using Adamantium.Engine.Compiler.Converter.Parsers;
+using Adamantium.Engine.Compiler.Models.ConversionUtils;
 
 namespace Adamantium.Engine.Compiler.Converter.Converters
 {

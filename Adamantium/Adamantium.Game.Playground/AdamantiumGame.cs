@@ -135,17 +135,17 @@ namespace Adamantium.Game.Playground
             var spaceX = 3;
             var spaceY = 3;
 
-            var subpixelsQuadList = new List<Vector3F>();
-            var pixelsQuadList = new List<Vector3F>();
+            var subpixelsQuadList = new List<Vector3>();
+            var pixelsQuadList = new List<Vector3>();
             var subpixelsColors = new List<Color>();
             var pixelsColors = new List<Color>();
 
             for (var y = 0; y < height; y++)
             {
-                var p0 = new Vector3F();
-                var p1 = new Vector3F();
-                var p2 = new Vector3F();
-                var p3 = new Vector3F();
+                var p0 = new Vector3();
+                var p1 = new Vector3();
+                var p2 = new Vector3();
+                var p3 = new Vector3();
                 
                 byte red = 0;
                 byte green = 0;
@@ -153,13 +153,13 @@ namespace Adamantium.Game.Playground
                 
                 for (var x = 0; x < width; x++)
                 {
-                    subpixelsQuadList.Add(new Vector3F(startPosX + subpixelWidth * x + spaceX * x, startPosY + subpixelHeight * y + spaceY * y));
-                    subpixelsQuadList.Add(new Vector3F(startPosX + subpixelWidth * x + subpixelWidth + spaceX * x, startPosY + subpixelHeight * y + spaceY * y));
-                    subpixelsQuadList.Add(new Vector3F(startPosX + subpixelWidth * x + subpixelWidth + spaceX * x, startPosY + subpixelHeight * y + subpixelHeight + spaceY * y));
+                    subpixelsQuadList.Add(new Vector3(startPosX + subpixelWidth * x + spaceX * x, startPosY + subpixelHeight * y + spaceY * y));
+                    subpixelsQuadList.Add(new Vector3(startPosX + subpixelWidth * x + subpixelWidth + spaceX * x, startPosY + subpixelHeight * y + spaceY * y));
+                    subpixelsQuadList.Add(new Vector3(startPosX + subpixelWidth * x + subpixelWidth + spaceX * x, startPosY + subpixelHeight * y + subpixelHeight + spaceY * y));
                     
-                    subpixelsQuadList.Add(new Vector3F(startPosX + subpixelWidth * x + spaceX * x, startPosY + subpixelHeight * y + spaceY * y));
-                    subpixelsQuadList.Add(new Vector3F(startPosX + subpixelWidth * x + subpixelWidth + spaceX * x, startPosY + subpixelHeight * y + subpixelHeight + spaceY * y));
-                    subpixelsQuadList.Add(new Vector3F(startPosX + subpixelWidth * x + spaceX * x, startPosY + subpixelHeight * y + subpixelHeight + spaceY * y));
+                    subpixelsQuadList.Add(new Vector3(startPosX + subpixelWidth * x + spaceX * x, startPosY + subpixelHeight * y + spaceY * y));
+                    subpixelsQuadList.Add(new Vector3(startPosX + subpixelWidth * x + subpixelWidth + spaceX * x, startPosY + subpixelHeight * y + subpixelHeight + spaceY * y));
+                    subpixelsQuadList.Add(new Vector3(startPosX + subpixelWidth * x + spaceX * x, startPosY + subpixelHeight * y + subpixelHeight + spaceY * y));
 
                     var subpixelColor = new Color();
 
@@ -168,8 +168,8 @@ namespace Adamantium.Game.Playground
                         subpixelColor = Color.FromRgba(subpixels[x, y], 0, 0, 255);
                         red = subpixels[x, y];
 
-                        p0 = new Vector3F(startPosX + subpixelWidth * x + subpixelWidth / 2.0f + spaceX * x, startPosY + subpixelHeight * y + subpixelHeight * 2 / 3.0f + spaceY * y);
-                        p3 = new Vector3F(startPosX + subpixelWidth * x + subpixelWidth / 2.0f + spaceX * x, startPosY + subpixelHeight * y + subpixelHeight * 2 / 3.0f + pixelHeight + spaceY * y);
+                        p0 = new Vector3(startPosX + subpixelWidth * x + subpixelWidth / 2.0f + spaceX * x, startPosY + subpixelHeight * y + subpixelHeight * 2 / 3.0f + spaceY * y);
+                        p3 = new Vector3(startPosX + subpixelWidth * x + subpixelWidth / 2.0f + spaceX * x, startPosY + subpixelHeight * y + subpixelHeight * 2 / 3.0f + pixelHeight + spaceY * y);
                     }
 
                     if (x % 3 == 1)
@@ -183,8 +183,8 @@ namespace Adamantium.Game.Playground
                         subpixelColor = Color.FromRgba(0, 0, subpixels[x, y], 255);
                         blue = subpixels[x, y];
 
-                        p1 = new Vector3F(startPosX + subpixelWidth * x + subpixelWidth / 2.0f + spaceX * x, startPosY + subpixelHeight * y + subpixelHeight * 2 / 3.0f + spaceY * y);
-                        p2 = new Vector3F(startPosX + subpixelWidth * x + subpixelWidth / 2.0f + spaceX * x, startPosY + subpixelHeight * y + subpixelHeight * 2 / 3.0f + pixelHeight + spaceY * y);
+                        p1 = new Vector3(startPosX + subpixelWidth * x + subpixelWidth / 2.0f + spaceX * x, startPosY + subpixelHeight * y + subpixelHeight * 2 / 3.0f + spaceY * y);
+                        p2 = new Vector3(startPosX + subpixelWidth * x + subpixelWidth / 2.0f + spaceX * x, startPosY + subpixelHeight * y + subpixelHeight * 2 / 3.0f + pixelHeight + spaceY * y);
                         
                         pixelsQuadList.Add(p0);
                         pixelsQuadList.Add(p1);
@@ -254,7 +254,7 @@ namespace Adamantium.Game.Playground
             
             var glyphTextureSize = fontSize <= smallFontSizeMaxValue ? fontSize : mtsdfTextureSize;
 
-            var quadList = new List<Vector3F>();
+            var quadList = new List<Vector3>();
             var uvList = new List<Vector2F>();
 
             double penPosition = 0.0;
@@ -292,13 +292,13 @@ namespace Adamantium.Game.Playground
                 double right = left + fontSize;
                 double bottom = top + fontSize;
 
-                quadList.Add(new Vector3F((float) left, (float) top));
-                quadList.Add(new Vector3F((float) right, (float) top));
-                quadList.Add(new Vector3F((float) right, (float) bottom));
+                quadList.Add(new Vector3((float) left, (float) top));
+                quadList.Add(new Vector3((float) right, (float) top));
+                quadList.Add(new Vector3((float) right, (float) bottom));
 
-                quadList.Add(new Vector3F((float) left, (float) top));
-                quadList.Add(new Vector3F((float) right, (float) bottom));
-                quadList.Add(new Vector3F((float) left, (float) bottom));
+                quadList.Add(new Vector3((float) left, (float) top));
+                quadList.Add(new Vector3((float) right, (float) bottom));
+                quadList.Add(new Vector3((float) left, (float) bottom));
 
                 var glyphUV = glyph.GetTextureAtlasUVCoordinates(glyphTextureSize, 0, typeface.GlyphCount);
 
@@ -383,16 +383,16 @@ namespace Adamantium.Game.Playground
 
                 var testEntity = new Entity(null, "Test");
             
-                var quadList = new List<Vector3F>();
+                var quadList = new List<Vector3>();
                 var uvList = new List<Vector2F>();
                 
-                quadList.Add(new Vector3F(0, 0));
-                quadList.Add(new Vector3F(500, 0));
-                quadList.Add(new Vector3F(500, 500));
+                quadList.Add(new Vector3(0, 0));
+                quadList.Add(new Vector3(500, 0));
+                quadList.Add(new Vector3(500, 500));
 
-                quadList.Add(new Vector3F(0, 0));
-                quadList.Add(new Vector3F(500, 500));
-                quadList.Add(new Vector3F(0, 500));
+                quadList.Add(new Vector3(0, 0));
+                quadList.Add(new Vector3(500, 500));
+                quadList.Add(new Vector3(0, 500));
                 
                 uvList.Add(new Vector2F(0, 0));
                 uvList.Add(new Vector2F(1, 0));

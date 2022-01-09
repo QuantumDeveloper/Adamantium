@@ -12,11 +12,11 @@ namespace Adamantium.Engine.Graphics
             public static Shape New(
                 GraphicsDevice device,
                 GeometryType geometryType,
-                float width = 1,
-                float height = 1,
-                float length = 1,
+                double width = 1,
+                double height = 1,
+                double length = 1,
                 int tessellation = 1,
-                Matrix4x4F? transform = null)
+                Matrix4x4? transform = null)
             {
                 var geometry = GenerateGeometry(geometryType, width, height, length, tessellation, transform);
                 return new Shape(device, geometry);
@@ -24,20 +24,20 @@ namespace Adamantium.Engine.Graphics
 
             public static Mesh GenerateGeometry(
                 GeometryType geometryType,
-                float size,
+                double size,
                 int tessellation = 1,
-                Matrix4x4F? transform = null)
+                Matrix4x4? transform = null)
             {
                 return GenerateGeometry(geometryType, size, size, size, tessellation, transform);
             }
 
             public static Mesh GenerateGeometry(
                 GeometryType geometryType,
-                float width = 1,
-                float height = 1,
-                float depth = 1,
+                double width = 1,
+                double height = 1,
+                double depth = 1,
                 int tessellation = 1,
-                Matrix4x4F? transform = null)
+                Matrix4x4? transform = null)
             {
                 if (width <= 0)
                 {
@@ -75,9 +75,9 @@ namespace Adamantium.Engine.Graphics
             }
 
             private static Mesh GenerateSolidGeometry(
-                float width = 1,
-                float height = 1,
-                float depth = 1,
+                double width = 1,
+                double height = 1,
+                double depth = 1,
                 int tessellation = 1)
             {
                 Vector2F uvFactor = Vector2F.One;
@@ -93,12 +93,12 @@ namespace Adamantium.Engine.Graphics
                 var deltaY = height / tessellation;
                 var deltaZ = depth / tessellation;
 
-                List<Vector3F> front = new List<Vector3F>();
-                List<Vector3F> right = new List<Vector3F>();
-                List<Vector3F> back = new List<Vector3F>();
-                List<Vector3F> left = new List<Vector3F>();
-                List<Vector3F> top = new List<Vector3F>();
-                List<Vector3F> bottom = new List<Vector3F>();
+                var front = new List<Vector3>();
+                var right = new List<Vector3>();
+                var back = new List<Vector3>();
+                var left = new List<Vector3>();
+                var top = new List<Vector3>();
+                var bottom = new List<Vector3>();
 
                 List<Vector2F> frontUV = new List<Vector2F>();
                 List<Vector2F> rightUV = new List<Vector2F>();
@@ -112,7 +112,7 @@ namespace Adamantium.Engine.Graphics
                 {
                     for (int x = 0; x < lineWidth; x++)
                     {
-                        Vector3F pos = new Vector3F(-sizeX + deltaX * x, -sizeY + deltaY * y, -sizeZ);
+                        var pos = new Vector3(-sizeX + deltaX * x, -sizeY + deltaY * y, -sizeZ);
                         var uv = new Vector2F(1.0f - (1.0f * x / tessellation * uvFactor.X), 1.0f - (1.0f * y / tessellation * uvFactor.Y));
                         front.Add(pos);
                         frontUV.Add(uv);
@@ -120,7 +120,7 @@ namespace Adamantium.Engine.Graphics
 
                     for (int z = 0; z < lineWidth; z++)
                     {
-                        Vector3F pos = new Vector3F(sizeX, -sizeY + deltaY * y, -sizeZ + deltaZ * z);
+                        var pos = new Vector3(sizeX, -sizeY + deltaY * y, -sizeZ + deltaZ * z);
                         var uv = new Vector2F(1.0f - (1.0f * z / tessellation * uvFactor.X), 1.0f - (1.0f * y / tessellation * uvFactor.Y));
                         right.Add(pos);
                         rightUV.Add(uv);
@@ -128,7 +128,7 @@ namespace Adamantium.Engine.Graphics
 
                     for (int x = 0; x < lineWidth; x++)
                     {
-                        Vector3F pos = new Vector3F(sizeX - deltaX * x, -sizeY + deltaY * y, sizeZ);
+                        var pos = new Vector3(sizeX - deltaX * x, -sizeY + deltaY * y, sizeZ);
                         var uv = new Vector2F(1.0f - (1.0f * x / tessellation * uvFactor.X), 1.0f - (1.0f * y / tessellation * uvFactor.Y));
                         back.Add(pos);
                         backUV.Add(uv);
@@ -136,7 +136,7 @@ namespace Adamantium.Engine.Graphics
 
                     for (int z = 0; z < lineWidth; z++)
                     {
-                        Vector3F pos = new Vector3F(-sizeX, -sizeY + deltaY * y, sizeZ - deltaZ * z);
+                        var pos = new Vector3(-sizeX, -sizeY + deltaY * y, sizeZ - deltaZ * z);
                         var uv = new Vector2F(1.0f - (1.0f * z / tessellation * uvFactor.X), 1.0f - (1.0f * y / tessellation * uvFactor.Y));
                         left.Add(pos);
                         leftUV.Add(uv);
@@ -148,29 +148,29 @@ namespace Adamantium.Engine.Graphics
                 {
                     for (int x = 0; x < lineWidth; x++)
                     {
-                        Vector3F pos = new Vector3F(-sizeX + deltaX * x, sizeY, -sizeZ + deltaZ * z);
+                        var pos = new Vector3(-sizeX + deltaX * x, sizeY, -sizeZ + deltaZ * z);
                         var uv = new Vector2F( 1.0f - (1.0f * x / tessellation * uvFactor.X), 1.0f - (1.0f * z / tessellation * uvFactor.Y));
                         top.Add(pos);
                         topUV.Add(uv);
                     }
                 }
 
-                QuaternionF rot = QuaternionF.RotationAxis(Vector3F.UnitX, MathHelper.DegreesToRadians(180));
-                Matrix4x4F rotationMatrix = Matrix4x4F.RotationQuaternion(rot);
+                var rot = Quaternion.RotationAxis(Vector3.UnitX, MathHelper.DegreesToRadians(180));
+                var rotationMatrix = Matrix4x4.RotationQuaternion(rot);
                 //Generate bottom cap
                 for (int z = 0; z < lineWidth; z++)
                 {
                     for (int x = 0; x < lineWidth; x++)
                     {
-                        Vector3F pos = new Vector3F(-sizeX + deltaX * x, sizeY, -sizeZ + deltaZ * z);
+                        var pos = new Vector3(-sizeX + deltaX * x, sizeY, -sizeZ + deltaZ * z);
                         var uv = new Vector2F( 1.0f - (1.0f * x / tessellation * uvFactor.X), 1.0f - (1.0f * z / tessellation * uvFactor.Y));
-                        pos = Vector3F.TransformCoordinate(pos, rotationMatrix);
+                        pos = Vector3.TransformCoordinate(pos, rotationMatrix);
                         bottom.Add(pos);
                         bottomUV.Add(uv);
                     }
                 }
 
-                var allVertices = new List<Vector3F>();
+                var allVertices = new List<Vector3>();
 
                 allVertices.AddRange(front);
                 allVertices.AddRange(right);
@@ -229,9 +229,9 @@ namespace Adamantium.Engine.Graphics
 
 
             private static Mesh GenerateOutlinedGeometry(
-                float width = 1,
-                float height = 1,
-                float depth = 1)
+                double width = 1,
+                double height = 1,
+                double depth = 1)
             {
                 var startPositionX = -width / 2;
                 var startPositionY = -height / 2;
@@ -241,15 +241,15 @@ namespace Adamantium.Engine.Graphics
                 var endPositionY = height / 2;
                 var endPositionZ = depth / 2;
 
-                var vertices = new List<Vector3F>();
-                vertices.Add(new Vector3F(startPositionX, startPositionY, startPositionZ));
-                vertices.Add(new Vector3F(startPositionX, endPositionY, startPositionZ));
-                vertices.Add(new Vector3F(endPositionX, endPositionY, startPositionZ));
-                vertices.Add(new Vector3F(endPositionX, startPositionY, startPositionZ));
-                vertices.Add(new Vector3F(startPositionX, startPositionY, endPositionZ));
-                vertices.Add(new Vector3F(startPositionX, endPositionY, endPositionZ));
-                vertices.Add(new Vector3F(endPositionX, endPositionY, endPositionZ));
-                vertices.Add(new Vector3F(endPositionX, startPositionY, endPositionZ));
+                var vertices = new List<Vector3>();
+                vertices.Add(new Vector3(startPositionX, startPositionY, startPositionZ));
+                vertices.Add(new Vector3(startPositionX, endPositionY, startPositionZ));
+                vertices.Add(new Vector3(endPositionX, endPositionY, startPositionZ));
+                vertices.Add(new Vector3(endPositionX, startPositionY, startPositionZ));
+                vertices.Add(new Vector3(startPositionX, startPositionY, endPositionZ));
+                vertices.Add(new Vector3(startPositionX, endPositionY, endPositionZ));
+                vertices.Add(new Vector3(endPositionX, endPositionY, endPositionZ));
+                vertices.Add(new Vector3(endPositionX, startPositionY, endPositionZ));
 
                 List<int> indices = new List<int>();
 

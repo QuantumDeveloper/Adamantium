@@ -1,8 +1,7 @@
-namespace Adamantium.UI.Media
+namespace Adamantium.UI.Media;
+
+public enum BezierType
 {
-    public enum BezierType
-    {
-        Quadratic,
-        Cubic
-    }
+    Quadratic,
+    Cubic
 }

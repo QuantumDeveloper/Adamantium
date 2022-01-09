@@ -68,19 +68,19 @@ namespace Adamantium.EntityFramework.ComponentsBasics
         /// <summary>
         /// Camera relative X axis from view matrix
         /// </summary>
-        public Vector3F Right { get; protected set; }
+        public Vector3 Right { get; protected set; }
 
         /// <summary>
         /// Camera relative Y axis from view matrix
         /// </summary>
-        public Vector3F Up { get; protected set; }
+        public Vector3 Up { get; protected set; }
 
         /// <summary>
         /// Camera relative Z axis from view matrix
         /// </summary>
-        public Vector3F Forward { get; protected set; }
+        public Vector3 Forward { get; protected set; }
 
-        public Vector3F Backward => -Forward;
+        public Vector3 Backward => -Forward;
 
         public Entity LookAtObject
         {
@@ -272,7 +272,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
         ///<summary>
         ///Sets camera as Free with specific parameters.
         ///</summary>
-        public abstract void SetFreeCamera(Vector3 position, Vector3 lookAt, Vector3F up);
+        public abstract void SetFreeCamera(Vector3 position, Vector3 lookAt, Vector3 up);
 
         ///<summary>
         ///Sets camera as Free without any parameters

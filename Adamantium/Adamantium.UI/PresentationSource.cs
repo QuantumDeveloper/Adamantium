@@ -1,9 +1,8 @@
 ﻿using Adamantium.UI.Controls;
 
-namespace Adamantium.UI
+namespace Adamantium.UI;
+
+public abstract class PresentationSource : AdamantiumComponent
 {
-    public abstract class PresentationSource : AdamantiumComponent
-    {
         
-    }
 }

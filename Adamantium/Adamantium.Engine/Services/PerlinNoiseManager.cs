@@ -17,14 +17,14 @@ namespace Adamantium.Engine.Services
          randomizer = new Randomizer();
       }
 
-      public void GenerateNoiseMap(int size, int seed, GraphicsDevice device, Mesh geometry, Vector4F modifiers)
+      public void GenerateNoiseMap(int size, int seed, GraphicsDevice device, Mesh mesh, Vector4 modifiers)
       {
          PerlinNoise.SetSeed(seed);
          uint octaveCount = (uint)Math.Floor(Math.Log(size + 1, 2));
 
-         for (int i = 0; i < geometry.Points.Length; ++i)
+         for (int i = 0; i < mesh.Points.Length; ++i)
          {
-            float noise = PerlinNoise.GetMultioctave3DNoiseValue(geometry.Points[i], modifiers, 0, octaveCount);
+            var noise = PerlinNoise.GetMultioctave3DNoiseValue(mesh.Points[i], modifiers, 0, octaveCount);
 
             if ((noise < randomizer.NextFloat(-0.5f, -0.7f)) || (noise > randomizer.NextFloat(0.5f, 0.7f)))
             {
@@ -37,16 +37,16 @@ namespace Adamantium.Engine.Services
                noise *= 0.05f * (float)Math.Pow(1.5f, (Math.Abs(0.0f - noise)));
             }
 
-            geometry.Points[i] += geometry.Normals[i] * noise;
-            geometry.Normals[i] = Vector3F.Normalize(geometry.Points[i]);
+            mesh.Points[i] += (Vector3)mesh.Normals[i] * noise;
+            mesh.Normals[i] = Vector3F.Normalize((Vector3F)mesh.Points[i]);
          }
 
 
       }
 
-      public float GenerateDensity(Vector3F vertex)
+      public double GenerateDensity(Vector3 vertex)
       {
-         float density = 0;
+         double density = 0;
          density = -vertex.Y;
          
          /*Vector3F warp = new Vector3F();
@@ -55,9 +55,9 @@ namespace Adamantium.Engine.Services
          
          //density += Perlin3D.GetMultioctave3DNoiseValue(vertex, Vector4F.One, 0, 3);
          
-         density += PerlinNoise.Get3DNoiseValue(vertex * 4.03f) * 0.25f;
-         density += PerlinNoise.Get3DNoiseValue(vertex * 1.96f) * 0.50f;
-         density += PerlinNoise.Get3DNoiseValue(vertex * 1.01f) * 1.00f;
+         density += PerlinNoise.Get3DNoiseValue(vertex * 4.03) * 0.25f;
+         density += PerlinNoise.Get3DNoiseValue(vertex * 1.96) * 0.50f;
+         density += PerlinNoise.Get3DNoiseValue(vertex * 1.01) * 1.00f;
          
          return density;
       }
@@ -77,19 +77,18 @@ namespace Adamantium.Engine.Services
          return MarchingCubes.ProcessGridCell(gridCell, 0.5f);
       }
 
-      public List<Vector3F> GenerateChunk(Vector3F chunkOrigin, float chunkSize, int voxelsInChunk)
+      public List<Vector3> GenerateChunk(Vector3 chunkOrigin, float chunkSize, int voxelsInChunk)
       {
-         List<GridTriangle> triangleList;
-         List<Vector3F> vertexList = new List<Vector3F>();
+         var vertexList = new List<Vector3>();
          GridCell gridCell = new GridCell();
          
          float increment = chunkSize / voxelsInChunk;
 
-         for (float x = chunkOrigin.X; x < (chunkOrigin.X + chunkSize); x += increment)
+         for (double x = chunkOrigin.X; x < (chunkOrigin.X + chunkSize); x += increment)
          {
-            for (float y = chunkOrigin.Y; y < (chunkOrigin.Y + chunkSize); y += increment)
+            for (double y = chunkOrigin.Y; y < (chunkOrigin.Y + chunkSize); y += increment)
             {
-               for (float z = chunkOrigin.Z; z < (chunkOrigin.Z + chunkSize); z += increment)
+               for (double z = chunkOrigin.Z; z < (chunkOrigin.Z + chunkSize); z += increment)
                {
                   gridCell.Vertexes[0].X = x;
                   gridCell.Vertexes[0].Y = y;
@@ -123,7 +122,7 @@ namespace Adamantium.Engine.Services
                   gridCell.Vertexes[7].Y = y + increment;
                   gridCell.Vertexes[7].Z = z;
 
-                  triangleList = GenerateSurface(gridCell);
+                  var triangleList = GenerateSurface(gridCell);
                   foreach (GridTriangle gridTriangle in triangleList)
                   {
                      vertexList.Add(gridTriangle.Vertexes[0]);
@@ -137,21 +136,20 @@ namespace Adamantium.Engine.Services
          return vertexList;
       }
 
-      public List<Vector3F> GenerateBlockOfChunks(Vector3F blockOrigin, int blockSize, float chunkSize, int voxelsInChunk)
+      public List<Vector3> GenerateBlockOfChunks(Vector3 blockOrigin, int blockSize, float chunkSize, int voxelsInChunk)
       {
-         List<Vector3F> blockVertexList = new List<Vector3F>();
-         List<Vector3F> chunkVertexList;
+         var blockVertexList = new List<Vector3>();
 
-         for (float x = blockOrigin.X; x < (blockOrigin.X + blockSize); ++x)
+         for (double x = blockOrigin.X; x < (blockOrigin.X + blockSize); ++x)
          {
-            for (float y = blockOrigin.Y; y < (blockOrigin.Y + blockSize); ++y)
+            for (double y = blockOrigin.Y; y < (blockOrigin.Y + blockSize); ++y)
             {
-               for (float z = blockOrigin.Z; z < (blockOrigin.Z + blockSize); ++z)
+               for (double z = blockOrigin.Z; z < (blockOrigin.Z + blockSize); ++z)
                {
-                  Vector3F chunkOrigin = new Vector3F(x, y, z);
-                  chunkVertexList = GenerateChunk(chunkOrigin, chunkSize, voxelsInChunk);
+                  var chunkOrigin = new Vector3(x, y, z);
+                  var chunkVertexList = GenerateChunk(chunkOrigin, chunkSize, voxelsInChunk);
 
-                  foreach (Vector3F vertex in chunkVertexList)
+                  foreach (var vertex in chunkVertexList)
                   {
                      blockVertexList.Add(vertex);
                   }

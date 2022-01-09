@@ -5,133 +5,132 @@ using System.Threading.Tasks;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.UI.Exceptions;
 
-namespace Adamantium.UI.Threading
+namespace Adamantium.UI.Threading;
+
+public sealed class Dispatcher : IDispatcher
 {
-    public sealed class Dispatcher : IDispatcher
+    private CancellationToken cancellationToken;
+    private IApplicationPlatform appPlatform;
+    private DispatcherOperationExecutor executor;
+    private Thread uiThread;
+        
+    private static object collectionLocker = new object();
+    private static Dictionary<DispatcherContext, Dispatcher> dispatchers;
+        
+    public static Dispatcher CurrentDispatcher { get; }
+        
+    static Dispatcher()
     {
-        private CancellationToken cancellationToken;
-        private IApplicationPlatform appPlatform;
-        private DispatcherOperationExecutor executor;
-        private Thread uiThread;
-        
-        private static object collectionLocker = new object();
-        private static Dictionary<DispatcherContext, Dispatcher> dispatchers;
-        
-        public static Dispatcher CurrentDispatcher { get; }
-        
-        static Dispatcher()
-        {
-            dispatchers = new Dictionary<DispatcherContext, Dispatcher>();
-            CurrentDispatcher = new Dispatcher(AdamantiumServiceLocator.Current.Resolve<IApplicationPlatform>());
-            SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(CurrentDispatcher));
-        }
+        dispatchers = new Dictionary<DispatcherContext, Dispatcher>();
+        CurrentDispatcher = new Dispatcher(AdamantiumServiceLocator.Current.Resolve<IApplicationPlatform>());
+        SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(CurrentDispatcher));
+    }
 
-        private void SetContext()
-        {
-            Context = CreateContext();
-        }
+    private void SetContext()
+    {
+        Context = CreateContext();
+    }
 
-        private DispatcherContext CreateContext()
-        {
-            return new(appPlatform, MainThread);
-        }
+    private DispatcherContext CreateContext()
+    {
+        return new(appPlatform, MainThread);
+    }
 
-        private static void AddToDict(Dispatcher dispatcher)
+    private static void AddToDict(Dispatcher dispatcher)
+    {
+        lock (collectionLocker)
         {
-            lock (collectionLocker)
+            dispatchers[dispatcher.Context] = dispatcher;
+        }
+    }
+        
+    public DispatcherContext Context { get; private set; }
+
+    public Dispatcher(IApplicationPlatform appPlatform)
+    {
+        MainThread = Thread.CurrentThread;
+        this.appPlatform = appPlatform;
+        executor = new DispatcherOperationExecutor(appPlatform);
+        appPlatform.Signaled += OnPlatformSignaled;
+        SetContext();
+        AddToDict(this);
+    }
+
+    private void OnPlatformSignaled()
+    {
+        executor.Execute();
+    }
+
+    public Thread MainThread { get; }
+
+    public Thread UIThread
+    {
+        get => uiThread;
+        set => uiThread = value;
+    }
+
+    public bool IsRunning => !cancellationToken.IsCancellationRequested;
+        
+    public void Run(CancellationToken token)
+    {
+        appPlatform.Run(token);
+    }
+
+    public bool CheckAccess()
+    {
+        lock (collectionLocker)
+        {
+            if (dispatchers.Count == 1)
             {
-                dispatchers[dispatcher.Context] = dispatcher;
+                return CheckAccessInternal();
             }
-        }
-        
-        public DispatcherContext Context { get; private set; }
-
-        public Dispatcher(IApplicationPlatform appPlatform)
-        {
-            MainThread = Thread.CurrentThread;
-            this.appPlatform = appPlatform;
-            executor = new DispatcherOperationExecutor(appPlatform);
-            appPlatform.Signaled += OnPlatformSignaled;
-            SetContext();
-            AddToDict(this);
-        }
-
-        private void OnPlatformSignaled()
-        {
-            executor.Execute();
-        }
-
-        public Thread MainThread { get; }
-
-        public Thread UIThread
-        {
-            get => uiThread;
-            set => uiThread = value;
-        }
-
-        public bool IsRunning => !cancellationToken.IsCancellationRequested;
-        
-        public void Run(CancellationToken token)
-        {
-            appPlatform.Run(token);
-        }
-
-        public bool CheckAccess()
-        {
-            lock (collectionLocker)
-            {
-                if (dispatchers.Count == 1)
-                {
-                    return CheckAccessInternal();
-                }
                 
-                bool access = false;
-                foreach (var dispatcher in dispatchers)
-                {
-                    access = dispatcher.Value.CheckAccessInternal();
-                    if (access) break;
-                }
-
-                return access;
-            }
-        }
-
-        private bool CheckAccessInternal()
-        {
-            return MainThread == Thread.CurrentThread || UIThread == Thread.CurrentThread;
-        }
-
-        public void VerifyAccess()
-        {
-            if (!CheckAccess())
+            bool access = false;
+            foreach (var dispatcher in dispatchers)
             {
-                throw new DispatcherException($"You are accessing object from non-ui or main thread");
+                access = dispatcher.Value.CheckAccessInternal();
+                if (access) break;
             }
-        }
 
-        public void Invoke(Action action, DispatcherPriority priority = DispatcherPriority.Normal)
-        {
-            action?.Invoke();
+            return access;
         }
+    }
 
-        public void Invoke(Delegate action, object args)
-        {
-            action?.DynamicInvoke(args);
-        }
+    private bool CheckAccessInternal()
+    {
+        return MainThread == Thread.CurrentThread || UIThread == Thread.CurrentThread;
+    }
 
-        public Task InvokeAsync(Action action, DispatcherPriority priority = DispatcherPriority.Normal)
+    public void VerifyAccess()
+    {
+        if (!CheckAccess())
         {
-            return executor.InvokeAsync(action, priority);
+            throw new DispatcherException($"You are accessing object from non-ui or main thread");
         }
+    }
 
-        public Task InvokeAsync(Delegate action, object args)
-        {
-            return executor.InvokeAsync(action, args, 1);
-        }
+    public void Invoke(Action action, DispatcherPriority priority = DispatcherPriority.Normal)
+    {
+        action?.Invoke();
+    }
 
-        public static void Attach(Dispatcher dispatcher)
-        {
-            AddToDict(dispatcher);
-        }
+    public void Invoke(Delegate action, object args)
+    {
+        action?.DynamicInvoke(args);
+    }
+
+    public Task InvokeAsync(Action action, DispatcherPriority priority = DispatcherPriority.Normal)
+    {
+        return executor.InvokeAsync(action, priority);
+    }
+
+    public Task InvokeAsync(Delegate action, object args)
+    {
+        return executor.InvokeAsync(action, args, 1);
+    }
+
+    public static void Attach(Dispatcher dispatcher)
+    {
+        AddToDict(dispatcher);
     }
 }

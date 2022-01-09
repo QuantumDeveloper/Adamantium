@@ -1,15 +1,14 @@
 ﻿using System;
 
-namespace Adamantium.UI.RoutedEvents
+namespace Adamantium.UI.RoutedEvents;
+
+public class VisualTreeAttachmentEventArgs : EventArgs
 {
-   public class VisualTreeAttachmentEventArgs : EventArgs
+   IRootVisualComponent Root { get; }
+
+   public VisualTreeAttachmentEventArgs(IRootVisualComponent root)
    {
-      IRootVisualComponent Root { get; }
-
-      public VisualTreeAttachmentEventArgs(IRootVisualComponent root)
-      {
-         Root = root;
-      }
-
+      Root = root;
    }
+
 }

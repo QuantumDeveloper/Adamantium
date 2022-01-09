@@ -29,7 +29,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
 
         public Vector3F GetRelativePosition(Vector3 offset)
         {
-            return Position - offset;
+            return (Vector3F)(Position - offset);
         }
 
         public void RemoveMetadata(CameraBase camera)
@@ -134,7 +134,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
 
         public Vector3F Scale => baseScale * scaleFactor;
 
-        public void Move(Vector3F direction, Double distance)
+        public void Move(Vector3 direction, Double distance)
         {
             lock (this)
             {
@@ -149,7 +149,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             }
         }
 
-        public void Move(Vector3F direction, Vector3 distance)
+        public void Move(Vector3 direction, Vector3 distance)
         {
             lock (this)
             {
@@ -164,7 +164,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             }
         }
 
-        public void Translate(Vector3F direction, Double distance)
+        public void Translate(Vector3 direction, Double distance)
         {
             lock (this)
             {
@@ -183,7 +183,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
         {
             lock (this)
             {
-                var distanceVector = Vector3.Multiply(GetRotationMatrix().Right, distance);
+                var distanceVector = Vector3.Multiply((Vector3)GetRotationMatrixF().Right, distance);
                 if (Owner == null && IsEnabled)
                 {
                     Position += distanceVector;
@@ -198,7 +198,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
         {
             lock (this)
             {
-                var distanceVector = Vector3.Multiply(GetRotationMatrix().Up, distance);
+                var distanceVector = Vector3.Multiply((Vector3)GetRotationMatrixF().Up, distance);
                 if (Owner == null && IsEnabled)
                 {
                     Position += distanceVector;
@@ -213,7 +213,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
         {
             lock (this)
             {
-                var distanceVector = Vector3.Multiply(GetRotationMatrix().Forward, distance);
+                var distanceVector = Vector3.Multiply((Vector3)GetRotationMatrixF().Forward, distance);
                 if (Owner == null && IsEnabled)
                 {
                     Position += distanceVector;
@@ -238,7 +238,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             }
         }
 
-        public void Translate(Vector3F direction, Vector3F distance)
+        public void Translate(Vector3 direction, Vector3 distance)
         {
             lock (this)
             {
@@ -253,7 +253,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             }
         }
 
-        public void TranslatePivot(Vector3F direction, Double distance)
+        public void TranslatePivot(Vector3 direction, Double distance)
         {
             lock (this)
             {
@@ -268,7 +268,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             }
         }
 
-        public void TranslatePivot(Vector3F direction, Vector3F distance)
+        public void TranslatePivot(Vector3 direction, Vector3 distance)
         {
             lock (this)
             {
@@ -297,7 +297,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             }
         }
 
-        public void SetPivot(Vector3F pivotPosition)
+        public void SetPivot(Vector3 pivotPosition)
         {
             lock (this)
             {
@@ -320,14 +320,24 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             return angle;
         }
 
-        public Matrix4x4F GetRotationMatrix()
+        public Matrix4x4F GetRotationMatrixF()
         {
             return Matrix4x4F.RotationQuaternion(Rotation);
         }
 
-        public Matrix4x4F GetPivotRotationMatrix()
+        public Matrix4x4F GetPivotRotationMatrixF()
         {
             return Matrix4x4F.RotationQuaternion(PivotRotation);
+        }
+        
+        public Matrix4x4 GetRotationMatrix()
+        {
+            return Matrix4x4.RotationQuaternion(Rotation);
+        }
+
+        public Matrix4x4 GetPivotRotationMatrix()
+        {
+            return Matrix4x4.RotationQuaternion(PivotRotation);
         }
 
         public void ResetPosition()
@@ -402,11 +412,11 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             angle = EnsureAngle(angle, units);
             if (Owner == null && IsEnabled)
             {
-                Rotation = QuaternionF.Multiply(QuaternionF.RotationAxis(GetRotationMatrix().Right, angle), Rotation);
+                Rotation = QuaternionF.Multiply(QuaternionF.RotationAxis(GetRotationMatrixF().Right, angle), Rotation);
                 return;
             }
 
-            Traverse(entity => Rotate(entity, Owner.Transform.GetRotationMatrix().Right, angle));
+            Traverse(entity => Rotate(entity, Owner.Transform.GetRotationMatrixF().Right, angle));
         }
 
         public void RotateUp(float angle, RotationUnits units = RotationUnits.Radians)
@@ -414,11 +424,11 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             angle = EnsureAngle(angle, units);
             if (Owner == null && IsEnabled)
             {
-                Rotation = QuaternionF.Multiply(QuaternionF.RotationAxis(GetRotationMatrix().Up, angle), Rotation);
+                Rotation = QuaternionF.Multiply(QuaternionF.RotationAxis(GetRotationMatrixF().Up, angle), Rotation);
                 return;
             }
 
-            Traverse(entity => Rotate(entity, Owner.Transform.GetRotationMatrix().Up, angle));
+            Traverse(entity => Rotate(entity, Owner.Transform.GetRotationMatrixF().Up, angle));
         }
 
         public void RotateForward(float angle, RotationUnits units = RotationUnits.Radians)
@@ -426,11 +436,11 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             angle = EnsureAngle(angle, units);
             if (Owner == null && IsEnabled)
             {
-                Rotation = QuaternionF.Multiply(QuaternionF.RotationAxis(GetRotationMatrix().Forward, angle), Rotation);
+                Rotation = QuaternionF.Multiply(QuaternionF.RotationAxis(GetRotationMatrixF().Forward, angle), Rotation);
                 return;
             }
 
-            Traverse(entity => Rotate(entity, Owner.Transform.GetRotationMatrix().Forward, angle));
+            Traverse(entity => Rotate(entity, Owner.Transform.GetRotationMatrixF().Forward, angle));
         }
 
         public void RotatePivot(Vector3F axis, float angle, RotationUnits units = RotationUnits.Radians)
@@ -450,11 +460,11 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             angle = EnsureAngle(angle, units);
             if (Owner == null && IsEnabled)
             {
-                PivotRotation = QuaternionF.Multiply(QuaternionF.RotationAxis(GetPivotRotationMatrix().Right, angle), PivotRotation);
+                PivotRotation = QuaternionF.Multiply(QuaternionF.RotationAxis(GetPivotRotationMatrixF().Right, angle), PivotRotation);
                 return;
             }
 
-            Traverse(entity => RotatePivot(entity, Owner.Transform.GetPivotRotationMatrix().Right, angle));
+            Traverse(entity => RotatePivot(entity, Owner.Transform.GetPivotRotationMatrixF().Right, angle));
         }
 
         public void RotatePivotUp(float angle, RotationUnits units = RotationUnits.Radians)
@@ -462,11 +472,11 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             angle = EnsureAngle(angle, units);
             if (Owner == null && IsEnabled)
             {
-                PivotRotation = QuaternionF.Multiply(QuaternionF.RotationAxis(GetPivotRotationMatrix().Up, angle), PivotRotation);
+                PivotRotation = QuaternionF.Multiply(QuaternionF.RotationAxis(GetPivotRotationMatrixF().Up, angle), PivotRotation);
                 return;
             }
 
-            Traverse(entity => RotatePivot(entity, Owner.Transform.GetPivotRotationMatrix().Up, angle));
+            Traverse(entity => RotatePivot(entity, Owner.Transform.GetPivotRotationMatrixF().Up, angle));
         }
 
         public void RotatePivotForward(float angle, RotationUnits units = RotationUnits.Radians)
@@ -474,11 +484,11 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             angle = EnsureAngle(angle, units);
             if (Owner == null && IsEnabled)
             {
-                PivotRotation = QuaternionF.Multiply(QuaternionF.RotationAxis(GetPivotRotationMatrix().Forward, angle), PivotRotation);
+                PivotRotation = QuaternionF.Multiply(QuaternionF.RotationAxis(GetPivotRotationMatrixF().Forward, angle), PivotRotation);
                 return;
             }
 
-            Traverse(entity => RotatePivot(entity, Owner.Transform.GetPivotRotationMatrix().Forward, angle));
+            Traverse(entity => RotatePivot(entity, Owner.Transform.GetPivotRotationMatrixF().Forward, angle));
         }
 
         ///<summary>
@@ -698,18 +708,18 @@ namespace Adamantium.EntityFramework.ComponentsBasics
 
         public Matrix4x4F CalculateFinalTransform(CameraBase camera, Vector3F pivotCorrection)
         {
-            Matrix4x4F matrix;
             var scaling = Scale;
             var relativePosition = GetRelativePosition(camera.Owner.Transform.Position);
             var finalPivot = (Vector3F)pivot + pivotCorrection;
             var scalingCenter = finalPivot;
             
-            Matrix4x4F.Transformation(ref scalingCenter, ref pivotRotation, ref scaling, ref finalPivot, ref rotation, ref relativePosition, out matrix);
+            Matrix4x4F.Transformation(ref scalingCenter, ref pivotRotation, ref scaling, ref finalPivot, ref rotation, ref relativePosition, out var matrix);
 
             var metadata = GetMetadata(camera);
             metadata.RelativePosition = relativePosition;
             metadata.Pivot = finalPivot;
-            metadata.WorldMatrix = matrix;
+            metadata.WorldMatrixF = matrix;
+            metadata.WorldMatrix = (Matrix4x4)matrix;
             metadata.Rotation = Rotation;
             metadata.Scale = Scale;
             return matrix;

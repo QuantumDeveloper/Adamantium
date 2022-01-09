@@ -5,42 +5,41 @@ using Adamantium.MacOS;
 using Adamantium.UI.Controls;
 using Adamantium.UI.MacOS;
 
-namespace Adamantium.UI.Threading
+namespace Adamantium.UI.Threading;
+
+internal class MacOSPlatform : IApplicationPlatform
 {
-    internal class MacOSPlatform : IApplicationPlatform
+    private IntPtr appDelegate;
+    private IntPtr app;
+        
+    public MacOSPlatform()
     {
-        private IntPtr appDelegate;
-        private IntPtr app;
+        appDelegate = MacOSInterop.CreateApplicationDelegate();
+        app = MacOSInterop.CreateApplication(appDelegate);
+    }
         
-        public MacOSPlatform()
-        {
-            appDelegate = MacOSInterop.CreateApplicationDelegate();
-            app = MacOSInterop.CreateApplication(appDelegate);
-        }
-        
-        public void Run(CancellationToken token)
-        {
-            MacOSInterop.RunApplication(app);
-        }
+    public void Run(CancellationToken token)
+    {
+        MacOSInterop.RunApplication(app);
+    }
 
-        public void AddWindow(IWindow window)
-        {
-            if (window == null) return;
+    public void AddWindow(IWindow window)
+    {
+        if (window == null) return;
             
-            MacOSInterop.AddWindowToAppDelegate(appDelegate, window.Handle);
-        }
+        MacOSInterop.AddWindowToAppDelegate(appDelegate, window.Handle);
+    }
 
-        public bool IsOnUIThread { get; }
-        public void Signal()
-        {
-            throw new NotImplementedException();
-        }
+    public bool IsOnUIThread { get; }
+    public void Signal()
+    {
+        throw new NotImplementedException();
+    }
 
-        public event Action Signaled;
+    public event Action Signaled;
 
-        public static void Initialize()
-        {
-            AdamantiumServiceLocator.Current.RegisterSingleton<IApplicationPlatform, MacOSPlatform>();
-        }
+    public static void Initialize()
+    {
+        AdamantiumServiceLocator.Current.RegisterSingleton<IApplicationPlatform, MacOSPlatform>();
     }
 }

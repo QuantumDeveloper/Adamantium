@@ -132,7 +132,7 @@ namespace Adamantium.Engine.Tools
                 else if (selectedTool == rightForwardManipulator)
                 {
                     var matr = entityToTransform.Transform.GetRotationMatrix();
-                    var res = Vector3F.Normalize(matr.Right + matr.Forward);
+                    var res = Vector3.Normalize(matr.Right + matr.Forward);
                     distance.Y = 0;
                     distance.Z = -distance.Z;
                     entityToTransform.Transform.Translate(res, distance);
@@ -140,7 +140,7 @@ namespace Adamantium.Engine.Tools
                 else if (selectedTool == upForwardManipulator)
                 {
                     var matr = entityToTransform.Transform.GetRotationMatrix();
-                    var res = Vector3F.Normalize(matr.Forward + matr.Up);
+                    var res = Vector3.Normalize(matr.Forward + matr.Up);
                     distance.X = 0;
                     distance.Z = -distance.Z;
                     entityToTransform.Transform.Translate(res, distance);
@@ -148,47 +148,47 @@ namespace Adamantium.Engine.Tools
                 else if (selectedTool == rightUpManipulator)
                 {
                     var matr = entityToTransform.Transform.GetRotationMatrix();
-                    var res = Vector3F.Normalize(matr.Right + matr.Up);
+                    var res = Vector3.Normalize(matr.Right + matr.Up);
                     distance.Z = 0;
                     entityToTransform.Transform.Translate(res, distance);
                 }
                 else if (selectedTool == centralManipulator)
                 {
-                    entityToTransform.Transform.Translate(Vector3F.Normalize(Vector3F.One), distance);
+                    entityToTransform.Transform.Translate(Vector3.Normalize(Vector3.One), distance);
                 }
             }
             else
             {
                 if (selectedTool == rightManipulator)
                 {
-                    entityToTransform.Transform.Translate(Vector3F.Right, distance.X);
+                    entityToTransform.Transform.Translate(Vector3.Right, distance.X);
                 }
                 else if (selectedTool == upManipulator)
                 {
-                    entityToTransform.Transform.Translate(Vector3F.Up, distance.Y);
+                    entityToTransform.Transform.Translate(Vector3.Up, distance.Y);
                 }
                 else if (selectedTool == forwardManipulator)
                 {
-                    entityToTransform.Transform.Translate(Vector3F.ForwardLH, distance.Z);
+                    entityToTransform.Transform.Translate(Vector3.ForwardLH, distance.Z);
                 }
                 else if (selectedTool == rightForwardManipulator)
                 {
-                    entityToTransform.Transform.Translate(Vector3F.ForwardLH, distance.Z);
-                    entityToTransform.Transform.Translate(Vector3F.Right, distance.X);
+                    entityToTransform.Transform.Translate(Vector3.ForwardLH, distance.Z);
+                    entityToTransform.Transform.Translate(Vector3.Right, distance.X);
                 }
                 else if (selectedTool == upForwardManipulator)
                 {
-                    entityToTransform.Transform.Translate(Vector3F.ForwardLH, distance.Z);
-                    entityToTransform.Transform.Translate(Vector3F.Up, distance.Y);
+                    entityToTransform.Transform.Translate(Vector3.ForwardLH, distance.Z);
+                    entityToTransform.Transform.Translate(Vector3.Up, distance.Y);
                 }
                 else if (selectedTool == rightUpManipulator)
                 {
-                    entityToTransform.Transform.Translate(Vector3F.Right, distance.X);
-                    entityToTransform.Transform.Translate(Vector3F.Up, distance.Y);
+                    entityToTransform.Transform.Translate(Vector3.Right, distance.X);
+                    entityToTransform.Transform.Translate(Vector3.Up, distance.Y);
                 }
                 else if (selectedTool == centralManipulator)
                 {
-                    entityToTransform.Transform.Translate(Vector3F.Normalize(Vector3F.One), distance);
+                    entityToTransform.Transform.Translate(Vector3.Normalize(Vector3.One), distance);
                 }
             }
             var center = entityToTransform.GetCenterAbsolute();

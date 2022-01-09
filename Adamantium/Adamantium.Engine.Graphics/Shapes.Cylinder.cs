@@ -12,7 +12,7 @@ namespace Adamantium.Engine.Graphics
         public class Cylinder
         {
             // Helper computes a point on a unit circle, aligned to the x/z plane and centered on the origin.
-            private static Vector3F GetCircleVector(
+            private static Vector3 GetCircleVector(
                 int i,
                 int tessellation)
             {
@@ -20,15 +20,15 @@ namespace Adamantium.Engine.Graphics
                 var dx = (float) Math.Sin(angle);
                 var dz = (float) Math.Cos(angle);
 
-                return new Vector3F(dx, 0, dz);
+                return new Vector3(dx, 0, dz);
             }
 
             public static Mesh GenerateGeometry(
                 GeometryType geometryType,
-                float height = 1.0f,
-                float diameter = 1.0f,
+                double height = 1.0,
+                double diameter = 1.0,
                 int tessellation = 32,
-                Matrix4x4F? transform = null)
+                Matrix4x4? transform = null)
             {
                 if (tessellation < 3)
                     tessellation = 3;
@@ -49,8 +49,8 @@ namespace Adamantium.Engine.Graphics
             }
 
             public static Mesh GenerateSolidGeometry(
-                float height = 1.0f,
-                float diameter = 1.0f,
+                double height = 1.0,
+                double diameter = 1.0,
                 int tessellation = 32
                 )
             {
@@ -58,15 +58,15 @@ namespace Adamantium.Engine.Graphics
             }
 
             public static Mesh GenerateOutlinedGeometry(
-                float height = 1.0f,
-                float diameter = 1.0f,
+                double height = 1.0,
+                double diameter = 1.0,
                 int tessellation = 32)
             {
-                List<Vector3F> vertices = new List<Vector3F>();
-                List<int> indices = new List<int>();
+                var vertices = new List<Vector3>();
+                var indices = new List<int>();
                 int lastIndex = 0;
-                float radius = diameter / 2;
-                var topOffset = Vector3F.Down * height / 2;
+                var radius = diameter / 2;
+                var topOffset = Vector3.Down * height / 2;
 
                 for (int i = 0; i <= tessellation; ++i)
                 {
@@ -122,7 +122,7 @@ namespace Adamantium.Engine.Graphics
                 float height = 1.0f,
                 float diameter = 1.0f,
                 int tessellation = 32,
-                Matrix4x4F? transform = null)
+                Matrix4x4? transform = null)
             {
                 var geometry = GenerateGeometry(geometryType, height, diameter, tessellation, transform);
                 return new Shape(device, geometry);

@@ -1,11 +1,10 @@
-﻿namespace Adamantium.UI
+﻿namespace Adamantium.UI;
+
+public enum Side
 {
-   public enum Side
-   {
-      None,
-      Left,
-      Top,
-      Right,
-      Bottom
-   }
+   None,
+   Left,
+   Top,
+   Right,
+   Bottom
 }

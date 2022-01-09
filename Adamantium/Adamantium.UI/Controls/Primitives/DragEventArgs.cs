@@ -1,15 +1,14 @@
 ﻿using Adamantium.Mathematics;
 using Adamantium.UI.RoutedEvents;
 
-namespace Adamantium.UI.Controls.Primitives
-{
-   public class DragEventArgs:RoutedEventArgs
-   {
-      public Vector2 Change { get; }
+namespace Adamantium.UI.Controls.Primitives;
 
-      public DragEventArgs(Vector2 changedPoint)
-      {
-         Change = changedPoint;
-      }
+public class DragEventArgs:RoutedEventArgs
+{
+   public Vector2 Change { get; }
+
+   public DragEventArgs(Vector2 changedPoint)
+   {
+      Change = changedPoint;
    }
 }

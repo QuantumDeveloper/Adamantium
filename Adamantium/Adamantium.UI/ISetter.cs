@@ -1,7 +1,6 @@
-﻿namespace Adamantium.UI
+﻿namespace Adamantium.UI;
+
+public interface ISetter
 {
-   public interface ISetter
-   {
-      void Apply(FrameworkComponent control);
-   }
+   void Apply(FrameworkComponent control);
 }

@@ -12,7 +12,7 @@ namespace Adamantium.Engine.Graphics
         public class Cone
         {
             //Computes a point on a unit circle, aligned to the x/z plane and centered on the origin.
-            private static Vector3F GetCircleVector(
+            private static Vector3 GetCircleVector(
                 int i,
                 int tessellation)
             {
@@ -20,17 +20,17 @@ namespace Adamantium.Engine.Graphics
                 var dx = (float) Math.Sin(angle);
                 var dz = (float) Math.Cos(angle);
 
-                return new Vector3F(dx, 0, dz);
+                return new Vector3(dx, 0, dz);
             }
 
             // Creates a triangle fan to close the end of a cylinder.
             private static void CreateConeCap(
-                List<Vector3F> positions,
+                List<Vector3> positions,
                 List<Vector2F> uvs,
                 List<int> indices,
                 int tessellation,
-                float height,
-                float radius,
+                double height,
+                double radius,
                 bool isTop)
             {
                 // Create cap indices.
@@ -51,7 +51,7 @@ namespace Adamantium.Engine.Graphics
                 }
 
                 // Which end of the cylinder is this?
-                var normal = Vector3F.UnitY;
+                var normal = Vector3.UnitY;
                 var textureScale = new Vector2F(-0.5f);
 
                 if (!isTop)
@@ -60,15 +60,15 @@ namespace Adamantium.Engine.Graphics
                     textureScale.X = -textureScale.X;
                 }
                 
-                Vector2F diameter = new Vector2F(radius * 2);
+                var diameter = new Vector2F((float)radius * 2);
                 // Create cap vertices.
                 for (int i = 0; i < tessellation; i++)
                 {
                     var circleVector = GetCircleVector(i, tessellation);
                     var position = (circleVector * radius) + (normal * height);
                     var uv = new Vector2F(
-                        0.5f + position.X / diameter.X,
-                        0.5f - position.Z / diameter.Y);
+                        0.5f + (float)(position.X / diameter.X),
+                        0.5f - (float)(position.Z / diameter.Y));
 
                     positions.Add(position);
                     uvs.Add(uv);
@@ -77,11 +77,11 @@ namespace Adamantium.Engine.Graphics
 
             public static Mesh GenerateGeometry(
                 GeometryType geometryType,
-                float height = 1.0f,
-                float topDiameter = 0.0f,
-                float bottomDiameter = 1f,
+                double height = 1.0,
+                double topDiameter = 0.0,
+                double bottomDiameter = 1,
                 int tessellation = 40,
-                Matrix4x4F? transform = null)
+                Matrix4x4? transform = null)
             {
                 if (tessellation < 3)
                 {
@@ -104,14 +104,14 @@ namespace Adamantium.Engine.Graphics
             }
 
             private static Mesh GenerateSolidGeometry(
-                float height = 1.0f,
-                float topDiameter = 0.0f,
-                float bottomDiameter = 1f,
+                double height = 1.0,
+                double topDiameter = 0.0,
+                double bottomDiameter = 1,
                 int tessellation = 32)
             {
                 PrimitiveType primitiveType = PrimitiveType.TriangleList;
 
-                var positions = new List<Vector3F>();
+                var positions = new List<Vector3>();
                 var uvs = new List<Vector2F>();
                 var indices = new List<int>();
 
@@ -120,7 +120,7 @@ namespace Adamantium.Engine.Graphics
                 var topRadius = topDiameter / 2;
                 var bottomRadius = bottomDiameter / 2;
 
-                var topOffset = Vector3F.UnitY * height;
+                var topOffset = Vector3.UnitY * height;
 
                 int stride = tessellation + 1;
 
@@ -164,25 +164,25 @@ namespace Adamantium.Engine.Graphics
             }
 
             private static Mesh GenerateOutlinedGeometry(
-                float height = 1.0f,
-                float bottomDiameter = 1f,
+                double height = 1.0,
+                double bottomDiameter = 1,
                 int tessellation = 40)
             {
-                PrimitiveType primitiveType = PrimitiveType.LineStrip;
+                var primitiveType = PrimitiveType.LineStrip;
 
-                List<Vector3F> vertices = new List<Vector3F>();
-                List<int> indices = new List<int>();
-                Vector3F center = Vector3F.Zero;
+                var vertices = new List<Vector3>();
+                var indices = new List<int>();
+                var center = Vector3.Zero;
                 int lastIndex = 0;
-                float bottomRadius = bottomDiameter / 2;
-                var topOffset = Vector3F.UnitY * height / 2;
+                var bottomRadius = bottomDiameter / 2;
+                var topOffset = Vector3.UnitY * height / 2;
                 for (int i = 0; i <= tessellation; ++i)
                 {
                     float angle = (float) Math.PI * 2 / tessellation * i;
 
-                    float x = center.X + bottomRadius * (float) Math.Cos(angle);
-                    float y = center.Y + bottomRadius * (float) Math.Sin(angle);
-                    var position = new Vector3F(x, -topOffset.Y, y);
+                    double x = center.X + bottomRadius * (float) Math.Cos(angle);
+                    double y = center.Y + bottomRadius * (float) Math.Sin(angle);
+                    var position = new Vector3(x, -topOffset.Y, y);
                     vertices.Add(position);
                     indices.Add(lastIndex++);
                 }
@@ -236,7 +236,7 @@ namespace Adamantium.Engine.Graphics
                 float topDiameter = 0.05f,
                 float bottomDiameter = 1f,
                 int tessellation = 32,
-                Matrix4x4F? transform = null)
+                Matrix4x4? transform = null)
             {
                 var geometry = GenerateGeometry(geometryType, height, topDiameter, bottomDiameter, tessellation, transform);
                 // Create the primitive object.

@@ -23,19 +23,19 @@ namespace Adamantium.Engine.Templates.Tools
            var zAxisMeshManipulator = Shapes.Ellipse.GenerateGeometry(
                GeometryType.Outlined,
                EllipseType.EdgeToEdge,
-               new Vector2F(maxDiameter),
+               new Vector2(maxDiameter),
                0,
                360,
                true,
                tessellation);
 
-           var yAxisMeshManipulator = zAxisMeshManipulator.Clone(Matrix4x4F.RotationX(MathHelper.DegreesToRadians(90)));
-           var xAxisMeshManipulator = yAxisMeshManipulator.Clone(Matrix4x4F.RotationZ(MathHelper.DegreesToRadians(90)));
+           var yAxisMeshManipulator = zAxisMeshManipulator.Clone(Matrix4x4.RotationX(MathHelper.DegreesToRadians(90)));
+           var xAxisMeshManipulator = yAxisMeshManipulator.Clone(Matrix4x4.RotationZ(MathHelper.DegreesToRadians(90)));
 
            var currentViewAxisMesh = Shapes.Ellipse.GenerateGeometry(
                GeometryType.Outlined,
                EllipseType.EdgeToEdge,
-               new Vector2F(maxDiameter + 0.25f),
+               new Vector2(maxDiameter + 0.25f),
                0,
                360,
                true,
@@ -44,7 +44,7 @@ namespace Adamantium.Engine.Templates.Tools
            var currentViewCircleMesh = Shapes.Ellipse.GenerateGeometry(
                GeometryType.Outlined,
                EllipseType.EdgeToEdge,
-               new Vector2F(maxDiameter + 0.1f),
+               new Vector2(maxDiameter + 0.1f),
                0,
                360,
                true,

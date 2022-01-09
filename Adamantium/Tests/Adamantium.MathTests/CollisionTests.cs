@@ -11,8 +11,8 @@ namespace Adamantium.MathTests
         public void RayToLineIntersection3D()
         {
             Ray ray = new Ray(Vector3.Zero, Vector3.ForwardLH);
-            Vector3 start = new Vector3(-10, 0, 10);
-            Vector3 end = new Vector3(10, 1, 10);
+            var start = new Vector3(-10, 0, 10);
+            var end = new Vector3(10, 1, 10);
             var distance = Collision.RayIntersectsLineSegment(ref ray, start, end, out Vector3F coordinates);
 
         }

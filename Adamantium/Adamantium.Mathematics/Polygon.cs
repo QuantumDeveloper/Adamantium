@@ -97,7 +97,7 @@ namespace Adamantium.Mathematics
         /// Triangulate current <see cref="Polygon"/>
         /// </summary>
         /// <returns></returns>
-        public List<Vector3F> Fill()
+        public List<Vector3> Fill()
         {
             Parallel.For(0, polygons.Count, i =>
             {
@@ -107,7 +107,7 @@ namespace Adamantium.Mathematics
 
             var nonIntersectedPolygons = CheckPolygonItemIntersections();
 
-            var vertices = new List<Vector3F>();
+            var vertices = new List<Vector3>();
 
             if (nonIntersectedPolygons.Count > 1)
             {
@@ -143,7 +143,7 @@ namespace Adamantium.Mathematics
             return vertices;
         }
 
-        public List<Vector3F> FIllDirect(List<Vector2> points, List<LineSegment2D> segments)
+        public List<Vector3> FillDirect(List<Vector2> points, List<LineSegment2D> segments)
         {
             MergedPoints.AddRange(points);
             MergedSegments.AddRange(segments);
@@ -153,7 +153,7 @@ namespace Adamantium.Mathematics
             return result;
         }
 
-        private List<Vector3F> TriangulatePolygonItem(PolygonItem item)
+        private List<Vector3> TriangulatePolygonItem(PolygonItem item)
         {
             var itemCopy = item;
             var polygon = new Polygon

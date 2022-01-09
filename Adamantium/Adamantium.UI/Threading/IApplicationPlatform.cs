@@ -1,16 +1,15 @@
 ﻿using System;
 using System.Threading;
 
-namespace Adamantium.UI.Threading
+namespace Adamantium.UI.Threading;
+
+public interface IApplicationPlatform
 {
-    public interface IApplicationPlatform
-    {
-        void Run(CancellationToken token);
+    void Run(CancellationToken token);
         
-        bool IsOnUIThread { get; }
+    bool IsOnUIThread { get; }
 
-        void Signal();
+    void Signal();
 
-        event Action Signaled;
-    }
+    event Action Signaled;
 }

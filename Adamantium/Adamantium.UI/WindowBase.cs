@@ -7,288 +7,303 @@ using Adamantium.UI.Media;
 using Adamantium.UI.RoutedEvents;
 using Adamantium.Win32;
 
-namespace Adamantium.UI
+namespace Adamantium.UI;
+
+public abstract class WindowBase : ContentControl, IWindow
 {
-    public abstract class WindowBase : ContentControl, IWindow
+    protected IWindowWorkerService WindowWorkerService { get; }
+        
+    public WindowBase()
     {
-        protected IWindowWorkerService WindowWorkerService { get; }
+        WindowWorkerService = IWindowWorkerService.GetWorker();
+    }
         
-        public WindowBase()
-        {
-            WindowWorkerService = IWindowWorkerService.GetWorker();
-        }
-        
-        public static readonly RoutedEvent ClientSizeChangedEvent = EventManager.RegisterRoutedEvent("ClientSizeChanged",
-            RoutingStrategy.Direct, typeof(SizeChangedEventHandler), typeof(WindowBase));
+    public static readonly RoutedEvent ClientSizeChangedEvent = EventManager.RegisterRoutedEvent("ClientSizeChanged",
+        RoutingStrategy.Direct, typeof(SizeChangedEventHandler), typeof(WindowBase));
 
-        public static readonly RoutedEvent MSAALevelChangedEvent = EventManager.RegisterRoutedEvent("MSAALevelChanged",
-            RoutingStrategy.Direct, typeof(MSAALeveChangedHandler), typeof(WindowBase));
+    public static readonly RoutedEvent MSAALevelChangedEvent = EventManager.RegisterRoutedEvent("MSAALevelChanged",
+        RoutingStrategy.Direct, typeof(MSAALeveChangedHandler), typeof(WindowBase));
         
-        public static readonly RoutedEvent StateChangedEvent = EventManager.RegisterRoutedEvent("StateChanged",
-            RoutingStrategy.Direct, typeof(StateChangedHandler), typeof(WindowBase));
+    public static readonly RoutedEvent StateChangedEvent = EventManager.RegisterRoutedEvent("StateChanged",
+        RoutingStrategy.Direct, typeof(StateChangedHandler), typeof(WindowBase));
         
         
-        public static readonly AdamantiumProperty LeftProperty = AdamantiumProperty.Register(nameof(Left),
-            typeof(Double), typeof(WindowBase), new PropertyMetadata(0d));
+    public static readonly AdamantiumProperty LeftProperty = AdamantiumProperty.Register(nameof(Left),
+        typeof(Double), typeof(WindowBase), new PropertyMetadata(0d));
         
-        public static readonly AdamantiumProperty TopProperty = AdamantiumProperty.Register(nameof(Top),
-            typeof(Double), typeof(WindowBase), new PropertyMetadata(0d));
+    public static readonly AdamantiumProperty TopProperty = AdamantiumProperty.Register(nameof(Top),
+        typeof(Double), typeof(WindowBase), new PropertyMetadata(0d));
         
-        public static readonly AdamantiumProperty TitleProperty = AdamantiumProperty.Register(nameof(Title),
-            typeof(String), typeof(WindowBase));
+    public static readonly AdamantiumProperty TitleProperty = AdamantiumProperty.Register(nameof(Title),
+        typeof(String), typeof(WindowBase));
 
-        public static readonly AdamantiumProperty ClientWidthProperty = AdamantiumProperty.Register(nameof(Width),
-            typeof(Double), typeof(WindowBase),
-            new PropertyMetadata(Double.NaN,
-                PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure |
-                PropertyMetadataOptions.AffectsRender, ClientWidthChangedCallBack));
+    public static readonly AdamantiumProperty ClientWidthProperty = AdamantiumProperty.Register(nameof(Width),
+        typeof(Double), typeof(WindowBase),
+        new PropertyMetadata(Double.NaN,
+            PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure |
+            PropertyMetadataOptions.AffectsRender, ClientWidthChangedCallBack));
 
-        public static readonly AdamantiumProperty ClientHeightProperty = AdamantiumProperty.Register(nameof(Height),
-            typeof(Double), typeof(WindowBase),
-            new PropertyMetadata(Double.NaN,
-                PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure |
-                PropertyMetadataOptions.AffectsRender, ClientHeightChangedCallBack));
+    public static readonly AdamantiumProperty ClientHeightProperty = AdamantiumProperty.Register(nameof(Height),
+        typeof(Double), typeof(WindowBase),
+        new PropertyMetadata(Double.NaN,
+            PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure |
+            PropertyMetadataOptions.AffectsRender, ClientHeightChangedCallBack));
         
-        public static readonly AdamantiumProperty MSAALevelProperty = AdamantiumProperty.Register(nameof(MSAALevel), 
-            typeof(MSAALevel), typeof(WindowBase),
-            new PropertyMetadata(Engine.Graphics.MSAALevel.X4, PropertyMetadataOptions.AffectsRender, MSAALevelChangedCallback));
+    public static readonly AdamantiumProperty MSAALevelProperty = AdamantiumProperty.Register(nameof(MSAALevel), 
+        typeof(MSAALevel), typeof(WindowBase),
+        new PropertyMetadata(Engine.Graphics.MSAALevel.X4, PropertyMetadataOptions.AffectsRender, MSAALevelChangedCallback));
 
-        public static readonly AdamantiumProperty StateProperty = AdamantiumProperty.Register(nameof(State), 
-            typeof(WindowState), typeof(WindowBase),
-            new PropertyMetadata(WindowState.Normal, PropertyMetadataOptions.AffectsRender, StateChangedCallback));
+    public static readonly AdamantiumProperty StateProperty = AdamantiumProperty.Register(nameof(State), 
+        typeof(WindowState), typeof(WindowBase),
+        new PropertyMetadata(WindowState.Normal, PropertyMetadataOptions.AffectsRender, StateChangedCallback));
         
-        private static void StateChangedCallback(AdamantiumComponent adamantiumComponent, AdamantiumPropertyChangedEventArgs e)
-        {
-            if (!(adamantiumComponent is WindowBase component)) return;
+    private static void StateChangedCallback(AdamantiumComponent adamantiumComponent, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (!(adamantiumComponent is WindowBase component)) return;
 
-            var args = new StateChangedEventArgs((WindowState)e.NewValue);
-            args.RoutedEvent = StateChangedEvent;
-            component.RaiseEvent(args);
-        }
+        var args = new StateChangedEventArgs((WindowState)e.NewValue);
+        args.RoutedEvent = StateChangedEvent;
+        component.RaiseEvent(args);
+    }
         
-        private static void MSAALevelChangedCallback(AdamantiumComponent adamantiumComponent, AdamantiumPropertyChangedEventArgs e)
-        {
-            if (!(adamantiumComponent is WindowBase component)) return;
+    private static void MSAALevelChangedCallback(AdamantiumComponent adamantiumComponent, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (!(adamantiumComponent is WindowBase component)) return;
 
-            var args = new MSAALevelChangedEventArgs((MSAALevel)e.NewValue);
-            args.RoutedEvent = MSAALevelChangedEvent;
-            component.RaiseEvent(args);
-        }
+        var args = new MSAALevelChangedEventArgs((MSAALevel)e.NewValue);
+        args.RoutedEvent = MSAALevelChangedEvent;
+        component.RaiseEvent(args);
+    }
 
-        private static void ClientWidthChangedCallBack(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
-        {
-            if (!(adamantiumObject is WindowBase component)) return;
-            Size old = default;
-            if (e.OldValue == AdamantiumProperty.UnsetValue)
-                return;
+    private static void ClientWidthChangedCallBack(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (!(adamantiumObject is WindowBase component)) return;
+        Size old = default;
+        if (e.OldValue == AdamantiumProperty.UnsetValue)
+            return;
             
-            old.Width = (double) e.OldValue;
-            old.Height = component.Height;
+        old.Width = (double) e.OldValue;
+        old.Height = component.Height;
             
-            var newSize = new Size((double)e.NewValue, component.Height);
-            var args = new SizeChangedEventArgs(old, newSize, true, false);
-            args.RoutedEvent = ClientSizeChangedEvent;
-            component.RaiseEvent(args);
-        }
+        var newSize = new Size((double)e.NewValue, component.Height);
+        var args = new SizeChangedEventArgs(old, newSize, true, false);
+        args.RoutedEvent = ClientSizeChangedEvent;
+        component.RaiseEvent(args);
+    }
         
-        private static void ClientHeightChangedCallBack(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
-        {
-            if (!(adamantiumObject is WindowBase component)) return;
-            if (e.OldValue == AdamantiumProperty.UnsetValue)
-                return;
+    private static void ClientHeightChangedCallBack(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (!(adamantiumObject is WindowBase component)) return;
+        if (e.OldValue == AdamantiumProperty.UnsetValue)
+            return;
             
-            var old = new Size(component.Width, (double)e.OldValue);
-            var newSize = new Size(component.Width, (double)e.NewValue);
-            var args = new SizeChangedEventArgs(old, newSize, false, true);
-            args.RoutedEvent = ClientSizeChangedEvent;
-            component?.RaiseEvent(args);
-        }
+        var old = new Size(component.Width, (double)e.OldValue);
+        var newSize = new Size(component.Width, (double)e.NewValue);
+        var args = new SizeChangedEventArgs(old, newSize, false, true);
+        args.RoutedEvent = ClientSizeChangedEvent;
+        component?.RaiseEvent(args);
+    }
         
-        internal bool IsLocked { get; set; }
+    internal bool IsLocked { get; set; }
 
-        public Double Left
-        {
-            get => GetValue<Double>(LeftProperty);
-            set => SetValue(LeftProperty, value);
-        }
+    public Double Left
+    {
+        get => GetValue<Double>(LeftProperty);
+        set => SetValue(LeftProperty, value);
+    }
         
-        public Double Top
-        {
-            get => GetValue<Double>(TopProperty);
-            set => SetValue(TopProperty, value);
-        }
+    public Double Top
+    {
+        get => GetValue<Double>(TopProperty);
+        set => SetValue(TopProperty, value);
+    }
         
-        public string Title
-        {
-            get => GetValue<string>(TitleProperty);
-            set => SetValue(TitleProperty, value);
-        }
+    public string Title
+    {
+        get => GetValue<string>(TitleProperty);
+        set => SetValue(TitleProperty, value);
+    }
 
-        public MSAALevel MSAALevel
-        {
-            get => GetValue<MSAALevel>(MSAALevelProperty);
-            set => SetValue(MSAALevelProperty, value);
-        }
+    public MSAALevel MSAALevel
+    {
+        get => GetValue<MSAALevel>(MSAALevelProperty);
+        set => SetValue(MSAALevelProperty, value);
+    }
 
-        public WindowState State
-        {
-            get => GetValue<WindowState>(StateProperty);
-            set => SetValue(StateProperty, value);
-        }
+    public WindowState State
+    {
+        get => GetValue<WindowState>(StateProperty);
+        set => SetValue(StateProperty, value);
+    }
 
-        public Double ClientWidth
-        {
-            get => GetValue<Double>(ClientWidthProperty);
-            set => SetValue(ClientWidthProperty, value);
-        }
+    public Double ClientWidth
+    {
+        get => GetValue<Double>(ClientWidthProperty);
+        set => SetValue(ClientWidthProperty, value);
+    }
 
-        public Double ClientHeight
-        {
-            get => GetValue<Double>(ClientHeightProperty);
-            set => SetValue(ClientHeightProperty, value);
-        }
+    public Double ClientHeight
+    {
+        get => GetValue<Double>(ClientHeightProperty);
+        set => SetValue(ClientHeightProperty, value);
+    }
         
-        // Pointer to the surface for rendering on this window
-        public abstract IntPtr SurfaceHandle { get; internal set; }
+    // Pointer to the surface for rendering on this window
+    public abstract IntPtr SurfaceHandle { get; internal set; }
         
-        public abstract IntPtr Handle { get; internal set; }
-        public bool IsClosed { get; protected set; }
+    public abstract IntPtr Handle { get; internal set; }
+    public bool IsClosed { get; protected set; }
 
-        public abstract Vector2 PointToClient(Vector2 point);
-        public abstract Vector2 PointToScreen(Vector2 point);
+    public abstract Vector2 PointToClient(Vector2 point);
+    public abstract Vector2 PointToScreen(Vector2 point);
                 
-        internal Vector2 ScreenToClient(Vector2 p)
-        {
-            var point = new NativePoint((int)p.X, (int)p.Y);
-            Win32Interop.ScreenToClient(Handle, ref point);
-            return point;
-        }
+    internal Vector2 ScreenToClient(Vector2 p)
+    {
+        var point = new NativePoint((int)p.X, (int)p.Y);
+        Win32Interop.ScreenToClient(Handle, ref point);
+        return point;
+    }
 
-        internal Vector2 ClientToScreen(Vector2 p)
-        {
-            var point = new NativePoint((int)p.X, (int)p.Y);
-            Win32Interop.ClientToScreen(Handle, ref point);
-            return point;
-        }
+    internal Vector2 ClientToScreen(Vector2 p)
+    {
+        var point = new NativePoint((int)p.X, (int)p.Y);
+        Win32Interop.ClientToScreen(Handle, ref point);
+        return point;
+    }
 
-        public abstract void Show();
-        public abstract void Close();
-        public abstract void Hide();
+    public abstract void Show();
+    public abstract void Close();
+    public abstract void Hide();
         
-        public abstract bool IsActive { get; internal set; }
+    public abstract bool IsActive { get; internal set; }
         
-        public event EventHandler<WindowClosingEventArgs> Closing;
-        public event EventHandler<EventArgs> Closed;
+    public event EventHandler<WindowClosingEventArgs> Closing;
+    public event EventHandler<EventArgs> Closed;
         
-        public event EventHandler<EventArgs> SourceInitialized;
+    public event EventHandler<EventArgs> SourceInitialized;
         
-        public event SizeChangedEventHandler ClientSizeChanged
-        {
-            add => AddHandler(ClientSizeChangedEvent, value);
-            remove => RemoveHandler(ClientSizeChangedEvent, value);
-        }
+    public event SizeChangedEventHandler ClientSizeChanged
+    {
+        add => AddHandler(ClientSizeChangedEvent, value);
+        remove => RemoveHandler(ClientSizeChangedEvent, value);
+    }
         
-        public event MSAALeveChangedHandler MSAALevelChanged
-        {
-            add => AddHandler(MSAALevelChangedEvent, value);
-            remove => RemoveHandler(MSAALevelChangedEvent, value);
-        }
+    public event MSAALeveChangedHandler MSAALevelChanged
+    {
+        add => AddHandler(MSAALevelChangedEvent, value);
+        remove => RemoveHandler(MSAALevelChangedEvent, value);
+    }
 
-        public event StateChangedHandler StateChanged
-        {
-            add => AddHandler(StateChangedEvent, value);
-            remove => RemoveHandler(StateChangedEvent, value);
-        }
+    public event StateChangedHandler StateChanged
+    {
+        add => AddHandler(StateChangedEvent, value);
+        remove => RemoveHandler(StateChangedEvent, value);
+    }
 
-        internal void OnSourceInitialized()
-        {
-            SourceInitialized?.Invoke(this, EventArgs.Empty);
-            InvalidateMeasure();
-        }
+    internal void OnSourceInitialized()
+    {
+        SourceInitialized?.Invoke(this, EventArgs.Empty);
+        InvalidateMeasure();
+    }
 
-        public abstract void Render();
-        
-        public void Update()
+    public abstract void Render();
+
+    public void Update()
+    {
+        ProcessVisualTree(UpdateComponent);
+
+        ProcessVisualTree(UpdateComponentLocation);
+    }
+
+    private void ProcessVisualTree(Action<IUIComponent> processAction)
+    {
+        var stack = new Stack<IUIComponent>();
+        stack.Push(this);
+        while (stack.Count > 0)
         {
-            var stack = new Stack<IUIComponent>();
-            stack.Push(this);
-            while (stack.Count > 0)
+            var control = stack.Pop();
+
+            processAction(control);
+
+            foreach (var visual in control.GetVisualDescendants())
             {
-                var control = stack.Pop();
-
-                UpdateControl(control);
-
-                foreach (var visual in control.GetVisualDescendants())
-                {
-                    stack.Push(visual as FrameworkComponent);
-                }
+                stack.Push(visual);
             }
         }
+    }
         
-        private void UpdateControl(IUIComponent visualComponent)
+    private void UpdateComponent(IUIComponent visualComponent)
+    {
+        var control = (FrameworkComponent)visualComponent;
+        var parent = control.VisualParent;
+        if (!control.IsMeasureValid)
         {
-            var control = (FrameworkComponent)visualComponent;
-            var parent = control.VisualParent;
-            if (!control.IsMeasureValid)
+            if (control is IWindow wnd)
             {
-                if (control is IWindow wnd)
-                {
-                    MeasureControl(control, wnd.ClientWidth, wnd.ClientHeight);
-                }
-                else
-                {
-                    MeasureControl(control, control.Width, control.Height);
-                }
-            }
-            
-            if (!control.IsArrangeValid)
-            {
-                if (parent != null)
-                {
-                    control.Arrange(new Rect(parent.DesiredSize));
-                }
-                else
-                {
-                    control.Arrange(new Rect(control.DesiredSize));
-                }
-            }
-            
-            // if (control.Parent != null)
-            // {
-            //     control.Location = control.Bounds.Location + control.Parent.Location;
-            //     control.ClipPosition = control.ClipRectangle.Location + control.Parent.Location;
-            // }
-        }
-
-        private void MeasureControl(IUIComponent control, Double width, Double height)
-        {
-            if (!Double.IsNaN(width) && !Double.IsNaN(height))
-            {
-                Size s = new Size(width, height);
-                control.Measure(s);
-            }
-            else if (Double.IsNaN(width) && !Double.IsNaN(height))
-            {
-                control.Measure(new Size(Double.PositiveInfinity, height));
-            }
-            else if (!Double.IsNaN(width) && Double.IsNaN(height))
-            {
-                control.Measure(new Size(width, Double.PositiveInfinity));
+                MeasureControl(control, wnd.ClientWidth, wnd.ClientHeight);
             }
             else
             {
-                control.Measure(Size.Infinity);
+                MeasureControl(control, control.Width, control.Height);
             }
         }
-
-        protected void OnClosed()
+            
+        if (!control.IsArrangeValid)
         {
-            var closingArgs = new WindowClosingEventArgs();
-            Closing?.Invoke(this, closingArgs);
-            if (!closingArgs.Cancel)
+            if (parent != null)
             {
-                Closed?.Invoke(this, EventArgs.Empty);
+                control.Arrange(new Rect(parent.DesiredSize));
             }
+            else
+            {
+                control.Arrange(new Rect(control.DesiredSize));
+            }
+        }
+            
+        // if (control.Parent != null)
+        // {
+        //     control.Location = control.Bounds.Location + control.Parent.Location;
+        //     control.ClipPosition = control.ClipRectangle.Location + control.Parent.Location;
+        // }
+    }
+
+    private void UpdateComponentLocation(IUIComponent visualComponent)
+    {
+        if (visualComponent.VisualParent != null)
+        {
+            visualComponent.Location = visualComponent.Bounds.Location + visualComponent.VisualParent.Location;
+            visualComponent.ClipPosition = visualComponent.ClipRectangle.Location + visualComponent.VisualParent.Location;
+        }
+    }
+
+    private void MeasureControl(IUIComponent control, Double width, Double height)
+    {
+        if (!Double.IsNaN(width) && !Double.IsNaN(height))
+        {
+            Size s = new Size(width, height);
+            control.Measure(s);
+        }
+        else if (Double.IsNaN(width) && !Double.IsNaN(height))
+        {
+            control.Measure(new Size(Double.PositiveInfinity, height));
+        }
+        else if (!Double.IsNaN(width) && Double.IsNaN(height))
+        {
+            control.Measure(new Size(width, Double.PositiveInfinity));
+        }
+        else
+        {
+            control.Measure(Size.Infinity);
+        }
+    }
+
+    protected void OnClosed()
+    {
+        var closingArgs = new WindowClosingEventArgs();
+        Closing?.Invoke(this, closingArgs);
+        if (!closingArgs.Cancel)
+        {
+            Closed?.Invoke(this, EventArgs.Empty);
         }
     }
 }

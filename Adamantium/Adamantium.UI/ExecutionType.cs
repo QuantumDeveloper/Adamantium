@@ -1,8 +1,7 @@
-﻿namespace Adamantium.UI
+﻿namespace Adamantium.UI;
+
+public enum ExecutionType
 {
-   public enum ExecutionType
-   {
-      Sync,
-      Async
-   }
+   Sync,
+   Async
 }

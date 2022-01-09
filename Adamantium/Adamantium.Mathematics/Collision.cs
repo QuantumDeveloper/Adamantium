@@ -438,9 +438,7 @@ namespace Adamantium.Mathematics
          //Source: Real-Time Rendering, Third Edition
          //Reference: Page 780
 
-         Vector3F cross;
-
-         Vector3F.Cross(ref ray1.Direction, ref ray2.Direction, out cross);
+         Vector3F.Cross(ref ray1.Direction, ref ray2.Direction, out var cross);
          float denominator = cross.Length();
 
          //Lines are parallel.

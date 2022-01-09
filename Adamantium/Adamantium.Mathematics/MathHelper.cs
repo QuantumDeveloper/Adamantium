@@ -498,6 +498,14 @@ namespace Adamantium.Mathematics
             var angle = (float)Math.Atan2(det, dot);
             return angle;
         }
+        
+        public static float AngleBetween(Vector3 vector0, Vector3 vector1, Vector3 normal)
+        {
+            var dot = Vector3.Dot(vector0, vector1);
+            var det = Vector3.Dot(Vector3.Cross(vector1, vector0), normal);
+            var angle = (float)Math.Atan2(det, dot);
+            return angle;
+        }
 
         public static float AngleBetween(Vector3F vector0, Vector3F vector1, bool is360Degrees = true)
         {

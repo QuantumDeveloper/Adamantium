@@ -1,9 +1,8 @@
-﻿namespace Adamantium.UI
+﻿namespace Adamantium.UI;
+
+public enum Visibility
 {
-   public enum Visibility
-   {
-      Visible = 0,
-      Hidden = 1,
-      Collapsed = 2
-   }
+   Visible = 0,
+   Hidden = 1,
+   Collapsed = 2
 }

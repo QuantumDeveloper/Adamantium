@@ -47,7 +47,7 @@ namespace Adamantium.Mathematics
         /// fill it only between even and odd segment pairs (Zero is also even number)
         /// According to Non-Zero rule you should fill also self intersecting parts of polygon in addition to written above.
         /// </remarks>
-        public static List<Vector3F> Triangulate(Polygon polygon)
+        public static List<Vector3> Triangulate(Polygon polygon)
         {
             var rays = new List<Ray2D>();
             var sortedY = new List<double>();
@@ -60,6 +60,10 @@ namespace Adamantium.Mathematics
             for (var i = 0; i < sortedList.Count; ++i)
             {
                 var point = sortedList[i];
+                if (point.Y == 93)
+                {
+                    int bug = 0;
+                }
                 if (sortedY.Contains(point.Y) || IsSimilarTo(point.Y, sortedY))
                 {
                     continue;
@@ -94,7 +98,7 @@ namespace Adamantium.Mathematics
 
             polygon.UpdatePolygonUsingRayInterPoints(interPoints);
 
-            var finalTriangles = new List<Vector3F>();
+            var finalTriangles = new List<Vector3>();
             for (var i = 0; i < rays.Count - 1; ++i)
             {
                 var upperInterPoints = rayIntersectionPoints[i];
@@ -178,21 +182,21 @@ namespace Adamantium.Mathematics
         /// <param name="trianglesList"></param>
         /// <param name="startSegment2D"></param>
         /// <param name="endSegment2D"></param>
-        private static void CreateTriangles(List<Vector3F> trianglesList, LineSegment2D startSegment2D, LineSegment2D endSegment2D)
+        private static void CreateTriangles(List<Vector3> trianglesList, LineSegment2D startSegment2D, LineSegment2D endSegment2D)
         {
             if (MathHelper.IsClockwise(startSegment2D.Start, endSegment2D.Start, endSegment2D.End, Vector3.BackwardRH))
             {
-                trianglesList.Add((Vector3F)startSegment2D.Start);
-                trianglesList.Add((Vector3F)endSegment2D.Start);
-                trianglesList.Add((Vector3F)endSegment2D.End);
+                trianglesList.Add((Vector3)startSegment2D.Start);
+                trianglesList.Add((Vector3)endSegment2D.Start);
+                trianglesList.Add((Vector3)endSegment2D.End);
             }
 
             if (MathHelper.IsClockwise(startSegment2D.Start, endSegment2D.End, startSegment2D.End, Vector3.BackwardRH))
             {
                 //Second triangle
-                trianglesList.Add((Vector3F)startSegment2D.Start);
-                trianglesList.Add((Vector3F)endSegment2D.End);
-                trianglesList.Add((Vector3F)startSegment2D.End);
+                trianglesList.Add((Vector3)startSegment2D.Start);
+                trianglesList.Add((Vector3)endSegment2D.End);
+                trianglesList.Add((Vector3)startSegment2D.End);
             }
         }
 

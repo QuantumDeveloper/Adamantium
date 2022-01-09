@@ -28,7 +28,7 @@ namespace Adamantium.EntityFramework.Components
 
         public override Mesh GetVisualRepresentation()
         {
-            Geometry = Shapes.Cube.GenerateGeometry(GeometryType.Outlined, Bounds.Size.X, Bounds.Size.Y, Bounds.Size.Z, 1, Matrix4x4F.Translation(Bounds.Center));
+            Geometry = Shapes.Cube.GenerateGeometry(GeometryType.Outlined, Bounds.Size.X, Bounds.Size.Y, Bounds.Size.Z, 1, Matrix4x4.Translation(Bounds.Center));
             return Geometry;
         }
 

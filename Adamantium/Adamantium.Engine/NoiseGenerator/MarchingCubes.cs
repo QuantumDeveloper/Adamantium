@@ -6,23 +6,23 @@ namespace Noise
 {
    public class GridTriangle
    {
-      public Vector3F[] Vertexes { get; set; }
+      public Vector3[] Vertexes { get; set; }
 
       public GridTriangle()
       {
-         Vertexes = new Vector3F[3];
+         Vertexes = new Vector3[3];
       }
    }
 
    public class GridCell
    {
-      public Vector3F[] Vertexes { get; set; }
-      public float[] Densities { get; set; }
+      public Vector3[] Vertexes { get; set; }
+      public double[] Densities { get; set; }
 
       public GridCell()
       {
-         Vertexes = new Vector3F[8];
-         Densities = new float[8];
+         Vertexes = new Vector3[8];
+         Densities = new Double[8];
       }
    }
 
@@ -341,7 +341,7 @@ namespace Noise
          List<GridTriangle> triangles = new List<GridTriangle>();
 
          int cubeIndex = 0;
-         Vector3F[] vertexList = new Vector3F[12];
+         var vertexList = new Vector3[12];
 
          /*
             Determine the index into the edge table which
@@ -362,29 +362,29 @@ namespace Noise
 
          /* Find the vertices where the surface intersects the cube */
          if ((EdgeTable[cubeIndex] & 1) != 0)
-            vertexList[0] = VertexInterpolation(surfaceLevel, gridCell.Vertexes[0], gridCell.Vertexes[1], gridCell.Densities[0], gridCell.Densities[1]);
+            vertexList[0] = VertexInterpolation(surfaceLevel, ref gridCell.Vertexes[0], ref gridCell.Vertexes[1],gridCell.Densities[0], gridCell.Densities[1]);
          if ((EdgeTable[cubeIndex] & 2) != 0)
-            vertexList[1] = VertexInterpolation(surfaceLevel, gridCell.Vertexes[1], gridCell.Vertexes[2], gridCell.Densities[1], gridCell.Densities[2]);
+            vertexList[1] = VertexInterpolation(surfaceLevel, ref gridCell.Vertexes[1], ref gridCell.Vertexes[2], gridCell.Densities[1], gridCell.Densities[2]);
          if ((EdgeTable[cubeIndex] & 4) != 0)
-            vertexList[2] = VertexInterpolation(surfaceLevel, gridCell.Vertexes[2], gridCell.Vertexes[3], gridCell.Densities[2], gridCell.Densities[3]);
+            vertexList[2] = VertexInterpolation(surfaceLevel, ref gridCell.Vertexes[2], ref gridCell.Vertexes[3], gridCell.Densities[2], gridCell.Densities[3]);
          if ((EdgeTable[cubeIndex] & 8) != 0)
-            vertexList[3] = VertexInterpolation(surfaceLevel, gridCell.Vertexes[3], gridCell.Vertexes[0], gridCell.Densities[3], gridCell.Densities[0]);
+            vertexList[3] = VertexInterpolation(surfaceLevel, ref gridCell.Vertexes[3], ref gridCell.Vertexes[0], gridCell.Densities[3], gridCell.Densities[0]);
          if ((EdgeTable[cubeIndex] & 16) != 0)
-            vertexList[4] = VertexInterpolation(surfaceLevel, gridCell.Vertexes[4], gridCell.Vertexes[5], gridCell.Densities[4], gridCell.Densities[5]);
+            vertexList[4] = VertexInterpolation(surfaceLevel, ref gridCell.Vertexes[4], ref gridCell.Vertexes[5], gridCell.Densities[4], gridCell.Densities[5]);
          if ((EdgeTable[cubeIndex] & 32) != 0)
-            vertexList[5] = VertexInterpolation(surfaceLevel, gridCell.Vertexes[5], gridCell.Vertexes[6], gridCell.Densities[5], gridCell.Densities[6]);
+            vertexList[5] = VertexInterpolation(surfaceLevel, ref gridCell.Vertexes[5], ref gridCell.Vertexes[6], gridCell.Densities[5], gridCell.Densities[6]);
          if ((EdgeTable[cubeIndex] & 64) != 0)
-            vertexList[6] = VertexInterpolation(surfaceLevel, gridCell.Vertexes[6], gridCell.Vertexes[7], gridCell.Densities[6], gridCell.Densities[7]);
+            vertexList[6] = VertexInterpolation(surfaceLevel, ref gridCell.Vertexes[6], ref gridCell.Vertexes[7], gridCell.Densities[6], gridCell.Densities[7]);
          if ((EdgeTable[cubeIndex] & 128) != 0)
-            vertexList[7] = VertexInterpolation(surfaceLevel, gridCell.Vertexes[7], gridCell.Vertexes[4], gridCell.Densities[7], gridCell.Densities[4]);
+            vertexList[7] = VertexInterpolation(surfaceLevel, ref gridCell.Vertexes[7], ref gridCell.Vertexes[4], gridCell.Densities[7], gridCell.Densities[4]);
          if ((EdgeTable[cubeIndex] & 256) != 0)
-            vertexList[8] = VertexInterpolation(surfaceLevel, gridCell.Vertexes[0], gridCell.Vertexes[4], gridCell.Densities[0], gridCell.Densities[4]);
+            vertexList[8] = VertexInterpolation(surfaceLevel, ref gridCell.Vertexes[0], ref gridCell.Vertexes[4], gridCell.Densities[0], gridCell.Densities[4]);
          if ((EdgeTable[cubeIndex] & 512) != 0)
-            vertexList[9] = VertexInterpolation(surfaceLevel, gridCell.Vertexes[1], gridCell.Vertexes[5], gridCell.Densities[1], gridCell.Densities[5]);
+            vertexList[9] = VertexInterpolation(surfaceLevel, ref gridCell.Vertexes[1], ref gridCell.Vertexes[5], gridCell.Densities[1], gridCell.Densities[5]);
          if ((EdgeTable[cubeIndex] & 1024) != 0)
-            vertexList[10] = VertexInterpolation(surfaceLevel, gridCell.Vertexes[2], gridCell.Vertexes[6], gridCell.Densities[2], gridCell.Densities[6]);
+            vertexList[10] = VertexInterpolation(surfaceLevel, ref gridCell.Vertexes[2], ref gridCell.Vertexes[6], gridCell.Densities[2], gridCell.Densities[6]);
          if ((EdgeTable[cubeIndex] & 2048) != 0)
-            vertexList[11] = VertexInterpolation(surfaceLevel, gridCell.Vertexes[3], gridCell.Vertexes[7], gridCell.Densities[3], gridCell.Densities[7]);
+            vertexList[11] = VertexInterpolation(surfaceLevel, ref gridCell.Vertexes[3], ref gridCell.Vertexes[7], gridCell.Densities[3], gridCell.Densities[7]);
 
          /* Create the triangles */
          for (int i = 0; TrianglesTable[cubeIndex, i] != -1; i += 3)
@@ -405,10 +405,9 @@ namespace Noise
          Linearly interpolate the position where an isosurface cuts
          an edge between two vertices, each with their own scalar value
       */
-      private static Vector3F VertexInterpolation(float surfaceLevel, Vector3F vertex1, Vector3F vertex2, float density1, float density2)
+      private static Vector3 VertexInterpolation(float surfaceLevel, ref Vector3 vertex1, ref Vector3 vertex2, double density1, double density2)
       {
-         float mu;
-         Vector3F resVertex = new Vector3F();
+         var resVertex = new Vector3();
 
          if (Math.Abs(surfaceLevel - density1) < 0.00001)
             return vertex1;
@@ -417,7 +416,7 @@ namespace Noise
          if (Math.Abs(density1 - density2) < 0.00001)
             return vertex1;
 
-         mu = (surfaceLevel - density1) / (density2 - density1);
+         var mu = (surfaceLevel - density1) / (density2 - density1);
          resVertex.X = vertex1.X + mu * (vertex2.X - vertex1.X);
          resVertex.Y = vertex1.Y + mu * (vertex2.Y - vertex1.Y);
          resVertex.Z = vertex1.Z + mu * (vertex2.Z - vertex1.Z);

@@ -14,10 +14,10 @@ namespace Adamantium.Engine.Graphics
 
             public static Mesh GenerateGeometry(
                 GeometryType geometryType,
-                float diameter = 1.0f,
-                float thickness = 0.33333f,
+                double diameter = 1.0f,
+                double thickness = 0.33333,
                 int tessellation = 32,
-                Matrix4x4F? transform = null)
+                Matrix4x4? transform = null)
             {
                 if (tessellation < 3)
                 {
@@ -44,11 +44,11 @@ namespace Adamantium.Engine.Graphics
 
 
             private static Mesh GenerateSolidGeometry(
-                float diameter = 1.0f,
-                float thickness = 0.33333f,
+                double diameter = 1.0,
+                double thickness = 0.33333,
                 int tessellation = 32)
             {
-                var vertices = new List<Vector3F>();
+                var vertices = new List<Vector3>();
                 var uvs = new List<Vector2F>();
                 var indices = new List<int>();
 
@@ -63,7 +63,7 @@ namespace Adamantium.Engine.Graphics
 
                     //Create a transform matrix that will align geometry to
                     //slice perpendicularly though the current ring position
-                    var transformMatrix = Matrix4x4F.Translation(diameter / 2, 0, 0) * Matrix4x4F.RotationY(outerAngle);
+                    var transformMatrix = Matrix4x4.Translation(diameter / 2, 0, 0) * Matrix4x4.RotationY(outerAngle);
 
                     // Now we loop along the other axis, around the side of the tube.
                     for (int j = 0; j <= tessellation; j++)
@@ -75,11 +75,11 @@ namespace Adamantium.Engine.Graphics
                         float dy = (float) Math.Sin(innerAngle);
 
                         //Create a vertex
-                        var normal = new Vector3F(dx, dy, 0);
+                        var normal = new Vector3(dx, dy, 0);
                         var position = normal * thickness / 2;
                         var uv = new Vector2F(u, v);
 
-                        Vector3F.TransformCoordinate(ref position, ref transformMatrix, out position);
+                        Vector3.TransformCoordinate(ref position, ref transformMatrix, out position);
 
                         vertices.Add(position);
                         uvs.Add(uv);
@@ -109,23 +109,23 @@ namespace Adamantium.Engine.Graphics
             }
 
             private static Mesh GenerateOutlinedGeometry(
-                float diameter = 1.0f,
-                float thickness = 0.33333f,
+                double diameter = 1.0,
+                double thickness = 0.33333,
                 int tessellation = 32)
             {
                 var radius = diameter / 2;
                 var meshes = new List<Mesh>();
                 for (int i = 0; i <= tessellation; i++)
                 {
-                    var meshItem = Polygon.GenerateGeometry(GeometryType.Outlined, new Vector2F(thickness/2), tessellation);
+                    var meshItem = Polygon.GenerateGeometry(GeometryType.Outlined, new Vector2(thickness/2), tessellation);
                     var angle = (float)(i * 2.0 * Math.PI / tessellation);
                     var normal = GetCircleVector(i, tessellation);
-                    var matrix = Matrix4x4F.RotationY(MathHelper.DegreesToRadians(90)) * Matrix4x4F.RotationY(angle) * Matrix4x4F.Translation(normal*radius);
+                    var matrix = Matrix4x4.RotationY(MathHelper.DegreesToRadians(90)) * Matrix4x4.RotationY(angle) * Matrix4x4.Translation(normal*radius);
                     meshItem.ApplyTransform(matrix);
                     meshes.Add(meshItem);
                 }
 
-                var vertices = new List<Vector3F>();
+                var vertices = new List<Vector3>();
                 var indices = new List<int>();
                 int lastIndex = 0;
                 for (int i = 0; i <= tessellation; ++i)
@@ -149,7 +149,7 @@ namespace Adamantium.Engine.Graphics
             }
 
             // Helper computes a point on a unit circle, aligned to the x/z plane and centered on the origin.
-            private static Vector3F GetCircleVector(
+            private static Vector3 GetCircleVector(
                 int i,
                 int tessellation)
             {
@@ -157,9 +157,8 @@ namespace Adamantium.Engine.Graphics
                 var dx = (float)Math.Sin(angle);
                 var dz = (float)Math.Cos(angle);
 
-                return new Vector3F(dx, 0, dz);
+                return new Vector3(dx, 0, dz);
             }
-
 
             public static Shape New(
                 GraphicsDevice device,
@@ -167,7 +166,7 @@ namespace Adamantium.Engine.Graphics
                 float diameter = 1.0f,
                 float thickness = 0.33333f,
                 int tessellation = 32,
-                Matrix4x4F? transform = null)
+                Matrix4x4? transform = null)
             {
                 var geometry = GenerateGeometry(geometryType, diameter, thickness, tessellation, transform);
                 return new Shape(device, geometry);

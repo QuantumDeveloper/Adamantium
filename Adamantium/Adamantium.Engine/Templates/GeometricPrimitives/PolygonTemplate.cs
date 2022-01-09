@@ -8,13 +8,13 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
 {
     public class PolygonTemplate : PrimitiveTemplate
     {
-        private Vector2F diameter;
+        private Vector2 diameter;
 
         public PolygonTemplate(
             GeometryType geometryType,
-            Vector2F diameter,
+            Vector2 diameter,
             int tessellation,
-            Matrix4x4F? transform = null) : base(geometryType, tessellation, transform)
+            Matrix4x4? transform = null) : base(geometryType, tessellation, transform)
         {
             this.diameter = diameter;
         }

@@ -1,13 +1,12 @@
 ﻿using System;
 
-namespace Adamantium.UI
+namespace Adamantium.UI;
+
+public class PropertyTrigger:ITrigger
 {
-   public class PropertyTrigger:ITrigger
+   public SetterCollection Setters { get; set; }
+   public void Apply(FrameworkComponent control)
    {
-      public SetterCollection Setters { get; set; }
-      public void Apply(FrameworkComponent control)
-      {
-         throw new NotImplementedException();
-      }
+      throw new NotImplementedException();
    }
 }

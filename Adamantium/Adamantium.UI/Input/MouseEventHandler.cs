@@ -1,5 +1,3 @@
-﻿namespace Adamantium.UI.Input
-{
-   public delegate void MouseEventHandler(object sender, MouseEventArgs e);
+﻿namespace Adamantium.UI.Input;
 
-}
+public delegate void MouseEventHandler(object sender, MouseEventArgs e);

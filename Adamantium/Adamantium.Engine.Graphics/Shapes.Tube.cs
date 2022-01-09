@@ -11,7 +11,7 @@ namespace Adamantium.Engine.Graphics
         public class Tube
         {
             // Helper computes a point on a unit circle, aligned to the x/z plane and centered on the origin.
-            private static Vector3F GetCircleVector(
+            private static Vector3 GetCircleVector(
                 int i,
                 int tessellation)
             {
@@ -19,21 +19,21 @@ namespace Adamantium.Engine.Graphics
                 var dx = (float)Math.Sin(angle);
                 var dz = (float)Math.Cos(angle);
 
-                return new Vector3F(dx, 0, dz);
+                return new Vector3(dx, 0, dz);
             }
 
             private static void CreateCylinder(
-                List<Vector3F> vertices,
+                List<Vector3> vertices,
                 List<Vector2F> uvs,
                 List<int> indices,
-                float radius,
-                float height,
+                double radius,
+                double height,
                 int tessellation,
                 bool isInnerCylinder
             )
             {
                 height /= 2;
-                var topOffset = Vector3F.UnitY * height;
+                var topOffset = Vector3.UnitY * height;
                 int stride = tessellation + 1;
                 int vbase = vertices.Count;
                 // Create a ring of triangles around the outside of the cylinder.
@@ -83,12 +83,12 @@ namespace Adamantium.Engine.Graphics
             }
 
             private static void CreateTubeCap(
-                List<Vector3F> vertices,
+                List<Vector3> vertices,
                 List<Vector2F> uvs,
                 List<int> indices,
-                float radius,
-                float height,
-                float thickness,
+                double radius,
+                double height,
+                double thickness,
                 int tessellation,
                 bool isTop
             )
@@ -98,7 +98,7 @@ namespace Adamantium.Engine.Graphics
                 var stride = tessellation + 1;
 
                 // Which end of the cylinder is this?
-                var normal = Vector3F.UnitY;
+                var normal = Vector3.UnitY;
                 var textureScale = new Vector2F(-0.5f);
 
                 if (!isTop)
@@ -114,16 +114,16 @@ namespace Adamantium.Engine.Graphics
 
                     var position = (circleVector * (radius + thickness)) + (normal * height);
                     var textureCoordinate = new Vector2F(
-                        circleVector.X * textureScale.X + 0.5f,
-                        circleVector.Z * textureScale.Y + 0.5f);
+                        (float)circleVector.X * textureScale.X + 0.5f,
+                        (float)circleVector.Z * textureScale.Y + 0.5f);
 
                     vertices.Add(position);
                     uvs.Add(textureCoordinate);
 
                     position = (circleVector * radius) + (normal * height);
                     textureCoordinate = new Vector2F(
-                        circleVector.X * textureScale.X + 0.5f - (1 / radius),
-                        circleVector.Z * textureScale.Y + 0.5f - (1 / radius));
+                        (float)(circleVector.X * textureScale.X + 0.5f - (1 / radius)),
+                        (float)(circleVector.Z * textureScale.Y + 0.5f - (1 / radius)));
 
                     vertices.Add(position);
                     uvs.Add(textureCoordinate);
@@ -160,11 +160,11 @@ namespace Adamantium.Engine.Graphics
 
             public static Mesh GenerateGeometry(
                 GeometryType geometryType,
-                float diameter,
-                float height,
-                float thickness,
+                double diameter,
+                double height,
+                double thickness,
                 int tessellation = 36,
-                Matrix4x4F? transform = null)
+                Matrix4x4? transform = null)
             {
                 if (tessellation < 3)
                 {
@@ -187,16 +187,16 @@ namespace Adamantium.Engine.Graphics
             }
 
             private static Mesh GenerateSolidGeometry(
-                float diameter,
-                float height,
-                float thickness,
+                double diameter,
+                double height,
+                double thickness,
                 int tessellation = 40)
             {
-                PrimitiveType primitiveType = PrimitiveType.TriangleList;
+                var primitiveType = PrimitiveType.TriangleList;
 
-                float radius = diameter / 2;
+                var radius = diameter / 2;
 
-                var vertices = new List<Vector3F>();
+                var vertices = new List<Vector3>();
                 var uvs = new List<Vector2F>();
                 var indices = new List<int>();
                 CreateCylinder(vertices, uvs, indices, radius, height, tessellation, true);
@@ -217,14 +217,14 @@ namespace Adamantium.Engine.Graphics
             }
 
             private static Mesh GenerateOutlinedGeometry(
-                float diameter,
-                float height,
-                float thickness,
+                double diameter,
+                double height,
+                double thickness,
                 int tessellation = 40)
             {
-                float radius = diameter / 2;
+                var radius = diameter / 2;
 
-                var vertices = new List<Vector3F>();
+                var vertices = new List<Vector3>();
                 var indices = new List<int>();
 
                 GenerateOutlinedCylinder(vertices, indices, radius, height, tessellation);
@@ -241,14 +241,14 @@ namespace Adamantium.Engine.Graphics
             }
 
             private static void GenerateOutlinedCylinder(
-                List<Vector3F> vertices,
+                List<Vector3> vertices,
                 List<int> indices,
-                float radius,
-                float height,
+                double radius,
+                double height,
                 int tessellation = 40)
             {
                 int lastIndex = vertices.Count;
-                var topOffset = Vector3F.UnitY * height / 2;
+                var topOffset = Vector3.UnitY * height / 2;
 
                 for (int i = 0; i <= tessellation; ++i)
                 {
@@ -284,17 +284,17 @@ namespace Adamantium.Engine.Graphics
             }
 
             private static void GenerateOutlinedCaps(
-                List<Vector3F> vertices,
+                List<Vector3> vertices,
                 List<int> indices,
-                float radius,
-                float height,
-                float thickness,
+                double radius,
+                double height,
+                double thickness,
                 int tessellation,
                 bool isTop)
             {
                 height /= 2;
                 int lastIndex = vertices.Count;
-                var normal = Vector3F.UnitY;
+                var normal = Vector3.UnitY;
 
                 if (!isTop)
                 {
@@ -335,7 +335,7 @@ namespace Adamantium.Engine.Graphics
                 float height,
                 float thickness,
                 int tessellation = 36,
-                Matrix4x4F? transform = null)
+                Matrix4x4? transform = null)
             {
                 var geometry = GenerateGeometry(geometryType, diameter, height, thickness, tessellation, transform);
                 // Create the primitive object.

@@ -30,7 +30,7 @@ namespace Adamantium.Engine.Tools
                 var planePosition = camera.Forward * 100;
                 var plane = new Plane(planePosition, camera.Forward);
                 toolIntersectionResult.Intersects = ray.Intersects(ref plane, out Vector3F interPoint);
-                toolIntersectionResult.IntersectionPoint = interPoint;
+                toolIntersectionResult.IntersectionPoint = (Vector3)interPoint;
                 if (toolIntersectionResult.Intersects)
                 {
                     dragStart = interPoint;

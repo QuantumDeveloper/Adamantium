@@ -9,11 +9,11 @@ namespace Adamantium.EntityFramework.Components
     {
         private ShapeType _shapeType;
         private int _tessellationFactor;
-        private float _width;
-        private float _height;
-        private float _depth;
-        private float _thickness;
-        private float _diameter;
+        private double _width;
+        private double _height;
+        private double _depth;
+        private double _thickness;
+        private double _diameter;
         private float _topDiameter;
         private float _bottomDiameter;
         private GeometryType _geometryType;
@@ -105,13 +105,13 @@ namespace Adamantium.EntityFramework.Components
             set => SetProperty(ref _tessellationFactor, value);
         }
 
-        public float Width
+        public double Width
         {
             get => _width;
             set => SetProperty(ref _width, value);
         }
 
-        public float Height
+        public double Height
         {
             get => _height;
             set => SetProperty(ref _height, value);
@@ -159,19 +159,19 @@ namespace Adamantium.EntityFramework.Components
             set => SetProperty(ref _isClockwise, value);
         }
 
-        public float Depth
+        public double Depth
         {
             get => _depth;
             set => SetProperty(ref _depth, value);
         }
 
-        public float Thickness
+        public double Thickness
         {
             get => _thickness;
             set => SetProperty(ref _thickness, value);
         }
 
-        public float Diameter
+        public double Diameter
         {
             get => _diameter;
             set => SetProperty(ref _diameter, value);

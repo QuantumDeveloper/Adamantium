@@ -7,6 +7,17 @@ namespace Adamantium.UI.Media;
 
 public class PolyQuadraticBezierSegment : PathSegment
 {
+    public PolyQuadraticBezierSegment()
+    {
+        
+    }
+
+    public PolyQuadraticBezierSegment(IEnumerable<Vector2> points, bool isStroked)
+    {
+        Points = new PointsCollection(points);
+        IsStroked = isStroked;
+    }
+    
     public static readonly AdamantiumProperty PointsProperty =
         AdamantiumProperty.Register(nameof(Points), typeof(PointsCollection), typeof(PolylineSegment),
             new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure, PointsChangedCallback));

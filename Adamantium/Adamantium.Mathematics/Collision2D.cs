@@ -44,8 +44,7 @@ namespace Adamantium.Mathematics
             }
 
             point = p + r * t;
-            point.X = Math.Round(point.X, 4, MidpointRounding.AwayFromZero);
-            point.Y = Math.Round(point.Y, 4, MidpointRounding.AwayFromZero);
+            point = Vector2.Round(point, 4);
             return true;
         }
 
@@ -244,7 +243,7 @@ namespace Adamantium.Mathematics
             }
         }
         
-        public static Vector2? LineLineIntersection(Vector2 a, Vector2 b, Vector2 c, Vector2 d)
+        public static bool LineLineIntersection(Vector2 a, Vector2 b, Vector2 c, Vector2 d, out Vector2 v)
         {
             // Line 'ab' represented as a1x + b1y = c1 
             double a1 = b.Y - a.Y;
@@ -260,13 +259,15 @@ namespace Adamantium.Mathematics
   
             if (determinant == 0)
             {
+                v = Vector2.Zero;
                 // The lines are parallel 
-                return null;
+                return false;
             }
             
             double x = (b2 * c1 - b1 * c2) / determinant;
             double y = (a1 * c2 - a2 * c1) / determinant;
-            return new Vector2(x, y);
+            v = new Vector2(x, y);
+            return true;
         }
         
         /// <summary>

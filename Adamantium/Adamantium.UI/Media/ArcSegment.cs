@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using Adamantium.Engine.Graphics;
 
 namespace Adamantium.UI.Media;
 
@@ -12,6 +10,22 @@ public class ArcSegment : PathSegment
     public ArcSegment()
     {
         
+    }
+
+    public ArcSegment(
+        Vector2 point, 
+        Size size, 
+        double rotationAngle, 
+        bool isLargeArc, 
+        SweepDirection sweepDirection,
+        bool isStroked)
+    {
+        Point = point;
+        Size = size;
+        RotationAngle = rotationAngle;
+        IsLargeArc = isLargeArc;
+        SweepDirection = sweepDirection;
+        IsStroked = isStroked;
     }
     
     public static readonly AdamantiumProperty PointProperty =
@@ -126,7 +140,7 @@ public class ArcSegment : PathSegment
                 else angle2 += 2 * Math.PI;
             }
         }
-        else if (Math.Abs(angle2 - angle1) == Math.PI)
+        else if (MathHelper.NearEqual(Math.Abs(angle2 - angle1), Math.PI))
         {
             if (isCounterclockwise) (angle1, angle2) = (angle2, angle1);
             else

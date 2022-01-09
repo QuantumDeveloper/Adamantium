@@ -10,14 +10,14 @@ namespace Adamantium.Engine.Graphics
         public class PlaneGrid
         {
             public static Mesh GenerateGeometry(
-                float width,
-                float length,
+                double width,
+                double length,
                 int tessellation = 1,
-                Matrix4x4F? transform = null)
+                Matrix4x4? transform = null)
             {
-                PrimitiveType primitiveType = PrimitiveType.LineList;
+                var primitiveType = PrimitiveType.LineList;
 
-                List<Vector3F> lineList = new List<Vector3F>();
+                var lineList = new List<Vector3>();
                 var lines = tessellation + 1;
                 var halfSizeX = width / 2;
                 var halfSizeZ = length / 2;
@@ -27,25 +27,22 @@ namespace Adamantium.Engine.Graphics
 
                 for (int i = 0; i < lines; i++)
                 {
-                    Vector3F lineStart = new Vector3F(-halfSizeX + deltaX*i, 0, -halfSizeZ);
-                    Vector3F lineEnd = new Vector3F(-halfSizeX + deltaX*i, 0, halfSizeZ);
+                    var lineStart = new Vector3(-halfSizeX + deltaX*i, 0, -halfSizeZ);
+                    var lineEnd = new Vector3(-halfSizeX + deltaX*i, 0, halfSizeZ);
                     lineList.Add(lineStart);
                     lineList.Add(lineEnd);
                 }
 
                 for (int i = 0; i < lines; i++)
                 {
-                    Vector3F lineStart = new Vector3F(-halfSizeX, 0, -halfSizeZ + deltaZ*i);
-                    Vector3F lineEnd = new Vector3F(halfSizeX, 0, -halfSizeZ + deltaZ*i);
+                    var lineStart = new Vector3(-halfSizeX, 0, -halfSizeZ + deltaZ*i);
+                    var lineEnd = new Vector3(halfSizeX, 0, -halfSizeZ + deltaZ*i);
                     lineList.Add(lineStart);
                     lineList.Add(lineEnd);
                 }
 
                 Mesh mesh = new Mesh();
-                mesh.SetTopology(primitiveType).SetPoints(lineList);
-
-                mesh.ApplyTransform(transform);
-
+                mesh.SetTopology(primitiveType).SetPoints(lineList).ApplyTransform(transform);
                 return mesh;
             }
         }

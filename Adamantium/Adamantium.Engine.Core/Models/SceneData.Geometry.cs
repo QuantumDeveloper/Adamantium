@@ -11,7 +11,7 @@ namespace Adamantium.Engine.Core.Models
       {
          public Geometry()
          {
-            Positions = new List<Vector3F>();
+            Positions = new List<Vector3>();
             UV0 = new List<Vector2F>();
             UV1 = new List<Vector2F>();
             UV2 = new List<Vector2F>();
@@ -29,7 +29,7 @@ namespace Adamantium.Engine.Core.Models
 
          public List<Int32> IndexBuffer { get; set; }
 
-         public List<Vector3F> Positions { get; set; }
+         public List<Vector3> Positions { get; set; }
 
          public List<Vector2F> UV0 { get; set; }
          public List<Vector2F> UV1 { get; set; }

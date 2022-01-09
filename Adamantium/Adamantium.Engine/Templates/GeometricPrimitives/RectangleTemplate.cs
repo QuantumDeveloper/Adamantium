@@ -17,7 +17,7 @@ namespace Adamantium.Engine.Templates.GeometricPrimitives
             float height = 1,
             CornerRadius corners = default,
             int tessellation = 20,
-            Matrix4x4F? transform = null) : base(geometryType, tessellation, transform)
+            Matrix4x4? transform = null) : base(geometryType, tessellation, transform)
         {
             this.width = width;
             this.height = height;

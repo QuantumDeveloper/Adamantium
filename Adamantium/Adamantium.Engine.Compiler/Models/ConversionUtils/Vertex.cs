@@ -1,7 +1,7 @@
 ﻿using System;
 using Adamantium.Mathematics;
 
-namespace Adamantium.Engine.Compiler.Converter.ConversionUtils
+namespace Adamantium.Engine.Compiler.Models.ConversionUtils
 {
     internal struct Vertex : IEquatable<Vertex>
    {
