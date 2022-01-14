@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Models;
 using Adamantium.Mathematics;
@@ -11,6 +12,21 @@ namespace Adamantium.Engine.Graphics
     {
         public class Ellipse
         {
+            public static Shape New(
+                GraphicsDevice graphicsDevice,
+                GeometryType geometryType,
+                EllipseType ellipseType,
+                Vector2 diameter,
+                float startAngle = 0,
+                float stopAngle = 360,
+                bool isClockWise = true,
+                int tessellation = 36,
+                Matrix4x4? transform = null)
+            {
+                var mesh = GenerateGeometry(geometryType, ellipseType, diameter, startAngle, stopAngle, isClockWise, tessellation, transform);
+                return new Shape(graphicsDevice, mesh);
+            }
+            
             public static Mesh GenerateGeometry(
                GeometryType geometryType,
                EllipseType ellipseType,
@@ -37,10 +53,7 @@ namespace Adamantium.Engine.Graphics
                     mesh = GenerateOutlinedGeometry(ellipseType, diameter, startAngle, stopAngle, isClockWise, tessellation);
                 }
 
-                mesh.ApplyTransform(transform);
-
                 return mesh;
-
             }
 
             private static Mesh GenerateSolidGeometry(
@@ -49,7 +62,8 @@ namespace Adamantium.Engine.Graphics
                 double startAngle = 0,
                 double stopAngle = 360,
                 bool isClockWise = true,
-                int tessellation = 36)
+                int tessellation = 36,
+                Matrix4x4? transform = null)
             {
                 if (startAngle < 0) startAngle = 0;
                 if (stopAngle > 360) stopAngle = 360;
@@ -80,8 +94,8 @@ namespace Adamantium.Engine.Graphics
                 for (int i = 0; i < tessellation; ++i)
                 {
                     var angleItem = MathHelper.DegreesToRadians(currentAngle * sign);
-                    Double x = center.X + (radiusX * Math.Cos(angleItem));
-                    Double y = center.Y + (radiusY * Math.Sin(angleItem));
+                    var x = center.X + (radiusX * Math.Cos(angleItem));
+                    var y = center.Y + (radiusY * Math.Sin(angleItem));
                     
                     x = Math.Round(x, 4);
                     y = Math.Round(y, 4);
@@ -119,7 +133,8 @@ namespace Adamantium.Engine.Graphics
                 mesh.SetTopology(PrimitiveType.TriangleList).
                     SetPoints(points).
                     SetUVs(0, uvs).
-                    Optimize();
+                    Optimize().
+                    ApplyTransform(transform);
                 
                 return mesh;
             }
@@ -130,7 +145,8 @@ namespace Adamantium.Engine.Graphics
                 double startAngle = 0,
                 double stopAngle = 360,
                 bool isClockWise = true,
-                int tessellation = 36)
+                int tessellation = 36,
+                Matrix4x4? transform = null)
             {
                 var vertices = new List<Vector3>();
                 var center = Vector3.Zero;
@@ -167,27 +183,17 @@ namespace Adamantium.Engine.Graphics
                 {
                     vertices.Add(center);
                 }
-                
+
+                if (transform is { IsIdentity: false })
+                {
+                    vertices = Mesh.ApplyTransform(vertices, transform.Value).ToList();
+                }
+
                 var mesh = new Mesh();
                 mesh.SetTopology(PrimitiveType.LineStrip).
                     SetPoints(vertices).
                     GenerateBasicIndices();
                 return mesh;
-            }
-
-            public static Shape New(
-                GraphicsDevice graphicsDevice,
-                GeometryType geometryType,
-                EllipseType ellipseType,
-                Vector2 diameter,
-                float startAngle = 0,
-                float stopAngle = 360,
-                bool isClockWise = true,
-                int tessellation = 36,
-                Matrix4x4? transform = null)
-            {
-                var mesh = GenerateGeometry(geometryType, ellipseType, diameter, startAngle, stopAngle, isClockWise, tessellation, transform);
-                return new Shape(graphicsDevice, mesh);
             }
         }
     }
