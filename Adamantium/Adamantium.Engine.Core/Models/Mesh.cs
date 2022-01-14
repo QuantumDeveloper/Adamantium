@@ -427,15 +427,17 @@ public class Mesh
         }
     }
 
-    public static Vector3[] ApplyTransform(Vector3[] positions, Matrix4x4 transform)
+    public static Vector3[] ApplyTransform(IEnumerable<Vector3> positions, Matrix4x4 transform)
     {
+        var points = positions as Vector3[] ?? positions.ToArray();
+        
         if (transform.IsIdentity)
         {
-            return positions;
+            return points;
         }
 
-        var transformed = new Vector3[positions.Length];
-        Vector3.TransformCoordinate(positions, ref transform, transformed);
+        var transformed = new Vector3[points.Length];
+        Vector3.TransformCoordinate(points, ref transform, transformed);
         return transformed;
     }
 

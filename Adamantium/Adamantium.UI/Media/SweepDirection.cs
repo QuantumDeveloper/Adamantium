@@ -2,6 +2,6 @@ namespace Adamantium.UI.Media;
 
 public enum SweepDirection
 {
-    Clockwise,
-    CounterClockwise
+    CounterClockwise = 0,
+    Clockwise = 1,
 }

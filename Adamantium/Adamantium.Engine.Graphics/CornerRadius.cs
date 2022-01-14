@@ -1,13 +1,15 @@
+using System;
+
 namespace Adamantium.Engine.Graphics
 {
     public struct CornerRadius
     {
-        public CornerRadius(double value)
+        public CornerRadius(Double value)
         {
             TopLeft = TopRight = BottomRight = BottomLeft = value;
         }
 
-        public CornerRadius(double topLeft, double topRight, double bottomRight, double bottomLeft)
+        public CornerRadius(Double topLeft, Double topRight, Double bottomRight, Double bottomLeft)
         {
             TopLeft = topLeft;
             TopRight = topRight;
@@ -15,13 +17,13 @@ namespace Adamantium.Engine.Graphics
             BottomLeft = bottomLeft;
         }
         
-        public double TopLeft;
+        public Double TopLeft;
 
-        public double TopRight;
+        public Double TopRight;
 
-        public double BottomRight;
+        public Double BottomRight;
 
-        public double BottomLeft;
+        public Double BottomLeft;
         
         public override string ToString()
         {
