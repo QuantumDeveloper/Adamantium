@@ -21,6 +21,6 @@ public abstract class BezierSegmentBase : PathSegment
             cumulativeLength += vector.Length();
         }
 
-        return cumulativeLength / points.Length;
+        return cumulativeLength;
     }
 }

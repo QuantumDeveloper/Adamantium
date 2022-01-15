@@ -58,21 +58,6 @@ namespace Adamantium.Mathematics
       }
       
       /// <summary>
-      /// Initializes a new instance of the <see cref="Rectangle"/> struct.
-      /// </summary>
-      /// <param name="x">The left.</param>
-      /// <param name="y">The top.</param>
-      /// <param name="right">The width.</param>
-      /// <param name="bottom">The height.</param>
-      // public Rectangle(int x, int y, int right, int bottom)
-      // {
-      //    Left = x;
-      //    Top = y;
-      //    Right = right;
-      //    Bottom = bottom;
-      // }
-
-      /// <summary>
       /// Gets or sets the X position.
       /// </summary>
       /// <value>The X position.</value>
