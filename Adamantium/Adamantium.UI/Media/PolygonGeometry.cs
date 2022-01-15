@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Core;
+using Adamantium.Engine.Core;
 using Polygon = Adamantium.Mathematics.Polygon;
 
 namespace Adamantium.UI.Media;
@@ -70,26 +71,26 @@ public class PolygonGeometry : Geometry
     private void GenerateGeometry(IEnumerable<Vector2> points)
     {
         var geometryPoints = points as Vector2[] ?? points.ToArray();
-        var polygonItem = new PolygonItem(geometryPoints);
+        var meshContour = new MeshContour(geometryPoints);
         var polygon = new Polygon();
-        polygon.AddItem(polygonItem);
+        polygon.AddItem(meshContour);
         polygon.FillRule = FillRule;
         var result = polygon.Fill();
             
         Mesh.Clear();
         Mesh.SetPoints(result);
- 
+
         var strokePoints = new List<Vector2>();
         if (FillRule == FillRule.NonZero)
         {
-            polygonItem = new PolygonItem(geometryPoints);
-            polygonItem.SplitOnSegments();
-            polygonItem.CheckForSelfIntersection(FillRule.NonZero);
-            var orderedSegments = PolygonHelper.OrderSegments(polygonItem.Segments);
+            meshContour = new MeshContour(geometryPoints);
+            meshContour.RemoveSelfIntersections(FillRule.NonZero);
+            meshContour.UpdateSegmentsOrder();
+            //var orderedSegments = PolygonHelper.OrderSegments(meshContour.Segments);
                 
-            for (int i = 0; i < orderedSegments.Count; ++i)
+            for (int i = 0; i < meshContour.Segments.Count; ++i)
             {
-                strokePoints.Add(orderedSegments[i].Start);
+                strokePoints.Add(meshContour.Segments[i].Start);
             }
         }
         else

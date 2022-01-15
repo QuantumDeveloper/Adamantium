@@ -12,13 +12,13 @@ namespace Adamantium.UI.Media;
 
 public class PathGeometry : Geometry
 {
-    private readonly Dictionary<PathFigure, PolygonItem> figureToPolygon;
+    private readonly Dictionary<PathFigure, MeshContour> figureToPolygon;
     private Dictionary<PathFigure, Vector2[]> outlines;
     private Rect bounds;
     
     public PathGeometry()
     {
-        figureToPolygon = new Dictionary<PathFigure, PolygonItem>();
+        figureToPolygon = new Dictionary<PathFigure, MeshContour>();
         outlines = new Dictionary<PathFigure, Vector2[]>();
     }
 
@@ -92,8 +92,8 @@ public class PathGeometry : Geometry
         foreach (var figure in Figures)
         {
             figure.ProcessSegments();
-            var polygonItem = new PolygonItem(figure.Points);
-            figureToPolygon[figure] = polygonItem;
+            var meshContour = new MeshContour(figure.Points);
+            figureToPolygon[figure] = meshContour;
             var outlinePoints = figure.Points.ToArray();
             outlines[figure] = outlinePoints;
         }
@@ -111,7 +111,7 @@ public class PathGeometry : Geometry
 
         foreach (var outline in outlines)
         {
-            OutlineMesh.AddContour(Utilities.ToVector3(outline.Value), outline.Key.IsClosed);
+            OutlineMesh.AddContour(outline.Value, outline.Key.IsClosed);
         }
     }
 

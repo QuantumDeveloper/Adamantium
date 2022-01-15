@@ -32,7 +32,7 @@ namespace Adamantium.MathTests
             points.Add(new Vector2(20, 0));
 
             Polygon polygon = new Polygon();
-            polygon.AddItem(new PolygonItem(points));
+            polygon.AddItem(new MeshContour(points));
 
             var timer = Stopwatch.StartNew();
             Assert.IsTrue(PolygonHelper.IsPolygonConcave(polygon.MergedSegments), "polygon is not concave");
@@ -65,10 +65,9 @@ namespace Adamantium.MathTests
             points.Add(new Vector2(20, 20));
             points.Add(new Vector2(20, 0));
             points.Add(new Vector2(0, 0));
-            PolygonItem p = new PolygonItem(points);
-            p.SplitOnSegments();
-            var hasSelfIntersections = p.CheckForSelfIntersection(FillRule.NonZero);
-            Assert.IsTrue(!hasSelfIntersections, "polygon has selfintersections");
+            MeshContour p = new MeshContour(points);
+            p.RemoveSelfIntersections(FillRule.NonZero);
+            Assert.AreEqual(points.Count, p.Points.Length, "polygon has selfintersections");
         }
 
         [Test]
@@ -80,11 +79,9 @@ namespace Adamantium.MathTests
             points.Add(new Vector2(10, 0));
             points.Add(new Vector2(-15, 15));
             points.Add(new Vector2(15, 15));
-            PolygonItem p = new PolygonItem(points);
-            p.SplitOnSegments();
-            var hasSelfIntersections = p.CheckForSelfIntersection(FillRule.NonZero);
-            Assert.IsTrue(hasSelfIntersections, "polygon has no selfintersections");
-            Assert.AreEqual(p.SelfIntersectedPoints.Count, 5);
+            MeshContour p = new MeshContour(points);
+            p.RemoveSelfIntersections(FillRule.NonZero);
+            Assert.AreNotEqual(points.Count, p.Points.Length, "polygon has no selfintersections");
         }
 
         [Test]
@@ -319,7 +316,7 @@ namespace Adamantium.MathTests
             points.Add(new Vector2(-15, -15));
             points.Add(new Vector2(15, -15));
 
-            polygon.AddItem(new PolygonItem(points));
+            polygon.AddItem(new MeshContour(points));
 
             polygon.FillRule = FillRule.NonZero;
             var result = polygon.Fill();

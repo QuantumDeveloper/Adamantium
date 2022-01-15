@@ -85,11 +85,6 @@ public class CombinedGeometry : Geometry
         set => SetValue(GeometryCombineModeProperty, value);
     }
 
-    private readonly List<Vector2> selfIntersectedPoints = new ();
-    private readonly List<LineSegment2D> mergedSegments = new ();
-    private readonly List<Vector2> mergedPoints = new ();
-    private readonly HashSet<Vector2> mergedPointsHash = new ();
-
     public override void RecalculateBounds()
     {
         var points = OutlineMesh.MergeContourPoints();
@@ -101,18 +96,11 @@ public class CombinedGeometry : Geometry
         Geometry1.InvalidateGeometry();
         Geometry1?.ProcessGeometry();
         Geometry2?.ProcessGeometry();
-            
-        selfIntersectedPoints.Clear();
-        mergedSegments.Clear();
-        mergedPoints.Clear();
-        mergedPointsHash.Clear();
+
         Mesh.Clear();
         OutlineMesh.Clear();
         
-        // OutlineMesh1?.Clear();
-        // OutlineMesh2?.Clear();
-
-        if (Geometry1 != null)
+        if (Geometry1 is {IsClosed: true})
         {
             OutlineMesh1 = Geometry1.OutlineMesh;
             OutlineMesh1.SplitContoursOnSegments();
@@ -121,7 +109,7 @@ public class CombinedGeometry : Geometry
         else
             OutlineMesh1 = new Mesh();
 
-        if (Geometry2 != null)
+        if (Geometry2 is {IsClosed: true})
         {
             OutlineMesh2 = Geometry2.OutlineMesh;
             OutlineMesh2.SplitContoursOnSegments();
@@ -130,136 +118,40 @@ public class CombinedGeometry : Geometry
         else
             OutlineMesh2 = new Mesh();
             
-        if (CheckGeometryIntersections())
+        // TODO check case if 'null' (or default in other words) bounding box is inside the real one - will it count as intersection?
+        if (CheckGeometryBoundingBoxesIntersection())
         {
-            MergePoints();
-            MergeSegments();
-                
-            FindEdgeIntersectionPointsExtended(OutlineMesh1, OutlineMesh2, out var edgePoints);
-                
-            for (var k = 0; k < edgePoints.Count; ++k)
-            {
-                if (!selfIntersectedPoints.Contains(edgePoints[k]))
-                {
-                    selfIntersectedPoints.Add(edgePoints[k]);
-                }
-            }
-                
-            //UpdatePolygonUsingIntersectionPoints(edgePoints);
-                
-            if (GeometryCombineMode == GeometryCombineMode.Union)
-            {
-                var intersections = FindUnionPoints(OutlineMesh1, OutlineMesh2);
-                var intersections2 = FindUnionPoints(OutlineMesh2, OutlineMesh1);
-                UpdateMeshContoursUsingInterPoints(edgePoints, OutlineMesh1);
-                UpdateMeshContoursUsingInterPoints(edgePoints, OutlineMesh2);
-                
-                // intersections.AddRange(edgePoints);
-                // intersections2.AddRange(edgePoints);
-                
-                RemoveInternalSegments(intersections, OutlineMesh2);
-                RemoveInternalSegments(intersections2, OutlineMesh1);
+            // find all intersections and break all intersected segments on 2 parts
+            ProcessOutlinesIntersections(OutlineMesh1, OutlineMesh2);
 
-                var polygon = new Polygon();
-                foreach (var contour in OutlineMesh1.Contours)
-                {
-                    var polygonItem = new PolygonItem(contour.Points);
-                    polygon.AddItem(polygonItem);
-                    OutlineMesh.AddContour(contour.Points, contour.IsGeometryClosed);
-                }
+            // mark all segments as inner or outer relatively to other mesh
+            MarkSegments(OutlineMesh1, OutlineMesh2);
+            MarkSegments(OutlineMesh2, OutlineMesh1);
 
-                foreach (var contour in OutlineMesh2.Contours)
-                {
-                    var polygonItem = new PolygonItem(contour.Points);
-                    polygon.AddItem(polygonItem);
-                    OutlineMesh.AddContour(contour.Points, contour.IsGeometryClosed);
-                }
-                polygon.FillRule = FillRule.NonZero;
-                var points = polygon.Fill();
-                Mesh.SetPoints(points).Optimize();
-                mergedSegments.Clear();
-                mergedSegments.AddRange(OutlineMesh.MergeContourSegments());
-            }
-            else if (GeometryCombineMode == GeometryCombineMode.Intersect)
+            switch (GeometryCombineMode)
             {
-                var intersections = FindAllPossibleIntersections(OutlineMesh1, OutlineMesh2, edgePoints);
-                var segments = FindIntersectedSegments(intersections);
-                mergedPoints.Clear();
-                mergedPoints.AddRange(intersections);
-                mergedSegments.Clear();
-                mergedSegments.AddRange(segments);
-            }
-            else if (GeometryCombineMode == GeometryCombineMode.Exclude)
-            {
-                var intersections = FindGeometryIntersections(OutlineMesh1, OutlineMesh2, edgePoints);
-                    
-                var pointsToRemove = new List<Vector2>();
-                foreach (var meshPoint in OutlineMesh2.Points)
-                {
-                    pointsToRemove.Add((Vector2)meshPoint);
-                }
-
-                var intersections2 = FindGeometryIntersections(OutlineMesh2, OutlineMesh1,
-                    new List<Vector2>());
-                pointsToRemove.AddRange(intersections2);
-                pointsToRemove.AddRange(edgePoints);
-                var diff = intersections.Except(edgePoints).ToArray();
-                foreach (var pt in diff)
-                {
-                    pointsToRemove.Remove(pt);
-                }
-
-                RemoveInternalSegments(pointsToRemove);
-            }
-            else if (GeometryCombineMode == GeometryCombineMode.Xor)
-            {
-                var polygon = new Polygon();
-                foreach (var meshLayer in OutlineMesh1.Contours)
-                {
-                    var polygonItem = new PolygonItem(meshLayer.Points);
-                    polygon.AddItem(polygonItem);
-                }
-                polygon.FillRule = FillRule.EvenOdd;
-                var points = polygon.Fill();
-                Mesh.SetPoints(points).Optimize();
-                    
-                var ordered = PolygonHelper.OrderSegments(polygon.MergedSegments);
-                var orderedPoints = new List<Vector3>();
-                foreach (var segment2D in ordered)
-                {
-                    orderedPoints.Add((Vector3)segment2D.Start);
-                }
-                OutlineMesh.AddContour(orderedPoints, IsClosed);
-                if (polygon.MergedSegments.Count != 0)
-                {
-                    orderedPoints.Clear();
-                    foreach (var segment2D in ordered)
-                    {
-                        orderedPoints.Add((Vector3)segment2D.Start);
-                    }
-                        
-                    OutlineMesh.AddContour(orderedPoints, IsClosed);
-                }
+                case GeometryCombineMode.Union:
+                    OutlineMesh1.RemoveSegmentsByRule(true);
+                    OutlineMesh2.RemoveSegmentsByRule(true);
+                    break;
+                case GeometryCombineMode.Intersect:
+                    OutlineMesh1.RemoveSegmentsByRule(false);
+                    OutlineMesh2.RemoveSegmentsByRule(false);
+                    break;
+                case GeometryCombineMode.Exclude:
+                    OutlineMesh1.RemoveSegmentsByRule(true);
+                    OutlineMesh2.RemoveSegmentsByRule(false);
+                    break;
+                case GeometryCombineMode.Xor:
+                    OutlineMesh.Contours.AddRange(OutlineMesh1.Contours);
+                    OutlineMesh.Contours.AddRange(OutlineMesh2.Contours);
+                    break;
             }
         }
-            
-        // var points1 = OutlineMesh1.Points.ToList();
-        // points1.Add(points1[0]);
-        // var points2 = OutlineMesh2.Points.ToList();
-        // points2.Add(points2[0]);
-        // points1.AddRange(points2);
-        //OutlineMesh.SetPoints(points1);
 
-
-        // var pts = new List<Vector2>();
-        // foreach (var p in points1)
-        // {
-        //     pts.Add((Vector2)p);
-        // }
-            
-        if (GeometryCombineMode != GeometryCombineMode.Xor && GeometryCombineMode != GeometryCombineMode.Union)
+        if (GeometryCombineMode == GeometryCombineMode.Xor)
         {
-            var ordered = PolygonHelper.OrderSegments(mergedSegments);
+            /*var ordered = PolygonHelper.OrderSegments(mergedSegments);
             mergedPoints.Clear();
             foreach (var segment in ordered)
             {
@@ -275,467 +167,177 @@ public class CombinedGeometry : Geometry
             }
             points.AddRange(mergedPoints);
                 
+            
+            
             OutlineMesh.AddContour(Utilities.ToVector3(mergedPoints), IsClosed);
             var polygon1 = new Polygon();        
             polygon1.FillRule = FillRule.NonZero;
             ordered.AddRange(mergedSegments);
             var triangulated = polygon1.FillDirect(points, ordered);
-            Mesh.SetPoints(triangulated);
-        }
+            Mesh.SetPoints(triangulated);*/
             
-        // var polygon1 = new Polygon();
-        // polygon1.FillRule = FillRule.NonZero;
-        // //var points1 = polygon1.FillDirect(pts, mergedSegments);
-        // Mesh.SetPoints(points1).Optimize();
-        // //Mesh.SetPoints(mergedPoints);
-        // //Mesh.SetTopology(PrimitiveType.LineStrip);
-        //
-        // // TODO: fix issue with merged segments/points for XOR combine mode
-        // OutlineMesh = new Mesh();
-        // OutlineMesh.SetPoints(points1);
+            // EVEN ODD
+        }
+        else
+        {
+            // 1. Merge all points of all contours of all meshes.
+            // If point is already present, merge connected segments for it.
+
+            var mesh1Points = OutlineMesh1.MergeGeometryContourPoints();
+            var mesh2Points = OutlineMesh2.MergeGeometryContourPoints();
+
+            var mesh1PointDict = mesh1Points.ToDictionary(x => x.Coordinates);
+            
+            foreach (var point in mesh2Points)
+            {
+                if (mesh1PointDict.ContainsKey(point.Coordinates))
+                {
+                    mesh1PointDict[point.Coordinates].ConnectedSegments.AddRange(point.ConnectedSegments);
+                }
+                else
+                {
+                    mesh1PointDict.Add(point.Coordinates, point);
+                }
+            }
+
+            var mergedPoints = mesh1PointDict.Values.ToList();
+            
+            // 2. Form contours
+
+            while (mergedPoints.Count > 0)
+            {
+                var contour = new List<Vector2>();
+
+                var startContourPoint = mergedPoints.First();
+                var currentContourPoint = startContourPoint;
+                
+                do
+                {
+                    contour.Add(currentContourPoint.Coordinates);
+                    mergedPoints.Remove(currentContourPoint);
+                    currentContourPoint = currentContourPoint.ConnectedSegments.First().GetOtherEnd(currentContourPoint);
+                } while (currentContourPoint != startContourPoint);
+                
+                OutlineMesh.AddContour(contour, true);
+            }
+            
+            // NON ZERO
+        }
     }
 
-    private void MergePoints()
-    {
-        mergedPoints.Clear();
-        foreach (var point in OutlineMesh1.Points)
-        {
-            var p = (Vector2)point;
-            mergedPoints.Add(p);
-        }
-            
-        foreach (var point in OutlineMesh2.Points)
-        {
-            var p = (Vector2)point;
-            mergedPoints.Add(p);
-        }
-    }
-        
-    private void MergeSegments()
-    {
-        mergedSegments.Clear();
-        mergedSegments.AddRange(OutlineMesh1.MergeContourSegments());
-        mergedSegments.AddRange(OutlineMesh2.MergeContourSegments());
-    }
-        
-    private bool CheckGeometryIntersections()
+    private bool CheckGeometryBoundingBoxesIntersection()
     {
         var intersects = bounds1.Intersects(bounds2);
             
         return intersects;
     }
-    
-    private bool FindEdgeIntersectionPointsExtended(Mesh mesh1, Mesh mesh2, out List<Vector2> edgePoints)
+
+    private void ProcessOutlinesIntersections(Mesh mesh1, Mesh mesh2)
     {
-        edgePoints = new List<Vector2>();
         var mergedSegments1 = mesh1.MergeContourSegments();
         var mergedSegments2 = mesh2.MergeContourSegments();
+
+        mesh1.ClearContoursSegments();
+        mesh2.ClearContoursSegments();
+        
+        var intersectionsList = new Dictionary<Vector2, GeometryIntersection>();
+        var mesh1Intersections = new Dictionary<GeometrySegment, SortedList<double, GeometryIntersection>>();
+        var mesh2Intersections = new Dictionary<GeometrySegment, SortedList<double, GeometryIntersection>>();
+        
         foreach (var segment1 in mergedSegments1)
         {
+            mesh1Intersections[segment1] = new SortedList<double, GeometryIntersection>();
+            
             foreach (var segment2 in mergedSegments2)
             {
-                var seg1 = segment1;
-                var seg2 = segment2;
-                if (Collision2D.SegmentSegmentIntersection(ref seg1, ref seg2, out var point))
-                {
-                    if (!edgePoints.Contains(point))
-                    {
-                        edgePoints.Add(point);
-                    }
-                }
-            }
-        }
-        
-        return edgePoints.Count > 0;
-    }
-        
-    // private bool FindEdgeIntersectionPoints(Mesh mesh1, Mesh mesh2, out List<Vector2> edgePoints)
-    // {
-    //     edgePoints = new List<Vector2>();
-    //     for (var i = 0; i < mesh1.Segments.Length; i++)
-    //     {
-    //         for (var j = 0; j < mesh2.Segments.Length; j++)
-    //         {
-    //             var segment1 = mesh1.Segments[i];
-    //             var segment2 = mesh2.Segments[j];
-    //             if (Collision2D.SegmentSegmentIntersection(ref segment1, ref segment2, out var point))
-    //             {
-    //                 if (!edgePoints.Contains(point))
-    //                 {
-    //                     edgePoints.Add(point);
-    //                 }
-    //             }
-    //         }
-    //     }
-    //
-    //     return edgePoints.Count > 0;
-    // }
-        
-    /// <summary>
-    /// Updates segments for polygons using self Intersection points
-    /// </summary>
-    /// <param name="intersectionPoints">Self intersection points</param>
-    private void UpdatePolygonUsingIntersectionPoints(List<Vector2> intersectionPoints)
-    {
-        if (intersectionPoints.Count == 0)
-        {
-            return;
-        }
-
-        foreach (var contour in OutlineMesh1.Contours)
-        {
-            UpdateContourBasedOnIntersectionPoints(intersectionPoints, contour);
-        }
-        
-        foreach (var contour in OutlineMesh2.Contours)
-        {
-            UpdateContourBasedOnIntersectionPoints(intersectionPoints, contour);
-        }
-    }
-
-    private void UpdateContourBasedOnIntersectionPoints(List<Vector2> intersectionPoints, MeshContour contour)
-    {
-        var tempSegments = new List<LineSegment2D>(contour.Segments);
-        for (var i = 0; i < intersectionPoints.Count; i++)
-        {
-            var interPoint = intersectionPoints[i];
-            if (!PolygonHelper.GetSegmentsFromPoint(tempSegments, interPoint, out var segments)) continue;
+                mesh2Intersections[segment2] = new SortedList<double, GeometryIntersection>();
                 
-            for (var j = 0; j < segments.Count; j++)
-            {
-                var segment = segments[j];
+                if (Collision2D.SegmentSegmentIntersection(segment1, segment2, out var point))
+                {
+                    if (point != segment1.Start && point != segment1.End)
+                    {
+                        if (!intersectionsList.ContainsKey(point))
+                        {
+                            intersectionsList[point] = new GeometryIntersection(point);
+                        }
+                        
+                        var distanceToStart = (point - segment1.Start).Length();
+                        mesh1Intersections[segment1].Add(distanceToStart, intersectionsList[point]);
+                    }
                     
-                if (MathHelper.WithinEpsilon(interPoint, segment.Start, Polygon.Epsilon) ||
-                    MathHelper.WithinEpsilon(interPoint, segment.End, Polygon.Epsilon))
-                {
-                    continue;
-                }
-
-                var index = tempSegments.IndexOf(segment);
-                tempSegments.RemoveAt(index);
-                var seg1 = new LineSegment2D(segment.Start, interPoint);
-                if (PolygonHelper.InsertSegment(tempSegments, seg1, index))
-                {
-                    index++;
-                }
-
-                var seg2 = new LineSegment2D(interPoint, segment.End);
-                PolygonHelper.InsertSegment(tempSegments, seg2, index);
-            }
-        }
-        
-        UpdateContourPoints(tempSegments, contour);
-    }
-        
-    /// <summary>
-    /// Remove all segments based on intersection points in case of Non-Zero rule
-    /// </summary>
-    /// <param name="interPoints"></param>
-    private void RemoveInternalSegments(List<Vector2> interPoints)
-    {
-        for (var i = 0; i < interPoints.Count; i++)
-        {
-            for (var j = 0; j < interPoints.Count; j++)
-            {
-                var point1 = interPoints[i];
-                var point2 = interPoints[j];
-                if (MathHelper.WithinEpsilon(point1, point2, Polygon.Epsilon))
-                { continue; }
-
-                if (PolygonHelper.IsConnectedInvariant(point1, point2, mergedSegments, out var segment2D))
-                {
-                    mergedSegments.Remove(segment2D);
-                }
-            }
-        }
-        UpdateMergedPoints();
-    }
-    
-    private void UpdateMeshContoursUsingInterPoints(List<Vector2> intersectionPoints, Mesh mesh)
-    {
-        foreach (var contour in mesh.Contours)
-        {
-            var tempSegments = contour.Segments.ToList();
-            foreach (var interPoint in intersectionPoints)
-            {
-                if (!PolygonHelper.GetSegmentsFromPoint(tempSegments, interPoint, out var segments)) continue;
-                
-                for (var j = 0; j < segments.Count; j++)
-                {
-                    var segment = segments[j];
-                    
-                    if (MathHelper.WithinEpsilon(interPoint, segment.Start, Polygon.Epsilon) ||
-                        MathHelper.WithinEpsilon(interPoint, segment.End, Polygon.Epsilon))
+                    if (point != segment2.Start && point != segment2.End)
                     {
-                        continue;
-                    }
-
-                    var index = tempSegments.IndexOf(segment);
-                    tempSegments.RemoveAt(index);
-                    var seg1 = new LineSegment2D(segment.Start, interPoint);
-                    if (PolygonHelper.InsertSegment(tempSegments, seg1, index))
-                    {
-                        index++;
-                    }
-
-                    var seg2 = new LineSegment2D(interPoint, segment.End);
-                    PolygonHelper.InsertSegment(tempSegments, seg2, index);
-                }
-            }
-        
-            UpdateContourPoints(tempSegments, contour);
-        }
-    }
-    
-    private void RemoveInternalSegments(List<Vector2> interPoints, Mesh mesh)
-    {
-        var newContours = new List<MeshContour>(); 
-        foreach (var contour in mesh.Contours)
-        {
-            var segments = contour.Segments.ToList();
-            foreach (var interPoint in interPoints)
-            {
-                if (PolygonHelper.GetSegmentsFromPoint(segments, interPoint, out var foundSegments))
-                {
-                    foreach (var segment in foundSegments)
-                    {
-                        segments.Remove(segment);
+                        if (!intersectionsList.ContainsKey(point))
+                        {
+                            intersectionsList[point] = new GeometryIntersection(point);
+                        }
+                        
+                        var distanceToStart = (point - segment2.Start).Length();
+                        mesh2Intersections[segment2].Add(distanceToStart, intersectionsList[point]);
                     }
                 }
             }
-
-            var segmentGroups = PolygonHelper.GetSegmentGroups(segments);
-
-            foreach (var group in segmentGroups)
-            {
-                if (group.Segments.Count <= 1) continue;
-                var newContour = new MeshContour();
-                newContour.IsGeometryClosed = contour.IsGeometryClosed;
-                UpdateContourPoints(group.Segments, newContour);
-                newContours.Add(newContour);
-            }
         }
 
-        mesh.Contours.Clear();
-        mesh.AddContours(newContours);
+        FillMeshSegments(mesh1Intersections);
+        FillMeshSegments(mesh2Intersections);
+        
+        mesh1.UpdateContoursPoints();
+        mesh2.UpdateContoursPoints();
     }
     
-    private List<LineSegment2D> FindIntersectedSegments(List<Vector2> interPoints)
+    private void FillMeshSegments(Dictionary<GeometrySegment, SortedList<double, GeometryIntersection>> meshIntersections)
     {
-        var segments = new List<LineSegment2D>();
-        for (var i = 0; i < interPoints.Count; i++)
+        foreach (var (key, value) in meshIntersections)
         {
-            for (var j = 0; j < interPoints.Count; j++)
+            if (value.Count == 0)
             {
-                var point1 = interPoints[i];
-                var point2 = interPoints[j];
-                if (MathHelper.WithinEpsilon(point1, point2, Polygon.Epsilon))
-                { continue; }
-
-                if (PolygonHelper.IsConnectedInvariant(point1, point2, mergedSegments, out var segment2D))
-                {
-                    mergedSegments.Remove(segment2D);
-                    segments.Add(segment2D);
-                }
+                key.Parent.Segments.Add(key);
+                continue;
             }
+
+            key.RemoveSelfFromConnectedSegments();
+
+            var startPart = new GeometrySegment(key.SegmentEnds[0], value.Values.First());
+            key.Parent.Segments.Add(startPart);
+
+            for (var i = 0; i < value.Values.Count - 1; i++)
+            {
+                var int1 = value.Values[i];
+                var int2 = value.Values[i + 1];
+
+                var seg = new GeometrySegment(int1, int2);
+                key.Parent.Segments.Add(seg);
+            }
+            
+            var endPart = new GeometrySegment(value.Values.Last(), key.SegmentEnds[1]);
+            key.Parent.Segments.Add(endPart);
         }
-        //UpdateMergedPoints();
-        return segments;
     }
-        
-    private List<Vector2> FindUnionPoints(Mesh mesh1, Mesh mesh2)
+
+    private void MarkSegments(Mesh mesh1, Mesh mesh2)
     {
-        var interPoints = new List<Vector2>();
         var mesh1Segments = mesh1.MergeContourSegments();
-        var mesh2Points = mesh2.MergeContourPoints();
+        var mesh2Points = mesh2.MergeGeometryContourPoints();
 
-        for (var k = 0; k < mesh2Points.Count; k++)
+        foreach (var point in mesh2Points)
         {
-            var currentPoint = (Vector2)mesh2Points[k];
-            var ray = new Ray2D(new Vector2(bounds1.X, currentPoint.Y), Vector2.UnitX);
-            var localPoints = new List<Vector2>();
-            for (var i = 0; i < mesh1Segments.Count; i++)
+            var ray = new Ray2D(point.Coordinates, Vector2.UnitX);
+            var intersectionCnt = 0;
+            
+            foreach (var segment in mesh1Segments)
             {
-                var segment = mesh1Segments[i];
-                if (Collision2D.RaySegmentIntersection(ref ray, ref segment, out Vector2 point))
-                {
-                    localPoints.Add(Vector2.Round(point, Mesh.RoundPrecision));
-                }
+                var seg = new LineSegment2D(segment);
+                if (Collision2D.RaySegmentIntersection(ref ray, ref seg, out var intPoint) && point.Coordinates != intPoint) ++intersectionCnt;
             }
-            localPoints.Add(currentPoint);
 
-            localPoints.Sort(HorizontalPointsComparer.Default);
-            for (int l = 0; l < localPoints.Count; l++)
+            if (intersectionCnt % 2 != 0)
             {
-                if (localPoints[l] == currentPoint && l % 2 != 0)
+                foreach (var segment in point.ConnectedSegments)
                 {
-                    interPoints.Add(currentPoint);
-                    break;
+                    segment.IsInnerSegment = true;
                 }
             }
         }
-
-        return interPoints;
     }
-    
-    private class HorizontalPointsComparer : IComparer<Vector2>
-    {
-        public static HorizontalPointsComparer Default => new HorizontalPointsComparer();
-
-        public int Compare(Vector2 x, Vector2 y)
-        {
-            if (MathHelper.WithinEpsilon(x.X, y.X, MathHelper.ZeroToleranceD))
-            {
-                return 0;
-            }
-
-            return x.X < y.X ? -1 : 1;
-        }
-    }
-        
-    /// <summary>
-    /// Find all possible intersections between 2 polygons including intersection points and remove all merged segments 
-    /// if any of 2 points are connected as segments. This needs for Non-zero rule to remove all inner segments between 2 polygons to correctly triangulate them
-    /// </summary>
-    /// <param name="mesh1">first polygon</param>
-    /// <param name="mesh2">second polygon</param>
-    /// <param name="edgePoints">intersection points between 2 polygons, which were found earlier on previous step</param>
-    /// <returns>Collection of intersection points, including points, which is not lying on segments, but also inside polygons.</returns>
-    /// <remarks>During running this method, it will remove all merged segments from <see cref="Polygon"/> if some of its segments contains both intersection points</remarks>
-    private List<Vector2> FindAllPossibleIntersections(Mesh mesh1, Mesh mesh2, List<Vector2> edgePoints)
-    {
-        var allIntersections = new List<Vector2>(edgePoints);
-        var contourPoints1 = mesh1.MergeContourPoints();
-        var contourPoints2 = mesh2.MergeContourPoints();
-
-        var mergedSegments1 = mesh1.MergeContourSegments();
-        var mergedSegments2 = mesh2.MergeContourSegments();
-        
-        foreach (var p in contourPoints1)
-        {
-            var point = (Vector2)p;
-            if (Collision2D.IsPointInsideArea(point, mergedSegments2) &&
-                !allIntersections.Contains(point))
-            {
-                allIntersections.Add(point);
-            }
-        }
-        foreach (var p in contourPoints2)
-        {
-            var point = (Vector2)p;
-            if (Collision2D.IsPointInsideArea(point, mergedSegments1) &&
-                !allIntersections.Contains(point))
-            {
-                allIntersections.Add(point);
-            }
-        }
-
-        return allIntersections;
-    }
-        
-    private List<Vector2> FindGeometryIntersections(Mesh mesh1, Mesh mesh2, List<Vector2> edgePoints)
-    {
-        var allIntersections = new List<Vector2>(edgePoints);
-        var mesh1Segments = mesh1.MergeContourSegments();
-        var mesh2Points = mesh2.MergeContourPoints();
-        
-        for (var i = 0; i < mesh2Points.Count; i++)
-        {
-            var point = (Vector2)mesh2Points[i];
-            if (Collision2D.IsPointInsideArea(point, mesh1Segments) &&
-                !allIntersections.Contains(point))
-            {
-                allIntersections.Add(point);
-            }
-        }
-
-        return allIntersections;
-    }
-    
-    private void UpdateContourPoints(IEnumerable<LineSegment2D> segments, MeshContour contour)
-    {
-        var pointsHash = new HashSet<Vector2>();
-        var points = new List<Vector2>();
-        foreach (var segment in segments)
-        {
-            if (!pointsHash.Contains(segment.Start))
-            {
-                points.Add(segment.Start);
-                pointsHash.Add(segment.Start);
-            }
-
-            if (!pointsHash.Contains(segment.End))
-            {
-                points.Add(segment.End);
-                pointsHash.Add(segment.End);
-            }
-        }
-        contour.SetOrUpdatePoints(points);
-    }
-
-
-    private void UpdateMergedPoints()
-    {
-        mergedPoints.Clear();
-        mergedPointsHash.Clear();
-        for (var i = 0; i < mergedSegments.Count; ++i)
-        {
-            var segment = mergedSegments[i];
-            if (!mergedPointsHash.Contains(segment.Start))
-            {
-                mergedPoints.Add(segment.Start);
-                mergedPointsHash.Add(segment.Start);
-            }
-
-            if (!mergedPointsHash.Contains(segment.End))
-            {
-                mergedPoints.Add(segment.End);
-                mergedPointsHash.Add(segment.End);
-            }
-        }
-    }
-
-    private void UpdateContourPoints(List<LineSegment2D> segments, MeshContour contour)
-    {
-        var hash = new HashSet<Vector2>();
-        var points = new List<Vector2>();
-        foreach (var segment in segments)
-        {
-            if (!hash.Contains(segment.Start))
-            {
-                points.Add(segment.Start);
-                hash.Add(segment.Start);
-            }
-
-            if (!hash.Contains(segment.End))
-            {
-                points.Add(segment.End);
-                hash.Add(segment.End);
-            }
-        }
-
-        contour.SetOrUpdatePoints(points);
-    }
-    
-    // private void UpdateMeshPoints(Mesh mesh)
-    // {
-    //     var hash = new HashSet<Vector2>();
-    //     var points = new List<Vector2>();
-    //     foreach (var segment in mesh.Segments)
-    //     {
-    //         if (!hash.Contains(segment.Start))
-    //         {
-    //             points.Add(segment.Start);
-    //             hash.Add(segment.Start);
-    //         }
-    //
-    //         if (!hash.Contains(segment.End))
-    //         {
-    //             points.Add(segment.End);
-    //             hash.Add(segment.End);
-    //         }
-    //     }
-    //
-    //     mesh.SetPoints(points);
-    // }
 }

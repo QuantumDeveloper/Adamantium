@@ -49,72 +49,86 @@ namespace Adamantium.Mathematics
         /// </remarks>
         public static List<Vector3> Triangulate(Polygon polygon)
         {
+            var additionalRayIntersections = new Dictionary<GeometrySegment, SortedList<double, GeometryIntersection>>();
+            
             var rays = new List<Ray2D>();
             var sortedY = new List<double>();
-            var rayIntersectionPoints = new List<Vector2[]>();
+            var sortedYHashSet = new HashSet<double>();
+            var raysIntersectionPoints = new List<GeometryIntersection[]>();
             var interPoints = new List<Vector2>();
             
-            var sortedList = polygon.SortPoints();
+            var verticallySortedPointList = polygon.SortPoints();
             var ray = new Ray2D(Vector2.Zero, Vector2.UnitX);
-            var mostLeftPoint = polygon.HighestPoint.X;
-            for (var i = 0; i < sortedList.Count; ++i)
+            var leftmostXCoord = polygon.LeftmostXCoord;
+            for (var i = 0; i < verticallySortedPointList.Count; ++i)
             {
-                var point = sortedList[i];
-                if (point.Y == 93)
-                {
-                    int bug = 0;
-                }
-                if (sortedY.Contains(point.Y) || IsSimilarTo(point.Y, sortedY))
+                var point = verticallySortedPointList[i];
+                if (sortedYHashSet.Contains(point.Coordinates.Y) || IsSimilarTo(point.Coordinates.Y, sortedY))
                 {
                     continue;
                 }
 
-                sortedY.Add(point.Y);
-                ray.Origin = new Vector2(mostLeftPoint, point.Y);
+                sortedY.Add(point.Coordinates.Y);
+                sortedYHashSet.Add(point.Coordinates.Y);
+                ray.Origin = new Vector2(leftmostXCoord, point.Coordinates.Y);
                 rays.Add(ray);
 
-                var rayPoints = new List<Vector2>();
+                var rayPoints = new List<GeometryIntersection>();
                 for (var j = 0; j < polygon.MergedSegments.Count; ++j)
                 {
                     var segment = polygon.MergedSegments[j];
-                    if (!Collision2D.RaySegmentIntersection(ref ray, ref segment, out var interPoint)) continue;
+
+                    if (!Collision2D.RaySegmentIntersection(ref ray, segment, out var interPoint)) continue;
                     
                     // We need to filter points very close to each other to avoid producing incorrect results during generation of triangles
-                    
-                    if (IsXPointSimilarTo(interPoint, rayPoints)) continue;
-                    
-                    if (!IsSimilarTo(interPoint, interPoints) && !IsSimilarTo(interPoint, polygon.MergedPoints))
+                    if (IsXPointSimilarTo(interPoint, rayPoints) || IsSimilarTo(interPoint, interPoints)) continue;
+
+                    if (!IsSimilarTo(interPoint, polygon.MergedPoints, out var geometryIntersection))
                     {
                         interPoints.Add(interPoint);
+                        geometryIntersection = new GeometryIntersection(interPoint);
+                        var distanceToStart = (interPoint - segment.Start).Length();
+
+                        if (!additionalRayIntersections.ContainsKey(segment))
+                        {
+                            additionalRayIntersections[segment] = new SortedList<double, GeometryIntersection>();
+                        }
+
+                        additionalRayIntersections[segment].Add(distanceToStart, geometryIntersection);
                     }
                     //Ray points should be added here because they needed for rayIntersectionPoints and if this collection will be empty
                     //it will affect triangulation results
-                    rayPoints.Add(interPoint);
+                    rayPoints.Add(geometryIntersection);
                 }
 
-                rayPoints.Sort(VertexHorizontalComparer.Defaut);
-                rayIntersectionPoints.Add(rayPoints.ToArray());
+                rayPoints.Sort(VertexGeometryHorizontalComparer.Defaut);
+                raysIntersectionPoints.Add(rayPoints.ToArray());
             }
 
-            polygon.UpdatePolygonUsingRayInterPoints(interPoints);
+            polygon.UpdatePolygonUsingAdditionalRayInterPoints(additionalRayIntersections);
 
             var finalTriangles = new List<Vector3>();
             for (var i = 0; i < rays.Count - 1; ++i)
             {
-                var upperInterPoints = rayIntersectionPoints[i];
-                var lowerInterPoints = rayIntersectionPoints[i + 1];
+                var upperInterPoints = raysIntersectionPoints[i];
+                var lowerInterPoints = raysIntersectionPoints[i + 1];
 
                 //find all connected segments which will represent start and end of triangulation sequence
-                var startEndSegments = new List<LineSegment2D>();
+                var startEndSegments = new List<GeometrySegment>();
                 for (var j = 0; j < upperInterPoints.Length; j++)
                 {
                     for (var k = 0; k < lowerInterPoints.Length; k++)
                     {
                         var upperPoint = upperInterPoints[j];
                         var lowerPoint = lowerInterPoints[k];
-                        if (PolygonHelper.IsConnected(upperPoint, lowerPoint, polygon.MergedSegments))
+
+                        foreach (var segment in upperPoint.ConnectedSegments)
                         {
-                            startEndSegments.Add(new LineSegment2D(upperPoint, lowerPoint));
+                            if (segment.GetOtherEnd(upperPoint) == lowerPoint)
+                            {
+                                startEndSegments.Add(new GeometrySegment(upperPoint, lowerPoint));
+                                break;
+                            }
                         }
                     }
                 }
@@ -160,15 +174,28 @@ namespace Adamantium.Mathematics
             }
             return false;
         }
+        
+        private static bool IsSimilarTo(Vector2 point, List<GeometryIntersection> lst, out GeometryIntersection similarPoint)
+        {
+            similarPoint = null;
+            
+            for (var i = 0; i < lst.Count; ++i)
+            {
+                if (MathHelper.WithinEpsilon(point, lst[i].Coordinates, Polygon.Epsilon))
+                {
+                    similarPoint = lst[i];
+                    return true;
+                }
+            }
 
-        /// <summary>
-        /// Check if Y point difference between another in list is near <see cref="Polygon.Epsilon"/> value
-        /// </summary>
-        private static bool IsXPointSimilarTo(Vector2 point, List<Vector2> lst)
+            return false;
+        }
+
+        private static bool IsXPointSimilarTo(Vector2 point, List<GeometryIntersection> lst)
         {
             for (var i = 0; i < lst.Count; ++i)
             {
-                if (MathHelper.WithinEpsilon(point.X, lst[i].X, Polygon.Epsilon))
+                if (MathHelper.WithinEpsilon(point.X, lst[i].Coordinates.X, Polygon.Epsilon))
                 {
                     return true;
                 }
@@ -182,7 +209,7 @@ namespace Adamantium.Mathematics
         /// <param name="trianglesList"></param>
         /// <param name="startSegment2D"></param>
         /// <param name="endSegment2D"></param>
-        private static void CreateTriangles(List<Vector3> trianglesList, LineSegment2D startSegment2D, LineSegment2D endSegment2D)
+        private static void CreateTriangles(List<Vector3> trianglesList, GeometrySegment startSegment2D, GeometrySegment endSegment2D)
         {
             if (MathHelper.IsClockwise(startSegment2D.Start, endSegment2D.Start, endSegment2D.End, Vector3.BackwardRH))
             {
@@ -200,21 +227,18 @@ namespace Adamantium.Mathematics
             }
         }
 
-        /// <summary>
-        /// Sort points vertically to form correct points sequence for triangulation 
-        /// </summary>
-        private class VertexHorizontalComparer : IComparer<Vector2>
+        private class VertexGeometryHorizontalComparer : IComparer<GeometryIntersection>
         {
-            public static VertexHorizontalComparer Defaut => new VertexHorizontalComparer();
+            public static VertexGeometryHorizontalComparer Defaut => new ();
 
-            public int Compare(Vector2 x, Vector2 y)
+            public int Compare(GeometryIntersection x, GeometryIntersection y)
             {
-                if (MathHelper.WithinEpsilon(x.X, y.X, Polygon.Epsilon))
+                if (MathHelper.WithinEpsilon(x.Coordinates.X, y.Coordinates.X, Polygon.Epsilon))
                 {
                     return 0;
                 }
 
-                return x.X < y.X ? -1 : 1;
+                return x.Coordinates.X < y.Coordinates.X ? -1 : 1;
             }
         }
 

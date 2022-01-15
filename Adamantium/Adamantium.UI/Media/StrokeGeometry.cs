@@ -47,7 +47,7 @@ public class StrokeGeometry : Geometry
       for (var i = 0; i < geometry.OutlineMesh.Contours.Count; i++)
       {
          var layer = geometry.OutlineMesh.GetContour(i);
-         strokes.AddRange(GenerateStroke(Utilities.ToVector2(layer.Points), layer.IsGeometryClosed)); 
+         strokes.AddRange(GenerateStroke(layer.Points, layer.IsGeometryClosed)); 
       }
 
       Mesh.SetPoints(strokes);
@@ -90,20 +90,20 @@ public class StrokeGeometry : Geometry
          points = pointList.ToArray();
       }
 
-      List<PolygonItem> polygonItems;
+      List<MeshContour> meshContours;
          
       if (pen.DashStrokeArray == null || pen.DashStrokeArray.Count == 0)
       {
-         polygonItems = GenerateStroke(points, pen, isGeometryClosed, zeroLineDir);
+         meshContours = GenerateStroke(points, pen, isGeometryClosed, zeroLineDir);
       }
       else
       {
-         polygonItems = GenerateDashes(points, pen, isGeometryClosed);
+         meshContours = GenerateDashes(points, pen, isGeometryClosed);
       }
 
       var vertices = new List<Vector3>();
 
-      foreach (var polygonItem in polygonItems)
+      foreach (var polygonItem in meshContours)
       {
          var polygon = new Polygon();
          polygon.AddItem(polygonItem);
@@ -114,17 +114,17 @@ public class StrokeGeometry : Geometry
       return vertices;
    }
 
-   private List<PolygonItem> GenerateDashes(Vector2[] points, Pen pen, bool isGeometryClosed)
+   private List<MeshContour> GenerateDashes(Vector2[] points, Pen pen, bool isGeometryClosed)
    {
-      var polygonItems = new List<PolygonItem>();
+      var meshContours = new List<MeshContour>();
       var dashesData = SplitGeometryToDashes(points, pen, isGeometryClosed);
 
       foreach (var dashData in dashesData)
       {
-         polygonItems.AddRange(GenerateStroke(dashData.Points.ToArray(), pen, false, dashData.Direction));
+         meshContours.AddRange(GenerateStroke(dashData.Points.ToArray(), pen, false, dashData.Direction));
       }
 
-      return polygonItems;
+      return meshContours;
    }
       
    private double GetGeometryLength(Vector2[] points, bool isGeometryClosed)
@@ -511,12 +511,12 @@ public class StrokeGeometry : Geometry
       return start + offsetFromStartOfSegment * direction;
    }
 
-   private List<PolygonItem> GenerateStroke(Vector2[] points, Pen pen, bool isGeometryClosed, Vector2? zeroLengthLineDirection = null)
+   private List<MeshContour> GenerateStroke(Vector2[] points, Pen pen, bool isGeometryClosed, Vector2? zeroLengthLineDirection = null)
    {
       // check if geometry is valid
-      if (points.Length < 2) return new List<PolygonItem>();
+      if (points.Length < 2) return new List<MeshContour>();
 
-      var polygonItems = new List<PolygonItem>();
+      var meshContours = new List<MeshContour>();
       var strokeSegments = new List<StrokeSegment>();
 
       // corner case - if line has zero length
@@ -573,9 +573,9 @@ public class StrokeGeometry : Geometry
          }
       }
          
-      polygonItems.AddRange(GenerateStrokeJoinsAndCaps(strokeSegments, pen, isGeometryClosed));
+      meshContours.AddRange(GenerateStrokeJoinsAndCaps(strokeSegments, pen, isGeometryClosed));
 
-      return polygonItems;
+      return meshContours;
    }
 
    private List<Vector2> GenerateCapOutline(PenLineCap capType, Vector2 geometryBasePoint, Vector2 capBasePoint1, Vector2 capBasePoint2, Vector2 capDirection, double thickness)
@@ -703,13 +703,13 @@ public class StrokeGeometry : Geometry
    /// <param name="isTopStrokeOutlinePart">Indicates if we are dealing with top stroke outline part</param>
    /// <param name="penLineJoin">Join type</param>
    /// <exception cref="ArgumentException">This exception will be thrown on unhandled join type</exception>
-   private List<PolygonItem> GenerateStrokeJoinsAndCaps(List<StrokeSegment> strokeSegments, Pen pen, bool isGeometryClosed)
+   private List<MeshContour> GenerateStrokeJoinsAndCaps(List<StrokeSegment> strokeSegments, Pen pen, bool isGeometryClosed)
    {
-      var polygonItems = new List<PolygonItem>();
+      var meshContours = new List<MeshContour>();
 
       for (var i = 0; i < strokeSegments.Count; i++)
       {
-         var polygonPoints = new List<Vector2>();
+         var contourPoints = new List<Vector2>();
          var startCapPoints = new List<Vector2>();
          var endCapPoints = new List<Vector2>();
 
@@ -744,14 +744,14 @@ public class StrokeGeometry : Geometry
          }
             
          // compose stroke segment (include caps if they are present)
-         polygonPoints.AddRange(startCapPoints);
-         polygonPoints.Add(strokeSegments[i].TopSegment.Start);
-         polygonPoints.Add(strokeSegments[i].TopSegment.End);
-         polygonPoints.AddRange(endCapPoints);
-         polygonPoints.Add(strokeSegments[i].BottomSegment.End);
-         polygonPoints.Add(strokeSegments[i].BottomSegment.Start);
+         contourPoints.AddRange(startCapPoints);
+         contourPoints.Add(strokeSegments[i].TopSegment.Start);
+         contourPoints.Add(strokeSegments[i].TopSegment.End);
+         contourPoints.AddRange(endCapPoints);
+         contourPoints.Add(strokeSegments[i].BottomSegment.End);
+         contourPoints.Add(strokeSegments[i].BottomSegment.Start);
                
-         polygonItems.Add(new PolygonItem(polygonPoints));
+         meshContours.Add(new MeshContour(contourPoints));
 
          var nextIndex = i + 1;
 
@@ -817,10 +817,10 @@ public class StrokeGeometry : Geometry
                throw new ArgumentException("Unhandled stroke join type");
          }
             
-         polygonItems.Add(new PolygonItem(joinPoints));
+         meshContours.Add(new MeshContour(joinPoints));
       }
 
-      return polygonItems;
+      return meshContours;
    }
       
    public override Geometry Clone()
