@@ -513,7 +513,7 @@ namespace Adamantium.Engine.Graphics
       /// </summary>
       /// <param name="typeT">The type T.</param>
       /// <returns>The equivalent Format.</returns>
-      /// <exception cref="System.NotSupportedException">If the convertion for this type is not supported.</exception>
+      /// <exception cref="System.NotSupportedException">If the conversion for this type is not supported.</exception>
       public static Format GetFormatFromType(Type typeT)
       {
          if (typeof(Vector4F) == typeT || typeof(Color4F) == typeT || typeof(RectangleF) == typeT)

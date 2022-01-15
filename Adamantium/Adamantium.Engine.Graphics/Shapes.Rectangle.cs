@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using Adamantium.Core;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Models;
 using Adamantium.Mathematics;
@@ -49,7 +51,7 @@ namespace Adamantium.Engine.Graphics
                 var min = Math.Min(width, height);
                 ValidateCorners(ref corners, min);
 
-                var vertices = new List<Vector2>();
+                var vertices = new List<Vector3>();
 
                 var halfWidth = width / 2;
                 var halfHeight = height / 2;
@@ -63,7 +65,7 @@ namespace Adamantium.Engine.Graphics
                 }
                 else
                 {
-                    vertices.Add(new Vector2(-halfWidth, -halfHeight));
+                    vertices.Add(new Vector3(-halfWidth, -halfHeight));
                 }
 
                 if (corners.TopRight > 0)
@@ -75,7 +77,7 @@ namespace Adamantium.Engine.Graphics
                 }
                 else
                 {
-                    vertices.Add(new Vector2(halfWidth, -halfHeight));
+                    vertices.Add(new Vector3(halfWidth, -halfHeight));
                 }
 
                 if (corners.BottomRight > 0)
@@ -87,7 +89,7 @@ namespace Adamantium.Engine.Graphics
                 }
                 else
                 {
-                    vertices.Add(new Vector2(halfWidth, halfHeight));
+                    vertices.Add(new Vector3(halfWidth, halfHeight));
                 }
 
                 if (corners.BottomLeft > 0)
@@ -99,7 +101,12 @@ namespace Adamantium.Engine.Graphics
                 }
                 else
                 {
-                    vertices.Add(new Vector2(-halfWidth, halfHeight));
+                    vertices.Add(new Vector3(-halfWidth, halfHeight));
+                }
+
+                if (transform is { IsIdentity: false })
+                {
+                    vertices = Mesh.ApplyTransform(vertices, transform.Value).ToList();
                 }
 
                 Mesh mesh = new Mesh();
@@ -115,7 +122,6 @@ namespace Adamantium.Engine.Graphics
                 {
                     mesh.SetPoints(vertices);
                 }
-                //mesh.GenerateBasicIndices().Optimize();
                 mesh.GenerateBasicIndices();
 
                 var uvs = new List<Vector2F>();
@@ -126,7 +132,7 @@ namespace Adamantium.Engine.Graphics
                     uvs.Add(new Vector2F(u, v));
                 }
                 
-                mesh.SetUVs(0, uvs).ApplyTransform(transform);
+                mesh.SetUVs(0, uvs);
 
                 return mesh;
             }
@@ -136,7 +142,7 @@ namespace Adamantium.Engine.Graphics
                 float startAngle,
                 Vector2 center,
                 Vector2 radius,
-                List<Vector2> vertices)
+                List<Vector3> vertices)
             {
                 var angleItem = -MathHelper.DegreesToRadians(rectangleSector / tessellation);
                 var angle = MathHelper.DegreesToRadians(startAngle);
@@ -145,7 +151,7 @@ namespace Adamantium.Engine.Graphics
                     var x = center.X + (radius.X * Math.Cos(angle));
                     var y = center.Y - (radius.Y * Math.Sin(angle));
                     angle += angleItem;
-                    vertices.Add( Vector2.Round(x, y, 3));
+                    vertices.Add( (Vector3)Vector2.Round(x, y, 3));
                 }
             }
             
