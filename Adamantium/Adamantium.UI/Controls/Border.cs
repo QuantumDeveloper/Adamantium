@@ -94,10 +94,10 @@ public class Border : Decorator
       var innerRect = new Rect(new Vector2(borderThickness.Left, borderThickness.Top), innerSize);
       var innerGeometry = new RectangleGeometry(innerRect, cornerRadius);
       innerGeometry.ProcessGeometry();
-      var outerPolygonItem = new PolygonItem(outerGeometry.OutlineMesh.Points);
-      var innerPolygonItem = new PolygonItem(innerGeometry.OutlineMesh.Points);
+      var outerMeshContour = outerGeometry.OutlineMesh.Contours[0];
+      var innerMeshContour = innerGeometry.OutlineMesh.Contours[0];
       var poly = new Mathematics.Polygon();
-      poly.AddItems(outerPolygonItem, innerPolygonItem);
+      poly.AddItems(outerMeshContour, innerMeshContour);
       poly.FillRule = FillRule.EvenOdd;
       var points = poly.Fill();
 

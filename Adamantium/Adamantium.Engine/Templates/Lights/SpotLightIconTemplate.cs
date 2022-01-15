@@ -41,8 +41,8 @@ namespace Adamantium.Engine.Templates.Lights
                 angle += angleItem;
             }
 
-            PolygonItem item = new PolygonItem(points);
-            Polygon polygon = new Polygon();
+            var item = new MeshContour(points);
+            var polygon = new Polygon();
             polygon.AddItem(item);
             var triangulatedList = polygon.Fill();
             var spotLightIcon = new Mesh();

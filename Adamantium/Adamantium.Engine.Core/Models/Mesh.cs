@@ -116,9 +116,9 @@ public class Mesh
         return this;
     }
 
-    public void AddContour(IEnumerable<Vector3> inPoints, bool isGeometryClosed, bool generateSegments = true)
+    public void AddContour(IEnumerable<Vector2> inPoints, bool isGeometryClosed, bool generateSegments = true)
     {
-        var points = inPoints as Vector3[] ?? inPoints?.ToArray();
+        var points = inPoints as Vector2[] ?? inPoints?.ToArray();
         if (points == null || points.Length == 0) return;
 
         Contours.Add(new MeshContour(points, isGeometryClosed));
@@ -141,9 +141,20 @@ public class Mesh
         return Contours[contour];
     }
 
-    public List<Vector3> MergeContourPoints()
+    public List<GeometryIntersection> MergeGeometryContourPoints()
     {
-        var points = new List<Vector3>();
+        var points = new List<GeometryIntersection>();
+        foreach (var contour in Contours)
+        {
+            points.AddRange(contour.GeometryPoints);
+        }
+
+        return points;
+    }
+    
+    public List<Vector2> MergeContourPoints()
+    {
+        var points = new List<Vector2>();
         foreach (var contour in Contours)
         {
             points.AddRange(contour.Points);
@@ -152,9 +163,9 @@ public class Mesh
         return points;
     }
 
-    public List<LineSegment2D> MergeContourSegments()
+    public List<GeometrySegment> MergeContourSegments()
     {
-        var segments = new List<LineSegment2D>();
+        var segments = new List<GeometrySegment>();
         foreach (var contour in Contours)
         {
             segments.AddRange(contour.Segments);
@@ -178,7 +189,7 @@ public class Mesh
         Points = pts;
 
         Contours?.Clear();
-        Contours?.Add(new MeshContour(pts, true));
+        Contours?.Add(new MeshContour(Utilities.ToVector2(pts), true));
             
         if (updateBoundingBox)
         {
@@ -1082,5 +1093,29 @@ public class Mesh
         }
 
         return this;
+    }
+
+    public void UpdateContoursPoints()
+    {
+        foreach (var contour in Contours)
+        {
+            contour.UpdatePoints();
+        }
+    }
+
+    public void ClearContoursSegments()
+    {
+        foreach (var contour in Contours)
+        {
+            contour.Segments.Clear();
+        }
+    }
+
+    public void RemoveSegmentsByRule(bool removeInner)
+    {
+        foreach (var contour in Contours)
+        {
+            contour.RemoveSegmentsByRule(removeInner);
+        }
     }
 }

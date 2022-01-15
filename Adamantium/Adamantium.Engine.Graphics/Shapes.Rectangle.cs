@@ -107,7 +107,7 @@ namespace Adamantium.Engine.Graphics
                 if (type == GeometryType.Solid)
                 {
                     var polygon = new Mathematics.Polygon();
-                    polygon.AddItem(new PolygonItem(vertices));
+                    polygon.AddItem(new MeshContour(vertices));
                     var points = polygon.Fill();
                     mesh.SetPoints(points);
                 }

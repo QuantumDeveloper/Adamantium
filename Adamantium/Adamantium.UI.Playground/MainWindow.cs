@@ -95,8 +95,11 @@ namespace Adamantium.UI.Playground
             combinedGeometry.GeometryCombineMode = GeometryCombineMode.Union;
             var innerCombinedGeometry = new CombinedGeometry();
             innerCombinedGeometry.GeometryCombineMode = GeometryCombineMode.Exclude;
-            innerCombinedGeometry.Geometry1 = new EllipseGeometry(new Vector2(100), 80, 80);
-            innerCombinedGeometry.Geometry2 = new EllipseGeometry(new Vector2(100), 65, 65);
+            /*innerCombinedGeometry.Geometry1 = new EllipseGeometry(new Vector2(100), 80, 80);
+            innerCombinedGeometry.Geometry2 = new EllipseGeometry(new Vector2(100), 65, 65);*/
+            
+            innerCombinedGeometry.Geometry1 = new RectangleGeometry(new Rect(50, 50, 50, 50), new CornerRadius(0));
+            innerCombinedGeometry.Geometry2 = new RectangleGeometry(new Rect(55, 55, 40, 40), new CornerRadius(0));
 
             var rectangleGeometry = new RectangleGeometry(new Rect(30, 93, 140, 15), new CornerRadius(0));
             rectangleGeometry.Transform = new Transform();
@@ -109,7 +112,7 @@ namespace Adamantium.UI.Playground
 
             //innerCombinedGeometry.Geometry2 = rectangleGeometry;
             
-            path.Data = combinedGeometry;
+            path.Data = innerCombinedGeometry;
             var pathGeometry = new PathGeometry();
             pathGeometry.FillRule = FillRule.NonZero;
             pathGeometry.IsClosed = false;
