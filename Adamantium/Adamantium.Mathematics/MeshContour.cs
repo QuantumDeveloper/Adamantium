@@ -8,15 +8,38 @@ public class MeshContour
 {
     public string Name { get; set; }
     public Vector2[] Points { get; set; }
-    
-    public List<GeometryIntersection> GeometryPoints { get; set; }
-    
-    public List<GeometrySegment> Segments { get; set; }
+
+    private List<GeometryIntersection> geometryPoints;
+    public List<GeometryIntersection> GeometryPoints
+    {
+        get => geometryPoints;
+        set
+        {
+            geometryPoints = value;
+            isSplittedOnSegments = false;
+            isSelfIntersectionsRemoved = false;
+        }
+    }
+
+    private List<GeometrySegment> segments;
+    public List<GeometrySegment> Segments
+    {
+        get => segments;
+        set
+        {
+            segments = value;
+            isSplittedOnSegments = false;
+            isSelfIntersectionsRemoved = false;
+        }
+    }
     
     public bool IsGeometryClosed { get; set; }
 
     public RectangleF BoundingBox { get; private set; }
-    
+
+    private bool isSplittedOnSegments;
+    private bool isSelfIntersectionsRemoved;
+
     public MeshContour()
     {
 
@@ -30,6 +53,17 @@ public class MeshContour
         {
             SplitOnSegments();
         }
+
+        CalculateBoundingBox();
+    }
+    
+    public MeshContour(IEnumerable<GeometrySegment> segments, bool isGeometryClosed = true) : this()
+    {
+        Segments = segments.ToList();
+        
+        IsGeometryClosed = isGeometryClosed;
+        
+        UpdatePoints();
 
         CalculateBoundingBox();
     }
@@ -56,28 +90,41 @@ public class MeshContour
         }
     }
 
-    public void SplitOnSegments()
+    public void SplitOnSegments(bool forceSplit = false)
     {
+        if (isSplittedOnSegments && !forceSplit) return;
+        
         Segments = PolygonHelper.SplitOnSegments(this, Points, IsGeometryClosed);
         UpdatePoints();
+
+        isSplittedOnSegments = true;
     }
     
     public void UpdatePoints()
     {
-        if (Segments == null || Segments.Count == 0) return;
-        
+        if (Segments == null || Segments.Count == 0)
+        {
+            GeometryPoints.Clear();
+            Points = Array.Empty<Vector2>();
+            return;
+        }
+
+        var pointsHashSet = new HashSet<GeometryIntersection>();
         GeometryPoints = new List<GeometryIntersection>();
         var updatedPoints = new List<Vector2>();
 
-        var startSegment = Segments[0];
-        var currentSegment = startSegment;
-
-        do
+        foreach (var segment in Segments)
         {
-            GeometryPoints.Add(currentSegment.SegmentEnds[0]);
-            updatedPoints.Add(currentSegment.Start);
-            currentSegment = currentSegment.GetNextSegment();
-        } while (currentSegment != startSegment && currentSegment != null);
+            foreach (var end in segment.SegmentEnds)
+            {
+                if (!pointsHashSet.Contains(end))
+                {
+                    pointsHashSet.Add(end);
+                    GeometryPoints.Add(end);
+                    updatedPoints.Add(end.Coordinates);
+                }
+            }
+        }
         
         Points = updatedPoints.ToArray();
 
@@ -117,10 +164,14 @@ public class MeshContour
                 segment.RemoveSelfFromParent();
             }
         }
+        
+        UpdatePoints();
     }
 
-    public void RemoveSelfIntersections(FillRule fillRule)
+    public void RemoveSelfIntersections(FillRule fillRule, bool forceRemove = false)
     {
+        if (isSelfIntersectionsRemoved && !forceRemove) return;
+        
         var intersectionsList = new Dictionary<Vector2, GeometryIntersection>();
         var selfIntersections = new Dictionary<GeometrySegment, SortedList<double, GeometryIntersection>>();
 
@@ -162,7 +213,7 @@ public class MeshContour
 
             key.RemoveSelfFromConnectedSegments();
             
-            var startPart = new GeometrySegment(key.SegmentEnds[0], value.Values.First());
+            var startPart = new GeometrySegment(key.Parent, key.SegmentEnds[0], value.Values.First());
             Segments.Add(startPart);
             
             if (fillRule == FillRule.EvenOdd)
@@ -172,16 +223,18 @@ public class MeshContour
                     var int1 = value.Values[i];
                     var int2 = value.Values[i + 1];
 
-                    var seg = new GeometrySegment(int1, int2);
+                    var seg = new GeometrySegment(key.Parent, int1, int2);
                     key.Parent.Segments.Add(seg);
                 }
             }
 
-            var endPart = new GeometrySegment(value.Values.Last(), key.SegmentEnds[1]);
+            var endPart = new GeometrySegment(key.Parent, value.Values.Last(), key.SegmentEnds[1]);
             Segments.Add(endPart);
         }
         
         UpdatePoints();
+
+        isSelfIntersectionsRemoved = true;
     }
 
     public ContainmentType IsCompletelyContains(MeshContour otherContour)
@@ -206,5 +259,22 @@ public class MeshContour
         }
 
         return intersects ? ContainmentType.Intersects : ContainmentType.Contains;
+    }
+
+    public MeshContour Copy()
+    {
+        var copy = new MeshContour();
+
+        copy.segments = new List<GeometrySegment>(segments);
+        copy.Points = new Vector2[Points.Length];
+        Array.Copy(Points, copy.Points, Points.Length);
+        copy.geometryPoints = new List<GeometryIntersection>(geometryPoints);
+        copy.isSplittedOnSegments = isSplittedOnSegments;
+        copy.isSelfIntersectionsRemoved = isSelfIntersectionsRemoved;
+        copy.Name = Name;
+        copy.IsGeometryClosed = IsGeometryClosed;
+        copy.BoundingBox = BoundingBox;
+
+        return copy;
     }
 }

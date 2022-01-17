@@ -56,7 +56,7 @@ public sealed class EllipseGeometry : Geometry
    public EllipseGeometry()
    {
       IsClosed = true;
-      TesselationFactor = 80;
+      TesselationFactor = 30;
    }
 
    public EllipseGeometry(Rect rect, Double startAngle = 0, Double stopAngle = 360) : this()
@@ -89,7 +89,7 @@ public sealed class EllipseGeometry : Geometry
       StartAngle = startAngle;
       StopAngle = stopAngle;
          
-      var translation = Matrix4x4.Translation(rect.Width/2 + rect.X, rect.Height/2 + rect.Y, 0);
+      var translation = Matrix4x4.Translation(Center.X, Center.Y, 0);
          
       Mesh = Shapes.Ellipse.GenerateGeometry(
          GeometryType.Solid, 

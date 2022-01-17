@@ -46,11 +46,11 @@ namespace Adamantium.Engine.Graphics
 
                 if (geometryType == GeometryType.Solid)
                 {
-                    mesh = GenerateSolidGeometry(ellipseType, diameter, startAngle, stopAngle, isClockWise, tessellation);
+                    mesh = GenerateSolidGeometry(ellipseType, diameter, startAngle, stopAngle, isClockWise, tessellation, transform);
                 }
                 else
                 {
-                    mesh = GenerateOutlinedGeometry(ellipseType, diameter, startAngle, stopAngle, isClockWise, tessellation);
+                    mesh = GenerateOutlinedGeometry(ellipseType, diameter, startAngle, stopAngle, isClockWise, tessellation, transform);
                 }
 
                 return mesh;

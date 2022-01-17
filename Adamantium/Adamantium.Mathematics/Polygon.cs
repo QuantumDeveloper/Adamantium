@@ -275,7 +275,7 @@ namespace Adamantium.Mathematics
 
                 key.RemoveSelfFromConnectedSegments();
 
-                var startPart = new GeometrySegment(key.SegmentEnds[0], value.Values.First());
+                var startPart = new GeometrySegment(key.Parent, key.SegmentEnds[0], value.Values.First());
                 key.Parent.Segments.Add(startPart);
 
                 for (var i = 0; i < value.Values.Count - 1; i++)
@@ -283,11 +283,11 @@ namespace Adamantium.Mathematics
                     var int1 = value.Values[i];
                     var int2 = value.Values[i + 1];
 
-                    var seg = new GeometrySegment(int1, int2);
+                    var seg = new GeometrySegment(key.Parent, int1, int2);
                     key.Parent.Segments.Add(seg);
                 }
 
-                var endPart = new GeometrySegment(value.Values.Last(), key.SegmentEnds[1]);
+                var endPart = new GeometrySegment(key.Parent, value.Values.Last(), key.SegmentEnds[1]);
                 key.Parent.Segments.Add(endPart);
             }
         }
@@ -346,7 +346,13 @@ namespace Adamantium.Mathematics
                 }
             }
 
-            if (FillRule == FillRule.EvenOdd) return;
+            if (FillRule == FillRule.EvenOdd)
+            {
+                MergeSegments();
+                MergePoints();
+                
+                return;
+            }
 
             foreach (var polygonPair in checkedPolygons)
             {
@@ -459,7 +465,7 @@ namespace Adamantium.Mathematics
                 key.RemoveSelfFromConnectedSegments();
                 if (MergedSegments.Contains(key)) MergedSegments.Remove(key);
 
-                var startPart = new GeometrySegment(key.SegmentEnds[0], value.Values.First());
+                var startPart = new GeometrySegment(key.Parent, key.SegmentEnds[0], value.Values.First());
                 MergedSegments.Add(startPart);
 
                 for (var i = 0; i < value.Values.Count - 1; i++)
@@ -467,11 +473,11 @@ namespace Adamantium.Mathematics
                     var int1 = value.Values[i];
                     var int2 = value.Values[i + 1];
 
-                    var seg = new GeometrySegment(int1, int2);
+                    var seg = new GeometrySegment(key.Parent, int1, int2);
                     MergedSegments.Add(seg);
                 }
 
-                var endPart = new GeometrySegment(value.Values.Last(), key.SegmentEnds[1]);
+                var endPart = new GeometrySegment(key.Parent, value.Values.Last(), key.SegmentEnds[1]);
                 MergedSegments.Add(endPart);
             }
         
