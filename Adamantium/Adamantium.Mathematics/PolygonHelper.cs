@@ -53,21 +53,15 @@ namespace Adamantium.Mathematics
             }
             
             var segments = new List<GeometrySegment>();
-            for (var i = 0; i < geometryIntersections.Count - 1; i++)  
+            for (var i = 0; i < geometryIntersections.Count - 1; i++)
             {
-                var segment = new GeometrySegment(geometryIntersections[i], geometryIntersections[i + 1])
-                {
-                    Parent = parent
-                };
+                var segment = new GeometrySegment(parent, geometryIntersections[i], geometryIntersections[i + 1]);
                 if (!IsSameStartEnd(ref segment)) segments.Add(segment);
             }
 
             if (!isContourClosed) return segments;
-            
-            var seg = new GeometrySegment(geometryIntersections.Last(), geometryIntersections.First())
-            {
-                Parent = parent
-            };
+
+            var seg = new GeometrySegment(parent, geometryIntersections.Last(), geometryIntersections.First());
             if (!IsSameStartEnd(ref seg)) segments.Add(seg);
 
             return segments;

@@ -151,32 +151,19 @@ public class CombinedGeometry : Geometry
 
         if (GeometryCombineMode == GeometryCombineMode.Xor)
         {
-            /*var ordered = PolygonHelper.OrderSegments(mergedSegments);
-            mergedPoints.Clear();
-            foreach (var segment in ordered)
-            {
-                mergedPoints.Add(segment.Start);
-            }
-            OutlineMesh.AddContour(Utilities.ToVector3(mergedPoints), IsClosed);
-            var points = new List<Vector2>(mergedPoints);
-                
-            mergedPoints.Clear();
-            foreach (var segment in mergedSegments)
-            {
-                mergedPoints.Add(segment.Start);
-            }
-            points.AddRange(mergedPoints);
-                
-            
-            
-            OutlineMesh.AddContour(Utilities.ToVector3(mergedPoints), IsClosed);
-            var polygon1 = new Polygon();        
-            polygon1.FillRule = FillRule.NonZero;
-            ordered.AddRange(mergedSegments);
-            var triangulated = polygon1.FillDirect(points, ordered);
-            Mesh.SetPoints(triangulated);*/
-            
             // EVEN ODD
+            var polygon = new Polygon
+            {
+                FillRule = FillRule.EvenOdd
+            };
+
+            foreach (var contour in OutlineMesh.Contours)
+            {
+                polygon.AddItem(contour.Copy());
+            }
+            
+            var triangulated = polygon.Fill();
+            Mesh.SetPoints(triangulated);
         }
         else
         {
@@ -186,17 +173,17 @@ public class CombinedGeometry : Geometry
             var mesh1Points = OutlineMesh1.MergeGeometryContourPoints();
             var mesh2Points = OutlineMesh2.MergeGeometryContourPoints();
 
-            var mesh1PointDict = mesh1Points.ToDictionary(x => x.Coordinates);
+            var mesh1PointDict = mesh1Points.ToDictionary(x => x/*.Coordinates*/);
             
             foreach (var point in mesh2Points)
             {
-                if (mesh1PointDict.ContainsKey(point.Coordinates))
+                if (mesh1PointDict.ContainsKey(point/*.Coordinates*/))
                 {
-                    mesh1PointDict[point.Coordinates].ConnectedSegments.AddRange(point.ConnectedSegments);
+                    mesh1PointDict[point/*.Coordinates*/].ConnectedSegments.AddRange(point.ConnectedSegments);
                 }
                 else
                 {
-                    mesh1PointDict.Add(point.Coordinates, point);
+                    mesh1PointDict.Add(point/*.Coordinates*/, point);
                 }
             }
 
@@ -206,22 +193,33 @@ public class CombinedGeometry : Geometry
 
             while (mergedPoints.Count > 0)
             {
-                var contour = new List<Vector2>();
+                var contourSegments = new List<GeometrySegment>();
 
                 var startContourPoint = mergedPoints.First();
+                var startSegment = startContourPoint.ConnectedSegments.First();
                 var currentContourPoint = startContourPoint;
+                var currentSegment = startSegment;
                 
                 do
                 {
-                    contour.Add(currentContourPoint.Coordinates);
+                    contourSegments.Add(currentSegment);
                     mergedPoints.Remove(currentContourPoint);
-                    currentContourPoint = currentContourPoint.ConnectedSegments.First().GetOtherEnd(currentContourPoint);
+
+                    currentContourPoint = currentSegment.GetOtherEnd(currentContourPoint);
+                    currentSegment = currentContourPoint.GetOtherSegment(currentSegment);
                 } while (currentContourPoint != startContourPoint);
                 
-                OutlineMesh.AddContour(contour, true);
+                OutlineMesh.AddContour(contourSegments);
             }
             
             // NON ZERO
+            var mergedContourPoints = OutlineMesh.MergeGeometryContourPoints();
+            var mergedContourSegments = OutlineMesh.MergeContourSegments();
+            
+            var polygon = new Polygon();        
+            polygon.FillRule = FillRule.NonZero;
+            var triangulated = polygon.FillDirect(mergedContourPoints, mergedContourSegments);
+            Mesh.SetPoints(triangulated);
         }
     }
 
@@ -250,7 +248,10 @@ public class CombinedGeometry : Geometry
             
             foreach (var segment2 in mergedSegments2)
             {
-                mesh2Intersections[segment2] = new SortedList<double, GeometryIntersection>();
+                if (!mesh2Intersections.ContainsKey(segment2))
+                {
+                    mesh2Intersections[segment2] = new SortedList<double, GeometryIntersection>();
+                }
                 
                 if (Collision2D.SegmentSegmentIntersection(segment1, segment2, out var point))
                 {
@@ -298,7 +299,7 @@ public class CombinedGeometry : Geometry
 
             key.RemoveSelfFromConnectedSegments();
 
-            var startPart = new GeometrySegment(key.SegmentEnds[0], value.Values.First());
+            var startPart = new GeometrySegment(key.Parent, key.SegmentEnds[0], value.Values.First());
             key.Parent.Segments.Add(startPart);
 
             for (var i = 0; i < value.Values.Count - 1; i++)
@@ -306,11 +307,11 @@ public class CombinedGeometry : Geometry
                 var int1 = value.Values[i];
                 var int2 = value.Values[i + 1];
 
-                var seg = new GeometrySegment(int1, int2);
+                var seg = new GeometrySegment(key.Parent, int1, int2);
                 key.Parent.Segments.Add(seg);
             }
-            
-            var endPart = new GeometrySegment(value.Values.Last(), key.SegmentEnds[1]);
+
+            var endPart = new GeometrySegment(key.Parent, value.Values.Last(), key.SegmentEnds[1]);
             key.Parent.Segments.Add(endPart);
         }
     }
@@ -318,25 +319,34 @@ public class CombinedGeometry : Geometry
     private void MarkSegments(Mesh mesh1, Mesh mesh2)
     {
         var mesh1Segments = mesh1.MergeContourSegments();
-        var mesh2Points = mesh2.MergeGeometryContourPoints();
+        var mesh2Segments = mesh2.MergeContourSegments();
 
-        foreach (var point in mesh2Points)
+        foreach (var segment2 in mesh2Segments)
         {
-            var ray = new Ray2D(point.Coordinates, Vector2.UnitX);
-            var intersectionCnt = 0;
+            var segmentCenter = (segment2.End - segment2.Start) * 0.5 + segment2.Start;
             
-            foreach (var segment in mesh1Segments)
+            var ray = new Ray2D(segmentCenter, Vector2.UnitX);
+            var intersectionCnt = 0;
+            var rayIntersectionPoints = new HashSet<Vector2>();
+            
+            foreach (var segment1 in mesh1Segments)
             {
-                var seg = new LineSegment2D(segment);
-                if (Collision2D.RaySegmentIntersection(ref ray, ref seg, out var intPoint) && point.Coordinates != intPoint) ++intersectionCnt;
+                var seg = new LineSegment2D(segment1);
+                if (Collision2D.RaySegmentIntersection(ref ray, ref seg, out var intPoint))
+                {
+                    intPoint = Vector2.Round(intPoint, 4);
+                    
+                    if (!rayIntersectionPoints.Contains(intPoint))
+                    {
+                        rayIntersectionPoints.Add(intPoint);
+                        ++intersectionCnt;
+                    }
+                }
             }
 
             if (intersectionCnt % 2 != 0)
             {
-                foreach (var segment in point.ConnectedSegments)
-                {
-                    segment.IsInnerSegment = true;
-                }
+                segment2.IsInnerSegment = true;
             }
         }
     }

@@ -123,6 +123,11 @@ public class Mesh
 
         Contours.Add(new MeshContour(points, isGeometryClosed));
     }
+
+    public void AddContour(IEnumerable<GeometrySegment> segments)
+    {
+        Contours.Add(new MeshContour(segments));
+    }
     
     public void AddContour(MeshContour contour)
     {
@@ -143,21 +148,39 @@ public class Mesh
 
     public List<GeometryIntersection> MergeGeometryContourPoints()
     {
-        var points = new List<GeometryIntersection>();
+        var pointsHashSet = new HashSet<GeometryIntersection>();
+        var geometryPoints = new List<GeometryIntersection>();
+
         foreach (var contour in Contours)
         {
-            points.AddRange(contour.GeometryPoints);
+            foreach (var point in contour.GeometryPoints)
+            {
+                if (!pointsHashSet.Contains(point))
+                {
+                    pointsHashSet.Add(point);
+                    geometryPoints.Add(point);
+                }
+            }
         }
 
-        return points;
+        return geometryPoints;
     }
     
     public List<Vector2> MergeContourPoints()
     {
+        var pointsHashSet = new HashSet<GeometryIntersection>();
         var points = new List<Vector2>();
+
         foreach (var contour in Contours)
         {
-            points.AddRange(contour.Points);
+            foreach (var point in contour.GeometryPoints)
+            {
+                if (!pointsHashSet.Contains(point))
+                {
+                    pointsHashSet.Add(point);
+                    points.Add(point.Coordinates);
+                }
+            }
         }
 
         return points;

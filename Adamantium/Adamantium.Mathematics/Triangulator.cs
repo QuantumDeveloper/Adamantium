@@ -126,7 +126,7 @@ namespace Adamantium.Mathematics
                         {
                             if (segment.GetOtherEnd(upperPoint) == lowerPoint)
                             {
-                                startEndSegments.Add(new GeometrySegment(upperPoint, lowerPoint));
+                                startEndSegments.Add(new GeometrySegment(null,upperPoint, lowerPoint));
                                 break;
                             }
                         }

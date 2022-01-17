@@ -23,4 +23,10 @@ public class GeometryIntersection
     {
         return $"Coordinates: {Coordinates} ConnectedSegments.Count: {ConnectedSegments.Count}";
     }
+
+    public GeometrySegment GetOtherSegment(GeometrySegment segment)
+    {
+        if (ConnectedSegments.Count < 2) return null;
+        return ConnectedSegments[0] == segment ? ConnectedSegments[1] : ConnectedSegments[0];
+    }
 }
