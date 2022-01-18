@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Adamantium.Mathematics
@@ -10,7 +11,7 @@ namespace Adamantium.Mathematics
     public class Polygon
     {
         private readonly HashSet<Vector2> mergedPointsHash;
-        private readonly List<PolygonItem> polygons;
+        private readonly List<MeshContour> contours;
 
         /// <summary>
         /// Precision level for polygon triangulation
@@ -20,52 +21,38 @@ namespace Adamantium.Mathematics
         /// Current ZeroTolerance value = 1e-9
         /// </remarks>
         public static double Epsilon = MathHelper.ZeroToleranceD;
+
         /// <summary>
         /// Polygon name
         /// </summary>
         public string Name { get; set; }
 
         /// <summary>
-        /// Collection of <see cref="PolygonItem"/>
+        /// Collection of <see cref="MeshContour"/>
         /// </summary>
-        public IReadOnlyCollection<PolygonItem> Polygons => polygons.AsReadOnly();
+        public IReadOnlyCollection<MeshContour> Contours => contours.AsReadOnly();
 
         /// <summary>
         /// Collection of points from all <see cref="PolygonItem"/>s in current <see cref="Polygon"/>
         /// </summary>
-        public List<Vector2> MergedPoints { get; private set; }
+        public List<GeometryIntersection> MergedPoints { get; private set; }
 
         /// <summary>
         /// Collection of segments from all <see cref="PolygonItem"/>s in current <see cref="Polygon"/>
         /// </summary>
-        public List<LineSegment2D> MergedSegments { get; private init; }
+        public List<GeometrySegment> MergedSegments { get; private init; }
 
         /// <summary>
-        /// Collection of self intersected points from all <see cref="PolygonItem"/>s in current <see cref="Polygon"/>
+        /// Leftmost X coordinate for polygon 
         /// </summary>
-        public List<Vector2> SelfIntersectedPoints { get; private init; }
-
-        /// <summary>
-        /// Defines presence of self intersection
-        /// </summary>
-        public bool HasSelfIntersections => SelfIntersectedPoints.Count > 0;
-
-        /// <summary>
-        /// Collection of self intersected segments
-        /// </summary>
-        public List<LineSegment2D> SelfIntersectedSegments { get; private init; }
-
-        /// <summary>
-        /// Highest point in polygon 
-        /// </summary>
-        public Vector2 HighestPoint;
+        public double LeftmostXCoord;
 
         /// <summary>
         /// Triangulation rule (true - Even-Odd, false - Non-Zero)
         /// </summary>
         public FillRule FillRule { get; set; }
 
-        private readonly List<PolygonPair> checkedPolygons;
+        private readonly List<ContourPair> checkedPolygons;
         private readonly object vertexLocker = new object();
 
         /// <summary>
@@ -73,47 +60,46 @@ namespace Adamantium.Mathematics
         /// </summary>
         public Polygon()
         {
-            polygons = new List<PolygonItem>();
-            MergedPoints = new List<Vector2>();
+            contours = new List<MeshContour>();
+            MergedPoints = new List<GeometryIntersection>();
             mergedPointsHash = new HashSet<Vector2>();
-            MergedSegments = new List<LineSegment2D>();
-            SelfIntersectedPoints = new List<Vector2>();
-            SelfIntersectedSegments = new List<LineSegment2D>();
-            checkedPolygons = new List<PolygonPair>();
+            MergedSegments = new List<GeometrySegment>();
+            checkedPolygons = new List<ContourPair>();
             FillRule = FillRule.EvenOdd;
         }
 
-        public void AddItem(PolygonItem item)
+        public void AddItem(MeshContour item)
         {
-            polygons.Add(item);
+            contours.Add(item);
         }
 
-        public void AddItems(params PolygonItem[] items)
+        public void AddItems(params MeshContour[] items)
         {
-            polygons.AddRange(items);
+            contours.AddRange(items);
         }
-        
+
         /// <summary>
         /// Triangulate current <see cref="Polygon"/>
         /// </summary>
         /// <returns></returns>
         public List<Vector3> Fill()
         {
-            Parallel.For(0, polygons.Count, i =>
+            Parallel.For(0, contours.Count, i =>
             {
-                polygons[i].SplitOnSegments();
-                polygons[i].CheckForSelfIntersection(FillRule);
+                contours[i].SplitOnSegments();
+                contours[i].RemoveSelfIntersections(FillRule);
             });
 
-            var nonIntersectedPolygons = CheckPolygonItemIntersections();
+            // process non intersecting contours
+            var nonIntersectedContours = GetNonIntersectingContours();
 
             var vertices = new List<Vector3>();
 
-            if (nonIntersectedPolygons.Count > 1)
+            if (nonIntersectedContours.Count > 0)
             {
-                Parallel.ForEach(nonIntersectedPolygons, item =>
+                Parallel.ForEach(nonIntersectedContours, item =>
                 {
-                    var result1 = TriangulatePolygonItem(item);
+                    var result1 = TriangulateContour(item);
                     lock (vertexLocker)
                     {
                         vertices.AddRange(result1);
@@ -121,15 +107,10 @@ namespace Adamantium.Mathematics
                 });
             }
 
-            if (polygons.Count > 0)
+            // process intersecting contours
+            if (contours.Count > 0)
             {
-                MergePoints();
-                MergeSegments();
-
-                MergeSelfIntersectedPoints();
-                MergeSelfIntersectedSegments();
-
-                CheckPolygonsIntersection();
+                MergeContours();
 
                 UpdateBoundingBox();
 
@@ -143,26 +124,23 @@ namespace Adamantium.Mathematics
             return vertices;
         }
 
-        public List<Vector3> FillDirect(List<Vector2> points, List<LineSegment2D> segments)
+        public List<Vector3> FillDirect(List<GeometryIntersection> points, List<GeometrySegment> segments)
         {
             MergedPoints.AddRange(points);
             MergedSegments.AddRange(segments);
             UpdateBoundingBox();
-            
+
             var result = Triangulator.Triangulate(this);
             return result;
         }
 
-        private List<Vector3> TriangulatePolygonItem(PolygonItem item)
+        private List<Vector3> TriangulateContour(MeshContour item)
         {
-            var itemCopy = item;
             var polygon = new Polygon
             {
                 Name = Name,
-                MergedPoints = itemCopy.Points,
-                MergedSegments = itemCopy.Segments,
-                SelfIntersectedPoints = itemCopy.SelfIntersectedPoints,
-                SelfIntersectedSegments = itemCopy.SelfIntersectedSegments
+                MergedPoints = item.GeometryPoints,
+                MergedSegments = item.Segments
             };
 
             polygon.UpdateBoundingBox();
@@ -170,31 +148,29 @@ namespace Adamantium.Mathematics
             return Triangulator.Triangulate(polygon);
         }
 
-        private List<PolygonItem> CheckPolygonItemIntersections()
+        private List<MeshContour> GetNonIntersectingContours()
         {
-            var polygonsList = new List<PolygonItem>();
+            var contourList = new List<MeshContour>();
 
-            if (Polygons.Count <= 1)
+            if (Contours.Count == 0) return contourList;
+
+            if (Contours.Count == 1)
             {
-                return polygonsList;
+                contourList.Add(contours[0]);
+                return contourList;
             }
 
-            foreach(var polygon1 in Polygons)
+            foreach (var contour1 in Contours)
             {
                 var canAdd = true;
-                foreach(var polygon2 in Polygons)
+
+                foreach (var contour2 in Contours)
                 {
-                    if (polygon1 == polygon2) continue;
+                    if (contour1 == contour2) continue;
 
-                    var bb1 = polygon1.BoundingBox;
-                    var bb2 = polygon2.BoundingBox;
-                    // var containment1 = polygon1.BoundingBox.Contains(bb2);
-                    // var containment2 = polygon2.BoundingBox.Contains(bb1);
-                    
-                    var containment1 = polygon1.BoundingBox.Intersects(bb2);
-                    var containment2 = polygon2.BoundingBox.Intersects(bb1);
+                    var containment = contour1.BoundingBox.Intersects(contour2.BoundingBox);
 
-                    if (containment1 || containment2)
+                    if (containment)
                     {
                         canAdd = false;
                         break;
@@ -203,19 +179,19 @@ namespace Adamantium.Mathematics
 
                 if (canAdd)
                 {
-                    polygonsList.Add(polygon1);
+                    contourList.Add(contour1);
                 }
             }
 
-            foreach(var p in polygonsList)
+            foreach (var p in contourList)
             {
-                if (polygons.Contains(p))
+                if (contours.Contains(p))
                 {
-                    polygons.Remove(p);
+                    contours.Remove(p);
                 }
             }
 
-            return polygonsList;
+            return contourList;
         }
 
         /// <summary>
@@ -224,21 +200,9 @@ namespace Adamantium.Mathematics
         private void MergePoints()
         {
             MergedPoints.Clear();
-            for (var i = 0; i < polygons.Count; ++i)
+            for (var i = 0; i < contours.Count; ++i)
             {
-                MergedPoints.AddRange(polygons[i].Points);
-            }
-        }
-
-        /// <summary>
-        /// Merge selfIntersected points from all <see cref="PolygonItem"/>s
-        /// </summary>
-        private void MergeSelfIntersectedPoints()
-        {
-            SelfIntersectedPoints.Clear();
-            for (var i = 0; i < polygons.Count; ++i)
-            {
-                SelfIntersectedPoints.AddRange(polygons[i].SelfIntersectedPoints);
+                MergedPoints.AddRange(contours[i].GeometryPoints);
             }
         }
 
@@ -248,167 +212,190 @@ namespace Adamantium.Mathematics
         private void MergeSegments()
         {
             MergedSegments.Clear();
-            for (var i = 0; i < polygons.Count; ++i)
+            for (var i = 0; i < contours.Count; ++i)
             {
-                MergedSegments.AddRange(polygons[i].Segments);
+                MergedSegments.AddRange(contours[i].Segments);
             }
         }
 
-        /// <summary>
-        /// Merge selfIntersected segments from all <see cref="PolygonItem"/>s
-        /// </summary>
-        private void MergeSelfIntersectedSegments()
+        private void ProcessContoursIntersections(MeshContour meshContour1, MeshContour meshContour2)
         {
-            SelfIntersectedSegments.Clear();
-            for (var i = 0; i < Polygons.Count; ++i)
-            {
-                SelfIntersectedSegments.AddRange(polygons[i].SelfIntersectedSegments);
-            }
-        }
+            var intersectionsList = new Dictionary<Vector2, GeometryIntersection>();
+            var contour1Intersections = new Dictionary<GeometrySegment, SortedList<double, GeometryIntersection>>();
+            var contour2Intersections = new Dictionary<GeometrySegment, SortedList<double, GeometryIntersection>>();
 
-        /// <summary>
-        /// Checking intersection between all <see cref="PolygonItem"/>s in <see cref="Polygon"/>
-        /// </summary>
-        private void CheckPolygonsIntersection()
-        {
-            if (polygons.Count <= 1)
+            foreach (var segment1 in meshContour1.Segments)
             {
-                return;
-            }
+                contour1Intersections[segment1] = new SortedList<double, GeometryIntersection>();
 
-            var edgePoints = new List<Vector2>();
-            for (var i = 0; i < polygons.Count; i++)
-            {
-                var polygon1 = polygons[i];
-                for (var j = 0; j < Polygons.Count; j++)
+                foreach (var segment2 in meshContour2.Segments)
                 {
-                    var polygon2 = polygons[j];
-                    if (polygon1 == polygon2 || ContainsPolygonPair(polygon1, polygon2))
+                    contour2Intersections[segment2] = new SortedList<double, GeometryIntersection>();
+
+                    if (Collision2D.SegmentSegmentIntersection(segment1, segment2, out var point))
                     {
-                        continue;
-                    }
-
-                    //Check if polygons are inside each other
-                    var intersectionResult = polygon1.IsCompletelyContains(polygon2);
-                    
-                    AddPolygonsPairsToList(polygon1, polygon2, intersectionResult);
-                }
-            }
-
-            foreach (var polygonPair in checkedPolygons)
-            {
-                var polygon1 = polygonPair.Polygon1;
-                var polygon2 = polygonPair.Polygon2;
-                var intersectionResult = polygonPair.IntersectionType;
-
-                //If polygons partly inside each other
-                if (intersectionResult == ContainmentType.Intersects)
-                {
-                    FindEdgeIntersectionPoints(polygon1, polygon2, out edgePoints);
-                }
-
-                for (var k = 0; k < edgePoints.Count; ++k)
-                {
-                    if (!SelfIntersectedPoints.Contains(edgePoints[k]))
-                    {
-                        SelfIntersectedPoints.Add(edgePoints[k]);
-                    }
-                }
-
-                //Split existing segments on more segments on edge points
-                UpdatePolygonUsingSelfPoints(edgePoints);
-
-                // If Non-zero, lets find a list of points describing all possible
-                // connections between smallest and biggest polygons and remove all segments,
-                // which connects any of two intersection points
-                if (FillRule == FillRule.NonZero && intersectionResult == ContainmentType.Intersects)
-                {
-                    var lst = FindAllPossibleIntersections(polygon1, polygon2, edgePoints);
-                    RemoveInternalSegments(lst);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Remove all segments based on intersection points in case of Non-Zero rule
-        /// </summary>
-        /// <param name="interPoints"></param>
-        private void RemoveInternalSegments(List<Vector2> interPoints)
-        {
-            if (FillRule != FillRule.NonZero || interPoints.Count <= 0) return;
-            for (var i = 0; i < interPoints.Count; i++)
-            {
-                for (var j = 0; j < interPoints.Count; j++)
-                {
-                    var point1 = interPoints[i];
-                    var point2 = interPoints[j];
-                    if (MathHelper.WithinEpsilon(point1, point2, Epsilon))
-                    { continue; }
-
-                    if (PolygonHelper.IsConnectedInvariant(point1, point2, MergedSegments, out var segment2D))
-                    {
-                        MergedSegments.Remove(segment2D);
-                    }
-                }
-            }
-            UpdateMergedPoints();
-        }
-
-        private bool FindEdgeIntersectionPoints(PolygonItem polygon1, PolygonItem polygon2, out List<Vector2> edgePoints)
-        {
-            edgePoints = new List<Vector2>();
-            for (var i = 0; i < polygon1.Segments.Count; i++)
-            {
-                for (var j = 0; j < polygon2.Segments.Count; j++)
-                {
-                    var segment1 = polygon1.Segments[i];
-                    var segment2 = polygon2.Segments[j];
-                    if (Collision2D.SegmentSegmentIntersection(ref segment1, ref segment2, out var point))
-                    {
-                        if (!edgePoints.Contains(point))
+                        if (point != segment1.Start && point != segment1.End)
                         {
-                            edgePoints.Add(point);
+                            if (!intersectionsList.ContainsKey(point))
+                            {
+                                intersectionsList[point] = new GeometryIntersection(point);
+                            }
+
+                            var distanceToStart = (point - segment1.Start).Length();
+                            contour1Intersections[segment1].Add(distanceToStart, intersectionsList[point]);
+                        }
+
+                        if (point != segment2.Start && point != segment2.End)
+                        {
+                            if (!intersectionsList.ContainsKey(point))
+                            {
+                                intersectionsList[point] = new GeometryIntersection(point);
+                            }
+
+                            var distanceToStart = (point - segment2.Start).Length();
+                            contour2Intersections[segment2].Add(distanceToStart, intersectionsList[point]);
                         }
                     }
                 }
             }
 
-            return edgePoints.Count > 0;
+            FillMeshSegments(contour1Intersections);
+            FillMeshSegments(contour2Intersections);
+        }
+
+        private void FillMeshSegments(Dictionary<GeometrySegment, SortedList<double, GeometryIntersection>> meshIntersections)
+        {
+            foreach (var (key, value) in meshIntersections)
+            {
+                if (value.Count == 0)
+                {
+                    key.Parent.Segments.Add(key);
+                    continue;
+                }
+
+                key.RemoveSelfFromConnectedSegments();
+
+                var startPart = new GeometrySegment(key.Parent, key.SegmentEnds[0], value.Values.First());
+                key.Parent.Segments.Add(startPart);
+
+                for (var i = 0; i < value.Values.Count - 1; i++)
+                {
+                    var int1 = value.Values[i];
+                    var int2 = value.Values[i + 1];
+
+                    var seg = new GeometrySegment(key.Parent, int1, int2);
+                    key.Parent.Segments.Add(seg);
+                }
+
+                var endPart = new GeometrySegment(key.Parent, value.Values.Last(), key.SegmentEnds[1]);
+                key.Parent.Segments.Add(endPart);
+            }
         }
         
-        /// <summary>
-        /// Find all possible intersections between 2 polygons including intersection points and remove all merged segments 
-        /// if any of 2 points are connected as segments. This needs for Non-zero rule to remove all inner segments between 2 polygons to correctly triangulate them
-        /// </summary>
-        /// <param name="polygon1">first polygon</param>
-        /// <param name="polygon2">second polygon</param>
-        /// <param name="edgePoints">intersection points between 2 polygons, which were found earlier on previous step</param>
-        /// <returns>Collection of intersection points, including points, which is not lying on segments, but also inside polygons.</returns>
-        /// <remarks>During running this method, it will remove all merged segments from <see cref="Polygon"/> if some of its segments contains both intersection points</remarks>
-        private List<Vector2> FindAllPossibleIntersections(PolygonItem polygon1, PolygonItem polygon2, List<Vector2> edgePoints)
+        private void MarkSegments(MeshContour meshContour1, MeshContour meshContour2)
         {
-            var allIntersections = new List<Vector2>(edgePoints);
+            var mesh1Segments = meshContour1.Segments;
+            var mesh2Points = meshContour2.GeometryPoints;
 
-            for (var i = 0; i < polygon1.Points.Count; i++)
+            foreach (var point in mesh2Points)
             {
-                var point = polygon1.Points[i];
-                if (Collision2D.IsPointInsideArea(point, polygon2.Segments) &&
-                    !allIntersections.Contains(point))
+                var ray = new Ray2D(point.Coordinates, Vector2.UnitX);
+                var intersectionCnt = 0;
+            
+                foreach (var segment in mesh1Segments)
                 {
-                    allIntersections.Add(point);
+                    var seg = new LineSegment2D(segment);
+                    if (Collision2D.RaySegmentIntersection(ref ray, ref seg, out var intPoint) && point.Coordinates != intPoint) ++intersectionCnt;
+                }
+
+                if (intersectionCnt % 2 != 0)
+                {
+                    foreach (var segment in point.ConnectedSegments)
+                    {
+                        segment.IsInnerSegment = true;
+                    }
                 }
             }
-            for (var i = 0; i < polygon2.Points.Count; i++)
+        }
+
+        private void MergeContours()
+        {
+            if (contours.Count <= 1)
             {
-                var point = polygon2.Points[i];
-                if (Collision2D.IsPointInsideArea(point, polygon1.Segments) &&
-                    !allIntersections.Contains(point))
+                MergeSegments();
+                MergePoints();
+
+                return;
+            }
+
+            for (var i = 0; i < contours.Count; i++)
+            {
+                var contour1 = contours[i];
+                for (var j = 0; j < contours.Count; j++)
                 {
-                    allIntersections.Add(point);
+                    var contour2 = contours[j];
+                    if (contour1 == contour2 || ContainsPolygonPair(contour1, contour2))
+                    {
+                        continue;
+                    }
+
+                    //Check if polygons are inside each other
+                    var intersectionResult = contour1.IsCompletelyContains(contour2);
+
+                    AddPolygonsPairsToList(contour1, contour2, intersectionResult);
                 }
             }
 
-            return allIntersections;
+            if (FillRule == FillRule.EvenOdd)
+            {
+                MergeSegments();
+                MergePoints();
+                
+                return;
+            }
+
+            foreach (var polygonPair in checkedPolygons)
+            {
+                var contour1 = polygonPair.Contour1;
+                var contour2 = polygonPair.Contour2;
+                var intersectionResult = polygonPair.IntersectionType;
+
+                //If polygons partly inside each other
+                if (intersectionResult == ContainmentType.Intersects)
+                {
+                    ProcessContoursIntersections(contour1, contour2);
+                }
+            }
+
+            // update for correct marking
+            foreach (var contour in contours)
+            {
+                contour.UpdatePoints();
+            }
+            
+            foreach (var polygonPair in checkedPolygons)
+            {
+                var contour1 = polygonPair.Contour1;
+                var contour2 = polygonPair.Contour2;
+                var intersectionResult = polygonPair.IntersectionType;
+
+                //If polygons partly inside each other
+                if (intersectionResult == ContainmentType.Intersects)
+                {
+                    MarkSegments(contour1, contour2);
+                    MarkSegments(contour2, contour1);
+                }
+            }
+
+            // delete inner segments and update points 
+            foreach (var contour in contours)
+            {
+                contour.RemoveSegmentsByRule(true);
+                contour.UpdatePoints();
+            }
+
+            MergeSegments();
+            MergePoints();
         }
 
         /// <summary>
@@ -417,30 +404,31 @@ namespace Adamantium.Mathematics
         /// <param name="polygon1">First polygon</param>
         /// <param name="polygon2">Second polygon</param>
         /// <param name="intersectionType">Intersection type between two polygons</param>
-        private void AddPolygonsPairsToList(PolygonItem polygon1, PolygonItem polygon2, ContainmentType intersectionType)
+        private void AddPolygonsPairsToList(MeshContour polygon1, MeshContour polygon2,
+            ContainmentType intersectionType)
         {
-            checkedPolygons.Add(new PolygonPair(polygon1, polygon2, intersectionType));
+            checkedPolygons.Add(new ContourPair(polygon1, polygon2, intersectionType));
         }
 
         /// <summary>
         /// Check does 2 polygons present in check list
         /// </summary>
-        /// <param name="polygon1">First polygon</param>
+        /// <param name="contour1">First polygon</param>
         /// <param name="polygon2">Second polygon</param>
         /// <returns>True if polygons already contains in check list, otherwise false</returns>
-        private bool ContainsPolygonPair(PolygonItem polygon1, PolygonItem polygon2)
+        private bool ContainsPolygonPair(MeshContour contour1, MeshContour contour2)
         {
-            return checkedPolygons.Contains(new PolygonPair(polygon1, polygon2));
+            return checkedPolygons.Contains(new ContourPair(contour1, contour2));
         }
 
         /// <summary>
         /// Sort points by its X component from smallest to largest
         /// </summary>
         /// <returns>New collection of </returns>
-        public List<Vector2> SortPoints()
+        public List<GeometryIntersection> SortPoints()
         {
-            var sortedList = new List<Vector2>(MergedPoints);
-            sortedList.Sort(VerticalPointsComparer.Default);
+            var sortedList = new List<GeometryIntersection>(MergedPoints);
+            sortedList.Sort(VerticalGeometryPointsComparer.Default);
             return sortedList;
         }
 
@@ -452,101 +440,47 @@ namespace Adamantium.Mathematics
 
             for (var i = 0; i < MergedPoints.Count; ++i)
             {
-                var point = MergedPoints[i];
+                var point = MergedPoints[i].Coordinates;
                 Vector2.Min(ref minimum, ref point, out minimum);
                 Vector2.Max(ref maximum, ref point, out maximum);
             }
-            //HighestPoint = new Vector2D(minimum.X, maximum.Y);
-            HighestPoint = new Vector2(minimum.X, minimum.Y);
-        }
 
-        /// <summary>
-        /// Updates segments for polygons using self Intersection points
-        /// </summary>
-        /// <param name="selfIntersectionPoints">Self intersection points</param>
-        private void UpdatePolygonUsingSelfPoints(List<Vector2> selfIntersectionPoints)
-        {
-            if (selfIntersectionPoints.Count == 0)
-            {
-                return;
-            }
-
-            var tempSegments = new List<LineSegment2D>(MergedSegments);
-            for (var i = 0; i < selfIntersectionPoints.Count; i++)
-            {
-                var interPoint = selfIntersectionPoints[i];
-                if (!PolygonHelper.GetSegmentsFromPoint(tempSegments, interPoint, out var segments)) continue;
-                
-                for (var j = 0; j < segments.Count; j++)
-                {
-                    var segment = segments[j];
-                    
-                    if (MathHelper.WithinEpsilon(interPoint, segment.Start, Epsilon) ||
-                        MathHelper.WithinEpsilon(interPoint, segment.End, Epsilon))
-                    {
-                        continue;
-                    }
-
-                    var index = tempSegments.IndexOf(segment);
-                    tempSegments.RemoveAt(index);
-                    var seg1 = new LineSegment2D(segment.Start, interPoint);
-                    if (PolygonHelper.InsertSegment(tempSegments, seg1, index))
-                    {
-                        index++;
-                    }
-
-                    var seg2 = new LineSegment2D(interPoint, segment.End);
-                    PolygonHelper.InsertSegment(tempSegments, seg2, index);
-                }
-            }
-            MergedSegments.Clear();
-            MergedSegments.AddRange(tempSegments);
-
-            UpdateMergedPoints();
+            LeftmostXCoord = minimum.X;
         }
 
         /// <summary>
         /// Update <see cref="MergedSegments"/> collection based on collection of intersection points. 
         /// As a result, this method will create new additional segments nad update <see cref="MergedPoints"/> collection
         /// </summary>
-        /// <param name="intersectionPoints">Collection of intersection points</param>
-        internal void UpdatePolygonUsingRayInterPoints(List<Vector2> intersectionPoints)
+        /// <param name="additionalRayIntersections">Collection of intersection points</param>
+        internal void UpdatePolygonUsingAdditionalRayInterPoints(Dictionary<GeometrySegment, SortedList<double, GeometryIntersection>> additionalRayIntersections)
         {
-            if (intersectionPoints.Count == 0)
+            foreach (var (key, value) in additionalRayIntersections)
             {
-                return;
-            }
-
-            var tempSegments = new List<LineSegment2D>(MergedSegments);
-            for (var i = 0; i < intersectionPoints.Count; i++)
-            {
-                var interPoint = intersectionPoints[i];
-                if (!PolygonHelper.GetSegmentsFromPoint(tempSegments, interPoint, out var segments)) continue;
-                
-                for (var j = 0; j < segments.Count; j++)
+                if (value.Count == 0)
                 {
-                    var segment = segments[j];
-                    if (MathHelper.WithinEpsilon(interPoint, segment.Start, Epsilon) ||
-                        MathHelper.WithinEpsilon(interPoint, segment.End, Epsilon))
-                    {
-                        continue;
-                    }
-
-                    var index = tempSegments.IndexOf(segment);
-                    tempSegments.RemoveAt(index);
-                    var seg1 = new LineSegment2D(segment.Start, interPoint);
-                    if (PolygonHelper.InsertSegment(tempSegments, seg1, index))
-                    {
-                        index++;
-                    }
-
-                    var seg2 = new LineSegment2D(interPoint, segment.End);
-                    PolygonHelper.InsertSegment(tempSegments, seg2, index);
+                    continue;
                 }
-            }
-            MergedSegments.Clear();
-            MergedSegments.AddRange(tempSegments);
 
+                key.RemoveSelfFromConnectedSegments();
+                if (MergedSegments.Contains(key)) MergedSegments.Remove(key);
+
+                var startPart = new GeometrySegment(key.Parent, key.SegmentEnds[0], value.Values.First());
+                MergedSegments.Add(startPart);
+
+                for (var i = 0; i < value.Values.Count - 1; i++)
+                {
+                    var int1 = value.Values[i];
+                    var int2 = value.Values[i + 1];
+
+                    var seg = new GeometrySegment(key.Parent, int1, int2);
+                    MergedSegments.Add(seg);
+                }
+
+                var endPart = new GeometrySegment(key.Parent, value.Values.Last(), key.SegmentEnds[1]);
+                MergedSegments.Add(endPart);
+            }
+        
             UpdateMergedPoints();
         }
 
@@ -562,74 +496,67 @@ namespace Adamantium.Mathematics
                 var segment = MergedSegments[i];
                 if (!mergedPointsHash.Contains(segment.Start))
                 {
-                    MergedPoints.Add(segment.Start);
+                    MergedPoints.Add(segment.SegmentEnds[0]);
                     mergedPointsHash.Add(segment.Start);
                 }
 
                 if (!mergedPointsHash.Contains(segment.End))
                 {
-                    MergedPoints.Add(segment.End);
+                    MergedPoints.Add(segment.SegmentEnds[1]);
                     mergedPointsHash.Add(segment.End);
                 }
             }
         }
 
-        
-
-        /// <summary>
-        /// Comparer here is for sorting vectors by its Y component from smallest to biggest value
-        /// </summary>
-        private class VerticalPointsComparer : IComparer<Vector2>
+        private class VerticalGeometryPointsComparer : IComparer<GeometryIntersection>
         {
-            public static VerticalPointsComparer Default => new VerticalPointsComparer();
+            public static VerticalGeometryPointsComparer Default => new ();
 
-            public int Compare(Vector2 x, Vector2 y)
+            public int Compare(GeometryIntersection x, GeometryIntersection y)
             {
-                if (MathHelper.WithinEpsilon(x.Y, y.Y, Epsilon))
+                if (MathHelper.WithinEpsilon(x.Coordinates.Y, y.Coordinates.Y, Epsilon))
                 {
                     return 0;
                 }
 
-                return x.Y < y.Y ? -1 : 1;
+                return x.Coordinates.Y < y.Coordinates.Y ? -1 : 1;
             }
         }
-
+        
         public override string ToString()
         {
-            return $"{Name}, PolygonItems: {Polygons.Count}";
+            return $"{Name}, PolygonItems: {Contours.Count}";
         }
 
-        private class PolygonPair: IEquatable<PolygonPair>
+        private class ContourPair : IEquatable<ContourPair>
         {
-            public PolygonItem Polygon1 { get; }
+            public MeshContour Contour1 { get; }
 
-            public PolygonItem Polygon2 { get; }
+            public MeshContour Contour2 { get; }
 
             public ContainmentType IntersectionType { get; }
 
-            public PolygonPair() {}
-
-            public PolygonPair(PolygonItem polygon1, PolygonItem polygon2, ContainmentType intersectionType)
+            public ContourPair(MeshContour contour1, MeshContour contour2, ContainmentType intersectionType)
             {
-                Polygon1 = polygon1;
-                Polygon2 = polygon2;
+                Contour1 = contour1;
+                Contour2 = contour2;
                 IntersectionType = intersectionType;
             }
 
-            public PolygonPair(PolygonItem polygon1, PolygonItem polygon2)
+            public ContourPair(MeshContour contour1, MeshContour contour2)
             {
-                Polygon1 = polygon1;
-                Polygon2 = polygon2;
+                Contour1 = contour1;
+                Contour2 = contour2;
             }
 
-            public bool Equals(PolygonPair other)
+            public bool Equals(ContourPair other)
             {
                 if (ReferenceEquals(null, other))
                     return false;
                 if (ReferenceEquals(this, other))
                     return true;
-                return (Equals(Polygon1, other.Polygon1) && Equals(Polygon2, other.Polygon2)) ||
-                       (Equals(Polygon1, other.Polygon2) && Equals(Polygon2, other.Polygon1));
+                return (Equals(Contour1, other.Contour1) && Equals(Contour2, other.Contour2)) ||
+                       (Equals(Contour1, other.Contour2) && Equals(Contour2, other.Contour1));
             }
 
             public override bool Equals(object obj)
@@ -640,15 +567,15 @@ namespace Adamantium.Mathematics
                     return true;
                 if (obj.GetType() != this.GetType())
                     return false;
-                return Equals((PolygonPair) obj);
+                return Equals((ContourPair) obj);
             }
 
             public override int GetHashCode()
             {
                 unchecked
                 {
-                    var hashCode = (Polygon1 != null ? Polygon1.GetHashCode() : 0);
-                    hashCode = (hashCode * 397) ^ (Polygon2 != null ? Polygon2.GetHashCode() : 0);
+                    var hashCode = (Contour1 != null ? Contour1.GetHashCode() : 0);
+                    hashCode = (hashCode * 397) ^ (Contour2 != null ? Contour2.GetHashCode() : 0);
                     hashCode = (hashCode * 397) ^ (int) IntersectionType;
                     return hashCode;
                 }
@@ -656,7 +583,7 @@ namespace Adamantium.Mathematics
 
             public override string ToString()
             {
-                return $"Polygon1 {Polygon1}, Polygon2 {Polygon2}, IntersectionType {IntersectionType}";
+                return $"Polygon1 {Contour1}, Polygon2 {Contour2}, IntersectionType {IntersectionType}";
             }
         }
     }

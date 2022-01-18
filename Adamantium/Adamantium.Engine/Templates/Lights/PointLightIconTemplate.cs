@@ -96,11 +96,11 @@ namespace Adamantium.Engine.Templates.Lights
                 angle += angleItem;
             }
 
-            PolygonItem bulb = new PolygonItem(bulbPoints) { Name = "Lightbulb" };
-            PolygonItem bulbBase = new PolygonItem(bulbBasePoints1) { Name = "Bulb_Base" };
-            PolygonItem base3 = new PolygonItem(bulbBasePoints2) { Name = "Base_2" };
-            PolygonItem base2 = new PolygonItem(bulbBasePoints3) { Name = "Base_3" };
-            PolygonItem base1 = new PolygonItem(bulbBasePoints4) { Name = "Base_4" };
+            MeshContour bulb     = new MeshContour(bulbPoints)      { Name = "Lightbulb" };
+            MeshContour bulbBase = new MeshContour(bulbBasePoints1) { Name = "Bulb_Base" };
+            MeshContour base3    = new MeshContour(bulbBasePoints2) { Name = "Base_2" };
+            MeshContour base2    = new MeshContour(bulbBasePoints3) { Name = "Base_3" };
+            MeshContour base1    = new MeshContour(bulbBasePoints4) { Name = "Base_4" };
 
             Polygon polygon = new Polygon();
             polygon.AddItems(base1, base2, base3, bulbBase, bulb);
