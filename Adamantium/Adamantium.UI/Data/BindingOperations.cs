@@ -15,30 +15,13 @@ public static class BindingOperations
    public static BindingExpressionBase SetBinding(AdamantiumComponent o, AdamantiumProperty property,
       BindingBase binding)
    {
-      if (o == null)
+      ArgumentNullException.ThrowIfNull(o);
+      ArgumentNullException.ThrowIfNull(property);
+      ArgumentNullException.ThrowIfNull(binding);
+      
+      if (binding is Binding bind)
       {
-         throw  new ArgumentNullException(nameof(o));
-      }
-
-      if (property == null)
-      {
-         throw new ArgumentNullException(nameof(property));
-      }
-
-      if (binding == null)
-      {
-         throw new ArgumentNullException(nameof(binding));
-      }
-
-      if (binding is Binding)
-      {
-         var bind = binding as Binding;
-         //bind.
-
-
-         BindingExpression expression = new BindingExpression();
-            
-
+         var expression = new BindingExpression();
       }
       return null;
    }

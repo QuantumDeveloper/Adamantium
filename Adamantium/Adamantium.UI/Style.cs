@@ -1,4 +1,6 @@
 ﻿using System;
+using Adamantium.Core;
+using Adamantium.UI.Exceptions;
 
 namespace Adamantium.UI;
 
@@ -26,19 +28,25 @@ public class Style
 
    public TriggerCollection Triggers { get; }
 
-   public void Attach(FrameworkComponent control)
+   public void Attach(IUIComponent control)
    {
-      if (control != null)
-      {
-         foreach (var setter in Setters)
-         {
-            setter.Apply(control);
-         }
+      if (control == null) return;
 
-         foreach (var trigger in Triggers)
-         {
-            trigger.Apply(control);
-         }
+      if (!Utilities.IsTypeInheritFrom(control.GetType(), TargetType))
+      {
+         throw new StyleTargetTypeException($"Control should be of type {TargetType.Name} instead of {control.GetType()}");
+      }
+      
+      
+
+      foreach (var setter in Setters)
+      {
+         setter.Apply(control);
+      }
+
+      foreach (var trigger in Triggers)
+      {
+         trigger.Apply(control);
       }
    }
 }

@@ -3,5 +3,5 @@
 public interface ITrigger
 {
    SetterCollection Setters { get; set; }
-   void Apply(FrameworkComponent control);
+   void Apply(IUIComponent control);
 }

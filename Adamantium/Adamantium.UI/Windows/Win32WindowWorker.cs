@@ -100,7 +100,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
             this.window.ClientWidth = (uint)client.Width;
             this.window.ClientHeight = (uint)client.Height;
 
-            this.window.ApplyTemplate();
+            this.window.OnApplyTemplate();
                 
             eventAggregator.GetEvent<WindowAddedEvent>().Publish(this.window);
                 

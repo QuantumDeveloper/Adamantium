@@ -1,10 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Linq;
 using Adamantium.Core.Collections;
-using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Input;
 using Adamantium.UI.Media;
@@ -23,15 +21,26 @@ public class UIComponent : AdamantiumComponent, IInputElement
     protected Size previousRenderSize;
         
     #region Adamantium properties
-        
+    
+    public static readonly AdamantiumProperty RenderTransformProperty =
+        AdamantiumProperty.Register(nameof(RenderTransform), typeof(Transform), typeof(UIComponent));
+    
+    public static readonly AdamantiumProperty LayoutTransformProperty =
+        AdamantiumProperty.Register(nameof(LayoutTransform), typeof(Transform), typeof(UIComponent));
+
+    public static readonly AdamantiumProperty StyleProperty =
+        AdamantiumProperty.Register(nameof(Style), typeof(Style), typeof(UIComponent), new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure, StyleChangedCallback));
+
+    private static void StyleChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (a is IUIComponent component)
+        {
+            component.Style.Attach(component);
+        }
+    }
+
     public static readonly AdamantiumProperty LocationProperty = AdamantiumProperty.Register(nameof(Location),
         typeof (Vector2), typeof (UIComponent), new PropertyMetadata(Vector2.Zero));
-
-    public static readonly AdamantiumProperty RotationProperty = AdamantiumProperty.Register(nameof(Rotation),
-        typeof(Double), typeof(UIComponent), new PropertyMetadata((Double)0));
-
-    public static readonly AdamantiumProperty ScaleProperty = AdamantiumProperty.Register(nameof(Scale),
-        typeof(Vector2), typeof(UIComponent), new PropertyMetadata(Vector2.One));
 
     public static readonly AdamantiumProperty VisibilityProperty = AdamantiumProperty.Register(nameof(Visibility),
         typeof(Visibility), typeof(UIComponent),
@@ -90,17 +99,16 @@ public class UIComponent : AdamantiumComponent, IInputElement
     #region Routed events
 
     public static readonly RoutedEvent LoadedEvent = EventManager.RegisterRoutedEvent("Loaded",
-        RoutingStrategy.Direct, typeof(TextInputEventHandler), typeof(UIComponent));
+        RoutingStrategy.Direct, typeof(RoutedEventHandler), typeof(UIComponent));
+    
+    public static readonly RoutedEvent UnloadedEvent = EventManager.RegisterRoutedEvent("Unloaded",
+        RoutingStrategy.Direct, typeof(RoutedEventHandler), typeof(UIComponent));
 
     public static readonly RoutedEvent InitializedEvent = EventManager.RegisterRoutedEvent("Initialized",
-        RoutingStrategy.Direct, typeof(TextInputEventHandler), typeof(UIComponent));
+        RoutingStrategy.Direct, typeof(RoutedEventHandler), typeof(UIComponent));
 
     public static readonly RoutedEvent TextInputEvent = EventManager.RegisterRoutedEvent("TextInput",
         RoutingStrategy.Bubble, typeof(TextInputEventHandler), typeof(UIComponent));
-
-    public static readonly RoutedEvent PreviewMouseDoubleClickEvent = EventManager.RegisterRoutedEvent(
-        "PreviewMouseDoubleClick",
-        RoutingStrategy.Tunnel, typeof(MouseButtonEventHandler), typeof(UIComponent));
 
     public static readonly RoutedEvent PreviewTextInputEvent = 
         EventManager.RegisterRoutedEvent("PreviewTextInput",
@@ -188,6 +196,24 @@ public class UIComponent : AdamantiumComponent, IInputElement
 
 
     #region Events
+    
+    public event RoutedEventHandler Loaded
+    {
+        add => AddHandler(LoadedEvent, value);
+        remove => RemoveHandler(LoadedEvent, value);
+    }
+    
+    public event RoutedEventHandler Unloaded
+    {
+        add => AddHandler(UnloadedEvent, value);
+        remove => RemoveHandler(UnloadedEvent, value);
+    }
+    
+    public event RoutedEventHandler Initialized
+    {
+        add => AddHandler(InitializedEvent, value);
+        remove => RemoveHandler(InitializedEvent, value);
+    }
 
     public event RawMouseEventHandler RawMouseMove
     {
@@ -487,18 +513,6 @@ public class UIComponent : AdamantiumComponent, IInputElement
     {
         get => GetValue<Vector2>(LocationProperty);
         set => SetValue(LocationProperty, value);
-    }
-
-    public Vector2 Scale
-    {
-        get => GetValue<Vector2>(ScaleProperty);
-        set => SetValue(ScaleProperty, value);
-    }
-
-    public Double Rotation
-    {
-        get => GetValue<Double>(RotationProperty);
-        set => SetValue(RotationProperty, value);
     }
 
     public Visibility Visibility
@@ -1341,15 +1355,8 @@ public class UIComponent : AdamantiumComponent, IInputElement
 
     public void RaiseEvent(RoutedEventArgs e)
     {
-        if (e == null)
-        {
-            throw new ArgumentNullException(nameof(e));
-        }
-
-        if (e.RoutedEvent == null)
-        {
-            throw new NullReferenceException(nameof(e.RoutedEvent));
-        }
+        ArgumentNullException.ThrowIfNull(e);
+        ArgumentNullException.ThrowIfNull(e.RoutedEvent);
 
         e.Source ??= this;
         e.OriginalSource ??= this;
@@ -1505,6 +1512,19 @@ public class UIComponent : AdamantiumComponent, IInputElement
 
     public Int32 ZIndex { get; set; }
 
+    
+    public Transform RenderTransform
+    {
+        get => GetValue<Transform>(RenderTransformProperty);
+        set => SetValue(RenderTransformProperty, value);
+    }
+    
+    public Transform LayoutTransform
+    {
+        get => GetValue<Transform>(LayoutTransformProperty);
+        set => SetValue(LayoutTransformProperty, value);
+    }
+    
     public IReadOnlyCollection<IUIComponent> GetVisualDescendants()
     {
         return VisualChildrenCollection.AsReadOnly();
@@ -1515,6 +1535,12 @@ public class UIComponent : AdamantiumComponent, IInputElement
     protected TrackingCollection<IUIComponent> VisualChildrenCollection { get; private set; } 
       
     public bool IsAttachedToVisualTree { get; private set; }
+
+    public Style Style
+    {
+        get => GetValue<Style>(StyleProperty);
+        set => SetValue(StyleProperty, value);
+    }
 
     protected void SetVisualParent(IUIComponent parent)
     {

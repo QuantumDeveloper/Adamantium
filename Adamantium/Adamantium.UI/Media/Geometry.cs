@@ -68,7 +68,7 @@ public abstract class Geometry : AdamantiumComponent
 
    public abstract void RecalculateBounds();
 
-   protected internal void ProcessGeometry()
+   public void ProcessGeometry()
    {
       if (!IsProcessed)
       {
@@ -95,5 +95,10 @@ public abstract class Geometry : AdamantiumComponent
    {
       base.OnComponentUpdated();
       InvalidateGeometry();
+   }
+
+   public static Geometry Parse(string xamlString)
+   {
+      return new SVGParser().Parse(xamlString);
    }
 }
