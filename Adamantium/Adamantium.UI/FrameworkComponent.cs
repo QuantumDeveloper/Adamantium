@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
 using Adamantium.Core.Collections;
-using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Data;
 using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI;
@@ -67,6 +67,25 @@ public class FrameworkComponent : UIComponent, IName, IFrameworkComponent
     public static readonly AdamantiumProperty DataContextProperty = AdamantiumProperty.Register(nameof(DataContext),
         typeof(object), typeof(FrameworkComponent),
         new PropertyMetadata(null, PropertyMetadataOptions.Inherits, DataContextChangedCallBack));
+
+    public static readonly AdamantiumProperty TemplateProperty =
+        AdamantiumProperty.Register(nameof(Template), typeof(ControlTemplate), typeof(FrameworkComponent), new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender, TemplateChangedCallback));
+
+    private static void TemplateChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (a is FrameworkComponent component)
+        {
+            if (e.OldValue != AdamantiumProperty.UnsetValue && e.OldValue != null)
+            {
+                component.OnRemoveTemplate();
+            }
+
+            if (e.NewValue != AdamantiumProperty.UnsetValue && e.NewValue != null)
+            {
+                component.OnApplyTemplate();
+            }
+        }
+    }
 
     private static void WidthChangedCallBack(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
     {
@@ -188,8 +207,20 @@ public class FrameworkComponent : UIComponent, IName, IFrameworkComponent
         set => SetValue(TagProperty, value);
     }
 
+    public ControlTemplate Template
+    {
+        get => GetValue<ControlTemplate>(TemplateProperty);
+        set => SetValue(TemplateProperty, value);
+    }
+
+    public BindingExpression SetBinding(AdamantiumProperty property, BindingBase bindingBase)
+    {
+        return null;
+    }
+
     public event AdamantiumPropertyChangedEventHandler DataContextChanged;
     public FrameworkComponent Parent => parent;
+    
     public IReadOnlyCollection<FrameworkComponent> LogicalChildrenCollection => LogicalChildren.AsReadOnly();
 
 
@@ -515,10 +546,20 @@ public class FrameworkComponent : UIComponent, IName, IFrameworkComponent
         }
     }
 
-    public bool ApplyTemplate()
+    public virtual void OnRemoveTemplate()
+    {
+        RaiseEvent(new RoutedEventArgs(UnloadedEvent, this));
+    }
+
+    public virtual void OnApplyTemplate()
     {
         RaiseEvent(new RoutedEventArgs(LoadedEvent, this));
+    }
 
-        return true;
+    public IAdamantiumComponent GetTemplateChild(string name)
+    {
+        if (Template == null) return null;
+
+        return Template.FindName(name);
     }
 }

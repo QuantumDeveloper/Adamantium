@@ -2,5 +2,5 @@
 
 public interface ISetter
 {
-   void Apply(FrameworkComponent control);
+   void Apply(IAdamantiumComponent control);
 }

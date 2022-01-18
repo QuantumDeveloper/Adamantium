@@ -90,7 +90,7 @@ namespace Adamantium.UI.Playground
             path.StrokeThickness = 0;
             path.Stroke = Brushes.CornflowerBlue;
             path.StrokeLineJoin = PenLineJoin.Miter;
-            path.Fill = Brushes.Fuchsia;
+            path.Fill = Brushes.Black;
             CombinedGeometry combinedGeometry = new CombinedGeometry();
             combinedGeometry.GeometryCombineMode = GeometryCombineMode.Union;
             var innerCombinedGeometry = new CombinedGeometry();
@@ -99,6 +99,7 @@ namespace Adamantium.UI.Playground
             innerCombinedGeometry.Geometry2 = new EllipseGeometry(new Vector2(100), 65, 65);
 
             var rectangleGeometry = new RectangleGeometry(new Rect(30, 93, 140, 15), new CornerRadius(0));
+            var rectangleGeometry2 = new RectangleGeometry(new Rect(50, 50, 50, 50), new CornerRadius(0));
             rectangleGeometry.Transform = new Transform();
             rectangleGeometry.Transform.RotationAngle = 16;
             rectangleGeometry.Transform.RotationCenterX = 100;
@@ -109,13 +110,28 @@ namespace Adamantium.UI.Playground
 
             //innerCombinedGeometry.Geometry2 = rectangleGeometry;
             
-            path.Data = combinedGeometry;
+            path.Data = rectangleGeometry2;
+
+            //var xamlIcon = "M3,4H17V8H20L23,12V17H21A3,3 0 0,1 18,20A3,3 0 0,1 15,17H9A3,3 0 0,1 6,20A3,3 0 0,1 3,17H1V6C1,4.89 1.9,4 3,4M17,9.5V12H21.47L19.5,9.5H17M6,15.5A1.5,1.5 0 0,0 4.5,17A1.5,1.5 0 0,0 6,18.5A1.5,1.5 0 0,0 7.5,17A1.5,1.5 0 0,0 6,15.5M18,15.5A1.5,1.5 0 0,0 16.5,17A1.5,1.5 0 0,0 18,18.5A1.5,1.5 0 0,0 19.5,17A1.5,1.5 0 0,0 18,15.5M8,14L14,8L12.59,6.58L8,11.17L5.91,9.08L4.5,10.5L8,14Z";
+            //var xamlIcon = "M14.12,10H19V8.2H15.38L13.38,4.87C13.08,4.37 12.54,4.03 11.92,4.03C11.74,4.03 11.58,4.06 11.42,4.11L6,5.8V11H7.8V7.33L9.91,6.67L6,22H7.8L10.67,13.89L13,17V22H14.8V15.59L12.31,11.05L13.04,8.18M14,3.8C15,3.8 15.8,3 15.8,2C15.8,1 15,0.2 14,0.2C13,0.2 12.2,1 12.2,2C12.2,3 13,3.8 14,3.8Z";
+            var xamlIcon = "M9,12C9,11.19 9.3,10.5 9.89,9.89C10.5,9.3 11.19,9 12,9C12.81,9 13.5,9.3 14.11,9.89C14.7,10.5 15,11.19 15,12C15,12.81 14.7,13.5 14.11,14.11C13.5,14.7 12.81,15 12,15C11.19,15 10.5,14.7 9.89,14.11C9.3,13.5 9,12.81 9,12M5.53,8.44L7.31,10.22L5.53,12L7.31,13.78L5.53,15.56L2,12L5.53,8.44M8.44,18.47L10.22,16.69L12,18.47L13.78,16.69L15.56,18.47L12,22L8.44,18.47M18.47,15.56L16.69,13.78L18.47,12L16.69,10.22L18.47,8.44L22,12L18.47,15.56M15.56,5.53L13.78,7.31L12,5.53L10.22,7.31L8.44,5.53L12,2L15.56,5.53Z";
+            //path.Data = Geometry.Parse(xamlIcon);
+            // path.Data.Transform = new Transform();
+            // path.Data.Transform.ScaleX = 5;
+            // path.Data.Transform.ScaleY = 5;
+            //var geom = path.Data as PathGeometry;
+            //geom.FillRule = FillRule.NonZero;
+            // var f = geom.Figures[2];
+            // geom.Figures.Clear();
+            // geom.Figures.Add(f);
             var pathGeometry = new PathGeometry();
             pathGeometry.FillRule = FillRule.NonZero;
-            pathGeometry.IsClosed = false;
+            pathGeometry.IsClosed = true;
             var pathFigure = new PathFigure();
-            pathFigure.StartPoint = new Vector2(200, 250);
+            pathFigure.StartPoint = new Vector2(150, 100);
             pathFigure.Segments = new PathSegmentCollection();
+            pathFigure.IsFilled = true;
+            pathFigure.IsClosed = true;
             // var segment = new PolylineSegment();
             // segment.Points = new PointsCollection();
             // segment.Points.Add(new Vector2(100, 10));
@@ -124,18 +140,21 @@ namespace Adamantium.UI.Playground
             var lineSegment = new LineSegment();
             lineSegment.Point = new Vector2(250, 250);
             arcSegment = new ArcSegment();
-            arcSegment.Point = new Vector2(400, 270);
-            arcSegment.Size = new Size(100, 50);
-            arcSegment.RotationAngle = 46;
-            arcSegment.IsLargeArc = true;
+            arcSegment.IsStroked = true;
+            arcSegment.Point = new Vector2(250,150);
+            arcSegment.Size = new Size(150, 200);
+            arcSegment.RotationAngle = 0;
+            arcSegment.IsLargeArc = false;
             arcSegment.SweepDirection = SweepDirection.Clockwise;
             
             var lineSegment2 = new LineSegment();
             lineSegment2.Point = new Vector2(1000, 270);
             
-            pathFigure.Segments.Add(lineSegment);
+            //pathFigure.Segments.Add(lineSegment);
             pathFigure.Segments.Add(arcSegment);
-            pathFigure.Segments.Add(lineSegment2);
+            //pathFigure.Segments.Add(lineSegment2);
+
+            //path.Data = pathGeometry;
 
             // var bSplineSegment = new NurbsSegment();
             // bSplineSegment.Points = new PointsCollection();
@@ -192,11 +211,11 @@ namespace Adamantium.UI.Playground
             border.Height = 300;
 
             grid.Background = Brushes.White;
-            // grid.Children.Add(rectangle);
+            grid.Children.Add(rectangle);
             // grid.Children.Add(ellipse);
             // grid.Children.Add(line);
             // grid.Children.Add(polygon);
-            grid.Children.Add(path);
+             grid.Children.Add(path);
             //grid.Children.Add(border);
 
             Content = grid;

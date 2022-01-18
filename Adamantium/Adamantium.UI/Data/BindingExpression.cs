@@ -4,11 +4,11 @@ using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI.Data;
 
-public class BindingExpression:BindingExpressionBase
+public class BindingExpression : BindingExpressionBase
 {
    public object DataSource { get; set; }
-   public Binding ParentBinding { get;  set; }
-   public String SourcePropertyName { get;  set; }
+   public Binding ParentBinding { get; set; }
+   public String SourcePropertyName { get; set; }
    public object ResolvedSource { get; set; }
 
    public void Init()
@@ -46,7 +46,7 @@ public class BindingExpression:BindingExpressionBase
          ResolvedSource.GetType()
             .GetProperty(SourcePropertyName)
             .SetValue(ResolvedSource, Target.GetValue(TargetProperty));
-            
+
       }
    }
 

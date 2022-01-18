@@ -53,7 +53,7 @@ public class MacOSWindowWorker : AdamantiumComponent, IWindowWorkerService
         MacOSInterop.AddWindowDidResizeCallback(windowDelegate,
             Marshal.GetFunctionPointerForDelegate(didResizeDelegate));
             
-        this.window.ApplyTemplate();
+        this.window.OnApplyTemplate();
         eventAggregator.GetEvent<WindowAddedEvent>().Publish(this.window);
         this.window.OnSourceInitialized();
         MacOSInterop.ShowWindow(window.Handle);

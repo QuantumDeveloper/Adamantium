@@ -5,7 +5,7 @@ namespace Adamantium.UI.Media;
 
 public class ArcSegment : PathSegment
 {
-    private int tessellationFactor = 5;
+    private int tessellationFactor = 200;
 
     public ArcSegment()
     {
@@ -94,7 +94,7 @@ public class ArcSegment : PathSegment
     private Vector2[] GetArcPoints(Vector2 pt1, Vector2 pt2,
         double radiusX, double radiusY, double rotationAngle,
         bool isLargeArc, bool isCounterclockwise,
-        double tolerance)
+        int tolerance)
     {
         var points = new List<Vector2>();
 
@@ -140,34 +140,44 @@ public class ArcSegment : PathSegment
                 else angle2 += 2 * Math.PI;
             }
         }
-        else if (MathHelper.NearEqual(Math.Abs(angle2 - angle1), Math.PI))
-        {
-            if (isCounterclockwise) (angle1, angle2) = (angle2, angle1);
-            else
-            {
-                if (angle1 < angle2) angle1 += 2 * Math.PI;
-                else angle2 += 2 * Math.PI;
-            }
-        }
 
         // Invert matrix for final point calculation
         transform.Invert();
 
-        // Calculate number of points for polyline approximation
-        var max = (int)((4 * (radiusX + radiusY) * Math.Abs(angle2 - angle1) / (2 * Math.PI)) / tolerance);
-
-        // Loop through the points
-        for (var i = 0; i <= max; i++)
+        var startAngle = MathHelper.RadiansToDegrees(angle1);
+        var stopAngle = MathHelper.RadiansToDegrees(angle2);
+        var range = Math.Abs(startAngle - stopAngle);
+        if (!isLargeArc && range > 180)
         {
-            var angle = ((max - i) * angle1 + i * angle2) / max;
-            var x = center.X + radiusY * Math.Cos(angle);
-            var y = center.Y + radiusY * Math.Sin(angle);
-
-            // Transform the point back
-            var pt = Matrix3x2.TransformPoint(transform, new Vector2(x, y));
-            points.Add(pt);
+            range = 360 - range;
         }
         
+        float sign = 1;
+        if (isCounterclockwise)
+        {
+            sign = -1;
+        }
+        
+        var segmentsCount = (int)((4 * (radiusX + radiusY) * MathHelper.DegreesToRadians(range) / (2 * Math.PI)));
+        if (segmentsCount > tolerance) segmentsCount = tolerance;
+        
+        var angle = (range / segmentsCount) * sign;
+        var currentAngle = startAngle;
+        
+        for (var i = 0; i <= segmentsCount; i++)
+        {
+            var angleItem = MathHelper.DegreesToRadians(currentAngle);
+            var x = center.X + (radiusY * Math.Cos(angleItem));
+            var y = center.Y + (radiusY * Math.Sin(angleItem));
+            
+            var pt = Matrix3x2.TransformPoint(transform, new Vector2(x, y));
+            
+            points.Add(Vector2.Round(pt, 4));
+
+            currentAngle += angle;
+        }
+        
+         
         return points.ToArray();
     }
 }

@@ -1,12 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using Adamantium.EntityFramework.ComponentsBasics;
-using Adamantium.Mathematics;
-using Adamantium.UI.Controls;
 using Adamantium.UI.Input;
 using Adamantium.UI.Media;
 using Adamantium.UI.RoutedEvents;
+using Transform = Adamantium.UI.Media.Transform;
 
 namespace Adamantium.UI;
 
@@ -79,8 +77,6 @@ public interface IUIComponent : IAdamantiumComponent, IComponent
     Size DesiredSize { get; }
     Size RenderSize { get; set; }
     Vector2 Location { get; set; }
-    Vector2 Scale { get; set; }
-    Double Rotation { get; set; }
     Visibility Visibility { get; set; }
     Rect Bounds { get; set; }
     Rect ClipRectangle { get; }
@@ -88,6 +84,11 @@ public interface IUIComponent : IAdamantiumComponent, IComponent
     IUIComponent VisualParent { get; }
     Int32 ZIndex { get; set; }
     bool IsAttachedToVisualTree { get; }
+    Style Style { get; set; }
+    
+    Transform LayoutTransform { get; set; }
+    
+    Transform RenderTransform { get; set; }
 
     IReadOnlyCollection<IUIComponent> GetVisualDescendants();
         
