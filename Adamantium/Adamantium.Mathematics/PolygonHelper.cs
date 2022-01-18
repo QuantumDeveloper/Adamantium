@@ -27,40 +27,10 @@ namespace Adamantium.Mathematics
         {
             return segment2D.Start == segment2D.End;
         }
-
-        /// <summary>
-        /// Creates a collection of segments from a collection of points
-        /// </summary>
-        /// <param name="inPoints"></param>
-        /// <param name="isContourClosed"></param>
-        /// <returns>Collection of segments if at least 2 points present in collection, otherwise null</returns>
-        public static LineSegment2D[] SplitOnSegments(IEnumerable<Vector2> inPoints, bool isContourClosed = true)
+        
+        public static bool IsSameStartEnd(ref GeometrySegment segment)
         {
-            var points = inPoints as Vector2[] ?? inPoints.ToArray();
-
-            if (points.Length <= 1) return Array.Empty<LineSegment2D>();
-            
-            var segments = new List<LineSegment2D>();
-            for (var i = 0; i < points.Length - 1; i++)
-            {
-                var segment = new LineSegment2D(points[i], points[i + 1]);
-                if (!IsSameStartEnd(ref segment))
-                {
-                    segments.Add(segment);
-                }
-            }
-
-            var seg = new LineSegment2D(points[^1], points[0]);
-                
-            if (!segments.Contains(seg) && isContourClosed)
-            {
-                //Add last segment
-                if (!IsSameStartEnd(ref seg))
-                {
-                    segments.Add(seg);
-                }
-            }
-            return segments.ToArray();
+            return segment.SegmentEnds[0] == segment.SegmentEnds[1];
         }
 
         /// <summary>
@@ -69,33 +39,50 @@ namespace Adamantium.Mathematics
         /// <param name="inPoints"></param>
         /// <param name="isContourClosed"></param>
         /// <returns>Collection of segments if at least 2 points present in collection, otherwise null</returns>
-        public static LineSegment2D[] SplitOnSegments(IEnumerable<Vector3> inPoints, bool isContourClosed = true)
+        public static List<GeometrySegment> SplitOnSegments(MeshContour parent, IEnumerable<Vector2> inPoints, bool isContourClosed = true)
         {
-            var points = inPoints as Vector3[] ?? inPoints.ToArray();
+            var points = inPoints as Vector2[] ?? inPoints.ToArray();
 
-            if (points.Length <= 1) return Array.Empty<LineSegment2D>();
+            if (points.Length <= 1) return new List<GeometrySegment>();
+
+            var geometryIntersections = new List<GeometryIntersection>();
             
-            var segments = new List<LineSegment2D>();
-            for (var i = 0; i < points.Length - 1; i++)  
+            foreach (var point in points)
             {
-                var segment = new LineSegment2D(points[i], points[i + 1]);
-                if (!IsSameStartEnd(ref segment))
-                {
-                    segments.Add(segment);
-                }
+                geometryIntersections.Add(new GeometryIntersection(point));
+            }
+            
+            var segments = new List<GeometrySegment>();
+            for (var i = 0; i < geometryIntersections.Count - 1; i++)
+            {
+                var segment = new GeometrySegment(parent, geometryIntersections[i], geometryIntersections[i + 1]);
+                if (!IsSameStartEnd(ref segment)) segments.Add(segment);
             }
 
-            var seg = new LineSegment2D(points[^1], points[0]);
-                
-            if (!segments.Contains(seg) && isContourClosed)
+            if (!isContourClosed) return segments;
+
+            var seg = new GeometrySegment(parent, geometryIntersections.Last(), geometryIntersections.First());
+            if (!IsSameStartEnd(ref seg)) segments.Add(seg);
+
+            return segments;
+        }
+
+        /// <summary>
+        /// Creates a collection of segments from a collection of points
+        /// </summary>
+        /// <param name="inPoints"></param>
+        /// <param name="isContourClosed"></param>
+        /// <returns>Collection of segments if at least 2 points present in collection, otherwise null</returns>
+        public static List<GeometrySegment> SplitOnSegments(MeshContour parent, IEnumerable<Vector3> inPoints, bool isContourClosed = true)
+        {
+            var points = new List<Vector2>();
+
+            foreach (var inPoint in inPoints)
             {
-                //Add last segment
-                if (!IsSameStartEnd(ref seg))
-                {
-                    segments.Add(seg);
-                }
+                points.Add((Vector2)inPoint);
             }
-            return segments.ToArray();
+            
+            return SplitOnSegments(parent, points, isContourClosed);
         }
 
         /// <summary>
@@ -108,6 +95,16 @@ namespace Adamantium.Mathematics
         public static bool IsConnected(Vector2 start, Vector2 end, List<LineSegment2D> segments)
         {
             return IsConnectedInvariant(start, end, segments, out var segment2D);
+        }
+        
+        public static bool IsConnected(GeometryIntersection start, GeometryIntersection end)
+        {
+            foreach (var segment in start.ConnectedSegments)
+            {
+                if (segment.GetOtherEnd(start) == end) return true;
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -233,142 +230,21 @@ namespace Adamantium.Mathematics
             return false;
         }
         
-        public static List<LineSegment2D> OrderSegments(List<LineSegment2D> mergedSegments)
+        public static bool IsPolygonConcave(List<GeometrySegment> segments)
         {
-            if (mergedSegments == null || mergedSegments.Count == 0)
+            for (var i = 0; i < segments.Count - 1; i++)
             {
-                return new List<LineSegment2D>();
-            }
-                
-            // for (int i = 0; i < mergedSegments.Count; ++i)
-            // {
-            //     var segment = mergedSegments[i];
-            //     var start = Vector2.Round(segment.Start, 4);
-            //     var end = Vector2.Round(segment.End, 4);
-            //     mergedSegments[i] = new LineSegment2D(start, end);
-            // }
-            
-            var currentSegment = mergedSegments[0];
-            var orderedSegments = new List<LineSegment2D>();
-            orderedSegments.Add(currentSegment);
-            var cnt = mergedSegments.Count;
-            for (int i = 0; i < cnt; ++i)
-            {
-                if (IsConnected(currentSegment.Start, currentSegment.End, mergedSegments, out var nextSegment))
+                var vec0 = segments[i].DirectionNormalized;
+                var vec1 = segments[i + 1].DirectionNormalized;
+
+                var angle = MathHelper.AngleBetween((Vector3F)vec0, (Vector3F)vec1);
+                if (angle > 180)
                 {
-                    if (!orderedSegments.Contains(nextSegment))
-                    {
-                        orderedSegments.Add(nextSegment);
-                        currentSegment = nextSegment;
-                    }
+                    return true;
                 }
             }
 
-            return orderedSegments;
-        }
-        
-        public static List<SegmentGroup> GetSegmentGroups(List<LineSegment2D> mergedSegments)
-        {
-            if (mergedSegments is not { Count: > 1 })
-            {
-                return new List<SegmentGroup>();
-            }
-
-            var segmentGroups = new List<SegmentGroup>();
-            var currentGroup = new SegmentGroup();
-            segmentGroups.Add(currentGroup);
-            
-            var cnt = mergedSegments.Count;
-            int startIndex = 0;
-            
-            for (int i = 0; i < cnt - 1; i++)
-            {
-                var current = mergedSegments[i];
-                var next = mergedSegments[i + 1];
-                if (current.End != next.Start)
-                {
-                    startIndex = i+1;
-                    break;
-                }
-            }
-
-            bool wasRestarted = false;
-            int nextIndex = startIndex + 1;
-            for (int currentIndex = startIndex; ;)
-            {
-                if (nextIndex >= mergedSegments.Count)
-                {
-                    currentIndex = 0;
-                    nextIndex = 1;
-                    wasRestarted = true;
-                    continue;
-                }
-                
-                var current = mergedSegments[currentIndex];
-                var next = mergedSegments[nextIndex];
-                if (current.End == next.Start)
-                {
-                    currentGroup.Segments.Add(current);
-                }
-                else
-                {
-                    currentGroup.Segments.Add(current);
-                    currentGroup = new SegmentGroup();
-                    segmentGroups.Add(currentGroup);
-                }
-            
-                currentIndex++;
-                nextIndex++;
-                if (nextIndex >= mergedSegments.Count && !wasRestarted)
-                {
-                    nextIndex = 0;
-                    current = mergedSegments[currentIndex];
-                    next = mergedSegments[nextIndex];
-                    if (current.End == next.Start)
-                    {
-                        currentGroup.Segments.Add(current);
-                    }
-                    else
-                    {
-                        currentGroup.Segments.Add(current);
-                        currentGroup = new SegmentGroup();
-                        segmentGroups.Add(currentGroup);
-                    }
-                    currentIndex = 0;
-                    nextIndex = currentIndex + 1;
-                }
-                
-                if (currentIndex == startIndex) break;
-            }
-
-            // for (int  i = 0; i< mergedSegments.Count - 1; i++)
-            // {
-            //     var current = mergedSegments[i];
-            //     var next = mergedSegments[i + 1];
-            //     if (current.End == next.Start)
-            //     {
-            //         currentGroup.Segments.Add(current);
-            //     }
-            //     else
-            //     {
-            //         currentGroup.Segments.Add(current);
-            //         currentGroup = new SegmentGroup();
-            //         segmentGroups.Add(currentGroup);
-            //     }
-            //
-            // }
-            
-            var current1 = mergedSegments[^1];
-            var next1 = mergedSegments[0];
-            if (current1.End == next1.Start)
-            {
-                if (!currentGroup.Segments.Contains(current1))
-                {
-                    currentGroup.Segments.Add(current1);
-                }
-            }
-
-            return segmentGroups;
+            return false;
         }
     }
 }

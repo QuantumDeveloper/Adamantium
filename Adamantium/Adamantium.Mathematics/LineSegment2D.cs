@@ -38,6 +38,14 @@ namespace Adamantium.Mathematics
             DirectionNormalized = Vector2.Normalize(Direction);
         }
 
+        public LineSegment2D(GeometrySegment segment)
+        {
+            Start = segment.Start;
+            End = segment.End;
+            Direction = End - Start;
+            DirectionNormalized = Vector2.Normalize(Direction);
+        }
+        
         public bool Equals(LineSegment2D other)
         {
             return MathHelper.WithinEpsilon(Start, other.Start, Polygon.Epsilon) && MathHelper.WithinEpsilon(End, other.End, Polygon.Epsilon);

@@ -46,11 +46,11 @@ namespace Adamantium.Engine.Graphics
 
                 if (geometryType == GeometryType.Solid)
                 {
-                    mesh = GenerateSolidGeometry(ellipseType, diameter, startAngle, stopAngle, isClockWise, tessellation);
+                    mesh = GenerateSolidGeometry(ellipseType, diameter, startAngle, stopAngle, isClockWise, tessellation, transform);
                 }
                 else
                 {
-                    mesh = GenerateOutlinedGeometry(ellipseType, diameter, startAngle, stopAngle, isClockWise, tessellation);
+                    mesh = GenerateOutlinedGeometry(ellipseType, diameter, startAngle, stopAngle, isClockWise, tessellation, transform);
                 }
 
                 return mesh;
@@ -117,7 +117,7 @@ namespace Adamantium.Engine.Graphics
                 }
 
                 var polygon = new Mathematics.Polygon();
-                polygon.AddItem(new PolygonItem(vertices));
+                polygon.AddItem(new MeshContour(vertices));
                 var points = polygon.Fill();
 
                 for (int i = 0; i < points.Count; ++i)

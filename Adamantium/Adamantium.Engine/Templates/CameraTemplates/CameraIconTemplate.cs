@@ -34,10 +34,10 @@ namespace Adamantium.Engine.Templates.CameraTemplates
             lensPoints.Add(new Vector2(0.24, -0.05));
 
             var polygon = new Polygon();
-            var cameraBase = new PolygonItem(rectangle.Points);
-            var ell1 = new PolygonItem(ellipse1.Points);
-            var ell2 = new PolygonItem(ellipse2.Points);
-            var lens = new PolygonItem(lensPoints);
+            var cameraBase = rectangle.GetContour(0);
+            var ell1 = ellipse1.GetContour(0);
+            var ell2 = ellipse2.GetContour(0);
+            var lens = new MeshContour(lensPoints);
             polygon.FillRule = FillRule.NonZero;
             polygon.AddItems(cameraBase, ell1,ell2,lens);
             var result = polygon.Fill();

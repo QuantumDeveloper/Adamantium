@@ -47,6 +47,39 @@ namespace Adamantium.Mathematics
             point = Vector2.Round(point, 4);
             return true;
         }
+        
+        public static bool SegmentSegmentIntersection(GeometrySegment segment1, GeometrySegment segment2, out Vector2 point)
+        {
+            var p = segment1.Start;
+            var q = segment2.Start;
+            var r = segment1.Direction;
+            var s = segment2.Direction;
+            // t = (q − p) × s / (r × s)
+            // u = (q − p) × r / (r × s)
+
+            var denominator = MathHelper.Determinant(r, s);
+
+            if (denominator == 0.0)
+            {
+                point = Vector2.Zero;
+                return false;
+            }
+
+            var tNumerator = MathHelper.Determinant(q - p, s);
+            var uNumerator = MathHelper.Determinant(q - p, r);
+            var t = tNumerator / denominator;
+            var u = uNumerator / denominator;
+
+            if (t < 0 || t > 1 || u < 0 || u > 1)
+            {
+                point = Vector2.Zero;
+                return false;
+            }
+
+            point = p + r * t;
+            point = Vector2.Round(point, 4);
+            return true;
+        }
 
         public static bool RaySegmentIntersection(ref Ray2D ray, ref Vector2 start, ref Vector2 end, out Vector2 point)
         {
@@ -67,6 +100,68 @@ namespace Adamantium.Mathematics
             var r = ray.Direction;
             var q = segment2D.Start;
             var s = segment2D.Direction;
+            // t = (q − p) × s / (r × s)
+            // u = (q − p) × r / (r × s)
+
+            var denominator = MathHelper.Determinant(r, s);
+
+            if (denominator == 0.0f)
+            {
+                point = Vector2.Zero;
+                return false;
+            }
+
+            var tNumerator = MathHelper.Determinant(q - p, s);
+            var uNumerator = MathHelper.Determinant(q - p, r);
+
+            var t = tNumerator / denominator;
+            var u = uNumerator / denominator;
+
+            
+            if (MathHelper.NearEqual(t, 0) && t < 0)
+            {
+                t = 0;
+            }
+
+            if (MathHelper.NearEqual(t, 1) && t > 1)
+            {
+                t = 1;
+            }
+
+            if (MathHelper.NearEqual(u, 0) && u < 0)
+            {
+                u = 0;
+            }
+
+            if (MathHelper.NearEqual(u, 1) && u > 1)
+            {
+                u = 1;
+            }
+            
+
+            if (t < 0 || u < 0 || u > 1)
+            {
+                point = Vector2.Zero;
+                return false;
+            }
+
+            point = p + r * t;
+            return true;
+        }
+        
+        public static bool RaySegmentIntersection(ref Ray2D ray, GeometrySegment segment, out Vector2 point)
+        {
+            var collinear = ray.Direction.IsCollinear(segment.Direction);
+            if (collinear)
+            {
+                point = Vector2.Zero;
+                return false;
+            }
+
+            var p = ray.Origin;
+            var r = ray.Direction;
+            var q = segment.Start;
+            var s = segment.Direction;
             // t = (q − p) × s / (r × s)
             // u = (q − p) × r / (r × s)
 
