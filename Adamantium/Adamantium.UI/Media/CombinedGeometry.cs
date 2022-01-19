@@ -173,17 +173,17 @@ public class CombinedGeometry : Geometry
             var mesh1Points = OutlineMesh1.MergeGeometryContourPoints();
             var mesh2Points = OutlineMesh2.MergeGeometryContourPoints();
 
-            var mesh1PointDict = mesh1Points.ToDictionary(x => x/*.Coordinates*/);
+            var mesh1PointDict = mesh1Points.ToDictionary(x => x);
             
             foreach (var point in mesh2Points)
             {
-                if (mesh1PointDict.ContainsKey(point/*.Coordinates*/))
+                if (mesh1PointDict.ContainsKey(point))
                 {
-                    mesh1PointDict[point/*.Coordinates*/].ConnectedSegments.AddRange(point.ConnectedSegments);
+                    mesh1PointDict[point].ConnectedSegments.AddRange(point.ConnectedSegments);
                 }
                 else
                 {
-                    mesh1PointDict.Add(point/*.Coordinates*/, point);
+                    mesh1PointDict.Add(point, point);
                 }
             }
 

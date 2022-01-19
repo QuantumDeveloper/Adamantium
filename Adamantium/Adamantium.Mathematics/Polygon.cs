@@ -97,14 +97,23 @@ namespace Adamantium.Mathematics
 
             if (nonIntersectedContours.Count > 0)
             {
-                Parallel.ForEach(nonIntersectedContours, item =>
+                // Parallel.ForEach(nonIntersectedContours, item =>
+                // {
+                //     var result1 = TriangulateContour(item);
+                //     lock (vertexLocker)
+                //     {
+                //         vertices.AddRange(result1);
+                //     }
+                // });
+
+                foreach (var item in nonIntersectedContours)
                 {
                     var result1 = TriangulateContour(item);
                     lock (vertexLocker)
                     {
                         vertices.AddRange(result1);
                     }
-                });
+                }
             }
 
             // process intersecting contours
@@ -455,6 +464,8 @@ namespace Adamantium.Mathematics
         /// <param name="additionalRayIntersections">Collection of intersection points</param>
         internal void UpdatePolygonUsingAdditionalRayInterPoints(Dictionary<GeometrySegment, SortedList<double, GeometryIntersection>> additionalRayIntersections)
         {
+            if (additionalRayIntersections.Count == 0) return;
+            
             foreach (var (key, value) in additionalRayIntersections)
             {
                 if (value.Count == 0)

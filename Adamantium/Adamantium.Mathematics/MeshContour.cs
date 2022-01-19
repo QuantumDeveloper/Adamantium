@@ -47,7 +47,24 @@ public class MeshContour
     
     public MeshContour(IEnumerable<Vector2> points, bool isGeometryClosed = true, bool generateSegments = true) : this()
     {
-        Points = points.ToArray();
+        var tmpList = new List<Vector2>();
+        var pts = points.ToArray();
+        for (int i = 0; i < pts.Length - 1; i++)
+        {
+            var p1 = pts[i];
+            var p2 = pts[i + 1];
+            if (p1 != p2)
+            {
+                tmpList.Add(p1);
+                
+                if (i + 1 == pts.Length - 1 && tmpList.Count > 0 && p2 != tmpList[0])
+                {
+                    tmpList.Add(p2);
+                }
+            }
+        }
+        
+        Points = tmpList.ToArray();
         IsGeometryClosed = isGeometryClosed;
         if (generateSegments)
         {
@@ -104,7 +121,7 @@ public class MeshContour
     {
         if (Segments == null || Segments.Count == 0)
         {
-            GeometryPoints.Clear();
+            GeometryPoints?.Clear();
             Points = Array.Empty<Vector2>();
             return;
         }
