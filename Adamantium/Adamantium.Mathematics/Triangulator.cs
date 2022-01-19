@@ -117,17 +117,6 @@ namespace Adamantium.Mathematics
             
             polygon.UpdatePolygonUsingAdditionalRayInterPoints(additionalRayIntersections);
 
-            // foreach (var rayPoints in raysIntersectionPoints)
-            // {
-            //     foreach (var rayPoint in rayPoints)
-            //     {
-            //         if (rayPoint.ConnectedSegments.Count < 2)
-            //         {
-            //             int bug = 1;
-            //         }
-            //     }
-            // }
-            
             var finalTriangles = new List<Vector3>();
             for (var i = 0; i < rays.Count - 1; ++i)
             {

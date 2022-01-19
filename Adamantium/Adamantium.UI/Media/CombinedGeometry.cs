@@ -118,15 +118,6 @@ public class CombinedGeometry : Geometry
             var xorTriangulated = xorPolygon.Fill();
             Mesh.SetPoints(xorTriangulated);
 
-            /*var v2Points = new List<Vector2>();
-
-            foreach (var gInter in xorPolygon.MergedPoints)
-            {
-                v2Points.Add(gInter.Coordinates);
-            }
-
-            Mesh.SetPoints(v2Points).SetTopology(PrimitiveType.PointList);*/
-            
             return;
         }
         
