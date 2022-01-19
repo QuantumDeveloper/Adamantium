@@ -59,7 +59,7 @@ namespace Adamantium.Mathematics
             
             var verticallySortedPointList = polygon.SortPoints();
             var ray = new Ray2D(Vector2.Zero, Vector2.UnitX);
-            var leftmostXCoord = polygon.LeftmostXCoord;
+            var leftmostXCoord = polygon.LeftmostXCoord - 10;
             for (var i = 0; i < verticallySortedPointList.Count; ++i)
             {
                 var point = verticallySortedPointList[i];
@@ -81,12 +81,13 @@ namespace Adamantium.Mathematics
                     if (!Collision2D.RaySegmentIntersection(ref ray, segment, out var interPoint)) continue;
                     
                     // We need to filter points very close to each other to avoid producing incorrect results during generation of triangles
-                    if (IsXPointSimilarTo(interPoint, rayPoints) || IsSimilarTo(interPoint, interPoints)) continue;
+                    if (IsXPointSimilarTo(interPoint, rayPoints)) continue;
 
-                    if (!IsSimilarTo(interPoint, polygon.MergedPoints, out var geometryIntersection))
+                    var geometryIntersection = new GeometryIntersection(interPoint);
+                    if (!IsSimilarTo(interPoint, interPoints) && !IsSimilarTo(interPoint, polygon.MergedPoints, out var similarIntersection))
                     {
                         interPoints.Add(interPoint);
-                        geometryIntersection = new GeometryIntersection(interPoint);
+
                         var distanceToStart = (interPoint - segment.Start).Length();
 
                         if (!additionalRayIntersections.ContainsKey(segment))
@@ -96,6 +97,7 @@ namespace Adamantium.Mathematics
 
                         additionalRayIntersections[segment].Add(distanceToStart, geometryIntersection);
                     }
+
                     //Ray points should be added here because they needed for rayIntersectionPoints and if this collection will be empty
                     //it will affect triangulation results
                     rayPoints.Add(geometryIntersection);

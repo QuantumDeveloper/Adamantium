@@ -33,7 +33,7 @@ public class UIComponent : AdamantiumComponent, IInputElement
 
     private static void StyleChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
-        if (a is IUIComponent component)
+        if (a is IUIComponent component && e.NewValue != null)
         {
             component.Style.Attach(component);
         }

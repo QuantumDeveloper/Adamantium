@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using Adamantium.EntityFramework.ComponentsBasics;
 using Adamantium.UI.RoutedEvents;
 using Adamantium.UI.Threading;
 
@@ -20,30 +19,33 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
 
         foreach (var property in list)
         {
-            PropertyMetadata value = property.GetDefaultMetadata(GetType());
-            if (property.ValidateValueCallBack?.Invoke(value.DefaultValue) == false)
+            var metadata = property.GetDefaultMetadata(GetType());
+            if (property.ValidateValueCallBack?.Invoke(metadata.DefaultValue) == false)
             {
-                throw new ArgumentException("Value " + value + "is incorrect!");
+                throw new ArgumentException("Value " + metadata + "is incorrect!");
             }
 
-            if (value.CoerceValueCallback != null)
+            if (metadata.CoerceValueCallback != null)
             {
-                var coercedValue = value.CoerceValueCallback?.Invoke(this, value.DefaultValue);
-                if (coercedValue != value)
+                var coercedValue = metadata.CoerceValueCallback?.Invoke(this, metadata.DefaultValue);
+                if (coercedValue != metadata)
                 {
                     if (property.ValidateValueCallBack?.Invoke(coercedValue) == false)
                     {
                         throw new ArgumentException("Value " + coercedValue + "is incorrect!");
                     }
 
-                    value.DefaultValue = coercedValue;
+                    metadata.DefaultValue = coercedValue;
                 }
             }
 
-            values[property] = value.DefaultValue;
-            var e = new AdamantiumPropertyChangedEventArgs(property, AdamantiumProperty.UnsetValue,
-                value.DefaultValue);
-            value.PropertyChangedCallback?.Invoke(this, e);
+            values[property] = metadata.DefaultValue;
+            if (metadata.DefaultValue != null)
+            {
+                var e = new AdamantiumPropertyChangedEventArgs(property, AdamantiumProperty.UnsetValue,
+                    metadata.DefaultValue);
+                metadata.PropertyChangedCallback?.Invoke(this, e);
+            }
         }
     }
 

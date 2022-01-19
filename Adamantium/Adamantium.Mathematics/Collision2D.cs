@@ -208,6 +208,7 @@ namespace Adamantium.Mathematics
             }
 
             point = p + r * t;
+
             return true;
         }
 
