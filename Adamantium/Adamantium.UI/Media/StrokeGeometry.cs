@@ -65,7 +65,6 @@ public class StrokeGeometry : Geometry
       //@TODO check concave zero length triangulation
 
       var zeroLineDir = new LineSegment2D(new Vector2(0, 0), new Vector2(1, 0)).DirectionNormalized;
-      // for test purposes end
 
       // sanitize geometry - remove equal points (but not in case when there is a single line with zero length)
       if (points.Length > 2)
@@ -765,7 +764,7 @@ public class StrokeGeometry : Geometry
 
          var angle = MathHelper.AngleBetween(strokeSegments[i].GeometrySegment, strokeSegments[nextIndex].GeometrySegment);
 
-         if (angle == 180) continue;
+         if (angle is 180 or 0) continue;
 
          var left = new LineSegment2D();
          var right = new LineSegment2D();

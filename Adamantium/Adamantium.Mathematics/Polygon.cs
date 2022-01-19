@@ -52,7 +52,7 @@ namespace Adamantium.Mathematics
         /// </summary>
         public FillRule FillRule { get; set; }
 
-        private readonly List<ContourPair> checkedPolygons;
+        private readonly List<ContourPair> checkedContours;
         private readonly object vertexLocker = new object();
 
         /// <summary>
@@ -64,7 +64,7 @@ namespace Adamantium.Mathematics
             MergedPoints = new List<GeometryIntersection>();
             mergedPointsHash = new HashSet<Vector2>();
             MergedSegments = new List<GeometrySegment>();
-            checkedPolygons = new List<ContourPair>();
+            checkedContours = new List<ContourPair>();
             FillRule = FillRule.EvenOdd;
         }
 
@@ -97,23 +97,14 @@ namespace Adamantium.Mathematics
 
             if (nonIntersectedContours.Count > 0)
             {
-                // Parallel.ForEach(nonIntersectedContours, item =>
-                // {
-                //     var result1 = TriangulateContour(item);
-                //     lock (vertexLocker)
-                //     {
-                //         vertices.AddRange(result1);
-                //     }
-                // });
-
-                foreach (var item in nonIntersectedContours)
+                Parallel.ForEach(nonIntersectedContours, item =>
                 {
                     var result1 = TriangulateContour(item);
                     lock (vertexLocker)
                     {
                         vertices.AddRange(result1);
                     }
-                }
+                });
             }
 
             // process intersecting contours
@@ -239,7 +230,10 @@ namespace Adamantium.Mathematics
 
                 foreach (var segment2 in meshContour2.Segments)
                 {
-                    contour2Intersections[segment2] = new SortedList<double, GeometryIntersection>();
+                    if (!contour2Intersections.ContainsKey(segment2))
+                    {
+                        contour2Intersections[segment2] = new SortedList<double, GeometryIntersection>();
+                    }
 
                     if (Collision2D.SegmentSegmentIntersection(segment1, segment2, out var point))
                     {
@@ -251,7 +245,7 @@ namespace Adamantium.Mathematics
                             }
 
                             var distanceToStart = (point - segment1.Start).Length();
-                            contour1Intersections[segment1].Add(distanceToStart, intersectionsList[point]);
+                            if (!contour1Intersections[segment1].ContainsKey(distanceToStart)) contour1Intersections[segment1].Add(distanceToStart, intersectionsList[point]);
                         }
 
                         if (point != segment2.Start && point != segment2.End)
@@ -262,7 +256,7 @@ namespace Adamantium.Mathematics
                             }
 
                             var distanceToStart = (point - segment2.Start).Length();
-                            contour2Intersections[segment2].Add(distanceToStart, intersectionsList[point]);
+                            if (!contour2Intersections[segment2].ContainsKey(distanceToStart)) contour2Intersections[segment2].Add(distanceToStart, intersectionsList[point]);
                         }
                     }
                 }
@@ -276,6 +270,8 @@ namespace Adamantium.Mathematics
         {
             foreach (var (key, value) in meshIntersections)
             {
+                key.RemoveSelfFromParent();
+                
                 if (value.Count == 0)
                 {
                     key.Parent.Segments.Add(key);
@@ -343,7 +339,7 @@ namespace Adamantium.Mathematics
                 for (var j = 0; j < contours.Count; j++)
                 {
                     var contour2 = contours[j];
-                    if (contour1 == contour2 || ContainsPolygonPair(contour1, contour2))
+                    if (contour1 == contour2 || ContainsContourPair(contour1, contour2))
                     {
                         continue;
                     }
@@ -351,19 +347,11 @@ namespace Adamantium.Mathematics
                     //Check if polygons are inside each other
                     var intersectionResult = contour1.IsCompletelyContains(contour2);
 
-                    AddPolygonsPairsToList(contour1, contour2, intersectionResult);
+                    AddContourPairToList(contour1, contour2, intersectionResult);
                 }
             }
 
-            if (FillRule == FillRule.EvenOdd)
-            {
-                MergeSegments();
-                MergePoints();
-                
-                return;
-            }
-
-            foreach (var polygonPair in checkedPolygons)
+            foreach (var polygonPair in checkedContours)
             {
                 var contour1 = polygonPair.Contour1;
                 var contour2 = polygonPair.Contour2;
@@ -381,26 +369,29 @@ namespace Adamantium.Mathematics
             {
                 contour.UpdatePoints();
             }
-            
-            foreach (var polygonPair in checkedPolygons)
-            {
-                var contour1 = polygonPair.Contour1;
-                var contour2 = polygonPair.Contour2;
-                var intersectionResult = polygonPair.IntersectionType;
 
-                //If polygons partly inside each other
-                if (intersectionResult == ContainmentType.Intersects)
+            if (FillRule != FillRule.EvenOdd)
+            {
+                foreach (var polygonPair in checkedContours)
                 {
-                    MarkSegments(contour1, contour2);
-                    MarkSegments(contour2, contour1);
-                }
-            }
+                    var contour1 = polygonPair.Contour1;
+                    var contour2 = polygonPair.Contour2;
+                    var intersectionResult = polygonPair.IntersectionType;
 
-            // delete inner segments and update points 
-            foreach (var contour in contours)
-            {
-                contour.RemoveSegmentsByRule(true);
-                contour.UpdatePoints();
+                    //If polygons partly inside each other
+                    if (intersectionResult == ContainmentType.Intersects)
+                    {
+                        MarkSegments(contour1, contour2);
+                        MarkSegments(contour2, contour1);
+                    }
+                }
+
+                // delete inner segments and update points 
+                foreach (var contour in contours)
+                {
+                    contour.RemoveSegmentsByRule(true);
+                    contour.UpdatePoints();
+                }
             }
 
             MergeSegments();
@@ -413,10 +404,10 @@ namespace Adamantium.Mathematics
         /// <param name="polygon1">First polygon</param>
         /// <param name="polygon2">Second polygon</param>
         /// <param name="intersectionType">Intersection type between two polygons</param>
-        private void AddPolygonsPairsToList(MeshContour polygon1, MeshContour polygon2,
+        private void AddContourPairToList(MeshContour polygon1, MeshContour polygon2,
             ContainmentType intersectionType)
         {
-            checkedPolygons.Add(new ContourPair(polygon1, polygon2, intersectionType));
+            checkedContours.Add(new ContourPair(polygon1, polygon2, intersectionType));
         }
 
         /// <summary>
@@ -425,9 +416,9 @@ namespace Adamantium.Mathematics
         /// <param name="contour1">First polygon</param>
         /// <param name="polygon2">Second polygon</param>
         /// <returns>True if polygons already contains in check list, otherwise false</returns>
-        private bool ContainsPolygonPair(MeshContour contour1, MeshContour contour2)
+        private bool ContainsContourPair(MeshContour contour1, MeshContour contour2)
         {
-            return checkedPolygons.Contains(new ContourPair(contour1, contour2));
+            return checkedContours.Contains(new ContourPair(contour1, contour2));
         }
 
         /// <summary>
@@ -444,6 +435,7 @@ namespace Adamantium.Mathematics
         private void UpdateBoundingBox()
         {
             if (MergedPoints.Count <= 0) return;
+
             var minimum = new Vector2(double.MaxValue);
             var maximum = new Vector2(double.MinValue);
 
