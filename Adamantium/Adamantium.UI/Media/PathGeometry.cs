@@ -99,16 +99,9 @@ public class PathGeometry : Geometry
         }
         
         var polygon = new Polygon();
-        int i = 0;
         foreach (var polygonItem in figureToPolygon)
         {
             if (!polygonItem.Key.IsFilled) continue;
-
-            /*if (i == 0)
-            {
-                i++;
-                continue;
-            }*/
 
             polygon.AddItem(polygonItem.Value);
         }
@@ -120,8 +113,6 @@ public class PathGeometry : Geometry
         {
             OutlineMesh.AddContour(outline.Value, outline.Key.IsClosed);
         }
-        
-        //Mesh.SetPoints(OutlineMesh.MergeContourPoints()).SetTopology(PrimitiveType.LineStrip);
     }
 
     public static PathGeometry Parse(string geometry)
