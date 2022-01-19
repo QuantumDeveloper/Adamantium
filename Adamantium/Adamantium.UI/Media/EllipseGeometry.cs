@@ -56,7 +56,7 @@ public sealed class EllipseGeometry : Geometry
    public EllipseGeometry()
    {
       IsClosed = true;
-      TesselationFactor = 30;
+      TesselationFactor = 80;
    }
 
    public EllipseGeometry(Rect rect, Double startAngle = 0, Double stopAngle = 360) : this()

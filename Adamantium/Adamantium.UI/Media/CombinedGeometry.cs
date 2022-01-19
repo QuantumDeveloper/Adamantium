@@ -99,6 +99,36 @@ public class CombinedGeometry : Geometry
 
         Mesh.Clear();
         OutlineMesh.Clear();
+
+        if (GeometryCombineMode == GeometryCombineMode.Xor)
+        {
+            if (Geometry1 != null) OutlineMesh.Contours.AddRange(Geometry1.OutlineMesh.Contours);
+            if (Geometry2 != null) OutlineMesh.Contours.AddRange(Geometry2.OutlineMesh.Contours);
+            
+            var xorPolygon = new Polygon
+            {
+                FillRule = FillRule.EvenOdd
+            };
+
+            foreach (var contour in OutlineMesh.Contours)
+            {
+                xorPolygon.AddItem(contour.Copy());
+            }
+
+            var xorTriangulated = xorPolygon.Fill();
+            Mesh.SetPoints(xorTriangulated);
+
+            /*var v2Points = new List<Vector2>();
+
+            foreach (var gInter in xorPolygon.MergedPoints)
+            {
+                v2Points.Add(gInter.Coordinates);
+            }
+
+            Mesh.SetPoints(v2Points).SetTopology(PrimitiveType.PointList);*/
+            
+            return;
+        }
         
         if (Geometry1 is {IsClosed: true})
         {
@@ -117,7 +147,7 @@ public class CombinedGeometry : Geometry
         }
         else
             OutlineMesh2 = new Mesh();
-            
+
         // TODO check case if 'null' (or default in other words) bounding box is inside the real one - will it count as intersection?
         if (CheckGeometryBoundingBoxesIntersection())
         {
@@ -143,84 +173,68 @@ public class CombinedGeometry : Geometry
                     OutlineMesh2.RemoveSegmentsByRule(false);
                     break;
                 case GeometryCombineMode.Xor:
-                    OutlineMesh.Contours.AddRange(OutlineMesh1.Contours);
-                    OutlineMesh.Contours.AddRange(OutlineMesh2.Contours);
                     break;
+                default:
+                    throw new ArgumentOutOfRangeException();
             }
         }
 
-        if (GeometryCombineMode == GeometryCombineMode.Xor)
+
+        // 1. Merge all points of all contours of all meshes.
+        // If point is already present, merge connected segments for it.
+
+        var mesh1Points = OutlineMesh1.MergeGeometryContourPoints();
+        var mesh2Points = OutlineMesh2.MergeGeometryContourPoints();
+
+        var mesh1PointDict = mesh1Points.ToDictionary(x => x);
+
+        foreach (var point in mesh2Points)
         {
-            // EVEN ODD
-            var polygon = new Polygon
+            if (mesh1PointDict.ContainsKey(point))
             {
-                FillRule = FillRule.EvenOdd
-            };
-
-            foreach (var contour in OutlineMesh.Contours)
-            {
-                polygon.AddItem(contour.Copy());
+                mesh1PointDict[point].ConnectedSegments.AddRange(point.ConnectedSegments);
             }
-            
-            var triangulated = polygon.Fill();
-            Mesh.SetPoints(triangulated);
+            else
+            {
+                mesh1PointDict.Add(point, point);
+            }
         }
-        else
+
+        var mergedPoints = mesh1PointDict.Values.ToList();
+
+        // 2. Form contours
+
+        while (mergedPoints.Count > 0)
         {
-            // 1. Merge all points of all contours of all meshes.
-            // If point is already present, merge connected segments for it.
+            var contourSegments = new List<GeometrySegment>();
 
-            var mesh1Points = OutlineMesh1.MergeGeometryContourPoints();
-            var mesh2Points = OutlineMesh2.MergeGeometryContourPoints();
+            var startContourPoint = mergedPoints.First();
+            var startSegment = startContourPoint.ConnectedSegments.First();
+            var currentContourPoint = startContourPoint;
+            var currentSegment = startSegment;
 
-            var mesh1PointDict = mesh1Points.ToDictionary(x => x);
-            
-            foreach (var point in mesh2Points)
+            do
             {
-                if (mesh1PointDict.ContainsKey(point))
-                {
-                    mesh1PointDict[point].ConnectedSegments.AddRange(point.ConnectedSegments);
-                }
-                else
-                {
-                    mesh1PointDict.Add(point, point);
-                }
-            }
+                contourSegments.Add(currentSegment);
+                mergedPoints.Remove(currentContourPoint);
 
-            var mergedPoints = mesh1PointDict.Values.ToList();
-            
-            // 2. Form contours
+                currentContourPoint = currentSegment.GetOtherEnd(currentContourPoint);
+                currentSegment = currentContourPoint.GetOtherSegment(currentSegment);
+            } while (currentContourPoint != startContourPoint);
 
-            while (mergedPoints.Count > 0)
-            {
-                var contourSegments = new List<GeometrySegment>();
-
-                var startContourPoint = mergedPoints.First();
-                var startSegment = startContourPoint.ConnectedSegments.First();
-                var currentContourPoint = startContourPoint;
-                var currentSegment = startSegment;
-                
-                do
-                {
-                    contourSegments.Add(currentSegment);
-                    mergedPoints.Remove(currentContourPoint);
-
-                    currentContourPoint = currentSegment.GetOtherEnd(currentContourPoint);
-                    currentSegment = currentContourPoint.GetOtherSegment(currentSegment);
-                } while (currentContourPoint != startContourPoint);
-                
-                OutlineMesh.AddContour(contourSegments);
-            }
-            
-            // NON ZERO
-            var mergedContourPoints = OutlineMesh.MergeGeometryContourPoints();
-            var mergedContourSegments = OutlineMesh.MergeContourSegments();
-            
-            var polygon = new Polygon();        
-            polygon.FillRule = FillRule.NonZero;
-            var triangulated = polygon.FillDirect(mergedContourPoints, mergedContourSegments);
-            Mesh.SetPoints(triangulated);
+            OutlineMesh.AddContour(contourSegments);
         }
+
+        var mergedContourPoints = OutlineMesh.MergeGeometryContourPoints();
+        var mergedContourSegments = OutlineMesh.MergeContourSegments();
+
+        var polygon = new Polygon
+        {
+            FillRule = FillRule.NonZero
+        };
+
+        var triangulated = polygon.FillDirect(mergedContourPoints, mergedContourSegments);
+        Mesh.SetPoints(triangulated);
     }
 
     private bool CheckGeometryBoundingBoxesIntersection()
@@ -263,7 +277,7 @@ public class CombinedGeometry : Geometry
                         }
                         
                         var distanceToStart = (point - segment1.Start).Length();
-                        mesh1Intersections[segment1].Add(distanceToStart, intersectionsList[point]);
+                        if (!mesh1Intersections[segment1].ContainsKey(distanceToStart)) mesh1Intersections[segment1].Add(distanceToStart, intersectionsList[point]);
                     }
                     
                     if (point != segment2.Start && point != segment2.End)
@@ -274,7 +288,7 @@ public class CombinedGeometry : Geometry
                         }
                         
                         var distanceToStart = (point - segment2.Start).Length();
-                        mesh2Intersections[segment2].Add(distanceToStart, intersectionsList[point]);
+                        if (!mesh2Intersections[segment2].ContainsKey(distanceToStart)) mesh2Intersections[segment2].Add(distanceToStart, intersectionsList[point]);
                     }
                 }
             }

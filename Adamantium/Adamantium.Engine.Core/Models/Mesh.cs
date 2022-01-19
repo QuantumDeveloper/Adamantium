@@ -168,17 +168,17 @@ public class Mesh
     
     public List<Vector2> MergeContourPoints()
     {
-        var pointsHashSet = new HashSet<GeometryIntersection>();
+        var pointsHashSet = new HashSet<Vector2>();
         var points = new List<Vector2>();
 
         foreach (var contour in Contours)
         {
-            foreach (var point in contour.GeometryPoints)
+            foreach (var point in contour.Points)
             {
                 if (!pointsHashSet.Contains(point))
                 {
                     pointsHashSet.Add(point);
-                    points.Add(point.Coordinates);
+                    points.Add(point);
                 }
             }
         }

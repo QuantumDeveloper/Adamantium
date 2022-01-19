@@ -9,43 +9,20 @@ public class MeshContour
     public string Name { get; set; }
     public Vector2[] Points { get; set; }
 
-    private List<GeometryIntersection> geometryPoints;
-    public List<GeometryIntersection> GeometryPoints
-    {
-        get => geometryPoints;
-        set
-        {
-            geometryPoints = value;
-            isSplittedOnSegments = false;
-            isSelfIntersectionsRemoved = false;
-        }
-    }
+    public List<GeometryIntersection> GeometryPoints { get; set; }
 
-    private List<GeometrySegment> segments;
-    public List<GeometrySegment> Segments
-    {
-        get => segments;
-        set
-        {
-            segments = value;
-            isSplittedOnSegments = false;
-            isSelfIntersectionsRemoved = false;
-        }
-    }
-    
+    public List<GeometrySegment> Segments { get; set; }
+
     public bool IsGeometryClosed { get; set; }
 
     public RectangleF BoundingBox { get; private set; }
-
-    private bool isSplittedOnSegments;
-    private bool isSelfIntersectionsRemoved;
 
     public MeshContour()
     {
 
     }
     
-    public MeshContour(IEnumerable<Vector2> points, bool isGeometryClosed = true, bool generateSegments = true) : this()
+    public MeshContour(IEnumerable<Vector2> points, bool isGeometryClosed = true, bool generateSegments = false) : this()
     {
         var tmpList = new List<Vector2>();
         var pts = points.ToArray();
@@ -107,14 +84,10 @@ public class MeshContour
         }
     }
 
-    public void SplitOnSegments(bool forceSplit = false)
+    public void SplitOnSegments()
     {
-        if (isSplittedOnSegments && !forceSplit) return;
-        
         Segments = PolygonHelper.SplitOnSegments(this, Points, IsGeometryClosed);
         UpdatePoints();
-
-        isSplittedOnSegments = true;
     }
     
     public void UpdatePoints()
@@ -185,10 +158,8 @@ public class MeshContour
         UpdatePoints();
     }
 
-    public void RemoveSelfIntersections(FillRule fillRule, bool forceRemove = false)
+    public void RemoveSelfIntersections(FillRule fillRule)
     {
-        if (isSelfIntersectionsRemoved && !forceRemove) return;
-        
         var intersectionsList = new Dictionary<Vector2, GeometryIntersection>();
         var selfIntersections = new Dictionary<GeometrySegment, SortedList<double, GeometryIntersection>>();
 
@@ -250,8 +221,6 @@ public class MeshContour
         }
         
         UpdatePoints();
-
-        isSelfIntersectionsRemoved = true;
     }
 
     public ContainmentType IsCompletelyContains(MeshContour otherContour)
@@ -282,12 +251,10 @@ public class MeshContour
     {
         var copy = new MeshContour();
 
-        copy.segments = new List<GeometrySegment>(segments);
+        if (Segments != null) copy.Segments = new List<GeometrySegment>(Segments);
         copy.Points = new Vector2[Points.Length];
         Array.Copy(Points, copy.Points, Points.Length);
-        copy.geometryPoints = new List<GeometryIntersection>(geometryPoints);
-        copy.isSplittedOnSegments = isSplittedOnSegments;
-        copy.isSelfIntersectionsRemoved = isSelfIntersectionsRemoved;
+        if (GeometryPoints != null) copy.GeometryPoints = new List<GeometryIntersection>(GeometryPoints);
         copy.Name = Name;
         copy.IsGeometryClosed = IsGeometryClosed;
         copy.BoundingBox = BoundingBox;

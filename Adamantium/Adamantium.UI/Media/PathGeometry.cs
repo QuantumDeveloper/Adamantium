@@ -104,11 +104,11 @@ public class PathGeometry : Geometry
         {
             if (!polygonItem.Key.IsFilled) continue;
 
-            if (i == 0)
+            /*if (i == 0)
             {
                 i++;
                 continue;
-            }
+            }*/
 
             polygon.AddItem(polygonItem.Value);
         }
