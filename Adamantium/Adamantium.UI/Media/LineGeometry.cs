@@ -38,6 +38,11 @@ public class LineGeometry : Geometry
    {
    }
 
+   static LineGeometry()
+   {
+      IsClosedProperty.OverrideMetadata(typeof(LineGeometry), new PropertyMetadata(false));
+   }
+
    public LineGeometry(Vector2 startPoint, Vector2 endPoint) : this()
    {
       StartPoint = startPoint;
@@ -47,7 +52,7 @@ public class LineGeometry : Geometry
 
    public override void RecalculateBounds()
    {
-      bounds = Rect.FromPoints(OutlineMesh.Points);
+      bounds = Rect.FromPoints(Mesh.MergeContourPoints());
    }
       
    public override Geometry Clone()
@@ -62,6 +67,6 @@ public class LineGeometry : Geometry
 
    private void CreateLine()
    {
-      OutlineMesh.SetPoints(new [] { (Vector3)StartPoint, (Vector3)EndPoint });
+      Mesh.AddContour(new [] { (Vector3)StartPoint, (Vector3)EndPoint }, false);
    }
 }

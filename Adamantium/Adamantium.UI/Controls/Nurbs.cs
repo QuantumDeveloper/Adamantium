@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Adamantium.UI.Media;
 using Adamantium.UI.RoutedEvents;
 
@@ -83,14 +84,12 @@ public class Nurbs : BSpline
             degree = CustomDegree;
         }
 
-        var rate = CalculatePointsLength(Points);
-        var result = MathHelper.GetNurbsCurve(Points, degree, IsUniform, 1.0/rate);
-        
-        SplineGeometry.Points = new PointsCollection(result);
+        var streamContext = StreamGeometry.Open();
+        streamContext.BeginFigure(Points[0], true, true).NurbsTo(Points.Skip(1), IsUniform, UseCustomDegree, degree, true);
             
         context.BeginDraw(this);
         
-        context.DrawGeometry(Stroke, SplineGeometry, GetPen());
+        context.DrawGeometry(Stroke, StreamGeometry, GetPen());
         context.EndDraw(this);
     }
 }

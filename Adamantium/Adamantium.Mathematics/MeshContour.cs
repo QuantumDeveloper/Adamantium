@@ -21,34 +21,24 @@ public class MeshContour
     {
 
     }
+
+    public MeshContour(IEnumerable<Vector3> points, bool isGeometryClosed = true, bool generateSegments = false) :
+        this()
+    {
+        var pts = new List<Vector2>();
+        foreach (var vector3 in points)
+        {
+            pts.Add((Vector2)vector3);
+        }
+
+        IsGeometryClosed = isGeometryClosed;
+        SetPoints(pts, generateSegments);
+    }
     
     public MeshContour(IEnumerable<Vector2> points, bool isGeometryClosed = true, bool generateSegments = false) : this()
     {
-        var tmpList = new List<Vector2>();
-        var pts = points.ToArray();
-        for (int i = 0; i < pts.Length - 1; i++)
-        {
-            var p1 = pts[i];
-            var p2 = pts[i + 1];
-            if (p1 != p2)
-            {
-                tmpList.Add(p1);
-                
-                if (i + 1 == pts.Length - 1 && tmpList.Count > 0 && p2 != tmpList[0])
-                {
-                    tmpList.Add(p2);
-                }
-            }
-        }
-        
-        Points = tmpList.ToArray();
         IsGeometryClosed = isGeometryClosed;
-        if (generateSegments)
-        {
-            SplitOnSegments();
-        }
-
-        CalculateBoundingBox();
+        SetPoints(points, generateSegments);
     }
     
     public MeshContour(IEnumerable<GeometrySegment> segments, bool isGeometryClosed = true) : this()
@@ -77,11 +67,32 @@ public class MeshContour
 
     public void SetPoints(IEnumerable<Vector2> points, bool generateSegments = true)
     {
-        Points = points.ToArray();
+        var tmpList = new List<Vector2>();
+        var pts = points.ToArray();
+        // Check for duplicating points going together and remove them
+        for (int i = 0; i < pts.Length - 1; i++)
+        {
+            var p1 = pts[i];
+            var p2 = pts[i + 1];
+            if (p1 != p2)
+            {
+                tmpList.Add(p1);
+            }
+            
+            if (i + 1 == pts.Length - 1 && tmpList.Count > 0 && p2 != tmpList[0])
+            {
+                tmpList.Add(p2);
+            }
+        }
+        
+        Points = tmpList.ToArray();
+        Segments?.Clear();
         if (generateSegments)
         {
             SplitOnSegments();
         }
+
+        CalculateBoundingBox();
     }
 
     public void SplitOnSegments()

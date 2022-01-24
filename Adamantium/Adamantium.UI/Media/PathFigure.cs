@@ -9,7 +9,7 @@ namespace Adamantium.UI.Media;
 public sealed class PathFigure : AdamantiumComponent
 {
     public static readonly AdamantiumProperty IsClosedProperty = AdamantiumProperty.Register(nameof(IsClosed),
-        typeof(bool), typeof(PathFigure), new PropertyMetadata(false, PropertyMetadataOptions.AffectsRender));
+        typeof(bool), typeof(PathFigure), new PropertyMetadata(true, PropertyMetadataOptions.AffectsRender));
 
     public static readonly AdamantiumProperty IsFilledProperty = AdamantiumProperty.Register(nameof(IsFilled),
         typeof(bool), typeof(PathFigure), new PropertyMetadata(true, PropertyMetadataOptions.AffectsRender));

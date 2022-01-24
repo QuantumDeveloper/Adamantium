@@ -1,7 +1,6 @@
 using System.Collections.Specialized;
 using System.Linq;
 using Adamantium.Core.Collections;
-using Adamantium.Mathematics;
 using Adamantium.UI.Media;
 using Adamantium.UI.RoutedEvents;
 
@@ -11,10 +10,10 @@ public class Polygon : Shape
 {
     public Polygon()
     {
-        geometry = new PolygonGeometry();
+        geometry = new StreamGeometry();
     }
         
-    private PolygonGeometry geometry { get; set; }
+    private StreamGeometry geometry { get; set; }
         
     public static readonly AdamantiumProperty PointsProperty = AdamantiumProperty.Register(nameof(Points),
         typeof(PointsCollection), typeof(Polygon),
@@ -30,7 +29,6 @@ public class Polygon : Shape
     {
         if (a is Polygon polygon && e.NewValue != null)
         {
-            polygon.geometry.Points = polygon.Points;
             if (e.OldValue is TrackingCollection<Vector2> oldCollection)
             {
                 polygon.UnsubscribeFromPointEvents(oldCollection);
@@ -70,14 +68,19 @@ public class Polygon : Shape
 
     protected override Size MeasureOverride(Size availableSize)
     {
-        Rect = new Rect(Vector2.Zero, geometry.Bounds.Size);
+        Rect = Rect.FromPoints(Points);
         return base.MeasureOverride(availableSize);
     }
 
     protected override void OnRender(DrawingContext context)
     {
+        if (Points == null || Points.Count < 2) return;
+        
         base.OnRender(context);
-            
+
+        var streamContext = geometry.Open();
+        streamContext.BeginFigure(Points[0], true, true).PolylineLineTo(Points.Skip(1), true);
+        
         context.BeginDraw(this);
         geometry.FillRule = FillRule;
         context.DrawGeometry(Fill, geometry, GetPen());

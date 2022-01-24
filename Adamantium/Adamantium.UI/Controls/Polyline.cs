@@ -7,11 +7,12 @@ namespace Adamantium.UI.Controls;
 
 public class Polyline : Shape
 {
-    protected SplineGeometry SplineGeometry { get; }
+    protected StreamGeometry StreamGeometry { get; }
         
     public Polyline()
     {
-        SplineGeometry = new SplineGeometry();
+        StreamGeometry = new StreamGeometry();
+        StreamGeometry.IsClosed = false;
     }
         
     public static readonly AdamantiumProperty PointsProperty = AdamantiumProperty.Register(nameof(Points),
@@ -48,16 +49,19 @@ public class Polyline : Shape
         
         var maxX = Points.Select(x=>x.X).Max();
         var maxY = Points.Select(y=>y.Y).Max();
-        Rect = new Rect(new Vector2(0), new Vector2(maxX, maxY));
+        Rect = new Rect(Vector2.Zero, new Vector2(maxX, maxY));
         return base.MeasureOverride(availableSize);
     }
 
     protected override void OnRender(DrawingContext context)
     {
         base.OnRender(context);
-        SplineGeometry.Points = new PointsCollection(Points);
+        
+        var streamContext = StreamGeometry.Open();
+        streamContext.BeginFigure(Points[0], true, true).PolylineLineTo(Points.Skip(1), true);
+
         context.BeginDraw(this);
-        context.DrawGeometry(Stroke, SplineGeometry, GetPen());
+        context.DrawGeometry(Stroke, StreamGeometry, GetPen());
         context.EndDraw(this);
     }
 }

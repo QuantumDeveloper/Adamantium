@@ -120,7 +120,7 @@ public class DrawingContext
    public void DrawGeometry(Brush brush, Geometry geometry, Pen pen = null)
    {
       if (geometry == null) return;
-         
+      
       geometry.ProcessGeometry();
       StrokeGeometry strokeGeometry = null;
       if (pen != null && pen.Thickness > 0.0)

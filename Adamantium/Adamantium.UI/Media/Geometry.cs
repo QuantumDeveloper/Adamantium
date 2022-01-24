@@ -11,14 +11,15 @@ public abstract class Geometry : AdamantiumComponent
       
    internal Mesh Mesh { get; set; }
       
-   internal Mesh OutlineMesh { get; set; }
-      
    protected Int32 TesselationFactor { get; set; }
 
    public static readonly AdamantiumProperty TransformProperty = AdamantiumProperty.Register(nameof(Transform),
       typeof(Transform), 
       typeof(Geometry),
       new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure, TransformChangedCallback));
+
+   public static readonly AdamantiumProperty IsClosedProperty =
+      AdamantiumProperty.Register(nameof(IsClosed), typeof(bool), typeof(Geometry), new PropertyMetadata(true));
 
    private static void TransformChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
    {
@@ -48,13 +49,17 @@ public abstract class Geometry : AdamantiumComponent
       set => SetValue(TransformProperty, value);
    }
 
-   public bool IsClosed { get; set; }
+   public bool IsClosed
+   {
+      get => GetValue<bool>(IsClosedProperty);
+      set => SetValue(IsClosedProperty, value);
+   }
 
    protected Geometry()
    {
       Mesh = new Mesh();
-      OutlineMesh = new Mesh();
       TesselationFactor = 20;
+      IsClosed = true;
    }
      
    public abstract Rect Bounds { get; }
@@ -77,7 +82,6 @@ public abstract class Geometry : AdamantiumComponent
          {
             var matrix = Transform.Matrix;
             Mesh.ApplyTransform(matrix);
-            OutlineMesh.ApplyTransform(matrix);
          }
          RecalculateBounds();
          IsProcessed = true;

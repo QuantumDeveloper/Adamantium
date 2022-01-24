@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Adamantium.Core;
 
 namespace Adamantium.UI.Media;
 
@@ -44,9 +43,9 @@ public class StrokeGeometry : Geometry
    protected internal override void ProcessGeometryCore()
    {
       var strokes = new List<Vector3>();
-      for (var i = 0; i < geometry.OutlineMesh.Contours.Count; i++)
+      for (var i = 0; i < geometry.Mesh.Contours.Count; i++)
       {
-         var layer = geometry.OutlineMesh.GetContour(i);
+         var layer = geometry.Mesh.GetContour(i);
          strokes.AddRange(GenerateStroke(layer.Points, layer.IsGeometryClosed)); 
       }
 
@@ -102,12 +101,40 @@ public class StrokeGeometry : Geometry
 
       var vertices = new List<Vector3>();
 
+      int k = 0;
       foreach (var polygonItem in meshContours)
       {
-         var polygon = new Polygon();
-         polygon.AddItem(polygonItem);
-         polygon.FillRule = FillRule.NonZero;
-         vertices.AddRange(polygon.Fill());
+         try
+         {
+            if (k == 12)
+            {
+               int bug = 1;
+               var tmpList = new List<Vector2>();
+               var pts = polygonItem.Points.ToArray();
+               for (int i = 0; i < pts.Length - 1; i++)
+               {
+                   var p1 = pts[i];
+                   var p2 = pts[i + 1];
+                   if (p1 != p2)
+                   {
+                       tmpList.Add(p1);
+                   }
+                   
+                   if (i + 1 == pts.Length - 1 && tmpList.Count > 0 && p2 != tmpList[0])
+                   {
+                      tmpList.Add(p2);
+                   }
+               }
+            }
+            var polygon = new Polygon();
+            polygon.AddItem(polygonItem);
+            polygon.FillRule = FillRule.NonZero;
+            vertices.AddRange(polygon.Fill());
+            k++;
+         }
+         catch (Exception e)
+         {
+         }
       }
 
       return vertices;
@@ -121,6 +148,10 @@ public class StrokeGeometry : Geometry
       foreach (var dashData in dashesData)
       {
          meshContours.AddRange(GenerateStroke(dashData.Points.ToArray(), pen, false, dashData.Direction));
+         if (meshContours.Count >= 12)
+         {
+            int bug = 2;
+         }
       }
 
       return meshContours;
@@ -749,7 +780,13 @@ public class StrokeGeometry : Geometry
          contourPoints.AddRange(endCapPoints);
          contourPoints.Add(strokeSegments[i].BottomSegment.End);
          contourPoints.Add(strokeSegments[i].BottomSegment.Start);
-               
+
+         Console.WriteLine($"ContourPoints = {contourPoints.Count}");
+         if (contourPoints.Count == 1)
+         {
+            int bug = 1;
+         }
+         
          meshContours.Add(new MeshContour(contourPoints));
 
          var nextIndex = i + 1;
@@ -814,6 +851,12 @@ public class StrokeGeometry : Geometry
             }
             default:
                throw new ArgumentException("Unhandled stroke join type");
+         }
+
+         Console.WriteLine($"ContourPoints2 = {contourPoints.Count}");
+         if (contourPoints.Count == 1)
+         {
+            int bug = 2;
          }
             
          meshContours.Add(new MeshContour(joinPoints));
