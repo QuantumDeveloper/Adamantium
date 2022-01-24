@@ -88,37 +88,21 @@ public class Border : Decorator
       var cornerRadius = CornerRadius;
       base.OnRender(context);
 
-      var commonTimer = Stopwatch.StartNew();
       var outerGeometry = new RectangleGeometry(new Rect(size), cornerRadius);
-      outerGeometry.ProcessGeometry();
       var innerSize = size.Deflate(BorderThickness);
       var innerRect = new Rect(new Vector2(borderThickness.Left, borderThickness.Top), innerSize);
       var innerGeometry = new RectangleGeometry(innerRect, cornerRadius);
-      innerGeometry.ProcessGeometry();
-      var outerMeshContour = outerGeometry.OutlineMesh.Contours[0];
-      var innerMeshContour = innerGeometry.OutlineMesh.Contours[0];
-      var poly = new Mathematics.Polygon();
-      poly.AddItems(outerMeshContour, innerMeshContour);
-      poly.FillRule = FillRule.EvenOdd;
-      var points = poly.Fill();
-
-      var polygonGeometry = new PolygonGeometry();
-      polygonGeometry.FillRule = FillRule.EvenOdd;
-      polygonGeometry.Points = new PointsCollection();
-      foreach (var point in points)
-      {
-         polygonGeometry.Points.Add(Vector2.Round(point.X, point.Y, 3));
-      }
-         
+      
+      var combined = new CombinedGeometry();
+      combined.GeometryCombineMode = GeometryCombineMode.Exclude;
+      combined.Geometry1 = outerGeometry;
+      combined.Geometry2 = innerGeometry;
+      
       context.BeginDraw(this);
-      //context.DrawRectangle(Background, innerRect, CornerRadius);
+      context.DrawRectangle(Background, innerRect, CornerRadius);
       var timer = Stopwatch.StartNew();
-      //context.DrawGeometry(BorderBrush, polygonGeometry);
+      context.DrawGeometry(BorderBrush, combined);
       timer.Stop();
-      commonTimer.Stop();
-      Console.WriteLine($"Triangulation time: {timer.ElapsedMilliseconds}");
-      Console.WriteLine($"Common time: {commonTimer.ElapsedMilliseconds}");
       context.EndDraw(this);
-         
    }
 }

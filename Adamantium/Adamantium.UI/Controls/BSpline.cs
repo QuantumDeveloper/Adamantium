@@ -1,3 +1,4 @@
+using System.Linq;
 using Adamantium.UI.Media;
 
 namespace Adamantium.UI.Controls;
@@ -25,12 +26,12 @@ public class BSpline : Polyline
     {
         base.OnRender(context);
         var rate = CalculatePointsLength(Points);
-        var result = MathHelper.GetBSpline2(Points, (uint)rate).ToArray();
-        SplineGeometry.Points = new PointsCollection(result);
-            
-        context.BeginDraw(this);
         
-        context.DrawGeometry(Stroke, SplineGeometry, GetPen());
+        var streamContext = StreamGeometry.Open();
+        streamContext.BeginFigure(Points[0], true, true).BSplineTo(Points.Skip(1), true);
+        
+        context.BeginDraw(this);
+        context.DrawGeometry(Stroke, StreamGeometry, GetPen());
         context.EndDraw(this);
     }
 }

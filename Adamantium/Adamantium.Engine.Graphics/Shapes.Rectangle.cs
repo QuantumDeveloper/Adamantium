@@ -111,16 +111,22 @@ namespace Adamantium.Engine.Graphics
 
                 Mesh mesh = new Mesh();
                 mesh.MeshTopology = primitiveType;
-                if (type == GeometryType.Solid)
+                switch (type)
                 {
-                    var polygon = new Mathematics.Polygon();
-                    polygon.AddItem(new MeshContour(Utilities.ToVector2(vertices)));
-                    var points = polygon.Fill();
-                    mesh.SetPoints(points);
-                }
-                else
-                {
-                    mesh.SetPoints(vertices);
+                    case GeometryType.Solid:
+                    {
+                        var polygon = new Mathematics.Polygon();
+                        polygon.AddItem(new MeshContour(vertices));
+                        var points = polygon.Fill();
+                        mesh.SetPoints(points);
+                        break;
+                    }
+                    case GeometryType.Both:
+                        mesh.AddContour(vertices, true);
+                        break;
+                    default:
+                        mesh.SetPoints(vertices);
+                        break;
                 }
                 mesh.GenerateBasicIndices();
 

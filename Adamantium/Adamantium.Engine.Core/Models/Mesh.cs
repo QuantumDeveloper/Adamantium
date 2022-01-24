@@ -115,6 +115,11 @@ public class Mesh
         MeshTopology = topology;
         return this;
     }
+    
+    public void AddContour(IEnumerable<Vector3> inPoints, bool isGeometryClosed, bool generateSegments = true)
+    {
+        Contours.Add(new MeshContour(inPoints, isGeometryClosed));
+    }
 
     public void AddContour(IEnumerable<Vector2> inPoints, bool isGeometryClosed, bool generateSegments = true)
     {
@@ -211,9 +216,6 @@ public class Mesh
         var pts = points as Vector3[] ?? points.ToArray();
         Points = pts;
 
-        Contours?.Clear();
-        Contours?.Add(new MeshContour(Utilities.ToVector2(pts), true));
-            
         if (updateBoundingBox)
         {
             CalculateBoundingVolumes();
@@ -489,6 +491,15 @@ public class Mesh
             var position = Points[i];
             Vector3.TransformCoordinate(ref position, ref transformMatrix, out position);
             Points[i] = Vector3.Round(position, RoundPrecision);
+        }
+
+        foreach (var meshContour in Contours)
+        {
+            var points = meshContour.Points;
+            
+            var transformed = new Vector2[points.Length];
+            Vector2.TransformCoordinate(points, ref transformMatrix, transformed);
+            meshContour.SetPoints(transformed, false);
         }
             
         CalculateNormals();

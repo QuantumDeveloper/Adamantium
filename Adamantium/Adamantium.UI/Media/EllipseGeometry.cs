@@ -92,20 +92,11 @@ public sealed class EllipseGeometry : Geometry
       var translation = Matrix4x4.Translation(Center.X, Center.Y, 0);
          
       Mesh = Shapes.Ellipse.GenerateGeometry(
-         GeometryType.Solid, 
+         GeometryType.Both, 
          EllipseType.Sector,
          new Vector2(rect.Width, rect.Height), 
          StartAngle, 
          StopAngle,
-         tessellation: TesselationFactor,
-         transform: translation);
-         
-      OutlineMesh = Shapes.Ellipse.GenerateGeometry(
-         GeometryType.Outlined, 
-         EllipseType.Sector,
-         new Vector2((float)rect.Width, (float)rect.Height), 
-         (float)StartAngle, 
-         (float)StopAngle,
          tessellation: TesselationFactor,
          transform: translation);
    }
@@ -119,7 +110,7 @@ public sealed class EllipseGeometry : Geometry
 
    public override void RecalculateBounds()
    {
-      bounds = Rect.FromPoints(OutlineMesh.Points);
+      bounds = Rect.FromPoints(Mesh.MergeContourPoints());
    }
 
    protected internal override void ProcessGeometryCore()

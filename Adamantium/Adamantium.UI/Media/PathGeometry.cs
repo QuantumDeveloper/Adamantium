@@ -87,7 +87,7 @@ public class PathGeometry : Geometry
     protected internal override void ProcessGeometryCore()
     {
         figureToPolygon.Clear();
-        OutlineMesh.ClearContours();
+        Mesh.ClearContours();
         
         foreach (var figure in Figures)
         {
@@ -111,7 +111,7 @@ public class PathGeometry : Geometry
         
         foreach (var outline in outlines)
         {
-            OutlineMesh.AddContour(outline.Value, outline.Key.IsClosed);
+            Mesh.AddContour(outline.Value, outline.Key.IsClosed);
         }
     }
 

@@ -5,6 +5,8 @@ namespace Adamantium.UI.Media;
 public interface IFigureSegments
 {
     IFigureSegments LineTo(Vector2 point, bool isStroked);
+    
+    IFigureSegments LineTo(double x, double y, bool isStroked = true);
 
     IFigureSegments PolylineLineTo(IEnumerable<Vector2> points, bool isStroked);
       

@@ -44,13 +44,21 @@ namespace Adamantium.Engine.Graphics
 
                 Mesh mesh;
 
-                if (geometryType == GeometryType.Solid)
+                switch (geometryType)
                 {
-                    mesh = GenerateSolidGeometry(ellipseType, diameter, startAngle, stopAngle, isClockWise, tessellation, transform);
-                }
-                else
-                {
-                    mesh = GenerateOutlinedGeometry(ellipseType, diameter, startAngle, stopAngle, isClockWise, tessellation, transform);
+                    case GeometryType.Solid:
+                        mesh = GenerateSolidGeometry(ellipseType, diameter, startAngle, stopAngle, isClockWise, tessellation, transform);
+                        break;
+                    case GeometryType.Both:
+                        var contour = GenerateOutlinedGeometry(ellipseType, diameter, startAngle, stopAngle, isClockWise, tessellation, transform);
+                        mesh = new Mesh();
+                        mesh.AddContour(contour, true);
+                        break;
+                    default:
+                        var vertices = GenerateOutlinedGeometry(ellipseType, diameter, startAngle, stopAngle, isClockWise, tessellation, transform);
+                        mesh = new Mesh();
+                        mesh.SetPoints(vertices).SetTopology(PrimitiveType.LineStrip).GenerateBasicIndices();
+                        break;
                 }
 
                 return mesh;
@@ -139,7 +147,7 @@ namespace Adamantium.Engine.Graphics
                 return mesh;
             }
 
-            private static Mesh GenerateOutlinedGeometry(
+            private static List<Vector3> GenerateOutlinedGeometry(
                 EllipseType ellipseType,
                 Vector2 diameter,
                 double startAngle = 0,
@@ -189,11 +197,7 @@ namespace Adamantium.Engine.Graphics
                     vertices = Mesh.ApplyTransform(vertices, transform.Value).ToList();
                 }
 
-                var mesh = new Mesh();
-                mesh.SetTopology(PrimitiveType.LineStrip).
-                    SetPoints(vertices).
-                    GenerateBasicIndices();
-                return mesh;
+                return vertices;
             }
         }
     }

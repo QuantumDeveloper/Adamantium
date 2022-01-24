@@ -23,6 +23,11 @@ public sealed class RectangleGeometry : Geometry
       Rect = copy.Rect;
       CornerRadius = copy.CornerRadius;
    }
+   
+   public RectangleGeometry(Rect size) : this(size, new CornerRadius(0))
+   {
+      
+   }
 
    public RectangleGeometry(Rect size, CornerRadius corners) : this()
    {
@@ -51,16 +56,8 @@ public sealed class RectangleGeometry : Geometry
       var translation = Matrix4x4.Translation((float)rect.Width / 2 + (float)rect.X,
          (float)rect.Height / 2 + (float)rect.Y, 0);
       Mesh = Shapes.Rectangle.GenerateGeometry(
-         GeometryType.Solid, 
+         GeometryType.Both, 
          (float)rect.Width,
-         (float)rect.Height,
-         CornerRadius, 
-         TesselationFactor, 
-         translation);
-         
-      OutlineMesh = Shapes.Rectangle.GenerateGeometry(
-         GeometryType.Outlined, 
-         (float)rect.Width, 
          (float)rect.Height,
          CornerRadius, 
          TesselationFactor, 
@@ -77,7 +74,7 @@ public sealed class RectangleGeometry : Geometry
 
    public override void RecalculateBounds()
    {
-      bounds = Rect.FromPoints(OutlineMesh.Points);
+      bounds = Rect.FromPoints(Mesh.MergeContourPoints());
    }
 
    protected internal override void ProcessGeometryCore()

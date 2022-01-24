@@ -87,30 +87,29 @@ public class CombinedGeometry : Geometry
 
     public override void RecalculateBounds()
     {
-        var points = OutlineMesh.MergeContourPoints();
+        var points = Mesh.MergeContourPoints();
         bounds = Rect.FromPoints(points);
     }
 
     protected internal override void ProcessGeometryCore()
     {
-        Geometry1.InvalidateGeometry();
+        Geometry1?.InvalidateGeometry();
         Geometry1?.ProcessGeometry();
         Geometry2?.ProcessGeometry();
 
         Mesh.Clear();
-        OutlineMesh.Clear();
 
         if (GeometryCombineMode == GeometryCombineMode.Xor)
         {
-            if (Geometry1 != null) OutlineMesh.Contours.AddRange(Geometry1.OutlineMesh.Contours);
-            if (Geometry2 != null) OutlineMesh.Contours.AddRange(Geometry2.OutlineMesh.Contours);
+            if (Geometry1 != null) Mesh.Contours.AddRange(Geometry1.Mesh.Contours);
+            if (Geometry2 != null) Mesh.Contours.AddRange(Geometry2.Mesh.Contours);
             
             var xorPolygon = new Polygon
             {
                 FillRule = FillRule.EvenOdd
             };
 
-            foreach (var contour in OutlineMesh.Contours)
+            foreach (var contour in Mesh.Contours)
             {
                 xorPolygon.AddItem(contour.Copy());
             }
@@ -123,7 +122,7 @@ public class CombinedGeometry : Geometry
         
         if (Geometry1 is {IsClosed: true})
         {
-            OutlineMesh1 = Geometry1.OutlineMesh;
+            OutlineMesh1 = Geometry1.Mesh;
             OutlineMesh1.SplitContoursOnSegments();
             bounds1 = Geometry1.Bounds;
         }
@@ -132,7 +131,7 @@ public class CombinedGeometry : Geometry
 
         if (Geometry2 is {IsClosed: true})
         {
-            OutlineMesh2 = Geometry2.OutlineMesh;
+            OutlineMesh2 = Geometry2.Mesh;
             OutlineMesh2.SplitContoursOnSegments();
             bounds2 = Geometry2.Bounds;
         }
@@ -206,18 +205,25 @@ public class CombinedGeometry : Geometry
 
             do
             {
-                contourSegments.Add(currentSegment);
-                mergedPoints.Remove(currentContourPoint);
+                try
+                {
+                    contourSegments.Add(currentSegment);
+                    mergedPoints.Remove(currentContourPoint);
 
-                currentContourPoint = currentSegment.GetOtherEnd(currentContourPoint);
-                currentSegment = currentContourPoint.GetOtherSegment(currentSegment);
+                    currentContourPoint = currentSegment.GetOtherEnd(currentContourPoint);
+                    currentSegment = currentContourPoint.GetOtherSegment(currentSegment);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e);
+                }
             } while (currentContourPoint != startContourPoint);
 
-            OutlineMesh.AddContour(contourSegments);
+            Mesh.AddContour(contourSegments);
         }
 
-        var mergedContourPoints = OutlineMesh.MergeGeometryContourPoints();
-        var mergedContourSegments = OutlineMesh.MergeContourSegments();
+        var mergedContourPoints = Mesh.MergeGeometryContourPoints();
+        var mergedContourSegments = Mesh.MergeContourSegments();
 
         var polygon = new Polygon
         {

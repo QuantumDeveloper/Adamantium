@@ -3,6 +3,7 @@
    public enum GeometryType
    {
       Solid,
-      Outlined
+      Outlined,
+      Both
    }
 }
