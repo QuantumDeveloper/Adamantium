@@ -61,13 +61,14 @@ namespace Adamantium.UI.Playground
             path.StrokeThickness = 2;
             path.Stroke = Brushes.CornflowerBlue;
             path.StrokeLineJoin = PenLineJoin.Miter;
-            path.Fill = Brushes.Black;
             CombinedGeometry combinedGeometry = new CombinedGeometry();
             combinedGeometry.GeometryCombineMode = GeometryCombineMode.Union;
             var innerCombinedGeometry = new CombinedGeometry();
             innerCombinedGeometry.GeometryCombineMode = GeometryCombineMode.Exclude;
-            innerCombinedGeometry.Geometry1 = new EllipseGeometry(new Vector2(100), 80, 80);
-            innerCombinedGeometry.Geometry2 = new EllipseGeometry(new Vector2(100), 65, 65);
+            // innerCombinedGeometry.Geometry1 = new EllipseGeometry(new Vector2(100), 80, 80);
+            // innerCombinedGeometry.Geometry2 = new EllipseGeometry(new Vector2(100), 65, 65);
+            innerCombinedGeometry.Geometry1 = new RectangleGeometry(new Rect(0, 0, 100, 50));
+            innerCombinedGeometry.Geometry2 = new RectangleGeometry(new Rect(0, 0, 50, 50));
             
             var innerCombinedGeometry2 = new CombinedGeometry();
             innerCombinedGeometry2.GeometryCombineMode = GeometryCombineMode.Exclude;
@@ -100,7 +101,7 @@ namespace Adamantium.UI.Playground
 
             combinedGeometry.Geometry1 = innerCombinedGeometry;
             //combinedGeometry.Geometry2 = innerCombinedGeometry2;
-            combinedGeometry.Geometry2 = streamGeometry;
+            //combinedGeometry.Geometry2 = streamGeometry;
 
             path.Data = combinedGeometry;
             //path.Data = polygonGeometry;
@@ -122,9 +123,9 @@ namespace Adamantium.UI.Playground
             //path.StrokeDashArray = new TrackingCollection<double>() { 5 };
 
             grid.Background = Brushes.White;
-            grid.Children.Add(polygon);
+            //grid.Children.Add(polygon);
             //grid.Children.Add(border);
-            //grid.Children.Add(path);
+            grid.Children.Add(path);
 
             Content = grid;
         }
