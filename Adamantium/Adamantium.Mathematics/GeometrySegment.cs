@@ -7,7 +7,9 @@ public class GeometrySegment
 {
     public MeshContour Parent { get; set; }
     public List<GeometryIntersection> SegmentEnds { get; set; }
-    public bool IsInnerSegment { get; set; }
+    public bool IsInner { get; set; }
+
+    public bool IsArguable { get; set; }
 
     public Vector2 Start => SegmentEnds[0].Coordinates;
     public Vector2 End => SegmentEnds[1].Coordinates;
@@ -91,5 +93,16 @@ public class GeometrySegment
     {
         if (SegmentEnds.Count < 2) return null;
         return SegmentEnds[0] == end ? SegmentEnds[1] : SegmentEnds[0];
+    }
+
+    public bool IsEqualTo(GeometrySegment other)
+    {
+        return ((Start == other.Start && End == other.End) ||
+                (Start == other.End && End == other.Start));
+    }
+    
+    public override string ToString()
+    {
+        return $"Start: {Start} End: {End} IsArguable: {IsArguable} IsInner: {IsInner}";
     }
 }

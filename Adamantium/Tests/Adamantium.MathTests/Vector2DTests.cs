@@ -1,4 +1,6 @@
+using Adamantium.Core;
 using Adamantium.Mathematics;
+using Microsoft.VisualStudio.TestPlatform.Utilities;
 using NUnit.Framework;
 
 namespace Adamantium.MathTests
@@ -21,6 +23,18 @@ namespace Adamantium.MathTests
             var vector2 = new Vector2(6, 60);
             var isCollinear = vector.IsCollinear(vector2);
             Assert.IsTrue(isCollinear, "Vectors are NOT collinear");
+        }
+        
+        [Test]
+        public void GetHashSetTest()
+        {
+            var v1 = new Vector2(100, 200);
+            var v2 = new Vector2(200, 100);
+
+            var h1 = v1.GetHashCode();
+            var h2 = v2.GetHashCode();
+
+            Assert.AreNotEqual(h1, h2);
         }
     }
 }

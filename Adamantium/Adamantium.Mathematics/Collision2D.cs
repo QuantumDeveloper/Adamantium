@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 
 namespace Adamantium.Mathematics
@@ -383,22 +384,22 @@ namespace Adamantium.Mathematics
             foreach (var a in area)
             {
                 var segment = a;
-                if (RaySegmentIntersection(ref rayLeft, ref segment, out var interPoint))
+                if (RaySegmentIntersection(ref rayLeft, ref segment, out _))
                 {
                     sides |= IntersectionSides.Left;
                 }
 
-                if (RaySegmentIntersection(ref rayDown, ref segment, out interPoint))
+                if (RaySegmentIntersection(ref rayDown, ref segment, out _))
                 {
                     sides |= IntersectionSides.Down;
                 }
 
-                if (RaySegmentIntersection(ref rayRight, ref segment, out interPoint))
+                if (RaySegmentIntersection(ref rayRight, ref segment, out _))
                 {
                     sides |= IntersectionSides.Right;
                 }
 
-                if (RaySegmentIntersection(ref rayUp, ref segment, out interPoint))
+                if (RaySegmentIntersection(ref rayUp, ref segment, out _))
                 {
                     sides |= IntersectionSides.Up;
                 }
@@ -409,6 +410,43 @@ namespace Adamantium.Mathematics
                 }
             }
             return false;
+        }
+        
+        public static bool IsSegmentInsideArea(GeometrySegment segment, IEnumerable<GeometrySegment> area)
+        {
+            var segmentCenter = (segment.End - segment.Start) * 0.5 + segment.Start;
+            
+            var rayList = new List<Ray2D>()
+            {
+                new (segmentCenter, -Vector2.UnitX),
+                new (segmentCenter, Vector2.UnitX),
+                new (segmentCenter, -Vector2.UnitY),
+                new (segmentCenter, Vector2.UnitY)
+            };
+
+            var segmentsArray = area.ToArray();
+            
+            foreach (var ray in rayList)
+            {
+                var intersection = false;
+
+                foreach (var areaSeg in segmentsArray)
+                {
+                    if (areaSeg == segment) continue;
+                    
+                    var tmpRay = ray;
+
+                    if (RaySegmentIntersection(ref tmpRay, areaSeg, out _))
+                    {
+                        intersection = true;
+                        break;
+                    }
+                }
+
+                if (!intersection) return false;
+            }
+
+            return true;
         }
     }
 }

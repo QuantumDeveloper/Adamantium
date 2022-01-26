@@ -107,8 +107,8 @@ namespace Adamantium.MathTests
         [Test]
         public void LineSegmentIntersectsLineSegment2D()
         {
-            LineSegment2D segment2D = new LineSegment2D(new Vector2(0.2, 0.2), new Vector2(-0.2, 0.2));
-            LineSegment2D segment2 = new LineSegment2D(new Vector2(0.2, -0.2), new Vector2(0.2, -0.4));
+            LineSegment2D segment2D = new LineSegment2D(new Vector2(0, 0), new Vector2(10, 0));
+            LineSegment2D segment2 = new LineSegment2D(new Vector2(10, 0), new Vector2(15, 0));
             var intersects = Collision2D.SegmentSegmentIntersection(ref segment2D, ref segment2, out var point);
 
             Assert.IsFalse(intersects);
