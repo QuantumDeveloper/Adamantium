@@ -82,7 +82,6 @@ public class Border : Decorator
 
    protected override void OnRender(DrawingContext context)
    {
-         
       var size = new Size(ActualWidth, ActualHeight);
       var borderThickness = BorderThickness;
       var cornerRadius = CornerRadius;

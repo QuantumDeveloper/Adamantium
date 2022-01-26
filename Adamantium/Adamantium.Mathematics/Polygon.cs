@@ -218,111 +218,6 @@ namespace Adamantium.Mathematics
             }
         }
 
-        private void ProcessContoursIntersections(MeshContour meshContour1, MeshContour meshContour2)
-        {
-            var intersectionsList = new Dictionary<Vector2, GeometryIntersection>();
-            var contour1Intersections = new Dictionary<GeometrySegment, SortedList<double, GeometryIntersection>>();
-            var contour2Intersections = new Dictionary<GeometrySegment, SortedList<double, GeometryIntersection>>();
-
-            foreach (var segment1 in meshContour1.Segments)
-            {
-                contour1Intersections[segment1] = new SortedList<double, GeometryIntersection>();
-
-                foreach (var segment2 in meshContour2.Segments)
-                {
-                    if (!contour2Intersections.ContainsKey(segment2))
-                    {
-                        contour2Intersections[segment2] = new SortedList<double, GeometryIntersection>();
-                    }
-
-                    if (Collision2D.SegmentSegmentIntersection(segment1, segment2, out var point))
-                    {
-                        if (point != segment1.Start && point != segment1.End)
-                        {
-                            if (!intersectionsList.ContainsKey(point))
-                            {
-                                intersectionsList[point] = new GeometryIntersection(point);
-                            }
-
-                            var distanceToStart = (point - segment1.Start).Length();
-                            if (!contour1Intersections[segment1].ContainsKey(distanceToStart)) contour1Intersections[segment1].Add(distanceToStart, intersectionsList[point]);
-                        }
-
-                        if (point != segment2.Start && point != segment2.End)
-                        {
-                            if (!intersectionsList.ContainsKey(point))
-                            {
-                                intersectionsList[point] = new GeometryIntersection(point);
-                            }
-
-                            var distanceToStart = (point - segment2.Start).Length();
-                            if (!contour2Intersections[segment2].ContainsKey(distanceToStart)) contour2Intersections[segment2].Add(distanceToStart, intersectionsList[point]);
-                        }
-                    }
-                }
-            }
-
-            FillMeshSegments(contour1Intersections);
-            FillMeshSegments(contour2Intersections);
-        }
-
-        private void FillMeshSegments(Dictionary<GeometrySegment, SortedList<double, GeometryIntersection>> meshIntersections)
-        {
-            foreach (var (key, value) in meshIntersections)
-            {
-                key.RemoveSelfFromParent();
-                
-                if (value.Count == 0)
-                {
-                    key.Parent.Segments.Add(key);
-                    continue;
-                }
-
-                key.RemoveSelfFromConnectedSegments();
-
-                var startPart = new GeometrySegment(key.Parent, key.SegmentEnds[0], value.Values.First());
-                key.Parent.Segments.Add(startPart);
-
-                for (var i = 0; i < value.Values.Count - 1; i++)
-                {
-                    var int1 = value.Values[i];
-                    var int2 = value.Values[i + 1];
-
-                    var seg = new GeometrySegment(key.Parent, int1, int2);
-                    key.Parent.Segments.Add(seg);
-                }
-
-                var endPart = new GeometrySegment(key.Parent, value.Values.Last(), key.SegmentEnds[1]);
-                key.Parent.Segments.Add(endPart);
-            }
-        }
-        
-        private void MarkSegments(MeshContour meshContour1, MeshContour meshContour2)
-        {
-            var mesh1Segments = meshContour1.Segments;
-            var mesh2Points = meshContour2.GeometryPoints;
-
-            foreach (var point in mesh2Points)
-            {
-                var ray = new Ray2D(point.Coordinates, Vector2.UnitX);
-                var intersectionCnt = 0;
-            
-                foreach (var segment in mesh1Segments)
-                {
-                    var seg = new LineSegment2D(segment);
-                    if (Collision2D.RaySegmentIntersection(ref ray, ref seg, out var intPoint) && point.Coordinates != intPoint) ++intersectionCnt;
-                }
-
-                if (intersectionCnt % 2 != 0)
-                {
-                    foreach (var segment in point.ConnectedSegments)
-                    {
-                        segment.IsInnerSegment = true;
-                    }
-                }
-            }
-        }
-
         private void MergeContours()
         {
             if (contours.Count <= 1)
@@ -360,7 +255,7 @@ namespace Adamantium.Mathematics
                 //If polygons partly inside each other
                 if (intersectionResult == ContainmentType.Intersects)
                 {
-                    ProcessContoursIntersections(contour1, contour2);
+                    ContourProcessingHelper.ProcessContoursIntersections(contour1.Segments, contour2.Segments);
                 }
             }
 
@@ -372,6 +267,8 @@ namespace Adamantium.Mathematics
 
             if (FillRule != FillRule.EvenOdd)
             {
+                var arguableSegments = new List<GeometrySegment>();
+                
                 foreach (var polygonPair in checkedContours)
                 {
                     var contour1 = polygonPair.Contour1;
@@ -381,16 +278,39 @@ namespace Adamantium.Mathematics
                     //If polygons partly inside each other
                     if (intersectionResult == ContainmentType.Intersects)
                     {
-                        MarkSegments(contour1, contour2);
-                        MarkSegments(contour2, contour1);
+                        // mark all segments as inner, outer or arguable (border case) relatively to other mesh
+                        arguableSegments.AddRange(ContourProcessingHelper.MarkSegments(contour1.Segments, contour2.Segments));
+                        arguableSegments.AddRange(ContourProcessingHelper.MarkSegments(contour2.Segments, contour1.Segments));
                     }
                 }
 
-                // delete inner segments and update points 
+                if (arguableSegments.Count > 0)
+                {
+                    // resolve arguable segments as inner or outer
+                    var mergedSegments = new List<GeometrySegment>();
+
+                    foreach (var contour in contours)
+                    {
+                        mergedSegments.AddRange(contour.Segments);
+                    }
+
+                    ContourProcessingHelper.ResolveArguableSegments(arguableSegments, mergedSegments);
+                }
+
+                // remove only inner segments, arguable segments will be skipped
                 foreach (var contour in contours)
                 {
                     contour.RemoveSegmentsByRule(true);
-                    contour.UpdatePoints();
+                }
+
+                // additionally remove resolved segments if they are inner
+                foreach (var arguableSeg in arguableSegments)
+                {
+                    if (arguableSeg.IsInner)
+                    {
+                        arguableSeg.RemoveSelfFromConnectedSegments();
+                        arguableSeg.RemoveSelfFromParent();
+                    }
                 }
             }
 

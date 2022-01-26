@@ -1522,12 +1522,17 @@ namespace Adamantium.Mathematics
       /// <returns>
       /// A hash code for this instance, suitable for use in hashing algorithms and data structures like a hash table. 
       /// </returns>
-      public override int GetHashCode()
+      /*public override int GetHashCode()
       {
          unchecked
          {
             return (X.GetHashCode() * 397) ^ Y.GetHashCode();
          }
+      }*/
+      
+      public override int GetHashCode()
+      {
+         return (int)((X * X + 3 * X + 2 * X * Y + Y + Y * Y) / 2.0);
       }
 
       /// <summary>

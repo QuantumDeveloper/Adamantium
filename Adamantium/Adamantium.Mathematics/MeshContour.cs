@@ -158,7 +158,9 @@ public class MeshContour
         
         foreach (var segment in tmpSegments)
         {
-            var delete = !(removeInner ^ segment.IsInnerSegment);
+            if (segment.IsArguable) continue;
+            
+            var delete = !(removeInner ^ segment.IsInner);
             if (delete)
             {
                 segment.RemoveSelfFromConnectedSegments();
@@ -186,8 +188,6 @@ public class MeshContour
                 {
                     if (point != currentSegment.Start && point != currentSegment.End)
                     {
-                        
-                        
                         if (!intersectionsList.ContainsKey(point))
                         {
                             intersectionsList[point] = new GeometryIntersection(point);

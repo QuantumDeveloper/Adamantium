@@ -15,8 +15,8 @@ public class VectorIconsTests
         SVGParser parser = new SVGParser();
         parser.Parse(xamlString);
     }
-    
-    
+
+
     [Test]
     public void SVGParserPerformanceTest()
     {
@@ -29,8 +29,8 @@ public class VectorIconsTests
             var geometry = Geometry.Parse(xamlString);
             geometry.ProcessGeometry();
         }
+
         timer.Stop();
         Console.WriteLine($"1000 icons was parsed in {timer.ElapsedMilliseconds}");
     }
-    
 }
