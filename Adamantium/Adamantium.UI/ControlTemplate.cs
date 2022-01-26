@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Adamantium.Core;
 
 namespace Adamantium.UI;
 
@@ -14,11 +15,13 @@ public class ControlTemplate : UITemplate
     {
         return null;
     }
+    
+    public TriggerCollection Triggers { get; set; }
 }
 
 public class UIComponentFactory
 {
-    private Dictionary<AdamantiumProperty, Object> properties;
+    private readonly Dictionary<AdamantiumProperty, Object> properties;
     private List<UIComponentFactory> children;
 
     public UIComponentFactory()
@@ -45,5 +48,37 @@ public class UIComponentFactory
     public void SetValue(AdamantiumProperty property, object value)
     {
         properties[property] = value;
+    }
+
+    public IUIComponent GenerateVisualTree()
+    {
+        return null;
+    }
+
+
+    private IUIComponent GenerateComponent()
+    {
+        ArgumentNullException.ThrowIfNull(Type);
+        
+        if (!Utilities.IsTypeInheritFrom(Type, typeof(IUIComponent)))
+        {
+            throw new ArgumentOutOfRangeException($"{Type} should be inherited from IUIComponent");
+        }
+        
+        var component = (IUIComponent)Activator.CreateInstance(Type);
+        
+        ArgumentNullException.ThrowIfNull(component);
+
+        var stack = new Stack<UIComponentFactory>();
+        stack.Push(this);
+
+        foreach (var (property, value) in properties)
+        {
+            component.SetValue(property, value);
+        }
+        
+        
+        
+        return component;
     }
 }

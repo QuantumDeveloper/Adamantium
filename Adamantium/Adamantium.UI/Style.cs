@@ -46,7 +46,7 @@ public class Style
          baseStyle = baseStyle.BasedOn;
       }
       
-      for (int i = styles.Count - 1; i >= 0; ++i)
+      for (int i = styles.Count - 1; i >= 0; --i)
       {
          var style = styles[i];
          foreach (var setter in style.Setters)
