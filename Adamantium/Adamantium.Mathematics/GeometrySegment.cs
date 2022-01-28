@@ -10,6 +10,9 @@ public class GeometrySegment
     public bool IsInner { get; set; }
 
     public bool IsArguable { get; set; }
+    
+    // used for combined geometry contour forming (only for one-point joint case) 
+    public bool IsAlreadyInTriangulatorContour { get; set; }
 
     public Vector2 Start => SegmentEnds[0].Coordinates;
     public Vector2 End => SegmentEnds[1].Coordinates;

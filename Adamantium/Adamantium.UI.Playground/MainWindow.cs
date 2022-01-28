@@ -62,13 +62,13 @@ namespace Adamantium.UI.Playground
             path.Stroke = Brushes.CornflowerBlue;
             path.StrokeLineJoin = PenLineJoin.Miter;
             CombinedGeometry combinedGeometry = new CombinedGeometry();
-            combinedGeometry.GeometryCombineMode = GeometryCombineMode.Union;
+            combinedGeometry.GeometryCombineMode = GeometryCombineMode.Xor;
             var innerCombinedGeometry = new CombinedGeometry();
             innerCombinedGeometry.GeometryCombineMode = GeometryCombineMode.Exclude;
-            // innerCombinedGeometry.Geometry1 = new EllipseGeometry(new Vector2(100), 80, 80);
-            // innerCombinedGeometry.Geometry2 = new EllipseGeometry(new Vector2(100), 65, 65);
-            innerCombinedGeometry.Geometry1 = new RectangleGeometry(new Rect(0, 0, 100, 50));
-            innerCombinedGeometry.Geometry2 = new RectangleGeometry(new Rect(0, 0, 50, 50));
+            innerCombinedGeometry.Geometry1 = new EllipseGeometry(new Vector2(100), 80, 80);
+            innerCombinedGeometry.Geometry2 = new EllipseGeometry(new Vector2(100), 65, 65);
+            //innerCombinedGeometry.Geometry1 = new RectangleGeometry(new Rect(0, 0, 50, 50));
+            //innerCombinedGeometry.Geometry2 = new RectangleGeometry(new Rect(100, 0, 50, 50));
             
             var innerCombinedGeometry2 = new CombinedGeometry();
             innerCombinedGeometry2.GeometryCombineMode = GeometryCombineMode.Exclude;
@@ -100,9 +100,16 @@ namespace Adamantium.UI.Playground
             
 
             combinedGeometry.Geometry1 = innerCombinedGeometry;
-            //combinedGeometry.Geometry2 = innerCombinedGeometry2;
+            combinedGeometry.Geometry2 = innerCombinedGeometry2;
             //combinedGeometry.Geometry2 = streamGeometry;
 
+            
+            rectangleGeometry = new RectangleGeometry(new Rect(50, 50, 50, 50));
+            CombinedGeometry combinedGeometry2 = new CombinedGeometry();
+            combinedGeometry2.GeometryCombineMode = GeometryCombineMode.Union;
+            combinedGeometry2.Geometry1 = combinedGeometry;
+            combinedGeometry2.Geometry2 = rectangleGeometry;
+            
             path.Data = combinedGeometry;
             //path.Data = polygonGeometry;
             

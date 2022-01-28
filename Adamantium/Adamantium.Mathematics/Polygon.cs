@@ -200,9 +200,19 @@ namespace Adamantium.Mathematics
         private void MergePoints()
         {
             MergedPoints.Clear();
-            for (var i = 0; i < contours.Count; ++i)
+            
+            var pointsHashSet = new HashSet<GeometryIntersection>();
+
+            foreach (var segment in MergedSegments)
             {
-                MergedPoints.AddRange(contours[i].GeometryPoints);
+                foreach (var end in segment.SegmentEnds)
+                {
+                    if (!pointsHashSet.Contains(end))
+                    {
+                        pointsHashSet.Add(end);
+                        MergedPoints.Add(end);
+                    }
+                }
             }
         }
 
@@ -228,35 +238,20 @@ namespace Adamantium.Mathematics
                 return;
             }
 
-            for (var i = 0; i < contours.Count; i++)
+            var processedSegments = new List<GeometrySegment>();
+
+            for (var i = 1; i < contours.Count; i++)
             {
-                var contour1 = contours[i];
-                for (var j = 0; j < contours.Count; j++)
+                processedSegments.Clear();
+
+                for (var j = 0; j < i; j++)
                 {
-                    var contour2 = contours[j];
-                    if (contour1 == contour2 || ContainsContourPair(contour1, contour2))
-                    {
-                        continue;
-                    }
-
-                    //Check if polygons are inside each other
-                    var intersectionResult = contour1.IsCompletelyContains(contour2);
-
-                    AddContourPairToList(contour1, contour2, intersectionResult);
+                    processedSegments.AddRange(contours[j].Segments);
                 }
-            }
-
-            foreach (var polygonPair in checkedContours)
-            {
-                var contour1 = polygonPair.Contour1;
-                var contour2 = polygonPair.Contour2;
-                var intersectionResult = polygonPair.IntersectionType;
-
-                //If polygons partly inside each other
-                if (intersectionResult == ContainmentType.Intersects)
-                {
-                    ContourProcessingHelper.ProcessContoursIntersections(contour1.Segments, contour2.Segments);
-                }
+                
+                var nextSegments = contours[i].Segments;
+                
+                ContourProcessingHelper.ProcessContoursIntersections(processedSegments, nextSegments);
             }
 
             // update for correct marking
@@ -303,13 +298,21 @@ namespace Adamantium.Mathematics
                     contour.RemoveSegmentsByRule(true);
                 }
 
-                // additionally remove resolved segments if they are inner
-                foreach (var arguableSeg in arguableSegments)
+                if (arguableSegments.Count > 0)
                 {
-                    if (arguableSeg.IsInner)
+                    // additionally remove resolved segments if they are inner
+                    foreach (var arguableSeg in arguableSegments)
                     {
-                        arguableSeg.RemoveSelfFromConnectedSegments();
-                        arguableSeg.RemoveSelfFromParent();
+                        if (arguableSeg.IsInner)
+                        {
+                            arguableSeg.RemoveSelfFromConnectedSegments();
+                            arguableSeg.RemoveSelfFromParent();
+                        }
+                    }
+
+                    foreach (var contour in contours)
+                    {
+                        contour.UpdatePoints();
                     }
                 }
             }
