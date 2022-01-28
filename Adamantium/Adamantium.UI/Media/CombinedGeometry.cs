@@ -160,117 +160,75 @@ public class CombinedGeometry : Geometry
             // remove only inner / outer segments (according to mode), arguable segments will be skipped
             RemoveSegmentsByMode();
 
-            // additionally remove resolved segment if needed (according to mode)
-            foreach (var arguableSeg in arguableSegments)
+            if (arguableSegments.Count > 0)
             {
-                switch (GeometryCombineMode)
+                // additionally remove resolved segment if needed (according to mode)
+                foreach (var arguableSeg in arguableSegments)
                 {
-                    case GeometryCombineMode.Union:
-                        if (arguableSeg.IsInner)
-                        {
-                            arguableSeg.RemoveSelfFromConnectedSegments();
-                            arguableSeg.RemoveSelfFromParent();
-                        }
+                    switch (GeometryCombineMode)
+                    {
+                        case GeometryCombineMode.Union:
+                            if (arguableSeg.IsInner)
+                            {
+                                arguableSeg.RemoveSelfFromConnectedSegments();
+                                arguableSeg.RemoveSelfFromParent();
+                            }
 
-                        break;
-                    case GeometryCombineMode.Exclude:
-                        if (!arguableSeg.IsInner)
-                        {
-                            arguableSeg.RemoveSelfFromConnectedSegments();
-                            arguableSeg.RemoveSelfFromParent();
-                        }
+                            break;
+                        case GeometryCombineMode.Exclude:
+                            if (!arguableSeg.IsInner)
+                            {
+                                arguableSeg.RemoveSelfFromConnectedSegments();
+                                arguableSeg.RemoveSelfFromParent();
+                            }
 
-                        break;
+                            break;
+                    }
+                }
+                
+                OutlineMesh1.UpdateContoursPoints();
+                OutlineMesh2.UpdateContoursPoints();
+            }
+
+            // 1. Merge all segments of all contours of all meshes.
+            var allSegments = OutlineMesh1.MergeContourSegments();
+            allSegments.AddRange(OutlineMesh2.MergeContourSegments());
+
+            var allSegmentsDict = allSegments.ToDictionary(x => x);
+            
+            // 2. Form contours
+            var strokeContours = FormStrokeContours(allSegmentsDict, out var onePointJointCase);
+            List<GeometrySegment> triangulatorSegments = null;
+            List<GeometryIntersection> triangulatorPoints = null;
+            foreach (var strokeContour in strokeContours)
+            {
+                Mesh.AddContour(strokeContour);
+            }
+
+            if (onePointJointCase)
+            {
+                allSegmentsDict = allSegments.ToDictionary(x => x);
+
+                triangulatorSegments = FormTriangulatorContours(allSegmentsDict);
+                
+                var pointsHashSet = new HashSet<GeometryIntersection>();
+                triangulatorPoints = new List<GeometryIntersection>();
+
+                foreach (var segment in triangulatorSegments)
+                {
+                    foreach (var end in segment.SegmentEnds)
+                    {
+                        if (!pointsHashSet.Contains(end))
+                        {
+                            pointsHashSet.Add(end);
+                            triangulatorPoints.Add(end);
+                        }
+                    }
                 }
             }
 
-            // 1. Merge all points of all contours of all meshes.
-            // If point is already present, merge connected segments for it.
-
-            var mesh1Points = OutlineMesh1.MergeGeometryContourPoints();
-            var mesh2Points = OutlineMesh2.MergeGeometryContourPoints();
-
-            var mesh1PointDict = mesh1Points.ToDictionary(x => x.Coordinates);
-
-            foreach (var point in mesh2Points)
-            {
-                if (!mesh1PointDict.ContainsKey(point.Coordinates))
-                {
-                    mesh1PointDict.Add(point.Coordinates, point);
-                }
-            }
-
-            var mergedPoints = mesh1PointDict.Values.ToList();
-
-            // 2. Form contours (we're splitting contours here, including the case of one-point joint, see below)
-            /*
-            _________
-            |        |
-            |        |
-            |________|________
-                     |        |
-                     |        |
-                     |________| 
-             */
-
-            while (mergedPoints.Count > 0)
-            {
-                var contourSegments = new List<GeometrySegment>();
-
-                var startContourPoint = mergedPoints.First();
-                var startSegment = startContourPoint.ConnectedSegments.First();
-                var currentContourPoint = startContourPoint;
-                var currentSegment = startSegment;
-
-                var intersectionsList = new Dictionary<Vector2, GeometryIntersection>();
-
-                do
-                {
-                    // check and create (if needed) the new instance of GeometryIntersection for start of the new segment
-                    var newStart = currentContourPoint.Coordinates;
-
-                    if (!intersectionsList.ContainsKey(newStart))
-                    {
-                        intersectionsList[newStart] = new GeometryIntersection(newStart);
-                    }
-
-                    // remove point from merged points list
-                    mergedPoints.Remove(currentContourPoint);
-
-                    // get next point
-                    currentContourPoint = currentSegment.GetOtherEnd(currentContourPoint);
-
-                    // check and create (if needed) the new instance of GeometryIntersection for end of the new segment
-                    var newEnd = currentContourPoint.Coordinates;
-
-                    if (!intersectionsList.ContainsKey(newEnd))
-                    {
-                        intersectionsList[newEnd] = new GeometryIntersection(newEnd);
-                    }
-
-                    // create and store new segment
-                    var newSegment = new GeometrySegment(currentSegment.Parent, intersectionsList[newStart],
-                        intersectionsList[newEnd]);
-                    contourSegments.Add(newSegment);
-
-                    // get next segment
-                    GeometrySegment nextSegment = null;
-                    if (currentContourPoint.ConnectedSegments.Count > 2)
-                        nextSegment = currentContourPoint.GetSiblingOtherSegment(currentSegment);
-                    else nextSegment = currentContourPoint.GetAnyOtherSegment(currentSegment);
-
-                    // remove current segment from lists of connected segments of it's ends (in order not to process it anymore further)
-                    currentSegment.RemoveSelfFromConnectedSegments();
-
-                    // switch to next segment
-                    currentSegment = nextSegment;
-                } while (currentContourPoint != startContourPoint);
-
-                Mesh.AddContour(contourSegments);
-            }
-
-            var mergedContourPoints = Mesh.MergeGeometryContourPoints();
-            var mergedContourSegments = Mesh.MergeContourSegments();
+            var mergedContourPoints = onePointJointCase ? triangulatorPoints : Mesh.MergeGeometryContourPoints();
+            var mergedContourSegments = onePointJointCase ? triangulatorSegments : Mesh.MergeContourSegments();
 
             var polygon = new Polygon
             {
@@ -302,6 +260,96 @@ public class CombinedGeometry : Geometry
             var triangulated = polygon.Fill();
             Mesh.SetPoints(triangulated);
         }
+    }
+
+    private List<GeometrySegment> FormTriangulatorContours(Dictionary<GeometrySegment, GeometrySegment> mergedSegments)
+    {
+        var triangulatorSegments = new List<GeometrySegment>();
+        
+        while (mergedSegments.Count > 0)
+        {
+            var currentSegment = mergedSegments.First().Value;
+            var currentPoint = currentSegment.SegmentEnds[0];
+
+            do
+            {
+                triangulatorSegments.Add(currentSegment);
+                currentSegment.IsAlreadyInTriangulatorContour = true;
+
+                mergedSegments.Remove(currentSegment);
+
+                currentPoint = currentSegment.GetOtherEnd(currentPoint);
+                currentSegment = currentPoint.ConnectedSegments.Count > 2 ?
+                                 currentPoint.GetSegmentFromOtherParent(currentSegment) :
+                                 currentPoint.GetAnyOtherSegment(currentSegment);
+            } while (currentSegment != null);
+        }
+
+        return triangulatorSegments;
+    }
+
+    private List<List<GeometrySegment>> FormStrokeContours(Dictionary<GeometrySegment, GeometrySegment> mergedSegments, out bool onePointJointCase)
+    {
+        var strokeContours = new List<List<GeometrySegment>>();
+        
+        onePointJointCase = false;
+
+        while (mergedSegments.Count > 0)
+        {
+            var strokeContour = new List<GeometrySegment>();
+
+            var startSegment = mergedSegments.First().Value;
+            var currentPoint = startSegment.SegmentEnds[0];
+            var currentSegment = startSegment;
+
+            var intersectionsList = new Dictionary<Vector2, GeometryIntersection>();
+
+            do
+            {
+                // check and create (if needed) the new instance of GeometryIntersection for start of the new segment
+                var newStart = currentPoint.Coordinates;
+
+                if (!intersectionsList.ContainsKey(newStart))
+                {
+                    intersectionsList[newStart] = new GeometryIntersection(newStart);
+                }
+
+                // check and create (if needed) the new instance of GeometryIntersection for end of the new segment
+                currentPoint = currentSegment.GetOtherEnd(currentPoint);
+                var newEnd = currentPoint.Coordinates;
+
+                if (!intersectionsList.ContainsKey(newEnd))
+                {
+                    intersectionsList[newEnd] = new GeometryIntersection(newEnd);
+                }
+
+                // create and store new segment
+                var newSegment = new GeometrySegment(currentSegment.Parent, intersectionsList[newStart],
+                    intersectionsList[newEnd]);
+                strokeContour.Add(newSegment);
+
+                // get next segment
+                GeometrySegment nextSegment = null;
+                if (currentPoint.ConnectedSegments.Count > 2)
+                {
+                    onePointJointCase = true;
+                    nextSegment = currentPoint.GetSegmentFromSameParent(currentSegment);
+                }
+                else
+                {
+                    nextSegment = currentPoint.GetAnyOtherSegment(currentSegment);
+                }
+
+                mergedSegments.Remove(currentSegment);
+                
+                // switch to next segment
+                currentSegment = nextSegment;
+            } while (currentSegment != startSegment);
+
+            strokeContours.Add(strokeContour);
+        }
+
+        return strokeContours;
     }
 
     private bool CheckGeometryBoundingBoxesIntersection()

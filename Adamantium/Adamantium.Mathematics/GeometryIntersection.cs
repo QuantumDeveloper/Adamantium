@@ -24,21 +24,43 @@ public class GeometryIntersection
         return $"Coordinates: {Coordinates} ConnectedSegments.Count: {ConnectedSegments.Count}";
     }
 
-    public GeometrySegment GetSiblingOtherSegment(GeometrySegment segment)
+    public GeometrySegment GetSegmentFromOtherParent(GeometrySegment segment)
     {
         if (ConnectedSegments.Count < 2) return null;
 
         foreach (var connectedSegment in ConnectedSegments)
         {
-            if (segment != connectedSegment && segment.Parent == connectedSegment.Parent) return connectedSegment;
+            if (segment != connectedSegment &&
+                connectedSegment.IsAlreadyInTriangulatorContour == false &&
+                segment.Parent != connectedSegment.Parent) return connectedSegment;
         }
 
         return null;
     }
     
+    public GeometrySegment GetSegmentFromSameParent(GeometrySegment segment)
+    {
+        if (ConnectedSegments.Count < 2) return null;
+
+        foreach (var connectedSegment in ConnectedSegments)
+        {
+            if (segment != connectedSegment &&
+                connectedSegment.IsAlreadyInTriangulatorContour == false &&
+                segment.Parent == connectedSegment.Parent) return connectedSegment;
+        }
+
+        return null;
+    }
+
     public GeometrySegment GetAnyOtherSegment(GeometrySegment segment)
     {
         if (ConnectedSegments.Count < 2) return null;
-        return ConnectedSegments[0] == segment ? ConnectedSegments[1] : ConnectedSegments[0];
+
+        foreach (var connectedSegment in ConnectedSegments)
+        {
+            if (segment != connectedSegment && connectedSegment.IsAlreadyInTriangulatorContour == false) return connectedSegment;
+        }
+
+        return null;
     }
 }
