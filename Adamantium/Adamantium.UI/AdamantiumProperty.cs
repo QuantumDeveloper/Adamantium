@@ -6,7 +6,7 @@ using Adamantium.UI.RoutedEvents;
 namespace Adamantium.UI;
 
 /// <summary>
-/// Represents a property that can be set throught methods such as: styling, data binding, animation and inheritance
+/// Represents a property that can be set through methods such as: styling, data binding, animation and inheritance
 /// </summary>
 public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
 {

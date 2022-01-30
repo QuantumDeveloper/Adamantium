@@ -6,9 +6,9 @@ public class RawInputMouseEventArgs : RawMouseEventArgs
 {
    public Vector2 Delta { get; }
 
-   public RawInputMouseEventArgs(Vector2 delta, RawMouseEventType eventType, IInputElement rootElement, Vector2 position,
+   public RawInputMouseEventArgs(Vector2 delta, RawMouseEventType eventType, IInputComponent rootComponent, Vector2 position,
       InputModifiers modifiers, MouseDevice device, uint timeStep)
-      : base(eventType, rootElement, position, modifiers, device, timeStep)
+      : base(eventType, rootComponent, position, modifiers, device, timeStep)
    {
       Delta = delta;
    }

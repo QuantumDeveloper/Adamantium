@@ -75,27 +75,27 @@ public abstract class KeyboardDevice
       }
    }
 
-   public IInputElement FocusedElement { get; private set; }
+   public IInputComponent FocusedComponent { get; private set; }
 
-   public bool SetFocusedElement(IInputElement element, NavigationMethod navigationMethod = NavigationMethod.Unspecified,
+   public bool SetFocusedElement(IInputComponent component, NavigationMethod navigationMethod = NavigationMethod.Unspecified,
       InputModifiers modifiers = InputModifiers.None)
    {
-      if (element == null)
+      if (component == null)
       {
          ClearState();
       }
 
-      if (element != FocusedElement)
+      if (component != FocusedComponent)
       {
-         KeyboardFocusChangedEventArgs args = new KeyboardFocusChangedEventArgs(FocusedElement, element);
+         KeyboardFocusChangedEventArgs args = new KeyboardFocusChangedEventArgs(FocusedComponent, component);
          args.RoutedEvent = Keyboard.PreviewGotKeyboardFocusEvent;
-         FocusedElement?.RaiseEvent(args);
+         FocusedComponent?.RaiseEvent(args);
 
-         FocusedElement = element;
+         FocusedComponent = component;
 
-         KeyboardGotFocusEventArgs e = new KeyboardGotFocusEventArgs(FocusedElement, element, navigationMethod, modifiers);
+         KeyboardGotFocusEventArgs e = new KeyboardGotFocusEventArgs(FocusedComponent, component, navigationMethod, modifiers);
          e.RoutedEvent = Keyboard.GotKeyboardFocusEvent;
-         FocusedElement?.RaiseEvent(e);
+         FocusedComponent?.RaiseEvent(e);
 
          return true;
       }
@@ -179,7 +179,7 @@ public abstract class KeyboardDevice
 
    public void ProcessEvent(RawInputEventArgs eventArgs)
    {
-      if (FocusedElement != null)
+      if (FocusedComponent != null)
       {
          UpdateKeyStates();
          if (eventArgs is RawKeyboardEventArgs e)
@@ -204,7 +204,7 @@ public abstract class KeyboardDevice
                   }
                   UpdateKeyData(e.ChangedKey, parameters);
 
-                  FocusedElement.RaiseEvent(args);
+                  FocusedComponent.RaiseEvent(args);
 
                   if (e.EventType == RawKeyboardEventType.KeyDown)
                   {
@@ -216,7 +216,7 @@ public abstract class KeyboardDevice
                      parameters.CurrentState = KeyStates.Up;
                      args.RoutedEvent = Keyboard.KeyUpEvent;
                   }
-                  FocusedElement.RaiseEvent(args);
+                  FocusedComponent.RaiseEvent(args);
                   break;
             }
          }
@@ -225,10 +225,10 @@ public abstract class KeyboardDevice
             var inputArgs = eventArgs as RawTextInputEventArgs;
             TextInputEventArgs textArgs = new TextInputEventArgs(inputArgs?.Text);
             textArgs.RoutedEvent = UIComponent.PreviewTextInputEvent;
-            FocusedElement.RaiseEvent(textArgs);
+            FocusedComponent.RaiseEvent(textArgs);
 
             textArgs.RoutedEvent = UIComponent.TextInputEvent;
-            FocusedElement.RaiseEvent(textArgs);
+            FocusedComponent.RaiseEvent(textArgs);
          }
       }
    }

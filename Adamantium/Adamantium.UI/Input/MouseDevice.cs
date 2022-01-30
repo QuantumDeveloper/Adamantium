@@ -15,10 +15,10 @@ public abstract class MouseDevice
 
     private int clickCount = 0;
     private uint lastClickTime = 0;
-    private IInputElement lastClickedElement = null;
+    private IInputComponent lastClickedComponent = null;
 
-    public IInputElement Captured { get; protected set; }
-    public IInputElement DirectlyOver { get; private set; }
+    public IInputComponent Captured { get; protected set; }
+    public IInputComponent DirectlyOver { get; private set; }
 
     public MouseButtonState LeftButton { get; private set; }
     public MouseButtonState RightButton { get; private set; }
@@ -48,17 +48,17 @@ public abstract class MouseDevice
         } 
     }
 
-    public bool Capture(IInputElement element)
+    public bool Capture(IInputComponent component)
     {
-        if (element != null)
+        if (component != null)
         {
-            Captured = element;
+            Captured = component;
             return true;
         }
         return false;
     }
 
-    public Vector2 GetPosition(IInputElement relativeTo)
+    public Vector2 GetPosition(IInputComponent relativeTo)
     {
         var p = Position;
         IUIComponent v = relativeTo;
@@ -101,16 +101,16 @@ public abstract class MouseDevice
 
     public void ProcessEvent(RawMouseEventArgs e)
     {
-        Position = e.RootElement.PointToScreen(e.Position);
+        Position = e.RootComponent.PointToScreen(e.Position);
         UpdateButtonStates(e.InputModifiers);
         MouseButtons button = MouseButtons.None;
         switch (e.EventType)
         {
             case RawMouseEventType.MouseMove:
-                MouseMove(e.RootElement, e.Position, e.InputModifiers, e.Timestamp);
+                MouseMove(e.RootComponent, e.Position, e.InputModifiers, e.Timestamp);
                 break;
             case RawMouseEventType.LeaveWindow:
-                LeaveWindow(e.RootElement, e.Position, e.InputModifiers, e.Timestamp);
+                LeaveWindow(e.RootComponent, e.Position, e.InputModifiers, e.Timestamp);
                 break;
 
             case RawMouseEventType.LeftButtonDown:
@@ -136,7 +136,7 @@ public abstract class MouseDevice
                         button = MouseButtons.XButton2;
                         break;
                 }
-                MouseDown(e.RootElement, e.Position, e.Timestamp, button, e.InputModifiers);
+                MouseDown(e.RootComponent, e.Position, e.Timestamp, button, e.InputModifiers);
                 break;
             case RawMouseEventType.LeftButtonUp:
             case RawMouseEventType.RightButtonUp:
@@ -161,10 +161,10 @@ public abstract class MouseDevice
                         button = MouseButtons.XButton2;
                         break;
                 }
-                MouseUp(e.RootElement, e.Position, e.Timestamp, button, e.InputModifiers);
+                MouseUp(e.RootComponent, e.Position, e.Timestamp, button, e.InputModifiers);
                 break;
             case RawMouseEventType.MouseWheel:
-                MouseWheel(e.RootElement, e.Position, e.InputModifiers, e.Timestamp, ((RawMouseWheelEventArgs)e).WheelDelta);
+                MouseWheel(e.RootComponent, e.Position, e.InputModifiers, e.Timestamp, ((RawMouseWheelEventArgs)e).WheelDelta);
                 break;
             case RawMouseEventType.LeftButtonDoubleClick:
             case RawMouseEventType.MiddleButtonDoubleClick:
@@ -181,12 +181,12 @@ public abstract class MouseDevice
                         button = MouseButtons.Left;
                         break;
                 }
-                MouseDoubleClick(e.RootElement, e.Position, e.Timestamp, button, e.InputModifiers);
+                MouseDoubleClick(e.RootComponent, e.Position, e.Timestamp, button, e.InputModifiers);
                 break;
 
             case RawMouseEventType.RawMouseMove:
                 var args = (RawInputMouseEventArgs)e;
-                RawMouseEvent(args.RootElement, args.Delta, args.InputModifiers, args.Timestamp);
+                RawMouseEvent(args.RootComponent, args.Delta, args.InputModifiers, args.Timestamp);
                 break;
 
             case RawMouseEventType.RawLeftButtonDown:
@@ -210,7 +210,7 @@ public abstract class MouseDevice
                         button = MouseButtons.XButton2;
                         break;
                 }
-                RawInputMouseDown(e.RootElement, e.Position, e.Timestamp, button, e.InputModifiers);
+                RawInputMouseDown(e.RootComponent, e.Position, e.Timestamp, button, e.InputModifiers);
                 break;
 
             case RawMouseEventType.RawLeftButtonUp:
@@ -234,12 +234,12 @@ public abstract class MouseDevice
                         button = MouseButtons.XButton2;
                         break;
                 }
-                RawInputMouseUp(e.RootElement, e.Timestamp, button, e.InputModifiers);
+                RawInputMouseUp(e.RootComponent, e.Timestamp, button, e.InputModifiers);
                 break;
         }
     }
 
-    private void RawInputMouseUp(IInputElement rootElement, uint timestamp, MouseButtons button,
+    private void RawInputMouseUp(IInputComponent rootComponent, uint timestamp, MouseButtons button,
         InputModifiers inputModifiers)
     {
         if (FocusManager.Focused != null)
@@ -250,7 +250,7 @@ public abstract class MouseDevice
         }
     }
 
-    private void RawInputMouseDown(IInputElement rootElement, Vector2 p, uint timestamp, MouseButtons button,
+    private void RawInputMouseDown(IInputComponent rootComponent, Vector2 p, uint timestamp, MouseButtons button,
         InputModifiers inputModifiers)
     {
         if (FocusManager.Focused != null)
@@ -261,7 +261,7 @@ public abstract class MouseDevice
         }
     }
 
-    private void RawMouseEvent(IInputElement element, Vector2 delta, InputModifiers modifiers, uint timestamp)
+    private void RawMouseEvent(IInputComponent component, Vector2 delta, InputModifiers modifiers, uint timestamp)
     {
         if (FocusManager.Focused != null)
         {
@@ -271,9 +271,9 @@ public abstract class MouseDevice
         }
     }
 
-    private void MouseDoubleClick(IInputElement rootElement, Vector2 p, uint timestamp, MouseButtons button, InputModifiers inputModifiers)
+    private void MouseDoubleClick(IInputComponent rootComponent, Vector2 p, uint timestamp, MouseButtons button, InputModifiers inputModifiers)
     {
-        var hit = rootElement.HitTest(p);
+        var hit = rootComponent.HitTest(p);
         if (hit != null)
         {
             MouseButtonEventArgs args = new MouseButtonEventArgs(this, button, GetState(button), inputModifiers, timestamp);
@@ -292,28 +292,28 @@ public abstract class MouseDevice
         }
     }
 
-    private void LeaveWindow(IInputElement rootElement, Vector2 p, InputModifiers inputModifiers, uint timestamp)
+    private void LeaveWindow(IInputComponent rootComponent, Vector2 p, InputModifiers inputModifiers, uint timestamp)
     {
         MouseEventArgs args = new MouseEventArgs(this, inputModifiers, timestamp)
         {
             RoutedEvent = Mouse.MouseLeaveEvent
         };
-        rootElement.RaiseEvent(args);
+        rootComponent.RaiseEvent(args);
         DirectlyOver = null;
     }
 
-    private void MouseMove(IInputElement rootElement, Vector2 p, InputModifiers inputModifiers, uint timestamp)
+    private void MouseMove(IInputComponent rootComponent, Vector2 p, InputModifiers inputModifiers, uint timestamp)
     {
-        IInputElement source = null;
+        IInputComponent source = null;
 
         if (Captured == null)
         {
-            source = SetMouseOver(rootElement, p, inputModifiers, timestamp);
+            source = SetMouseOver(rootComponent, p, inputModifiers, timestamp);
         }
         else
         {
             var element = Captured.HitTest(p);
-            SetMouseOver(rootElement, element, inputModifiers, timestamp);
+            SetMouseOver(rootComponent, element, inputModifiers, timestamp);
             source = Captured;
         }
         var args = new MouseEventArgs(this, inputModifiers, timestamp) { RoutedEvent = Mouse.PreviewMouseMoveEvent };
@@ -322,17 +322,17 @@ public abstract class MouseDevice
         source.RaiseEvent(args);
     }
 
-    private IInputElement SetMouseOver(IInputElement rootElement, Vector2 p, InputModifiers modifiers, uint timestamp)
+    private IInputComponent SetMouseOver(IInputComponent rootComponent, Vector2 p, InputModifiers modifiers, uint timestamp)
     {
-        var element = rootElement.HitTest(p);
-        return SetMouseOver(rootElement, element, modifiers, timestamp);
+        var element = rootComponent.HitTest(p);
+        return SetMouseOver(rootComponent, element, modifiers, timestamp);
     }
 
-    private IInputElement SetMouseOver(IInputElement root, IInputElement element, InputModifiers modifiers, uint timestamp)
+    private IInputComponent SetMouseOver(IInputComponent root, IInputComponent component, InputModifiers modifiers, uint timestamp)
     {
-        if (element != null)
+        if (component != null)
         {
-            if (DirectlyOver != element)
+            if (DirectlyOver != component)
             {
                 MouseEventArgs args = new MouseEventArgs(this, modifiers, timestamp)
                 {
@@ -348,30 +348,30 @@ public abstract class MouseDevice
 
                 args.RoutedEvent = Mouse.MouseEnterEvent;
 
-                if (!element.IsMouseOver)
+                if (!component.IsMouseOver)
                 {
-                    element.RaiseEvent(args);
+                    component.RaiseEvent(args);
                 }
             }
         }
 
-        DirectlyOver = element ?? root;
+        DirectlyOver = component ?? root;
         return DirectlyOver;
     }
 
-    private void MouseDown(IInputElement rootElement, Vector2 p, uint timestamp, MouseButtons button, InputModifiers inputModifiers)
+    private void MouseDown(IInputComponent rootComponent, Vector2 p, uint timestamp, MouseButtons button, InputModifiers inputModifiers)
     {
-        var hit = rootElement.HitTest(p);
+        var hit = rootComponent.HitTest(p);
 
         if (hit != null)
         {
-            if (lastClickTime - timestamp > PlatformSettings.DoubleClickTime || lastClickedElement != hit)
+            if (lastClickTime - timestamp > PlatformSettings.DoubleClickTime || lastClickedComponent != hit)
             {
                 clickCount = 0;
             }
             clickCount++;
             lastClickTime = timestamp;
-            lastClickedElement = hit;
+            lastClickedComponent = hit;
 
             MouseButtonEventArgs eventArgs = new MouseButtonEventArgs(this, button, GetState(button), inputModifiers, timestamp)
             {
@@ -385,9 +385,9 @@ public abstract class MouseDevice
         }
     }
 
-    private void MouseUp(IInputElement rootElement, Vector2 p, uint timestamp, MouseButtons button, InputModifiers inputModifiers)
+    private void MouseUp(IInputComponent rootComponent, Vector2 p, uint timestamp, MouseButtons button, InputModifiers inputModifiers)
     {
-        var hit = rootElement.HitTest(p);
+        var hit = rootComponent.HitTest(p);
 
         if (hit != null)
         {
@@ -427,9 +427,9 @@ public abstract class MouseDevice
         }
     }
 
-    private void MouseWheel(IInputElement rootElement, Vector2 p, InputModifiers modifiers, uint timestemp, Int32 wheelDelta)
+    private void MouseWheel(IInputComponent rootComponent, Vector2 p, InputModifiers modifiers, uint timestemp, Int32 wheelDelta)
     {
-        var hit = rootElement.HitTest(p);
+        var hit = rootComponent.HitTest(p);
 
         hit?.RaiseEvent(new MouseWheelEventArgs(this, modifiers, wheelDelta, timestemp) { RoutedEvent = Mouse.MouseWheelEvent });
     }

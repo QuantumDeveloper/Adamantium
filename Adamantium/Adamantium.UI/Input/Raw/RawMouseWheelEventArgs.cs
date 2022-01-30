@@ -8,12 +8,12 @@ public class RawMouseWheelEventArgs : RawMouseEventArgs
    public RawMouseWheelEventArgs(
       Int32 wheelDelta, 
       RawMouseEventType eventType, 
-      IInputElement rootElement,
+      IInputComponent rootComponent,
       Vector2 position, 
       InputModifiers modifiers, 
       MouseDevice device, 
       UInt32 timeStep)
-      : base(eventType, rootElement, position, modifiers, device, timeStep)
+      : base(eventType, rootComponent, position, modifiers, device, timeStep)
    {
       WheelDelta = wheelDelta;
    }

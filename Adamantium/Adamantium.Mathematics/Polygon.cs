@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 namespace Adamantium.Mathematics
 {
     /// <summary>
-    /// Describes a collection of <see cref="PolygonItem"/>s, which will form a single merged triangulated polygon
+    /// Describes a collection of <see cref="MeshContour"/>s, which will form a single merged triangulated polygon
     /// </summary>
     public class Polygon
     {
@@ -33,12 +33,12 @@ namespace Adamantium.Mathematics
         public IReadOnlyCollection<MeshContour> Contours => contours.AsReadOnly();
 
         /// <summary>
-        /// Collection of points from all <see cref="PolygonItem"/>s in current <see cref="Polygon"/>
+        /// Collection of points from all <see cref="MeshContour"/>s in current <see cref="Polygon"/>
         /// </summary>
         public List<GeometryIntersection> MergedPoints { get; private set; }
 
         /// <summary>
-        /// Collection of segments from all <see cref="PolygonItem"/>s in current <see cref="Polygon"/>
+        /// Collection of segments from all <see cref="MeshContour"/>s in current <see cref="Polygon"/>
         /// </summary>
         public List<GeometrySegment> MergedSegments { get; private init; }
 
@@ -58,14 +58,14 @@ namespace Adamantium.Mathematics
         /// <summary>
         /// Constructs <see cref="Polygon"/>
         /// </summary>
-        public Polygon()
+        public Polygon(FillRule fillRule = FillRule.EvenOdd)
         {
             contours = new List<MeshContour>();
             MergedPoints = new List<GeometryIntersection>();
             mergedPointsHash = new HashSet<Vector2>();
             MergedSegments = new List<GeometrySegment>();
             checkedContours = new List<ContourPair>();
-            FillRule = FillRule.EvenOdd;
+            FillRule = fillRule;
         }
 
         public void AddItem(MeshContour item)
@@ -195,7 +195,7 @@ namespace Adamantium.Mathematics
         }
 
         /// <summary>
-        /// Merge points from all <see cref="PolygonItem"/>s
+        /// Merge points from all <see cref="MeshContour"/>s
         /// </summary>
         private void MergePoints()
         {
@@ -217,7 +217,7 @@ namespace Adamantium.Mathematics
         }
 
         /// <summary>
-        /// Merge segments from all <see cref="PolygonItem"/>s
+        /// Merge segments from all <see cref="MeshContour"/>s
         /// </summary>
         private void MergeSegments()
         {
@@ -451,7 +451,7 @@ namespace Adamantium.Mathematics
         
         public override string ToString()
         {
-            return $"{Name}, PolygonItems: {Contours.Count}";
+            return $"{Name}, MeshContours: {Contours.Count}";
         }
 
         private class ContourPair : IEquatable<ContourPair>

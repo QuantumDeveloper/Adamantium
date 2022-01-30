@@ -18,42 +18,42 @@ public class Canvas : Panel
       typeof(Double), typeof(UIComponent), new PropertyMetadata(Double.NaN, PropertyMetadataOptions.AffectsArrange));
 
 
-   public static Double GetLeft(AdamantiumComponent element)
+   public static Double GetLeft(IAdamantiumComponent element)
    {
       return element.GetValue<Double>(LeftProperty);
    }
 
-   public static void SetLeft(AdamantiumComponent element, Double value)
+   public static void SetLeft(IAdamantiumComponent element, Double value)
    {
       element.SetValue(LeftProperty, value);
    }
 
-   public static Double GetTop(AdamantiumComponent element)
+   public static Double GetTop(IAdamantiumComponent element)
    {
       return element.GetValue<Double>(TopProperty);
    }
 
-   public static void SetTop(AdamantiumComponent element, Double value)
+   public static void SetTop(IAdamantiumComponent element, Double value)
    {
       element.SetValue(TopProperty, value);
    }
 
-   public static Double GetRight(AdamantiumComponent element)
+   public static Double GetRight(IAdamantiumComponent element)
    {
       return element.GetValue<Double>(RightProperty);
    }
 
-   public static void SetRight(AdamantiumComponent element, Double value)
+   public static void SetRight(IAdamantiumComponent element, Double value)
    {
       element.SetValue(RightProperty, value);
    }
 
-   public static Double GetBottom(AdamantiumComponent element)
+   public static Double GetBottom(IAdamantiumComponent element)
    {
       return element.GetValue<Double>(BottomProperty);
    }
 
-   public static void SetBottom(AdamantiumComponent element, Double value)
+   public static void SetBottom(IAdamantiumComponent element, Double value)
    {
       element.SetValue(BottomProperty, value);
    }
