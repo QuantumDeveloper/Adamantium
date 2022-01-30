@@ -152,7 +152,7 @@ public class WrapPanel : Panel
             }
             else
             {
-               var controlsInLine = GetContolsBetween(firstChildInLineindex, i);
+               var controlsInLine = GetControlsBetween(firstChildInLineindex, i);
                ArrangeLine(accumulated, lineSize.Height, controlsInLine);
                accumulated += lineSize.Height;
                lineSize = childSize;
@@ -168,7 +168,7 @@ public class WrapPanel : Panel
             }
             else
             {
-               var controlsInLine = GetContolsBetween(firstChildInLineindex, i);
+               var controlsInLine = GetControlsBetween(firstChildInLineindex, i);
                ArrangeLine(accumulated, lineSize.Width, controlsInLine);
                accumulated += lineSize.Width;
                lineSize = childSize;
@@ -178,7 +178,7 @@ public class WrapPanel : Panel
       }
       if (firstChildInLineindex < Children.Count)
       {
-         var controlsInLine = GetContolsBetween(firstChildInLineindex, Children.Count);
+         var controlsInLine = GetControlsBetween(firstChildInLineindex, Children.Count);
          ArrangeLine(accumulated, Orientation == Orientation.Horizontal ? lineSize.Height : lineSize.Width,
             controlsInLine);
       }
@@ -188,18 +188,18 @@ public class WrapPanel : Panel
 
    }
 
-   private IEnumerable<UIComponent> GetContolsBetween(int first, int last)
+   private IEnumerable<IUIComponent> GetControlsBetween(int first, int last)
    {
       return Children.Skip(first).Take(last - first);
    }
 
-   private void ArrangeLine(double accumulated, double lineSize, IEnumerable<UIComponent> contols)
+   private void ArrangeLine(double accumulated, double lineSize, IEnumerable<IUIComponent> controls)
    {
       bool isHorizontal = (Orientation == Orientation.Horizontal);
       double accumulatedY = 0;
-      foreach (var contol in contols)
+      foreach (var control in controls)
       {
-         var childSize = new Size(contol.DesiredSize);
+         var childSize = new Size(control.DesiredSize);
          if (!Double.IsNaN(ItemWidth))
          {
             childSize.Width = ItemWidth;
@@ -214,7 +214,7 @@ public class WrapPanel : Panel
             var y = accumulated;
             var width = childSize.Width;
             var height = childSize.Height;
-            contol.Arrange(new Rect(x, y, width, height));
+            control.Arrange(new Rect(x, y, width, height));
             accumulatedY += childSize.Width;
          }
          else
@@ -223,7 +223,7 @@ public class WrapPanel : Panel
             var y = accumulatedY;
             var width =  isHorizontal ? childSize.Width: lineSize;
             var height = isHorizontal ? lineSize : childSize.Height;
-            contol.Arrange(new Rect(x, y, width, height));
+            control.Arrange(new Rect(x, y, width, height));
             accumulatedY += childSize.Height;
          }
       }

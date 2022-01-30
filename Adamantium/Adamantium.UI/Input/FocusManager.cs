@@ -13,25 +13,25 @@ public static class FocusManager
    public static readonly RoutedEvent LostFocusEvent = EventManager.RegisterRoutedEvent("LostFocus",
       RoutingStrategy.Bubble, typeof(RoutedEventHandler), typeof(FocusManager));
 
-   public static IInputElement Focused { get; private set; }
+   public static IInputComponent Focused { get; private set; }
 
-   public static IInputElement Scope { get; private set; }
+   public static IInputComponent Scope { get; private set; }
 
-   private static Dictionary<IInputElement, IInputElement> focusScopes = new Dictionary<IInputElement, IInputElement>();
+   private static Dictionary<IInputComponent, IInputComponent> focusScopes = new Dictionary<IInputComponent, IInputComponent>();
 
    static FocusManager()
    {
-      Mouse.PreviewMouseDownEvent.RegisterClassHandler<IInputElement>(new MouseButtonEventHandler(OnPreviewMouseDown));
+      Mouse.PreviewMouseDownEvent.RegisterClassHandler<IInputComponent>(new MouseButtonEventHandler(OnPreviewMouseDown));
    }
 
    private static void OnPreviewMouseDown(object sender, MouseButtonEventArgs e)
    {
       if (e.OriginalSource == e.Source)
       {
-         var element = e.OriginalSource as IInputElement;
+         var element = e.OriginalSource as IInputComponent;
          if (element != null && !CanFocus(element))
          {
-            element = element.GetSelfAndVisualAncestors().OfType<IInputElement>().FirstOrDefault();
+            element = element.GetSelfAndVisualAncestors().OfType<IInputComponent>().FirstOrDefault();
          }
 
          if (element != null && Focused != element)
@@ -47,32 +47,32 @@ public static class FocusManager
       }
    }
 
-   internal static void SetFocusScope(IInputElement scope)
+   internal static void SetFocusScope(IInputComponent scope)
    {
       if (scope == null)
       {
          throw new ArgumentNullException(nameof(scope));
       }
 
-      IInputElement inputElement = null;
+      IInputComponent inputComponent = null;
 
       if (!focusScopes.ContainsKey(scope))
       {
-         inputElement = FindFirstFocusableInScope(scope);
-         focusScopes.Add(scope, inputElement);
+         inputComponent = FindFirstFocusableInScope(scope);
+         focusScopes.Add(scope, inputComponent);
       }
       else
       {
          Scope = scope;
-         inputElement = focusScopes[scope];
+         inputComponent = focusScopes[scope];
       }
          
-      Focus(inputElement);
+      Focus(inputComponent);
    }
 
-   private static IEnumerable<IInputElement> GetFocusScopeAncestors(IInputElement scope)
+   private static IEnumerable<IInputComponent> GetFocusScopeAncestors(IInputComponent scope)
    {
-      var inputList = scope.GetSelfAndVisualAncestors().OfType<IInputElement>();
+      var inputList = scope.GetSelfAndVisualAncestors().OfType<IInputComponent>();
       foreach (var inputElement in inputList)
       {
          if (CanFocus(inputElement))
@@ -82,9 +82,9 @@ public static class FocusManager
       }
    }
 
-   private static IInputElement FindFirstFocusableInScope(IInputElement scope)
+   private static IInputComponent FindFirstFocusableInScope(IInputComponent scope)
    {
-      var inputList = scope.GetSelfAndVisualAncestors().OfType<IInputElement>();
+      var inputList = scope.GetSelfAndVisualAncestors().OfType<IInputComponent>();
       foreach (var inputElement in inputList)
       {
          if (CanFocus(inputElement))
@@ -95,10 +95,10 @@ public static class FocusManager
       return null;
    }
 
-   public static Boolean CanFocus(IInputElement inputElement)
+   public static Boolean CanFocus(IInputComponent inputComponent)
    {
-      return inputElement != null && inputElement.IsEnabled && inputElement.Visibility == Visibility.Visible &&
-             inputElement.Focusable;
+      return inputComponent != null && inputComponent.IsEnabled && inputComponent.Visibility == Visibility.Visible &&
+             inputComponent.Focusable;
    }
 
    public static void ResetFocus()
@@ -106,18 +106,18 @@ public static class FocusManager
       Focused = null;
    }
 
-   public static bool Focus(IInputElement element, NavigationMethod navigationMethod = NavigationMethod.Unspecified,
+   public static bool Focus(IInputComponent component, NavigationMethod navigationMethod = NavigationMethod.Unspecified,
       InputModifiers modifiers = InputModifiers.None)
    {
-      if (element != null)
+      if (component != null)
       {
-         var scope = GetFocusScopeAncestors(element).FirstOrDefault();
-         Focused = element;
-         lastFocued = element;
+         var scope = GetFocusScopeAncestors(component).FirstOrDefault();
+         Focused = component;
+         lastFocued = component;
          if (scope != null)
          {
             Scope = scope;
-            SetFocusedElement(element, scope, navigationMethod, modifiers);
+            SetFocusedElement(component, scope, navigationMethod, modifiers);
             return true;
          }
       }
@@ -135,9 +135,9 @@ public static class FocusManager
       return false;
    }
 
-   private static IInputElement lastFocued;
+   private static IInputComponent lastFocued;
 
-   public static bool TryRestoreFocus(IInputElement scope)
+   public static bool TryRestoreFocus(IInputComponent scope)
    {
       if (lastFocued != null)
       {
@@ -151,7 +151,7 @@ public static class FocusManager
       }
    }
 
-   public static void SetFocusedElement(IInputElement element, IInputElement scope,
+   public static void SetFocusedElement(IInputComponent component, IInputComponent scope,
       NavigationMethod navigationMethod = NavigationMethod.Unspecified,
       InputModifiers modifiers = InputModifiers.None)
    {
@@ -160,11 +160,11 @@ public static class FocusManager
          throw new ArgumentNullException(nameof(scope));
       }
 
-      focusScopes[scope] = element;
+      focusScopes[scope] = component;
 
       if (Scope == scope)
       {
-         KeyboardDevice.CurrentDevice.SetFocusedElement(element, navigationMethod, modifiers);
+         KeyboardDevice.CurrentDevice.SetFocusedElement(component, navigationMethod, modifiers);
       }
    }
 }

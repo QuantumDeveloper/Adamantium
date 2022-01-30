@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using Adamantium.EntityFramework.ComponentsBasics;
 using Adamantium.UI.Input;
 using Adamantium.UI.Media;
 using Adamantium.UI.RoutedEvents;
@@ -8,7 +7,7 @@ using Transform = Adamantium.UI.Media.Transform;
 
 namespace Adamantium.UI;
 
-public interface IUIComponent : IAdamantiumComponent, IComponent
+public interface IUIComponent : IAdamantiumComponent
 {
     event MouseButtonEventHandler RawMouseDown;
     event MouseButtonEventHandler RawMouseUp;
@@ -57,6 +56,7 @@ public interface IUIComponent : IAdamantiumComponent, IComponent
     event MouseWheelEventHandler PreviewMouseWheel;
     event MouseEventHandler PreviewMouseMove;
     event TextInputEventHandler PreviewTextInput;
+    event EventHandler<VisualParentChangedEventArgs> VisualParentChanged;
         
     Cursor Cursor { get; set; }
     Boolean ClipToBounds { get; set; }
@@ -129,5 +129,4 @@ public interface IUIComponent : IAdamantiumComponent, IComponent
     void RemoveHandler(RoutedEvent routedEvent, Delegate handler);
     void ReleaseMouseCapture();
     void ReleaseStylusCapture();
-
 }

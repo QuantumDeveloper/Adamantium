@@ -4,7 +4,7 @@ using Adamantium.UI.Media;
 
 namespace Adamantium.UI.Controls;
 
-public abstract class Panel: FrameworkComponent
+public abstract class Panel: FrameworkComponent, IContainer
 {
    public static readonly AdamantiumProperty BackgroundProperty = AdamantiumProperty.Register(nameof(Background),
       typeof(Brush), typeof(Panel),
@@ -16,15 +16,13 @@ public abstract class Panel: FrameworkComponent
       set => SetValue(BackgroundProperty, value);
    }
 
-   private readonly UIElementCollection childern;
-
    [Content]
-   public UIElementCollection Children => childern;
+   public UIElementCollection Children { get; }
 
    protected Panel()
    {
-      childern = new UIElementCollection();
-      childern.CollectionChanged += ChildrenChanged;
+      Children = new UIElementCollection();
+      Children.CollectionChanged += ChildrenChanged;
    }
 
    private void ChildrenChanged(object sender, NotifyCollectionChangedEventArgs e)
@@ -64,5 +62,15 @@ public abstract class Panel: FrameworkComponent
       context.BeginDraw(this);
       context.DrawRectangle(Background, new Rect(new Size(ActualWidth, ActualHeight)));
       context.EndDraw(this);
+   }
+
+   public void AddOrSetChildComponent(IUIComponent component)
+   {
+      Children.Add(component);
+   }
+
+   public void RemoveAllChildComponents()
+   {
+      Children.Clear();
    }
 }

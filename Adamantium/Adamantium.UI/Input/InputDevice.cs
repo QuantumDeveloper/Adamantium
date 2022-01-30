@@ -2,5 +2,5 @@
 
 public abstract class InputDevice
 {
-   public abstract IInputElement TargetElement { get; protected set; }
+   public abstract IInputComponent TargetComponent { get; protected set; }
 }

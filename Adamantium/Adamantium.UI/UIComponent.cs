@@ -11,15 +11,15 @@ using Adamantium.UI.Windows.Input;
 
 namespace Adamantium.UI;
 
-public class UIComponent : AdamantiumComponent, IInputElement
+public abstract class UIComponent : AdamantiumComponent, IInputComponent
 {
     private Size renderSize;
     private Size? _previousMeasure;
     private Rect? _previousArrange;
-        
+
     protected bool sizeChanged;
     protected Size previousRenderSize;
-        
+
     #region Adamantium properties
     
     public static readonly AdamantiumProperty RenderTransformProperty =
@@ -503,6 +503,8 @@ public class UIComponent : AdamantiumComponent, IInputElement
         add => AddHandler(Mouse.PreviewMouseDoubleClickEvent, value);
         remove => RemoveHandler(Mouse.PreviewMouseDoubleClickEvent, value);
     }
+    
+    public event EventHandler<VisualParentChangedEventArgs> VisualParentChanged;
 
     #endregion
 
@@ -1411,8 +1413,9 @@ public class UIComponent : AdamantiumComponent, IInputElement
             throw new ArgumentNullException(nameof(e));
         }
 
-        foreach (UIComponent element in GetBubbleEventRoute())
+        foreach (var uiComponent in GetBubbleEventRoute())
         {
+            var element = (UIComponent)uiComponent;
             e.Source = element;
             element.RaiseDirectEvent(e);
         }
@@ -1425,8 +1428,9 @@ public class UIComponent : AdamantiumComponent, IInputElement
             throw new ArgumentNullException(nameof(e));
         }
 
-        foreach (UIComponent element in GetTunnelEventRoute())
+        foreach (var uiComponent in GetTunnelEventRoute())
         {
+            var element = (UIComponent)uiComponent;
             e.Source = element;
             element.RaiseDirectEvent(e);
         }
@@ -1506,13 +1510,10 @@ public class UIComponent : AdamantiumComponent, IInputElement
 
     public Vector2 ClipPosition { get; set; }
 
-    private IUIComponent visualComponentParent;
-
-    public IUIComponent VisualParent => visualComponentParent;
+    public IUIComponent VisualParent { get; private set; }
 
     public Int32 ZIndex { get; set; }
 
-    
     public Transform RenderTransform
     {
         get => GetValue<Transform>(RenderTransformProperty);
@@ -1527,13 +1528,28 @@ public class UIComponent : AdamantiumComponent, IInputElement
     
     public IReadOnlyCollection<IUIComponent> GetVisualDescendants()
     {
-        return VisualChildrenCollection.AsReadOnly();
+        return VisualChildren;
     }
 
     public IReadOnlyCollection<IUIComponent> VisualChildren => VisualChildrenCollection.AsReadOnly();
 
-    protected TrackingCollection<IUIComponent> VisualChildrenCollection { get; private set; } 
-      
+    protected TrackingCollection<IUIComponent> VisualChildrenCollection { get; private set; }
+
+    protected void AddVisualChild(IUIComponent child)
+    {
+        VisualChildrenCollection.Add(child);
+    }
+    
+    protected void RemoveVisualChild(IUIComponent child)
+    {
+        VisualChildrenCollection.Remove(child);
+    }
+
+    protected void RemoveVisualChildren()
+    {
+        VisualChildrenCollection.Clear();
+    }
+
     public bool IsAttachedToVisualTree { get; private set; }
 
     public Style Style
@@ -1544,13 +1560,13 @@ public class UIComponent : AdamantiumComponent, IInputElement
 
     protected void SetVisualParent(IUIComponent parent)
     {
-        if (visualComponentParent == parent)
+        if (VisualParent == parent)
         {
             return;
         }
 
-        var old = visualComponentParent;
-        visualComponentParent = parent;
+        var old = VisualParent;
+        VisualParent = parent;
 
         if (IsAttachedToVisualTree)
         {
@@ -1559,7 +1575,7 @@ public class UIComponent : AdamantiumComponent, IInputElement
             DetachedFromVisualTree(e);
         }
 
-        if (visualComponentParent is IRootVisualComponent || visualComponentParent?.IsAttachedToVisualTree == true)
+        if (VisualParent is IRootVisualComponent || VisualParent?.IsAttachedToVisualTree == true)
         {
             var root =  this.GetVisualAncestors().OfType<IRootVisualComponent>().FirstOrDefault();
             var e = new VisualTreeAttachmentEventArgs(root);
@@ -1615,8 +1631,6 @@ public class UIComponent : AdamantiumComponent, IInputElement
     {
         VisualParentChanged?.Invoke(this, new VisualParentChangedEventArgs(oldParent, newParent));
     }
-
-    public EventHandler<VisualParentChangedEventArgs> VisualParentChanged;
 
     protected virtual void OnRender(DrawingContext context)
     {

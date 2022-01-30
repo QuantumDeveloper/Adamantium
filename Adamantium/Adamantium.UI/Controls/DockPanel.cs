@@ -4,23 +4,25 @@ namespace Adamantium.UI.Controls;
 
 public class DockPanel:Panel
 {
-   public  static readonly AdamantiumProperty DockProperty = AdamantiumProperty.RegisterAttached("Dock", typeof(Dock), typeof(UIComponent));
+   public static readonly AdamantiumProperty DockProperty =
+      AdamantiumProperty.RegisterAttached("Dock", typeof(Dock), typeof(UIComponent));
 
-   public static readonly AdamantiumProperty LastFildFillProperty = AdamantiumProperty.Register(nameof(LastChildFill), typeof(Boolean), typeof(DockPanel),
+   public static readonly AdamantiumProperty LastChildFillProperty = AdamantiumProperty.Register(nameof(LastChildFill),
+      typeof(Boolean), typeof(DockPanel),
       new PropertyMetadata(true));
 
    public Boolean LastChildFill
    {
-      get => GetValue<Boolean>(LastFildFillProperty);
-      set => SetValue(LastFildFillProperty, value);
+      get => GetValue<Boolean>(LastChildFillProperty);
+      set => SetValue(LastChildFillProperty, value);
    }
 
-   public static Dock GetDock(UIComponent element)
+   public static Dock GetDock(IUIComponent element)
    {
       return element.GetValue<Dock>(DockProperty);
    }
 
-   public static void SetDock(UIComponent element, Dock position)
+   public static void SetDock(IUIComponent element, Dock position)
    {
       element.SetValue(DockProperty, position);
    }

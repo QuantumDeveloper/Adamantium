@@ -7,7 +7,7 @@ public class MouseEventArgs:InputEventArgs
    public MouseDevice MouseDevice { get; }
       
 
-   public Vector2 GetPosition(IInputElement relativeTo)
+   public Vector2 GetPosition(IInputComponent relativeTo)
    {
       return MouseDevice.GetPosition(relativeTo);
    }

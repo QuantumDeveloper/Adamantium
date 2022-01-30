@@ -7,16 +7,16 @@ namespace Adamantium.UI.Input;
 
 public static class InputExtensions
 {
-   public static IInputElement HitTest(this IInputElement root, Vector2 p)
+   public static IInputComponent HitTest(this IInputComponent root, Vector2 p)
    {
       return root.GetInputElementsAt(p).FirstOrDefault();
    }
 
-   public static IEnumerable<IInputElement> GetInputElementsAt(this IInputElement root, Vector2 p)
+   public static IEnumerable<IInputComponent> GetInputElementsAt(this IInputComponent root, Vector2 p)
    {
          
-      List<IInputElement> elements = new List<IInputElement>();
-      Stack<IInputElement> stack = new Stack<IInputElement>();
+      List<IInputComponent> elements = new List<IInputComponent>();
+      Stack<IInputComponent> stack = new Stack<IInputComponent>();
 
       stack.Push((UIComponent)root);
 
@@ -34,7 +34,7 @@ public static class InputExtensions
                
             if (current.VisualChildren.Any())
             {
-               foreach (var child in ZSort(current.VisualChildren.OfType<IInputElement>().Reverse()))
+               foreach (var child in ZSort(current.VisualChildren.OfType<IInputComponent>().Reverse()))
                {
                   if (
                      child.ClipRectangle.Contains(p) &&
@@ -78,19 +78,19 @@ public static class InputExtensions
       */
    }
 
-   private static IEnumerable<IInputElement> ZSort(IEnumerable<IInputElement> elements)
+   private static IEnumerable<IInputComponent> ZSort(IEnumerable<IInputComponent> elements)
    {
       return elements.Select((element, index) => new ZOrderedElement
       {
-         Element = element,
+         Component = element,
          Index = index,
          ZIndex = element.ZIndex
-      }).OrderBy(x => x, null).Select(x => x.Element);
+      }).OrderBy(x => x, null).Select(x => x.Component);
    }
 
    private class ZOrderedElement : IComparable<ZOrderedElement>
    {
-      public IInputElement Element { get; set; }
+      public IInputComponent Component { get; set; }
       public int Index { get; set; }
       public int ZIndex { get; set; }
 

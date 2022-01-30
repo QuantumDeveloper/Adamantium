@@ -3,9 +3,13 @@ using Adamantium.Core.Collections;
 
 namespace Adamantium.UI;
 
-public sealed class UIElementCollection:TrackingCollection<UIComponent>
+public sealed class UIElementCollection : TrackingCollection<IUIComponent>
 {
-   public UIElementCollection() { }
-   public UIElementCollection(IEnumerable<UIComponent> elements ):base(elements)
-   { }
+    public UIElementCollection()
+    {
+    }
+
+    public UIElementCollection(IEnumerable<IUIComponent> elements) : base(elements)
+    {
+    }
 }

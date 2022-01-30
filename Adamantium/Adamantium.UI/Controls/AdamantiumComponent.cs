@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using Adamantium.EntityFramework.ComponentsBasics;
 using Adamantium.UI.RoutedEvents;
-using Adamantium.UI.Threading;
 
 namespace Adamantium.UI.Controls;
 
-public abstract class AdamantiumComponent : IAdamantiumComponent
+public abstract class AdamantiumComponent : DispatcherComponent, IAdamantiumComponent
 {
     public long Uid { get; set; }
 
@@ -416,7 +416,4 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         throw new ArgumentException($"Property '{p.Name} not registered on '{this.GetType()}");
     }
 
-    public void VerifyAccess() => Dispatcher.CurrentDispatcher.VerifyAccess();
-
-    public bool CheckAccess() => Dispatcher.CurrentDispatcher.CheckAccess();
 }

@@ -138,7 +138,6 @@ public class CombinedGeometry : Geometry
         else
             OutlineMesh2 = new Mesh();
 
-        // TODO check case if 'null' (or default in other words) bounding box is inside the real one - will it count as intersection?
         if (CheckGeometryBoundingBoxesIntersection())
         {
             // find all intersections and break all intersected segments on 2 parts
@@ -230,20 +229,14 @@ public class CombinedGeometry : Geometry
             var mergedContourPoints = onePointJointCase ? triangulatorPoints : Mesh.MergeGeometryContourPoints();
             var mergedContourSegments = onePointJointCase ? triangulatorSegments : Mesh.MergeContourSegments();
 
-            var polygon = new Polygon
-            {
-                FillRule = FillRule.NonZero
-            };
-
+            var polygon = new Polygon(FillRule.NonZero);
+            
             var triangulated = polygon.FillDirect(mergedContourPoints, mergedContourSegments);
             Mesh.SetPoints(triangulated);
         }
         else
         {
-            var polygon = new Polygon
-            {
-                FillRule = FillRule.NonZero
-            };
+            var polygon = new Polygon(FillRule.NonZero);
             
             foreach (var contour1 in OutlineMesh1.Contours)
             {
@@ -354,6 +347,8 @@ public class CombinedGeometry : Geometry
 
     private bool CheckGeometryBoundingBoxesIntersection()
     {
+        if (Geometry1 is null || Geometry2 is null) return false;
+        
         var intersects = bounds1.Intersects(bounds2);
             
         return intersects;

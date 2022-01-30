@@ -78,7 +78,7 @@ public static class Mouse
 
    public static MouseDevice PrimaryDevice { get; }
 
-   public static IInputElement Captured => PrimaryDevice.Captured;
+   public static IInputComponent Captured => PrimaryDevice.Captured;
    public static MouseButtonState LeftButton => PrimaryDevice.LeftButton;
    public static MouseButtonState RightButton => PrimaryDevice.RightButton;
    public static MouseButtonState MiddleButton => PrimaryDevice.MiddleButton;
@@ -96,9 +96,9 @@ public static class Mouse
       set => Win32Interop.SetCursorPos((int)value.X, (int)value.Y);
    }
 
-   public static Vector2 GetPosition(IInputElement element)
+   public static Vector2 GetPosition(IInputComponent component)
    {
-      return PrimaryDevice.GetPosition(element);
+      return PrimaryDevice.GetPosition(component);
    }
 
    private static Cursor _cursor = Cursor.Default;
@@ -113,8 +113,8 @@ public static class Mouse
       }
    }
 
-   public static bool Capture(IInputElement element)
+   public static bool Capture(IInputComponent component)
    {
-      return PrimaryDevice.Capture(element);
+      return PrimaryDevice.Capture(component);
    }
 }

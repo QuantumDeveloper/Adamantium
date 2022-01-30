@@ -1,13 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using Adamantium.UI.Controls;
 using Adamantium.UI.Data;
 using Adamantium.UI.Input;
 using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI;
 
-public interface IFrameworkComponent : IUIComponent, IInputElement
+public interface IFrameworkComponent : IUIComponent, IInputComponent
 {
     object DataContext { get; set; }
     Double Width { get; set; }
@@ -22,8 +21,8 @@ public interface IFrameworkComponent : IUIComponent, IInputElement
     VerticalAlignment VerticalAlignment { get; set; }
     HorizontalAlignment HorizontalAlignment { get; set; }
     object Tag { get; set; }
-    FrameworkComponent Parent { get; }
-    ControlTemplate Template { get; set; }
+    IFrameworkComponent Parent { get; }
+    
     IReadOnlyCollection<FrameworkComponent> LogicalChildrenCollection { get; }
     
     BindingExpression SetBinding(AdamantiumProperty property, BindingBase bindingBase);
@@ -39,10 +38,6 @@ public interface IFrameworkComponent : IUIComponent, IInputElement
     /// Raised when the control is detached from a rooted logical tree.
     /// </summary>
     event EventHandler<LogicalTreeAttachmentEventArgs> DetachedFromLogicalTree;
-
-    void OnApplyTemplate();
     
-    void OnRemoveTemplate();
-
-    IAdamantiumComponent GetTemplateChild(string name);
+    
 }

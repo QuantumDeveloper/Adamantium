@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Diagnostics;
-using Adamantium.Mathematics;
 using Adamantium.UI.Media;
 using Adamantium.UI.RoutedEvents;
 
@@ -44,42 +43,42 @@ public class Grid: Panel
       set => SetValue(ShowGridLinesProperty, value);
    }
 
-   public static Int32 GetColumn(AdamantiumComponent element)
+   public static Int32 GetColumn(IAdamantiumComponent element)
    {
       return element.GetValue<Int32>(ColumnProperty);
    }
 
-   public static Int32 GetRow(AdamantiumComponent element)
+   public static Int32 GetRow(IAdamantiumComponent element)
    {
       return element.GetValue<Int32>(RowProperty);
    }
 
-   public static void SetColumn(AdamantiumComponent element, Int32 value)
+   public static void SetColumn(IAdamantiumComponent element, Int32 value)
    {
       element.SetValue(ColumnProperty, value);
    }
 
-   public static void SetRow(AdamantiumComponent element, Int32 value)
+   public static void SetRow(IAdamantiumComponent element, Int32 value)
    {
       element.SetValue(RowProperty, value);
    }
 
-   public static Int32 GetColumnSpan(AdamantiumComponent element)
+   public static Int32 GetColumnSpan(IAdamantiumComponent element)
    {
       return element.GetValue<Int32>(ColumnSpanProperty);
    }
 
-   public static Int32 GetRowSpan(AdamantiumComponent element)
+   public static Int32 GetRowSpan(IAdamantiumComponent element)
    {
       return element.GetValue<Int32>(RowSpanProperty);
    }
 
-   public static void SetColumnSpan(AdamantiumComponent element, Int32 value)
+   public static void SetColumnSpan(IAdamantiumComponent element, Int32 value)
    {
       element.SetValue(ColumnSpanProperty, value);
    }
 
-   public static void SetRowSpan(AdamantiumComponent element, Int32 value)
+   public static void SetRowSpan(IAdamantiumComponent element, Int32 value)
    {
       element.SetValue(RowSpanProperty, value);
    }
