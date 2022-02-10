@@ -1,13 +1,10 @@
-﻿using Adamantium.Mathematics;
-using Adamantium.UI.Input;
+﻿using Adamantium.UI.Input;
 using Adamantium.UI.Input.Raw;
 using Adamantium.Win32;
 using Adamantium.Win32.RawInput;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Runtime.InteropServices;
-using System.Threading;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.Core.Events;
 using Adamantium.UI.AggregatorEvents;

@@ -1,4 +1,3 @@
-using Adamantium.Mathematics;
 using Adamantium.UI.Media;
 
 namespace Adamantium.UI.Controls;

@@ -3,7 +3,6 @@ using System.Threading;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.MacOS;
 using Adamantium.UI.Controls;
-using Adamantium.UI.MacOS;
 
 namespace Adamantium.UI.Threading;
 

@@ -1,7 +1,5 @@
 ﻿using Adamantium.Win32;
 using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Adamantium.UI.Windows;
 

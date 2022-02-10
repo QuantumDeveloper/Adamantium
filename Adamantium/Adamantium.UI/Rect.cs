@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using Adamantium.Mathematics;
 
 namespace Adamantium.UI;
 

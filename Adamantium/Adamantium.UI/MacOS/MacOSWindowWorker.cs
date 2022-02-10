@@ -3,7 +3,6 @@ using System.Runtime.InteropServices;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.Core.Events;
 using Adamantium.MacOS;
-using Adamantium.Mathematics;
 using Adamantium.UI.AggregatorEvents;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Threading;

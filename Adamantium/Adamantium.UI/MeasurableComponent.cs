@@ -1,10 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Collections.Specialized;
-using System.Linq;
-using Adamantium.Core.Collections;
 using Adamantium.UI.Controls;
-using Adamantium.UI.Data;
 using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI;

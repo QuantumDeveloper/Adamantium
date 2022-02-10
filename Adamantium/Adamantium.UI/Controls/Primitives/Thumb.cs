@@ -1,5 +1,4 @@
-﻿using Adamantium.Mathematics;
-using Adamantium.UI.Input;
+﻿using Adamantium.UI.Input;
 using Adamantium.UI.Media;
 using Adamantium.UI.RoutedEvents;
 

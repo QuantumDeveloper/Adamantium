@@ -20,12 +20,14 @@ public abstract class Decorator:MeasurableComponent
       {
          if (e.OldValue != null && e.OldValue != AdamantiumProperty.UnsetValue)
          {
-            o.LogicalChildrenCollection.Remove((MeasurableComponent)e.OldValue);
+            o.LogicalChildrenCollection.Remove((IUIComponent)e.OldValue);
+            o.VisualChildrenCollection.Remove((IUIComponent)e.OldValue);
          }
 
          if (e.NewValue != null)
          {
-            o.LogicalChildrenCollection.Add((MeasurableComponent)e.NewValue);
+            o.LogicalChildrenCollection.Add((IUIComponent)e.NewValue);
+            o.VisualChildrenCollection.Add((IUIComponent)e.NewValue);
          }
       }
    }

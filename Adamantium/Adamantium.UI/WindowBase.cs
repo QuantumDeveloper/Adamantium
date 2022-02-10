@@ -208,42 +208,8 @@ public abstract class WindowBase : ContentControl, IWindow
 
     public void Update()
     {
-        ProcessLogicalTree();
-        ProcessLogicalTreeUpdate();
-    }
-
-    private void ProcessLogicalTree()
-    {
-        var stack = new Stack<IUIComponent>();
-        stack.Push(this);
-        while (stack.Count > 0)
-        {
-            var control = stack.Pop();
-            
-            ProcessVisualTree(control, UpdateComponent);
-            
-            foreach (var visual in control.LogicalChildren)
-            {
-                stack.Push(visual as IUIComponent);
-            }
-        }
-    }
-    
-    private void ProcessLogicalTreeUpdate()
-    {
-        var stack = new Stack<IUIComponent>();
-        stack.Push(this);
-        while (stack.Count > 0)
-        {
-            var control = stack.Pop();
-
-            ProcessVisualTree(control, UpdateComponentLocation);
-
-            foreach (var visual in control.LogicalChildren)
-            {
-                stack.Push(visual as IUIComponent);
-            }
-        }
+        ProcessVisualTree(this, UpdateComponent);
+        ProcessVisualTree(this, UpdateComponentLocation);
     }
 
     private void ProcessVisualTree(IUIComponent component, Action<IUIComponent> processAction)

@@ -2,7 +2,7 @@
 
 namespace Adamantium.UI.Controls;
 
-public class ContentControl:Control
+public class ContentControl : Control
 {
    public static readonly AdamantiumProperty ContentProperty = AdamantiumProperty.Register(nameof(Content),
       typeof(object), typeof(ContentControl), new PropertyMetadata(null, ContentChangedCallback));
@@ -14,18 +14,21 @@ public class ContentControl:Control
    }
 
 
-   private static void ContentChangedCallback(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
+   private static void ContentChangedCallback(AdamantiumComponent adamantiumObject,
+      AdamantiumPropertyChangedEventArgs e)
    {
       if (adamantiumObject is ContentControl o)
       {
          if (e.OldValue != null && e.OldValue != AdamantiumProperty.UnsetValue)
          {
-            o.LogicalChildrenCollection.Remove((MeasurableComponent)e.OldValue);
+            o.LogicalChildrenCollection.Remove((IUIComponent)e.OldValue);
+            o.VisualChildrenCollection.Remove((IUIComponent)e.OldValue);
          }
 
          if (e.NewValue != null)
          {
-            o.LogicalChildrenCollection.Add((MeasurableComponent)e.NewValue);
+            o.LogicalChildrenCollection.Add((IUIComponent)e.NewValue);
+            o.VisualChildrenCollection.Add((IUIComponent)e.NewValue);
          }
       }
    }

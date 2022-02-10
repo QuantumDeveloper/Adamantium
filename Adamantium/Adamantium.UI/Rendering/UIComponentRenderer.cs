@@ -3,7 +3,6 @@ using Adamantium.Core;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Models;
 using Adamantium.Engine.Graphics;
-using Adamantium.Mathematics;
 using Adamantium.UI.Media;
 using Adamantium.UI.Media.Imaging;
 using Buffer = Adamantium.Engine.Graphics.Buffer;

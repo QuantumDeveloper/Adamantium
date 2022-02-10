@@ -1,6 +1,5 @@
 using System.Runtime.InteropServices;
 using Adamantium.Engine.Graphics;
-using Adamantium.Mathematics;
 
 namespace Adamantium.UI;
 

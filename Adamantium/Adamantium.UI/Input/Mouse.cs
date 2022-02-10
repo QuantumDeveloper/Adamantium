@@ -1,5 +1,4 @@
-﻿using Adamantium.Mathematics;
-using Adamantium.UI.RoutedEvents;
+﻿using Adamantium.UI.RoutedEvents;
 using Adamantium.UI.Windows.Input;
 using Adamantium.Win32;
 

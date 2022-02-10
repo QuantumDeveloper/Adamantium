@@ -1,9 +1,6 @@
-using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using Adamantium.Engine.Graphics;
 using Adamantium.Engine.Graphics.Effects;
-using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Media;
 using Adamantium.UI.RoutedEvents;
@@ -130,33 +127,16 @@ internal class WindowRenderer : IWindowRenderer
         {
             var component = queue.Dequeue();
                 
-            RenderVisualTree(component);
+            RenderComponent(component);
 
-            foreach (var visual in component.LogicalChildren)
+            foreach (var visual in component.VisualChildren)
             {
                 queue.Enqueue(visual as IUIComponent);
             }
         }
     }
 
-    private void RenderVisualTree(IUIComponent component)
-    {
-        var queue = new Queue<IUIComponent>();
-        queue.Enqueue(component);
-        while (queue.Count > 0)
-        {
-            var control = queue.Dequeue();
-                
-            RenderControl(control);
-
-            foreach (var visual in control.VisualChildren)
-            {
-                queue.Enqueue(visual);
-            }
-        }
-    }
-
-    private void RenderControl(IUIComponent component)
+    private void RenderComponent(IUIComponent component)
     {
         if (component.Visibility != Visibility.Visible) return;
 

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Adamantium.Mathematics;
 
 namespace Adamantium.UI.Input;
 
@@ -32,9 +31,9 @@ public static class InputExtensions
          {
             p -= current.ClipRectangle.Location;
                
-            if (current.LogicalChildren.Any())
+            if (current.VisualChildren.Any())
             {
-               foreach (var child in ZSort(current.LogicalChildren.OfType<IInputComponent>().Reverse()))
+               foreach (var child in ZSort(current.VisualChildren.OfType<IInputComponent>().Reverse()))
                {
                   if (
                      child.ClipRectangle.Contains(p) &&

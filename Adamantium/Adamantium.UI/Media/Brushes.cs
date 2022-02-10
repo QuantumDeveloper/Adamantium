@@ -1,6 +1,4 @@
-﻿using Adamantium.Mathematics;
-
-namespace Adamantium.UI.Media;
+﻿namespace Adamantium.UI.Media;
 
 public static class Brushes
 {

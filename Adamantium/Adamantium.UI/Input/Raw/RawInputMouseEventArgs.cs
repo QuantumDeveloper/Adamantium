@@ -1,6 +1,4 @@
-﻿using Adamantium.Mathematics;
-
-namespace Adamantium.UI.Input.Raw;
+﻿namespace Adamantium.UI.Input.Raw;
 
 public class RawInputMouseEventArgs : RawMouseEventArgs
 {

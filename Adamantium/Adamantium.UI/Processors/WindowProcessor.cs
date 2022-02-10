@@ -1,12 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Runtime.InteropServices;
+﻿using System.Diagnostics;
 using System.Threading;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.EntityFramework;
-using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Rendering;
 using Adamantium.UI.RoutedEvents;

@@ -1,7 +1,4 @@
-﻿using Adamantium.EntityFramework.ComponentsBasics;
-using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System;
 using Adamantium.Engine.Graphics;
 using Adamantium.UI.RoutedEvents;
 

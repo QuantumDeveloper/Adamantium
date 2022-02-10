@@ -32,11 +32,11 @@ public abstract class Panel: MeasurableComponent, IContainer
          case NotifyCollectionChangedAction.Add:
             var controls = e.NewItems.OfType<MeasurableComponent>();
             LogicalChildrenCollection.InsertRange(e.NewStartingIndex, controls);
-            //VisualChildrenCollection.AddRange(e.NewItems.OfType<IUIComponent>());
+            VisualChildrenCollection.AddRange(e.NewItems.OfType<IUIComponent>());
             break;
          case NotifyCollectionChangedAction.Remove:
             LogicalChildrenCollection.Remove(e.OldItems.OfType<MeasurableComponent>());
-            //VisualChildrenCollection.Remove(e.OldItems.OfType<IUIComponent>());
+            VisualChildrenCollection.Remove(e.OldItems.OfType<IUIComponent>());
             break;
          case NotifyCollectionChangedAction.Replace:
             for (var i = 0; i < e.OldItems.Count; ++i)
@@ -44,13 +44,13 @@ public abstract class Panel: MeasurableComponent, IContainer
                var index = LogicalChildrenCollection.IndexOf((MeasurableComponent)e.OldItems[i]);
                var child = (MeasurableComponent)e.NewItems[i];
                LogicalChildrenCollection[index] = child;
-               //VisualChildrenCollection[index] = child;
+               VisualChildrenCollection[index] = child;
             }
             break;
 
          case NotifyCollectionChangedAction.Reset:
             LogicalChildrenCollection.Clear();
-            //VisualChildrenCollection.Clear();
+            VisualChildrenCollection.Clear();
             break;
       }
 
