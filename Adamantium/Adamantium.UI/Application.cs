@@ -1,24 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Runtime.InteropServices;
 using System.Threading;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.Core.Events;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
-using Adamantium.Engine.Graphics.Effects;
 using Adamantium.EntityFramework;
 using Adamantium.UI.AggregatorEvents;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Input;
-using Adamantium.UI.MacOS;
 using Adamantium.UI.Processors;
 using Adamantium.UI.Threading;
-using Adamantium.UI.Windows;
 using AdamantiumVulkan;
-using AdamantiumVulkan.Core;
 using UnhandledExceptionEventArgs = Adamantium.UI.RoutedEvents.UnhandledExceptionEventArgs;
 using UnhandledExceptionEventHandler = Adamantium.UI.RoutedEvents.UnhandledExceptionEventHandler;
 

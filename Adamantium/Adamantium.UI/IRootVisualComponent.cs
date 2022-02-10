@@ -1,7 +1,4 @@
-﻿using Adamantium.Mathematics;
-using Adamantium.UI.Media;
-
-namespace Adamantium.UI;
+﻿namespace Adamantium.UI;
 
 public interface IRootVisualComponent : IUIComponent
 {

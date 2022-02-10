@@ -1,6 +1,4 @@
-﻿using Adamantium.Mathematics;
-
-namespace Adamantium.UI.Input;
+﻿namespace Adamantium.UI.Input;
 
 public class UnboundMouseEventArgs:MouseEventArgs
 {

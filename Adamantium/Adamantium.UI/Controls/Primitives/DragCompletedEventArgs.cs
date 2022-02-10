@@ -1,6 +1,4 @@
-﻿using Adamantium.Mathematics;
-
-namespace Adamantium.UI.Controls.Primitives;
+﻿namespace Adamantium.UI.Controls.Primitives;
 
 public class DragCompletedEventArgs:DragEventArgs
 {

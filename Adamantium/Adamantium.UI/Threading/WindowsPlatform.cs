@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Threading;
 using Adamantium.Core.DependencyInjection;
-using Adamantium.Core.Events;
 using Adamantium.Engine.Core;
 using Adamantium.UI.Windows;
 using Adamantium.Win32;

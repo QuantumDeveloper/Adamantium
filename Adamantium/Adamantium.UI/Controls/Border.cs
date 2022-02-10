@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using Adamantium.Engine.Graphics;
-using Adamantium.Mathematics;
+﻿using Adamantium.Engine.Graphics;
 using Adamantium.UI.Media;
 
 namespace Adamantium.UI.Controls;

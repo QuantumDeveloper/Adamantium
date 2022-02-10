@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Diagnostics;
 using Adamantium.Engine.Graphics;
 using Adamantium.Imaging;
 using Adamantium.UI.Media;

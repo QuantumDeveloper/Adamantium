@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Collections.Specialized;
 using Adamantium.Core.Collections;
 using Adamantium.UI.Controls;

@@ -1446,7 +1446,7 @@ public class UIComponent : FundamentalUIComponent, IInputComponent
         while (element != null)
         {
             yield return element;
-            element = (UIComponent)element.LogicalParent;
+            element = (UIComponent)element.VisualParent;
         }
     }
 

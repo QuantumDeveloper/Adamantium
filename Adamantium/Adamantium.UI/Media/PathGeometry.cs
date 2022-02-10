@@ -1,9 +1,6 @@
-using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
-using Adamantium.Core;
-using Adamantium.Engine.Core;
 using Adamantium.UI.Controls;
 using Adamantium.UI.RoutedEvents;
 using Polygon = Adamantium.Mathematics.Polygon;
