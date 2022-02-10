@@ -7,7 +7,7 @@ using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI.Controls;
 
-public interface IWindow : IRootVisualComponent, IFrameworkComponent
+public interface IWindow : IRootVisualComponent, IMeasurableComponent
 {
     void Show();
     void Close();

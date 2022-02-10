@@ -2,7 +2,7 @@ namespace Adamantium.UI;
 
 public interface IContainer
 {
-    void AddOrSetChildComponent(IUIComponent component);
+    void AddOrSetChildComponent(IMeasurableComponent component);
 
     void RemoveAllChildComponents();
 }

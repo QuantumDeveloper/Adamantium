@@ -1,8 +1,5 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using Adamantium.Core;
-using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Models;
 using Adamantium.UI.Controls;
 using Adamantium.UI.RoutedEvents;
@@ -87,13 +84,31 @@ public class CombinedGeometry : Geometry
 
     public override void RecalculateBounds()
     {
-        var points = Mesh.MergeContourPoints();
-        bounds = Rect.FromPoints(points);
+        // TODO: define is this suitable calculation mechanism or we need to fully process geometry first?
+        Rect rect = new Rect();
+        if (Geometry1 != null)
+        {
+            Geometry1.RecalculateBounds();
+            rect = Geometry1.Bounds;
+        }
+
+        if (Geometry2 != null)
+        {
+            Geometry2.RecalculateBounds();
+            rect = rect.Merge(Geometry2.Bounds);
+        }
+        
+        if (Transform != null)
+        {
+            var matrix = Transform.Matrix;
+            rect.TransformToAABB(matrix);
+        }
+
+        bounds = rect;
     }
 
     protected internal override void ProcessGeometryCore()
     {
-        Geometry1?.InvalidateGeometry();
         Geometry1?.ProcessGeometry();
         Geometry2?.ProcessGeometry();
 

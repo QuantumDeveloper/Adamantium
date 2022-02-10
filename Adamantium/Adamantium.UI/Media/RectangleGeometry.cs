@@ -74,7 +74,11 @@ public sealed class RectangleGeometry : Geometry
 
    public override void RecalculateBounds()
    {
-      bounds = Rect.FromPoints(Mesh.MergeContourPoints());
+      bounds = Rect;
+      if (Transform != null)
+      {
+         bounds = bounds.TransformToAABB(Transform.Matrix);
+      }
    }
 
    protected internal override void ProcessGeometryCore()

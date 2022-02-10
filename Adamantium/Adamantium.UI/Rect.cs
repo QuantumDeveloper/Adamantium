@@ -354,19 +354,31 @@ public struct Rect
       return (rect.X <= Right) && (X <= rect.Right) && (rect.Y <= Bottom) && (Y <= rect.Bottom);
    }
 
+   public Rect Merge(Rect rect)
+   {
+      var points = GetPoints();
+      points.AddRange(rect.GetPoints());
+      return FromPoints(points);
+   }
+
+   public List<Vector2> GetPoints()
+   {
+      return new List<Vector2> { Location, BottomRight };
+   }
+
    /// <summary>
    /// Returns the axis-aligned bounding box of a transformed rectangle.
    /// </summary>
    /// <param name="matrix">The transform.</param>
    /// <returns>The bounding box</returns>
-   public Rect TransformToAABB(Matrix4x4F matrix)
+   public Rect TransformToAABB(Matrix4x4 matrix)
    {
       var points = new[]
       {
-         Vector2F.TransformCoordinate(TopLeft, matrix),
-         Vector2F.TransformCoordinate(TopRight, matrix),
-         Vector2F.TransformCoordinate(BottomRight, matrix),
-         Vector2F.TransformCoordinate(BottomLeft, matrix)
+         Vector2.TransformCoordinate(TopLeft, matrix),
+         Vector2.TransformCoordinate(TopRight, matrix),
+         Vector2.TransformCoordinate(BottomRight, matrix),
+         Vector2.TransformCoordinate(BottomLeft, matrix)
       };
 
       var left = double.MaxValue;
@@ -415,6 +427,12 @@ public struct Rect
       ArgumentNullException.ThrowIfNull(inPoints);
 
       var points = inPoints as Vector2[] ?? inPoints.ToArray();
+      
+      if (points.Length == 0)
+      {
+         return Rect.Empty;
+      }
+
       var minimum = new Vector2(float.MaxValue);
       var maximum = new Vector2(float.MinValue);
 

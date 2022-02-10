@@ -32,9 +32,9 @@ public static class InputExtensions
          {
             p -= current.ClipRectangle.Location;
                
-            if (current.VisualChildren.Any())
+            if (current.LogicalChildren.Any())
             {
-               foreach (var child in ZSort(current.VisualChildren.OfType<IInputComponent>().Reverse()))
+               foreach (var child in ZSort(current.LogicalChildren.OfType<IInputComponent>().Reverse()))
                {
                   if (
                      child.ClipRectangle.Contains(p) &&

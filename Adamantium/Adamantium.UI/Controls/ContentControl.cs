@@ -16,19 +16,16 @@ public class ContentControl:Control
 
    private static void ContentChangedCallback(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
    {
-      var o = adamantiumObject as ContentControl;
-      if (o != null)
+      if (adamantiumObject is ContentControl o)
       {
          if (e.OldValue != null && e.OldValue != AdamantiumProperty.UnsetValue)
          {
-            o.LogicalChildren.Remove((FrameworkComponent)e.OldValue);
-            o.VisualChildrenCollection.Remove((FrameworkComponent)e.OldValue);
+            o.LogicalChildrenCollection.Remove((MeasurableComponent)e.OldValue);
          }
 
          if (e.NewValue != null)
          {
-            o.LogicalChildren.Add((FrameworkComponent)e.NewValue);
-            o.VisualChildrenCollection.Add((FrameworkComponent)e.NewValue);
+            o.LogicalChildrenCollection.Add((MeasurableComponent)e.NewValue);
          }
       }
    }

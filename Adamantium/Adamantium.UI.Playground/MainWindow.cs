@@ -2,8 +2,11 @@ using Adamantium.Core.Collections;
 using Adamantium.Engine.Graphics;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Input;
 using Adamantium.UI.Media;
+using Adamantium.Win32;
 using Polygon = Adamantium.UI.Controls.Polygon;
+using Rectangle = Adamantium.UI.Controls.Rectangle;
 using Shape = Adamantium.UI.Controls.Shape;
 
 namespace Adamantium.UI.Playground
@@ -42,8 +45,8 @@ namespace Adamantium.UI.Playground
             var border = new Border();
             border.Width = 250;
             border.Height = 150;
-            //border.CornerRadius = new CornerRadius(0, 15, 20, 5);
-            border.CornerRadius = new CornerRadius(0, 0, 0, 0);
+            border.CornerRadius = new CornerRadius(0, 15, 20, 5);
+            //border.CornerRadius = new CornerRadius(0, 0, 0, 0);
             border.BorderThickness = new Thickness(4, 2, 0, 1);
             border.BorderBrush = Brushes.Blue;
             border.Background = Brushes.Gray;
@@ -56,13 +59,13 @@ namespace Adamantium.UI.Playground
 
             path = new Path();
             path.Style = style;
-            path.HorizontalAlignment = HorizontalAlignment.Center;
+            path.HorizontalAlignment = HorizontalAlignment.Right;
             path.VerticalAlignment = VerticalAlignment.Center;
             path.StrokeThickness = 2;
             path.Stroke = Brushes.CornflowerBlue;
             path.StrokeLineJoin = PenLineJoin.Miter;
             CombinedGeometry combinedGeometry = new CombinedGeometry();
-            combinedGeometry.GeometryCombineMode = GeometryCombineMode.Xor;
+            combinedGeometry.GeometryCombineMode = GeometryCombineMode.Intersect;
             var innerCombinedGeometry = new CombinedGeometry();
             innerCombinedGeometry.GeometryCombineMode = GeometryCombineMode.Exclude;
             innerCombinedGeometry.Geometry1 = new EllipseGeometry(new Vector2(100), 80, 80);
@@ -127,11 +130,32 @@ namespace Adamantium.UI.Playground
             //path.StrokeDashArray = new TrackingCollection<double>() { 5 };
 
             grid.Background = Brushes.White;
-            //grid.Children.Add(polygon);
-            //grid.Children.Add(border);
+            grid.Children.Add(polygon);
+            grid.Children.Add(border);
             grid.Children.Add(path);
 
+            var rect = new Rectangle();
+            rect.Width = 250;
+            rect.Height = 55;
+            rect.Fill = Brushes.Gray;
+            rect.HorizontalAlignment = HorizontalAlignment.Center;
+            rect.VerticalAlignment = VerticalAlignment.Top;
+            //grid.Children.Add(rect);
+            
+            path.MouseDown += PathOnPreviewMouseDown;
+            MouseDown += OnPreviewMouseDown;
+
             Content = grid;
+        }
+
+        private void OnPreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            MessageBox.Show("Window mouse down");
+        }
+
+        private void PathOnPreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            MessageBox.Show("Path PreviewMouseDown");
         }
     }
 }

@@ -50,15 +50,23 @@ namespace Adamantium.Engine.Graphics
                         mesh = GenerateSolidGeometry(ellipseType, diameter, startAngle, stopAngle, isClockWise, tessellation, transform);
                         break;
                     case GeometryType.Both:
-                        var contour = GenerateOutlinedGeometry(ellipseType, diameter, startAngle, stopAngle, isClockWise, tessellation, transform);
+                    {
+                        var contour = GenerateOutlinedGeometry(ellipseType, diameter, startAngle, stopAngle,
+                            isClockWise, tessellation, transform);
                         mesh = new Mesh();
                         mesh.AddContour(contour, true);
+                        var vertices = Triangulate(contour);
+                        mesh.SetPoints(vertices).SetTopology(PrimitiveType.LineStrip).GenerateBasicIndices();
                         break;
+                    }
                     default:
-                        var vertices = GenerateOutlinedGeometry(ellipseType, diameter, startAngle, stopAngle, isClockWise, tessellation, transform);
+                    {
+                        var vertices = GenerateOutlinedGeometry(ellipseType, diameter, startAngle, stopAngle,
+                            isClockWise, tessellation, transform);
                         mesh = new Mesh();
                         mesh.SetPoints(vertices).SetTopology(PrimitiveType.LineStrip).GenerateBasicIndices();
                         break;
+                    }
                 }
 
                 return mesh;
@@ -198,6 +206,14 @@ namespace Adamantium.Engine.Graphics
                 }
 
                 return vertices;
+            }
+            
+            private static List<Vector3> Triangulate(List<Vector3> vertices)
+            {
+                var polygon = new Mathematics.Polygon();
+                polygon.AddItem(new MeshContour(vertices));
+                var points = polygon.Fill();
+                return points;
             }
         }
     }

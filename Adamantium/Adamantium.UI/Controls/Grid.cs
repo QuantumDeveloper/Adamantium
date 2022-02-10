@@ -489,7 +489,7 @@ public class Grid: Panel
             var childFinalH = GetArrangeSize(rowSegments, cell.RowIndex, cell.RowSpan);
 
             var rect = new Rect(childFinalX, childFinalY, childFinalW, childFinalH);
-            //Debug.WriteLine("rect for "+child +" = "+rect);
+
             child.Arrange(rect);
             index++;
          }
@@ -665,7 +665,6 @@ public class Grid: Panel
       var list = cellsDictionary[groupIndex];
       foreach (var cell in list)
       {
-         var element = Children[cell.ChildIndex];
          GridSegment row = rowSegments[cell.RowIndex];
          GridSegment col = colSegments[cell.ColumnIndex];
          bool ignoreMeasuredRow = false;
@@ -697,6 +696,7 @@ public class Grid: Panel
             }
          }
 
+         var element = Children[cell.ChildIndex];
          element.Measure(childSize);
          var desired = element.DesiredSize;
             

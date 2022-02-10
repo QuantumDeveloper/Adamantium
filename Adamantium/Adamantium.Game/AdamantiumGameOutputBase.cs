@@ -15,7 +15,7 @@ namespace Adamantium.Game
         
         public override GameWindowDescription Description { get; protected set; }
 
-        protected FrameworkComponent UiComponent { get; set; }
+        protected MeasurableComponent UiComponent { get; set; }
 
         protected static readonly Dictionary<Key, Keys> TranslationKeys;
         protected static readonly Dictionary<MouseButtons, GameMouseButtons> MouseTranslationKeys;

@@ -59,10 +59,10 @@ public class Border : Decorator
       var child = Child;
       var padding = Padding + BorderThickness;
       var size = availableSize.Deflate(padding);
-      if (child != null)
+      if (child is IMeasurableComponent measurable)
       {
-         child.Measure(size);
-         return child.DesiredSize.Inflate(padding);
+         measurable.Measure(size);
+         return measurable.DesiredSize.Inflate(padding);
       }
       else
       {
@@ -75,7 +75,7 @@ public class Border : Decorator
       if (Child != null)
       {
          var padding = Padding + BorderThickness;
-         Child.Arrange(new Rect(finalSize).Deflate(padding));
+         base.Arrange(new Rect(finalSize).Deflate(padding));
       }
       return finalSize;
    }
@@ -99,9 +99,7 @@ public class Border : Decorator
       
       context.BeginDraw(this);
       context.DrawRectangle(Background, innerRect, CornerRadius);
-      var timer = Stopwatch.StartNew();
       context.DrawGeometry(BorderBrush, combined);
-      timer.Stop();
       context.EndDraw(this);
    }
 }

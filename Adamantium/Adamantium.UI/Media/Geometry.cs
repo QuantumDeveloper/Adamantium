@@ -7,7 +7,7 @@ namespace Adamantium.UI.Media;
 
 public abstract class Geometry : AdamantiumComponent
 {
-   private bool IsProcessed { get; set; }
+   public bool IsProcessed { get; private set; }
       
    internal Mesh Mesh { get; set; }
       

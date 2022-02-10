@@ -4,9 +4,9 @@ namespace Adamantium.UI.RoutedEvents;
 
 public class LogicalTreeAttachmentEventArgs:EventArgs
 {
-   public FrameworkComponent LogicalRoot { get; }
+   public MeasurableComponent LogicalRoot { get; }
 
-   public LogicalTreeAttachmentEventArgs(FrameworkComponent logicalRoot)
+   public LogicalTreeAttachmentEventArgs(MeasurableComponent logicalRoot)
    {
       LogicalRoot = logicalRoot;
    }

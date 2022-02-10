@@ -1,6 +1,6 @@
 namespace Adamantium.UI;
 
-public interface IControl : IFrameworkComponent
+public interface IControl : IMeasurableComponent
 {
     ControlTemplate Template { get; set; }
 

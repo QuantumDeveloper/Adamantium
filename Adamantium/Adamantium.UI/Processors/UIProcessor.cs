@@ -24,7 +24,7 @@ public abstract class UIProcessor : EntityProcessor
 
             foreach (var visual in control.GetVisualDescendants())
             {
-                stack.Push(visual as FrameworkComponent);
+                stack.Push(visual as MeasurableComponent);
             }
         }
     }
