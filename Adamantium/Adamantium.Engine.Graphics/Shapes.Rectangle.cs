@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Adamantium.Core;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Models;
 using Adamantium.Mathematics;
@@ -115,15 +114,17 @@ namespace Adamantium.Engine.Graphics
                 {
                     case GeometryType.Solid:
                     {
-                        var polygon = new Mathematics.Polygon();
-                        polygon.AddItem(new MeshContour(vertices));
-                        var points = polygon.Fill();
+                        var points = Triangulate(vertices);
                         mesh.SetPoints(points);
                         break;
                     }
                     case GeometryType.Both:
+                    {
                         mesh.AddContour(vertices, true);
+                        var points = Triangulate(vertices);
+                        mesh.SetPoints(points);
                         break;
+                    }
                     default:
                         mesh.SetPoints(vertices);
                         break;
@@ -201,6 +202,14 @@ namespace Adamantium.Engine.Graphics
                 {
                     corners.BottomLeft = halfSize;
                 }
+            }
+
+            private static List<Vector3> Triangulate(List<Vector3> vertices)
+            {
+                var polygon = new Mathematics.Polygon();
+                polygon.AddItem(new MeshContour(vertices));
+                var points = polygon.Fill();
+                return points;
             }
         }
     }

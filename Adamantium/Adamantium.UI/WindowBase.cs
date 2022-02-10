@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Adamantium.Engine.Graphics;
-using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
-using Adamantium.UI.Media;
 using Adamantium.UI.RoutedEvents;
 using Adamantium.Win32;
 
@@ -210,12 +208,28 @@ public abstract class WindowBase : ContentControl, IWindow
 
     public void Update()
     {
-        ProcessVisualTree(UpdateComponent);
-
-        ProcessVisualTree(UpdateComponentLocation);
+        ProcessLogicalTree();
+        ProcessLogicalTreeUpdate();
     }
 
-    private void ProcessVisualTree(Action<IUIComponent> processAction)
+    private void ProcessLogicalTree()
+    {
+        var stack = new Stack<IUIComponent>();
+        stack.Push(this);
+        while (stack.Count > 0)
+        {
+            var control = stack.Pop();
+            
+            ProcessVisualTree(control, UpdateComponent);
+            
+            foreach (var visual in control.LogicalChildren)
+            {
+                stack.Push(visual as IUIComponent);
+            }
+        }
+    }
+    
+    private void ProcessLogicalTreeUpdate()
     {
         var stack = new Stack<IUIComponent>();
         stack.Push(this);
@@ -223,6 +237,23 @@ public abstract class WindowBase : ContentControl, IWindow
         {
             var control = stack.Pop();
 
+            ProcessVisualTree(control, UpdateComponentLocation);
+
+            foreach (var visual in control.LogicalChildren)
+            {
+                stack.Push(visual as IUIComponent);
+            }
+        }
+    }
+
+    private void ProcessVisualTree(IUIComponent component, Action<IUIComponent> processAction)
+    {
+        var stack = new Stack<IUIComponent>();
+        stack.Push(component);
+        while (stack.Count > 0)
+        {
+            var control = stack.Pop();
+            
             processAction(control);
 
             foreach (var visual in control.GetVisualDescendants())
@@ -234,8 +265,8 @@ public abstract class WindowBase : ContentControl, IWindow
         
     private void UpdateComponent(IUIComponent visualComponent)
     {
-        var control = (FrameworkComponent)visualComponent;
-        var parent = control.VisualParent;
+        var control = (MeasurableComponent)visualComponent;
+        var parent = control.VisualParent as IMeasurableComponent;
         if (!control.IsMeasureValid)
         {
             if (control is IWindow wnd)
@@ -269,14 +300,14 @@ public abstract class WindowBase : ContentControl, IWindow
 
     private void UpdateComponentLocation(IUIComponent visualComponent)
     {
-        if (visualComponent.VisualParent != null)
+        if (visualComponent.LogicalParent != null)
         {
-            visualComponent.Location = visualComponent.Bounds.Location + visualComponent.VisualParent.Location;
-            visualComponent.ClipPosition = visualComponent.ClipRectangle.Location + visualComponent.VisualParent.Location;
+            visualComponent.Location = visualComponent.Bounds.Location + ((IUIComponent)(visualComponent.LogicalParent)).Location;
+            visualComponent.ClipPosition = visualComponent.ClipRectangle.Location + ((IUIComponent)(visualComponent.LogicalParent)).Location;
         }
     }
 
-    private void MeasureControl(IUIComponent control, Double width, Double height)
+    private void MeasureControl(IMeasurableComponent control, Double width, Double height)
     {
         if (!Double.IsNaN(width) && !Double.IsNaN(height))
         {

@@ -4,7 +4,7 @@ using Adamantium.UI.Media;
 
 namespace Adamantium.UI.Controls;
 
-public abstract class Panel: FrameworkComponent, IContainer
+public abstract class Panel: MeasurableComponent, IContainer
 {
    public static readonly AdamantiumProperty BackgroundProperty = AdamantiumProperty.Register(nameof(Background),
       typeof(Brush), typeof(Panel),
@@ -17,11 +17,11 @@ public abstract class Panel: FrameworkComponent, IContainer
    }
 
    [Content]
-   public UIElementCollection Children { get; }
+   public MeasurableComponentsCollection Children { get; }
 
    protected Panel()
    {
-      Children = new UIElementCollection();
+      Children = new MeasurableComponentsCollection();
       Children.CollectionChanged += ChildrenChanged;
    }
 
@@ -30,27 +30,27 @@ public abstract class Panel: FrameworkComponent, IContainer
       switch (e.Action)
       {
          case NotifyCollectionChangedAction.Add:
-            var controls = e.NewItems.OfType<FrameworkComponent>();
-            LogicalChildren.InsertRange(e.NewStartingIndex, controls);
-            VisualChildrenCollection.AddRange(e.NewItems.OfType<IUIComponent>());
+            var controls = e.NewItems.OfType<MeasurableComponent>();
+            LogicalChildrenCollection.InsertRange(e.NewStartingIndex, controls);
+            //VisualChildrenCollection.AddRange(e.NewItems.OfType<IUIComponent>());
             break;
          case NotifyCollectionChangedAction.Remove:
-            LogicalChildren.Remove(e.OldItems.OfType<FrameworkComponent>());
-            VisualChildrenCollection.Remove(e.OldItems.OfType<IUIComponent>());
+            LogicalChildrenCollection.Remove(e.OldItems.OfType<MeasurableComponent>());
+            //VisualChildrenCollection.Remove(e.OldItems.OfType<IUIComponent>());
             break;
          case NotifyCollectionChangedAction.Replace:
             for (var i = 0; i < e.OldItems.Count; ++i)
             {
-               var index = LogicalChildren.IndexOf((FrameworkComponent)e.OldItems[i]);
-               var child = (FrameworkComponent)e.NewItems[i];
-               LogicalChildren[index] = child;
-               VisualChildrenCollection[index] = child;
+               var index = LogicalChildrenCollection.IndexOf((MeasurableComponent)e.OldItems[i]);
+               var child = (MeasurableComponent)e.NewItems[i];
+               LogicalChildrenCollection[index] = child;
+               //VisualChildrenCollection[index] = child;
             }
             break;
 
          case NotifyCollectionChangedAction.Reset:
-            LogicalChildren.Clear();
-            VisualChildrenCollection.Clear();
+            LogicalChildrenCollection.Clear();
+            //VisualChildrenCollection.Clear();
             break;
       }
 
@@ -64,7 +64,7 @@ public abstract class Panel: FrameworkComponent, IContainer
       context.EndDraw(this);
    }
 
-   public void AddOrSetChildComponent(IUIComponent component)
+   public void AddOrSetChildComponent(IMeasurableComponent component)
    {
       Children.Add(component);
    }

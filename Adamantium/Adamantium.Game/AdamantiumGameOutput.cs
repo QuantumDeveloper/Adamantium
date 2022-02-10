@@ -45,7 +45,7 @@ namespace Adamantium.Game
         {
             GameContext = context;
             window = GameContext.Context as IWindow ?? throw new ArgumentException($"{nameof(context.Context)} should be of type {nameof(IWindow)}");
-            UiComponent = window as FrameworkComponent;
+            UiComponent = window as MeasurableComponent;
             window.ClientSizeChanged += WindowOnClientSizeChanged;
             window.StateChanged += WindowOnStateChanged;
 

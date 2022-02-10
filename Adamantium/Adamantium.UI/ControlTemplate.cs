@@ -154,7 +154,7 @@ public class UIComponentFactory
         return result;
     }
 
-    private IUIComponent GenerateComponent()
+    private IMeasurableComponent GenerateComponent()
     {
         ArgumentNullException.ThrowIfNull(Type);
         
@@ -163,7 +163,7 @@ public class UIComponentFactory
             throw new ArgumentOutOfRangeException($"{Type} should be inherited from IUIComponent");
         }
         
-        var component = (IUIComponent)Activator.CreateInstance(Type);
+        var component = (IMeasurableComponent)Activator.CreateInstance(Type);
         
         ArgumentNullException.ThrowIfNull(component);
 

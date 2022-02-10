@@ -385,14 +385,14 @@ public abstract class AdamantiumComponent : DispatcherComponent, IAdamantiumComp
         values[property] = value;
         metadata.PropertyChangedCallback?.Invoke(this, e);
         var element = this as IUIComponent;
-        if (metadata.AffectsMeasure)
+        if (metadata.AffectsMeasure && element is IMeasurableComponent measurable)
         {
-            element?.InvalidateMeasure();
+            measurable?.InvalidateMeasure();
         }
 
-        if (metadata.AffectsArrange)
+        if (metadata.AffectsArrange  && element is IMeasurableComponent measurable1)
         {
-            element?.InvalidateArrange();
+            measurable1?.InvalidateArrange();
         }
 
         if (metadata.AffectsRender)

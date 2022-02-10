@@ -4,6 +4,7 @@ using System.Collections.Specialized;
 using System.Linq;
 using Adamantium.Core.Collections;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Data;
 using Adamantium.UI.Input;
 using Adamantium.UI.Media;
 using Adamantium.UI.RoutedEvents;
@@ -11,16 +12,183 @@ using Adamantium.UI.Windows.Input;
 
 namespace Adamantium.UI;
 
-public abstract class UIComponent : AdamantiumComponent, IInputComponent
+public class FundamentalUIComponent : AdamantiumComponent, IFundamentalUIComponent
+{
+    private IFundamentalUIComponent parent;
+    private TrackingCollection<IFundamentalUIComponent> logicalChildren;
+    
+    public static readonly AdamantiumProperty NameProperty = AdamantiumProperty.Register(nameof(Name),
+        typeof(String), typeof(MeasurableComponent), new PropertyMetadata(String.Empty));
+    
+    public static readonly AdamantiumProperty DataContextProperty = AdamantiumProperty.Register(nameof(DataContext),
+        typeof(object), typeof(MeasurableComponent),
+        new PropertyMetadata(null, PropertyMetadataOptions.Inherits, DataContextChangedCallBack));
+    
+    private static void DataContextChangedCallBack(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
+    {
+        var o = adamantiumObject as MeasurableComponent;
+        o?.DataContextChanged?.Invoke(o, e);
+    }
+    
+    
+    public Style Style { get; }
+    public object DataContext { get; set; }
+    public IFundamentalUIComponent LogicalParent => parent;
+    
+    public BindingExpression SetBinding(AdamantiumProperty property, BindingBase bindingBase)
+    {
+        return null;
+    }
+
+    public event AdamantiumPropertyChangedEventHandler DataContextChanged;
+   
+    public IReadOnlyCollection<IFundamentalUIComponent> LogicalChildren => LogicalChildrenCollection.AsReadOnly();
+    
+    protected TrackingCollection<IFundamentalUIComponent> LogicalChildrenCollection
+    {
+        get
+        {
+            if (logicalChildren == null)
+            {
+                var list = new TrackingCollection<IFundamentalUIComponent>();
+                LogicalChildrenCollection = list;
+            }
+            return logicalChildren;
+        }
+        set
+        {
+            if (value == null)
+            {
+                throw new ArgumentNullException(nameof(value));
+            }
+            if (logicalChildren != value && logicalChildren != null)
+            {
+                logicalChildren.CollectionChanged -= LogicalChildrenCollectionChanged;
+            }
+
+            logicalChildren = value;
+            logicalChildren.CollectionChanged += LogicalChildrenCollectionChanged;
+        }
+
+    }
+    
+    public String Name
+    {
+        get => GetValue<String>(NameProperty);
+        set => SetValue(NameProperty, value);
+    }
+    
+    private void LogicalChildrenCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+    {
+        switch (e.Action)
+        {
+            case NotifyCollectionChangedAction.Add:
+                SetLogicalParent(e.NewItems.Cast<FundamentalUIComponent>());
+                break;
+
+            case NotifyCollectionChangedAction.Remove:
+                ClearLogicalParent(e.OldItems.Cast<FundamentalUIComponent>());
+                break;
+
+            case NotifyCollectionChangedAction.Replace:
+                ClearLogicalParent(e.OldItems.Cast<FundamentalUIComponent>());
+                SetLogicalParent(e.NewItems.Cast<FundamentalUIComponent>());
+                break;
+
+            case NotifyCollectionChangedAction.Reset:
+                throw new NotSupportedException("Reset should not be signalled on LogicalChildren collection");
+        }
+    }
+
+    private void SetLogicalParent(IEnumerable<FundamentalUIComponent> children)
+    {
+        foreach (var element in children)
+        {
+            element.SetParent(this);
+        }
+    }
+
+    private void ClearLogicalParent(IEnumerable<FundamentalUIComponent> children)
+    {
+        foreach (var element in children)
+        {
+            if (element.LogicalParent == this)
+            {
+                element.SetParent(null);
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Sets the control's logical parent.
+    /// </summary>
+    /// <param name="logicalParent">The parent.</param>
+    private void SetParent(IFundamentalUIComponent logicalParent)
+    {
+        var old = LogicalParent;
+
+        if (logicalParent != old)
+        {
+            if (old != null && logicalParent != null)
+            {
+                throw new InvalidOperationException("The Control already has a parent.Parent Element is: " + LogicalParent);
+            }
+
+            // TODO: define do we actually need InheritanceParent proprety
+            //InheritanceParent = parent;
+            parent = logicalParent;
+
+            /*
+            var root = FindStyleRoot(old);
+
+            if (root != null)
+            {
+               var e = new LogicalTreeAttachmentEventArgs(root);
+               OnDetachedFromLogicalTree(e);
+            }
+
+            root = FindStyleRoot(this);
+
+            if (root != null)
+            {
+               var e = new LogicalTreeAttachmentEventArgs(root);
+               OnAttachedToLogicalTree(e);
+            }
+
+            RaisePropertyChanged(ParentProperty, old, _parent, BindingPriority.LocalValue);
+            */
+        }
+    }
+
+
+    protected virtual void OnAttachedToLogicalTree(LogicalTreeAttachmentEventArgs e)
+    { }
+
+    protected virtual void OnDetachedFromLogicalTree(LogicalTreeAttachmentEventArgs e)
+    { }
+
+    /// <summary>
+    /// Raised when the control is attached to a rooted logical tree.
+    /// </summary>
+    public event EventHandler<LogicalTreeAttachmentEventArgs> AttachedToLogicalTree;
+
+    /// <summary>
+    /// Raised when the control is detached from a rooted logical tree.
+    /// </summary>
+    public event EventHandler<LogicalTreeAttachmentEventArgs> DetachedFromLogicalTree;
+
+}
+
+public class UIComponent : FundamentalUIComponent, IInputComponent
 {
     private Size renderSize;
-    private Size? _previousMeasure;
-    private Rect? _previousArrange;
-
+    
     protected bool sizeChanged;
     protected Size previousRenderSize;
 
     #region Adamantium properties
+    
+    
     
     public static readonly AdamantiumProperty RenderTransformProperty =
         AdamantiumProperty.Register(nameof(RenderTransform), typeof(Transform), typeof(UIComponent));
@@ -29,7 +197,8 @@ public abstract class UIComponent : AdamantiumComponent, IInputComponent
         AdamantiumProperty.Register(nameof(LayoutTransform), typeof(Transform), typeof(UIComponent));
 
     public static readonly AdamantiumProperty StyleProperty =
-        AdamantiumProperty.Register(nameof(Style), typeof(Style), typeof(UIComponent), new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure, StyleChangedCallback));
+        AdamantiumProperty.Register(nameof(Style), typeof(Style), typeof(UIComponent),
+            new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure, StyleChangedCallback));
 
     private static void StyleChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
@@ -45,7 +214,9 @@ public abstract class UIComponent : AdamantiumComponent, IInputComponent
     public static readonly AdamantiumProperty VisibilityProperty = AdamantiumProperty.Register(nameof(Visibility),
         typeof(Visibility), typeof(UIComponent),
         new PropertyMetadata(Visibility.Visible,
-            PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsArrange));
+            PropertyMetadataOptions.BindsTwoWayByDefault | 
+            PropertyMetadataOptions.AffectsMeasure |
+            PropertyMetadataOptions.AffectsRender));
       
     public static readonly AdamantiumProperty IsFocusedProperty =
         AdamantiumProperty.RegisterReadOnly(nameof(IsFocused),
@@ -88,10 +259,8 @@ public abstract class UIComponent : AdamantiumComponent, IInputComponent
     public static readonly AdamantiumProperty UidProperty = AdamantiumProperty.Register(nameof(Uid),
         typeof(String), typeof(UIComponent), new PropertyMetadata(String.Empty));
 
-    public static readonly AdamantiumProperty UseLayoutRoundingProperty = AdamantiumProperty.Register(nameof(UseLayoutRounding),
-        typeof(Boolean), typeof(FrameworkComponent), new PropertyMetadata(false, PropertyMetadataOptions.AffectsArrange));
-
-    public static readonly AdamantiumProperty CursorProperty = AdamantiumProperty.Register(nameof(Cursor), typeof(Cursor), typeof(UIComponent), new PropertyMetadata(Cursor.Default));
+    public static readonly AdamantiumProperty CursorProperty = AdamantiumProperty.Register(nameof(Cursor),
+        typeof(Cursor), typeof(UIComponent), new PropertyMetadata(Cursor.Default));
 
     #endregion
 
@@ -271,8 +440,8 @@ public abstract class UIComponent : AdamantiumComponent, IInputComponent
 
     public event SizeChangedEventHandler SizeChanged
     {
-        add => AddHandler(FrameworkComponent.SizeChangedEvent, value);
-        remove => RemoveHandler(FrameworkComponent.SizeChangedEvent, value);
+        add => AddHandler(MeasurableComponent.SizeChangedEvent, value);
+        remove => RemoveHandler(MeasurableComponent.SizeChangedEvent, value);
     }
 
     public event MouseButtonEventHandler MouseDoubleClick
@@ -510,7 +679,7 @@ public abstract class UIComponent : AdamantiumComponent, IInputComponent
 
 
     #region Properties
-        
+    
     public Vector2 Location
     {
         get => GetValue<Vector2>(LocationProperty);
@@ -593,12 +762,6 @@ public abstract class UIComponent : AdamantiumComponent, IInputComponent
     {
         get => GetValue<Boolean>(IsHitTestVisibleProperty);
         set => SetValue(IsHitTestVisibleProperty, value);
-    }
-
-    public bool UseLayoutRounding
-    {
-        get => GetValue<bool>(UseLayoutRoundingProperty);
-        set => SetValue(UseLayoutRoundingProperty, value);
     }
 
     #endregion
@@ -1071,13 +1234,7 @@ public abstract class UIComponent : AdamantiumComponent, IInputComponent
         IsMouseOver = false;
     }
 
-    public bool IsMeasureValid { get; private set; }
-
-    public bool IsArrangeValid { get; private set; }
-
-    public bool IsGeometryValid { get; private set; }
-
-    public Size DesiredSize { get; private set; }
+    public bool IsGeometryValid { get; protected set; }
 
     public Size RenderSize
     {
@@ -1093,26 +1250,6 @@ public abstract class UIComponent : AdamantiumComponent, IInputComponent
         }
     }
 
-    public void InvalidateMeasure()
-    {
-        var parent = this.GetVisualParent<UIComponent>();
-
-        IsMeasureValid = false;
-        IsArrangeValid = false;
-        IsGeometryValid = false;
-        _previousMeasure = null;
-        _previousArrange = null;
-
-        parent?.InvalidateMeasure();
-    }
-
-    public void InvalidateArrange()
-    {
-        IsArrangeValid = false;
-
-        _previousArrange = null;
-    }
-
     public void InvalidateRender()
     {
         IsGeometryValid = false;
@@ -1123,142 +1260,9 @@ public abstract class UIComponent : AdamantiumComponent, IInputComponent
     /// </summary>
     /// <param name="control">The control.</param>
     /// <returns>True if the control's size can change; otherwise false.</returns>
-    private static bool IsResizable(FrameworkComponent control)
+    private static bool IsResizable(MeasurableComponent control)
     {
         return Double.IsNaN(control.Width) || Double.IsNaN(control.Height);
-    }
-
-    /// <summary>
-    /// The default implementation of the control's measure pass.
-    /// </summary>
-    /// <param name="availableSize">The size available to the control.</param>
-    /// <returns>The desired size for the control.</returns>
-    /// <remarks>
-    /// This method calls <see cref="MeasureOverride(Size)"/> which is probably the method you
-    /// want to override in order to modify a control's arrangement.
-    /// </remarks>
-    protected virtual Size MeasureCore(Size availableSize)
-    {
-        return availableSize;
-    }
-
-    /// <summary>
-    /// Measures the control and its child elements as part of a layout pass.
-    /// </summary>
-    /// <param name="availableSize">The size available to the control.</param>
-    /// <returns>The desired size for the control.</returns>
-    protected virtual Size MeasureOverride(Size availableSize)
-    {
-        double width = 0;
-        double height = 0;
-
-        foreach (var visual in VisualChildren)
-        {
-            var child = (UIComponent)visual;
-            child.Measure(availableSize);
-            width = Math.Max(width, child.DesiredSize.Width);
-            height = Math.Max(height, child.DesiredSize.Height);
-        }
-
-        if (UseLayoutRounding)
-        {
-            width = Math.Ceiling(width);
-            height = Math.Ceiling(height);
-        }
-
-        return new Size(width, height);
-    }
-
-    /// <summary>
-    /// Carries out a measure of the control.
-    /// </summary>
-    /// <param name="availableSize">The available size for the control.</param>
-    /// <param name="force">
-    /// If true, the control will be measured even if <paramref name="availableSize"/> has not
-    /// changed from the last measure.
-    /// </param>
-    public void Measure(Size availableSize, bool force = false)
-    {
-        if (Double.IsNaN(availableSize.Width) || Double.IsNaN(availableSize.Height))
-        {
-            throw new InvalidOperationException("Cannot call Measure using a size with NaN values.");
-        }
-
-        if (force || !IsMeasureValid || _previousMeasure != availableSize)
-        {
-            IsMeasureValid = true;
-            IsArrangeValid = false;
-            IsGeometryValid = false;
-
-            var desiredSize = MeasureCore(availableSize).Constrain(availableSize);
-
-            if (IsInvalidSize(desiredSize))
-            {
-                throw new InvalidOperationException("Invalid size returned for Measure.");
-            }
-
-            DesiredSize = desiredSize;
-            _previousMeasure = DesiredSize;
-
-        }
-    }
-
-    /// <summary>
-    /// Positions child elements as part of a layout pass.
-    /// </summary>
-    /// <param name="finalSize">The size available to the control.</param>
-    /// <returns>The actual size used.</returns>
-    protected virtual Size ArrangeOverride(Size finalSize)
-    {
-        foreach (var visual in VisualChildren)
-        {
-            var child = (UIComponent)visual;
-            child.Arrange(new Rect(finalSize));
-        }
-
-        return finalSize;
-    }
-
-    /// <summary>
-    /// Arranges the control and its children.
-    /// </summary>
-    /// <param name="rect">The control's new bounds.</param>
-    /// <param name="force">
-    /// If true, the control will be arranged even if <paramref name="rect"/> has not changed
-    /// from the last arrange.
-    /// </param>
-    public void Arrange(Rect rect, bool force = false)
-    {
-        if (IsInvalidRect(rect))
-        {
-            throw new InvalidOperationException("Invalid Arrange rectangle.");
-        }
-
-        // If the measure was invalidated during an arrange pass, wait for the measure pass to
-        // be re-run.
-        if (!IsMeasureValid)
-        {
-            return;
-        }
-
-        if (force || !IsArrangeValid || _previousArrange != rect)
-        {
-            IsArrangeValid = true;
-            ArrangeCore(rect);
-            _previousArrange = rect;
-        }
-    }
-
-    /// <summary>
-    /// The default implementation of the control's arrange pass.
-    /// </summary>
-    /// <param name="finalRect">The control's new bounds.</param>
-    /// <remarks>
-    /// This method calls <see cref="ArrangeOverride(Size)"/> which is probably the method you
-    /// want to override in order to modify a control's arrangement.
-    /// </remarks>
-    protected virtual void ArrangeCore(Rect finalRect)
-    {
     }
 
     public void Render(DrawingContext context)
@@ -1275,7 +1279,7 @@ public abstract class UIComponent : AdamantiumComponent, IInputComponent
     /// </summary>
     /// <param name="rect">The rect.</param>
     /// <returns>True if the rect is invalid; otherwise false.</returns>
-    private static bool IsInvalidRect(Rect rect)
+    protected static bool IsInvalidRect(Rect rect)
     {
         return rect.Width < 0 || rect.Height < 0 ||
                Double.IsInfinity(rect.X) || Double.IsInfinity(rect.Y) ||
@@ -1289,7 +1293,7 @@ public abstract class UIComponent : AdamantiumComponent, IInputComponent
     /// </summary>
     /// <param name="size">The size.</param>
     /// <returns>True if the size is invalid; otherwise false.</returns>
-    private static bool IsInvalidSize(Size size)
+    protected static bool IsInvalidSize(Size size)
     {
         return size.Width < 0 || size.Height < 0 ||
                Double.IsInfinity(size.Width) || Double.IsInfinity(size.Height) ||
@@ -1436,14 +1440,13 @@ public abstract class UIComponent : AdamantiumComponent, IInputComponent
         }
     }
 
-
     public IEnumerable<IUIComponent> GetBubbleEventRoute()
     {
         var element = this;
         while (element != null)
         {
             yield return element;
-            element = (UIComponent)element.VisualParent;
+            element = (UIComponent)element.LogicalParent;
         }
     }
 

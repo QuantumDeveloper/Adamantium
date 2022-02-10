@@ -130,9 +130,26 @@ internal class WindowRenderer : IWindowRenderer
         {
             var component = queue.Dequeue();
                 
-            RenderControl(component);
+            RenderVisualTree(component);
 
-            foreach (var visual in component.VisualChildren)
+            foreach (var visual in component.LogicalChildren)
+            {
+                queue.Enqueue(visual as IUIComponent);
+            }
+        }
+    }
+
+    private void RenderVisualTree(IUIComponent component)
+    {
+        var queue = new Queue<IUIComponent>();
+        queue.Enqueue(component);
+        while (queue.Count > 0)
+        {
+            var control = queue.Dequeue();
+                
+            RenderControl(control);
+
+            foreach (var visual in control.VisualChildren)
             {
                 queue.Enqueue(visual);
             }

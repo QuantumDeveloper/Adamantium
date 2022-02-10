@@ -3,7 +3,7 @@ using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI.Controls;
 
-public class Control : FrameworkComponent, IControl
+public class Control : MeasurableComponent, IControl
 {
    private TemplateResult templateResult;
    public Control()
@@ -20,7 +20,7 @@ public class Control : FrameworkComponent, IControl
       new PropertyMetadata(Brushes.Transparent, PropertyMetadataOptions.AffectsRender));
 
    public static readonly AdamantiumProperty TemplateProperty =
-      AdamantiumProperty.Register(nameof(Template), typeof(ControlTemplate), typeof(FrameworkComponent),
+      AdamantiumProperty.Register(nameof(Template), typeof(ControlTemplate), typeof(MeasurableComponent),
          new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender, TemplateChangedCallback));
 
    private static void TemplateChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)

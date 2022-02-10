@@ -9,70 +9,64 @@ using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI;
 
-public abstract class FrameworkComponent : UIComponent, IName, IFrameworkComponent
+public class MeasurableComponent : UIComponent, IName, IMeasurableComponent
 {
-    private FrameworkComponent parent;
-    private TrackingCollection<FrameworkComponent> logicalChildren;
+    private Size? _previousMeasure;
+    private Rect? _previousArrange;
         
-    public FrameworkComponent()
+    public MeasurableComponent()
     { }
 
     public static readonly AdamantiumProperty TagProperty = AdamantiumProperty.Register(nameof(Tag),
-        typeof(object), typeof(FrameworkComponent), new PropertyMetadata(null));
-
-    public static readonly AdamantiumProperty NameProperty = AdamantiumProperty.Register(nameof(Name),
-        typeof(String), typeof(FrameworkComponent), new PropertyMetadata(String.Empty));
+        typeof(object), typeof(MeasurableComponent), new PropertyMetadata(null));
 
     public static readonly AdamantiumProperty WidthProperty = AdamantiumProperty.Register(nameof(Width),
-        typeof(Double), typeof(FrameworkComponent),
+        typeof(Double), typeof(MeasurableComponent),
         new PropertyMetadata(Double.NaN, PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender, WidthChangedCallBack));
 
     public static readonly AdamantiumProperty HeightProperty = AdamantiumProperty.Register(nameof(Height),
-        typeof(Double), typeof(FrameworkComponent),
+        typeof(Double), typeof(MeasurableComponent),
         new PropertyMetadata(Double.NaN, PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender, HeightChangedCallBack));
 
     public static readonly AdamantiumProperty MinWidthProperty = AdamantiumProperty.Register(nameof(MinWidth),
-        typeof(Double), typeof(FrameworkComponent),
+        typeof(Double), typeof(MeasurableComponent),
         new PropertyMetadata((Double)0, PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender));
 
     public static readonly AdamantiumProperty MinHeightProperty = AdamantiumProperty.Register(nameof(MinHeight),
-        typeof(Double), typeof(FrameworkComponent),
+        typeof(Double), typeof(MeasurableComponent),
         new PropertyMetadata((Double)0, PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender));
 
     public static readonly AdamantiumProperty ActualWidthProperty = AdamantiumProperty.RegisterReadOnly(nameof(ActualWidth),
-        typeof(Double), typeof(FrameworkComponent),
+        typeof(Double), typeof(MeasurableComponent),
         new PropertyMetadata((Double)0));
 
     public static readonly AdamantiumProperty ActualHeightProperty = AdamantiumProperty.RegisterReadOnly(nameof(ActualHeight),
-        typeof(Double), typeof(FrameworkComponent),
+        typeof(Double), typeof(MeasurableComponent),
         new PropertyMetadata((Double)0));
 
     public static readonly AdamantiumProperty MaxWidthProperty = AdamantiumProperty.Register(nameof(MaxWidth),
-        typeof(Double), typeof(FrameworkComponent),
+        typeof(Double), typeof(MeasurableComponent),
         new PropertyMetadata(Double.PositiveInfinity, PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender));
 
     public static readonly AdamantiumProperty MaxHeightProperty = AdamantiumProperty.Register(nameof(MaxHeight),
-        typeof(Double), typeof(FrameworkComponent),
+        typeof(Double), typeof(MeasurableComponent),
         new PropertyMetadata(Double.PositiveInfinity, PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender));
 
     public static readonly AdamantiumProperty HorizontalAlignmentProperty = AdamantiumProperty.Register(nameof(HorizontalAlignment),
-        typeof(HorizontalAlignment), typeof(FrameworkComponent), new PropertyMetadata(HorizontalAlignment.Stretch, PropertyMetadataOptions.AffectsArrange));
+        typeof(HorizontalAlignment), typeof(MeasurableComponent), new PropertyMetadata(HorizontalAlignment.Stretch, PropertyMetadataOptions.AffectsArrange));
 
     public static readonly AdamantiumProperty VerticalAlignmentProperty = AdamantiumProperty.Register(nameof(VerticalAlignment),
-        typeof(VerticalAlignment), typeof(FrameworkComponent), new PropertyMetadata(VerticalAlignment.Stretch, PropertyMetadataOptions.AffectsArrange));
+        typeof(VerticalAlignment), typeof(MeasurableComponent), new PropertyMetadata(VerticalAlignment.Stretch, PropertyMetadataOptions.AffectsArrange));
 
     public static readonly AdamantiumProperty MarginProperty = AdamantiumProperty.Register(nameof(Margin),
-        typeof(Thickness), typeof(FrameworkComponent), new PropertyMetadata(default(Thickness), PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange));
+        typeof(Thickness), typeof(MeasurableComponent), new PropertyMetadata(default(Thickness), PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange));
 
-    public static readonly AdamantiumProperty DataContextProperty = AdamantiumProperty.Register(nameof(DataContext),
-        typeof(object), typeof(FrameworkComponent),
-        new PropertyMetadata(null, PropertyMetadataOptions.Inherits, DataContextChangedCallBack));
-
-    
+    public static readonly AdamantiumProperty UseLayoutRoundingProperty = AdamantiumProperty.Register(nameof(UseLayoutRounding),
+        typeof(Boolean), typeof(MeasurableComponent), new PropertyMetadata(false, PropertyMetadataOptions.AffectsArrange));
 
     private static void WidthChangedCallBack(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
     {
-        if (!(adamantiumObject is FrameworkComponent o)) return;
+        if (!(adamantiumObject is MeasurableComponent o)) return;
         Size old = default;
         if (e.OldValue == AdamantiumProperty.UnsetValue)
             return;
@@ -88,7 +82,7 @@ public abstract class FrameworkComponent : UIComponent, IName, IFrameworkCompone
         
     private static void HeightChangedCallBack(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
     {
-        if (!(adamantiumObject is FrameworkComponent o)) return;
+        if (!(adamantiumObject is MeasurableComponent o)) return;
         if (e.OldValue == AdamantiumProperty.UnsetValue)
             return;
             
@@ -98,13 +92,6 @@ public abstract class FrameworkComponent : UIComponent, IName, IFrameworkCompone
         args.RoutedEvent = SizeChangedEvent;
         o?.RaiseEvent(args);
     }
-
-    private static void DataContextChangedCallBack(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
-    {
-        var o = adamantiumObject as FrameworkComponent;
-        o?.DataContextChanged?.Invoke(o, e);
-    }
-
 
     public object DataContext
     {
@@ -178,156 +165,143 @@ public abstract class FrameworkComponent : UIComponent, IName, IFrameworkCompone
         set => SetValue(HorizontalAlignmentProperty, value);
     }
 
-    public String Name
-    {
-        get => GetValue<String>(NameProperty);
-        set => SetValue(NameProperty, value);
-    }
-
     public object Tag
     {
         get => GetValue(TagProperty);
         set => SetValue(TagProperty, value);
     }
-
-    public BindingExpression SetBinding(AdamantiumProperty property, BindingBase bindingBase)
-    {
-        return null;
-    }
-
-    public event AdamantiumPropertyChangedEventHandler DataContextChanged;
-    public IFrameworkComponent Parent => parent;
     
-    public IReadOnlyCollection<FrameworkComponent> LogicalChildrenCollection => LogicalChildren.AsReadOnly();
-
-    protected TrackingCollection<FrameworkComponent> LogicalChildren
+    public bool UseLayoutRounding
     {
-        get
-        {
-            if (logicalChildren == null)
-            {
-                var list = new TrackingCollection<FrameworkComponent>();
-                LogicalChildren = list;
-            }
-            return logicalChildren;
-        }
-        set
-        {
-            if (value == null)
-            {
-                throw new ArgumentNullException(nameof(value));
-            }
-            if (logicalChildren != value)
-            {
-                if (logicalChildren != null)
-                {
-                    logicalChildren.CollectionChanged -= LogicalChildrenCollectionChanged;
-                }
-            }
+        get => GetValue<bool>(UseLayoutRoundingProperty);
+        set => SetValue(UseLayoutRoundingProperty, value);
+    }
+    
+    public bool IsMeasureValid { get; private set; }
 
-            logicalChildren = value;
-            logicalChildren.CollectionChanged += LogicalChildrenCollectionChanged;
+    public bool IsArrangeValid { get; private set; }
+    
+    public Size DesiredSize { get; private set; }
+
+    /// <summary>
+    /// Measures the control and its child elements as part of a layout pass.
+    /// </summary>
+    /// <param name="availableSize">The size available to the control.</param>
+    /// <returns>The desired size for the control.</returns>
+    protected virtual Size MeasureOverride(Size availableSize)
+    {
+        double width = 0;
+        double height = 0;
+
+        foreach (var visual in VisualChildren)
+        {
+            var child = (MeasurableComponent)visual;
+            child.Measure(availableSize);
+            width = Math.Max(width, child.DesiredSize.Width);
+            height = Math.Max(height, child.DesiredSize.Height);
+        }
+        
+        foreach (var visual in LogicalChildren)
+        {
+            var child = (MeasurableComponent)visual;
+            child.Measure(availableSize);
+            width = Math.Max(width, child.DesiredSize.Width);
+            height = Math.Max(height, child.DesiredSize.Height);
         }
 
+        if (UseLayoutRounding)
+        {
+            width = Math.Ceiling(width);
+            height = Math.Ceiling(height);
+        }
+
+        return new Size(width, height);
     }
 
-    private void LogicalChildrenCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+    /// <summary>
+    /// Carries out a measure of the control.
+    /// </summary>
+    /// <param name="availableSize">The available size for the control.</param>
+    /// <param name="force">
+    /// If true, the control will be measured even if <paramref name="availableSize"/> has not
+    /// changed from the last measure.
+    /// </param>
+    public void Measure(Size availableSize, bool force = false)
     {
-        switch (e.Action)
+        if (Double.IsNaN(availableSize.Width) || Double.IsNaN(availableSize.Height))
         {
-            case NotifyCollectionChangedAction.Add:
-                SetLogicalParent(e.NewItems.Cast<FrameworkComponent>());
-                break;
-
-            case NotifyCollectionChangedAction.Remove:
-                ClearLogicalParent(e.OldItems.Cast<FrameworkComponent>());
-                break;
-
-            case NotifyCollectionChangedAction.Replace:
-                ClearLogicalParent(e.OldItems.Cast<FrameworkComponent>());
-                SetLogicalParent(e.NewItems.Cast<FrameworkComponent>());
-                break;
-
-            case NotifyCollectionChangedAction.Reset:
-                throw new NotSupportedException("Reset should not be signalled on LogicalChildren collection");
+            throw new InvalidOperationException("Cannot call Measure using a size with NaN values.");
         }
-    }
 
-    private void SetLogicalParent(IEnumerable<FrameworkComponent> children)
-    {
-        foreach (var element in children)
+        if (force || !IsMeasureValid || _previousMeasure != availableSize)
         {
-            element.SetParent(this);
-        }
-    }
+            IsMeasureValid = true;
+            IsArrangeValid = false;
+            IsGeometryValid = false;
 
-    private void ClearLogicalParent(IEnumerable<FrameworkComponent> children)
-    {
-        foreach (var element in children)
-        {
-            if (element.Parent == this)
+            var desiredSize = MeasureCore(availableSize).Constrain(availableSize);
+
+            if (IsInvalidSize(desiredSize))
             {
-                element.SetParent(null);
+                throw new InvalidOperationException("Invalid size returned for Measure.");
             }
+
+            DesiredSize = desiredSize;
+            _previousMeasure = DesiredSize;
         }
     }
 
     /// <summary>
-    /// Sets the control's logical parent.
+    /// Positions child elements as part of a layout pass.
     /// </summary>
-    /// <param name="parent">The parent.</param>
-    private void SetParent(FrameworkComponent parent)
+    /// <param name="finalSize">The size available to the control.</param>
+    /// <returns>The actual size used.</returns>
+    protected virtual Size ArrangeOverride(Size finalSize)
     {
-        var old = Parent;
-
-        if (parent != old)
+        foreach (var visual in VisualChildren)
         {
-            if (old != null && parent != null)
-            {
-                throw new InvalidOperationException("The Control already has a parent.Parent Element is: " + Parent);
-            }
-
-            InheritanceParent = parent;
-            this.parent = parent;
-
-            /*
-            var root = FindStyleRoot(old);
-
-            if (root != null)
-            {
-               var e = new LogicalTreeAttachmentEventArgs(root);
-               OnDetachedFromLogicalTree(e);
-            }
-
-            root = FindStyleRoot(this);
-
-            if (root != null)
-            {
-               var e = new LogicalTreeAttachmentEventArgs(root);
-               OnAttachedToLogicalTree(e);
-            }
-
-            RaisePropertyChanged(ParentProperty, old, _parent, BindingPriority.LocalValue);
-            */
+            var child = (IMeasurableComponent)visual;
+            child.Arrange(new Rect(finalSize));
         }
+        
+        foreach (var visual in LogicalChildren)
+        {
+            var child = (IMeasurableComponent)visual;
+            child.Arrange(new Rect(finalSize));
+        }
+
+        return finalSize;
     }
 
-
-    protected virtual void OnAttachedToLogicalTree(LogicalTreeAttachmentEventArgs e)
-    { }
-
-    protected virtual void OnDetachedFromLogicalTree(LogicalTreeAttachmentEventArgs e)
-    { }
-
     /// <summary>
-    /// Raised when the control is attached to a rooted logical tree.
+    /// Arranges the control and its children.
     /// </summary>
-    public event EventHandler<LogicalTreeAttachmentEventArgs> AttachedToLogicalTree;
+    /// <param name="rect">The control's new bounds.</param>
+    /// <param name="force">
+    /// If true, the control will be arranged even if <paramref name="rect"/> has not changed
+    /// from the last arrange.
+    /// </param>
+    public void Arrange(Rect rect, bool force = false)
+    {
+        if (IsInvalidRect(rect))
+        {
+            throw new InvalidOperationException("Invalid Arrange rectangle.");
+        }
 
-    /// <summary>
-    /// Raised when the control is detached from a rooted logical tree.
-    /// </summary>
-    public event EventHandler<LogicalTreeAttachmentEventArgs> DetachedFromLogicalTree;
+        // If the measure was invalidated during an arrange pass, wait for the measure pass to
+        // be re-run.
+        if (!IsMeasureValid)
+        {
+            return;
+        }
+
+        if (force || !IsArrangeValid || _previousArrange != rect)
+        {
+            IsArrangeValid = true;
+            ArrangeCore(rect);
+            _previousArrange = rect;
+        }
+    }
 
     /// <summary>
     /// The default implementation of the control's measure pass.
@@ -338,7 +312,7 @@ public abstract class FrameworkComponent : UIComponent, IName, IFrameworkCompone
     /// This method calls <see cref="MeasureOverride(Size)"/> which is probably the method you
     /// want to override in order to modify a control's arrangement.
     /// </remarks>
-    protected sealed override Size MeasureCore(Size availableSize)
+    protected Size MeasureCore(Size availableSize)
     {
         if (Visibility == Visibility.Visible || Visibility == Visibility.Hidden)
         {
@@ -394,7 +368,7 @@ public abstract class FrameworkComponent : UIComponent, IName, IFrameworkCompone
     /// This method calls <see cref="ArrangeOverride(Size)"/> which is probably the method you
     /// want to override in order to modify a control's arrangement.
     /// </remarks>
-    protected sealed override void ArrangeCore(Rect finalRect)
+    protected void ArrangeCore(Rect finalRect)
     {
         if (Visibility == Visibility.Visible || Visibility == Visibility.Hidden)
         {
@@ -521,5 +495,32 @@ public abstract class FrameworkComponent : UIComponent, IName, IFrameworkCompone
             }
         }
     }
-   
+
+    public void InvalidateMeasure()
+    {
+        IsMeasureValid = false;
+        IsArrangeValid = false;
+        IsGeometryValid = false;
+        _previousMeasure = null;
+        _previousArrange = null;
+
+        if (LogicalParent is IMeasurableComponent parent)
+        {
+            parent?.InvalidateMeasure();
+        }
+    }
+
+    public void InvalidateArrange()
+    {
+        IsArrangeValid = false;
+
+        _previousArrange = null;
+
+        if (LogicalParent is IMeasurableComponent parent)
+        {
+            parent?.InvalidateArrange();
+        }
+
+    }
+
 }

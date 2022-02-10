@@ -188,12 +188,12 @@ public class WrapPanel : Panel
 
    }
 
-   private IEnumerable<IUIComponent> GetControlsBetween(int first, int last)
+   private IEnumerable<IMeasurableComponent> GetControlsBetween(int first, int last)
    {
       return Children.Skip(first).Take(last - first);
    }
 
-   private void ArrangeLine(double accumulated, double lineSize, IEnumerable<IUIComponent> controls)
+   private void ArrangeLine(double accumulated, double lineSize, IEnumerable<IMeasurableComponent> controls)
    {
       bool isHorizontal = (Orientation == Orientation.Horizontal);
       double accumulatedY = 0;

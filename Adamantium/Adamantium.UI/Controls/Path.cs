@@ -38,6 +38,7 @@ public class Path : Shape
         if (Data != null)
         {
             Data.RecalculateBounds();
+
             Rect = Data.Bounds;
         }
         return base.MeasureOverride(availableSize);

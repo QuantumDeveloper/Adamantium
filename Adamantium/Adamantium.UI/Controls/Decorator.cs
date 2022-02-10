@@ -2,7 +2,7 @@
 
 namespace Adamantium.UI.Controls;
 
-public abstract class Decorator:FrameworkComponent
+public abstract class Decorator:MeasurableComponent
 {
    public static readonly AdamantiumProperty PaddingProperty = AdamantiumProperty.Register(nameof(Padding),
       typeof (Thickness), typeof (Decorator),
@@ -20,14 +20,12 @@ public abstract class Decorator:FrameworkComponent
       {
          if (e.OldValue != null && e.OldValue != AdamantiumProperty.UnsetValue)
          {
-            o.LogicalChildren.Remove((FrameworkComponent)e.OldValue);
-            o.VisualChildrenCollection.Remove((UIComponent)e.OldValue);
+            o.LogicalChildrenCollection.Remove((MeasurableComponent)e.OldValue);
          }
 
          if (e.NewValue != null)
          {
-            o.LogicalChildren.Add((FrameworkComponent)e.NewValue);
-            o.VisualChildrenCollection.Add((UIComponent)e.NewValue);
+            o.LogicalChildrenCollection.Add((MeasurableComponent)e.NewValue);
          }
       }
    }
@@ -39,9 +37,9 @@ public abstract class Decorator:FrameworkComponent
    }
 
    [Content]
-   public UIComponent Child
+   public IUIComponent Child
    {
-      get => GetValue<UIComponent>(ChildProperty);
+      get => GetValue<IUIComponent>(ChildProperty);
       set => SetValue(ChildProperty, value);
    }
 
@@ -50,10 +48,10 @@ public abstract class Decorator:FrameworkComponent
       var content = Child;
       var padding = Padding;
 
-      if (content != null)
+      if (content is IMeasurableComponent layoutable)
       {
-         content.Measure(availableSize.Deflate(padding));
-         return content.DesiredSize.Inflate(padding);
+         layoutable.Measure(availableSize.Deflate(padding));
+         return layoutable.DesiredSize.Inflate(padding);
       }
       else
       {
@@ -63,7 +61,10 @@ public abstract class Decorator:FrameworkComponent
 
    protected override Size ArrangeOverride(Size finalSize)
    {
-      Child?.Arrange(new Rect(finalSize).Deflate(Padding));
+      if (Child is IMeasurableComponent layoutable)
+      {
+         layoutable.Arrange(new Rect(finalSize).Deflate(Padding));
+      }
       return finalSize;
    }
 }

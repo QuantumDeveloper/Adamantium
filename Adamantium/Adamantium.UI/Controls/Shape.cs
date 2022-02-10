@@ -4,7 +4,7 @@ using Adamantium.UI.Media;
 
 namespace Adamantium.UI.Controls;
 
-public abstract class Shape : FrameworkComponent
+public abstract class Shape : MeasurableComponent
 {
    protected Rect Rect;
      
@@ -144,12 +144,12 @@ public abstract class Shape : FrameworkComponent
          
       if (double.IsNaN(Width) && HorizontalAlignment != HorizontalAlignment.Stretch)
       {
-         desiredSize.Width = shapeSize.Width;
+         desiredSize.Width = shapeSize.Width + Rect.X;
       }
 
       if (double.IsNaN(Height) && VerticalAlignment != VerticalAlignment.Stretch)
       {
-         desiredSize.Height = shapeSize.Height;
+         desiredSize.Height = shapeSize.Height + Rect.Y;
       }
 
       if (!double.IsNaN(Width))

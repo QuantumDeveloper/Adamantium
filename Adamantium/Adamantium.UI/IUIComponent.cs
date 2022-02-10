@@ -7,7 +7,7 @@ using Transform = Adamantium.UI.Media.Transform;
 
 namespace Adamantium.UI;
 
-public interface IUIComponent : IAdamantiumComponent
+public interface IUIComponent : IFundamentalUIComponent
 {
     event MouseButtonEventHandler RawMouseDown;
     event MouseButtonEventHandler RawMouseUp;
@@ -70,11 +70,7 @@ public interface IUIComponent : IAdamantiumComponent
     String Uid { get; }
     Boolean IsFocused { get; }
     Boolean IsHitTestVisible { get; set; }
-    bool UseLayoutRounding { get; set; }
-    bool IsMeasureValid { get; }
-    bool IsArrangeValid { get; }
     bool IsGeometryValid { get; }
-    Size DesiredSize { get; }
     Size RenderSize { get; set; }
     Vector2 Location { get; set; }
     Visibility Visibility { get; set; }
@@ -94,29 +90,7 @@ public interface IUIComponent : IAdamantiumComponent
         
     IReadOnlyCollection<IUIComponent> VisualChildren { get; }
 
-    void InvalidateMeasure();
-    void InvalidateArrange();
     void InvalidateRender();
-
-    /// <summary>
-    /// Carries out a measure of the control.
-    /// </summary>
-    /// <param name="availableSize">The available size for the control.</param>
-    /// <param name="force">
-    /// If true, the control will be measured even if <paramref name="availableSize"/> has not
-    /// changed from the last measure.
-    /// </param>
-    void Measure(Size availableSize, bool force = false);
-
-    /// <summary>
-    /// Arranges the control and its children.
-    /// </summary>
-    /// <param name="rect">The control's new bounds.</param>
-    /// <param name="force">
-    /// If true, the control will be arranged even if <paramref name="rect"/> has not changed
-    /// from the last arrange.
-    /// </param>
-    void Arrange(Rect rect, bool force = false);
 
     void Render(DrawingContext context);
     void AddHandler(RoutedEvent routedEvent, Delegate handler, bool handledEventsToo = false);

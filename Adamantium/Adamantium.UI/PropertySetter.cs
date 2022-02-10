@@ -29,7 +29,7 @@ public class PropertySetter : ISetter, IEquatable<PropertySetter>
       }
       else
       {
-         if (control is IFrameworkComponent component)
+         if (control is IUIComponent component)
          {
             component.SetBinding(Property, binding);
          }

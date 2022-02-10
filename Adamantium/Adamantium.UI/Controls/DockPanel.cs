@@ -82,7 +82,7 @@ public class DockPanel:Panel
             Math.Max(0.0, finalSize.Height - top - bottom));
 
          //Trim the remaining Rect to the docked size of the element
-         //(unless the element should fill the remaning space because of LastChildFill)
+         //(unless the element should fill the remaining space because of LastChildFill)
          if (index < dockedCount)
          {
             Size desiredSize = child.DesiredSize;
