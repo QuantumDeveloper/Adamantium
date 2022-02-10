@@ -30,16 +30,4 @@ public abstract class BezierCurveBase : Shape
         get => GetValue<Vector2>(EndPointProperty); 
         set => SetValue(EndPointProperty, value);
     }
-    
-    protected double CalculatePointsLength(Vector2[] points)
-    {
-        double cumulativeLength = 0;
-        for (int i = 0; i < points.Length - 1; i++)
-        {
-            var vector = points[i + 1] - points[i];
-            cumulativeLength += vector.Length();
-        }
-
-        return cumulativeLength / points.Length;
-    }
 }
