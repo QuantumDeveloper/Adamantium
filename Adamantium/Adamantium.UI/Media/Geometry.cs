@@ -1,5 +1,6 @@
 ﻿using System;
 using Adamantium.Engine.Core.Models;
+using Adamantium.Engine.Graphics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.RoutedEvents;
 
@@ -73,11 +74,11 @@ public abstract class Geometry : AdamantiumComponent
 
    public abstract void RecalculateBounds();
 
-   public void ProcessGeometry()
+   public void ProcessGeometry(GeometryType geometryType)
    {
       if (!IsProcessed)
       {
-         ProcessGeometryCore();
+         ProcessGeometryCore(geometryType);
          if (Transform != null)
          {
             var matrix = Transform.Matrix;
@@ -93,7 +94,7 @@ public abstract class Geometry : AdamantiumComponent
       IsProcessed = false;
    }
    
-   protected internal abstract void ProcessGeometryCore();
+   protected internal abstract void ProcessGeometryCore(GeometryType geometryType);
 
    protected override void OnComponentUpdated()
    {

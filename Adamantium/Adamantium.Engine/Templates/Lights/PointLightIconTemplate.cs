@@ -103,11 +103,11 @@ namespace Adamantium.Engine.Templates.Lights
             MeshContour base1    = new MeshContour(bulbBasePoints4) { Name = "Base_4" };
 
             Polygon polygon = new Polygon();
-            polygon.AddItems(base1, base2, base3, bulbBase, bulb);
+            polygon.AddContours(base1, base2, base3, bulbBase, bulb);
 
             polygon.FillRule = FillRule.NonZero;
             Stopwatch timer = Stopwatch.StartNew();
-            var triangulatedList = polygon.Fill();
+            var triangulatedList = polygon.FillIndirect();
             timer.Stop();
             var pointLightIcon = new Mesh();
             pointLightIcon.MeshTopology = PrimitiveType.TriangleList;

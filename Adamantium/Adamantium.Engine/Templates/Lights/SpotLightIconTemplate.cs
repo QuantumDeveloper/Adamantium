@@ -43,8 +43,8 @@ namespace Adamantium.Engine.Templates.Lights
 
             var item = new MeshContour(points);
             var polygon = new Polygon();
-            polygon.AddItem(item);
-            var triangulatedList = polygon.Fill();
+            polygon.AddContour(item);
+            var triangulatedList = polygon.FillIndirect();
             var spotLightIcon = new Mesh();
             spotLightIcon.MeshTopology = PrimitiveType.TriangleList;
             spotLightIcon.SetPoints(triangulatedList);

@@ -34,11 +34,24 @@ namespace Adamantium.UI.Playground
             polygon.Points.Add(new Vector2(30, 190));
             polygon.Points.Add(new Vector2(100, 10));
             polygon.Points.Add(new Vector2(170, 190));
+            
+            polygon.Points.Add(new Vector2(270, 190));
+            polygon.Points.Add(new Vector2(270, 270));
+            polygon.Points.Add(new Vector2(170, 270));
+            polygon.Points.Add(new Vector2(170, 190));
+            
+            polygon.Points.Add(new Vector2(10, 80));
+            polygon.Points.Add(new Vector2(190, 80));
+            polygon.Points.Add(new Vector2(290, 80));
+            polygon.Points.Add(new Vector2(290, 120));
+            polygon.Points.Add(new Vector2(190, 120));
+            polygon.Points.Add(new Vector2(190, 80));
+            
             polygon.Fill = Brushes.Red;
-            polygon.FillRule = FillRule.NonZero;
+            polygon.FillRule = FillRule.EvenOdd;
             polygon.HorizontalAlignment = HorizontalAlignment.Left;
             polygon.ClipToBounds = false;
-            polygon.StrokeThickness = 0;
+            polygon.StrokeThickness = 2;
             polygon.Stroke = Brushes.Black;
             polygon.StrokeDashArray = new TrackingCollection<double>() { 20, 10, 10, 10, 4, 20 };
 
@@ -113,7 +126,27 @@ namespace Adamantium.UI.Playground
             combinedGeometry2.Geometry1 = combinedGeometry;
             combinedGeometry2.Geometry2 = rectangleGeometry;
             
+            
             path.Data = combinedGeometry;
+
+
+            var gGroup = new GeometryGroup();
+
+            gGroup.FillRule = FillRule.EvenOdd;
+            
+            innerCombinedGeometry.GeometryCombineMode = GeometryCombineMode.Exclude;
+            innerCombinedGeometry.Geometry1 = new RectangleGeometry(new Rect(0, 0, 250, 150));
+            innerCombinedGeometry.Geometry2 = new RectangleGeometry(new Rect(50, 25, 150, 100));
+            
+            rectangleGeometry = new RectangleGeometry(new Rect(45, 20, 50, 50));
+            
+            gGroup.Children.Add(innerCombinedGeometry);
+            gGroup.Children.Add(rectangleGeometry);
+
+            path.Data = gGroup;
+
+            path.HorizontalAlignment = HorizontalAlignment.Left;
+            
             //path.Data = polygonGeometry;
             
             //var xamlIcon = "M3,4H17V8H20L23,12V17H21A3,3 0 0,1 18,20A3,3 0 0,1 15,17H9A3,3 0 0,1 6,20A3,3 0 0,1 3,17H1V6C1,4.89 1.9,4 3,4M17,9.5V12H21.47L19.5,9.5H17M6,15.5A1.5,1.5 0 0,0 4.5,17A1.5,1.5 0 0,0 6,18.5A1.5,1.5 0 0,0 7.5,17A1.5,1.5 0 0,0 6,15.5M18,15.5A1.5,1.5 0 0,0 16.5,17A1.5,1.5 0 0,0 18,18.5A1.5,1.5 0 0,0 19.5,17A1.5,1.5 0 0,0 18,15.5M8,14L14,8L12.59,6.58L8,11.17L5.91,9.08L4.5,10.5L8,14Z";
@@ -130,8 +163,8 @@ namespace Adamantium.UI.Playground
             //path.StrokeDashArray = new TrackingCollection<double>() { 5 };
 
             grid.Background = Brushes.White;
-            grid.Children.Add(polygon);
-            grid.Children.Add(border);
+            //grid.Children.Add(polygon);
+            //grid.Children.Add(border);
             grid.Children.Add(path);
 
             var rect = new Rectangle();

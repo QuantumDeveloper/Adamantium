@@ -16,7 +16,17 @@ public class GeometryIntersection
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(Coordinates.X, Coordinates.Y);
+        return Coordinates.GetHashCode();
+    }
+
+    public override bool Equals(object? obj)
+    {
+        if (obj is GeometryIntersection point)
+        {
+            return Coordinates == point.Coordinates;
+        }
+
+        return false;
     }
 
     public override string ToString()
