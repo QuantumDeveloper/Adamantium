@@ -80,7 +80,7 @@ public sealed class EllipseGeometry : Geometry
       StopAngle = stopAngle;
    }
 
-   private void CreateEllipse(Rect rect, Double startAngle = 0, Double stopAngle = 360)
+   private void CreateEllipse(Rect rect, GeometryType geometryType, Double startAngle = 0, Double stopAngle = 360)
    {
       bounds = rect;
       RadiusX = rect.Width / 2;
@@ -92,7 +92,7 @@ public sealed class EllipseGeometry : Geometry
       var translation = Matrix4x4.Translation(Center.X, Center.Y, 0);
          
       Mesh = Shapes.Ellipse.GenerateGeometry(
-         GeometryType.Both, 
+         geometryType, 
          EllipseType.Sector,
          new Vector2(rect.Width, rect.Height), 
          StartAngle, 
@@ -117,8 +117,8 @@ public sealed class EllipseGeometry : Geometry
       }
    }
 
-   protected internal override void ProcessGeometryCore()
+   protected internal override void ProcessGeometryCore(GeometryType geometryType)
    {
-      CreateEllipse(Bounds, StartAngle, StopAngle);
+      CreateEllipse(Bounds, geometryType, StartAngle, StopAngle);
    }
 }

@@ -122,8 +122,9 @@ public class MeshContour
                 {
                     pointsHashSet.Add(end);
                     GeometryPoints.Add(end);
-                    updatedPoints.Add(end.Coordinates);
                 }
+                
+                updatedPoints.Add(end.Coordinates);
             }
         }
         

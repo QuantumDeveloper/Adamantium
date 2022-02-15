@@ -39,8 +39,8 @@ namespace Adamantium.Engine.Templates.CameraTemplates
             var ell2 = ellipse2.GetContour(0);
             var lens = new MeshContour(lensPoints);
             polygon.FillRule = FillRule.NonZero;
-            polygon.AddItems(cameraBase, ell1,ell2,lens);
-            var result = polygon.Fill();
+            polygon.AddContours(cameraBase, ell1,ell2,lens);
+            var result = polygon.FillIndirect();
 
             Mesh mesh = new Mesh();
             mesh.SetPoints(result);

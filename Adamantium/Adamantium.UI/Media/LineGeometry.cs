@@ -1,4 +1,5 @@
 ﻿using System;
+using Adamantium.Engine.Graphics;
 
 namespace Adamantium.UI.Media;
 
@@ -54,7 +55,7 @@ public class LineGeometry : Geometry
       throw new NotImplementedException();
    }
 
-   protected internal override void ProcessGeometryCore()
+   protected internal override void ProcessGeometryCore(GeometryType geometryType)
    {
       CreateLine();
    }

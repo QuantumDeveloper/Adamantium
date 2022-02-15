@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Engine.Core.Models;
+using Adamantium.Engine.Graphics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.RoutedEvents;
 using Polygon = Adamantium.Mathematics.Polygon;
@@ -107,10 +108,10 @@ public class CombinedGeometry : Geometry
         bounds = rect;
     }
 
-    protected internal override void ProcessGeometryCore()
+    protected internal override void ProcessGeometryCore(GeometryType geometryType)
     {
-        Geometry1?.ProcessGeometry();
-        Geometry2?.ProcessGeometry();
+        Geometry1?.ProcessGeometry(GeometryType.Outlined);
+        Geometry2?.ProcessGeometry(GeometryType.Outlined);
 
         Mesh.Clear();
 
@@ -126,10 +127,14 @@ public class CombinedGeometry : Geometry
 
             foreach (var contour in Mesh.Contours)
             {
-                xorPolygon.AddItem(contour.Copy());
+                xorPolygon.AddContour(contour.Copy());
             }
 
-            var xorTriangulated = xorPolygon.Fill();
+            var xorTriangulated = xorPolygon.FillIndirect(geometryType != GeometryType.Outlined);
+
+            // Triangulate only if geometry type is not Outlined
+            if (geometryType == GeometryType.Outlined) return;
+
             Mesh.SetPoints(xorTriangulated);
 
             return;
@@ -219,6 +224,9 @@ public class CombinedGeometry : Geometry
                 Mesh.AddContour(strokeContour);
             }
 
+            // Triangulate only if geometry type is not Outlined
+            if (geometryType == GeometryType.Outlined) return;
+
             if (onePointJointCase)
             {
                 allSegmentsDict = allSegments.ToDictionary(x => x);
@@ -251,25 +259,30 @@ public class CombinedGeometry : Geometry
         }
         else
         {
-            var polygon = new Polygon(FillRule.NonZero);
-            
             foreach (var contour1 in OutlineMesh1.Contours)
             {
-                polygon.AddItem(contour1.Copy());
                 Mesh.AddContour(contour1);
             }
             
             foreach (var contour2 in OutlineMesh2.Contours)
             {
-                polygon.AddItem(contour2.Copy());
                 Mesh.AddContour(contour2);
             }
+
+            // Triangulate only if geometry type is not Outlined
+            if (geometryType == GeometryType.Outlined) return;
+
+            var mergedContourPoints = Mesh.MergeGeometryContourPoints();
+            var mergedContourSegments = Mesh.MergeContourSegments();
+
+            var polygon = new Polygon(FillRule.NonZero);
             
-            var triangulated = polygon.Fill();
+            var triangulated = polygon.FillDirect(mergedContourPoints, mergedContourSegments);
             Mesh.SetPoints(triangulated);
         }
     }
 
+    // Triangulator needs to maintain segment-intersection-segment connection, so we deal with one point join case as with single contour
     private List<GeometrySegment> FormTriangulatorContours(Dictionary<GeometrySegment, GeometrySegment> mergedSegments)
     {
         var triangulatorSegments = new List<GeometrySegment>();
@@ -296,6 +309,7 @@ public class CombinedGeometry : Geometry
         return triangulatorSegments;
     }
 
+    // We cannot provide one point join case as single contour for stroke generating, so we split for two separate contours with one of the corners connected only visually, not logically
     private List<List<GeometrySegment>> FormStrokeContours(Dictionary<GeometrySegment, GeometrySegment> mergedSegments, out bool onePointJointCase)
     {
         var strokeContours = new List<List<GeometrySegment>>();

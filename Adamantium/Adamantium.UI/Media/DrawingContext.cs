@@ -51,7 +51,7 @@ public class DrawingContext
       if (pen != null && pen.Thickness > 0.0)
       {
          strokeGeometry = new StrokeGeometry(pen, rectangle);
-         strokeGeometry.ProcessGeometry();
+         strokeGeometry.ProcessGeometry(GeometryType.Solid);
       }
 
       var presentationItem = new UIPresentationItem();
@@ -71,12 +71,12 @@ public class DrawingContext
    public void DrawEllipse(Rect destinationRect, Brush brush, Double startAngle, Double stopAngle, Pen pen = null)
    {
       var ellipse = new EllipseGeometry(destinationRect, startAngle, stopAngle);
-      ellipse.ProcessGeometry();
+      ellipse.ProcessGeometry(GeometryType.Both);
       StrokeGeometry strokeGeometry = null;
       if (pen != null && pen.Thickness > 0.0)
       {
          strokeGeometry = new StrokeGeometry(pen, ellipse);
-         strokeGeometry.ProcessGeometry();
+         strokeGeometry.ProcessGeometry(GeometryType.Solid);
       }
 
       var presentationItem = new UIPresentationItem();
@@ -96,12 +96,12 @@ public class DrawingContext
    public void DrawRectangle(Brush brush, Rect rect, CornerRadius corners, Pen pen = null)
    {
       var rectangle = new RectangleGeometry(rect, corners);
-      rectangle.ProcessGeometry();
+      rectangle.ProcessGeometry(GeometryType.Both);
       StrokeGeometry strokeGeometry = null;
       if (pen != null && pen.Thickness > 0.0)
       {
          strokeGeometry = new StrokeGeometry(pen, rectangle);
-         strokeGeometry.ProcessGeometry();
+         strokeGeometry.ProcessGeometry(GeometryType.Solid);
       }
 
       var presentationItem = new UIPresentationItem();
@@ -121,12 +121,12 @@ public class DrawingContext
    {
       if (geometry == null) return;
       
-      geometry.ProcessGeometry();
+      geometry.ProcessGeometry(GeometryType.Both);
       StrokeGeometry strokeGeometry = null;
       if (pen != null && pen.Thickness > 0.0)
       {
          strokeGeometry = new StrokeGeometry(pen, geometry);
-         strokeGeometry.ProcessGeometry();
+         strokeGeometry.ProcessGeometry(GeometryType.Solid);
       }
 
       var presentationItem = new UIPresentationItem();
@@ -148,13 +148,13 @@ public class DrawingContext
    public void DrawLine(Vector2 start, Vector2 end, Pen pen)
    {
       var geometry = new LineGeometry(start, end);
-      geometry.ProcessGeometry();
+      geometry.ProcessGeometry(GeometryType.Both);
          
       StrokeGeometry strokeGeometry = null;
       if (pen != null && pen.Thickness > 0.0)
       {
          strokeGeometry = new StrokeGeometry(pen, geometry);
-         strokeGeometry.ProcessGeometry();
+         strokeGeometry.ProcessGeometry(GeometryType.Solid);
       }
 
       var presentationItem = new UIPresentationItem();

@@ -98,6 +98,21 @@ public class GeometrySegment
         return SegmentEnds[0] == end ? SegmentEnds[1] : SegmentEnds[0];
     }
 
+    public override int GetHashCode()
+    {
+        return Start.GetHashCode() ^ End.GetHashCode();
+    }
+
+    public override bool Equals(object? obj)
+    {
+        if (obj is GeometrySegment segment)
+        {
+            return IsEqualTo(segment);
+        }
+
+        return false;
+    }
+
     public bool IsEqualTo(GeometrySegment other)
     {
         return ((Start == other.Start && End == other.End) ||
