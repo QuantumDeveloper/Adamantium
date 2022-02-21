@@ -18,7 +18,7 @@ namespace Adamantium.MathTests
             points.Add(new Vector2(-15, 15));
             points.Add(new Vector2(15, 15));
 
-            polygon.AddItem(new MeshContour(points));
+            polygon.AddContour(new MeshContour(points));
 
             var points2 = new List<Vector2>();
 
@@ -27,16 +27,16 @@ namespace Adamantium.MathTests
             points2.Add(new Vector2(2, 10));
             points2.Add(new Vector2(-6, 10));
 
-            polygon.AddItem(new MeshContour(points2));
+            polygon.AddContour(new MeshContour(points2));
 
             points2.Clear();
             points2.Add(new Vector2(-2, 22));
             points2.Add(new Vector2(2, 22));
             points2.Add(new Vector2(2, 10));
             points2.Add(new Vector2(-2, 10));
-            polygon.AddItem(new MeshContour(points2));
+            polygon.AddContour(new MeshContour(points2));
 
-            var triangles = polygon.Fill();
+            var triangles = polygon.FillIndirect();
 
             Assert.AreEqual(84, triangles.Count);
 
@@ -158,7 +158,7 @@ namespace Adamantium.MathTests
             points.Add(new Vector2(-15, 15));
             points.Add(new Vector2(15, 15));
 
-            polygon.AddItem(new MeshContour(points));
+            polygon.AddContour(new MeshContour(points));
 
             var points2 = new List<Vector2>();
 
@@ -167,16 +167,16 @@ namespace Adamantium.MathTests
             points2.Add(new Vector2(2, 10));
             points2.Add(new Vector2(-6, 10));
 
-            polygon.AddItem(new MeshContour(points2));
+            polygon.AddContour(new MeshContour(points2));
 
             points2.Clear();
             points2.Add(new Vector2(-2, 22));
             points2.Add(new Vector2(2, 22));
             points2.Add(new Vector2(2, 10f));
             points2.Add(new Vector2(-2, 10f));
-            polygon.AddItem(new MeshContour(points2));
+            polygon.AddContour(new MeshContour(points2));
 
-            var triangles = polygon.Fill();
+            var triangles = polygon.FillIndirect();
 
             Assert.AreEqual(138, triangles.Count);
 
@@ -345,9 +345,9 @@ namespace Adamantium.MathTests
             points.Add(new Vector2(-15, -15));
             points.Add(new Vector2(15, -15));
 
-            polygon.AddItem(new MeshContour(points));
+            polygon.AddContour(new MeshContour(points));
 
-            var triangles = polygon.Fill();
+            var triangles = polygon.FillIndirect();
 
             Assert.AreEqual(96, triangles.Count);
 
@@ -472,9 +472,9 @@ namespace Adamantium.MathTests
             points.Add(new Vector2(-15, -15));
             points.Add(new Vector2(15, -15));
 
-            polygon.AddItem(new MeshContour(points));
+            polygon.AddContour(new MeshContour(points));
 
-            var triangles = polygon.Fill();
+            var triangles = polygon.FillIndirect();
 
             Assert.AreEqual(108, triangles.Count);
 

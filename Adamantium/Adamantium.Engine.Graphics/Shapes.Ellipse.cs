@@ -42,7 +42,7 @@ namespace Adamantium.Engine.Graphics
                     stopAngle = startAngle + 360;
                 }
 
-                Mesh mesh;
+                Mesh mesh = null;
 
                 switch (geometryType)
                 {
@@ -59,12 +59,12 @@ namespace Adamantium.Engine.Graphics
                         mesh.SetPoints(vertices).SetTopology(PrimitiveType.LineStrip).GenerateBasicIndices();
                         break;
                     }
-                    default:
+                    case GeometryType.Outlined:
                     {
-                        var vertices = GenerateOutlinedGeometry(ellipseType, diameter, startAngle, stopAngle,
+                        var contour = GenerateOutlinedGeometry(ellipseType, diameter, startAngle, stopAngle,
                             isClockWise, tessellation, transform);
                         mesh = new Mesh();
-                        mesh.SetPoints(vertices).SetTopology(PrimitiveType.LineStrip).GenerateBasicIndices();
+                        mesh.AddContour(contour, true);
                         break;
                     }
                 }
@@ -133,8 +133,8 @@ namespace Adamantium.Engine.Graphics
                 }
 
                 var polygon = new Mathematics.Polygon();
-                polygon.AddItem(new MeshContour(vertices));
-                var points = polygon.Fill();
+                polygon.AddContour(new MeshContour(vertices));
+                var points = polygon.FillIndirect();
 
                 for (int i = 0; i < points.Count; ++i)
                 {
@@ -211,8 +211,8 @@ namespace Adamantium.Engine.Graphics
             private static List<Vector3> Triangulate(List<Vector3> vertices)
             {
                 var polygon = new Mathematics.Polygon();
-                polygon.AddItem(new MeshContour(vertices));
-                var points = polygon.Fill();
+                polygon.AddContour(new MeshContour(vertices));
+                var points = polygon.FillIndirect();
                 return points;
             }
         }

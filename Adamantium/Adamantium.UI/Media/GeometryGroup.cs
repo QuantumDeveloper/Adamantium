@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Collections.Specialized;
+using Adamantium.Engine.Graphics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.RoutedEvents;
 using Polygon = Adamantium.Mathematics.Polygon;
@@ -36,7 +37,7 @@ public class GeometryGroup : Geometry
 
     public GeometryGroup()
     {
-        
+        Children = new GeometryCollection();
     }
 
     public FillRule FillRule
@@ -84,26 +85,46 @@ public class GeometryGroup : Geometry
         bounds = Rect.FromPoints(points);
     }
 
-    protected internal override void ProcessGeometryCore()
+    protected internal override void ProcessGeometryCore(GeometryType geometryType)
     {
         if (Children.Count == 0) return;
 
         var polygon = new Polygon(FillRule);
-        foreach (var child in Children)
+
+        if (FillRule == FillRule.EvenOdd)
         {
-            if (child is CombinedGeometry { IsProcessed: false } combined)
+            foreach (var child in Children)
             {
-                combined.ProcessGeometry();
-            }
+                child.ProcessGeometry(GeometryType.Outlined);
             
-            foreach (var meshContour in child.Mesh.Contours)
+                foreach (var meshContour in child.Mesh.Contours)
+                {
+                    if (meshContour.IsGeometryClosed) polygon.AddContour(meshContour);
+                    Mesh.AddContour(meshContour.Points, meshContour.IsGeometryClosed);
+                }
+            }
+        }
+        else
+        {
+            foreach (var child in Children)
             {
-                polygon.AddItem(meshContour);
-                Mesh.AddContour(meshContour.Points, meshContour.IsGeometryClosed);
+                child.ProcessGeometry(GeometryType.Outlined);
+
+                var newContainer = true;
+            
+                foreach (var meshContour in child.Mesh.Contours)
+                {
+                    if (meshContour.IsGeometryClosed)
+                    {
+                        polygon.AddContour(meshContour, newContainer);
+                        newContainer = false;
+                    }
+                    Mesh.AddContour(meshContour.Points, meshContour.IsGeometryClosed);
+                }
             }
         }
 
-        var points = polygon.Fill();
+        var points = polygon.FillIndirect();
         Mesh.SetPoints(points);
     }
 }

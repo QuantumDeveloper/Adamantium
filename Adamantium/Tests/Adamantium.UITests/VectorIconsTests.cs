@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using Adamantium.Engine.Graphics;
 using Adamantium.UI.Media;
 using NUnit.Framework;
 
@@ -27,7 +28,7 @@ public class VectorIconsTests
         for (int i = 0; i < 1000; ++i)
         {
             var geometry = Geometry.Parse(xamlString);
-            geometry.ProcessGeometry();
+            geometry.ProcessGeometry(GeometryType.Solid);
         }
 
         timer.Stop();
