@@ -101,8 +101,5 @@ public abstract class Geometry : AdamantiumComponent
       InvalidateGeometry();
    }
 
-   public static Geometry Parse(string xamlString)
-   {
-      return new SVGParser().Parse(xamlString);
-   }
+   public static Geometry Parse(string xamlString) => new SVGParser().Parse(xamlString); 
 }

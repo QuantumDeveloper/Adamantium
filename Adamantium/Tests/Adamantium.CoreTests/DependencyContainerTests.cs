@@ -11,7 +11,7 @@ namespace Adamantium.CoreTests
         [SetUp]
         public void Setup()
         {
-            container = new AdamantiumServiceLocator();
+            container = new AdamantiumDependencyResolver();
             container.Register<IContactsService, ContactsService>();
             container.Register<ICommonService, CommonService>();
             container.Register<IItemsApi, ItemsApi>();
@@ -31,7 +31,7 @@ namespace Adamantium.CoreTests
         [Test]
         public void SingletonTest()
         {
-            container = new AdamantiumServiceLocator();
+            container = new AdamantiumDependencyResolver();
             container.Register<IContactsService, ContactsService>();
             container.RegisterSingleton<ICommonService, CommonService>();
             container.Register<IItemsApi, ItemsApi>();
@@ -50,7 +50,7 @@ namespace Adamantium.CoreTests
         [Test]
         public void SingletonItemsApiTest()
         {
-            container = new AdamantiumServiceLocator();
+            container = new AdamantiumDependencyResolver();
             container.Register<IContactsService, ContactsService>();
             container.Register<ICommonService, CommonService>();
             container.RegisterSingleton<IItemsApi, ItemsApi>();
@@ -66,7 +66,7 @@ namespace Adamantium.CoreTests
         [Test]
         public void NamedInstancesTest()
         {
-            container = new AdamantiumServiceLocator();
+            container = new AdamantiumDependencyResolver();
             container.RegisterInstance<INamingService>(new NamingService("ContactsService1"), "ContactsService1");
             container.RegisterInstance<INamingService>(new NamingService("ContactsService2"), "ContactsService2");
 
@@ -79,7 +79,7 @@ namespace Adamantium.CoreTests
         [Test]
         public void UnnamedInstancesTest()
         {
-            container = new AdamantiumServiceLocator();
+            container = new AdamantiumDependencyResolver();
             container.RegisterInstance<INamingService>(new NamingService(""));
             container.RegisterInstance<INamingService>(new NamingService("ContactsService2"), "ContactsService2");
 

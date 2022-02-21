@@ -660,8 +660,7 @@ namespace Adamantium.Mathematics
         /// <returns>The premultiplied result.</returns>
         public static Color Premultiply(Color value)
         {
-            Color result;
-            Premultiply(ref value, out result);
+            Premultiply(ref value, out var result);
             return result;
         }
 
@@ -782,8 +781,7 @@ namespace Adamantium.Mathematics
         /// <returns>The clamped value.</returns>
         public static Color Clamp(Color value, Color min, Color max)
         {
-            Color result;
-            Clamp(ref value, ref min, ref max, out result);
+            Clamp(ref value, ref min, ref max, out var result);
             return result;
         }
 
@@ -817,8 +815,7 @@ namespace Adamantium.Mathematics
         /// </remarks>
         public static Color Lerp(Color start, Color end, float amount)
         {
-            Color result;
-            Lerp(ref start, ref end, amount, out result);
+            Lerp(ref start, ref end, amount, out var result);
             return result;
         }
 
@@ -844,8 +841,7 @@ namespace Adamantium.Mathematics
         /// <returns>The cubic interpolation of the two colors.</returns>
         public static Color SmoothStep(Color start, Color end, float amount)
         {
-            Color result;
-            SmoothStep(ref start, ref end, amount, out result);
+            SmoothStep(ref start, ref end, amount, out var result);
             return result;
         }
 
@@ -871,8 +867,7 @@ namespace Adamantium.Mathematics
         /// <returns>A color containing the largest components of the source colors.</returns>
         public static Color Max(Color left, Color right)
         {
-            Color result;
-            Max(ref left, ref right, out result);
+            Max(ref left, ref right, out var result);
             return result;
         }
 
@@ -898,8 +893,7 @@ namespace Adamantium.Mathematics
         /// <returns>A color containing the smallest components of the source colors.</returns>
         public static Color Min(Color left, Color right)
         {
-            Color result;
-            Min(ref left, ref right, out result);
+            Min(ref left, ref right, out var result);
             return result;
         }
 

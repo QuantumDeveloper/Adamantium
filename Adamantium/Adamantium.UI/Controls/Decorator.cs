@@ -50,23 +50,21 @@ public abstract class Decorator:MeasurableComponent
       var content = Child;
       var padding = Padding;
 
-      if (content is IMeasurableComponent layoutable)
+      if (content is IMeasurableComponent measurable)
       {
-         layoutable.Measure(availableSize.Deflate(padding));
-         return layoutable.DesiredSize.Inflate(padding);
+         measurable.Measure(availableSize.Deflate(padding));
+         return measurable.DesiredSize.Inflate(padding);
       }
-      else
-      {
-         return new Size(padding.Left + padding.Right, padding.Bottom + padding.Top);
-      }
+
+      return new Size(padding.Left + padding.Right, padding.Bottom + padding.Top);
    }
 
    protected override Size ArrangeOverride(Size finalSize)
    {
-      if (Child is IMeasurableComponent layoutable)
+      if (Child is IMeasurableComponent measurable)
       {
-         layoutable.Arrange(new Rect(finalSize).Deflate(Padding));
+         measurable.Arrange(new Rect(finalSize).Deflate(Padding));
       }
-      return finalSize;
+      return Child.Bounds.Size;
    }
 }

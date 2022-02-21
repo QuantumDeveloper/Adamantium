@@ -17,13 +17,24 @@ public sealed class Dispatcher : IDispatcher
     private static object collectionLocker = new object();
     private static Dictionary<DispatcherContext, Dispatcher> dispatchers;
         
-    public static Dispatcher CurrentDispatcher { get; }
+    public static Dispatcher CurrentDispatcher { get; private set; }
+    
+    public static bool Initialized { get; private set; }
         
     static Dispatcher()
     {
+        Initialize();
+    }
+
+    internal static void Initialize()
+    {
+        if (Initialized) return;
+        
         dispatchers = new Dictionary<DispatcherContext, Dispatcher>();
-        CurrentDispatcher = new Dispatcher(AdamantiumServiceLocator.Current.Resolve<IApplicationPlatform>());
+        CurrentDispatcher = new Dispatcher(AdamantiumDependencyResolver.Current.Resolve<IApplicationPlatform>());
         SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(CurrentDispatcher));
+        
+        Initialized = true;
     }
 
     private void SetContext()

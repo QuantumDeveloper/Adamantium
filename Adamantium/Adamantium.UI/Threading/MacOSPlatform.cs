@@ -39,6 +39,6 @@ internal class MacOSPlatform : IApplicationPlatform
 
     public static void Initialize()
     {
-        AdamantiumServiceLocator.Current.RegisterSingleton<IApplicationPlatform, MacOSPlatform>();
+        AdamantiumDependencyResolver.Current.RegisterSingleton<IApplicationPlatform, MacOSPlatform>();
     }
 }

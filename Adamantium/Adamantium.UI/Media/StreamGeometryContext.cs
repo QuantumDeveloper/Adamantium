@@ -25,7 +25,7 @@ public class StreamGeometryContext : IFigureSegments
         return this;
     }
 
-    public IFigureSegments LineTo(double x, double y, bool isStroked = true)
+    IFigureSegments IFigureSegments.LineTo(double x, double y, bool isStroked)
     {
         figure.Segments.Add(new LineSegment(new Vector2(x, y), isStroked));
         return this;
@@ -87,6 +87,13 @@ public class StreamGeometryContext : IFigureSegments
             pathFigure?.ProcessSegments();
         }
         
+    }
+
+    internal int SegmentsCount => figure.Segments.Count;
+
+    internal PathSegment GetLastSegment()
+    {
+        return figure.Segments[^1];
     }
 
     internal MeshContour[] GetContours()

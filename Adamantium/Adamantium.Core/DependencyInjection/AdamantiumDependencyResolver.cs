@@ -4,18 +4,18 @@ using Adamantium.Core.Events;
 
 namespace Adamantium.Core.DependencyInjection
 {
-    public class AdamantiumServiceLocator : IDependencyResolver
+    public class AdamantiumDependencyResolver : IDependencyResolver
     {
         private Dictionary<Type, DependencyInjectionDetails> mappings;
         
-        public static AdamantiumServiceLocator Current { get; }
+        public static AdamantiumDependencyResolver Current { get; }
 
-        static AdamantiumServiceLocator()
+        static AdamantiumDependencyResolver()
         {
-            Current = new AdamantiumServiceLocator();
+            Current = new AdamantiumDependencyResolver();
         }
 
-        public AdamantiumServiceLocator()
+        public AdamantiumDependencyResolver()
         {
             mappings = new Dictionary<Type, DependencyInjectionDetails>();
             RegisterSingleton<IEventAggregator, EventAggregator>();
