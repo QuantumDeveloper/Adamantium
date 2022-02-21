@@ -6,16 +6,14 @@ namespace Adamantium.Core.Events
 {
     internal class EventAggregator : IEventAggregator
     {
-        private readonly Dictionary<Type, EventBase> registeredEvents = new Dictionary<Type, EventBase>();
-        
-        private readonly SynchronizationContext syncContext = SynchronizationContext.Current;
+        private readonly Dictionary<Type, EventBase> registeredEvents = new ();
         
         public T GetEvent<T>() where T : EventBase, new()
         {
             if (registeredEvents.TryGetValue(typeof(T), out var @event)) 
                 return (T)@event;
-            
-            @event = new T {SynchronizationContext = syncContext};
+
+            @event = new T { SynchronizationContext = SynchronizationContext.Current };
             registeredEvents[typeof(T)] = @event;
 
             return (T)@event;

@@ -5,12 +5,12 @@ namespace Adamantium.UI.Media;
 
 internal class SVGCommandInterpreter
 {
-    public PathGeometry InterpretCommands(List<SVGCommand> commands)
+    public StreamGeometry InterpretCommands(List<SVGCommand> commands)
     {
-        var pathGeometry = new PathGeometry();
-        pathGeometry.Figures = new PathFigureCollection();
-        PathFigure currentFigure = null;
         Vector2 currentPoint = Vector2.Zero;
+        var streamGeometry = new StreamGeometry();
+        var context = streamGeometry.Open();
+        IFigureSegments figureSegments = null;
 
         foreach (var command in commands)
         {
@@ -19,130 +19,120 @@ internal class SVGCommandInterpreter
             {
                 case 'M':
                 case 'm':
-                    currentFigure = new PathFigure();
-                    currentFigure.Segments = new PathSegmentCollection();
-                    currentFigure.StartPoint = new Vector2(command.Arguments[0], command.Arguments[1]);
-                    pathGeometry.Figures.Add(currentFigure);
-                    currentPoint = currentFigure.StartPoint;
+                    var startPoint = new Vector2(command.Arguments[0], command.Arguments[1]);
+                    figureSegments = context.BeginFigure(startPoint, true, true);
+                    currentPoint = startPoint;
                     break;
                 case 'A':
                 case 'a':
-                    var arcSegment = new ArcSegment();
-                    currentFigure.Segments.Add(arcSegment);
-                    arcSegment.Size = new Size(command.Arguments[index++], command.Arguments[index++]);
-                    arcSegment.RotationAngle = command.Arguments[index++];
-                    arcSegment.IsLargeArc = Convert.ToBoolean(command.Arguments[index++]);
-                    arcSegment.SweepDirection = (SweepDirection)command.Arguments[index++];
-                    arcSegment.Point = new Vector2(command.Arguments[index++], command.Arguments[index++]);
-                    currentPoint = arcSegment.Point;
+                {
+                    var size = new Size(command.Arguments[index++], command.Arguments[index++]);
+                    var rotationAngle = command.Arguments[index++];
+                    var isLargeArc = Convert.ToBoolean(command.Arguments[index++]);
+                    var sweepDirection = (SweepDirection)command.Arguments[index++];
+                    var point = new Vector2(command.Arguments[index++], command.Arguments[index++]);
+                    figureSegments?.ArcTo(point, size, rotationAngle, isLargeArc, sweepDirection, true);
+                    currentPoint = point;
                     break;
+                }
                 case 'L':
                 case 'l':
-                    var lineSegment = new LineSegment();
-                    currentFigure.Segments.Add(lineSegment);
-                    lineSegment.Point = new Vector2(command.Arguments[0], command.Arguments[1]);
-                    currentPoint = lineSegment.Point;
+                    currentPoint = new Vector2(command.Arguments[0], command.Arguments[1]);
+                    figureSegments?.LineTo(currentPoint);
                     break;
                 case 'H':
                 case 'h':
-                    var horizontalSegment = new LineSegment();
-                    currentFigure.Segments.Add(horizontalSegment);
-                    horizontalSegment.Point = new Vector2(command.Arguments[0], currentPoint.Y);
-                    currentPoint = horizontalSegment.Point;
+                    currentPoint = new Vector2(command.Arguments[0], currentPoint.Y);
+                    figureSegments?.LineTo(currentPoint);
                     break;
                 case 'V':
                 case 'v':
-                    var verticalSegment = new LineSegment();
-                    currentFigure.Segments.Add(verticalSegment);
-                    verticalSegment.Point = new Vector2(currentPoint.X, command.Arguments[0]);
-                    currentPoint = verticalSegment.Point;
+                    currentPoint = new Vector2(currentPoint.X, command.Arguments[0]);
+                    figureSegments?.LineTo(currentPoint);
                     break;
                 case 'C':
                 case 'c':
                 {
-                    var cubicBezier = new CubicBezierSegment();
-                    currentFigure.Segments.Add(cubicBezier);
-                    cubicBezier.ControlPoint1 = new Vector2(command.Arguments[index++], command.Arguments[index++]);
-                    cubicBezier.ControlPoint2 = new Vector2(command.Arguments[index++], command.Arguments[index++]);
-                    cubicBezier.Point = new Vector2(command.Arguments[index++], command.Arguments[index++]);
-                    currentPoint = cubicBezier.Point;
+                    var controlPoint1 = new Vector2(command.Arguments[index++], command.Arguments[index++]);
+                    var controlPoint2 = new Vector2(command.Arguments[index++], command.Arguments[index++]);
+                    var point = new Vector2(command.Arguments[index++], command.Arguments[index++]);
+                    figureSegments?.CubicBezierTo(controlPoint1, controlPoint2, point);
+                    currentPoint = point;
                     break;
                 }
                 case 'Q':
                 case 'q':
                 {
-                    var quadraticBezier = new QuadraticBezierSegment();
-                    currentFigure.Segments.Add(quadraticBezier);
-                    quadraticBezier.ControlPoint = new Vector2(command.Arguments[index++], command.Arguments[index++]);
-                    quadraticBezier.Point = new Vector2(command.Arguments[index++], command.Arguments[index++]);
-                    currentPoint = quadraticBezier.Point;
+                    var controlPoint = new Vector2(command.Arguments[index++], command.Arguments[index++]);
+                    var point = new Vector2(command.Arguments[index++], command.Arguments[index++]);
+                    currentPoint = point;
+                    figureSegments?.QuadraticBezierTo(controlPoint, point);
                     break;
                 }
                 case 'S':
                 case 's':
                 {
-                    var cubicBezier = new CubicBezierSegment();
-                    currentFigure.Segments.Add(cubicBezier);
-                    cubicBezier.ControlPoint2 = new Vector2(command.Arguments[index++], command.Arguments[index++]);
-                    cubicBezier.Point = new Vector2(command.Arguments[index++], command.Arguments[index++]);
-
-                    if (currentFigure.Segments.Count == 0)
+                    Vector2 controlPoint1;
+                    var controlPoint2 = new Vector2(command.Arguments[index++], command.Arguments[index++]);
+                    var point = new Vector2(command.Arguments[index++], command.Arguments[index++]);
+                    
+                    if (context.SegmentsCount == 0)
                     {
-                        cubicBezier.ControlPoint1 = currentPoint;
+                        controlPoint1 = currentPoint;
                     }
                     else
                     {
-                        var prevSegment = currentFigure.Segments[^2];
+                        var prevSegment = context.GetLastSegment();
                         if (prevSegment is CubicBezierSegment cubic)
                         {
-                            var direction = cubicBezier.Point - currentPoint;
+                            var direction = point - currentPoint;
                             direction.Normalize();
-                            var controlPoint = Vector2.Reflect(cubic.ControlPoint2, direction);
-                            cubicBezier.ControlPoint1 = controlPoint;
+                            controlPoint1 = Vector2.Reflect(cubic.ControlPoint2, direction);
                         }
                         else
                         {
-                            cubicBezier.ControlPoint1 = currentPoint;
+                            controlPoint1 = currentPoint;
                         }
 
-                        currentPoint = cubicBezier.Point;
+                        currentPoint = point;
                     }
+
+                    figureSegments?.CubicBezierTo(controlPoint1, controlPoint2, point);
                     break;
                 }
                 case 'T':
                 case 't':
                 {
-                    var quadraticBezier = new QuadraticBezierSegment();
-                    currentFigure.Segments.Add(quadraticBezier);
-                    quadraticBezier.Point = new Vector2(command.Arguments[index++], command.Arguments[index++]);
-
-                    if (currentFigure.Segments.Count == 0)
+                    Vector2 controlPoint;
+                    var point = new Vector2(command.Arguments[index++], command.Arguments[index++]);
+                    
+                    if (context.SegmentsCount == 0)
                     {
-                        quadraticBezier.ControlPoint = currentPoint;
+                        controlPoint = currentPoint;
                     }
                     else
                     {
-                        var prevSegment = currentFigure.Segments[^2];
+                        var prevSegment = context.GetLastSegment();
                         if (prevSegment is QuadraticBezierSegment quadratic)
                         {
-                            var direction = quadraticBezier.Point - currentPoint;
+                            var direction = point - currentPoint;
                             direction.Normalize();
-                            var controlPoint = Vector2.Reflect(quadratic.ControlPoint, direction);
-                            quadraticBezier.ControlPoint = controlPoint;
+                            controlPoint = Vector2.Reflect(quadratic.ControlPoint, direction);
                         }
                         else
                         {
-                            quadraticBezier.ControlPoint = currentPoint;
+                            controlPoint = currentPoint;
                         }
 
-                        currentPoint = quadraticBezier.Point;
+                        currentPoint = point;
                     }
 
+                    figureSegments?.QuadraticBezierTo(controlPoint, point);
                     break;
                 }
             }
         }
 
-        return pathGeometry;
+        return streamGeometry;
     }
 }

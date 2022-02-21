@@ -8,15 +8,174 @@ namespace Adamantium.Mathematics
 {
    public class Colors
    {
+      private static readonly Dictionary<string, Color> ColorsMap;
+
+      static Colors()
+      {
+         ColorsMap = new Dictionary<string, Color>();
+         ColorsMap["Zero"] = Color.FromBgra(0x00000000);
+         ColorsMap["Transparent"] = Color.FromBgra(0x00000000);
+         ColorsMap["AliceBlue"] = Color.FromBgra(0xFFF0F8FF);
+         ColorsMap["AntiqueWhite"] = Color.FromBgra(0xFFFAEBD7);
+         ColorsMap["Aqua"] = Color.FromBgra(0xFF00FFFF);
+         ColorsMap["Aquamarine"] = Color.FromBgra(0xFF7FFFD4);
+         ColorsMap["Azure"] = Color.FromBgra(0xFFF0FFFF);
+         ColorsMap["Beige"] = Color.FromBgra(0xFFF5F5DC);
+         ColorsMap["Bisque"] = Color.FromBgra(0xFFFFE4C4);
+         ColorsMap["Black"] = Color.FromBgra(0xFF000000);
+         ColorsMap["BlanchedAlmond"] = Color.FromBgra(0xFFFFEBCD);
+         ColorsMap["Blue"] = Color.FromBgra(0xFF0000FF);
+         ColorsMap["BlueViolet"] = Color.FromBgra(0xFF8A2BE2);
+         ColorsMap["Brown"] = Color.FromBgra(0xFFA52A2A);
+         ColorsMap["BurlyWood"] = Color.FromBgra(0xFFDEB887);
+         ColorsMap["CadetBlue"] = Color.FromBgra(0xFF5F9EA0);
+         ColorsMap["Chartreuse"] = Color.FromBgra(0xFF7FFF00);
+         ColorsMap["Chocolate"] = Color.FromBgra(0xFFD2691E);
+         ColorsMap["Coral"] = Color.FromBgra(0xFFFF7F50);
+         ColorsMap["CornflowerBlue"] = Color.FromBgra(0xFF6495ED);
+         ColorsMap["Cornsilk"] = Color.FromBgra(0xFFFFF8DC);
+         ColorsMap["Crimson"] = Color.FromBgra(0xFFDC143C);
+         ColorsMap["Cyan"] = Color.FromBgra(0xFF00FFFF);
+         ColorsMap["DarkBlue"] = Color.FromBgra(0xFF00008B);
+         ColorsMap["DarkCyan"] = Color.FromBgra(0xFF008B8B);
+         ColorsMap["DarkGoldenrod"] = Color.FromBgra(0xFFB8860B);
+         ColorsMap["DarkGray"] = Color.FromBgra(0xFFA9A9A9);
+         ColorsMap["DarkGreen"] = Color.FromBgra(0xFF006400);
+         ColorsMap["DarkKhaki"] = Color.FromBgra(0xFFBDB76B);
+         ColorsMap["DarkMagenta"] = Color.FromBgra(0xFF8B008B);
+         ColorsMap["DarkOliveGreen"] = Color.FromBgra(0xFF556B2F);
+         ColorsMap["DarkOrange"] = Color.FromBgra(0xFFFF8C00);
+         ColorsMap["DarkOrchid"] = Color.FromBgra(0xFF9932CC);
+         ColorsMap["DarkRed"] = Color.FromBgra(0xFF8B0000);
+         ColorsMap["DarkSalmon"] = Color.FromBgra(0xFFE9967A);
+         ColorsMap["DarkSeaGreen"] = Color.FromBgra(0xFF8FBC8B);
+         ColorsMap["DarkSlateBlue"] = Color.FromBgra(0xFF483D8B);
+         ColorsMap["DarkSlateGray"] = Color.FromBgra(0xFF2F4F4F);
+         ColorsMap["DarkTurquoise"] = Color.FromBgra(0xFF00CED1);
+         ColorsMap["DarkViolet"] = Color.FromBgra(0xFF9400D3);
+         ColorsMap["DeepPink"] = Color.FromBgra(0xFFFF1493);
+         ColorsMap["DeepSkyBlue"] = Color.FromBgra(0xFF00BFFF);
+         ColorsMap["DimGray"] = Color.FromBgra(0xFF696969);
+         ColorsMap["DodgerBlue"] = Color.FromBgra(0xFF1E90FF);
+         ColorsMap["Firebrick"] = Color.FromBgra(0xFFB22222);
+         ColorsMap["FloralWhite"] = Color.FromBgra(0xFFFFFAF0);
+         ColorsMap["ForestGreen"] = Color.FromBgra(0xFF228B22);
+         ColorsMap["Fuchsia"] = Color.FromBgra(0xFFFF00FF);
+         ColorsMap["Gainsboro"] = Color.FromBgra(0xFFDCDCDC);
+         ColorsMap["GhostWhite"] = Color.FromBgra(0xFFF8F8FF);
+         ColorsMap["Gold"] = Color.FromBgra(0xFFFFD700);
+         ColorsMap["Goldenrod"] = Color.FromBgra(0xFFDAA520);
+         ColorsMap["Gray"] = Color.FromBgra(0xFF808080);
+         ColorsMap["Green"] = Color.FromBgra(0xFF008000);
+         ColorsMap["GreenYellow"] = Color.FromBgra(0xFFADFF2F);
+         ColorsMap["Honeydew"] = Color.FromBgra(0xFFF0FFF0);
+         ColorsMap["HotPink"] = Color.FromBgra(0xFFFF69B4); 
+         ColorsMap["IndianRed"] = Color.FromBgra(0xFFCD5C5C);
+         ColorsMap["Indigo"] = Color.FromBgra(0xFF4B0082);
+         ColorsMap["Ivory"] = Color.FromBgra(0xFFFFFFF0);
+         ColorsMap["Khaki"] = Color.FromBgra(0xFFF0E68C);
+         ColorsMap["Lavender"] = Color.FromBgra(0xFFE6E6FA);
+         ColorsMap["LavenderBlush"] = Color.FromBgra(0xFFFFF0F5);
+         ColorsMap["LawnGreen"] = Color.FromBgra(0xFF7CFC00);
+         ColorsMap["LemonChiffon"] = Color.FromBgra(0xFFFFFACD);
+         ColorsMap["LightBlue"] = Color.FromBgra(0xFFADD8E6);
+         ColorsMap["LightCoral"] = Color.FromBgra(0xFFF08080);
+         ColorsMap["LightCyan"] = Color.FromBgra(0xFFE0FFFF);
+         ColorsMap["LightGoldenrodYellow"] = Color.FromBgra(0xFFFAFAD2);
+         ColorsMap["LightGray"] = Color.FromBgra(0xFFD3D3D3);
+         ColorsMap["LightGreen"] = Color.FromBgra(0xFF90EE90);
+         ColorsMap["LightPink"] = Color.FromBgra(0xFFFFB6C1);
+         ColorsMap["LightSalmon"] = Color.FromBgra(0xFFFFA07A);
+         ColorsMap["LightSeaGreen"] = Color.FromBgra(0xFF20B2AA);
+         ColorsMap["LightSkyBlue"] = Color.FromBgra(0xFF87CEFA);
+         ColorsMap["LightSlateGray"] = Color.FromBgra(0xFF778899);
+         ColorsMap["LightSteelBlue"] = Color.FromBgra(0xFFB0C4DE);
+         ColorsMap["LightYellow"] = Color.FromBgra(0xFFFFFFE0);
+         ColorsMap["Lime"] = Color.FromBgra(0xFF00FF00);
+         ColorsMap["LimeGreen"] = Color.FromBgra(0xFF32CD32);
+         ColorsMap["Linen"] = Color.FromBgra(0xFFFAF0E6);
+         ColorsMap["Magenta"] = Color.FromBgra(0xFFFF00FF);
+         ColorsMap["Maroon"] = Color.FromBgra(0xFF800000);
+         ColorsMap["MediumAquamarine"] = Color.FromBgra(0xFF66CDAA);
+         ColorsMap["MediumBlue"] = Color.FromBgra(0xFF0000CD);
+         ColorsMap["MediumOrchid"] = Color.FromBgra(0xFFBA55D3);
+         ColorsMap["MediumPurple"] = Color.FromBgra(0xFF9370DB);
+         ColorsMap["MediumSeaGreen"] = Color.FromBgra(0xFF3CB371);
+         ColorsMap["MediumSlateBlue"] = Color.FromBgra(0xFF7B68EE);
+         ColorsMap["MediumSpringGreen"] = Color.FromBgra(0xFF00FA9A);
+         ColorsMap["MediumTurquoise"] = Color.FromBgra(0xFF48D1CC);
+         ColorsMap["MediumVioletRed"] = Color.FromBgra(0xFFC71585);
+         ColorsMap["MidnightBlue"] = Color.FromBgra(0xFF191970);
+         ColorsMap["MintCream"] = Color.FromBgra(0xFFF5FFFA);
+         ColorsMap["MistyRose"] = Color.FromBgra(0xFFFFE4E1);
+         ColorsMap["Moccasin"] = Color.FromBgra(0xFFFFE4B5);
+         ColorsMap["NavajoWhite"] = Color.FromBgra(0xFFFFDEAD);
+         ColorsMap["Navy"] = Color.FromBgra(0xFF000080);
+         ColorsMap["OldLace"] = Color.FromBgra(0xFFFDF5E6);
+         ColorsMap["Olive"] = Color.FromBgra(0xFF808000);
+         ColorsMap["OliveDrab"] = Color.FromBgra(0xFF6B8E23);
+         ColorsMap["Orange"] = Color.FromBgra(0xFFFFA500);
+         ColorsMap["OrangeRed"] = Color.FromBgra(0xFFFF4500);
+         ColorsMap["Orchid"] = Color.FromBgra(0xFFDA70D6);
+         ColorsMap["PaleGoldenrod"] = Color.FromBgra(0xFFEEE8AA);
+         ColorsMap["PaleGreen"] = Color.FromBgra(0xFF98FB98);
+         ColorsMap["PaleTurquoise"] = Color.FromBgra(0xFFAFEEEE);
+         ColorsMap["PaleVioletRed"] = Color.FromBgra(0xFFDB7093);
+         ColorsMap["PapayaWhip"] = Color.FromBgra(0xFFFFEFD5);
+         ColorsMap["PeachPuff"] = Color.FromBgra(0xFFFFDAB9);
+         ColorsMap["Peru"] = Color.FromBgra(0xFFCD853F);
+         ColorsMap["Pink"] = Color.FromBgra(0xFFFFC0CB);
+         ColorsMap["Plum"] = Color.FromBgra(0xFFDDA0DD);
+         ColorsMap["PowderBlue"] = Color.FromBgra(0xFFB0E0E6);
+         ColorsMap["Purple"] = Color.FromBgra(0xFF800080);
+         ColorsMap["Red"] = Color.FromBgra(0xFFFF0000);
+         ColorsMap["RosyBrown"] = Color.FromBgra(0xFFBC8F8F);
+         ColorsMap["RoyalBlue"] = Color.FromBgra(0xFF4169E1);
+         ColorsMap["SaddleBrown"] = Color.FromBgra(0xFF8B4513);
+         ColorsMap["Salmon"] = Color.FromBgra(0xFFFA8072);
+         ColorsMap["SandyBrown"] = Color.FromBgra(0xFFF4A460);
+         ColorsMap["SeaGreen"] = Color.FromBgra(0xFF2E8B57);
+         ColorsMap["SeaShell"] = Color.FromBgra(0xFFFFF5EE);
+         ColorsMap["Sienna"] = Color.FromBgra(0xFFA0522D);
+         ColorsMap["Silver"] = Color.FromBgra(0xFFC0C0C0);
+         ColorsMap["SkyBlue"] = Color.FromBgra(0xFF87CEEB);
+         ColorsMap["SlateBlue"] = Color.FromBgra(0xFF6A5ACD);
+         ColorsMap["SlateGray"] = Color.FromBgra(0xFF708090);
+         ColorsMap["Snow"] = Color.FromBgra(0xFFFFFAFA);
+         ColorsMap["SpringGreen"] = Color.FromBgra(0xFF00FF7F);
+         ColorsMap["SteelBlue"] = Color.FromBgra(0xFF4682B4);
+         ColorsMap["Tan"] = Color.FromBgra(0xFFD2B48C);
+         ColorsMap["Teal"] = Color.FromBgra(0xFF008080);
+         ColorsMap["Thistle"] = Color.FromBgra(0xFFD8BFD8);
+         ColorsMap["Tomato"] = Color.FromBgra(0xFFFF6347);
+         ColorsMap["Turquoise"] = Color.FromBgra(0xFF40E0D0);
+         ColorsMap["Violet"] = Color.FromBgra(0xFFEE82EE);
+         ColorsMap["Wheat"] = Color.FromBgra(0xFFF5DEB3);
+         ColorsMap["White"] = Color.FromBgra(0xFFFFFFFF);
+         ColorsMap["WhiteSmoke"] = Color.FromBgra(0xFFF5F5F5);
+         ColorsMap["Yellow"] = Color.FromBgra(0xFFFFFF00);
+         ColorsMap["YellowGreen"] = Color.FromBgra(0xFF9ACD32);
+      }
+
+      public static Color Get(string name)
+      {
+         if (name.StartsWith("#"))
+         {
+            return Color.FromRgba(Convert.ToUInt32(name));
+         }
+
+         return ColorsMap[name];
+      }
+      
       /// <summary>
       /// Zero color.
       /// </summary>
-      public static readonly Color Zero = Color.FromBgra(0x00000000);
+      public static Color Zero => ColorsMap["Zero"];
 
       /// <summary>
       /// Transparent color.
       /// </summary>
-      public static readonly Color Transparent = Color.FromBgra(0x00000000);
+      public static Color Transparent => ColorsMap["Transparent"];
 
       /// <summary>
       /// AliceBlue color.
@@ -586,7 +745,7 @@ namespace Adamantium.Mathematics
       /// <summary>
       /// Red color.
       /// </summary>
-      public static readonly Color Red = Color.FromBgra(0xFFFF0000);
+      public static Color Red => ColorsMap["Red"];
 
       /// <summary>
       /// RosyBrown color.

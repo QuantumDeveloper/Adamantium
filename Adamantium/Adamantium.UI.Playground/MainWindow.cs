@@ -11,7 +11,7 @@ using Shape = Adamantium.UI.Controls.Shape;
 
 namespace Adamantium.UI.Playground
 {
-    public class MainWindow : Window
+    public partial class MainWindow : Window
     {
         private Path path = null;
         public MainWindow()

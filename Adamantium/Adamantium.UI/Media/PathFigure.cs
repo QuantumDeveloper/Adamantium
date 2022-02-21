@@ -27,6 +27,7 @@ public sealed class PathFigure : AdamantiumComponent
     public PathFigure()
     {
         Points = new List<Vector2>();
+        Segments = new PathSegmentCollection();
     }
 
     private static void SegmentsChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)

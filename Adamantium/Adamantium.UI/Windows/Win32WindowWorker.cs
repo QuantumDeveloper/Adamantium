@@ -33,7 +33,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
 
     public Win32WindowWorker()
     {
-        eventAggregator = AdamantiumServiceLocator.Current.Resolve<IEventAggregator>();
+        eventAggregator = AdamantiumDependencyResolver.Current.Resolve<IEventAggregator>();
         messageTable = new Dictionary<uint, HandleMessage>();
         messageTable[(uint)WindowMessages.Activate] = HandleActivate;
         messageTable[(uint)WindowMessages.Syscommand] = HandleSysCommand;
@@ -505,8 +505,8 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
     private static InputModifiers GetKeyModifiers(RawMouse rawMouse)
     {
         var modifiers = WindowsMouseDevice.GetRawMouseModifiers(rawMouse);
-        var keyModif = WindowsKeyboardDevice.Instance.Modifiers;
-        modifiers |= keyModif;
+        var keyModifiers = WindowsKeyboardDevice.Instance.Modifiers;
+        modifiers |= keyModifiers;
         return modifiers;
     }
 

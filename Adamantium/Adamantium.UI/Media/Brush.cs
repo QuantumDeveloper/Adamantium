@@ -14,10 +14,5 @@ public abstract class Brush: AdamantiumComponent
       set => SetValue(OpacityProperty, value);
    }
 
-   //public static Brush Parse(string brush)
-   //{
-   //   //return new SolidColorBrush();
-         
-   //}
-
+   public static Brush Parse(string color) => new SolidColorBrush(color);
 }

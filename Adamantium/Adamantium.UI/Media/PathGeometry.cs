@@ -17,6 +17,7 @@ public class PathGeometry : Geometry
     {
         figureToPolygon = new Dictionary<PathFigure, MeshContour>();
         outlines = new Dictionary<PathFigure, Vector2[]>();
+        Figures = new PathFigureCollection();
     }
 
     public static readonly AdamantiumProperty FillRuleProperty = AdamantiumProperty.Register(nameof(FillRule),
@@ -48,6 +49,7 @@ public class PathGeometry : Geometry
         set => SetValue(FillRuleProperty, value);
     }
     
+    [Content]
     public PathFigureCollection Figures
     {
         get => GetValue<PathFigureCollection>(FiguresProperty);

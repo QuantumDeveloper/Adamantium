@@ -19,8 +19,6 @@ namespace Adamantium.UI;
 
 public abstract class Application : AdamantiumComponent, IService
 {
-    //private Mutex mutex = new Mutex(false, "adamantiumMutex");
-        
     public IWindow MainWindow
     {
         get => mainWindow;
@@ -68,13 +66,13 @@ public abstract class Application : AdamantiumComponent, IService
 
     static Application()
     {
+        //ApplicationBuilder.Build();
         WindowsPlatform.Initialize();
     }
 
     protected Application()
     {
         Current = this;
-        var d = Dispatcher.CurrentDispatcher;
         VulkanDllMap.Register();
         ShutDownMode = ShutDownMode.OnMainWindowClosed;
         systemManager = new ApplicationSystemManager(this);
@@ -86,11 +84,12 @@ public abstract class Application : AdamantiumComponent, IService
         Windows.WindowRemoved += WindowRemoved;
         appTime = new ApplicationTime();
         preciseTimer = new PreciseTimer();
-        Services = AdamantiumServiceLocator.Current;
+        Services = AdamantiumDependencyResolver.Current;
         Services.RegisterInstance<IService>(this);
         Services.RegisterInstance<SystemManager>(systemManager);
         entityWorld = new EntityWorld(Services);
         eventAggregator = Services.Resolve<IEventAggregator>();
+        
         Initialize();
         renderThread = new Thread(RenderThread);
     }
@@ -114,7 +113,7 @@ public abstract class Application : AdamantiumComponent, IService
     }
         
     public static Application Current { get; private set; }
-
+    
     public bool IsRunning => cancellationTokenSource?.IsCancellationRequested != true;
     public bool IsPaused { get; private set; }
 
@@ -198,12 +197,10 @@ public abstract class Application : AdamantiumComponent, IService
         {
             var frameTime = preciseTimer.GetElapsedTime();
             ProcessPendingWindows();
-            //mutex.WaitOne();
             Update(appTime);
             BeginScene();
             Draw(appTime);
             EndScene();
-            //mutex.ReleaseMutex();
             UpdateGameTime(frameTime);
             CalculateFps(frameTime);
                 
@@ -313,6 +310,7 @@ public abstract class Application : AdamantiumComponent, IService
 
     protected void Initialize()
     {
+        Dispatcher.Initialize();
         MainGraphicsDevice = MainGraphicsDevice.Create("Adamantium Engine", true);
         Services.RegisterInstance<GraphicsDevice>(MainGraphicsDevice);
 

@@ -24,8 +24,8 @@ public class MacOSWindowWorker : AdamantiumComponent, IWindowWorkerService
     {
         willResizeDelegate = OnWindowWillResize;
         didResizeDelegate = OnWindowDidResize;
-        macOsApp = AdamantiumServiceLocator.Current.Resolve<IApplicationPlatform>() as MacOSPlatform;
-        eventAggregator = AdamantiumServiceLocator.Current.Resolve<IEventAggregator>();
+        macOsApp = AdamantiumDependencyResolver.Current.Resolve<IApplicationPlatform>() as MacOSPlatform;
+        eventAggregator = AdamantiumDependencyResolver.Current.Resolve<IEventAggregator>();
     }
 
     public void SetWindow(WindowBase window)

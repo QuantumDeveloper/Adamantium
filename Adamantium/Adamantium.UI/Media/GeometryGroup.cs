@@ -50,6 +50,7 @@ public class GeometryGroup : Geometry
         InvalidateGeometry();
     }
 
+    [Content]
     public GeometryCollection Children
     {
         get => GetValue<GeometryCollection>(ChildrenProperty);

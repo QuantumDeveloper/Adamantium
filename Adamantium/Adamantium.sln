@@ -78,6 +78,10 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Fonts", "Adamant
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.FontTests", "Tests\Adamantium.FontTests\Adamantium.FontTests.csproj", "{2540B1A7-AC53-4CA2-B4F3-8FD11AB279E7}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.UI.Xaml", "Adamantium.UI.Xaml\Adamantium.UI.Xaml.csproj", "{28400A8F-CB82-4619-B2D9-97D81602A6BB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.XamlTests", "Tests\Adamantium.XamlTests\Adamantium.XamlTests.csproj", "{82A681BE-F84B-47CF-83F0-C13A1BD3B2FD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -220,6 +224,14 @@ Global
 		{2540B1A7-AC53-4CA2-B4F3-8FD11AB279E7}.Debug|x64.Build.0 = Debug|x64
 		{2540B1A7-AC53-4CA2-B4F3-8FD11AB279E7}.Release|x64.ActiveCfg = Release|x64
 		{2540B1A7-AC53-4CA2-B4F3-8FD11AB279E7}.Release|x64.Build.0 = Release|x64
+		{28400A8F-CB82-4619-B2D9-97D81602A6BB}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{28400A8F-CB82-4619-B2D9-97D81602A6BB}.Debug|x64.Build.0 = Debug|Any CPU
+		{28400A8F-CB82-4619-B2D9-97D81602A6BB}.Release|x64.ActiveCfg = Release|Any CPU
+		{28400A8F-CB82-4619-B2D9-97D81602A6BB}.Release|x64.Build.0 = Release|Any CPU
+		{82A681BE-F84B-47CF-83F0-C13A1BD3B2FD}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{82A681BE-F84B-47CF-83F0-C13A1BD3B2FD}.Debug|x64.Build.0 = Debug|Any CPU
+		{82A681BE-F84B-47CF-83F0-C13A1BD3B2FD}.Release|x64.ActiveCfg = Release|Any CPU
+		{82A681BE-F84B-47CF-83F0-C13A1BD3B2FD}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -231,6 +243,7 @@ Global
 		{B46F42CD-6698-4215-95F3-A108624C9C8A} = {3A783815-220B-420E-80CE-4CD4805A0834}
 		{BC9DA1CA-61BA-45C5-9F92-14BEE36A8C10} = {3A783815-220B-420E-80CE-4CD4805A0834}
 		{2540B1A7-AC53-4CA2-B4F3-8FD11AB279E7} = {3A783815-220B-420E-80CE-4CD4805A0834}
+		{82A681BE-F84B-47CF-83F0-C13A1BD3B2FD} = {3A783815-220B-420E-80CE-4CD4805A0834}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {DC88E606-C87C-4FA7-8A47-4A2BD89517F9}

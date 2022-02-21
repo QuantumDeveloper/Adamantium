@@ -10,7 +10,7 @@ public class SVGParser
    
     public List<SVGCommand> Commands { get; private set; }
    
-    public PathGeometry Parse(string svgString)
+    public StreamGeometry Parse(string svgString)
     {
         var tokens = Regex.Split(svgString, pattern).Where(t => !string.IsNullOrEmpty(t));
         Commands = new List<SVGCommand>();
@@ -19,7 +19,7 @@ public class SVGParser
             Commands.Add(SVGCommand.Parse(token));
         }
 
-        if (Commands.Count == 0) return new PathGeometry();
+        if (Commands.Count == 0) return new StreamGeometry();
 
         var geometry = new SVGCommandInterpreter().InterpretCommands(Commands);
 

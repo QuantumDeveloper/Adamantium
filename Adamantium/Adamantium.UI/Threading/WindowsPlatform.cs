@@ -59,6 +59,6 @@ public class WindowsPlatform : IApplicationPlatform
 
     public static void Initialize()
     {
-        AdamantiumServiceLocator.Current.RegisterSingleton<IApplicationPlatform, WindowsPlatform>();
+        AdamantiumDependencyResolver.Current.RegisterSingleton<IApplicationPlatform, WindowsPlatform>();
     }
 }

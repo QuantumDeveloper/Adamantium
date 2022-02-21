@@ -10,7 +10,7 @@ namespace Adamantium.UI.Playground
         static void Main(string[] args)
         {
             var app = new App();
-            MainWindow wnd = new MainWindow();
+            var wnd = new MainWindow();
             app.MainWindow = wnd;
             wnd.Show();
             app.Run();

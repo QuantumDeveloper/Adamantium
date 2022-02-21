@@ -15,7 +15,7 @@ namespace Adamantium.Game
         
         public GamePlatformWindows(GameBase gameBase) : base(gameBase)
         {
-            applicationPlatform = AdamantiumServiceLocator.Current.Resolve<IApplicationPlatform>();
+            applicationPlatform = AdamantiumDependencyResolver.Current.Resolve<IApplicationPlatform>();
         }
 
         public override void Run(CancellationToken token)
