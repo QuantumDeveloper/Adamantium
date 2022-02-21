@@ -75,11 +75,12 @@ public static class ContourProcessingHelper
         }
     }
     
-    public static List<GeometrySegment> MarkSegments(List<GeometrySegment> contoursSegments1, List<GeometrySegment> contoursSegments2)
+    // Check position of second contour's segments against first contour's segments (if contour 2 partially or fully inside or outside of contour 1) 
+    public static List<GeometrySegment> MarkSegments(List<GeometrySegment> contourSegments, List<GeometrySegment> checkedContourSegments)
     {
         var arguableSegments = new List<GeometrySegment>();
         
-        foreach (var segment2 in contoursSegments2)
+        foreach (var segment2 in checkedContourSegments)
         {
             var segmentCenter = (segment2.End - segment2.Start) * 0.5 + segment2.Start;
             
@@ -87,7 +88,7 @@ public static class ContourProcessingHelper
             var intersectionCnt = 0;
             var rayIntersectionPoints = new HashSet<Vector2>();
             
-            foreach (var segment1 in contoursSegments1)
+            foreach (var segment1 in contourSegments)
             {
                 if (segment1.IsEqualTo(segment2))
                 {

@@ -45,24 +45,48 @@ namespace Adamantium.Mathematics
 
             if (points.Length <= 1) return new List<GeometrySegment>();
 
-            var geometryIntersections = new List<GeometryIntersection>();
-            
-            foreach (var point in points)
-            {
-                geometryIntersections.Add(new GeometryIntersection(point));
-            }
-            
+            var intersectionsList = new Dictionary<Vector2, GeometryIntersection>();
+            var segmentHashSet = new HashSet<GeometrySegment>();
             var segments = new List<GeometrySegment>();
-            for (var i = 0; i < geometryIntersections.Count - 1; i++)
+
+            for (var i = 0; i < points.Length - 1; i++)
             {
-                var segment = new GeometrySegment(parent, geometryIntersections[i], geometryIntersections[i + 1]);
-                if (!IsSameStartEnd(ref segment)) segments.Add(segment);
+                var start = points[i];
+                var end = points[i + 1];
+                
+                if (!intersectionsList.ContainsKey(start))
+                {
+                    intersectionsList[start] = new GeometryIntersection(start);
+                }
+                
+                if (!intersectionsList.ContainsKey(end))
+                {
+                    intersectionsList[end] = new GeometryIntersection(end);
+                }
+                
+                var segment = new GeometrySegment(parent, intersectionsList[start], intersectionsList[end]);
+
+                if (!IsSameStartEnd(ref segment))
+                {
+                    if (!segmentHashSet.Contains(segment))
+                    {
+                        segmentHashSet.Add(segment);
+                        segments.Add(segment);
+                    }
+                }
             }
 
             if (!isContourClosed) return segments;
 
-            var seg = new GeometrySegment(parent, geometryIntersections.Last(), geometryIntersections.First());
-            if (!IsSameStartEnd(ref seg)) segments.Add(seg);
+            var lastSegment = new GeometrySegment(parent, intersectionsList[points[^1]], intersectionsList[points[0]]);
+            if (!IsSameStartEnd(ref lastSegment))
+            {
+                if (!segmentHashSet.Contains(lastSegment))
+                {
+                    segmentHashSet.Add(lastSegment);
+                    segments.Add(lastSegment);
+                }
+            }
 
             return segments;
         }

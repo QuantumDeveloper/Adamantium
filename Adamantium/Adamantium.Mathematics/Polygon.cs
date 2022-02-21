@@ -11,7 +11,9 @@ namespace Adamantium.Mathematics
     public class Polygon
     {
         private readonly HashSet<Vector2> mergedPointsHash;
-        private readonly List<MeshContour> contours;
+        private readonly List<ContoursContainer> contourContainers;
+
+        public List<MeshContour> ProcessedContours { get; private set; }
 
         /// <summary>
         /// Precision level for polygon triangulation
@@ -26,11 +28,6 @@ namespace Adamantium.Mathematics
         /// Polygon name
         /// </summary>
         public string Name { get; set; }
-
-        /// <summary>
-        /// Collection of <see cref="MeshContour"/>
-        /// </summary>
-        public IReadOnlyCollection<MeshContour> Contours => contours.AsReadOnly();
 
         /// <summary>
         /// Collection of points from all <see cref="MeshContour"/>s in current <see cref="Polygon"/>
@@ -60,73 +57,94 @@ namespace Adamantium.Mathematics
         /// </summary>
         public Polygon(FillRule fillRule = FillRule.EvenOdd)
         {
-            contours = new List<MeshContour>();
+            contourContainers = new List<ContoursContainer>();
             MergedPoints = new List<GeometryIntersection>();
             mergedPointsHash = new HashSet<Vector2>();
             MergedSegments = new List<GeometrySegment>();
             checkedContours = new List<ContourPair>();
+            ProcessedContours = new List<MeshContour>();
             FillRule = fillRule;
         }
 
-        public void AddItem(MeshContour item)
+        public void AddContour(MeshContour contour, bool newContainer = true)
         {
-            contours.Add(item);
+            if (newContainer) contourContainers.Add(new ContoursContainer());
+            contourContainers.Last().AddContour(contour);
         }
 
-        public void AddItems(params MeshContour[] items)
+        public void AddContours(params MeshContour[] contours)
         {
-            contours.AddRange(items);
+            foreach (var contour in contours)
+            {
+                contourContainers.Add(new ContoursContainer());
+                contourContainers.Last().AddContour(contour);
+            }
         }
 
         /// <summary>
         /// Triangulate current <see cref="Polygon"/>
         /// </summary>
         /// <returns></returns>
-        public List<Vector3> Fill()
+        public List<Vector3> FillIndirect(bool triangulate = true)
         {
-            var localContours = new List<MeshContour>();
-            foreach (var contour in contours)
+            var localContourContainers = new List<ContoursContainer>();
+
+            foreach (var container in contourContainers)
             {
-                localContours.Add(contour.Copy());
+                localContourContainers.Add(container.Copy());
             }
             
-            Parallel.For(0, localContours.Count, i =>
+            Parallel.For(0, localContourContainers.Count, i =>
             {
-                localContours[i].SplitOnSegments();
-                localContours[i].RemoveSelfIntersections(FillRule);
+                localContourContainers[i].SplitContoursOnSegments();
+                localContourContainers[i].RemoveContoursSelfIntersections(FillRule);
             });
-
-            // process non intersecting contours
-            var nonIntersectedContours = GetNonIntersectingContours(localContours);
-
+            
+            // process non intersecting contours - only when the whole container not intersects with other containers and contains only single contour
+            // such container is removed from list
+            var nonIntersectedContours = GetNonIntersectingContours(localContourContainers);
+            
             var vertices = new List<Vector3>();
-
-            if (nonIntersectedContours.Count > 0)
+            
+            if (triangulate)
             {
-                Parallel.ForEach(nonIntersectedContours, item =>
+                if (nonIntersectedContours.Count > 0)
                 {
-                    var result1 = TriangulateContour(item);
-                    lock (vertexLocker)
+                    ProcessedContours.AddRange(nonIntersectedContours);
+                    
+                    Parallel.ForEach(nonIntersectedContours, item =>
                     {
-                        vertices.AddRange(result1);
-                    }
-                });
-            }
-
-            // process intersecting contours
-            if (localContours.Count > 0)
-            {
-                MergeContours(localContours);
-
-                UpdateBoundingBox();
-
-                var result = Triangulator.Triangulate(this);
-                lock (vertexLocker)
-                {
-                    vertices.AddRange(result);
+                        var result1 = TriangulateContour(item);
+                        lock (vertexLocker)
+                        {
+                            vertices.AddRange(result1);
+                        }
+                    });
                 }
             }
+            
+            // process intersecting contours
+            if (localContourContainers.Count > 0)
+            {
+                MergeContours(localContourContainers);
+                
+                foreach (var container in localContourContainers)
+                {
+                    ProcessedContours.AddRange(container.Contours);
+                }
 
+                UpdateLeftmostXCoord();
+            
+                if (triangulate)
+                {
+                    var result = Triangulator.Triangulate(this);
+                    lock (vertexLocker)
+                    {
+                        vertices.AddRange(result);
+                    }
+                }
+            }
+            
             return vertices;
         }
 
@@ -134,7 +152,7 @@ namespace Adamantium.Mathematics
         {
             MergedPoints.AddRange(points);
             MergedSegments.AddRange(segments);
-            UpdateBoundingBox();
+            UpdateLeftmostXCoord();
 
             var result = Triangulator.Triangulate(this);
             return result;
@@ -149,34 +167,34 @@ namespace Adamantium.Mathematics
                 MergedSegments = item.Segments
             };
 
-            polygon.UpdateBoundingBox();
+            polygon.UpdateLeftmostXCoord();
 
             return Triangulator.Triangulate(polygon);
         }
 
-        private List<MeshContour> GetNonIntersectingContours(List<MeshContour> localContours)
+        private List<MeshContour> GetNonIntersectingContours(List<ContoursContainer> localContourContainers)
         {
             var contourList = new List<MeshContour>();
 
-            if (localContours.Count == 0) return contourList;
+            if (localContourContainers.Count == 0) return contourList;
 
-            if (localContours.Count == 1)
+            if (localContourContainers.Count == 1 && localContourContainers[0].Contours.Count == 1)
             {
-                contourList.Add(localContours[0]);
+                contourList.Add(localContourContainers[0].Contours[0]);
                 return contourList;
             }
 
-            foreach (var contour1 in localContours)
+            foreach (var container1 in localContourContainers)
             {
                 var canAdd = true;
 
-                foreach (var contour2 in localContours)
+                foreach (var container2 in localContourContainers)
                 {
-                    if (contour1 == contour2) continue;
+                    if (container1 == container2) continue;
 
-                    var containment = contour1.BoundingBox.Intersects(contour2.BoundingBox);
+                    var containment = container1.BoundingBox.Intersects(container2.BoundingBox);
 
-                    if (containment)
+                    if (containment || container1.Contours.Count > 1)
                     {
                         canAdd = false;
                         break;
@@ -185,16 +203,14 @@ namespace Adamantium.Mathematics
 
                 if (canAdd)
                 {
-                    contourList.Add(contour1);
+                    contourList.Add(container1.Contours[0]);
+                    container1.ClearContours();
                 }
             }
 
-            foreach (var p in contourList)
+            for (var i = 0; i < localContourContainers.Count; i++)
             {
-                if (localContours.Contains(p))
-                {
-                    localContours.Remove(p);
-                }
+                if (localContourContainers[i].Contours.Count == 0) localContourContainers.RemoveAt(i);
             }
 
             return contourList;
@@ -225,63 +241,64 @@ namespace Adamantium.Mathematics
         /// <summary>
         /// Merge segments from all <see cref="MeshContour"/>s
         /// </summary>
-        private void MergeSegments(List<MeshContour> localContours)
+        private void MergeSegments(List<ContoursContainer> localContourContainers)
         {
             MergedSegments.Clear();
-            for (var i = 0; i < localContours.Count; ++i)
+
+            foreach (var container in localContourContainers)
             {
-                MergedSegments.AddRange(localContours[i].Segments);
+                foreach (var contour in container.Contours)
+                {
+                    MergedSegments.AddRange(contour.Segments);
+                }
             }
         }
 
-        private void MergeContours(List<MeshContour> localContours)
+        private void MergeContours(List<ContoursContainer> localContourContainers)
         {
-            if (localContours.Count <= 1)
+            if (localContourContainers.Count <= 1)
             {
-                MergeSegments(localContours);
+                MergeSegments(localContourContainers);
                 MergePoints();
 
                 return;
             }
-
+            
             var processedSegments = new List<GeometrySegment>();
 
-            for (var i = 1; i < localContours.Count; i++)
+            // each iteration we are processing next contour with the merged segments of all previous contours 
+            for (var i = 1; i < localContourContainers.Count; i++)
             {
                 processedSegments.Clear();
 
                 for (var j = 0; j < i; j++)
                 {
-                    processedSegments.AddRange(localContours[j].Segments);
+                    processedSegments.AddRange(localContourContainers[j].MergeContoursSegments());
                 }
                 
-                var nextSegments = localContours[i].Segments;
-                
+                var nextSegments = new List<GeometrySegment>();
+                nextSegments.AddRange(localContourContainers[i].MergeContoursSegments());
+
                 ContourProcessingHelper.ProcessContoursIntersections(processedSegments, nextSegments);
             }
 
             // update for correct marking
-            foreach (var contour in localContours)
+            foreach (var container in localContourContainers)
             {
-                contour.UpdatePoints();
+                container.UpdateContoursPoints();
             }
 
-            if (FillRule != FillRule.EvenOdd)
+            if (FillRule == FillRule.NonZero)
             {
                 var arguableSegments = new List<GeometrySegment>();
-                
-                foreach (var polygonPair in checkedContours)
-                {
-                    var contour1 = polygonPair.Contour1;
-                    var contour2 = polygonPair.Contour2;
-                    var intersectionResult = polygonPair.IntersectionType;
 
-                    //If polygons partly inside each other
-                    if (intersectionResult == ContainmentType.Intersects)
+                foreach (var checkedContainer in localContourContainers)
+                {
+                    foreach (var container in localContourContainers)
                     {
-                        // mark all segments as inner, outer or arguable (border case) relatively to other mesh
-                        arguableSegments.AddRange(ContourProcessingHelper.MarkSegments(contour1.Segments, contour2.Segments));
-                        arguableSegments.AddRange(ContourProcessingHelper.MarkSegments(contour2.Segments, contour1.Segments));
+                        if (container == checkedContainer) continue;
+                        
+                        arguableSegments.AddRange(ContourProcessingHelper.MarkSegments(container.MergeContoursSegments(), checkedContainer.MergeContoursSegments()));
                     }
                 }
 
@@ -290,18 +307,18 @@ namespace Adamantium.Mathematics
                     // resolve arguable segments as inner or outer
                     var mergedSegments = new List<GeometrySegment>();
 
-                    foreach (var contour in localContours)
+                    foreach (var container in localContourContainers)
                     {
-                        mergedSegments.AddRange(contour.Segments);
+                        mergedSegments.AddRange(container.MergeContoursSegments());
                     }
 
                     ContourProcessingHelper.ResolveArguableSegments(arguableSegments, mergedSegments);
                 }
 
                 // remove only inner segments, arguable segments will be skipped
-                foreach (var contour in localContours)
+                foreach (var container in localContourContainers)
                 {
-                    contour.RemoveSegmentsByRule(true);
+                    container.RemoveSegmentsByRule(true);
                 }
 
                 if (arguableSegments.Count > 0)
@@ -316,14 +333,14 @@ namespace Adamantium.Mathematics
                         }
                     }
 
-                    foreach (var contour in localContours)
+                    foreach (var container in localContourContainers)
                     {
-                        contour.UpdatePoints();
+                        container.UpdateContoursPoints();
                     }
                 }
             }
 
-            MergeSegments(localContours);
+            MergeSegments(localContourContainers);
             MergePoints();
         }
 
@@ -361,7 +378,7 @@ namespace Adamantium.Mathematics
             return sortedList;
         }
 
-        private void UpdateBoundingBox()
+        private void UpdateLeftmostXCoord()
         {
             if (MergedPoints.Count <= 0) return;
 
@@ -457,7 +474,9 @@ namespace Adamantium.Mathematics
         
         public override string ToString()
         {
-            return $"{Name}, MeshContours: {Contours.Count}";
+            var contoursCnt = contourContainers.Sum(container => container.Contours.Count);
+
+            return $"{Name}, Contour containers: {contourContainers.Count}, Mesh contours: {contoursCnt}";
         }
 
         private class ContourPair : IEquatable<ContourPair>

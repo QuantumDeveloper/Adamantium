@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Adamantium.Engine.Graphics;
 
 namespace Adamantium.UI.Media;
 
@@ -47,17 +48,25 @@ public sealed class StreamGeometry : Geometry
       bounds = Rect.FromPoints(points);
    }
 
-   protected internal override void ProcessGeometryCore()
+   protected internal override void ProcessGeometryCore(GeometryType geometryType)
    {
       context.ProcessFigures();
       var contours = context.GetContours();
       Mesh.Clear();
-      Mesh.AddContours(contours);
+
+      if (geometryType == GeometryType.Outlined)
+      {
+         Mesh.AddContours(contours);
+         return;
+      }
+      
       var polygon = new Polygon();
       polygon.FillRule = FillRule;
-      polygon.AddItems(contours);
+      polygon.AddContours(contours);
 
-      var points = polygon.Fill();
+      var points = polygon.FillIndirect();
+      Mesh.AddContours(polygon.ProcessedContours);
+      
       Mesh.SetPoints(points);
    }
 }

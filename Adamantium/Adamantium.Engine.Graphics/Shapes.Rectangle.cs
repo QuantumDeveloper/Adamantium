@@ -125,9 +125,11 @@ namespace Adamantium.Engine.Graphics
                         mesh.SetPoints(points);
                         break;
                     }
-                    default:
-                        mesh.SetPoints(vertices);
+                    case GeometryType.Outlined:
+                    {
+                        mesh.AddContour(vertices, true);
                         break;
+                    }
                 }
                 mesh.GenerateBasicIndices();
 
@@ -207,8 +209,8 @@ namespace Adamantium.Engine.Graphics
             private static List<Vector3> Triangulate(List<Vector3> vertices)
             {
                 var polygon = new Mathematics.Polygon();
-                polygon.AddItem(new MeshContour(vertices));
-                var points = polygon.Fill();
+                polygon.AddContour(new MeshContour(vertices));
+                var points = polygon.FillIndirect();
                 return points;
             }
         }

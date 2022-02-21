@@ -1379,6 +1379,11 @@ namespace Adamantium.Mathematics
          return !left.Equals(ref right);
       }
 
+      public static explicit operator Vector2(Vector2F value)
+      {
+         return new Vector2(value.X, value.Y);
+      }
+      
       /// <summary>
       /// Performs an explicit conversion from <see cref="Vector2F"/> to <see cref="Vector3F"/>.
       /// </summary>

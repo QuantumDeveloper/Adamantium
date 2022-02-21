@@ -481,5 +481,12 @@ namespace Adamantium.Mathematics
          return new Rectangle((int)value.X, (int)value.Y, (int)value.Width, (int)value.Height);
       }
 
+      public RectangleF Merge(RectangleF value)
+      {
+         var points = new Vector2[] { (Vector2)Location, (Vector2)BottomRight, (Vector2)value.Location, (Vector2)value.BottomRight };
+
+         return FromPoints(points);
+      }
+
    }
 }

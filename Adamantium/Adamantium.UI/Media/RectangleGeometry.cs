@@ -47,7 +47,7 @@ public sealed class RectangleGeometry : Geometry
       set => SetValue(RectProperty, value);
    }
 
-   private void CreateRectangle(Rect rect, CornerRadius corners)
+   private void CreateRectangle(Rect rect, CornerRadius corners, GeometryType geometryType)
    {
       Rect = rect;
       bounds = rect;
@@ -56,7 +56,7 @@ public sealed class RectangleGeometry : Geometry
       var translation = Matrix4x4.Translation((float)rect.Width / 2 + (float)rect.X,
          (float)rect.Height / 2 + (float)rect.Y, 0);
       Mesh = Shapes.Rectangle.GenerateGeometry(
-         GeometryType.Both, 
+         geometryType, 
          (float)rect.Width,
          (float)rect.Height,
          CornerRadius, 
@@ -81,8 +81,8 @@ public sealed class RectangleGeometry : Geometry
       }
    }
 
-   protected internal override void ProcessGeometryCore()
+   protected internal override void ProcessGeometryCore(GeometryType geometryType)
    {
-      CreateRectangle(Rect, CornerRadius);
+      CreateRectangle(Rect, CornerRadius, geometryType);
    }
 }

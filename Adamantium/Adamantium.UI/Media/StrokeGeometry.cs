@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Adamantium.Engine.Graphics;
 
 namespace Adamantium.UI.Media;
 
@@ -40,7 +41,7 @@ public class StrokeGeometry : Geometry
       this.geometry = geometry;
    }
       
-   protected internal override void ProcessGeometryCore()
+   protected internal override void ProcessGeometryCore(GeometryType geometryType)
    {
       var strokes = new List<Vector3>();
       for (var i = 0; i < geometry.Mesh.Contours.Count; i++)
@@ -101,40 +102,12 @@ public class StrokeGeometry : Geometry
 
       var vertices = new List<Vector3>();
 
-      int k = 0;
       foreach (var polygonItem in meshContours)
       {
-         try
-         {
-            if (k == 12)
-            {
-               int bug = 1;
-               var tmpList = new List<Vector2>();
-               var pts = polygonItem.Points.ToArray();
-               for (int i = 0; i < pts.Length - 1; i++)
-               {
-                   var p1 = pts[i];
-                   var p2 = pts[i + 1];
-                   if (p1 != p2)
-                   {
-                       tmpList.Add(p1);
-                   }
-                   
-                   if (i + 1 == pts.Length - 1 && tmpList.Count > 0 && p2 != tmpList[0])
-                   {
-                      tmpList.Add(p2);
-                   }
-               }
-            }
             var polygon = new Polygon();
-            polygon.AddItem(polygonItem);
+            polygon.AddContour(polygonItem);
             polygon.FillRule = FillRule.NonZero;
-            vertices.AddRange(polygon.Fill());
-            k++;
-         }
-         catch (Exception e)
-         {
-         }
+            vertices.AddRange(polygon.FillIndirect());
       }
 
       return vertices;
@@ -148,10 +121,6 @@ public class StrokeGeometry : Geometry
       foreach (var dashData in dashesData)
       {
          meshContours.AddRange(GenerateStroke(dashData.Points.ToArray(), pen, false, dashData.Direction));
-         if (meshContours.Count >= 12)
-         {
-            int bug = 2;
-         }
       }
 
       return meshContours;
@@ -602,7 +571,7 @@ public class StrokeGeometry : Geometry
             strokeSegments.Add(strokeSegment);
          }
       }
-         
+
       meshContours.AddRange(GenerateStrokeJoinsAndCaps(strokeSegments, pen, isGeometryClosed));
 
       return meshContours;
@@ -782,11 +751,7 @@ public class StrokeGeometry : Geometry
          contourPoints.Add(strokeSegments[i].BottomSegment.Start);
 
          Console.WriteLine($"ContourPoints = {contourPoints.Count}");
-         if (contourPoints.Count == 1)
-         {
-            int bug = 1;
-         }
-         
+
          meshContours.Add(new MeshContour(contourPoints));
 
          var nextIndex = i + 1;
@@ -854,11 +819,7 @@ public class StrokeGeometry : Geometry
          }
 
          Console.WriteLine($"ContourPoints2 = {contourPoints.Count}");
-         if (contourPoints.Count == 1)
-         {
-            int bug = 2;
-         }
-            
+
          meshContours.Add(new MeshContour(joinPoints));
       }
 

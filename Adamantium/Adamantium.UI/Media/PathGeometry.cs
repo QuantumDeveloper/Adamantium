@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
+using Adamantium.Engine.Graphics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.RoutedEvents;
 using Polygon = Adamantium.Mathematics.Polygon;
@@ -83,7 +84,7 @@ public class PathGeometry : Geometry
         bounds = new Rect(new Vector2(minX, minY), new Vector2(maxX, maxY));
     }
 
-    protected internal override void ProcessGeometryCore()
+    protected internal override void ProcessGeometryCore(GeometryType geometryType)
     {
         figureToPolygon.Clear();
         Mesh.ClearContours();
@@ -102,11 +103,18 @@ public class PathGeometry : Geometry
         {
             if (!polygonItem.Key.IsFilled) continue;
 
-            polygon.AddItem(polygonItem.Value);
+            polygon.AddContour(polygonItem.Value);
         }
 
         polygon.FillRule = FillRule;
-        Mesh.SetPoints(polygon.Fill());
+        var points = polygon.FillIndirect(geometryType != GeometryType.Outlined);
+
+        foreach (var processedContour in polygon.ProcessedContours)
+        {
+            Mesh.AddContour(processedContour);
+        }
+
+        if (geometryType != GeometryType.Outlined) Mesh.SetPoints(points);
         
         foreach (var outline in outlines)
         {
