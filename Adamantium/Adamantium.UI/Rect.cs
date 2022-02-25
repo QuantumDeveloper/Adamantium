@@ -462,4 +462,19 @@ public struct Rect
       var rect = maximum - minimum;
       return new Rect(minimum.X, minimum.Y, rect.X, rect.Y);
    }
+
+   public static Rect Parse(string values)
+   {
+      var parsedValues = values.Split(new string[] { " ", "," },
+         StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+      if (parsedValues.Length < 4)
+         throw new ArgumentException($"{values} must contain 4 parameters, but provide only {parsedValues.Length}");
+
+      var rect = new Rect(
+         double.Parse(parsedValues[0]),
+         double.Parse(parsedValues[1]), 
+      double.Parse(parsedValues[2]), 
+      double.Parse(parsedValues[3]));
+      return rect;
+   }
 }

@@ -17,6 +17,9 @@
     <Content Include="Textures\texture.jpg">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <None Include="MainWindow.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Remove="Textures\texture2.jpg" />
     <Content Include="Textures\texture2.jpg">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -26,6 +29,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Adamantium.Fonts\Adamantium.Fonts.csproj" />
+    <ProjectReference Include="..\Adamantium.UI.Xaml\Adamantium.UI.Xaml.csproj" />
     <ProjectReference Include="..\Adamantium.UI\Adamantium.UI.csproj" />
   </ItemGroup>
 
