@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using System.Collections;
+using System.Reflection;
 using System.Xml;
 using System.Xml.Linq;
 using Adamantium.Core;
@@ -12,12 +13,12 @@ public class XamlParser
     {
         public XamlObject()
         {
-            Children = new List<object>();
+            Children = new List<XamlObject>();
         }
         
-        public object Parent { get; set; }
+        public XamlObject Parent { get; set; }
         
-        public object Component { get; set; } 
+        public object Element { get; set; } 
         
         public bool IsProperty { get; set; }
         
@@ -25,7 +26,27 @@ public class XamlParser
         
         public bool IsAdamantiumComponent { get; set; }
         
-        public List<object> Children { get; set; }
+        public List<XamlObject> Children { get; }
+
+        public override string ToString()
+        {
+            return Element.GetType().Name;
+        }
+
+        public override bool Equals(object? obj)
+        {
+            if (obj is XamlObject xamlObject)
+            {
+                return xamlObject.Element == Element;
+            }
+
+            return false;
+        }
+
+        public override int GetHashCode()
+        {
+            return Element.GetHashCode();
+        }
     }
     
     private static string DefaultNamespace = "Adamantium.UI";
@@ -71,7 +92,7 @@ public class XamlParser
                 }
                 
                 rootComponent = new XamlObject();
-                rootComponent.Component = currentObject;
+                rootComponent.Element = currentObject;
                 objectsDict[element] = rootComponent;
 
                 rootComponent.IsUIComponent = currentObject is IUIComponent;
@@ -86,6 +107,13 @@ public class XamlParser
                 {
                     var propertyName = element.Name.LocalName.Split('.')[1];
                     var property = currentObject.GetType().GetProperty(propertyName);
+                    var xamlObject = new XamlObject();
+                    xamlObject.Element = property;
+                    xamlObject.IsProperty = true;
+                    xamlObject.Parent = objectsDict[element.Parent];
+                    objectsDict[element] = xamlObject;
+                    xamlObject.Parent.Children.Add(xamlObject);
+                    
                     currentObject = property;
                 }
                 else
@@ -94,7 +122,7 @@ public class XamlParser
                     if (currentObject != null)
                     {
                         var xamlObject = new XamlObject();
-                        xamlObject.Component = currentObject;
+                        xamlObject.Element = currentObject;
                         objectsDict[element] = xamlObject;
                         var parent = objectsDict[element.Parent];
                         xamlObject.Parent = parent;
@@ -108,14 +136,85 @@ public class XamlParser
             }
         }
 
-        return rootComponent.Component as IUIComponent;
+        var rootElement = FormHierarchy(rootComponent);
+
+        return rootElement;
+    }
+
+    private static IUIComponent FormHierarchy(XamlObject rootObject)
+    {
+        var dict = new Dictionary<XamlObject, object>();
+        IUIComponent root = null;
+        object current = null;
+        var stack = new Stack<XamlObject>();
+        stack.Push(rootObject);
+        while (stack.Count > 0)
+        {
+            var xamlObject = stack.Pop();
+
+            if (root != null)
+            {
+                current = dict[xamlObject];
+            }
+
+            if (xamlObject.IsUIComponent && root == null)
+            {
+                root = xamlObject.Element as IUIComponent;
+                current = root;
+            }
+            else if (xamlObject.IsUIComponent && root != null)
+            {
+                var properties = current.GetType().GetProperties();
+                var content = properties.FirstOrDefault(x => x.GetCustomAttribute<ContentAttribute>() != null);
+                if (content.PropertyType.GetInterface(nameof(IEnumerable)) != null)
+                {
+                    var collection = content.GetValue(current);
+                    content.PropertyType.GetMethod("Add")?.Invoke(collection, new[] { xamlObject.Element });
+                }
+                else
+                {
+                    content.SetValue(current, xamlObject.Element);
+                }
+            }
+            else if (xamlObject.IsAdamantiumComponent)
+            {
+                var parent = xamlObject.Parent;
+                if (parent.IsProperty)
+                {
+                    var prop = parent.Element as PropertyInfo;
+                    prop.SetValue(dict[parent], xamlObject.Element);
+                }
+                else if (parent.IsAdamantiumComponent)
+                {
+                    var properties = current.GetType().GetProperties();
+                    var content = properties.FirstOrDefault(x => x.GetCustomAttribute<ContentAttribute>() != null);
+                    if (content.PropertyType.GetInterface(nameof(IEnumerable)) != null)
+                    {
+                        var collection = content.GetValue(current);
+                        content.PropertyType.GetMethod("Add")?.Invoke(collection, new[] { xamlObject.Element });
+                    }
+                    else
+                    {
+                        content.SetValue(current, xamlObject.Element);
+                    }
+                }
+
+            }
+
+            foreach (var obj in xamlObject.Children)
+            {
+                dict[obj] = xamlObject.Element;
+                stack.Push(obj);
+            }
+        }
+        return root;
     }
 
     private static void ParseAttributes(XElement element, XamlObject xamlObject)
     {
         if (!xamlObject.IsAdamantiumComponent) return;
         
-        var component = xamlObject.Component as IAdamantiumComponent;
+        var component = xamlObject.Element as IAdamantiumComponent;
         var attributes = element.Attributes().ToList();
         var properties = component.GetType().GetProperties();
                     
@@ -144,17 +243,31 @@ public class XamlParser
                         }
                         if (type == null) throw new XamlParseException($"Cannot find an object type {controlType} in namespace {ns}");
 
-                        if (type == typeof(Brush))
+                        // TODO make generic processing for abstract types
+                        var parseMethod = type.GetMethod("Parse");
+                        if (parseMethod != null)
                         {
-                            var brush = Brush.Parse(value);
-                            prop.SetValue(component, brush);
+                            var result = parseMethod.Invoke(component, new[] { value });
+                            prop.SetValue(component, result);
                         }
                     }
-                    else
+                    else if (prop.PropertyType.IsEnum)
+                    {
+                        if (!Enum.TryParse(prop.PropertyType, attribute.Value, true, out var result))
+                        {
+                            throw new XamlParseException($"");
+                        }
+                        prop.SetValue(component, result);
+                    }
+                    else if (prop.PropertyType.IsPrimitive || prop.PropertyType == typeof(string))
                     {
                         prop.SetValue(component, Convert.ChangeType(value, prop.PropertyType));
                     }
-                    
+                    else
+                    {
+                        var val = prop.PropertyType.GetMethod("Parse").Invoke(component, new[] { value });
+                        prop.SetValue(component, val);
+                    }
                 }
             }
         }
