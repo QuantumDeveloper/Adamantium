@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.Core.Events;
@@ -41,6 +42,8 @@ public abstract class Application : AdamantiumComponent, IService
     public WindowCollection Windows { get; private set; }
 
     public ShutDownMode ShutDownMode { get; set; }
+    
+    public Uri StartupUri { get; set; }
 
     protected MainGraphicsDevice MainGraphicsDevice;
     internal IDependencyResolver Services { get; set; }
@@ -97,15 +100,7 @@ public abstract class Application : AdamantiumComponent, IService
     private void RenderThread()
     {
         Dispatcher.CurrentDispatcher.UIThread = Thread.CurrentThread;
-        // Dispatcher.CurrentDispatcher.InvokeAsync(() =>
-        // {
-        //     var wnd = Window.New();
-        //     wnd.Width = 1280;
-        //     wnd.Height = 720;
-        //     Windows.Add(wnd);
-        //     wnd.Show();
-        // });
-            
+        
         while(!cancellationTokenSource.IsCancellationRequested)
         {
             RunUpdateDrawBlock();
@@ -177,7 +172,13 @@ public abstract class Application : AdamantiumComponent, IService
     {
         cancellationTokenSource = new CancellationTokenSource();
         renderThread.Start();
+        OnStartup();
         Dispatcher.CurrentDispatcher.Run(cancellationTokenSource.Token);
+    }
+
+    protected virtual void OnStartup()
+    {
+        
     }
         
     public void Run(IWindow window)

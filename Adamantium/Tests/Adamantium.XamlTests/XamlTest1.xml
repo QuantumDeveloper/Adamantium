@@ -1,9 +1,10 @@
-<Window 
+<Window
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns="Adamantium.UI"
         Title="MainWindow" 
         Height="850" 
         Width="800">
-    <Grid>
+    <Grid x:Class="MainWindow">
     
     <Path StrokeThickness="2" Fill="Red">
         <Path.Data>
