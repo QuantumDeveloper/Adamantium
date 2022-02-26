@@ -48,18 +48,21 @@ public class XamlParser
             return Element.GetHashCode();
         }
     }
+
+    static XamlParser()
+    {
+        assemblies["Adamantium.UI"] = Assembly.Load("Adamantium.UI");
+    }
     
     private static string DefaultNamespace = "Adamantium.UI";
     
     private static Dictionary<XElement, XamlObject> objectsDict = new Dictionary<XElement, XamlObject>();
-    private static Assembly assembly = Assembly.Load("Adamantium.UI");
+    private static Dictionary<string, Assembly> assemblies = new Dictionary<string, Assembly>();
     
     public static IUIComponent Parse(string xamlString)
     {
         ArgumentNullException.ThrowIfNull(xamlString);
-        
         var doc = XDocument.Parse(xamlString, LoadOptions.SetLineInfo);
-        var objectStructure = new XamlObject();
         
         XamlObject rootComponent = null;
         object currentObject = null;
@@ -220,6 +223,15 @@ public class XamlParser
                     
         foreach (var attribute in attributes)
         {
+            if (attribute.IsNamespaceDeclaration)
+            {
+                if (!assemblies.ContainsKey(attribute.Value))
+                {
+                    assemblies[attribute.Value] = Assembly.Load(attribute.Value);
+                }
+                continue;
+            }
+            
             var name = attribute.Name;
             var value = attribute.Value;
             var prop = properties.FirstOrDefault(x => x.Name == name);
@@ -276,7 +288,7 @@ public class XamlParser
     private static object ParseObject(XElement element)
     {
         var controlName = element.Name.LocalName;
-        var type = assembly.DefinedTypes.FirstOrDefault(x => x.Name == controlName);
+        var type = assemblies[element.Name.NamespaceName].DefinedTypes.FirstOrDefault(x => x.Name == controlName);
 
         var ns = element.Name.Namespace.NamespaceName;
         if (string.IsNullOrEmpty(ns))

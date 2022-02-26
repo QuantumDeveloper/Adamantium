@@ -13,14 +13,8 @@ namespace Adamantium.UI.Playground
         static void Main(string[] args)
         {
             var app = new App();
-            //var wnd = new MainWindow();
-            var wnd = XamlParser.Parse(File.ReadAllText("MainWindow.xml")) as IWindow;
-            app.MainWindow = wnd;
-            wnd.Show();
+            app.StartupUri = new Uri("MainWindow.xml", UriKind.RelativeOrAbsolute);
             app.Run();
-            // mainWindow.Width = 1280;
-            // mainWindow.Height = 720;
-            //app.Run(mainWindow);70028128<
         }
     }
 }
