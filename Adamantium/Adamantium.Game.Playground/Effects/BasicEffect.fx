@@ -106,7 +106,7 @@ float4 SmallGlyph_PS(PS_OUTPUT_BASIC input) : SV_TARGET
 
 float4 LargeGlyph_PS(PS_OUTPUT_BASIC input) : SV_TARGET
 {
-    float3 sample = shaderTexture.Sample(sampleType, input.uv).rgb;
+    float4 sample = shaderTexture.Sample(sampleType, input.uv).rgba;
     int2 sz;
     shaderTexture.GetDimensions(sz.x, sz.y);
     float dx = ddx( input.uv.x ) * sz.x;
@@ -115,7 +115,17 @@ float4 LargeGlyph_PS(PS_OUTPUT_BASIC input) : SV_TARGET
     float sigDist = median( sample.r, sample.g, sample.b ) - 0.5;
     float opacity = clamp( sigDist * toPixels + 0.5, 0.0, 1.0 );
 
-    float4 color = float4(foregroundColor.r, foregroundColor.g, foregroundColor.b, opacity);
+    //float4 color = float4(foregroundColor.r, foregroundColor.g, foregroundColor.b, opacity);
+
+    float4 color;
+    if (sample.a >= 0.55)
+    {
+        color = foregroundColor;
+    }
+    else
+    {
+        color = float4(foregroundColor.r, foregroundColor.g, foregroundColor.b, opacity);
+    }
 
 //float3 sample = shaderTexture.Sample(sampleType, input.uv).rgb;
 //    float sigDist = median( sample.r, sample.g, sample.b );
