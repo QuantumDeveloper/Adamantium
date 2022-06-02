@@ -471,10 +471,10 @@ public struct Rect
          throw new ArgumentException($"{values} must contain 4 parameters, but provide only {parsedValues.Length}");
 
       var rect = new Rect(
-         double.Parse(parsedValues[0]),
-         double.Parse(parsedValues[1]), 
-      double.Parse(parsedValues[2]), 
-      double.Parse(parsedValues[3]));
+         double.Parse(parsedValues[0], CultureInfo.InvariantCulture),
+         double.Parse(parsedValues[1], CultureInfo.InvariantCulture), 
+      double.Parse(parsedValues[2], CultureInfo.InvariantCulture), 
+      double.Parse(parsedValues[3], CultureInfo.InvariantCulture));
       return rect;
    }
 }

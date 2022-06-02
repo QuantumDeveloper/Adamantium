@@ -14,8 +14,13 @@ public abstract class WindowBase : ContentControl, IWindow
     public WindowBase()
     {
         WindowWorkerService = IWindowWorkerService.GetWorker();
+        InitializeComponent();
     }
-        
+
+    protected virtual void InitializeComponent()
+    {
+    }
+
     public static readonly RoutedEvent ClientSizeChangedEvent = EventManager.RegisterRoutedEvent("ClientSizeChanged",
         RoutingStrategy.Direct, typeof(SizeChangedEventHandler), typeof(WindowBase));
 
@@ -24,8 +29,9 @@ public abstract class WindowBase : ContentControl, IWindow
         
     public static readonly RoutedEvent StateChangedEvent = EventManager.RegisterRoutedEvent("StateChanged",
         RoutingStrategy.Direct, typeof(StateChangedHandler), typeof(WindowBase));
-        
-        
+
+
+
     public static readonly AdamantiumProperty LeftProperty = AdamantiumProperty.Register(nameof(Left),
         typeof(Double), typeof(WindowBase), new PropertyMetadata(0d));
         
@@ -33,7 +39,7 @@ public abstract class WindowBase : ContentControl, IWindow
         typeof(Double), typeof(WindowBase), new PropertyMetadata(0d));
         
     public static readonly AdamantiumProperty TitleProperty = AdamantiumProperty.Register(nameof(Title),
-        typeof(String), typeof(WindowBase));
+        typeof(String), typeof(WindowBase), new PropertyMetadata(String.Empty, TitleChangedCallback));
 
     public static readonly AdamantiumProperty ClientWidthProperty = AdamantiumProperty.Register(nameof(Width),
         typeof(Double), typeof(WindowBase),
@@ -54,7 +60,18 @@ public abstract class WindowBase : ContentControl, IWindow
     public static readonly AdamantiumProperty StateProperty = AdamantiumProperty.Register(nameof(State), 
         typeof(WindowState), typeof(WindowBase),
         new PropertyMetadata(WindowState.Normal, PropertyMetadataOptions.AffectsRender, StateChangedCallback));
-        
+
+    private static void TitleChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (!(a is WindowBase component)) return;
+
+        if (component.WindowWorkerService != null)
+        {
+            var title = (string)e.NewValue;
+            component.WindowWorkerService.SetTitle(title);
+        }
+    }
+
     private static void StateChangedCallback(AdamantiumComponent adamantiumComponent, AdamantiumPropertyChangedEventArgs e)
     {
         if (!(adamantiumComponent is WindowBase component)) return;

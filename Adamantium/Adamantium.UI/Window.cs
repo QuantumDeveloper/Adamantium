@@ -1,4 +1,7 @@
 using System;
+using System.IO;
+using Adamantium.UI.Controls;
+using Adamantium.UI.Markup;
 using Adamantium.UI.Rendering;
 
 namespace Adamantium.UI;
@@ -9,11 +12,6 @@ public class Window : WindowBase
         
     public override IntPtr SurfaceHandle { get; internal set; }
     public override IntPtr Handle { get; internal set; }
-
-    public Window()
-    {
-            
-    }
 
     public override Vector2 PointToClient(Vector2 point)
     {
@@ -31,6 +29,7 @@ public class Window : WindowBase
         {
             VerifyAccess();
             WindowWorkerService.SetWindow(this);
+            WindowWorkerService.SetTitle(Title);
         }
     }
         

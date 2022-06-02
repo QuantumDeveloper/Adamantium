@@ -1,5 +1,5 @@
 using System.IO;
-using Adamantium.UI.Xaml;
+using Adamantium.UI.Markup;
 using NUnit.Framework;
 
 namespace Adamantium.XamlTests;
@@ -14,7 +14,8 @@ public class XamlParseTests
     [Test]
     public void BasicXamlParse()
     {
-        var xamlString = File.ReadAllText("XamlTest1.xml");
-        var res = XamlParser.Parse(xamlString);
+        //var res = XamlParser.Parse("MainWindow.xml");
+        var str = File.ReadAllText("MainWindow.xml");
+        var res = AumlParser.Parse(str);
     }
 }

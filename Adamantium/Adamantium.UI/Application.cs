@@ -18,7 +18,7 @@ using UnhandledExceptionEventHandler = Adamantium.UI.RoutedEvents.UnhandledExcep
 
 namespace Adamantium.UI;
 
-public abstract class Application : AdamantiumComponent, IService
+public abstract class Application : AdamantiumComponent, IService, IApplication
 {
     public IWindow MainWindow
     {
@@ -36,6 +36,8 @@ public abstract class Application : AdamantiumComponent, IService
             }
         }
     }
+
+    public IThemeManager ThemeManager { get; private set; }
 
     private object applicationLocker = new object();
 
@@ -69,8 +71,8 @@ public abstract class Application : AdamantiumComponent, IService
 
     static Application()
     {
-        //ApplicationBuilder.Build();
-        WindowsPlatform.Initialize();
+        ApplicationBuilder.Build();
+        //WindowsPlatform.Initialize();
     }
 
     protected Application()
@@ -89,9 +91,11 @@ public abstract class Application : AdamantiumComponent, IService
         preciseTimer = new PreciseTimer();
         Services = AdamantiumDependencyResolver.Current;
         Services.RegisterInstance<IService>(this);
+        Services.RegisterInstance<IApplication>(this);
         Services.RegisterInstance<SystemManager>(systemManager);
         entityWorld = new EntityWorld(Services);
         eventAggregator = Services.Resolve<IEventAggregator>();
+        ThemeManager = new ThemeManager(Services);
         
         Initialize();
         renderThread = new Thread(RenderThread);
@@ -180,7 +184,7 @@ public abstract class Application : AdamantiumComponent, IService
     {
         
     }
-        
+
     public void Run(IWindow window)
     {
         if (cancellationTokenSource != null) return;
@@ -188,10 +192,10 @@ public abstract class Application : AdamantiumComponent, IService
         MainWindow = window ?? throw new ArgumentNullException($"{nameof(window)}");
         MainWindow.Show();
         Windows.Add(window);
-            
+
         Run();
     }
-        
+
     protected void RunUpdateDrawBlock()
     {
         try
@@ -204,7 +208,7 @@ public abstract class Application : AdamantiumComponent, IService
             EndScene();
             UpdateGameTime(frameTime);
             CalculateFps(frameTime);
-                
+
             CheckExitConditions();
         }
         catch (Exception ex)
@@ -324,7 +328,7 @@ public abstract class Application : AdamantiumComponent, IService
         cancellationTokenSource.Cancel();
         ContentUnloading?.Invoke(this, EventArgs.Empty);
 
-        MainGraphicsDevice.DeviceWaitIdle();
+        MainGraphicsDevice?.DeviceWaitIdle();
         MainGraphicsDevice?.Dispose();
     }
 

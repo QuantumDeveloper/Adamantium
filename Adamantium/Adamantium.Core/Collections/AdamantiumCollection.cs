@@ -116,7 +116,7 @@ namespace Adamantium.Core.Collections
         /// Returns <see cref="ReadOnlyCollection{T}"/> of the <see cref="AdamantiumCollection{T}"/>
         /// </summary>
         /// <returns></returns>
-        public ReadOnlyCollection<T> AsReadOnly()
+        public IReadOnlyCollection<T> AsReadOnly()
         {
             lock (SyncRoot)
             {

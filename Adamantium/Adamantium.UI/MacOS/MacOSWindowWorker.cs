@@ -80,6 +80,11 @@ public class MacOSWindowWorker : AdamantiumComponent, IWindowWorkerService
         window.ClientHeight = (uint) size.Height;
     }
 
+    public void SetTitle(string title)
+    {
+        throw new NotImplementedException();
+    }
+
     public static implicit operator IntPtr(MacOSWindowWorker worker)
     {
         return worker.windowDelegate;

@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.28729.10
+# Visual Studio Version 17
+VisualStudioVersion = 17.2.32408.312
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Win32", "Adamantium.Win32\Adamantium.Win32.csproj", "{D85CB923-92B2-40F0-9947-F316370814F7}"
 EndProject
@@ -78,9 +78,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Fonts", "Adamant
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.FontTests", "Tests\Adamantium.FontTests\Adamantium.FontTests.csproj", "{2540B1A7-AC53-4CA2-B4F3-8FD11AB279E7}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.UI.Xaml", "Adamantium.UI.Xaml\Adamantium.UI.Xaml.csproj", "{28400A8F-CB82-4619-B2D9-97D81602A6BB}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.XamlTests", "Tests\Adamantium.XamlTests\Adamantium.XamlTests.csproj", "{82A681BE-F84B-47CF-83F0-C13A1BD3B2FD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.XamlTests", "Tests\Adamantium.XamlTests\Adamantium.XamlTests.csproj", "{82A681BE-F84B-47CF-83F0-C13A1BD3B2FD}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.UI.Markup", "Adamantium.UI.Markup\Adamantium.UI.Markup.csproj", "{AC13D4EA-3631-4F83-8A47-0A7F38DD27F9}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.UI.Generators", "Adamantium.UI.Generators\Adamantium.UI.Generators.csproj", "{F8435D84-664B-4B65-94BB-4D867F6FF2F6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -92,10 +94,10 @@ Global
 		{D85CB923-92B2-40F0-9947-F316370814F7}.Debug|x64.Build.0 = Debug|x64
 		{D85CB923-92B2-40F0-9947-F316370814F7}.Release|x64.ActiveCfg = Release|x64
 		{D85CB923-92B2-40F0-9947-F316370814F7}.Release|x64.Build.0 = Release|x64
-		{9A399CD8-EC18-4407-A6C0-82337D9089C7}.Release|x64.ActiveCfg = Release|x64
-		{9A399CD8-EC18-4407-A6C0-82337D9089C7}.Release|x64.Build.0 = Release|x64
 		{9A399CD8-EC18-4407-A6C0-82337D9089C7}.Debug|x64.ActiveCfg = Debug|x64
 		{9A399CD8-EC18-4407-A6C0-82337D9089C7}.Debug|x64.Build.0 = Debug|x64
+		{9A399CD8-EC18-4407-A6C0-82337D9089C7}.Release|x64.ActiveCfg = Release|x64
+		{9A399CD8-EC18-4407-A6C0-82337D9089C7}.Release|x64.Build.0 = Release|x64
 		{9CB44D45-0B39-4EA6-9C98-1FF6302AF245}.Debug|x64.ActiveCfg = Debug|x64
 		{9CB44D45-0B39-4EA6-9C98-1FF6302AF245}.Debug|x64.Build.0 = Debug|x64
 		{9CB44D45-0B39-4EA6-9C98-1FF6302AF245}.Release|x64.ActiveCfg = Release|x64
@@ -224,14 +226,18 @@ Global
 		{2540B1A7-AC53-4CA2-B4F3-8FD11AB279E7}.Debug|x64.Build.0 = Debug|x64
 		{2540B1A7-AC53-4CA2-B4F3-8FD11AB279E7}.Release|x64.ActiveCfg = Release|x64
 		{2540B1A7-AC53-4CA2-B4F3-8FD11AB279E7}.Release|x64.Build.0 = Release|x64
-		{28400A8F-CB82-4619-B2D9-97D81602A6BB}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{28400A8F-CB82-4619-B2D9-97D81602A6BB}.Debug|x64.Build.0 = Debug|Any CPU
-		{28400A8F-CB82-4619-B2D9-97D81602A6BB}.Release|x64.ActiveCfg = Release|Any CPU
-		{28400A8F-CB82-4619-B2D9-97D81602A6BB}.Release|x64.Build.0 = Release|Any CPU
-		{82A681BE-F84B-47CF-83F0-C13A1BD3B2FD}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{82A681BE-F84B-47CF-83F0-C13A1BD3B2FD}.Debug|x64.Build.0 = Debug|Any CPU
+		{82A681BE-F84B-47CF-83F0-C13A1BD3B2FD}.Debug|x64.ActiveCfg = Debug|x64
+		{82A681BE-F84B-47CF-83F0-C13A1BD3B2FD}.Debug|x64.Build.0 = Debug|x64
 		{82A681BE-F84B-47CF-83F0-C13A1BD3B2FD}.Release|x64.ActiveCfg = Release|Any CPU
 		{82A681BE-F84B-47CF-83F0-C13A1BD3B2FD}.Release|x64.Build.0 = Release|Any CPU
+		{AC13D4EA-3631-4F83-8A47-0A7F38DD27F9}.Debug|x64.ActiveCfg = Debug|x64
+		{AC13D4EA-3631-4F83-8A47-0A7F38DD27F9}.Debug|x64.Build.0 = Debug|x64
+		{AC13D4EA-3631-4F83-8A47-0A7F38DD27F9}.Release|x64.ActiveCfg = Release|x64
+		{AC13D4EA-3631-4F83-8A47-0A7F38DD27F9}.Release|x64.Build.0 = Release|x64
+		{F8435D84-664B-4B65-94BB-4D867F6FF2F6}.Debug|x64.ActiveCfg = Debug|x64
+		{F8435D84-664B-4B65-94BB-4D867F6FF2F6}.Debug|x64.Build.0 = Debug|x64
+		{F8435D84-664B-4B65-94BB-4D867F6FF2F6}.Release|x64.ActiveCfg = Release|x64
+		{F8435D84-664B-4B65-94BB-4D867F6FF2F6}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

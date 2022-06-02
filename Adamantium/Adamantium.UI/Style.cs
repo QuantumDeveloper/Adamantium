@@ -1,11 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using Adamantium.Core;
+using Adamantium.UI.Controls;
 using Adamantium.UI.Exceptions;
 
 namespace Adamantium.UI;
 
-public class Style
+public class Style : AdamantiumComponent
 {
    private Dictionary<AdamantiumProperty, ISetter> settersDict;
    
@@ -17,6 +18,8 @@ public class Style
       TargetType = targetType;
       BasedOn = basedOn;
    }
+   
+   public Selector Selector { get; set; }
 
    public Style BasedOn { get; set; }
 
@@ -70,4 +73,9 @@ public class Style
          trigger.Apply(control);
       }
    }
+}
+
+public class Selector
+{
+   
 }

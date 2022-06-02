@@ -98,13 +98,20 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
             this.window.ClientHeight = (uint)client.Height;
 
             this.window.OnApplyTemplate();
-                
+
             eventAggregator.GetEvent<WindowAddedEvent>().Publish(this.window);
                 
             this.window.OnSourceInitialized();
             Win32Interop.ShowWindow(source.Handle, WindowShowStyle.ShowNormal);
             this.window.StateChanged+= WindowOnStateChanged;
         }
+    }
+
+    public void SetTitle(string title)
+    {
+        if (window == null) return;
+        
+        Win32Interop.SetWindowText(window.Handle, title);
     }
 
     private void WindowOnStateChanged(object sender, StateChangedEventArgs e)

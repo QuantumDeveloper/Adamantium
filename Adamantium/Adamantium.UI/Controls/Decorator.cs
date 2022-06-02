@@ -2,10 +2,10 @@
 
 namespace Adamantium.UI.Controls;
 
-public abstract class Decorator:MeasurableComponent
+public abstract class Decorator : MeasurableComponent, IContainer
 {
    public static readonly AdamantiumProperty PaddingProperty = AdamantiumProperty.Register(nameof(Padding),
-      typeof (Thickness), typeof (Decorator),
+      typeof(Thickness), typeof(Decorator),
       new PropertyMetadata(default(Thickness),
          PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange));
 
@@ -65,6 +65,17 @@ public abstract class Decorator:MeasurableComponent
       {
          measurable.Arrange(new Rect(finalSize).Deflate(Padding));
       }
+
       return Child.Bounds.Size;
+   }
+
+   void IContainer.AddOrSetChildComponent(IMeasurableComponent component)
+   {
+      Child = component;
+   }
+
+   void IContainer.RemoveAllChildComponents()
+   {
+      throw new System.NotImplementedException();
    }
 }

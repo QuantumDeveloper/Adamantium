@@ -1,6 +1,6 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using Adamantium.UI.Controls;
-using Adamantium.UI.Xaml;
 
 namespace Adamantium.UI.Playground
 {
@@ -13,12 +13,11 @@ namespace Adamantium.UI.Playground
         
         protected override void OnStartup()
         {
+            if (StartupUri == null) return;
+            
             var path = StartupUri.OriginalString;
-            if (XamlParser.Parse(File.ReadAllText(path)) is IWindow wnd)
-            {
-                MainWindow = wnd;
-                MainWindow.Show();
-            }
+            MainWindow = new MainWindow();
+            MainWindow.Show();
         }
     }
 }

@@ -11,11 +11,11 @@ namespace Adamantium.Core.Collections
    /// </summary>
    /// <typeparam name="TKey"></typeparam>
    /// <typeparam name="TValue"></typeparam>
-   /// <remarks>Notofocations for binding could be switched on or off using EnableNotifications property</remarks>
+   /// <remarks>Notifications for binding could be switched on or off using EnableNotifications property</remarks>
    public class AdamantiumDictionary<TKey, TValue>: IDictionary<TKey, TValue>, IDictionary, INotifyPropertyChanged, INotifyCollectionChanged
    {
       private readonly Dictionary<TKey, TValue> innerDictionary;
-      private readonly object syncObject = new object();
+      protected readonly object syncObject = new object();
 
       /// <summary>
       /// Enbales/disables sending notifications for binding

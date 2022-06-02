@@ -80,7 +80,6 @@ public interface IUIComponent : IFundamentalUIComponent
     IUIComponent VisualParent { get; }
     Int32 ZIndex { get; set; }
     bool IsAttachedToVisualTree { get; }
-    Style Style { get; set; }
     
     Transform LayoutTransform { get; set; }
     

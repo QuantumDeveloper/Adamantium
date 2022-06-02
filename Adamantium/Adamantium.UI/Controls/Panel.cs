@@ -64,12 +64,12 @@ public abstract class Panel: MeasurableComponent, IContainer
       context.EndDraw(this);
    }
 
-   public void AddOrSetChildComponent(IMeasurableComponent component)
+   void IContainer.AddOrSetChildComponent(IMeasurableComponent component)
    {
       Children.Add(component);
    }
 
-   public void RemoveAllChildComponents()
+   void IContainer.RemoveAllChildComponents()
    {
       Children.Clear();
    }

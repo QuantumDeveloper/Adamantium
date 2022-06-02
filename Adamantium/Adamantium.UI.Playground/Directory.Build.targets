@@ -2,7 +2,6 @@
   <PropertyGroup>
       <AssignTargetPathsDependsOn>
          $(AssignTargetPathsDependsOn);
-          EngineContentAndCompileTarget;
       </AssignTargetPathsDependsOn>
   </PropertyGroup>
   

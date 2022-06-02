@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Linq;
 using Adamantium.Core;
 using Adamantium.Engine.Graphics;
@@ -32,7 +31,7 @@ namespace Adamantium.Game
             private set => resourceLoaderDevice = value;
         }
 
-        public ReadOnlyCollection<GraphicsDevice> GraphicsDevices => graphicsDevices.AsReadOnly();
+        public IReadOnlyCollection<GraphicsDevice> GraphicsDevices => graphicsDevices.AsReadOnly();
 
         public GraphicsDeviceService(GameBase gameBase)
         {
