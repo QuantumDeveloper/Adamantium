@@ -76,6 +76,7 @@ public class GeometryGroup : Geometry
                 combined.RecalculateBounds();
             }
             
+            child.ProcessGeometry(GeometryType.Both);
             foreach (var meshContour in child.Mesh.Contours)
             {
                 points.AddRange(meshContour.Points);

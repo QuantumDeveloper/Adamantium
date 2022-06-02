@@ -1,43 +1,49 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net6.0</TargetFramework>
-    <ApplicationIcon />
-    <StartupObject />
-    <Platforms>x64</Platforms>
-    <Configurations>Debug;Release</Configurations>
-    <LangVersion>latestmajor</LangVersion>
-  </PropertyGroup>
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net6.0</TargetFramework>
+		<Platforms>x64</Platforms>
+		<RootNamespace>Adamantium.UI.Playground</RootNamespace>
+		<Configurations>Debug;Release</Configurations>
+		<LangVersion>latest</LangVersion>
+		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+		<CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <Content Include="Textures\texture.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Textures\texture.jpg">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="MainWindow.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <None Remove="Textures\texture2.jpg" />
-    <Content Include="Textures\texture2.jpg">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <None Remove="Models\swordman.dae" />
-  </ItemGroup>
+	<ItemGroup>
+		<Content Include="Textures\texture.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="Textures\texture.jpg">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Textures\texture2.jpg" />
+		<Content Include="Textures\texture2.jpg">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+	</ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\Adamantium.Fonts\Adamantium.Fonts.csproj" />
-    <ProjectReference Include="..\Adamantium.UI.Xaml\Adamantium.UI.Xaml.csproj" />
-    <ProjectReference Include="..\Adamantium.UI\Adamantium.UI.csproj" />
-  </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\Adamantium.Fonts\Adamantium.Fonts.csproj" />
+		<ProjectReference Include="..\Adamantium.UI\Adamantium.UI.csproj" />
+		<ProjectReference Include="..\Adamantium.UI.Markup\Adamantium.UI.Markup.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true"/>
+		<ProjectReference Include="..\Adamantium.UI.Generators\Adamantium.UI.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=netstandard2.0" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <Effect Include="Effects\BasicEffect.fx" />
-    <Effect Include="Effects\UIEffect.fx" />
-  </ItemGroup>
+	<ItemGroup>
+		<Effect Include="Effects\BasicEffect.fx" />
+		<Effect Include="Effects\UIEffect.fx" />
+	</ItemGroup>
 
-  <Import Project="$(SolutionDir)Adamantium.targets" />
+	<!--<ItemGroup>
+		<ProjectReference Include="..\Adamantium.UI.Generators\Adamantium.UI.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=netstandard2.0" />
+	</ItemGroup>-->
+
+	<ItemGroup>
+		<AdditionalFiles Include="$(ProjectDir)**\*.xml" />
+	</ItemGroup>
+	
+	<!--<Import Project="$(SolutionDir)Adamantium.targets" />-->
 
 </Project>

@@ -129,7 +129,7 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
    {
       if (name.Contains("."))
       {
-         throw new ArgumentException(" 'Name' could not contain periods");
+         throw new ArgumentException("'Name' could not contain periods");
       }
       defaultValues = new Dictionary<Type, PropertyMetadata>();
       IsAttached = false;

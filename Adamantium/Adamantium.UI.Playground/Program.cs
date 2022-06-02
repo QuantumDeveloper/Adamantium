@@ -4,7 +4,6 @@ using System;
 using System.IO;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Threading;
-using Adamantium.UI.Xaml;
 
 namespace Adamantium.UI.Playground
 {

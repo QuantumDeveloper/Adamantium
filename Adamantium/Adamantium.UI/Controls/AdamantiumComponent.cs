@@ -380,9 +380,9 @@ public abstract class AdamantiumComponent : DispatcherComponent, IAdamantiumComp
             value = newValue;
         }
 
-        var e = new AdamantiumPropertyChangedEventArgs(property, values[property], value);
+        var args = new AdamantiumPropertyChangedEventArgs(property, values[property], value);
         values[property] = value;
-        metadata.PropertyChangedCallback?.Invoke(this, e);
+        metadata.PropertyChangedCallback?.Invoke(this, args);
         var element = this as IUIComponent;
         if (metadata.AffectsMeasure && element is IMeasurableComponent measurable)
         {
@@ -401,7 +401,7 @@ public abstract class AdamantiumComponent : DispatcherComponent, IAdamantiumComp
 
         if (raiseValueChangedEvent)
         {
-            RaisePropertyChanged(property, e.OldValue, e.NewValue);
+            RaisePropertyChanged(property, args.OldValue, args.NewValue);
         }
     }
 

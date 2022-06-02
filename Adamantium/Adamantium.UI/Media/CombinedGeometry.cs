@@ -213,7 +213,12 @@ public class CombinedGeometry : Geometry
             var allSegments = OutlineMesh1.MergeContourSegments();
             allSegments.AddRange(OutlineMesh2.MergeContourSegments());
 
-            var allSegmentsDict = allSegments.ToDictionary(x => x);
+            var allSegmentsDict = new Dictionary<GeometrySegment, GeometrySegment>();
+            //var allSegmentsDict = allSegments.ToDictionary(x => x);
+            foreach(var segment in allSegments)
+            {
+                allSegmentsDict[segment] = segment;
+            }
             
             // 2. Form contours
             var strokeContours = FormStrokeContours(allSegmentsDict, out var onePointJointCase);
@@ -334,6 +339,11 @@ public class CombinedGeometry : Geometry
                 if (!intersectionsList.ContainsKey(newStart))
                 {
                     intersectionsList[newStart] = new GeometryIntersection(newStart);
+                }
+
+                if (currentSegment == null)
+                {
+                    int bug = 0;
                 }
 
                 // check and create (if needed) the new instance of GeometryIntersection for end of the new segment

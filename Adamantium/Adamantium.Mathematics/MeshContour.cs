@@ -122,9 +122,8 @@ public class MeshContour
                 {
                     pointsHashSet.Add(end);
                     GeometryPoints.Add(end);
+                    updatedPoints.Add(end.Coordinates);
                 }
-                
-                updatedPoints.Add(end.Coordinates);
             }
         }
         
@@ -195,7 +194,10 @@ public class MeshContour
                         }
 
                         var distanceToStart = (point - currentSegment.Start).Length();
-                        selfIntersections[currentSegment].Add(distanceToStart, intersectionsList[point]);
+                        if (!selfIntersections[currentSegment].ContainsKey(distanceToStart))
+                        {
+                            selfIntersections[currentSegment].Add(distanceToStart, intersectionsList[point]);
+                        }
                     }
                 }
             }

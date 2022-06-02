@@ -42,22 +42,25 @@ namespace Adamantium.EntityFramework
         
         private void SyncEntities()
         {
-            if (entitiesToRemove.Count > 0)
+            lock (syncObject)
             {
-                foreach (var entity in entitiesToRemove)
+                if (entitiesToRemove.Count > 0)
                 {
-                    RemoveEntityInternal(entity);
+                    foreach (var entity in entitiesToRemove)
+                    {
+                        RemoveEntityInternal(entity);
+                    }
+                    entitiesToRemove.Clear();
                 }
-                entitiesToRemove.Clear();
-            }
 
-            if (entitiesToAdd.Count > 0)
-            {
-                foreach (var entity in entitiesToAdd)
+                if (entitiesToAdd.Count > 0)
                 {
-                    AddEntityInternal(entity);
+                    foreach (var entity in entitiesToAdd)
+                    {
+                        AddEntityInternal(entity);
+                    }
+                    entitiesToAdd.Clear();
                 }
-                entitiesToAdd.Clear();
             }
         }
         

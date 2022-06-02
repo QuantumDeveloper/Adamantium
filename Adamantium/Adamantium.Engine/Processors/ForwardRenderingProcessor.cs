@@ -479,7 +479,7 @@ namespace Adamantium.Engine.Processors
                                         GraphicsDevice.BasicEffect.Parameters["meshColor"].SetValue(Colors.Black.ToVector3());
                                         GraphicsDevice.BasicEffect.Parameters["transparency"].SetValue(0.5f);
                                         //GraphicsDevice.BasicEffect.Parameters["worldMatrix"].SetValue(transformation.WorldMatrix);
-                                        //GraphicsDevice.BasicEffec.SetValue(Matrix4x4F.Transpose(Matrix4x4F.Invert(transformation.WorldMatrix)));
+                                        //GraphicsDevice.BasicEffect.SetValue(Matrix4x4F.Transpose(Matrix4x4F.Invert(transformation.WorldMatrix)));
                                         
                                         //DeferredDevice.RasterizerState = DeferredDevice.RasterizerStates.Default;
                                         //DeferredDevice.SetRasterizerState(DeferredDevice.RasterizerStates.CullBackClipDisabled);

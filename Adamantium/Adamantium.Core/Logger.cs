@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Adamantium.Core
 {
-    public class Logger
+   public class Logger
    {
       /// <summary>
       /// An action to log a message.
@@ -126,6 +126,7 @@ namespace Adamantium.Core
                return false;
             }
          }
+
          return true;
       }
    }

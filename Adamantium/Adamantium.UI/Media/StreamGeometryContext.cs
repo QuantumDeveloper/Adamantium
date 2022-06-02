@@ -7,6 +7,7 @@ public class StreamGeometryContext : IFigureSegments
     private PathFigure figure;
     private List<PathFigure> figures = new List<PathFigure>();
     private List<MeshContour> contours = new List<MeshContour>();
+    private bool isProcessed;
 
     public IFigureSegments BeginFigure(Vector2 startPoint, bool isFilled, bool isClosed)
     {
@@ -82,11 +83,14 @@ public class StreamGeometryContext : IFigureSegments
 
     internal void ProcessFigures()
     {
+        if (isProcessed) return;
+
         foreach (var pathFigure in figures)
         {
             pathFigure?.ProcessSegments();
         }
-        
+
+        isProcessed = true;
     }
 
     internal int SegmentsCount => figure.Segments.Count;

@@ -2,7 +2,7 @@
 
 namespace Adamantium.UI.Controls;
 
-public class ContentControl : Control
+public class ContentControl : Control, IContainer
 {
    public static readonly AdamantiumProperty ContentProperty = AdamantiumProperty.Register(nameof(Content),
       typeof(object), typeof(ContentControl), new PropertyMetadata(null, ContentChangedCallback));
@@ -31,5 +31,15 @@ public class ContentControl : Control
             o.VisualChildrenCollection.Add((IUIComponent)e.NewValue);
          }
       }
+   }
+
+   void IContainer.AddOrSetChildComponent(IMeasurableComponent component)
+   {
+      Content = component;
+   }
+
+   void IContainer.RemoveAllChildComponents()
+   {
+      Content = null;
    }
 }

@@ -34,8 +34,6 @@
     <Effect Include="HLSL\BasicEffect.fx" />
   </ItemGroup>
 
-  <Import Project="$(SolutionDir)Adamantium.targets" />
-
-  <Import Project="$(SolutionDir)Adamantium.targets" />
+  <!--<Import Project="$(SolutionDir)Adamantium.targets" />-->
 
 </Project>

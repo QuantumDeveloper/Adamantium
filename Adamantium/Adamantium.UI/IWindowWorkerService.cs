@@ -8,6 +8,8 @@ public interface IWindowWorkerService
 {
     public void SetWindow(WindowBase window);
 
+    public void SetTitle(string title);
+
     public static IWindowWorkerService GetWorker()
     {
         switch (Configuration.Platform)

@@ -5,6 +5,10 @@
         <Nullable>enable</Nullable>
 
         <IsPackable>false</IsPackable>
+
+        <Configurations>Release;Debug</Configurations>
+
+        <Platforms>AnyCPU;x64</Platforms>
     </PropertyGroup>
 
     <ItemGroup>
@@ -22,7 +26,14 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\Adamantium.UI.Xaml\Adamantium.UI.Xaml.csproj" />
+      <ProjectReference Include="..\..\Adamantium.UI.Markup\Adamantium.UI.Markup.csproj" />
+      <ProjectReference Include="..\..\Adamantium.UI\Adamantium.UI.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Content Include="MainWindow.xml">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
     </ItemGroup>
 
 </Project>

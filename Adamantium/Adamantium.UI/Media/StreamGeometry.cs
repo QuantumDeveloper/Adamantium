@@ -6,67 +6,68 @@ namespace Adamantium.UI.Media;
 
 public sealed class StreamGeometry : Geometry
 {
-   private Rect bounds;
-   private StreamGeometryContext context;
+    private Rect bounds;
+    private StreamGeometryContext context;
 
-   public StreamGeometry()
-   {
-      context = new StreamGeometryContext();
-   }
+    public StreamGeometry()
+    {
+        context = new StreamGeometryContext();
+    }
 
-   public override Rect Bounds => bounds;
+    public override Rect Bounds => bounds;
 
-   public StreamGeometryContext Open()
-   {
-      context = new StreamGeometryContext();
-      return context;
-   }
-   
-   public static readonly AdamantiumProperty FillRuleProperty = AdamantiumProperty.Register(nameof(FillRule),
-      typeof(FillRule), typeof(StreamGeometry),
-      new PropertyMetadata(FillRule.EvenOdd, PropertyMetadataOptions.AffectsRender));
-   
-   public FillRule FillRule
-   {
-      get => GetValue<FillRule>(FillRuleProperty);
-      set => SetValue(FillRuleProperty, value);
-   }
+    public StreamGeometryContext Open()
+    {
+        context = new StreamGeometryContext();
+        return context;
+    }
 
-   public override Geometry Clone()
-   {
-      throw new NotImplementedException();
-   }
+    public static readonly AdamantiumProperty FillRuleProperty = AdamantiumProperty.Register(nameof(FillRule),
+       typeof(FillRule), typeof(StreamGeometry),
+       new PropertyMetadata(FillRule.EvenOdd, PropertyMetadataOptions.AffectsRender));
 
-   public override void RecalculateBounds()
-   {
-      var contours = context.GetContours();
-      var points = new List<Vector2>();
-      foreach (var contour in contours)
-      {
-         points.AddRange(contour.Points);
-      }
-      bounds = Rect.FromPoints(points);
-   }
+    public FillRule FillRule
+    {
+        get => GetValue<FillRule>(FillRuleProperty);
+        set => SetValue(FillRuleProperty, value);
+    }
 
-   protected internal override void ProcessGeometryCore(GeometryType geometryType)
-   {
-      context.ProcessFigures();
-      var contours = context.GetContours();
-      Mesh.Clear();
+    public override Geometry Clone()
+    {
+        throw new NotImplementedException();
+    }
 
-      if (geometryType == GeometryType.Outlined)
-      {
-         Mesh.AddContours(contours);
-         return;
-      }
-      
-      var polygon = new Polygon();
-      polygon.FillRule = FillRule;
-      polygon.AddContours(contours);
+    public override void RecalculateBounds()
+    {
+        context.ProcessFigures();
+        var contours = context.GetContours();
+        var points = new List<Vector2>();
+        foreach (var contour in contours)
+        {
+            points.AddRange(contour.Points);
+        }
+        bounds = Rect.FromPoints(points);
+    }
 
-      var points = polygon.FillIndirect();
-      Mesh.AddContours(polygon.ProcessedContours);
-      
-      Mesh.SetPoints(points);
-   }
+    protected internal override void ProcessGeometryCore(GeometryType geometryType)
+    {
+        context.ProcessFigures();
+        var contours = context.GetContours();
+        Mesh.Clear();
+
+        if (geometryType == GeometryType.Outlined)
+        {
+            Mesh.AddContours(contours);
+            return;
+        }
+
+        var polygon = new Polygon();
+        polygon.FillRule = FillRule;
+        polygon.AddContours(contours);
+
+        var points = polygon.FillIndirect();
+        Mesh.AddContours(polygon.ProcessedContours);
+
+        Mesh.SetPoints(points);
+    }
 }

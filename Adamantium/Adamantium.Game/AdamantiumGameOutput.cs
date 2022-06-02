@@ -1,11 +1,8 @@
 ﻿using System;
 using Adamantium.Engine.Graphics;
 using Adamantium.Game.Events;
-using Adamantium.Game.GameInput;
-using Adamantium.Imaging;
 using Adamantium.UI;
 using Adamantium.UI.Controls;
-using Adamantium.UI.Input;
 using Adamantium.UI.RoutedEvents;
 using Rectangle = Adamantium.Mathematics.Rectangle;
 

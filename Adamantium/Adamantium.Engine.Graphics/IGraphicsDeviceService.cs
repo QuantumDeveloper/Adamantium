@@ -1,12 +1,12 @@
 ﻿using System;
-using System.Collections.ObjectModel;
+using System.Collections.Generic;
 
 namespace Adamantium.Engine.Graphics
 {
-   /// <summary>
-   /// Interface of GraphicsDeviceService
-   /// </summary>
-   public interface IGraphicsDeviceService
+    /// <summary>
+    /// Interface of GraphicsDeviceService
+    /// </summary>
+    public interface IGraphicsDeviceService
    {
       /// <summary>
       /// Create VulkanInstance, PhysicalDevice and LogicalDevice with certain parameters
@@ -57,7 +57,7 @@ namespace Adamantium.Engine.Graphics
       
       GraphicsDevice ResourceLoaderDevice { get; }
       
-      ReadOnlyCollection<GraphicsDevice> GraphicsDevices { get; }
+      IReadOnlyCollection<GraphicsDevice> GraphicsDevices { get; }
 
    }
 }
