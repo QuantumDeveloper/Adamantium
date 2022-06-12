@@ -11,7 +11,7 @@
     <ProjectReference Include="..\Adamantium.EntityFramework.Components\Adamantium.EntityFramework.Components.csproj" />
     <ProjectReference Include="..\Adamantium.EntityFramework\Adamantium.EntityFramework.csproj" />
     <ProjectReference Include="..\Adamantium.Fonts\Adamantium.Fonts.csproj" />
-    <ProjectReference Include="..\Adamantium.Game\Adamantium.Game.csproj" />
+    <ProjectReference Include="..\Adamantium.Game.Core\Adamantium.Game.Core.csproj" />
     <ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
   </ItemGroup>
 

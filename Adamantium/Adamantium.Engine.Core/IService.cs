@@ -69,11 +69,6 @@ namespace Adamantium.Engine.Core
         event EventHandler Resumed;
 
         /// <summary>
-        /// Fires just after service was initialized
-        /// </summary>
-        event EventHandler<EventArgs> Initialized;
-
-        /// <summary>
         /// Fires when service is ready to work
         /// </summary>
         event EventHandler<EventArgs> ContentLoading;

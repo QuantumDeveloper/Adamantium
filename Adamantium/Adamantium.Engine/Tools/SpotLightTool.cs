@@ -1,15 +1,16 @@
 ﻿using System;
+using Adamantium.Engine.Managers;
 using Adamantium.Engine.Services;
 using Adamantium.Engine.Templates.Lights;
 using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
 using Adamantium.EntityFramework.Components.Extensions;
-using Adamantium.Game.GameInput;
+using Adamantium.Game.Core.Input;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Engine.Tools
 {
-    public class SpotLightTool : LightTool
+    public class SpotLightTool : LightToolBase
     {
         private Vector3F _scale;
         private Entity anchorCenter;
@@ -33,26 +34,26 @@ namespace Adamantium.Engine.Tools
             anchorBackward = Tool.Get("AnchorPointBackward");
         }
 
-        public override void Process(Entity targetEntity, CameraService cameraService, InputService inputService)
+        public override void Process(Entity targetEntity, CameraManager cameraManager, GameInputManager inputManager)
         {
             if (!CheckTargetEntity(targetEntity))
                 return;
 
             HighlightSelectedTool(false);
-            var camera = cameraService.UserControlledCamera;
+            var camera = cameraManager.UserControlledCamera;
 
-            SetIsLocked(inputService);
+            SetIsLocked(inputManager);
 
             if (!IsLocked)
             {
                 Tool.IsEnabled = true;
-                UpdateToolTransform(targetEntity, cameraService, false, true, true);
+                UpdateToolTransform(targetEntity, cameraManager, false, true, true);
 
                 var collisionMode = CollisionMode.CollidersOnly;
 
                 toolIntersectionResult = Tool.Intersects(
                     camera,
-                    inputService.RelativePosition,
+                    inputManager.RelativePosition,
                     collisionMode,
                     CompareOrder.Less,
                     0.05f);
@@ -66,7 +67,7 @@ namespace Adamantium.Engine.Tools
                     HighlightSelectedTool(true);
                 }
 
-                IsLocked = CheckIsLocked(inputService);
+                IsLocked = CheckIsLocked(inputManager);
 
                 if (IsLocked)
                 {
@@ -74,21 +75,21 @@ namespace Adamantium.Engine.Tools
                 }
                 else
                 {
-                    ShouldStayVisible(inputService);
+                    ShouldStayVisible(inputManager);
                 }
             }
 
             if (IsLocked && Enabled)
             {
                 HighlightSelectedTool(true);
-                var intersects = GetRayPlaneIntersectionPoint(camera, inputService, out var interPoint);
+                var intersects = GetRayPlaneIntersectionPoint(camera, inputManager, out var interPoint);
                 if (intersects)
                 {
                     ScaleSpotLight(targetEntity, camera, interPoint);
                 }
             }
 
-            Transform(Tool, cameraService);
+            Transform(Tool, cameraManager);
         }
 
         private void ScaleSpotLight(Entity lightToTransform, Camera camera, Vector3F rayPlaneInterPoint)
@@ -167,9 +168,9 @@ namespace Adamantium.Engine.Tools
             selectedTool.IsSelected = value;
         }
 
-        protected override void UpdateToolTransform(Entity target, CameraService cameraService, bool isLocalAxis, bool useTargetCenter, bool calculateTransform)
+        protected override void UpdateToolTransform(Entity target, CameraManager cameraManager, bool isLocalAxis, bool useTargetCenter, bool calculateTransform)
         {
-            var camera = cameraService.UserControlledCamera;
+            var camera = cameraManager.UserControlledCamera;
             // Set tool to the local coordinates center of the target Entity (not geometrical center)
             if (useTargetCenter)
             {

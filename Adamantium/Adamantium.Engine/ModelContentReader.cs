@@ -28,7 +28,7 @@ namespace Adamantium.Engine
          if (entityWorld == null)
             throw new InvalidOperationException("Unable to retrieve EntityWorld service provider");
          //var camera = contentManager.ServiceProvider.Resolve<CameraService>().UserControlledCamera;
-         var camera = contentManager.ServiceProvider.Resolve<CameraService>().Cameras.FirstOrDefault();
+         
          if (parameters.AssetName.EndsWith(".aemf"))
          {
             return await entityWorld.CreateEntityFromTemplate(new EntityLoadTemplate(parameters.AssetPath, contentManager, graphicsDevice, Vector3.Zero));

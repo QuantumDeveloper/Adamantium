@@ -9,6 +9,7 @@ using Adamantium.Core.DependencyInjection;
 using Adamantium.Core.Events;
 using Adamantium.UI.AggregatorEvents;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Events;
 using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI.Windows;
@@ -16,7 +17,7 @@ namespace Adamantium.UI.Windows;
 internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
 {
     private WindowBase window;
-    private Dictionary<uint, HandleMessage> messageTable;
+    private readonly Dictionary<uint, HandleMessage> messageTable;
     //private Mutex mutex = Mutex.OpenExisting("adamantiumMutex");
 
     private bool isOverSizeFrame;
@@ -24,7 +25,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
     private InputModifiers lastRawMouseModifiers;
     private Win32NativeWindowWrapper source;
 
-    private IEventAggregator eventAggregator;
+    private readonly IEventAggregator eventAggregator;
 
     static Win32WindowWorker()
     {
@@ -99,7 +100,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
 
             this.window.OnApplyTemplate();
 
-            eventAggregator.GetEvent<WindowAddedEvent>().Publish(this.window);
+            eventAggregator.GetEvent<WindowCreatedEvent>().Publish(this.window);
                 
             this.window.OnSourceInitialized();
             Win32Interop.ShowWindow(source.Handle, WindowShowStyle.ShowNormal);
@@ -137,6 +138,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
     private void OnWindowClosed(object sender, EventArgs e)
     {
         source.RemoveHook(CustomWndProc);
+        eventAggregator.GetEvent<WindowClosedEvent>().Publish(window);
     }
 
     /// <summary>
@@ -203,14 +205,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
     {
         var uHitTest = Win32Interop.DefWindowProc(window.Handle, WindowMessages.Nchittest, wParam, lParam);
         var result = (NcHitTest)(Environment.Is64BitProcess ? uHitTest.ToInt64() : uHitTest.ToInt32());
-        if (result != NcHitTest.Client)
-        {
-            isOverSizeFrame = true;
-        }
-        else
-        {
-            isOverSizeFrame = false;
-        }
+        isOverSizeFrame = result != NcHitTest.Client;
         handled = false;
         return Win32Interop.DefWindowProc(window.Handle, windowMessage, wParam, lParam);
     }
@@ -364,7 +359,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         }
         var eventArgs = new RawMouseEventArgs(RawMouseEventType.MouseMove, window, Messages.PointFromLParam(lParam),
             WindowsMouseDevice.GetKeyModifiers(windowMessage, wParam), WindowsMouseDevice.Instance, GetTimeStamp());
-        WindowsMouseDevice.Instance.ProcessEvent((RawMouseEventArgs)eventArgs);
+        WindowsMouseDevice.Instance.ProcessEvent(eventArgs);
         handled = true;
         return IntPtr.Zero;
     }
@@ -374,7 +369,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         trackMouse = false;
         var eventArgs = new RawMouseEventArgs(RawMouseEventType.LeaveWindow, window, Vector2.Zero,
             WindowsKeyboardDevice.Instance.Modifiers, WindowsMouseDevice.Instance, GetTimeStamp());
-        WindowsMouseDevice.Instance.ProcessEvent((RawMouseEventArgs)eventArgs);
+        WindowsMouseDevice.Instance.ProcessEvent(eventArgs);
         handled = true;
         return IntPtr.Zero;
     }
@@ -384,7 +379,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         var eventType = WindowsMouseDevice.EventTypeFromMessage(windowMessage, wParam);
         var eventArgs = new RawMouseEventArgs(eventType, window, Messages.PointFromLParam(lParam),
             WindowsMouseDevice.GetKeyModifiers(windowMessage, wParam), WindowsMouseDevice.Instance, GetTimeStamp());
-        WindowsMouseDevice.Instance.ProcessEvent((RawMouseEventArgs)eventArgs);
+        WindowsMouseDevice.Instance.ProcessEvent(eventArgs);
         handled = true;
         return IntPtr.Zero;
     }
@@ -398,18 +393,17 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
             window.PointToClient(Messages.PointFromLParam(lParam)),
             WindowsMouseDevice.GetKeyModifiers(windowMessage, wParam),
             WindowsMouseDevice.Instance, GetTimeStamp());
-        WindowsMouseDevice.Instance.ProcessEvent((RawMouseEventArgs)eventArgs);
+        WindowsMouseDevice.Instance.ProcessEvent(eventArgs);
         handled = true;
         return IntPtr.Zero;
     }
 
     private IntPtr HandleRawInput(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
     {
-        RawInputData inputData;
         int outSize = 0;
         int size = Marshal.SizeOf(typeof(RawInputData));
 
-        outSize = Win32Interop.GetRawInputData(lParam, RawInputCommand.Input, out inputData, ref size,
+        outSize = Win32Interop.GetRawInputData(lParam, RawInputCommand.Input, out var inputData, ref size,
             Marshal.SizeOf(typeof(RawInputHeader)));
         if (outSize == -1)
         {
@@ -420,8 +414,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         if (inputData.Header.DeviceType == DeviceType.Mouse)
         {
             var position = WindowsMouseDevice.Instance.GetScreenPosition();
-            RECT wndRect;
-            Win32Interop.GetWindowRect(window.Handle, out wndRect);
+            Win32Interop.GetWindowRect(window.Handle, out var wndRect);
             WindowStyle value = Win32Interop.GetWindowStyle(window.Handle, WindowLongType.Style);
             if (!window.IsLocked)
             {
@@ -494,14 +487,15 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
     {
         FocusManager.TryRestoreFocus(window);
         window.IsActive = true;
+        eventAggregator.GetEvent<WindowActivatedEvent>().Publish(window);
     }
 
     private void HandleDeactivation()
     {
         window.IsActive = false;
         window.IsLocked = false;
+        eventAggregator.GetEvent<WindowDeactivatedEvent>().Publish(window);
     }
-
 
     private static InputModifiers GetKeyModifiers(InputModifiers mouse)
     {

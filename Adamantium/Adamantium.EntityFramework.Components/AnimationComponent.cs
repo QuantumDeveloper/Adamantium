@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Adamantium.Engine.Core;
+using Adamantium.Core;
 using Adamantium.Engine.Core.Models;
 using Adamantium.EntityFramework.ComponentsBasics;
 using Adamantium.Mathematics;
@@ -51,7 +51,7 @@ namespace Adamantium.EntityFramework.Components
 
         public Dictionary<string, Matrix4x4F> InterpolatedMatrices { get; private set; }
 
-        public void Update(IGameTime gameTime)
+        public void Update(AppTime gameTime)
         {
             if (!IsPaused)
             {

@@ -1,4 +1,5 @@
 ﻿using System;
+using Adamantium.Core;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Models;
 using Adamantium.Engine.Graphics;
@@ -13,6 +14,6 @@ namespace Adamantium.EntityFramework.Components
 
         protected Buffer IndexBuffer { get; set; }
 
-        public abstract void Draw(GraphicsDevice renderContext, IGameTime gameTime);
+        public abstract void Draw(GraphicsDevice renderContext, AppTime gameTime);
     }
 }

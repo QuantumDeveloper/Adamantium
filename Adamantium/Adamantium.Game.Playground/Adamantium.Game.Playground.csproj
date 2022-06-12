@@ -13,8 +13,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Adamantium.Engine\Adamantium.Engine.csproj" />
       <ProjectReference Include="..\Adamantium.Fonts\Adamantium.Fonts.csproj" />
+      <ProjectReference Include="..\Adamantium.Game\Adamantium.Game.csproj" />
     </ItemGroup>
 
     <ItemGroup>

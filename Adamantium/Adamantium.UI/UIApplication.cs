@@ -1,0 +1,464 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Threading;
+using Adamantium.Core;
+using Adamantium.Core.Collections;
+using Adamantium.Core.DependencyInjection;
+using Adamantium.Core.Events;
+using Adamantium.Engine.Core;
+using Adamantium.Engine.Graphics;
+using Adamantium.EntityFramework;
+using Adamantium.UI.AggregatorEvents;
+using Adamantium.UI.Controls;
+using Adamantium.UI.Events;
+using Adamantium.UI.Input;
+using Adamantium.UI.Processors;
+using Adamantium.UI.Threading;
+using AdamantiumVulkan;
+using UnhandledExceptionEventArgs = Adamantium.UI.RoutedEvents.UnhandledExceptionEventArgs;
+using UnhandledExceptionEventHandler = Adamantium.UI.RoutedEvents.UnhandledExceptionEventHandler;
+
+namespace Adamantium.UI;
+
+public abstract class UIApplication : AdamantiumComponent, IService, IUIApplication
+{
+    private object applicationLocker = new object();
+    
+    private Dictionary<IWindow, WindowService> windowToSystem;
+    
+    private double accumulatedFrameTime;
+    private TimeSpan totalTime;
+    private PreciseTimer preciseTimer;
+    private Double fpsTime;
+    private Int32 fpsCounter;
+    private AppTime appTime;
+        
+    private IWindow mainWindow;
+    private AdamantiumCollection<IWindow> windowsCollection;
+    private List<IWindow> addedWindows;
+    private List<IWindow> closedWindows;
+    private bool firstWindowAdded;
+    private Thread applicationLoopThread;
+    private CancellationTokenSource cancellationTokenSource;
+
+    static UIApplication()
+    {
+        VulkanDllMap.Register();
+        ApplicationBuilder.Build(AdamantiumDependencyResolver.Current);
+    }
+
+    protected UIApplication()
+    {
+        Current = this;
+        DesiredFPS = 60;
+        appTime = new AppTime();
+        ShutDownMode = ShutDownMode.OnMainWindowClosed;
+        windowToSystem = new Dictionary<IWindow, WindowService>();
+        addedWindows = new List<IWindow>();
+        closedWindows = new List<IWindow>();
+        windowsCollection = new AdamantiumCollection<IWindow>();
+        
+        preciseTimer = new PreciseTimer();
+        
+        Resolver = AdamantiumDependencyResolver.Current;
+        EventAggregator = Resolver.Resolve<IEventAggregator>();
+        
+        GraphicsDeviceService = new GraphicsDeviceService(true);
+        EntityWorld = new EntityWorld(Resolver);
+        
+        applicationLoopThread = new Thread(ApplicationLoopThread);
+    }
+
+    public static UIApplication Current { get; private set; }
+
+    public IWindow MainWindow
+    {
+        get => mainWindow;
+        set
+        {
+            if (mainWindow != null)
+            {
+                mainWindow.Closed -= MainWindow_Closed;
+            }
+            mainWindow = value;
+            if (mainWindow != null)
+            {
+                mainWindow.Closed += MainWindow_Closed;
+            }
+        }
+    }
+    
+    public IWindow ActiveWindow { get; private set; }
+
+    public IThemeManager ThemeManager { get; private set; }
+
+    public IReadOnlyList<IWindow> Windows => windowsCollection;
+
+    public ShutDownMode ShutDownMode { get; set; }
+
+    public Uri StartupUri { get; set; }
+
+    public IDependencyResolver Resolver { get; private set; }
+
+    protected IGraphicsDeviceService GraphicsDeviceService { get; private set; }
+    
+    protected IEventAggregator EventAggregator { get; private set; }
+    
+    public EntityWorld EntityWorld { get; private set; }
+
+    public bool IsRunning => cancellationTokenSource != null && cancellationTokenSource.IsCancellationRequested != true;
+    public bool IsPaused { get; private set; }
+    public bool IsFixedTimeStep { get; set; }
+    public double TimeStep => 1.0d / DesiredFPS;
+    public uint DesiredFPS { get; set; }
+    
+    public bool DisableRendering { get; set; }
+
+    internal MouseDevice MouseDevice => MouseDevice.CurrentDevice;
+    internal KeyboardDevice KeyboardDevice => KeyboardDevice.CurrentDevice;
+
+    private void MainWindow_Closed(object sender, EventArgs e)
+    {
+        MainWindow.Closed -= MainWindow_Closed;
+        MainWindow = null;
+    }
+    
+    protected virtual void OnWindowCreated(IWindow wnd)
+    {
+        lock (applicationLocker)
+        {
+            addedWindows.Add(wnd);
+        }
+    }
+
+    protected virtual void OnWindowClosed(IWindow wnd)
+    {
+        lock (applicationLocker)
+        {
+            closedWindows.Add(wnd);
+        }
+    }
+    
+    private void OnWindowAdded(IWindow window)
+    {
+        var renderProcessor = EntityWorld.CreateService<WindowService>(EntityWorld, window);
+        var entity = new Entity();
+        entity.AddComponent(window);
+        EntityWorld.AddEntity(entity);
+
+        windowToSystem.Add(window, renderProcessor);
+
+        if (!firstWindowAdded)
+        {
+            firstWindowAdded = true;
+        }
+    }
+
+    private void OnWindowRemoved(IWindow window)
+    {
+        if (!windowToSystem.ContainsKey(window)) return;
+        
+        var processor = windowToSystem[window];
+        processor.UnloadContent();
+        EntityWorld.RemoveService(processor);
+        windowToSystem.Remove(window);
+
+        if (window == MainWindow)
+        {
+            MainWindow = null;
+        }
+    }
+
+    private void Initialize()
+    {
+        Dispatcher.Initialize();
+        GraphicsDeviceService.CreateMainDevice("Adamantium Main");
+        
+        SubscribeToEvents();
+        RegisterServices();
+        
+        EntityWorld.Initialize();
+        
+        ThemeManager = new ThemeManager(Resolver);
+
+        if (MainWindow != null)
+        {
+            OnWindowCreated(MainWindow);
+        }
+
+        OnInitialize();
+    }
+
+    protected virtual void OnInitialize()
+    {
+        
+    }
+
+    private void SubscribeToEvents()
+    {
+        EventAggregator.GetEvent<WindowCreatedEvent>().Subscribe(OnWindowCreated, ThreadOption.UIThread);
+        EventAggregator.GetEvent<WindowClosedEvent>().Subscribe(OnWindowClosed, ThreadOption.UIThread);
+        EventAggregator.GetEvent<WindowActivatedEvent>().Subscribe(OnWindowActivated, ThreadOption.UIThread);
+        EventAggregator.GetEvent<WindowDeactivatedEvent>().Subscribe(OnWindowDeactivated, ThreadOption.UIThread);
+    }
+    
+    private void RegisterServices()
+    {
+        Resolver.RegisterInstance<IService>(this);
+        Resolver.RegisterInstance<IUIApplication>(this);
+        Resolver.RegisterInstance<EntityWorld>(EntityWorld);
+        Resolver.RegisterInstance<IGraphicsDeviceService>(GraphicsDeviceService);
+    }
+
+    private void OnWindowActivated(IWindow obj)
+    {
+        ActiveWindow = obj;
+    }
+    
+    private void OnWindowDeactivated(IWindow obj)
+    {
+        if (ActiveWindow == obj) ActiveWindow = null;
+    }
+
+    public virtual void Run()
+    {
+        if (IsRunning) return;
+
+        cancellationTokenSource = new CancellationTokenSource();
+        Initialize();
+        OnStartupInternal();
+        applicationLoopThread.Start();
+        Dispatcher.CurrentDispatcher.Run(cancellationTokenSource.Token);
+    }
+
+    public void Run(IWindow window)
+    {
+        if (IsRunning) return;
+
+        MainWindow = window ?? throw new ArgumentNullException($"{nameof(window)}");
+        MainWindow.Show();
+        
+        Run();
+    }
+
+    public void Run(object context)
+    {
+        if (context is IWindow wnd)
+        {
+            Run(wnd);
+        }
+        else
+        {
+            throw new ArgumentException($"{nameof(context)} should be of type IWindow, but currently it is of type {context.GetType()}");
+        }
+    }
+
+    private void OnStartupInternal()
+    {
+        Started?.Invoke(this, EventArgs.Empty);
+        OnStartup();
+    }
+
+    protected virtual void OnStartup()
+    {
+
+    }
+
+    private void ApplicationLoopThread()
+    {
+        Dispatcher.CurrentDispatcher.UIThread = Thread.CurrentThread;
+
+        while (!cancellationTokenSource.IsCancellationRequested)
+        {
+            try
+            {
+                var frameTime = preciseTimer.GetElapsedTime();
+                if (IsFixedTimeStep)
+                {
+                    accumulatedFrameTime += frameTime;
+
+                    if (accumulatedFrameTime >= TimeStep)
+                    {
+                        ProcessPendingWindows();
+                        Update(appTime);
+                        ExecuteDrawSequence(appTime);
+
+                        UpdateAppTime(accumulatedFrameTime);
+                        accumulatedFrameTime = 0;
+                    }
+                }
+                else
+                {
+                    ProcessPendingWindows();
+                    Update(appTime);
+                    ExecuteDrawSequence(appTime);
+                    UpdateAppTime(frameTime);
+                }
+
+                CheckExitConditions();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+                UnhandledException?.Invoke(this, new UnhandledExceptionEventArgs(ex));
+            }
+        }
+    }
+
+    private void ExecuteDrawSequence(AppTime appTime)
+    {
+        if (DisableRendering) return;
+
+        if (BeginScene())
+        {
+            Draw(appTime);
+            EndScene();
+        }
+    }
+
+    /// <summary>
+    /// Updates game time for each frame
+    /// </summary>
+    /// <param name="elapsed">elapsed time from the last frame</param>
+    protected void UpdateAppTime(double elapsed)
+    {
+        TimeSpan frameTimeSpan = TimeSpan.FromSeconds(appTime.FrameTime);
+        if (!IsPaused)
+        {
+            totalTime += frameTimeSpan;
+        }
+        if (appTime.FramesCount > 0 && appTime.FramesCount - 1 < UInt64.MaxValue)
+        {
+            appTime.FramesCount++;
+        }
+        else
+        {
+            appTime.FramesCount = 1;
+        }
+
+        appTime.FrameTime = elapsed;
+        appTime.TotalTime = totalTime;
+        CalculateFps(ref appTime);
+
+    }
+
+    /// <summary>
+    /// Calculates FPS count
+    /// </summary>
+    /// <param name="elapsed"></param>
+    private void CalculateFps(ref AppTime appTime)
+    {
+        fpsCounter++;
+        fpsTime += appTime.FrameTime;
+        if (fpsTime >= 1.0d)
+        {
+            Console.WriteLine($"FPS = {fpsCounter}");
+            appTime.Fps = (fpsCounter) / (Single)fpsTime;
+            fpsCounter = 0;
+            fpsTime = 0;
+        }
+    }
+
+    private void ProcessPendingWindows()
+    {
+        lock (applicationLocker)
+        {
+            for (int i = 0; i < closedWindows.Count; ++i)
+            {
+                OnWindowRemoved(closedWindows[i]);
+            }
+            closedWindows.Clear();
+
+            for (int i = 0; i < addedWindows.Count; ++i)
+            {
+                OnWindowAdded(addedWindows[i]);
+            }
+            addedWindows.Clear();
+        }
+    }
+
+    protected void CheckExitConditions()
+    {
+        // Solving an issue with early closing on the renderCycle
+        if (ShutDownMode != ShutDownMode.OnExplicitShutDown && !firstWindowAdded) return;
+
+        if (ShutDownMode == ShutDownMode.OnMainWindowClosed && MainWindow == null)
+        {
+            ShutDown();
+        }
+        else if (ShutDownMode == ShutDownMode.OnLastWindowClosed && Windows.Count == 0)
+        {
+            ShutDown();
+        }
+    }
+
+    protected virtual bool BeginScene()
+    {
+        return GraphicsDeviceService.IsInitialized;
+    }
+
+    protected void Update(AppTime frameTime)
+    {
+        EntityWorld.ServiceManager.Update(frameTime);
+    }
+
+    protected void Draw(AppTime frameTime)
+    {
+        EntityWorld.ServiceManager.Draw(frameTime);
+    }
+
+    protected void EndScene()
+    {
+        EntityWorld.ServiceManager.DisplayContent();
+    }
+
+    public void ShutDown()
+    {
+        ShuttingDown?.Invoke(this, EventArgs.Empty);
+        cancellationTokenSource.Cancel();
+        ContentUnloading?.Invoke(this, EventArgs.Empty);
+        FreeResources();
+        Stopped?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void FreeResources()
+    {
+        if (GraphicsDeviceService is IDisposable disposableDevice)
+        {
+            disposableDevice?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Calling this method will pause running service
+    /// </summary>
+    public void Pause()
+    {
+        if (!IsPaused)
+        {
+            IsPaused = true;
+            Paused?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    /// <summary>
+    /// Calling this method will resume running service
+    /// </summary>
+    public void Resume()
+    {
+        if (IsPaused)
+        {
+            IsPaused = false;
+            Resumed?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    public event EventHandler<EventArgs> Started;
+    public event EventHandler<EventArgs> ShuttingDown;
+    public event EventHandler<EventArgs> Stopped;
+    public event EventHandler Paused;
+    public event EventHandler Resumed;
+    public event EventHandler<EventArgs> ContentLoading;
+    public event EventHandler<EventArgs> ContentUnloading;
+    public event UnhandledExceptionEventHandler UnhandledException;
+}
