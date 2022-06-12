@@ -1,14 +1,15 @@
-﻿using Adamantium.Engine.Services;
+﻿using Adamantium.Engine.Managers;
+using Adamantium.Engine.Services;
 using Adamantium.Engine.Templates.Tools;
 using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
 using Adamantium.EntityFramework.Components.Extensions;
-using Adamantium.Game.GameInput;
+using Adamantium.Game.Core.Input;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Engine.Tools
 {
-    public class MoveTool: TransformTool
+    public class MoveTool: ToolBase
     {
         private Vector3F toolDelta;
 
@@ -45,15 +46,15 @@ namespace Adamantium.Engine.Tools
             centralManipulator = Tool.Get(CentralManipulatorName);
         }
 
-        public override void Process(Entity targetEntity, CameraService cameraService, InputService inputService)
+        public override void Process(Entity targetEntity, CameraManager cameraManager, GameInputManager inputManager)
         {
             if (!CheckTargetEntity(targetEntity))
                 return;
 
             HighlightSelectedTool(false);
-            var camera = cameraService.UserControlledCamera;
+            var camera = cameraManager.UserControlledCamera;
 
-            if (inputService.IsMouseButtonReleased(MouseButton.Left))
+            if (inputManager.IsMouseButtonReleased(MouseButton.Left))
             {
                 IsLocked = false;
                 ResetVisibility(true);
@@ -62,12 +63,12 @@ namespace Adamantium.Engine.Tools
             if (!IsLocked)
             {
                 Tool.IsEnabled = true;
-                UpdateToolTransform(targetEntity, cameraService, LocalTransformEnabled, true, true);
+                UpdateToolTransform(targetEntity, cameraManager, LocalTransformEnabled, true, true);
                 var collisionMode = CollisionMode.Mixed;
 
                 toolIntersectionResult = Tool.Intersects(
                     camera,
-                    inputService.VirtualPosition,
+                    inputManager.VirtualPosition,
                     collisionMode,
                     CompareOrder.Less, 
                     0.05f);
@@ -80,7 +81,7 @@ namespace Adamantium.Engine.Tools
                     toolDelta = selectedTool.GetRelativePosition(camera) - toolIntersectionResult.IntersectionPoint;
                 }
 
-                IsLocked = CheckIsLocked(inputService);
+                IsLocked = CheckIsLocked(inputManager);
 
                 if (IsLocked)
                 {
@@ -88,14 +89,14 @@ namespace Adamantium.Engine.Tools
                 }
                 else
                 {
-                    ShouldStayVisible(inputService);
+                    ShouldStayVisible(inputManager);
                 }
             }
 
             if (IsLocked && Enabled)
             {
                 HighlightSelectedTool(true);
-                var intersects = GetRayPlaneIntersectionPoint(camera, inputService, out var interPoint);
+                var intersects = GetRayPlaneIntersectionPoint(camera, inputManager, out var interPoint);
                 if (intersects)
                 {
                     TransformEntityPosition(targetEntity, camera, interPoint);
@@ -108,7 +109,7 @@ namespace Adamantium.Engine.Tools
                     UpdateAxisVisibility(current, camera);
                 },
                 true);
-            Transform(Tool, cameraService);
+            Transform(Tool, cameraManager);
         }
 
         private void TransformEntityPosition(Entity entityToTransform, Camera camera, Vector3F rayPlaneInterPoint)

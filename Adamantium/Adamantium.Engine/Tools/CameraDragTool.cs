@@ -1,12 +1,13 @@
-﻿using Adamantium.Engine.Services;
+﻿using Adamantium.Engine.Managers;
+using Adamantium.Engine.Services;
 using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
-using Adamantium.Game.GameInput;
+using Adamantium.Game.Core.Input;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Engine.Tools
 {
-    public class CameraDragTool: TransformTool
+    public class CameraDragTool: ToolBase
     {
         private Vector3F dragStart;
 
@@ -14,16 +15,16 @@ namespace Adamantium.Engine.Tools
         {
         }
 
-        public override void Process(Entity targetEntity, CameraService cameraService, InputService inputService)
+        public override void Process(Entity targetEntity, CameraManager cameraManager, GameInputManager inputManager)
         {
-            var camera = cameraService.UserControlledCamera;
+            var camera = cameraManager.UserControlledCamera;
 
-            SetIsLocked(inputService);
+            SetIsLocked(inputManager);
 
             if (!IsLocked)
             {
-                var nearPoint = Vector3F.Unproject(new Vector3F(inputService.RelativePosition.X, inputService.RelativePosition.Y, 1), 0, 0, camera.Width, camera.Height, 0, 1, camera.ViewMatrix * camera.ProjectionMatrix);
-                var farPoint = Vector3F.Unproject(new Vector3F(inputService.RelativePosition.X, inputService.RelativePosition.Y, 0), 0, 0, camera.Width, camera.Height, 0, 1, camera.ViewMatrix * camera.ProjectionMatrix);
+                var nearPoint = Vector3F.Unproject(new Vector3F(inputManager.RelativePosition.X, inputManager.RelativePosition.Y, 1), 0, 0, camera.Width, camera.Height, 0, 1, camera.ViewMatrix * camera.ProjectionMatrix);
+                var farPoint = Vector3F.Unproject(new Vector3F(inputManager.RelativePosition.X, inputManager.RelativePosition.Y, 0), 0, 0, camera.Width, camera.Height, 0, 1, camera.ViewMatrix * camera.ProjectionMatrix);
                 var direction = farPoint - nearPoint;
                 direction.Normalize();
                 var ray = new Ray(nearPoint, direction);
@@ -36,12 +37,12 @@ namespace Adamantium.Engine.Tools
                     dragStart = interPoint;
                 }
 
-                IsLocked = CheckIsLocked(inputService);
+                IsLocked = CheckIsLocked(inputManager);
             }
 
             if (IsLocked && Enabled)
             {
-                var intersects = GetRayPlaneIntersectionPoint(camera, inputService, out var interPoint);
+                var intersects = GetRayPlaneIntersectionPoint(camera, inputManager, out var interPoint);
                 if (intersects)
                 {
                     MoveCamera(camera, interPoint);

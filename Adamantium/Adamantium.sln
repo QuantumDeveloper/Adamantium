@@ -84,6 +84,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.UI.Markup", "Ada
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.UI.Generators", "Adamantium.UI.Generators\Adamantium.UI.Generators.csproj", "{F8435D84-664B-4B65-94BB-4D867F6FF2F6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.Game.Core", "Adamantium.Game.Core\Adamantium.Game.Core.csproj", "{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -238,6 +240,10 @@ Global
 		{F8435D84-664B-4B65-94BB-4D867F6FF2F6}.Debug|x64.Build.0 = Debug|x64
 		{F8435D84-664B-4B65-94BB-4D867F6FF2F6}.Release|x64.ActiveCfg = Release|x64
 		{F8435D84-664B-4B65-94BB-4D867F6FF2F6}.Release|x64.Build.0 = Release|x64
+		{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}.Debug|x64.Build.0 = Debug|Any CPU
+		{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}.Release|x64.ActiveCfg = Release|Any CPU
+		{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

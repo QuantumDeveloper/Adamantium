@@ -1,14 +1,15 @@
-﻿using Adamantium.Engine.Services;
+﻿using Adamantium.Engine.Managers;
+using Adamantium.Engine.Services;
 using Adamantium.Engine.Templates.Tools;
 using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
 using Adamantium.EntityFramework.Components.Extensions;
-using Adamantium.Game.GameInput;
+using Adamantium.Game.Core.Input;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Engine.Tools
 {
-    public class RotationTool: TransformTool
+    public class RotationTool: ToolBase
     {
         private float limitDistance = 0.06f;
         private Vector3F lastCoordinates;
@@ -36,20 +37,20 @@ namespace Adamantium.Engine.Tools
             centralManipulator = Tool.Get("CentralManipulator");
         }
 
-        public override void Process(Entity targetEntity, CameraService cameraService, InputService inputService)
+        public override void Process(Entity targetEntity, CameraManager cameraManager, GameInputManager inputManager)
         {
             if (!CheckTargetEntity(targetEntity))
                 return;
 
             HighlightSelectedTool(false);
-            var camera = cameraService.UserControlledCamera;
+            var camera = cameraManager.UserControlledCamera;
 
-            SetIsLocked(inputService);
+            SetIsLocked(inputManager);
 
             if (!IsLocked)
             {
                 Tool.IsEnabled = true;
-                UpdateToolTransform(targetEntity, cameraService, LocalTransformEnabled, false, true);
+                UpdateToolTransform(targetEntity, cameraManager, LocalTransformEnabled, false, true);
 
                 Tool.TraverseByLayer(
                     (current) =>
@@ -57,13 +58,13 @@ namespace Adamantium.Engine.Tools
                         TransformRotationTool(current, camera);
                     },
                     true);
-                Transform(Tool, cameraService);
+                Transform(Tool, cameraManager);
 
                 var collisionMode = CollisionMode.Mixed;
 
                 toolIntersectionResult = Tool.Intersects(
                     camera,
-                    inputService.RelativePosition,
+                    inputManager.RelativePosition,
                     collisionMode,
                     CompareOrder.Less,
                     limitDistance);
@@ -74,32 +75,32 @@ namespace Adamantium.Engine.Tools
                     lastCoordinates = toolIntersectionResult.IntersectionPoint;
                     HighlightSelectedTool(true);
                 }
-                IsLocked = CheckIsLocked(inputService);
-                ShouldStayVisible(inputService);
+                IsLocked = CheckIsLocked(inputManager);
+                ShouldStayVisible(inputManager);
             }
 
             if (IsLocked)
             {
                 HighlightSelectedTool(true);
-                var intersects = GetRayPlaneIntersectionPoint(camera, inputService, out var interPoint);
+                var intersects = GetRayPlaneIntersectionPoint(camera, inputManager, out var interPoint);
                 if (intersects)
                 {
-                    TransformEntityByRotationTool(targetEntity, camera, inputService);
+                    TransformEntityByRotationTool(targetEntity, camera, inputManager);
                     Tool.TraverseByLayer(
                         (current) =>
                         {
                             TransformRotationTool(current, camera);
                         },
                         true);
-                    Transform(Tool, cameraService);
+                    Transform(Tool, cameraManager);
                 }
             }
         }
 
-        private void TransformEntityByRotationTool(Entity targetEntity, Camera camera, InputService inputService)
+        private void TransformEntityByRotationTool(Entity targetEntity, Camera camera, GameInputManager inputManager)
         {
             Vector3F start = lastCoordinates;
-            Vector3F end = new Vector3F(inputService.VirtualPosition);
+            Vector3F end = new Vector3F(inputManager.VirtualPosition);
             float radians = MathHelper.AngleBetween2D(Vector3F.Normalize(start), Vector3F.Normalize(end));
             radians /= coefficient;
 
@@ -186,7 +187,7 @@ namespace Adamantium.Engine.Tools
                     targetEntity.Transform.Rotate(Vector3F.Up, radians);
                 }
             }
-            lastCoordinates = new Vector3F(inputService.VirtualPosition);
+            lastCoordinates = new Vector3F(inputManager.VirtualPosition);
         }
 
         private void TransformRotationTool(Entity current, Camera camera)

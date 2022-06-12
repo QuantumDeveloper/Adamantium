@@ -1,49 +1,41 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Runtime.InteropServices;
-using System.Threading;
 using System.Threading.Tasks;
 using Adamantium.Engine;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Content;
 using Adamantium.Engine.Core.Models;
-using Adamantium.Engine.Graphics;
-using Adamantium.Engine.Processors;
+using Adamantium.Engine.EntityServices;
 using Adamantium.Engine.Templates;
 using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
 using Adamantium.Fonts;
-using Adamantium.Game.Events;
+using Adamantium.Game.Core;
+using Adamantium.Game.Core.Events;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
-using Adamantium.UI;
-using AdamantiumVulkan.Core;
 using Image = Adamantium.Imaging.Image;
 
 namespace Adamantium.Game.Playground
 {
-    internal class AdamantiumGame : Engine.Game
+    public class AdamantiumGame : Game
     {
         private TypeFace typeFace;
-        public AdamantiumGame(GameMode gameMode) : base(gameMode)
+        
+        public AdamantiumGame():base(GameMode.Slave)
         {
             EventAggregator.GetEvent<GameOutputCreatedEvent>().Subscribe(OnWindowCreated);
         }
 
         private void OnWindowCreated(GameOutput output)
         {
-            EntityWorld.CreateProcessor<ForwardRenderingProcessor>(EntityWorld, output);
+            EntityWorld.CreateService<ForwardRenderingService>(EntityWorld, output);
         }
 
-        /// <summary>
-        /// Method for initialization of all resources needed for game at startup.
-        /// At this point device already initialized
-        /// </summary>
         protected override void Initialize()
         {
             base.Initialize();
-            InitializeResources();
+            InitializeGameResources();
         }
 
         protected override void LoadContent()
@@ -52,6 +44,29 @@ namespace Adamantium.Game.Playground
             LoadModels();
         }
 
+        private void InitializeGameResources()
+        {
+            try
+            {
+                EntityWorld.CreateService<InputService>(EntityWorld);
+                EntityWorld.CreateService<TransformService>(EntityWorld);
+            }
+            catch (Exception exception)
+            {
+                Console.WriteLine(exception);
+            }
+        }
+        
+        public Task<Entity> ImportModel(SceneData scene)
+        {
+            return Task.Run(() => EntityWorld.CreateEntityFromTemplate(new EntityImportTemplate(scene, Content, CameraManager.UserControlledCamera)));
+        }
+
+        public Task<Entity> ImportModel(String pathToFile, ContentLoadOptions options = null)
+        {
+            return Task.Run(() => Content.Load<Entity>(pathToFile, options));
+        }
+        
         private async void LoadModels()
         {
             // var entity = await ImportModel(@"Models\monkey\monkey.dae");
@@ -62,29 +77,6 @@ namespace Adamantium.Game.Playground
             //await ImportModel(@"Models\F15C\F-15C_Eagle.dae");
             //ImportFont();
             ImportOTFFont();
-        }
-
-        private void InitializeResources()
-        {
-            try
-            {
-                EntityWorld.CreateProcessor<InputProcessor>(EntityWorld);
-                EntityWorld.CreateProcessor<TransformProcessor>(EntityWorld);
-            }
-            catch (Exception exception)
-            {
-                Console.WriteLine(exception);
-            }
-        }
-        
-        public Task<Entity> ImportModel(SceneData scene)
-        {
-            return Task.Run(() => EntityWorld.CreateEntityFromTemplate(new EntityImportTemplate(scene, Content, CameraService.UserControlledCamera)));
-        }
-
-        public Task<Entity> ImportModel(String pathToFile, ContentLoadOptions options = null)
-        {
-            return Task.Run(() => Content.Load<Entity>(pathToFile, options));
         }
 
         private void ImportFont()
@@ -366,15 +358,10 @@ namespace Adamantium.Game.Playground
                 var visSubpixels = glyph.GetVisSubpixels();
                 var visEntity = VisualizeSubpixelRendering(visSubpixels);*/
 
+                // Generate MSDF texture
                 /*var atlasGen = new TextureAtlasGenerator();
                 
-                var stopwatch = new Stopwatch(); 
-                stopwatch.Start();
-
                 var mtsdfAtlasData = atlasGen.GenerateTextureAtlas(typeface, font, mtsdfTextureSize, sampleRate, 4,0, (int)typeface.GlyphCount, GeneratorType.Msdf);
-                
-                stopwatch.Stop();                
-                Console.WriteLine($"{typeface.GlyphCount} glyphs: {stopwatch.ElapsedMilliseconds} ms");
                 
                 SaveAtlas(@"Textures\mtsdf.png", mtsdfAtlasData);*/
 

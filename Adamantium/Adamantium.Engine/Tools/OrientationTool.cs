@@ -1,15 +1,16 @@
 ﻿using System;
+using Adamantium.Engine.Managers;
 using Adamantium.Engine.Services;
 using Adamantium.Engine.Templates.Tools;
 using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
 using Adamantium.EntityFramework.Components.Extensions;
-using Adamantium.Game.GameInput;
+using Adamantium.Game.Core.Input;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Engine.Tools
 {
-    public class OrientationTool: TransformTool
+    public class OrientationTool: ToolBase
     {
         private Entity rightAxisManipulator;
         private Entity leftAxisManipulator;
@@ -33,12 +34,12 @@ namespace Adamantium.Engine.Tools
             centralManipulator = Tool.Get("CentralManipulator");
         }
 
-        public override void Process(Entity targetEntity, CameraService cameraService, InputService inputService)
+        public override void Process(Entity targetEntity, CameraManager cameraManager, GameInputManager inputManager)
         {
             Tool.TraverseByLayer((current) =>
             {
                 var colliders = current.GetComponents<Collider>();
-                foreach (var camera in cameraService.ActiveCameras)
+                foreach (var camera in cameraManager.ActiveCameras)
                 {
                     TransformOrientationTool(current, camera);
                     for (int i = 0; i < colliders.Length; ++i)
@@ -54,9 +55,9 @@ namespace Adamantium.Engine.Tools
 
                     current.Transform.GetMetadata(camera).IsSelected = false;
 
-                    if (camera == cameraService.UserControlledCamera)
+                    if (camera == cameraManager.UserControlledCamera)
                     {
-                        toolIntersectionResult = Tool.Intersects(camera, inputService.RelativePosition, false, camera.UiProjection, CollisionMode.IgnoreNonGeometryParts, CompareOrder.Greater, 0, false);
+                        toolIntersectionResult = Tool.Intersects(camera, inputManager.RelativePosition, false, camera.UiProjection, CollisionMode.IgnoreNonGeometryParts, CompareOrder.Greater, 0, false);
 
                         if (toolIntersectionResult.Intersects)
                         {
@@ -66,10 +67,10 @@ namespace Adamantium.Engine.Tools
                 }
             }, true);
 
-            if (inputService.IsMouseButtonPressed(MouseButton.Left) && toolIntersectionResult.Intersects)
+            if (inputManager.IsMouseButtonPressed(MouseButton.Left) && toolIntersectionResult.Intersects)
             {
                 selectedTool = toolIntersectionResult.Entity;
-                HandleMouseClick(cameraService.UserControlledCamera);
+                HandleMouseClick(cameraManager.UserControlledCamera);
             }
         }
 

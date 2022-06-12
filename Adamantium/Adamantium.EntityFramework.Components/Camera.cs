@@ -1,4 +1,5 @@
 ﻿using System;
+using Adamantium.Core;
 using Adamantium.Engine.Core;
 using Adamantium.EntityFramework.Components.Extensions;
 using Adamantium.EntityFramework.ComponentsBasics;
@@ -219,7 +220,7 @@ namespace Adamantium.EntityFramework.Components
             Type = CameraType.Special;
         }
 
-        private void ContiniousRotation(IGameTime gameTime)
+        private void ContiniousRotation(AppTime gameTime)
         {
             if (!rotationDone)
             {
@@ -249,7 +250,7 @@ namespace Adamantium.EntityFramework.Components
             Type = CameraType.Free;
         }
 
-        private void MoveToPoint(IGameTime gameTime)
+        private void MoveToPoint(AppTime gameTime)
         {
             if (!moveToObjectDone)
             {
@@ -266,7 +267,7 @@ namespace Adamantium.EntityFramework.Components
             }
         }
 
-        public override void Update(IGameTime gameTime)
+        public override void Update(AppTime gameTime)
         {
             Rotation.Normalize();
             MoveToPoint(gameTime);

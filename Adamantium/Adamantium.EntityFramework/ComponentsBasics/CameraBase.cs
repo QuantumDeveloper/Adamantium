@@ -1,6 +1,7 @@
 ﻿using Adamantium.Mathematics;
 using System;
 using Adamantium.Engine.Core;
+using Adamantium.Core;
 
 namespace Adamantium.EntityFramework.ComponentsBasics
 {
@@ -203,7 +204,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             }
         }
 
-        public abstract void Update(IGameTime gameTime);
+        public abstract void Update(AppTime gameTime);
 
         ///<summary>
         ///Rotate camera absolutely around base X, Y and Z axis.

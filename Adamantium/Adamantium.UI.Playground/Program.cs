@@ -12,6 +12,8 @@ namespace Adamantium.UI.Playground
         static void Main(string[] args)
         {
             var app = new App();
+            app.IsFixedTimeStep = false;
+            app.DesiredFPS = 300;
             app.StartupUri = new Uri("MainWindow.xml", UriKind.RelativeOrAbsolute);
             app.Run();
         }
