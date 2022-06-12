@@ -12,7 +12,7 @@ namespace Adamantium.Core.Collections
     /// </summary>
     /// <remarks>Implements <see cref="INotifyPropertyChanged"/> and <see cref="INotifyPropertyChanged"/> interfaces</remarks>
     /// <typeparam name="T"></typeparam>
-    public class AdamantiumCollection<T> : IList<T>, IReadOnlyCollection<T>
+    public class AdamantiumCollection<T> : IList<T>, IReadOnlyList<T>
     {
         private T[] items;
         private int currentIndex;

@@ -5,7 +5,7 @@ namespace Adamantium.UI.Rendering;
 
 public interface IWindowRenderer
 {
-    public bool IsWindowResized { get; }
+    public bool IsWindowUpToDate { get; }
         
     public void SetWindow(IWindow window);
         

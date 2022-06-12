@@ -1,17 +1,15 @@
-﻿using Adamantium.Engine.Graphics;
+﻿using Adamantium.UI;
 
-namespace Adamantium.Game.Playground
+namespace Adamantium.Game.Playground;
+
+class Program
 {
-    using Game = Adamantium.Engine.Game;
-
-    class Program
+    static void Main(string[] args)
     {
-        static void Main(string[] args)
-        {
-            var game = new AdamantiumGame(GameMode.Standalone);
-            var wnd = game.CreateWindow();
-            wnd.Show();
-            game.Run();
-        }
+        var game = new AdamantiumGameApplication();
+        var wnd = new Window();
+        wnd.Width = 1280;
+        wnd.Height = 720;
+        game.Run(wnd);
     }
 }

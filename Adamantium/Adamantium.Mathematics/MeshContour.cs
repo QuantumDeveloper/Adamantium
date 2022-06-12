@@ -264,8 +264,11 @@ public class MeshContour
     public MeshContour Copy()
     {
         var copy = new MeshContour();
-
+        
         if (Segments != null) copy.Segments = new List<GeometrySegment>(Segments);
+        
+        if (Points == null) return copy;
+        
         copy.Points = new Vector2[Points.Length];
         Array.Copy(Points, copy.Points, Points.Length);
         if (GeometryPoints != null) copy.GeometryPoints = new List<GeometryIntersection>(GeometryPoints);

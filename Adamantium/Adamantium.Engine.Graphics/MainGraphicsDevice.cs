@@ -121,6 +121,7 @@ namespace Adamantium.Engine.Graphics
 
         protected override void Dispose(bool disposeManaged)
         {
+            LogicalDevice?.DeviceWaitIdle();
             LogicalDevice?.DestroyCommandPool(CommandPool);
             LogicalDevice?.Dispose();
             VulkanInstance?.Dispose();

@@ -6,7 +6,7 @@ using Adamantium.UI.Controls;
 
 namespace Adamantium.UI.Threading;
 
-internal class MacOSPlatform : IApplicationPlatform
+public class MacOSPlatform : IApplicationPlatform
 {
     private IntPtr appDelegate;
     private IntPtr app;
@@ -37,8 +37,8 @@ internal class MacOSPlatform : IApplicationPlatform
 
     public event Action Signaled;
 
-    public static void Initialize()
+    public static void Initialize(IDependencyResolver resolver)
     {
-        AdamantiumDependencyResolver.Current.RegisterSingleton<IApplicationPlatform, MacOSPlatform>();
+        resolver.RegisterSingleton<IApplicationPlatform, MacOSPlatform>();
     }
 }

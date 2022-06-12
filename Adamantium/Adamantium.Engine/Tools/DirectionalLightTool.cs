@@ -1,38 +1,39 @@
-﻿using Adamantium.Engine.Services;
+﻿using Adamantium.Engine.Managers;
+using Adamantium.Engine.Services;
 using Adamantium.Engine.Templates.Lights;
 using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components.Extensions;
-using Adamantium.Game.GameInput;
+using Adamantium.Game.Core.Input;
 
 namespace Adamantium.Engine.Tools
 {
-    public class DirectionalLightTool : LightTool
+    public class DirectionalLightTool : LightToolBase
     {
         public DirectionalLightTool(string name) : base(name)
         {
             Tool = new DirectionalLightVisualTemplate().BuildEntity(null, "Directional");
         }
 
-        public override void Process(Entity targetEntity, CameraService cameraService, InputService inputService)
+        public override void Process(Entity targetEntity, CameraManager cameraManager, GameInputManager inputManager)
         {
             if (!CheckTargetEntity(targetEntity))
                 return;
 
             HighlightSelectedTool(false);
-            var camera = cameraService.UserControlledCamera;
+            var camera = cameraManager.UserControlledCamera;
 
-            SetIsLocked(inputService);
+            SetIsLocked(inputManager);
 
             if (!IsLocked)
             {
                 Tool.IsEnabled = true;
-                UpdateToolTransform(targetEntity, cameraService, false, true, true);
+                UpdateToolTransform(targetEntity, cameraManager, false, true, true);
 
                 var collisionMode = CollisionMode.CollidersOnly;
 
                 toolIntersectionResult = Tool.Intersects(
                     camera,
-                    inputService.RelativePosition,
+                    inputManager.RelativePosition,
                     collisionMode,
                     CompareOrder.Less,
                     0.05f);
@@ -44,7 +45,7 @@ namespace Adamantium.Engine.Tools
                     HighlightSelectedTool(true);
                 }
 
-                IsLocked = CheckIsLocked(inputService);
+                IsLocked = CheckIsLocked(inputManager);
 
                 if (IsLocked)
                 {
@@ -52,11 +53,11 @@ namespace Adamantium.Engine.Tools
                 }
                 else
                 {
-                    ShouldStayVisible(inputService);
+                    ShouldStayVisible(inputManager);
                 }
             }
 
-            Transform(Tool, cameraService);
+            Transform(Tool, cameraManager);
         }
     }
 }

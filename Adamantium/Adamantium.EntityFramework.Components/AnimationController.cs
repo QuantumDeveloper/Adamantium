@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Adamantium.Core;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Models;
 using Adamantium.EntityFramework.ComponentsBasics;
@@ -33,7 +34,7 @@ namespace Adamantium.EntityFramework.Components
 
       public Dictionary<String, Matrix4x4F> FinalMatrices { get; }
 
-      public void Update(IGameTime gameTime)
+      public void Update(AppTime gameTime)
       {
          var animation = GetComponentInParents<AnimationComponent>();
          if (animation != null && animation.IsAnimationStarted && IsEnabled)

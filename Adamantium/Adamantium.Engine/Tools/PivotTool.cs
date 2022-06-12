@@ -1,15 +1,16 @@
 ﻿using System;
+using Adamantium.Engine.Managers;
 using Adamantium.Engine.Services;
 using Adamantium.Engine.Templates.Tools;
 using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
 using Adamantium.EntityFramework.Components.Extensions;
-using Adamantium.Game.GameInput;
+using Adamantium.Game.Core.Input;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Engine.Tools
 {
-    public class PivotTool: TransformTool
+    public class PivotTool: ToolBase
     {
         private Vector3F toolDelta;
         private float limitDistance = 0.06f;
@@ -62,15 +63,15 @@ namespace Adamantium.Engine.Tools
             pivotPoint = Tool.Get(PivotPointName);
         }
 
-        public override void Process(Entity targetEntity, CameraService cameraService, InputService inputService)
+        public override void Process(Entity targetEntity, CameraManager cameraManager, GameInputManager inputManager)
         {
             if (!CheckTargetEntity(targetEntity))
                 return;
 
             HighlightSelectedTool(false);
-            var camera = cameraService.UserControlledCamera;
+            var camera = cameraManager.UserControlledCamera;
 
-            if (inputService.IsMouseButtonReleased(MouseButton.Left))
+            if (inputManager.IsMouseButtonReleased(MouseButton.Left))
             {
                 IsLocked = false;
                 ResetVisibility(true);
@@ -79,7 +80,7 @@ namespace Adamantium.Engine.Tools
             if (!IsLocked)
             {
                 Tool.IsEnabled = true;
-                UpdateToolTransform(targetEntity, cameraService, false, true, false);
+                UpdateToolTransform(targetEntity, cameraManager, false, true, false);
                 Tool.Transform.SetRotation(targetEntity.Transform.PivotRotation);
                 Tool.TraverseByLayer(
                     current =>
@@ -93,7 +94,7 @@ namespace Adamantium.Engine.Tools
 
                 toolIntersectionResult = Tool.Intersects(
                     camera,
-                    inputService.RelativePosition,
+                    inputManager.RelativePosition,
                     collisionMode,
                     CompareOrder.Less,
                     limitDistance);
@@ -106,7 +107,7 @@ namespace Adamantium.Engine.Tools
                     toolDelta = selectedTool.GetRelativePosition(camera) - toolIntersectionResult.IntersectionPoint;
                 }
 
-                IsLocked = CheckIsLocked(inputService);
+                IsLocked = CheckIsLocked(inputManager);
 
                 if (IsLocked)
                 {
@@ -114,14 +115,14 @@ namespace Adamantium.Engine.Tools
                 }
                 else
                 {
-                    ShouldStayVisible(inputService);
+                    ShouldStayVisible(inputManager);
                 }
             }
 
             if (IsLocked && Enabled)
             {
                 HighlightSelectedTool(true);
-                var intersects = GetRayPlaneIntersectionPoint(camera, inputService, out var interPoint);
+                var intersects = GetRayPlaneIntersectionPoint(camera, inputManager, out var interPoint);
                 if (intersects)
                 {
                     Tool.TraverseByLayer(
@@ -134,7 +135,7 @@ namespace Adamantium.Engine.Tools
                 }
             }
 
-            Transform(Tool, cameraService);
+            Transform(Tool, cameraManager);
         }
 
         protected override void UpdateAxisVisibility(Entity current, Camera camera)
@@ -290,9 +291,9 @@ namespace Adamantium.Engine.Tools
             }
         }
 
-        protected virtual void UpdateToolTransform(Entity target, CameraService cameraService, bool isLocalAxis, bool useTargetCenter, bool calculateTransform)
+        protected virtual void UpdateToolTransform(Entity target, CameraManager cameraManager, bool isLocalAxis, bool useTargetCenter, bool calculateTransform)
         {
-            var camera = cameraService.UserControlledCamera;
+            var camera = cameraManager.UserControlledCamera;
             // Set tool to the local coordinates center of the target Entity (not geometrical center)
             Tool.TraverseByLayer(current =>
             {

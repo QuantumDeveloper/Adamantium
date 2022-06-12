@@ -12,7 +12,7 @@ namespace Adamantium.EntityFramework
     {
         private object syncObject = new object();
 
-        private List<Entity> rootEntities;
+        private readonly List<Entity> rootEntities;
         private readonly Dictionary<Int64, Entity> availableEntities;
         private readonly Dictionary<String, EntityGroup> entitiesByGroup;
         private readonly List<Entity> entitiesToAdd;
@@ -20,19 +20,26 @@ namespace Adamantium.EntityFramework
 
         public EntityWorld(IDependencyResolver container)
         {
-            if (container == null) throw new ArgumentNullException($"{nameof(container)} should not be null");
-            
             rootEntities = new List<Entity>();
             availableEntities = new Dictionary<long, Entity>();
             entitiesByGroup = new Dictionary<String, EntityGroup>();
             entitiesToAdd = new List<Entity>();
             entitiesToRemove = new List<Entity>();
 
-            Services = container;
-            System = new EntitySystem(this);
-            SystemManager = Services.Resolve<SystemManager>();
-            SystemManager.AddSystem(System);
-            System.FrameEnded += FrameEnded;
+            DependencyResolver = container ?? throw new ArgumentNullException($"{nameof(container)} should not be null");
+            ServiceManager = new EntityServiceManager(this);
+            ServiceManager.FrameEnded += FrameEnded;
+        }
+
+        public IReadOnlyList<Entity> RootEntities => rootEntities.AsReadOnly();
+
+        public EntityServiceManager ServiceManager { get; }
+
+        public IDependencyResolver DependencyResolver { get; }
+
+        public void Initialize()
+        {
+            ServiceManager.InitializeResources();
         }
 
         private void FrameEnded()
@@ -81,13 +88,6 @@ namespace Adamantium.EntityFramework
                 OnEntityRemoved(entity);
             }
         }
-
-        public Entity[] RootEntities => rootEntities.ToArray();
-
-        public IDependencyResolver Services { get; }
-
-        private readonly EntitySystem System;
-        private readonly SystemManager SystemManager;
 
         public Entity CreateEntity(string name, Entity owner = null, bool addToWorld = true, bool createDisabled = false)
         {
@@ -169,14 +169,14 @@ namespace Adamantium.EntityFramework
             return entity;
         }
 
-        public T GetProcessor<T>() where T : EntityProcessor
+        public T GetService<T>() where T : EntityService
         {
-            return System.GetProcessor<T>();
+            return ServiceManager.GetService<T>();
         }
 
-        public T[] GetProcessors<T>() where T : EntityProcessor
+        public T[] GetServices<T>() where T : EntityService
         {
-            return System.GetProcessors<T>();
+            return ServiceManager.GetServices<T>();
         }
 
         private void OnEntityAdded(Entity entity)
@@ -192,26 +192,36 @@ namespace Adamantium.EntityFramework
         public event EventHandler<EntityEventArgs> EntityAdded;
         public event EventHandler<EntityEventArgs> EntityRemoved;
 
-        public T CreateProcessor<T>(params object[] args) where T : EntityProcessor
+        public T CreateService<T>(params object[] args) where T : EntityService
         {
-            var processor = (T)Activator.CreateInstance(typeof(T), args);
-            AddProcessor(processor);
-            return processor;
+            var service = (T)Activator.CreateInstance(typeof(T), args);
+            AddService(service);
+            return service;
         }
 
-        public void AddProcessor(EntityProcessor processor)
+        public void AddService(EntityService service)
         {
-            System.AddProcessor(processor);
+            ServiceManager.AddService(service);
         }
 
-        public void RemoveProcessor(EntityProcessor processor)
+        public void RemoveService(EntityService service)
         {
-            System.RemoveProcessor(processor);
+            ServiceManager.RemoveService(service);
         }
 
-        public void RemoveProcessor(long processorId)
+        public void RemoveService(long processorId)
         {
-            System.RemoveProcessor(processorId);
+            ServiceManager.RemoveService(processorId);
+        }
+        
+        public void AddServices(params EntityService[] services)
+        {
+            ServiceManager.AddServices(services);
+        }
+
+        public void RemoveServices(params EntityService[] services)
+        {
+            ServiceManager.RemoveServices(services);
         }
 
         public EntityGroup CreateGroup(string groupName)
@@ -495,11 +505,7 @@ namespace Adamantium.EntityFramework
                 rootEntities.Clear();
                 availableEntities.Clear();
                 entitiesByGroup.Clear();
-                var systems = System.Processors;
-                for (int i = 0; i < systems.Length; i++)
-                {
-                    systems[i].Reset();
-                }
+                ServiceManager.Reset();
                 WorldReseted?.Invoke(this, EventArgs.Empty);
             }
         }

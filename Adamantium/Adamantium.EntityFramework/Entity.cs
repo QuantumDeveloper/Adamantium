@@ -46,6 +46,7 @@ namespace Adamantium.EntityFramework
         private EntityComponentCollection componentCollection;
         private ReadOnlyTrackingCollection<IComponent> readOnlyComponents;
         private List<IInitializable> pendingComponents = new List<IInitializable>();
+        private bool visible;
 
         public Transform Transform { get; internal set; }
 
@@ -59,18 +60,16 @@ namespace Adamantium.EntityFramework
             set => SetProperty(ref name, value);
         }
 
-        public bool Visible { get; set; }
+        public bool Visible 
+        { 
+            get => visible; 
+            set => SetProperty(ref visible, value); 
+        }
 
         public bool IsEnabled
         {
             get => isEnabled;
-            set
-            {
-                if (SetProperty(ref isEnabled, value))
-                {
-                    EnabledChanged?.Invoke(this, new StateEventArgs(value));
-                }
-            }
+            set => SetProperty(ref isEnabled, value);
         }
 
         public bool IsSelected
@@ -101,8 +100,6 @@ namespace Adamantium.EntityFramework
 
             OwnerChanged?.Invoke(this, new OwnerChangedEventArgs(oldOwner, newOwner));
         }
-
-        public event EventHandler<StateEventArgs> EnabledChanged;
 
         public event EventHandler<OwnerChangedEventArgs> OwnerChanged;
 
@@ -347,7 +344,7 @@ namespace Adamantium.EntityFramework
         public Entity Duplicate()
         {
             Entity root = new Entity(null, $"{this.Name} (1)");
-            System.Collections.Generic.Dictionary<long, Entity> entities = new System.Collections.Generic.Dictionary<long, Entity>();
+            var entities = new Dictionary<long, Entity>();
             entities.Add(Uid, root);
             CloneComponents(root, this);
             TraverseByLayer(current =>

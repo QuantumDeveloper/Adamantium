@@ -1,4 +1,5 @@
 ﻿using System;
+using Adamantium.Core;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.EntityFramework.ComponentsBasics;
@@ -50,7 +51,7 @@ namespace Adamantium.EntityFramework.Components
 
         protected abstract bool Update(GraphicsDevice graphicsContext);
 
-        public override void Draw(GraphicsDevice graphicsContext, IGameTime gameTime)
+        public override void Draw(GraphicsDevice graphicsContext, AppTime gameTime)
         {
             if (!IsEnabled)
             {

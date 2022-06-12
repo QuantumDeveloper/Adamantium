@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>disable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" />
+      <ProjectReference Include="..\Adamantium.Engine.Graphics\Adamantium.Engine.Graphics.csproj" />
+      <ProjectReference Include="..\Adamantium.EntityFramework\Adamantium.EntityFramework.csproj" />
+      <ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
+      <ProjectReference Include="..\Adamantium.UI\Adamantium.UI.csproj" />
+      <ProjectReference Include="..\Adamantium.XInput\Adamantium.XInput.csproj" />
+    </ItemGroup>
+
+</Project>

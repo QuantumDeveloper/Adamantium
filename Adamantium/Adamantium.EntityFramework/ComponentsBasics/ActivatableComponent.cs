@@ -5,25 +5,17 @@ namespace Adamantium.EntityFramework.ComponentsBasics
 {
     public abstract class ActivatableComponent: Component
    {
-      private Boolean _isEnabled;
+      private Boolean isEnabled;
 
       protected ActivatableComponent()
       {
-         _isEnabled = true;
+         isEnabled = true;
       }
 
       public bool IsEnabled
       {
-         get => _isEnabled;
-          set
-         {
-            if (SetProperty(ref _isEnabled, value))
-            {
-               EnabledChanged?.Invoke(this, new StateEventArgs(value));
-            }
-         }
+         get => isEnabled;
+         set => SetProperty(ref isEnabled, value);
       }
-
-      public event EventHandler<StateEventArgs> EnabledChanged;
    }
 }

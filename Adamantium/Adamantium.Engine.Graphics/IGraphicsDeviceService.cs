@@ -11,7 +11,7 @@ namespace Adamantium.Engine.Graphics
       /// <summary>
       /// Create VulkanInstance, PhysicalDevice and LogicalDevice with certain parameters
       /// </summary>
-      void CreateMainDevice();
+      void CreateMainDevice(string name);
 
       GraphicsDevice CreateRenderDevice(PresentationParameters parameters);
 

@@ -12,7 +12,7 @@ internal class WindowRenderer : IWindowRenderer
 {
     private IWindow window;
 
-    public bool IsWindowResized { get; private set; }
+    public bool IsWindowUpToDate { get; private set; }
     private Viewport viewport;
     private Rect2D scissor;
     private Matrix4x4F projectionMatrix;
@@ -42,7 +42,7 @@ internal class WindowRenderer : IWindowRenderer
 
     private void UpdateWindowResources()
     {
-        IsWindowResized = true;
+        IsWindowUpToDate = true;
         InitializeWindowResources();
     }
 
@@ -68,7 +68,7 @@ internal class WindowRenderer : IWindowRenderer
     public void ResizePresenter(PresentationParameters parameters)
     {
         graphicsDevice.ResizePresenter(parameters);
-        IsWindowResized = false;
+        IsWindowUpToDate = false;
     }
 
     private void CalculateProjectionMatrix()

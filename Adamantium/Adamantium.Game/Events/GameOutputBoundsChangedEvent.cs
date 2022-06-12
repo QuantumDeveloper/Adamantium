@@ -1,9 +1,0 @@
-﻿using Adamantium.Core.Events;
-
-namespace Adamantium.Game.Events
-{
-    public class GameOutputBoundsChangedEvent : BasicAggregatorEvent<GameOutputBoundsChangedPayload>
-    {
-        
-    }
-}

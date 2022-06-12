@@ -57,8 +57,8 @@ public class WindowsPlatform : IApplicationPlatform
 
     public event Action Signaled;
 
-    public static void Initialize()
+    public static void Initialize(IDependencyResolver resolver)
     {
-        AdamantiumDependencyResolver.Current.RegisterSingleton<IApplicationPlatform, WindowsPlatform>();
+        resolver.RegisterSingleton<IApplicationPlatform, WindowsPlatform>();
     }
 }
