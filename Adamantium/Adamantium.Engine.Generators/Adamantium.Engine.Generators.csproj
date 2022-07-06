@@ -1,0 +1,60 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <Configurations>Debug;Release</Configurations>
+        <Platforms>x64</Platforms>
+        <LangVersion>latest</LangVersion>
+        <Nullable>disable</Nullable>
+	    <!--<IsRoslynComponent>true</IsRoslynComponent>-->
+    </PropertyGroup>
+
+    <ItemGroup>
+      <Compile Remove="bin\**" />
+      <EmbeddedResource Remove="bin\**" />
+      <None Remove="bin\**" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.1.0" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.3" PrivateAssets="all" />
+        <CompilerVisibleItemMetadata Include="AdditionalFiles" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="bin\x64\Debug\netstandard2.0\\Adamantium.Engine.Generators.dll" />
+    </ItemGroup>
+	
+	<ItemGroup>
+        <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Adamantium.Engine.Effects\Adamantium.Engine.Effects.csproj" GeneratePathProperty="true" PrivateAssets="all" />
+        <ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" GeneratePathProperty="true" PrivateAssets="all" />
+        <ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" GeneratePathProperty="true" PrivateAssets="all" />
+        <ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.Common\AdamantiumVulkan.Common.csproj" GeneratePathProperty="true" PrivateAssets="all" />
+        <ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.Shaders\AdamantiumVulkan.Shaders.csproj" GeneratePathProperty="true" PrivateAssets="all" />
+        <ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.SPIRV\AdamantiumVulkan.SPIRV.csproj" GeneratePathProperty="true" PrivateAssets="all" />
+        <ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.SPIRV.Reflection\AdamantiumVulkan.SPIRV.Reflection.csproj" GeneratePathProperty="true" PrivateAssets="all" />
+        <ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.SPIRV.Cross\AdamantiumVulkan.SPIRV.Cross.csproj" GeneratePathProperty="true" PrivateAssets="all" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- Generator dependencies -->
+        <PackageReference Include="MessagePack" Version="2.3.112" GeneratePathProperty="true" PrivateAssets="all" />
+		<PackageReference Include="MessagePack.Annotations" Version="2.3.112" GeneratePathProperty="true" PrivateAssets="all" />
+    </ItemGroup>
+
+    <PropertyGroup>
+        <GetTargetPathDependsOn>$(GetTargetPathDependsOn);GetDependencyTargetPaths</GetTargetPathDependsOn>
+    </PropertyGroup>
+
+    <Target Name="GetDependencyTargetPaths">
+        <ItemGroup>
+            <TargetPathWithTargetPlatformMoniker Include="$(PKGMessagePack)\lib\netstandard2.0\MessagePack.dll" IncludeRuntimeDependency="false" />
+			<TargetPathWithTargetPlatformMoniker Include="$(PKGMessagePack_Annotations)\lib\netstandard2.0\MessagePack.Annotations.dll" IncludeRuntimeDependency="false" />
+        </ItemGroup>
+    </Target>
+
+</Project>

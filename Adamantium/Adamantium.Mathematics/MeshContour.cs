@@ -205,32 +205,32 @@ public class MeshContour
 
         Segments.Clear();
         
-        foreach (var (key, value) in selfIntersections)
+        foreach (var pair in selfIntersections)
         {
-            if (value.Count == 0)
+            if (pair.Value.Count == 0)
             {
-                Segments.Add(key);
+                Segments.Add(pair.Key);
                 continue;
             }
 
-            key.RemoveSelfFromConnectedSegments();
+            pair.Key.RemoveSelfFromConnectedSegments();
             
-            var startPart = new GeometrySegment(key.Parent, key.SegmentEnds[0], value.Values.First());
+            var startPart = new GeometrySegment(pair.Key.Parent, pair.Key.SegmentEnds[0], pair.Value.Values.First());
             Segments.Add(startPart);
             
             if (fillRule == FillRule.EvenOdd)
             {
-                for (var i = 0; i < value.Values.Count - 1; i++)
+                for (var i = 0; i < pair.Value.Values.Count - 1; i++)
                 {
-                    var int1 = value.Values[i];
-                    var int2 = value.Values[i + 1];
+                    var int1 = pair.Value.Values[i];
+                    var int2 = pair.Value.Values[i + 1];
 
-                    var seg = new GeometrySegment(key.Parent, int1, int2);
-                    key.Parent.Segments.Add(seg);
+                    var seg = new GeometrySegment(pair.Key.Parent, int1, int2);
+                    pair.Key.Parent.Segments.Add(seg);
                 }
             }
 
-            var endPart = new GeometrySegment(key.Parent, value.Values.Last(), key.SegmentEnds[1]);
+            var endPart = new GeometrySegment(pair.Key.Parent, pair.Value.Values.Last(), pair.Key.SegmentEnds[1]);
             Segments.Add(endPart);
         }
         

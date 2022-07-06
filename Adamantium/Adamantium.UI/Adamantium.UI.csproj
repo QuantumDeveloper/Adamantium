@@ -7,10 +7,11 @@
     <RootNamespace>Adamantium.UI</RootNamespace>
     <PackageId>Adamantium.UI</PackageId>
     <Authors>Adamantium.UI</Authors>
-    <Company>Adamantium</Company>
+    <Company>Adamantium Studio</Company>
     <Product>Adamantium.UI</Product>
     <Configurations>Debug;Release</Configurations>
-    <LangVersion>latestmajor</LangVersion>
+    <LangVersion>latest</LangVersion>
+	<Nullable>disable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>
@@ -31,7 +32,4 @@
   <ItemGroup>
     <PackageReference Include="System.ObjectModel" Version="4.0.12" />
   </ItemGroup>
-
-  <!--<Import Project="$(SolutionDir)Adamantium.targets" />-->
-
 </Project>

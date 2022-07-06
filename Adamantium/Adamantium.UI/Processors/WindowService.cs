@@ -59,8 +59,8 @@ public class WindowService : UiService
         GraphicsDevice.ClearColor = Colors.White;
         GraphicsDevice.AddDynamicStates(DynamicState.Viewport, DynamicState.Scissor);
 
-        windowRenderer = new WindowRenderer(GraphicsDevice);
-        var renderer = (WindowRenderer)windowRenderer;
+        windowRenderer = new ForwardWindowRenderer(GraphicsDevice);
+        var renderer = (ForwardWindowRenderer)windowRenderer;
         renderer.Parameters = parameters;
         windowRenderer.SetWindow(Window);
     }

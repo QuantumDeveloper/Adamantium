@@ -103,7 +103,7 @@ public class GeometrySegment
         return Start.GetHashCode() ^ End.GetHashCode();
     }
 
-    public override bool Equals(object? obj)
+    public override bool Equals(object obj)
     {
         if (obj is GeometrySegment segment)
         {

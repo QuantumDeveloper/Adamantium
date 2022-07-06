@@ -1,3 +1,4 @@
+#if NETCORE
 using System.Runtime.Intrinsics.X86;
 
 namespace Adamantium.Mathematics
@@ -27,3 +28,4 @@ namespace Adamantium.Mathematics
         }
     }
 }
+#endif

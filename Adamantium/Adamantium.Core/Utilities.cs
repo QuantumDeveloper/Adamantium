@@ -20,8 +20,13 @@ namespace Adamantium.Core
 
         public static unsafe void ClearMemory(ref IntPtr dest, byte value, int sizeInBytesToClear)
         {
+            #if NETCORE
             Span<byte> bytes = new Span<byte>(dest.ToPointer(), sizeInBytesToClear);
             bytes.Fill(value);
+            #else
+            var bytes = new byte[sizeInBytesToClear];
+            Marshal.Copy(dest, bytes, 0, sizeInBytesToClear);
+            #endif
         }
 
         public static bool IsEnum<T>(T type)
@@ -48,7 +53,7 @@ namespace Adamantium.Core
         {
             if (stream == null || !stream.CanRead)
             {
-                return new byte[0];
+                return Array.Empty<byte>();
             }
 
             long size = readLength;
@@ -62,7 +67,7 @@ namespace Adamantium.Core
 
             if (size == 0)
             {
-                return new byte[0];
+                return Array.Empty<byte>();
             }
 
             var buffer = new byte[size];

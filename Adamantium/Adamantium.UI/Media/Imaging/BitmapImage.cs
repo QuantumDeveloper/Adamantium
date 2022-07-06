@@ -39,16 +39,16 @@ public sealed class BitmapImage : BitmapSource
 
    public BitmapImage(Uri source)
    {
-      // var device = Application.Current.Services.Get<GraphicsDevice>();
-      // try
-      // {
-      //    //DXTexture = Texture.Load(device, source.IsAbsoluteUri ? source.AbsolutePath : source.OriginalString);
-      // }
-      // catch (Exception exception)
-      // {
-      //    DecodeFailed?.Invoke(this, new ExceptionEventArgs(exception));
-      // }
-   }
+        var deviceService = UIApplication.Current.Resolver.Resolve<GraphicsDeviceService>();
+        try
+        {
+            //DXTexture = Texture.Load(device, source.IsAbsoluteUri ? source.AbsolutePath : source.OriginalString);
+        }
+        catch (Exception exception)
+        {
+            DecodeFailed?.Invoke(this, new ExceptionEventArgs(exception));
+        }
+    }
 
    public event EventHandler<ExceptionEventArgs> DecodeFailed;
 }

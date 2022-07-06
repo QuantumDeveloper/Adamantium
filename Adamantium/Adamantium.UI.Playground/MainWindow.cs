@@ -10,8 +10,12 @@
 //using Rectangle = Adamantium.UI.Controls.Rectangle;
 //using Shape = Adamantium.UI.Controls.Shape;
 
+using Adamantium.Engine.Effects;
+using Adamantium.Engine.Graphics;
+using Adamantium.Engine.Graphics.Effects;
 using Adamantium.Mathematics;
 using Adamantium.UI.Media;
+using Adamantium.Generated.Effects;
 
 namespace Adamantium.UI.Playground;
 
@@ -19,12 +23,13 @@ public partial class MainWindow : Window
 {
     public MainWindow()
     {
-        
+        //BasicEffect f = new BasicEffect();
+        //f.MeshColor.SetValue(Colors.Gray.ToVector4());
     }
 
 }
 
-// public partial class MainWindow : Window
+// public partial class MainWindow : WindowEffect
 // {
 //     protected override void InitializeComponent()
 //     {

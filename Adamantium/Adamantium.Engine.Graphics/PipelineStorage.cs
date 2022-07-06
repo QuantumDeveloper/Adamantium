@@ -11,7 +11,6 @@ namespace Adamantium.Engine.Graphics
     {
         private Pipeline pipeline;
         private RenderPass renderPass;
-        private DescriptorSetLayout descriptorSetLayout;
         private EffectPass effectPass;
 
         protected PipelineBase(GraphicsDevice graphicsDevice)

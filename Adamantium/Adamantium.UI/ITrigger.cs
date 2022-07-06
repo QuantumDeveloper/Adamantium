@@ -1,7 +1,9 @@
-﻿namespace Adamantium.UI;
+﻿using Adamantium.UI.Input;
+
+namespace Adamantium.UI;
 
 public interface ITrigger
 {
    SetterCollection Setters { get; set; }
-   void Apply(IUIComponent control);
+   void Apply(IInputComponent control);
 }

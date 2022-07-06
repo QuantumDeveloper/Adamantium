@@ -2,8 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using Adamantium.Core;
-using Adamantium.Engine.Core;
-using Adamantium.Engine.Core.Effects;
+using Adamantium.Engine.Effects;
 using AdamantiumVulkan.Core;
 
 namespace Adamantium.Engine.Graphics.Effects

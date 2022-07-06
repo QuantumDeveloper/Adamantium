@@ -59,11 +59,10 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AdamantiumVulkan.SPIRV.Refl
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Engine.CompilerTests", "Tests\Adamantium.Engine.CompilerTests\Adamantium.Engine.CompilerTests.csproj", "{CF68DBD7-6464-4A32-88AF-F2BB3540E470}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Engine.CompilerTask", "Adamantium.Engine.CompilerTask\Adamantium.Engine.CompilerTask.csproj", "{BEFFBDB0-633A-49AE-9FCB-BEDFCF84169B}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{A2ED49F9-8458-4DB5-8F9B-CEC7D3FC3358}"
 	ProjectSection(SolutionItems) = preProject
 		Adamantium.targets = Adamantium.targets
+		SourceGeneratorsDocs.txt = SourceGeneratorsDocs.txt
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.CoreTests", "Tests\Adamantium.CoreTests\Adamantium.CoreTests.csproj", "{018D1D6B-80C9-4DB1-B249-F5589A68D6F4}"
@@ -84,7 +83,13 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.UI.Markup", "Ada
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.UI.Generators", "Adamantium.UI.Generators\Adamantium.UI.Generators.csproj", "{F8435D84-664B-4B65-94BB-4D867F6FF2F6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.Game.Core", "Adamantium.Game.Core\Adamantium.Game.Core.csproj", "{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Game.Core", "Adamantium.Game.Core\Adamantium.Game.Core.csproj", "{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Engine.Effects", "Adamantium.Engine.Effects\Adamantium.Engine.Effects.csproj", "{E0093086-D17A-490E-93DB-AB9B73EF18A0}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Engine.Generators", "Adamantium.Engine.Generators\Adamantium.Engine.Generators.csproj", "{4B40C0E5-C9E4-49BF-A045-CD7F319ACB20}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AdamantiumVulkan.Common", "..\..\AdamantiumVulkan\AdamantiumVulkan.Common\AdamantiumVulkan.Common.csproj", "{637547DA-B1E4-4AFE-BD4A-62E6C4C46ECE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -200,10 +205,6 @@ Global
 		{CF68DBD7-6464-4A32-88AF-F2BB3540E470}.Debug|x64.Build.0 = Debug|x64
 		{CF68DBD7-6464-4A32-88AF-F2BB3540E470}.Release|x64.ActiveCfg = Release|x64
 		{CF68DBD7-6464-4A32-88AF-F2BB3540E470}.Release|x64.Build.0 = Release|x64
-		{BEFFBDB0-633A-49AE-9FCB-BEDFCF84169B}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{BEFFBDB0-633A-49AE-9FCB-BEDFCF84169B}.Debug|x64.Build.0 = Debug|Any CPU
-		{BEFFBDB0-633A-49AE-9FCB-BEDFCF84169B}.Release|x64.ActiveCfg = Release|x64
-		{BEFFBDB0-633A-49AE-9FCB-BEDFCF84169B}.Release|x64.Build.0 = Release|x64
 		{018D1D6B-80C9-4DB1-B249-F5589A68D6F4}.Debug|x64.ActiveCfg = Debug|x64
 		{018D1D6B-80C9-4DB1-B249-F5589A68D6F4}.Debug|x64.Build.0 = Debug|x64
 		{018D1D6B-80C9-4DB1-B249-F5589A68D6F4}.Release|x64.ActiveCfg = Release|x64
@@ -240,10 +241,22 @@ Global
 		{F8435D84-664B-4B65-94BB-4D867F6FF2F6}.Debug|x64.Build.0 = Debug|x64
 		{F8435D84-664B-4B65-94BB-4D867F6FF2F6}.Release|x64.ActiveCfg = Release|x64
 		{F8435D84-664B-4B65-94BB-4D867F6FF2F6}.Release|x64.Build.0 = Release|x64
-		{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}.Debug|x64.Build.0 = Debug|Any CPU
+		{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}.Debug|x64.ActiveCfg = Debug|x64
+		{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}.Debug|x64.Build.0 = Debug|x64
 		{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}.Release|x64.ActiveCfg = Release|Any CPU
 		{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}.Release|x64.Build.0 = Release|Any CPU
+		{E0093086-D17A-490E-93DB-AB9B73EF18A0}.Debug|x64.ActiveCfg = Debug|x64
+		{E0093086-D17A-490E-93DB-AB9B73EF18A0}.Debug|x64.Build.0 = Debug|x64
+		{E0093086-D17A-490E-93DB-AB9B73EF18A0}.Release|x64.ActiveCfg = Release|Any CPU
+		{E0093086-D17A-490E-93DB-AB9B73EF18A0}.Release|x64.Build.0 = Release|Any CPU
+		{4B40C0E5-C9E4-49BF-A045-CD7F319ACB20}.Debug|x64.ActiveCfg = Debug|x64
+		{4B40C0E5-C9E4-49BF-A045-CD7F319ACB20}.Debug|x64.Build.0 = Debug|x64
+		{4B40C0E5-C9E4-49BF-A045-CD7F319ACB20}.Release|x64.ActiveCfg = Release|Any CPU
+		{4B40C0E5-C9E4-49BF-A045-CD7F319ACB20}.Release|x64.Build.0 = Release|Any CPU
+		{637547DA-B1E4-4AFE-BD4A-62E6C4C46ECE}.Debug|x64.ActiveCfg = Debug|x64
+		{637547DA-B1E4-4AFE-BD4A-62E6C4C46ECE}.Debug|x64.Build.0 = Debug|x64
+		{637547DA-B1E4-4AFE-BD4A-62E6C4C46ECE}.Release|x64.ActiveCfg = Release|Any CPU
+		{637547DA-B1E4-4AFE-BD4A-62E6C4C46ECE}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

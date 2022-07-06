@@ -32,7 +32,7 @@ public class PolylineSegment : PathSegment
         }
     }
 
-    protected virtual void PointsOnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    protected virtual void PointsOnCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
     {
         RaiseComponentUpdated();
     }

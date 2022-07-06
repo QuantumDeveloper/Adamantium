@@ -4,7 +4,7 @@ using Adamantium.UI.Media;
 
 namespace Adamantium.UI.Controls;
 
-public abstract class Shape : MeasurableComponent
+public abstract class Shape : MeasurableUIComponent
 {
    protected Rect Rect;
      

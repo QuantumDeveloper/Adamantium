@@ -12,7 +12,6 @@ public class WindowsPlatform : IApplicationPlatform
     private Thread uiThread;
     private DispatcherWin32NativeSourceWrapper window;
     private uint dispatchMessage;
-    private IService appService;
 
     public WindowsPlatform()
     {

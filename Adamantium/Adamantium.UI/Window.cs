@@ -8,8 +8,6 @@ namespace Adamantium.UI;
 
 public class Window : WindowBase
 {
-    private IWindowRenderer renderer;
-        
     public override IntPtr SurfaceHandle { get; internal set; }
     public override IntPtr Handle { get; internal set; }
 
@@ -46,12 +44,6 @@ public class Window : WindowBase
 
     public override bool IsActive { get; internal set; }
 
-    internal void SetRenderer(IWindowRenderer renderer)
-    {
-        this.renderer = renderer;
-        renderer.SetWindow(this);
-    }
-        
     public override void Render()
     {
             

@@ -78,7 +78,7 @@ namespace Adamantium.Mathematics
 
             if (!isContourClosed) return segments;
 
-            var lastSegment = new GeometrySegment(parent, intersectionsList[points[^1]], intersectionsList[points[0]]);
+            var lastSegment = new GeometrySegment(parent, intersectionsList[points[points.Length - 1]], intersectionsList[points[0]]);
             if (!IsSameStartEnd(ref lastSegment))
             {
                 if (!segmentHashSet.Contains(lastSegment))

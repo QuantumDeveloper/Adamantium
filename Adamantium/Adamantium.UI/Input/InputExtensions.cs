@@ -17,7 +17,7 @@ public static class InputExtensions
       List<IInputComponent> elements = new List<IInputComponent>();
       Stack<IInputComponent> stack = new Stack<IInputComponent>();
 
-      stack.Push((UIComponent)root);
+      stack.Push(root);
 
       while (stack.Count > 0)
       {
@@ -41,7 +41,7 @@ public static class InputExtensions
                      child.IsEnabled &&
                      child.IsHitTestVisible)
                   {
-                     stack.Push((UIComponent) child);
+                     stack.Push(child);
                   }
                }
             }

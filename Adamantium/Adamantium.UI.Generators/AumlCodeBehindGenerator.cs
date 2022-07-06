@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using Adamantium.Core;
 using Adamantium.UI.Markup;
 using Microsoft.CodeAnalysis;
 

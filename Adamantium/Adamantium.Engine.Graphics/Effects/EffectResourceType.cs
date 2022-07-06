@@ -1,4 +1,4 @@
-﻿using Adamantium.Engine.Core.Effects;
+﻿using Adamantium.Engine.Effects;
 
 namespace Adamantium.Engine.Graphics.Effects
 {

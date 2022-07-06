@@ -238,7 +238,7 @@ namespace Adamantium.Imaging.Bmp
             IntPtr colorHeaderMemory = Utilities.AllocateMemory(Marshal.SizeOf<BitmapColorHeader>());
             Marshal.StructureToPtr(infoHeader, colorHeaderMemory, true);
             var bufferOffset = Marshal.SizeOf<BitmapFileHeader>() + Marshal.SizeOf<BitmapInfoHeader>();
-            //Utilities.Read(colorHeaderMemory, buffer, bufferOffset, Marshal.SizeOf<BitmapInfoHeader>());
+            Utilities.Read(colorHeaderMemory, buffer, bufferOffset, Marshal.SizeOf<BitmapInfoHeader>());
 
             var px = PixelBuffer.FlipBuffer(pixelBuffer, FlipBufferOptions.FlipVertically);
             if (px.Format.SizeOfInBytes() == 3)

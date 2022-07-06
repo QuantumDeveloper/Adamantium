@@ -1,5 +1,5 @@
 ﻿using Adamantium.Core;
-using Adamantium.Engine.Core.Effects;
+using Adamantium.Engine.Effects;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Engine.Graphics.Effects

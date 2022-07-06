@@ -1,6 +1,6 @@
 ﻿using System;
 using Adamantium.Core;
-using Adamantium.Engine.Core.Effects;
+using Adamantium.Engine.Effects;
 
 namespace Adamantium.Engine.Graphics.Effects
 {

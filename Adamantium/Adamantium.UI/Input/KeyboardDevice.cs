@@ -84,7 +84,6 @@ public abstract class KeyboardDevice
       {
          ClearState();
       }
-
       if (component != FocusedComponent)
       {
          KeyboardFocusChangedEventArgs args = new KeyboardFocusChangedEventArgs(FocusedComponent, component);
@@ -224,10 +223,10 @@ public abstract class KeyboardDevice
          {
             var inputArgs = eventArgs as RawTextInputEventArgs;
             TextInputEventArgs textArgs = new TextInputEventArgs(inputArgs?.Text);
-            textArgs.RoutedEvent = UIComponent.PreviewTextInputEvent;
+            textArgs.RoutedEvent = InputUIComponent.PreviewTextInputEvent;
             FocusedComponent.RaiseEvent(textArgs);
 
-            textArgs.RoutedEvent = UIComponent.TextInputEvent;
+            textArgs.RoutedEvent = InputUIComponent.TextInputEvent;
             FocusedComponent.RaiseEvent(textArgs);
          }
       }

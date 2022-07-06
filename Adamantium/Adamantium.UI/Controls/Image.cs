@@ -5,7 +5,7 @@ using Adamantium.UI.Media.Imaging;
 
 namespace Adamantium.UI.Controls;
 
-public class Image:MeasurableComponent
+public class Image:MeasurableUIComponent
 {
    public static readonly AdamantiumProperty StretchProperty = AdamantiumProperty.Register(nameof(Stretch),
       typeof (Stretch), typeof (Image), new PropertyMetadata(Stretch.None, PropertyMetadataOptions.AffectsMeasure));

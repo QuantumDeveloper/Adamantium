@@ -7,7 +7,8 @@ namespace Adamantium.UI;
 
 public interface IFundamentalUIComponent : IAdamantiumComponent, IName
 {
-    Style Style { get; set; }
+    String Uid { get; set; }
+    StylesCollection Styles { get; }
     object DataContext { get; set; }
     IFundamentalUIComponent LogicalParent { get; }
     

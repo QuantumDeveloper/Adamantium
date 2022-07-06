@@ -8,16 +8,16 @@
       /// <summary>
       /// Information message.
       /// </summary>
-      Info,
+      Info = 1,
 
       /// <summary>
       /// Warning message.
       /// </summary>
-      Warning,
+      Warning = 2,
 
       /// <summary>
       /// Error message.
       /// </summary>
-      Error,
+      Error = 3,
    }
 }

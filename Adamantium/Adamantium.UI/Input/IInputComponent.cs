@@ -1,32 +1,28 @@
 ﻿using System;
 using Adamantium.UI.RoutedEvents;
+using Adamantium.UI.Windows.Input;
 
 namespace Adamantium.UI.Input;
 
 /// <summary>
 /// Interface for all elements, which takes user input
 /// </summary>
-public interface IInputComponent: IUIComponent
+public interface IInputComponent: IMeasurableComponent
 {
    /// <summary>
    /// Define is element could receive focus
    /// </summary>
    bool Focusable { get; set; }
+   
+   bool IsFocused { get; }
+   
+   Cursor Cursor { get; set; }
       
-   /// <summary>
-   /// Set enable or disable state for element
-   /// </summary>
-   bool IsEnabled { get; set; }
    /// <summary>
    /// Returns true if mouse cursor is over element
    /// </summary>
    bool IsMouseOver { get; }
 
-   /// <summary>
-   /// Indicates is input elements ready for hit testing
-   /// </summary>
-   bool IsHitTestVisible { get; }
-      
    /// <summary>
    /// Returns true if mouse cursor directly over element
    /// </summary>
@@ -106,10 +102,42 @@ public interface IInputComponent: IUIComponent
    /// </summary>
    event MouseButtonEventHandler MouseRightButtonUp;
 
+   event MouseButtonEventHandler MouseDown;
+
+   event MouseButtonEventHandler MouseUp;
+
    /// <summary>
    /// Occurs when the mouse wheel moves while the mouse pointer is over this element.
    /// </summary>
    event MouseWheelEventHandler MouseWheel;
+
+   event RawMouseEventHandler RawMouseMove;
+
+   event MouseButtonEventHandler RawMouseDown;
+
+   event MouseButtonEventHandler RawMouseUp;
+
+   event MouseButtonEventHandler RawMouseLeftButtonDown;
+
+   event MouseButtonEventHandler RawMouseLeftButtonUp;
+
+   event MouseButtonEventHandler RawMouseRightButtonDown;
+
+   event MouseButtonEventHandler RawMouseRightButtonUp;
+
+   event MouseButtonEventHandler RawMouseMiddleButtonDown;
+
+   event MouseButtonEventHandler RawMouseMiddleButtonUp;
+
+   event MouseButtonEventHandler MouseDoubleClick;
+
+   public event MouseButtonEventHandler MouseMiddleButtonDown;
+
+   public event MouseButtonEventHandler MouseMiddleButtonUp;
+
+   public event RoutedEventHandler GotFocus;
+
+   public event RoutedEventHandler LostFocus;
 
    /// <summary>
    /// Occurs when the keyboard is focused on this element.
@@ -175,13 +203,15 @@ public interface IInputComponent: IUIComponent
    /// </summary>
    event TextInputEventHandler PreviewTextInput;
 
-   /// <summary>
-   /// Adds a routed event handler for a specific routed event to an element.
-   /// </summary>
-   /// <param name="routedEvent">The identifier for the routed event that is being handled.</param>
-   /// <param name="handler">A reference to the handler implementation.</param>
-   /// <param name="handledEventsToo">identify should hanled events also be processed</param>
-   void AddHandler(RoutedEvent routedEvent, Delegate handler, bool handledEventsToo = false);
+   event MouseEventHandler PreviewGotMouseCapture;
+
+   public event MouseEventHandler PreviewLostMouseCapture;
+
+   public event MouseButtonEventHandler PreviewMouseDown;
+
+   public event MouseButtonEventHandler PreviewMouseUp;
+
+   event MouseButtonEventHandler PreviewMouseDoubleClick;
 
    /// <summary>
    /// Attempts to force capture of the mouse to this element.
@@ -203,16 +233,6 @@ public interface IInputComponent: IUIComponent
    bool Focus();
 
    /// <summary>
-   /// Raises the routed event that is specified by the RoutedEventArgs.RoutedEvent
-   /// property within the provided System.Windows.RoutedEventArgs.
-   /// </summary>
-   /// <param name="e">
-   /// An instance of the System.Windows.RoutedEventArgs class that contains the identifier
-   /// for the event to raise.
-   /// </param>
-   void RaiseEvent(RoutedEventArgs e);
-
-   /// <summary>
    /// Releases the mouse capture, if this element holds the capture.
    /// </summary>
    void ReleaseMouseCapture();
@@ -221,11 +241,4 @@ public interface IInputComponent: IUIComponent
    /// Releases the stylus capture, if this element holds the capture.
    /// </summary>
    void ReleaseStylusCapture();
-
-   /// <summary>
-   /// Removes all instances of the specified routed event handler from this element.
-   /// </summary>
-   /// <param name="routedEvent">Identifier of the routed event for which the handler is attached.</param>
-   /// <param name="handler">The specific handler implementation to remove from this element's event handler collection</param>
-   void RemoveHandler(RoutedEvent routedEvent, Delegate handler);
 }

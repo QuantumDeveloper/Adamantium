@@ -46,7 +46,7 @@ public class GeometryGroup : Geometry
         set => SetValue(FillRuleProperty, value);
     }
 
-    private void ChildrenOnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    private void ChildrenOnCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
     {
         InvalidateGeometry();
     }
