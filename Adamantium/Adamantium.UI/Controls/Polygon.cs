@@ -49,7 +49,7 @@ public class Polygon : Shape
         Points.CollectionChanged += PointsOnCollectionChanged;
     }
 
-    private  void PointsOnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    private  void PointsOnCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
     {
         InvalidateMeasure();
     }

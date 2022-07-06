@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Adamantium.Engine.Graphics;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Rendering;
 using Adamantium.UI.RoutedEvents;
 using Adamantium.Win32;
 
@@ -10,6 +11,8 @@ namespace Adamantium.UI;
 public abstract class WindowBase : ContentControl, IWindow
 {
     protected IWindowWorkerService WindowWorkerService { get; }
+    
+    private IWindowRenderer renderer;
         
     public WindowBase()
     {
@@ -248,7 +251,7 @@ public abstract class WindowBase : ContentControl, IWindow
         
     private void UpdateComponent(IUIComponent visualComponent)
     {
-        var control = (MeasurableComponent)visualComponent;
+        var control = (MeasurableUIComponent)visualComponent;
         var parent = control.VisualParent as IMeasurableComponent;
         if (!control.IsMeasureValid)
         {
@@ -309,6 +312,12 @@ public abstract class WindowBase : ContentControl, IWindow
         {
             control.Measure(Size.Infinity);
         }
+    }
+    
+    internal void SetRenderer(IWindowRenderer renderer)
+    {
+        this.renderer = renderer;
+        renderer.SetWindow(this);
     }
 
     protected void OnClosed()

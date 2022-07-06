@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using Adamantium.Engine.Core.Effects;
+using Adamantium.Engine.Effects;
 using AdamantiumVulkan.Core;
 using VulkanBuffer = AdamantiumVulkan.Core.Buffer;
 

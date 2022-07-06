@@ -3,13 +3,14 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
 using Adamantium.Core.Collections;
+using Adamantium.Core.DependencyInjection;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Data;
 using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI;
 
-public class FundamentalUIComponent : AdamantiumComponent, IFundamentalUIComponent
+public class FundamentalUIComponent : AnimatableUIComponent, IFundamentalUIComponent
 {
     private IFundamentalUIComponent parent;
     private TrackingCollection<IFundamentalUIComponent> logicalChildren;
@@ -17,34 +18,32 @@ public class FundamentalUIComponent : AdamantiumComponent, IFundamentalUICompone
     public static readonly AdamantiumProperty NameProperty = AdamantiumProperty.Register(nameof(Name),
         typeof(String), typeof(FundamentalUIComponent), new PropertyMetadata(String.Empty));
         
-    public static readonly AdamantiumProperty StyleProperty =
-            AdamantiumProperty.Register(nameof(Style), typeof(Style), typeof(FundamentalUIComponent),
-                new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure, StyleChangedCallback));
+    public static readonly AdamantiumProperty StylesProperty =
+            AdamantiumProperty.RegisterReadOnly(nameof(Styles), typeof(StylesCollection), typeof(FundamentalUIComponent));
     
     public static readonly AdamantiumProperty DataContextProperty = AdamantiumProperty.Register(nameof(DataContext),
-        typeof(object), typeof(MeasurableComponent),
+        typeof(object), typeof(FundamentalUIComponent),
         new PropertyMetadata(null, PropertyMetadataOptions.Inherits, DataContextChangedCallBack));
 
-    public static readonly AdamantiumProperty ClassesProperty = AdamantiumProperty.Register(nameof(Classes), typeof(Classes), typeof(FundamentalUIComponent),
+    public static readonly AdamantiumProperty ClassesProperty = AdamantiumProperty.Register(nameof(Classes),
+        typeof(Classes), typeof(FundamentalUIComponent),
         new PropertyMetadata(new Classes(), ClassesChangedCallBack));
     
+    public static readonly AdamantiumProperty UidProperty = AdamantiumProperty.Register(nameof(Uid),
+        typeof(String), typeof(FundamentalUIComponent), new PropertyMetadata(String.Empty));
+    
+    public static readonly AdamantiumProperty AllowDropProperty = AdamantiumProperty.Register(nameof(AllowDrop),
+        typeof(Boolean), typeof(UIComponent), new PropertyMetadata(true));
+
     private static void DataContextChangedCallBack(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
     {
-        var o = adamantiumObject as MeasurableComponent;
+        var o = adamantiumObject as MeasurableUIComponent;
         o?.DataContextChanged?.Invoke(o, e);
     }
     
-    private static void StyleChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
-    {
-        if (a is IUIComponent component && e.NewValue != null)
-        {
-            component.Style.Attach(component);
-        }
-    }
-
     private static void ClassesChangedCallBack(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
     {
-        var o = adamantiumObject as MeasurableComponent;
+        var o = adamantiumObject as MeasurableUIComponent;
         if (o == null) return;
 
         if (e.OldValue != null)
@@ -62,11 +61,43 @@ public class FundamentalUIComponent : AdamantiumComponent, IFundamentalUICompone
 
     public FundamentalUIComponent()
     {
+        Styles = new StylesCollection();
+        Styles.CollectionChanged += StylesOnCollectionChanged;
+    }
+
+    private void StylesOnCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+    {
+        switch (e.Action)
+        {
+            case NotifyCollectionChangedAction.Add:
+            {
+                var styles = (IEnumerable<Style>)e.NewItems;
+                AdamantiumDependencyResolver.Current.Resolve<IThemeManager>().ApplyStyles(styles.ToArray());
+                break;
+            }
+            case NotifyCollectionChangedAction.Remove:
+            {
+                var styles = (IEnumerable<Style>)e.NewItems;
+                AdamantiumDependencyResolver.Current.Resolve<IThemeManager>().ApplyStyles(styles.ToArray());
+                break;
+            }
+        }
+    }
+
+    private void ApplyStyle()
+    {
+        
     }
 
     private void ClassesCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
     {
         
+    }
+    
+    public Boolean AllowDrop
+    {
+        get => GetValue<Boolean>(AllowDropProperty);
+        set => SetValue(AllowDropProperty, value);
     }
 
     public Classes Classes
@@ -81,10 +112,16 @@ public class FundamentalUIComponent : AdamantiumComponent, IFundamentalUICompone
         set => SetValue(DataContextProperty, value);
     }
 
-    public Style Style
+    public string Uid
     {
-        get => GetValue<Style>(StyleProperty);
-        set => SetValue(StyleProperty, value);
+        get => GetValue<string>(UidProperty);
+        set => SetValue(UidProperty, value);
+    }
+
+    public StylesCollection Styles
+    {
+        get => GetValue<StylesCollection>(StylesProperty);
+        private set => SetValue(StylesProperty, value);
     }
 
     public IFundamentalUIComponent LogicalParent => parent;
@@ -188,7 +225,7 @@ public class FundamentalUIComponent : AdamantiumComponent, IFundamentalUICompone
                 throw new InvalidOperationException("The Control already has a parent.Parent Element is: " + LogicalParent);
             }
 
-            // TODO: define do we actually need InheritanceParent proprety
+            // TODO: define do we actually need InheritanceParent property
             //InheritanceParent = parent;
             parent = logicalParent;
 

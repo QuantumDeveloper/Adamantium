@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <AssemblyName>Adamantium.Engine.Effects</AssemblyName>
+        <RootNamespace>Adamantium.Engine.Effects</RootNamespace>
+        <LangVersion>latest</LangVersion>
+        <Platforms>x64</Platforms>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="MessagePack" Version="2.3.112" />
+      <PackageReference Include="MessagePack.Annotations" Version="2.3.112" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.SPIRV.Reflection\AdamantiumVulkan.SPIRV.Reflection.csproj" />
+      <ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.SPIRV\AdamantiumVulkan.SPIRV.csproj" />
+      <ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" />
+      <ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
+    </ItemGroup>
+
+</Project>

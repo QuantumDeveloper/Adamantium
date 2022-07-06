@@ -38,7 +38,7 @@ public class PolyQuadraticBezierSegment : PathSegment
         set => SetValue(PointsProperty, value);
     }
 
-    private void PointsOnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    private void PointsOnCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
     {
         RaiseComponentUpdated();
     }

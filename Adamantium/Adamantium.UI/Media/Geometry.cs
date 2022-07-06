@@ -38,7 +38,7 @@ public abstract class Geometry : AdamantiumComponent
       }
    }
 
-   private void TransformOnPropertyChanged(object? sender, AdamantiumPropertyChangedEventArgs e)
+   private void TransformOnPropertyChanged(object sender, AdamantiumPropertyChangedEventArgs e)
    {
       InvalidateGeometry();
       RaiseComponentUpdated();

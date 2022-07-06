@@ -37,7 +37,7 @@ namespace Adamantium.Mathematics
         /// <summary>
         /// Collection of segments from all <see cref="MeshContour"/>s in current <see cref="Polygon"/>
         /// </summary>
-        public List<GeometrySegment> MergedSegments { get; private init; }
+        public List<GeometrySegment> MergedSegments { get; private set; }
 
         /// <summary>
         /// Leftmost X coordinate for polygon 
@@ -404,29 +404,29 @@ namespace Adamantium.Mathematics
         {
             if (additionalRayIntersections.Count == 0) return;
             
-            foreach (var (key, value) in additionalRayIntersections)
+            foreach (var pair in additionalRayIntersections)
             {
-                if (value.Count == 0)
+                if (pair.Value.Count == 0)
                 {
                     continue;
                 }
 
-                key.RemoveSelfFromConnectedSegments();
-                if (MergedSegments.Contains(key)) MergedSegments.Remove(key);
+                pair.Key.RemoveSelfFromConnectedSegments();
+                if (MergedSegments.Contains(pair.Key)) MergedSegments.Remove(pair.Key);
 
-                var startPart = new GeometrySegment(key.Parent, key.SegmentEnds[0], value.Values.First());
+                var startPart = new GeometrySegment(pair.Key.Parent, pair.Key.SegmentEnds[0], pair.Value.Values.First());
                 MergedSegments.Add(startPart);
 
-                for (var i = 0; i < value.Values.Count - 1; i++)
+                for (var i = 0; i < pair.Value.Values.Count - 1; i++)
                 {
-                    var int1 = value.Values[i];
-                    var int2 = value.Values[i + 1];
+                    var int1 = pair.Value.Values[i];
+                    var int2 = pair.Value.Values[i + 1];
 
-                    var seg = new GeometrySegment(key.Parent, int1, int2);
+                    var seg = new GeometrySegment(pair.Key.Parent, int1, int2);
                     MergedSegments.Add(seg);
                 }
 
-                var endPart = new GeometrySegment(key.Parent, value.Values.Last(), key.SegmentEnds[1]);
+                var endPart = new GeometrySegment(pair.Key.Parent, pair.Value.Values.Last(), pair.Key.SegmentEnds[1]);
                 MergedSegments.Add(endPart);
             }
         

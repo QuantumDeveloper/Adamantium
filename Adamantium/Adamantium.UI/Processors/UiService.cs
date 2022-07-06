@@ -23,7 +23,7 @@ public abstract class UiService : EntityService
 
             foreach (var visual in control.GetVisualDescendants())
             {
-                stack.Push(visual as MeasurableComponent);
+                stack.Push(visual as MeasurableUIComponent);
             }
         }
     }

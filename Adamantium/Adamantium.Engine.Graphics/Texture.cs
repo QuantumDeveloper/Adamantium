@@ -1,10 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 using Adamantium.Imaging;
 using Adamantium.Core;
 using System.IO;
-using System.Runtime.InteropServices;
 using Adamantium.Engine.Core.Content;
 using Adamantium.Win32;
 using VulkanImage = AdamantiumVulkan.Core.Image;
@@ -368,6 +365,7 @@ namespace Adamantium.Engine.Graphics
                 throw new ArgumentNullException(nameof(graphicsDevice));
             }
 
+            // TODO: check how this could be implemented
             if (description.Usage.HasFlag(ImageUsageFlagBits.ColorAttachmentBit))
             {
                 //switch (description.Dimension)

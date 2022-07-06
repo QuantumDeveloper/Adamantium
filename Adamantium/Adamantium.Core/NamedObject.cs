@@ -42,7 +42,7 @@ namespace Adamantium.Core
       /// Gets or sets a value indicating whether the name of this instance is immutable.
       /// </summary>
       /// <value><c>true</c> if this instance is name immutable; otherwise, <c>false</c>.</value>
-      protected bool IsNameImmutable { get; set; }
+      public bool IsNameImmutable { get; set; }
 
       /// <summary>
       /// Initializes a new instance of the <see cref="NamedObject" /> class with a mutable name.
@@ -55,13 +55,10 @@ namespace Adamantium.Core
       /// Initializes a new instance of the <see cref="NamedObject" /> class with an immutable name.
       /// </summary>
       /// <param name="name">The name.</param>
-      protected NamedObject(string name)
+      protected NamedObject(string name, bool isImmutable = true)
       {
-         if (name != null)
-         {
-            this.name = name;
-            IsNameImmutable = true;
-         }
+         this.name = name;
+         IsNameImmutable = isImmutable;
       }
 
       /// <summary>
@@ -72,16 +69,16 @@ namespace Adamantium.Core
       [DataMember(Order = 1)]
       public string Name
       {
-         get { return name; }
+         get => name;
          set
          {
             if (IsNameImmutable)
                throw new ArgumentException("Name property is immutable for this instance", nameof(value));
-            if (name == value) return;
-            name = value;
-            RaisePropertyChanged();
+            SetProperty(ref name, value);
          }
       }
+
+      public bool HasName => !string.IsNullOrEmpty(Name);
 
       /// <summary>
       /// Gets or sets the tag associated to this object.
@@ -91,16 +88,8 @@ namespace Adamantium.Core
       [DataMember(Order = 2, EmitDefaultValue = false)]
       public object Tag
       {
-         get
-         {
-            return tag;
-         }
-         set
-         {
-            if (ReferenceEquals(tag, value)) return;
-            tag = value;
-            RaisePropertyChanged();
-         }
+         get => tag;
+         set => SetProperty(ref tag, value);
       }
    }
 }

@@ -60,6 +60,8 @@ namespace Adamantium.EntityFramework
             set => SetProperty(ref name, value);
         }
 
+        public bool HasName => !string.IsNullOrEmpty(Name);
+
         public bool Visible 
         { 
             get => visible; 
