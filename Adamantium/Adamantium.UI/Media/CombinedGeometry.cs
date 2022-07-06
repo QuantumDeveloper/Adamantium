@@ -55,7 +55,7 @@ public class CombinedGeometry : Geometry
         }
     }
 
-    private void GeometryOnComponentUpdated(object? sender, ComponentUpdatedEventArgs e)
+    private void GeometryOnComponentUpdated(object sender, ComponentUpdatedEventArgs e)
     {
         InvalidateGeometry();
     }
@@ -339,11 +339,6 @@ public class CombinedGeometry : Geometry
                 if (!intersectionsList.ContainsKey(newStart))
                 {
                     intersectionsList[newStart] = new GeometryIntersection(newStart);
-                }
-
-                if (currentSegment == null)
-                {
-                    int bug = 0;
                 }
 
                 // check and create (if needed) the new instance of GeometryIntersection for end of the new segment

@@ -8,7 +8,6 @@ namespace Adamantium.EntityFramework.ComponentsBasics
     public abstract class CameraBase : ActivatableComponent
     {
         private QuaternionF rotation = QuaternionF.Identity;
-        private Vector3 offset;
         private uint width;
         private uint height;
         private Single fov;

@@ -11,6 +11,6 @@ namespace Adamantium.Core
         /// <value>The name.</value>
         string Name { get; set; }
 
-        public bool HasName => !string.IsNullOrEmpty(Name);
+        public bool HasName { get; }
     }
 }

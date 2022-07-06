@@ -3,6 +3,7 @@ using Adamantium.Game.Core.Events;
 using Adamantium.Game.Core.Payloads;
 using Adamantium.UI;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Input;
 using Adamantium.UI.RoutedEvents;
 using Rectangle = Adamantium.Mathematics.Rectangle;
 
@@ -42,7 +43,7 @@ namespace Adamantium.Game.Core
         {
             GameContext = context;
             window = GameContext.Context as IWindow ?? throw new ArgumentException($"{nameof(context.Context)} should be of type {nameof(IWindow)}");
-            UiComponent = window as MeasurableComponent;
+            InputComponent = window as IInputComponent;
             window.ClientSizeChanged += WindowOnClientSizeChanged;
             window.StateChanged += WindowOnStateChanged;
 

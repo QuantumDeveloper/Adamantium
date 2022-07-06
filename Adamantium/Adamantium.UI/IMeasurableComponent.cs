@@ -3,7 +3,7 @@ using Adamantium.UI.Input;
 
 namespace Adamantium.UI;
 
-public interface IMeasurableComponent : IUIComponent, IInputComponent
+public interface IMeasurableComponent : IObservableComponent
 {
     Double Width { get; set; }
     Double Height { get; set; }

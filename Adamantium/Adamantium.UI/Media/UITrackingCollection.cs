@@ -36,7 +36,7 @@ public class UITrackingCollection<T> : TrackingCollection<T> where T : Adamantiu
         item.ComponentUpdated -= OnComponentUpdated;
     }
     
-    private void OnComponentUpdated(object? sender, ComponentUpdatedEventArgs e)
+    private void OnComponentUpdated(object sender, ComponentUpdatedEventArgs e)
     {
         NotifyCollectionChanged(NotifyCollectionChangedAction.Reset, null);
     }

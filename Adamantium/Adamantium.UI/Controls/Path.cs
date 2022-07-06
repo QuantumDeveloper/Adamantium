@@ -18,7 +18,7 @@ public class Path : Shape
         }
     }
 
-    private void OnGeometryUpdated(object? sender, ComponentUpdatedEventArgs e)
+    private void OnGeometryUpdated(object sender, ComponentUpdatedEventArgs e)
     {
         InvalidateMeasure();
     }

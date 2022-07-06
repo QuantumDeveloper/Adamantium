@@ -4,7 +4,7 @@ using Adamantium.UI.Media;
 
 namespace Adamantium.UI.Controls;
 
-public abstract class Panel: MeasurableComponent, IContainer
+public abstract class Panel: InputUIComponent, IContainer
 {
    public static readonly AdamantiumProperty BackgroundProperty = AdamantiumProperty.Register(nameof(Background),
       typeof(Brush), typeof(Panel),
@@ -30,19 +30,19 @@ public abstract class Panel: MeasurableComponent, IContainer
       switch (e.Action)
       {
          case NotifyCollectionChangedAction.Add:
-            var controls = e.NewItems.OfType<MeasurableComponent>();
+            var controls = e.NewItems.OfType<MeasurableUIComponent>();
             LogicalChildrenCollection.InsertRange(e.NewStartingIndex, controls);
             VisualChildrenCollection.AddRange(e.NewItems.OfType<IUIComponent>());
             break;
          case NotifyCollectionChangedAction.Remove:
-            LogicalChildrenCollection.Remove(e.OldItems.OfType<MeasurableComponent>());
+            LogicalChildrenCollection.Remove(e.OldItems.OfType<MeasurableUIComponent>());
             VisualChildrenCollection.Remove(e.OldItems.OfType<IUIComponent>());
             break;
          case NotifyCollectionChangedAction.Replace:
             for (var i = 0; i < e.OldItems.Count; ++i)
             {
-               var index = LogicalChildrenCollection.IndexOf((MeasurableComponent)e.OldItems[i]);
-               var child = (MeasurableComponent)e.NewItems[i];
+               var index = LogicalChildrenCollection.IndexOf((MeasurableUIComponent)e.OldItems[i]);
+               var child = (MeasurableUIComponent)e.NewItems[i];
                LogicalChildrenCollection[index] = child;
                VisualChildrenCollection[index] = child;
             }

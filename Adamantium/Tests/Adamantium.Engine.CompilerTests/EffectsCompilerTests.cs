@@ -1,8 +1,6 @@
 using System;
 using System.IO;
-using System.Text;
-using Adamantium.Engine.Compiler.Effects;
-using Adamantium.Engine.Core.Effects;
+using Adamantium.Engine.Effects;
 using MessagePack;
 using NUnit.Framework;
 
@@ -20,7 +18,7 @@ namespace Adamantium.Engine.CompilerTests
                 if (File.Exists(path))
                 {
                     var text = File.ReadAllText(path);
-                    var result = EffectCompiler.CompileFromFile(path);
+                    var result = EffectCompiler.Compile(text, path);
             
                     result.EffectData.Save("UIEffect.fx.compiled");
                     var restored = EffectData.Load("UIEffect.fx.compiled");

@@ -39,7 +39,7 @@ public class PathGeometry : Geometry
         }
     }
 
-    private void FiguresOnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    private void FiguresOnCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
     {
         RaiseComponentUpdated();
     }
@@ -120,10 +120,5 @@ public class PathGeometry : Geometry
         {
             Mesh.AddContour(outline.Value, outline.Key.IsClosed);
         }
-    }
-
-    public static PathGeometry Parse(string geometry)
-    {
-        return null;
     }
 }

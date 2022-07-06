@@ -39,7 +39,7 @@ public sealed class PathFigure : AdamantiumComponent
         if (e.NewValue is PathSegmentCollection collection2) collection2.CollectionChanged += figure.OnCollectionChanged;
     }
 
-    private void OnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    private void OnCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
     {
         RaiseComponentUpdated();
         isSegmentProcessed = false;

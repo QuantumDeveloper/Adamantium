@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Adamantium.UI.Input;
 using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI;
@@ -16,7 +17,7 @@ public class PropertyTrigger : ITrigger
     
     public Object Value { get; set; }
     
-    public void Apply(IUIComponent control)
+    public void Apply(IInputComponent control)
     {
         component = control;
         values = new Dictionary<AdamantiumProperty, object>();
@@ -24,7 +25,7 @@ public class PropertyTrigger : ITrigger
         Property.NotifyChanged += PropertyChanged;
     }
 
-    private void PropertyChanged(object? sender, AdamantiumPropertyChangedEventArgs e)
+    private void PropertyChanged(object sender, AdamantiumPropertyChangedEventArgs e)
     {
         if (sender != component) return;
 
@@ -46,28 +47,5 @@ public class PropertyTrigger : ITrigger
                 component.SetValue(key, value);
             }
         }
-    }
-}
-
-public class EventTrigger : ITrigger
-{
-    private IUIComponent component;
-    private Dictionary<AdamantiumProperty, object> values;
-    private bool applied;
-   
-    public RoutedEvent Event { get; set; }
-    
-    public SetterCollection Setters { get; set; }
-    public void Apply(IUIComponent control)
-    {
-        component = control;
-        values = new Dictionary<AdamantiumProperty, object>();
-        applied = false;
-        component.AddHandler(Event, new RoutedEventHandler(EventHandler));
-    }
-
-    private void EventHandler(object sender, RoutedEventArgs e)
-    {
-        
     }
 }

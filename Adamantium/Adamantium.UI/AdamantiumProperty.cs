@@ -103,7 +103,7 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
       NotifyChanged?.Invoke(this, e);
    }
 
-   protected AdamantiumProperty(String name, Type valueType, Type ownerType )
+   private AdamantiumProperty(String name, Type valueType, Type ownerType )
    {
       if (name.Contains("."))
       {
@@ -125,7 +125,7 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
       PropertyId = nextPropertyId++;
    }
 
-   protected AdamantiumProperty(String name, Type valueType, Type ownerType, PropertyMetadata metadata)
+    private AdamantiumProperty(String name, Type valueType, Type ownerType, PropertyMetadata metadata)
    {
       if (name.Contains("."))
       {
@@ -145,7 +145,7 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
       PropertyId = nextPropertyId++;
    }
 
-   protected AdamantiumProperty(String name, Type valueType, Type ownerType, PropertyMetadata metadata, ValidateValueCallBack validateValueCallBack)
+    private AdamantiumProperty(String name, Type valueType, Type ownerType, PropertyMetadata metadata, ValidateValueCallBack validateValueCallBack)
    {
       if (name.Contains("."))
       {
@@ -197,7 +197,7 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
 
    public static AdamantiumProperty Register(String name, Type propertyType, Type ownerType)
    {
-      AdamantiumProperty property = new AdamantiumProperty(name, propertyType, ownerType);
+      var property = new AdamantiumProperty(name, propertyType, ownerType);
 
       AdamantiumPropertyMap.Register(ownerType, property);
 
@@ -268,6 +268,17 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
          validateValueCallBack)
       {
          IsAttached = true,
+         ReadOnly = true
+      };
+      AdamantiumPropertyMap.Register(ownerType, property);
+
+      return property;
+   }
+   
+   public static AdamantiumProperty RegisterReadOnly(String name, Type propertyType, Type ownerType)
+   {
+      AdamantiumProperty property = new AdamantiumProperty(name, propertyType, ownerType)
+      {
          ReadOnly = true
       };
       AdamantiumPropertyMap.Register(ownerType, property);

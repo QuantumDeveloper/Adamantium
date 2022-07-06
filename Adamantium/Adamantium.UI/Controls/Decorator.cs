@@ -2,7 +2,7 @@
 
 namespace Adamantium.UI.Controls;
 
-public abstract class Decorator : MeasurableComponent, IContainer
+public abstract class Decorator : MeasurableUIComponent, IContainer
 {
    public static readonly AdamantiumProperty PaddingProperty = AdamantiumProperty.Register(nameof(Padding),
       typeof(Thickness), typeof(Decorator),

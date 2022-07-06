@@ -1,17 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Threading;
 using Adamantium.Core;
 using Adamantium.Core.Collections;
-using Adamantium.Engine.Core.Effects;
 using Adamantium.Engine.Graphics.Effects;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
 using AdamantiumVulkan.Core;
 using Semaphore = AdamantiumVulkan.Core.Semaphore;
+using Adamantium.Generated.Effects;
 
 namespace Adamantium.Engine.Graphics
 {
@@ -20,7 +18,6 @@ namespace Adamantium.Engine.Graphics
         public string DeviceId { get; private set; }
 
         private SurfaceKHR surface;
-        private Pipeline graphicsPipeline;
         private CommandBuffer[] commandBuffers;
         internal Queue GraphicsQueue { get; private set; }
         private Queue resourceQueue;
@@ -107,9 +104,7 @@ namespace Adamantium.Engine.Graphics
             ClearColor = Colors.CornflowerBlue;
 
             pipelineManager = new PipelineManager(this);
-
-            BasicEffect = Effect.Load(Path.Combine("Effects", "BasicEffect.fx.compiled"), this);
-            //BasicEffect = Effect.Load(Path.Combine("HLSL", "BasicEffect.fx.compiled"), this);
+            BasicEffect = new BasicEffect(this);
         }
         
         public bool IsResourceLoaderDevice { get; }
@@ -150,7 +145,7 @@ namespace Adamantium.Engine.Graphics
         
         public SamplerStateCollection SamplerStates { get; internal set; }
         
-        public Effect BasicEffect { get; private set; }
+        public BasicEffect BasicEffect { get; private set; }
         
         public Color ClearColor { get; set; }
         

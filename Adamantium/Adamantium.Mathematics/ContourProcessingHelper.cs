@@ -58,19 +58,19 @@ public static class ContourProcessingHelper
     
     private static void FillMeshSegments(Dictionary<GeometrySegment, SortedList<double, GeometryIntersection>> meshIntersections)
     {
-        foreach (var (key, value) in meshIntersections)
+        foreach (var pair in meshIntersections)
         {
-            if (value.Count < 2) continue;
+            if (pair.Value.Count < 2) continue;
 
-            key.RemoveSelfFromConnectedSegments();
-            key.RemoveSelfFromParent();
+            pair.Key.RemoveSelfFromConnectedSegments();
+            pair.Key.RemoveSelfFromParent();
 
-            for (var i = 0; i < value.Values.Count - 1; i++)
+            for (var i = 0; i < pair.Value.Values.Count - 1; i++)
             {
-                var newStart = value.Values[i];
-                var newEnd = value.Values[i + 1];
-                var newSegment = new GeometrySegment(key.Parent, newStart, newEnd);
-                key.Parent.Segments.Add(newSegment);
+                var newStart = pair.Value.Values[i];
+                var newEnd = pair.Value.Values[i + 1];
+                var newSegment = new GeometrySegment(pair.Key.Parent, newStart, newEnd);
+                pair.Key.Parent.Segments.Add(newSegment);
             }
         }
     }

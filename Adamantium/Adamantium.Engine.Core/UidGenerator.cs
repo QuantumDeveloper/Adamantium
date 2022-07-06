@@ -10,7 +10,7 @@ namespace Adamantium.Engine.Core
     {
         private static object syncObject = new object();
 
-        private static readonly RNGCryptoServiceProvider RandomGenerator = new RNGCryptoServiceProvider();
+        private static readonly RandomNumberGenerator RandomGenerator = RandomNumberGenerator.Create();
         private static int length = 15;
 
         /// <summary>

@@ -1,39 +1,59 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
-    <Platforms>x64</Platforms>
-    <LangVersion>latestmajor</LangVersion>
-    <Configurations>Debug;Release</Configurations>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFramework>net6.0</TargetFramework>
+		<Platforms>x64</Platforms>
+		<LangVersion>latest</LangVersion>
+		<Configurations>Debug;Release</Configurations>
+		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+		<CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
+	</PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-  </PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	</PropertyGroup>
 
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-  </PropertyGroup>
+	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.Core\AdamantiumVulkan.Core.csproj" />
-    <ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.MacOS\AdamantiumVulkan.MacOS.csproj" />
-    <ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.Shaders\AdamantiumVulkan.Shaders.csproj" />
-    <ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.SPIRV.Cross\AdamantiumVulkan.SPIRV.Cross.csproj" />
-    <ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.Windows\AdamantiumVulkan.Windows.csproj" />
-    <ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan\AdamantiumVulkan.csproj" />
-    <ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" />
-    <ProjectReference Include="..\Adamantium.Engine.Compiler\Adamantium.Engine.Compiler.csproj" />
-    <ProjectReference Include="..\Adamantium.Engine.Core\Adamantium.Engine.Core.csproj" />
-    <ProjectReference Include="..\Adamantium.Imaging\Adamantium.Imaging.csproj" />
-    <ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
-    <ProjectReference Include="..\Adamantium.Win32\Adamantium.Win32.csproj" />
-  </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.Core\AdamantiumVulkan.Core.csproj" />
+		<ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.MacOS\AdamantiumVulkan.MacOS.csproj" />
+		<ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.Windows\AdamantiumVulkan.Windows.csproj" />
+		<ProjectReference Include="..\Adamantium.Engine.Compiler\Adamantium.Engine.Compiler.csproj" />
+		<ProjectReference Include="..\Adamantium.Engine.Core\Adamantium.Engine.Core.csproj" />
+		<ProjectReference Include="..\Adamantium.Imaging\Adamantium.Imaging.csproj" />
+		<ProjectReference Include="..\Adamantium.Win32\Adamantium.Win32.csproj" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <Effect Include="HLSL\BasicEffect.fx" />
-  </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\Adamantium.Engine.Generators\Adamantium.Engine.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=netstandard2.0" />
+		<ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" SetTargetFramework="TargetFramework=netstandard2.0"/>
+		<ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" SetTargetFramework="TargetFramework=netstandard2.0"/>
+		<ProjectReference Include="..\Adamantium.Engine.Effects\Adamantium.Engine.Effects.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" />
+		
+		<ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.Common\AdamantiumVulkan.Common.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" />
+		<ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.Shaders\AdamantiumVulkan.Shaders.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" />
+		<ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.SPIRV\AdamantiumVulkan.SPIRV.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" />
+		<ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.SPIRV.Reflection\AdamantiumVulkan.SPIRV.Reflection.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" />
+		<ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.SPIRV.Cross\AdamantiumVulkan.SPIRV.Cross.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" />
+	</ItemGroup>
 
-  <!--<Import Project="$(SolutionDir)Adamantium.targets" />-->
+	<ItemGroup>
+		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.1.0" PrivateAssets="all" />
+		<PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.3" PrivateAssets="all" />
+		<CompilerVisibleItemMetadata Include="AdditionalFiles" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<AdditionalFiles Include="$(ProjectDir)**\*.fx" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Compile Remove="bin\**" />
+		<EmbeddedResource Remove="bin\**" />
+		<None Remove="bin\**" />
+	</ItemGroup>
 
 </Project>

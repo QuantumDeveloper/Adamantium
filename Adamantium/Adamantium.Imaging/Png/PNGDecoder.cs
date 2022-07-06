@@ -212,8 +212,6 @@ namespace Adamantium.Imaging.Png
         private uint DecodeGeneric(PNGState state, out PNGImage pngImage)
         {
             bool IEND = false;
-            string chunk;
-            ulong i;
             /*the data from idat chunks*/
             long predict = 0;
 

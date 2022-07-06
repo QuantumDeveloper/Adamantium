@@ -135,8 +135,6 @@ public class RenderTargetPanel: Grid
    {
       rendertarget.Save(path, fileType);
    }
-
-   private bool sizeChanged = true;
 }
 
 public class RenderTargetEventArgs : EventArgs

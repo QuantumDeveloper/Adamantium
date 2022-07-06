@@ -6,7 +6,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using Adamantium.Core;
 using Adamantium.Engine.Core;
-using Adamantium.Engine.Core.Effects;
+using Adamantium.Engine.Effects;
 using AdamantiumVulkan.Core;
 
 namespace Adamantium.Engine.Graphics.Effects
@@ -20,7 +20,7 @@ namespace Adamantium.Engine.Graphics.Effects
         ///   Gets the attributes associated with this pass.
         /// </summary>
         /// <value> The attributes. </value>
-        public readonly PropertyCollection Properties;
+        public readonly PropertyKeyCollection PropertiesKey;
 
         /// <summary>
         /// The parent effect of this pass.
@@ -70,7 +70,7 @@ namespace Adamantium.Engine.Graphics.Effects
             shaderStages = new List<PipelineShaderStageCreateInfo>();
             layoutBindings = new List<DescriptorSetLayoutBinding>();
             writeDescriptorSets = new List<WriteDescriptorSet>();
-            Properties = PrepareProperties(logger, pass.Properties);
+            PropertiesKey = PrepareProperties(logger, pass.Properties);
             IsSubPass = pass.IsSubPass;
             graphicsDevice.FrameFinished += GraphicsDeviceOnFrameFinished;
             
@@ -827,9 +827,9 @@ namespace Adamantium.Engine.Graphics.Effects
             return left.Class != right.Class || left.Type != right.Type || left.Count != right.Count;
         }
 
-        private PropertyCollection PrepareProperties(Logger logger, CommonData.PropertyCollection properties)
+        private PropertyKeyCollection PrepareProperties(Logger logger, EffectPropertyCollection properties)
         {
-            var passProperties = new PropertyCollection();
+            var passProperties = new PropertyKeyCollection();
 
             foreach (var property in properties)
             {
@@ -948,8 +948,6 @@ namespace Adamantium.Engine.Graphics.Effects
             public string EntryPoint;
 
             public readonly EffectShaderType Type;
-
-            public int StreamOutputRasterizedStream;
 
             public StageBlock(EffectShaderType type)
             {

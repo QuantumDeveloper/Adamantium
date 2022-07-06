@@ -5,15 +5,15 @@ namespace Adamantium.UI.Media.Imaging;
 
 public abstract class BitmapSource : ImageSource
 {
-   public virtual UInt32 PixelWidth => DXTexture.Width;
+   public virtual UInt32 PixelWidth => Texture.Width;
 
-   public virtual UInt32 PixelHeight => DXTexture.Height;
+   public virtual UInt32 PixelHeight => Texture.Height;
 
-   public virtual SurfaceFormat PixelFormat => DXTexture.SurfaceFormat;
+   public virtual SurfaceFormat PixelFormat => Texture.SurfaceFormat;
 
-   public override double Width => DXTexture.Width*DpiXScale;
+   public override double Width => Texture.Width*DpiXScale;
 
-   public override double Height => DXTexture.Height* DpiYScale;
+   public override double Height => Texture.Height* DpiYScale;
 
    public Double DpiXScale { get; set; }
 
@@ -21,6 +21,6 @@ public abstract class BitmapSource : ImageSource
 
    public void Save(Uri filePath, ImageFileType fileType)
    {
-      DXTexture.Save(filePath.IsAbsoluteUri ? filePath.AbsolutePath : filePath.LocalPath, fileType);
+      Texture.Save(filePath.IsAbsoluteUri ? filePath.AbsolutePath : filePath.LocalPath, fileType);
    }
 }

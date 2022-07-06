@@ -3,10 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using Adamantium.Core;
-using Adamantium.Engine.Compiler.Effects;
-using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Content;
-using Adamantium.Engine.Core.Effects;
+using Adamantium.Engine.Effects;
 
 namespace Adamantium.Engine.Graphics.Effects
 {

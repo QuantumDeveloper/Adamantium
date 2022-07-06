@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using Adamantium.Core;
+using Adamantium.Core.Collections;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Exceptions;
+using Adamantium.UI.Input;
 
 namespace Adamantium.UI;
 
@@ -21,15 +23,17 @@ public class Style : AdamantiumComponent
    
    public Selector Selector { get; set; }
 
+   // TODO: Seems BasedOn does not needed anymore?
    public Style BasedOn { get; set; }
 
+   // TODO: Seems TargetType does not needed anymore?
    public Type TargetType { get; set; }
 
    public SetterCollection Setters { get; }
 
    public TriggerCollection Triggers { get; }
 
-   public void Attach(IUIComponent control)
+   public void Attach(IInputComponent control)
    {
       ArgumentNullException.ThrowIfNull(TargetType);
       
@@ -77,5 +81,14 @@ public class Style : AdamantiumComponent
 
 public class Selector
 {
+   public Selector()
+   {
+      
+   }
    
+   public Type TargetType { get; set; }
+   
+   public TrackingCollection<string> Classes {get;}
+   
+   public TrackingCollection<string> Ids { get; }
 }

@@ -32,7 +32,7 @@ public class Polyline : Shape
         }
     }
 
-    protected virtual void PointsOnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    protected virtual void PointsOnCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
     {
         RaiseComponentUpdated();
     }

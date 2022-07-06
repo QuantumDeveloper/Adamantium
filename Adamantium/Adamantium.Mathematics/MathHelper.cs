@@ -129,7 +129,11 @@ namespace Adamantium.Mathematics
         /// <param name="b">The right value to compare.</param>
         /// <param name="epsilon">Epsilon value</param>
         /// <returns><c>true</c> if a almost equal to b within a float epsilon, <c>false</c> otherwise</returns>
+        #if NETCORE
         [MethodImpl(MethodImplOptions.AggressiveInlining|MethodImplOptions.AggressiveOptimization)]
+        #else
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        #endif
         public static bool WithinEpsilon(double a, double b, double epsilon)
         {
             double absA = Math.Abs(a);
@@ -1026,7 +1030,7 @@ namespace Adamantium.Mathematics
             
             // because of possible float pointing precision issues
             bezierPoints[0] = start;
-            bezierPoints[^1] = end;
+            bezierPoints[bezierPoints.Count - 1] = end;
             
             return bezierPoints;
         }
@@ -1053,7 +1057,7 @@ namespace Adamantium.Mathematics
             
             // because of possible float pointing precision issues
             bezierPoints[0] = start;
-            bezierPoints[^1] = end;
+            bezierPoints[bezierPoints.Count - 1] = end;
             
             return bezierPoints;
         }
@@ -1101,7 +1105,7 @@ namespace Adamantium.Mathematics
             }
             
             points[0] = start;
-            points[^1] = end;
+            points[points.Count - 1] = end;
 
             return points;
         }
