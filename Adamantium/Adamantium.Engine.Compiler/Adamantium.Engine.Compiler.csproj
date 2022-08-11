@@ -1,20 +1,20 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
-    <Platforms>x64</Platforms>
-    <Configurations>Debug;Release</Configurations>
-    <LangVersion>latestmajor</LangVersion>
-  </PropertyGroup>
-  <ItemGroup>
-    <Folder Include="Models\" />
-  </ItemGroup>
+	<PropertyGroup>
+		<TargetFramework>net6.0</TargetFramework>
+		<Platforms>x64</Platforms>
+		<Configurations>Debug;Release</Configurations>
+		<LangVersion>latest</LangVersion>
+		<BaseOutputPath>..\..\output\Adamantium.Engine.Compiler\bin</BaseOutputPath>
+		<BaseIntermediateOutputPath>..\..\output\Adamantium.Engine.Compiler\obj\</BaseIntermediateOutputPath>
+	</PropertyGroup>
+	<ItemGroup>
+		<Folder Include="Models\" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.Shaders\AdamantiumVulkan.Shaders.csproj" />
-    <ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.SPIRV.Reflection\AdamantiumVulkan.SPIRV.Reflection.csproj" />
-    <ProjectReference Include="..\Adamantium.Engine.Core\Adamantium.Engine.Core.csproj" />
-    <ProjectReference Include="..\Adamantium.Win32\Adamantium.Win32.csproj" />
-  </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\Adamantium.Engine.Core\Adamantium.Engine.Core.csproj" />
+		<ProjectReference Include="..\Adamantium.Win32\Adamantium.Win32.csproj" />
+	</ItemGroup>
 
 </Project>

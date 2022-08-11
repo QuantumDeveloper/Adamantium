@@ -15,7 +15,7 @@ using Adamantium.Engine.Graphics;
 using Adamantium.Engine.Graphics.Effects;
 using Adamantium.Mathematics;
 using Adamantium.UI.Media;
-using Adamantium.Generated.Effects;
+using Adamantium.UI.Playground.Effects.Generated;
 
 namespace Adamantium.UI.Playground;
 
@@ -23,6 +23,8 @@ public partial class MainWindow : Window
 {
     public MainWindow()
     {
+        UIEffect fx;
+        
         //BasicEffect f = new BasicEffect();
         //f.MeshColor.SetValue(Colors.Gray.ToVector4());
     }

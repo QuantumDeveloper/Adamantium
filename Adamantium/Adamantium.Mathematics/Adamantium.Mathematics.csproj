@@ -4,10 +4,19 @@
     <Platforms>x64</Platforms>
     <Configurations>Debug;Release</Configurations>
     <LangVersion>latestmajor</LangVersion>
-    <!--<TargetFramework>netstandard2.0</TargetFramework>-->
 	<Nullable>disable</Nullable>
     <TargetFrameworks>net6.0;netstandard2.0</TargetFrameworks>
+	  <BaseOutputPath>..\..\output\Adamantium.Mathematics\bin</BaseOutputPath>
+	  <BaseIntermediateOutputPath>..\..\output\Adamantium.Mathematics\obj\</BaseIntermediateOutputPath>
   </PropertyGroup>
+
+	<PropertyGroup>
+		<PackageId>Adamantium.Mathematics</PackageId>
+		<Version>1.0.0</Version>
+		<Authors>Adamantium studio</Authors>
+		<Company>Adamantium studio</Company>
+		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+	</PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>

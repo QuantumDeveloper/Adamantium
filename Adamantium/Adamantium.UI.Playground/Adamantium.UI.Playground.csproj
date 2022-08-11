@@ -7,17 +7,23 @@
 		<RootNamespace>Adamantium.UI.Playground</RootNamespace>
 		<Configurations>Debug;Release</Configurations>
 		<LangVersion>latest</LangVersion>
+		<BaseOutputPath>..\..\output\Adamantium.UI.Playground\bin</BaseOutputPath>
+		<BaseIntermediateOutputPath>..\..\output\Adamantium.UI.Playground\obj\</BaseIntermediateOutputPath>
 		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
 		<CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
 	</PropertyGroup>
 
 	<ItemGroup>
+		<Content Include="Effects\structs.hlsl">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
 		<Content Include="Textures\texture.png">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
 		<Content Include="Textures\texture.jpg">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
+		<None Remove="Effects\structs.hlsl" />
 		<None Remove="Textures\texture2.jpg" />
 		<Content Include="Textures\texture2.jpg">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -31,23 +37,20 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" SetTargetFramework="TargetFramework=netstandard2.0"/>
+		<ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" SetTargetFramework="TargetFramework=netstandard2.0" />
 		<ProjectReference Include="..\Adamantium.UI.Markup\Adamantium.UI.Markup.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" />
 		<ProjectReference Include="..\Adamantium.UI.Generators\Adamantium.UI.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=netstandard2.0" />
 		
 		<ProjectReference Include="..\Adamantium.Engine.Generators\Adamantium.Engine.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=netstandard2.0" />
 		<ProjectReference Include="..\Adamantium.Engine.Effects\Adamantium.Engine.Effects.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" />
-		<ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" SetTargetFramework="TargetFramework=netstandard2.0"/>
-		<ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.Common\AdamantiumVulkan.Common.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" />
-		<ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.Shaders\AdamantiumVulkan.Shaders.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" />
-		<ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.SPIRV\AdamantiumVulkan.SPIRV.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" />
-		<ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.SPIRV.Reflection\AdamantiumVulkan.SPIRV.Reflection.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" />
-		<ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.SPIRV.Cross\AdamantiumVulkan.SPIRV.Cross.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" />
+		<ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" SetTargetFramework="TargetFramework=netstandard2.0" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<AdditionalFiles Include="$(ProjectDir)**\*.xml" />
 		<AdditionalFiles Include="$(ProjectDir)**\*.fx" />
+		<AdditionalFiles Include="$(ProjectDir)**\*.hlsl" />
+		<CompilerVisibleProperty Include="RootNamespace" />
 	</ItemGroup>
 
 </Project>

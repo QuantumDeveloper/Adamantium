@@ -6,10 +6,9 @@
         <Platforms>x64</Platforms>
         <Configurations>Debug;Release</Configurations>
         <LangVersion>latestmajor</LangVersion>
-    </PropertyGroup>
-
-    <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
-      <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<BaseOutputPath>..\..\output\Adamantium.Game.Playground\bin</BaseOutputPath>
+		<BaseIntermediateOutputPath>..\..\output\Adamantium.Game.Playground\obj\</BaseIntermediateOutputPath>
     </PropertyGroup>
 
     <ItemGroup>
@@ -158,6 +157,6 @@
       <Effect Include="Effects\BasicEffect.fx" />
     </ItemGroup>
 
-    <Import Project="$(SolutionDir)Adamantium.targets" />
+<!--    <Import Project="$(SolutionDir)Adamantium.targets" />-->
 
 </Project>

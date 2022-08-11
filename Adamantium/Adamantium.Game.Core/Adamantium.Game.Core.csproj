@@ -4,7 +4,9 @@
         <TargetFramework>net6.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>disable</Nullable>
-        <Platforms>AnyCPU;x64</Platforms>
+        <Platforms>x64</Platforms>
+		<BaseOutputPath>..\..\output\Adamantium.Game.Core\bin</BaseOutputPath>
+		<BaseIntermediateOutputPath>..\..\output\Adamantium.Game.Core\obj\</BaseIntermediateOutputPath>
     </PropertyGroup>
 
     <ItemGroup>

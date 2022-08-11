@@ -5,6 +5,8 @@
         <Platforms>x64</Platforms>
         <Configurations>Debug;Release</Configurations>
         <LangVersion>latestmajor</LangVersion>
+		<BaseOutputPath>..\..\output\Adamantium.MacOS\bin</BaseOutputPath>
+		<BaseIntermediateOutputPath>..\..\output\Adamantium.MacOS\obj\</BaseIntermediateOutputPath>
     </PropertyGroup>
 
     <ItemGroup>

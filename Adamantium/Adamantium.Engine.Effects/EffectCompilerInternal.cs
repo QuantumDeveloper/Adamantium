@@ -1,16 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using Adamantium.Core;
+using Adamantium.DXC;
 using Adamantium.Mathematics;
-using AdamantiumVulkan.Shaders;
-using AdamantiumVulkan.SPIRV.Cross;
-using AdamantiumVulkan.SPIRV.Reflection;
+using AdamantiumVulkan.Spirv.Cross;
+using AdamantiumVulkan.Spirv.Reflection;
 
 namespace Adamantium.Engine.Effects
 {
@@ -47,44 +48,18 @@ namespace Adamantium.Engine.Effects
         private string preprocessorText;
         private EffectData.Technique technique;
         private int nextSubPassCount;
-        private int profile;
+        private float profile;
         private List<ResourceBindingKey> resourceKeys = new List<ResourceBindingKey>();
+        public IncludeFileDelegate IncludeFileDelegate;
 
         //private StreamOutputElement[] currentStreamOutputElements;
 
         private FileDependencyList dependencyList;
-
-        private AdamantiumVulkan.Shaders.Interop.ShadercIncludeResult ShadercIncludeResolveFn(System.IntPtr user_data, int type, IntPtr requested_source, ulong include_depth, IntPtr requesting_source)
-        {
-            IntPtr source = (IntPtr)type;
-            IntPtr ssource = (IntPtr)include_depth;
-
-            var includePath = Marshal.PtrToStringAnsi(user_data);
-            //var source = Marshal.PtrToStringAnsi(requested_source);
-            //var r_source = Marshal.PtrToStringAnsi(requesting_source);
-            var finalPath = Path.Combine("shaders\\TerrainGenShaders", includePath);
-            var text = File.ReadAllText(finalPath);
-            var result = new AdamantiumVulkan.Shaders.ShadercIncludeResult();
-            result.User_data = user_data;
-            result.Content = text;
-            result.Content_length = (ulong)text.Length;
-            result.Source_name = Marshal.PtrToStringAnsi(requested_source);
-            result.Source_name_length = (ulong)result.Source_name.Length;
-            return result.ToInternal();
-        }
-
-        private IntPtr IncludeResolver(IntPtr userData, string requestedSource, int type, string requesting_source, ulong includeDepth)
-        {
-            return IntPtr.Zero;
-        }
-
-        private void IncludeResultRelease(IntPtr userData, AdamantiumVulkan.Shaders.Interop.ShadercIncludeResult includeResult)
-        {
-            
-        }
+        private IDxcCompilerPlatform dxcCompiler;
 
         public EffectCompilerInternal()
         {
+            dxcCompiler = DxcCompiler.Create();
         }
 
         /// <summary>
@@ -178,7 +153,7 @@ namespace Adamantium.Engine.Effects
             return new SpirvReflection(shader.Bytecode).Disassemble(resourceKeys);
         }
 
-        public EffectData Build(params CompilationResult[] bytecodes)
+        public EffectData Build(params DxcCompilationResult[] bytecodes)
         {
             if (bytecodes == null || bytecodes.Length == 0)
                 throw new ArgumentException("Expected at least one bytecode", "bytecodes");
@@ -198,9 +173,9 @@ namespace Adamantium.Engine.Effects
             return effectData;
         }
 
-        private void ProcessShader(CompilationResult shaderBytecode)
+        private void ProcessShader(DxcCompilationResult shaderBytecode)
         {
-            var shaderType = VersionToShaderType(shaderBytecode.ShaderStage);
+            var shaderType = TargetProfileToShaderStage(shaderBytecode.TargetProfile);
 
             var shader = CreateEffectShader(shaderType, shaderBytecode.Name, shaderBytecode.EntryPoint, shaderBytecode);
             ProcessShaderData(shaderType, shaderBytecode, shader);
@@ -213,7 +188,7 @@ namespace Adamantium.Engine.Effects
             fileName = fileName.Replace(@"\\", @"\");
 
             logger = new EffectCompilerLogger();
-            var parser = new EffectParser { Logger = logger };
+            var parser = new EffectParser { Logger = logger, IncludeFileCallback = IncludeFileDelegate};
             parser.Macros.AddRange(macros);
             parser.IncludeDirectoryList.AddRange(includeDirectoryList);
 
@@ -828,7 +803,7 @@ namespace Adamantium.Engine.Effects
                 }
 
                 if (string.IsNullOrEmpty(literalValue))
-                    logger.Error("Unexpected assignement for [Profile] attribute: expecting only [identifier (fx_4_0, fx_4_1... etc.), or number (9.3, 10.0, 11.0... etc.)]", expression.Span);
+                    logger.Error("Unexpected assignment for [Profile] attribute: expecting only [identifier (fx_4_0, fx_4_1... etc.), or number (9.3, 10.0, 11.0... etc.)]", expression.Span);
             }
         }
 
@@ -836,14 +811,14 @@ namespace Adamantium.Engine.Effects
         {
             if (expression is Ast.IdentifierExpression identifierExpression)
             {
-                profile = (int)(Convert.ToSingle(identifierExpression.Name.Text, CultureInfo.InvariantCulture) * 10);
+                profile = Convert.ToSingle(identifierExpression.Name.Text, CultureInfo.InvariantCulture);
             }
             else if (expression is Ast.LiteralExpression)
             {
                 var literalValue = ((Ast.LiteralExpression)expression).Value.Value.ToString();
                 try
                 {
-                    profile = (int)(Convert.ToSingle(literalValue) * 10);
+                    profile = Convert.ToSingle(literalValue);
                 }
                 catch (Exception)
                 {
@@ -897,7 +872,6 @@ namespace Adamantium.Engine.Effects
             }
             else if (expression is Ast.MethodExpression)
             {
-                // CompileShader( vs_4_0, VS() )
                 var compileExpression = (Ast.MethodExpression)expression;
 
                 if (compileExpression.Name.Text == "CompileShader")
@@ -975,7 +949,7 @@ namespace Adamantium.Engine.Effects
                 }
                 else
                 {
-                    logger.Warnings(result.Warnings);
+                    //logger.Warnings(result.Warnings);
 
                     var shader = CreateEffectShader(type, effect.Name, entryPoint, result);
 
@@ -987,6 +961,7 @@ namespace Adamantium.Engine.Effects
             }
             catch (Exception ex)
             {
+                logger.Error($"{type} {entryPoint}: {ex.Message}");
                 Console.WriteLine(ex);
             }
             finally
@@ -994,84 +969,52 @@ namespace Adamantium.Engine.Effects
             }
         }
 
-        private CompilationResult CompileParsedShader(EffectShaderType shaderKind, string entryPoint, int profile)
+        private DxcCompilationResult CompileParsedShader(EffectShaderType shaderKind, string entryPoint, float profile)
         {
             var sourcecodeBuilder = new StringBuilder();
             if (!string.IsNullOrEmpty(preprocessorText))
                 sourcecodeBuilder.Append(preprocessorText);
             sourcecodeBuilder.Append(parserResult.PreprocessedSource);
 
-            var sourcecode = sourcecodeBuilder.ToString();
+            var sourcecode = sourcecodeBuilder.ToString().TrimEnd('\r', '\n', ' ');
 
             var filePath = replaceBackSlash.Replace(parserResult.SourceFileName, @"\");
-            var includeCallback = parserResult.IncludeHandler.IncludeResolverCallback;
-            var includeReleaserCallback = parserResult.IncludeHandler.IncludeReleaseCallback;
-
-            var includeResolverPtr = Marshal.GetFunctionPointerForDelegate(includeCallback);
-            var includeReleasePtr = Marshal.GetFunctionPointerForDelegate(includeReleaserCallback);
-
-            var zeroPtr = IntPtr.Zero;
-
-            var opts = CompileOptions.New();
-            opts.EnableHlslFunctionality = true;
-            //opts.UseHlslIoMapping = true;
-            //opts.UseHlslOffsets = true;
-            //opts.SetAutoBindUniforms = true;
-            //opts.TargetSpirv = ShadercSpirvVersion._5;
-            opts.TargetSpirv = ShadercSpirvVersion._3;
             
-            //TODO: Remove this condition when MoltenVK will be the same version as version for Windows
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            var compilerOptions = new CompilerOptions();
+            compilerOptions.Add(CompilerArguments.AllResourcesBound);
+            compilerOptions.Add(CompilerArguments.SpvUseDxLayout);
+            compilerOptions.Add($"{CompilerArguments.SpvTargetEnv}vulkan1.1");
+            compilerOptions.Add($"{CompilerArguments.SpvExtension}SPV_GOOGLE_hlsl_functionality1");
+            compilerOptions.Add($"{CompilerArguments.SpvExtension}SPV_GOOGLE_user_type");
+            compilerOptions.Add(CompilerArguments.SpvReflect);
+
+            var targetProfile = $"{StageTypeToString(shaderKind)}_{GetShaderModelFromProfile(profile)}";
+            DxcCompilationResult result = null;
+
+            try
             {
-                opts.TargetSpirv = ShadercSpirvVersion._3;
+                var timer = Stopwatch.StartNew();
+                result = dxcCompiler.CompileIntoSpirvFromText(sourcecode, filePath, entryPoint, targetProfile, compilerOptions);
+                timer.Stop();
+                var ms = timer.ElapsedMilliseconds;
             }
-            opts.SetTargetEnv(ShadercTargetEnv.Vulkan, 1 << 22 | 2 << 12);
-            opts.SourceLanguage = (ShadercSourceLanguage)language;
-            opts.SetForcedVersionProfile(profile, ShadercProfile.Core);
-            opts.SetIncludeCallbacks(includeResolverPtr, includeReleasePtr, ref zeroPtr);
-
-            var result = SpirvReflection.CompileToSpirvBinary(
-                sourcecode,
-                GetShadercType(shaderKind),
-                Path.GetFileName(filePath),
-                entryPoint,
-                opts);
-
-            // var result2 = SpirvReflection.CompileToSpirvAssembly(sourcecode, GetShadercType(shaderKind), entryPoint,
-            //    entryPoint, opts);
-            //
-            // var text = Encoding.ASCII.GetString(result2.Bytecode);
-            
-            opts.Dispose();
+            catch(Exception ex)
+            {
+                int bug = 0;
+            }
 
             return result;
         }
 
-        private ShadercShaderKind GetShadercType(EffectShaderType type)
-        {
-            switch(type)
-            {
-                case EffectShaderType.Vertex: return ShadercShaderKind.VertexShader;
-                case EffectShaderType.Hull: return ShadercShaderKind.TessControlShader;
-                case EffectShaderType.Domain: return ShadercShaderKind.TessEvaluationShader;
-                case EffectShaderType.Geometry: return ShadercShaderKind.GeometryShader;
-                case EffectShaderType.Fragment: return ShadercShaderKind.FragmentShader;
-                case EffectShaderType.Compute: return ShadercShaderKind.ComputeShader;
-                default:
-                    throw new ArgumentOutOfRangeException($"Shader type {type} could not be converted to any ShadercShaderKind type");
-            }
-        }
-
-        private EffectData.Shader CreateEffectShader(EffectShaderType type, string shaderName, string entryPoint, CompilationResult bytecode)
+        private EffectData.Shader CreateEffectShader(EffectShaderType type, string shaderName, string entryPoint, DxcCompilationResult compilationResult)
         {
             var shader = new EffectData.Shader()
             {
                 Name = shaderName,
                 EntryPoint = entryPoint,
                 Level = GetShaderModelFromProfile(profile),
-                Language = language,
-                Bytecode = bytecode,
-                Hashcode = Utilities.ComputeHashFNV1Modified(bytecode),
+                Bytecode = compilationResult.Bytecode,
+                Hashcode = Utilities.ComputeHashFNV1Modified(compilationResult.Bytecode),
                 Type = type,
                 ConstantBuffers = new List<EffectData.ConstantBuffer>(),
                 ResourceParameters = new List<EffectData.ResourceParameter>(),
@@ -1081,42 +1024,18 @@ namespace Adamantium.Engine.Effects
             {
                 var result = reflect.Disassemble(resourceKeys);
                 shader.Bytecode = reflect.GetByteCode();
-                //BuiltSemanticInputAndOutput(shader, reflect);
                 BuildParameters(shader, result);
             }
 
             return shader;
         }
 
-        private ShaderModel GetShaderModelFromProfile(int profile)
+        private string GetShaderModelFromProfile(float profile)
         {
-            switch (language)
-            {
-                case ShaderLanguage.HLSL:
-                    switch (profile)
-                    {
-                        case 50:
-                            return ShaderModel.HLSL_5_0;
-                        case 51:
-                            return ShaderModel.HLSL_5_1;
-                        case 60:
-                            return ShaderModel.HLSL_6_0;
-                    }
-                    break;
-                case ShaderLanguage.GLSL:
-                    switch(profile)
-                    {
-                        case 450:
-                            return ShaderModel.GLSL_450;
-                        case 460:
-                            return ShaderModel.GLSL_460;
-                    }
-                    break;
-            }
-            return ShaderModel.Unknown;
+            return profile.ToString(CultureInfo.InvariantCulture).Replace('.', '_');
         }
 
-        private void ProcessShaderData(EffectShaderType type, CompilationResult bytecode, EffectData.Shader shader)
+        private void ProcessShaderData(EffectShaderType type, DxcCompilationResult bytecode, EffectData.Shader shader)
         {
             // if No debug is required, take the bytecode without any debug/reflection info.
             if ((compilerFlags & EffectCompilerFlags.Debug) == 0)
@@ -1210,19 +1129,26 @@ namespace Adamantium.Engine.Effects
             return profile;
         }
 
-        private static EffectShaderType VersionToShaderType(ShadercShaderKind stageText)
+        private static EffectShaderType TargetProfileToShaderStage(string targetProfile)
         {
-            switch (stageText)
+            var shader = targetProfile.Substring(0, targetProfile.IndexOf('_'));
+            switch (shader)
             {
-                case ShadercShaderKind.VertexShader: return EffectShaderType.Vertex;
-                case ShadercShaderKind.TessEvaluationShader: return EffectShaderType.Domain;
-                case ShadercShaderKind.TessControlShader: return EffectShaderType.Hull;
-                case ShadercShaderKind.GeometryShader: return EffectShaderType.Geometry;
-                case ShadercShaderKind.FragmentShader: return EffectShaderType.Fragment;
-                case ShadercShaderKind.ComputeShader: return EffectShaderType.Compute;
+                case "vs":
+                    return EffectShaderType.Vertex;
+                case "ds":
+                    return EffectShaderType.Domain;
+                case "hs":
+                    return EffectShaderType.Hull;
+                case "gs":
+                    return EffectShaderType.Geometry;
+                case "ps":
+                    return EffectShaderType.Fragment;
+                case "cs":
+                    return EffectShaderType.Compute;
+                default:
+                    throw new InvalidEnumArgumentException($"Unknown shader type: {shader}");
             }
-
-            throw new ArgumentException("Unknown shader stage type: " + stageText);
         }
 
         /// <summary>

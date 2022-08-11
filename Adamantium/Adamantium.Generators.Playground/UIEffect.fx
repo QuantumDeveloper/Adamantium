@@ -1,4 +1,4 @@
-#include "Effects/structs.hlsl"
+#include "structs.hlsl"
 
 float4x4 wvp;
 float4 fillColor;

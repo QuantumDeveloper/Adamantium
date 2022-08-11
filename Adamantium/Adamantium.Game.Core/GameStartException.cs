@@ -1,4 +1,6 @@
-﻿namespace Adamantium.Game.Core
+﻿using System;
+
+namespace Adamantium.Game.Core
 {
     public class GameStartException : Exception
     {

@@ -1,8 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.IO;
 using System.Text;
-using AdamantiumVulkan.Shaders;
-using AdamantiumVulkan.SPIRV.Reflection;
+using Adamantium.DXC;
+using AdamantiumVulkan.Spirv.Reflection;
 
 namespace Adamantium.Engine.Effects
 {
@@ -79,7 +79,7 @@ namespace Adamantium.Engine.Effects
       /// </summary>
       /// <param name="shaderSource">The bytecode list to for the provided effect.</param>
       /// <returns>Built effect data.</returns>
-      public static EffectData Compile(params CompilationResult[] shaderSource)
+      public static EffectData Compile(params DxcCompilationResult[] shaderSource)
       {
          var compiler = new EffectCompilerInternal();
          return compiler.Build(shaderSource);

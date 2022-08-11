@@ -5,7 +5,9 @@
     <TargetFramework>net6.0</TargetFramework>
     <Platforms>x64</Platforms>
     <Configurations>Debug;Release</Configurations>
-    <LangVersion>latestmajor</LangVersion>
+    <LangVersion>latest</LangVersion>
+	  <BaseOutputPath>..\..\output\Adamantium.XInput.Playground\bin</BaseOutputPath>
+	  <BaseIntermediateOutputPath>..\..\output\Adamantium.XInput.Playground\obj\</BaseIntermediateOutputPath>
   </PropertyGroup>
 
   <ItemGroup>

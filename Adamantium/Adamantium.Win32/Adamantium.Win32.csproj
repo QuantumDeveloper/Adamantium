@@ -1,23 +1,25 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
-    <Platforms>x64</Platforms>
-    <Configurations>Debug;Release</Configurations>
-    <LangVersion>latestmajor</LangVersion>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFramework>net6.0</TargetFramework>
+		<Platforms>x64</Platforms>
+		<Configurations>Debug;Release</Configurations>
+		<LangVersion>latest</LangVersion>
+		<BaseOutputPath>..\..\output\Adamantium.Win32\bin</BaseOutputPath>
+		<BaseIntermediateOutputPath>..\..\output\Adamantium.Win32\obj\</BaseIntermediateOutputPath>
+	</PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-  </PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	</PropertyGroup>
 
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-  </PropertyGroup>
+	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" />
-    <ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
-  </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" />
+		<ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
+	</ItemGroup>
 
 </Project>

@@ -1,0 +1,33 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net6.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<Platforms>x64</Platforms>
+		<BaseOutputPath>..\..\output\Adamantium.Generators.Playground\bin</BaseOutputPath>
+		<BaseIntermediateOutputPath>..\..\output\Adamantium.Generators.Playground\obj\</BaseIntermediateOutputPath>
+		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+		<CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
+	</PropertyGroup>
+
+	<!--<ItemGroup>
+		<ProjectReference Include="..\Adamantium.Engine.Generators\Adamantium.Engine.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+	</ItemGroup>-->
+	<ItemGroup>
+		<ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" SetTargetFramework="TargetFramework=netstandard2.0" />
+		<ProjectReference Include="..\Adamantium.Engine.Effects\Adamantium.Engine.Effects.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" />
+		<ProjectReference Include="..\Adamantium.Engine.Graphics\Adamantium.Engine.Graphics.csproj" />
+		<ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" SetTargetFramework="TargetFramework=netstandard2.0" />
+		<ProjectReference Include="..\Adamantium.Engine.Generators\Adamantium.Engine.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=netstandard2.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<AdditionalFiles Include="$(ProjectDir)**\*.xml" />
+		<AdditionalFiles Include="$(ProjectDir)**\*.fx" />
+		<AdditionalFiles Include="$(ProjectDir)**\*.hlsl" />
+		<CompilerVisibleProperty Include="RootNamespace" />
+	</ItemGroup>
+
+</Project>

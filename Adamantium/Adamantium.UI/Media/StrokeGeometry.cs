@@ -817,9 +817,6 @@ public class StrokeGeometry : Geometry
             default:
                throw new ArgumentException("Unhandled stroke join type");
          }
-
-         Console.WriteLine($"ContourPoints2 = {contourPoints.Count}");
-
          meshContours.Add(new MeshContour(joinPoints));
       }
 

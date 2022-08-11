@@ -6,8 +6,9 @@
 		<Platforms>x64</Platforms>
 		<LangVersion>latest</LangVersion>
 		<Nullable>disable</Nullable>
-		<!--<IsRoslynComponent>true</IsRoslynComponent>-->
-		
+		<BaseOutputPath>..\..\output\Adamantium.UI.Generators\bin</BaseOutputPath>
+		<BaseIntermediateOutputPath>..\..\output\Adamantium.UI.Generators\obj\</BaseIntermediateOutputPath>
+		<!--<IsRoslynComponent>true</IsRoslynComponent>-->		
     </PropertyGroup>
 
     <ItemGroup>
@@ -24,7 +25,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\Adamantium.UI.Markup\Adamantium.UI.Markup.csproj" GeneratePathProperty="true" PrivateAssets="all" />
-        <ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" GeneratePathProperty="true" PrivateAssets="all" />
+      <ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" GeneratePathProperty="true" PrivateAssets="all" />
     </ItemGroup>
 
 </Project>

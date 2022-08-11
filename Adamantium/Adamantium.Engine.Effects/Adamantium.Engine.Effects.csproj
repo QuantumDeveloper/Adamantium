@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFramework>netstandard2.0</TargetFramework>
@@ -6,18 +6,34 @@
         <RootNamespace>Adamantium.Engine.Effects</RootNamespace>
         <LangVersion>latest</LangVersion>
         <Platforms>x64</Platforms>
+	<BaseOutputPath>..\..\output\Adamantium.Engine.Effects\bin</BaseOutputPath>
+    <BaseIntermediateOutputPath>..\..\output\Adamantium.Engine.Effects\obj\</BaseIntermediateOutputPath>
     </PropertyGroup>
 
+	<PropertyGroup>
+		<PackageId>Adamantium.Engine.Effects</PackageId>
+		<Version>1.0.0</Version>
+		<Authors>Adamantium studio</Authors>
+		<Company>Adamantium studio</Company>
+		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+	</PropertyGroup>
+
     <ItemGroup>
+      <PackageReference Include="Adamantium.DXC" Version="1.0.2" />
+      <PackageReference Include="AdamantiumVulkan.Spirv" Version="1.0.0" />
       <PackageReference Include="MessagePack" Version="2.3.112" />
       <PackageReference Include="MessagePack.Annotations" Version="2.3.112" />
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.SPIRV.Reflection\AdamantiumVulkan.SPIRV.Reflection.csproj" />
-      <ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.SPIRV\AdamantiumVulkan.SPIRV.csproj" />
       <ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" />
       <ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Content Update="C:\Users\dzapo\.nuget\packages\adamantium.dxc\1.0.0\contentFiles\any\netstandard2.0\dxcompiler.dll">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
     </ItemGroup>
 
 </Project>

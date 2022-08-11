@@ -30,12 +30,7 @@ namespace Adamantium.Engine.Effects
             /// <summary>
             /// Level of this shader.
             /// </summary>
-            public ShaderModel Level;
-
-            /// <summary>
-            /// Shader language HLSL/GLSL
-            /// </summary>
-            public ShaderLanguage Language;
+            public string Level;
 
             /// <summary>
             /// Bytecode of this shader.
