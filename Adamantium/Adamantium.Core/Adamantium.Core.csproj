@@ -1,12 +1,21 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <Platforms>x64</Platforms>
     <Configurations>Debug;Release</Configurations>
     <LangVersion>latestmajor</LangVersion>
-	<!--<TargetFramework>netstandard2.0</TargetFramework>-->
     <TargetFrameworks>netstandard2.0;net6.0</TargetFrameworks>
+    <BaseOutputPath>..\..\output\Adamantium.Core\bin</BaseOutputPath>
+    <BaseIntermediateOutputPath>..\..\output\Adamantium.Core\obj\</BaseIntermediateOutputPath>
   </PropertyGroup>
+
+	<PropertyGroup>
+		<PackageId>Adamantium.Core</PackageId>
+		<Version>1.0.0</Version>
+		<Authors>Adamantium studio</Authors>
+		<Company>Adamantium studio</Company>
+		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+	</PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -16,8 +25,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
-  <ItemGroup><!--    <ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />-->
-  
+  <ItemGroup>
     <ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
   </ItemGroup>
 

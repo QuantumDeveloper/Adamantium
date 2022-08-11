@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Adamantium.UI.Markup;
 
 public class AumlAstObjectNode : AumlAstNode, IAumlAstValueNode

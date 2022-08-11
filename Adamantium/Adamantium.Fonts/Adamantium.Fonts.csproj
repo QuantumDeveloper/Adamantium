@@ -5,6 +5,8 @@
         <Platforms>x64</Platforms>
         <Configurations>Debug;Release</Configurations>
         <LangVersion>latestmajor</LangVersion>
+		<BaseOutputPath>..\..\output\Adamantium.Fonts\bin</BaseOutputPath>
+		<BaseIntermediateOutputPath>..\..\output\Adamantium.Fonts\obj\</BaseIntermediateOutputPath>
     </PropertyGroup>
 
     <ItemGroup>

@@ -1,4 +1,7 @@
-﻿namespace Adamantium.Game.Core
+﻿using System;
+using System.IO;
+
+namespace Adamantium.Game.Core
 {
    public abstract class GamePlatformDesktop : GamePlatform
    {

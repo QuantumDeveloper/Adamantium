@@ -1,4 +1,6 @@
-﻿float4x4 wvp;
+
+
+float4x4 wvp;
 float3 meshColor;
 float transparency;
 //[[vk::binding(1)]] 
@@ -12,16 +14,16 @@ uint atlasSize;
 
 struct TexturedVertexInputType
 {
-	float4 position : SV_POSITION;
-	float4 color: COLOR;
-	float2 texcoord: TEXCOORD;
+    float4 position : SV_POSITION;
+    float4 color: COLOR;
+    float2 texcoord: TEXCOORD;
 };
 
 struct TexturedPixelInputType
 {
-	float4 position : SV_POSITION;
-	float2 texcoord: TEXCOORD;
-	float4 color: COLOR;
+    float4 position : SV_POSITION;
+    float2 texcoord: TEXCOORD;
+    float4 color: COLOR;
 };
 
 struct MESH_VERTEX
@@ -43,7 +45,6 @@ struct PS_OUTPUT_BASIC
     float2 uv : TEXCOORD0;
     float4 color : COLOR0;
 };
-
 
 TexturedPixelInputType TexturedVertexShader(TexturedVertexInputType input)
 {
@@ -164,7 +165,7 @@ float4 BasicTextured_PS(PS_OUTPUT_BASIC input) : SV_TARGET
     float4 color = shaderTexture.Sample(sampleType, input.uv);
     return color;
 }
-technique10 Render
+technique Render
 {
 	pass Textured
 	{
@@ -174,7 +175,7 @@ technique10 Render
 	}
 }
 
-technique10 Basic
+technique Basic
 {
     pass Default
     {

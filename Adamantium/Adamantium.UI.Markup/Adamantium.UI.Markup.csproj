@@ -6,7 +6,13 @@
         <Configurations>Release;Debug</Configurations>
         <Platforms>x64</Platforms>
         <TargetFramework>netstandard2.0</TargetFramework>
-        <LangVersion>10</LangVersion>
+        <LangVersion>latest</LangVersion>
+		<BaseOutputPath>..\..\output\Adamantium.UI.Markup\bin</BaseOutputPath>
+		<BaseIntermediateOutputPath>..\..\output\Adamantium.UI.Markup\obj\</BaseIntermediateOutputPath>
     </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" />
+    </ItemGroup>
 
 </Project>

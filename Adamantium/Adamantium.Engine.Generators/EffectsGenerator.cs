@@ -13,48 +13,81 @@ public class EffectsGenerator : IIncrementalGenerator
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         var effectFiles = context.AdditionalTextsProvider.Where(file => file.Path.EndsWith(".fx"));
-        
+
         var namesAndContents = effectFiles.Select((text, cancellationToken) => (
             name: Path.GetFileNameWithoutExtension(text.Path),
+            path: text.Path,
             content: text.GetText(cancellationToken)!.ToString()));
 
-        var sourceProvider = namesAndContents.Combine(context.CompilationProvider);
+        var sourceProvider = namesAndContents.Combine(context.CompilationProvider).Combine(context.AnalyzerConfigOptionsProvider);
 
         context.RegisterSourceOutput(sourceProvider, (spc, provider) =>
         {
-            var (file, compilation) = provider;
-            var text = file.content;
-            var compilerResult = EffectCompiler.Compile(text, file.name);
-            var result = GenerateEffect(compilerResult, compilation, file.name);
-            if (compilerResult.Logger.Messages.Count > 0)
-            {
-                CreateDiagnostic(ref spc, compilerResult, file.name);
-            }
-            if (!compilerResult.HasErrors)
-            {
-                spc.AddSource($"{file.name}.g.cs", result);
-            }
+            var ((file, compilation), configOptions) = provider;
 
+            configOptions.GlobalOptions.TryGetValue("build_property.RootNamespace", out var @namespace);
+            if (string.IsNullOrEmpty(@namespace))
+            {
+                CreateDiagnostic(ref spc,
+                    file.name,
+                    "No RootNamespace Compiler option provided in project file. Please, add <CompilerVisibleProperty Include=\"RootNamespace\" /> to your csproj file",
+                    DiagnosticSeverity.Error);
+            }
+            var text = file.content;
+            try
+            {
+                var compilerResult = EffectCompiler.Compile(text, file.name);
+                var result = GenerateEffect(compilerResult, compilation, file.name, @namespace);
+                if (compilerResult.Logger.Messages.Count > 0)
+                {
+                    CreateDiagnostic(ref spc, compilerResult, file.name);
+                }
+                if (!compilerResult.HasErrors)
+                {
+                    spc.AddSource($"{file.name}.g.cs", result);
+                }
+            }
+            catch(System.Exception ex)
+            {
+                CreateDiagnostic(ref spc, file.name, ex.Message, DiagnosticSeverity.Error);
+                CreateDiagnostic(ref spc, file.name, ex.StackTrace, DiagnosticSeverity.Error);
+                CreateDiagnostic(ref spc, file.name, ex.TargetSite.ToString(), DiagnosticSeverity.Error);
+            }
         });
     }
 
     private void CreateDiagnostic(ref SourceProductionContext spc, EffectCompilerResult result, string filePath)
     {
-        foreach(var message in result.Logger.Messages)
+        foreach (var message in result.Logger.Messages)
         {
             var descriptor = new DiagnosticDescriptor(
-                id: "EffectGenerator", 
+                id: "EffectGenerator",
                 title: "Effects parsing error",
-                messageFormat: "Error while parsing {0}: {1}", 
+                messageFormat: "Error while parsing {0}: {1}",
                 category: "EffectParser",
-                (DiagnosticSeverity)message.Type, 
+                (DiagnosticSeverity)message.Type,
                 isEnabledByDefault: true);
             var diagnostic = Diagnostic.Create(descriptor, Location.None, $"{filePath}.fx", message.Text);
             spc.ReportDiagnostic(diagnostic);
         }
     }
 
-    private string GenerateEffect(EffectCompilerResult result, Compilation compilation, string fileName)
+    private void CreateDiagnostic(ref SourceProductionContext spc, string filePath, string diagnosticText, DiagnosticSeverity severity)
+    {
+        var descriptor = new DiagnosticDescriptor(
+            id: "EffectGenerator",
+            title: "Effects parsing error",
+            messageFormat: "Error while parsing {0}: {1}",
+            category: "EffectParser",
+            severity,
+            isEnabledByDefault: true);
+        var diagnostic = Diagnostic.Create(descriptor, Location.None, $"{filePath}.fx", diagnosticText);
+        spc.ReportDiagnostic(diagnostic);
+
+    }
+
+    private string GenerateEffect(EffectCompilerResult result, Compilation compilation, string fileName, string @namespace)
+
     {
         var textGenerator = new TextGenerator();
         textGenerator.WriteLine("using Adamantium.Engine.Effects;");
@@ -63,7 +96,8 @@ public class EffectsGenerator : IIncrementalGenerator
 
         textGenerator.NewLine();
 
-        textGenerator.WriteLine($"namespace Adamantium.Generated.Effects;");
+        textGenerator.WriteLine($"namespace {@namespace}.Effects.Generated");
+        textGenerator.WriteOpenBraceAndIndent();
         textGenerator.WriteLine($"public partial class {Path.GetFileName(fileName)} : Effect");
         textGenerator.WriteOpenBraceAndIndent();
 
@@ -74,13 +108,13 @@ public class EffectsGenerator : IIncrementalGenerator
         textGenerator.WriteLine(@$"private static readonly EffectData bytecode = EffectData.Load(new byte[] {{
         {bytes}
         }});");
-        
+
         textGenerator.NewLine();
 
         textGenerator.WriteLine($"public {fileName}(GraphicsDevice device, EffectPool effectPool = null) " +
                                 $": base(device, bytecode, effectPool)");
         textGenerator.WriteOpenBraceAndIndent();
-        
+
         var effectParameters = new List<string>();
         var effectPasses = new List<string>();
         foreach (var technique in result.EffectData.Description.Techniques)
@@ -112,7 +146,7 @@ public class EffectsGenerator : IIncrementalGenerator
 
             foreach (var resource in shader.ResourceParameters)
             {
-                if (parametersIdentity.Contains(resource.Name) || resource.Name == "$Global") continue;
+                if (parametersIdentity.Contains(resource.Name) || resource.Name == "type.$Globals") continue;
 
                 parametersIdentity.Add(resource.Name);
                 var name = char.ToUpper(resource.Name[0]) + resource.Name.Substring(1);
@@ -122,7 +156,8 @@ public class EffectsGenerator : IIncrementalGenerator
         }
 
         textGenerator.UnindentAndWriteCloseBrace();
-        
+
+
         textGenerator.NewLine();
 
         foreach (var pass in effectPasses)
@@ -137,11 +172,12 @@ public class EffectsGenerator : IIncrementalGenerator
             textGenerator.WriteLine($"public EffectParameter {parameter} {{get;}}");
         }
 
-        textGenerator.UnindentAndWriteCloseBrace();
+        textGenerator.UnindentAndWriteCloseBrace(); // close class
+        textGenerator.UnindentAndWriteCloseBrace(); // close namespace
 
         return textGenerator.ToString();
     }
-    
+
 
     private string GetBytecodeAsText(byte[] bytecode)
     {

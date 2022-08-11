@@ -9,7 +9,7 @@ using Adamantium.Imaging;
 using Adamantium.Mathematics;
 using AdamantiumVulkan.Core;
 using Semaphore = AdamantiumVulkan.Core.Semaphore;
-using Adamantium.Generated.Effects;
+using Adamantium.Engine.Graphics.Effects.Generated;
 
 namespace Adamantium.Engine.Graphics
 {

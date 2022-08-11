@@ -1,1 +1,2 @@
 main docs about source generators: https://github.com/dotnet/roslyn/blob/main/docs/features/source-generators.cookbook.md
+how to debug: https://github.com/JoanComasFdz/dotnet-how-to-debug-source-generator-vs2022

@@ -1,4 +1,6 @@
-﻿namespace Adamantium.UI.Markup;
+﻿using System.Collections.Generic;
+
+namespace Adamantium.UI.Markup;
 
 public abstract class AumlAstNode : IAumlAstNode
 {

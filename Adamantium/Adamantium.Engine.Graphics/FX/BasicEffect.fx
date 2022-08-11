@@ -1,4 +1,4 @@
-﻿float4x4 wvp;
+float4x4 wvp;
 float3 meshColor;
 float transparency;
 //[[vk::binding(1)]] 
@@ -164,7 +164,7 @@ float4 BasicTextured_PS(PS_OUTPUT_BASIC input) : SV_TARGET
     float4 color = shaderTexture.Sample(sampleType, input.uv);
     return color;
 }
-technique10 Render
+technique Render
 {
 	pass Textured
 	{
@@ -174,7 +174,7 @@ technique10 Render
 	}
 }
 
-technique10 Basic
+technique Basic
 {
     pass Default
     {

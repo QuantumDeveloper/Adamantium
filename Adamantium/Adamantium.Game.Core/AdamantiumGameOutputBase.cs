@@ -1,4 +1,5 @@
-﻿using Adamantium.Engine.Graphics;
+﻿using System.Collections.Generic;
+using Adamantium.Engine.Graphics;
 using Adamantium.Game.Core.Input;
 using Adamantium.Imaging;
 using Adamantium.UI;

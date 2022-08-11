@@ -1,15 +1,17 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net6.0</TargetFramework>
-    <Platforms>x64</Platforms>
-    <Configurations>Debug;Release</Configurations>
-    <LangVersion>latestmajor</LangVersion>
-  </PropertyGroup>
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net6.0</TargetFramework>
+		<Platforms>x64</Platforms>
+		<Configurations>Debug;Release</Configurations>
+		<LangVersion>latestmajor</LangVersion>
+		<BaseOutputPath>..\..\output\Adamantium.Imaging.Playground\bin</BaseOutputPath>
+		<BaseIntermediateOutputPath>..\..\output\Adamantium.Imaging.Playground\obj\</BaseIntermediateOutputPath>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\Adamantium.Imaging\Adamantium.Imaging.csproj" />
-  </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\Adamantium.Imaging\Adamantium.Imaging.csproj" />
+	</ItemGroup>
 
 </Project>

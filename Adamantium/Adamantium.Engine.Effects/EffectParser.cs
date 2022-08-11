@@ -55,6 +55,12 @@ namespace Adamantium.Engine.Effects
         /// </summary>
         /// <value>The include directory list.</value>
         public List<string> IncludeDirectoryList => includeDirectoryList;
+        
+        /// <summary>
+        /// Gets or sets the include file callback.
+        /// </summary>
+        /// <value>The include file callback.</value>
+        public IncludeFileDelegate IncludeFileCallback { get; set; }
 
         /// <summary>
         /// Gets or sets the logger.
@@ -80,6 +86,7 @@ namespace Adamantium.Engine.Effects
             };
             localResult.IncludeHandler.CurrentDirectory.Push(Path.GetDirectoryName(localResult.SourceFileName));
             localResult.IncludeHandler.IncludeDirectories.AddRange(IncludeDirectoryList);
+            localResult.IncludeHandler.IncludeFileCallback = IncludeFileCallback;
             localResult.IncludeHandler.FileResolved.Add(fileName, new FileIncludeHandler.FileItem(fileName, filePath, File.GetLastWriteTime(filePath)));
             localResult.PreprocessedSource = input;
 
@@ -114,7 +121,7 @@ namespace Adamantium.Engine.Effects
                 switch (token.Type)
                 {
                     case TokenType.Identifier:
-                        if ((token.EqualString("technique") || token.EqualString("technique10") || token.EqualString("technique11") || token.EqualString("technique12")) && curlyBraceCount == 0)
+                        if (token.EqualString("technique") && curlyBraceCount == 0)
                             ParseTechnique();
                         break;
                 }
@@ -253,38 +260,48 @@ namespace Adamantium.Engine.Effects
             while (token.Type == TokenType.Preprocessor)
             {
                 InternalNextToken();
-                if (!Expect("line"))
+                if (Expect("include") || Expect("define"))
                 {
-                    Logger.Error("Unsupported preprocessor token [{0}]. Only #line is supported.", token.Span, currentToken.Value);
-                    return currentToken;
-                }
-
-                if (!ExpectNext(TokenType.Number))
-                    return currentToken;
-
-                // Set currentLine - 1 as the NL at the end of the preprocessor line will add +1 
-                currentLine = int.Parse(currentToken.Value) - 1;
-
-                // Check next token
-                token = InternalNextToken();
-
-                // If this is a string, then this is the end of preprocessor line
-                if (token.Type == TokenType.String)
-                {
-                    currentFile = token.Value.Substring(1, token.Value.Length - 2);
-
-                    // Replace "file" from #line preprocessor with the actual full path.
-                    var includeHandler = result.IncludeHandler;
-                    if (includeHandler.FileResolved.ContainsKey(currentFile))
-                    {
-                        var fullPathFile = includeHandler.FileResolved[currentFile].FilePath;
-                        // This is not 100% accurate, but it is better than having invalid file path
-                        newPreprocessedSource = newPreprocessedSource.Replace(token.Value, "\"" + fullPathFile + "\"");
-                        currentFile = fullPathFile;
-                    }
-                    currentFile = currentFile.Replace(@"\\", @"\");
-
                     token = InternalNextToken();
+                    //skip
+                }
+                else if(Expect("line"))
+                {
+                    if (!ExpectNext(TokenType.Number))
+                        return currentToken;
+
+                    // Set currentLine - 1 as the NL at the end of the preprocessor line will add +1 
+                    currentLine = int.Parse(currentToken.Value) - 1;
+
+                    // Check next token
+                    token = InternalNextToken();
+
+                    // If this is a string, then this is the end of preprocessor line
+                    if (token.Type == TokenType.String)
+                    {
+                        currentFile = token.Value.Substring(1, token.Value.Length - 2);
+
+                        // Replace "file" from #line preprocessor with the actual full path.
+                        var includeHandler = result.IncludeHandler;
+                        if (includeHandler.FileResolved.ContainsKey(currentFile))
+                        {
+                            var fullPathFile = includeHandler.FileResolved[currentFile].FilePath;
+                            // This is not 100% accurate, but it is better than having invalid file path
+                            newPreprocessedSource =
+                                newPreprocessedSource.Replace(token.Value, "\"" + fullPathFile + "\"");
+                            currentFile = fullPathFile;
+                        }
+
+                        currentFile = currentFile.Replace(@"\\", @"\");
+
+                        token = InternalNextToken();
+                    }
+                }
+                else
+                {
+                    Logger.Error("Unsupported preprocessor token [{0}]. Only #line is supported.", token.Span,
+                        currentToken.Value);
+                    return currentToken;
                 }
             }
 
