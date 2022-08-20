@@ -7,7 +7,6 @@
 		<Nullable>enable</Nullable>
 		<Platforms>x64</Platforms>
 		<BaseOutputPath>..\..\output\Adamantium.Generators.Playground\bin</BaseOutputPath>
-		<BaseIntermediateOutputPath>..\..\output\Adamantium.Generators.Playground\obj\</BaseIntermediateOutputPath>
 		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
 		<CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
 	</PropertyGroup>

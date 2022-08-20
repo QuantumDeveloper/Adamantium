@@ -1,0 +1,5 @@
+﻿<Project>
+	<PropertyGroup>
+		<BaseIntermediateOutputPath>..\..\output\Adamantium.Engine.Compiler\obj\</BaseIntermediateOutputPath>
+	</PropertyGroup>
+</Project>

@@ -6,7 +6,6 @@
 		<Configurations>Debug;Release</Configurations>
 		<LangVersion>latestmajor</LangVersion>
 		<BaseOutputPath>..\..\output\Adamantium.Imaging\bin</BaseOutputPath>
-		<BaseIntermediateOutputPath>..\..\output\Adamantium.Imaging\obj\</BaseIntermediateOutputPath>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">

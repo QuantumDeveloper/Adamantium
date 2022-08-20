@@ -6,7 +6,6 @@
 		<Configurations>Debug;Release</Configurations>
 		<LangVersion>latest</LangVersion>
 		<BaseOutputPath>..\..\output\Adamantium.Game\bin</BaseOutputPath>
-		<BaseIntermediateOutputPath>..\..\output\Adamantium.Game\obj\</BaseIntermediateOutputPath>
 	</PropertyGroup>
 
 	<ItemGroup>

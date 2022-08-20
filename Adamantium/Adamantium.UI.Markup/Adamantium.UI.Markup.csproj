@@ -8,7 +8,6 @@
         <TargetFramework>netstandard2.0</TargetFramework>
         <LangVersion>latest</LangVersion>
 		<BaseOutputPath>..\..\output\Adamantium.UI.Markup\bin</BaseOutputPath>
-		<BaseIntermediateOutputPath>..\..\output\Adamantium.UI.Markup\obj\</BaseIntermediateOutputPath>
     </PropertyGroup>
 
     <ItemGroup>

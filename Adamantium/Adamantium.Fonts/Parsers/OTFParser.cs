@@ -19,9 +19,6 @@ namespace Adamantium.Fonts.Parsers
     {
         private TTCHeader ttcHeader;
 
-        // is font collection
-        private bool IsFontCollection;
-
         // list of common mandatory tables
         private static ReadOnlyCollection<string> commonMandatoryTables;
 
@@ -65,33 +62,21 @@ namespace Adamantium.Fonts.Parsers
             };
         }
         
-        internal static TypeFace Parse(string path, byte resolution)
-        {
-            var parser = new OTFParser(path, resolution);
-            return parser.TypeFace;
-        }
-
-        internal static TypeFace Parse(FontStreamReader FontReader, byte sample, params TableDirectory[] tableDirectories)
-        {
-            var parser = new OTFParser(FontReader, sample, tableDirectories);
-            return parser.TypeFace;
-        }
-
-        protected OTFParser()
+        protected internal OTFParser()
         {
             
         }
 
-        protected OTFParser(string filePath, byte resolution = 1) : base(filePath, resolution)
+        protected internal OTFParser(string filePath, byte resolution = 1) : base(filePath, resolution)
         {
         }
 
-        protected OTFParser(FontStreamReader fontStreamReader, byte resolution = 0, params TableDirectory[] tableDirectories) 
+        protected internal OTFParser(FontStreamReader fontStreamReader, byte resolution = 0, params TableDirectory[] tableDirectories) 
             : base(fontStreamReader, resolution, tableDirectories)
         {
         }
 
-        protected override void Parse()
+        public override void Parse()
         {
             // 1st step - check if this is a single font or collection
             IsOTFCollection();

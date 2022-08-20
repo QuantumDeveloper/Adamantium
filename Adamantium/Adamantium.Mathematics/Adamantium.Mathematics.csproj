@@ -7,7 +7,7 @@
 	<Nullable>disable</Nullable>
     <TargetFrameworks>net6.0;netstandard2.0</TargetFrameworks>
 	  <BaseOutputPath>..\..\output\Adamantium.Mathematics\bin</BaseOutputPath>
-	  <BaseIntermediateOutputPath>..\..\output\Adamantium.Mathematics\obj\</BaseIntermediateOutputPath>
+	  <!--<BaseIntermediateOutputPath>..\..\output\Adamantium.Mathematics\obj\</BaseIntermediateOutputPath>-->
   </PropertyGroup>
 
 	<PropertyGroup>

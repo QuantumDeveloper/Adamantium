@@ -1,0 +1,5 @@
+﻿<Project>
+	<PropertyGroup>
+		<BaseIntermediateOutputPath>..\..\output\Adamantium.MacOS\obj\</BaseIntermediateOutputPath>
+	</PropertyGroup>
+</Project>

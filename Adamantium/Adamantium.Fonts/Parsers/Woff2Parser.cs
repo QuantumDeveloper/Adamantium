@@ -93,21 +93,14 @@ namespace Adamantium.Fonts.Parsers
             };
         }
 
-        private Woff2Parser(string filePath, byte resolution = 1)
+        protected internal Woff2Parser(string filePath, byte resolution = 1)
         {
             InitializeBase(filePath, resolution);
             fontEntries = new List<FontCollectionEntry>();
             reader = filePath.LoadIntoStream();
-            Parse();
         }
 
-        internal static TypeFace Parse(string filePath, byte resolution)
-        {
-            var parser = new Woff2Parser(filePath, resolution);
-            return parser.TypeFace;
-        }
-
-        protected override void Parse()
+        public override void Parse()
         {
             ReadHeader();
             ReadTableDirectories();

@@ -6,7 +6,6 @@
 		<Configurations>Debug;Release</Configurations>
 		<LangVersion>latest</LangVersion>
 		<BaseOutputPath>..\..\output\Adamantium.Engine.Compiler\bin</BaseOutputPath>
-		<BaseIntermediateOutputPath>..\..\output\Adamantium.Engine.Compiler\obj\</BaseIntermediateOutputPath>
 	</PropertyGroup>
 	<ItemGroup>
 		<Folder Include="Models\" />
