@@ -11,7 +11,5 @@ namespace Adamantium.Engine.Effects
       public FileDependencyList DependencyList;
 
       public Ast.Shader Shader;
-
-      public FileIncludeHandler IncludeHandler;
    }
 }

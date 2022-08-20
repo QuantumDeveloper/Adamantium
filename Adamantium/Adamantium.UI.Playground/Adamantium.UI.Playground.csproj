@@ -8,7 +8,6 @@
 		<Configurations>Debug;Release</Configurations>
 		<LangVersion>latest</LangVersion>
 		<BaseOutputPath>..\..\output\Adamantium.UI.Playground\bin</BaseOutputPath>
-		<BaseIntermediateOutputPath>..\..\output\Adamantium.UI.Playground\obj\</BaseIntermediateOutputPath>
 		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
 		<CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
 	</PropertyGroup>
@@ -24,6 +23,9 @@
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
 		<None Remove="Effects\structs.hlsl" />
+		<None Remove="Effects\structs2.hlsl" />
+		<None Remove="Effects\structs3.hlsl" />
+		<None Remove="Effects\structs4.hlsl" />
 		<None Remove="Textures\texture2.jpg" />
 		<Content Include="Textures\texture2.jpg">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

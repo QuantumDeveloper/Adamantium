@@ -13,7 +13,6 @@
 		<LangVersion>latest</LangVersion>
 		<Nullable>disable</Nullable>
 		<BaseOutputPath>..\..\output\Adamantium.UI\bin</BaseOutputPath>
-		<BaseIntermediateOutputPath>..\..\output\Adamantium.UI\obj\</BaseIntermediateOutputPath>
 	</PropertyGroup>
 
 	<ItemGroup>

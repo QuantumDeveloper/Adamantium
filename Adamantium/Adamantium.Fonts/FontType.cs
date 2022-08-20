@@ -1,11 +1,11 @@
 namespace Adamantium.Fonts
 {
-    internal enum FontType
+    public enum FontType
     {
-        TTF,
-        OTF,
-        WOFF,
-        WOFF2,
+        Ttf,
+        Otf,
+        Woff,
+        Woff2,
         Unknown
     }
 }

@@ -98,27 +98,29 @@ namespace Adamantium.Fonts
             var reader = new FontTypeReader(path);
             var fontType = reader.GetFontType();
             reader.Close();
-            TypeFace typeFace;
+            IFontParser parser = null; 
             
             switch (fontType)
             {
-                case FontType.TTF:
-                    typeFace = TTFParser.Parse(path, sampleResolution);
+                case FontType.Ttf:
+                    parser = new TTFParser(path, sampleResolution);
                     break;
-                case FontType.OTF:
-                    typeFace = OTFParser.Parse(path, sampleResolution);
+                case FontType.Otf:
+                    parser = new OTFParser(path, sampleResolution);
                     break;
-                case FontType.WOFF:
-                    typeFace = WoffParser.Parse(path, sampleResolution);
+                case FontType.Woff:
+                    parser = new WoffParser(path, sampleResolution);
                     break;
-                case FontType.WOFF2:
-                    typeFace = Woff2Parser.Parse(path, sampleResolution);
+                case FontType.Woff2:
+                    parser = new Woff2Parser(path, sampleResolution);
                     break;
                 default:
                     throw new NotSupportedException("This font type is not supported");
             }
 
-            return typeFace;
+            parser.Parse();
+
+            return parser.TypeFace;
         }
 
         public static async Task<TypeFace> LoadFontAsync(string path, byte sampleResolution)

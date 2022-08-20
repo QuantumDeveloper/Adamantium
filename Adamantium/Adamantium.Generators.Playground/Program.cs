@@ -6,7 +6,7 @@ public class Program
     public static void Main(params string[] args)
     {
         UIEffect ef = null;
-        //UIEffect ef = null;
+
         int bug = 0;
 
     }

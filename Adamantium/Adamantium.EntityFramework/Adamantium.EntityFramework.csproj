@@ -6,7 +6,6 @@
 		<Configurations>Debug;Release</Configurations>
 		<LangVersion>latest</LangVersion>
 		<BaseOutputPath>..\..\output\Adamantium.EntityFramework\bin</BaseOutputPath>
-		<BaseIntermediateOutputPath>..\..\output\Adamantium.EntityFramework\obj\</BaseIntermediateOutputPath>
 	</PropertyGroup>
 
 	<ItemGroup>

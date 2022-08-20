@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
@@ -40,9 +41,9 @@ namespace Adamantium.Engine.Effects
         private EffectData.Effect effect;
 
         private List<string> includeDirectoryList;
-        private ShaderLanguage language = ShaderLanguage.HLSL;
         private EffectCompilerLogger logger;
         private List<EffectData.ShaderMacro> macros;
+        private ImmutableArray<ShaderFileInfo> includes;
         private EffectParserResult parserResult;
         private EffectData.Pass pass;
         private string preprocessorText;
@@ -50,7 +51,6 @@ namespace Adamantium.Engine.Effects
         private int nextSubPassCount;
         private float profile;
         private List<ResourceBindingKey> resourceKeys = new List<ResourceBindingKey>();
-        public IncludeFileDelegate IncludeFileDelegate;
 
         //private StreamOutputElement[] currentStreamOutputElements;
 
@@ -142,6 +142,28 @@ namespace Adamantium.Engine.Effects
 
             return result;
         }
+        
+        public EffectCompilerResult Compile(string sourceCode, string filePath, ImmutableArray<ShaderFileInfo> includes, List<EffectData.ShaderMacro> macrosArgs = null, List<string> includeDirectoryList = null)
+        {
+            var nativeMacros = new List<EffectData.ShaderMacro>();
+            if (macrosArgs != null)
+            {
+                foreach (var macro in macrosArgs)
+                {
+                    nativeMacros.Add(new EffectData.ShaderMacro(macro.Name, macro.Value));
+                }
+            }
+            
+            macros = nativeMacros;
+            this.includes = includes;
+            this.includeDirectoryList = includeDirectoryList ?? new List<string>();
+
+            InternalCompile(sourceCode, filePath);
+
+            var result = new EffectCompilerResult(null, effectData, logger);
+
+            return result;
+        }
 
         /// <summary>
         /// Disassembles a shader HLSL bytecode to asm code.
@@ -188,11 +210,24 @@ namespace Adamantium.Engine.Effects
             fileName = fileName.Replace(@"\\", @"\");
 
             logger = new EffectCompilerLogger();
-            var parser = new EffectParser { Logger = logger, IncludeFileCallback = IncludeFileDelegate};
+
+            var includeParser = new IncludeParser() { Logger = logger };
+            includeParser.Includes = includes;
+            foreach (var include in includes)
+            {
+                if (include.Content.Contains("#include"))
+                {
+                    var result = includeParser.Parse(include.Content, include.Path);
+                    include.Content = result.PreprocessedSource;
+                }
+            }
+
+            var parser = new EffectParser { Logger = logger };
             parser.Macros.AddRange(macros);
             parser.IncludeDirectoryList.AddRange(includeDirectoryList);
-
+            parser.Includes = includes;
             parserResult = parser.Parse(sourceCode, fileName);
+            
             dependencyList = parserResult.DependencyList;
 
             if (logger.HasErrors) return;
@@ -655,8 +690,7 @@ namespace Adamantium.Engine.Effects
 
         private void HandlePreprocessor(Ast.Expression expression)
         {
-            object value;
-            if (!ExtractValue(expression, out value))
+            if (!ExtractValue(expression, out var value))
                 return;
 
             // If null, then preprocessor is reset
@@ -777,8 +811,7 @@ namespace Adamantium.Engine.Effects
             var values = new object[methodExpression.Arguments.Count];
             for (int i = 0; i < methodExpression.Arguments.Count; i++)
             {
-                object localValue;
-                if (!ExtractValue(methodExpression.Arguments[i], out localValue))
+                if (!ExtractValue(methodExpression.Arguments[i], out var localValue))
                     return null;
                 values[i] = converter.ConvertItem(this, localValue);
                 if (localValue == null)
@@ -826,7 +859,7 @@ namespace Adamantium.Engine.Effects
                 }
 
                 if (string.IsNullOrEmpty(literalValue))
-                    logger.Error("Unexpected assignement for [Profile] attribute: expecting only [identifier (fx_4_0, fx_4_1... etc.), or number (9.3, 10.0, 11.0... etc.)]", expression.Span);
+                    logger.Error("Unexpected assignment for [Profile] attribute: expecting only [identifier (fx_4_0, fx_4_1... etc.), or number (9.3, 10.0, 11.0... etc.)]", expression.Span);
             }
         }
 
@@ -1000,7 +1033,7 @@ namespace Adamantium.Engine.Effects
             }
             catch(Exception ex)
             {
-                int bug = 0;
+                throw;
             }
 
             return result;

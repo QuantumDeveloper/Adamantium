@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Adamantium.Fonts
 {
-    internal class FontTypeReader : BinaryReader
+    public class FontTypeReader : BinaryReader
     {
         private string fontPath;
         public FontTypeReader(String path) : this(File.Open(path, FileMode.Open, FileAccess.Read))
@@ -28,19 +28,19 @@ namespace Adamantium.Fonts
         {
             if (IsOTF())
             {
-                return FontType.OTF;
+                return FontType.Otf;
             }
             else if (IsWOFF())
             {
-                return FontType.WOFF;
+                return FontType.Woff;
             }
             else if (IsWOFF2())
             {
-                return FontType.WOFF2;
+                return FontType.Woff2;
             }
             else if (Path.GetExtension(fontPath)?.ToLower() == ".ttf")
             {
-                return FontType.TTF;
+                return FontType.Ttf;
             }
             
             return FontType.Unknown;

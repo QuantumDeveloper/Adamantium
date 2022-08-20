@@ -7,7 +7,6 @@
         <LangVersion>latest</LangVersion>
         <Platforms>x64</Platforms>
 	<BaseOutputPath>..\..\output\Adamantium.Engine.Effects\bin</BaseOutputPath>
-    <BaseIntermediateOutputPath>..\..\output\Adamantium.Engine.Effects\obj\</BaseIntermediateOutputPath>
     </PropertyGroup>
 
 	<PropertyGroup>
@@ -19,7 +18,7 @@
 	</PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="Adamantium.DXC" Version="1.0.2" />
+      <PackageReference Include="Adamantium.DXC" Version="1.0.5" />
       <PackageReference Include="AdamantiumVulkan.Spirv" Version="1.0.0" />
       <PackageReference Include="MessagePack" Version="2.3.112" />
       <PackageReference Include="MessagePack.Annotations" Version="2.3.112" />

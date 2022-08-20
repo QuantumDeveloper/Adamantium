@@ -16,20 +16,13 @@ namespace Adamantium.Fonts.Parsers
         private WoffTableDirectory tableDirectory;
         private List<WoffTable> tables;
         
-        private WoffParser(string filePath, byte resolution = 1)
+        protected internal WoffParser(string filePath, byte resolution = 1)
         {
             InitializeBase(filePath, resolution);
             reader = filePath.LoadIntoStream();
-            Parse();
         }
 
-        internal static TypeFace Parse(string filePath, byte resolution = 1)
-        {
-            var parser = new WoffParser(filePath, resolution);
-            return parser.TypeFace;
-        }
-
-        protected override void Parse()
+        public override void Parse()
         {
             ReadWoffHeader();
             ReadTableDirectory();

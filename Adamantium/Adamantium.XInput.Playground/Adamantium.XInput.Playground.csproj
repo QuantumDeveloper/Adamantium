@@ -7,7 +7,6 @@
     <Configurations>Debug;Release</Configurations>
     <LangVersion>latest</LangVersion>
 	  <BaseOutputPath>..\..\output\Adamantium.XInput.Playground\bin</BaseOutputPath>
-	  <BaseIntermediateOutputPath>..\..\output\Adamantium.XInput.Playground\obj\</BaseIntermediateOutputPath>
   </PropertyGroup>
 
   <ItemGroup>

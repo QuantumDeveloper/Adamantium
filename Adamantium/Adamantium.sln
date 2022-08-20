@@ -37,8 +37,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Engine.GraphicsT
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Imaging", "Adamantium.Imaging\Adamantium.Imaging.csproj", "{E625BE65-9BAF-4573-81A9-92861020FE5C}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Imaging.Playground", "Adamantium.Imaging.Playground\Adamantium.Imaging.Playground.csproj", "{D7642FD8-CF5C-4AA8-A5F6-909F1258AF2F}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.UI", "Adamantium.UI\Adamantium.UI.csproj", "{820E2B9B-65D7-4988-BB56-7A0987FF9C01}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Engine.Compiler", "Adamantium.Engine.Compiler\Adamantium.Engine.Compiler.csproj", "{7745D669-6AE3-4BBD-8A3F-200D5918056C}"
@@ -221,14 +219,6 @@ Global
 		{E625BE65-9BAF-4573-81A9-92861020FE5C}.Release|Any CPU.Build.0 = Release|x64
 		{E625BE65-9BAF-4573-81A9-92861020FE5C}.Release|x64.ActiveCfg = Release|x64
 		{E625BE65-9BAF-4573-81A9-92861020FE5C}.Release|x64.Build.0 = Release|x64
-		{D7642FD8-CF5C-4AA8-A5F6-909F1258AF2F}.Debug|Any CPU.ActiveCfg = Debug|x64
-		{D7642FD8-CF5C-4AA8-A5F6-909F1258AF2F}.Debug|Any CPU.Build.0 = Debug|x64
-		{D7642FD8-CF5C-4AA8-A5F6-909F1258AF2F}.Debug|x64.ActiveCfg = Debug|x64
-		{D7642FD8-CF5C-4AA8-A5F6-909F1258AF2F}.Debug|x64.Build.0 = Debug|x64
-		{D7642FD8-CF5C-4AA8-A5F6-909F1258AF2F}.Release|Any CPU.ActiveCfg = Release|x64
-		{D7642FD8-CF5C-4AA8-A5F6-909F1258AF2F}.Release|Any CPU.Build.0 = Release|x64
-		{D7642FD8-CF5C-4AA8-A5F6-909F1258AF2F}.Release|x64.ActiveCfg = Release|x64
-		{D7642FD8-CF5C-4AA8-A5F6-909F1258AF2F}.Release|x64.Build.0 = Release|x64
 		{820E2B9B-65D7-4988-BB56-7A0987FF9C01}.Debug|Any CPU.ActiveCfg = Debug|x64
 		{820E2B9B-65D7-4988-BB56-7A0987FF9C01}.Debug|Any CPU.Build.0 = Debug|x64
 		{820E2B9B-65D7-4988-BB56-7A0987FF9C01}.Debug|x64.ActiveCfg = Debug|x64

@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.IO;
 using System.Text;
 using Adamantium.DXC;
@@ -9,7 +10,7 @@ namespace Adamantium.Engine.Effects
    /// <summary>
    /// Main class used to compile a Toolkit FX file.
    /// </summary>
-   public class EffectCompiler
+   public static class EffectCompiler
    {
       public static string GetDependencyFileNameFromSourcePath(string pathToFxFile)
       {
@@ -61,6 +62,12 @@ namespace Adamantium.Engine.Effects
       {
          var compiler = new EffectCompilerInternal();
          return compiler.Compile(sourceCode, filePath, flags, macrosArgs, includeDirectoryList, allowDynamicCompiling, dependencyFilePath);
+      }
+      
+      public static EffectCompilerResult Compile(string sourceCode, string filePath, ImmutableArray<ShaderFileInfo> includes, List<EffectData.ShaderMacro> macrosArgs = null, List<string> includeDirectoryList = null)
+      {
+         var compiler = new EffectCompilerInternal();
+         return compiler.Compile(sourceCode, filePath, includes, macrosArgs, includeDirectoryList);
       }
 
       /// <summary>

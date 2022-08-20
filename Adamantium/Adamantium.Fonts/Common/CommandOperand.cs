@@ -108,5 +108,18 @@ namespace Adamantium.Fonts.Common
 
             return $"{Value}" + blendDataString;
         }
+
+        public override bool Equals(object obj)
+        {
+            if (obj == null) return false;
+
+            var instnace = obj as CommandOperand;
+            return Value == instnace.Value && BlendData == instnace.BlendData;
+        }
+
+        public override int GetHashCode()
+        {
+            return Value.GetHashCode() + BlendData.GetHashCode();
+        }
     }
 }

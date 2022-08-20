@@ -8,7 +8,6 @@
         <LangVersion>latestmajor</LangVersion>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<BaseOutputPath>..\..\output\Adamantium.Game.Playground\bin</BaseOutputPath>
-		<BaseIntermediateOutputPath>..\..\output\Adamantium.Game.Playground\obj\</BaseIntermediateOutputPath>
     </PropertyGroup>
 
     <ItemGroup>

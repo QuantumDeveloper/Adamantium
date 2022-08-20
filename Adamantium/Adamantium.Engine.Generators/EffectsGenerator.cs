@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using Adamantium.Core;
 using Adamantium.Engine.Effects;
@@ -13,17 +14,27 @@ public class EffectsGenerator : IIncrementalGenerator
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         var effectFiles = context.AdditionalTextsProvider.Where(file => file.Path.EndsWith(".fx"));
+        var includeFiles = context.AdditionalTextsProvider.Where(file => file.Path.EndsWith(".hlsl"));
 
-        var namesAndContents = effectFiles.Select((text, cancellationToken) => (
+        var fxNamesAndContents = effectFiles.Select((text, cancellationToken) => (
             name: Path.GetFileNameWithoutExtension(text.Path),
             path: text.Path,
             content: text.GetText(cancellationToken)!.ToString()));
 
-        var sourceProvider = namesAndContents.Combine(context.CompilationProvider).Combine(context.AnalyzerConfigOptionsProvider);
+        var includesAndContents = includeFiles.Select((text, cancellationToken) => new ShaderFileInfo()
+        {
+            FileName = Path.GetFileName(text.Path),
+            Path = text.Path,
+            Content = text.GetText(cancellationToken)!.ToString()
+        });
+
+        var includesProvider = includesAndContents.Collect();
+
+        var sourceProvider = fxNamesAndContents.Combine(context.CompilationProvider).Combine(context.AnalyzerConfigOptionsProvider).Combine(includesProvider);
 
         context.RegisterSourceOutput(sourceProvider, (spc, provider) =>
         {
-            var ((file, compilation), configOptions) = provider;
+            var (((file, compilation), configOptions), includes) = provider;
 
             configOptions.GlobalOptions.TryGetValue("build_property.RootNamespace", out var @namespace);
             if (string.IsNullOrEmpty(@namespace))
@@ -33,25 +44,24 @@ public class EffectsGenerator : IIncrementalGenerator
                     "No RootNamespace Compiler option provided in project file. Please, add <CompilerVisibleProperty Include=\"RootNamespace\" /> to your csproj file",
                     DiagnosticSeverity.Error);
             }
-            var text = file.content;
+            
             try
             {
-                var compilerResult = EffectCompiler.Compile(text, file.name);
-                var result = GenerateEffect(compilerResult, compilation, file.name, @namespace);
-                if (compilerResult.Logger.Messages.Count > 0)
+                var text = file.content;
+                var compilerResult = EffectCompiler.Compile(text, file.name, includes);
+                if (compilerResult.HasErrors)
                 {
                     CreateDiagnostic(ref spc, compilerResult, file.name);
                 }
-                if (!compilerResult.HasErrors)
+                else
                 {
+                    var result = GenerateEffect(compilerResult, compilation, file.name, @namespace);
                     spc.AddSource($"{file.name}.g.cs", result);
                 }
             }
             catch(System.Exception ex)
             {
                 CreateDiagnostic(ref spc, file.name, ex.Message, DiagnosticSeverity.Error);
-                CreateDiagnostic(ref spc, file.name, ex.StackTrace, DiagnosticSeverity.Error);
-                CreateDiagnostic(ref spc, file.name, ex.TargetSite.ToString(), DiagnosticSeverity.Error);
             }
         });
     }
@@ -77,7 +87,7 @@ public class EffectsGenerator : IIncrementalGenerator
         var descriptor = new DiagnosticDescriptor(
             id: "EffectGenerator",
             title: "Effects parsing error",
-            messageFormat: "Error while parsing {0}: {1}",
+            messageFormat: "{0}: {1}",
             category: "EffectParser",
             severity,
             isEnabledByDefault: true);

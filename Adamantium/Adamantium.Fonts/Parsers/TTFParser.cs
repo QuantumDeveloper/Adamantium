@@ -21,6 +21,9 @@ namespace Adamantium.Fonts.Parsers
         // mandatory tables
         private static List<string> mandatoryTables;
 
+        // is font collection
+        protected bool IsFontCollection { get; set; }
+
         // "table name-table entry" mapping
         //private Dictionary<string, TableEntry> tableMap;
 
@@ -396,35 +399,20 @@ namespace Adamantium.Fonts.Parsers
             };
         }
 
-        public static TypeFace Parse(string filePath, byte resolution)
-        {
-            var parser = new TTFParser(filePath, resolution);
-            return parser.TypeFace;
-        }
-        
-        public static TypeFace Parse(FontStreamReader fontReader, byte resolution, params TableDirectory[] tableDirectory)
-        {
-            var parser = new TTFParser(fontReader, resolution, tableDirectory);
-            return parser.TypeFace;
-        }
-
-        protected TTFParser()
+        protected internal TTFParser()
         {
             
         }
 
-        protected TTFParser(string filePath, byte resolution)
+        protected internal TTFParser(string filePath, byte resolution)
         {
             Initialize(filePath, resolution);
-
-            Parse();
         }
         
-        protected TTFParser(FontStreamReader fontReader, byte resolution, params TableDirectory[] tableDirectories)
+        protected internal TTFParser(FontStreamReader fontReader, byte resolution, params TableDirectory[] tableDirectories)
         {
             Initialize(fontReader, resolution, tableDirectories);
-            
-            ReadFontCollection();
+            IsFontCollection = true;
         }
 
         protected void InitializeBase(string filePath, byte resolution)
@@ -449,15 +437,22 @@ namespace Adamantium.Fonts.Parsers
             FontReader = fontReader;
         }
 
-        protected virtual void Parse()
+        public virtual void Parse()
         {
-            // 1st step: read ttf file header, we need number of tables from here
-            ReadTTFHeader();
+            if (IsFontCollection)
+            {
+                ReadFontCollection();
+            }
+            else
+            {
+                // 1st step: read ttf file header, we need number of tables from here
+                ReadTTFHeader();
 
-            // 2nd step: make "name - table" mapping for all tables, we need name, offset and length from here
-            MapTableDirectories();
+                // 2nd step: make "name - table" mapping for all tables, we need name, offset and length from here
+                MapTableDirectories();
             
-            ReadFontCollection();
+                ReadFontCollection();
+            }
         }
 
         private void SortTables()

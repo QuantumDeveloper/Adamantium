@@ -1,0 +1,5 @@
+﻿<Project>
+	<PropertyGroup>
+		<BaseIntermediateOutputPath>..\..\output\Adamantium.XInput.Playground\obj\</BaseIntermediateOutputPath>
+	</PropertyGroup>
+</Project>

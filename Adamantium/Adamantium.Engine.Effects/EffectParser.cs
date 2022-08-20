@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -12,27 +13,27 @@ namespace Adamantium.Engine.Effects
         /// <summary>
         ///   End of file token.
         /// </summary>
-        private static readonly Token EndOfFile = new Token(TokenType.EndOfFile, null, new SourceSpan());
+        protected static readonly Token EndOfFile = new Token(TokenType.EndOfFile, null, new SourceSpan());
 
-        private int bracketCount = 0;
-        private int curlyBraceCount = 0;
-        private string currentFile;
-        private int currentLine;
-        private int currentLineAbsolutePos;
-        private Ast.Pass currentPass;
-        private List<Token> currentPreviewTokens = new List<Token>();
-        private Ast.Technique currentTechnique;
-        private Token currentToken;
+        private protected int bracketCount = 0;
+        private protected int curlyBraceCount = 0;
+        private protected string currentFile;
+        private protected int currentLine;
+        private protected int currentLineAbsolutePos;
+        private protected Ast.Pass currentPass;
+        private protected List<Token> currentPreviewTokens = new List<Token>();
+        private protected Ast.Technique currentTechnique;
+        private protected Token currentToken;
 
-        private bool isPreviewToken = false;
-        private int parentCount = 0;
-        private List<Token> previewTokens = new List<Token>();
-        private EffectParserResult result;
-        private Token savedPreviewToken;
-        private IEnumerator<Token> tokenEnumerator;
-        private List<string> includeDirectoryList;
+        private protected bool isPreviewToken = false;
+        private protected int parentCount = 0;
+        private protected List<Token> previewTokens = new List<Token>();
+        private protected EffectParserResult result;
+        private protected Token savedPreviewToken;
+        private protected IEnumerator<Token> tokenEnumerator;
+        private protected List<string> includeDirectoryList;
 
-        private string newPreprocessedSource;
+        private protected StringBuilder newPreprocessedSource;
 
 
         /// <summary>
@@ -56,11 +57,7 @@ namespace Adamantium.Engine.Effects
         /// <value>The include directory list.</value>
         public List<string> IncludeDirectoryList => includeDirectoryList;
         
-        /// <summary>
-        /// Gets or sets the include file callback.
-        /// </summary>
-        /// <value>The include file callback.</value>
-        public IncludeFileDelegate IncludeFileCallback { get; set; }
+        public ImmutableArray<ShaderFileInfo> Includes { get; set; }
 
         /// <summary>
         /// Gets or sets the logger.
@@ -74,7 +71,7 @@ namespace Adamantium.Engine.Effects
         /// <param name="input">The input.</param>
         /// <param name="fileName">Name of the file.</param>
         /// <returns>Result of parsing</returns>
-        private EffectParserResult PrepareParsing(string input, string fileName)
+        protected EffectParserResult PrepareParsing(string input, string fileName)
         {
             var filePath = Path.GetFullPath(fileName);
             fileName = Path.GetFileName(fileName);
@@ -82,15 +79,9 @@ namespace Adamantium.Engine.Effects
             var localResult = new EffectParserResult
             {
                 SourceFileName = Path.Combine(Environment.CurrentDirectory, filePath),
-                IncludeHandler = new FileIncludeHandler { Logger = Logger }
             };
-            localResult.IncludeHandler.CurrentDirectory.Push(Path.GetDirectoryName(localResult.SourceFileName));
-            localResult.IncludeHandler.IncludeDirectories.AddRange(IncludeDirectoryList);
-            localResult.IncludeHandler.IncludeFileCallback = IncludeFileCallback;
-            localResult.IncludeHandler.FileResolved.Add(fileName, new FileIncludeHandler.FileItem(fileName, filePath, File.GetLastWriteTime(filePath)));
-            localResult.PreprocessedSource = input;
 
-            localResult.DependencyList = CalculateDependencies(localResult);
+            localResult.PreprocessedSource = input;
 
             return localResult;
         }
@@ -108,7 +99,7 @@ namespace Adamantium.Engine.Effects
             bracketCount = 0;
 
             result = previousParsing;
-            newPreprocessedSource = result.PreprocessedSource;
+            newPreprocessedSource = new StringBuilder(result.PreprocessedSource);
 
             tokenEnumerator = Tokenizer.Run(previousParsing.PreprocessedSource).GetEnumerator();
 
@@ -145,16 +136,7 @@ namespace Adamantium.Engine.Effects
                 }
             }
 
-            // Replace technique in string with spaces because Vulkan shader compiler is not allowing technique block to be present in file
-            StringBuilder stringBuilder = new StringBuilder(newPreprocessedSource);
-            var ranges = result.Shader.Techniques.Select(x => x.Span).OrderByDescending(x => x.StartIndex).ToArray();
-            foreach (var range in ranges)
-            {
-                stringBuilder.Remove(range.StartIndex, range.EndIndex - range.StartIndex);
-            }
-
-            //result.PreprocessedSource = newPreprocessedSource;
-            result.PreprocessedSource = stringBuilder.ToString();
+            result.PreprocessedSource = newPreprocessedSource.ToString();
 
             return result;
         }
@@ -165,7 +147,7 @@ namespace Adamantium.Engine.Effects
         /// <param name="input">The input.</param>
         /// <param name="fileName">Name of the file.</param>
         /// <returns>Result of parsing</returns>
-        public EffectParserResult Parse(string input, string fileName)
+        public virtual EffectParserResult Parse(string input, string fileName)
         {
             return ParseInput(PrepareParsing(input, fileName));
         }
@@ -252,18 +234,28 @@ namespace Adamantium.Engine.Effects
             currentToken = savedPreviewToken;
         }
 
-        private Token NextToken()
+        protected virtual Token NextToken()
         {
             var token = InternalNextToken();
+            StringBuilder buider = new StringBuilder();
 
-            // Handle preprocessor "line"
             while (token.Type == TokenType.Preprocessor)
             {
                 InternalNextToken();
                 if (Expect("include") || Expect("define"))
                 {
+                    var prevToken = token.Value + currentToken.Value;
                     token = InternalNextToken();
-                    //skip
+                    var includePath = token.Value.Replace("\"", "").Replace('/', '\\');
+
+                    foreach (var include in Includes)
+                    {
+                        if (include.Path.EndsWith(includePath))
+                        {
+                            newPreprocessedSource =
+                                newPreprocessedSource.Replace(prevToken, "").Replace(token.Value, include.Content);
+                        }
+                    }
                 }
                 else if(Expect("line"))
                 {
@@ -282,15 +274,14 @@ namespace Adamantium.Engine.Effects
                         currentFile = token.Value.Substring(1, token.Value.Length - 2);
 
                         // Replace "file" from #line preprocessor with the actual full path.
-                        var includeHandler = result.IncludeHandler;
-                        if (includeHandler.FileResolved.ContainsKey(currentFile))
-                        {
-                            var fullPathFile = includeHandler.FileResolved[currentFile].FilePath;
-                            // This is not 100% accurate, but it is better than having invalid file path
-                            newPreprocessedSource =
-                                newPreprocessedSource.Replace(token.Value, "\"" + fullPathFile + "\"");
-                            currentFile = fullPathFile;
-                        }
+                        //if (includeHandler.FileResolved.ContainsKey(currentFile))
+                        //{
+                        //    var fullPathFile = includeHandler.FileResolved[currentFile].FilePath;
+                        //    // This is not 100% accurate, but it is better than having invalid file path
+                        //    newPreprocessedSource =
+                        //        newPreprocessedSource.Replace(token.Value, "\"" + fullPathFile + "\"");
+                        //    currentFile = fullPathFile;
+                        //}
 
                         currentFile = currentFile.Replace(@"\\", @"\");
 
@@ -299,7 +290,7 @@ namespace Adamantium.Engine.Effects
                 }
                 else
                 {
-                    Logger.Error("Unsupported preprocessor token [{0}]. Only #line is supported.", token.Span,
+                    Logger.Error("Unsupported preprocessor token [{0}].", token.Span,
                         currentToken.Value);
                     return currentToken;
                 }
@@ -313,7 +304,7 @@ namespace Adamantium.Engine.Effects
             return currentToken;
         }
 
-        private Token InternalNextToken()
+        protected Token InternalNextToken()
         {
             // TODO: token preview is not safe with NewLine count
             if (previewTokens.Count > 0)
@@ -358,7 +349,7 @@ namespace Adamantium.Engine.Effects
             return Expect(tokenType);
         }
 
-        private bool Expect(TokenType tokenType)
+        protected bool Expect(TokenType tokenType)
         {
             bool isSameTokenType = currentToken.Type == tokenType;
             if (!isSameTokenType)
@@ -366,7 +357,7 @@ namespace Adamantium.Engine.Effects
             return isSameTokenType;
         }
 
-        private bool Expect(string keyword, bool isCaseSensitive = false)
+        protected bool Expect(string keyword, bool isCaseSensitive = false)
         {
             if (Expect(TokenType.Identifier))
             {
@@ -831,21 +822,5 @@ namespace Adamantium.Engine.Effects
             return expression;
         }
 
-        private FileDependencyList CalculateDependencies(EffectParserResult parserResult)
-        {
-            var keys = new List<string>(parserResult.IncludeHandler.FileResolved.Keys);
-            keys.Sort(StringComparer.InvariantCultureIgnoreCase);
-
-            var dependency = new FileDependencyList();
-            dependency.AddDefaultDependencies();
-
-            foreach (var fileKey in keys)
-            {
-                var fileItem = parserResult.IncludeHandler.FileResolved[fileKey];
-                dependency.AddDependencyPath(fileItem.FilePath);
-            }
-
-            return dependency;
-        }
     }
 }
