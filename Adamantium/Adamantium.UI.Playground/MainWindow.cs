@@ -14,8 +14,10 @@ using Adamantium.Engine.Effects;
 using Adamantium.Engine.Graphics;
 using Adamantium.Engine.Graphics.Effects;
 using Adamantium.Mathematics;
+using Adamantium.UI.Input;
 using Adamantium.UI.Media;
 using Adamantium.UI.Playground.Effects.Generated;
+using Serilog;
 
 namespace Adamantium.UI.Playground;
 
@@ -24,6 +26,18 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         UIEffect fx;
+        KeyDown+= delegate(object sender, KeyEventArgs args)
+        {
+            Log.Logger.Information($"Key: {args.Key}");
+            if (args.Key == Key.A)
+            {
+                UIApplication.Current.EnableGraphicsDebug = true;
+            }
+            else if (args.Key == Key.S)
+            {
+                UIApplication.Current.EnableGraphicsDebug = false;
+            }
+        };
         
         //BasicEffect f = new BasicEffect();
         //f.MeshColor.SetValue(Colors.Gray.ToVector4());

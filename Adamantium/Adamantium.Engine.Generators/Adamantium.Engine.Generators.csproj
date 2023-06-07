@@ -8,6 +8,8 @@
         <Nullable>disable</Nullable>
 		<BaseOutputPath>..\..\output\Adamantium.Engine.Generators\bin</BaseOutputPath>
         <!--<IsRoslynComponent>true</IsRoslynComponent>-->
+		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+		<CompilerGeneratedFilesOutputPath>Generated</CompilerGeneratedFilesOutputPath>
     </PropertyGroup>
 
     <!--<PropertyGroup>
@@ -36,17 +38,17 @@
     <ItemGroup>
          <!--Generator dependencies-->
 		
-		<PackageReference Include="Adamantium.DXC" Version="1.0.5" GeneratePathProperty="true" PrivateAssets="all" />
-		<PackageReference Include="AdamantiumVulkan.Spirv" Version="1.0.0" GeneratePathProperty="true" PrivateAssets="all" />
-		<PackageReference Include="AdamantiumVulkan.Common" Version="1.0.0" GeneratePathProperty="true" PrivateAssets="all" />
-        <PackageReference Include="MessagePack" Version="2.3.112" GeneratePathProperty="true" PrivateAssets="all" />
-        <PackageReference Include="MessagePack.Annotations" Version="2.3.112" GeneratePathProperty="true" PrivateAssets="all" />
-		<PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="5.0.0" GeneratePathProperty="true" PrivateAssets="all" />
+		<PackageReference Include="Adamantium.DXC" Version="1.0.7" GeneratePathProperty="true" PrivateAssets="all" />
+		<PackageReference Include="AdamantiumVulkan.Spirv" Version="1.0.2" GeneratePathProperty="true" PrivateAssets="all" />
+        <PackageReference Include="QuantumBinding.Utils" Version="1.0.0" GeneratePathProperty="true" PrivateAssets="all" />
+        <PackageReference Include="MessagePack" Version="2.5.108" GeneratePathProperty="true" PrivateAssets="all" />
+        <PackageReference Include="MessagePack.Annotations" Version="2.5.108" GeneratePathProperty="true" PrivateAssets="all" />
+		<PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.0.0" GeneratePathProperty="true" PrivateAssets="all" />
 
-		<!--<None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />-->
+        <!--<None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />-->
     </ItemGroup>
-
-    <ItemGroup>
+    
+	<ItemGroup>
       <Content Update="C:\Users\dzapo\.nuget\packages\adamantium.dxc\1.0.2\contentFiles\any\netstandard2.0\dxcompiler.dll">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
@@ -58,26 +60,12 @@
 
     <Target Name="GetDependencyTargetPaths">
         <ItemGroup>
-			<!--<TargetPathWithTargetPlatformMoniker Include="$(PKGAdamantium_Mathematics)\lib\netstandard2.0\Adamantium.Mathematics.dll" IncludeRuntimeDependency="false" />
-			<TargetPathWithTargetPlatformMoniker Include="$(PKGAdamantium_Core)\lib\netstandard2.0\Adamantium.Core.dll" IncludeRuntimeDependency="false" />
-			<TargetPathWithTargetPlatformMoniker Include="$(PKGAdamantium_Engine_Effects)\lib\netstandard2.0\Adamantium.Engine.Effects.dll" IncludeRuntimeDependency="false" />-->
-
 			<TargetPathWithTargetPlatformMoniker Include="$(PKGAdamantium_DXC)\lib\netstandard2.0\Adamantium.DXC.dll" IncludeRuntimeDependency="false" />
             <TargetPathWithTargetPlatformMoniker Include="$(PKGAdamantiumVulkan_Spirv)\lib\netstandard2.0\AdamantiumVulkan.Spirv.dll" IncludeRuntimeDependency="false" />
-            <TargetPathWithTargetPlatformMoniker Include="$(PKGAdamantiumVulkan_Common)\lib\netstandard2.0\AdamantiumVulkan.Common.dll" IncludeRuntimeDependency="false" />
+            <TargetPathWithTargetPlatformMoniker Include="$(PKGQuantumBinding_Utils)\lib\netstandard2.0\QuantumBinding.Utils.dll" IncludeRuntimeDependency="false" />
             <TargetPathWithTargetPlatformMoniker Include="$(PKGMessagePack)\lib\netstandard2.0\MessagePack.dll" IncludeRuntimeDependency="false" />
             <TargetPathWithTargetPlatformMoniker Include="$(PKGMessagePack_Annotations)\lib\netstandard2.0\MessagePack.Annotations.dll" IncludeRuntimeDependency="false" />
             <TargetPathWithTargetPlatformMoniker Include="$(PKGSystem_Runtime_CompilerServices_Unsafe)\lib\netstandard2.0\System.Runtime.CompilerServices.Unsafe.dll" IncludeRuntimeDependency="false" />
-
-			<!--<None Include="$(PKGAdamantium_Mathematics)\lib\netstandard2.0\Adamantium.Mathematics.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
-			<None Include="$(PKGAdamantium_Core)\lib\netstandard2.0\Adamantium.Core.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
-			<None Include="$(PKGAdamantium_Engine_Effects)\lib\netstandard2.0\Adamantium.Engine.Effects.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
-			<None Include="$(PKGAdamantium_DXC)\lib\netstandard2.0\Adamantium.DXC.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
-			<None Include="$(PKGAdamantiumVulkan_Spirv)\lib\netstandard2.0\AdamantiumVulkan.Spirv.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
-			<None Include="$(PKGAdamantiumVulkan_Common)\lib\netstandard2.0\AdamantiumVulkan.Common.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
-			<None Include="$(PKGMessagePack)\lib\netstandard2.0\MessagePack.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
-			<None Include="$(PKGMessagePack_Annotations)\lib\netstandard2.0\MessagePack.Annotations.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
-			<None Include="$(PKGSystem_Runtime_CompilerServices_Unsafe)\lib\netstandard2.0\System.Runtime.CompilerServices.Unsafe.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />-->
 		</ItemGroup>
     </Target>
 

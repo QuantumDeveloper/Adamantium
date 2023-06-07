@@ -6,12 +6,12 @@ using AdamantiumVulkan.Core;
 
 namespace Adamantium.Engine.Graphics
 {
-    public class PipelineManager
+    public class PipelineManager : IDisposable
     {
         private Dictionary<int, GraphicsPipeline> graphicsPipelines;
         private Dictionary<int, ComputePipeline> computePipelines;
 
-        private GraphicsDevice graphicsDevice;
+        private readonly GraphicsDevice graphicsDevice;
 
         private GraphicsPipeline currentGraphicsPipeline;
 
@@ -112,7 +112,10 @@ namespace Adamantium.Engine.Graphics
         {
             var hashCode = vertexType.GetHashCode();
             hashCode = (hashCode * 397) ^ effectPass.GetHashCode();
-            hashCode = (hashCode * 397) ^ renderPass.GetHashCode();
+            if (renderPass != null)
+            {
+                hashCode = (hashCode * 397) ^ renderPass.GetHashCode();
+            }
             hashCode = (hashCode * 397) ^ primitiveTopology.GetHashCode();
             hashCode = (hashCode * 397) ^ rasterizerState.GetHashCode();
             hashCode = (hashCode * 397) ^ blendState.GetHashCode();
@@ -137,6 +140,12 @@ namespace Adamantium.Engine.Graphics
             }
 
             return hashCode;
+        }
+
+        public void Dispose()
+        {
+            graphicsPipelines.Clear();
+            computePipelines.Clear();
         }
     }
 }

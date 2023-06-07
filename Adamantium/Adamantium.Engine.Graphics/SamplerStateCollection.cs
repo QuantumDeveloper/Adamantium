@@ -49,8 +49,10 @@ namespace Adamantium.Engine.Graphics
         /// </summary>
         public readonly SamplerState AnisotropicMirror;
 
+        private GraphicsDevice _device;
         internal SamplerStateCollection(GraphicsDevice device)
         {
+            _device = device;
             LinearRepeat = Add(GetSamplerSate(device, nameof(LinearRepeat), Filter.Linear, SamplerAddressMode.Repeat, false));
             LinearClampToBorder = Add(GetSamplerSate(device, nameof(LinearClampToBorder), Filter.Linear,
                 SamplerAddressMode.ClampToBorder, false));
@@ -96,6 +98,15 @@ namespace Adamantium.Engine.Graphics
             samplerInfo.MipmapMode = SamplerMipmapMode.Linear;
 
             return SamplerState.New(device, name, samplerInfo);
+        }
+
+        public override void Dispose()
+        {
+            foreach (var state in this)
+            {
+                _device.LogicalDevice.DestroySampler(state);
+            }
+            Clear();
         }
     }
 }

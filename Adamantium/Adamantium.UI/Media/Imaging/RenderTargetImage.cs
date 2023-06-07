@@ -4,7 +4,7 @@
 
 namespace Adamantium.UI.Media.Imaging;
 
-public sealed class RenderTargetImage : BitmapSource
+public sealed unsafe class RenderTargetImage : BitmapSource
 {
     //public RenderTargetImage(int width, int height, SurfaceFormat format, MSAALevel level, int arraysize = 1, 
     //   TextureFlags flags = TextureFlags.ShaderResource, ResourceUsage usage = ResourceUsage.Default, ResourceOptionFlags optionFlags = ResourceOptionFlags.None)
@@ -28,7 +28,7 @@ public sealed class RenderTargetImage : BitmapSource
     //   }
     //}
 
-    public IntPtr NativePointer => Texture.NativePointer;
+    public void* NativePointer => Texture.NativePointer;
 
     public event EventHandler<ExceptionEventArgs> RendertargetCreationFailed;
 }

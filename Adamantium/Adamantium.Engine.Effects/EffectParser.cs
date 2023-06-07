@@ -114,6 +114,10 @@ namespace Adamantium.Engine.Effects
                     case TokenType.Identifier:
                         if (token.EqualString("technique") && curlyBraceCount == 0)
                             ParseTechnique();
+                        else if (token.StartsWith("technique"))
+                        {
+                            Logger.Error($"Identifier technique expected, but present {token.Value} instead");
+                        }
                         break;
                 }
             } while (true);

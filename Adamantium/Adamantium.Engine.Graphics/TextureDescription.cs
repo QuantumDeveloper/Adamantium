@@ -204,12 +204,12 @@ namespace Adamantium.Engine.Graphics
                 ArrayLayers = description.ArrayLayers,
                 Format = description.Format,
                 Samples = MSAALevel.None,
-                Usage = (ImageUsageFlagBits)description.Usage,
+                Usage = description.Usage,
                 SharingMode = description.SharingMode,
                 ImageTiling = description.Tiling,
                 ImageType = description.ImageType,
                 DesiredImageLayout = description.InitialLayout,
-                Flags = (ImageCreateFlagBits)description.Flags
+                Flags = description.Flags
             };
         }
 
@@ -228,11 +228,11 @@ namespace Adamantium.Engine.Graphics
                 ArrayLayers = ArrayLayers,
                 Format = Format,
                 Samples = (SampleCountFlagBits)Samples,
-                Usage = (uint)Usage,
+                Usage = Usage,
                 SharingMode = SharingMode,
                 Tiling = ImageTiling,
                 InitialLayout = InitialLayout,
-                Flags = (uint)Flags,
+                Flags = Flags,
             };
         }
 

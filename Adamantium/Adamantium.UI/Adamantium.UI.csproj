@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>net6.0</TargetFramework>
+		<TargetFramework>net7.0</TargetFramework>
 		<Platforms>x64</Platforms>
 		<AssemblyName>Adamantium.UI</AssemblyName>
 		<RootNamespace>Adamantium.UI</RootNamespace>
@@ -13,6 +13,14 @@
 		<LangVersion>latest</LangVersion>
 		<Nullable>disable</Nullable>
 		<BaseOutputPath>..\..\output\Adamantium.UI\bin</BaseOutputPath>
+	</PropertyGroup>
+
+	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x64' ">
+	  <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	</PropertyGroup>
+
+	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
+	  <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 	</PropertyGroup>
 
 	<ItemGroup>

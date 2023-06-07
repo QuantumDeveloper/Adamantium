@@ -7,7 +7,7 @@ using Adamantium.Game.Core;
 
 namespace Adamantium.Engine.EntityServices
 {
-    public class DeferredRenderingService : RenderService
+    public class DeferredRenderingService : RenderingService
     {
         //Clear Shader
 //        Effect Clear;

@@ -9,11 +9,8 @@ namespace Adamantium.UI
     public sealed class GraphicsDeviceService : PropertyChangedBase, IGraphicsDeviceService, IDisposable
     {
         private MainGraphicsDevice mainGraphicsDevice;
-        private GraphicsDevice resourceLoaderDevice;
 
-        private bool deviceUpdateNeeded;
-
-        private bool enableDebugMode;
+        private bool isInDebugMode;
         private readonly List<GraphicsDevice> graphicsDevices;
         private readonly Dictionary<string, GraphicsDevice> deviceMap;
 
@@ -23,25 +20,23 @@ namespace Adamantium.UI
             private set => mainGraphicsDevice = value;
         }
 
-        public GraphicsDevice ResourceLoaderDevice
-        {
-            get => resourceLoaderDevice;
-            private set => resourceLoaderDevice = value;
-        }
+        public GraphicsDevice ResourceLoaderDevice { get; private set; }
 
         public IReadOnlyCollection<GraphicsDevice> GraphicsDevices => graphicsDevices.AsReadOnly();
+        
+        public bool DeviceUpdateNeeded { get; set; }
 
-        public GraphicsDeviceService(bool enableDebug)
+        public GraphicsDeviceService(bool isInDebug)
         {
             graphicsDevices = new List<GraphicsDevice>();
             deviceMap = new Dictionary<string, GraphicsDevice>();
-            EnableDebugMode = enableDebug;
+            IsInDebugMode = isInDebug;
         }
 
-        void IGraphicsDeviceService.CreateMainDevice(string name)
+        void IGraphicsDeviceService.CreateMainDevice(string name, bool enableDynamicRendering)
         {
-            CreateMainDevice(name, EnableDebugMode);
-            deviceUpdateNeeded = false;
+            CreateMainDevice(name, enableDynamicRendering, IsInDebugMode);
+            DeviceUpdateNeeded = false;
             DeviceCreated?.Invoke(this, EventArgs.Empty);
         }
 
@@ -91,15 +86,24 @@ namespace Adamantium.UI
             return null;
         }
 
-        public bool IsInitialized => MainGraphicsDevice != null;
+        public bool IsReady => MainGraphicsDevice != null;
 
-        private void ChangeOrCreateDevice(string name, bool forceUpdate)
+        public void ChangeOrCreateDevice(string name, bool forceUpdate)
         {
-            if (deviceUpdateNeeded || forceUpdate)
+            if (DeviceUpdateNeeded || forceUpdate)
             {
+                MainGraphicsDevice.DeviceWaitIdle();
                 OnDeviceChangeBegin();
-                CreateMainDevice(name, EnableDebugMode);
-                deviceUpdateNeeded = false;
+                ResourceLoaderDevice?.Dispose();
+                foreach (var device in graphicsDevices)
+                {
+                    device?.Dispose();
+                }
+                graphicsDevices.Clear();
+                deviceMap.Clear();
+                CreateMainDevice(name, IsInDebugMode);
+                
+                DeviceUpdateNeeded = false;
                 OnDeviceChangeEnd();
             }
         }
@@ -134,24 +138,23 @@ namespace Adamantium.UI
             handler?.Invoke(sender, args);
         }
 
-        public bool EnableDebugMode
+        public bool IsInDebugMode
         {
-            get => enableDebugMode;
+            get => isInDebugMode;
             set
             {
-                if (SetProperty(ref enableDebugMode, value))
+                if (SetProperty(ref isInDebugMode, value))
                 {
-                    deviceUpdateNeeded = true;
+                    DeviceUpdateNeeded = true;
                 }
             }
         }
 
-        internal void CreateMainDevice(string name, bool debugEnabled = true)
+        internal void CreateMainDevice(string name, bool enableDynamicRendering, bool debugEnabled = true)
         {
-            Utilities.Dispose(ref mainGraphicsDevice);
-
-            MainGraphicsDevice = MainGraphicsDevice.Create(name, debugEnabled);
-
+            MainGraphicsDevice?.Dispose();
+            MainGraphicsDevice = MainGraphicsDevice.Create(name, enableDynamicRendering, debugEnabled);
+           
             ResourceLoaderDevice = MainGraphicsDevice.CreateResourceLoaderDevice();
 
             MainGraphicsDevice.Disposing += GraphicsDeviceDisposing;
@@ -160,13 +163,13 @@ namespace Adamantium.UI
 
         private void GraphicsDeviceDisposing(object sender, EventArgs e)
         {
-            MainGraphicsDevice = null;
             OnDeviceDisposing();
         }
 
         public void Dispose()
         {
-            Utilities.Dispose(ref mainGraphicsDevice);
+            mainGraphicsDevice?.Dispose();
+            mainGraphicsDevice = null;
         }
 
         #region Events

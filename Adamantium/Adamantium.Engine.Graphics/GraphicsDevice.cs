@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using Adamantium.Core;
@@ -10,6 +11,8 @@ using Adamantium.Mathematics;
 using AdamantiumVulkan.Core;
 using Semaphore = AdamantiumVulkan.Core.Semaphore;
 using Adamantium.Engine.Graphics.Effects.Generated;
+using Serilog;
+using Image = AdamantiumVulkan.Core.Image;
 
 namespace Adamantium.Engine.Graphics
 {
@@ -38,7 +41,7 @@ namespace Adamantium.Engine.Graphics
         private TrackingCollection<Rect2D> scissors;
         private TrackingCollection<DynamicState> dynamicStates;
         
-        private readonly uint[] waitStages = {(uint) PipelineStageFlagBits.ColorAttachmentOutputBit};
+        private readonly PipelineStageFlagBits[] waitStages = {PipelineStageFlagBits.ColorAttachmentOutputBit};
         
         private PipelineManager pipelineManager;
 
@@ -54,35 +57,42 @@ namespace Adamantium.Engine.Graphics
         private Semaphore[] waitSemaphoresArray = new Semaphore[1];
         private Semaphore[] signalSemaphoresArray = new Semaphore[1];
         private CommandBuffer[] commandBuffersArray = new CommandBuffer[1];
-        
+
+        private List<GraphicsResource> _graphicsResources = new List<GraphicsResource>();  
+
         static GraphicsDevice()
         {
             BlendStates = new BlendStatesCollection();
             RasterizerStates = new RasterizerStateCollection();
             DepthStencilStates = new DepthStencilStatesCollection();
-            
         }
 
         private GraphicsDevice(MainGraphicsDevice mainDevice)
         {
             InitializeMutex();
+            DeviceId = Guid.NewGuid().ToString();
             MainDevice = mainDevice;
             MaxFramesInFlight = 1;
             IsResourceLoaderDevice = true;
             InitializeResourceLoadingDevice();
+            Log.Logger.Debug($"Resource loader device created. Id: {DeviceId}");
         }
 
         private GraphicsDevice(MainGraphicsDevice mainDevice, PresentationParameters presentationParameters)
         {
             CreateDevice(mainDevice, presentationParameters);
+            Log.Logger.Debug($"Render device created. Id: {DeviceId}");
         }
 
         private void CreateDevice(MainGraphicsDevice mainDevice, PresentationParameters presentationParameters)
         {
-            InitializeMutex();
+            //InitializeMutex();
+            var timer = Stopwatch.StartNew();
+            var timer2 = Stopwatch.StartNew();
             DeviceId = Guid.NewGuid().ToString();
             MainDevice = mainDevice;
-            
+
+            EnableDynamicRendering = mainDevice.EnableDynamicRendering;
             surface = MainDevice.VulkanInstance.GetOrCreateSurface(presentationParameters);
 
             EffectPools = new List<EffectPool>();
@@ -102,12 +112,18 @@ namespace Adamantium.Engine.Graphics
             Sampler = SamplerStates.Default;
             
             ClearColor = Colors.CornflowerBlue;
-
+            
             pipelineManager = new PipelineManager(this);
+
+            timer.Stop();
             BasicEffect = new BasicEffect(this);
+            timer2.Stop();
+            var diff = timer2.ElapsedMilliseconds - timer.ElapsedMilliseconds;
         }
         
         public bool IsResourceLoaderDevice { get; }
+        
+        public bool EnableDynamicRendering { get; private set; }
         
         public CommandPool CommandPool { get; private set; }
 
@@ -322,6 +338,11 @@ namespace Adamantium.Engine.Graphics
             CreateCommandBuffers();
         }
 
+        internal void AddResource(GraphicsResource resource)
+        {
+            _graphicsResources.Add(resource);
+        }
+
         public RenderPass CreateRenderPass(RenderPassCreateInfo createInfo)
         {
             return LogicalDevice.CreateRenderPass(createInfo);
@@ -370,7 +391,7 @@ namespace Adamantium.Engine.Graphics
             var poolInfo = new CommandPoolCreateInfo
             {
                 QueueFamilyIndex = queueFamilyIndices.graphicsFamily.Value,
-                Flags = (uint) CommandPoolCreateFlagBits.ResetCommandBufferBit
+                Flags = CommandPoolCreateFlagBits.ResetCommandBufferBit
             };
             CommandPool = LogicalDevice.CreateCommandPool(poolInfo);
             
@@ -383,7 +404,10 @@ namespace Adamantium.Engine.Graphics
         private void CreateGraphicsPresenter(PresentationParameters parameters)
         {
             Presenter = GraphicsPresenter.Create(this, parameters);
-            RenderPass = Presenter.RenderPass;
+            if (!EnableDynamicRendering)
+            {
+                RenderPass = Presenter.RenderPass;
+            }
         }
 
         private void CreateCommandBuffers()
@@ -405,7 +429,7 @@ namespace Adamantium.Engine.Graphics
             var semaphoreInfo = new SemaphoreCreateInfo();
 
             var fenceInfo = new FenceCreateInfo();
-            fenceInfo.Flags = (uint)FenceCreateFlagBits.SignaledBit;
+            fenceInfo.Flags = FenceCreateFlagBits.SignaledBit;
 
             ImageAvailableSemaphores = LogicalDevice.CreateSemaphores(semaphoreInfo, MaxFramesInFlight);
             RenderFinishedSemaphores = LogicalDevice.CreateSemaphores(semaphoreInfo, MaxFramesInFlight);
@@ -425,6 +449,38 @@ namespace Adamantium.Engine.Graphics
         public Framebuffer CreateFramebuffer(FramebufferCreateInfo info)
         {
             return LogicalDevice.CreateFramebuffer(info);
+        }
+        
+        private void InsertImageMemoryBarrier(CommandBuffer commandBuffer,
+            Image image,
+            AccessFlagBits sourceAccessMask,
+            AccessFlagBits destinationAccessMask,
+            ImageLayout oldLayout,
+            ImageLayout newLayout,
+            PipelineStageFlagBits sourceStageMask,
+            PipelineStageFlagBits destinationStageMask,
+            ImageSubresourceRange subresourceRange)
+        {
+            ImageMemoryBarrier barrier = new ImageMemoryBarrier();
+            barrier.SrcQueueFamilyIndex = (~0U);
+            barrier.DstQueueFamilyIndex = (~0U);
+            barrier.SrcAccessMask = sourceAccessMask;
+            barrier.DstAccessMask = destinationAccessMask;
+            barrier.OldLayout = oldLayout;
+            barrier.NewLayout = newLayout;
+            barrier.Image = image;
+            barrier.SubresourceRange = subresourceRange;
+
+            commandBuffer.PipelineBarrier(
+                (uint)sourceStageMask,
+                (uint)destinationStageMask,
+                0,
+                0,
+                null,
+                0,
+                null,
+                1,
+                barrier);
         }
 
         public bool BeginDraw(float depth = 1.0f, uint stencil = 0)
@@ -454,7 +510,7 @@ namespace Adamantium.Engine.Graphics
             var commandBuffer = commandBuffers[ImageIndex];
 
             var beginInfo = new CommandBufferBeginInfo();
-            beginInfo.Flags = (uint) CommandBufferUsageFlagBits.SimultaneousUseBit;
+            beginInfo.Flags = CommandBufferUsageFlagBits.SimultaneousUseBit;
 
             result = commandBuffer.ResetCommandBuffer(0);
 
@@ -474,15 +530,6 @@ namespace Adamantium.Engine.Graphics
             //clearColorValue.Float32 = clearColor.ToFloatArray();
 
             //commandBuffer.ClearColorImage(backbuffer, ImageLayout.ColorAttachmentOptimal, clearColorValue, 0, null);
-
-            var renderPassInfo = new RenderPassBeginInfo();
-            renderPassInfo.RenderPass = renderPass;
-            renderPassInfo.Framebuffer = Presenter.GetFramebuffer(ImageIndex);
-            renderPassInfo.RenderArea = new Rect2D();
-            renderPassInfo.RenderArea.Offset = new Offset2D();
-            renderPassInfo.RenderArea.Extent = new Extent2D()
-                {Width = Presenter.Width, Height = Presenter.Height};
-
             ClearValue clearColorValue = new ClearValue();
             clearColorValue.Color = new ClearColorValue();
             clearColorValue.Color.Float32 = ClearColor.ToFloatArray();
@@ -491,29 +538,138 @@ namespace Adamantium.Engine.Graphics
             clearDepthValue.DepthStencil = new ClearDepthStencilValue();
             clearDepthValue.DepthStencil.Depth = depth;
             clearDepthValue.DepthStencil.Stencil = stencil;
+            if (EnableDynamicRendering)
+            {
+                var colorAttachmentInfo = new RenderingAttachmentInfo();
+                colorAttachmentInfo.SType = StructureType.RenderingAttachmentInfo;
+                colorAttachmentInfo.ImageLayout = ImageLayout.ColorAttachmentOptimal;
+                colorAttachmentInfo.ResolveMode = ResolveModeFlagBits.None;
+                colorAttachmentInfo.LoadOp = AttachmentLoadOp.Clear;
+                colorAttachmentInfo.StoreOp = AttachmentStoreOp.Store;
+                colorAttachmentInfo.ClearValue = clearColorValue;
+                if (Presenter.Description.MSAALevel != MSAALevel.None)
+                {
+                    colorAttachmentInfo.ImageView = Presenter.RenderTarget;
+                    colorAttachmentInfo.ResolveImageView = Presenter.GetImageView(imageIndex);
+                }
+                else
+                {
+                    colorAttachmentInfo.ImageView = Presenter.GetImageView(imageIndex);
+                }
 
-            ClearValue clearColorValueResolve = new ClearValue();
-            clearColorValueResolve.Color = new ClearColorValue();
-            clearColorValueResolve.Color.Float32 = ClearColor.ToFloatArray();
+                var depthAttachmentInfo = new RenderingAttachmentInfo();
+                depthAttachmentInfo.SType = StructureType.RenderingAttachmentInfo;
+                depthAttachmentInfo.ImageView = Presenter.DepthBuffer;
+                depthAttachmentInfo.ImageLayout = ImageLayout.DepthStencilAttachmentOptimal;
+                depthAttachmentInfo.ResolveMode = ResolveModeFlagBits.None;
+                depthAttachmentInfo.LoadOp = AttachmentLoadOp.Clear;
+                depthAttachmentInfo.StoreOp = AttachmentStoreOp.DontCare;
+                depthAttachmentInfo.ClearValue = clearDepthValue;
 
-            renderPassInfo.PClearValues = new[] {clearColorValue, clearDepthValue, clearColorValueResolve};
-            renderPassInfo.ClearValueCount = (uint) renderPassInfo.PClearValues.Length;
+                var renderingInfo = new RenderingInfo();
+                renderingInfo.SType = StructureType.RenderingInfo;
+                renderingInfo.RenderArea = new Rect2D();
+                renderingInfo.RenderArea.Extent = new Extent2D(){ Width = Presenter.Width, Height = Presenter.Height};
+                renderingInfo.RenderArea.Offset = new Offset2D();
+                renderingInfo.PColorAttachments = new[] { colorAttachmentInfo };
+                renderingInfo.ColorAttachmentCount = 1U;
+                renderingInfo.PDepthAttachment = depthAttachmentInfo;
+                renderingInfo.PStencilAttachment = depthAttachmentInfo;
+                renderingInfo.LayerCount = 1;
+                
+                ImageSubresourceRange range = new ImageSubresourceRange();
+                range.AspectMask = ImageAspectFlagBits.ColorBit;
+                range.BaseMipLevel = 0;
+                range.LevelCount = (~0U);
+                range.BaseArrayLayer = 0;
+                range.LayerCount = (~0U);
 
-            commandBuffer.BeginRenderPass(renderPassInfo, SubpassContents.Inline);
+                ImageSubresourceRange depthRange = new ImageSubresourceRange();
+                depthRange.AspectMask = ImageAspectFlagBits.DepthBit | ImageAspectFlagBits.StencilBit;
+                depthRange.BaseMipLevel = 0;
+                depthRange.LevelCount = (~0U);
+                depthRange.BaseArrayLayer = 0;
+                depthRange.LayerCount = (~0U);
 
-            ShouldChangeGraphicsPipeline = true;
+                InsertImageMemoryBarrier(commandBuffer,
+                    Presenter.GetImage(imageIndex),
+                    0,
+                    AccessFlagBits.ColorAttachmentWriteBit,
+                    ImageLayout.Undefined,
+                    ImageLayout.ColorAttachmentOptimal,
+                    PipelineStageFlagBits.TopOfPipeBit,
+                    PipelineStageFlagBits.ColorAttachmentOutputBit,
+                    range
+                );
 
-            //commandBuffer.BindPipeline(PipelineBindPoint.Graphics, graphicsPipeline);
+                InsertImageMemoryBarrier(commandBuffer,
+                    Presenter.DepthBuffer,
+                    0,
+                    AccessFlagBits.DepthStencilAttachmentWriteBit,
+                    ImageLayout.Undefined,
+                    ImageLayout.DepthStencilAttachmentOptimal,
+                    PipelineStageFlagBits.EarlyFragmentTestsBit | PipelineStageFlagBits.LateFragmentTestsBit,
+                    PipelineStageFlagBits.EarlyFragmentTestsBit | PipelineStageFlagBits.LateFragmentTestsBit,
+                    depthRange
+                );
+                
+                commandBuffer.BeginRendering(renderingInfo);
+            }
+            else
+            {
+                var renderPassInfo = new RenderPassBeginInfo();
+                renderPassInfo.RenderPass = renderPass;
+                renderPassInfo.Framebuffer = Presenter.GetFramebuffer(ImageIndex);
+                renderPassInfo.RenderArea = new Rect2D();
+                renderPassInfo.RenderArea.Offset = new Offset2D();
+                renderPassInfo.RenderArea.Extent = new Extent2D()
+                    {Width = Presenter.Width, Height = Presenter.Height};
 
+                ClearValue clearColorValueResolve = new ClearValue();
+                clearColorValueResolve.Color = new ClearColorValue();
+                clearColorValueResolve.Color.Float32 = ClearColor.ToFloatArray();
+
+                renderPassInfo.PClearValues = new[] {clearColorValue, clearDepthValue, clearColorValueResolve};
+                renderPassInfo.ClearValueCount = (uint) renderPassInfo.PClearValues.Length;
+
+                commandBuffer.BeginRenderPass(renderPassInfo, SubpassContents.Inline);
+
+                ShouldChangeGraphicsPipeline = true;
+
+                //commandBuffer.BindPipeline(PipelineBindPoint.Graphics, graphicsPipeline);
+            }
             return true;
-
         }
 
         public void EndDraw()
         {
             var commandBuffer = commandBuffers[ImageIndex];
 
-            commandBuffer.EndRenderPass();
+            if (EnableDynamicRendering)
+            {
+                commandBuffer.EndRendering();
+                
+                ImageSubresourceRange range = new ImageSubresourceRange();
+                range.AspectMask = ImageAspectFlagBits.ColorBit;
+                range.BaseMipLevel = 0;
+                range.LevelCount = (~0U);
+                range.BaseArrayLayer = 0;
+                range.LayerCount = (~0U);
+
+                InsertImageMemoryBarrier(commandBuffer,
+                    Presenter.GetImage(imageIndex),
+                    AccessFlagBits.ColorAttachmentWriteBit,
+                    0,
+                    ImageLayout.ColorAttachmentOptimal,
+                    ImageLayout.PresentSrcKhr,
+                    PipelineStageFlagBits.ColorAttachmentOutputBit,
+                    PipelineStageFlagBits.BottomOfPipeBit,
+                    range);
+            }
+            else
+            {
+                commandBuffer.EndRenderPass();
+            }
 
             var result = commandBuffer.EndCommandBuffer();
             if (result != Result.Success)
@@ -552,7 +708,7 @@ namespace Adamantium.Engine.Graphics
 
             if (MainDevice.AvailableQueuesCount == 1)
             {
-                mutex.WaitOne();
+                mutex?.WaitOne();
             }
             
             result = GraphicsQueue.QueueSubmit(1, submitInfos, renderFence);
@@ -560,7 +716,7 @@ namespace Adamantium.Engine.Graphics
             
             if (MainDevice.AvailableQueuesCount == 1)
             {
-                mutex.ReleaseMutex();
+                mutex?.ReleaseMutex();
             }
 
             if (result != Result.Success)
@@ -601,7 +757,7 @@ namespace Adamantium.Engine.Graphics
         {
             ulong offset = 0;
             var commandBuffer = commandBuffers[ImageIndex];
-            commandBuffer.BindVertexBuffers(0, 1, vertexBuffer, ref offset);
+            commandBuffer.BindVertexBuffers(0, 1, vertexBuffer, offset);
         }
 
         public void SetVertexBuffers(params Buffer[] vertexBuffers)
@@ -668,7 +824,7 @@ namespace Adamantium.Engine.Graphics
                 0,
                 0);
 
-            commandBuffer.BindVertexBuffers(0, 1, vertexBuffer, ref offset);
+            commandBuffer.BindVertexBuffers(0, 1, vertexBuffer, offset);
 
             commandBuffer.BindIndexBuffer(indexBuffer, 0, IndexType.Uint32);
 
@@ -680,25 +836,25 @@ namespace Adamantium.Engine.Graphics
             if (writeDescriptorSets == null || writeDescriptorSets.Length == 0) return;
             
             // TODO: decide does wait for fences really need here
-            //var renderFence = InFlightFences[CurrentFrame];
-            //var result = LogicalDevice.WaitForFences(1, renderFence, true, ulong.MaxValue);
+            var renderFence = InFlightFences[CurrentFrame];
+            var result = LogicalDevice.WaitForFences(1, renderFence, true, ulong.MaxValue);
            
             LogicalDevice.UpdateDescriptorSets((uint)writeDescriptorSets.Length, writeDescriptorSets, 0, out var copySets);
         }
 
         public CommandBuffer BeginSingleTimeCommands()
         {
-            mutex.WaitOne();
+            //mutex.WaitOne();
             return LogicalDevice.BeginSingleTimeCommand(CommandPool);
         }
 
         public void EndSingleTimeCommands(CommandBuffer commandBuffer)
         {
             LogicalDevice.EndSingleTimeCommands(resourceQueue, CommandPool, commandBuffer);
-            mutex.ReleaseMutex();
+            //mutex.ReleaseMutex();
         }
 
-        public IntPtr MapMemory(DeviceMemory memory, ulong offset, ulong size, uint flags)
+        public unsafe void* MapMemory(DeviceMemory memory, ulong offset, ulong size, uint flags)
         {
             return LogicalDevice.MapMemory(memory, offset, size, flags);
         }
@@ -792,22 +948,46 @@ namespace Adamantium.Engine.Graphics
         protected override void Dispose(bool disposeManagedResources)
         {
             base.Dispose(disposeManagedResources);
-            
-            Presenter?.Dispose();
-            LogicalDevice.DestroyRenderPass(renderPass);
-            BasicEffect?.Dispose();
-            DefaultEffectPool?.Dispose();
-            
-            for (int i = 0; i < commandBuffers.Length; i++)
+
+            if (IsResourceLoaderDevice)
             {
-                LogicalDevice?.DestroySemaphore(RenderFinishedSemaphores[i]);
-                LogicalDevice?.DestroySemaphore(ImageAvailableSemaphores[i]);
-                LogicalDevice?.DestroyFence(InFlightFences[i]);
+                Log.Logger.Debug("Disposing Resource loading device");
+                LogicalDevice?.FreeCommandBuffers(CommandPool, (uint)commandBuffers.Length, commandBuffers);
+                LogicalDevice?.DestroyCommandPool(CommandPool);
             }
+            else
+            {
+                Log.Logger.Debug("Disposing render device");
+                Presenter?.Dispose();
+                Presenter = null;
+                LogicalDevice?.DestroyRenderPass(renderPass);
+                BasicEffect?.Dispose();
+                DefaultEffectPool?.Dispose();
             
-            LogicalDevice?.DestroyCommandPool(CommandPool);
+                for (int i = 0; i < commandBuffers.Length; i++)
+                {
+                    LogicalDevice?.DestroySemaphore(RenderFinishedSemaphores[i]);
+                    LogicalDevice?.DestroySemaphore(ImageAvailableSemaphores[i]);
+                    LogicalDevice?.DestroyFence(InFlightFences[i]);
+                }
+            
+                LogicalDevice?.FreeCommandBuffers(CommandPool, (uint)commandBuffers.Length, commandBuffers);
+                LogicalDevice?.DestroyCommandPool(CommandPool);
+            
+                pipelineManager?.Dispose();
+                SamplerStates?.Dispose();
+
+                foreach (var disposableObject in _graphicsResources)
+                {
+                    if (disposableObject.IsDisposed) continue;
+                
+                    disposableObject?.Dispose();
+                }
+            
+                _graphicsResources?.Clear();
+            }
         }
-        
+
         internal static GraphicsDevice Create(MainGraphicsDevice device)
         {
             return new(device);

@@ -8,7 +8,7 @@ using Adamantium.Game.Core;
 
 namespace Adamantium.Engine.EntityServices
 {
-    public class ForwardPlusRenderingService : RenderService
+    public class ForwardPlusRenderingService : RenderingService
     {
         public ForwardPlusRenderingService(EntityWorld world, GameOutput window) : base(world, window)
         {

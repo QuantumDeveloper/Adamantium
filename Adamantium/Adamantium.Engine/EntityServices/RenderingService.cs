@@ -17,7 +17,7 @@ using Keys = Adamantium.Game.Core.Input.Keys;
 
 namespace Adamantium.Engine.EntityServices
 {
-    public class RenderService : EntityService
+    public class RenderingService : EntityService
     {
         
         // protected SpriteBatch SpriteBatch;
@@ -38,7 +38,7 @@ namespace Adamantium.Engine.EntityServices
         protected Camera ActiveCamera { get; set; }
         protected bool ShowDebugOutput { get; set; }
 
-        public RenderService(EntityWorld world, GameOutput window) : base(world)
+        public RenderingService(EntityWorld world, GameOutput window) : base(world)
         {
             GraphicsDeviceService = world.DependencyResolver.Resolve<IGraphicsDeviceService>();
             GraphicsDeviceService.DeviceChangeBegin += DeviceChangeBegin;

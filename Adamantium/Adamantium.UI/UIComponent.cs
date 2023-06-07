@@ -64,7 +64,6 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
 
     #endregion
 
-
     #region Properties
     
     public Vector2 Location
@@ -107,18 +106,11 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
 
     #endregion
 
-
-    
-
     public UIComponent()
     {
         VisualChildrenCollection = new TrackingCollection<IUIComponent>();
         VisualChildrenCollection.CollectionChanged += VisualChildrenCollectionChanged;
     }
-
-    
-
-    
 
     public bool IsGeometryValid { get; protected set; }
 
@@ -139,6 +131,10 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     public void InvalidateRender()
     {
         IsGeometryValid = false;
+        foreach (var uiComponent in VisualChildrenCollection)
+        {
+            uiComponent.InvalidateRender();
+        }
     }
 
     /// <summary>
@@ -195,10 +191,6 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     {
         return new Size(Math.Max(size.Width, 0), Math.Max(size.Height, 0));
     }
-
-    
-
-    
 
     private void VisualChildrenCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
     {

@@ -5,7 +5,7 @@
     <Configurations>Debug;Release</Configurations>
     <LangVersion>latestmajor</LangVersion>
 	<Nullable>disable</Nullable>
-    <TargetFrameworks>net6.0;netstandard2.0</TargetFrameworks>
+    <TargetFrameworks>net7.0;netstandard2.0</TargetFrameworks>
 	  <BaseOutputPath>..\..\output\Adamantium.Mathematics\bin</BaseOutputPath>
 	  <!--<BaseIntermediateOutputPath>..\..\output\Adamantium.Mathematics\obj\</BaseIntermediateOutputPath>-->
   </PropertyGroup>
@@ -20,6 +20,11 @@
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DefineConstants>TRACE</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
+    <DefineConstants>TRACE</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(TargetFramework)' == 'net6.0'">

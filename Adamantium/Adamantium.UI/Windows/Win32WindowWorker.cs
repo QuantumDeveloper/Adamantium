@@ -4,6 +4,7 @@ using Adamantium.Win32;
 using Adamantium.Win32.RawInput;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.Core.Events;
@@ -104,7 +105,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
                 
             this.window.OnSourceInitialized();
             Win32Interop.ShowWindow(source.Handle, WindowShowStyle.ShowNormal);
-            this.window.StateChanged+= WindowOnStateChanged;
+            this.window.StateChanged += WindowOnStateChanged;
         }
     }
 

@@ -8,10 +8,10 @@ namespace Adamantium.UI.Media;
 public class StrokeGeometry : Geometry
 {
    private Rect bounds;
-   private int doublePrecision = 4;
+   private readonly int doublePrecision = 4;
       
-   private Geometry geometry;
-   private Pen pen;
+   private readonly Geometry geometry;
+   private readonly Pen pen;
    public uint BezierSampleRate { get; set; } = 15;
    public double ArcSampleRate { get; set; } = 0.1;
 
@@ -749,8 +749,6 @@ public class StrokeGeometry : Geometry
          contourPoints.AddRange(endCapPoints);
          contourPoints.Add(strokeSegments[i].BottomSegment.End);
          contourPoints.Add(strokeSegments[i].BottomSegment.Start);
-
-         Console.WriteLine($"ContourPoints = {contourPoints.Count}");
 
          meshContours.Add(new MeshContour(contourPoints));
 

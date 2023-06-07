@@ -22,17 +22,18 @@ namespace Adamantium.Engine.Graphics
                     indices.graphicsFamily = i;
                 }
 
-                bool presentSupport = false;
                 //presentSupport = device.GetPhysicalDeviceWin32PresentationSupportKHR(i);
+                bool presentSupport;
                 if (surface != null)
                 {
-                    device.GetPhysicalDeviceSurfaceSupportKHR(i, surface, ref presentSupport);
+                    device.GetPhysicalDeviceSurfaceSupport(i, surface, out presentSupport);
                 }
                 else
                 {
                     presentSupport = true;
                 }
-
+                
+                
                 if (queueFamily.QueueCount > 0 && presentSupport)
                 {
                     indices.presentFamily = i;

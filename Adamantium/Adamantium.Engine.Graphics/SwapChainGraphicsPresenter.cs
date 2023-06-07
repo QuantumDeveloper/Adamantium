@@ -20,13 +20,20 @@ namespace Adamantium.Engine.Graphics
         private uint[] imageIndices;
         private Semaphore[] waitSemaphores;
 
-        public SwapChainGraphicsPresenter(GraphicsDevice graphicsDevice, PresentationParameters description, string name = "") : base(graphicsDevice, description, name)
+        public SwapChainGraphicsPresenter(
+            GraphicsDevice graphicsDevice, 
+            PresentationParameters description,
+            string name = "") : base(graphicsDevice, description, name)
         {
             CreateSurface();
             CreateSwapchain();
             CreateRenderTarget();
             CreateImageViews();
-            CreateFramebuffers();
+            if (!graphicsDevice.EnableDynamicRendering)
+            {
+                CreateFramebuffers();
+            }
+
             BackBuffers = new Texture[BuffersCount];
             presentQueue = graphicsDevice.GraphicsQueue;
             swapchains = new SwapchainKHR[1];
@@ -87,7 +94,7 @@ namespace Adamantium.Engine.Graphics
             createInfo.ImageColorSpace = surfaceFormat.ColorSpace;
             createInfo.ImageExtent = extent;
             createInfo.ImageArrayLayers = 1;
-            createInfo.ImageUsage = (uint)ImageUsageFlagBits.ColorAttachmentBit;
+            createInfo.ImageUsage = ImageUsageFlagBits.ColorAttachmentBit;
 
             QueueFamilyIndices indices = physicalDevice.FindQueueFamilies(surface);
             var queueFamilyIndices = new [] { indices.graphicsFamily.Value, indices.presentFamily.Value };
@@ -118,7 +125,6 @@ namespace Adamantium.Engine.Graphics
             images = logicalDevice.GetSwapchainImagesKHR(swapchain);
         }
 
-
         private void CreateImageViews()
         {
             Device logicalDevice = GraphicsDevice;
@@ -137,7 +143,7 @@ namespace Adamantium.Engine.Graphics
                 componentMapping.A = ComponentSwizzle.Identity;
                 createInfo.Components = componentMapping;
                 ImageSubresourceRange subresourceRange = new ImageSubresourceRange();
-                subresourceRange.AspectMask = (uint)ImageAspectFlagBits.ColorBit;
+                subresourceRange.AspectMask = ImageAspectFlagBits.ColorBit;
                 subresourceRange.BaseMipLevel = 0;
                 subresourceRange.LevelCount = 1;
                 subresourceRange.BaseArrayLayer = 0;
@@ -245,7 +251,7 @@ namespace Adamantium.Engine.Graphics
                 Debug.WriteLine("Failed to present swap chain image");
             }
 
-            return ConvertState(result);;
+            return ConvertState(result);
         }
 
         /// <summary>
@@ -277,32 +283,39 @@ namespace Adamantium.Engine.Graphics
             return framebuffers[index];
         }
 
-        public VulkanImage GetImage(uint index)
+        public override ImageView GetImageView(uint index)
+        {
+            return imageViews[index];
+        }
+        
+        public override VulkanImage GetImage(uint index)
         {
             return images[index];
         }
 
         private void RecreateSwapchain()
         {
-            var timer = Stopwatch.StartNew();
             CleanupSwapChain();
-
             CreateSwapchain();
             CreateRenderTarget();
             CreateDepthBuffer();
             CreateImageViews();
-            CreateFramebuffers();
-            timer.Stop();
-            Console.WriteLine($"Resize presenter time: {timer.ElapsedMilliseconds}");
+            if (!GraphicsDevice.EnableDynamicRendering)
+            {
+                CreateFramebuffers();
+            }
         }
 
         protected override void CleanupSwapChain()
         {
-            foreach (var framebuffer in framebuffers)
+            if (framebuffers != null)
             {
-                framebuffer.Destroy(GraphicsDevice);
+                foreach (var framebuffer in framebuffers)
+                {
+                    framebuffer.Destroy(GraphicsDevice);
+                }
             }
-            
+
             foreach (var view in imageViews)
             {
                 view.Destroy(GraphicsDevice);

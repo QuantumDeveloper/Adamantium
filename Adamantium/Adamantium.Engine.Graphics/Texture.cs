@@ -12,7 +12,7 @@ using VkBuffer = AdamantiumVulkan.Core.Buffer;
 namespace Adamantium.Engine.Graphics
 {
     [ContentReader(typeof(TextureContentReader))]
-    public class Texture : DisposableBase
+    public unsafe class Texture : GraphicsResource
     {
         private VulkanImage vulkanImage;
         private DeviceMemory vulkanImageMemory;
@@ -29,29 +29,23 @@ namespace Adamantium.Engine.Graphics
         
         public long TotalSizeInBytes { get; }
 
-        public IntPtr NativePointer => VulkanImage.NativePointer;
+        public void* NativePointer => VulkanImage.NativePointer;
         
-        public string Name { get; set; }
-
-        public GraphicsDevice GraphicsDevice { get; private set; }
-
         protected VulkanImage VulkanImage => vulkanImage;
         protected DeviceMemory ImageMemory => vulkanImageMemory;
         protected ImageView ImageView { get; set; }
 
-        protected Texture(GraphicsDevice device, TextureDescription description)
+        protected Texture(GraphicsDevice device, TextureDescription description) : base(device)
         {
-            GraphicsDevice = device;
             Description = description;
             Initialize();
             TransitionImageLayout(VulkanImage, description.InitialLayout, description.DesiredImageLayout);
         }
 
-        protected Texture(GraphicsDevice device, Image img, ImageUsageFlagBits usage, ImageLayout desiredLayout)
+        protected Texture(GraphicsDevice device, Image img, ImageUsageFlagBits usage, ImageLayout desiredLayout) : base(device)
         {
             //var formats = GraphicsDevice.VulkanInstance.CurrentDevice.GetPhysicalDeviceFormatProperties()
             
-            GraphicsDevice = device;
             Description = img.Description;
             Description.Usage |= ImageUsageFlagBits.TransferDstBit | usage;
             Description.DesiredImageLayout = desiredLayout;
@@ -61,12 +55,9 @@ namespace Adamantium.Engine.Graphics
             DeviceMemory stagingBufferMemory;
             CreateBuffer((ulong)TotalSizeInBytes, BufferUsageFlagBits.TransferSrcBit, MemoryPropertyFlags.HostVisible| MemoryPropertyFlags.HostCoherent, out stagingBuffer, out stagingBufferMemory);
             
-            unsafe
-            {
-                var data = GraphicsDevice.MapMemory(stagingBufferMemory, 0, (ulong)img.TotalSizeInBytes, 0);
-                System.Buffer.MemoryCopy(img.DataPointer.ToPointer(), data.ToPointer(), img.TotalSizeInBytes, img.TotalSizeInBytes);
-                GraphicsDevice.UnmapMemory(stagingBufferMemory);
-            }
+            var data = GraphicsDevice.MapMemory(stagingBufferMemory, 0, (ulong)img.TotalSizeInBytes, 0);
+            System.Buffer.MemoryCopy(img.DataPointer.ToPointer(), data, img.TotalSizeInBytes, img.TotalSizeInBytes);
+            GraphicsDevice.UnmapMemory(stagingBufferMemory);
             
             CreateImage(Description, MemoryPropertyFlags.DeviceLocal, out vulkanImage, out vulkanImageMemory);
             TransitionImageLayout(vulkanImage, ImageLayout.Undefined,ImageLayout.TransferDstOptimal);
@@ -78,9 +69,10 @@ namespace Adamantium.Engine.Graphics
             stagingBufferMemory.FreeMemory(GraphicsDevice);
         }
         
-        protected Texture(GraphicsDevice device, Image[] img, ImageUsageFlagBits usage, ImageLayout desiredLayout)
+        // TODO properly implement texture arrays and texture cube
+        protected Texture(GraphicsDevice device, Image[] img, ImageUsageFlagBits usage, ImageLayout desiredLayout) : base(device)
         {
-            GraphicsDevice = device;
+
         }
 
         private void CreateBuffer(ulong size, BufferUsageFlagBits usage, MemoryPropertyFlags memoryProperties, out VkBuffer buffer, out DeviceMemory bufferMemory)
@@ -89,7 +81,7 @@ namespace Adamantium.Engine.Graphics
             
             BufferCreateInfo bufferInfo = new BufferCreateInfo();
             bufferInfo.Size = size;
-            bufferInfo.Usage = (uint)usage;
+            bufferInfo.Usage = usage;
             bufferInfo.SharingMode = SharingMode.Exclusive;
 
             buffer = GraphicsDevice.LogicalDevice.CreateBuffer(bufferInfo);
@@ -123,7 +115,7 @@ namespace Adamantium.Engine.Graphics
             region.BufferRowLength = 0;
             region.BufferImageHeight = 0;
             region.ImageSubresource = new ImageSubresourceLayers();
-            region.ImageSubresource.AspectMask = (uint)ImageAspectFlagBits.ColorBit;
+            region.ImageSubresource.AspectMask = ImageAspectFlagBits.ColorBit;
             region.ImageSubresource.MipLevel = 0;
             region.ImageSubresource.BaseArrayLayer = 0;
             region.ImageSubresource.LayerCount = 1;
@@ -143,7 +135,7 @@ namespace Adamantium.Engine.Graphics
             region.BufferRowLength = 0;
             region.BufferImageHeight = 0;
             region.ImageSubresource = new ImageSubresourceLayers();
-            region.ImageSubresource.AspectMask = (uint)ImageAspectFlagBits.ColorBit;
+            region.ImageSubresource.AspectMask = ImageAspectFlagBits.ColorBit;
             region.ImageSubresource.MipLevel = 0;
             region.ImageSubresource.BaseArrayLayer = 0;
             region.ImageSubresource.LayerCount = 1;
@@ -218,7 +210,7 @@ namespace Adamantium.Engine.Graphics
             createInfo.Components = componentMapping;
             ImageSubresourceRange subresourceRange = new ImageSubresourceRange
             {
-                AspectMask = (uint) description.ImageAspect,
+                AspectMask = description.ImageAspect,
                 BaseMipLevel = 0,
                 LevelCount = 1,
                 BaseArrayLayer = 0,
@@ -245,16 +237,16 @@ namespace Adamantium.Engine.Graphics
             
             if (newLayout == ImageLayout.DepthStencilAttachmentOptimal)
             {
-                barrier.SubresourceRange.AspectMask = (uint)ImageAspectFlagBits.DepthBit;
+                barrier.SubresourceRange.AspectMask = ImageAspectFlagBits.DepthBit;
 
                 if (SurfaceFormat.HasStencilFormat())
                 {
-                    barrier.SubresourceRange.AspectMask |= (uint) ImageAspectFlagBits.StencilBit;
+                    barrier.SubresourceRange.AspectMask |= ImageAspectFlagBits.StencilBit;
                 }
             }
             else
             {
-                barrier.SubresourceRange.AspectMask = (uint)ImageAspectFlagBits.ColorBit;
+                barrier.SubresourceRange.AspectMask = ImageAspectFlagBits.ColorBit;
             }
 
             barrier.SubresourceRange.BaseMipLevel = 0;
@@ -265,20 +257,20 @@ namespace Adamantium.Engine.Graphics
             PipelineStageFlagBits sourceStage;
             PipelineStageFlagBits destinationStage;
 
-            if ((oldLayout == ImageLayout.Undefined || oldLayout == ImageLayout.Preinitialized) &&
-                (newLayout == ImageLayout.TransferDstOptimal || newLayout == ImageLayout.TransferSrcOptimal))
+            if (oldLayout is ImageLayout.Undefined or ImageLayout.Preinitialized &&
+                newLayout is ImageLayout.TransferDstOptimal or ImageLayout.TransferSrcOptimal)
             {
                 barrier.SrcAccessMask = 0;
-                barrier.DstAccessMask = (uint)AccessFlagBits.TransferWriteBit;
+                barrier.DstAccessMask = AccessFlagBits.TransferWriteBit;
 
                 sourceStage = PipelineStageFlagBits.TopOfPipeBit;
                 destinationStage = PipelineStageFlagBits.TransferBit;
             }
-            else if ((oldLayout == ImageLayout.TransferSrcOptimal || oldLayout == ImageLayout.TransferDstOptimal) 
+            else if (oldLayout is ImageLayout.TransferSrcOptimal or ImageLayout.TransferDstOptimal 
                      && newLayout == ImageLayout.ShaderReadOnlyOptimal)
             {
-                barrier.SrcAccessMask = (uint)AccessFlagBits.TransferWriteBit;
-                barrier.DstAccessMask = (uint) AccessFlagBits.ShaderReadBit;
+                barrier.SrcAccessMask = AccessFlagBits.TransferWriteBit;
+                barrier.DstAccessMask = AccessFlagBits.ShaderReadBit;
 
                 sourceStage = PipelineStageFlagBits.TransferBit;
                 destinationStage = PipelineStageFlagBits.FragmentShaderBit;
@@ -286,8 +278,8 @@ namespace Adamantium.Engine.Graphics
             else if (oldLayout == ImageLayout.Undefined && newLayout == ImageLayout.DepthStencilAttachmentOptimal)
             {
                 barrier.SrcAccessMask = 0;
-                barrier.DstAccessMask = (uint)(AccessFlagBits.DepthStencilAttachmentReadBit |
-                                        AccessFlagBits.DepthStencilAttachmentWriteBit);
+                barrier.DstAccessMask = (AccessFlagBits.DepthStencilAttachmentReadBit |
+                                         AccessFlagBits.DepthStencilAttachmentWriteBit);
 
                 sourceStage = PipelineStageFlagBits.TopOfPipeBit;
                 destinationStage = PipelineStageFlagBits.EarlyFragmentTestsBit;
@@ -295,7 +287,7 @@ namespace Adamantium.Engine.Graphics
             else if (oldLayout == ImageLayout.Undefined && newLayout == ImageLayout.ColorAttachmentOptimal)
             {
                 barrier.SrcAccessMask = 0;
-                barrier.DstAccessMask = (uint)(AccessFlagBits.ColorAttachmentReadBit| AccessFlagBits.ColorAttachmentWriteBit);
+                barrier.DstAccessMask = (AccessFlagBits.ColorAttachmentReadBit| AccessFlagBits.ColorAttachmentWriteBit);
                 sourceStage = PipelineStageFlagBits.TopOfPipeBit;
                 destinationStage = PipelineStageFlagBits.ColorAttachmentOutputBit;
             }
@@ -469,14 +461,14 @@ namespace Adamantium.Engine.Graphics
         {
             if (filePath?.Length != 6)
             {
-                throw new ArgumentException("File pathes array must contain exactly 6 textures");
+                throw new ArgumentException("File paths array must contain exactly 6 textures");
             }
             Image[] images = new Image[6];
             try
             {
                 for (int i = 0; i < filePath.Length; i++)
                 {
-                    images[i] = Adamantium.Imaging.Image.Load(filePath[i]);
+                    images[i] = Image.Load(filePath[i]);
                 }
                 return new Texture(device, images, flags, usage);
             }
@@ -506,7 +498,7 @@ namespace Adamantium.Engine.Graphics
             unsafe
             {
                 var data = GraphicsDevice.MapMemory(stagingBufferMemory, 0, (ulong)TotalSizeInBytes, 0);
-                System.Buffer.MemoryCopy(data.ToPointer(), img.DataPointer.ToPointer(), TotalSizeInBytes, TotalSizeInBytes);
+                System.Buffer.MemoryCopy(data, img.DataPointer.ToPointer(), TotalSizeInBytes, TotalSizeInBytes);
                 GraphicsDevice.UnmapMemory(stagingBufferMemory);
             }
 

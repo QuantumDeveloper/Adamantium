@@ -4,7 +4,7 @@ using System.Threading;
 
 namespace Adamantium.Core.Events
 {
-    internal class EventAggregator : IEventAggregator
+    public class EventAggregator : IEventAggregator
     {
         private readonly Dictionary<Type, EventBase> registeredEvents = new ();
         

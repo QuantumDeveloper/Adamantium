@@ -38,12 +38,6 @@ namespace Adamantium.Engine.Core.Models
                   JointWeight.Equals(vertex.JointWeight);
         }
 
-        public bool Equals(object obj)
-        {
-            if (ReferenceEquals(null, obj)) return false;
-            return obj is Vertex && Equals((Vertex)obj);
-        }
-
         public static bool operator ==(Vertex left, Vertex right)
         {
             return left.Equals(right);
@@ -65,6 +59,11 @@ namespace Adamantium.Engine.Core.Models
             //hashCode = (hashCode * 25) ^ JointIndex.GetHashCode();
             //hashCode = (hashCode * 25) ^ JointWeight.GetHashCode();
             return hashCode;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is Vertex && Equals((Vertex)obj);
         }
     }
 }

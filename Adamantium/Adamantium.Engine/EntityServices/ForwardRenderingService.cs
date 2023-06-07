@@ -20,7 +20,7 @@ using AdamantiumVulkan.Core;
 
 namespace Adamantium.Engine.EntityServices
 {
-    public class ForwardRenderingService : RenderService
+    public class ForwardRenderingService : RenderingService
     {
         private Sampler smallGlyphTextureSampler;
         private Sampler largeGlyphTextureSampler;

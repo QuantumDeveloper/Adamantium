@@ -8,6 +8,7 @@ using Adamantium.Core;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Effects;
 using AdamantiumVulkan.Core;
+using Serilog;
 
 namespace Adamantium.Engine.Graphics.Effects
 {
@@ -464,7 +465,7 @@ namespace Adamantium.Engine.Graphics.Effects
                     continue;
                 }
 
-                CreateAndAddLayoutBinding(constantBuffer.Description.Slot, DescriptorType.UniformBuffer, (uint)EffectShaderTypeToShaderStage(stageBlock.Type));
+                CreateAndAddLayoutBinding(constantBuffer.Description.Slot, DescriptorType.UniformBuffer, EffectShaderTypeToShaderStage(stageBlock.Type));
 
                 // Test if this constant buffer is not already part of the effect
                 if (Effect.ConstantBuffers[constantBufferRaw.Name] == null)
@@ -542,7 +543,7 @@ namespace Adamantium.Engine.Graphics.Effects
                 }
 
                 CreateAndAddLayoutBinding(parameterRaw.Slot, ConvertFromEffectParameterType(parameterRaw.Type),
-                    (uint) EffectShaderTypeToShaderStage(stageBlock.Type));
+                    EffectShaderTypeToShaderStage(stageBlock.Type));
 
                 // For constant buffers, we need to store explicit link
                 if (parameter.ResourceType == EffectResourceType.ConstantBuffer)
@@ -562,7 +563,7 @@ namespace Adamantium.Engine.Graphics.Effects
 
         }
 
-        private void CreateAndAddLayoutBinding(uint slot, DescriptorType descriptorType, uint stageFlags)
+        private void CreateAndAddLayoutBinding(uint slot, DescriptorType descriptorType, ShaderStageFlagBits stageFlags)
         {
             var binding = layoutBindings.FirstOrDefault(x=>x.Binding == slot);
 
@@ -616,12 +617,11 @@ namespace Adamantium.Engine.Graphics.Effects
 
             DescriptorPoolCreateInfo poolInfo = new DescriptorPoolCreateInfo();
             poolInfo.PoolSizeCount = (uint)poolSizes.Count;
-            poolInfo.PPoolSizes = poolSizes.ToArray();
+            poolInfo.PoolSizes = poolSizes.ToArray();
             poolInfo.MaxSets = buffersCount * poolCountMultiplier;
 
             DescriptorPool = graphicsDevice.CreateDescriptorPool(poolInfo);
             timer.Stop();
-            Console.WriteLine($"Descriptor pool creation time: {timer.ElapsedMilliseconds} ms");
         }
 
         private DescriptorSet[] CreateDescriptorSets()
@@ -902,11 +902,16 @@ namespace Adamantium.Engine.Graphics.Effects
 
         protected override void Dispose(bool disposeManagedResources)
         {
+            Log.Logger.Debug("Disposing EffectPass resources");
             ClearWriteDescriptorSets();
             ClearLayoutBindings();
             descriptorSetLayout?.Destroy(graphicsDevice);
-            PipelineLayout?.Destroy(graphicsDevice);
+            graphicsDevice.LogicalDevice.DestroyDescriptorPool(DescriptorPool);
+            DescriptorPool = null;
             ClearDescriptorsCache();
+            graphicsDevice.LogicalDevice.DestroyPipelineLayout(PipelineLayout);
+            PipelineLayout = null;
+            pipelineStages.Clear();
             base.Dispose(disposeManagedResources);
         }
 

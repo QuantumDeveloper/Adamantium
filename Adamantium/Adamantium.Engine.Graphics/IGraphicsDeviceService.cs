@@ -8,10 +8,12 @@ namespace Adamantium.Engine.Graphics
     /// </summary>
     public interface IGraphicsDeviceService
    {
+       bool IsInDebugMode { get; set; }
+       
       /// <summary>
       /// Create VulkanInstance, PhysicalDevice and LogicalDevice with certain parameters
       /// </summary>
-      void CreateMainDevice(string name);
+      void CreateMainDevice(string name, bool enableDynamicRendering);
 
       GraphicsDevice CreateRenderDevice(PresentationParameters parameters);
 
@@ -22,8 +24,12 @@ namespace Adamantium.Engine.Graphics
       GraphicsDevice GetDeviceById(string deviceId);
 
       GraphicsDevice UpdateDevice(string deviceId, PresentationParameters parameters);
+
+      void ChangeOrCreateDevice(string name, bool forceUpdate);
       
-      bool IsInitialized { get; }
+      bool IsReady { get; }
+      
+      bool DeviceUpdateNeeded { get; set; }
       
       /// <summary>
       /// Event raising after <see cref="MainGraphicsDevice"/> was created

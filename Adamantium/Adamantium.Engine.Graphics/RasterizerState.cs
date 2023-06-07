@@ -14,7 +14,7 @@ namespace Adamantium.Engine.Graphics
             DepthClampEnable = info.DepthClampEnable;
             RasterizerDiscardEnable = info.RasterizerDiscardEnable;
             PolygonMode = info.PolygonMode;
-            CullMode = (CullModeFlagBits)info.CullMode;
+            CullMode = info.CullMode;
             FrontFace = info.FrontFace;
             DepthBiasEnable = info.DepthBiasEnable;
             DepthBiasConstantFactor = info.DepthBiasConstantFactor;
@@ -87,7 +87,7 @@ namespace Adamantium.Engine.Graphics
         {
             var rasterizerState = PipelineRasterizationStateCreateInfo.Default();
 
-            rasterizerState.CullMode = (uint)cullMode;
+            rasterizerState.CullMode = cullMode;
             rasterizerState.PolygonMode = polygonMode;
             rasterizerState.FrontFace = frontFace;
             rasterizerState.DepthClampEnable = depthClampEnable;
