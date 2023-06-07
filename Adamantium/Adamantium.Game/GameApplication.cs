@@ -16,7 +16,7 @@ public abstract class GameApplication : UIApplication
 
         protected virtual Game OnCreateGameInstance()
         {
-            return new Game(GameMode.Slave);
+            return new Game(GameMode.Slave, true);
         }
 
         protected override void OnStartup()

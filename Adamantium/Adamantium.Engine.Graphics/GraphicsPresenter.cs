@@ -5,11 +5,18 @@ using Adamantium.Engine.Core;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
 using AdamantiumVulkan.Core;
+using Image = AdamantiumVulkan.Core.Image;
 
 namespace Adamantium.Engine.Graphics
 {
     public abstract class GraphicsPresenter : DisposableObject
     {
+        protected RenderTarget renderTarget;
+        protected DepthStencilBuffer depthBuffer;
+        protected RenderPass renderPass;
+        
+        private PresentInterval presentInterval;
+        
         public GraphicsDevice GraphicsDevice { get; private set; }
 
         internal PresentationParameters Description { get; set; }
@@ -38,13 +45,6 @@ namespace Adamantium.Engine.Graphics
 
         public Viewport Viewport { get; protected set; }
 
-        protected RenderTarget renderTarget;
-        protected DepthStencilBuffer depthBuffer;
-        protected RenderPass renderPass;
-        
-        
-        private PresentInterval presentInterval;
-
         public PresentInterval PresentInterval
         {
             get => presentInterval;
@@ -63,7 +63,11 @@ namespace Adamantium.Engine.Graphics
             GraphicsDevice = graphicsDevice;
             Description = description.Clone();
             CreateDepthBuffer();
-            CreateRenderPass();
+            if (!graphicsDevice.EnableDynamicRendering)
+            {
+                CreateRenderPass();
+            }
+
             CreateViewPort();
         }
 
@@ -189,6 +193,16 @@ namespace Adamantium.Engine.Graphics
             renderPassInfo.PDependencies = new[] {subpassDependency};
 
             RenderPass = GraphicsDevice.CreateRenderPass(renderPassInfo);
+        }
+
+        public virtual ImageView GetImageView(uint index)
+        {
+            return null;
+        }
+        
+        public virtual Image GetImage(uint index)
+        {
+            return null;
         }
 
         public virtual Framebuffer GetFramebuffer(uint index)

@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using Adamantium.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Events;
 using Adamantium.UI.Rendering;
 using Adamantium.UI.RoutedEvents;
 using Adamantium.Win32;
@@ -10,10 +12,29 @@ namespace Adamantium.UI;
 
 public abstract class WindowBase : ContentControl, IWindow
 {
+    private IWindowRenderer _renderer;
     protected IWindowWorkerService WindowWorkerService { get; }
-    
-    private IWindowRenderer renderer;
-        
+
+    public IWindowRenderer Renderer
+    {
+        get => _renderer;
+        set
+        {
+            if (value != _renderer)
+            {
+                OnRendererChanged(_renderer, value);
+                _renderer = value;
+            }
+            
+        }
+    }
+
+    private void OnRendererChanged(IWindowRenderer oldRenderer, IWindowRenderer newRenderer)
+    {
+        var args = new WindowRendererChangedEventArgs(oldRenderer, newRenderer);
+        RendererChanged?.Invoke(this, args);
+    }
+
     public WindowBase()
     {
         WindowWorkerService = IWindowWorkerService.GetWorker();
@@ -58,11 +79,13 @@ public abstract class WindowBase : ContentControl, IWindow
         
     public static readonly AdamantiumProperty MSAALevelProperty = AdamantiumProperty.Register(nameof(MSAALevel), 
         typeof(MSAALevel), typeof(WindowBase),
-        new PropertyMetadata(Engine.Graphics.MSAALevel.X4, PropertyMetadataOptions.AffectsRender, MSAALevelChangedCallback));
+        new PropertyMetadata(MSAALevel.X4, PropertyMetadataOptions.AffectsRender, MSAALevelChangedCallback));
 
     public static readonly AdamantiumProperty StateProperty = AdamantiumProperty.Register(nameof(State), 
         typeof(WindowState), typeof(WindowBase),
         new PropertyMetadata(WindowState.Normal, PropertyMetadataOptions.AffectsRender, StateChangedCallback));
+
+    
 
     private static void TitleChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
@@ -194,12 +217,7 @@ public abstract class WindowBase : ContentControl, IWindow
     public abstract void Hide();
         
     public abstract bool IsActive { get; internal set; }
-        
-    public event EventHandler<WindowClosingEventArgs> Closing;
-    public event EventHandler<EventArgs> Closed;
-        
-    public event EventHandler<EventArgs> SourceInitialized;
-        
+
     public event SizeChangedEventHandler ClientSizeChanged
     {
         add => AddHandler(ClientSizeChangedEvent, value);
@@ -224,102 +242,6 @@ public abstract class WindowBase : ContentControl, IWindow
         InvalidateMeasure();
     }
 
-    public abstract void Render();
-
-    public void Update()
-    {
-        ProcessVisualTree(this, UpdateComponent);
-        ProcessVisualTree(this, UpdateComponentLocation);
-    }
-
-    private void ProcessVisualTree(IUIComponent component, Action<IUIComponent> processAction)
-    {
-        var stack = new Stack<IUIComponent>();
-        stack.Push(component);
-        while (stack.Count > 0)
-        {
-            var control = stack.Pop();
-            
-            processAction(control);
-
-            foreach (var visual in control.GetVisualDescendants())
-            {
-                stack.Push(visual);
-            }
-        }
-    }
-        
-    private void UpdateComponent(IUIComponent visualComponent)
-    {
-        var control = (MeasurableUIComponent)visualComponent;
-        var parent = control.VisualParent as IMeasurableComponent;
-        if (!control.IsMeasureValid)
-        {
-            if (control is IWindow wnd)
-            {
-                MeasureControl(control, wnd.ClientWidth, wnd.ClientHeight);
-            }
-            else
-            {
-                MeasureControl(control, control.Width, control.Height);
-            }
-        }
-            
-        if (!control.IsArrangeValid)
-        {
-            if (parent != null)
-            {
-                control.Arrange(new Rect(parent.DesiredSize));
-            }
-            else
-            {
-                control.Arrange(new Rect(control.DesiredSize));
-            }
-        }
-            
-        // if (control.Parent != null)
-        // {
-        //     control.Location = control.Bounds.Location + control.Parent.Location;
-        //     control.ClipPosition = control.ClipRectangle.Location + control.Parent.Location;
-        // }
-    }
-
-    private void UpdateComponentLocation(IUIComponent visualComponent)
-    {
-        if (visualComponent.LogicalParent != null)
-        {
-            visualComponent.Location = visualComponent.Bounds.Location + ((IUIComponent)(visualComponent.LogicalParent)).Location;
-            visualComponent.ClipPosition = visualComponent.ClipRectangle.Location + ((IUIComponent)(visualComponent.LogicalParent)).Location;
-        }
-    }
-
-    private void MeasureControl(IMeasurableComponent control, Double width, Double height)
-    {
-        if (!Double.IsNaN(width) && !Double.IsNaN(height))
-        {
-            Size s = new Size(width, height);
-            control.Measure(s);
-        }
-        else if (Double.IsNaN(width) && !Double.IsNaN(height))
-        {
-            control.Measure(new Size(Double.PositiveInfinity, height));
-        }
-        else if (!Double.IsNaN(width) && Double.IsNaN(height))
-        {
-            control.Measure(new Size(width, Double.PositiveInfinity));
-        }
-        else
-        {
-            control.Measure(Size.Infinity);
-        }
-    }
-    
-    internal void SetRenderer(IWindowRenderer renderer)
-    {
-        this.renderer = renderer;
-        renderer.SetWindow(this);
-    }
-
     protected void OnClosed()
     {
         var closingArgs = new WindowClosingEventArgs();
@@ -329,4 +251,10 @@ public abstract class WindowBase : ContentControl, IWindow
             Closed?.Invoke(this, EventArgs.Empty);
         }
     }
+    
+    public event EventHandler<WindowClosingEventArgs> Closing;
+    public event EventHandler<EventArgs> Closed;
+    public event EventHandler<WindowRendererChangedEventArgs> RendererChanged;
+
+    public event EventHandler<EventArgs> SourceInitialized;
 }

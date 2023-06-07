@@ -79,7 +79,7 @@ namespace Adamantium.Engine.Graphics
             colorAttachment.DstAlphaBlendFactor = destinationBlend;
             colorAttachment.ColorBlendOp = colorBlendOp;
             colorAttachment.AlphaBlendOp = colorBlendOp;
-            colorAttachment.ColorWriteMask = (uint)colorWriteMask;
+            colorAttachment.ColorWriteMask = colorWriteMask;
             
             return new BlendState(name, state);
         }

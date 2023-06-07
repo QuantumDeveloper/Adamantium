@@ -9,37 +9,29 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Runtime.InteropServices;
 using Adamantium.Core;
-using AdamantiumVulkan;
-using AdamantiumVulkan.MacOS.Interop;
+using QuantumBinding.Utils;
 using Constants = AdamantiumVulkan.Core.Constants;
-using DisposableObject = Adamantium.Core.DisposableObject;
 
 namespace Adamantium.Engine.Graphics
 {
-    public class VulkanInstance : DisposableBase
+    public unsafe class VulkanInstance : DisposableBase
     {
         private const string EngineName = "AdamantiumEngine";
 
         private Instance instance;
-        private PFN_vkDebugUtilsMessengerCallbackEXT debugCallback;
+        private delegate* unmanaged<DebugUtilsMessageSeverityFlagBitsEXT, DebugUtilsMessageTypeFlagBitsEXT, VkDebugUtilsMessengerCallbackDataEXT*, void*, uint> debugCallback;
         private DebugUtilsMessengerEXT debugMessenger;
 
         public string ApplicationName { get; set; }
 
-        public bool IsInDebugMode { get; private set; }
-
-        public static ReadOnlyCollection<string> DeviceExtensions { get; private set; }
+        public bool IsInDebugMode { get; set; }
 
         public static ReadOnlyCollection<string> ValidationLayers { get; private set; }
 
-        private static Dictionary<IntPtr, SurfaceKHR> availableSurfaces;
+        private Dictionary<IntPtr, SurfaceKHR> availableSurfaces;
 
         static VulkanInstance()
         {
-            availableSurfaces = new Dictionary<IntPtr, SurfaceKHR>();
-            var deviceExt = new List<string>();
-            deviceExt.Add(AdamantiumVulkan.Core.Constants.VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-            DeviceExtensions = new ReadOnlyCollection<string>(deviceExt);
             var validationLayers = new List<string>();
             
             validationLayers.Add("VK_LAYER_KHRONOS_validation");
@@ -62,34 +54,29 @@ namespace Adamantium.Engine.Graphics
                 return null;
             }
         }
-
+        
         public PhysicalDevice CurrentDevice { get; set; }
 
         private VulkanInstance(string appName, bool enableDebug)
         {
-            debugCallback = DebugCallback;
+            availableSurfaces = new Dictionary<IntPtr, SurfaceKHR>();
+            debugCallback = &DebugCallback;
             ApplicationName = appName;
             IsInDebugMode = enableDebug;
-            CreateInstance(appName, enableDebug);
+            CreateInstance(appName);
             PhysicalDevices = new AdamantiumCollection<PhysicalDevice>();
             EnumerateDevices();
             CurrentDevice = PhysicalDevices[0];
         }
-
-        private void CreateInstance(string appName, bool enableDebug)
+        
+        private void CreateInstance(string appName)
         {
-            //enableDebug = false;
             var appInfo = new ApplicationInfo();
             appInfo.PApplicationName = appName;
-            appInfo.ApplicationVersion = AdamantiumVulkan.Core.Constants.VK_MAKE_VERSION(1, 0, 0);
+            appInfo.ApplicationVersion = AdamantiumVulkan.Core.Constants.VK_MAKE_API_VERSION(1, 0, 0, 0);
             appInfo.PEngineName = EngineName;
-            appInfo.EngineVersion = AdamantiumVulkan.Core.Constants.VK_MAKE_VERSION(1, 0, 0);
-            appInfo.ApiVersion = AdamantiumVulkan.Core.Constants.VK_MAKE_VERSION(1, 2, 148);
-
-            DebugUtilsMessengerCreateInfoEXT debugInfo = new DebugUtilsMessengerCreateInfoEXT();
-            debugInfo.MessageSeverity = (uint)(DebugUtilsMessageSeverityFlagBitsEXT.InfoBitExt | DebugUtilsMessageSeverityFlagBitsEXT.WarningBitExt | DebugUtilsMessageSeverityFlagBitsEXT.ErrorBitExt);
-            debugInfo.MessageType = (uint)(DebugUtilsMessageTypeFlagBitsEXT.GeneralBitExt | DebugUtilsMessageTypeFlagBitsEXT.ValidationBitExt | DebugUtilsMessageTypeFlagBitsEXT.PerformanceBitExt);
-            debugInfo.PfnUserCallback = Marshal.GetFunctionPointerForDelegate(debugCallback);
+            appInfo.EngineVersion = AdamantiumVulkan.Core.Constants.VK_MAKE_API_VERSION(1, 0, 0, 0);
+            appInfo.ApiVersion = AdamantiumVulkan.Core.Constants.VK_MAKE_API_VERSION(1, 3, 224, 0);
 
             var createInfo = new InstanceCreateInfo();
             createInfo.PApplicationInfo = appInfo;
@@ -100,26 +87,41 @@ namespace Adamantium.Engine.Graphics
             //var ext = new string[] { "VK_MVK_macos_surface", "VK_KHR_surface", "VK_KHR_swapchain" };
             //createInfo.EnabledExtensionCount = (uint)ext.Length;
             //createInfo.PpEnabledExtensionNames = ext.ToArray();
+            
+            createInfo.PEnabledExtensionNames = extensions.Select(x => x.ExtensionName).ToArray();//.Except(new []{"VK_KHR_surface_protected_capabilities"}).ToArray();
+            createInfo.EnabledExtensionCount = (uint)createInfo.PEnabledExtensionNames.Length;
 
-            createInfo.PpEnabledExtensionNames = extensions.Select(x => x.ExtensionName).ToArray();//.Except(new []{"VK_KHR_surface_protected_capabilities"}).ToArray();
-            createInfo.EnabledExtensionCount = (uint)createInfo.PpEnabledExtensionNames.Length;
-
-            if (enableDebug)
+            if (IsInDebugMode)
             {
                 createInfo.EnabledLayerCount = (uint)ValidationLayers.Count;
-                createInfo.PpEnabledLayerNames = ValidationLayers.ToArray();
+                createInfo.PEnabledLayerNames = ValidationLayers.ToArray();
             }
 
             instance = Instance.Create(createInfo);
+            NativePointer = new IntPtr(instance.NativePointer);
 
             createInfo.Dispose();
 
-            if (enableDebug)
+            if (IsInDebugMode)
             {
-                CreateDebugUtilsMessenger(debugInfo, out debugMessenger);
+                EnableDebug();
             }
-
         }
+
+        private void EnableDebug()
+        {
+            DebugUtilsMessengerCreateInfoEXT debugInfo = new DebugUtilsMessengerCreateInfoEXT();
+            debugInfo.MessageSeverity = (DebugUtilsMessageSeverityFlagBitsEXT.InfoBitExt |
+                                         DebugUtilsMessageSeverityFlagBitsEXT.WarningBitExt |
+                                         DebugUtilsMessageSeverityFlagBitsEXT.ErrorBitExt);
+            debugInfo.MessageType = (DebugUtilsMessageTypeFlagBitsEXT.GeneralBitExt |
+                                     DebugUtilsMessageTypeFlagBitsEXT.ValidationBitExt |
+                                     DebugUtilsMessageTypeFlagBitsEXT.PerformanceBitExt);
+            debugInfo.PfnUserCallback = debugCallback;
+            CreateDebugUtilsMessenger(debugInfo, out debugMessenger);
+        }
+
+        public IntPtr NativePointer { get; private set; }
 
         public void EnumerateDevices()
         {
@@ -135,9 +137,9 @@ namespace Adamantium.Engine.Graphics
 
         public SurfaceKHR GetOrCreateSurface(PresentationParameters parameters)
         {
-            if (availableSurfaces.ContainsKey(parameters.OutputHandle))
+            if (availableSurfaces.TryGetValue(parameters.OutputHandle, out var createSurface))
             {
-                return availableSurfaces[parameters.OutputHandle];
+                return createSurface;
             }
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -155,7 +157,7 @@ namespace Adamantium.Engine.Graphics
             if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
                 var surfaceInfo = new MacOSSurfaceCreateInfoMVK();
-                surfaceInfo.PView = parameters.OutputHandle;
+                surfaceInfo.PView = parameters.OutputHandle.ToPointer();
                 var surface = instance.CreateMacOSSurfaceMVK(surfaceInfo);
 
                 availableSurfaces.Add(parameters.OutputHandle, surface);
@@ -166,32 +168,31 @@ namespace Adamantium.Engine.Graphics
             throw new NotSupportedException("Current platform is not supported yet for Surface creation");
         }
         
-        Result CreateDebugUtilsMessenger(DebugUtilsMessengerCreateInfoEXT pCreateInfo, out DebugUtilsMessengerEXT pDebugMessenger)
+        private Result CreateDebugUtilsMessenger(DebugUtilsMessengerCreateInfoEXT pCreateInfo, out DebugUtilsMessengerEXT pDebugMessenger)
         {
             pDebugMessenger = null;
             var ptr = instance.GetInstanceProcAddr("vkCreateDebugUtilsMessengerEXT");
-            var func = Marshal.GetDelegateForFunctionPointer<PFN_vkCreateDebugUtilsMessengerEXT>(ptr);
-            if (func != null)
-            {
-                var result = func(instance, pCreateInfo.ToInternal(), IntPtr.Zero, out var pDebugMessenger_t);
-                pCreateInfo.Dispose();
-                pDebugMessenger = pDebugMessenger_t;
-                return result;
-            }
-            
-            return Result.ErrorExtensionNotPresent;
+            var func = new PFN_vkCreateDebugUtilsMessengerEXT(ptr);
+            var infoPtr = NativeUtils.StructOrEnumToPointer(pCreateInfo.ToNative());
+            var result = func.Invoke(instance, infoPtr, null, out var pDebugMessenger_t);
+            pCreateInfo.Dispose();
+            NativeUtils.Free(infoPtr);
+            pDebugMessenger = new DebugUtilsMessengerEXT(pDebugMessenger_t);
+            return result;
         }
 
-        void DestroyDebugUtilsMessenger(DebugUtilsMessengerEXT debugMessenger)
+        private void DestroyDebugUtilsMessenger(DebugUtilsMessengerEXT debugMessenger)
         {
             var ptr = instance.GetInstanceProcAddr("vkDestroyDebugUtilsMessengerEXT");
-            var func = Marshal.GetDelegateForFunctionPointer<PFN_vkDestroyDebugUtilsMessengerEXT>(ptr);
-            func?.Invoke(instance, debugMessenger, IntPtr.Zero);
+            var func = new PFN_vkDestroyDebugUtilsMessengerEXT(ptr);
+            func.Invoke(instance, debugMessenger, null);
         }
 
-        private uint DebugCallback(DebugUtilsMessageSeverityFlagBitsEXT messageSeverity, uint messageTypes, AdamantiumVulkan.Core.Interop.VkDebugUtilsMessengerCallbackDataEXT pCallbackData, IntPtr pUserData)
+        [UnmanagedCallersOnly]
+        private static uint DebugCallback(DebugUtilsMessageSeverityFlagBitsEXT messageSeverity, DebugUtilsMessageTypeFlagBitsEXT messageTypes, VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData)
         {
-            Console.WriteLine(Marshal.PtrToStringAnsi(pCallbackData.pMessage));
+            var data = *pCallbackData;
+            Console.WriteLine(new string(data.pMessage));
             return 0;
         }
 
@@ -211,8 +212,10 @@ namespace Adamantium.Engine.Graphics
             {
                 DestroyDebugUtilsMessenger(debugMessenger);
             }
-            
-            instance?.DestroyInstance();
+
+            instance?.Dispose();
+            instance = null;
+            PhysicalDevices.Clear();
         }
     }
 }

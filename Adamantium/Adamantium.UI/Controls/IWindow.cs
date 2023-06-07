@@ -1,5 +1,8 @@
 ﻿using System;
+using Adamantium.Core;
 using Adamantium.Engine.Graphics;
+using Adamantium.UI.Events;
+using Adamantium.UI.Rendering;
 using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI.Controls;
@@ -31,13 +34,14 @@ public interface IWindow : IRootVisualComponent, IMeasurableComponent
         
     WindowState State { get; set; }
 
-    public void Render();
-
-    public void Update();
+    IWindowRenderer Renderer { get; set; }
         
     event SizeChangedEventHandler ClientSizeChanged;
     event EventHandler<WindowClosingEventArgs> Closing;
-    event EventHandler<EventArgs> Closed;
     event MSAALeveChangedHandler MSAALevelChanged;
     event StateChangedHandler StateChanged;
+    
+    event EventHandler<EventArgs> Closed;
+
+    event EventHandler<WindowRendererChangedEventArgs> RendererChanged;
 }

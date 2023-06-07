@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using Adamantium.Core;
 using Adamantium.Engine.Effects;
 using AdamantiumVulkan.Core;
+using Serilog;
 
 namespace Adamantium.Engine.Graphics.Effects
 {
@@ -244,10 +245,31 @@ namespace Adamantium.Engine.Graphics.Effects
 
         protected override void Dispose(bool disposeManagedResources)
         {
-            base.Dispose(disposeManagedResources);
+            Log.Logger.Debug("Start disposing EffectsPool");
+            lock (effects)
+            {
+                foreach (var effect in effects)
+                {
+                    effect.Dispose();
+                }
 
-            if (disposeManagedResources)
-                graphicsDevice.EffectPools.Remove(this);
+                effects.Clear();
+            }
+
+            for (var index = 0; index < compiledShadersGroup.Length; index++)
+            {
+                var group = compiledShadersGroup[index];
+                Log.Logger.Debug($"Disposing shader modules in group [{index}]");
+                foreach (var module in group)
+                {
+                    graphicsDevice.LogicalDevice.DestroyShaderModule(module);
+                }
+
+                group.Clear();
+            }
+
+            graphicsDevice.EffectPools.Remove(this);
+            base.Dispose(disposeManagedResources);
         }
 
         /// <summary>

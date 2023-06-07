@@ -46,10 +46,11 @@ namespace Adamantium.Game
 
         private readonly Dictionary<Object, GameContext> contextsMapping;
         
-        public Game(GameMode mode, IDependencyResolver resolver = null)
+        public Game(GameMode mode, bool enableDynamicRendering, IDependencyResolver resolver = null)
         {
             Mode = mode;
 
+            EnableDynamicRendering = enableDynamicRendering;
             Resolver = resolver ?? new AdamantiumDependencyResolver();
             GameBuilder.Build(Resolver);
             
@@ -94,6 +95,8 @@ namespace Adamantium.Game
         protected IEventAggregator EventAggregator { get; }
         
         public EntityWorld EntityWorld { get; }
+        
+        public bool EnableDynamicRendering { get; }
 
         public GameInputManager InputManager { get; private set; }
 
@@ -204,7 +207,7 @@ namespace Adamantium.Game
             }
         }
 
-        public T CreateRenderService<T>(GameOutput window) where T : RenderService
+        public T CreateRenderService<T>(GameOutput window) where T : RenderingService
         {
             var system = EntityWorld.CreateService<T>(new object[] { EntityWorld, window });
             lock (drawSystems)
@@ -471,7 +474,7 @@ namespace Adamantium.Game
 
         private void InitializeBeforeRun()
         {
-            GraphicsDeviceService.CreateMainDevice("");
+            GraphicsDeviceService.CreateMainDevice("", EnableDynamicRendering);
             cancellationTokenSource = new CancellationTokenSource();
             
             EntityWorld.Initialize();
@@ -524,7 +527,7 @@ namespace Adamantium.Game
         /// </summary>
         protected virtual bool BeginScene()
         {
-            return GraphicsDeviceService.IsInitialized;
+            return GraphicsDeviceService.IsReady;
         }
 
         /// <summary>

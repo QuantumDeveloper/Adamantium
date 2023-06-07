@@ -1,11 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>net6.0</TargetFramework>
+		<TargetFramework>net7.0</TargetFramework>
 		<Platforms>x64</Platforms>
 		<LangVersion>latest</LangVersion>
 		<Configurations>Debug;Release</Configurations>
-		<OutputType>Library</OutputType>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<BaseOutputPath>..\..\output\Adamantium.Engine.Graphics\bin</BaseOutputPath>
 		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
@@ -20,9 +19,6 @@
 		<ProjectReference Include="..\Adamantium.Engine.Core\Adamantium.Engine.Core.csproj" />
 		<ProjectReference Include="..\Adamantium.Imaging\Adamantium.Imaging.csproj" />
 		<ProjectReference Include="..\Adamantium.Win32\Adamantium.Win32.csproj" />
-
-		
-		<!--<ProjectReference Include="..\Adamantium.Engine.Effects\Adamantium.Engine.Effects.csproj" />-->
 	</ItemGroup>
 
 	<ItemGroup>

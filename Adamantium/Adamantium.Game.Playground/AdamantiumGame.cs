@@ -22,7 +22,7 @@ namespace Adamantium.Game.Playground
     {
         private TypeFace typeFace;
         
-        public AdamantiumGame():base(GameMode.Slave)
+        public AdamantiumGame():base(GameMode.Slave, true)
         {
             EventAggregator.GetEvent<GameOutputCreatedEvent>().Subscribe(OnWindowCreated);
         }

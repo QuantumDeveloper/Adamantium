@@ -1288,10 +1288,10 @@ namespace Adamantium.Engine.Effects
 
             switch (variableBinding.Class)
             {
-                case SpvcResourceType.UniformBuffer:
+                case ResourceType.UniformBuffer:
                     parameter.Type = EffectParameterType.ConstantBuffer;
                     break;
-                case SpvcResourceType.SeparateImage:
+                case ResourceType.SeparateImage:
                     switch (variableBinding.Dimension)
                     {
                         case ShaderResourceDimension.Buffer:
@@ -1311,10 +1311,10 @@ namespace Adamantium.Engine.Effects
                             break;
                     }
                     break;
-                case SpvcResourceType.StorageBuffer:
+                case ResourceType.StorageBuffer:
                     parameter.Type = EffectParameterType.StorageBuffer;
                     break;
-                case SpvcResourceType.StorageImage:
+                case ResourceType.StorageImage:
                     switch (variableBinding.Dimension)
                     {
                         case ShaderResourceDimension.Buffer:
@@ -1331,7 +1331,7 @@ namespace Adamantium.Engine.Effects
                             break;
                     }
                     break;
-                case SpvcResourceType.SeparateSamplers:
+                case ResourceType.SeparateSamplers:
                     parameter.Type = EffectParameterType.Sampler;
                     break;
             }

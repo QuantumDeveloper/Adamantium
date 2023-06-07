@@ -6,11 +6,10 @@ using VulkanBuffer = AdamantiumVulkan.Core.Buffer;
 
 namespace Adamantium.Engine.Graphics
 {
-    public partial class Buffer : DisposableObject
+    public partial class Buffer : GraphicsResource
     {
         private VulkanBuffer VulkanBuffer;
         private DeviceMemory BufferMemory;
-        private GraphicsDevice GraphicsDevice;
 
         public BufferUsageFlags Usage { get; private set; }
 
@@ -32,9 +31,12 @@ namespace Adamantium.Engine.Graphics
         /// <param name="bufferFlags">Type of the buffer.</param>
         /// <param name="viewFormat">The view format.</param>
         /// <param name="dataPointer">The data pointer.</param>
-        protected Buffer(GraphicsDevice device, BufferUsageFlags bufferFlags, DataPointer dataPointer, MemoryPropertyFlags memoryFlags, SharingMode sharingMode)
+        protected Buffer(GraphicsDevice device, 
+            BufferUsageFlags bufferFlags, 
+            DataPointer dataPointer,
+            MemoryPropertyFlags memoryFlags, 
+            SharingMode sharingMode) : base(device)
         {
-            GraphicsDevice = device;
             Usage = bufferFlags;
             MemoryFlags = memoryFlags;
             SharingMode = sharingMode;
@@ -44,9 +46,11 @@ namespace Adamantium.Engine.Graphics
             Initialize(dataPointer);
         }
 
-        protected Buffer(GraphicsDevice device, BufferCreateInfo description, uint count, MemoryPropertyFlags memoryFlags)
+        protected Buffer(GraphicsDevice device, 
+            BufferCreateInfo description, 
+            uint count, 
+            MemoryPropertyFlags memoryFlags) : base(device)
         {
-            GraphicsDevice = device;
             Usage = (BufferUsageFlags)description.Usage;
             MemoryFlags = memoryFlags;
             SharingMode = description.SharingMode;
@@ -54,16 +58,24 @@ namespace Adamantium.Engine.Graphics
             ElementCount = count;
         }
 
-        protected Buffer(GraphicsDevice device, BufferUsageFlags bufferFlags, int size, uint count, MemoryPropertyFlags memoryflags, SharingMode sharingMode)
+        protected Buffer(GraphicsDevice device,
+            BufferUsageFlags bufferFlags,
+            int size,
+            uint count,
+            MemoryPropertyFlags memoryFlags,
+            SharingMode sharingMode) : base(device)
         {
-            GraphicsDevice = device;
             Usage = bufferFlags;
-            MemoryFlags = memoryflags;
+            MemoryFlags = memoryFlags;
             SharingMode = sharingMode;
             ElementSize = (uint)size / count;
             ElementCount = count;
 
-            CreateBuffer(size, BufferUsageFlags.TransferDst | Usage, MemoryFlags | MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent, out VulkanBuffer, out BufferMemory);
+            CreateBuffer(size,
+                BufferUsageFlags.TransferDst | Usage,
+                MemoryFlags | MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent,
+                out VulkanBuffer,
+                out BufferMemory);
         }
 
         private void Initialize(DataPointer dataPointer)
@@ -80,7 +92,11 @@ namespace Adamantium.Engine.Graphics
             CreateBuffer(TotalSize, BufferUsageFlags.TransferSrc, stagingMemoryFlags, out stagingBuffer, out stagingBufferMemory);
 
             UpdateBufferContent(stagingBufferMemory, dataPointer);
-            CreateBuffer(TotalSize, BufferUsageFlags.TransferDst | Usage, MemoryFlags | MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent, out VulkanBuffer, out BufferMemory);
+            CreateBuffer(TotalSize, 
+                BufferUsageFlags.TransferDst | Usage, 
+                MemoryFlags | MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent, 
+                out VulkanBuffer, 
+                out BufferMemory);
             CopyBuffer(stagingBuffer, VulkanBuffer, TotalSize);
 
             stagingBuffer.Destroy(GraphicsDevice);
@@ -90,7 +106,7 @@ namespace Adamantium.Engine.Graphics
         private unsafe void UpdateBufferContent(DeviceMemory bufferMemory, DataPointer dataPointer, ulong offset = 0)
         {
             var data = GraphicsDevice.MapMemory(bufferMemory, offset, (ulong)TotalSize, 0);
-            System.Buffer.MemoryCopy(dataPointer.Pointer.ToPointer(), data.ToPointer(), TotalSize, dataPointer.Size);
+            System.Buffer.MemoryCopy(dataPointer.Pointer.ToPointer(), data, TotalSize, dataPointer.Size);
             GraphicsDevice.UnmapMemory(bufferMemory);
         }
 
@@ -111,7 +127,7 @@ namespace Adamantium.Engine.Graphics
         {
             BufferCreateInfo bufferInfo = new BufferCreateInfo();
             bufferInfo.Size = (ulong)size;
-            bufferInfo.Usage = (uint)usage;
+            bufferInfo.Usage = (BufferUsageFlagBits)usage;
             bufferInfo.SharingMode = SharingMode.Exclusive;
 
             buffer = GraphicsDevice.LogicalDevice.CreateBuffer(bufferInfo);
@@ -213,7 +229,7 @@ namespace Adamantium.Engine.Graphics
         /// <msdn-id>ff476457</msdn-id>	
         /// <unmanaged>HRESULT ID3D11DeviceContext::Map([In] ID3D11Resource* pResource,[In] unsigned int Subresource,[In] D3D11_MAP MapType,[In] D3D11_MAP_FLAG MapFlags,[Out] D3D11_MAPPED_SUBRESOURCE* pMappedResource)</unmanaged>	
         /// <unmanaged-short>ID3D11DeviceContext::Map</unmanaged-short>	
-        public void GetData(DataPointer toData)
+        public unsafe void GetData(DataPointer toData)
         {
             // Check size validity of data to copy to
             if (toData.Size > TotalSize)
@@ -222,7 +238,7 @@ namespace Adamantium.Engine.Graphics
             var data = GraphicsDevice.MapMemory(BufferMemory, 0, (ulong)toData.Size, 0);
             unsafe
             {
-                System.Buffer.MemoryCopy(data.ToPointer(), toData.Pointer.ToPointer(), toData.Size, toData.Size);
+                System.Buffer.MemoryCopy(data, toData.Pointer.ToPointer(), toData.Size, toData.Size);
             }
             GraphicsDevice.UnmapMemory(BufferMemory);
         }
@@ -406,7 +422,7 @@ namespace Adamantium.Engine.Graphics
             var info = new BufferCreateInfo();
             info.SharingMode = SharingMode.Exclusive;
             info.Size = (ulong)bufferSize;
-            info.Usage = (uint)bufferFlags;
+            info.Usage = (BufferUsageFlagBits)bufferFlags;
 
             return new Buffer<T>(device, info, elementCount, memoryFlags);
         }

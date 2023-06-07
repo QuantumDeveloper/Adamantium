@@ -1,6 +1,4 @@
-﻿using System;
-using System.IO;
-using Adamantium.UI.Controls;
+﻿using Serilog;
 
 namespace Adamantium.UI.Playground
 {
@@ -13,10 +11,12 @@ namespace Adamantium.UI.Playground
         
         protected override void OnStartup()
         {
+            base.OnStartup();
             if (StartupUri == null) return;
             
             var path = StartupUri.OriginalString;
             MainWindow = new MainWindow();
+            Log.Logger.Information("Window is shown");
             MainWindow.Show();
         }
     }

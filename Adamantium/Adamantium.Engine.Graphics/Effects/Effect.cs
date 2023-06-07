@@ -44,7 +44,7 @@ namespace Adamantium.Engine.Graphics.Effects
         /// Gets the data associated to this effect.
         /// </summary> 
         public EffectData.Effect RawEffectData { get; private set; }
-
+        
         /// <summary>
         /// Set to <c>true</c> to force all constant shaders to be shared between other effects within a common <see cref="EffectPool"/>. Default is <c>false</c>.
         /// </summary>
@@ -75,8 +75,7 @@ namespace Adamantium.Engine.Graphics.Effects
         /// <param name="effectPool">The effect pool used to register the bytecode. Default is <see cref="GraphicsDevice.DefaultEffectPool"/>.</param>
         /// <exception cref="ArgumentException">If the bytecode doesn't contain a single effect.</exception>
         /// <remarks>The effect bytecode must contain only a single effect and will be registered into the <see cref="GraphicsDevice.DefaultEffectPool"/>.</remarks>
-        public Effect(GraphicsDevice device, EffectData effectData, EffectPool effectPool = null)
-           : base(device)
+        public Effect(GraphicsDevice device, EffectData effectData, EffectPool effectPool = null) : base(device)
         {
             CreateInstanceFrom(device, effectData, effectPool);
         }
@@ -109,7 +108,6 @@ namespace Adamantium.Engine.Graphics.Effects
 
         internal void CreateInstanceFrom(GraphicsDevice device, EffectData effectData, EffectPool effectPool)
         {
-            GraphicsDevice = device;
             ConstantBuffers = new EffectConstantBufferCollection();
             Parameters = new EffectParameterCollection();
             Techniques = new EffectTechniqueCollection();
@@ -119,12 +117,15 @@ namespace Adamantium.Engine.Graphics.Effects
             // Sets the effect name
             Name = effectData.Description.Name;
 
+            var t = Stopwatch.StartNew();
             // Register the bytecode to the pool
             var effect = Pool.RegisterBytecode(effectData);
 
             // Initialize from effect
             InitializeFrom(effect, null);
 
+            t.Stop();
+            Debug.WriteLine($"Effect initialized in {t.ElapsedMilliseconds} ms");
             // If everything was fine, then we can register it into the pool
             Pool.AddEffect(this);
         }
@@ -176,7 +177,7 @@ namespace Adamantium.Engine.Graphics.Effects
                     if (string.IsNullOrEmpty(name))
                         name = $"${passIndex++}";
 
-                    var pass = new EffectPass(logger, this, technique, passRaw, name);
+                    var pass = ToDispose(new EffectPass(logger, this, technique, passRaw, name));
 
                     var timer = Stopwatch.StartNew();
                     pass.Initialize(logger);
@@ -266,7 +267,6 @@ namespace Adamantium.Engine.Graphics.Effects
                     {
                         subPass.ComputeSlotLinks();
                     }
-                    //pass.ComputeSlotLinks();
                     pass.ComputeSlotLinks();
                 }
             }

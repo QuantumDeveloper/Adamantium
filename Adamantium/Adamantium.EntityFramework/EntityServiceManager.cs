@@ -180,7 +180,7 @@ namespace Adamantium.EntityFramework
             OnFrameEnded();
         }
 
-        private void SyncServices()
+        internal void SyncServices()
         {
             if (servicesToRemove.Count > 0)
             {
@@ -233,6 +233,14 @@ namespace Adamantium.EntityFramework
             }
         }
 
+        public void RemoveAllServices()
+        {
+            foreach (var entityService in services)
+            {
+                RemoveService(entityService);
+            }
+        }
+
         public void RemoveServices(IEnumerable<EntityService> services)
         {
             foreach (var service in services)
@@ -262,8 +270,11 @@ namespace Adamantium.EntityFramework
 
         private void RemoveServiceInternal(EntityService service)
         {
+            if (service == null) return;
+            
             if (activeServices.ContainsKey(service.Uid))
             {
+                service.UnloadContent();
                 activeServices.Remove(service.Uid);
                 services.Remove(service);
                 OnServiceRemoved(service);

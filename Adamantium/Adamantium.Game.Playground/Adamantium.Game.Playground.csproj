@@ -1,11 +1,11 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-        <TargetFramework>net6.0</TargetFramework>
+        <TargetFramework>net7.0</TargetFramework>
         <Platforms>x64</Platforms>
         <Configurations>Debug;Release</Configurations>
-        <LangVersion>latestmajor</LangVersion>
+        <LangVersion>latest</LangVersion>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<BaseOutputPath>..\..\output\Adamantium.Game.Playground\bin</BaseOutputPath>
     </PropertyGroup>
@@ -153,9 +153,11 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Effect Include="Effects\BasicEffect.fx" />
+      <!--<Effect Include="Effects\BasicEffect.fx" />-->
     </ItemGroup>
 
 <!--    <Import Project="$(SolutionDir)Adamantium.targets" />-->
+	
+	
 
 </Project>

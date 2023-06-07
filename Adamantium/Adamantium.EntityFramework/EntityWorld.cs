@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Adamantium.Core;
 using Adamantium.Core.DependencyInjection;
@@ -141,6 +142,11 @@ namespace Adamantium.EntityFramework
                 entitiesToRemove.Add(root);
             }
         }
+
+        public void RemoveAllEntities()
+        {
+            RemoveEntities(RootEntities.ToArray());
+        }
         
         public void RemoveEntities(IEnumerable<Entity> entities)
         {
@@ -217,6 +223,11 @@ namespace Adamantium.EntityFramework
         public void AddServices(params EntityService[] services)
         {
             ServiceManager.AddServices(services);
+        }
+        
+        public void RemoveAllServices()
+        {
+            ServiceManager.RemoveAllServices();
         }
 
         public void RemoveServices(params EntityService[] services)
@@ -521,6 +532,12 @@ namespace Adamantium.EntityFramework
             {
                 AddGroup(group.Value);
             }
+        }
+
+        public void ForceUpdate()
+        {
+            SyncEntities();
+            ServiceManager.SyncServices();
         }
     }
 }

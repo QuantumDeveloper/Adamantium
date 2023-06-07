@@ -7,7 +7,7 @@ namespace Adamantium.Engine.Graphics
    /// Base collection for Graphics device states (BlendState, DepthStencilState, RasterizerState).
    /// </summary>
    /// <typeparam name="T">Type of the state.</typeparam>
-   public abstract class StateCollectionBase<T>:ComponentCollection<T> where T : NamedObject
+   public abstract class StateCollectionBase<T> : ComponentCollection<T>, IDisposable where T : NamedObject
    {
       /// <summary>
       /// An allocator of state.
@@ -45,6 +45,11 @@ namespace Adamantium.Engine.Graphics
       protected override T TryToGetOnNotFound(string name)
       {
          return StateAllocatorCallback?.Invoke(name);
+      }
+
+      public virtual void Dispose()
+      {
+         
       }
    }
 }

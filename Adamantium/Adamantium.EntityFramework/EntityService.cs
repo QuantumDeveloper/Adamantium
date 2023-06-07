@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Adamantium.Core;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.Core.Events;

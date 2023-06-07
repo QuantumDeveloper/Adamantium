@@ -43,10 +43,4 @@ public class Window : WindowBase
     }
 
     public override bool IsActive { get; internal set; }
-
-    public override void Render()
-    {
-            
-    }
-
 }

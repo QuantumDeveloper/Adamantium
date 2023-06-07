@@ -4,6 +4,8 @@ using Adamantium.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.EntityFramework;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Events;
+using Adamantium.UI.Extensions;
 using Adamantium.UI.Rendering;
 using Adamantium.UI.RoutedEvents;
 using AdamantiumVulkan.Core;
@@ -16,6 +18,7 @@ public class WindowService : UiService
         
     private PresentationParameters parameters;
     private IWindowRenderer windowRenderer;
+    private IWindowRenderer _pendingRenderer;
     private readonly AutoResetEvent pauseEvent;
 
     protected IWindow Window { get; }
@@ -59,24 +62,39 @@ public class WindowService : UiService
         GraphicsDevice.ClearColor = Colors.White;
         GraphicsDevice.AddDynamicStates(DynamicState.Viewport, DynamicState.Scissor);
 
-        windowRenderer = new ForwardWindowRenderer(GraphicsDevice);
-        var renderer = (ForwardWindowRenderer)windowRenderer;
-        renderer.Parameters = parameters;
-        windowRenderer.SetWindow(Window);
+        if (Window.Renderer == null)
+        {
+            windowRenderer = new ForwardWindowRenderer(GraphicsDevice);
+            windowRenderer.SetWindow(Window);
+            Window.Renderer = windowRenderer;
+        }
+        else
+        {
+            windowRenderer = Window.Renderer;
+            windowRenderer.SetWindow(Window);
+        }
+        
+        Window.RendererChanged += WindowOnRendererChanged;
+    }
+
+    private void WindowOnRendererChanged(object sender, WindowRendererChangedEventArgs e)
+    {
+        _pendingRenderer = e.NewRenderer;
     }
 
     public override void UnloadContent()
     {
+        windowRenderer?.Dispose();
     }
         
     public override void Update(AppTime gameTime)
     {
-        Window.Update();
+        Window.Update(gameTime);
     }
 
     public override bool BeginDraw()
     {
-        return IsVisible;
+        return Window.Visibility == Visibility.Visible;
     }
 
     public override void Draw(AppTime gameTime)
@@ -92,7 +110,7 @@ public class WindowService : UiService
             
         if (GraphicsDevice.BeginDraw(1, 0))
         {
-            windowRenderer.Render();
+            windowRenderer?.Render(gameTime);
         }
     }
         
@@ -114,9 +132,15 @@ public class WindowService : UiService
         parameters.Width = (uint)Window.ClientWidth;
         parameters.Height = (uint)Window.ClientHeight;
         
-        if (windowRenderer.IsWindowUpToDate)
+        if (!windowRenderer.IsRendererUpToDate)
         {
             windowRenderer.ResizePresenter(parameters);
+        }
+
+        if (_pendingRenderer != null)
+        {
+            windowRenderer = _pendingRenderer;
+            _pendingRenderer = null;
         }
     }
 }

@@ -1,6 +1,7 @@
 ﻿using System;
 using Adamantium.Engine.Graphics;
 using Adamantium.Imaging;
+using Adamantium.UI.Events;
 using Adamantium.UI.Media;
 using Adamantium.UI.Media.Imaging;
 using Adamantium.UI.RoutedEvents;
@@ -8,8 +9,10 @@ using Adamantium.Win32;
 
 namespace Adamantium.UI.Controls;
 
-public class RenderTargetPanel: Grid
+public unsafe class RenderTargetPanel: Grid
 {
+   private RenderTargetImage rendertarget;
+   
    public RenderTargetPanel() { }
 
    static RenderTargetPanel()
@@ -58,8 +61,6 @@ public class RenderTargetPanel: Grid
       var image = adamantiumObject as RenderTargetPanel;
       image?.UpdateOrCreateRenderTarget();
    }
-
-   private RenderTargetImage rendertarget;
 
    protected override void OnSizeChanged(SizeChangedEventArgs e)
    {
@@ -120,7 +121,7 @@ public class RenderTargetPanel: Grid
    {
       if (rendertarget != null)
       {
-         OnRenderEvent?.Invoke(this, new RenderTargetEventArgs(rendertarget.NativePointer, PixelWidth, PixelHeight, PixelFormat));
+         OnRenderEvent?.Invoke(this, new RenderTargetEventArgs(new IntPtr(rendertarget.NativePointer), PixelWidth, PixelHeight, PixelFormat));
          if (sizeChanged)
          {
             context.BeginDraw(this);
@@ -134,21 +135,5 @@ public class RenderTargetPanel: Grid
    public void SaveCurrentFrame(Uri path, ImageFileType fileType)
    {
       rendertarget.Save(path, fileType);
-   }
-}
-
-public class RenderTargetEventArgs : EventArgs
-{
-   public IntPtr Handle { get; }
-   public Int32 Width { get; }
-   public Int32 Height { get; }
-   public SurfaceFormat PixelFormat { get; }
-
-   public RenderTargetEventArgs(IntPtr pointer, Int32 width, Int32 height, SurfaceFormat format)
-   {
-      Handle = pointer;
-      Width = width;
-      Height = height;
-      PixelFormat = format;
    }
 }

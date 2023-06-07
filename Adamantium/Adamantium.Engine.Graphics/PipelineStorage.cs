@@ -1,24 +1,20 @@
 ﻿using System;
 using System.Collections.ObjectModel;
 using System.Linq;
-using Adamantium.Core;
 using Adamantium.Engine.Graphics.Effects;
 using AdamantiumVulkan.Core;
+using QuantumBinding.Utils;
 
 namespace Adamantium.Engine.Graphics
 {
-    public abstract class PipelineBase : DisposableObject
+    public abstract class PipelineBase : GraphicsResource
     {
-        private Pipeline pipeline;
         private RenderPass renderPass;
         private EffectPass effectPass;
 
-        protected PipelineBase(GraphicsDevice graphicsDevice)
+        protected PipelineBase(GraphicsDevice graphicsDevice) : base(graphicsDevice)
         {
-            GraphicsDevice = graphicsDevice;
         }
-
-        public GraphicsDevice GraphicsDevice { get; }
 
         public abstract PipelineBindPoint BindPoint { get; }
         
@@ -52,11 +48,22 @@ namespace Adamantium.Engine.Graphics
 
         public virtual bool IsDynamic { get; }
         
-        protected Pipeline Pipeline { get => pipeline; set => pipeline = value; }
+        protected Pipeline Pipeline { get; set; }
 
         public static implicit operator Pipeline(PipelineBase pipelineBase)
         {
             return pipelineBase.Pipeline;
+        }
+
+        protected override void Dispose(bool disposeManagedResources)
+        {
+            if (Pipeline != null)
+            {
+                GraphicsDevice?.LogicalDevice.DestroyPipeline(Pipeline);
+                Pipeline = null;
+            }
+
+            base.Dispose(disposeManagedResources);
         }
 
         protected abstract void CreateOrUpdatePipeline();
@@ -173,7 +180,7 @@ namespace Adamantium.Engine.Graphics
             vertexInputInfo.PVertexAttributeDescriptions = vertexAttributesDescriptions;
         }
 
-        protected override void CreateOrUpdatePipeline()
+        protected override unsafe void CreateOrUpdatePipeline()
         {
             if (!IsDirty) return;
 
@@ -183,8 +190,7 @@ namespace Adamantium.Engine.Graphics
 
             var inputAssembly = new PipelineInputAssemblyStateCreateInfo();
             inputAssembly.Topology = PrimitiveTopology;
-            if (PrimitiveTopology == PrimitiveTopology.LineStrip ||
-                PrimitiveTopology == PrimitiveTopology.TriangleStrip)
+            if (PrimitiveTopology is PrimitiveTopology.LineStrip or PrimitiveTopology.TriangleStrip)
             {
                 inputAssembly.PrimitiveRestartEnable = true;
             }
@@ -196,11 +202,20 @@ namespace Adamantium.Engine.Graphics
             viewportState.ScissorCount = (uint)Scissors.Count;
 
             var multisampling = new PipelineMultisampleStateCreateInfo();
-            multisampling.SampleShadingEnable = true;
+            multisampling.SampleShadingEnable = presenter.MSAALevel != MSAALevel.None;
             multisampling.MinSampleShading = 0.8f;
             multisampling.RasterizationSamples = (SampleCountFlagBits)presenter.MSAALevel;
+            
+            var renderingCreateInfo = new PipelineRenderingCreateInfo();
+            renderingCreateInfo.SType = StructureType.PipelineRenderingCreateInfo;
+            renderingCreateInfo.ColorAttachmentCount = 1U;
+            renderingCreateInfo.PColorAttachmentFormats = new Format[] { GraphicsDevice.Presenter.Description.ImageFormat};
+            renderingCreateInfo.DepthAttachmentFormat = Format.D32_SFLOAT_S8_UINT;
+            renderingCreateInfo.StencilAttachmentFormat = Format.D32_SFLOAT_S8_UINT;
+            var nativeInfo = renderingCreateInfo.ToNative();
 
             var pipelineInfo = new GraphicsPipelineCreateInfo();
+            pipelineInfo.PNext = NativeUtils.StructOrEnumToPointer(nativeInfo);
             pipelineInfo.StageCount = (uint)shaderStages.Length;
             pipelineInfo.PStages = shaderStages;
             pipelineInfo.PVertexInputState = vertexInputInfo;
@@ -210,9 +225,15 @@ namespace Adamantium.Engine.Graphics
             pipelineInfo.PMultisampleState = multisampling;
             pipelineInfo.PColorBlendState = BlendState;
             pipelineInfo.Layout = EffectPass.PipelineLayout;
-            pipelineInfo.RenderPass = RenderPass;
+            pipelineInfo.RenderPass = null;
             pipelineInfo.PDepthStencilState = DepthStencilState;
             pipelineInfo.Subpass = 0;
+            
+            if (!GraphicsDevice.EnableDynamicRendering)
+            {
+                pipelineInfo.PNext = null;
+                pipelineInfo.RenderPass = RenderPass;
+            }
 
             if (IsDynamic)
             {
@@ -228,6 +249,7 @@ namespace Adamantium.Engine.Graphics
             }
 
             Pipeline = GraphicsDevice.CreateGraphicsPipeline(pipelineInfo);
+            
             IsDirty = false;
         }
 
@@ -235,7 +257,10 @@ namespace Adamantium.Engine.Graphics
         {
             var hashCode = VertexType.GetHashCode();
             hashCode = (hashCode * 397) ^ EffectPass.GetHashCode();
-            hashCode = (hashCode * 397) ^ RenderPass.GetHashCode();
+            if (RenderPass != null)
+            {
+                hashCode = (hashCode * 397) ^ RenderPass.GetHashCode();
+            }
             hashCode = (hashCode * 397) ^ PrimitiveTopology.GetHashCode();
             hashCode = (hashCode * 397) ^ RasterizerState.GetHashCode();
             hashCode = (hashCode * 397) ^ BlendState.GetHashCode();
@@ -264,6 +289,8 @@ namespace Adamantium.Engine.Graphics
         {
             return HashCode;
         }
+        
+        
         
         public static GraphicsPipeline New(
             GraphicsDevice graphicsDevice,
