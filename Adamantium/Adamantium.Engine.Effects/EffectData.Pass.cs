@@ -1,8 +1,11 @@
 ﻿
+using MessagePack;
+
 namespace Adamantium.Engine.Effects
 {
    public sealed partial class EffectData
    {
+      [MessagePackObject]
       public sealed class Pass
       {
          private EffectPropertyCollection properties;
@@ -10,16 +13,19 @@ namespace Adamantium.Engine.Effects
          /// <summary>
          /// Name of this pass.
          /// </summary>
+         [Key(0)]
          public string Name;
 
          /// <summary>
          /// True if this pass is the sub-pass of a root pass.
          /// </summary>
+         [Key(1)]
          public bool IsSubPass;
 
          /// <summary>
          /// List of <see cref="EffectData.Properties"/>.
          /// </summary>
+         [Key(2)]
          public EffectPropertyCollection Properties
          {
             get { return properties ??= new EffectPropertyCollection(); }
@@ -29,6 +35,7 @@ namespace Adamantium.Engine.Effects
          /// <summary>
          /// Description of the shader stage <see cref="Pipeline"/>.
          /// </summary>
+         [Key(3)]
          public Pipeline Pipeline;
 
          /// <summary>

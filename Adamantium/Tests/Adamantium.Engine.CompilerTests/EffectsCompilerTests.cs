@@ -95,7 +95,7 @@ namespace Adamantium.Engine.CompilerTests
                 var result = EffectCompiler.CompileFromFile(path);
 
                 var memoryStream = new MemoryStream();
-                MessagePackSerializer.DefaultOptions = MessagePack.Resolvers.ContractlessStandardResolver.Options;
+                //MessagePackSerializer.DefaultOptions = MessagePack.Resolvers.ContractlessStandardResolver.Options;
                 MessagePackSerializer.Serialize(memoryStream, result.EffectData);
                 memoryStream.Position = 0;
                 var results2 = MessagePackSerializer.Deserialize<EffectData>(memoryStream);

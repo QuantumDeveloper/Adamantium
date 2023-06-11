@@ -204,9 +204,7 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
 
     private void CreateWindowService(IWindow window)
     {
-        //var windowService = EntityWorld.CreateService<WindowService>(EntityWorld, window);
-        var windowService = new WindowService(EntityWorld, window);
-        EntityWorld.AddService(windowService);
+        var windowService = EntityWorld.CreateService<WindowService>(EntityWorld, window);
         var entity = new Entity();
         entity.AddComponent(window);
         EntityWorld.AddEntity(entity);

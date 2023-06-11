@@ -1,9 +1,11 @@
 ﻿using System;
+using MessagePack;
 
 namespace Adamantium.Engine.Effects
 {
     public sealed partial class EffectData
     {
+        [MessagePackObject]
         public sealed class ShaderLink : IEquatable<ShaderLink>
         {
             public static readonly ShaderLink NullShader = new ShaderLink();
@@ -11,6 +13,7 @@ namespace Adamantium.Engine.Effects
             /// <summary>
             /// The stream output rasterized stream (-1 if no rasterized stream).
             /// </summary>
+            [IgnoreMember]
             public int StreamOutputRasterizedStream;
 
             /// <summary>
@@ -34,6 +37,7 @@ namespace Adamantium.Engine.Effects
             /// <remarks>
             /// When this is an import, the <see cref="Index"/> is not valid. Only <see cref="ImportName"/> is valid.
             /// </remarks>
+            [IgnoreMember]
             public bool IsImport => !String.IsNullOrEmpty(ImportName);
 
             /// <summary>
@@ -43,11 +47,13 @@ namespace Adamantium.Engine.Effects
             /// <remarks>
             /// This index is a direct reference to the shader in <see cref="EffectData.Shaders"/>.
             /// </remarks>
+            [Key(0)]
             public int Index { get; set; }
 
             /// <summary>
             /// Gets or sets the entrypoint shader name for further usage.
             /// </summary>
+            [Key(1)]
             public string EntryPoint { get; set; }
 
             /// <summary>
@@ -57,14 +63,17 @@ namespace Adamantium.Engine.Effects
             /// <remarks>
             /// This property is not null when there is no shader compiled and this is an import.
             /// </remarks>
+            [Key(2)]
             public string ImportName { get; set; }
 
+            [Key(3)]
             public EffectShaderType ShaderType;
 
             /// <summary>
             /// Gets a value indicating whether this instance is a null shader.
             /// </summary>
             /// <value><c>true</c> if this instance is null shader; otherwise, <c>false</c>.</value>
+            [IgnoreMember]
             public bool IsNullShader => Index < 0;
 
             public ShaderLink Clone()

@@ -17,9 +17,10 @@ public class EffectsGenerator : IIncrementalGenerator
         var includeFiles = context.AdditionalTextsProvider.Where(file => file.Path.EndsWith(".hlsl"));
 
         var fxNamesAndContents = effectFiles.Select((text, cancellationToken) => (
-            name: Path.GetFileNameWithoutExtension(text.Path),
+            name: Path.GetFileName(text.Path),
             path: text.Path,
-            content: text.GetText(cancellationToken)!.ToString()));
+            content: text.GetText(cancellationToken)!.ToString(),
+            fxName: Path.GetFileNameWithoutExtension(text.Path)));
 
         var includesAndContents = includeFiles.Select((text, cancellationToken) => new ShaderFileInfo()
         {
@@ -55,8 +56,8 @@ public class EffectsGenerator : IIncrementalGenerator
                 }
                 else
                 {
-                    var result = GenerateEffect(compilerResult, compilation, file.name, @namespace);
-                    spc.AddSource($"{file.name}.g.cs", result);
+                    var result = GenerateEffect(compilerResult, compilation, file.fxName, @namespace);
+                    spc.AddSource($"{file.fxName}.g.cs", result);
                 }
             }
             catch(System.Exception ex)
@@ -96,8 +97,7 @@ public class EffectsGenerator : IIncrementalGenerator
 
     }
 
-    private string GenerateEffect(EffectCompilerResult result, Compilation compilation, string fileName, string @namespace)
-
+    private string GenerateEffect(EffectCompilerResult result, Compilation compilation, string fxName, string @namespace)
     {
         var textGenerator = new TextGenerator();
         textGenerator.WriteLine("using Adamantium.Engine.Effects;");
@@ -108,7 +108,7 @@ public class EffectsGenerator : IIncrementalGenerator
 
         textGenerator.WriteLine($"namespace {@namespace}.Effects.Generated");
         textGenerator.WriteOpenBraceAndIndent();
-        textGenerator.WriteLine($"public partial class {Path.GetFileName(fileName)} : Effect");
+        textGenerator.WriteLine($"public partial class {fxName} : Effect");
         textGenerator.WriteOpenBraceAndIndent();
 
         var bytecodeStream = new MemoryStream();
@@ -121,7 +121,7 @@ public class EffectsGenerator : IIncrementalGenerator
 
         textGenerator.NewLine();
 
-        textGenerator.WriteLine($"public {fileName}(GraphicsDevice device, EffectPool effectPool = null) " +
+        textGenerator.WriteLine($"public {fxName}(GraphicsDevice device, EffectPool effectPool = null) " +
                                 $": base(device, bytecode, effectPool)");
         textGenerator.WriteOpenBraceAndIndent();
 

@@ -1,19 +1,23 @@
 ﻿using System;
+using MessagePack;
 
 namespace Adamantium.Engine.Effects
 {
    public partial class EffectData
    {
+      [MessagePackObject]
       public struct ShaderMacro : IEquatable<ShaderMacro>
       {
          /// <summary>
          /// The name of the macro.
          /// </summary>
+         [Key(0)]
          public string Name;
 
          /// <summary>
          /// The value of the macro.
          /// </summary>
+         [Key(1)]
          public string Value;
 
          /// <summary>
@@ -24,7 +28,7 @@ namespace Adamantium.Engine.Effects
          public ShaderMacro(string name, object value)
          {
             Name = name;
-            Value = value == null ? null : value.ToString();
+            Value = value?.ToString();
          }
 
          public bool Equals(ShaderMacro other)
