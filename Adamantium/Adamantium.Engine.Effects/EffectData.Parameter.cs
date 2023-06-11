@@ -1,24 +1,29 @@
 ﻿using System;
+using MessagePack;
 
 namespace Adamantium.Engine.Effects
 {
    public partial class EffectData
    {
+      [MessagePackObject]
       public abstract class Parameter : IEquatable<Parameter>
       {
          /// <summary>
          /// Name of this parameter.
          /// </summary>
+         [Key(0)]
          public string Name;
 
          /// <summary>
          /// The <see cref="EffectParameterClass"/> of this parameter.
          /// </summary>
+         [Key(1)]
          public EffectParameterClass Class;
 
          /// <summary>
          /// The <see cref="EffectParameterType"/> of this parameter.
          /// </summary>
+         [Key(2)]
          public EffectParameterType Type;
 
          public bool Equals(Parameter other)

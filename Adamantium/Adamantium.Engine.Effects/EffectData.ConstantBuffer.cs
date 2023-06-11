@@ -1,31 +1,37 @@
 ﻿using System;
 using System.Collections.Generic;
 using Adamantium.Core;
+using MessagePack;
 
 namespace Adamantium.Engine.Effects
 {
     public partial class EffectData
     {
+        [MessagePackObject]
         public sealed class ConstantBuffer : IEquatable<ConstantBuffer>
         {
             /// <summary>
             /// Name of this constant buffer.
             /// </summary>
+            [Key(0)]
             public string Name;
 
             /// <summary>
             /// Size in bytes of this constant buffer.
             /// </summary>
+            [Key(1)]
             public int Size;
 
             /// <summary>
             /// Binding index
             /// </summary>
+            [Key(2)]
             public uint Slot;
 
             /// <summary>
             /// List of parameters in this constant buffer.
             /// </summary>
+            [Key(3)]
             public List<ValueTypeParameter> Parameters;
 
             public bool Equals(ConstantBuffer other)

@@ -1,40 +1,51 @@
 ﻿using System.Collections.Generic;
 using Adamantium.Core;
+using MessagePack;
 
 namespace Adamantium.Engine.Effects
 {
     public sealed partial class EffectData
     {
+        [MessagePackObject]
         public sealed class Shader
         {
+            private List<ConstantBuffer> constantBuffers;
+            private List<ResourceParameter> resourceParameters;
+            
             /// <summary>
             /// Name of this shader.
             /// </summary>
+            [Key(0)]
             public string Name;
 
             /// <summary>
             /// Entry point of this shader.
             /// </summary>
+            [Key(1)]
             public string EntryPoint;
 
             /// <summary>
             /// Type of this shader.
             /// </summary>
+            [Key(2)] 
             public EffectShaderType Type;
 
             /// <summary>
             /// Compiler flags used to compile this shader.
             /// </summary>
+            [Key(3)]
             public EffectCompilerFlags CompilerFlags;
 
             /// <summary>
             /// Level of this shader.
             /// </summary>
+            [Key(4)]
             public string Level;
 
             /// <summary>
             /// Bytecode of this shader.
             /// </summary>
+            [Key(5)] 
             public byte[] Bytecode;
 
             /// <summary>
@@ -43,11 +54,13 @@ namespace Adamantium.Engine.Effects
             /// <remarks>
             /// Shaders with same bytecode with have same hashcode.
             /// </remarks>
+            [Key(6)]
             public int Hashcode;
 
             /// <summary>
             /// List of constant buffers used by this shader.
             /// </summary>
+            [Key(7)]
             public List<ConstantBuffer> ConstantBuffers
             {
                 get { return constantBuffers ??= new List<ConstantBuffer>(); }
@@ -57,14 +70,12 @@ namespace Adamantium.Engine.Effects
             /// <summary>
             /// List of resource parameters used by this shader.
             /// </summary>
+            [Key(8)]
             public List<ResourceParameter> ResourceParameters
             {
                 get { return resourceParameters ??= new List<ResourceParameter>(); }
                 set => resourceParameters = value;
             }
-
-            private List<ConstantBuffer> constantBuffers;
-            private List<ResourceParameter> resourceParameters;
 
             public override string ToString()
             {

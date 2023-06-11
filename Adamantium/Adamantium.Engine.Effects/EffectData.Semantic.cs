@@ -1,4 +1,5 @@
 ﻿using System;
+using MessagePack;
 
 namespace Adamantium.Engine.Effects
 {
@@ -19,7 +20,8 @@ namespace Adamantium.Engine.Effects
       /// </remarks>	
       /// <msdn-id>ff476215</msdn-id>	
       /// <unmanaged>D3D11_SIGNATURE_PARAMETER_DESC</unmanaged>	
-      /// <unmanaged-short>D3D11_SIGNATURE_PARAMETER_DESC</unmanaged-short>	
+      /// <unmanaged-short>D3D11_SIGNATURE_PARAMETER_DESC</unmanaged-short>
+      [MessagePackObject]
       public sealed class Semantic : IEquatable<Semantic>
       {
          /// <summary>
@@ -58,7 +60,8 @@ namespace Adamantium.Engine.Effects
          /// </summary>	
          /// <msdn-id>ff476215</msdn-id>	
          /// <unmanaged>const char* SemanticName</unmanaged>	
-         /// <unmanaged-short>char SemanticName</unmanaged-short>	
+         /// <unmanaged-short>char SemanticName</unmanaged-short>
+         [Key(0)]
          public string Name { get; internal set; }
 
          /// <summary>	
@@ -66,7 +69,8 @@ namespace Adamantium.Engine.Effects
          /// </summary>	
          /// <msdn-id>ff476215</msdn-id>	
          /// <unmanaged>unsigned int SemanticIndex</unmanaged>	
-         /// <unmanaged-short>unsigned int SemanticIndex</unmanaged-short>	
+         /// <unmanaged-short>unsigned int SemanticIndex</unmanaged-short>
+         [Key(1)]	
          public byte Index { get; internal set; }
 
          /// <summary>	
@@ -74,7 +78,8 @@ namespace Adamantium.Engine.Effects
          /// </summary>	
          /// <msdn-id>ff476215</msdn-id>	
          /// <unmanaged>unsigned int Register</unmanaged>	
-         /// <unmanaged-short>unsigned int Register</unmanaged-short>	
+         /// <unmanaged-short>unsigned int Register</unmanaged-short>
+         [Key(2)]
          public byte Register { get; internal set; }
 
          /// <summary>	
@@ -82,7 +87,8 @@ namespace Adamantium.Engine.Effects
          /// </summary>	
          /// <msdn-id>ff476215</msdn-id>	
          /// <unmanaged>D3D_NAME SystemValueType</unmanaged>	
-         /// <unmanaged-short>D3D_NAME SystemValueType</unmanaged-short>	
+         /// <unmanaged-short>D3D_NAME SystemValueType</unmanaged-short>
+         [Key(3)]	
          public byte SystemValueType { get; internal set; }
 
          /// <summary>	
@@ -90,7 +96,8 @@ namespace Adamantium.Engine.Effects
          /// </summary>	
          /// <msdn-id>ff476215</msdn-id>	
          /// <unmanaged>D3D_REGISTER_COMPONENT_TYPE ComponentType</unmanaged>	
-         /// <unmanaged-short>D3D_REGISTER_COMPONENT_TYPE ComponentType</unmanaged-short>	
+         /// <unmanaged-short>D3D_REGISTER_COMPONENT_TYPE ComponentType</unmanaged-short>
+         [Key(4)]
          public byte ComponentType { get; internal set; }
 
          /// <summary>	
@@ -98,7 +105,8 @@ namespace Adamantium.Engine.Effects
          /// </summary>	
          /// <msdn-id>ff476215</msdn-id>	
          /// <unmanaged>D3D11_REGISTER_COMPONENT_MASK_FLAG Mask</unmanaged>	
-         /// <unmanaged-short>D3D11_REGISTER_COMPONENT_MASK_FLAG Mask</unmanaged-short>	
+         /// <unmanaged-short>D3D11_REGISTER_COMPONENT_MASK_FLAG Mask</unmanaged-short>
+         [Key(5)]	
          public byte UsageMask { get; internal set; }
 
          /// <summary>	
@@ -106,7 +114,8 @@ namespace Adamantium.Engine.Effects
          /// </summary>	
          /// <msdn-id>ff476215</msdn-id>	
          /// <unmanaged>D3D11_REGISTER_COMPONENT_MASK_FLAG ReadWriteMask</unmanaged>	
-         /// <unmanaged-short>D3D11_REGISTER_COMPONENT_MASK_FLAG ReadWriteMask</unmanaged-short>	
+         /// <unmanaged-short>D3D11_REGISTER_COMPONENT_MASK_FLAG ReadWriteMask</unmanaged-short>
+         [Key(6)]
          public byte ReadWriteMask { get; internal set; }
 
          /// <summary>	
@@ -114,7 +123,8 @@ namespace Adamantium.Engine.Effects
          /// </summary>	
          /// <msdn-id>ff476215</msdn-id>	
          /// <unmanaged>unsigned int Stream</unmanaged>	
-         /// <unmanaged-short>unsigned int Stream</unmanaged-short>	
+         /// <unmanaged-short>unsigned int Stream</unmanaged-short>
+         [Key(7)]
          public byte Stream { get; internal set; }
 
          public bool Equals(Semantic other)

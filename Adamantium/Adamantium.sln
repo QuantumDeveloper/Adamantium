@@ -79,8 +79,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Engine.Effects",
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Engine.Generators", "Adamantium.Engine.Generators\Adamantium.Engine.Generators.csproj", "{4B40C0E5-C9E4-49BF-A045-CD7F319ACB20}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Generators.Playground", "Adamantium.Generators.Playground\Adamantium.Generators.Playground.csproj", "{A96F876A-D2EE-4827-BF03-5F2161B299B1}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -361,14 +359,6 @@ Global
 		{4B40C0E5-C9E4-49BF-A045-CD7F319ACB20}.Release|Any CPU.Build.0 = Release|Any CPU
 		{4B40C0E5-C9E4-49BF-A045-CD7F319ACB20}.Release|x64.ActiveCfg = Release|x64
 		{4B40C0E5-C9E4-49BF-A045-CD7F319ACB20}.Release|x64.Build.0 = Release|x64
-		{A96F876A-D2EE-4827-BF03-5F2161B299B1}.Debug|Any CPU.ActiveCfg = Debug|x64
-		{A96F876A-D2EE-4827-BF03-5F2161B299B1}.Debug|Any CPU.Build.0 = Debug|x64
-		{A96F876A-D2EE-4827-BF03-5F2161B299B1}.Debug|x64.ActiveCfg = Debug|x64
-		{A96F876A-D2EE-4827-BF03-5F2161B299B1}.Debug|x64.Build.0 = Debug|x64
-		{A96F876A-D2EE-4827-BF03-5F2161B299B1}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{A96F876A-D2EE-4827-BF03-5F2161B299B1}.Release|Any CPU.Build.0 = Release|Any CPU
-		{A96F876A-D2EE-4827-BF03-5F2161B299B1}.Release|x64.ActiveCfg = Release|x64
-		{A96F876A-D2EE-4827-BF03-5F2161B299B1}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

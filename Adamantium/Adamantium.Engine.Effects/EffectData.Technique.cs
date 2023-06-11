@@ -1,9 +1,11 @@
 ﻿using System.Collections.Generic;
+using MessagePack;
 
 namespace Adamantium.Engine.Effects
 {
    public sealed partial class EffectData
    {
+      [MessagePackObject]
       public sealed class Technique
       {
          /// <summary>
@@ -12,11 +14,13 @@ namespace Adamantium.Engine.Effects
          /// <remarks>
          /// This value can be null.
          /// </remarks>
+         [Key(0)]
          public string Name;
 
          /// <summary>
          /// List of <see cref="Pass"/>.
          /// </summary>
+         [Key(1)]
          public List<Pass> Passes;
 
          public override string ToString()

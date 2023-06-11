@@ -211,7 +211,16 @@ namespace Adamantium.Engine.Effects
 
             logger = new EffectCompilerLogger();
 
+            if (includes == null)
+            {
+                var directory = Path.GetDirectoryName(fileName);
+                var includeFiles = Directory.GetFiles(directory, "*.hlsl");
+                includes = includeFiles.Select(x => new ShaderFileInfo()
+                { Content = File.ReadAllText(x), Path = x, FileName = Path.GetFileName(x) }).ToImmutableArray();
+            }
+
             var includeParser = new IncludeParser() { Logger = logger };
+            
             includeParser.Includes = includes;
             foreach (var include in includes)
             {

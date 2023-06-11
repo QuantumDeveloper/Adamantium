@@ -4,6 +4,7 @@ using MessagePack;
 
 namespace Adamantium.Engine.Effects
 {
+    [MessagePackObject]
     public sealed partial class EffectData
     {
         public static readonly string CompiledExtension = "fx.compiled";
@@ -13,7 +14,7 @@ namespace Adamantium.Engine.Effects
         static EffectData()
         {
             //Scheme = RuntimeTypeModel.Create();
-            ConfigureSerializationScheme();
+            //ConfigureSerializationScheme();
         }
 
         private static void ConfigureSerializationScheme()
@@ -107,14 +108,17 @@ namespace Adamantium.Engine.Effects
 
         public EffectData() { }
 
+        
         /// <summary>
         /// List of compiled shaders.
         /// </summary>
+        [Key(0)]
         public List<Shader> Shaders;
 
         /// <summary>
         /// Complete Effect description
         /// </summary>
+        [Key(1)]
         public Effect Description;
 
         /// <summary>

@@ -66,7 +66,6 @@ public class WindowService : UiService
         {
             windowRenderer = new ForwardWindowRenderer(GraphicsDevice);
             windowRenderer.SetWindow(Window);
-            Window.Renderer = windowRenderer;
         }
         else
         {

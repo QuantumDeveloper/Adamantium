@@ -13,6 +13,7 @@ using Semaphore = AdamantiumVulkan.Core.Semaphore;
 using Adamantium.Engine.Graphics.Effects.Generated;
 using Serilog;
 using Image = AdamantiumVulkan.Core.Image;
+using Logger = Serilog.Core.Logger;
 
 namespace Adamantium.Engine.Graphics
 {
@@ -119,6 +120,7 @@ namespace Adamantium.Engine.Graphics
             BasicEffect = new BasicEffect(this);
             timer2.Stop();
             var diff = timer2.ElapsedMilliseconds - timer.ElapsedMilliseconds;
+            Log.Logger.Information($"Effect initialization time: {diff}");
         }
         
         public bool IsResourceLoaderDevice { get; }

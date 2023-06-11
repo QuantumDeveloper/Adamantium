@@ -1,14 +1,16 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using MessagePack;
 
 namespace Adamantium.Engine.Effects
 {
     public sealed partial class EffectData
     {
+        [MessagePackObject]
         public sealed class Pipeline : IEnumerable<ShaderLink>
         {
             //public ShaderLink[] Links;
-
+            [Key(0)]
             public Dictionary<EffectShaderType, ShaderLink> Links;
 
             /// <summary>

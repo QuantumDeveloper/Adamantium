@@ -1,19 +1,23 @@
 ﻿using System;
+using MessagePack;
 
 namespace Adamantium.Engine.Effects
 {
    public partial class EffectData
    {
+      [MessagePackObject]
       public sealed class ResourceParameter : Parameter, IEquatable<ResourceParameter>
       {
          /// <summary>
          /// The slot index register to bind to.
          /// </summary>
+         [Key(3)]
          public byte Slot;
 
          /// <summary>
          /// The number of slots to bind.
          /// </summary>
+         [Key(4)]
          public byte Count;
 
          public bool Equals(ResourceParameter other)
