@@ -4,5 +4,5 @@ namespace Adamantium.UI;
 
 public interface IName
 {
-   String Name { get; set; }
+   public String Name { get; set; }
 }

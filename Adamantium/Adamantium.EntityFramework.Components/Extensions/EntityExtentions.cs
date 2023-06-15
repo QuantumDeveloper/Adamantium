@@ -71,6 +71,8 @@ namespace Adamantium.EntityFramework.Components.Extensions
 
         public static Double GetDiameter(this Entity owner)
         {
+            if (owner == null) return 0;
+            
             var collision = owner.GetComponent<Collider>();
             if (collision == null)
             {

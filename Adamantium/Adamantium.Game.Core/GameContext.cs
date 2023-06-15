@@ -22,7 +22,7 @@ namespace Adamantium.Game
          {
             ContextType = GameContextType.Window;
          }
-         else if (Utilities.IsTypeInheritFrom(type, typeof(RenderTarget)))
+         else if (Utilities.IsTypeInheritFrom(type, typeof(RenderTargetPanel)))
          {
             ContextType = GameContextType.RenderTargetPanel;
          }

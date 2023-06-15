@@ -5,6 +5,7 @@ using Adamantium.Engine.Graphics;
 using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
 using Adamantium.Mathematics;
+using Adamantium.Mathematics.Triangulation;
 
 namespace Adamantium.Engine.Templates.CameraTemplates
 {

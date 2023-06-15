@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Linq;
 using Adamantium.Core;
 using Adamantium.Core.Collections;
+using Adamantium.Mathematics.Triangulation;
 
 namespace Adamantium.Engine.Core.Models;
 

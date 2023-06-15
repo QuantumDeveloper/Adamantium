@@ -2,9 +2,10 @@ using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Engine.Core.Models;
 using Adamantium.Engine.Graphics;
+using Adamantium.Mathematics.Triangulation;
 using Adamantium.UI.Controls;
 using Adamantium.UI.RoutedEvents;
-using Polygon = Adamantium.Mathematics.Polygon;
+using Polygon = Adamantium.Mathematics.Triangulation.Polygon;
 
 namespace Adamantium.UI.Media;
 
@@ -213,12 +214,7 @@ public class CombinedGeometry : Geometry
             var allSegments = OutlineMesh1.MergeContourSegments();
             allSegments.AddRange(OutlineMesh2.MergeContourSegments());
 
-            var allSegmentsDict = new Dictionary<GeometrySegment, GeometrySegment>();
-            //var allSegmentsDict = allSegments.ToDictionary(x => x);
-            foreach(var segment in allSegments)
-            {
-                allSegmentsDict[segment] = segment;
-            }
+            var allSegmentsDict = allSegments.Distinct().ToDictionary(x=>x);
             
             // 2. Form contours
             var strokeContours = FormStrokeContours(allSegmentsDict, out var onePointJointCase);
@@ -314,7 +310,8 @@ public class CombinedGeometry : Geometry
         return triangulatorSegments;
     }
 
-    // We cannot provide one point join case as single contour for stroke generating, so we split for two separate contours with one of the corners connected only visually, not logically
+    // We cannot provide one point join case as single contour for stroke generating, so we split for two separate contours
+    // with one of the corners connected only visually, not logically
     private List<List<GeometrySegment>> FormStrokeContours(Dictionary<GeometrySegment, GeometrySegment> mergedSegments, out bool onePointJointCase)
     {
         var strokeContours = new List<List<GeometrySegment>>();
@@ -371,7 +368,7 @@ public class CombinedGeometry : Geometry
                 
                 // switch to next segment
                 currentSegment = nextSegment;
-            } while (currentSegment != startSegment);
+            } while (!Equals(currentSegment, startSegment) && currentSegment != null);
 
             strokeContours.Add(strokeContour);
         }

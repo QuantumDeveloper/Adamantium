@@ -1,13 +1,15 @@
 ﻿using System;
 using Adamantium.Core;
+using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.UI.Events;
+using Adamantium.UI.Input;
 using Adamantium.UI.Rendering;
 using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI.Controls;
 
-public interface IWindow : IRootVisualComponent, IMeasurableComponent
+public interface IWindow : IRootVisualComponent, IContentControl
 {
     void Show();
     void Close();
@@ -44,4 +46,6 @@ public interface IWindow : IRootVisualComponent, IMeasurableComponent
     event EventHandler<EventArgs> Closed;
 
     event EventHandler<WindowRendererChangedEventArgs> RendererChanged;
+    
+    event EventHandler<EventArgs> SourceInitialized;
 }

@@ -1,8 +1,7 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Adamantium.Mathematics
+namespace Adamantium.Mathematics.Triangulation
 {
     public static class PolygonHelper
     {
