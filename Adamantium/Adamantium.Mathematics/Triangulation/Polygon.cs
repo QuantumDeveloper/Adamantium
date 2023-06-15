@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Adamantium.Mathematics
+namespace Adamantium.Mathematics.Triangulation
 {
     /// <summary>
     /// Describes a collection of <see cref="MeshContour"/>s, which will form a single merged triangulated polygon

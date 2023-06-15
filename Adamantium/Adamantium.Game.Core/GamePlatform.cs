@@ -381,7 +381,7 @@ namespace Adamantium.Game.Core
         {
             if (outputs.Contains(window)) return;
 
-            if (!contextToWindow.ContainsKey(window.GameContext))
+            if (!contextToWindow.ContainsKey(window.GameContext) && !windowsToAdd.Contains(window))
             {
                 contextToWindow.Add(window.GameContext, window);
                 windowsToAdd.Add(window);

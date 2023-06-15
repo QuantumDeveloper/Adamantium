@@ -296,8 +296,9 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         // TODO: check if we need to call AttachedToVisualTree in chain
         if (VisualChildren.Count > 0)
         {
-            foreach (UIComponent visual in VisualChildren)
+            foreach (var uiComponent in VisualChildren)
             {
+                var visual = (UIComponent)uiComponent;
                 visual.AttachedToVisualTree(e);
             }
         }

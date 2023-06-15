@@ -35,6 +35,7 @@
 	<ItemGroup>
 		<ProjectReference Include="..\Adamantium.Engine.Graphics\Adamantium.Engine.Graphics.csproj" />
 		<ProjectReference Include="..\Adamantium.Fonts\Adamantium.Fonts.csproj" />
+		<ProjectReference Include="..\Adamantium.Game\Adamantium.Game.csproj" />
 		<ProjectReference Include="..\Adamantium.UI\Adamantium.UI.csproj" />
 	</ItemGroup>
 

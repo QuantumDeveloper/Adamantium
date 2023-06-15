@@ -70,7 +70,7 @@ namespace Adamantium.Engine.Graphics
 
         private GraphicsDevice(MainGraphicsDevice mainDevice)
         {
-            InitializeMutex();
+            //InitializeMutex();
             DeviceId = Guid.NewGuid().ToString();
             MainDevice = mainDevice;
             MaxFramesInFlight = 1;
@@ -495,20 +495,27 @@ namespace Adamantium.Engine.Graphics
             {
                 return false;
             }
-            
-            result = LogicalDevice.AcquireNextImageKHR((SwapChainGraphicsPresenter) Presenter, ulong.MaxValue,
-                ImageAvailableSemaphores[CurrentFrame], null, ref imageIndex);
 
-            if (result == Result.ErrorOutOfDateKhr)
+            if (Presenter is SwapChainGraphicsPresenter swapchain)
             {
-                return false;
+                result = LogicalDevice.AcquireNextImageKHR(swapchain, ulong.MaxValue,
+                    ImageAvailableSemaphores[CurrentFrame], null, ref imageIndex);
+
+                if (result == Result.ErrorOutOfDateKhr)
+                {
+                    return false;
+                }
+
+                if (result != Result.Success && result != Result.SuboptimalKhr)
+                {
+                    throw new ArgumentException("Failed to acquire swap chain image!");
+                }
+            }
+            else
+            {
+                imageIndex = 0;
             }
 
-            if (result != Result.Success && result != Result.SuboptimalKhr)
-            {
-                throw new ArgumentException("Failed to acquire swap chain image!");
-            }
-            
             var commandBuffer = commandBuffers[ImageIndex];
 
             var beginInfo = new CommandBufferBeginInfo();
@@ -978,16 +985,16 @@ namespace Adamantium.Engine.Graphics
             
                 pipelineManager?.Dispose();
                 SamplerStates?.Dispose();
-
-                foreach (var disposableObject in _graphicsResources)
-                {
-                    if (disposableObject.IsDisposed) continue;
-                
-                    disposableObject?.Dispose();
-                }
-            
-                _graphicsResources?.Clear();
             }
+            
+            foreach (var disposableObject in _graphicsResources)
+            {
+                if (disposableObject.IsDisposed) continue;
+                
+                disposableObject?.Dispose();
+            }
+            
+            _graphicsResources?.Clear();
         }
 
         internal static GraphicsDevice Create(MainGraphicsDevice device)

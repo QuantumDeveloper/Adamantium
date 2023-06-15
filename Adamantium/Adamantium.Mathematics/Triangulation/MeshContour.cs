@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Adamantium.Mathematics;
+namespace Adamantium.Mathematics.Triangulation;
 
 public class MeshContour
 {
@@ -182,7 +182,7 @@ public class MeshContour
             
             foreach (var intersectSegment in Segments)
             {
-                if (intersectSegment == currentSegment) continue;
+                if (Equals(intersectSegment, currentSegment)) continue;
                 
                 if (Collision2D.SegmentSegmentIntersection(currentSegment, intersectSegment, out var point))
                 {

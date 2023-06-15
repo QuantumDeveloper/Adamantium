@@ -164,11 +164,11 @@ namespace Adamantium.Engine.Graphics
             {
                 var x = center.X + ((radiusX - thickness) * (float)Math.Cos(angle));
                 var y = center.Y + ((radiusY - thickness) * (float)Math.Sin(angle));
-                if (Math.Abs(x) < Mathematics.Polygon.Epsilon)
+                if (Math.Abs(x) < Mathematics.Triangulation.Polygon.Epsilon)
                 {
                     x = 0;
                 }
-                if (Math.Abs(y) < Mathematics.Polygon.Epsilon)
+                if (Math.Abs(y) < Mathematics.Triangulation.Polygon.Epsilon)
                 {
                     y = 0;
                 }

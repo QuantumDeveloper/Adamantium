@@ -104,8 +104,21 @@ namespace Adamantium.Engine.EntityServices
 
         public override bool BeginDraw()
         {
-            //return Window.IsVisible;
-            return IsVisible;
+            if (!Window.IsUpToDate()) return false;
+
+            if (base.BeginDraw())
+            {
+                if (GraphicsDevice.BeginDraw(1.0f, 0))
+                {
+                    GraphicsDevice.SetViewports(Window.Viewport);
+                    GraphicsDevice.SetScissors(Window.Scissor);
+                    return true;
+                }
+
+                return false;
+            }
+
+            return false;
         }
 
         private AutoResetEvent pauseEvent = new AutoResetEvent(false);
@@ -322,8 +335,7 @@ namespace Adamantium.Engine.EntityServices
 
         public override void EndDraw()
         {
-            base.EndDraw();
-            
+            GraphicsDevice.EndDraw();
         }
     }
 }

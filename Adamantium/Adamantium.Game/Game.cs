@@ -74,6 +74,7 @@ namespace Adamantium.Game
 
             gamePlatform = GamePlatform.Create(this, Resolver);
             GraphicsDeviceService = new GraphicsDeviceService(true);
+            GraphicsDeviceService.CreateMainDevice("Game", enableDynamicRendering);
             EntityWorld = new EntityWorld(Resolver);
 
             Resolver.RegisterInstance<ModelConverter>(ModelConverter);
@@ -86,7 +87,6 @@ namespace Adamantium.Game
 
             InputManager = new GameInputManager(this);
             GamePlayManager = new GamePlayManager(Resolver);
-            EventAggregator.GetEvent<GameOutputRemovedEvent>().Subscribe(OnGameOutputRemoved);
             Stopped += Game_Stopped;
             drawSystems = new Dictionary<GameOutput, EntityService>();
             gameLoopThread = new Thread(StartGameLoop);
@@ -188,11 +188,6 @@ namespace Adamantium.Game
         private void Game_Stopped(object sender, EventArgs e)
         {
             EntityWorld.Reset();
-        }
-
-        private void OnGameOutputRemoved(GameOutput output)
-        {
-            RemoveRenderProcessor(output);
         }
 
         private void RemoveRenderProcessor(GameOutput window)
@@ -450,7 +445,7 @@ namespace Adamantium.Game
             }
             catch (Exception exception)
             {
-                MessageBox.Show(exception.Message + exception.StackTrace + exception.TargetSite);
+                MessageBox.Show(exception.ToString());
             }
         }
 
@@ -605,6 +600,7 @@ namespace Adamantium.Game
 
         private void OnOutputRemoved(GameOutput output)
         {
+            RemoveRenderProcessor(output);
             if (gamePlatform.Outputs.Count == 0 && ShutDownMode == ShutDownMode.OnLastWindowClosed)
             {
                 ShutDown();

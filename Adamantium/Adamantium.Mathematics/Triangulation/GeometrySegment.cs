@@ -1,7 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
-namespace Adamantium.Mathematics;
+namespace Adamantium.Mathematics.Triangulation;
 
 public class GeometrySegment
 {
@@ -76,7 +75,7 @@ public class GeometrySegment
     {
         foreach (var segment in SegmentEnds[1].ConnectedSegments)
         {
-            if (segment != this && segment.Parent == Parent) return segment;
+            if (!Equals(segment, this) && segment.Parent == Parent) return segment;
         }
 
         return null;
@@ -86,7 +85,7 @@ public class GeometrySegment
     {
         foreach (var segment in SegmentEnds[0].ConnectedSegments)
         {
-            if (segment != this && segment.Parent == Parent) return segment;
+            if (!Equals(segment, this) && segment.Parent == Parent) return segment;
         }
 
         return null;
@@ -95,7 +94,7 @@ public class GeometrySegment
     public GeometryIntersection GetOtherEnd(GeometryIntersection end)
     {
         if (SegmentEnds.Count < 2) return null;
-        return SegmentEnds[0] == end ? SegmentEnds[1] : SegmentEnds[0];
+        return Equals(SegmentEnds[0], end) ? SegmentEnds[1] : SegmentEnds[0];
     }
 
     public override int GetHashCode()

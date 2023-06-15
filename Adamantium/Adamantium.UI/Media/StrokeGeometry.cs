@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Engine.Graphics;
+using Adamantium.Mathematics.Triangulation;
 
 namespace Adamantium.UI.Media;
 

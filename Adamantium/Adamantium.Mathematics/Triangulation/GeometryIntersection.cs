@@ -1,7 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
-namespace Adamantium.Mathematics;
+namespace Adamantium.Mathematics.Triangulation;
 
 public class GeometryIntersection
 {
@@ -40,7 +39,7 @@ public class GeometryIntersection
 
         foreach (var connectedSegment in ConnectedSegments)
         {
-            if (segment != connectedSegment &&
+            if (!Equals(segment, connectedSegment) &&
                 connectedSegment.IsAlreadyInTriangulatorContour == false &&
                 segment.Parent != connectedSegment.Parent) return connectedSegment;
         }
@@ -54,7 +53,7 @@ public class GeometryIntersection
 
         foreach (var connectedSegment in ConnectedSegments)
         {
-            if (segment != connectedSegment &&
+            if (!Equals(segment, connectedSegment) &&
                 connectedSegment.IsAlreadyInTriangulatorContour == false &&
                 segment.Parent == connectedSegment.Parent) return connectedSegment;
         }
@@ -68,7 +67,8 @@ public class GeometryIntersection
 
         foreach (var connectedSegment in ConnectedSegments)
         {
-            if (segment != connectedSegment && connectedSegment.IsAlreadyInTriangulatorContour == false) return connectedSegment;
+            if (!Equals(segment, connectedSegment) && connectedSegment.IsAlreadyInTriangulatorContour == false)
+                return connectedSegment;
         }
 
         return null;

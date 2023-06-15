@@ -6,6 +6,7 @@ using Adamantium.Engine.Core.Models;
 using Adamantium.Engine.Graphics;
 using Adamantium.EntityFramework;
 using Adamantium.Mathematics;
+using Adamantium.Mathematics.Triangulation;
 
 namespace Adamantium.Engine.Templates.Lights
 {

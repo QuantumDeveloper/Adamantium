@@ -102,7 +102,7 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
             }
         }
     }
-
+    
     public bool EnableGraphicsDebug
     {
         get => GetValue<bool>(EnableGraphicsDebugProperty);

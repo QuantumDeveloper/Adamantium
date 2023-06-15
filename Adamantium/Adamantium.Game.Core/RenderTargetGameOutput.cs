@@ -33,7 +33,7 @@ namespace Adamantium.Game.Core
 
         protected override void InitializeInternal(GameContext context)
         {
-            if (GameContext.Context == null || !(GameContext.Context is RenderTargetPanel))
+            if (GameContext.Context is not RenderTargetPanel)
             {
                 throw new ArgumentException($"{nameof(context.Context)} should be of type RenderTargetPanel");
             }
@@ -41,7 +41,7 @@ namespace Adamantium.Game.Core
             GameContext = context;
             nativeWindow = (RenderTargetPanel)GameContext.Context;
             InputComponent = nativeWindow;
-            nativeWindow.RenderTargetChanged += NativeWindow_RenderTargetChanged;
+            nativeWindow.RenderTargetCreatedOrUpdated += NativeWindowOnRenderTargetCreatedOrUpdated;
             nativeWindow.GotFocus += NativeWindow_GotFocus;
             nativeWindow.LostFocus += NativeWindow_LostFocus;
             Description = new GameWindowDescription(PresenterType.RenderTarget);
@@ -52,12 +52,13 @@ namespace Adamantium.Game.Core
             UpdateViewportAndScissor((uint)ClientBounds.Width, (uint)ClientBounds.Height);
         }
 
-        private void NativeWindow_RenderTargetChanged(object sender, RenderTargetEventArgs e)
+        private void NativeWindowOnRenderTargetCreatedOrUpdated(object sender, RenderTargetEventArgs e)
         {
             Handle = e.Handle;
-            ClientBounds = new Rectangle(0, 0, e.Width, e.Height);
+            ClientBounds = new Rectangle(0, 0, (int)e.Width, (int)e.Height);
             Width = (uint)nativeWindow.ActualWidth;
             Height = (uint)nativeWindow.ActualHeight;
+            UpdateViewportAndScissor((uint)ClientBounds.Width, (uint)ClientBounds.Height);
             Debug.WriteLine("RenderTarget window size = " + Description.Width + " " + Description.Height);
         }
 
@@ -91,7 +92,7 @@ namespace Adamantium.Game.Core
         {
             if (!CanHandle(context)) return;
             
-            nativeWindow.RenderTargetChanged -= NativeWindow_RenderTargetChanged;
+            nativeWindow.RenderTargetCreatedOrUpdated -= NativeWindowOnRenderTargetCreatedOrUpdated;
             nativeWindow.GotFocus -= NativeWindow_GotFocus;
             nativeWindow.LostFocus -= NativeWindow_LostFocus;
             Initialize(context);

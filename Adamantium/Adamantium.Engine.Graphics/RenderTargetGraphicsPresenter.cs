@@ -1,10 +1,11 @@
 ﻿using Adamantium.Imaging;
 using System;
 using AdamantiumVulkan.Core;
+using Image = AdamantiumVulkan.Core.Image;
 
 namespace Adamantium.Engine.Graphics
 {
-   public class RenderTargetGraphicsPresenter:GraphicsPresenter
+   public class RenderTargetGraphicsPresenter : GraphicsPresenter
    {
       //private SharpDX.Direct3D11.Texture2D baseTexture;
       //private SharpDX.Direct3D11.Texture2D sharedTexture;
@@ -13,44 +14,26 @@ namespace Adamantium.Engine.Graphics
       public RenderTargetGraphicsPresenter(GraphicsDevice graphicsDevice, PresentationParameters description,
          string name = "") : base(graphicsDevice, description, name)
       {
-         CreateBackBuffer();
+         CreateRenderTarget();
+      }
+      
+      private void CreateRenderTarget()
+      {
+         renderTarget = ToDispose(RenderTarget.New(GraphicsDevice, Width, Height, MSAALevel, ImageFormat));
       }
 
-      private void CreateBackBuffer()
+      public override Image GetImage(uint index)
       {
-         //RemoveAndDispose(ref backbuffer);
-         //RemoveAndDispose(ref baseTexture);
-         //RemoveAndDispose(ref sharedTexture);
+         return renderTarget;
+      }
 
-         //baseTexture = ToDispose(new SharpDX.Direct3D11.Texture2D(Description.OutputHandle));
-         //isShared = baseTexture.Description.OptionFlags.HasFlag(ResourceOptionFlags.Shared);
-
-         //if (isShared)
-         //{
-         //   sharedTexture = ToDispose(GraphicsDevice.GetSharedResource<SharpDX.Direct3D11.Texture2D>(baseTexture));
-         //   baseTexture.Dispose();
-         //}
-
-         //TextureDescription textureDesc = new TextureDescription()
-         //{
-         //   Format = Description.PixelFormat,
-         //   ArraySize = 1,
-         //   MipLevels = 1,
-         //   Width = Description.BackBufferWidth,
-         //   Height = Description.BackBufferHeight,
-         //   SampleDescription = new SampleDescription((Int32)Description.MSAALevel, 0),
-         //   Usage = ResourceUsage.Default,
-         //   BindFlags = BindFlags.RenderTarget | BindFlags.ShaderResource,
-         //   CpuAccessFlags = CpuAccessFlags.None,
-         //   OptionFlags = ResourceOptionFlags.None
-         //};
-
-         //// Renderview on the backbuffer
-         //backbuffer = ToDispose(RenderTarget2D.New(GraphicsDevice, textureDesc));
+      public override ImageView GetImageView(uint index)
+      {
+         return renderTarget;
       }
 
       /// <summary>
-      /// Resize graphics presenter bacbuffer according to width and height
+      /// Resize graphics presenter backbuffer according to width and height
       /// </summary>
       /// <param name="parameters"></param>
       public override bool Resize(PresentationParameters parameters)
@@ -59,20 +42,9 @@ namespace Adamantium.Engine.Graphics
          {
             return false;
          }
-
-         //RemoveAndDispose(ref baseTexture);
-         //RemoveAndDispose(ref sharedTexture);
-
-         //baseTexture = ToDispose(new SharpDX.Direct3D11.Texture2D(Description.OutputHandle));
-         //isShared = baseTexture.Description.OptionFlags.HasFlag(ResourceOptionFlags.Shared);
-
-         //if (isShared)
-         //{
-         //   sharedTexture = ToDispose(GraphicsDevice.GetSharedResource<SharpDX.Direct3D11.Texture2D>(baseTexture));
-         //   baseTexture.Dispose();
-         //}
-
-         CreateBackBuffer();
+         
+         RemoveAndDispose(ref renderTarget);
+         CreateRenderTarget();
 
          return true;
       }
@@ -82,6 +54,8 @@ namespace Adamantium.Engine.Graphics
       /// </summary>
       public override PresenterState Present()
       {
+         
+         
          return PresenterState.Success;
          //if (isShared)
          //{
@@ -92,6 +66,8 @@ namespace Adamantium.Engine.Graphics
          //{
          //   GraphicsDevice.ResolveSubresource(backbuffer, 0, baseTexture, 0, Description.PixelFormat);
          //}
+
+         
       }
    }
 }

@@ -1,17 +1,16 @@
 ﻿using System;
 using Adamantium.Engine.Graphics;
 using Adamantium.Imaging;
-using Adamantium.UI.Events;
 using Adamantium.UI.Media;
 using Adamantium.UI.Media.Imaging;
 using Adamantium.UI.RoutedEvents;
-using Adamantium.Win32;
+using Serilog;
 
 namespace Adamantium.UI.Controls;
 
 public unsafe class RenderTargetPanel: Grid
 {
-   private RenderTargetImage rendertarget;
+   private RenderTargetImage _renderTarget;
    
    public RenderTargetPanel() { }
 
@@ -44,16 +43,26 @@ public unsafe class RenderTargetPanel: Grid
       set => SetValue(PixelFormatProperty, value);
    }
       
-   public Int32 PixelWidth
+   public UInt32 PixelWidth
    {
-      get => GetValue<Int32>(PixelWidthProperty);
+      get => GetValue<UInt32>(PixelWidthProperty);
       set => SetValue(PixelWidthProperty, value);
    }
 
-   public Int32 PixelHeight
+   public UInt32 PixelHeight
    {
-      get => GetValue<Int32>(PixelHeightProperty);
+      get => GetValue<UInt32>(PixelHeightProperty);
       set => SetValue(PixelHeightProperty, value);
+   }
+   
+   public static readonly RoutedEvent RenderTargetCreatedOrUpdatedEvent = 
+      EventManager.RegisterRoutedEvent(nameof(RenderTargetCreatedOrUpdated),
+         RoutingStrategy.Direct, typeof(RenderTargetChangedEventHandler), typeof(RenderTargetPanel));
+    
+   public event RenderTargetChangedEventHandler RenderTargetCreatedOrUpdated
+   {
+      add => AddHandler(RenderTargetCreatedOrUpdatedEvent, value);
+      remove => RemoveHandler(RenderTargetCreatedOrUpdatedEvent, value);
    }
 
    private static void RenderTargetParametersChanged(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
@@ -81,59 +90,57 @@ public unsafe class RenderTargetPanel: Grid
    {
       try
       {
-         if ((int)ActualWidth > 0 && (int)ActualHeight > 0)
-         {
-            PixelWidth = (int)ActualWidth;
-            PixelHeight = (int) ActualHeight;
-            var pixelWidth = PixelWidth;
-            var pixelHeight = PixelHeight;
+         if ((int)ActualWidth <= 0 || (int)ActualHeight <= 0) return;
+         
+         PixelWidth = (uint)ActualWidth;
+         PixelHeight = (uint)ActualHeight;
+         var pixelWidth = PixelWidth;
+         var pixelHeight = PixelHeight;
 
-            rendertarget?.Dispose();
-            //rendertarget = new RenderTargetImage(pixelWidth, pixelHeight, PixelFormat, MSAALevel.None, 1, TextureFlags.ShaderResource, ResourceUsage.Default, ResourceOptionFlags.Shared);
-            //Debug.WriteLine("RenderTargetPanel size changed = "+ pixelWidth + " "+ pixelHeight);
-            //Handle = rendertarget.NativePointer;
-            //if (!isInitialized)
-            //{
-            //   RenderTargetInitialized?.Invoke(this, new RenderTargetEventArgs(rendertarget.NativePointer, pixelWidth, pixelHeight, PixelFormat));
-            //   isInitialized = true;
-            //}
-            //else
-            //{
-            //   RenderTargetChanged?.Invoke(this, new RenderTargetEventArgs(rendertarget.NativePointer, pixelWidth, pixelHeight, PixelFormat));
-            //}
-         }
+         _renderTarget?.Dispose();
+         _renderTarget = new RenderTargetImage(pixelWidth, pixelHeight, MSAALevel.None, PixelFormat);
+         Handle = new IntPtr(_renderTarget.NativePointer);
+         var args = new RenderTargetEventArgs(Handle, pixelWidth, pixelHeight, PixelFormat);
+         args.RoutedEvent = RenderTargetCreatedOrUpdatedEvent;
+         RaiseEvent(args);
       }
       catch (Exception e)
       {
-         MessageBox.Show(e.Message + e.StackTrace);
+         Log.Error(e.ToString());
+         throw;
       }
    }
 
-   private bool isInitialized;
-
-   public event EventHandler<RenderTargetEventArgs> OnRenderEvent;
-
-   public event EventHandler<RenderTargetEventArgs> RenderTargetChanged;
-
-   public event EventHandler<RenderTargetEventArgs> RenderTargetInitialized;
+   protected override void OnInitialized()
+   {
+      base.OnInitialized();
+      SizeChanged += OnSizeChanged;
+      UpdateOrCreateRenderTarget();
+   }
+   
+   private void OnSizeChanged(object sender, SizeChangedEventArgs e)
+   {
+        if (e.OriginalSource == this)
+        {
+            UpdateOrCreateRenderTarget();
+        }
+   }
 
    protected override void OnRender(DrawingContext context)
    {
-      if (rendertarget != null)
+      if (_renderTarget == null) return;
+      
+      if (sizeChanged)
       {
-         OnRenderEvent?.Invoke(this, new RenderTargetEventArgs(new IntPtr(rendertarget.NativePointer), PixelWidth, PixelHeight, PixelFormat));
-         if (sizeChanged)
-         {
-            context.BeginDraw(this);
-            context.DrawImage(rendertarget, Brushes.White, new Rect(Bounds.Size), new CornerRadius(0));
-            context.EndDraw(this);
-            sizeChanged = false;
-         }
+         context.BeginDraw(this);
+         context.DrawImage(_renderTarget, Brushes.White, new Rect(Bounds.Size), new CornerRadius(0));
+         context.EndDraw(this);
+         sizeChanged = false;
       }
    }
 
    public void SaveCurrentFrame(Uri path, ImageFileType fileType)
    {
-      rendertarget.Save(path, fileType);
+      _renderTarget.Save(path, fileType);
    }
 }

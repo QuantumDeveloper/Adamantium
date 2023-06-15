@@ -65,7 +65,7 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
         typeof(Boolean), typeof(MeasurableUIComponent), new PropertyMetadata(false, PropertyMetadataOptions.AffectsArrange));
     
     public static readonly RoutedEvent SizeChangedEvent = 
-        EventManager.RegisterRoutedEvent("SizeChangedEvent",
+        EventManager.RegisterRoutedEvent(nameof(SizeChanged),
             RoutingStrategy.Bubble, typeof(SizeChangedEventHandler), typeof(UIComponent));
     
     public event SizeChangedEventHandler SizeChanged

@@ -66,5 +66,5 @@ public interface IAdamantiumComponent : IComponent
    /// <summary>
    /// Fires when value on <see cref="AdamantiumProperty"/> was changed
    /// </summary>
-   event EventHandler<AdamantiumPropertyChangedEventArgs> PropertyChanged;
+   public event EventHandler<AdamantiumPropertyChangedEventArgs> PropertyChanged;
 }

@@ -1,4 +1,5 @@
 using System;
+using Adamantium.UI.Controls;
 using Adamantium.UI.Input;
 using Adamantium.UI.RoutedEvents;
 using Adamantium.UI.Windows.Input;
@@ -15,7 +16,7 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     public static readonly RoutedEvent UnloadedEvent = EventManager.RegisterRoutedEvent("Unloaded",
         RoutingStrategy.Direct, typeof(RoutedEventHandler), typeof(UIComponent));
 
-    public static readonly RoutedEvent InitializedEvent = EventManager.RegisterRoutedEvent("Initialized",
+    public static readonly RoutedEvent InitializedEvent = EventManager.RegisterRoutedEvent(nameof(Initialized),
         RoutingStrategy.Direct, typeof(RoutedEventHandler), typeof(UIComponent));
 
     public static readonly RoutedEvent TextInputEvent = EventManager.RegisterRoutedEvent("TextInput",
@@ -138,28 +139,38 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
         RawMouseMiddleButtonDownEvent.RegisterClassHandler<IInputComponent>(new MouseButtonEventHandler(RawMouseMiddleButtonDownHandler));
         RawMouseMiddleButtonUpEvent.RegisterClassHandler<IInputComponent>(new MouseButtonEventHandler(RawMouseMiddleButtonUpHandler));
     }
-    
+
     public static readonly AdamantiumProperty IsFocusedProperty =
         AdamantiumProperty.RegisterReadOnly(nameof(IsFocused),
-            typeof(Boolean), typeof(UIComponent), new PropertyMetadata(false));
+            typeof(Boolean), typeof(InputUIComponent), new PropertyMetadata(false));
     
     public static readonly AdamantiumProperty FocusableProperty = AdamantiumProperty.Register(nameof(Focusable),
-        typeof(Boolean), typeof(UIComponent), new PropertyMetadata(true));
+        typeof(Boolean), typeof(InputUIComponent), new PropertyMetadata(true));
     
     public static readonly AdamantiumProperty CursorProperty = AdamantiumProperty.Register(nameof(Cursor),
-        typeof(Cursor), typeof(UIComponent), new PropertyMetadata(Cursor.Default));
+        typeof(Cursor), typeof(InputUIComponent), new PropertyMetadata(Cursor.Default));
     
     public static readonly AdamantiumProperty IsKeyboardFocusedProperty =
         AdamantiumProperty.RegisterReadOnly(nameof(IsKeyboardFocused),
-            typeof(Boolean), typeof(UIComponent), new PropertyMetadata(false));
+            typeof(Boolean), typeof(InputUIComponent), new PropertyMetadata(false));
     
     public static readonly AdamantiumProperty IsMouseOverProperty =
         AdamantiumProperty.RegisterReadOnly(nameof(IsMouseOver),
-            typeof(Boolean), typeof(UIComponent), new PropertyMetadata(false));
+            typeof(Boolean), typeof(InputUIComponent), new PropertyMetadata(false));
 
     public static readonly AdamantiumProperty IsMouseDirectlyOverProperty =
         AdamantiumProperty.RegisterReadOnly(nameof(IsMouseDirectlyOver),
-            typeof(Boolean), typeof(UIComponent), new PropertyMetadata(false));
+            typeof(Boolean), typeof(InputUIComponent), new PropertyMetadata(false));
+    
+    public static readonly AdamantiumProperty IsInitializedProperty =
+        AdamantiumProperty.RegisterReadOnly(nameof(IsInitialized),
+            typeof(Boolean), typeof(InputUIComponent), new PropertyMetadata(false, OnIsInitializedChanged));
+
+    public bool IsInitialized
+    {
+        get => GetValue<bool>(IsInitializedProperty);
+        private set => SetValue(IsInitializedProperty, value);
+    }
     
     public bool IsMouseOver
     {
@@ -501,8 +512,6 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
         remove => RemoveHandler(Mouse.PreviewMouseDoubleClickEvent, value);
     }
     
-    
-
     private static void GotFocusHandler(object sender, RoutedEventArgs e)
     {
         var ui = sender as InputUIComponent;
@@ -787,6 +796,27 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
         ui?.OnRawMouseMiddleButtonUp(ui, e);
     }
 
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+         base.OnAttachedToVisualTree(e);
+         IsInitialized = true;
+    }
+    
+    private static void OnIsInitializedChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    {
+        if ((bool)e.NewValue)
+        {
+            var ui = a as InputUIComponent;
+            ui?.RaiseEvent(new RoutedEventArgs(InitializedEvent));
+            ui?.OnInitialized();
+        }
+    }
+
+    protected virtual void OnInitialized()
+    {
+        
+    }
+
     protected virtual void OnRawMouseMove(object sender, UnboundMouseEventArgs e)
     {
 
@@ -887,7 +917,7 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     {
 
     }
-
+    
     protected virtual void OnGotFocus(RoutedEventArgs e)
     {
         IsFocused = e.OriginalSource == this;
