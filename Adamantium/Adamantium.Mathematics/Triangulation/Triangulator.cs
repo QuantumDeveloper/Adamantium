@@ -1,7 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
-namespace Adamantium.Mathematics
+namespace Adamantium.Mathematics.Triangulation
 {
     internal class Triangulator
     {

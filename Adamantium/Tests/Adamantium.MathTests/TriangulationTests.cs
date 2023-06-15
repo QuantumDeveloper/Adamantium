@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Adamantium.Mathematics;
+using Adamantium.Mathematics.Triangulation;
 using NUnit.Framework;
 
 namespace Adamantium.MathTests

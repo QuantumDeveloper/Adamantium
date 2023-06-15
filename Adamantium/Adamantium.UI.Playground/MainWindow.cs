@@ -39,6 +39,8 @@ public partial class MainWindow : Window
             }
         };
         
+        
+        
         //BasicEffect f = new BasicEffect();
         //f.MeshColor.SetValue(Colors.Gray.ToVector4());
     }

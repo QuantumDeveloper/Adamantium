@@ -182,22 +182,27 @@ namespace Adamantium.EntityFramework
 
         internal void SyncServices()
         {
-            if (servicesToRemove.Count > 0)
+            lock (syncObject)
             {
-                foreach (var entity in servicesToRemove)
+                if (servicesToRemove.Count > 0)
                 {
-                    RemoveServiceInternal(entity);
-                }
-                servicesToRemove.Clear();
-            }
+                    foreach (var entity in servicesToRemove)
+                    {
+                        RemoveServiceInternal(entity);
+                    }
 
-            if (servicesToAdd.Count > 0)
-            {
-                foreach (var entity in servicesToAdd)
-                {
-                    AddServiceInternal(entity);
+                    servicesToRemove.Clear();
                 }
-                servicesToAdd.Clear();
+
+                if (servicesToAdd.Count > 0)
+                {
+                    foreach (var entity in servicesToAdd)
+                    {
+                        AddServiceInternal(entity);
+                    }
+
+                    servicesToAdd.Clear();
+                }
             }
         }
 

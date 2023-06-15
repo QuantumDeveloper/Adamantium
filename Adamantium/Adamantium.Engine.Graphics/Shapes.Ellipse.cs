@@ -5,6 +5,7 @@ using System.Linq;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Models;
 using Adamantium.Mathematics;
+using Adamantium.Mathematics.Triangulation;
 
 namespace Adamantium.Engine.Graphics
 {
@@ -132,7 +133,7 @@ namespace Adamantium.Engine.Graphics
                     }
                 }
 
-                var polygon = new Mathematics.Polygon();
+                var polygon = new Mathematics.Triangulation.Polygon();
                 polygon.AddContour(new MeshContour(vertices));
                 var points = polygon.FillIndirect();
 
@@ -210,7 +211,7 @@ namespace Adamantium.Engine.Graphics
             
             private static List<Vector3> Triangulate(List<Vector3> vertices)
             {
-                var polygon = new Mathematics.Polygon();
+                var polygon = new Mathematics.Triangulation.Polygon();
                 polygon.AddContour(new MeshContour(vertices));
                 var points = polygon.FillIndirect();
                 return points;
