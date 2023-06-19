@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Adamantium.Core;
+using Adamantium.Core.DependencyInjection;
 using Adamantium.Engine.Graphics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Events;
@@ -34,6 +35,8 @@ public abstract class WindowBase : ContentControl, IWindow
         var args = new WindowRendererChangedEventArgs(oldRenderer, newRenderer);
         RendererChanged?.Invoke(this, args);
     }
+
+    public IDependencyResolver Resolver => UIApplication.Current.Container;
 
     public WindowBase()
     {

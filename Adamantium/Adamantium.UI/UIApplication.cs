@@ -47,7 +47,7 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
     static UIApplication()
     {
         VulkanDllMap.Register();
-        ApplicationBuilder.Build(AdamantiumDependencyResolver.Current);
+        ApplicationBuilder.Build(AdamantiumDependencyContainer.Current);
     }
 
     protected UIApplication()
@@ -63,12 +63,13 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
         
         preciseTimer = new PreciseTimer();
         
-        DependencyResolver = AdamantiumDependencyResolver.Current;
-        EventAggregator = DependencyResolver.Resolve<IEventAggregator>();
+        Container = AdamantiumDependencyContainer.Current;
+        EventAggregator = Container.Resolve<IEventAggregator>();
 
         GraphicsDeviceService = new GraphicsDeviceService(EnableGraphicsDebug);
         
-        EntityWorld = new EntityWorld(DependencyResolver);
+        EntityWorld = new EntityWorld(Container);
+        RegisterBasicServices(Container);
         
         applicationLoopThread = new Thread(ApplicationLoopThread);
         
@@ -136,7 +137,7 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
 
     public Uri StartupUri { get; set; }
 
-    public IDependencyResolver DependencyResolver { get; private set; }
+    public AdamantiumDependencyContainer Container { get; private set; }
 
     protected IGraphicsDeviceService GraphicsDeviceService { get; private set; }
     
@@ -243,22 +244,21 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
 
     private void Initialize()
     {
+        cancellationTokenSource = new CancellationTokenSource();
         Dispatcher.Initialize();
         GraphicsDeviceService.IsInDebugMode = EnableGraphicsDebug;
-        GraphicsDeviceService.CreateMainDevice("Adamantium Main", false);
+        GraphicsDeviceService.CreateMainDevice("Adamantium Main", true);
+        ThemeManager = new ThemeManager(Container);
         SubscribeToEvents();
-        RegisterServices();
         
         EntityWorld.Initialize();
-        
-        ThemeManager = new ThemeManager(DependencyResolver);
+        OnInitialize();
+        RegisterServices(Container);
 
         if (MainWindow != null)
         {
             OnWindowCreated(MainWindow);
         }
-
-        OnInitialize();
     }
 
     protected virtual void OnInitialize()
@@ -273,13 +273,18 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
         EventAggregator.GetEvent<WindowActivatedEvent>().Subscribe(OnWindowActivated, ThreadOption.UIThread);
         EventAggregator.GetEvent<WindowDeactivatedEvent>().Subscribe(OnWindowDeactivated, ThreadOption.UIThread);
     }
-    
-    private void RegisterServices()
+
+    private void RegisterBasicServices(IContainerRegistry containerRegistry)
     {
-        DependencyResolver.RegisterInstance<IService>(this);
-        DependencyResolver.RegisterInstance<IUIApplication>(this);
-        DependencyResolver.RegisterInstance<EntityWorld>(EntityWorld);
-        DependencyResolver.RegisterInstance<IGraphicsDeviceService>(GraphicsDeviceService);
+        containerRegistry.RegisterInstance<IService>(this);
+        containerRegistry.RegisterInstance<IUIApplication>(this);
+        containerRegistry.RegisterInstance<EntityWorld>(EntityWorld);
+        containerRegistry.RegisterInstance<IGraphicsDeviceService>(GraphicsDeviceService);
+    }
+
+    protected virtual void RegisterServices(IContainerRegistry containerRegistry)
+    {
+        
     }
 
     private void OnWindowActivated(IWindow obj)
@@ -296,7 +301,6 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
     {
         if (IsRunning) return;
 
-        cancellationTokenSource = new CancellationTokenSource();
         Initialize();
         OnStartupInternal();
         applicationLoopThread.Start();
@@ -306,6 +310,8 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
     public void Run(IWindow window)
     {
         if (IsRunning) return;
+        
+        Dispatcher.Initialize();
 
         MainWindow = window ?? throw new ArgumentNullException($"{nameof(window)}");
         MainWindow.Show();

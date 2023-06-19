@@ -83,6 +83,8 @@ namespace Adamantium.Game.Core
         public PresenterType PresenterType { get; }
 
         public PresentInterval PresentInterval { get; set; }
+        
+        public RenderTarget SharedTexture { get; set; }
 
         public GameWindowDescription Clone()
         {
@@ -92,14 +94,17 @@ namespace Adamantium.Game.Core
         public PresentationParameters ToPresentationParameters()
         {
             return new PresentationParameters(
-                PresenterType, 
-                Width, 
-                Height, 
-                Handle, 
-                MsaaLevel, 
-                PixelFormat, 
-                DepthFormat, 
-                BuffersCount);
+                PresenterType,
+                Width,
+                Height,
+                Handle,
+                MsaaLevel,
+                PixelFormat,
+                DepthFormat,
+                BuffersCount)
+            {
+                SharedTexture = SharedTexture
+            };
         }
         
         public static implicit operator PresentationParameters(GameWindowDescription description)

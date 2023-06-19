@@ -45,6 +45,10 @@ namespace Adamantium.Game.Core
             nativeWindow.GotFocus += NativeWindow_GotFocus;
             nativeWindow.LostFocus += NativeWindow_LostFocus;
             Description = new GameWindowDescription(PresenterType.RenderTarget);
+            if (nativeWindow.RenderTarget != null)
+            {
+                Description.SharedTexture = (RenderTarget)nativeWindow.RenderTarget.Texture;
+            }
             Width = (uint)nativeWindow.ActualWidth;
             Height = (uint)nativeWindow.ActualHeight;
             Handle = nativeWindow.Handle;
@@ -58,6 +62,10 @@ namespace Adamantium.Game.Core
             ClientBounds = new Rectangle(0, 0, (int)e.Width, (int)e.Height);
             Width = (uint)nativeWindow.ActualWidth;
             Height = (uint)nativeWindow.ActualHeight;
+            if (nativeWindow.RenderTarget != null)
+            {
+                Description.SharedTexture = (RenderTarget)nativeWindow.RenderTarget.Texture;
+            }
             UpdateViewportAndScissor((uint)ClientBounds.Width, (uint)ClientBounds.Height);
             Debug.WriteLine("RenderTarget window size = " + Description.Width + " " + Description.Height);
         }

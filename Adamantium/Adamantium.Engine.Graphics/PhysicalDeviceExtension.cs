@@ -17,12 +17,11 @@ namespace Adamantium.Engine.Graphics
             uint i = 0;
             foreach (var queueFamily in queueFamilies)
             {
-                if ((queueFamily.QueueFlags & (uint)QueueFlagBits.GraphicsBit) > 0)
+                if (queueFamily.QueueFlags.HasFlag(QueueFlagBits.GraphicsBit))
                 {
                     indices.graphicsFamily = i;
                 }
 
-                //presentSupport = device.GetPhysicalDeviceWin32PresentationSupportKHR(i);
                 bool presentSupport;
                 if (surface != null)
                 {

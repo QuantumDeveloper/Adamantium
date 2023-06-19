@@ -56,7 +56,7 @@ public class WindowsPlatform : IApplicationPlatform
 
     public event Action Signaled;
 
-    public static void Initialize(IDependencyResolver resolver)
+    public static void Initialize(IContainerRegistry resolver)
     {
         resolver.RegisterSingleton<IApplicationPlatform, WindowsPlatform>();
     }

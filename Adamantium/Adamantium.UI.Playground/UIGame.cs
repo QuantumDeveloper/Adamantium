@@ -1,6 +1,7 @@
 using System;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.Engine.EntityServices;
+using Adamantium.Engine.Graphics;
 using Adamantium.Game;
 using Adamantium.Game.Core;
 using Adamantium.Game.Core.Events;
@@ -9,7 +10,7 @@ namespace Adamantium.UI.Playground;
 
 public class UIGame : Game.Game
 {
-    public UIGame(GameMode mode, bool enableDynamicRendering, IDependencyResolver resolver = null) : base(mode, enableDynamicRendering, resolver)
+    public UIGame(GameMode mode, bool enableDynamicRendering, IGraphicsDeviceService service, IDependencyContainer container = null) : base(mode, enableDynamicRendering, service, container)
     {
         
     }

@@ -336,6 +336,7 @@ namespace Adamantium.Engine.EntityServices
         public override void EndDraw()
         {
             GraphicsDevice.EndDraw();
+            //GraphicsDevice.Present();
         }
     }
 }

@@ -26,12 +26,12 @@ namespace Adamantium.EntityFramework
         /// <summary>
         /// A service registry that provides methods to register and unregister services.
         /// </summary>
-        public IDependencyResolver DependencyResolver { get; }
+        public IDependencyResolver Container { get; }
 
         internal EntityServiceManager(EntityWorld world)
         {
             EntityWorld = world;
-            DependencyResolver = EntityWorld.DependencyResolver;
+            Container = EntityWorld.DependencyResolver;
             services = new AdamantiumCollection<EntityService>();
             activeServices = new Dictionary<long, EntityService>();
             servicesToAdd = new List<EntityService>();
@@ -45,7 +45,7 @@ namespace Adamantium.EntityFramework
         
         internal void InitializeResources()
         {
-            appService = DependencyResolver.Resolve<IService>();
+            appService = Container.Resolve<IService>();
             appService.Started += OnServiceStarted;
             appService.ShuttingDown += OnServiceShuttingDown;
         }
@@ -93,7 +93,7 @@ namespace Adamantium.EntityFramework
 
         public T[] GetServices<T>() where T : EntityService
         {
-            List<T> list = new List<T>();
+            var list = new List<T>();
             foreach (var service in Services)
             {
                 if (service is T variable)

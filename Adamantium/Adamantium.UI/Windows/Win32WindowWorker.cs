@@ -35,7 +35,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
 
     public Win32WindowWorker()
     {
-        eventAggregator = AdamantiumDependencyResolver.Current.Resolve<IEventAggregator>();
+        eventAggregator = AdamantiumDependencyContainer.Current.Resolve<IEventAggregator>();
         messageTable = new Dictionary<uint, HandleMessage>();
         messageTable[(uint)WindowMessages.Activate] = HandleActivate;
         messageTable[(uint)WindowMessages.Syscommand] = HandleSysCommand;

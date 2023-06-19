@@ -54,7 +54,13 @@ namespace Adamantium.Engine.Graphics
       /// </summary>
       public override PresenterState Present()
       {
-         
+         //GraphicsDevice.DeviceWaitIdle();
+         GraphicsDevice.CurrentCommandBuffer.CopyImage(renderTarget, 
+            renderTarget.Description.DesiredImageLayout, 
+            Description.SharedTexture,
+            renderTarget.Description.DesiredImageLayout,
+            0, 
+            null);
          
          return PresenterState.Success;
          //if (isShared)
@@ -66,8 +72,6 @@ namespace Adamantium.Engine.Graphics
          //{
          //   GraphicsDevice.ResolveSubresource(backbuffer, 0, baseTexture, 0, Description.PixelFormat);
          //}
-
-         
       }
    }
 }

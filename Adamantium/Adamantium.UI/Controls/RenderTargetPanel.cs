@@ -10,7 +10,7 @@ namespace Adamantium.UI.Controls;
 
 public unsafe class RenderTargetPanel: Grid
 {
-   private RenderTargetImage _renderTarget;
+   public RenderTargetImage RenderTarget { get; private set; }
    
    public RenderTargetPanel() { }
 
@@ -97,9 +97,9 @@ public unsafe class RenderTargetPanel: Grid
          var pixelWidth = PixelWidth;
          var pixelHeight = PixelHeight;
 
-         _renderTarget?.Dispose();
-         _renderTarget = new RenderTargetImage(pixelWidth, pixelHeight, MSAALevel.None, PixelFormat);
-         Handle = new IntPtr(_renderTarget.NativePointer);
+         RenderTarget?.Dispose();
+         RenderTarget = new RenderTargetImage(pixelWidth, pixelHeight, MSAALevel.None, PixelFormat);
+         Handle = new IntPtr(RenderTarget.NativePointer);
          var args = new RenderTargetEventArgs(Handle, pixelWidth, pixelHeight, PixelFormat);
          args.RoutedEvent = RenderTargetCreatedOrUpdatedEvent;
          RaiseEvent(args);
@@ -114,8 +114,8 @@ public unsafe class RenderTargetPanel: Grid
    protected override void OnInitialized()
    {
       base.OnInitialized();
-      SizeChanged += OnSizeChanged;
       UpdateOrCreateRenderTarget();
+      SizeChanged += OnSizeChanged;
    }
    
    private void OnSizeChanged(object sender, SizeChangedEventArgs e)
@@ -128,12 +128,12 @@ public unsafe class RenderTargetPanel: Grid
 
    protected override void OnRender(DrawingContext context)
    {
-      if (_renderTarget == null) return;
+      if (RenderTarget == null) return;
       
       if (sizeChanged)
       {
          context.BeginDraw(this);
-         context.DrawImage(_renderTarget, Brushes.White, new Rect(Bounds.Size), new CornerRadius(0));
+         context.DrawImage(RenderTarget, Brushes.White, new Rect(Bounds.Size), new CornerRadius(0));
          context.EndDraw(this);
          sizeChanged = false;
       }
@@ -141,6 +141,6 @@ public unsafe class RenderTargetPanel: Grid
 
    public void SaveCurrentFrame(Uri path, ImageFileType fileType)
    {
-      _renderTarget.Save(path, fileType);
+      RenderTarget.Save(path, fileType);
    }
 }

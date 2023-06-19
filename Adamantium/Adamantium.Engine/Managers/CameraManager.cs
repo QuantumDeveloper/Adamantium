@@ -69,14 +69,14 @@ namespace Adamantium.Engine.Managers
         ///</summary>
         public CameraManager(IGame game)
         {
-            game.Resolver.RegisterInstance<CameraManager>(this);
+            game.Container.RegisterInstance<CameraManager>(this);
             windowToCameras = new Dictionary<GameOutput, List<Camera>>();
             cameraToWindow = new Dictionary<Camera, GameOutput>();
             activeCameras = new Dictionary<GameOutput, Camera>();
             windowToCamerasCollection = new AdamantiumCollection<Camera>();
             activeCamerasCollection = new AdamantiumCollection<Camera>();
             this.game = game;
-            eventAggregator = game.Resolver.Resolve<IEventAggregator>();
+            eventAggregator = game.Container.Resolve<IEventAggregator>();
             cameraGroup = this.game.EntityWorld.CreateGroup("Cameras");
 
             foreach (var window in this.game.Outputs)

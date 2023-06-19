@@ -21,17 +21,17 @@ public sealed class Dispatcher : IDispatcher
     
     public static bool Initialized { get; private set; }
         
-    static Dispatcher()
-    {
-        Initialize();
-    }
+    // static Dispatcher()
+    // {
+    //     Initialize();
+    // }
 
     internal static void Initialize()
     {
         if (Initialized) return;
         
         dispatchers = new Dictionary<DispatcherContext, Dispatcher>();
-        CurrentDispatcher = new Dispatcher(AdamantiumDependencyResolver.Current.Resolve<IApplicationPlatform>());
+        CurrentDispatcher = new Dispatcher(AdamantiumDependencyContainer.Current.Resolve<IApplicationPlatform>());
         SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(CurrentDispatcher));
         
         Initialized = true;

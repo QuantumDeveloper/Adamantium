@@ -88,7 +88,7 @@ namespace Adamantium.Engine.Graphics
         
         public bool IsShared { get; set; }
         
-        public nint SharedTextureHandle { get; set; }
+        public RenderTarget SharedTexture { get; set; }
 
         public PresentationParameters Clone()
         {

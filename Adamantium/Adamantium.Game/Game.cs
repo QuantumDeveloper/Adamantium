@@ -46,13 +46,13 @@ namespace Adamantium.Game
 
         private readonly Dictionary<Object, GameContext> contextsMapping;
         
-        public Game(GameMode mode, bool enableDynamicRendering, IDependencyResolver resolver = null)
+        public Game(GameMode mode, bool enableDynamicRendering, IGraphicsDeviceService graphicsDeviceService, IDependencyContainer container = null)
         {
             Mode = mode;
 
             EnableDynamicRendering = enableDynamicRendering;
-            Resolver = resolver ?? new AdamantiumDependencyResolver();
-            GameBuilder.Build(Resolver);
+            Container = container ?? new AdamantiumDependencyContainer();
+            GameBuilder.Build(Container);
             
             appTime = new AppTime();
             gameTimer = new PreciseTimer();
@@ -60,7 +60,7 @@ namespace Adamantium.Game
             IsFixedTimeStep = false;
             DesiredFPS = 60;
             
-            Content = new ContentManager(Resolver);
+            Content = new ContentManager(Container);
             Content.Resolvers.Add(new FileSystemContentResolver());
             Content.Resolvers.Add(new EffectContentResolver());
             Content.Readers.Add(typeof(Entity), new ModelContentReader());
@@ -69,24 +69,33 @@ namespace Adamantium.Game
             unloadContentCollector = new DisposeCollector();
             ShutDownMode = ShutDownMode.OnMainWindowClosed;
             
-            EventAggregator = Resolver.Resolve<IEventAggregator>();
+            EventAggregator = Container.Resolve<IEventAggregator>();
             EventAggregator.GetEvent<GameOutputRemovedEvent>().Subscribe(OnOutputRemoved);
 
-            gamePlatform = GamePlatform.Create(this, Resolver);
-            GraphicsDeviceService = new GraphicsDeviceService(true);
-            GraphicsDeviceService.CreateMainDevice("Game", enableDynamicRendering);
-            EntityWorld = new EntityWorld(Resolver);
+            gamePlatform = GamePlatform.Create(this, Container);
+            if (mode == GameMode.Standalone)
+            {
+                GraphicsDeviceService = new GraphicsDeviceService(true);
+                GraphicsDeviceService.CreateMainDevice("Game", enableDynamicRendering);
+            }
+            else
+            {
+                //GraphicsDeviceService = Container.Resolve<IGraphicsDeviceService>();
+                GraphicsDeviceService = graphicsDeviceService;
+            }
 
-            Resolver.RegisterInstance<ModelConverter>(ModelConverter);
-            Resolver.RegisterInstance<IContentManager>(Content);
-            Resolver.RegisterInstance<IGamePlatform>(gamePlatform);
-            Resolver.RegisterInstance<IGame>(this);
-            Resolver.RegisterInstance<IService>(this);
-            Resolver.RegisterInstance<IGraphicsDeviceService>(GraphicsDeviceService);
-            Resolver.RegisterInstance<EntityWorld>(EntityWorld);
+            EntityWorld = new EntityWorld(Container);
+
+            Container.RegisterInstance<ModelConverter>(ModelConverter);
+            Container.RegisterInstance<IContentManager>(Content);
+            Container.RegisterInstance<IGamePlatform>(gamePlatform);
+            Container.RegisterInstance<IGame>(this);
+            Container.RegisterInstance<IService>(this);
+            Container.RegisterInstance<IGraphicsDeviceService>(GraphicsDeviceService);
+            Container.RegisterInstance<EntityWorld>(EntityWorld);
 
             InputManager = new GameInputManager(this);
-            GamePlayManager = new GamePlayManager(Resolver);
+            GamePlayManager = new GamePlayManager(Container);
             Stopped += Game_Stopped;
             drawSystems = new Dictionary<GameOutput, EntityService>();
             gameLoopThread = new Thread(StartGameLoop);
@@ -166,7 +175,7 @@ namespace Adamantium.Game
         /// <summary>
         /// Game services which could be added to the game
         /// </summary>
-        public IDependencyResolver Resolver { get; }
+        public IDependencyContainer Container { get; }
         
         /// <summary>
         /// Represents a Content Manager, which can load all needed resources as Textures, Effects, Entity
@@ -469,7 +478,11 @@ namespace Adamantium.Game
 
         private void InitializeBeforeRun()
         {
-            GraphicsDeviceService.CreateMainDevice("", EnableDynamicRendering);
+            if (Mode == GameMode.Standalone)
+            {
+                GraphicsDeviceService.CreateMainDevice("", EnableDynamicRendering);
+            }
+
             cancellationTokenSource = new CancellationTokenSource();
             
             EntityWorld.Initialize();

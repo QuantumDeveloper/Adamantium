@@ -22,7 +22,7 @@ namespace Adamantium.UI
 
         public GraphicsDevice ResourceLoaderDevice { get; private set; }
 
-        public IReadOnlyCollection<GraphicsDevice> GraphicsDevices => graphicsDevices.AsReadOnly();
+        public IReadOnlyList<GraphicsDevice> GraphicsDevices => graphicsDevices.AsReadOnly();
         
         public bool DeviceUpdateNeeded { get; set; }
 

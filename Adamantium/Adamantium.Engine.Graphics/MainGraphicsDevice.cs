@@ -66,7 +66,7 @@ namespace Adamantium.Engine.Graphics
             var indices = PhysicalDevice.FindQueueFamilies(null);
 
             var queueInfos = new List<DeviceQueueCreateInfo>();
-            HashSet<uint> uniqueQueueFamilies = new HashSet<uint>() { indices.graphicsFamily.Value, indices.presentFamily.Value };
+            var uniqueQueueFamilies = new HashSet<uint>() { indices.graphicsFamily.Value, indices.presentFamily.Value };
             float queuePriority = 1.0f;
             var queueFamilies = PhysicalDevice.GetQueueFamilyProperties();
 
@@ -75,13 +75,9 @@ namespace Adamantium.Engine.Graphics
                 Console.WriteLine($"Queue family {i}. Queue count: {queueFamilies[i].QueueCount}");
             }
             
-            AvailableQueuesCount = 2;
+            AvailableQueuesCount = (uint)queueFamilies.Count(x => x.QueueFlags.HasFlag(QueueFlagBits.GraphicsBit));
 
-            if (queueFamilies[0].QueueCount < 2)
-            {
-                Console.WriteLine($"There are only {queueFamilies[0].QueueCount} queues for queue family 0");
-                AvailableQueuesCount = 1;
-            }
+            Console.WriteLine($"Only {AvailableQueuesCount} queues available for graphics queue family");
             
             foreach (var queueFamily in uniqueQueueFamilies)
             {

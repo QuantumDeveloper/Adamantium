@@ -1,40 +1,30 @@
 using System;
+using Adamantium.Core.DependencyInjection;
 using Adamantium.Game.Core;
 using Adamantium.UI;
 using Adamantium.UI.Controls;
+using Serilog;
 
 namespace Adamantium.Game;
 
 public abstract class GameApplication : UIApplication
     {
-        public Game Game { get; protected set; }
+        public IGameService GameService { get; private set; }
         
         public GameApplication()
         {
-            DisableRendering = true;
+            //DisableRendering = true;
         }
 
-        protected virtual Game OnCreateGameInstance()
+        protected override void OnInitialize()
         {
-            return new Game(GameMode.Slave, true);
+            base.OnInitialize();
+            GameService = new GameService();
         }
 
-        protected override void OnStartup()
+        protected override void RegisterServices(IContainerRegistry containerRegistry)
         {
-            base.OnStartup();
-            Game = OnCreateGameInstance();
-            Game.Initialized += GameInitialized;
-            Game.Run();
+            base.RegisterServices(containerRegistry);
+            containerRegistry.RegisterSingleton<IGameService>(GameService);
         }
-
-        private void GameInitialized(object sender, EventArgs e)
-        {
-            OnGameInitialized();
-        }
-
-        protected virtual void OnGameInitialized()
-        {
-            
-        }
-        
     }

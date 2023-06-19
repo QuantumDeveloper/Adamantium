@@ -37,10 +37,9 @@ namespace Adamantium.Engine.EntityServices
         {
             //DeferredDevice = GraphicsDeviceService.GraphicsDevice.CreateDeferred();
             //DeferredDevice = GraphicsDeviceService.GraphicsDevice;
-//            SpriteBatch = new SpriteBatch(DeferredDevice, 80000);
+            //SpriteBatch = new SpriteBatch(DeferredDevice, 80000);
             CreateResources();
             CreateSystemResources();
-            
         }
 
         protected override void OnWindowParametersChanging(ChangeReason reason)
@@ -1089,12 +1088,6 @@ namespace Adamantium.Engine.EntityServices
 //            fractalEffect.Techniques["Julia"].Passes[0].Apply();
             //fractalEffect.Techniques["Mandelbrot"].Passes[0].Apply();
 //            DeferredDevice.Quad.Draw();
-        }
-
-        public override void EndDraw()
-        {
-            base.EndDraw();
-            GraphicsDevice.EndDraw();
         }
     }
 }

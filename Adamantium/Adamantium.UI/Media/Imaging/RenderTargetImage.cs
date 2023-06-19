@@ -26,7 +26,7 @@ public sealed unsafe class RenderTargetImage : BitmapSource
        SurfaceFormat format, 
        ImageLayout desiredLayout = ImageLayout.ColorAttachmentOptimal)
     {
-       var deviceService = UIApplication.Current.DependencyResolver.Resolve<IGraphicsDeviceService>();
+       var deviceService = UIApplication.Current.Container.Resolve<IGraphicsDeviceService>();
        try
        {
           Texture = RenderTarget.New(deviceService.ResourceLoaderDevice, width, height, msaa, format, desiredLayout);

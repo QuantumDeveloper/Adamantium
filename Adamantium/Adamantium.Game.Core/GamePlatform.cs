@@ -66,7 +66,7 @@ namespace Adamantium.Game.Core
         {
             Game = game;
             game.Initialized += Initialized;
-            eventAggregator = game.Resolver.Resolve<IEventAggregator>();
+            eventAggregator = game.Container.Resolve<IEventAggregator>();
 
             outputs = new AdamantiumCollection<GameOutput>();
             windowsToAdd = new List<GameOutput>();
@@ -76,7 +76,7 @@ namespace Adamantium.Game.Core
 
         private void Initialized(object sender, EventArgs e)
         {
-            GraphicsDeviceService = Game.Resolver.Resolve<IGraphicsDeviceService>();
+            GraphicsDeviceService = Game.Container.Resolve<IGraphicsDeviceService>();
             GraphicsDeviceService.DeviceChangeEnd += DeviceChangeEnd;
         }
 
@@ -136,7 +136,8 @@ namespace Adamantium.Game.Core
                 for (int i = 0; i < windowsToAdd.Count; i++)
                 {
                     var wnd = windowsToAdd[i];
-                    var device = GraphicsDeviceService.CreateRenderDevice(wnd.Description);
+                    // TODO revisit this line and think how to correctly get Primary GraphicsDevice inside Game
+                    var device = GraphicsDeviceService.GraphicsDevices[0].CreateSecondary(wnd.Description);
                     wnd.SetGraphicsDevice(device);
                     SubscribeToEvents(wnd);
                     wnd.Closed += Wnd_Closed;

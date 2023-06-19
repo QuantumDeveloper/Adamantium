@@ -39,7 +39,7 @@ public sealed class BitmapImage : BitmapSource
 
    public BitmapImage(Uri source)
    {
-        var deviceService = UIApplication.Current.DependencyResolver.Resolve<GraphicsDeviceService>();
+        var deviceService = UIApplication.Current.Container.Resolve<GraphicsDeviceService>();
         try
         {
             //DXTexture = Texture.Load(device, source.IsAbsoluteUri ? source.AbsolutePath : source.OriginalString);

@@ -6,27 +6,19 @@ namespace Adamantium.Game.Playground;
 
 public class AdamantiumGameApplication : GameApplication
 {
-    private List<GameOutput> outputs;
+    
     public AdamantiumGameApplication()
     {
-        outputs = new List<GameOutput>();
+        
     }
         
-    protected override Game OnCreateGameInstance()
+    protected override void OnStartup()
     {
-        return new AdamantiumGame();
-    }
-    
-    protected override void OnWindowCreated(IWindow wnd)
-    {
-        outputs.Add(GameOutput.New(new GameContext(wnd)));
-    }
-
-    protected override void OnGameInitialized()
-    {
-        foreach (var window in outputs)
-        {
-            Game.AddOutput(window);
-        }
+        base.OnStartup();
+        if (StartupUri == null) return;
+            
+        var path = StartupUri.OriginalString;
+        MainWindow = new MainWindow();
+        MainWindow.Show();
     }
 }

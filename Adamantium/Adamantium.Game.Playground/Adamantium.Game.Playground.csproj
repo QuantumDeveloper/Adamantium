@@ -146,6 +146,9 @@
       <Content Include="Fonts\OTFFonts\CFF\Quicksand-Regular.otf">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
+      <Content Update="Effects\structs.hlsl">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
     </ItemGroup>
 
     <ItemGroup>
@@ -156,8 +159,22 @@
       <!--<Effect Include="Effects\BasicEffect.fx" />-->
     </ItemGroup>
 
-<!--    <Import Project="$(SolutionDir)Adamantium.targets" />-->
-	
-	
+  <ItemGroup>
+    <ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" SetTargetFramework="TargetFramework=netstandard2.0" />
+    <ProjectReference Include="..\Adamantium.UI.Markup\Adamantium.UI.Markup.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" />
+    <ProjectReference Include="..\Adamantium.UI.Generators\Adamantium.UI.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=netstandard2.0" />
 
+    <ProjectReference Include="..\Adamantium.Engine.Generators\Adamantium.Engine.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=netstandard2.0" />
+    <ProjectReference Include="..\Adamantium.Engine.Effects\Adamantium.Engine.Effects.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" />
+    <ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" SetTargetFramework="TargetFramework=netstandard2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AdditionalFiles Include="$(ProjectDir)**\*.xml" />
+    <AdditionalFiles Include="$(ProjectDir)**\*.fx" />
+    <AdditionalFiles Include="$(ProjectDir)**\*.hlsl" />
+    <CompilerVisibleProperty Include="RootNamespace" />
+  </ItemGroup>
+
+<!--    <Import Project="$(SolutionDir)Adamantium.targets" />-->
 </Project>

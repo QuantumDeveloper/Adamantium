@@ -200,7 +200,7 @@ float4 Subpixel_PS(PS_OUTPUT_BASIC input) : SV_TARGET
     return color;
 }
 
-technique10 Render
+technique Render
 {
 	pass Textured
 	{
@@ -210,7 +210,7 @@ technique10 Render
 	}
 }
 
-technique10 Basic
+technique Basic
 {
     pass Default
     {

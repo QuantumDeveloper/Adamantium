@@ -20,7 +20,7 @@ namespace Adamantium.Game.Core
         /// <summary>
         /// Game services which could be added to the game
         /// </summary>
-        public IDependencyResolver Resolver { get; }
+        public IDependencyContainer Container { get; }
 
         /// <summary>
         /// Enables or disables fixed framerate
