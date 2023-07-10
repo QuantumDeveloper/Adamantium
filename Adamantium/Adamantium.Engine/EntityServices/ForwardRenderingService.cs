@@ -259,7 +259,7 @@ namespace Adamantium.Engine.EntityServices
             samplerInfo.CompareOp = CompareOp.Always;
             samplerInfo.MipmapMode = mtsdf ? SamplerMipmapMode.Linear : SamplerMipmapMode.Nearest;
 
-            return GraphicsDevice.CreateSampler(samplerInfo);
+            return SamplerState.New(GraphicsDevice, "", samplerInfo);
         }
 
         private void CreateResources()
@@ -386,25 +386,6 @@ namespace Adamantium.Engine.EntityServices
 //            fractalrenderTarget?.Dispose();
 //            mcube?.Dispose();
 //            lookupTexture?.Dispose();
-        }
-
-        public override bool BeginDraw()
-        {
-            if (!Window.IsUpToDate()) return false;
-
-            if (base.BeginDraw())
-            {
-                if (GraphicsDevice.BeginDraw(1.0f, 0))
-                {
-                    GraphicsDevice.SetViewports(Window.Viewport);
-                    GraphicsDevice.SetScissors(Window.Scissor);
-                    return true;
-                }
-
-                return false;
-            }
-
-            return false;
         }
 
         public override void Draw(AppTime gameTime)

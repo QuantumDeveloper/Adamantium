@@ -5,6 +5,7 @@ using Adamantium.Core.DependencyInjection;
 using Adamantium.Engine.Graphics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Events;
+using Adamantium.UI.Media;
 using Adamantium.UI.Rendering;
 using Adamantium.UI.RoutedEvents;
 using Adamantium.Win32;
@@ -15,6 +16,8 @@ public abstract class WindowBase : ContentControl, IWindow
 {
     private IWindowRenderer _renderer;
     protected IWindowWorkerService WindowWorkerService { get; }
+
+    public IWindowRenderer DefaultRenderer { get; set; }
 
     public IWindowRenderer Renderer
     {
@@ -46,7 +49,9 @@ public abstract class WindowBase : ContentControl, IWindow
 
     protected virtual void InitializeComponent()
     {
+        
     }
+    
 
     public static readonly RoutedEvent ClientSizeChangedEvent = EventManager.RegisterRoutedEvent("ClientSizeChanged",
         RoutingStrategy.Direct, typeof(SizeChangedEventHandler), typeof(WindowBase));
@@ -220,6 +225,19 @@ public abstract class WindowBase : ContentControl, IWindow
     public abstract void Hide();
         
     public abstract bool IsActive { get; internal set; }
+
+    public DrawingContext GetDrawingContext()
+    {
+        if (Renderer != null)
+        {
+            return Renderer.DrawingContext;
+        }
+
+        if (DefaultRenderer != null)
+            return DefaultRenderer.DrawingContext;
+
+        throw new ArgumentException("Window does not contain renderer and could not return DrawingContext");
+    }
 
     public event SizeChangedEventHandler ClientSizeChanged
     {

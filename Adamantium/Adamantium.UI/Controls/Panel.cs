@@ -59,10 +59,8 @@ public abstract class Panel: InputUIComponent, IContainer
 
    protected override void OnRender(DrawingContext context)
    {
-      context.BeginDraw(this);
       context.DrawRectangle(Background, new Rect(new Size(ActualWidth, ActualHeight)));
-      context.EndDraw(this);
-   }
+  }
 
    void IContainer.AddOrSetChildComponent(IMeasurableComponent component)
    {

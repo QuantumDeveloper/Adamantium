@@ -55,7 +55,7 @@ namespace Adamantium.Engine.Graphics
 
         private void CreateRenderTarget()
         {
-            renderTarget = ToDispose(RenderTarget.New(GraphicsDevice, Width, Height, MSAALevel, ImageFormat));
+            renderTarget = ToDispose(RenderTarget.New(GraphicsDevice, Width, Height, MSAALevel, SurfaceFormat));
         }
 
         SwapChainSupportDetails QuerySwapChainSupport(PhysicalDevice device)
@@ -135,7 +135,7 @@ namespace Adamantium.Engine.Graphics
                 var createInfo = new ImageViewCreateInfo();
                 createInfo.Image = images[i];
                 createInfo.ViewType = ImageViewType._2d;
-                createInfo.Format = ImageFormat;
+                createInfo.Format = SurfaceFormat;
                 ComponentMapping componentMapping = new ComponentMapping();
                 componentMapping.R = ComponentSwizzle.Identity;
                 componentMapping.G = ComponentSwizzle.Identity;

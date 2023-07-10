@@ -48,7 +48,7 @@ public sealed class BitmapImage : BitmapSource
         {
             DecodeFailed?.Invoke(this, new ExceptionEventArgs(exception));
         }
-    }
+   }
 
    public event EventHandler<ExceptionEventArgs> DecodeFailed;
 }

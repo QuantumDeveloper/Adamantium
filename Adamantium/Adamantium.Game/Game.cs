@@ -46,7 +46,7 @@ namespace Adamantium.Game
 
         private readonly Dictionary<Object, GameContext> contextsMapping;
         
-        public Game(GameMode mode, bool enableDynamicRendering, IGraphicsDeviceService graphicsDeviceService, IDependencyContainer container = null)
+        public Game(GameMode mode, bool enableDynamicRendering, bool enableDebug, IGraphicsDeviceService graphicsDeviceService = null, IDependencyContainer container = null)
         {
             Mode = mode;
 
@@ -59,7 +59,6 @@ namespace Adamantium.Game
             contextsMapping = new Dictionary<Object, GameContext>();
             IsFixedTimeStep = false;
             DesiredFPS = 60;
-            
             Content = new ContentManager(Container);
             Content.Resolvers.Add(new FileSystemContentResolver());
             Content.Resolvers.Add(new EffectContentResolver());
@@ -72,20 +71,20 @@ namespace Adamantium.Game
             EventAggregator = Container.Resolve<IEventAggregator>();
             EventAggregator.GetEvent<GameOutputRemovedEvent>().Subscribe(OnOutputRemoved);
 
-            gamePlatform = GamePlatform.Create(this, Container);
-            if (mode == GameMode.Standalone)
+            if (mode is GameMode.Standalone or GameMode.Primary)
             {
-                GraphicsDeviceService = new GraphicsDeviceService(true);
-                GraphicsDeviceService.CreateMainDevice("Game", enableDynamicRendering);
+                GraphicsDeviceService = new GraphicsDeviceService(enableDebug);
+                //GraphicsDeviceService.CreateMainDevice("Game", enableDynamicRendering);
             }
             else
             {
                 //GraphicsDeviceService = Container.Resolve<IGraphicsDeviceService>();
                 GraphicsDeviceService = graphicsDeviceService;
             }
-
+            
+            gamePlatform = GamePlatform.Create(this, Container);
             EntityWorld = new EntityWorld(Container);
-
+            
             Container.RegisterInstance<ModelConverter>(ModelConverter);
             Container.RegisterInstance<IContentManager>(Content);
             Container.RegisterInstance<IGamePlatform>(gamePlatform);
@@ -93,7 +92,7 @@ namespace Adamantium.Game
             Container.RegisterInstance<IService>(this);
             Container.RegisterInstance<IGraphicsDeviceService>(GraphicsDeviceService);
             Container.RegisterInstance<EntityWorld>(EntityWorld);
-
+            
             InputManager = new GameInputManager(this);
             GamePlayManager = new GamePlayManager(Container);
             Stopped += Game_Stopped;
@@ -114,7 +113,8 @@ namespace Adamantium.Game
         public CameraManager CameraManager { get; private set; }
         public GamePlayManager GamePlayManager { get; private set; }
         public IGraphicsDeviceService GraphicsDeviceService { get; set; }
-        
+
+        public bool IsInitialized { get; private set; }
         public bool IsPaused { get; private set; }
         
         /// <summary>
@@ -171,7 +171,12 @@ namespace Adamantium.Game
         public string Title { get; set; }
         
         public bool IsRunning => cancellationTokenSource != null && cancellationTokenSource.IsCancellationRequested != true;
-        
+
+        public void InitializeGame()
+        {
+            InitializeBeforeRun();
+        }
+
         /// <summary>
         /// Game services which could be added to the game
         /// </summary>
@@ -232,15 +237,30 @@ namespace Adamantium.Game
             RunInternal();
         }
 
+        public void Run(object context)
+        {
+            Run(context, null);
+        }
+
+        public void RunOnce(AppTime time)
+        {
+            //InitializeBeforeRun();
+            MakePreparations();
+            Update(time);
+            ExecuteDrawSequence(time);
+            FrameFinished?.Invoke(this, EventArgs.Empty);
+        }
+
         /// <summary>
         /// Run game loop on the selected control
         /// </summary>
         /// <param name="context">Control which will be used for creating corresponding <see cref="GameOutput"/> and further rendering</param>
-        public void Run(Object context)
+        /// <param name="graphicsDevice">Device on which Context was created</param>
+        public void Run(Object context, GraphicsDevice graphicsDevice)
         {
             if (IsRunning) return;
             
-            var window = CreateOutputFromContext(context);
+            var window = CreateOutputFromContext(context, graphicsDevice);
             Run(window);
         }
 
@@ -259,7 +279,6 @@ namespace Adamantium.Game
         private void RunInternal()
         {
             InitializeBeforeRun();
-            OnInitialized();
             
             //StartGameLoop();
             gameLoopThread.Start();
@@ -272,6 +291,7 @@ namespace Adamantium.Game
 
         private void OnInitialized()
         {
+            IsInitialized = true;
             Initialized?.Invoke(this, EventArgs.Empty);
         }
 
@@ -299,11 +319,12 @@ namespace Adamantium.Game
         /// Create new game window from context and add it to the list of game windows
         /// </summary>
         /// <param name="context">Window, in which Vulkan content will be rendered</param>
-        public GameOutput CreateOutputFromContext(object context)
+        /// <param name="graphicsDevice">Graphics device which will be used for communication with parent thread</param>
+        public GameOutput CreateOutputFromContext(object context, GraphicsDevice graphicsDevice)
         {
             if (!contextsMapping.ContainsKey(context))
             {
-                var gameContext = new GameContext(context);
+                var gameContext = new GameContext(context, graphicsDevice);
                 contextsMapping.Add(context, gameContext);
                 return gamePlatform.CreateOutput(gameContext);
             }
@@ -357,17 +378,13 @@ namespace Adamantium.Game
                 throw new ArgumentNullException(nameof(newContext));
             }
 
-            GameContext gameContext;
-            if (contextsMapping.TryGetValue(oldContext, out gameContext))
+            if (contextsMapping.TryGetValue(oldContext, out var gameContext))
             {
                 gamePlatform.RemoveOutput(gameContext);
             }
             var context = new GameContext(newContext);
             gamePlatform.SwitchContext(gameContext, context);
-            if (!contextsMapping.ContainsKey(newContext))
-            {
-                contextsMapping.Add(newContext, context);
-            }
+            contextsMapping.TryAdd(newContext, context);
         }
         
         /// <summary>
@@ -405,7 +422,7 @@ namespace Adamantium.Game
             fpsTime += appTime.FrameTime;
             if (fpsTime >= 1.0d)
             {
-                Console.WriteLine($"FPS = {fpsCounter}");
+                Console.WriteLine($"Game FPS = {fpsCounter}");
                 appTime.Fps = (fpsCounter) / (Single)fpsTime;
                 fpsCounter = 0;
                 fpsTime = 0;
@@ -431,7 +448,7 @@ namespace Adamantium.Game
                         {
                             MakePreparations();
                             Update(appTime);
-                            ExecuteDrawSequence();
+                            ExecuteDrawSequence(appTime);
 
                             UpdateAppTime(accumulatedFrameTime);
                             accumulatedFrameTime = 0;
@@ -443,11 +460,11 @@ namespace Adamantium.Game
 
                         MakePreparations();
                         Update(appTime);
-                        ExecuteDrawSequence();
+                        ExecuteDrawSequence(appTime);
 
                         UpdateAppTime(frameTime);
                     }
-                    
+                    FrameFinished?.Invoke(this, EventArgs.Empty);
                 }
 
                 OnStopped();
@@ -458,27 +475,22 @@ namespace Adamantium.Game
             }
         }
 
-        private void OnStopped()
-        {
-            ShuttingDown?.Invoke(this, EventArgs.Empty);
-            FreeGameResources();
-            Stopped?.Invoke(this, EventArgs.Empty);
-        }
-
-        private void ExecuteDrawSequence()
+        private void ExecuteDrawSequence(AppTime gameTime)
         {
             if (!gamePlatform.HasOutputs) return;
                 
             if (BeginScene())
             {
-                Draw(appTime);
+                Draw(gameTime);
                 EndScene();
             }
         }
 
         private void InitializeBeforeRun()
         {
-            if (Mode == GameMode.Standalone)
+            if (IsInitialized) return;
+            
+            if (Mode is GameMode.Standalone or GameMode.Primary)
             {
                 GraphicsDeviceService.CreateMainDevice("", EnableDynamicRendering);
             }
@@ -489,6 +501,7 @@ namespace Adamantium.Game
 
             InitializeCore();
             LoadContentCore();
+            OnInitialized();
         }
 
         private void InitializeCore()
@@ -627,6 +640,13 @@ namespace Adamantium.Game
         {
             cancellationTokenSource?.Cancel();
         }
+        
+        private void OnStopped()
+        {
+            ShuttingDown?.Invoke(this, EventArgs.Empty);
+            FreeGameResources();
+            Stopped?.Invoke(this, EventArgs.Empty);
+        }
 
         /// <summary>
         /// Load content at startup after game resources initialization
@@ -639,6 +659,7 @@ namespace Adamantium.Game
         }
 
         public event EventHandler Initialized;
+        public event EventHandler FrameFinished;
         public event EventHandler<EventArgs> Started;
         public event EventHandler<EventArgs> ShuttingDown;
         public event EventHandler<EventArgs> Stopped;

@@ -603,6 +603,11 @@ namespace Adamantium.Engine.Graphics
             return buffer.VulkanBuffer;
         }
         
+        public static implicit operator DeviceMemory(Buffer buffer)
+        {
+            return buffer.BufferMemory;
+        }
+        
         protected override void Dispose(bool disposeManagedResources)
         {
             VulkanBuffer?.Destroy(GraphicsDevice);

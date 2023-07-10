@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using Adamantium.Core.Events;
 using Adamantium.Engine.Graphics;
 using Adamantium.Game.Core.Input;
 using Adamantium.Imaging;
@@ -192,7 +193,7 @@ namespace Adamantium.Game.Core
             
         }
 
-        protected AdamantiumGameOutputBase()
+        protected AdamantiumGameOutputBase(IEventAggregator eventAggregator) : base(eventAggregator)
         {
             
         }

@@ -11,21 +11,15 @@
 //using Shape = Adamantium.UI.Controls.Shape;
 
 using System;
-using System.Threading;
-using Adamantium.Engine.Effects;
+using System.Linq;
+using System.Threading.Tasks;
 using Adamantium.Engine.Graphics;
-using Adamantium.Engine.Graphics.Effects;
-using Adamantium.Engine.Graphics.Effects.Generated;
-using Adamantium.Game;
-using Adamantium.Game.Core;
-using Adamantium.Game.Playground;
-using Adamantium.Mathematics;
 using Adamantium.UI.Input;
-using Adamantium.UI.Media;
-using Adamantium.Game.Playground.Effects.Generated;
 using Adamantium.UI.Controls;
 using Serilog;
 using Adamantium.UI;
+using Adamantium.UI.Processors;
+using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.Game.Playground;
 
@@ -33,7 +27,7 @@ public partial class MainWindow : Window
 {
     public MainWindow()
     {
-        //SourceInitialized += OnSourceInitialized;
+        SourceInitialized += OnSourceInitialized;
         KeyDown+= delegate(object sender, KeyEventArgs args)
         {
             Log.Logger.Information($"Key: {args.Key}");
@@ -46,37 +40,33 @@ public partial class MainWindow : Window
                 UIApplication.Current.EnableGraphicsDebug = false;
             }
         };
-        
-        //BasicEffect f = new BasicEffect();
-        //f.MeshColor.SetValue(Colors.Gray.ToVector4());
     }
 
     private void OnSourceInitialized(object sender, EventArgs e)
     {
+        CreateGame();
+    }
+
+    private void CreateGame()
+    {
         var rt = Content as RenderTargetPanel;
         var gameService = Resolver.Resolve<IGameService>();
-        var game = gameService.CreateGame<AdamantiumGame>("AdamantiumGame", UIApplication.Current.Container.Resolve<IGraphicsDeviceService>());
-        var t = new Thread(() => GameThread(game, rt));
-        t.IsBackground = true;
-        t.Start();
-    }
-
-    private void GameThread(IGame game, RenderTargetPanel panel)
-    {
-        game.Run(panel);
+        var graphicsDeviceService = Resolver.Resolve<IGraphicsDeviceService>();
+        // Primary mode
+        //var game = gameService.CreateGame<AdamantiumGame>("AdamantiumGame", true, UIApplication.Current.EnableGraphicsDebug);
+        
+        // Fully slave mode
+        var service = UIApplication.Current.EntityWorld.ServiceManager.GetServices<UiRenderService>()
+            .Cast<WindowRenderService>().FirstOrDefault(x => x.Window == this);
+        var game = gameService.CreateGame<AdamantiumGame>(
+            "AdamantiumGame", 
+            this, 
+            service, 
+            graphicsDeviceService, true, UIApplication.Current.EnableGraphicsDebug);
+        var drawingContext = GetDrawingContext();
+        game.CreateOutputFromContext(rt, drawingContext.GraphicsDevice);
     }
 }
-
-// public partial class MainWindow : WindowEffect
-// {
-//     protected override void InitializeComponent()
-//     {
-//         base.InitializeComponent();
-//         MouseDown += OnMouseDown;
-//     }
-//
-//     
-// }
 
 /*
 public partial class MainWindow : Window

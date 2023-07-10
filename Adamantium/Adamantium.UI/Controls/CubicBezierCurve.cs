@@ -34,10 +34,6 @@ public class CubicBezierCurve : BezierCurveBase
         var streamContext = StreamGeometry.Open();
         streamContext.BeginFigure(StartPoint, true, true).CubicBezierTo(ControlPoint1, ControlPoint2, EndPoint, true);
         
-        base.OnRender(context);
-        
-        context.BeginDraw(this);
         context.DrawGeometry(Stroke, StreamGeometry, GetPen());
-        context.EndDraw(this);
     }
 }

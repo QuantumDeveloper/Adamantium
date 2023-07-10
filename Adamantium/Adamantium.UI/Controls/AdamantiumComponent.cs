@@ -396,7 +396,7 @@ public abstract class AdamantiumComponent : DispatcherComponent, IAdamantiumComp
 
         if (metadata.AffectsRender)
         {
-            element?.InvalidateRender();
+            element?.InvalidateRender(false);
         }
 
         if (raiseValueChangedEvent)

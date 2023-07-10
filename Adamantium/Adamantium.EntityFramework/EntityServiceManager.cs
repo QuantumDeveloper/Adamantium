@@ -156,10 +156,15 @@ namespace Adamantium.EntityFramework
             {
                 foreach (var service in Services)
                 {
+                    if (!service.IsRenderingService) continue;
+                    
                     if (service.BeginDraw())
                     {
+                        OnDrawStarted?.Invoke(service, gameTime);
                         service.Draw(gameTime);
                         service.EndDraw();
+                        OnDrawFinished?.Invoke(service, gameTime);
+                        service.Submit();
                     }
                 }
             }
@@ -312,54 +317,8 @@ namespace Adamantium.EntityFramework
         public event EventHandler<EntityServiceEventArgs> ServiceAdded;
         public event EventHandler<EntityServiceEventArgs> ServiceRemoved;
 
-        internal struct UpdatePriorityComparer : IComparer<IUpdatable>
-        {
-            public static readonly UpdatePriorityComparer Default = new UpdatePriorityComparer();
+        public event Action<IEntityService, AppTime> OnDrawStarted;
 
-            public int Compare(IUpdatable left, IUpdatable right)
-            {
-                if (Equals(left, right))
-                {
-                    return 0;
-                }
-
-                if (left == null)
-                {
-                    return 1;
-                }
-
-                if (right == null)
-                {
-                    return -1;
-                }
-
-                return left.UpdatePriority.CompareTo(right.UpdatePriority);
-            }
-        }
-
-        internal struct DrawPriorityComparer : IComparer<IDrawable>
-        {
-            public static readonly DrawPriorityComparer Default = new DrawPriorityComparer();
-
-            public int Compare(IDrawable left, IDrawable right)
-            {
-                if (Equals(left, right))
-                {
-                    return 0;
-                }
-
-                if (left == null)
-                {
-                    return 1;
-                }
-
-                if (right == null)
-                {
-                    return -1;
-                }
-
-                return left.DrawPriority.CompareTo(right.DrawPriority);
-            }
-        }
+        public event Action<IEntityService, AppTime> OnDrawFinished; 
     }
 }

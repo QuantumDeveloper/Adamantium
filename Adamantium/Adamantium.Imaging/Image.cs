@@ -47,7 +47,7 @@ namespace Adamantium.Imaging
         /// <summary>
         /// Gets the total number of bytes occupied by this image in memory.
         /// </summary>
-        private int totalSizeInBytes;
+        private ulong totalSizeInBytes;
 
         /// <summary>
         /// Pointer to the buffer.
@@ -96,7 +96,7 @@ namespace Adamantium.Imaging
         /// <summary>
         /// Gets the total number of bytes occupied by this image in memory.
         /// </summary>
-        public int TotalSizeInBytes => totalSizeInBytes;
+        public ulong TotalSizeInBytes => totalSizeInBytes;
 
         private Image()
         {
@@ -809,7 +809,7 @@ namespace Adamantium.Imaging
 
             if (dataPointer == IntPtr.Zero)
             {
-                buffer = Utilities.AllocateMemory(totalSizeInBytes);
+                buffer = Utilities.AllocateMemory((int)totalSizeInBytes);
                 offset = 0;
                 this.bufferIsDisposable = true;
             }
@@ -843,8 +843,9 @@ namespace Adamantium.Imaging
             pixelBuffers = new PixelBuffer[pixelBufferCount];
             pixelBufferArray = new PixelBufferArray(this);
 
-            buffer = Utilities.AllocateMemory(totalSizeInBytes);
-            this.bufferIsDisposable = true;
+            // TODO replace with new alloc method
+            buffer = Utilities.AllocateMemory((int)totalSizeInBytes);
+            bufferIsDisposable = true;
 
             SetupImageArray((IntPtr)((byte*)buffer), mainDescription.Format, animatedDescriptions, pixelBuffers);
 
@@ -992,18 +993,18 @@ namespace Adamantium.Imaging
             return mipmaps;
         }
 
-        private static int CalculateAnimatedImageArray(params AnimatedImageDescription[] descriptions)
+        private static ulong CalculateAnimatedImageArray(params AnimatedImageDescription[] descriptions)
         {
             if (descriptions == null)
                 return 0;
 
-            long allocateSize = 0;
+            ulong allocateSize = 0;
             foreach (var desc in descriptions)
             {
-                allocateSize += desc.Width * desc.Height * desc.BytesPerPixel;
+                allocateSize += desc.Width * desc.Height * (uint)desc.BytesPerPixel;
             }
 
-            return (int)allocateSize;
+            return allocateSize;
         }
 
         /// <summary>
@@ -1013,7 +1014,7 @@ namespace Adamantium.Imaging
         /// <param name="pitchFlags">Pitch flags.</param>
         /// <param name="bufferCount">Output number of mipmap.</param>
         /// <param name="pixelSizeInBytes">Output total size to allocate pixel buffers for all images.</param>
-        private static List<int> CalculateImageArray(ImageDescription imageDesc, PitchFlags pitchFlags, out int bufferCount, out int pixelSizeInBytes)
+        private static List<int> CalculateImageArray(ImageDescription imageDesc, PitchFlags pitchFlags, out int bufferCount, out ulong pixelSizeInBytes)
         {
             pixelSizeInBytes = 0;
             bufferCount = 0;
@@ -1038,7 +1039,7 @@ namespace Adamantium.Imaging
                         mipmapToZIndex.Add(bufferCount);
 
                     // Keep a trace of indices for the 1st array size, for each mip levels
-                    pixelSizeInBytes += (int)d * slicePitch;
+                    pixelSizeInBytes += d * (ulong)slicePitch;
                     bufferCount += (int)d;
 
                     if (h > 1)

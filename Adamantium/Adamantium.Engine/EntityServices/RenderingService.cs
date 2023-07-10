@@ -25,6 +25,9 @@ namespace Adamantium.Engine.EntityServices
         
         protected IGraphicsDeviceService GraphicsDeviceService;
         protected GraphicsDevice GraphicsDevice => Window.GraphicsDevice;
+
+        public override bool IsUpdateService => false;
+        public override bool IsRenderingService => true;
         protected IContentManager Content { get; }
         protected GameOutput Window { get; }
 
@@ -48,6 +51,7 @@ namespace Adamantium.Engine.EntityServices
             Window.ParametersChanging += Window_ParametersChanging;
             Window.ParametersChanged += Window_ParametersChanged;
             Window.StateChanged += StateChanged;
+            Window.SizeChanged += WindowOnSizeChanged;
             LightManager = world.DependencyResolver.Resolve<LightManager>();
             InputManager = world.DependencyResolver.Resolve<GameInputManager>();
             CameraManager = EntityWorld.DependencyResolver.Resolve<CameraManager>();
@@ -55,6 +59,11 @@ namespace Adamantium.Engine.EntityServices
 
 //            BasicEffect = Effect.Load(@"Content\Effects\BasicEffect.fx.compiled", GraphicsDevice);
 //            SpriteBatch = new SpriteBatch(DeferredDevice, 25000);
+        }
+
+        private void WindowOnSizeChanged(GameOutputSizeChangedPayload obj)
+        {
+            //Window.UpdatePresenter();
         }
 
         private void StateChanged(WindowStatePayload obj)
@@ -104,21 +113,14 @@ namespace Adamantium.Engine.EntityServices
 
         public override bool BeginDraw()
         {
-            if (!Window.IsUpToDate()) return false;
-
-            if (base.BeginDraw())
+            if (!Window.IsUpToDate() || !GraphicsDevice.BeginDraw())
             {
-                if (GraphicsDevice.BeginDraw(1.0f, 0))
-                {
-                    GraphicsDevice.SetViewports(Window.Viewport);
-                    GraphicsDevice.SetScissors(Window.Scissor);
-                    return true;
-                }
-
                 return false;
             }
 
-            return false;
+            GraphicsDevice.SetViewports(Window.Viewport);
+            GraphicsDevice.SetScissors(Window.Scissor);
+            return true;
         }
 
         private AutoResetEvent pauseEvent = new AutoResetEvent(false);
@@ -336,7 +338,16 @@ namespace Adamantium.Engine.EntityServices
         public override void EndDraw()
         {
             GraphicsDevice.EndDraw();
-            //GraphicsDevice.Present();
+        }
+
+        public override void Submit()
+        {
+            GraphicsDevice.Submit();
+        }
+
+        public override void DisplayContent()
+        {
+            GraphicsDevice.Present();
         }
     }
 }

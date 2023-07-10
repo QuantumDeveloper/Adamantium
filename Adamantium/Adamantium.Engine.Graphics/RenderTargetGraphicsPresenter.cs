@@ -1,15 +1,14 @@
-﻿using Adamantium.Imaging;
-using System;
+﻿using System.Threading;
 using AdamantiumVulkan.Core;
+using Serilog;
 using Image = AdamantiumVulkan.Core.Image;
 
 namespace Adamantium.Engine.Graphics
 {
    public class RenderTargetGraphicsPresenter : GraphicsPresenter
    {
-      //private SharpDX.Direct3D11.Texture2D baseTexture;
-      //private SharpDX.Direct3D11.Texture2D sharedTexture;
       private bool isShared = false;
+      private Texture _resolveTexture;
 
       public RenderTargetGraphicsPresenter(GraphicsDevice graphicsDevice, PresentationParameters description,
          string name = "") : base(graphicsDevice, description, name)
@@ -19,17 +18,20 @@ namespace Adamantium.Engine.Graphics
       
       private void CreateRenderTarget()
       {
-         renderTarget = ToDispose(RenderTarget.New(GraphicsDevice, Width, Height, MSAALevel, ImageFormat));
+         renderTarget = ToDispose(RenderTarget.New(GraphicsDevice, Width, Height, MSAALevel, SurfaceFormat));
+         _resolveTexture = ToDispose(RenderTarget.New(GraphicsDevice, Width, Height, MSAALevel.None, SurfaceFormat));
       }
+
+      public Texture ResolveTexture => _resolveTexture;
 
       public override Image GetImage(uint index)
       {
-         return renderTarget;
+         return _resolveTexture;
       }
 
       public override ImageView GetImageView(uint index)
       {
-         return renderTarget;
+         return _resolveTexture;
       }
 
       /// <summary>
@@ -43,7 +45,11 @@ namespace Adamantium.Engine.Graphics
             return false;
          }
          
+         RemoveAndDispose(ref depthBuffer);
          RemoveAndDispose(ref renderTarget);
+         RemoveAndDispose(ref _resolveTexture);
+         
+         CreateDepthBuffer();
          CreateRenderTarget();
 
          return true;
@@ -54,24 +60,7 @@ namespace Adamantium.Engine.Graphics
       /// </summary>
       public override PresenterState Present()
       {
-         //GraphicsDevice.DeviceWaitIdle();
-         GraphicsDevice.CurrentCommandBuffer.CopyImage(renderTarget, 
-            renderTarget.Description.DesiredImageLayout, 
-            Description.SharedTexture,
-            renderTarget.Description.DesiredImageLayout,
-            0, 
-            null);
-         
          return PresenterState.Success;
-         //if (isShared)
-         //{
-         //   GraphicsDevice.ResolveSubresource(backbuffer, 0, sharedTexture, 0, Description.PixelFormat);
-         //   GraphicsDevice.Flush();
-         //}
-         //else
-         //{
-         //   GraphicsDevice.ResolveSubresource(backbuffer, 0, baseTexture, 0, Description.PixelFormat);
-         //}
       }
    }
 }

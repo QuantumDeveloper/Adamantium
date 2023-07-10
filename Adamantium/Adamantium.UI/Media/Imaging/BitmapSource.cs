@@ -5,6 +5,12 @@ namespace Adamantium.UI.Media.Imaging;
 
 public abstract class BitmapSource : ImageSource
 {
+   public BitmapSource()
+   {
+      DpiXScale = 1;
+      DpiYScale = 1;
+   }
+   
    public virtual UInt32 PixelWidth => Texture.Width;
 
    public virtual UInt32 PixelHeight => Texture.Height;

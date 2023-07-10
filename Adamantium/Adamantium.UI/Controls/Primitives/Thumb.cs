@@ -148,10 +148,7 @@ public class Thumb:Control
    {
       if (!IsGeometryValid)
       {
-         base.OnRender(context);
-         context.BeginDraw(this);
          context.DrawRectangle(Background, new Rect(new Size(ActualWidth, ActualHeight)));
-         context.EndDraw(this);
       }
    }
 }

@@ -50,6 +50,7 @@ namespace Adamantium.Engine.Graphics
         public readonly SamplerState AnisotropicMirror;
 
         private GraphicsDevice _device;
+        
         internal SamplerStateCollection(GraphicsDevice device)
         {
             _device = device;

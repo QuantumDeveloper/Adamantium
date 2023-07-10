@@ -1,43 +1,31 @@
 ﻿using System;
-using System.Net.Mime;
 using Adamantium.Engine.Graphics;
 using Adamantium.Imaging;
-using Adamantium.Imaging.Dds;
 using AdamantiumVulkan.Core;
-
-//using Texture2D = Adamantium.Engine.Graphics.Texture2D;
 
 namespace Adamantium.UI.Media.Imaging;
 
 public sealed unsafe class RenderTargetImage : BitmapSource
 {
-   public RenderTargetImage(UInt32 width, 
+   public RenderTargetImage(DrawingContext drawingContext, 
+      UInt32 width, 
        UInt32 height, 
        MSAALevel msaa, 
        SurfaceFormat format, 
-       ImageLayout desiredLayout = ImageLayout.ColorAttachmentOptimal)
-    {
-       CreateTexture(width, height, msaa, format, desiredLayout);
+       ImageLayout desiredLayout = ImageLayout.ShaderReadOnlyOptimal)
+   {
+       CreateTexture(drawingContext, width, height, msaa, format, desiredLayout);
     }
 
-    private void CreateTexture(UInt32 width, 
+    private void CreateTexture(DrawingContext drawingContext,
+       UInt32 width, 
        UInt32 height, 
        MSAALevel msaa, 
        SurfaceFormat format, 
-       ImageLayout desiredLayout = ImageLayout.ColorAttachmentOptimal)
+       ImageLayout desiredLayout)
     {
-       var deviceService = UIApplication.Current.Container.Resolve<IGraphicsDeviceService>();
-       try
-       {
-          Texture = RenderTarget.New(deviceService.ResourceLoaderDevice, width, height, msaa, format, desiredLayout);
-       }
-       catch (Exception exception)
-       {
-          RenderTargetCreationFailed?.Invoke(this, new ExceptionEventArgs(exception));
-       }
+       Texture = RenderTarget.New(drawingContext.GraphicsDevice, width, height, msaa, format, ImageUsageFlagBits.TransferDstBit, desiredLayout);
     }
 
     public void* NativePointer => Texture.NativePointer;
-
-    public event EventHandler<ExceptionEventArgs> RenderTargetCreationFailed;
 }

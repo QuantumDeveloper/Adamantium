@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.Engine.Core;
+using Adamantium.Engine.Graphics;
 using Adamantium.EntityFramework;
 using Adamantium.UI;
 
@@ -16,6 +17,8 @@ namespace Adamantium.Game.Core
         GameOutput ActiveOutput { get; }
         
         GameOutput MainOutput { get; }
+
+        public void InitializeGame();
         
         /// <summary>
         /// Game services which could be added to the game
@@ -49,7 +52,11 @@ namespace Adamantium.Game.Core
         /// Title of the game to show in the window title bar
         /// </summary>
         String Title { get; set; }
+
+        void Run(object context, GraphicsDevice graphicsDevice);
         
         public event EventHandler Initialized;
+
+        public event EventHandler FrameFinished;
     }
 }

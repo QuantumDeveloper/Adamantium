@@ -25,9 +25,9 @@ namespace Adamantium.Engine.Graphics
 
         public SurfaceFormat SurfaceFormat => Description.Format;
 
-        public ImageLayout ImageLayout { get; private set; }
+        public ImageLayout ImageLayout { get; internal set; }
         
-        public long TotalSizeInBytes { get; }
+        public ulong TotalSizeInBytes { get; private set; }
 
         public void* NativePointer => VulkanImage.NativePointer;
         
@@ -38,8 +38,9 @@ namespace Adamantium.Engine.Graphics
         protected Texture(GraphicsDevice device, TextureDescription description) : base(device)
         {
             Description = description;
+            ImageLayout = description.InitialLayout;
             Initialize();
-            TransitionImageLayout(VulkanImage, description.InitialLayout, description.DesiredImageLayout);
+            this.TransitionImageLayout(description.DesiredImageLayout);
         }
 
         protected Texture(GraphicsDevice device, Image img, ImageUsageFlagBits usage, ImageLayout desiredLayout) : base(device)
@@ -60,9 +61,9 @@ namespace Adamantium.Engine.Graphics
             GraphicsDevice.UnmapMemory(stagingBufferMemory);
             
             CreateImage(Description, MemoryPropertyFlags.DeviceLocal, out vulkanImage, out vulkanImageMemory);
-            TransitionImageLayout(vulkanImage, ImageLayout.Undefined,ImageLayout.TransferDstOptimal);
+            this.TransitionImageLayout(ImageLayout.TransferDstOptimal);
             CopyBufferToImage(stagingBuffer, vulkanImage, Description);
-            TransitionImageLayout(vulkanImage, ImageLayout.TransferDstOptimal, Description.DesiredImageLayout);
+            this.TransitionImageLayout(Description.DesiredImageLayout);
             CreateImageView(Description);
             
             stagingBuffer.Destroy(GraphicsDevice);
@@ -146,7 +147,6 @@ namespace Adamantium.Engine.Graphics
             GraphicsDevice.EndSingleTimeCommands(commandBuffer);
         }
         
-
         private MemoryPropertyFlags GetStagingMemoryFlags()
         {
             var stagingMemoryFlags = MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent; // Windows
@@ -177,6 +177,7 @@ namespace Adamantium.Engine.Graphics
             }
 
             device.GetImageMemoryRequirements(image, out var memRequirements);
+            TotalSizeInBytes = memRequirements.Size;
 
             var allocInfo = new MemoryAllocateInfo
             {
@@ -220,105 +221,11 @@ namespace Adamantium.Engine.Graphics
 
             ImageView = GraphicsDevice.LogicalDevice.CreateImageView(createInfo);
         }
-
-        public void TransitionImageLayout(VulkanImage image, ImageLayout oldLayout, ImageLayout newLayout)
-        {
-            var commandBuffer = GraphicsDevice.BeginSingleTimeCommands();
-
-            var barrier = new ImageMemoryBarrier
-            {
-                OldLayout = oldLayout,
-                NewLayout = newLayout,
-                SrcQueueFamilyIndex = Constants.VK_QUEUE_FAMILY_IGNORED,
-                DstQueueFamilyIndex = Constants.VK_QUEUE_FAMILY_IGNORED,
-                Image = image,
-                SubresourceRange = new ImageSubresourceRange()
-            };
-            
-            if (newLayout == ImageLayout.DepthStencilAttachmentOptimal)
-            {
-                barrier.SubresourceRange.AspectMask = ImageAspectFlagBits.DepthBit;
-
-                if (SurfaceFormat.HasStencilFormat())
-                {
-                    barrier.SubresourceRange.AspectMask |= ImageAspectFlagBits.StencilBit;
-                }
-            }
-            else
-            {
-                barrier.SubresourceRange.AspectMask = ImageAspectFlagBits.ColorBit;
-            }
-
-            barrier.SubresourceRange.BaseMipLevel = 0;
-            barrier.SubresourceRange.LevelCount = 1;
-            barrier.SubresourceRange.BaseArrayLayer = 0;
-            barrier.SubresourceRange.LayerCount = 1;
-
-            PipelineStageFlagBits sourceStage;
-            PipelineStageFlagBits destinationStage;
-
-            if (oldLayout is ImageLayout.Undefined or ImageLayout.Preinitialized &&
-                newLayout is ImageLayout.TransferDstOptimal or ImageLayout.TransferSrcOptimal)
-            {
-                barrier.SrcAccessMask = 0;
-                barrier.DstAccessMask = AccessFlagBits.TransferWriteBit;
-
-                sourceStage = PipelineStageFlagBits.TopOfPipeBit;
-                destinationStage = PipelineStageFlagBits.TransferBit;
-            }
-            else if (oldLayout is ImageLayout.TransferSrcOptimal or ImageLayout.TransferDstOptimal 
-                     && newLayout == ImageLayout.ShaderReadOnlyOptimal)
-            {
-                barrier.SrcAccessMask = AccessFlagBits.TransferWriteBit;
-                barrier.DstAccessMask = AccessFlagBits.ShaderReadBit;
-
-                sourceStage = PipelineStageFlagBits.TransferBit;
-                destinationStage = PipelineStageFlagBits.FragmentShaderBit;
-            }
-            else if (oldLayout == ImageLayout.Undefined && newLayout == ImageLayout.DepthStencilAttachmentOptimal)
-            {
-                barrier.SrcAccessMask = 0;
-                barrier.DstAccessMask = (AccessFlagBits.DepthStencilAttachmentReadBit |
-                                         AccessFlagBits.DepthStencilAttachmentWriteBit);
-
-                sourceStage = PipelineStageFlagBits.TopOfPipeBit;
-                destinationStage = PipelineStageFlagBits.EarlyFragmentTestsBit;
-            }
-            else if (oldLayout == ImageLayout.Undefined && newLayout == ImageLayout.ColorAttachmentOptimal)
-            {
-                barrier.SrcAccessMask = 0;
-                barrier.DstAccessMask = (AccessFlagBits.ColorAttachmentReadBit| AccessFlagBits.ColorAttachmentWriteBit);
-                sourceStage = PipelineStageFlagBits.TopOfPipeBit;
-                destinationStage = PipelineStageFlagBits.ColorAttachmentOutputBit;
-            }
-            else
-            {
-                throw new ImageLayoutTransitionException(
-                    $"Transition from {ImageLayout} to {newLayout} is not supported");
-            }
-
-            commandBuffer.PipelineBarrier(
-                (uint) sourceStage, 
-                (uint) destinationStage, 
-                0, 
-                0, 
-                null, 
-                0, 
-                null, 
-                1,
-                barrier);
-
-            ImageLayout = newLayout;
-
-            GraphicsDevice.EndSingleTimeCommands(commandBuffer);
-        }
-        
         
         public static uint CalculateMipLevels(int width, int height, MipMapCount mipLevels)
         {
             return CalculateMipLevels(width, height, 1, mipLevels);
         }
-
 
         public static uint CalculateMipLevels(int width, int height, int depth, MipMapCount mipLevels)
         {

@@ -1,14 +1,16 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Adamantium.Core;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.Core.Events;
 using Adamantium.Engine.Core;
+using Adamantium.Engine.Graphics;
 using Adamantium.EntityFramework.Events;
 using Adamantium.EntityFramework.Payloads;
 
 namespace Adamantium.EntityFramework
 {
-    public abstract class EntityService : PropertyChangedBase, IIdentifiable, IUpdatable, IDrawable, IContentable, IDisplayContent
+    public abstract class EntityService : PropertyChangedBase, IEntityService
     {
         private bool enabled;
         private ExecutionType updateExecutionType;
@@ -22,7 +24,16 @@ namespace Adamantium.EntityFramework
 
         protected IEventAggregator EventAggregator { get; }
 
-        protected EntityWorld EntityWorld { get; private set; }
+        Int128 IEntityService.Uid => Uid;
+
+        public EntityWorld EntityWorld { get; private set; }
+        
+        public IGraphicsDeviceService GraphicsDeviceService { get; protected set; }
+        
+        public GraphicsDevice GraphicsDevice { get; protected set; }
+        
+        public abstract bool IsUpdateService { get; }
+        public abstract bool IsRenderingService { get; }
         protected AppTime AppTime { get; set; }
         protected IDependencyResolver DependencyResolver { get; }
 
@@ -69,6 +80,11 @@ namespace Adamantium.EntityFramework
 
                 SetProperty(ref updatePriority, value);
             }
+        }
+
+        public virtual void Submit()
+        {
+            
         }
 
         public bool IsVisible 

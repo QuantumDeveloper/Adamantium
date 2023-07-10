@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -26,7 +27,6 @@ namespace Adamantium.Imaging.Gif
         {
             WriteGifHeader(stream);
             WriteHeader(ref img.Description, stream);
-            //WriteGraphicsControlExtension(stream, 0, 0);
             WriteApplicationExtension(stream, 0);
             WriteImageData(img, stream);
             stream.WriteByte((byte)GifChunkCodes.Trailer);
@@ -73,19 +73,23 @@ namespace Adamantium.Imaging.Gif
             stream.WriteByte(0); // Trailer
         }
 
-        private void WriteGraphicsControlExtension(Stream stream, ushort delay, int transparentIndex, DisposalMethod disposalMethod)
+        private void WriteGraphicsControlExtension(Stream stream, UInt16 delay, byte transparentIndex, DisposalMethod disposalMethod)
         {
             stream.WriteByte((byte)GifChunkCodes.ExtensionIntroducer);
 
             stream.WriteByte((byte)GifChunkCodes.GraphicControl);
+            // block size
+            stream.WriteByte(4);
+            
+            // flags
             stream.WriteByte(5);
 
+            //delay
+            stream.WriteUInt16(delay);
+            //transparent index
+            stream.WriteByte(transparentIndex);
+            
             stream.WriteByte(0);
-            stream.WriteUInt16(0);
-            stream.WriteByte(0);
-            stream.WriteByte((byte)disposalMethod);
-
-            stream.WriteByte(0); // Trailer
         }
 
         private void WriteImageData(Image img, Stream stream)
@@ -143,7 +147,7 @@ namespace Adamantium.Imaging.Gif
                 }
 
                 WriteCompressedImage(stream, result.CompressedPixels, 8);
-                WriteGraphicsControlExtension(stream, 0, 0, DisposalMethod.None);
+                WriteGraphicsControlExtension(stream, 4, 127, DisposalMethod.DoNotDispose);
             }
         }
 

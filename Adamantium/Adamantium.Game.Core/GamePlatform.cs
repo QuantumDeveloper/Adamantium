@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Threading;
-using Adamantium.Core.Collections;
+﻿using Adamantium.Core.Collections;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.Core.Events;
 using Adamantium.Engine.Graphics;
@@ -11,6 +8,7 @@ using Adamantium.Game.Core.Payloads;
 using Adamantium.Imaging;
 using Adamantium.UI;
 using Adamantium.UI.Controls;
+using Serilog;
 
 namespace Adamantium.Game.Core
 {
@@ -21,7 +19,7 @@ namespace Adamantium.Game.Core
     {
         private List<GameOutput> windowsToAdd;
         private List<GameOutput> windowsToRemove;
-        private IEventAggregator eventAggregator;
+        private readonly IEventAggregator _eventAggregator;
         private Dictionary<GameContext, GameOutput> contextToWindow;
 
         private bool graphicsDeviceChanged;
@@ -29,6 +27,8 @@ namespace Adamantium.Game.Core
         internal static int WindowId = 1;
 
         private AdamantiumCollection<GameOutput> outputs;
+
+        private Dictionary<GameOutput, GameOutputParametersPayload> _changedOutputs;
 
         private object syncObject = new object();
 
@@ -66,12 +66,24 @@ namespace Adamantium.Game.Core
         {
             Game = game;
             game.Initialized += Initialized;
-            eventAggregator = game.Container.Resolve<IEventAggregator>();
+           
+            _eventAggregator = game.Container.Resolve<IEventAggregator>();
+            _eventAggregator.GetEvent<GameOutputChangesRequestedEvent>()
+                .Subscribe(OnGameOutputChangesRequested);
 
+            _changedOutputs = new Dictionary<GameOutput, GameOutputParametersPayload>();
             outputs = new AdamantiumCollection<GameOutput>();
             windowsToAdd = new List<GameOutput>();
             windowsToRemove = new List<GameOutput>();
             contextToWindow = new Dictionary<GameContext, GameOutput>();
+        }
+
+        private void OnGameOutputChangesRequested(GameOutputParametersPayload obj)
+        {
+            lock (syncObject)
+            {
+                _changedOutputs[obj.Output] = obj;
+            }
         }
 
         private void Initialized(object sender, EventArgs e)
@@ -136,12 +148,19 @@ namespace Adamantium.Game.Core
                 for (int i = 0; i < windowsToAdd.Count; i++)
                 {
                     var wnd = windowsToAdd[i];
-                    // TODO revisit this line and think how to correctly get Primary GraphicsDevice inside Game
-                    var device = GraphicsDeviceService.GraphicsDevices[0].CreateSecondary(wnd.Description);
+                    
+                    GraphicsDevice device = null;
+                    if (Game.Mode is GameMode.Standalone or GameMode.Primary)
+                    {
+                        device = GraphicsDeviceService.CreateRenderDevice(wnd.Description);
+                    }
+                    else
+                    {
+                        device = GraphicsDeviceService.CreateRenderDevice(wnd.Description);
+                    }
                     wnd.SetGraphicsDevice(device);
                     SubscribeToEvents(wnd);
-                    wnd.Closed += Wnd_Closed;
-
+                    
                     outputs.Add(wnd);
 
                     if (outputs.Count == 1)
@@ -184,6 +203,7 @@ namespace Adamantium.Game.Core
             wnd.Deactivated += Window_Deactivated;
             wnd.MouseInput += OnMouseInput;
             wnd.KeyInput += OnKeyInput;
+            wnd.Closed += Wnd_Closed;
         }
 
         private void UnsubscribeFromEvents(GameOutput wnd)
@@ -192,6 +212,7 @@ namespace Adamantium.Game.Core
             wnd.Deactivated -= Window_Deactivated;
             wnd.MouseInput += OnMouseInput;
             wnd.KeyInput += OnKeyInput;
+            wnd.Closed -= Wnd_Closed;
         }
 
         /// <summary>
@@ -204,20 +225,23 @@ namespace Adamantium.Game.Core
             lock (syncObject)
             {
                 AddWindowsInternal();
-                foreach (var wnd in outputs)
+                foreach (var wndObj in _changedOutputs)
                 {
-                    if (graphicsDeviceChanged || wnd.UpdateRequested)
+                    var reason = wndObj.Value.Reason;
+                    var wnd = wndObj.Key;
+                    if ((graphicsDeviceChanged || reason == ChangeReason.FullUpdate) && wndObj.Key.Type != GameWindowType.RenderTarget)
                     {
-                        OnWindowParametersChanging(wnd, ChangeReason.FullUpdate);
+                        OnWindowParametersChanging(wnd, wnd.Description, ChangeReason.FullUpdate);
                         var device = GraphicsDeviceService.UpdateDevice(wnd.GraphicsDevice.DeviceId, wnd.Description);
                         wnd.SetGraphicsDevice(device);
-                        OnWindowParametersChanged(wnd, ChangeReason.FullUpdate);
+                        OnWindowParametersChanged(wnd, wnd.Description, ChangeReason.FullUpdate);
                     }
-                    else if (wnd.ResizeRequested)
+                    else if (reason == ChangeReason.Resize)
                     {
-                        OnWindowParametersChanging(wnd, ChangeReason.Resize);
+                        OnWindowParametersChanging(wnd, wnd.Description, ChangeReason.Resize);
+                        Log.Logger.Debug("Update game output presenter");
                         wnd.UpdatePresenter();
-                        OnWindowParametersChanged(wnd, ChangeReason.Resize);
+                        OnWindowParametersChanged(wnd, wnd.Description, ChangeReason.Resize);
                         OnWindowSizeChanged(wnd);
                     }
                     else
@@ -225,22 +249,24 @@ namespace Adamantium.Game.Core
                         wnd.SetPresentOptions();
                     }
                 }
+                
+                _changedOutputs.Clear();
                 graphicsDeviceChanged = false;
             }
         }
 
-        private void OnWindowParametersChanging(GameOutput window, ChangeReason reason)
+        private void OnWindowParametersChanging(GameOutput window,  GameWindowDescription description, ChangeReason reason)
         {
             window.OnWindowParametersChanging(reason);
 
-            eventAggregator.GetEvent<GameOutputParametersChangingEvent>().Publish(new GameOutputParametersPayload(window, reason));
+            _eventAggregator.GetEvent<GameOutputParametersChangingEvent>().Publish(new GameOutputParametersPayload(window, description, reason));
         }
 
-        private void OnWindowParametersChanged(GameOutput window, ChangeReason reason)
+        private void OnWindowParametersChanged(GameOutput window, GameWindowDescription description, ChangeReason reason)
         {
             window.OnWindowParametersChanged(reason);
 
-            eventAggregator.GetEvent<GameOutputParametersChangedEvent>().Publish(new GameOutputParametersPayload(window, reason));
+            _eventAggregator.GetEvent<GameOutputParametersChangedEvent>().Publish(new GameOutputParametersPayload(window, description, reason));
         }
 
         private void Window_Deactivated(GameOutput output)
@@ -267,12 +293,12 @@ namespace Adamantium.Game.Core
 
         private void OnActivated(GameOutput output)
         {
-            eventAggregator.GetEvent<GameOutputActivatedEvent>().Publish(output);
+            _eventAggregator.GetEvent<GameOutputActivatedEvent>().Publish(output);
         }
 
         private void OnDeactivated(GameOutput output)
         {
-            eventAggregator.GetEvent<GameOutputDeactivatedEvent>().Publish(output);
+            _eventAggregator.GetEvent<GameOutputDeactivatedEvent>().Publish(output);
         }
 
         private void OnWindowSizeChanged(GameOutput wnd)
@@ -285,22 +311,22 @@ namespace Adamantium.Game.Core
 
         private void OnKeyInput(KeyboardInput input)
         {
-            eventAggregator.GetEvent<KeyboardInputEvent>().Publish(input);
+            _eventAggregator.GetEvent<KeyboardInputEvent>().Publish(input);
         }
 
         private void OnMouseInput(MouseInput input)
         {
-            eventAggregator.GetEvent<MouseInputEvent>().Publish(input);
+            _eventAggregator.GetEvent<MouseInputEvent>().Publish(input);
         }
 
         private void OnWindowCreated(GameOutput output)
         {
-            eventAggregator.GetEvent<GameOutputCreatedEvent>().Publish(output);
+            _eventAggregator.GetEvent<GameOutputCreatedEvent>().Publish(output);
         }
 
         private void OnOutputRemoved(GameOutput output)
         {
-            eventAggregator.GetEvent<GameOutputRemovedEvent>().Publish(output);
+            _eventAggregator.GetEvent<GameOutputRemovedEvent>().Publish(output);
         }
 
         public void Dispose()
@@ -321,7 +347,7 @@ namespace Adamantium.Game.Core
         public abstract void Run(CancellationToken token);
         public GameOutput CreateOutput(uint width = 1280, uint height = 720)
         {
-            var wnd = GameOutput.NewWindow(width, height);
+            var wnd = GameOutput.NewWindow(_eventAggregator, width, height);
             windowsToAdd.Add(wnd);
             return wnd;
         }
@@ -338,7 +364,7 @@ namespace Adamantium.Game.Core
                 return null;
             }
 
-            var wnd = GameOutput.New(context);
+            var wnd = GameOutput.New(_eventAggregator, context);
             windowsToAdd.Add(wnd);
             return wnd;
         }
@@ -361,12 +387,16 @@ namespace Adamantium.Game.Core
         /// <param name="surfaceFormat">Surface format</param>
         /// <param name="depthFormat">Depth buffer format</param>
         /// <param name="msaaLevel">MSAA level</param>
-        public GameOutput CreateOutput(object context, SurfaceFormat surfaceFormat, DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24, MSAALevel msaaLevel = MSAALevel.None)
+        public GameOutput CreateOutput( 
+            object context,
+            SurfaceFormat surfaceFormat, 
+            DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24, 
+            MSAALevel msaaLevel = MSAALevel.None)
         {
             var gameContext = new GameContext(context);
             if (!contextToWindow.ContainsKey(gameContext))
             {
-                var wnd = GameOutput.New(gameContext, surfaceFormat, depthFormat, msaaLevel);
+                var wnd = GameOutput.New(_eventAggregator, gameContext, surfaceFormat, depthFormat, msaaLevel);
                 contextToWindow.Add(gameContext, wnd);
                 windowsToAdd.Add(wnd);
                 return wnd;

@@ -85,10 +85,6 @@ namespace Adamantium.Engine.Graphics
         public SurfaceTransform PreTransform { get; set; }
         public PresentMode PresentMode { get; set; }
         public bool Clipped { get; set; }
-        
-        public bool IsShared { get; set; }
-        
-        public RenderTarget SharedTexture { get; set; }
 
         public PresentationParameters Clone()
         {

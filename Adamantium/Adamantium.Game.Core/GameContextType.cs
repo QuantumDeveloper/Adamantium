@@ -1,4 +1,6 @@
-﻿namespace Adamantium.Game
+﻿using Adamantium.Game.Core;
+
+namespace Adamantium.Game
 {
     /// <summary>
     /// Define type of <see cref="GameContext"/>

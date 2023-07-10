@@ -6,7 +6,7 @@ public abstract class BezierCurveBase : Shape
 {
     protected BezierCurveBase()
     {
-        
+        StreamGeometry = new StreamGeometry();
     }
     
     protected StreamGeometry StreamGeometry { get; }

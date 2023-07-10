@@ -329,7 +329,7 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
     /// </remarks>
     protected Size MeasureCore(Size availableSize)
     {
-        if (Visibility == Visibility.Visible || Visibility == Visibility.Hidden)
+        if (Visibility is Visibility.Visible or Visibility.Hidden)
         {
             var margin = Margin;
                 
@@ -385,7 +385,7 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
     /// </remarks>
     protected void ArrangeCore(Rect finalRect)
     {
-        if (Visibility == Visibility.Visible || Visibility == Visibility.Hidden)
+        if (Visibility is Visibility.Visible or Visibility.Hidden)
         {
             var margin = Margin;
                 
@@ -501,7 +501,10 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
                 }
                 if (widthChanged || heightChanged)
                 {
-                    SizeChangedEventArgs args = new SizeChangedEventArgs(previousRenderSize, Bounds.Size, widthChanged,
+                    var args = new SizeChangedEventArgs(
+                        previousRenderSize, 
+                        Bounds.Size,
+                        widthChanged,
                         heightChanged);
                     previousRenderSize = Bounds.Size;
                     args.RoutedEvent = SizeChangedEvent;

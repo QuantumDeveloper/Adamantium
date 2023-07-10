@@ -1,14 +1,39 @@
 ﻿using System;
 using System.Collections.Generic;
+using Adamantium.Engine.Graphics;
 using Adamantium.EntityFramework;
 
 namespace Adamantium.UI.Processors;
 
-public abstract class UiService : EntityService
+public abstract class UiRenderService : EntityService
 {
-    protected UiService(EntityWorld world)
+    
+    protected UiRenderService(EntityWorld world)
         : base(world)
     {
+        GraphicsDeviceService = world.DependencyResolver.Resolve<IGraphicsDeviceService>();
+    }
+
+    public override bool IsRenderingService => true;
+    
+    public override bool BeginDraw()
+    {
+        return GraphicsDevice.BeginDraw();
+    }
+    
+    public override void EndDraw()
+    {
+        GraphicsDevice.EndDraw();
+    }
+
+    public override void Submit()
+    {
+        GraphicsDevice.Submit();
+    }
+    
+    public override void DisplayContent()
+    {
+        GraphicsDevice.Present();
     }
 
     public void TraverseInDepth(IUIComponent visualComponent, Action<IUIComponent> action)

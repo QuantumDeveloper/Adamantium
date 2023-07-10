@@ -157,7 +157,9 @@ namespace Adamantium.UI
            
             ResourceLoaderDevice = MainGraphicsDevice.CreateResourceLoaderDevice();
 
+            MainGraphicsDevice.ResourceLoaderDevice = ResourceLoaderDevice;
             MainGraphicsDevice.Disposing += GraphicsDeviceDisposing;
+            
             OnDeviceCreated();
         }
 

@@ -23,7 +23,14 @@ namespace Adamantium.Game.Playground
     {
         private TypeFace typeFace;
         
-        public AdamantiumGame(IGraphicsDeviceService graphicsDeviceService):base(GameMode.Slave, true, graphicsDeviceService)
+        public AdamantiumGame(bool enableDynamicRendering, bool enableDebug):
+            base(GameMode.Primary, enableDynamicRendering, enableDebug)
+        {
+            EventAggregator.GetEvent<GameOutputCreatedEvent>().Subscribe(OnWindowCreated);
+        }
+        
+        public AdamantiumGame(IGraphicsDeviceService graphicsDeviceService, bool enableDynamicRendering, bool enableDebug):
+            base(GameMode.Slave, enableDynamicRendering, enableDebug, graphicsDeviceService)
         {
             EventAggregator.GetEvent<GameOutputCreatedEvent>().Subscribe(OnWindowCreated);
         }

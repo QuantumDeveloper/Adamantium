@@ -5,6 +5,7 @@ using Adamantium.Engine.Core;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
 using AdamantiumVulkan.Core;
+using Serilog;
 using Image = AdamantiumVulkan.Core.Image;
 
 namespace Adamantium.Engine.Graphics
@@ -27,7 +28,7 @@ namespace Adamantium.Engine.Graphics
 
         public uint Height => Description.Height;
 
-        public SurfaceFormat ImageFormat => Description.ImageFormat;
+        public SurfaceFormat SurfaceFormat => Description.ImageFormat;
 
         public DepthFormat DepthFormat => Description.DepthFormat;
 
@@ -106,16 +107,15 @@ namespace Adamantium.Engine.Graphics
         public virtual bool Resize(PresentationParameters parameters)
         {
             Description = parameters.Clone();
-            
             CreateViewPort();
-
+            
             return true;
         }
         
         protected void CreateRenderPass()
         {
             var colorAttachment = new AttachmentDescription();
-            colorAttachment.Format = ImageFormat;
+            colorAttachment.Format = SurfaceFormat;
             colorAttachment.Samples = (SampleCountFlagBits)MSAALevel;
             colorAttachment.LoadOp = AttachmentLoadOp.Clear;
             colorAttachment.StoreOp = MSAALevel == MSAALevel.None ? AttachmentStoreOp.Store : AttachmentStoreOp.DontCare;
@@ -135,7 +135,7 @@ namespace Adamantium.Engine.Graphics
             depthAttachment.FinalLayout = DepthBuffer.ImageLayout;
 
             var colorAttachmentResolve = new AttachmentDescription();
-            colorAttachmentResolve.Format = ImageFormat;
+            colorAttachmentResolve.Format = SurfaceFormat;
             colorAttachmentResolve.Samples = SampleCountFlagBits._1Bit;
             colorAttachmentResolve.LoadOp = AttachmentLoadOp.Clear;
             colorAttachmentResolve.StoreOp = AttachmentStoreOp.Store;

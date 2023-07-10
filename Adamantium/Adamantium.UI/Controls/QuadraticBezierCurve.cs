@@ -24,10 +24,6 @@ public class QuadraticBezierCurve : BezierCurveBase
         var streamContext = StreamGeometry.Open();
         streamContext.BeginFigure(StartPoint, true, true).QuadraticBezierTo(ControlPoint, EndPoint, true);
         
-        base.OnRender(context);
-        
-        context.BeginDraw(this);
         context.DrawGeometry(Stroke, StreamGeometry, GetPen());
-        context.EndDraw(this);
     }
 }

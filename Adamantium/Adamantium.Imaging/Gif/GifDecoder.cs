@@ -115,10 +115,6 @@ namespace Adamantium.Imaging.Gif
 
         private void GetImageFromIndexStream(GifFrame frame, int frameIndex, GifImage gifImage)
         {
-            if (frameIndex == 75)
-            {
-
-            }
             var width = frame.Descriptor.Width;
             var height = frame.Descriptor.Height;
             var colorTable = frame.ColorTable;

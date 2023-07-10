@@ -20,8 +20,6 @@ public class Pen
 
    public PenLineJoin PenLineJoin { get; set; }
       
-      
-
    public Pen(
       Brush brush, 
       Double thickness = 1.0, 

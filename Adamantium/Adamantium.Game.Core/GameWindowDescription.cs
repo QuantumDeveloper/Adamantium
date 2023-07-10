@@ -3,6 +3,7 @@ using Adamantium.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.Imaging;
 using AdamantiumVulkan.Core;
+using Buffer = Adamantium.Engine.Graphics.Buffer;
 
 namespace Adamantium.Game.Core
 {
@@ -72,6 +73,18 @@ namespace Adamantium.Game.Core
            BuffersCount = buffersCount;
         }
 
+        public GameWindowDescription(GameWindowDescription copy)
+        {
+            Width = copy.Width;
+            Height = copy.Height;
+            Handle = copy.Handle;
+            MsaaLevel = copy.MsaaLevel;
+            PixelFormat = copy.PixelFormat;
+            DepthFormat = copy.DepthFormat;
+            BuffersCount = copy.BuffersCount;
+            PresenterType = copy.PresenterType;
+        }
+
         public UInt32 Width { get; set; }
         public UInt32 Height { get; set; }
         public IntPtr Handle { get; set; }
@@ -84,11 +97,9 @@ namespace Adamantium.Game.Core
 
         public PresentInterval PresentInterval { get; set; }
         
-        public RenderTarget SharedTexture { get; set; }
-
         public GameWindowDescription Clone()
         {
-            return (GameWindowDescription)MemberwiseClone();
+            return new GameWindowDescription(this);
         }
 
         public PresentationParameters ToPresentationParameters()
@@ -101,10 +112,7 @@ namespace Adamantium.Game.Core
                 MsaaLevel,
                 PixelFormat,
                 DepthFormat,
-                BuffersCount)
-            {
-                SharedTexture = SharedTexture
-            };
+                BuffersCount);
         }
         
         public static implicit operator PresentationParameters(GameWindowDescription description)

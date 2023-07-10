@@ -12,27 +12,20 @@ using AdamantiumVulkan.Core;
 
 namespace Adamantium.UI.Processors;
 
-public class WindowService : UiService
+public class WindowRenderService : UiRenderService
 {
-    //private Mutex mutex = new Mutex(false, "adamantiumMutex");
-        
     private PresentationParameters parameters;
     private IWindowRenderer windowRenderer;
     private IWindowRenderer _pendingRenderer;
     private readonly AutoResetEvent pauseEvent;
 
-    protected IWindow Window { get; }
+    public IWindow Window { get; }
     
-    protected IGraphicsDeviceService GraphicsDeviceService { get; }
-    
-    protected GraphicsDevice GraphicsDevice { get; set; }
-    
-    public WindowService(EntityWorld world, IWindow window)
+    public WindowRenderService(EntityWorld world, IWindow window)
         : base(world)
     {
         Window = window;
         Window.StateChanged += WindowOnStateChanged;
-        GraphicsDeviceService = world.DependencyResolver.Resolve<IGraphicsDeviceService>();
         CreateResources();
         pauseEvent = new AutoResetEvent(false);
     }
@@ -62,16 +55,9 @@ public class WindowService : UiService
         GraphicsDevice.ClearColor = Colors.White;
         GraphicsDevice.AddDynamicStates(DynamicState.Viewport, DynamicState.Scissor);
 
-        if (Window.Renderer == null)
-        {
-            windowRenderer = new ForwardWindowRenderer(GraphicsDevice);
-            windowRenderer.SetWindow(Window);
-        }
-        else
-        {
-            windowRenderer = Window.Renderer;
-            windowRenderer.SetWindow(Window);
-        }
+        windowRenderer = Window.Renderer ?? new ForwardWindowRenderer(GraphicsDevice);
+        windowRenderer.SetWindow(Window);
+        Window.DefaultRenderer = windowRenderer;
         
         Window.RendererChanged += WindowOnRendererChanged;
     }
@@ -85,15 +71,12 @@ public class WindowService : UiService
     {
         windowRenderer?.Dispose();
     }
-        
+
+    public override bool IsUpdateService => true;
+
     public override void Update(AppTime gameTime)
     {
         Window.Update(gameTime);
-    }
-
-    public override bool BeginDraw()
-    {
-        return Window.Visibility == Visibility.Visible;
     }
 
     public override void Draw(AppTime gameTime)
@@ -104,25 +87,8 @@ public class WindowService : UiService
         }
 
         base.Draw(gameTime);
-            
-        if (windowRenderer == null) return;
-            
-        if (GraphicsDevice.BeginDraw(1, 0))
-        {
-            windowRenderer?.Render(gameTime);
-        }
-    }
-        
-    public override void EndDraw()
-    {
-        base.EndDraw();
-        GraphicsDevice.EndDraw();
-    }
 
-    public override void DisplayContent()
-    {
-        base.DisplayContent();
-        GraphicsDevice.Present(parameters);
+        windowRenderer?.Render(gameTime);
     }
 
     public override void FrameEnded()

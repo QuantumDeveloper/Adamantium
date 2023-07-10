@@ -109,7 +109,7 @@ public sealed class Dispatcher : IDispatcher
 
     private bool CheckAccessInternal()
     {
-        return MainThread == Thread.CurrentThread || UIThread == Thread.CurrentThread;
+        return MainThread == Thread.CurrentThread;
     }
 
     public void VerifyAccess()

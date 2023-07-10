@@ -10,10 +10,16 @@ public abstract class ImageSource : AdamantiumComponent, IDisposable
 
    public abstract double Width { get; }
    public abstract double Height { get; }
+   
+   public bool IsDisposed { get; private set; }
 
    public void Dispose()
    {
-      Texture?.Dispose();
-      Texture = null;
+      if (!IsDisposed)
+      {
+         Texture?.Dispose();
+         Texture = null;
+         IsDisposed = true;
+      }
    }
 }

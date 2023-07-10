@@ -37,7 +37,7 @@ public class Image:MeasurableUIComponent
       set => SetValue(StretchProperty, value);
    }
 
-   public BitmapSource Source
+   public ImageSource Source
    {
       get => GetValue<BitmapSource>(SourceProperty);
       set => SetValue(SourceProperty, value);
@@ -52,7 +52,7 @@ public class Image:MeasurableUIComponent
       {
          var source = Source;
 
-         var measuredSize = CalculateScaling(Stretch, availableSize, new Size(source.PixelWidth, source.PixelHeight));
+         var measuredSize = CalculateScaling(Stretch, availableSize, new Size(source.Width, source.Height));
          return measuredSize;
       }
       else
@@ -67,9 +67,7 @@ public class Image:MeasurableUIComponent
       var source = Source;
       if (source != null)
       {
-         context.BeginDraw(this);
          context.DrawImage(source, FilterBrush, new Rect(Bounds.Size), CornerRadius);
-         context.BeginDraw(this);
       }
    }
 

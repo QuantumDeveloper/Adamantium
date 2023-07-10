@@ -45,6 +45,14 @@ namespace Adamantium.Engine.Graphics
             return $"{nameof(TopLeft)}: {TopLeft} {nameof(TopRight)}: {TopRight} {nameof(BottomRight)}: {BottomRight} {nameof(BottomLeft)}: {BottomLeft}";
         }
 
+        static CornerRadius()
+        {
+            Empty = new CornerRadius();
+        }
+
+        public static CornerRadius Empty { get; }
+        
+
         public static CornerRadius Parse(string value)
         {
             var values = value.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);

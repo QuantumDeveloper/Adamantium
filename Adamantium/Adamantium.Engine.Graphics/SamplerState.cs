@@ -1,14 +1,13 @@
 using System;
-using Adamantium.Core;
 using AdamantiumVulkan.Core;
 
 namespace Adamantium.Engine.Graphics
 {
-    public class SamplerState : NamedObject
+    public class SamplerState : GraphicsResource
     {
-        private Sampler sampler;
+        private readonly Sampler sampler;
 
-        private SamplerState(string name, Sampler sampler)
+        private SamplerState(GraphicsDevice device, string name, Sampler sampler) : base(device)
         {
             Name = name;
             this.sampler = sampler;
@@ -21,8 +20,17 @@ namespace Adamantium.Engine.Graphics
 
         public static SamplerState New(GraphicsDevice device, string name, SamplerCreateInfo info)
         {
-            var sampler = device.CreateSampler(info);
-            return new SamplerState(name, sampler);
+            if (device.LogicalDevice.CreateSampler(info, null, out var sampler) != Result.Success)
+            {
+                throw new Exception("failed to create texture sampler!");
+            }
+            return new SamplerState(device, name, sampler);
+        }
+
+        protected override void Dispose(bool disposeManagedResources)
+        {
+            base.Dispose(disposeManagedResources);
+            GraphicsDevice.LogicalDevice.DestroySampler(sampler);
         }
     }
 }

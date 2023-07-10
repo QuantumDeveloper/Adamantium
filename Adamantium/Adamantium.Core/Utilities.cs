@@ -34,6 +34,14 @@ namespace Adamantium.Core
             return type is Enum;
         }
 
+#if NET6_0_OR_GREATER
+        public static unsafe IntPtr AllocateMemory(nuint sizeInBytes)
+        {
+            var ptr = NativeMemory.Alloc(sizeInBytes);
+            return new IntPtr(ptr);
+        }
+#endif
+
         public static unsafe IntPtr AllocateMemory(int sizeInBytes, int align = 1)
         {
             int mask = align - 1;

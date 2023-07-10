@@ -501,7 +501,6 @@ public class Grid: Panel
       
    protected override void OnRender(DrawingContext context)
    {
-      context.BeginDraw(this);
       context.DrawRectangle(Background, new Rect(new Size(ActualWidth, ActualHeight)));
       if (ShowGridLines && rowSegments != null)
       {
@@ -542,7 +541,6 @@ public class Grid: Panel
             }
          }
       }
-      context.EndDraw(this);
    }
 
    private double GetArrangeSize(GridSegment[] segments, int start, int count)

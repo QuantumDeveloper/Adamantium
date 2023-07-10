@@ -254,7 +254,7 @@ namespace Adamantium.EntityFramework
                 Console.WriteLine(e);
                 //throw;
             }
-            return new T[0];
+            return Array.Empty<T>();
         }
 
         public bool ContainsComponent<T>() where T : class, IComponent

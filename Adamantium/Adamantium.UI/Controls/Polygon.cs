@@ -76,14 +76,9 @@ public class Polygon : Shape
     {
         if (Points == null || Points.Count < 2) return;
         
-        base.OnRender(context);
-
         var streamContext = geometry.Open();
         streamContext.BeginFigure(Points[0], true, true).PolylineLineTo(Points.Skip(1), true);
-        
-        context.BeginDraw(this);
         geometry.FillRule = FillRule;
         context.DrawGeometry(Fill, geometry, GetPen());
-        context.EndDraw(this);
     }
 }

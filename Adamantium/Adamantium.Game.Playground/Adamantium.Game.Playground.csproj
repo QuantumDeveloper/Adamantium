@@ -149,6 +149,10 @@
       <Content Update="Effects\structs.hlsl">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
+      <None Remove="Textures\infinity.gif" />
+      <Content Include="Textures\infinity.gif">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
     </ItemGroup>
 
     <ItemGroup>

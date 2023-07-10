@@ -1,6 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Adamantium.Core;
+using Adamantium.Engine.Graphics;
+using Adamantium.EntityFramework;
 using Adamantium.Game.Core;
+using Adamantium.UI.Controls;
 
 namespace Adamantium.Game;
 
@@ -8,23 +14,37 @@ public class GameService : IGameService
 {
     private readonly object _locker = new object();
     
-    private List<IGame> _games;
-    private Dictionary<string, IGame> _gamesByName;
+    private List<GameKey> _games;
+    private List<Task> _tasks;
 
     public GameService()
     {
-        _games = new List<IGame>();
+        _games = new List<GameKey>();
+        _tasks = new List<Task>();
     }
 
-    public IReadOnlyList<IGame> Games => _games.AsReadOnly();
-    
-    public T CreateGame<T>(string name, params object[] args) where T : IGame
+    public IReadOnlyList<IGame> Games
+    {
+        get
+        {
+            lock (_locker)
+            {
+                return _games.Select(x=>x.Game).ToList();
+            }
+        }  
+    } 
+
+    public T CreateGame<T>(string name, IWindow wnd, EntityService service, params object[] args) where T : IGame
     {
         var game = (T)Activator.CreateInstance(typeof(T), args);
+        game.InitializeGame();
+        var key = new GameKey(name, wnd, service, game);
         lock (_locker)
         {
-            _games.Add(game);
+            _games.Add(key);
         }
+
+        OnGameAdded?.Invoke(game);
         return game;
     }
 
@@ -32,7 +52,87 @@ public class GameService : IGameService
     {
         lock (_locker)
         {
-            return _games.Remove(game);
+            var result = _games.FirstOrDefault(x => x.Game == game);
+            return _games.Remove(result);
+        }
+    }
+
+    public void RunGames(IRenderService renderService, AppTime time)
+    {
+        lock (_locker)
+        {
+            
+            foreach (var key in _games)
+            {
+                if (key.Service != renderService)  continue;
+                
+                _tasks.Add(Task.Run(() => key.Game.RunOnce(time)));
+            }
+        }
+    }
+
+    public void WaitForGames()
+    {
+        Task.WaitAll(_tasks.ToArray());
+        _tasks.Clear();
+    }
+
+    public void CopyOutput(GraphicsDevice graphicsDevice)
+    {
+        foreach (var game in Games)
+        {
+            foreach (var gameOutput in game.Outputs)
+            {
+                gameOutput.CopyOutput(graphicsDevice);
+            }
+        }
+    }
+
+    public event Action<IGame> OnGameAdded;
+    
+    private class GameKey
+    {
+        public GameKey(string name, IWindow window, EntityService service, IGame game)
+        {
+            Name = name;
+            Window = window;
+            Service = service;
+            Game = game;
+        }
+        
+        public string Name { get; }
+        
+        public IWindow Window { get; }
+        
+        public EntityService Service { get; }
+        
+        public IGame Game { get; }
+
+        public override bool Equals(object obj)
+        {
+            if (obj is GameKey key)
+            {
+                return this == key;
+            }
+
+            return false;
+        }
+        
+        public static bool operator == (GameKey key1, GameKey key2)
+        {
+            if (key1 == null || key2 == null) return false;
+
+            return key1 == key2;
+        }
+
+        public static bool operator !=(GameKey key1, GameKey key2)
+        {
+            return !(key1 == key2);
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(Name.GetHashCode(), Window.GetHashCode(), Service.GetHashCode(), Game.GetHashCode());
         }
     }
 }

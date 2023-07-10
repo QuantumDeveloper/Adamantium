@@ -15,6 +15,7 @@ using Adamantium.UI.Events;
 using Adamantium.UI.Input;
 using Adamantium.UI.Processors;
 using Adamantium.UI.RoutedEvents;
+using Adamantium.UI.Services;
 using Adamantium.UI.Threading;
 using AdamantiumVulkan;
 using Serilog;
@@ -23,11 +24,11 @@ using UnhandledExceptionEventHandler = Adamantium.UI.RoutedEvents.UnhandledExcep
 
 namespace Adamantium.UI;
 
-public abstract class UIApplication : AdamantiumComponent, IService, IUIApplication
+public abstract class UIApplication : AdamantiumComponent, IService, IUIApplication, IWindowPlatformService
 {
     private object applicationLocker = new object();
     
-    private Dictionary<IWindow, WindowService> windowToSystem;
+    private Dictionary<IWindow, WindowRenderService> windowToSystem;
     
     private double accumulatedFrameTime;
     private TimeSpan totalTime;
@@ -56,7 +57,7 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
         DesiredFPS = 60;
         appTime = new AppTime();
         ShutDownMode = ShutDownMode.OnMainWindowClosed;
-        windowToSystem = new Dictionary<IWindow, WindowService>();
+        windowToSystem = new Dictionary<IWindow, WindowRenderService>();
         addedWindows = new List<IWindow>();
         closedWindows = new List<IWindow>();
         windowsCollection = new AdamantiumCollection<IWindow>();
@@ -146,6 +147,8 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
     public EntityWorld EntityWorld { get; private set; }
 
     public bool IsRunning => cancellationTokenSource != null && cancellationTokenSource.IsCancellationRequested != true;
+    
+    public bool IsInitialized { get; private set; }
     public bool IsPaused { get; private set; }
     public bool IsFixedTimeStep { get; set; }
     public double TimeStep => 1.0d / DesiredFPS;
@@ -158,31 +161,9 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
 
     private void MainWindow_Closed(object sender, EventArgs e)
     {
-        MainWindow.Closed -= MainWindow_Closed;
         MainWindow = null;
     }
     
-    protected virtual void OnWindowCreated(IWindow wnd)
-    {
-        // lock (applicationLocker)
-        // {
-        //     addedWindows.Add(wnd);
-        // }
-        var t = Stopwatch.StartNew();
-        OnWindowAdded(wnd);
-        t.Stop();
-        Log.Logger.Information($"Service created in {t.ElapsedMilliseconds} ms");
-    }
-
-    protected virtual void OnWindowClosed(IWindow wnd)
-    {
-        // lock (applicationLocker)
-        // {
-        //     closedWindows.Add(wnd);
-        // }
-        OnWindowRemoved(wnd);
-    }
-
     private void RecreateDevicesAndServices()
     {
         Log.Logger.Debug("======Starting recreating sequence======");
@@ -192,7 +173,7 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
         windowToSystem.Clear();
         foreach (var window in Windows)
         {
-            window.InvalidateRender();
+            window.InvalidateRender(true);
         }
         GraphicsDeviceService.ChangeOrCreateDevice("Adamantium Main", true);
         foreach (var window in Windows)
@@ -205,13 +186,12 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
 
     private void CreateWindowService(IWindow window)
     {
-        var windowService = EntityWorld.CreateService<WindowService>(EntityWorld, window);
+        var windowService = EntityWorld.CreateService<WindowRenderService>(EntityWorld, window);
+        windowToSystem.Add(window, windowService);
         var entity = new Entity();
         entity.AddComponent(window);
         EntityWorld.AddEntity(entity);
         EntityWorld.ForceUpdate();
-
-        windowToSystem.Add(window, windowService);
     }
     
     private void OnWindowAdded(IWindow window)
@@ -232,9 +212,10 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
         
         var service = windowToSystem[window];
         service.UnloadContent();
-        EntityWorld.RemoveService(service);
         windowToSystem.Remove(window);
         windowsCollection.Remove(window);
+        EntityWorld.RemoveService(service);
+        EntityWorld.ForceUpdate();
 
         if (window == MainWindow)
         {
@@ -244,6 +225,8 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
 
     private void Initialize()
     {
+        if (IsInitialized) return;
+        
         cancellationTokenSource = new CancellationTokenSource();
         Dispatcher.Initialize();
         GraphicsDeviceService.IsInDebugMode = EnableGraphicsDebug;
@@ -254,7 +237,8 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
         EntityWorld.Initialize();
         OnInitialize();
         RegisterServices(Container);
-
+        IsInitialized = true;
+        
         if (MainWindow != null)
         {
             OnWindowCreated(MainWindow);
@@ -268,10 +252,10 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
 
     private void SubscribeToEvents()
     {
-        EventAggregator.GetEvent<WindowCreatedEvent>().Subscribe(OnWindowCreated, ThreadOption.UIThread);
-        EventAggregator.GetEvent<WindowClosedEvent>().Subscribe(OnWindowClosed, ThreadOption.UIThread);
-        EventAggregator.GetEvent<WindowActivatedEvent>().Subscribe(OnWindowActivated, ThreadOption.UIThread);
-        EventAggregator.GetEvent<WindowDeactivatedEvent>().Subscribe(OnWindowDeactivated, ThreadOption.UIThread);
+        EventAggregator.GetEvent<WindowCreatedEvent>().Subscribe(OnWindowCreated);
+        EventAggregator.GetEvent<WindowClosedEvent>().Subscribe(OnWindowClosed);
+        EventAggregator.GetEvent<WindowActivatedEvent>().Subscribe(OnWindowActivated);
+        EventAggregator.GetEvent<WindowDeactivatedEvent>().Subscribe(OnWindowDeactivated);
     }
 
     private void RegisterBasicServices(IContainerRegistry containerRegistry)
@@ -286,13 +270,26 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
     {
         
     }
+    
+    protected virtual void OnWindowCreated(IWindow wnd)
+    {
+        var t = Stopwatch.StartNew();
+        OnWindowAdded(wnd);
+        t.Stop();
+        Log.Logger.Information($"Service created in {t.ElapsedMilliseconds} ms");
+    }
 
-    private void OnWindowActivated(IWindow obj)
+    protected virtual void OnWindowClosed(IWindow wnd)
+    {
+        OnWindowRemoved(wnd);
+    }
+
+    protected void OnWindowActivated(IWindow obj)
     {
         ActiveWindow = obj;
     }
     
-    private void OnWindowDeactivated(IWindow obj)
+    protected void OnWindowDeactivated(IWindow obj)
     {
         if (ActiveWindow == obj) ActiveWindow = null;
     }
@@ -331,6 +328,11 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
         }
     }
 
+    public void RunOnce(AppTime time)
+    {
+        
+    }
+
     private void OnStartupInternal()
     {
         Started?.Invoke(this, EventArgs.Empty);
@@ -342,7 +344,6 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
         
     }
 
-    private int cycle = 0;
     private void ApplicationLoopThread()
     {
         Dispatcher.CurrentDispatcher.UIThread = Thread.CurrentThread;
@@ -351,9 +352,7 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
         {
             try
             {
-                //Log.Logger.Information($"Current cycle: {cycle}");
                 var frameTime = preciseTimer.GetElapsedTime();
-                //ProcessPendingWindows();
                 if (IsFixedTimeStep)
                 {
                     accumulatedFrameTime += frameTime;
@@ -371,6 +370,7 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
                 {
                     Update(appTime);
                     ExecuteDrawSequence(appTime);
+                    
                     UpdateAppTime(frameTime);
                 }
 
@@ -381,8 +381,6 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
                 Console.WriteLine(ex);
                 UnhandledException?.Invoke(this, new UnhandledExceptionEventArgs(ex));
             }
-
-            cycle++;
         }
     }
 
@@ -394,12 +392,6 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
             RecreateDevicesAndServices();
         }
         CycleFinished?.Invoke(this, EventArgs.Empty);
-        OnCycleFinished();
-    }
-
-    protected virtual void OnCycleFinished()
-    {
-        
     }
 
     private void ExecuteDrawSequence(AppTime appTime)
@@ -409,6 +401,7 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
         if (BeginScene())
         {
             Draw(appTime);
+            OnBeforeEndScene();
             EndScene();
         }
     }
@@ -449,7 +442,7 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
         fpsTime += appTime.FrameTime;
         if (fpsTime >= 1.0d)
         {
-            Console.WriteLine($"FPS = {fpsCounter}");
+            Console.WriteLine($"App FPS = {fpsCounter}");
             appTime.Fps = (fpsCounter) / (Single)fpsTime;
             fpsCounter = 0;
             fpsTime = 0;
@@ -501,6 +494,11 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
     protected void Draw(AppTime frameTime)
     {
         EntityWorld.ServiceManager.Draw(frameTime);
+    }
+
+    protected virtual void OnBeforeEndScene()
+    {
+        
     }
 
     protected void EndScene()
