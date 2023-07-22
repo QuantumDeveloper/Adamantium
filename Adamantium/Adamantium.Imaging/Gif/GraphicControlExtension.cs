@@ -1,6 +1,6 @@
 ﻿namespace Adamantium.Imaging.Gif
 {
-    internal class GraphicControlExtension
+    public class GraphicControlExtension
     {
         public byte Fields { get; set; }
         public ushort DelayTime { get; set; }

@@ -20,7 +20,7 @@ namespace Adamantium.Imaging
     //[ContentReader(typeof(ImageContentReader))]
     public sealed class Image : DisposableObject
     {
-        public delegate Image ImageLoadDelegate(IntPtr dataPointer, int dataSize, bool makeACopy, GCHandle? handle);
+        public delegate Image ImageLoadDelegate(IntPtr dataPointer, ulong dataSize, bool makeACopy, GCHandle? handle);
         public delegate void ImageSaveDelegate(Image img, PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream);
 
         /// <summary>
@@ -33,8 +33,7 @@ namespace Adamantium.Imaging
         private MipMapDescription[] mipmapDescriptions;
         private static List<LoadSaveDelegate> loadSaveDelegates = new List<LoadSaveDelegate>();
         private bool isAnimated;
-        private uint numberOfReplays;
-
+        
         /// <summary>
         /// Provides access to all pixel buffers.
         /// </summary>
@@ -71,13 +70,13 @@ namespace Adamantium.Imaging
 
         public bool IsAnimated => isAnimated;
 
-        public uint NumberOfReplays => numberOfReplays;
-
         /// <summary>
         /// Gets a pointer to the image buffer in memory.
         /// </summary>
         /// <value>A pointer to the image buffer in memory.</value>
         public IntPtr DataPointer => this.buffer;
+        
+        public IRawBitmap Frames { get; private set; }
 
         /// <summary>
         /// Provides access to all pixel buffers.
@@ -111,14 +110,14 @@ namespace Adamantium.Imaging
         /// <param name="handle">The handle (optional).</param>
         /// <param name="bufferIsDisposable">if set to <c>true</c> [buffer is disposable].</param>
         /// <exception cref="System.InvalidOperationException">If the format is invalid, or width/height/depth/arraysize is invalid with respect to the dimension.</exception>
-        internal Image(ImageDescription description, IntPtr dataPointer, int offset, GCHandle? handle, bool bufferIsDisposable, PitchFlags pitchFlags = PitchFlags.None)
+        internal Image(ImageDescription description, IntPtr dataPointer, ulong offset, GCHandle? handle, bool bufferIsDisposable, PitchFlags pitchFlags = PitchFlags.None)
         {
             Initialize(description, dataPointer, offset, handle, bufferIsDisposable, pitchFlags);
         }
 
-        internal Image(ImageDescription mainDescription, uint numberOfReplays, params AnimatedImageDescription[] animatedDescriptions)
+        internal Image(ImageDescription description, IRawBitmap multiFrameImage)
         {
-            InitializeAnimated(mainDescription, numberOfReplays, animatedDescriptions);
+            InitializeMultiFrame(description, multiFrameImage);
         }
 
         protected override void Dispose(bool disposeManagedResources)
@@ -287,15 +286,20 @@ namespace Adamantium.Imaging
         {
             return New(description, IntPtr.Zero);
         }
+        
+        public static Image New(ImageDescription description, byte[] data)
+        {
+            return New(description, IntPtr.Zero);
+        }
 
         /// <summary>
         /// Creates a new instance of animated <see cref="Image"/> from an image description.
         /// </summary>
         /// <param name="description">The image description.</param>
         /// <returns>A new image.</returns>
-        public static Image New(ImageDescription mainDescription, uint numberOfReplays, params AnimatedImageDescription[] descriptions)
+        public static Image New(ImageDescription description, IRawBitmap multiFrameImage)
         {
-            return new Image(mainDescription, numberOfReplays, descriptions);
+            return new Image(description, multiFrameImage);
         }
 
         /// <summary>
@@ -428,7 +432,7 @@ namespace Adamantium.Imaging
         /// <param name="makeACopy">True to copy the content of the buffer to a new allocated buffer, false otherwise.</param>
         /// <returns>An new image.</returns>
         /// <remarks>If <paramref name="makeACopy"/> is set to false, the returned image is now the holder of the unmanaged pointer and will release it on Dispose. </remarks>
-        public static Image Load(IntPtr dataPointer, int dataSize, ImageFileType expectedType = ImageFileType.Unknown, bool makeACopy = false)
+        public static Image Load(IntPtr dataPointer, ulong dataSize, ImageFileType expectedType = ImageFileType.Unknown, bool makeACopy = false)
         {
             //Find delegate which will try to load image of concrete type
             foreach (var loadSaveDelegate in loadSaveDelegates)
@@ -470,7 +474,7 @@ namespace Adamantium.Imaging
         /// <remarks>If <paramref name="makeACopy"/> is set to false, the returned image is now the holder of the unmanaged pointer and will release it on Dispose. </remarks>
         public static Image Load(DataPointer dataBuffer, bool makeACopy = false)
         {
-            return Load(dataBuffer.Pointer, dataBuffer.Size, makeACopy);
+            return Load(dataBuffer.Pointer, (ulong)dataBuffer.Size, makeACopy);
         }
 
         /// <summary>
@@ -481,7 +485,7 @@ namespace Adamantium.Imaging
         /// <param name="makeACopy">True to copy the content of the buffer to a new allocated buffer, false otherwise.</param>
         /// <returns>An new image.</returns>
         /// <remarks>If <paramref name="makeACopy"/> is set to false, the returned image is now the holder of the unmanaged pointer and will release it on Dispose. </remarks>
-        public static Image Load(IntPtr dataPointer, int dataSize, bool makeACopy = false)
+        public static Image Load(IntPtr dataPointer, ulong dataSize, bool makeACopy = false)
         {
             return Load(dataPointer, dataSize, makeACopy, null);
         }
@@ -497,7 +501,7 @@ namespace Adamantium.Imaging
             if (buffer == null)
                 throw new ArgumentNullException(nameof(buffer));
 
-            int size = buffer.Length;
+            ulong size = (ulong)buffer.Length;
 
             // If buffer is allocated on Large Object Heap, then we are going to pin it instead of making a copy.
             if (size > (85 * 1024))
@@ -506,9 +510,9 @@ namespace Adamantium.Imaging
                 return Load(handle.AddrOfPinnedObject(), size, false, handle);
             }
 
-            fixed (void* pbuffer = buffer)
+            fixed (void* pBuffer = buffer)
             {
-                return Load((IntPtr)pbuffer, size, true);
+                return Load((IntPtr)pBuffer, size, true);
             }
         }
 
@@ -532,9 +536,9 @@ namespace Adamantium.Imaging
                 {
                     unsafe
                     {
-                        var imageSize = (int)nativeImageStream.Length;
-                        imageBuffer = Utilities.AllocateMemory(imageSize);
-                        Span<byte> bytes = new Span<byte>(imageBuffer.ToPointer(), imageSize);
+                        var imageSize = (ulong)nativeImageStream.Length;
+                        imageBuffer = Utilities.AllocateMemory((int)imageSize);
+                        Span<byte> bytes = new Span<byte>(imageBuffer.ToPointer(), (int)imageSize);
                         nativeImageStream.Read(bytes);
                         image = Load(imageBuffer, imageSize, fileType);
                     }
@@ -568,15 +572,15 @@ namespace Adamantium.Imaging
 
             FileStream stream = null;
             IntPtr memoryPtr = IntPtr.Zero;
-            int size;
+            ulong size;
             try
             {
                 unsafe
                 {
                     stream = new FileStream(fileName, FileMode.Open, FileAccess.Read);
-                    size = (int)stream.Length;
-                    memoryPtr = Utilities.AllocateMemory(size);
-                    Span<byte> bytes = new Span<byte>(memoryPtr.ToPointer(), size);
+                    size = (ulong)stream.Length;
+                    memoryPtr = Utilities.AllocateMemory((int)size);
+                    Span<byte> bytes = new Span<byte>(memoryPtr.ToPointer(), (int)size);
                     stream.Read(bytes);
                 }
             }
@@ -701,7 +705,7 @@ namespace Adamantium.Imaging
         /// <param name="handle">The handle.</param>
         /// <returns></returns>
         /// <exception cref="System.NotSupportedException"></exception>
-        private static Image Load(IntPtr dataPointer, int dataSize, bool makeACopy, GCHandle? handle)
+        private static Image Load(IntPtr dataPointer, ulong dataSize, bool makeACopy, GCHandle? handle)
         {
             foreach (var loadSaveDelegate in loadSaveDelegates)
             {
@@ -740,18 +744,18 @@ namespace Adamantium.Imaging
 
         static Image()
         {
-            Register(ImageFileType.Dds, DDSHelper.LoadFromMemory, DDSHelper.SaveToStream);
-            Register(ImageFileType.Ico, ICOHelper.LoadFromMemory, ICOHelper.SaveToStream);
-            Register(ImageFileType.Gif, GIFHelper.LoadFromMemory, GIFHelper.SaveToStream);
-            Register(ImageFileType.Bmp, BitmapHelper.LoadFromMemory, BitmapHelper.SaveToStream);
-            Register(ImageFileType.Jpg, JpegHelper.LoadFromMemory, JpegHelper.SaveToStream);
-            Register(ImageFileType.Png, PNGHelper.LoadFromMemory, PNGHelper.SaveToStream);
-            Register(ImageFileType.Tga, TGAHelper.LoadFromMemory, TGAHelper.SaveToStream);
+            //Register(ImageFileType.Dds, DDSHelper.LoadFromMemory, DDSHelper.SaveToStream);
+            //Register(ImageFileType.Ico, ICOHelper.LoadFromMemory, ICOHelper.SaveToStream);
+            //Register(ImageFileType.Gif, GIFHelper.LoadFromMemory, GIFHelper.SaveToStream);
+            //Register(ImageFileType.Bmp, BitmapHelper.LoadFromMemory, BitmapHelper.SaveToStream);
+            //Register(ImageFileType.Jpg, JpegHelper.LoadFromMemory, JpegHelper.SaveToStream);
+            //Register(ImageFileType.Png, PNGHelper.LoadFromMemory, PNGHelper.SaveToStream);
+            //Register(ImageFileType.Tga, TGAHelper.LoadFromMemory, TGAHelper.SaveToStream);
             //Register(ImageFileType.Tiff, WICHelper.LoadFromWICMemory, WICHelper.SaveTiffToWICMemory);
         }
 
 
-        internal unsafe void Initialize(ImageDescription description, IntPtr dataPointer, int offset, GCHandle? handle, bool bufferIsDisposable, PitchFlags pitchFlags = PitchFlags.None)
+        internal unsafe void Initialize(ImageDescription description, IntPtr dataPointer, ulong offset, GCHandle? handle, bool bufferIsDisposable, PitchFlags pitchFlags = PitchFlags.None)
         {
             if (!FormatHelper.IsValid(description.Format))
                 throw new InvalidOperationException("Unsupported Image Format");
@@ -793,8 +797,7 @@ namespace Adamantium.Imaging
             }
 
             // Calculate mipmaps
-            int pixelBufferCount;
-            mipMapToZIndex = CalculateImageArray(description, pitchFlags, out pixelBufferCount, out totalSizeInBytes);
+            mipMapToZIndex = CalculateImageArray(description, pitchFlags, out var pixelBufferCount, out totalSizeInBytes);
             mipmapDescriptions = CalculateMipMapDescription(description, pitchFlags);
             zBufferCountPerArraySlice = mipMapToZIndex[^1];
 
@@ -805,7 +808,7 @@ namespace Adamantium.Imaging
             // Setup all pointers
             // only release buffer that is not pinned and is asked to be disposed.
             this.bufferIsDisposable = !handle.HasValue && bufferIsDisposable;
-            this.buffer = dataPointer;
+            buffer = dataPointer;
 
             if (dataPointer == IntPtr.Zero)
             {
@@ -814,7 +817,7 @@ namespace Adamantium.Imaging
                 this.bufferIsDisposable = true;
             }
 
-            SetupImageArray((IntPtr)((byte*)buffer + offset), description, pitchFlags, pixelBuffers);
+            SetupImageArray((IntPtr)((byte*)buffer + offset), description, pitchFlags, pixelBuffers, mipmapDescriptions);
 
             Description = description;
 
@@ -823,36 +826,41 @@ namespace Adamantium.Imaging
         }
 
 
-        internal unsafe void InitializeAnimated(ImageDescription mainDescription, uint numberOfReplays, params AnimatedImageDescription[] animatedDescriptions)
+        internal unsafe void InitializeMultiFrame(ImageDescription description, IRawBitmap multiFrameImage)
         {
-            if (!FormatHelper.IsValid(mainDescription.Format))
+            if (!FormatHelper.IsValid(description.Format))
                 throw new InvalidOperationException("Unsupported Image Format");
 
-            if (animatedDescriptions == null || animatedDescriptions.Length < 2)
-                throw new InvalidOperationException("Animated descriptions count must be more than 1");
+            PitchFlags pitchFlags = PitchFlags.None;
+            Frames = multiFrameImage;
 
             isAnimated = true;
 
-            this.numberOfReplays = numberOfReplays;
-
             // Calculate mipmaps
-            int pixelBufferCount = animatedDescriptions.Length;
-            totalSizeInBytes = CalculateAnimatedImageArray(animatedDescriptions);
+            mipMapToZIndex = CalculateImageArray(description, pitchFlags, out var pixelBufferCount, out totalSizeInBytes);
+            mipmapDescriptions = CalculateMipMapDescription(description, pitchFlags);
+            zBufferCountPerArraySlice = mipMapToZIndex[^1];
 
             // Allocate all pixel buffers
             pixelBuffers = new PixelBuffer[pixelBufferCount];
             pixelBufferArray = new PixelBufferArray(this);
 
-            // TODO replace with new alloc method
-            buffer = Utilities.AllocateMemory((int)totalSizeInBytes);
-            bufferIsDisposable = true;
+            // Setup all pointers
+            // only release buffer that is not pinned and is asked to be disposed.
+            bufferIsDisposable = !handle.HasValue && bufferIsDisposable;
+            
+            if (buffer == IntPtr.Zero)
+            {
+                buffer = Utilities.AllocateMemory((int)totalSizeInBytes);
+                bufferIsDisposable = true;
+            }
 
-            SetupImageArray((IntPtr)((byte*)buffer), mainDescription.Format, animatedDescriptions, pixelBuffers);
+            SetupImageArray((IntPtr)((byte*)buffer), description, pitchFlags, pixelBuffers, mipmapDescriptions);
 
-            Description = mainDescription;
+            Description = description;
 
             // PreCompute databoxes
-            dataBoxArray = ComputeAnimatedDataBox();
+            dataBoxArray = ComputeDataBox();
         }
 
         private PixelBuffer GetPixelBufferUnsafe(int arrayIndex, int zIndex, int mipmap)
@@ -899,15 +907,20 @@ namespace Adamantium.Imaging
                 //            || format == Format.BC4_Typeless
                 //            || format == Format.BC4_UNorm
                 //            || format == Format.BC4_SNorm) ? 8 : 16;
-                int bpb = (format == Format.BC1_RGBA_SRGB_BLOCK
-                            || format == Format.BC1_RGBA_UNORM_BLOCK
-                            || format == Format.BC4_UNORM_BLOCK
-                            || format == Format.BC4_SNORM_BLOCK) ? 8 : 16;
-                widthCount = Math.Max(1, (width + 3) / 4);
-                heightCount = Math.Max(1, (height + 3) / 4);
-                rowPitch = widthCount * bpb;
-
-                slicePitch = rowPitch * heightCount;
+                int bytesPerPixel = format is 
+                    Format.BC1_RGBA_SRGB_BLOCK or 
+                    Format.BC1_RGBA_UNORM_BLOCK or
+                    Format.BC2_UNORM_BLOCK or
+                    Format.BC3_UNORM_BLOCK or
+                    Format.BC4_UNORM_BLOCK or 
+                    Format.BC4_SNORM_BLOCK ? 1 : 2;
+                // widthCount = Math.Max(1, (width + 3) / 4);
+                // heightCount = Math.Max(1, (height + 3) / 4);
+                // rowPitch = widthCount * bpb;
+                //
+                // slicePitch = rowPitch * heightCount;
+                rowPitch = width * bytesPerPixel;
+                slicePitch = rowPitch * height;
             }
             else if (format.IsPacked())
             {
@@ -945,9 +958,7 @@ namespace Adamantium.Imaging
 
         internal static MipMapDescription[] CalculateMipMapDescription(ImageDescription metadata, PitchFlags cpFlags = PitchFlags.None)
         {
-            int nImages;
-            int pixelSize;
-            return CalculateMipMapDescription(metadata, cpFlags, out nImages, out pixelSize);
+            return CalculateMipMapDescription(metadata, cpFlags, out var nImages, out var pixelSize);
         }
 
         internal static MipMapDescription[] CalculateMipMapDescription(ImageDescription metadata, PitchFlags cpFlags, out int nImages, out int pixelSize)
@@ -1014,7 +1025,7 @@ namespace Adamantium.Imaging
         /// <param name="pitchFlags">Pitch flags.</param>
         /// <param name="bufferCount">Output number of mipmap.</param>
         /// <param name="pixelSizeInBytes">Output total size to allocate pixel buffers for all images.</param>
-        private static List<int> CalculateImageArray(ImageDescription imageDesc, PitchFlags pitchFlags, out int bufferCount, out ulong pixelSizeInBytes)
+        internal static List<int> CalculateImageArray(ImageDescription imageDesc, PitchFlags pitchFlags, out int bufferCount, out ulong pixelSizeInBytes)
         {
             pixelSizeInBytes = 0;
             bufferCount = 0;
@@ -1059,39 +1070,6 @@ namespace Adamantium.Imaging
             return mipmapToZIndex;
         }
 
-
-        /// <summary>
-        /// Allocates PixelBuffers for animated image
-        /// </summary>
-        /// <param name="buffer"></param>
-        /// <param name="imageDesc"></param>
-        /// <param name="pitchFlags"></param>
-        /// <param name="output"></param>
-        private static unsafe void SetupImageArray(IntPtr buffer, Format format, AnimatedImageDescription[] imageDesc, PixelBuffer[] output)
-        {
-            int index = 0;
-            var pixels = (byte*)buffer;
-            foreach (var desc in imageDesc)
-            {
-                int rowPitch, slicePitch;
-                int widthPacked;
-                int heightPacked;
-                ComputePitch(format, (int)desc.Width, (int)desc.Height, out rowPitch, out slicePitch, out widthPacked, out heightPacked);
-
-                // We use the same memory organization that Direct3D 11 needs for D3D11_SUBRESOURCE_DATA
-                // with all slices of a given miplevel being continuous in memory
-                var pxBuffer = new PixelBuffer(desc.Width, desc.Height, format, rowPitch, slicePitch, (IntPtr)pixels);
-                pxBuffer.XOffset = desc.XOffset;
-                pxBuffer.YOffset = desc.YOffset;
-                pxBuffer.DelayNumerator = desc.DelayNumerator;
-                pxBuffer.DelayDenominator = desc.DelayDenominator;
-                output[index] = pxBuffer;
-                ++index;
-
-                pixels += slicePitch;
-            }
-        }
-
         /// <summary>
         /// Allocates PixelBuffers 
         /// </summary>
@@ -1099,41 +1077,44 @@ namespace Adamantium.Imaging
         /// <param name="imageDesc"></param>
         /// <param name="pitchFlags"></param>
         /// <param name="output"></param>
-        private static unsafe void SetupImageArray(IntPtr buffer, ImageDescription imageDesc, PitchFlags pitchFlags, PixelBuffer[] output)
+        internal static unsafe void SetupImageArray(IntPtr buffer, ImageDescription imageDesc, PitchFlags pitchFlags, PixelBuffer[] output, MipMapDescription[] mipMapDescriptions)
         {
             int index = 0;
-            var pixels = (byte*)buffer;
+            var pixels = buffer;
             for (uint item = 0; item < imageDesc.ArraySize; ++item)
             {
-                var w = imageDesc.Width;
-                var h = imageDesc.Height;
-                var d = imageDesc.Depth;
+                var width = imageDesc.Width;
+                var height = imageDesc.Height;
+                var depth = imageDesc.Depth;
 
                 for (uint level = 0; level < imageDesc.MipLevels; ++level)
                 {
                     int rowPitch, slicePitch;
                     int widthPacked;
                     int heightPacked;
-                    ComputePitch(imageDesc.Format, (int)w, (int)h, out rowPitch, out slicePitch, out widthPacked, out heightPacked, pitchFlags);
+                    ComputePitch(imageDesc.Format, (int)width, (int)height, out rowPitch, out slicePitch, out widthPacked, out heightPacked, pitchFlags);
 
-                    for (uint zSlice = 0; zSlice < d; ++zSlice)
+                    for (uint zSlice = 0; zSlice < depth; ++zSlice)
                     {
                         // We use the same memory organization that Direct3D 11 needs for D3D11_SUBRESOURCE_DATA
                         // with all slices of a given miplevel being continuous in memory
-                        output[index] = new PixelBuffer(w, h, imageDesc.Format, rowPitch, slicePitch, (IntPtr)pixels);
+                        var pixelBuffer = new PixelBuffer(width, height, imageDesc.Format, rowPitch, slicePitch, pixels);
+                        pixelBuffer.MipLevel = level;
+                        pixelBuffer.MipMapDescription = mipMapDescriptions[level];
+                        output[index] = pixelBuffer;
                         ++index;
 
                         pixels += slicePitch;
                     }
 
-                    if (h > 1)
-                        h >>= 1;
+                    if (height > 1)
+                        height >>= 1;
 
-                    if (w > 1)
-                        w >>= 1;
+                    if (width > 1)
+                        width >>= 1;
 
-                    if (d > 1)
-                        d >>= 1;
+                    if (depth > 1)
+                        depth >>= 1;
                 }
             }
         }

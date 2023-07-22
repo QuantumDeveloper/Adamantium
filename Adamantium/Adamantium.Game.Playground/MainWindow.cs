@@ -18,6 +18,7 @@ using Adamantium.UI.Input;
 using Adamantium.UI.Controls;
 using Serilog;
 using Adamantium.UI;
+using Adamantium.UI.Media.Imaging;
 using Adamantium.UI.Processors;
 using Adamantium.UI.RoutedEvents;
 
@@ -44,7 +45,7 @@ public partial class MainWindow : Window
 
     private void OnSourceInitialized(object sender, EventArgs e)
     {
-        CreateGame();
+        //CreateGame();
     }
 
     private void CreateGame()

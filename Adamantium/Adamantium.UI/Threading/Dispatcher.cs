@@ -122,7 +122,7 @@ public sealed class Dispatcher : IDispatcher
 
     public void Invoke(Action action, DispatcherPriority priority = DispatcherPriority.Normal)
     {
-        action?.Invoke();
+        executor.Invoke(action, priority);
     }
 
     public void Invoke(Delegate action, object args)

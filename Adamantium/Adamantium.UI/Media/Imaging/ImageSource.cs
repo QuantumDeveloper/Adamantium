@@ -6,20 +6,33 @@ namespace Adamantium.UI.Media.Imaging;
 
 public abstract class ImageSource : AdamantiumComponent, IDisposable
 {
-   public virtual Texture Texture { get; set; }
-
    public abstract double Width { get; }
    public abstract double Height { get; }
    
    public bool IsDisposed { get; private set; }
 
-   public void Dispose()
+   protected virtual void ReleaseUnmanagedResources()
+   {
+      
+   }
+   
+   private void Dispose(bool disposing)
    {
       if (!IsDisposed)
       {
-         Texture?.Dispose();
-         Texture = null;
+         ReleaseUnmanagedResources();
          IsDisposed = true;
       }
+   }
+
+   public void Dispose()
+   {
+      Dispose(true);
+      GC.SuppressFinalize(this);
+   }
+
+   ~ImageSource()
+   {
+      Dispose(false);
    }
 }

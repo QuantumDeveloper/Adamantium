@@ -8,12 +8,13 @@ namespace Adamantium.Imaging.Png
 {
     public static class PNGHelper
     {
+        // TODO: Rework to support Image class
         public static unsafe Image LoadFromMemory(IntPtr pSource, int size, bool makeACopy, GCHandle? handle)
         {
             var stream = new PNGStreamReader(pSource, size);
-            PNGDecoder decoder = new PNGDecoder(stream);
+            var decoder = new PNGDecoder(stream);
             var img = decoder.Decode();
-            return img;
+            return null;
         }
 
         public static void SaveToStream(Image img, PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream)
@@ -49,7 +50,7 @@ namespace Adamantium.Imaging.Png
             {
                 state.InfoPng.FramesCount--;
             }
-            state.InfoPng.RepeatCount = img.NumberOfReplays;
+            state.InfoPng.RepeatCount = img.Frames.NumberOfReplays;
             state.InfoPng.ColorMode.ColorType = colorType;
             state.InfoPng.ColorMode.BitDepth = (uint)description.Format.SizeOfInBits() / (uint)description.Format.SizeOfInBytes();
 

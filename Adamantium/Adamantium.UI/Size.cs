@@ -151,6 +151,11 @@ public struct Size:IEquatable<Size>
          Math.Max(0, Height + thickness.Top + thickness.Bottom));
    }
 
+   public static bool IsZero(Size size)
+   {
+      return size.Width == 0 && size.Height == 0;
+   }
+
    /// <summary>
    /// Converts Size2D to Point
    /// </summary>

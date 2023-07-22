@@ -3,12 +3,15 @@ using Adamantium.Mathematics;
 
 namespace Adamantium.Imaging.Gif
 {
-    internal class GifFrame
+    public class GifFrame
     {
-        public GifFrame()
+        public GifFrame(int frameIndex)
         {
+            FrameIndex = frameIndex;
             CompressedData = new List<byte>();
         }
+        
+        public int FrameIndex { get; }
 
         public GifImageDescriptor Descriptor { get; set; }
 
@@ -25,5 +28,7 @@ namespace Adamantium.Imaging.Gif
         public int[] IndexData { get; set; }
 
         public bool Interlaced { get; set; }
+        
+        public bool IsDecoded { get; internal set; }
     }
 }

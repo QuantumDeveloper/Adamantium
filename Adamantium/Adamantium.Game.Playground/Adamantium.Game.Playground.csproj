@@ -153,6 +153,50 @@
       <Content Include="Textures\infinity.gif">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
+      <None Remove="Textures\APNG-cube.png" />
+      <Content Include="Textures\APNG-cube.png">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Textures\ball.png" />
+      <Content Include="Textures\ball.png">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Textures\elephant.png" />
+      <Content Include="Textures\elephant.png">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Textures\RotatingEarth2.gif" />
+      <Content Include="Textures\RotatingEarth2.gif">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Textures\balls.dds" />
+      <Content Include="Textures\balls.dds">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Textures\TextureCube.dds" />
+      <Content Include="Textures\TextureCube.dds">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Textures\ai.ico" />
+      <Content Include="Textures\ai.ico">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Textures\SharpDoc.ico" />
+      <Content Include="Textures\SharpDoc.ico">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Textures\PDF-Document.ico" />
+      <Content Include="Textures\PDF-Document.ico">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Textures\ColoredImage.jpg" />
+      <Content Include="Textures\ColoredImage.jpg">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Textures\luxfon.tga" />
+      <Content Include="Textures\luxfon.tga">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
     </ItemGroup>
 
     <ItemGroup>

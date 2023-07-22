@@ -7,34 +7,34 @@ using AdamantiumVulkan.Core;
 
 namespace Adamantium.Imaging.Bmp
 {
-    internal class BitmapHelper
+    public class BitmapHelper
     {
         private const UInt16 fileType = 0x4D42;
 
-        public static Image LoadFromMemory(IntPtr pSource, int size, bool makeACopy, GCHandle? handle)
+        public static IRawBitmap LoadFromMemory(IntPtr pSource, ulong size, bool makeACopy, GCHandle? handle)
         {
             if (!DecodeBitmapHeader(pSource, size, out var description, out var dataOffset, out var compression))
             {
-                return null;
+                throw new ArgumentException("Given file is not a BMP file");
             }
 
             return CreateImageFromBitmap(pSource, dataOffset, description, handle);
         }
 
-        private static unsafe Image CreateImageFromBitmap(IntPtr pSource, int offset, ImageDescription description, GCHandle? handle)
+        private static unsafe IRawBitmap CreateImageFromBitmap(IntPtr pSource, int offset, ImageDescription description, GCHandle? handle)
         {
             var originalFormat = description.Format;
             var realFormatSize = description.Format.SizeOfInBytes();
-            var sizeinBytes = description.Format.SizeOfInBytes();
-            var bufferSize = description.Width * description.Height * sizeinBytes;
+            var sizeInBytes = description.Format.SizeOfInBytes();
+            var bufferSize = description.Width * description.Height * sizeInBytes;
             byte[] buffer = new byte[bufferSize];
             var rowStride = (int)(description.Width * realFormatSize);
             var alignedRowStride = AlignStride(rowStride);
             int rowStrideDiff = alignedRowStride - rowStride;
-            var convertionsFlags = ConvertionFlags.None;
+            var conversionFlags = ConversionFlags.None;
             if (realFormatSize == 2)
             {
-                convertionsFlags = originalFormat == Format.B5G5R5A1_UNORM_PACK16 ? ConvertionFlags.RGB555 : ConvertionFlags.RGB565;
+                conversionFlags = originalFormat == Format.B5G5R5A1_UNORM_PACK16 ? ConversionFlags.RGB555 : ConversionFlags.RGB565;
             }
 
             using (var stream = new UnmanagedMemoryStream((byte*)pSource, rowStride * description.Height + offset))
@@ -42,7 +42,7 @@ namespace Adamantium.Imaging.Bmp
                 int bufferOffset = 0;
                 var streamOffset = 0;
                 stream.Seek(offset, SeekOrigin.Begin);
-                for (int i = 0; i < bufferSize; i += sizeinBytes)
+                for (int i = 0; i < bufferSize; i += sizeInBytes)
                 {
                     stream.Read(buffer, bufferOffset, realFormatSize);
                     bufferOffset += realFormatSize;
@@ -55,13 +55,13 @@ namespace Adamantium.Imaging.Bmp
                         byte r = 0;
                         byte g = 0;
                         byte b = 0;
-                        if (convertionsFlags == ConvertionFlags.RGB565)
+                        if (conversionFlags == ConversionFlags.RGB565)
                         {
                             b = (byte)(rg16 & ColorMasks.RGB565.BlueMask);
                             g = (byte)((rg16 & ColorMasks.RGB565.GreenMask) >> 5);
                             r = (byte)((rg16 & ColorMasks.RGB565.RedMask) >> 11);
                         }
-                        else if (convertionsFlags == ConvertionFlags.RGB555)
+                        else if (conversionFlags == ConversionFlags.RGB555)
                         {
                             b = (byte)(rg16 & ColorMasks.RGB555.BlueMask);
                             g = (byte)((rg16 & ColorMasks.RGB555.GreenMask) >> 5);
@@ -81,9 +81,9 @@ namespace Adamantium.Imaging.Bmp
                         Utilities.Swap(ref buffer[origin], ref buffer[origin + 2]);
                     }
 
-                    if (realFormatSize < sizeinBytes)
+                    if (realFormatSize < sizeInBytes)
                     {
-                        var bytesDiff = sizeinBytes - realFormatSize;
+                        var bytesDiff = sizeInBytes - realFormatSize;
                         bufferOffset += bytesDiff;
                     }
 
@@ -95,15 +95,9 @@ namespace Adamantium.Imaging.Bmp
                 }
             }
 
-            Image image = Image.New(description);
-            var bufferHandle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
-            var ptr = image.PixelBuffer[0].DataPointer;
-            Utilities.CopyMemory(ptr, bufferHandle.AddrOfPinnedObject(), buffer.Length);
-            bufferHandle.Free();
-            var px = PixelBuffer.FlipBuffer(image.PixelBuffer[0], FlipBufferOptions.FlipVertically);
-            image.ApplyPixelBuffer(px, 0, true); 
-
-            return image;
+            var bmpImage = new BmpImage(description);
+            bmpImage.PixelData = buffer;
+            return bmpImage;
         }
 
         private static int AlignStride(int stride, int align = 4)
@@ -117,7 +111,7 @@ namespace Adamantium.Imaging.Bmp
             return newStride;
         }
 
-        private static bool DecodeBitmapHeader(IntPtr headerPtr, int size, out ImageDescription description, out int dataOffset, out BitmapCompressionMode compressionMode)
+        private static bool DecodeBitmapHeader(IntPtr headerPtr, ulong size, out ImageDescription description, out int dataOffset, out BitmapCompressionMode compressionMode)
         {
             dataOffset = 0;
             compressionMode = BitmapCompressionMode.RGB;
@@ -125,7 +119,7 @@ namespace Adamantium.Imaging.Bmp
             if (headerPtr == IntPtr.Zero)
                 throw new ArgumentException("Pointer to Bitmap header cannot be null", nameof(headerPtr));
 
-            if (size < (Utilities.SizeOf<BitmapFileHeader>()))
+            if (size < (ulong)(Utilities.SizeOf<BitmapFileHeader>()))
                 return false;
 
             var fileHeader = Utilities.Read<BitmapFileHeader>(headerPtr);
@@ -155,7 +149,7 @@ namespace Adamantium.Imaging.Bmp
             }
             else if (infoHeader.bitCount == 16)
             {
-                description.Format = Format.B5G5R5A1_UNORM_PACK16;
+                description.Format = Format.B5G6R5_UNORM_PACK16;
             }
 
             description.MipLevels = 1;

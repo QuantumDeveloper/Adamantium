@@ -153,6 +153,11 @@ public class DrawingContext
 
    public void DrawImage(ImageSource image, Brush filter, Rect destinationRect, CornerRadius corners)
    {
+      if (image is BitmapSource bitmapSource)
+      {
+         bitmapSource.InitUnderlyingImage(this);
+      }
+      
       var geometry = new RectangleGeometry(destinationRect, corners);
       geometry.ProcessGeometry(GeometryType.Solid);
 

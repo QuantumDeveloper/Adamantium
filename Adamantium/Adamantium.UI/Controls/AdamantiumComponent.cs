@@ -6,7 +6,7 @@ namespace Adamantium.UI.Controls;
 
 public abstract class AdamantiumComponent : DispatcherComponent, IAdamantiumComponent
 {
-    public long Uid { get; set; }
+    public UInt128 Uid { get; set; }
 
     private readonly Dictionary<AdamantiumProperty, object> values = new Dictionary<AdamantiumProperty, object>();
 

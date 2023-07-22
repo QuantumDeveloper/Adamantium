@@ -18,7 +18,6 @@ public class RenderTargetPanel: Grid
 
    public RenderTargetPanel()
    {
-      Background = Brushes.Crimson;
    }
 
    static RenderTargetPanel()

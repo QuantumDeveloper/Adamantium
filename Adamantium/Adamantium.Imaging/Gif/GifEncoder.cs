@@ -16,11 +16,8 @@ namespace Adamantium.Imaging.Gif
         private const string GIFHeader = "GIF89a";
         private const string NetscapeAppExt = "NETSCAPE2.0";
 
-        private LZW lzw;
-
         public GifEncoder()
         {
-            lzw = new LZW();
         }
 
         public void Encode(Image img, Stream stream)
@@ -114,7 +111,7 @@ namespace Adamantium.Imaging.Gif
 
                         result.ColorTable = lst.ToArray();
                     }
-                    result.CompressedPixels = lzw.Compress(result.IndexTable, 8);
+                    result.CompressedPixels = LZW.Compress(result.IndexTable, 8);
                     quantizerResults[index] = result;
                 }
             );

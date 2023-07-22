@@ -1,6 +1,6 @@
 ﻿namespace Adamantium.Imaging.Gif
 {
-    internal class ScreenDescriptor
+    public class ScreenDescriptor
     {
         public ushort   Width { get; set; }
         public ushort   Height { get; set; }

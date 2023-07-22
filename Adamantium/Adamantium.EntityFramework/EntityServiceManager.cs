@@ -11,7 +11,7 @@ namespace Adamantium.EntityFramework
     {
         private readonly object syncObject = new object();
 
-        private readonly Dictionary<Int64, EntityService> activeServices;
+        private readonly Dictionary<UInt128, EntityService> activeServices;
 
         private readonly List<EntityService> servicesToAdd;
         private readonly List<EntityService> servicesToRemove;
@@ -33,7 +33,7 @@ namespace Adamantium.EntityFramework
             EntityWorld = world;
             Container = EntityWorld.DependencyResolver;
             services = new AdamantiumCollection<EntityService>();
-            activeServices = new Dictionary<long, EntityService>();
+            activeServices = new Dictionary<UInt128, EntityService>();
             servicesToAdd = new List<EntityService>();
             servicesToRemove = new List<EntityService>();
             pendingServices = new List<EntityService>();
@@ -227,7 +227,7 @@ namespace Adamantium.EntityFramework
             }
         }
 
-        public void RemoveService(long uid)
+        public void RemoveService(UInt128 uid)
         {
             if (activeServices.TryGetValue(uid, out var service))
             {

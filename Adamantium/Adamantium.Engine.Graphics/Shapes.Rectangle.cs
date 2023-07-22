@@ -42,6 +42,28 @@ namespace Adamantium.Engine.Graphics
                 int tessellation = 20,
                 Matrix4x4? transform = null)
             {
+                return GenerateGeometry(type,
+                    0,
+                    0,
+                    width, 
+                    height, 
+                    corners, 
+                    tessellation,
+                    transform);
+            }
+            
+            public static Mesh GenerateGeometry(
+                GeometryType type,
+                double left,
+                double top,
+                double width,
+                double height,
+                CornerRadius corners,
+                int tessellation = 20,
+                Matrix4x4? transform = null)
+            {
+                if (width == 0 || height == 0) return null;
+                
                 var primitiveType = PrimitiveType.TriangleList;
                 if (type == GeometryType.Outlined)
                 {
@@ -103,7 +125,7 @@ namespace Adamantium.Engine.Graphics
                 {
                     vertices.Add(new Vector3(-halfWidth, halfHeight));
                 }
-
+                
                 if (transform is { IsIdentity: false })
                 {
                     vertices = Mesh.ApplyTransform(vertices, transform.Value).ToList();
@@ -133,12 +155,13 @@ namespace Adamantium.Engine.Graphics
                     }
                 }
                 mesh.GenerateBasicIndices();
-
+                
                 var uvs = new List<Vector2F>();
+                
                 foreach (var vertex in mesh.Points)
                 {
-                    var u = (float)(vertex.X / width);
-                    var v = (float)(vertex.Y / height);
+                    var u = (float)((vertex.X - left) / width);
+                    var v = (float)((vertex.Y - top) / height);
                     uvs.Add(new Vector2F(u, v));
                 }
                 

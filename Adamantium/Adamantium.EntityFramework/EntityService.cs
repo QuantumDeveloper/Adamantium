@@ -24,8 +24,6 @@ namespace Adamantium.EntityFramework
 
         protected IEventAggregator EventAggregator { get; }
 
-        Int128 IEntityService.Uid => Uid;
-
         public EntityWorld EntityWorld { get; private set; }
         
         public IGraphicsDeviceService GraphicsDeviceService { get; protected set; }
@@ -40,7 +38,7 @@ namespace Adamantium.EntityFramework
         /// <summary>
         /// Gets unique identifier for the system
         /// </summary>
-        public long Uid { get; }
+        public UInt128 Uid { get; }
 
         protected EntityService(EntityWorld world)
         {

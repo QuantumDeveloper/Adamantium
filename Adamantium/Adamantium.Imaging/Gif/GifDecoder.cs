@@ -12,14 +12,14 @@ namespace Adamantium.Imaging.Gif
     public class GifDecoder
     {
         private const string GIFHeader = "GIF89a";
-        private LZW lzw;
+
+        private int _frameIndex = 0;
 
         public GifDecoder()
         {
-            lzw = new LZW();
         }
 
-        public unsafe Image Decode(UnmanagedMemoryStream stream)
+        public GifImage Decode(UnmanagedMemoryStream stream)
         {
             if (!ReadGIFHeader(stream))
             {
@@ -63,7 +63,8 @@ namespace Adamantium.Imaging.Gif
                 switch (blockType)
                 {
                     case GifChunkCodes.ImageDescriptor:
-                        ProcessImageDescriptor(stream, gifImage);
+                        ProcessImageDescriptor(stream, gifImage, _frameIndex);
+                        _frameIndex++;
                         break;
                     case GifChunkCodes.ExtensionIntroducer:
                         ProcessExtension(stream, gifImage);
@@ -73,159 +74,27 @@ namespace Adamantium.Imaging.Gif
                 }
             }
 
-            return DecodeAllFrames(gifImage);
+            return gifImage;
         }
 
-        private Image DecodeAllFrames(GifImage gif)
-        {
-            for (int i = 0; i < gif.Frames.Count; i++)
-            {
-                var frame = gif.Frames[i];
-                frame.IndexData = lzw.Decompress(frame.CompressedData.ToArray(), frame.LzwMinimumCodeSize);
-                GetImageFromIndexStream(frame, i, gif);
-            }
-
-            ImageDescription description = new ImageDescription();
-            description.Width = gif.Descriptor.Width;
-            description.Height = gif.Descriptor.Height;
-            description.MipLevels = 1;
-            description.Dimension = TextureDimension.Texture2D;
-            description.Format = AdamantiumVulkan.Core.Format.R8G8B8A8_UNORM;
-            description.ArraySize = 1;
-            description.Depth = 1;
-
-            var img = Image.New3D(gif.Descriptor.Width, gif.Descriptor.Height, (uint)gif.Frames.Count, new MipMapCount(1), SurfaceFormat.R8G8B8A8.UNorm);
-            //var img = Image.New3D(gif.Descriptor.Width, gif.Descriptor.Height, 1, new MipMapCount(1), SurfaceFormat.R8G8B8A8.UNorm);
-            //var img = Image.New3D(gif.Frames[45].Descriptor.Width, gif.Frames[45].Descriptor.Height, 1, new MipMapCount(1), SurfaceFormat.R8G8B8A8.UNorm);
-            for (int i = 0; i < gif.Frames.Count; i++)
-            {
-                GifFrame frame = gif.Frames[i];
-                var handle = GCHandle.Alloc(frame.RawPixels, GCHandleType.Pinned);
-                Utilities.CopyMemory(img.pixelBuffers[i].DataPointer, handle.AddrOfPinnedObject(), frame.RawPixels.Length);
-                handle.Free();
-            }
-            //{
-            //    var frame = gif.Frames[75];
-            //    var handle = GCHandle.Alloc(frame.RawPixels, GCHandleType.Pinned);
-            //    Utilities.CopyMemory(img.DataPointer, handle.AddrOfPinnedObject(), frame.RawPixels.Length);
-            //    handle.Free();
-            //}
-            return img;
-        }
-
-        private void GetImageFromIndexStream(GifFrame frame, int frameIndex, GifImage gifImage)
-        {
-            var width = frame.Descriptor.Width;
-            var height = frame.Descriptor.Height;
-            var colorTable = frame.ColorTable;
-
-            byte[] pixels = null;
-            int offset = 0;
-            int bytesPerPixel = 4;
-
-            if (frame.Interlaced)
-            {
-                frame.IndexData = Deinterlace(frame);
-            }
-
-            if (frame.GraphicControlExtension != null)
-            {
-                Debug.WriteLine($"{frameIndex} Disposal method: {frame.GraphicControlExtension.DisposalMethod}");
-            }
-
-            if (frameIndex == 0 || 
-                (frame.Descriptor.Width == gifImage.Descriptor.Width && frame.Descriptor.Height == gifImage.Descriptor.Height) || 
-                (frame.GraphicControlExtension != null && frame.GraphicControlExtension.DisposalMethod == DisposalMethod.None))
-            {
-                pixels = new byte[width * height * bytesPerPixel];
-
-                for (int i = 0; i < width * height; i++)
-                {
-                    var colors = colorTable[frame.IndexData[i]];
-                    pixels[offset] = colors.R;
-                    pixels[offset + 1] = colors.G;
-                    pixels[offset + 2] = colors.B;
-                    if (frame.GraphicControlExtension != null &&
-                        frame.GraphicControlExtension.TransparentColorIndex == i)
-                    {
-                        pixels[offset + 3] = 0;
-                    }
-                    else
-                    {
-                        pixels[offset + 3] = 255;
-                    }
-
-                    offset += bytesPerPixel;
-                }
-                Debug.WriteLine($"{frameIndex} - Condition 1");
-            }
-            else if (frameIndex > 0 && 
-                     (frame.Descriptor.OffsetLeft != gifImage.Descriptor.Width || frame.Descriptor.OffsetTop != gifImage.Descriptor.Height))
-                     //frame.GraphicControlExtension != null && 
-                     //frame.GraphicControlExtension.DisposalMethod == DisposalMethod.DoNotDispose)
-            {
-                pixels = new byte[gifImage.Descriptor.Width * gifImage.Descriptor.Height * bytesPerPixel];
-                var baseFrame = gifImage.Frames[frameIndex - 1];
-                var originalIndexStream = baseFrame.IndexData;
-                var currentIndexStream = new List<int>(originalIndexStream).ToArray();
-                for (int i = 0; i < frame.Descriptor.Height; ++i)
-                {
-                    var dstIndex = ((frame.Descriptor.OffsetTop + i) * gifImage.Descriptor.Width) + frame.Descriptor.OffsetLeft;
-                    var srcIndex = i * frame.Descriptor.Width;
-                    Array.Copy(frame.IndexData, srcIndex, currentIndexStream, dstIndex, frame.Descriptor.Width);
-                }
-
-                int transparentIndex = 0;
-                bool transparencyAvailable = false;
-                if (baseFrame.GraphicControlExtension != null && baseFrame.GraphicControlExtension.TransparencyAvailable)
-                {
-                    transparencyAvailable = baseFrame.GraphicControlExtension.TransparencyAvailable;
-                    transparentIndex = baseFrame.GraphicControlExtension.TransparentColorIndex;
-                }
-                Debug.WriteLine($"{frameIndex}: transparency index - {transparentIndex}");
-                for (int i = 0; i < currentIndexStream.Length; i++)
-                {
-                    bool useBaseColorTable = false;
-                    if (currentIndexStream[i] == transparentIndex && transparencyAvailable)
-                    {
-                        currentIndexStream[i] = originalIndexStream[i];
-                        useBaseColorTable = true;
-                    }
-
-                    ColorRGB colors;
-                    if (useBaseColorTable)
-                    {
-                        colors = baseFrame.ColorTable[currentIndexStream[i]];
-                    }
-                    else
-                    {
-                        colors = colorTable[currentIndexStream[i]];
-                    }
-
-                    pixels[offset] = colors.R;
-                    pixels[offset + 1] = colors.G;
-                    pixels[offset + 2] = colors.B;
-                    if (frame.GraphicControlExtension != null &&
-                        frame.GraphicControlExtension.TransparentColorIndex == i)
-                    {
-                        pixels[offset + 3] = 0;
-                    }
-                    else
-                    {
-                        pixels[offset + 3] = 255;
-                    }
-                    offset += bytesPerPixel;
-                }
-                frame.IndexData = currentIndexStream;
-                Debug.WriteLine($"{frameIndex} - Condition 2");
-            }
-            else
-            {
-                throw new NotImplementedException($"Current disposal method: {frame.GraphicControlExtension?.DisposalMethod} is not supported");
-            }
-
-            frame.RawPixels = pixels;
-        }
+        // private Image DecodeAllFrames(GifImage gif)
+        // {
+        //     for (int i = 0; i < gif.Frames.Count; i++)
+        //     {
+        //         var frame = gif.Frames[i];
+        //         
+        //         GetImageFromIndexStream(frame, i, gif);
+        //     }
+        //
+        //     for (int i = 0; i < gif.Frames.Count; i++)
+        //     {
+        //         GifFrame frame = gif.Frames[i];
+        //         var handle = GCHandle.Alloc(frame.RawPixels, GCHandleType.Pinned);
+        //         Utilities.CopyMemory(img.pixelBuffers[i].DataPointer, handle.AddrOfPinnedObject(), frame.RawPixels.Length);
+        //         handle.Free();
+        //     }
+        //     return img;
+        // }
 
         /*
             interlaced GIF images are stored as 4 separated images
@@ -235,7 +104,7 @@ namespace Adamantium.Imaging.Gif
             4. containing every odd line of image (1/2 of size)
             http://www.fileformat.info/format/gif/egff.htm
          */
-        private int[] Deinterlace(GifFrame frame)
+        internal static int[] Deinterlace(GifFrame frame)
         {
             var width = frame.Descriptor.Width;
             var height = frame.Descriptor.Height;
@@ -281,7 +150,7 @@ namespace Adamantium.Imaging.Gif
         /// </summary>
         /// <param name="stream"></param>
         /// <param name="gifImage"></param>
-        private static void ProcessImageDescriptor(Stream stream, GifImage gifImage)
+        private static void ProcessImageDescriptor(Stream stream, GifImage gifImage, int frameIndex)
         {
             var descriptor = new GifImageDescriptor();
             descriptor.OffsetLeft = stream.ReadUInt16();
@@ -290,7 +159,7 @@ namespace Adamantium.Imaging.Gif
             descriptor.Height = stream.ReadUInt16();
             descriptor.Fields = (byte)stream.ReadByte();
             int interlace = descriptor.Fields & 0x40;
-            GifFrame frame = new GifFrame();
+            GifFrame frame = new GifFrame(frameIndex);
             frame.Interlaced = Convert.ToBoolean(interlace);
 
             if ((descriptor.Fields & 0x80) != 0)
@@ -315,7 +184,7 @@ namespace Adamantium.Imaging.Gif
             frame.Descriptor = descriptor;
             ReadImageData(stream, frame);
             gifImage.CurrentFrame = frame;
-            gifImage.Frames.Add(frame);
+            gifImage.AddFrame(frame);
         }
 
         /// Decompress image pixels.

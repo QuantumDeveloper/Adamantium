@@ -93,7 +93,7 @@ namespace Adamantium.Engine.Graphics
         private void CreateResourceLoadingDevice(MainGraphicsDevice mainDevice)
         {
             DeviceType = GraphicsDeviceType.ResourceLoader;
-            InitializeMutex();
+            //InitializeMutex();
             DeviceId = Guid.NewGuid().ToString();
             MainDevice = mainDevice;
             MaxFramesInFlight = 1;
@@ -434,17 +434,17 @@ namespace Adamantium.Engine.Graphics
 
         private void InitializeSecondaryRenderingDevice(GraphicsDevice primaryDevice, PresentationParameters presentationParameters)
         {
-            var queueFamilyIndices = MainDevice.PhysicalDevice.FindQueueFamilies(surface);
+            var graphicsFamily = MainDevice.QueueFamilyContainer.GetFamilyInfo(QueueFlagBits.GraphicsBit);
+            MainDevice.QueueFamilyContainer.CanPresent(graphicsFamily, surface);
 
             var poolInfo = new CommandPoolCreateInfo
             {
-                QueueFamilyIndex = queueFamilyIndices.graphicsFamily.Value,
+                QueueFamilyIndex = graphicsFamily.FamilyIndex,
                 Flags = CommandPoolCreateFlagBits.ResetCommandBufferBit
             };
             CommandPool = LogicalDevice.CreateCommandPool(poolInfo);
             
-            uint queueIndex = (uint) (MainDevice.AvailableQueuesCount > 1 ? 1 : 0);
-            resourceQueue = LogicalDevice.GetDeviceQueue(queueFamilyIndices.graphicsFamily.Value, queueIndex);
+            resourceQueue = MainDevice.GetAvailableTransferQueue();
             
             CreateGraphicsPresenter(presentationParameters);
             CreateCommandBuffers();
@@ -505,22 +505,22 @@ namespace Adamantium.Engine.Graphics
 
         private void CreateCommandPool()
         {
-            var queueFamilyIndices = MainDevice.PhysicalDevice.FindQueueFamilies(surface);
+            var graphicsFamily = MainDevice.QueueFamilyContainer.GetFamilyInfo(QueueFlagBits.GraphicsBit);
 
             var poolInfo = new CommandPoolCreateInfo
             {
-                QueueFamilyIndex = queueFamilyIndices.graphicsFamily.Value,
+                QueueFamilyIndex = graphicsFamily.FamilyIndex,
                 Flags = CommandPoolCreateFlagBits.ResetCommandBufferBit
             };
             CommandPool = LogicalDevice.CreateCommandPool(poolInfo);
             
-            GraphicsQueue = LogicalDevice.GetDeviceQueue(queueFamilyIndices.graphicsFamily.Value, 0);
+            GraphicsQueue = MainDevice.GetAvailableGraphicsQueue();
             unsafe
             {
                 Log.Logger.Information($"Graphics Queue address of Logical device {new IntPtr(LogicalDevice.NativePointer)}: 0x{new IntPtr(GraphicsQueue.NativePointer).ToString("X2")}");
             }
-            uint queueIndex = (uint) (MainDevice.AvailableQueuesCount > 1 ? 1 : 0);
-            resourceQueue = LogicalDevice.GetDeviceQueue(queueFamilyIndices.graphicsFamily.Value, queueIndex);
+            
+            resourceQueue = MainDevice.GetAvailableTransferQueue();
         }
 
         private void CreateGraphicsPresenter(PresentationParameters parameters)

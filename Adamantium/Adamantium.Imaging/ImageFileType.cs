@@ -39,6 +39,11 @@
         /// A TGA File.
         /// </summary>
         Tga,
+        
+        /// <summary>
+        /// A TIFF File.
+        /// </summary>
+        Tiff,
 
         /// <summary>
         /// An ICO File.

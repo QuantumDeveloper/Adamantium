@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using Adamantium.Core;
 
 namespace Adamantium.Imaging.Gif
 {
@@ -8,10 +9,15 @@ namespace Adamantium.Imaging.Gif
     {
         public static unsafe Image LoadFromMemory(IntPtr pSource, int size, bool makeACopy, GCHandle? handle)
         {
-            var stream = new UnmanagedMemoryStream((byte*)pSource, (long)size);
+            var stream = new UnmanagedMemoryStream((byte*)pSource, size);
 
-            GifDecoder decoder = new GifDecoder();
-            var img = decoder.Decode(stream);
+            var decoder = new GifDecoder();
+            var gifImage = decoder.Decode(stream);
+            var img = Image.New(gifImage.GetImageDescription(), gifImage);
+            var data = gifImage.DecodeFrame(0);
+            handle = GCHandle.Alloc(data, GCHandleType.Pinned);
+            Utilities.CopyMemory(img.pixelBuffers[0].DataPointer, handle.Value.AddrOfPinnedObject(), data.Length);
+            handle?.Free();
             return img;
         }
 

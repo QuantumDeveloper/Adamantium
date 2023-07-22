@@ -133,13 +133,36 @@ namespace Adamantium.Imaging
 
             Array.Clear(colorBuffer, 0, colorBuffer.Length);
         }
+        
+        public byte[] GetPixelBuffer()
+        {
+            var colorBuffer = new byte[Width * Height * ComponentCount];
+            int counter = 0;
+            for (int i = 0; i< Height; ++i)
+            {
+                for (int j = 0; j < Width; ++j)
+                {
+                    for (int k = 0; k < Raster.Length; ++k)
+                    {
+                        colorBuffer[counter] = Raster[k][j, i];
+                        if (k == 3)
+                        {
+                            colorBuffer[counter] = 255;
+                        }
+                        counter++;
+                    }
+                }
+            }
 
-        public static byte[][,] CreateRaster(int Width, int Height, int bands)
+            return colorBuffer;
+        }
+
+        public static byte[][,] CreateRaster(int width, int height, int bands)
         {
             // Create the raster
             byte[][,] raster = new byte[bands][,];
             for (int b = 0; b < bands; b++)
-                raster[b] = new byte[Width, Height];
+                raster[b] = new byte[width, height];
             return raster;
         }
 

@@ -222,7 +222,7 @@ namespace Adamantium.Imaging
                     case Format.B8G8R8A8_UNORM:
                     case Format.B8G8R8A8_SRGB:
                         {
-                            uint alpha = (format == Format.R8G8B8A8_SNORM || format == Format.R8G8B8A8_SINT) ? 0x7f000000 : 0xff000000;
+                            uint alpha = format is Format.R8G8B8A8_SNORM or Format.R8G8B8A8_SINT ? 0x7f000000 : 0xff000000;
 
                             if (pDestination == pSource)
                             {
@@ -423,6 +423,89 @@ namespace Adamantium.Imaging
         public static unsafe void CopyScanline(IntPtr pDestination, IntPtr pSource, int size)
         {
             Utilities.CopyMemory(pDestination, pSource, size);
+        }
+
+        public static unsafe PixelBuffer[] CreatePixelBuffers(ImageDescription description, IntPtr dataPointer, long offset, Image.PitchFlags pitchFlags = Image.PitchFlags.None)
+        {
+            // Calculate mipmaps
+            var mipMapToZIndex = Image.CalculateImageArray(description, pitchFlags, out var pixelBufferCount, out var totalSizeInBytes);
+            var mipMapDescriptions = Image.CalculateMipMapDescription(description, pitchFlags);
+            
+            // Allocate all pixel buffers
+            var pixelBuffers = new PixelBuffer[pixelBufferCount];
+            
+            // Setup all pointers
+            // only release buffer that is not pinned and is asked to be disposed.
+            
+            var buffer = dataPointer;
+
+            if (dataPointer == IntPtr.Zero)
+            {
+                buffer = Utilities.AllocateMemory((int)totalSizeInBytes);
+                offset = 0;
+            }
+
+            Image.SetupImageArray((IntPtr)((byte*)buffer + offset), description, pitchFlags, pixelBuffers, mipMapDescriptions);
+
+            return pixelBuffers;
+        }
+
+        public static byte[] FlipBuffer(byte[] buffer, uint width, uint height, byte bytesPerPixel, FlipBufferOptions flipOptions)
+        {
+            var flipped = new byte[buffer.Length];
+            var rowStride = width * bytesPerPixel;
+            
+            switch (flipOptions)
+            {
+                case FlipBufferOptions.FlipVertically:
+                {
+                    int offset = 0;
+                    for (int i = (int)height - 1; i >= 0; --i)
+                    {
+                        System.Buffer.BlockCopy(buffer, (int)(i * rowStride), flipped, offset, (int)rowStride);
+                        offset += (int)rowStride;
+                    }
+
+                    break;
+                }
+                case FlipBufferOptions.FlipHorizontally:
+                {
+                    for (int i = 0; i < height; ++i)
+                    {
+                        var originalOffset = i * rowStride;
+                        var offset = ((i + 1) * rowStride) - bytesPerPixel;
+                        for (int k = 0; k < width; ++k)
+                        {
+                            System.Buffer.BlockCopy(buffer, (int)originalOffset, flipped, (int)offset, bytesPerPixel);
+                            offset -= bytesPerPixel;
+                            originalOffset += bytesPerPixel;
+                        }
+                    }
+
+                    break;
+                }
+                default:
+                {
+                    int rowOffset = 0;
+                    for (int i = (int)height - 1; i >= 0; --i)
+                    {
+                        System.Buffer.BlockCopy(buffer, (int)(i * rowStride), flipped, rowOffset, (int)rowStride);
+                        var originalOffset = i * rowStride;
+                        var columnOffset = rowOffset + rowStride - bytesPerPixel;
+                        for (int k = 0; k < width; ++k)
+                        {
+                            System.Buffer.BlockCopy(buffer, (int)originalOffset, flipped, (int)columnOffset, bytesPerPixel);
+                            columnOffset -= bytesPerPixel;
+                            originalOffset += bytesPerPixel;
+                        }
+                        rowOffset += (int)rowStride;
+                    }
+
+                    break;
+                }
+            }
+
+            return flipped;
         }
     }
 }

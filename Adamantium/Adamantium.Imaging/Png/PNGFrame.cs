@@ -9,11 +9,11 @@ namespace Adamantium.Imaging.Png
             frameData = new List<byte>();
         }
 
-        public PNGFrame(byte[] pixels, uint width, uint height, int bitDepth)
+        public PNGFrame(byte[] pixels, uint encodedWidth, uint encodedHeight, int bitDepth)
         {
             RawPixelBuffer = pixels;
-            Width = width;
-            Height = height;
+            EncodedWidth = encodedWidth;
+            EncodedHeight = encodedHeight;
             BitDepth = bitDepth;
             frameData = new List<byte>();
         }
@@ -21,6 +21,8 @@ namespace Adamantium.Imaging.Png
         private List<byte> frameData;
 
         public int BitDepth { get; set; }
+        
+        public bool IsDecoded { get; internal set; }
 
         /// <summary>
         /// Sequence number of the animation chunk, starting from 0
@@ -31,9 +33,18 @@ namespace Adamantium.Imaging.Png
         /// <summary>
         /// Width of the following frame
         /// </summary>
-        public uint Width { get; set; }
+        public uint EncodedWidth { get; set; }
         /// <summary>
         /// Height of the following frame
+        /// </summary>
+        public uint EncodedHeight { get; set; }
+        
+        /// <summary>
+        /// Width of the final decoded frame
+        /// </summary>
+        public uint Width { get; set; }
+        /// <summary>
+        /// Height of the final decoded frame
         /// </summary>
         public uint Height { get; set; }
         /// <summary>

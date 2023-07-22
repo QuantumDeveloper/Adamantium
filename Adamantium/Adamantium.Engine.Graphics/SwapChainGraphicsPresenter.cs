@@ -96,11 +96,13 @@ namespace Adamantium.Engine.Graphics
             createInfo.ImageArrayLayers = 1;
             createInfo.ImageUsage = ImageUsageFlagBits.ColorAttachmentBit;
 
-            QueueFamilyIndices indices = physicalDevice.FindQueueFamilies(surface);
-            var queueFamilyIndices = new [] { indices.graphicsFamily.Value, indices.presentFamily.Value };
-
-            if (indices.graphicsFamily != indices.presentFamily)
+            var graphicsFamily =
+                GraphicsDevice.MainDevice.QueueFamilyContainer.GetFamilyInfo(QueueFlagBits.GraphicsBit);
+            var presentFamilyIndex = GraphicsDevice.MainDevice.QueueFamilyContainer.GetPresentFamilyIndex(surface);
+            
+            if (graphicsFamily.FamilyIndex != presentFamilyIndex)
             {
+                var queueFamilyIndices = new[] { graphicsFamily.FamilyIndex, presentFamilyIndex };
                 createInfo.ImageSharingMode = SharingMode.Concurrent;
                 createInfo.QueueFamilyIndexCount = (uint)queueFamilyIndices.Length;
                 createInfo.PQueueFamilyIndices = queueFamilyIndices;

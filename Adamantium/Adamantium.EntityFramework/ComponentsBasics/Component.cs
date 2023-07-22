@@ -15,7 +15,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
         }
 
         private Entity owner;
-        private readonly long uid;
+        private readonly UInt128 uid;
         private bool initialized;
 
         public Entity Owner
@@ -45,7 +45,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
             initialized = true;
         }
 
-        public long Uid => uid;
+        public UInt128 Uid => uid;
 
         protected void Traverse(Action<Entity> action)
         {

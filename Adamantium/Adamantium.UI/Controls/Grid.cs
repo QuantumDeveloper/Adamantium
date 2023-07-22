@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Diagnostics;
+using System.Linq;
 using Adamantium.UI.Media;
 using Adamantium.UI.RoutedEvents;
 
@@ -250,7 +251,7 @@ public class Grid: Panel
 
       if (emptyRows)
       {
-         rowSegments[0] = new GridSegment(0, 0, double.PositiveInfinity, GridUnitType.Star) {Stars = 1.0};
+         rowSegments[0] = new GridSegment(0, 0, double.PositiveInfinity, GridUnitType.Star, 0) {Stars = 1.0};
          rowSegments[0].MeasuredSize = Double.PositiveInfinity;
          rowSegments[0].MeasureType = replaceRowStarsWithAuto ? InnerGridUnitType.Auto : InnerGridUnitType.Star;
       }
@@ -272,7 +273,7 @@ public class Grid: Panel
                margin = 0;
             }
 
-            var segment = new GridSegment(0, def.MinHeight, def.MaxHeight, height.GridUnitType);
+            var segment = new GridSegment(0, def.MinHeight, def.MaxHeight, height.GridUnitType, i);
 
             switch (def.Height.GridUnitType)
             {
@@ -304,7 +305,7 @@ public class Grid: Panel
 
       if (emptyCols)
       {
-         colSegments[0] = new GridSegment(0, 0, double.PositiveInfinity, GridUnitType.Star) {Stars = 1.0};
+         colSegments[0] = new GridSegment(0, 0, double.PositiveInfinity, GridUnitType.Star, 0) {Stars = 1.0};
          colSegments[0].MeasuredSize = Double.PositiveInfinity;
          colSegments[0].MeasureType = replaceColStarsWithAuto ? InnerGridUnitType.Auto : InnerGridUnitType.Star;
       }
@@ -327,7 +328,7 @@ public class Grid: Panel
             double minSize = def.MinWidth;
             double maxSize = Math.Min(def.MaxWidth, MaxDefinitionSize);
 
-            var segment = new GridSegment(0, def.MinWidth, def.MaxWidth, width.GridUnitType);
+            var segment = new GridSegment(0, def.MinWidth, def.MaxWidth, width.GridUnitType, i);
             switch (def.Width.GridUnitType)
             {
                case GridUnitType.Pixel:
@@ -489,7 +490,7 @@ public class Grid: Panel
             var childFinalH = GetArrangeSize(rowSegments, cell.RowIndex, cell.RowSpan);
 
             var rect = new Rect(childFinalX, childFinalY, childFinalW, childFinalH);
-
+            
             child.Arrange(rect);
             index++;
          }
@@ -570,44 +571,71 @@ public class Grid: Panel
       for (int i = 0; i < segments.Length; ++i)
       {
          //size += segments[i].Min;
-         size += segments[i].FullSizeWithMargin;
+         if (segments[i].IsAuto)
+         {
+            size += segments[i].FullSizeWithMargin;
+         }
+         else if (segments[i].IsStar)
+         {
+            size += segments[i].MeasuredSize + segments[i].Padding + segments[i].Margin;
+         }
+         
       }
       return size;
    }
 
-   private void CalculateFinalGridSize(GridSegment[] segment, double finalSize, bool isRow)
+   private void CalculateFinalGridSize(GridSegment[] segments, double finalSize, bool isRow)
    {
       double totalTakenSize = 0;
       double stars = 0;
-      for (int i = 0; i < segment.Length; ++i)
+      for (int i = 0; i < segments.Length; ++i)
       {
-         if (!segment[i].IsStar)
+         if (!segments[i].IsStar)
          {
-            //totalTakenSize += segment[i].Min;
-            totalTakenSize += segment[i].FullSizeWithMargin;
+            totalTakenSize += segments[i].FullSizeWithMargin;
          }
          else
          {
-            stars += segment[i].Stars;
-            totalTakenSize += segment[i].Margin + segment[i].Padding;
+            stars += segments[i].Stars;
+            totalTakenSize += segments[i].Margin + segments[i].Padding;
          }
       }
 
       var availableSize = Math.Max(finalSize - totalTakenSize, 0);
-      //row/colunm offset for each GridSegment
-      Double offset = 0.0;
-      if (isRow)
+      
+      //row/column offset for each GridSegment
+      var starSegments = segments.Where(x => x.IsStar).ToArray();
+      foreach (var starSegment in starSegments)
       {
-         Debug.WriteLine("available height = " +finalSize);
-      }
-      for (int i = 0; i < segment.Length; ++i)
-      {
-         var gridSegment = segment[i];
-
-         if (availableSize > 0 && gridSegment.IsStar)
+         if (availableSize > 0)
          {
-            gridSegment.Min = Math.Max((availableSize/stars)*gridSegment.Stars, 0);
+            starSegment.Min = Math.Max((availableSize/stars)*starSegment.Stars, 0);
          }
+      }
+
+      if (starSegments.Length > 0)
+      {
+         availableSize = 0;
+      }
+
+      if (availableSize != 0)
+      {
+         var autoSegments = segments.Where(x => x.IsAuto).ToArray();
+         var freeSegmentSize = availableSize / autoSegments.Length;
+         foreach (var autoSegment in autoSegments)
+         {
+            if (availableSize > 0)
+            {
+               autoSegment.Min += freeSegmentSize;
+            }
+         }
+      }
+      
+      Double offset = 0.0;
+      for (int i = 0; i < segments.Length; ++i)
+      {
+         var gridSegment = segments[i];
+         gridSegment.Offset = offset;
 
          if (isRow && RowDefinitions.Count > 0)
          {
@@ -619,13 +647,7 @@ public class Grid: Panel
             columnDefinitions[i].ActualWidth = gridSegment.FullSize;
             columnDefinitions[i].Offset = offset;
          }
-         gridSegment.Offset = offset;
-
-         if (isRow)
-         {
-            Debug.WriteLine("row" + i + " offset " + gridSegment.Offset + " height = " + gridSegment.FullSizeWithMargin);
-         }
-
+         
          offset += gridSegment.FullSizeWithMargin;
       }
    }
@@ -644,18 +666,22 @@ public class Grid: Panel
       {
          CalculateStarSegments(colSegments, availableSize.Width);
       }
-      MeasureCells(1);
+      //MeasureCells(1);
       MeasureCells(2);
-
+      
       double desiredX = CalculateTotalSize(colSegments);
       double desiredY = CalculateTotalSize(rowSegments);
       //Debug.WriteLine("Grid measure time = " + measureTimer.ElapsedMilliseconds);
+      
+      desiredX = Math.Max(availableSize.Width, desiredX);
+      desiredY = Math.Max(availableSize.Height, desiredY);
+      
       return new Size(desiredX, desiredY);
    }
 
    private void MeasureCells(int groupIndex, bool ignoreStarSize = false)
    {
-      if (groupIndex> MaxGroupIndex)
+      if (groupIndex > MaxGroupIndex)
          return;
 
       if (!cellsDictionary.ContainsKey(groupIndex)) return;
@@ -697,7 +723,7 @@ public class Grid: Panel
          var element = Children[cell.ChildIndex];
          element.Measure(childSize);
          var desired = element.DesiredSize;
-            
+
          if (!ignoreMeasuredRow)
          {
             if (cell.RowSpan == 1)
@@ -867,12 +893,14 @@ public class Grid: Panel
       public Double Margin;
 
       public HalfThickness Padding;
-         
+
+      public int Index;
+      
       public Boolean IsAuto => OriginalType == GridUnitType.Auto;
 
       public Boolean IsStar => OriginalType == GridUnitType.Star;
 
-      public GridSegment(double size, double min, double max, GridUnitType originalType)
+      public GridSegment(double size, double min, double max, GridUnitType originalType, int index)
       {
          Min = min;
          Max = max;
@@ -880,6 +908,7 @@ public class Grid: Panel
          Stars = 0;
          OriginalType = originalType;
          Offset = 0;
+         Index = index;
       }
    }
 

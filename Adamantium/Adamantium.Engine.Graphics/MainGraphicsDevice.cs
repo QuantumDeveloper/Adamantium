@@ -12,6 +12,12 @@ namespace Adamantium.Engine.Graphics
 {
     public class MainGraphicsDevice : DisposableBase
     {
+        private uint _availableGraphicsQueueIndex;
+
+        private uint _availableComputeQueueIndex;
+
+        private uint _availableTransferQueueIndex;
+        
         public bool EnableDynamicRendering { get; }
         public VulkanInstance VulkanInstance { get; private set; }
         
@@ -23,9 +29,7 @@ namespace Adamantium.Engine.Graphics
         
         public uint AvailableQueuesCount { get; private set; }
         
-        //internal Queue GraphicsQueue { get; private set; }
-        
-        internal CommandPool CommandPool { get; private set; }
+        public QueueFamilyContainer QueueFamilyContainer { get; private set; }
         
         public static ReadOnlyCollection<string> DeviceExtensions { get; private set; }
 
@@ -51,8 +55,8 @@ namespace Adamantium.Engine.Graphics
             EnableDynamicRendering = enableDynamicRendering;
             VulkanInstance = VulkanInstance.Create(name, enableDebug);
             PhysicalDevice = VulkanInstance.CurrentDevice;
+            QueueFamilyContainer = PhysicalDevice.FindQueueFamilies();
             CreateLogicalDevice();
-            CreateCommandPool();
             unsafe
             {
                 if (LogicalDevice != null)
@@ -65,10 +69,6 @@ namespace Adamantium.Engine.Graphics
         
         private unsafe void CreateLogicalDevice()
         {
-            var indices = PhysicalDevice.FindQueueFamilies(null);
-
-            var queueInfos = new List<DeviceQueueCreateInfo>();
-            var uniqueQueueFamilies = new HashSet<uint>() { indices.graphicsFamily.Value, indices.presentFamily.Value };
             float queuePriority = 1.0f;
             var queueFamilies = PhysicalDevice.GetQueueFamilyProperties();
 
@@ -82,15 +82,15 @@ namespace Adamantium.Engine.Graphics
 
             Console.WriteLine($"{AvailableQueuesCount} queues available for graphics");
             Console.WriteLine($"{computeQueuesCount} queues available for compute");
+
+            var graphicsFamily = QueueFamilyContainer.GetFamilyInfo(QueueFlagBits.GraphicsBit);
             
-            foreach (var queueFamily in uniqueQueueFamilies)
-            {
-                var queueCreateInfo = new DeviceQueueCreateInfo();
-                queueCreateInfo.QueueFamilyIndex = queueFamily;
-                queueCreateInfo.QueueCount = AvailableQueuesCount;
-                queueCreateInfo.PQueuePriorities = queuePriority;
-                queueInfos.Add(queueCreateInfo);
-            }
+            var queueInfos = new List<DeviceQueueCreateInfo>();
+            var queueCreateInfo = new DeviceQueueCreateInfo();
+            queueCreateInfo.QueueFamilyIndex = graphicsFamily.FamilyIndex;
+            queueCreateInfo.QueueCount = AvailableQueuesCount;
+            queueCreateInfo.PQueuePriorities = queuePriority;
+            queueInfos.Add(queueCreateInfo);
 
             var deviceFeatures = PhysicalDevice.GetPhysicalDeviceFeatures();
             deviceFeatures.SamplerAnisotropy = true;
@@ -170,18 +170,6 @@ namespace Adamantium.Engine.Graphics
             LogicalDevice = PhysicalDevice.CreateDevice(createInfo);
             
             createInfo.Dispose();
-
-            //GraphicsQueue = LogicalDevice.GetDeviceQueue(indices.graphicsFamily.Value, 0);
-        }
-        
-        private void CreateCommandPool()
-        {
-            var queueFamilyIndices = PhysicalDevice.FindQueueFamilies(null);
-
-            var poolInfo = new CommandPoolCreateInfo();
-            poolInfo.QueueFamilyIndex = queueFamilyIndices.graphicsFamily.Value;
-            poolInfo.Flags = CommandPoolCreateFlagBits.ResetCommandBufferBit;
-            CommandPool = LogicalDevice?.CreateCommandPool(poolInfo);
         }
         
         public Result DeviceWaitIdle()
@@ -204,6 +192,47 @@ namespace Adamantium.Engine.Graphics
             return new(name, enableDynamicRendering, enableDebug);
         }
 
+        public Queue GetAvailableGraphicsQueue()
+        {
+            var graphicsFamily = QueueFamilyContainer.GetFamilyInfo(QueueFlagBits.GraphicsBit);
+            var queue = LogicalDevice.GetDeviceQueue(graphicsFamily.FamilyIndex, _availableGraphicsQueueIndex);
+            _availableGraphicsQueueIndex++;
+            if (_availableGraphicsQueueIndex >= graphicsFamily.Count)
+            {
+                _availableGraphicsQueueIndex = 0;
+            }
+
+            return queue;
+        }
+
+        public Queue GetAvailableComputeQueue()
+        {
+            var computeFamily = QueueFamilyContainer.GetFamilyInfo(QueueFlagBits.ComputeBit);
+            
+            var queue = LogicalDevice.GetDeviceQueue(computeFamily.FamilyIndex, _availableComputeQueueIndex);
+            _availableComputeQueueIndex++;
+            if (_availableComputeQueueIndex >= computeFamily.Count)
+            {
+                _availableComputeQueueIndex = 0;
+            }
+
+            return queue;
+        }
+
+        public Queue GetAvailableTransferQueue()
+        {
+            var transferFamily = QueueFamilyContainer.GetFamilyInfo(QueueFlagBits.TransferBit);
+            
+            var queue = LogicalDevice.GetDeviceQueue(transferFamily.FamilyIndex, _availableTransferQueueIndex);
+            _availableTransferQueueIndex++;
+            if (_availableTransferQueueIndex >= transferFamily.Count)
+            {
+                _availableTransferQueueIndex = 0;
+            }
+
+            return queue;
+        }
+
         public static implicit operator PhysicalDevice(MainGraphicsDevice device)
         {
             return device.PhysicalDevice;
@@ -213,12 +242,13 @@ namespace Adamantium.Engine.Graphics
         {
             Log.Logger.Debug("Start disposing main device");
             LogicalDevice?.DeviceWaitIdle();
-            LogicalDevice?.DestroyCommandPool(CommandPool);
-            CommandPool = null;
             LogicalDevice?.Dispose();
             LogicalDevice = null;
             VulkanInstance?.Dispose();
             VulkanInstance = null;
+            _availableTransferQueueIndex = 0;
+            _availableComputeQueueIndex = 0;
+            _availableGraphicsQueueIndex = 0;
             Log.Logger.Debug("End disposing main device");
         }
     }

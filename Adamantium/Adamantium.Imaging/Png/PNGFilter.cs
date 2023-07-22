@@ -129,7 +129,7 @@ namespace Adamantium.Imaging.Png
             */
             int x, y;
             uint error = 0;
-            var bpp = PNGColorConvertion.GetBitsPerPixel(info);
+            var bpp = PNGColorConversion.GetBitsPerPixel(info);
             /*the width of a scanline in bytes, not including the filter type*/
             var lineBytes = (width * bpp + 7) / 8;
             /*bytewidth is used for filtering, is 1 when bpp < 8, number of bytes per pixel otherwise*/

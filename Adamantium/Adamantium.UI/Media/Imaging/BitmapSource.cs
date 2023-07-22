@@ -1,9 +1,11 @@
 ﻿using System;
+using Adamantium.Engine.Graphics;
 using Adamantium.Imaging;
+using AdamantiumVulkan.Core;
 
 namespace Adamantium.UI.Media.Imaging;
 
-public abstract class BitmapSource : ImageSource
+public class BitmapSource : ImageSource
 {
    public BitmapSource()
    {
@@ -11,15 +13,37 @@ public abstract class BitmapSource : ImageSource
       DpiYScale = 1;
    }
    
-   public virtual UInt32 PixelWidth => Texture.Width;
+   public BitmapSource(
+      UInt32 width, 
+      UInt32 height, 
+      double dpiX, 
+      double dpiY, 
+      SurfaceFormat format,
+      byte[] pixels)
+   {
+      PixelWidth = width;
+      PixelHeight = height;
+      DpiXScale = dpiX;
+      DpiYScale = dpiY;
+      PixelFormat = format;
+      _pixels = pixels;
+   }
 
-   public virtual UInt32 PixelHeight => Texture.Height;
+   private byte[] _pixels;
+   
+   public virtual Texture Texture { get; set; }
 
-   public virtual SurfaceFormat PixelFormat => Texture.SurfaceFormat;
+   public virtual UInt32 PixelWidth { get; protected set; }
 
-   public override double Width => Texture.Width*DpiXScale;
+   public virtual UInt32 PixelHeight { get; protected set; }
 
-   public override double Height => Texture.Height* DpiYScale;
+   public virtual SurfaceFormat PixelFormat { get; protected set; }
+   
+   public int Depth { get; set; }
+
+   public override double Width => PixelWidth * DpiXScale;
+
+   public override double Height => PixelHeight * DpiYScale;
 
    public Double DpiXScale { get; set; }
 
@@ -29,4 +53,36 @@ public abstract class BitmapSource : ImageSource
    {
       Texture.Save(filePath.IsAbsoluteUri ? filePath.AbsolutePath : filePath.LocalPath, fileType);
    }
+   
+   protected override void ReleaseUnmanagedResources()
+   {
+      Texture?.Dispose();
+      Texture = null;
+   }
+
+   protected void SetPixels(byte[] pixels)
+   {
+      _pixels = pixels;
+   }
+
+   internal void InitUnderlyingImage(DrawingContext context)
+   {
+      if (IsDisposed || Texture != null) return;
+      
+      var textureDescription = new TextureDescription();
+      textureDescription.Width = PixelWidth;
+      textureDescription.Height = PixelHeight;
+      textureDescription.Dimension = TextureDimension.Texture2D;
+      textureDescription.Format = PixelFormat;
+      textureDescription.Depth = 1;
+      textureDescription.InitialLayout = ImageLayout.Undefined;
+      textureDescription.ImageAspect = ImageAspectFlagBits.ColorBit;
+      textureDescription.DesiredImageLayout = ImageLayout.ShaderReadOnlyOptimal;
+      textureDescription.MipLevels = 1;
+      textureDescription.ArrayLayers = 1;
+      
+      Texture = Texture.CreateFrom(context.GraphicsDevice, textureDescription, _pixels);
+   }
+
+   public event EventHandler<ExceptionEventArgs> DecodeFailed;
 }

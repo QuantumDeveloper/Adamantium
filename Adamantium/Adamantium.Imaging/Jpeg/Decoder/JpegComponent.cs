@@ -53,7 +53,7 @@ namespace Adamantium.Imaging.Jpeg.Decoder
             /* Set default tables in case they're not provided.  J. Powers */
             // TODO: only gen if needed
 
-            if (colorMode == JPEGFrame.JPEG_COLOR_YCbCr)
+            if (colorMode == JpegFrame.JPEG_COLOR_YCbCr)
             {
                 if (id == 1) // Luminance
                 {

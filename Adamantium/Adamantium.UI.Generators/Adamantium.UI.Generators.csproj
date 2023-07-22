@@ -7,7 +7,7 @@
 		<LangVersion>latest</LangVersion>
 		<Nullable>disable</Nullable>
 		<BaseOutputPath>..\..\output\Adamantium.UI.Generators\bin</BaseOutputPath>
-		<!--<IsRoslynComponent>true</IsRoslynComponent>-->		
+		<!--<IsRoslynComponent>true</IsRoslynComponent>-->
     </PropertyGroup>
 
     <ItemGroup>

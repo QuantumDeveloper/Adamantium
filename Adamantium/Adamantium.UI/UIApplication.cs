@@ -400,9 +400,15 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
 
         if (BeginScene())
         {
-            Draw(appTime);
-            OnBeforeEndScene();
-            EndScene();
+            try
+            {
+                Draw(appTime);
+                OnBeforeEndScene();
+            }
+            finally
+            {
+                EndScene();
+            }
         }
     }
 

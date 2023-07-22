@@ -62,7 +62,11 @@ namespace Adamantium.Imaging
             PixelSize = format.SizeOfInBytes();
             isStrictRowStride = (PixelSize * width) == rowStride;
         }
-
+        
+        public uint MipLevel { get; set; }
+        
+        public MipMapDescription MipMapDescription { get; set; }
+        
         /// <summary>
         /// Gets the width.
         /// </summary>
@@ -486,7 +490,7 @@ namespace Adamantium.Imaging
             return componentsArray;
         }
 
-        public static PixelBuffer FlipBuffer(PixelBuffer pixelBuffer, FlipBufferOptions flipOtions)
+        public static PixelBuffer FlipBuffer(PixelBuffer pixelBuffer, FlipBufferOptions flipOptions)
         {
             var bufferStride = pixelBuffer.BufferStride;
             var dataPointer = pixelBuffer.DataPointer;
@@ -498,16 +502,16 @@ namespace Adamantium.Imaging
             var buffer = new byte[bufferStride];
             var flipped = new byte[bufferStride];
             Utilities.Read(dataPointer, buffer, 0, bufferStride);
-            if (flipOtions == FlipBufferOptions.FlipVertically)
+            if (flipOptions == FlipBufferOptions.FlipVertically)
             {
                 int offset = 0;
                 for (int i = (int)height - 1; i >= 0; --i)
                 {
-                    System.Buffer.BlockCopy(buffer, (int)i * rowStride, flipped, offset, rowStride);
+                    System.Buffer.BlockCopy(buffer, i * rowStride, flipped, offset, rowStride);
                     offset += rowStride;
                 }
             }
-            else if (flipOtions == FlipBufferOptions.FlipHorizontally)
+            else if (flipOptions == FlipBufferOptions.FlipHorizontally)
             {
                 for (int i = 0; i < height; ++i)
                 {
@@ -526,12 +530,12 @@ namespace Adamantium.Imaging
                 int rowOffset = 0;
                 for (int i = (int)height - 1; i >= 0; --i)
                 {
-                    System.Buffer.BlockCopy(buffer, (int)i * rowStride, flipped, rowOffset, rowStride);
+                    System.Buffer.BlockCopy(buffer, i * rowStride, flipped, rowOffset, rowStride);
                     var originalOffset = i * rowStride;
                     var columnOffset = rowOffset + rowStride - pixelSize;
                     for (int k = 0; k < width; ++k)
                     {
-                        System.Buffer.BlockCopy(buffer, (int)originalOffset, flipped, columnOffset, pixelSize);
+                        System.Buffer.BlockCopy(buffer, originalOffset, flipped, columnOffset, pixelSize);
                         columnOffset -= pixelSize;
                         originalOffset += pixelSize;
                     }

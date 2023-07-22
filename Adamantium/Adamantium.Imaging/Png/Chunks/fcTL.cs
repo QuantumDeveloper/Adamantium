@@ -68,8 +68,8 @@ namespace Adamantium.Imaging.Png.Chunks
         {
             var fctl = new fcTL();
             fctl.SequenceNumber = frame.SequenceNumberFCTL;
-            fctl.Width = frame.Width;
-            fctl.Height = frame.Height;
+            fctl.Width = frame.EncodedWidth;
+            fctl.Height = frame.EncodedHeight;
             fctl.XOffset = frame.XOffset;
             fctl.YOffset = frame.YOffset;
             fctl.DelayNum = frame.DelayNumerator;

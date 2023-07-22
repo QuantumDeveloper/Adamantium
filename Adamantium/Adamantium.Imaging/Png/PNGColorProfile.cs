@@ -40,7 +40,7 @@ namespace Adamantium.Imaging.Png
             image[7] = (byte)a;
             mode.BitDepth = 16;
             mode.ColorType = PNGColorType.RGBA;
-            PNGColorConvertion.GetColorProfile(this, image, 1, 1, mode);
+            PNGColorConversion.GetColorProfile(this, image, 1, 1, mode);
         }
 
         public static void AddPalette(PNGColorMode info, byte r, byte g, byte b, byte a)
@@ -69,7 +69,7 @@ namespace Adamantium.Imaging.Png
         public static void AutoChooseColor(PNGColorMode modeOut, byte[] image, uint width, uint height, PNGColorMode modeIn)
         {
             PNGColorProfile profile = new PNGColorProfile();
-            PNGColorConvertion.GetColorProfile(profile, image, width, height, modeIn);
+            PNGColorConversion.GetColorProfile(profile, image, width, height, modeIn);
             AutoChooseColorFromProfile(modeOut, modeIn, profile);
         }
 

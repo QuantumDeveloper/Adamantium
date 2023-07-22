@@ -53,7 +53,7 @@ internal class GeometryRenderer : ComponentRenderer
         effect.MeshColor.SetValue(color.Color.ToVector4());
         effect.Transparency.SetValue((float)Brush.Opacity);
         
-        var texture = image?.Texture;
+        var texture = ((BitmapSource)image)?.Texture;
 
         if (texture == null)
         {

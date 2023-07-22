@@ -49,6 +49,7 @@ public class WindowsPlatform : IApplicationPlatform
     }
 
     public bool IsOnUIThread => uiThread == Thread.CurrentThread;
+    
     public void Signal()
     {
         Messages.PostMessage(window.Handle, dispatchMessage, IntPtr.Zero, IntPtr.Zero);

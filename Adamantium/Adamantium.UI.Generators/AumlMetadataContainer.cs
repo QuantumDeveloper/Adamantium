@@ -1,7 +1,6 @@
 ﻿
 using System.Collections.Generic;
 using Adamantium.UI.Markup;
-using Microsoft.CodeAnalysis;
 
 namespace Adamantium.UI.Generators
 {
@@ -29,20 +28,5 @@ namespace Adamantium.UI.Generators
         public Dictionary<string, TypeContainer> TypesMap { get; }
 
         public IAumlAstNode RootNode { get; set; }
-    }
-
-    public class TypeContainer
-    {
-        public TypeContainer(IAssemblySymbol assembly, List<INamedTypeSymbol> types)
-        {
-            AssemblySymbol = assembly;
-            Types = types;
-        }
-
-        public IAssemblySymbol AssemblySymbol { get; }
-
-        public List<INamedTypeSymbol> Types { get; }
-
-
     }
 }
