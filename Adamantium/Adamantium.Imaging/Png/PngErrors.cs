@@ -1,6 +1,6 @@
 ﻿namespace Adamantium.Imaging.Png
 {
-    internal static class PNGErrors
+    internal static class PngErrors
     {
         public static string GetErrorFromCode(uint errorCode)
         {

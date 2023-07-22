@@ -2,9 +2,9 @@
 
 namespace Adamantium.Imaging.Png
 {
-    internal class PNGColorProfile
+    internal class PngColorProfile
     {
-        public PNGColorProfile()
+        public PngColorProfile()
         {
             Palette = new byte[1024];
         }
@@ -29,7 +29,7 @@ namespace Adamantium.Imaging.Png
         public void Add(uint r, uint g, uint b, uint a)
         {
             byte[] image = new byte[8];
-            PNGColorMode mode = new PNGColorMode();
+            PngColorMode mode = new PngColorMode();
             image[0] = (byte)(r >> 8);
             image[1] = (byte)r;
             image[2] = (byte)(g >> 8);
@@ -39,11 +39,11 @@ namespace Adamantium.Imaging.Png
             image[6] = (byte)(a >> 8);
             image[7] = (byte)a;
             mode.BitDepth = 16;
-            mode.ColorType = PNGColorType.RGBA;
-            PNGColorConversion.GetColorProfile(this, image, 1, 1, mode);
+            mode.ColorType = PngColorType.RGBA;
+            PngColorConversion.GetColorProfile(this, image, 1, 1, mode);
         }
 
-        public static void AddPalette(PNGColorMode info, byte r, byte g, byte b, byte a)
+        public static void AddPalette(PngColorMode info, byte r, byte g, byte b, byte a)
         {
             byte[] data;
             /*the same resize technique as C++ std::vectors is used, and here it's made so that for a palette with
@@ -66,16 +66,16 @@ namespace Adamantium.Imaging.Png
         are less than 256 colors, color key if only single transparent color, ...
         Updates values of mode with a potentially smaller color model. mode_out should
         contain the user chosen color model, but will be overwritten with the new chosen one.*/
-        public static void AutoChooseColor(PNGColorMode modeOut, byte[] image, uint width, uint height, PNGColorMode modeIn)
+        public static void AutoChooseColor(PngColorMode modeOut, byte[] image, uint width, uint height, PngColorMode modeIn)
         {
-            PNGColorProfile profile = new PNGColorProfile();
-            PNGColorConversion.GetColorProfile(profile, image, width, height, modeIn);
+            PngColorProfile profile = new PngColorProfile();
+            PngColorConversion.GetColorProfile(profile, image, width, height, modeIn);
             AutoChooseColorFromProfile(modeOut, modeIn, profile);
         }
 
         /*Autochoose color model given the computed profile. mode_in is to copy palette order from
         when relevant.*/
-        public static void AutoChooseColorFromProfile(PNGColorMode modeOut, PNGColorMode modeIn, PNGColorProfile prof)
+        public static void AutoChooseColorFromProfile(PngColorMode modeOut, PngColorMode modeIn, PngColorProfile prof)
         {
             bool paletteOk;
             int paletteBits = 0;
@@ -111,10 +111,10 @@ namespace Adamantium.Imaging.Png
                     AddPalette(modeOut, p[i * 4 + 0], p[i * 4 + 1], p[i * 4 + 2], p[i * 4 + 3]);
                 }
 
-                modeOut.ColorType = PNGColorType.Palette;
+                modeOut.ColorType = PngColorType.Palette;
                 modeOut.BitDepth = (uint)paletteBits;
 
-                if (modeIn.ColorType == PNGColorType.Palette && modeIn.PaletteSize >= modeOut.PaletteSize
+                if (modeIn.ColorType == PngColorType.Palette && modeIn.PaletteSize >= modeOut.PaletteSize
                     && modeIn.BitDepth == modeOut.BitDepth)
                 {
                     /*If input should have same palette colors, keep original to preserve its order and prevent conversion*/
@@ -126,8 +126,8 @@ namespace Adamantium.Imaging.Png
             else /*8-bit or 16-bit per channel*/
             {
                 modeOut.BitDepth = bits;
-                modeOut.ColorType = alpha ? (prof.Colored ? PNGColorType.RGBA : PNGColorType.GreyAlpha)
-                    : (prof.Colored ? PNGColorType.RGB : PNGColorType.Grey);
+                modeOut.ColorType = alpha ? (prof.Colored ? PngColorType.RGBA : PngColorType.GreyAlpha)
+                    : (prof.Colored ? PngColorType.RGB : PngColorType.Grey);
 
                 if (key)
                 {

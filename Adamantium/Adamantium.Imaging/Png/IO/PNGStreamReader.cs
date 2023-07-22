@@ -75,14 +75,14 @@ namespace Adamantium.Imaging.Png.IO
             header.Width = ReadInt32();
             header.Height = ReadInt32();
             header.BitDepth = (byte)ReadByte();
-            header.ColorType = (PNGColorType)ReadByte();
+            header.ColorType = (PngColorType)ReadByte();
             header.CompressionMethod = (byte)ReadByte();
             header.FilterMethod = (byte)ReadByte();
             header.InterlaceMethod = (InterlaceMethod)ReadByte();
             header.CRC = ReadUInt32();
             Position = 12;
             var data = ReadBytes(17);
-            header.CheckSum = CRC32.CalculateCheckSum(data);
+            header.CheckSum = Crc32.CalculateCheckSum(data);
 
             return header;
         }
@@ -95,7 +95,7 @@ namespace Adamantium.Imaging.Png.IO
             srgb.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(5);
-            srgb.CheckSum = CRC32.CalculateCheckSum(bytes);
+            srgb.CheckSum = Crc32.CalculateCheckSum(bytes);
             return srgb;
         }
 
@@ -108,7 +108,7 @@ namespace Adamantium.Imaging.Png.IO
             gama.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(5);
-            gama.CheckSum = CRC32.CalculateCheckSum(bytes);
+            gama.CheckSum = Crc32.CalculateCheckSum(bytes);
             return gama;
         }
 
@@ -122,11 +122,11 @@ namespace Adamantium.Imaging.Png.IO
             phys.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(13);
-            phys.CheckSum = CRC32.CalculateCheckSum(bytes);
+            phys.CheckSum = Crc32.CalculateCheckSum(bytes);
             return phys;
         }
 
-        internal tEXt ReadtEXt(PNGState state, uint chunkLength)
+        internal tEXt ReadtEXt(PngState state, uint chunkLength)
         {
             var pos = Position - 4;
             var data = ReadBytes((int)chunkLength);
@@ -147,12 +147,12 @@ namespace Adamantium.Imaging.Png.IO
             text.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(4 + (int)chunkLength);
-            text.CheckSum = CRC32.CalculateCheckSum(bytes);
+            text.CheckSum = Crc32.CalculateCheckSum(bytes);
 
             return text;
         }
 
-        internal iCCP ReadiCCP(PNGState state, PNGDecoder decoder, uint chunkLength)
+        internal iCCP ReadiCCP(PngState state, PngDecoder decoder, uint chunkLength)
         {
             var pos = Position - 4;
             var data = ReadBytes((int)chunkLength);
@@ -183,7 +183,7 @@ namespace Adamantium.Imaging.Png.IO
 
             var slice = data[length..];
             List<byte> decoded = new List<byte>();
-            PNGCompressor compressor = new PNGCompressor();
+            PngCompressor compressor = new PngCompressor();
             state.Error = compressor.Decompress(slice, state.DecoderSettings, decoded);
             if (state.Error == 0)
             {
@@ -193,7 +193,7 @@ namespace Adamantium.Imaging.Png.IO
             iccp.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(4 + (int)chunkLength);
-            iccp.CheckSum = CRC32.CalculateCheckSum(bytes);
+            iccp.CheckSum = Crc32.CalculateCheckSum(bytes);
 
             return iccp;
         }
@@ -214,11 +214,11 @@ namespace Adamantium.Imaging.Png.IO
             chrm.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(36);
-            chrm.CheckSum = CRC32.CalculateCheckSum(bytes);
+            chrm.CheckSum = Crc32.CalculateCheckSum(bytes);
             return chrm;
         }
 
-        internal iTXt ReadiTXt(PNGState state, PNGDecoder decoder, uint chunkLength)
+        internal iTXt ReadiTXt(PngState state, PngDecoder decoder, uint chunkLength)
         {
             if (chunkLength < 5)
             {
@@ -282,7 +282,7 @@ namespace Adamantium.Imaging.Png.IO
             List<byte> decoded = new List<byte>();
             if (compressed == 1)
             {
-                PNGCompressor compressor = new PNGCompressor();
+                PngCompressor compressor = new PngCompressor();
                 state.Error = compressor.Decompress(slice, state.DecoderSettings, decoded);
                 if (state.Error > 0)
                 {
@@ -298,13 +298,13 @@ namespace Adamantium.Imaging.Png.IO
             itxt.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(4 + (int)chunkLength);
-            itxt.CheckSum = CRC32.CalculateCheckSum(bytes);
+            itxt.CheckSum = Crc32.CalculateCheckSum(bytes);
 
             state.InfoPng.InternationalText = itxt;
             return itxt;
         }
 
-        internal zTXt ReadzTXt(PNGState state, PNGDecoder decoder, uint chunkLength)
+        internal zTXt ReadzTXt(PngState state, PngDecoder decoder, uint chunkLength)
         {
             var pos = Position - 4;
             var data = ReadBytes((int)chunkLength);
@@ -343,7 +343,7 @@ namespace Adamantium.Imaging.Png.IO
 
             List<byte> decoded = new List<byte>();
             var slice = data[begin..];
-            PNGCompressor compressor = new PNGCompressor();
+            PngCompressor compressor = new PngCompressor();
             state.Error = compressor.Decompress(slice, state.DecoderSettings, decoded);
 
             if (state.Error > 0)
@@ -355,12 +355,12 @@ namespace Adamantium.Imaging.Png.IO
             ztxt.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(4 + (int)chunkLength);
-            ztxt.CheckSum = CRC32.CalculateCheckSum(bytes);
+            ztxt.CheckSum = Crc32.CalculateCheckSum(bytes);
 
             return ztxt;
         }
 
-        internal tIME ReadtIME(PNGState state)
+        internal tIME ReadtIME(PngState state)
         {
             var pos = Position - 4;
             tIME time = new tIME();
@@ -374,19 +374,19 @@ namespace Adamantium.Imaging.Png.IO
             time.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(11);
-            time.CheckSum = CRC32.CalculateCheckSum(bytes);
+            time.CheckSum = Crc32.CalculateCheckSum(bytes);
 
             state.InfoPng.Time = time;
 
             return time;
         }
 
-        internal bKGD ReadbKGD(PNGState state, uint chunkLength)
+        internal bKGD ReadbKGD(PngState state, uint chunkLength)
         {
             var pos = Position - 4;
             var info = state.InfoPng;
             var bkgd = new bKGD();
-            if (info.ColorMode.ColorType == PNGColorType.Palette)
+            if (info.ColorMode.ColorType == PngColorType.Palette)
             {
                 if (chunkLength != 1)
                 {
@@ -407,7 +407,7 @@ namespace Adamantium.Imaging.Png.IO
                 bkgd.BackgroundR = bkgd.BackgroundB = bkgd.BackgroundB = (uint)colorByte;
                 info.BackgroundR = info.BackgroundG = info.BackgroundB = (uint)colorByte;
             }
-            else if (info.ColorMode.ColorType == PNGColorType.Grey || info.ColorMode.ColorType == PNGColorType.GreyAlpha)
+            else if (info.ColorMode.ColorType == PngColorType.Grey || info.ColorMode.ColorType == PngColorType.GreyAlpha)
             {
                 /*error: this chunk must be 2 bytes for grayscale image*/
                 if (chunkLength != 2)
@@ -421,7 +421,7 @@ namespace Adamantium.Imaging.Png.IO
                 bkgd.BackgroundR = bkgd.BackgroundB = bkgd.BackgroundB = color;
                 info.BackgroundR = info.BackgroundG = info.BackgroundB = color;
             }
-            else if (info.ColorMode.ColorType == PNGColorType.RGB || info.ColorMode.ColorType == PNGColorType.RGBA)
+            else if (info.ColorMode.ColorType == PngColorType.RGB || info.ColorMode.ColorType == PngColorType.RGBA)
             {
                 /*error: this chunk must be 6 bytes for grayscale image*/
                 if (chunkLength != 6)
@@ -447,17 +447,17 @@ namespace Adamantium.Imaging.Png.IO
             bkgd.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(4 + (int)chunkLength);
-            bkgd.CheckSum = CRC32.CalculateCheckSum(bytes);
+            bkgd.CheckSum = Crc32.CalculateCheckSum(bytes);
 
             return bkgd;
         }
 
-        internal tRNS ReadtRNS(PNGState state, uint chunkLength)
+        internal tRNS ReadtRNS(PngState state, uint chunkLength)
         {
             var pos = Position - 4;
             var trns = new tRNS();
             var colorMode = state.InfoPng.ColorMode;
-            if (colorMode.ColorType == PNGColorType.Palette)
+            if (colorMode.ColorType == PngColorType.Palette)
             {
                 /*error: more alpha values given than there are palette entries*/
                 if (chunkLength > colorMode.PaletteSize)
@@ -470,7 +470,7 @@ namespace Adamantium.Imaging.Png.IO
                     colorMode.Palette[4 * i + 3] = (byte)ReadByte();
                 }
             }
-            else if (colorMode.ColorType == PNGColorType.Grey)
+            else if (colorMode.ColorType == PngColorType.Grey)
             {
                 /*error: this chunk must be 2 bytes for grayscale image*/
                 if (chunkLength != 2)
@@ -483,7 +483,7 @@ namespace Adamantium.Imaging.Png.IO
                 colorMode.KeyR = colorMode.KeyG = colorMode.KeyB = keyValue;
                 trns.KeyR = trns.KeyG = trns.KeyB = keyValue;
             }
-            else if (colorMode.ColorType == PNGColorType.RGB)
+            else if (colorMode.ColorType == PngColorType.RGB)
             {
                 /*error: this chunk must be 6 bytes for RGB image*/
                 if (chunkLength != 6)
@@ -508,12 +508,12 @@ namespace Adamantium.Imaging.Png.IO
             trns.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(4 + (int)chunkLength);
-            trns.CheckSum = CRC32.CalculateCheckSum(bytes);
+            trns.CheckSum = Crc32.CalculateCheckSum(bytes);
 
             return trns;
         }
 
-        internal PLTE ReadPLTE(PNGState state, uint chunkLength)
+        internal PLTE ReadPLTE(PngState state, uint chunkLength)
         {
             var pos = Position - 4;
             var plte = new PLTE();
@@ -544,11 +544,11 @@ namespace Adamantium.Imaging.Png.IO
             plte.CRC = ReadUInt32();
             Position = pos;
             var bytes = ReadBytes(4 + (int)chunkLength);
-            plte.CheckSum = CRC32.CalculateCheckSum(bytes);
+            plte.CheckSum = Crc32.CalculateCheckSum(bytes);
             return plte;
         }
 
-        internal acTL ReadacTL(PNGState state)
+        internal acTL ReadacTL(PngState state)
         {
             var pos = Position - 4;
             var actl = new acTL();
@@ -562,7 +562,7 @@ namespace Adamantium.Imaging.Png.IO
             return actl;
         }
 
-        internal void ReadfcTL(PNGState state, PNGFrame frame)
+        internal void ReadfcTL(PngState state, PngFrame frame)
         {
             var pos = Position - 4;
             var fctl = new fcTL();
@@ -580,12 +580,12 @@ namespace Adamantium.Imaging.Png.IO
             ReadCRC(state, fctl, pos, 30);
         }
 
-        internal void ReadCRC(PNGState state, Chunk chunk, long position, uint sizeToRead)
+        internal void ReadCRC(PngState state, Chunk chunk, long position, uint sizeToRead)
         {
             chunk.CRC = ReadUInt32();
             Position = position;
             var bytes = ReadBytes((int)sizeToRead);
-            chunk.CheckSum = CRC32.CalculateCheckSum(bytes);
+            chunk.CheckSum = Crc32.CalculateCheckSum(bytes);
 
             if (chunk.CRC != chunk.CheckSum)
             {

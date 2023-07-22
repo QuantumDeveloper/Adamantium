@@ -47,7 +47,7 @@ namespace Adamantium.Imaging.Png.Chunks
         /// </summary>
         public BlendOp BlendOp { get; set; }
 
-        internal override byte[] GetChunkBytes(PNGState state)
+        internal override byte[] GetChunkBytes(PngState state)
         {
             var bytes = new List<byte>();
             bytes.AddRange(GetNameAsBytes());
@@ -64,7 +64,7 @@ namespace Adamantium.Imaging.Png.Chunks
             return bytes.ToArray();
         }
 
-        internal static fcTL FromFrame(PNGFrame frame)
+        internal static fcTL FromFrame(PngFrame frame)
         {
             var fctl = new fcTL();
             fctl.SequenceNumber = frame.SequenceNumberFCTL;

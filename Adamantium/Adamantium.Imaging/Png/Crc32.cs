@@ -1,8 +1,8 @@
 ﻿namespace Adamantium.Imaging.Png
 {
-    public static class CRC32
+    public static class Crc32
     {
-        internal static uint[] CRC32Table = new uint[256] {
+        internal static uint[] Crc32Table = new uint[256] {
                       0u, 1996959894u, 3993919788u, 2567524794u,  124634137u, 1886057615u, 3915621685u, 2657392035u,
              249268274u, 2044508324u, 3772115230u, 2547177864u,  162941995u, 2125561021u, 3887607047u, 2428444049u,
              498536548u, 1789927666u, 4089016648u, 2227061214u,  450548861u, 1843258603u, 4107580753u, 2211677639u,
@@ -42,7 +42,7 @@
             uint r = 0xffffffffu;
             for (int i = 0; i < data.Length; ++i)
             {
-                r = CRC32.CRC32Table[(r ^ data[i]) & 0xff] ^ (r >> 8);
+                r = Crc32.Crc32Table[(r ^ data[i]) & 0xff] ^ (r >> 8);
             }
             return r ^ 0xffffffffu;
         }

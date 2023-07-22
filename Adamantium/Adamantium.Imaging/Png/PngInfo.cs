@@ -3,18 +3,18 @@ using Adamantium.Imaging.Png.Chunks;
 
 namespace Adamantium.Imaging.Png
 {
-    internal class PNGInfo
+    internal class PngInfo
     {
-        public PNGInfo()
+        public PngInfo()
         {
-            ColorMode = new PNGColorMode();
+            ColorMode = new PngColorMode();
             TextItems = new List<TXTItem>();
             ITextItems = new List<ITextItem>();
         }
 
-        public PNGInfo(PNGInfo info)
+        public PngInfo(PngInfo info)
         {
-            ColorMode = new PNGColorMode(info.ColorMode);
+            ColorMode = new PngColorMode(info.ColorMode);
             TextItems = new List<TXTItem>(info.TextItems);
             ITextItems = new List<ITextItem>(info.ITextItems);
             CompressionMethod = info.CompressionMethod;
@@ -39,7 +39,7 @@ namespace Adamantium.Imaging.Png
         /*interlace method of the original file: 0=none, 1=Adam7*/
         public InterlaceMethod InterlaceMethod;
         /*color type and bits, palette and transparency of the PNG file*/
-        public PNGColorMode ColorMode;
+        public PngColorMode ColorMode;
 
         /*
         Suggested background color chunk (bKGD)
@@ -190,7 +190,7 @@ namespace Adamantium.Imaging.Png
         /*size in bytes of the unknown chunks, given for protection*/
         public ulong[] UnknownChunksSize; 
 
-        public static bool operator ==(PNGInfo left, PNGInfo right)
+        public static bool operator ==(PngInfo left, PngInfo right)
         {
             if (left.CompressionMethod == right.CompressionMethod && left.FilterMethod == right.FilterMethod
                 && left.InterlaceMethod == right.InterlaceMethod && left.ColorMode == right.ColorMode)
@@ -201,7 +201,7 @@ namespace Adamantium.Imaging.Png
             return false;
         }
 
-        public static bool operator !=(PNGInfo left, PNGInfo right)
+        public static bool operator !=(PngInfo left, PngInfo right)
         {
             if (left == right)
             {

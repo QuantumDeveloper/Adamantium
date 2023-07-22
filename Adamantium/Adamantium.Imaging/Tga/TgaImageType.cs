@@ -1,6 +1,6 @@
 ﻿namespace Adamantium.Imaging.Tga
 {
-    internal enum TGAImageType : byte
+    internal enum TgaImageType : byte
     {
         NoImage = 0,
         ColorMapped = 1,

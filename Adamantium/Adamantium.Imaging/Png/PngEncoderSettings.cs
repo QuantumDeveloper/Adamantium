@@ -1,6 +1,6 @@
 ﻿namespace Adamantium.Imaging.Png
 {
-    public class PNGEncoderSettings
+    public class PngEncoderSettings
     {
         /*automatically choose output PNG color type. Default: true*/
         public bool AutoConvert { get; set; } = true;

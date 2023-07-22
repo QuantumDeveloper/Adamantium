@@ -1,8 +1,8 @@
 ﻿namespace Adamantium.Imaging.Png
 {
-    public class PNGDecoderSettings
+    public class PngDecoderSettings
     {
-        public PNGDecoderSettings()
+        public PngDecoderSettings()
         {
             ColorСonvert = true;
             ReadTextChunks = true;
@@ -21,7 +21,7 @@
 
         public bool ReadTextChunks { get; set; }
 
-        public static bool operator ==(PNGDecoderSettings left, PNGDecoderSettings right)
+        public static bool operator ==(PngDecoderSettings left, PngDecoderSettings right)
         {
             if (left.IgnoreAdler32 == right.IgnoreAdler32 && left.IgnoreCrc == right.IgnoreCrc
                 && left.IgnoreCritical == right.IgnoreCritical && left.ColorСonvert == right.ColorСonvert)
@@ -32,7 +32,7 @@
             return false;
         }
 
-        public static bool operator !=(PNGDecoderSettings left, PNGDecoderSettings right)
+        public static bool operator !=(PngDecoderSettings left, PngDecoderSettings right)
         {
             if (left == right)
             {

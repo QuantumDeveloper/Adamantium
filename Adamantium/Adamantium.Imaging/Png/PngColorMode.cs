@@ -2,14 +2,14 @@
 
 namespace Adamantium.Imaging.Png
 {
-    internal class PNGColorMode
+    internal class PngColorMode
     {
-        public PNGColorMode()
+        public PngColorMode()
         {
 
         }
 
-        public PNGColorMode(PNGColorMode copy)
+        public PngColorMode(PngColorMode copy)
         {
             ColorType = copy.ColorType;
             BitDepth = copy.BitDepth;
@@ -25,16 +25,16 @@ namespace Adamantium.Imaging.Png
             KeyB = copy.KeyB;
         }
 
-        public static PNGColorMode Create(PNGColorType colorType, uint bitDepth)
+        public static PngColorMode Create(PngColorType colorType, uint bitDepth)
         {
-            PNGColorMode colorMode = new PNGColorMode();
+            PngColorMode colorMode = new PngColorMode();
             colorMode.ColorType = colorType;
             colorMode.BitDepth = bitDepth;
             return colorMode;
         }
 
         /*color type, see PNG standard or documentation further in this header file*/
-        public PNGColorType ColorType { get; set; }
+        public PngColorType ColorType { get; set; }
 
         /*bits per sample, see PNG standard or documentation further in this header file*/
         public uint BitDepth { get; set; }
@@ -74,7 +74,7 @@ namespace Adamantium.Imaging.Png
         /*blue component of color key*/
         public uint KeyB;
 
-        public static bool operator ==(PNGColorMode left, PNGColorMode right)
+        public static bool operator ==(PngColorMode left, PngColorMode right)
         {
             if (left.ColorType == right.ColorType && left.BitDepth == right.BitDepth
                 && left.PaletteSize == right.PaletteSize && left.IsKeyDefined == right.IsKeyDefined
@@ -86,7 +86,7 @@ namespace Adamantium.Imaging.Png
             return false;
         }
 
-        public static bool operator !=(PNGColorMode left, PNGColorMode right)
+        public static bool operator !=(PngColorMode left, PngColorMode right)
         {
             if (left == right)
             {

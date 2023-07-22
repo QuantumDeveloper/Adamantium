@@ -50,7 +50,7 @@ using AdamantiumVulkan.Core;
 
 namespace Adamantium.Imaging.Dds
 {
-    public class DDSHelper
+    public class DdsHelper
     {
         /// <summary>
         /// Magic code to identify DDS header
@@ -178,7 +178,7 @@ namespace Adamantium.Imaging.Dds
         //      FourCC 117 D3DFMT_CxV8U8
         //      ZBuffer D3DFMT_D16_LOCKABLE
         //      FourCC 82 D3DFMT_D32F_LOCKABLE
-        private static DXGIFormat GetDXGIFormat(ref PixelFormat pixelFormat, DDSFlags flags, out ConversionFlags conversionFlags)
+        private static DXGIFormat GetDXGIFormat(ref PixelFormat pixelFormat, DdsFlags flags, out ConversionFlags conversionFlags)
         {
             conversionFlags = ConversionFlags.None;
 
@@ -217,10 +217,10 @@ namespace Adamantium.Imaging.Dds
             conversionFlags = LegacyMaps[index].ConversionFlags;
             var format = LegacyMaps[index].DXGIFormat;
 
-            if ((conversionFlags & ConversionFlags.Expand) != 0 && (flags & DDSFlags.NoLegacyExpansion) != 0)
+            if ((conversionFlags & ConversionFlags.Expand) != 0 && (flags & DdsFlags.NoLegacyExpansion) != 0)
                 return DXGIFormat.Unknown;
 
-            if ((format == DXGIFormat.R10G10B10A2_UNorm) && (flags & DDSFlags.NoR10B10G10A2Fixup) != 0)
+            if ((format == DXGIFormat.R10G10B10A2_UNorm) && (flags & DdsFlags.NoR10B10G10A2Fixup) != 0)
             {
                 conversionFlags ^= ConversionFlags.Swizzle;
             }
@@ -240,7 +240,7 @@ namespace Adamantium.Imaging.Dds
         /// <exception cref="ArgumentException">If the argument headerPtr is null</exception>
         /// <exception cref="InvalidOperationException">If the DDS header contains invalid data.</exception>
         /// <returns>True if the decoding is successful, false if this is not a DDS header.</returns>
-        private static unsafe bool DecodeDDSHeader(IntPtr headerPtr, long size, DDSFlags flags, out ImageDescription description, out DXGIFormat dxgiFormat, out ConversionFlags convFlags)
+        private static unsafe bool DecodeDDSHeader(IntPtr headerPtr, long size, DdsFlags flags, out ImageDescription description, out DXGIFormat dxgiFormat, out ConversionFlags convFlags)
         {
             description = new ImageDescription();
             convFlags = ConversionFlags.None;
@@ -371,7 +371,7 @@ namespace Adamantium.Imaging.Dds
             }
 
             // Special flag for handling BGR DXGI 1.1 formats
-            if ((flags & DDSFlags.ForceRgb) != 0)
+            if ((flags & DdsFlags.ForceRgb) != 0)
             {
                 switch (dxgiFormat)
                 {
@@ -408,11 +408,11 @@ namespace Adamantium.Imaging.Dds
             }
 
             // Pass DDSFlags copy memory to the conversion flags
-            if ((flags & DDSFlags.CopyMemory) != 0)
+            if ((flags & DdsFlags.CopyMemory) != 0)
                 convFlags |= ConversionFlags.CopyMemory;
 
             // Special flag for handling 16bpp formats
-            if ((flags & DDSFlags.No16Bpp) != 0)
+            if ((flags & DdsFlags.No16Bpp) != 0)
             {
                 switch (dxgiFormat)
                 {
@@ -440,20 +440,20 @@ namespace Adamantium.Imaging.Dds
         /// <exception cref="ArgumentException">If the argument headerPtr is null</exception>
         /// <exception cref="InvalidOperationException">If the DDS header contains invalid data.</exception>
         /// <returns>True if the decoding is successful, false if this is not a DDS header.</returns>
-        private static unsafe void EncodeDDSHeader( ImageDescription description, DDSFlags flags, IntPtr pDestination, int maxsize, out int required )
+        private static unsafe void EncodeDDSHeader( ImageDescription description, DdsFlags flags, IntPtr pDestination, int maxsize, out int required )
         {
             if (description.ArraySize > 1)
             {
                 if ((description.ArraySize != 6) || (description.Dimension != TextureDimension.Texture2D) || (description.Dimension != TextureDimension.TextureCube))
                 {
-                    flags |= DDSFlags.ForceDX10Ext;
+                    flags |= DdsFlags.ForceDX10Ext;
                 }
             }
 
             var dxgiFormat = FormatConverter.VulkanToDXGI(description.Format);
 
             var ddpf = default(PixelFormat);
-            if ((flags & DDSFlags.ForceDX10Ext) == 0)
+            if ((flags & DdsFlags.ForceDX10Ext) == 0)
             {
                 switch (dxgiFormat)
                 {
@@ -931,7 +931,7 @@ namespace Adamantium.Imaging.Dds
         /// <returns></returns>
         public static unsafe IRawBitmap LoadFromMemory(IntPtr pSource, long size, bool makeACopy, GCHandle? handle)
         {
-            var flags = makeACopy ? DDSFlags.CopyMemory : DDSFlags.None;
+            var flags = makeACopy ? DdsFlags.CopyMemory : DdsFlags.None;
 
             ConversionFlags convFlags;
             ImageDescription metadata;
@@ -952,7 +952,7 @@ namespace Adamantium.Imaging.Dds
 
             if (size < offset)
                 throw new InvalidOperationException();
-            var cpFlags = (flags & DDSFlags.LegacyDword) != 0 ? Image.PitchFlags.LegacyDword : Image.PitchFlags.None;
+            var cpFlags = (flags & DdsFlags.LegacyDword) != 0 ? Image.PitchFlags.LegacyDword : Image.PitchFlags.None;
             metadata.Format = FormatConverter.DXGIToVulkan(dxgiFormat);
             var image = CreateImageFromDDS(pSource, offset, (size - offset), metadata, cpFlags, convFlags, pal8);
             return image;
@@ -960,13 +960,13 @@ namespace Adamantium.Imaging.Dds
 
         public static void SaveToStream(Image img, PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream)
         {
-            SaveToDDSStream(pixelBuffers, count, description, DDSFlags.None, imageStream);
+            SaveToDDSStream(pixelBuffers, count, description, DdsFlags.None, imageStream);
         }
 
         //-------------------------------------------------------------------------------------
         // Save a DDS to a stream
         //-------------------------------------------------------------------------------------
-        public unsafe static void SaveToDDSStream(PixelBuffer[] pixelBuffers, int count, ImageDescription metadata, DDSFlags flags, Stream stream)
+        public unsafe static void SaveToDDSStream(PixelBuffer[] pixelBuffers, int count, ImageDescription metadata, DdsFlags flags, Stream stream)
         {
             // Determine memory required
             int totalSize;

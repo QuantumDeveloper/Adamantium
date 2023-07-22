@@ -4,30 +4,30 @@ using Adamantium.Imaging.Png.IO;
 
 namespace Adamantium.Imaging.Png
 {
-    internal class PNGEncoder
+    internal class PngEncoder
     {
-        private PNGCompressor compressor;
+        private PngCompressor compressor;
         private Stream outputStream;
         private PNGStreamWriter pngStream;
-        public PNGEncoder(Stream outputStream)
+        public PngEncoder(Stream outputStream)
         {
-            compressor = new PNGCompressor();
+            compressor = new PngCompressor();
             this.outputStream = outputStream;
             pngStream = new PNGStreamWriter();
         }
 
-        public PNGEncoder()
+        public PngEncoder()
         {
-            compressor = new PNGCompressor();
+            compressor = new PngCompressor();
             pngStream = new PNGStreamWriter();
         }
 
-        public uint Encode(PNGImage pngImage, PNGState state)
+        public uint Encode(PngImage pngImage, PngState state)
         {
             uint error = 0;
 
             /*check input values validity*/
-            if ((state.InfoPng.ColorMode.ColorType == PNGColorType.Palette || state.EncoderSettings.ForcePalette)
+            if ((state.InfoPng.ColorMode.ColorType == PngColorType.Palette || state.EncoderSettings.ForcePalette)
                 && (state.InfoPng.ColorMode.PaletteSize == 0 || state.InfoPng.ColorMode.PaletteSize > 256))
             {
                 /*invalid palette size, it is only allowed to be 1-256*/
@@ -40,20 +40,20 @@ namespace Adamantium.Imaging.Png
                 return 61;
             }
 
-            state.Error = PNGColorConversion.CheckColorValidity(state.InfoPng.ColorMode.ColorType, state.InfoPng.ColorMode.BitDepth);
+            state.Error = PngColorConversion.CheckColorValidity(state.InfoPng.ColorMode.ColorType, state.InfoPng.ColorMode.BitDepth);
             if (state.Error > 0)
             {
                 return state.Error;
             }
 
-            state.Error = PNGColorConversion.CheckColorValidity(state.ColorModeRaw.ColorType, state.ColorModeRaw.BitDepth);
+            state.Error = PngColorConversion.CheckColorValidity(state.ColorModeRaw.ColorType, state.ColorModeRaw.BitDepth);
             if (state.Error > 0)
             {
                 return state.Error;
             }
 
             /* color convert and compute scanline filter types */
-            PNGInfo info = new PNGInfo(state.InfoPng);
+            PngInfo info = new PngInfo(state.InfoPng);
 
             if (state.EncoderSettings.AutoConvert)
             {
@@ -66,24 +66,24 @@ namespace Adamantium.Imaging.Png
                     uint g = 0;
                     uint b = 0;
 
-                    PNGColorProfile profile = new PNGColorProfile();
-                    PNGColorMode mode16 = PNGColorMode.Create(PNGColorType.RGB, 16);
-                    PNGColorConversion.ConvertRGB(ref r, ref g, ref b, bgR, bgG, bgB, mode16, state.InfoPng.ColorMode);
+                    PngColorProfile profile = new PngColorProfile();
+                    PngColorMode mode16 = PngColorMode.Create(PngColorType.RGB, 16);
+                    PngColorConversion.ConvertRGB(ref r, ref g, ref b, bgR, bgG, bgB, mode16, state.InfoPng.ColorMode);
                     var frame = pngImage.Frames[0];
-                    PNGColorConversion.GetColorProfile(profile, frame.RawPixelBuffer, frame.EncodedWidth, frame.EncodedHeight, state.ColorModeRaw);
+                    PngColorConversion.GetColorProfile(profile, frame.RawPixelBuffer, frame.EncodedWidth, frame.EncodedHeight, state.ColorModeRaw);
                     profile.Add(r, g, b, ushort.MaxValue);
-                    PNGColorProfile.AutoChooseColorFromProfile(info.ColorMode, state.ColorModeRaw, profile);
-                    error = PNGColorConversion.ConvertRGB(ref info.BackgroundR, ref info.BackgroundG,
+                    PngColorProfile.AutoChooseColorFromProfile(info.ColorMode, state.ColorModeRaw, profile);
+                    error = PngColorConversion.ConvertRGB(ref info.BackgroundR, ref info.BackgroundG,
                         ref info.BackgroundB, bgR, bgG, bgB, info.ColorMode, state.InfoPng.ColorMode);
                     if (error > 0)
                     {
-                        throw new PNGEncoderException(error);
+                        throw new PngEncoderException(error);
                     }
                 }
                 else
                 {
                     var frame = pngImage.Frames[0];
-                    PNGColorProfile.AutoChooseColor(info.ColorMode, frame.RawPixelBuffer, frame.EncodedWidth, frame.EncodedHeight, state.ColorModeRaw);
+                    PngColorProfile.AutoChooseColor(info.ColorMode, frame.RawPixelBuffer, frame.EncodedWidth, frame.EncodedHeight, state.ColorModeRaw);
                     //state.InfoRaw.ColorType = info.ColorMode.ColorType;
                     //state.InfoRaw.BitDepth = info.ColorMode.BitDepth;
                     state.ColorModeRaw = info.ColorMode;
@@ -93,25 +93,25 @@ namespace Adamantium.Imaging.Png
             if (state.InfoPng.IsIccpDefined)
             {
                 var grayICC = iCCP.IsGrayICCProfile(state.InfoPng.IccpProfile);
-                var grayPng = info.ColorMode.ColorType == PNGColorType.Grey || info.ColorMode.ColorType == PNGColorType.GreyAlpha;
+                var grayPng = info.ColorMode.ColorType == PngColorType.Grey || info.ColorMode.ColorType == PngColorType.GreyAlpha;
                 /* TODO: perhaps instead of giving errors or less optimal compression, we can automatically modify
                 the ICC profile here to say "GRAY" or "RGB " to match the PNG color type, unless this will require
                 non trivial changes to the rest of the ICC profile */
                 if (!grayICC && !iCCP.IsRGBICCProfile(state.InfoPng.IccpProfile))
                 {
                     /* Disallowed profile color type for PNG */
-                    throw new PNGEncoderException(100);
+                    throw new PngEncoderException(100);
                 }
                 if (!state.EncoderSettings.AutoConvert && grayICC != grayPng)
                 {
                     /* Non recoverable: encoder not allowed to convert color type, and requested color type not
                     compatible with ICC color type */
-                    throw new PNGEncoderException(101);
+                    throw new PngEncoderException(101);
                 }
                 if (grayICC && !grayPng)
                 {
                     /* Non recoverable: trying to set grayscale ICC profile while colored pixels were given */
-                    throw new PNGEncoderException(102);
+                    throw new PngEncoderException(102);
                     /* NOTE: this relies on the fact that PNGColorProfile.AutoChooseColor never returns palette for grayscale pixels */
                 }
                 if (!grayICC && grayPng)
@@ -119,42 +119,42 @@ namespace Adamantium.Imaging.Png
                     /* Recoverable but an unfortunate loss in compression density: We have grayscale pixels but
                     are forced to store them in more expensive RGB format that will repeat each value 3 times
                     because the PNG spec does not allow an RGB ICC profile with internal grayscale color data */
-                    if (info.ColorMode.ColorType == PNGColorType.Grey) info.ColorMode.ColorType = PNGColorType.RGB;
-                    if (info.ColorMode.ColorType == PNGColorType.GreyAlpha) info.ColorMode.ColorType = PNGColorType.RGBA;
+                    if (info.ColorMode.ColorType == PngColorType.Grey) info.ColorMode.ColorType = PngColorType.RGB;
+                    if (info.ColorMode.ColorType == PngColorType.GreyAlpha) info.ColorMode.ColorType = PngColorType.RGBA;
                     if (info.ColorMode.BitDepth < 8) info.ColorMode.BitDepth = 8;
                 }
             }
 
             if (state.InfoPng.ColorMode != info.ColorMode)
             {
-                foreach (PNGFrame frame in pngImage.Frames)
+                foreach (PngFrame frame in pngImage.Frames)
                 {
-                    long size = (frame.EncodedWidth * frame.EncodedHeight * PNGColorConversion.GetBitsPerPixel(info.ColorMode) + 7) / 8;
+                    long size = (frame.EncodedWidth * frame.EncodedHeight * PngColorConversion.GetBitsPerPixel(info.ColorMode) + 7) / 8;
                     var converted = new byte[size];
-                    state.Error = PNGColorConversion.Convert(converted, frame.RawPixelBuffer, info.ColorMode, state.InfoPng.ColorMode, (int)frame.EncodedWidth, (int)frame.EncodedHeight);
+                    state.Error = PngColorConversion.Convert(converted, frame.RawPixelBuffer, info.ColorMode, state.InfoPng.ColorMode, (int)frame.EncodedWidth, (int)frame.EncodedHeight);
                     if (state.Error > 0)
                     {
-                        throw new PNGEncoderException(state.Error);
+                        throw new PngEncoderException(state.Error);
                     }
                     var compressedBuffer = new byte[0];
                     state.Error = PreprocessScanlines(ref compressedBuffer, converted, frame.EncodedWidth, frame.EncodedHeight, info, state.EncoderSettings);
                     frame.FrameData = compressedBuffer;
                     if (state.Error > 0)
                     {
-                        throw new PNGEncoderException(state.Error);
+                        throw new PngEncoderException(state.Error);
                     }
                 }
             }
             else
             {
-                foreach (PNGFrame frame in pngImage.Frames)
+                foreach (PngFrame frame in pngImage.Frames)
                 {
                     var compressedBuffer = new byte[0];
                     state.Error = PreprocessScanlines(ref compressedBuffer, frame.RawPixelBuffer, frame.EncodedWidth, frame.EncodedHeight, info, state.EncoderSettings);
                     frame.FrameData = compressedBuffer;
                     if (state.Error > 0)
                     {
-                        throw new PNGEncoderException(state.Error);
+                        throw new PngEncoderException(state.Error);
                     }
                 }
             }
@@ -182,19 +182,19 @@ namespace Adamantium.Imaging.Png
             }
 
             /*PLTE*/
-            if (info.ColorMode.ColorType == PNGColorType.Palette)
+            if (info.ColorMode.ColorType == PngColorType.Palette)
             {
                 pngStream.WritePLTE(state);
             }
             if (state.EncoderSettings.ForcePalette 
-                && (info.ColorMode.ColorType == PNGColorType.RGB 
-                || info.ColorMode.ColorType == PNGColorType.RGBA))
+                && (info.ColorMode.ColorType == PngColorType.RGB 
+                || info.ColorMode.ColorType == PngColorType.RGBA))
             {
                 pngStream.WritePLTE(state);
             }
             /*tRNS*/
-            if ((info.ColorMode.ColorType == PNGColorType.Grey ||
-                info.ColorMode.ColorType == PNGColorType.RGB)
+            if ((info.ColorMode.ColorType == PngColorType.Grey ||
+                info.ColorMode.ColorType == PngColorType.RGB)
                 && info.ColorMode.IsKeyDefined)
             {
                 pngStream.WritetRNS(state);
@@ -295,10 +295,10 @@ namespace Adamantium.Imaging.Png
         */
         /*out must be buffer big enough to contain uncompressed IDAT chunk data, and in must contain the full image.
         return value is error**/
-        private unsafe uint PreprocessScanlines(ref byte[] outData, byte[] inData, uint width, uint height, PNGInfo pngInfo, PNGEncoderSettings settings)
+        private unsafe uint PreprocessScanlines(ref byte[] outData, byte[] inData, uint width, uint height, PngInfo pngInfo, PngEncoderSettings settings)
         {
             uint error = 0;
-            var bpp = PNGColorConversion.GetBitsPerPixel(pngInfo.ColorMode);
+            var bpp = PngColorConversion.GetBitsPerPixel(pngInfo.ColorMode);
 
             if (pngInfo.InterlaceMethod == InterlaceMethod.None)
             {

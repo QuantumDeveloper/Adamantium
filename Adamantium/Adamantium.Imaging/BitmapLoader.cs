@@ -50,13 +50,13 @@ public static class BitmapLoader
     public static IRawBitmap LoadPng(IntPtr dataPointer, long dataSize)
     {
         var stream = new PNGStreamReader(dataPointer, dataSize);
-        var decoder = new PNGDecoder(stream);
+        var decoder = new PngDecoder(stream);
         return decoder.Decode();
     }
     
     public static IRawBitmap LoadDds(IntPtr dataPointer, long dataSize)
     {
-        return DDSHelper.LoadFromMemory(dataPointer, dataSize, false, null);
+        return DdsHelper.LoadFromMemory(dataPointer, dataSize, false, null);
     }
     
     public static IRawBitmap LoadJpg(IntPtr dataPointer, long dataSize)
@@ -66,7 +66,7 @@ public static class BitmapLoader
     
     public static IRawBitmap LoadBmp(IntPtr dataPointer, long dataSize)
     {
-        return Adamantium.Imaging.Bmp.BitmapHelper.LoadFromMemory(dataPointer, (ulong)dataSize, false, null);
+        return Bmp.BitmapHelper.LoadFromMemory(dataPointer, (ulong)dataSize, false, null);
     }
     
     public static IRawBitmap LoadIco(IntPtr dataPointer, long dataSize)

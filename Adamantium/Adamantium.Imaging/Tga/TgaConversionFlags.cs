@@ -3,7 +3,7 @@
 namespace Adamantium.Imaging.Tga
 {
     [Flags]
-    public enum TGAConversionFlags
+    public enum TgaConversionFlags
     {
         None = 0x0,
         Expand = 0x1,        //Conversion requires expanded pixel size

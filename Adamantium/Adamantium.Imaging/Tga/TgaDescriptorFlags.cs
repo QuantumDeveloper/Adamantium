@@ -3,7 +3,7 @@
 namespace Adamantium.Imaging.Tga
 {
     [Flags]
-    internal enum TGADescriptorFlags : byte
+    internal enum TgaDescriptorFlags : byte
     {
         InvertX = 0x10,
         InvertY = 0x20,

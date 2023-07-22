@@ -46,10 +46,10 @@ using System;
 namespace Adamantium.Imaging.Dds
 {
     /// <summary>
-    /// Flags used by <see cref="DDSHelper.LoadFromMemory"/>.
+    /// Flags used by <see cref="DdsHelper.LoadFromMemory"/>.
     /// </summary>
     [Flags]
-    public enum DDSFlags
+    public enum DdsFlags
     {
         None = 0x0,
         LegacyDword = 0x1, // Assume pitch is DWORD aligned instead of BYTE aligned (used by some legacy DDS files)

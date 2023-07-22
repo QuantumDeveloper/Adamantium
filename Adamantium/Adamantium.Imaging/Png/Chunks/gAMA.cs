@@ -12,7 +12,7 @@ namespace Adamantium.Imaging.Png.Chunks
 
         public uint Gamma { get; set; }
 
-        internal override byte[] GetChunkBytes(PNGState state)
+        internal override byte[] GetChunkBytes(PngState state)
         {
             var bytes = new List<byte>();
             bytes.AddRange(GetNameAsBytes());
@@ -21,7 +21,7 @@ namespace Adamantium.Imaging.Png.Chunks
             return bytes.ToArray();
         }
 
-        internal static gAMA FromState(PNGState state)
+        internal static gAMA FromState(PngState state)
         {
             return new gAMA() { Gamma = state.InfoPng.Gamma };
         }

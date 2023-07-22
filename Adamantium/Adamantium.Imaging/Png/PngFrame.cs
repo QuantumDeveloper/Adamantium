@@ -2,14 +2,14 @@
 
 namespace Adamantium.Imaging.Png
 {
-    internal class PNGFrame
+    internal class PngFrame
     {
-        public PNGFrame()
+        public PngFrame()
         {
             frameData = new List<byte>();
         }
 
-        public PNGFrame(byte[] pixels, uint encodedWidth, uint encodedHeight, int bitDepth)
+        public PngFrame(byte[] pixels, uint encodedWidth, uint encodedHeight, int bitDepth)
         {
             RawPixelBuffer = pixels;
             EncodedWidth = encodedWidth;

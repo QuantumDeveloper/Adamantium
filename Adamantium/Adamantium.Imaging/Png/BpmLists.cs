@@ -3,7 +3,7 @@
     /// <summary>
     /// Lists of chains
     /// </summary>
-    internal class BPMLists
+    internal class BpmLists
     {
         /*memory pool*/
         public uint MemSize { get; set; }

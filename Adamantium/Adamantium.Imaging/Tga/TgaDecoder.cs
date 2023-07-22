@@ -7,30 +7,30 @@ namespace Adamantium.Imaging.Tga;
 
 public static class TgaDecoder
 {
-    public static unsafe bool DecodeTgaHeader(IntPtr source, long size, out ImageDescription description, out long offset, out TGAConversionFlags convFlags)
+    public static unsafe bool DecodeTgaHeader(IntPtr source, long size, out ImageDescription description, out long offset, out TgaConversionFlags convFlags)
         {
             if (source == IntPtr.Zero)
             {
                 throw new ArgumentException("Source cannot be IntPtr.Zero");
             }
 
-            if (size < Utilities.SizeOf<TGAHeader>())
+            if (size < Utilities.SizeOf<TgaHeader>())
             {
                 throw new ArgumentException("File contains invalid data");
             }
 
             description = new ImageDescription();
             offset = 0;
-            convFlags = TGAConversionFlags.None;
+            convFlags = TgaConversionFlags.None;
 
-            var header = (TGAHeader*)source;
+            var header = (TgaHeader*)source;
 
             if (header->ColorMapType != 0 || header->ColorMapLength != 0)
             {
                 return false;
             }
 
-            if (((TGADescriptorFlags)header->Descriptor).HasFlag(TGADescriptorFlags.Interleaved2Way | TGADescriptorFlags.Interleaved4Way))
+            if (((TgaDescriptorFlags)header->Descriptor).HasFlag(TgaDescriptorFlags.Interleaved2Way | TgaDescriptorFlags.Interleaved4Way))
             {
                 return false;
             }
@@ -40,10 +40,10 @@ public static class TgaDecoder
                 return false;
             }
 
-            switch ((TGAImageType)header->ImageType)
+            switch ((TgaImageType)header->ImageType)
             {
-                case TGAImageType.TrueColor:
-                case TGAImageType.TruecolorRLE:
+                case TgaImageType.TrueColor:
+                case TgaImageType.TruecolorRLE:
                     switch (header->BitsPerPixel)
                     {
                         case 16:
@@ -51,7 +51,7 @@ public static class TgaDecoder
                             break;
                         case 24:
                             description.Format = Format.R8G8B8A8_UNORM;
-                            convFlags |= TGAConversionFlags.Expand;
+                            convFlags |= TgaConversionFlags.Expand;
                             // We could use DXGI_FORMAT_B8G8R8X8_UNORM, but we prefer DXGI 1.0 formats
                             break;
                         case 32:
@@ -60,14 +60,14 @@ public static class TgaDecoder
                             break;
                     }
 
-                    if ((TGAImageType)header->ImageType == TGAImageType.TruecolorRLE)
+                    if ((TgaImageType)header->ImageType == TgaImageType.TruecolorRLE)
                     {
-                        convFlags |= TGAConversionFlags.RLE;
+                        convFlags |= TgaConversionFlags.RLE;
                     }
 
                     break;
-                case TGAImageType.BlackAndWhite:
-                case TGAImageType.BlackAndWhiteRLE:
+                case TgaImageType.BlackAndWhite:
+                case TgaImageType.BlackAndWhiteRLE:
                     switch (header->BitsPerPixel)
                     {
                         case 8:
@@ -78,15 +78,15 @@ public static class TgaDecoder
                             return false;
                     }
 
-                    if ((TGAImageType)header->ImageType == TGAImageType.BlackAndWhiteRLE)
+                    if ((TgaImageType)header->ImageType == TgaImageType.BlackAndWhiteRLE)
                     {
-                        convFlags |= TGAConversionFlags.RLE;
+                        convFlags |= TgaConversionFlags.RLE;
                     }
                     break;
 
-                case TGAImageType.NoImage:
-                case TGAImageType.ColorMapped:
-                case TGAImageType.ColorMappedRLE:
+                case TgaImageType.NoImage:
+                case TgaImageType.ColorMapped:
+                case TgaImageType.ColorMappedRLE:
                     return false;
 
                 default:
@@ -98,17 +98,17 @@ public static class TgaDecoder
             description.Depth = description.ArraySize = description.MipLevels = 1;
             description.Dimension = TextureDimension.Texture2D;
 
-            if ((header->Descriptor & (byte)TGADescriptorFlags.InvertX) != 0)
+            if ((header->Descriptor & (byte)TgaDescriptorFlags.InvertX) != 0)
             {
-                convFlags |= TGAConversionFlags.InvertX;
+                convFlags |= TgaConversionFlags.InvertX;
             }
 
-            if ((header->Descriptor & (byte)TGADescriptorFlags.InvertY) != 0)
+            if ((header->Descriptor & (byte)TgaDescriptorFlags.InvertY) != 0)
             {
-                convFlags |= TGAConversionFlags.InvertY;
+                convFlags |= TgaConversionFlags.InvertY;
             }
 
-            offset = Utilities.SizeOf<TGAHeader>();
+            offset = Utilities.SizeOf<TgaHeader>();
 
             if (header->IDLength != 0)
             {
@@ -121,11 +121,11 @@ public static class TgaDecoder
     public static unsafe TgaImage CreateImageFromTGA(IntPtr pTGA,
         long offset,
         ImageDescription description,
-        TGAConversionFlags convFlags)
+        TgaConversionFlags convFlags)
     {
         var pData = (IntPtr)((byte*)pTGA + offset);
         //If TGA compressed, then we must uncompress pixels
-        if (convFlags.HasFlag(TGAConversionFlags.RLE))
+        if (convFlags.HasFlag(TgaConversionFlags.RLE))
         {
             return UncompressPixels(pData, description, convFlags);
         }
@@ -135,10 +135,10 @@ public static class TgaDecoder
     
     private static unsafe TgaImage CopyPixels(IntPtr pSource,
             ImageDescription description,
-            TGAConversionFlags convFlags)
+            TgaConversionFlags convFlags)
         {
             int rowPitch, slicePitch;
-            if (convFlags.HasFlag(TGAConversionFlags.Format888))
+            if (convFlags.HasFlag(TgaConversionFlags.Format888))
             {
                 rowPitch = (int)description.Width * 3;
             }
@@ -169,15 +169,15 @@ public static class TgaDecoder
                 case Format.R8_UNORM: //-------------------------- 8 bit
                     for (int y = 0; y < description.Height; ++y)
                     {
-                        uint offset = (uint)(convFlags.HasFlag(TGAConversionFlags.InvertX) ? description.Width - 1 : 0);
+                        uint offset = (uint)(convFlags.HasFlag(TgaConversionFlags.InvertX) ? description.Width - 1 : 0);
 
                         var dPtr = ((byte*)pDestination +
-                                            (rowStride * (convFlags.HasFlag(TGAConversionFlags.InvertY) ? y : (description.Height - y - 1))))
+                                            (rowStride * (convFlags.HasFlag(TgaConversionFlags.InvertY) ? y : (description.Height - y - 1))))
                                    + offset;
                         for (int x = 0; x < description.Width; ++x)
                         {
                             *dPtr = *(sPtr++);
-                            if (convFlags.HasFlag(TGAConversionFlags.InvertX))
+                            if (convFlags.HasFlag(TgaConversionFlags.InvertX))
                             {
                                 --dPtr;
                             }
@@ -193,10 +193,10 @@ public static class TgaDecoder
                     bool nonzeroa = false;
                     for (int y = 0; y < description.Height; ++y)
                     {
-                        uint offset = (uint)(convFlags.HasFlag(TGAConversionFlags.InvertX) ? description.Width - 1 : 0);
+                        uint offset = (uint)(convFlags.HasFlag(TgaConversionFlags.InvertX) ? description.Width - 1 : 0);
 
                         var dPtr = (ushort*)((byte*)pDestination +
-                                            (rowStride * (convFlags.HasFlag(TGAConversionFlags.InvertY) ? y : (description.Height - y - 1))))
+                                            (rowStride * (convFlags.HasFlag(TgaConversionFlags.InvertY) ? y : (description.Height - y - 1))))
                                    + offset;
                         for (int x = 0; x < description.Width; ++x)
                         {
@@ -214,7 +214,7 @@ public static class TgaDecoder
                                 nonzeroa = true;
                             }
 
-                            if (convFlags.HasFlag(TGAConversionFlags.InvertX))
+                            if (convFlags.HasFlag(TgaConversionFlags.InvertX))
                             {
                                 --dPtr;
                             }
@@ -236,13 +236,13 @@ public static class TgaDecoder
                     nonzeroa = false;
                     for (int y = 0; y < description.Height; ++y)
                     {
-                        uint offset = (uint)(convFlags.HasFlag(TGAConversionFlags.InvertX) ? description.Width - 1 : 0);
+                        uint offset = (uint)(convFlags.HasFlag(TgaConversionFlags.InvertX) ? description.Width - 1 : 0);
 
-                        var dPtr = (uint*)((byte*)pDestination + (rowStride * (convFlags.HasFlag(TGAConversionFlags.InvertY) ? y : (description.Height - y - 1)))) + offset;
+                        var dPtr = (uint*)((byte*)pDestination + (rowStride * (convFlags.HasFlag(TgaConversionFlags.InvertY) ? y : (description.Height - y - 1)))) + offset;
 
                         for (int x = 0; x < description.Width; ++x)
                         {
-                            if (convFlags.HasFlag(TGAConversionFlags.Expand))
+                            if (convFlags.HasFlag(TgaConversionFlags.Expand))
                             {
 
                                 if (sPtr + 2 >= endPtr)
@@ -269,7 +269,7 @@ public static class TgaDecoder
                                 sPtr += 4;
                             }
 
-                            if (convFlags.HasFlag(TGAConversionFlags.InvertX))
+                            if (convFlags.HasFlag(TgaConversionFlags.InvertX))
                             {
                                 --dPtr;
                             }
@@ -295,11 +295,11 @@ public static class TgaDecoder
     
     private static unsafe TgaImage UncompressPixels(IntPtr pSource,
             ImageDescription description,
-            TGAConversionFlags convFlags)
+            TgaConversionFlags convFlags)
         {
             int rowPitch = 0;
             int slicePitch = 0;
-            if (convFlags.HasFlag(TGAConversionFlags.Expand))
+            if (convFlags.HasFlag(TgaConversionFlags.Expand))
             {
                 rowPitch = (int)description.Width * 3;
             }
@@ -333,11 +333,11 @@ public static class TgaDecoder
 
                     for (int y = 0; y < description.Height; ++y)
                     {
-                        long offset = convFlags.HasFlag(TGAConversionFlags.InvertX) ? (int)description.Width - 1 : 0;
+                        long offset = convFlags.HasFlag(TgaConversionFlags.InvertX) ? (int)description.Width - 1 : 0;
 
                         var dPtr = ((byte*)pDestination +
                                             (rowStride *
-                                             (convFlags.HasFlag(TGAConversionFlags.InvertY) ? y : (description.Height - y - 1)))) +
+                                             (convFlags.HasFlag(TgaConversionFlags.InvertY) ? y : (description.Height - y - 1)))) +
                                    offset;
 
                         for (int x = 0; x < description.Width;)
@@ -365,7 +365,7 @@ public static class TgaDecoder
 
                                     *dPtr = *sPtr;
 
-                                    if (convFlags.HasFlag(TGAConversionFlags.InvertX))
+                                    if (convFlags.HasFlag(TgaConversionFlags.InvertX))
                                     {
                                         --dPtr;
                                     }
@@ -395,7 +395,7 @@ public static class TgaDecoder
 
                                     *dPtr = *(sPtr++);
 
-                                    if (convFlags.HasFlag(TGAConversionFlags.InvertX))
+                                    if (convFlags.HasFlag(TgaConversionFlags.InvertX))
                                     {
                                         --dPtr;
                                     }
@@ -413,11 +413,11 @@ public static class TgaDecoder
                     bool nonzeroa = false;
                     for (int y = 0; y < description.Height; ++y)
                     {
-                        int offset = convFlags.HasFlag(TGAConversionFlags.InvertX) ? (int)description.Width - 1 : 0;
+                        int offset = convFlags.HasFlag(TgaConversionFlags.InvertX) ? (int)description.Width - 1 : 0;
 
                         var dPtr = (ushort*)((byte*)pDestination +
                                               (rowStride *
-                                               (convFlags.HasFlag(TGAConversionFlags.InvertY)
+                                               (convFlags.HasFlag(TgaConversionFlags.InvertY)
                                                   ? y
                                                   : (description.Height - y - 1)))) +
                                    offset;
@@ -455,7 +455,7 @@ public static class TgaDecoder
 
                                     *dPtr = t;
 
-                                    if (convFlags.HasFlag(TGAConversionFlags.InvertX))
+                                    if (convFlags.HasFlag(TgaConversionFlags.InvertX))
                                     {
                                         --dPtr;
                                     }
@@ -489,7 +489,7 @@ public static class TgaDecoder
                                     sPtr += 2;
                                     *dPtr = t;
 
-                                    if (convFlags.HasFlag(TGAConversionFlags.InvertX))
+                                    if (convFlags.HasFlag(TgaConversionFlags.InvertX))
                                     {
                                         --dPtr;
                                     }
@@ -512,11 +512,11 @@ public static class TgaDecoder
                     nonzeroa = false;
                     for (int y = 0; y < description.Height; ++y)
                     {
-                        int offset = convFlags.HasFlag(TGAConversionFlags.InvertX) ? (int)description.Width - 1 : 0;
+                        int offset = convFlags.HasFlag(TgaConversionFlags.InvertX) ? (int)description.Width - 1 : 0;
 
                         var dPtr = (uint*)((byte*)pDestination +
                                             (rowStride *
-                                             (convFlags.HasFlag(TGAConversionFlags.InvertY) ? y : (description.Height - y - 1)))) +
+                                             (convFlags.HasFlag(TgaConversionFlags.InvertY) ? y : (description.Height - y - 1)))) +
                                    offset;
 
                         for (int x = 0; x < description.Width;)
@@ -527,7 +527,7 @@ public static class TgaDecoder
                                 ++sPtr;
 
                                 uint t;
-                                if (convFlags.HasFlag(TGAConversionFlags.Expand))
+                                if (convFlags.HasFlag(TgaConversionFlags.Expand))
                                 {
                                     if (sPtr + 2 >= endPtr)
                                     {
@@ -567,7 +567,7 @@ public static class TgaDecoder
 
                                     *dPtr = t;
 
-                                    if (convFlags.HasFlag(TGAConversionFlags.InvertX))
+                                    if (convFlags.HasFlag(TgaConversionFlags.InvertX))
                                     {
                                         --dPtr;
                                     }
@@ -582,7 +582,7 @@ public static class TgaDecoder
                                 int j = (*sPtr & 0x7F) + 1;
                                 ++sPtr;
 
-                                if (convFlags.HasFlag(TGAConversionFlags.Expand))
+                                if (convFlags.HasFlag(TgaConversionFlags.Expand))
                                 {
                                     if (sPtr + (j * 3) > endPtr)
                                     {
@@ -604,7 +604,7 @@ public static class TgaDecoder
                                         throw new InvalidOperationException("TGA convertion failed. Unexpected end of buffer");
                                     }
 
-                                    if (convFlags.HasFlag(TGAConversionFlags.Expand))
+                                    if (convFlags.HasFlag(TgaConversionFlags.Expand))
                                     {
                                         if (sPtr + 2 >= endPtr)
                                         {
@@ -636,7 +636,7 @@ public static class TgaDecoder
                                         sPtr += 4;
                                     }
 
-                                    if (convFlags.HasFlag(TGAConversionFlags.InvertX))
+                                    if (convFlags.HasFlag(TgaConversionFlags.InvertX))
                                     {
                                         --dPtr;
                                     }

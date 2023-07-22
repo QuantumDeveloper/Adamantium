@@ -5,17 +5,17 @@ using Adamantium.Imaging.Png.Chunks;
 
 namespace Adamantium.Imaging.Png
 {
-    internal class PNGImage : IRawBitmap
+    internal class PngImage : IRawBitmap
     {
-        private readonly PNGCompressor compressor;
+        private readonly PngCompressor compressor;
         
-        public PNGImage()
+        public PngImage()
         {
-            Frames = new List<PNGFrame>();
-            compressor = new PNGCompressor();
+            Frames = new List<PngFrame>();
+            compressor = new PngCompressor();
         }
         
-        public PNGState State { get; set; }
+        public PngState State { get; set; }
 
         public bool HasMipLevels => false;
         public uint MipLevelsCount => 0;
@@ -62,11 +62,11 @@ namespace Adamantium.Imaging.Png
 
         public IHDR Header { get; set; }
         
-        public PNGColorType ColorType { get; set; }
+        public PngColorType ColorType { get; set; }
 
-        public List<PNGFrame> Frames { get; }
+        public List<PngFrame> Frames { get; }
 
-        public PNGFrame DefaultImage { get; set; }
+        public PngFrame DefaultImage { get; set; }
 
         public uint Width
         {
@@ -84,7 +84,7 @@ namespace Adamantium.Imaging.Png
 
         private SurfaceFormat GetFormat()
         {
-            switch (PNGColorConversion.GetNumberOfColorChannels(ColorType) * Header.BitDepth)
+            switch (PngColorConversion.GetNumberOfColorChannels(ColorType) * Header.BitDepth)
             {
                 case 8:
                     return AdamantiumVulkan.Core.Format.R8_UNORM;
@@ -96,7 +96,7 @@ namespace Adamantium.Imaging.Png
             return SurfaceFormat.Undefined;
         }
 
-        private byte[] DecodeFrame(PNGFrame frame, uint index)
+        private byte[] DecodeFrame(PngFrame frame, uint index)
         {
             if (frame.IsDecoded) return frame.RawPixelBuffer;
             
@@ -106,38 +106,38 @@ namespace Adamantium.Imaging.Png
             predict = 0;
             if (State.InfoPng.InterlaceMethod == InterlaceMethod.None)
             {
-                predict = PNGDecoder.GetRawSizeIdat(width, height, State.InfoPng.ColorMode);
+                predict = PngDecoder.GetRawSizeIdat(width, height, State.InfoPng.ColorMode);
             }
             else
             {
                 /*Adam-7 interlaced: predicted size is the sum of the 7 sub-images sizes*/
                 var colorMode = State.InfoPng.ColorMode;
-                predict += PNGDecoder.GetRawSizeIdat((width + 7) >> 3, (height + 7) >> 3, colorMode);
+                predict += PngDecoder.GetRawSizeIdat((width + 7) >> 3, (height + 7) >> 3, colorMode);
                 if (width > 4)
                 {
-                    predict += PNGDecoder.GetRawSizeIdat((width + 3) >> 3, (height + 7) >> 3, colorMode);
+                    predict += PngDecoder.GetRawSizeIdat((width + 3) >> 3, (height + 7) >> 3, colorMode);
                 }
 
-                predict += PNGDecoder.GetRawSizeIdat((width + 3) >> 2, (height + 3) >> 3, colorMode);
+                predict += PngDecoder.GetRawSizeIdat((width + 3) >> 2, (height + 3) >> 3, colorMode);
                 if (width > 2)
                 {
-                    predict += PNGDecoder.GetRawSizeIdat((width + 1) >> 2, (height + 3) >> 2, colorMode);
+                    predict += PngDecoder.GetRawSizeIdat((width + 1) >> 2, (height + 3) >> 2, colorMode);
                 }
 
-                predict += PNGDecoder.GetRawSizeIdat((width + 1) >> 1, (height + 1) >> 2, colorMode);
+                predict += PngDecoder.GetRawSizeIdat((width + 1) >> 1, (height + 1) >> 2, colorMode);
                 if (width > 1)
                 {
-                    predict += PNGDecoder.GetRawSizeIdat(width >> 1, (height + 1) >> 1, colorMode);
+                    predict += PngDecoder.GetRawSizeIdat(width >> 1, (height + 1) >> 1, colorMode);
                 }
 
-                predict += PNGDecoder.GetRawSizeIdat(width, height >> 1, colorMode);
+                predict += PngDecoder.GetRawSizeIdat(width, height >> 1, colorMode);
             }
             
             var scanlines = new List<byte>((int)predict);
 
             State.Error = compressor.Decompress(frame.FrameData, State.DecoderSettings, scanlines);
 
-            long bufferSize = PNGDecoder.GetRawSizeIdat(width, height, State.InfoPng.ColorMode);
+            long bufferSize = PngDecoder.GetRawSizeIdat(width, height, State.InfoPng.ColorMode);
             frame.RawPixelBuffer = new byte[bufferSize];
 
             if (State.Error == 0)
@@ -147,7 +147,7 @@ namespace Adamantium.Imaging.Png
 
             if (State.Error > 0)
             {
-                throw new PNGDecodeException(State.Error);
+                throw new PngDecodeException(State.Error);
             }
             
             ProcessFrame(frame, index);
@@ -163,10 +163,10 @@ namespace Adamantium.Imaging.Png
         /// NOTE: the in buffer will be overwritten with intermediate data!
         /// </summary>
         /// <returns>Error code</returns>
-        internal unsafe uint PostProcessScanline(byte[] rawBuffer, byte[] inputData, int width, int height, PNGInfo infoPng)
+        internal unsafe uint PostProcessScanline(byte[] rawBuffer, byte[] inputData, int width, int height, PngInfo infoPng)
         {
             uint error = 0;
-            var bpp = PNGColorConversion.GetBitsPerPixel(infoPng.ColorMode);
+            var bpp = PngColorConversion.GetBitsPerPixel(infoPng.ColorMode);
             if (bpp == 0)
             {
                 /*error: invalid colortype*/
@@ -265,7 +265,7 @@ namespace Adamantium.Imaging.Png
             }
         }
 
-        private void ProcessFrame(PNGFrame frame, uint index)
+        private void ProcessFrame(PngFrame frame, uint index)
         {
             frame.Width = (uint)Header.Width;
             frame.Height = (uint)Header.Height;
@@ -280,7 +280,7 @@ namespace Adamantium.Imaging.Png
                 Array.Copy(baseFrame.RawPixelBuffer, pixels, pixels.Length);
             }
 
-            var bytesPerPixel = (int)(PNGColorConversion.GetBitsPerPixel(State.ColorModeRaw) / 8);
+            var bytesPerPixel = (int)(PngColorConversion.GetBitsPerPixel(State.ColorModeRaw) / 8);
             int lineLength = Header.Width * bytesPerPixel;
 
             for (int k = 0; k < frame.EncodedHeight; ++k)
@@ -328,7 +328,7 @@ namespace Adamantium.Imaging.Png
             frame.IsDecoded = true;
         }
 
-        private void ConvertColorsIfNeeded(PNGFrame frame, PNGState state)
+        private void ConvertColorsIfNeeded(PngFrame frame, PngState state)
         {
             if (!state.DecoderSettings.ColorСonvert || state.ColorModeRaw == state.InfoPng.ColorMode)
             {
@@ -343,29 +343,29 @@ namespace Adamantium.Imaging.Png
             else
             {
                 /*color conversion needed; sort of copy of the data*/
-                if (!(state.ColorModeRaw.ColorType == PNGColorType.RGB || state.ColorModeRaw.ColorType == PNGColorType.RGBA)
+                if (!(state.ColorModeRaw.ColorType == PngColorType.RGB || state.ColorModeRaw.ColorType == PngColorType.RGBA)
                     && state.ColorModeRaw.BitDepth != 8)
                 {
                     /*unsupported color mode conversion*/
-                    throw new PNGDecodeException(56);
+                    throw new PngDecodeException(56);
                 }
 
                 var width = (int)frame.EncodedWidth;
                 var height = (int)frame.EncodedHeight;
 
-                int rawBufferSize = (int)PNGDecoder.GetRawSizeLct(width, height, state.ColorModeRaw);
+                int rawBufferSize = (int)PngDecoder.GetRawSizeLct(width, height, state.ColorModeRaw);
                 var outBuffer = new byte[rawBufferSize];
 
-                state.Error = PNGColorConversion.Convert(outBuffer, frame.RawPixelBuffer, state.ColorModeRaw, state.InfoPng.ColorMode, width, height);
+                state.Error = PngColorConversion.Convert(outBuffer, frame.RawPixelBuffer, state.ColorModeRaw, state.InfoPng.ColorMode, width, height);
                 frame.RawPixelBuffer = outBuffer;
                 if (state.Error > 0)
                 {
-                    throw new PNGDecodeException(state.Error);
+                    throw new PngDecodeException(state.Error);
                 }
             }
         }
 
-        public static PNGImage FromImage(Image image)
+        public static PngImage FromImage(Image image)
         {
             var png = FromPixelBuffers(image.PixelBuffer);
             png.DefaultImage = GetFrameFromBuffer(image.DefaultImage);
@@ -376,9 +376,9 @@ namespace Adamantium.Imaging.Png
             return png;
         }
 
-        public static PNGImage FromPixelBuffers(params PixelBuffer[] buffers)
+        public static PngImage FromPixelBuffers(params PixelBuffer[] buffers)
         {
-            var pngImage = new PNGImage();
+            var pngImage = new PngImage();
             for (int i = 0; i < buffers.Length; ++i)
             {
                 var pixelBuffer = buffers[i];
@@ -389,7 +389,7 @@ namespace Adamantium.Imaging.Png
             return pngImage;
         }
 
-        private static PNGFrame GetFrameFromBuffer(PixelBuffer pixelBuffer)
+        private static PngFrame GetFrameFromBuffer(PixelBuffer pixelBuffer)
         {
             if (pixelBuffer == null)
             {
@@ -397,7 +397,7 @@ namespace Adamantium.Imaging.Png
             }
 
             var pixels = pixelBuffer.GetPixels<byte>();
-            var frame = new PNGFrame(pixels, (uint)pixelBuffer.Width, (uint)pixelBuffer.Height, pixelBuffer.PixelSize * 8);
+            var frame = new PngFrame(pixels, (uint)pixelBuffer.Width, (uint)pixelBuffer.Height, pixelBuffer.PixelSize * 8);
             frame.DelayNumerator = pixelBuffer.DelayNumerator;
             frame.DelayDenominator = pixelBuffer.DelayDenominator;
             frame.XOffset = pixelBuffer.XOffset;

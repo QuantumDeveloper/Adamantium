@@ -3,7 +3,7 @@
 namespace Adamantium.Imaging.Tga
 {
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    internal struct TGAHeader
+    internal struct TgaHeader
     {
         public byte IDLength;
         public byte ColorMapType;

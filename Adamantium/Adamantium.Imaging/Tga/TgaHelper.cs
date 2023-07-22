@@ -7,7 +7,7 @@ namespace Adamantium.Imaging.Tga
     {
         public static TgaImage LoadFromMemory(IntPtr source, long size)
         {
-            TGAConversionFlags conversionFlags = 0;
+            TgaConversionFlags conversionFlags = 0;
             ImageDescription description;
             var result = TgaDecoder.DecodeTgaHeader(source, size, out description, out var offset, out conversionFlags);
 

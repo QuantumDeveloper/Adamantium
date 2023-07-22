@@ -6,37 +6,37 @@ using AdamantiumVulkan.Core;
 
 namespace Adamantium.Imaging.Png
 {
-    public static class PNGHelper
+    public static class PngHelper
     {
         // TODO: Rework to support Image class
         public static unsafe Image LoadFromMemory(IntPtr pSource, int size, bool makeACopy, GCHandle? handle)
         {
             var stream = new PNGStreamReader(pSource, size);
-            var decoder = new PNGDecoder(stream);
+            var decoder = new PngDecoder(stream);
             var img = decoder.Decode();
             return null;
         }
 
         public static void SaveToStream(Image img, PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream)
         {
-            PNGColorType colorType;
+            PngColorType colorType;
 
             var colorFormat = description.Format.SizeOfInBytes();
             switch (colorFormat)
             {
                 case 1:
-                    colorType = PNGColorType.Grey;
+                    colorType = PngColorType.Grey;
                     break;
                 case 4:
-                    colorType = PNGColorType.RGBA;
+                    colorType = PngColorType.RGBA;
                     break;
                 default:
-                    colorType = PNGColorType.RGBA;
+                    colorType = PngColorType.RGBA;
                     break;
             }
 
-            PNGEncoder encoder = new PNGEncoder(imageStream);
-            PNGState state = new PNGState();
+            PngEncoder encoder = new PngEncoder(imageStream);
+            PngState state = new PngState();
             state.EncoderSettings.BType = 2;
             state.EncoderSettings.UseLZ77 = true;
             state.InfoPng.InterlaceMethod = InterlaceMethod.None;
@@ -54,7 +54,7 @@ namespace Adamantium.Imaging.Png
             state.InfoPng.ColorMode.ColorType = colorType;
             state.InfoPng.ColorMode.BitDepth = (uint)description.Format.SizeOfInBits() / (uint)description.Format.SizeOfInBytes();
 
-            PNGImage pngImage = PNGImage.FromImage(img);
+            PngImage pngImage = PngImage.FromImage(img);
 
             encoder.Encode(pngImage, state);
 

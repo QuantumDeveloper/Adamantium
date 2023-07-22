@@ -8,9 +8,9 @@ namespace Adamantium.Imaging.Tga;
 
 public class TgaEncoder
 {
-    internal static bool EncodeTgaHeader(ImageDescription description, out TGAHeader header, ref TGAConversionFlags flags)
+    internal static bool EncodeTgaHeader(ImageDescription description, out TgaHeader header, ref TgaConversionFlags flags)
     {
-        header = new TGAHeader();
+        header = new TgaHeader();
         if (description.Width > 0xFFFF || description.Height > 0xFFFF)
         {
             return false;
@@ -23,40 +23,40 @@ public class TgaEncoder
         {
             case Format.R8G8B8A8_UNORM:
             case Format.R8G8B8A8_SRGB:
-                header.ImageType = (byte)TGAImageType.TrueColor;
+                header.ImageType = (byte)TgaImageType.TrueColor;
                 header.BitsPerPixel = 32;
-                header.Descriptor = (byte)TGADescriptorFlags.InvertY | 8;
-                flags |= TGAConversionFlags.Swizzle;
+                header.Descriptor = (byte)TgaDescriptorFlags.InvertY | 8;
+                flags |= TgaConversionFlags.Swizzle;
                 break;
             case Format.B8G8R8A8_UNORM:
             case Format.B8G8R8A8_SRGB:
-                header.ImageType = (byte)TGAImageType.TrueColor;
+                header.ImageType = (byte)TgaImageType.TrueColor;
                 header.BitsPerPixel = 32;
-                header.Descriptor = (byte)TGADescriptorFlags.InvertY | 8;
-                flags |= TGAConversionFlags.Swizzle;
+                header.Descriptor = (byte)TgaDescriptorFlags.InvertY | 8;
+                flags |= TgaConversionFlags.Swizzle;
                 break;
             case Format.R8G8B8_UNORM:
-                header.ImageType = (byte)TGAImageType.TrueColor;
+                header.ImageType = (byte)TgaImageType.TrueColor;
                 header.BitsPerPixel = 24;
-                header.Descriptor = (byte)TGADescriptorFlags.InvertY;
-                flags |= TGAConversionFlags.Format888 | TGAConversionFlags.Swizzle;
+                header.Descriptor = (byte)TgaDescriptorFlags.InvertY;
+                flags |= TgaConversionFlags.Format888 | TgaConversionFlags.Swizzle;
                 break;
             case Format.B8G8R8_UNORM:
             case Format.B8G8R8_SRGB:
-                header.ImageType = (byte)TGAImageType.TrueColor;
+                header.ImageType = (byte)TgaImageType.TrueColor;
                 header.BitsPerPixel = 24;
-                header.Descriptor = (byte)TGADescriptorFlags.InvertY;
-                flags |= TGAConversionFlags.Format888;
+                header.Descriptor = (byte)TgaDescriptorFlags.InvertY;
+                flags |= TgaConversionFlags.Format888;
                 break;
             case Format.R8_UNORM:
-                header.ImageType = (byte)TGAImageType.BlackAndWhite;
+                header.ImageType = (byte)TgaImageType.BlackAndWhite;
                 header.BitsPerPixel = 8;
-                header.Descriptor = (byte)TGADescriptorFlags.InvertY;
+                header.Descriptor = (byte)TgaDescriptorFlags.InvertY;
                 break;
             case Format.B5G5R5A1_UNORM_PACK16:
-                header.ImageType = (byte)TGAImageType.TrueColor;
+                header.ImageType = (byte)TgaImageType.TrueColor;
                 header.BitsPerPixel = 16;
-                header.Descriptor = (byte)TGADescriptorFlags.InvertY | 1;
+                header.Descriptor = (byte)TgaDescriptorFlags.InvertY | 1;
                 break;
 
             default:
@@ -68,12 +68,12 @@ public class TgaEncoder
     
     public static unsafe void SaveToTgaStream(byte[] pixelBuffer, ImageDescription description, Stream imageStream)
         {
-            TGAHeader header;
-            TGAConversionFlags flags = TGAConversionFlags.None;
+            TgaHeader header;
+            TgaConversionFlags flags = TgaConversionFlags.None;
             EncodeTgaHeader(description, out header, ref flags);
 
             int rowPitch, slicePitch;
-            if (flags.HasFlag(TGAConversionFlags.Format888))
+            if (flags.HasFlag(TgaConversionFlags.Format888))
             {
                 rowPitch = (int)description.Width * 3;
                 slicePitch = (int)description.Height * rowPitch;
@@ -88,7 +88,7 @@ public class TgaEncoder
             IntPtr pSource = handle.AddrOfPinnedObject();
             var sPitch = description.Width * description.Format.SizeOfInBytes();
 
-            int headerSize = Utilities.SizeOf<TGAHeader>();
+            int headerSize = Utilities.SizeOf<TgaHeader>();
             var buffer = new byte[Math.Max(slicePitch, headerSize)];
             IntPtr memory = Utilities.AllocateMemory(headerSize, 1);
             Marshal.StructureToPtr(header, memory, true);
@@ -102,11 +102,11 @@ public class TgaEncoder
 
             for (int y = 0; y < description.Height; ++y)
             {
-                if (flags.HasFlag(TGAConversionFlags.Format888))
+                if (flags.HasFlag(TgaConversionFlags.Format888))
                 {
                     ImageHelper.CopyScanline(dPtr, pSource, rowPitch);
                 }
-                else if (flags.HasFlag(TGAConversionFlags.Swizzle))
+                else if (flags.HasFlag(TgaConversionFlags.Swizzle))
                 {
                     ImageHelper.SwizzleScanline(dPtr, rowPitch, pSource, (int)sPitch,
                        description.Format, ImageHelper.ScanlineFlags.None);

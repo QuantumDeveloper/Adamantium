@@ -20,7 +20,7 @@ namespace Adamantium.Imaging.Png.Chunks
         public uint BlueX { get; set; }
         public uint BlueY { get; set; }
 
-        internal override byte[] GetChunkBytes(PNGState state)
+        internal override byte[] GetChunkBytes(PngState state)
         {
             var bytes = new List<byte>();
             bytes.AddRange(GetNameAsBytes());
@@ -36,7 +36,7 @@ namespace Adamantium.Imaging.Png.Chunks
             return bytes.ToArray();
         }
 
-        internal static cHRM FromState(PNGState state)
+        internal static cHRM FromState(PngState state)
         {
             var chrm = new cHRM();
             chrm.WhitePointX = state.InfoPng.ChrmWhiteX;

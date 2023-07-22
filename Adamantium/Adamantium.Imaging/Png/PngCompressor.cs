@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Adamantium.Imaging.Png
 {
-    public class PNGCompressor
+    public class PngCompressor
     {
         #region Compressor
 
@@ -302,7 +302,7 @@ namespace Adamantium.Imaging.Png
             return left;
         }
 
-        public uint Compress(byte[] rawData, PNGEncoderSettings settings, List<byte> outData)
+        public uint Compress(byte[] rawData, PngEncoderSettings settings, List<byte> outData)
         {
             uint error = 0;
 
@@ -330,7 +330,7 @@ namespace Adamantium.Imaging.Png
             return error;
         }
 
-        private uint Deflate(byte[] inData, PNGEncoderSettings settings, List<byte> outData)
+        private uint Deflate(byte[] inData, PngEncoderSettings settings, List<byte> outData)
         {
             uint error = 0;
             int blockSize = 0;
@@ -384,7 +384,7 @@ namespace Adamantium.Imaging.Png
             return error;
         }
 
-        private uint DeflateFixed(byte[] data, List<byte> outData, ref int bitPointer, ref Hash hash, int dataPos, int dataEnd, PNGEncoderSettings settings, byte final)
+        private uint DeflateFixed(byte[] data, List<byte> outData, ref int bitPointer, ref Hash hash, int dataPos, int dataEnd, PngEncoderSettings settings, byte final)
         {
             uint error = 0;
 
@@ -424,7 +424,7 @@ namespace Adamantium.Imaging.Png
             return error;
         }
 
-        private uint DeflateDynamic(byte[] data, List<byte> outData, ref int bitPointer, ref Hash hash, int dataPos, int dataEnd, PNGEncoderSettings settings, byte final)
+        private uint DeflateDynamic(byte[] data, List<byte> outData, ref int bitPointer, ref Hash hash, int dataPos, int dataEnd, PngEncoderSettings settings, byte final)
         {
             uint error = 0;
 
@@ -736,7 +736,7 @@ namespace Adamantium.Imaging.Png
             return result;
         }
 
-        public uint Decompress(byte[] inputData, PNGDecoderSettings settings, List<byte> outData)
+        public uint Decompress(byte[] inputData, PngDecoderSettings settings, List<byte> outData)
         {
             uint error = 0;
             int CM, CINFO, FDICT;

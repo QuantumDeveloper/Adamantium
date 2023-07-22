@@ -2,60 +2,60 @@
 
 namespace Adamantium.Imaging.Png
 {
-    internal class PNGColorConversion
+    internal class PngColorConversion
     {
-        public static uint GetBitsPerPixel(PNGColorMode colorMode)
+        public static uint GetBitsPerPixel(PngColorMode colorMode)
         {
             return (uint)GetNumberOfColorChannels(colorMode.ColorType) * colorMode.BitDepth;
         }
 
-        public static int GetNumberOfColorChannels(PNGColorType colorType)
+        public static int GetNumberOfColorChannels(PngColorType colorType)
         {
             switch (colorType)
             {
-                case PNGColorType.Grey:
-                case PNGColorType.Palette:
+                case PngColorType.Grey:
+                case PngColorType.Palette:
                     return 1;
-                case PNGColorType.GreyAlpha:
+                case PngColorType.GreyAlpha:
                     return 2;
-                case PNGColorType.RGB:
+                case PngColorType.RGB:
                     return 3;
-                case PNGColorType.RGBA:
+                case PngColorType.RGBA:
                     return 4;
             }
 
             return 0;
         }
 
-        public static uint CheckColorValidity(PNGColorType colorType, uint bitDepth)
+        public static uint CheckColorValidity(PngColorType colorType, uint bitDepth)
         {
             switch(colorType)
             {
-                case PNGColorType.Grey:
+                case PngColorType.Grey:
                     if (!(bitDepth == 1 || bitDepth == 2 || bitDepth == 4 || bitDepth == 8 || bitDepth == 16))
                     {
                         return 37;
                     }
                     break;
-                case PNGColorType.RGB:
+                case PngColorType.RGB:
                     if (!(bitDepth == 8 || bitDepth == 16))
                     {
                         return 37;
                     }
                     break;
-                case PNGColorType.Palette:
+                case PngColorType.Palette:
                     if (!(bitDepth == 1 || bitDepth == 2 || bitDepth == 4 || bitDepth == 8))
                     {
                         return 37;
                     }
                     break;
-                case PNGColorType.GreyAlpha:
+                case PngColorType.GreyAlpha:
                     if (!(bitDepth == 8 || bitDepth == 16))
                     {
                         return 37;
                     }
                     break;
-                case PNGColorType.RGBA:
+                case PngColorType.RGBA:
                     if (!(bitDepth == 8 || bitDepth == 16))
                     {
                         return 37;
@@ -66,7 +66,7 @@ namespace Adamantium.Imaging.Png
             return 0; /*allowed color type / bits combination*/
         }
 
-        public static uint Convert(byte[] outBuffer, byte[] inBuffer, PNGColorMode outMode, PNGColorMode inMode, int width, int height)
+        public static uint Convert(byte[] outBuffer, byte[] inBuffer, PngColorMode outMode, PngColorMode inMode, int width, int height)
         {
             uint error = 0;
             ColorTree tree = null;
@@ -74,7 +74,7 @@ namespace Adamantium.Imaging.Png
 
             if (outMode == inMode)
             {
-                var size = PNGDecoder.GetRawSizeLct(width, height, inMode);
+                var size = PngDecoder.GetRawSizeLct(width, height, inMode);
                 for (int i = 0; i < size; ++i)
                 {
                     outBuffer[i] = inBuffer[i];
@@ -82,7 +82,7 @@ namespace Adamantium.Imaging.Png
                 return error;
             }
 
-            if (outMode.ColorType == PNGColorType.Palette)
+            if (outMode.ColorType == PngColorType.Palette)
             {
                 var paletteSize = outMode.PaletteSize;
                 var palette = outMode.Palette;
@@ -99,9 +99,9 @@ namespace Adamantium.Imaging.Png
                     /*if the input was also palette with same bitdepth, then the color types are also
                     equal, so copy literally. This to preserve the exact indices that were in the PNG
                     even in case there are duplicate colors in the palette.*/
-                    if (inMode.ColorType == PNGColorType.Palette && inMode.BitDepth == outMode.BitDepth)
+                    if (inMode.ColorType == PngColorType.Palette && inMode.BitDepth == outMode.BitDepth)
                     {
-                        var numBytes = PNGDecoder.GetRawSizeLct(width, height, inMode);
+                        var numBytes = PngDecoder.GetRawSizeLct(width, height, inMode);
                         for (int i = 0; i < numBytes; ++i)
                         {
                             outBuffer[i] = inBuffer[i];
@@ -133,11 +133,11 @@ namespace Adamantium.Imaging.Png
                     RGBA16ToPixel(outBuffer, i, outMode, r, g, b, a);
                 }
             }
-            else if (outMode.BitDepth == 8 && outMode.ColorType == PNGColorType.RGBA)
+            else if (outMode.BitDepth == 8 && outMode.ColorType == PngColorType.RGBA)
             {
                 GetPixelColorsRGBA8(outBuffer, numPixels, true, inBuffer, inMode);
             }
-            else if (outMode.BitDepth == 8 && outMode.ColorType == PNGColorType.RGB)
+            else if (outMode.BitDepth == 8 && outMode.ColorType == PngColorType.RGB)
             {
                 GetPixelColorsRGBA8(outBuffer, numPixels, false, inBuffer, inMode);
             }
@@ -167,7 +167,7 @@ namespace Adamantium.Imaging.Png
         /// <param name=""></param>
         /// <returns></returns>
         public static uint ConvertRGB(ref uint rOut, ref uint gOut, ref uint bOut,
-            uint rIn, uint gIn, uint bIn, PNGColorMode modeOut, PNGColorMode modeIn)
+            uint rIn, uint gIn, uint bIn, PngColorMode modeOut, PngColorMode modeIn)
         {
             uint r = 0;
             uint g = 0;
@@ -175,17 +175,17 @@ namespace Adamantium.Imaging.Png
             int mul = 65535 / ((1 << (int)modeIn.BitDepth) - 1); /*65535, 21845, 4369, 257, 1*/
             int shift = (int)(16 - modeOut.BitDepth);
 
-            if (modeIn.ColorType == PNGColorType.Grey || modeIn.ColorType == PNGColorType.GreyAlpha)
+            if (modeIn.ColorType == PngColorType.Grey || modeIn.ColorType == PngColorType.GreyAlpha)
             {
                 r = g = b = (ushort)(rIn * mul);
             }
-            else if (modeIn.ColorType == PNGColorType.RGB || modeIn.ColorType == PNGColorType.RGBA)
+            else if (modeIn.ColorType == PngColorType.RGB || modeIn.ColorType == PngColorType.RGBA)
             {
                 r = (uint)(rIn * mul);
                 g = (uint)(gIn * mul);
                 b = (uint)(bIn * mul);
             }
-            else if (modeIn.ColorType == PNGColorType.Palette)
+            else if (modeIn.ColorType == PngColorType.Palette)
             {
                 if (rIn >= modeIn.PaletteSize) return 82;
                 r = (uint)(modeIn.Palette[rIn * 4 + 0] * 257);
@@ -195,17 +195,17 @@ namespace Adamantium.Imaging.Png
             else return 31;
 
             /* now convert to output format */
-            if (modeOut.ColorType == PNGColorType.Grey || modeOut.ColorType == PNGColorType.GreyAlpha)
+            if (modeOut.ColorType == PngColorType.Grey || modeOut.ColorType == PngColorType.GreyAlpha)
             {
                 rOut = r >> shift;
             }
-            else if (modeOut.ColorType == PNGColorType.RGB || modeOut.ColorType == PNGColorType.RGBA)
+            else if (modeOut.ColorType == PngColorType.RGB || modeOut.ColorType == PngColorType.RGBA)
             {
                 rOut = r >> shift;
                 gOut = g >> shift;
                 bOut = b >> shift;
             }
-            else if (modeOut.ColorType == PNGColorType.Palette)
+            else if (modeOut.ColorType == PngColorType.Palette)
             {
                 if (((r >> 8) != (r & 255))
                     || ((g >> 8) != (g & 255))
@@ -231,17 +231,17 @@ namespace Adamantium.Imaging.Png
             return 0;
         }
 
-        public static bool IsGrayScaleType(PNGColorType type)
+        public static bool IsGrayScaleType(PngColorType type)
         {
-            return type == PNGColorType.Grey || type == PNGColorType.GreyAlpha;
+            return type == PngColorType.Grey || type == PngColorType.GreyAlpha;
         }
 
-        public static bool IsAlphaType(PNGColorType type)
+        public static bool IsAlphaType(PngColorType type)
         {
-            return type == PNGColorType.GreyAlpha || type == PNGColorType.RGBA;
+            return type == PngColorType.GreyAlpha || type == PngColorType.RGBA;
         }
 
-        public static bool HasPaletteAlpha(PNGColorMode mode)
+        public static bool HasPaletteAlpha(PngColorMode mode)
         {
             for (int i = 0; i != mode.PaletteSize; ++i)
             {
@@ -250,7 +250,7 @@ namespace Adamantium.Imaging.Png
             return false;
         }
 
-        public static bool CanHaveAlpha(PNGColorMode mode)
+        public static bool CanHaveAlpha(PngColorMode mode)
         {
             return mode.IsKeyDefined || IsAlphaType(mode.ColorType) || HasPaletteAlpha(mode);
         }
@@ -265,7 +265,7 @@ namespace Adamantium.Imaging.Png
             return 8;
         }
 
-        public static void GetColorProfile(PNGColorProfile profile, byte[] inData, uint width, uint height, PNGColorMode modeIn)
+        public static void GetColorProfile(PngColorProfile profile, byte[] inData, uint width, uint height, PngColorMode modeIn)
         {
             ColorTree tree = null;
             int numpixels = (int)(width * height);
@@ -486,9 +486,9 @@ namespace Adamantium.Imaging.Png
 
         /*Get RGBA16 color of pixel with index i (y * width + x) from the raw image with
         given color type, but the given color type must be 16-bit itself.*/
-        private static void GetPixelColorRGBA16(ref ushort r, ref ushort g, ref ushort b, ref ushort a, byte[] inBuffer, int index, PNGColorMode mode)
+        private static void GetPixelColorRGBA16(ref ushort r, ref ushort g, ref ushort b, ref ushort a, byte[] inBuffer, int index, PngColorMode mode)
         {
-            if (mode.ColorType == PNGColorType.Grey)
+            if (mode.ColorType == PngColorType.Grey)
             {
                 r = g = b = a = (ushort)(256 * inBuffer[index * 2] + inBuffer[index * 2 + 1]);
                 if (mode.IsKeyDefined && 256u * inBuffer[index * 2]+ inBuffer[index * 2 + 1] == mode.KeyR)
@@ -500,7 +500,7 @@ namespace Adamantium.Imaging.Png
                     a = ushort.MaxValue;
                 }
             }
-            else if (mode.ColorType == PNGColorType.RGB)
+            else if (mode.ColorType == PngColorType.RGB)
             {
                 r = (ushort)(256u * inBuffer[index * 6] + inBuffer[index * 6 + 1]);
                 g = (ushort)(256u * inBuffer[index * 6 + 2] + inBuffer[index * 6 + 3]);
@@ -518,12 +518,12 @@ namespace Adamantium.Imaging.Png
                     a = ushort.MaxValue;
                 }
             }
-            else if (mode.ColorType == PNGColorType.GreyAlpha)
+            else if (mode.ColorType == PngColorType.GreyAlpha)
             {
                 r = g = b = (ushort)(256u * inBuffer[index * 4] + inBuffer[index * 4 + 1]);
                 a = (ushort)(256u * inBuffer[index * 4 + 2] + inBuffer[index * 4 + 3]);
             }
-            else if (mode.ColorType == PNGColorType.RGBA)
+            else if (mode.ColorType == PngColorType.RGBA)
             {
                 r = (ushort)(256u * inBuffer[index * 8 + 0] + inBuffer[index * 8 + 1]);
                 g = (ushort)(256u * inBuffer[index * 8 + 2] + inBuffer[index * 8 + 3]);
@@ -537,10 +537,10 @@ namespace Adamantium.Imaging.Png
         to RGBA or RGB with 8 bit per cannel. buffer must be RGBA or RGB output with
         enough memory, if has_alpha is true the output is RGBA. mode has the color mode
         of the input buffer.*/
-        private static void GetPixelColorsRGBA8(byte[] buffer, int numPixels, bool hasAlpha, byte[] inBuffer, PNGColorMode mode)
+        private static void GetPixelColorsRGBA8(byte[] buffer, int numPixels, bool hasAlpha, byte[] inBuffer, PngColorMode mode)
         {
             int numChannels = hasAlpha ? 4 : 3;
-            if (mode.ColorType == PNGColorType.Grey)
+            if (mode.ColorType == PngColorType.Grey)
             {
                 if (mode.BitDepth == 8)
                 {
@@ -582,7 +582,7 @@ namespace Adamantium.Imaging.Png
                     }
                 }
             }
-            else if (mode.ColorType == PNGColorType.RGB)
+            else if (mode.ColorType == PngColorType.RGB)
             {
                 if (mode.BitDepth == 8)
                 {
@@ -619,7 +619,7 @@ namespace Adamantium.Imaging.Png
                     }
                 }
             }
-            else if (mode.ColorType == PNGColorType.Palette)
+            else if (mode.ColorType == PngColorType.Palette)
             {
                 for (int i = 0; i != numPixels; ++i)
                 {
@@ -656,7 +656,7 @@ namespace Adamantium.Imaging.Png
                     }
                 }
             }
-            else if (mode.ColorType == PNGColorType.GreyAlpha)
+            else if (mode.ColorType == PngColorType.GreyAlpha)
             {
                 if (mode.BitDepth == 8)
                 {
@@ -683,7 +683,7 @@ namespace Adamantium.Imaging.Png
                     }
                 }
             }
-            else if (mode.ColorType == PNGColorType.RGBA)
+            else if (mode.ColorType == PngColorType.RGBA)
             {
                 if (mode.BitDepth == 8)
                 {
@@ -714,9 +714,9 @@ namespace Adamantium.Imaging.Png
         }
 
         /*Get RGBA8 color of pixel with index (y * width + x) from the raw image with given color type.*/
-        private static unsafe void GetPixelColorRGBA8(ref byte r, ref byte g, ref byte b, ref byte a, byte[] inBuffer, int index, PNGColorMode mode)
+        private static unsafe void GetPixelColorRGBA8(ref byte r, ref byte g, ref byte b, ref byte a, byte[] inBuffer, int index, PngColorMode mode)
         {
-            if (mode.ColorType == PNGColorType.Grey)
+            if (mode.ColorType == PngColorType.Grey)
             {
                 if (mode.BitDepth == 8)
                 {
@@ -753,7 +753,7 @@ namespace Adamantium.Imaging.Png
                     a = mode.IsKeyDefined && value == mode.KeyR ? (byte)0 : (byte)255;
                 }
             }
-            else if (mode.ColorType == PNGColorType.RGB)
+            else if (mode.ColorType == PngColorType.RGB)
             {
                 if (mode.BitDepth == 8)
                 {
@@ -790,7 +790,7 @@ namespace Adamantium.Imaging.Png
                     }
                 }
             }
-            else if (mode.ColorType == PNGColorType.Palette)
+            else if (mode.ColorType == PngColorType.Palette)
             {
                 int i = 0;
                 if (mode.BitDepth == 8)
@@ -818,7 +818,7 @@ namespace Adamantium.Imaging.Png
                     a = mode.Palette[i * 4 + 3];
                 }
             }
-            else if (mode.ColorType == PNGColorType.GreyAlpha)
+            else if (mode.ColorType == PngColorType.GreyAlpha)
             {
                 if (mode.BitDepth == 8)
                 {
@@ -831,7 +831,7 @@ namespace Adamantium.Imaging.Png
                     a = inBuffer[index * 4 + 2];
                 }
             }
-            else if (mode.ColorType == PNGColorType.RGBA)
+            else if (mode.ColorType == PngColorType.RGBA)
             {
                 if (mode.BitDepth == 8)
                 {
@@ -851,11 +851,11 @@ namespace Adamantium.Imaging.Png
         }
 
         /*Put a pixel, given its RGBA color, into image of any color type*/
-        private static uint RGBA8ToPixel(byte[] outBuffer, int index, PNGColorMode mode, 
+        private static uint RGBA8ToPixel(byte[] outBuffer, int index, PngColorMode mode, 
             ref ColorTree tree /*for palette*/,
             byte r, byte g, byte b, byte a)
         {
-            if (mode.ColorType == PNGColorType.Grey)
+            if (mode.ColorType == PngColorType.Grey)
             {
                 byte gray = r;
                 if (mode.BitDepth == 8)
@@ -873,7 +873,7 @@ namespace Adamantium.Imaging.Png
                     AddColorBits(outBuffer, index, (int)mode.BitDepth, (int)gray);
                 }
             }
-            else if (mode.ColorType == PNGColorType.RGB)
+            else if (mode.ColorType == PngColorType.RGB)
             {
                 if (mode.BitDepth == 8)
                 {
@@ -888,7 +888,7 @@ namespace Adamantium.Imaging.Png
                     outBuffer[index * 6 + 4] = outBuffer[index * 6 + 5] = b;
                 }
             }
-            else if (mode.ColorType == PNGColorType.Palette)
+            else if (mode.ColorType == PngColorType.Palette)
             {
                 int i = ColorTree.Get(ref tree, r, g, b, a);
                 if (i < 0)
@@ -905,7 +905,7 @@ namespace Adamantium.Imaging.Png
                     AddColorBits(outBuffer, index, (int)mode.BitDepth, i);
                 }
             }
-            else if (mode.ColorType == PNGColorType.GreyAlpha)
+            else if (mode.ColorType == PngColorType.GreyAlpha)
             {
                 byte gray = r; /*((byte)r + g + b) / 3;*/
                 if (mode.BitDepth == 8)
@@ -919,7 +919,7 @@ namespace Adamantium.Imaging.Png
                     outBuffer[index * 4 + 2] = outBuffer[index * 4 + 3] = a;
                 }
             }
-            else if (mode.ColorType == PNGColorType.RGBA)
+            else if (mode.ColorType == PngColorType.RGBA)
             {
                 if (mode.BitDepth == 8)
                 {
@@ -940,15 +940,15 @@ namespace Adamantium.Imaging.Png
             return 0; //no errors
         }
 
-        private static void RGBA16ToPixel(byte[] outBuffer, int index, PNGColorMode mode, ushort r, ushort g, ushort b, ushort a)
+        private static void RGBA16ToPixel(byte[] outBuffer, int index, PngColorMode mode, ushort r, ushort g, ushort b, ushort a)
         {
-            if (mode.ColorType == PNGColorType.Grey)
+            if (mode.ColorType == PngColorType.Grey)
             {
                 ushort gray = r;
                 outBuffer[index * 2] = (byte)((gray >> 8) & 255);
                 outBuffer[index * 2 + 1] = (byte)(gray & 255);
             }
-            else if (mode.ColorType == PNGColorType.RGB)
+            else if (mode.ColorType == PngColorType.RGB)
             {
                 outBuffer[index * 6] = (byte)((r >> 8) & 255);
                 outBuffer[index * 6 + 1] = (byte)(r & 255);
@@ -957,7 +957,7 @@ namespace Adamantium.Imaging.Png
                 outBuffer[index * 6 + 4] = (byte)((b >> 8) & 255);
                 outBuffer[index * 6 + 5] = (byte)(b & 255);
             }
-            else if (mode.ColorType == PNGColorType.GreyAlpha)
+            else if (mode.ColorType == PngColorType.GreyAlpha)
             {
                 ushort gray = r;
                 outBuffer[index * 4] = (byte)((gray >> 8) & 255);
@@ -965,7 +965,7 @@ namespace Adamantium.Imaging.Png
                 outBuffer[index * 4 + 2] = (byte)((a >> 8) & 255);
                 outBuffer[index * 4 + 3] = (byte)(a & 255);
             }
-            else if (mode.ColorType == PNGColorType.RGBA)
+            else if (mode.ColorType == PngColorType.RGBA)
             {
                 outBuffer[index * 8] = (byte)((r >> 8) & 255);
                 outBuffer[index * 8 + 1] = (byte)(r & 255);

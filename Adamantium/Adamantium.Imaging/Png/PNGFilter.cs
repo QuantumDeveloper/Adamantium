@@ -120,7 +120,7 @@ namespace Adamantium.Imaging.Png
         }
 
         internal static unsafe uint Filter(byte* outData, byte* inData, uint width, uint height,
-            PNGColorMode info, PNGEncoderSettings settings)
+            PngColorMode info, PngEncoderSettings settings)
         {
             /*
             For PNG filter method 0
@@ -129,7 +129,7 @@ namespace Adamantium.Imaging.Png
             */
             int x, y;
             uint error = 0;
-            var bpp = PNGColorConversion.GetBitsPerPixel(info);
+            var bpp = PngColorConversion.GetBitsPerPixel(info);
             /*the width of a scanline in bytes, not including the filter type*/
             var lineBytes = (width * bpp + 7) / 8;
             /*bytewidth is used for filtering, is 1 when bpp < 8, number of bytes per pixel otherwise*/
@@ -152,7 +152,7 @@ namespace Adamantium.Imaging.Png
             heuristic is used.
             */
             if (settings.FilterPaletteZero 
-                && (info.ColorType == PNGColorType.Palette || info.BitDepth < 8))
+                && (info.ColorType == PngColorType.Palette || info.BitDepth < 8))
             {
                 strategy = FilterStrategy.Zero;
             }
@@ -315,7 +315,7 @@ namespace Adamantium.Imaging.Png
                     attempt.Add(new byte[lineBytes]);
                 }
 
-                PNGCompressor compressor = new PNGCompressor();
+                PngCompressor compressor = new PngCompressor();
                 for (y = 0; y != height; ++y) /*try the 5 filter types*/
                 {
                     for (type = 0; type != 5; ++type)

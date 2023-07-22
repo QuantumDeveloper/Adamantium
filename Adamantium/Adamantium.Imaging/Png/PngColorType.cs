@@ -1,6 +1,6 @@
 ﻿namespace Adamantium.Imaging.Png
 {
-    public enum PNGColorType: byte
+    public enum PngColorType: byte
     {
         /*grayscale: 1,2,4,8,16 bit*/
         Grey = 0,
