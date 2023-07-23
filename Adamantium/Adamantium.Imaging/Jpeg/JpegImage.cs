@@ -6,6 +6,7 @@ namespace Adamantium.Imaging.Jpeg;
 public class JpegImage : IRawBitmap
 {
     private List<JpegFrame> _frames;
+    private FrameData _defaultFrame;
 
     public JpegImage()
     {
@@ -21,7 +22,7 @@ public class JpegImage : IRawBitmap
     public uint MipLevelsCount => 0;
     public uint NumberOfReplays => 0;
     public uint FramesCount => (uint)_frames.Count;
-    public byte[] GetFrameData(uint frameIndex)
+    public byte[] GetRawPixels(uint frameIndex)
     {
         if (FramesCount == 1)
         {
@@ -36,10 +37,9 @@ public class JpegImage : IRawBitmap
         _frames.Add(frame);
     }
 
-    public byte[] GetMipLevelData(uint mipLevel, out ImageDescription description)
+    public MipLevelData GetMipLevelData(uint mipLevel)
     {
-        description = default;
-        return null;
+        return new MipLevelData(GetImageDescription(), 0) { Pixels = GetRawPixels(0) };
     }
 
     public ImageDescription GetImageDescription()
@@ -53,5 +53,15 @@ public class JpegImage : IRawBitmap
         description.MipLevels = 1;
         description.Format = PixelFormat;
         return description;
+    }
+
+    public FrameData GetFrameData(uint frameIndex)
+    {
+        if (FramesCount > 1)
+        {
+            return new FrameData(GetRawPixels(frameIndex), GetImageDescription());
+        }
+
+        return _defaultFrame ??= new FrameData(GetRawPixels(0), GetImageDescription());
     }
 }

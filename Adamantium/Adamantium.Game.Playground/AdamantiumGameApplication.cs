@@ -12,8 +12,8 @@ public class AdamantiumGameApplication : GameApplication
     public AdamantiumGameApplication()
     {
         EnableGraphicsDebug = true;
-        //var img = Image.Load(@"Textures\infinity.gif");
-        //img.Save(@"Textures\infinity2.gif", ImageFileType.Gif);
+        // var img = BitmapLoader.Load(@"Textures\infinity.gif");
+        // BitmapLoader.Save(img, @"Textures\infinity3.gif", ImageFileType.Gif);
     }
         
     protected override void OnStartup()

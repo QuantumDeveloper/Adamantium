@@ -63,7 +63,7 @@ namespace Adamantium.Engine.Graphics
             Description.DesiredImageLayout = desiredLayout;
             TotalSizeInBytes = bitmap.TotalSizeInBytes;
 
-            var pixelData = bitmap.GetFrameData(0);
+            var pixelData = bitmap.GetRawPixels(0);
             var handle = GCHandle.Alloc(pixelData, GCHandleType.Pinned);
 
             CopyDataToImage(TotalSizeInBytes, handle.AddrOfPinnedObject());

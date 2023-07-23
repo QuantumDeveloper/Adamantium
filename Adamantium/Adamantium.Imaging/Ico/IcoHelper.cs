@@ -73,8 +73,9 @@ namespace Adamantium.Imaging.Ico
             // var colorsBuf = px.GetPixels<Color>();
             // image.ApplyPixelBuffer(px, 0, true);
 
-            ico.PixelBuffer = ico.GetMipLevelData(0, out var descr);
-            ico.Description = descr;
+            var data = ico.GetMipLevelData(0);
+            ico.PixelBuffer = data.Pixels;
+            ico.Description = data.Description;
 
             return ico;
         }
@@ -92,14 +93,13 @@ namespace Adamantium.Imaging.Ico
             }
 
             var descr = ImageDescription.Default2D((uint)width, (uint)height, SurfaceFormat.R8G8B8A8.UNorm);
-            var icoMipData = new IcoMipLevelData(descr);
+            var icoMipData = new MipLevelData(descr);
             image.AddMipLevel(icoMipData);
 
             int realBitsCount = iconImageInfo.Header.bitCount;
             bool hasAndMask = /*(realBitsCount < 32) &&*/ (height != iconImageInfo.Header.height);
 
             dataPtr = IntPtr.Add(dataPtr, Marshal.SizeOf<BitmapInfoHeader>());
-            //dataPtr = IntPtr.Add(dataPtr, 40);
             var buffer = new byte[width * height * 4];
 
             var stream = new UnmanagedMemoryStream((byte*)dataPtr, iconInfo.BytesInRes);

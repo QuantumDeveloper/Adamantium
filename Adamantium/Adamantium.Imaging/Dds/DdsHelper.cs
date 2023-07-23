@@ -1031,8 +1031,14 @@ namespace Adamantium.Imaging.Dds
         /// <param name="pal8"></param>
         /// <param name="handle"></param>
         /// <returns></returns>
-        private static unsafe IRawBitmap CreateImageFromDDS(IntPtr pDDS, long offset, long size,
-            ImageDescription metadata, Image.PitchFlags cpFlags, ConversionFlags convFlags, int* pal8)
+        private static unsafe IRawBitmap CreateImageFromDDS(
+            IntPtr pDDS, 
+            long offset, 
+            long size,
+            ImageDescription metadata, 
+            Image.PitchFlags cpFlags, 
+            ConversionFlags convFlags, 
+            int* pal8)
         {
             if ((convFlags & ConversionFlags.Expand) != 0)
             {
@@ -1052,7 +1058,7 @@ namespace Adamantium.Imaging.Dds
                                ((cpFlags & Image.PitchFlags.LegacyDword) != 0);
             
             var ddsImage = new DdsImage(metadata);
-            ddsImage.PixelBuffers = ImageHelper.CreatePixelBuffers(metadata, pDDS, offset, cpFlags);
+            var sourcePixelBuffers = ImageHelper.CreatePixelBuffers(metadata, pDDS, offset, cpFlags);
 
             // Size must be inferior to destination size.
             //Debug.Assert(size <= image.TotalSizeInBytes);
@@ -1060,7 +1066,6 @@ namespace Adamantium.Imaging.Dds
             if (!isCopyNeeded && (convFlags & (ConversionFlags.Swizzle | ConversionFlags.NoAlpha)) == 0)
                 return ddsImage;
 
-            var sourcePixelBuffers = ddsImage.PixelBuffers;
             var destinationPixelBuffers = ImageHelper.CreatePixelBuffers(metadata, IntPtr.Zero, 0);
 
             ImageHelper.ScanlineFlags tflags = (convFlags & ConversionFlags.NoAlpha) != 0
@@ -1141,15 +1146,59 @@ namespace Adamantium.Imaging.Dds
                 }
             }
 
+            var img = ConvertPixelBuffersToRawData(ddsImage, destinationPixelBuffers);
             
             Utilities.FreeMemory(sourcePixelBuffers[0].DataPointer);
-            // Return the imageDst or the original image
-            ddsImage.PixelBuffers = destinationPixelBuffers;
-            return ddsImage;
+            Utilities.FreeMemory(destinationPixelBuffers[0].DataPointer);
+
+            return img;
         }
 
+        private static DdsImage ConvertPixelBuffersToRawData(DdsImage image, PixelBuffer[] buffers)
+        {
+            if (image.Description.MipLevels <= 1)
+            {
+                image.PixelBuffers = new FrameData[buffers.Length];
+                for (int i = 0; i < buffers.Length; i++)
+                {
+                    var pixelBuffer = buffers[i];
+                    var description = CreateDescriptionFromPixelBuffer(pixelBuffer, image.Description.Dimension);
+                    var frameData = new FrameData(pixelBuffer.GetPixels<byte>(), description);
+                    image.PixelBuffers[i] = frameData;
+                }
+            }
+            else
+            {
+                image.PixelBuffers = new FrameData[1];
+                image.MipLevels = new MipLevelData[image.Description.MipLevels];
+                for (int i = 0; i < buffers.Length; i++)
+                {
+                    var pixelBuffer = buffers[i];
+                    var description = CreateDescriptionFromPixelBuffer(pixelBuffer, image.Description.Dimension);
+                    var mipData = new MipLevelData(description, pixelBuffer.MipLevel, pixelBuffer.GetPixels<byte>());
+                    image.MipLevels[i] = mipData;
+                }
 
+                var mipData0 = image.GetMipLevelData(0);
+                image.PixelBuffers[0] = new FrameData(mipData0.Pixels, mipData0.Description);
+            }
 
+            return image;
+        }
+
+        private static ImageDescription CreateDescriptionFromPixelBuffer(PixelBuffer buffer, TextureDimension dimension)
+        {
+            return new ImageDescription()
+            {
+                Width = buffer.Width,
+                Height = buffer.Height,
+                Depth = 1,
+                Format = buffer.Format,
+                Dimension = dimension,
+                ArraySize = 1,
+                MipLevels = 1
+            };
+        }
 
     }
 }

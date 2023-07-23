@@ -22,15 +22,14 @@ public class TgaImage : IRawBitmap
     
     public byte[] PixelBuffer { get; set; }
     
-    public byte[] GetFrameData(uint frameIndex)
+    public byte[] GetRawPixels(uint frameIndex)
     {
         return PixelBuffer;
     }
 
-    public byte[] GetMipLevelData(uint mipLevel, out ImageDescription description)
+    public MipLevelData GetMipLevelData(uint mipLevel)
     {
-        description = default;
-        return null;
+        return new MipLevelData(GetImageDescription(), 0, PixelBuffer);
     }
 
     public ImageDescription GetImageDescription()
@@ -44,5 +43,10 @@ public class TgaImage : IRawBitmap
         description.MipLevels = 1;
         description.Format = PixelFormat;
         return description;
+    }
+
+    public FrameData GetFrameData(uint frameIndex)
+    {
+        return new FrameData(PixelBuffer, GetImageDescription());
     }
 }

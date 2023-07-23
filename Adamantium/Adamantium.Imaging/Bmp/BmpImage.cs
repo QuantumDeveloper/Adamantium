@@ -30,19 +30,23 @@ public class BmpImage : IRawBitmap
     
     public ImageDescription Description { get; }
     
-    public byte[] GetFrameData(uint frameIndex)
+    public byte[] GetRawPixels(uint frameIndex)
     {
         return PixelData;
     }
 
-    public byte[] GetMipLevelData(uint mipLevel, out ImageDescription description)
+    public MipLevelData GetMipLevelData(uint mipLevel)
     {
-        description = default;
-        return null;
+        return new MipLevelData(GetImageDescription(), 0, GetRawPixels(0));
     }
 
     public ImageDescription GetImageDescription()
     {
         return Description;
+    }
+
+    public FrameData GetFrameData(uint frameIndex)
+    {
+        return new FrameData(PixelData, Description);
     }
 }

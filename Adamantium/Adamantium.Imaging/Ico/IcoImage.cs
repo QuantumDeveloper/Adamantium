@@ -4,10 +4,10 @@ namespace Adamantium.Imaging.Ico;
 
 public class IcoImage : IRawBitmap
 {
-    private List<IcoMipLevelData> _mipLevels;
+    private List<MipLevelData> _mipLevels;
     public IcoImage(ImageDescription description)
     {
-        _mipLevels = new List<IcoMipLevelData>();
+        _mipLevels = new List<MipLevelData>();
         Description = description;
     }
 
@@ -24,38 +24,31 @@ public class IcoImage : IRawBitmap
     
     public byte[] PixelBuffer { get; set; }
 
-    public void AddMipLevel(IcoMipLevelData mipData)
+    public void AddMipLevel(MipLevelData mipData)
     {
+        mipData.MipLevel = (uint)_mipLevels.Count;
         _mipLevels.Add(mipData);
     }
     
     public ImageDescription Description { get; set; }
-    public byte[] GetFrameData(uint frameIndex)
+    public byte[] GetRawPixels(uint frameIndex)
     {
         return _mipLevels[0].Pixels;
     }
 
-    public byte[] GetMipLevelData(uint mipLevel, out ImageDescription description)
+    public MipLevelData GetMipLevelData(uint mipLevel)
     {
         var level = _mipLevels[(int)mipLevel];
-        description = level.Description;
-        return level.Pixels;
+        return level;
     }
 
     public ImageDescription GetImageDescription()
     {
         return Description;
     }
-}
 
-public class IcoMipLevelData
-{
-    public IcoMipLevelData(ImageDescription description)
+    public FrameData GetFrameData(uint frameIndex)
     {
-        Description = description;
+        return new FrameData(PixelBuffer, Description);
     }
-    
-    public ImageDescription Description { get; }
-    
-    public byte[] Pixels { get; set; }
 }

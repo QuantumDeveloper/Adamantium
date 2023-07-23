@@ -21,10 +21,10 @@ namespace Adamantium.Imaging.Gif
             return img;
         }
 
-        public static unsafe void SaveToStream(Image img, PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream)
+        public static unsafe void SaveToStream(GifImage image, Stream imageStream)
         {
             GifEncoder encoder = new GifEncoder();
-            encoder.Encode(img, imageStream);
+            encoder.Encode(image, imageStream);
 
             //var quant = new NeuralColorQuantizer();
             //var quant = new DistinctSelectionQuantizer();

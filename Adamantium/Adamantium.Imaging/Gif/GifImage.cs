@@ -9,6 +9,7 @@ namespace Adamantium.Imaging.Gif
     public class GifImage : IRawBitmap
     {
         private readonly List<GifFrame> frames;
+        private MipLevelData _defaultMipLevelData;
         
         public GifImage()
         {
@@ -40,12 +41,12 @@ namespace Adamantium.Imaging.Gif
             if (!frame.IsDecoded)
             {
                 frame.IndexData = LZW.Decompress(frame.CompressedData.ToArray(), frame.LzwMinimumCodeSize);
-                GetImageFromIndexStream(frame, (int)frameIndex);
+                GetImageFromIndexStream(frame, frameIndex);
             }
             return frame.RawPixels;
         }
 
-        private void GetImageFromIndexStream(GifFrame frame, int frameIndex)
+        private void GetImageFromIndexStream(GifFrame frame, uint frameIndex)
         {
             var width = frame.Descriptor.Width;
             var height = frame.Descriptor.Height;
@@ -91,7 +92,7 @@ namespace Adamantium.Imaging.Gif
                      //frame.GraphicControlExtension.DisposalMethod == DisposalMethod.DoNotDispose)
             {
                 pixels = new byte[Descriptor.Width * Descriptor.Height * bytesPerPixel];
-                var baseFrame = Frames[frameIndex - 1];
+                var baseFrame = Frames[(int)frameIndex - 1];
                 var originalIndexStream = baseFrame.IndexData;
                 var currentIndexStream = new List<int>(originalIndexStream).ToArray();
                 for (int i = 0; i < frame.Descriptor.Height; ++i)
@@ -164,20 +165,14 @@ namespace Adamantium.Imaging.Gif
         public uint MipLevelsCount => 0;
         public uint NumberOfReplays => 0;
         public uint FramesCount => (uint)frames.Count;
-        public byte[] GetFrameData(uint frameIndex)
+        public byte[] GetRawPixels(uint frameIndex)
         {
             return DecodeFrame(frameIndex);
         }
 
-        public byte[] GetMipLevelData(uint mipLevel, out ImageDescription description)
+        public MipLevelData GetMipLevelData(uint mipLevel)
         {
-            description = default;
-            return null;
-        }
-
-        public ImageDescription GetMipLevelDescription(uint mipLevel)
-        {
-            return GetImageDescription();
+            return _defaultMipLevelData ??= new MipLevelData(GetImageDescription(), 0, GetRawPixels(0));
         }
 
         public ImageDescription GetImageDescription()
@@ -192,6 +187,12 @@ namespace Adamantium.Imaging.Gif
                 ArraySize = 1,
                 MipLevels = 1
             };
+        }
+
+        public FrameData GetFrameData(uint frameIndex)
+        {
+            var pixels = GetRawPixels(frameIndex);
+            return new FrameData(pixels, GetImageDescription());
         }
     }
 }

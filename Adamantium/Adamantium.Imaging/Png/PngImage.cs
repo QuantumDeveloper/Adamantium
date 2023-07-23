@@ -23,7 +23,7 @@ namespace Adamantium.Imaging.Png
 
         public uint FramesCount { get; internal set; }
         
-        public byte[] GetFrameData(uint frameIndex)
+        public byte[] GetRawPixels(uint frameIndex)
         {
             var frame = frameIndex < FramesCount ? Frames[(int)frameIndex] : Frames.Last();
             if (frameIndex >= FramesCount)
@@ -33,15 +33,9 @@ namespace Adamantium.Imaging.Png
             return DecodeFrame(frame, frameIndex);
         }
 
-        public byte[] GetMipLevelData(uint mipLevel, out ImageDescription description)
+        public MipLevelData GetMipLevelData(uint mipLevel)
         {
-            description = default;
-            return null;
-        }
-
-        public ImageDescription GetMipLevelDescription(uint mipLevel)
-        {
-            return GetImageDescription();
+            return new MipLevelData(GetImageDescription(), 0) { Pixels = GetRawPixels(0)};
         }
 
         public ImageDescription GetImageDescription()
@@ -56,6 +50,11 @@ namespace Adamantium.Imaging.Png
                 ArraySize = 1,
                 MipLevels = 1
             };
+        }
+
+        public FrameData GetFrameData(uint frameIndex)
+        {
+            return new FrameData(GetRawPixels(frameIndex), GetImageDescription());
         }
 
         public uint RepeatCount { get; set; }

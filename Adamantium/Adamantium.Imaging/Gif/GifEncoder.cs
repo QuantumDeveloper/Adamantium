@@ -20,10 +20,10 @@ namespace Adamantium.Imaging.Gif
         {
         }
 
-        public void Encode(Image img, Stream stream)
+        public void Encode(GifImage img, Stream stream)
         {
             WriteGifHeader(stream);
-            WriteHeader(ref img.Description, stream);
+            WriteHeader(img.GetImageDescription(), stream);
             WriteApplicationExtension(stream, 0);
             WriteImageData(img, stream);
             stream.WriteByte((byte)GifChunkCodes.Trailer);
@@ -35,7 +35,7 @@ namespace Adamantium.Imaging.Gif
             stream.WriteBytes(header);
         }
 
-        private void WriteHeader(ref ImageDescription description, Stream stream)
+        private void WriteHeader(ImageDescription description, Stream stream)
         {
             stream.WriteUInt16((ushort)description.Width);
             stream.WriteUInt16((ushort)description.Height);
@@ -89,16 +89,20 @@ namespace Adamantium.Imaging.Gif
             stream.WriteByte(0);
         }
 
-        private void WriteImageData(Image img, Stream stream)
+        private void WriteImageData(GifImage img, Stream stream)
         {
-            var quantizerResults = new QuantizerResult[img.PixelBuffer.Count];
+            for (uint i = 0; i< img.FramesCount; ++i)
+            {
+                img.DecodeFrame(i);
+            }
+            var quantizerResults = new QuantizerResult[img.FramesCount];
             Parallel.For(
                 0,
-                img.PixelBuffer.Count,
+                img.FramesCount,
                 index =>
                 {
                     var quant = new DistinctSelectionQuantizer();
-                    var result = ImageBuffer.QuantizeImage(img.PixelBuffer[index], quant, null, 256, true, 1);
+                    var result = ImageBuffer.QuantizeImage(img.GetFrameData((uint)index), quant, null, 256, true, 1);
 
                     if (result.ColorTable.Length < 256)
                     {
@@ -133,8 +137,8 @@ namespace Adamantium.Imaging.Gif
                 stream.WriteByte((byte) GifChunkCodes.ImageDescriptor);
                 stream.WriteUInt16(0);
                 stream.WriteUInt16(0);
-                stream.WriteUInt16((ushort) result.Image.Width);
-                stream.WriteUInt16((ushort) result.Image.Height);
+                stream.WriteUInt16((ushort) result.Image.Description.Width);
+                stream.WriteUInt16((ushort) result.Image.Description.Height);
                 stream.WriteByte(fields);
 
                 //Writing local color table

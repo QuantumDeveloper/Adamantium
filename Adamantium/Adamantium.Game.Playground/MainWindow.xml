@@ -49,17 +49,17 @@
                CornerRadius="6"
                Source="Textures\elephant.png"
         />
-<!--		<Image Grid.Column="1" -->
-<!--			   HorizontalAlignment="Center"-->
-<!--               VerticalAlignment="Center"-->
-<!--               CornerRadius="6"-->
-<!--               Source="Textures\infinity.gif"-->
-<!--        />-->
-<!--		<Image Grid.Column="2" -->
-<!--			   HorizontalAlignment="Center"-->
-<!--               VerticalAlignment="Center"-->
-<!--               CornerRadius="6"-->
-<!--               Source="Textures\APNG-cube.png"-->
-<!--        />-->
+		<Image Grid.Column="1" 
+			   HorizontalAlignment="Center"
+               VerticalAlignment="Center"
+               CornerRadius="6"
+               Source="Textures\infinity.gif"
+        />
+		<Image Grid.Column="2" 
+			   HorizontalAlignment="Center"
+               VerticalAlignment="Center"
+               CornerRadius="6"
+               Source="Textures\APNG-cube.png"
+        />
     </RenderTargetPanel>
 </Window>

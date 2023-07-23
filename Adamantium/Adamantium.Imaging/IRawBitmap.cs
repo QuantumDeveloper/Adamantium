@@ -20,9 +20,11 @@ public interface IRawBitmap
         
     public uint FramesCount { get; }
         
-    public byte[] GetFrameData(uint frameIndex);
+    public byte[] GetRawPixels(uint frameIndex);
 
-    public byte[] GetMipLevelData(uint mipLevel, out ImageDescription description);
+    public MipLevelData GetMipLevelData(uint mipLevel);
 
     public ImageDescription GetImageDescription();
+
+    public FrameData GetFrameData(uint frameIndex);
 }

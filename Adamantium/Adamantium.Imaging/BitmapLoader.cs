@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Adamantium.Core;
 using Adamantium.Imaging.Dds;
 using Adamantium.Imaging.Gif;
@@ -16,14 +17,14 @@ public static class BitmapLoader
 {
     public delegate IRawBitmap ImageLoadDelegate(IntPtr dataPointer, long dataSize);
 
-    public delegate void ImageSaveDelegate(IRawBitmap image);
+    public delegate void ImageSaveDelegate(IRawBitmap image, Stream imageStream);
     
     private static readonly List<LoadSaveDelegates> _loadSaveDelegates;
     
     static BitmapLoader()
     {
         _loadSaveDelegates = new List<LoadSaveDelegates>();
-        Register(ImageFileType.Gif, LoadGif, null);
+        Register(ImageFileType.Gif, LoadGif, SaveGif);
         Register(ImageFileType.Png, LoadPng, null);
         Register(ImageFileType.Bmp, LoadBmp, null);
         Register(ImageFileType.Dds, LoadDds, null);
@@ -45,6 +46,11 @@ public static class BitmapLoader
         var decoder = new GifDecoder();
         var img = decoder.Decode(stream);
         return img;
+    }
+
+    public static void SaveGif(IRawBitmap image, Stream imageStream)
+    {
+        GIFHelper.SaveToStream((GifImage)image, imageStream);
     }
     
     public static IRawBitmap LoadPng(IntPtr dataPointer, long dataSize)
@@ -142,6 +148,20 @@ public static class BitmapLoader
         }
 
         return null;
+    }
+
+    public static void Save(IRawBitmap bitmap, string path, ImageFileType fileType)
+    {
+        var stream = new FileStream(path, FileMode.Create, FileAccess.Write);
+        try
+        {
+            var saveDelegate = _loadSaveDelegates.FirstOrDefault(x => x.FileType == fileType);
+            saveDelegate?.Saver?.Invoke(bitmap, stream);
+        }
+        finally
+        {
+            stream.Dispose();
+        }
     }
     
     

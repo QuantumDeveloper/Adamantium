@@ -96,6 +96,10 @@ namespace Adamantium.Imaging
         /// <unmanaged>Vulkan imange Format</unmanaged>	
         public Format Format;
 
+        public long RowStride => Width * Format.SizeOfInBytes();
+
+        public long TotalSizeInBytes => RowStride * Height;
+
         /// <inheritdoc />
         public bool Equals(ImageDescription other)
         {

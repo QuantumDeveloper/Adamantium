@@ -47,7 +47,7 @@ public sealed class BitmapImage : BitmapSource
       1,
       1,
       bitmap.PixelFormat,
-      bitmap.GetFrameData(0))
+      bitmap.GetRawPixels(0))
    {
       _rawBitmap = bitmap;
    }
@@ -75,10 +75,13 @@ public sealed class BitmapImage : BitmapSource
       if (a is BitmapImage bitmap)
       {
          var newLimit = (uint)e.NewValue;
-         var oldLimit = (uint)e.OldValue;
-         if (newLimit < oldLimit)
+         if (e.OldValue != AdamantiumProperty.UnsetValue)
          {
-            bitmap.RemoveCacheItems(newLimit - oldLimit);
+            var oldLimit = (uint)e.OldValue;
+            if (newLimit < oldLimit)
+            {
+               bitmap.RemoveCacheItems(newLimit - oldLimit);
+            }
          }
       }
    }
@@ -122,7 +125,7 @@ public sealed class BitmapImage : BitmapSource
    public BitmapFrame GetFrame(uint frameIndex)
    {
       CurrentFrameIndex = frameIndex;
-      var rawData = _rawBitmap.GetFrameData(frameIndex);
+      var rawData = _rawBitmap.GetRawPixels(frameIndex);
       return new BitmapFrame(
          PixelWidth,
          PixelHeight,
@@ -177,16 +180,16 @@ public sealed class BitmapImage : BitmapSource
 
    public BitmapFrame GetMipLevel(uint level)
    {
-      var rawData = _rawBitmap.GetMipLevelData(level, out var mipDescription);
-      if (rawData == null) return null;
+      var mipData = _rawBitmap.GetMipLevelData(level);
+      if (mipData == null) return null;
       
       return new BitmapFrame(
-         mipDescription.Width,
-         mipDescription.Height,
+         mipData.Description.Width,
+         mipData.Description.Height,
          DpiXScale,
          DpiYScale,
          PixelFormat,
-         rawData,
+         mipData.Pixels,
          level);
    }
 
@@ -203,20 +206,26 @@ public sealed class BitmapImage : BitmapSource
       PixelWidth = rawBitmap.Width;
       PixelHeight = rawBitmap.Height;
       PixelFormat = rawBitmap.PixelFormat;
-      SetPixels(rawBitmap.GetFrameData(0));
+      SetPixels(rawBitmap.GetRawPixels(0));
       _rawBitmap = rawBitmap;
    }
 
    private BitmapFrame GetFrameFromCache(uint index)
    {
-      if (!_indexToFrame.TryGetValue(index, out var frame))
-      {
-         frame = GetFrame(index);
-         _indexToFrame[index] = frame;
-         AddToCache(frame);
-      }
+      return GetFrame(index);
+      // if (!_indexToFrame.TryGetValue(index, out var frame))
+      // {
+      //    frame = GetFrame(index);
+      //    _indexToFrame[index] = frame;
+      //    AddToCache(frame);
+      // }
 
-      return frame;
+      // if (_indexToFrame.Count > FrameCacheLimit)
+      // {
+      //    RemoveCacheItems(FrameCacheLimit - (uint)_indexToFrame.Count);
+      // }
+
+      //return frame;
    }
    
    protected override void ReleaseUnmanagedResources()

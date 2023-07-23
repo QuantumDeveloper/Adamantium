@@ -1,5 +1,3 @@
-using System.Linq;
-
 namespace Adamantium.Imaging.Dds;
 
 public class DdsImage : IRawBitmap
@@ -9,7 +7,8 @@ public class DdsImage : IRawBitmap
         Description = description;
     }
     
-    public PixelBuffer[] PixelBuffers { get; set; }
+    public MipLevelData[] MipLevels { get; set; }
+    public FrameData[] PixelBuffers { get; set; }
     public uint Width => Description.Width;
     public uint Height => Description.Height;
     public SurfaceFormat PixelFormat => Description.Format;
@@ -34,33 +33,29 @@ public class DdsImage : IRawBitmap
     
     public ImageDescription Description { get; }
     
-    public byte[] GetFrameData(uint frameIndex)
+    public byte[] GetRawPixels(uint frameIndex)
     {
         if (Description.Dimension == TextureDimension.TextureCube)
         {
-            return PixelBuffers[frameIndex].GetPixels<byte>();
+            return PixelBuffers[frameIndex].RawPixels;
         }
-        return PixelBuffers[0].GetPixels<byte>();
+        return PixelBuffers[0].RawPixels;
     }
 
-    public byte[] GetMipLevelData(uint mipLevel, out ImageDescription description)
+    public MipLevelData GetMipLevelData(uint mipLevel)
     {
-        var buffer = PixelBuffers.FirstOrDefault(x => x.MipLevel == mipLevel);
-        var descr = buffer.MipMapDescription;
-        description = new ImageDescription()
-        {
-            Width = descr.Width,
-            Height = descr.Height,
-            Depth = 1,
-            Dimension = TextureDimension.Texture2D,
-            Format = Description.Format,
-            ArraySize = 1
-        };
-        return buffer?.GetPixels<byte>();
+        var mipData = MipLevels[mipLevel];
+        return mipData;
     }
+
 
     public ImageDescription GetImageDescription()
     {
         return Description;
+    }
+
+    public FrameData GetFrameData(uint frameIndex)
+    {
+        return new FrameData(GetRawPixels(frameIndex), Description);
     }
 }
