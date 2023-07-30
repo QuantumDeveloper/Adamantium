@@ -55,7 +55,7 @@ namespace Adamantium.Engine.Graphics
 
         private void CreateRenderTarget()
         {
-            renderTarget = ToDispose(RenderTarget.New(GraphicsDevice, Width, Height, MSAALevel, ImageFormat));
+            renderTarget = ToDispose(RenderTarget.New(GraphicsDevice, Width, Height, MSAALevel, SurfaceFormat));
         }
 
         SwapChainSupportDetails QuerySwapChainSupport(PhysicalDevice device)
@@ -96,11 +96,13 @@ namespace Adamantium.Engine.Graphics
             createInfo.ImageArrayLayers = 1;
             createInfo.ImageUsage = ImageUsageFlagBits.ColorAttachmentBit;
 
-            QueueFamilyIndices indices = physicalDevice.FindQueueFamilies(surface);
-            var queueFamilyIndices = new [] { indices.graphicsFamily.Value, indices.presentFamily.Value };
-
-            if (indices.graphicsFamily != indices.presentFamily)
+            var graphicsFamily =
+                GraphicsDevice.MainDevice.QueueFamilyContainer.GetFamilyInfo(QueueFlagBits.GraphicsBit);
+            var presentFamilyIndex = GraphicsDevice.MainDevice.QueueFamilyContainer.GetPresentFamilyIndex(surface);
+            
+            if (graphicsFamily.FamilyIndex != presentFamilyIndex)
             {
+                var queueFamilyIndices = new[] { graphicsFamily.FamilyIndex, presentFamilyIndex };
                 createInfo.ImageSharingMode = SharingMode.Concurrent;
                 createInfo.QueueFamilyIndexCount = (uint)queueFamilyIndices.Length;
                 createInfo.PQueueFamilyIndices = queueFamilyIndices;
@@ -135,7 +137,7 @@ namespace Adamantium.Engine.Graphics
                 var createInfo = new ImageViewCreateInfo();
                 createInfo.Image = images[i];
                 createInfo.ViewType = ImageViewType._2d;
-                createInfo.Format = ImageFormat;
+                createInfo.Format = SurfaceFormat;
                 ComponentMapping componentMapping = new ComponentMapping();
                 componentMapping.R = ComponentSwizzle.Identity;
                 componentMapping.G = ComponentSwizzle.Identity;

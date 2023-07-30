@@ -1,16 +1,15 @@
 ﻿using System;
 using System.IO;
-using System.Runtime.InteropServices;
 using Adamantium.Imaging.Jpeg.Decoder;
 using Adamantium.Imaging.Jpeg.Encoder;
 
 namespace Adamantium.Imaging.Jpeg
 {
-    internal static class JpegHelper
+    public static class JpegHelper
     {
-        public static unsafe Image LoadFromMemory(IntPtr pSource, int size, bool makeACopy, GCHandle? handle)
+        public static unsafe JpegImage LoadFromMemory(IntPtr pSource, long size)
         {
-            Image image = null;
+            JpegImage image = null;
             using (var stream = new UnmanagedMemoryStream((byte*)pSource, size))
             {
                 var decoder = new JpegDecoder(stream);
@@ -20,9 +19,9 @@ namespace Adamantium.Imaging.Jpeg
             return image;
         }
 
-        public static void SaveToStream(Image img, PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream)
+        public static void SaveToStream(IRawBitmap img, Stream imageStream)
         {
-            JpegEncoder encoder = new JpegEncoder(pixelBuffers[0], 100, imageStream);
+            JpegEncoder encoder = new JpegEncoder(img, 100, imageStream);
             encoder.Encode();
         }
 

@@ -18,7 +18,7 @@ namespace Adamantium.Imaging.Png.Chunks
         public byte Minute { get; set; }
         public byte Second { get; set; }
 
-        internal override byte[] GetChunkBytes(PNGState state)
+        internal override byte[] GetChunkBytes(PngState state)
         {
             var bytes = new List<byte>();
             bytes.AddRange(GetNameAsBytes());
@@ -32,7 +32,7 @@ namespace Adamantium.Imaging.Png.Chunks
             return bytes.ToArray();
         }
 
-        internal static tIME FromState(PNGState state)
+        internal static tIME FromState(PngState state)
         {
             var time = new tIME();
             var date = DateTime.Now;

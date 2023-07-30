@@ -63,7 +63,7 @@ namespace Adamantium.Engine.Graphics
       
       GraphicsDevice ResourceLoaderDevice { get; }
       
-      IReadOnlyCollection<GraphicsDevice> GraphicsDevices { get; }
+      IReadOnlyList<GraphicsDevice> GraphicsDevices { get; }
 
    }
 }

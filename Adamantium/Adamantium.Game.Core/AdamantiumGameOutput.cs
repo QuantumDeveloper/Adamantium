@@ -1,4 +1,5 @@
 ﻿using System;
+using Adamantium.Core.Events;
 using Adamantium.Engine.Graphics;
 using Adamantium.Game.Core.Events;
 using Adamantium.Game.Core.Payloads;
@@ -14,12 +15,12 @@ namespace Adamantium.Game.Core
     {
         private IWindow window;
 
-        public AdamantiumGameOutput(IWindow window)
+        public AdamantiumGameOutput(IEventAggregator eventAggregator, IWindow window) : base(eventAggregator)
         {
             Initialize(new GameContext(window));
         }
 
-        public AdamantiumGameOutput(GameContext gameContext)
+        public AdamantiumGameOutput(IEventAggregator eventAggregator, GameContext gameContext) : base(eventAggregator)
         {
             Initialize(gameContext);
         }

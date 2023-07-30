@@ -24,11 +24,8 @@ public class Rectangle : Shape
    {
       base.OnRender(context);
 
-      context.BeginDraw(this);
       var dstRect = Rect.Deflate(StrokeThickness);
       context.DrawRectangle(Fill, dstRect, CornerRadius, GetPen());
-      context.EndDraw(this);
-
    }
 
 }

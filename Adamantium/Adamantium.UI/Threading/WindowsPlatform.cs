@@ -49,6 +49,7 @@ public class WindowsPlatform : IApplicationPlatform
     }
 
     public bool IsOnUIThread => uiThread == Thread.CurrentThread;
+    
     public void Signal()
     {
         Messages.PostMessage(window.Handle, dispatchMessage, IntPtr.Zero, IntPtr.Zero);
@@ -56,7 +57,7 @@ public class WindowsPlatform : IApplicationPlatform
 
     public event Action Signaled;
 
-    public static void Initialize(IDependencyResolver resolver)
+    public static void Initialize(IContainerRegistry resolver)
     {
         resolver.RegisterSingleton<IApplicationPlatform, WindowsPlatform>();
     }

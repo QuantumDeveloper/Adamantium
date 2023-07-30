@@ -25,7 +25,7 @@
         /// <param name="index"></param>
         /// <param name="tail"></param>
         /// <returns></returns>
-        public static BPMNode Create(BPMLists lists, int weight, int index, BPMNode tail)
+        public static BPMNode Create(BpmLists lists, int weight, int index, BPMNode tail)
         {
             /*memory full, so garbage collect*/
             if (lists.NextFree >= lists.Numfree)
@@ -105,7 +105,7 @@
         }
 
         /*Boundary Package Merge step, numpresent is the amount of leaves, and chain is the current chain.*/
-        public static void BoundaryPackageMerge(BPMLists lists, BPMNode[] leaves, int numpresent, int chain, int num)
+        public static void BoundaryPackageMerge(BpmLists lists, BPMNode[] leaves, int numpresent, int chain, int num)
         {
             int lastIndex = lists.Chains1[chain].Index;
 

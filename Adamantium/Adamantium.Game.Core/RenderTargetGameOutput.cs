@@ -1,11 +1,15 @@
-﻿using System;
-using System.Diagnostics;
+﻿using System.Diagnostics;
+using Adamantium.Core.Events;
 using Adamantium.Engine.Graphics;
+using Adamantium.Game.Core.Events;
+using Adamantium.Game.Core.Payloads;
 using Adamantium.Imaging;
 using Adamantium.UI;
 using Adamantium.UI.Controls;
-using Adamantium.UI.Events;
+using Adamantium.UI.Media.Imaging;
 using Adamantium.UI.RoutedEvents;
+using Serilog;
+using Buffer = Adamantium.Engine.Graphics.Buffer;
 using Rectangle = Adamantium.Mathematics.Rectangle;
 
 namespace Adamantium.Game.Core
@@ -16,17 +20,22 @@ namespace Adamantium.Game.Core
     public class RenderTargetGameOutput : AdamantiumGameOutputBase
     {
         private RenderTargetPanel nativeWindow;
+        private Buffer _dstBuffer;
+        private bool isExecuted = true;
+        private bool _invalidateRender;
+        private RenderTarget _renderTarget;
 
-        internal RenderTargetGameOutput(GameContext context)
+        internal RenderTargetGameOutput(IEventAggregator eventAggregator, GameContext context) : base(eventAggregator)
         {
             Initialize(context);
         }
 
         internal RenderTargetGameOutput(
+            IEventAggregator eventAggregator,
             GameContext context, 
             SurfaceFormat pixelFormat, 
             DepthFormat depthFormat, 
-            MSAALevel msaaLevel)
+            MSAALevel msaaLevel) : base(eventAggregator)
         {
             Initialize(context, pixelFormat, depthFormat, msaaLevel);
         }
@@ -42,9 +51,12 @@ namespace Adamantium.Game.Core
             nativeWindow = (RenderTargetPanel)GameContext.Context;
             InputComponent = nativeWindow;
             nativeWindow.RenderTargetCreatedOrUpdated += NativeWindowOnRenderTargetCreatedOrUpdated;
+            nativeWindow.SizeChanged += NativeWindowOnSizeChanged;
             nativeWindow.GotFocus += NativeWindow_GotFocus;
             nativeWindow.LostFocus += NativeWindow_LostFocus;
             Description = new GameWindowDescription(PresenterType.RenderTarget);
+            _renderTarget = nativeWindow.RenderTarget?.Texture as RenderTarget;
+
             Width = (uint)nativeWindow.ActualWidth;
             Height = (uint)nativeWindow.ActualHeight;
             Handle = nativeWindow.Handle;
@@ -52,24 +64,42 @@ namespace Adamantium.Game.Core
             UpdateViewportAndScissor((uint)ClientBounds.Width, (uint)ClientBounds.Height);
         }
 
-        private void NativeWindowOnRenderTargetCreatedOrUpdated(object sender, RenderTargetEventArgs e)
+        public override void CopyOutput(GraphicsDevice mainDevice)
         {
-            Handle = e.Handle;
-            ClientBounds = new Rectangle(0, 0, (int)e.Width, (int)e.Height);
-            Width = (uint)nativeWindow.ActualWidth;
-            Height = (uint)nativeWindow.ActualHeight;
-            UpdateViewportAndScissor((uint)ClientBounds.Width, (uint)ClientBounds.Height);
-            Debug.WriteLine("RenderTarget window size = " + Description.Width + " " + Description.Height);
+            var rt = GraphicsDevice.Presenter as RenderTargetGraphicsPresenter;
+            mainDevice.CopyImageFromPresenter(rt?.ResolveTexture, _renderTarget);
+            nativeWindow.CanPresent = true;
         }
 
-        private void NativeWindow_LostFocus(object sender, RoutedEventArgs e)
+        private void NativeWindowOnSizeChanged(object sender, SizeChangedEventArgs e)
         {
-            OnDeactivated();
+            RaiseSizeChangedEvent(new GameOutputSizeChangedPayload(this, e.NewSize));
+        }
+
+        private unsafe void NativeWindowOnRenderTargetCreatedOrUpdated(object sender, RenderTargetEventArgs e)
+        {
+            Handle = new IntPtr(e.RenderTarget.NativePointer);
+            _renderTarget = e.RenderTarget.Texture as RenderTarget;
+            Log.Logger.Debug($"Updated render target with pointer: {new IntPtr(e.RenderTarget.NativePointer)}");
+            ClientBounds = new Rectangle(0, 0, (int)e.Width, (int)e.Height);
+            _renderTarget = e.RenderTarget.Texture as RenderTarget;
+            UpdateViewportAndScissor((uint)ClientBounds.Width, (uint)ClientBounds.Height);
+            Width = (uint)nativeWindow.ActualWidth;
+            Height = (uint)nativeWindow.ActualHeight;
+            Debug.WriteLine("RenderTarget window size = " + Description.Width + " " + Description.Height);
+            ResizeRequested = true;
+            EventAggregator.GetEvent<GameOutputChangesRequestedEvent>().Publish(new GameOutputParametersPayload(this, Description, ChangeReason.Resize));
+            _invalidateRender = true;
         }
 
         private void NativeWindow_GotFocus(object sender, RoutedEventArgs e)
         {
             OnActivated();
+        }
+        
+        private void NativeWindow_LostFocus(object sender, RoutedEventArgs e)
+        {
+            OnDeactivated();
         }
 
         public override GameWindowDescription Description { get; protected set; }

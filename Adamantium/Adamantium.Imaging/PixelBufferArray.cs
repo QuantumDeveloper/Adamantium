@@ -40,21 +40,13 @@ namespace Adamantium.Imaging
         /// Gets the pixel buffer.
         /// </summary>
         /// <returns>A <see cref="PixelBuffer"/>.</returns>
-        public PixelBuffer this[int bufferIndex]
-        {
-            get
-            {
-                return this.image.pixelBuffers[bufferIndex];
-            }
-        }
+        public PixelBuffer this[int bufferIndex] => image.pixelBuffers[bufferIndex];
 
         /// <summary>
         /// Gets the total number of pixel buffers.
         /// </summary>
         /// <returns>The total number of pixel buffers.</returns>
-        public int Count { get { return this.image.pixelBuffers.Length; } }
-
-        public object Current => throw new NotImplementedException();
+        public int Count => image.pixelBuffers.Length;
 
         /// <summary>
         /// Gets the pixel buffer for the specified array/z slice and mipmap level.
@@ -71,13 +63,7 @@ namespace Adamantium.Imaging
         /// <param name="zIndex">Z index for 3D image. Must be set to 0 for all 1D/2D images.</param>
         /// <param name="mipIndex">The mip map slice index.</param>
         /// <returns>A <see cref="PixelBuffer"/>.</returns>
-        public PixelBuffer this[int arrayIndex, int zIndex, int mipIndex]
-        {
-            get
-            {
-                return this.image.GetPixelBuffer(arrayIndex, zIndex, mipIndex);
-            }
-        }
+        public PixelBuffer this[int arrayIndex, int zIndex, int mipIndex] => this.image.GetPixelBuffer(arrayIndex, zIndex, mipIndex);
 
         public IEnumerator GetEnumerator()
         {

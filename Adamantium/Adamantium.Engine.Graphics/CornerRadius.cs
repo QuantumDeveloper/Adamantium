@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using Adamantium.Mathematics;
 
 namespace Adamantium.Engine.Graphics
 {
@@ -44,6 +45,27 @@ namespace Adamantium.Engine.Graphics
         {
             return $"{nameof(TopLeft)}: {TopLeft} {nameof(TopRight)}: {TopRight} {nameof(BottomRight)}: {BottomRight} {nameof(BottomLeft)}: {BottomLeft}";
         }
+
+        static CornerRadius()
+        {
+            Empty = new CornerRadius();
+        }
+
+        public static CornerRadius Empty { get; }
+
+        public static bool operator ==(CornerRadius radius1, CornerRadius radius2)
+        {
+            return MathHelper.NearEqual(radius1.TopLeft, radius2.TopLeft) &&
+                   MathHelper.NearEqual(radius1.TopRight, radius2.TopRight) &&
+                   MathHelper.NearEqual(radius1.BottomRight, radius2.BottomRight) &&
+                   MathHelper.NearEqual(radius1.BottomLeft, radius2.BottomLeft);
+        }
+
+        public static bool operator !=(CornerRadius radius1, CornerRadius radius2)
+        {
+            return !(radius1 == radius2);
+        }
+
 
         public static CornerRadius Parse(string value)
         {

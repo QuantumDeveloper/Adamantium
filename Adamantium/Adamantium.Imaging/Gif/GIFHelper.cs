@@ -1,24 +1,25 @@
 ﻿using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using Adamantium.Core;
 
 namespace Adamantium.Imaging.Gif
 {
     public static class GIFHelper
     {
-        public static unsafe Image LoadFromMemory(IntPtr pSource, int size, bool makeACopy, GCHandle? handle)
+        public static unsafe IRawBitmap LoadFromMemory(IntPtr pSource, long size)
         {
-            var stream = new UnmanagedMemoryStream((byte*)pSource, (long)size);
+            var stream = new UnmanagedMemoryStream((byte*)pSource, size);
 
-            GifDecoder decoder = new GifDecoder();
-            var img = decoder.Decode(stream);
-            return img;
+            var decoder = new GifDecoder();
+            var gifImage = decoder.Decode(stream);
+            return gifImage;
         }
 
-        public static unsafe void SaveToStream(Image img, PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream)
+        public static void SaveToStream(IRawBitmap image, Stream imageStream)
         {
             GifEncoder encoder = new GifEncoder();
-            encoder.Encode(img, imageStream);
+            encoder.Encode(image, imageStream);
 
             //var quant = new NeuralColorQuantizer();
             //var quant = new DistinctSelectionQuantizer();

@@ -77,7 +77,6 @@ public class Nurbs : BSpline
     
     protected override void OnRender(DrawingContext context)
     {
-        base.OnRender(context);
         var degree = Points.Count - 1;
         if (UseCustomDegree)
         {
@@ -87,9 +86,6 @@ public class Nurbs : BSpline
         var streamContext = StreamGeometry.Open();
         streamContext.BeginFigure(Points[0], true, true).NurbsTo(Points.Skip(1), IsUniform, UseCustomDegree, degree, true);
             
-        context.BeginDraw(this);
-        
         context.DrawGeometry(Stroke, StreamGeometry, GetPen());
-        context.EndDraw(this);
     }
 }

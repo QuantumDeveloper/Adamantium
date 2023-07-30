@@ -2,8 +2,12 @@ using Adamantium.UI.Media;
 
 namespace Adamantium.UI.Controls;
 
-public class BezierLine : Line
+public class BezierLine : BezierCurveBase
 {
+    public BezierLine()
+    {
+    }
+    
     public static readonly AdamantiumProperty BezierTypeProperty = AdamantiumProperty.Register(nameof(BezierType),
         typeof(BezierLine), typeof(Shape),
         new PropertyMetadata(BezierType.Quadratic,
@@ -37,12 +41,8 @@ public class BezierLine : Line
 
     protected override void OnRender(DrawingContext context)
     {
-        base.OnRender(context);
-        var start = new Vector2(X1, Y1);
-        var end = new Vector2(X2, Y2);
-         
-        context.BeginDraw(this);
-        //context.DrawLine();
-        context.EndDraw(this);
+        var streamContext = StreamGeometry.Open();
+        streamContext.BeginFigure(StartPoint, true, false).QuadraticBezierTo(ControlPoint1, EndPoint);
+        context.DrawGeometry(Fill, StreamGeometry, GetPen());
     }
 }

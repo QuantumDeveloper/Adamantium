@@ -72,13 +72,13 @@ public class FundamentalUIComponent : AnimatableUIComponent, IFundamentalUICompo
             case NotifyCollectionChangedAction.Add:
             {
                 var styles = (IEnumerable<Style>)e.NewItems;
-                AdamantiumDependencyResolver.Current.Resolve<IThemeManager>().ApplyStyles(styles.ToArray());
+                AdamantiumDependencyContainer.Current.Resolve<IThemeManager>().ApplyStyles(styles.ToArray());
                 break;
             }
             case NotifyCollectionChangedAction.Remove:
             {
                 var styles = (IEnumerable<Style>)e.NewItems;
-                AdamantiumDependencyResolver.Current.Resolve<IThemeManager>().ApplyStyles(styles.ToArray());
+                AdamantiumDependencyContainer.Current.Resolve<IThemeManager>().ApplyStyles(styles.ToArray());
                 break;
             }
         }

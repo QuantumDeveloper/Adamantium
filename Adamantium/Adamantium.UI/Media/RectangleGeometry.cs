@@ -57,6 +57,8 @@ public sealed class RectangleGeometry : Geometry
          (float)rect.Height / 2 + (float)rect.Y, 0);
       Mesh = Shapes.Rectangle.GenerateGeometry(
          geometryType, 
+         rect.X,
+         rect.Y,
          (float)rect.Width,
          (float)rect.Height,
          CornerRadius, 

@@ -32,6 +32,11 @@ namespace Adamantium.Imaging
         {
             Value = format;
         }
+        
+        /// <summary>
+        /// Size in bytes of current Surface format
+        /// </summary>
+        public int SizeInBits => FormatHelper.SizeOfInBits(this);
 
         /// <summary>
         /// Size in bytes of current Surface format

@@ -7,6 +7,8 @@
         /// </summary>
         Standalone,
         
+        Primary,
+        
         /// <summary>
         /// Game is working under another platform and should not start up game platforms
         /// </summary>

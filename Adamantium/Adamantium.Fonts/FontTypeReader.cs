@@ -7,7 +7,7 @@ namespace Adamantium.Fonts
     public class FontTypeReader : BinaryReader
     {
         private string fontPath;
-        public FontTypeReader(String path) : this(File.Open(path, FileMode.Open, FileAccess.Read))
+        public FontTypeReader(String path) : this(File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read))
         {
             fontPath = path;
         }

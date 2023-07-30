@@ -37,10 +37,9 @@ namespace Adamantium.Engine.EntityServices
         {
             //DeferredDevice = GraphicsDeviceService.GraphicsDevice.CreateDeferred();
             //DeferredDevice = GraphicsDeviceService.GraphicsDevice;
-//            SpriteBatch = new SpriteBatch(DeferredDevice, 80000);
+            //SpriteBatch = new SpriteBatch(DeferredDevice, 80000);
             CreateResources();
             CreateSystemResources();
-            
         }
 
         protected override void OnWindowParametersChanging(ChangeReason reason)
@@ -260,7 +259,7 @@ namespace Adamantium.Engine.EntityServices
             samplerInfo.CompareOp = CompareOp.Always;
             samplerInfo.MipmapMode = mtsdf ? SamplerMipmapMode.Linear : SamplerMipmapMode.Nearest;
 
-            return GraphicsDevice.CreateSampler(samplerInfo);
+            return SamplerState.New(GraphicsDevice, "", samplerInfo);
         }
 
         private void CreateResources()
@@ -387,25 +386,6 @@ namespace Adamantium.Engine.EntityServices
 //            fractalrenderTarget?.Dispose();
 //            mcube?.Dispose();
 //            lookupTexture?.Dispose();
-        }
-
-        public override bool BeginDraw()
-        {
-            if (!Window.IsUpToDate()) return false;
-
-            if (base.BeginDraw())
-            {
-                if (GraphicsDevice.BeginDraw(1.0f, 0))
-                {
-                    GraphicsDevice.SetViewports(Window.Viewport);
-                    GraphicsDevice.SetScissors(Window.Scissor);
-                    return true;
-                }
-
-                return false;
-            }
-
-            return false;
         }
 
         public override void Draw(AppTime gameTime)
@@ -1089,12 +1069,6 @@ namespace Adamantium.Engine.EntityServices
 //            fractalEffect.Techniques["Julia"].Passes[0].Apply();
             //fractalEffect.Techniques["Mandelbrot"].Passes[0].Apply();
 //            DeferredDevice.Quad.Draw();
-        }
-
-        public override void EndDraw()
-        {
-            base.EndDraw();
-            GraphicsDevice.EndDraw();
         }
     }
 }

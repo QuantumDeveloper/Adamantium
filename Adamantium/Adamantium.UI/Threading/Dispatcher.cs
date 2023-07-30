@@ -21,17 +21,17 @@ public sealed class Dispatcher : IDispatcher
     
     public static bool Initialized { get; private set; }
         
-    static Dispatcher()
-    {
-        Initialize();
-    }
+    // static Dispatcher()
+    // {
+    //     Initialize();
+    // }
 
     internal static void Initialize()
     {
         if (Initialized) return;
         
         dispatchers = new Dictionary<DispatcherContext, Dispatcher>();
-        CurrentDispatcher = new Dispatcher(AdamantiumDependencyResolver.Current.Resolve<IApplicationPlatform>());
+        CurrentDispatcher = new Dispatcher(AdamantiumDependencyContainer.Current.Resolve<IApplicationPlatform>());
         SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(CurrentDispatcher));
         
         Initialized = true;
@@ -109,7 +109,7 @@ public sealed class Dispatcher : IDispatcher
 
     private bool CheckAccessInternal()
     {
-        return MainThread == Thread.CurrentThread || UIThread == Thread.CurrentThread;
+        return MainThread == Thread.CurrentThread;
     }
 
     public void VerifyAccess()
@@ -122,7 +122,7 @@ public sealed class Dispatcher : IDispatcher
 
     public void Invoke(Action action, DispatcherPriority priority = DispatcherPriority.Normal)
     {
-        action?.Invoke();
+        executor.Invoke(action, priority);
     }
 
     public void Invoke(Delegate action, object args)

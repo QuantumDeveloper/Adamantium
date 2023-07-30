@@ -1,120 +1,192 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Adamantium.Engine.Graphics;
 using Adamantium.UI.Media.Imaging;
 using Adamantium.UI.Rendering;
+using Serilog;
 
 namespace Adamantium.UI.Media;
 
 public class DrawingContext
 {
-   internal GraphicsDevice GraphicsDevice { get; }
+   public GraphicsDevice GraphicsDevice { get; }
       
-   private readonly Dictionary<IUIComponent, UIPresentationContainer> visualPresentations;
+   private readonly Dictionary<IUIComponent, UIRenderContainer> visualPresentations;
 
-   private UIPresentationContainer currentContainer;
+   private UIRenderContainer currentContainer;
+   private RenderUnit currentUnit;
    private IUIComponent currentComponent;
+   private uint _currentIndex;
 
    internal DrawingContext(GraphicsDevice d3dDevice)
    {
       GraphicsDevice = d3dDevice;
-      visualPresentations = new Dictionary<IUIComponent, UIPresentationContainer>();
+      visualPresentations = new Dictionary<IUIComponent, UIRenderContainer>();
    }
 
-   internal bool GetPresentationForComponent(IUIComponent component, out UIPresentationContainer container)
+   internal bool GetContainerForComponent(IUIComponent component, out UIRenderContainer container)
    {
       return visualPresentations.TryGetValue(component, out container);
    }
 
-   public void BeginDraw(IUIComponent visualComponent)
+   internal void BeginDraw(IUIComponent visualComponent)
    {
-      if (visualPresentations.ContainsKey(visualComponent))
+      if (!visualPresentations.TryGetValue(visualComponent, out currentContainer))
       {
-         var presentation = visualPresentations[visualComponent];
-         presentation.DisposeAndClearItems();
+         currentContainer = new UIRenderContainer();
       }
-      currentContainer = new UIPresentationContainer();
+      //currentContainer?.DisposeAndClearItems();
+      _currentIndex = 0;
       currentComponent = visualComponent;
    }
 
-   public void EndDraw(IUIComponent visualComponent)
+   internal void EndDraw()
    {
-      visualPresentations[visualComponent] = currentContainer;
+      if (currentContainer.ChildUnits.Count > 0)
+      {
+         visualPresentations[currentComponent] = currentContainer;
+      }
+
+      if (_currentIndex < currentContainer.ChildUnits.Count)
+      {
+         int itemsToRemove = currentContainer.ChildUnits.Count - (int)_currentIndex;
+         for (int i = itemsToRemove; i >= 0; --i)
+         {
+            currentContainer.ChildUnits[i].Dispose();
+            currentContainer.ChildUnits.RemoveAt(i);
+         }
+      }
+
       currentContainer = null;
+      currentUnit = null;
       currentComponent = null;
    }
 
-   public void DrawRectangle(Brush brush, Rect rect, Pen pen = null)
+   public void DrawRectangle(Brush brush, Rect destinationRect, Pen pen = null)
    {
-      var rectangle = new RectangleGeometry(rect, new CornerRadius(0));
-      StrokeGeometry strokeGeometry = null;
-      if (pen != null && pen.Thickness > 0.0)
+      DrawRectangle(brush, destinationRect, CornerRadius.Empty, pen);
+   }
+
+   private void ProcessStrokeRenderer(Pen pen)
+   {
+      if (pen is { Thickness: > 0.0 } && currentUnit.StrokeParametersHash != HashCode.Combine(pen))
       {
-         strokeGeometry = new StrokeGeometry(pen, rectangle);
+         var strokeGeometry = new StrokeGeometry(pen, currentUnit.GeometryRenderer.Geometry);
          strokeGeometry.ProcessGeometry(GeometryType.Solid);
+         var strokeRenderer =
+            ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, strokeGeometry, pen?.Brush);
+         currentUnit.StrokeParametersHash = HashCode.Combine(pen);
+         currentUnit.StrokeRenderer = strokeRenderer;
       }
+   }
 
-      var presentationItem = new UIPresentationItem();
+   private void ProcessRectangleGeometry(Rect destinationRect, CornerRadius corners, Brush brush, int hash)
+   {
+      var rectangle = new RectangleGeometry(destinationRect, corners);
          
-      var uiRenderer = UIComponentRenderer.Create(GraphicsDevice, rectangle.Mesh, brush);
-      presentationItem.GeometryRenderer = uiRenderer;
+      rectangle.ProcessGeometry(GeometryType.Solid);
+      currentUnit = new RenderUnit();
+      currentUnit.GeometryParametersHash = hash;
+      currentUnit.GeometryRenderer =
+         ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, rectangle, brush);
+   }
+   
+   private void ProcessImageGeometry(Rect destinationRect, CornerRadius corners, Brush brush, ImageSource image, int hash)
+   {
+      var rectangle = new RectangleGeometry(destinationRect, corners);
+      rectangle.ProcessGeometry(GeometryType.Solid);
+      
+      currentUnit = new RenderUnit();
+      currentUnit.GeometryParametersHash = hash;
+      currentUnit.GeometryRenderer =
+         ComponentRenderFactory.CreateImageRenderer(GraphicsDevice, rectangle, brush, image);
+   }
 
-      if (strokeGeometry != null)
+   public void DrawRectangle(Brush brush, Rect destinationRect, CornerRadius corners, Pen pen = null)
+   {
+      var hash = HashCode.Combine(destinationRect, corners);
+      if (currentContainer.ChildUnits.Count == 0)
       {
-         var strokeRenderer = UIComponentRenderer.Create(GraphicsDevice, strokeGeometry?.Mesh, pen?.Brush);
-         presentationItem.StrokeRenderer = strokeRenderer;
+         ProcessRectangleGeometry(destinationRect, corners, brush, hash);
+         ProcessStrokeRenderer(pen);
+
+         currentContainer.AddItem(currentUnit);
       }
-         
-      currentContainer?.AddItem(presentationItem);
+      else
+      {
+         var unit = currentContainer.ChildUnits.FirstOrDefault(x => x.GeometryParametersHash == hash);
+         if (unit != null)
+         {
+            var index = currentContainer.ChildUnits.IndexOf(unit);
+            unit.GeometryRenderer.Brush = brush;
+            if (index != _currentIndex)
+            {
+               currentContainer.ChildUnits.Insert((int)_currentIndex, unit);
+            }
+
+            ProcessStrokeRenderer(pen);
+         }
+         else
+         {
+            ProcessRectangleGeometry(destinationRect, corners, brush, hash);
+            ProcessStrokeRenderer(pen);
+            
+            currentContainer.ChildUnits[(int)_currentIndex].Dispose();
+            currentContainer.ChildUnits[(int)_currentIndex] = currentUnit;
+         }
+      }
+
+      _currentIndex++;
    }
       
    public void DrawEllipse(Rect destinationRect, Brush brush, Double startAngle, Double stopAngle, Pen pen = null)
    {
-      var ellipse = new EllipseGeometry(destinationRect, startAngle, stopAngle);
-      ellipse.ProcessGeometry(GeometryType.Both);
-      StrokeGeometry strokeGeometry = null;
-      if (pen != null && pen.Thickness > 0.0)
+      var hash = HashCode.Combine(destinationRect, startAngle, stopAngle);
+      if (currentContainer.ChildUnits.Count == 0)
       {
-         strokeGeometry = new StrokeGeometry(pen, ellipse);
-         strokeGeometry.ProcessGeometry(GeometryType.Solid);
-      }
-
-      var presentationItem = new UIPresentationItem();
+         var ellipse = new EllipseGeometry(destinationRect, startAngle, stopAngle);
+         ellipse.ProcessGeometry(GeometryType.Both);
          
-      var uiRenderer = UIComponentRenderer.Create(GraphicsDevice, ellipse.Mesh, brush);
-      presentationItem.GeometryRenderer = uiRenderer;
-
-      if (strokeGeometry != null && strokeGeometry.Mesh.HasPoints)
-      {
-         var strokeRenderer = UIComponentRenderer.Create(GraphicsDevice, strokeGeometry?.Mesh, pen?.Brush);
-         presentationItem.StrokeRenderer = strokeRenderer;
-      }
+         currentUnit = new RenderUnit();
+         var uiRenderer = ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, ellipse, brush);
+         currentUnit.GeometryRenderer = uiRenderer;
+         currentUnit.GeometryParametersHash = hash;
          
-      currentContainer?.AddItem(presentationItem);
-   }
-
-   public void DrawRectangle(Brush brush, Rect rect, CornerRadius corners, Pen pen = null)
-   {
-      var rectangle = new RectangleGeometry(rect, corners);
-      rectangle.ProcessGeometry(GeometryType.Both);
-      StrokeGeometry strokeGeometry = null;
-      if (pen != null && pen.Thickness > 0.0)
+         ProcessStrokeRenderer(pen);
+         currentContainer?.AddItem(currentUnit);
+      }
+      else
       {
-         strokeGeometry = new StrokeGeometry(pen, rectangle);
-         strokeGeometry.ProcessGeometry(GeometryType.Solid);
+         var unit = currentContainer.ChildUnits.FirstOrDefault(x => x.GeometryParametersHash == hash);
+         if (unit != null)
+         {
+            var index = currentContainer.ChildUnits.IndexOf(unit);
+            unit.GeometryRenderer.Brush = brush;
+            ProcessStrokeRenderer(pen);
+            if (index != _currentIndex)
+            {
+               currentContainer.ChildUnits.Insert((int)_currentIndex, unit);
+            }
+         }
+         else
+         {
+            var ellipse = new EllipseGeometry(destinationRect, startAngle, stopAngle);
+            ellipse.ProcessGeometry(GeometryType.Both);
+
+            currentUnit = new RenderUnit();
+            var uiRenderer = ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, ellipse, brush);
+            currentUnit.GeometryRenderer = uiRenderer;
+            currentUnit.GeometryParametersHash = hash;
+            
+            ProcessStrokeRenderer(pen);
+            
+            currentContainer.ChildUnits[(int)_currentIndex].Dispose();
+            currentContainer.ChildUnits[(int)_currentIndex] = currentUnit;
+         }
       }
 
-      var presentationItem = new UIPresentationItem();
-      var uiRenderer = UIComponentRenderer.Create(GraphicsDevice, rectangle.Mesh, brush);
-      presentationItem.GeometryRenderer = uiRenderer;
-
-      if (strokeGeometry != null && strokeGeometry.Mesh.HasPoints)
-      {
-         var strokeRenderer = UIComponentRenderer.Create(GraphicsDevice, strokeGeometry?.Mesh, pen?.Brush);
-         presentationItem.StrokeRenderer = strokeRenderer;
-      }
-         
-      currentContainer?.AddItem(presentationItem);
+      _currentIndex++;
    }
 
    public void DrawGeometry(Brush brush, Geometry geometry, Pen pen = null)
@@ -123,86 +195,89 @@ public class DrawingContext
       
       geometry.ProcessGeometry(GeometryType.Both);
       StrokeGeometry strokeGeometry = null;
-      if (pen != null && pen.Thickness > 0.0)
+      if (pen is { Thickness: > 0.0 })
       {
          strokeGeometry = new StrokeGeometry(pen, geometry);
          strokeGeometry.ProcessGeometry(GeometryType.Solid);
       }
 
-      var presentationItem = new UIPresentationItem();
+      currentUnit = new RenderUnit();
       if (geometry.Mesh.HasPoints)
       {
-         var uiRenderer = UIComponentRenderer.Create(GraphicsDevice, geometry.Mesh, brush);
-         presentationItem.GeometryRenderer = uiRenderer;
+         var uiRenderer = ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, geometry, brush);
+         currentUnit.GeometryRenderer = uiRenderer;
       }
 
       if (strokeGeometry != null && strokeGeometry.Mesh.HasPoints)
       {
-         var strokeRenderer = UIComponentRenderer.Create(GraphicsDevice, strokeGeometry?.Mesh, pen?.Brush);
-         presentationItem.StrokeRenderer = strokeRenderer;
+         var strokeRenderer = ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, strokeGeometry, pen?.Brush);
+         currentUnit.StrokeRenderer = strokeRenderer;
       }
-         
-      currentContainer?.AddItem(presentationItem);
+      
+      currentContainer?.AddItem(currentUnit);
+      _currentIndex++;
    }
 
    public void DrawLine(Vector2 start, Vector2 end, Pen pen)
    {
+      if (pen is { Thickness: > 0.0 }) return;
+      
       var geometry = new LineGeometry(start, end);
-      geometry.ProcessGeometry(GeometryType.Both);
+      geometry.ProcessGeometry(GeometryType.Solid);
          
-      StrokeGeometry strokeGeometry = null;
-      if (pen != null && pen.Thickness > 0.0)
+      var strokeGeometry = new StrokeGeometry(pen, geometry);
+      strokeGeometry.ProcessGeometry(GeometryType.Solid);
+
+      currentUnit = new RenderUnit();
+         
+      var strokeRenderer = ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, strokeGeometry, pen.Brush);
+      currentUnit.StrokeRenderer = strokeRenderer;
+         
+      currentContainer?.AddItem(currentUnit);
+      _currentIndex++;
+   }
+
+   public void DrawImage(ImageSource image, Brush filter, Rect destinationRect, CornerRadius corners)
+   {
+      if (image is BitmapSource bitmapSource)
       {
-         strokeGeometry = new StrokeGeometry(pen, geometry);
-         strokeGeometry.ProcessGeometry(GeometryType.Solid);
+         bitmapSource.InitUnderlyingImage(this);
+      }
+      var hash = HashCode.Combine(destinationRect, corners);
+
+      if (currentContainer.ChildUnits.Count == 0)
+      {
+         ProcessImageGeometry(destinationRect, corners, filter, image, hash);
+         currentContainer?.AddItem(currentUnit);
+      }
+      else
+      {
+         var unit = currentContainer.ChildUnits.FirstOrDefault(x =>
+            x.GeometryParametersHash == hash);
+         if (unit != null)
+         {
+            var index = currentContainer.ChildUnits.IndexOf(unit);
+            ((ImageRenderer)unit.GeometryRenderer).Image = image;
+            unit.GeometryRenderer.Brush = filter;
+            if (index != _currentIndex)
+            {
+               currentContainer.ChildUnits.Insert((int)_currentIndex, unit);
+            }
+         }
+         else
+         {
+            ProcessImageGeometry(destinationRect, corners, filter, image, hash);
+            
+            currentContainer.ChildUnits[(int)_currentIndex].Dispose();
+            currentContainer.ChildUnits[(int)_currentIndex] = currentUnit;
+         }
       }
 
-      var presentationItem = new UIPresentationItem();
-         
-      if (strokeGeometry != null)
-      {
-         var strokeRenderer = UIComponentRenderer.Create(GraphicsDevice, strokeGeometry?.Mesh, pen?.Brush);
-         presentationItem.StrokeRenderer = strokeRenderer;
-      }
-         
-      // var uiRenderer = UIComponentRenderer.Create(GraphicsDevice, geometry.Mesh, brush);
-      // presentationItem.GeometryRenderer = uiRenderer;
-      currentContainer?.AddItem(presentationItem);
+      _currentIndex++;
    }
 
-   public void DrawImage(BitmapSource bitmap, Brush filter, Rect destinationRect, CornerRadius corners)
+   public void AddImage(ImageSource imageSource)
    {
-      var geometry = new RectangleGeometry(destinationRect, corners);
-         
-      var uiRenderer = UIComponentRenderer.Create(GraphicsDevice, geometry.Mesh, filter);
-      uiRenderer.Bitmap = bitmap;
-      var presentationItem = new UIPresentationItem();
-      presentationItem.GeometryRenderer = uiRenderer;
-      currentContainer?.AddItem(presentationItem);
+      currentUnit.Image = imageSource;
    }
-
-   public void PushTexture(BitmapSource bitmap)
-   {
-      // if (VisualPresentations.TryGetValue(visualComponent, out var shapePresentation))
-      // {
-      //    if (shapePresentation[0].HasTexture)
-      //    {
-      //       var textured = shapePresentation[0];
-      //       textured.Texture = bitmap.DXTexture;
-      //    }
-      // }
-   }
-
-   public void PushTexture(Texture bitmap)
-   {
-      // if (VisualPresentations.TryGetValue(visualComponent, out var shapePresentation))
-      // {
-      //    if (shapePresentation[0].HasTexture)
-      //    {
-      //       var textured = shapePresentation[0];
-      //       textured.Texture = bitmap;
-      //    }
-      // }
-   }
-
 }

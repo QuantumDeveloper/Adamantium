@@ -6,6 +6,7 @@ using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Content;
 using Adamantium.Engine.Core.Models;
 using Adamantium.Engine.EntityServices;
+using Adamantium.Engine.Graphics;
 using Adamantium.Engine.Templates;
 using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
@@ -22,7 +23,14 @@ namespace Adamantium.Game.Playground
     {
         private TypeFace typeFace;
         
-        public AdamantiumGame():base(GameMode.Slave, true)
+        public AdamantiumGame(bool enableDynamicRendering, bool enableDebug):
+            base(GameMode.Primary, enableDynamicRendering, enableDebug)
+        {
+            EventAggregator.GetEvent<GameOutputCreatedEvent>().Subscribe(OnWindowCreated);
+        }
+        
+        public AdamantiumGame(IGraphicsDeviceService graphicsDeviceService, bool enableDynamicRendering, bool enableDebug):
+            base(GameMode.Slave, enableDynamicRendering, enableDebug, graphicsDeviceService)
         {
             EventAggregator.GetEvent<GameOutputCreatedEvent>().Subscribe(OnWindowCreated);
         }

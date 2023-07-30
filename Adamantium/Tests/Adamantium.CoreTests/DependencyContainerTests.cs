@@ -11,12 +11,13 @@ namespace Adamantium.CoreTests
         [SetUp]
         public void Setup()
         {
-            container = new AdamantiumDependencyResolver();
-            container.Register<IContactsService, ContactsService>();
-            container.Register<ICommonService, CommonService>();
-            container.Register<IItemsApi, ItemsApi>();
-            container.Register<IItemsService, ItemsService>();
-            container.Register<IMediaService, MediaService>();
+            container = new AdamantiumDependencyContainer();
+            var containerRegistry = (IContainerRegistry)container;
+            containerRegistry.Register<IContactsService, ContactsService>();
+            containerRegistry.Register<ICommonService, CommonService>();
+            containerRegistry.Register<IItemsApi, ItemsApi>();
+            containerRegistry.Register<IItemsService, ItemsService>();
+            containerRegistry.Register<IMediaService, MediaService>();
         }
 
         [Test]
@@ -31,12 +32,13 @@ namespace Adamantium.CoreTests
         [Test]
         public void SingletonTest()
         {
-            container = new AdamantiumDependencyResolver();
-            container.Register<IContactsService, ContactsService>();
-            container.RegisterSingleton<ICommonService, CommonService>();
-            container.Register<IItemsApi, ItemsApi>();
-            container.Register<IItemsService, ItemsService>();
-            container.Register<IMediaService, MediaService>();
+            container = new AdamantiumDependencyContainer();
+            var containerRegistry = (IContainerRegistry)container;
+            containerRegistry.Register<IContactsService, ContactsService>();
+            containerRegistry.RegisterSingleton<ICommonService, CommonService>();
+            containerRegistry.Register<IItemsApi, ItemsApi>();
+            containerRegistry.Register<IItemsService, ItemsService>();
+            containerRegistry.Register<IMediaService, MediaService>();
             
             var instance1 = container.Resolve<ICommonService>();
             var instance2 = container.Resolve<ICommonService>();
@@ -50,12 +52,13 @@ namespace Adamantium.CoreTests
         [Test]
         public void SingletonItemsApiTest()
         {
-            container = new AdamantiumDependencyResolver();
-            container.Register<IContactsService, ContactsService>();
-            container.Register<ICommonService, CommonService>();
-            container.RegisterSingleton<IItemsApi, ItemsApi>();
-            container.Register<IItemsService, ItemsService>();
-            container.Register<IMediaService, MediaService>();
+            container = new AdamantiumDependencyContainer();
+            var containerRegistry = (IContainerRegistry)container;
+            containerRegistry.Register<IContactsService, ContactsService>();
+            containerRegistry.Register<ICommonService, CommonService>();
+            containerRegistry.RegisterSingleton<IItemsApi, ItemsApi>();
+            containerRegistry.Register<IItemsService, ItemsService>();
+            containerRegistry.Register<IMediaService, MediaService>();
             
             var instance1 = container.Resolve<ICommonService>();
             var instance2 = container.Resolve<ICommonService>();
@@ -66,9 +69,10 @@ namespace Adamantium.CoreTests
         [Test]
         public void NamedInstancesTest()
         {
-            container = new AdamantiumDependencyResolver();
-            container.RegisterInstance<INamingService>(new NamingService("ContactsService1"), "ContactsService1");
-            container.RegisterInstance<INamingService>(new NamingService("ContactsService2"), "ContactsService2");
+            container = new AdamantiumDependencyContainer();
+            var containerRegistry = (IContainerRegistry)container;
+            containerRegistry.RegisterInstance<INamingService>(new NamingService("ContactsService1"), "ContactsService1");
+            containerRegistry.RegisterInstance<INamingService>(new NamingService("ContactsService2"), "ContactsService2");
 
             var named1 = container.Resolve<INamingService>("ContactsService1");
             var named2 = container.Resolve<INamingService>("ContactsService2");
@@ -79,9 +83,10 @@ namespace Adamantium.CoreTests
         [Test]
         public void UnnamedInstancesTest()
         {
-            container = new AdamantiumDependencyResolver();
-            container.RegisterInstance<INamingService>(new NamingService(""));
-            container.RegisterInstance<INamingService>(new NamingService("ContactsService2"), "ContactsService2");
+            container = new AdamantiumDependencyContainer();
+            var containerRegistry = (IContainerRegistry)container;
+            containerRegistry.RegisterInstance<INamingService>(new NamingService(""));
+            containerRegistry.RegisterInstance<INamingService>(new NamingService("ContactsService2"), "ContactsService2");
 
             var named1 = container.Resolve<INamingService>();
             var named2 = container.Resolve<INamingService>("ContactsService2");

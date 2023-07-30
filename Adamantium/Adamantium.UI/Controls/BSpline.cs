@@ -24,14 +24,9 @@ public class BSpline : Polyline
     
     protected override void OnRender(DrawingContext context)
     {
-        base.OnRender(context);
-        var rate = CalculatePointsLength(Points);
-        
         var streamContext = StreamGeometry.Open();
-        streamContext.BeginFigure(Points[0], true, true).BSplineTo(Points.Skip(1), true);
+        streamContext.BeginFigure(Points[0], true, true).BSplineTo(Points.Skip(1));
         
-        context.BeginDraw(this);
         context.DrawGeometry(Stroke, StreamGeometry, GetPen());
-        context.EndDraw(this);
     }
 }

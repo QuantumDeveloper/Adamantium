@@ -58,7 +58,7 @@ namespace Adamantium.Engine.Managers
 
         public LightManager(IGame game): base(game)
         {
-            DependencyResolver.RegisterInstance<LightManager>(this);
+            Container.RegisterInstance<LightManager>(this);
             //depthWriter = game.Content.Load<Effect>("Effects/DeferredShading/DepthWriter");
             lights = new List<Light>();
             _lights = new ReadOnlyCollection<Light>(lights);

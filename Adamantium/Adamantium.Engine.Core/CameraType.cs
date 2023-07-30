@@ -52,7 +52,7 @@ namespace Adamantium.Engine.Core
         public override bool Equals(object obj)
         {
             if (ReferenceEquals(null, obj)) return false;
-            return obj is CameraType && Equals((CameraType)obj);
+            return obj is CameraType type && Equals(type);
         }
 
         public override int GetHashCode()

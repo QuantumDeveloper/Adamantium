@@ -46,9 +46,6 @@ public class Path : Shape
 
     protected override void OnRender(DrawingContext context)
     {
-        base.OnRender(context);
-        context.BeginDraw(this);
         context.DrawGeometry(Fill, Data, GetPen());
-        context.EndDraw(this);
     }
 }

@@ -4,7 +4,7 @@ namespace Adamantium.Imaging.PaletteQuantizer
 {
     public class QuantizerResult
     {
-        public PixelBuffer Image { get; set; }
+        public FrameData Image { get; set; }
 
         public Color[] ColorTable { get; set; }
 
@@ -16,7 +16,7 @@ namespace Adamantium.Imaging.PaletteQuantizer
         {
         }
 
-        public QuantizerResult(PixelBuffer image, Color[] colorTable, int[] indexTable)
+        public QuantizerResult(FrameData image, Color[] colorTable, int[] indexTable)
         {
             Image = image;
             ColorTable = colorTable;

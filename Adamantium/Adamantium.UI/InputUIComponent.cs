@@ -1,6 +1,7 @@
 using System;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Input;
+using Adamantium.UI.Media;
 using Adamantium.UI.RoutedEvents;
 using Adamantium.UI.Windows.Input;
 
@@ -9,6 +10,8 @@ namespace Adamantium.UI;
 public class InputUIComponent : MeasurableUIComponent, IInputComponent
 {
     #region Routed events
+    
+    private bool _isLoaded;
 
     public static readonly RoutedEvent LoadedEvent = EventManager.RegisterRoutedEvent("Loaded",
         RoutingStrategy.Direct, typeof(RoutedEventHandler), typeof(UIComponent));
@@ -801,6 +804,21 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
          base.OnAttachedToVisualTree(e);
          IsInitialized = true;
     }
+
+    public IWindow GetWindow()
+    {
+        if (!IsInitialized) return null;
+
+        if (this is IWindow) return this as IWindow;
+
+        var parent = LogicalParent;
+        while (parent is not IWindow)
+        {
+            parent = parent.LogicalParent;
+        }
+
+        return parent as IWindow;
+    }
     
     private static void OnIsInitializedChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
@@ -962,5 +980,15 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     public void ReleaseStylusCapture()
     {
         throw new NotImplementedException();
+    }
+
+    protected override void OnRenderCompleted()
+    {
+        base.OnRenderCompleted();
+        if (!_isLoaded)
+        {
+            _isLoaded = true; 
+            RaiseEvent( new RoutedEventArgs(LoadedEvent, this));
+        }
     }
 }

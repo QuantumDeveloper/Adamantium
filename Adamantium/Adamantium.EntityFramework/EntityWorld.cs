@@ -14,7 +14,7 @@ namespace Adamantium.EntityFramework
         private object syncObject = new object();
 
         private readonly List<Entity> rootEntities;
-        private readonly Dictionary<Int64, Entity> availableEntities;
+        private readonly Dictionary<UInt128, Entity> availableEntities;
         private readonly Dictionary<String, EntityGroup> entitiesByGroup;
         private readonly List<Entity> entitiesToAdd;
         private readonly List<Entity> entitiesToRemove;
@@ -22,7 +22,7 @@ namespace Adamantium.EntityFramework
         public EntityWorld(IDependencyResolver container)
         {
             rootEntities = new List<Entity>();
-            availableEntities = new Dictionary<long, Entity>();
+            availableEntities = new Dictionary<UInt128, Entity>();
             entitiesByGroup = new Dictionary<String, EntityGroup>();
             entitiesToAdd = new List<Entity>();
             entitiesToRemove = new List<Entity>();
@@ -215,7 +215,7 @@ namespace Adamantium.EntityFramework
             ServiceManager.RemoveService(service);
         }
 
-        public void RemoveService(long processorId)
+        public void RemoveService(UInt128 processorId)
         {
             ServiceManager.RemoveService(processorId);
         }
@@ -459,7 +459,7 @@ namespace Adamantium.EntityFramework
         /// </summary>
         /// <param name="uid"><see cref="IIdentifiable.Uid"/></param>
         /// <returns>First found entity</returns>
-        public Entity FindEntity(long uid)
+        public Entity FindEntity(UInt128 uid)
         {
             lock (syncObject)
             {

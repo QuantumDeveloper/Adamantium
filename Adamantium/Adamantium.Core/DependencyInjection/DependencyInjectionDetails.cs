@@ -55,14 +55,14 @@ namespace Adamantium.Core.DependencyInjection
             DependencyItems.Add(item);
         }
 
-        public object GetDependency(IDependencyResolver container, Type type, string name = "")
+        public object GetDependency(IDependencyContainer container, Type type, string name = "")
         {
             var service = type;
             DependencyItem item = DependencyItems.FirstOrDefault(x => x.RegistryName == name);
             
             if (item == null) throw new ArgumentException($"Cannot resolve {service.Name} because its not registered");
 
-            if (LifeTimeVariant == LifeTimeVariant.Transient || LifeTimeVariant == LifeTimeVariant.Singleton)
+            if (LifeTimeVariant is LifeTimeVariant.Transient or LifeTimeVariant.Singleton)
             {
                 var parameters = new List<object>();
                 if (item.Ctor != null)

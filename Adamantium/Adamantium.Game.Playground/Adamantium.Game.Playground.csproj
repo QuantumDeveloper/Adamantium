@@ -146,6 +146,61 @@
       <Content Include="Fonts\OTFFonts\CFF\Quicksand-Regular.otf">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
+      <Content Update="Effects\structs.hlsl">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Textures\infinity.gif" />
+      <Content Include="Textures\infinity.gif">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Textures\APNG-cube.png" />
+      <Content Include="Textures\APNG-cube.png">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Textures\ball.png" />
+      <Content Include="Textures\ball.png">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Textures\elephant.png" />
+      <Content Include="Textures\elephant.png">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Textures\RotatingEarth2.gif" />
+      <Content Include="Textures\RotatingEarth2.gif">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Textures\balls.dds" />
+      <Content Include="Textures\balls.dds">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Textures\TextureCube.dds" />
+      <Content Include="Textures\TextureCube.dds">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Textures\ai.ico" />
+      <Content Include="Textures\ai.ico">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Textures\SharpDoc.ico" />
+      <Content Include="Textures\SharpDoc.ico">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Textures\PDF-Document.ico" />
+      <Content Include="Textures\PDF-Document.ico">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Textures\ColoredImage.jpg" />
+      <Content Include="Textures\ColoredImage.jpg">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Textures\luxfon.tga" />
+      <Content Include="Textures\luxfon.tga">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Textures\AplhaTestBitmap.bmp" />
+      <Content Include="Textures\AplhaTestBitmap.bmp">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
     </ItemGroup>
 
     <ItemGroup>
@@ -156,8 +211,22 @@
       <!--<Effect Include="Effects\BasicEffect.fx" />-->
     </ItemGroup>
 
-<!--    <Import Project="$(SolutionDir)Adamantium.targets" />-->
-	
-	
+  <ItemGroup>
+    <ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" SetTargetFramework="TargetFramework=netstandard2.0" />
+    <ProjectReference Include="..\Adamantium.UI.Markup\Adamantium.UI.Markup.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" />
+    <ProjectReference Include="..\Adamantium.UI.Generators\Adamantium.UI.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=netstandard2.0" />
 
+    <ProjectReference Include="..\Adamantium.Engine.Generators\Adamantium.Engine.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=netstandard2.0" />
+    <ProjectReference Include="..\Adamantium.Engine.Effects\Adamantium.Engine.Effects.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" />
+    <ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" SetTargetFramework="TargetFramework=netstandard2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AdditionalFiles Include="$(ProjectDir)**\*.xml" />
+    <AdditionalFiles Include="$(ProjectDir)**\*.fx" />
+    <AdditionalFiles Include="$(ProjectDir)**\*.hlsl" />
+    <CompilerVisibleProperty Include="RootNamespace" />
+  </ItemGroup>
+
+<!--    <Import Project="$(SolutionDir)Adamantium.targets" />-->
 </Project>

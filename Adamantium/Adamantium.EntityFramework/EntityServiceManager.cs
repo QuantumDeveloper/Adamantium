@@ -11,7 +11,7 @@ namespace Adamantium.EntityFramework
     {
         private readonly object syncObject = new object();
 
-        private readonly Dictionary<Int64, EntityService> activeServices;
+        private readonly Dictionary<UInt128, EntityService> activeServices;
 
         private readonly List<EntityService> servicesToAdd;
         private readonly List<EntityService> servicesToRemove;
@@ -26,14 +26,14 @@ namespace Adamantium.EntityFramework
         /// <summary>
         /// A service registry that provides methods to register and unregister services.
         /// </summary>
-        public IDependencyResolver DependencyResolver { get; }
+        public IDependencyResolver Container { get; }
 
         internal EntityServiceManager(EntityWorld world)
         {
             EntityWorld = world;
-            DependencyResolver = EntityWorld.DependencyResolver;
+            Container = EntityWorld.DependencyResolver;
             services = new AdamantiumCollection<EntityService>();
-            activeServices = new Dictionary<long, EntityService>();
+            activeServices = new Dictionary<UInt128, EntityService>();
             servicesToAdd = new List<EntityService>();
             servicesToRemove = new List<EntityService>();
             pendingServices = new List<EntityService>();
@@ -45,7 +45,7 @@ namespace Adamantium.EntityFramework
         
         internal void InitializeResources()
         {
-            appService = DependencyResolver.Resolve<IService>();
+            appService = Container.Resolve<IService>();
             appService.Started += OnServiceStarted;
             appService.ShuttingDown += OnServiceShuttingDown;
         }
@@ -93,7 +93,7 @@ namespace Adamantium.EntityFramework
 
         public T[] GetServices<T>() where T : EntityService
         {
-            List<T> list = new List<T>();
+            var list = new List<T>();
             foreach (var service in Services)
             {
                 if (service is T variable)
@@ -156,10 +156,15 @@ namespace Adamantium.EntityFramework
             {
                 foreach (var service in Services)
                 {
+                    if (!service.IsRenderingService) continue;
+                    
                     if (service.BeginDraw())
                     {
+                        OnDrawStarted?.Invoke(service, gameTime);
                         service.Draw(gameTime);
                         service.EndDraw();
+                        OnDrawFinished?.Invoke(service, gameTime);
+                        service.Submit();
                     }
                 }
             }
@@ -222,7 +227,7 @@ namespace Adamantium.EntityFramework
             }
         }
 
-        public void RemoveService(long uid)
+        public void RemoveService(UInt128 uid)
         {
             if (activeServices.TryGetValue(uid, out var service))
             {
@@ -312,54 +317,8 @@ namespace Adamantium.EntityFramework
         public event EventHandler<EntityServiceEventArgs> ServiceAdded;
         public event EventHandler<EntityServiceEventArgs> ServiceRemoved;
 
-        internal struct UpdatePriorityComparer : IComparer<IUpdatable>
-        {
-            public static readonly UpdatePriorityComparer Default = new UpdatePriorityComparer();
+        public event Action<IEntityService, AppTime> OnDrawStarted;
 
-            public int Compare(IUpdatable left, IUpdatable right)
-            {
-                if (Equals(left, right))
-                {
-                    return 0;
-                }
-
-                if (left == null)
-                {
-                    return 1;
-                }
-
-                if (right == null)
-                {
-                    return -1;
-                }
-
-                return left.UpdatePriority.CompareTo(right.UpdatePriority);
-            }
-        }
-
-        internal struct DrawPriorityComparer : IComparer<IDrawable>
-        {
-            public static readonly DrawPriorityComparer Default = new DrawPriorityComparer();
-
-            public int Compare(IDrawable left, IDrawable right)
-            {
-                if (Equals(left, right))
-                {
-                    return 0;
-                }
-
-                if (left == null)
-                {
-                    return 1;
-                }
-
-                if (right == null)
-                {
-                    return -1;
-                }
-
-                return left.DrawPriority.CompareTo(right.DrawPriority);
-            }
-        }
+        public event Action<IEntityService, AppTime> OnDrawFinished; 
     }
 }

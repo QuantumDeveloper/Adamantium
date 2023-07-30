@@ -75,11 +75,8 @@ public class Ellipse : Shape
    {
       if (!IsGeometryValid)
       {
-         base.OnRender(context);
          var destRect = Rect.Deflate(StrokeThickness);
-         context.BeginDraw(this);
          context.DrawEllipse(destRect, Fill, StartAngle, StopAngle, GetPen());
-         context.EndDraw(this);
       }
    }
 }

@@ -49,7 +49,7 @@ namespace Adamantium.Engine.Graphics.Effects
             // By default, all constant buffers are cleared with 0
             BackingBuffer.Clear();
 
-            NativeBuffer = ToDispose(Buffer.Uniform.New(device, BackingBuffer.Size));
+            NativeBuffer = ToDispose(Buffer.Uniform.New(device, (int)BackingBuffer.Size));
 
             // The buffer is considered dirty for the first usage.
             IsDirty = true;

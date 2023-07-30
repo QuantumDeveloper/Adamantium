@@ -55,13 +55,9 @@ public class Polyline : Shape
 
     protected override void OnRender(DrawingContext context)
     {
-        base.OnRender(context);
-        
         var streamContext = StreamGeometry.Open();
         streamContext.BeginFigure(Points[0], true, true).PolylineLineTo(Points.Skip(1), true);
 
-        context.BeginDraw(this);
         context.DrawGeometry(Stroke, StreamGeometry, GetPen());
-        context.EndDraw(this);
     }
 }

@@ -71,7 +71,7 @@ public class Border : Decorator
       if (Child != null)
       {
          var padding = Padding + BorderThickness;
-         base.Arrange(new Rect(finalSize).Deflate(padding));
+         Arrange(new Rect(finalSize).Deflate(padding));
       }
       return finalSize;
    }
@@ -93,9 +93,7 @@ public class Border : Decorator
       combined.Geometry1 = outerGeometry;
       combined.Geometry2 = innerGeometry;
       
-      context.BeginDraw(this);
       context.DrawRectangle(Background, innerRect, CornerRadius);
       context.DrawGeometry(BorderBrush, combined);
-      context.EndDraw(this);
    }
 }

@@ -12,6 +12,7 @@ using Adamantium.UI.AggregatorEvents;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Events;
 using Adamantium.UI.RoutedEvents;
+using Adamantium.UI.Services;
 
 namespace Adamantium.UI.Windows;
 
@@ -19,7 +20,6 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
 {
     private WindowBase window;
     private readonly Dictionary<uint, HandleMessage> messageTable;
-    //private Mutex mutex = Mutex.OpenExisting("adamantiumMutex");
 
     private bool isOverSizeFrame;
     private bool trackMouse;
@@ -35,7 +35,8 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
 
     public Win32WindowWorker()
     {
-        eventAggregator = AdamantiumDependencyResolver.Current.Resolve<IEventAggregator>();
+        eventAggregator = AdamantiumDependencyContainer.Current.Resolve<IEventAggregator>();
+        
         messageTable = new Dictionary<uint, HandleMessage>();
         messageTable[(uint)WindowMessages.Activate] = HandleActivate;
         messageTable[(uint)WindowMessages.Syscommand] = HandleSysCommand;

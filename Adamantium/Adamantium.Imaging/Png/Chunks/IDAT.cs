@@ -14,15 +14,15 @@ namespace Adamantium.Imaging.Png.Chunks
         /// </summary>
         public byte[] RawData { get; set; }
 
-        internal override byte[] GetChunkBytes(PNGState state)
+        internal override byte[] GetChunkBytes(PngState state)
         {
             var bytes = new List<byte>();
-            PNGCompressor compressor = new PNGCompressor();
+            PngCompressor compressor = new PngCompressor();
             var compressedData = new List<byte>();
             var result = compressor.Compress(RawData, state.EncoderSettings, compressedData);
             if (result > 0)
             {
-                throw new PNGEncoderException(result);
+                throw new PngEncoderException(result);
             }
 
             bytes.AddRange(GetNameAsBytes());
@@ -31,7 +31,7 @@ namespace Adamantium.Imaging.Png.Chunks
             return bytes.ToArray();
         }
 
-        internal static IDAT FromState(PNGState state, byte[] rawData)
+        internal static IDAT FromState(PngState state, byte[] rawData)
         {
             var data = new IDAT();
             data.RawData = rawData;

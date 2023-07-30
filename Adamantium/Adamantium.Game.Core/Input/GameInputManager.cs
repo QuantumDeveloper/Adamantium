@@ -70,11 +70,11 @@ namespace Adamantium.Game.Core.Input
             MouseInputs = new List<MouseInput>();
 
             Enabled = true;
-            DependencyResolver.RegisterInstance<GameInputManager>(this);
+            Container.RegisterInstance<GameInputManager>(this);
 
             mouseButtons = new ButtonState[5];
 
-            eventAggregator = DependencyResolver.Resolve<IEventAggregator>();
+            eventAggregator = Container.Resolve<IEventAggregator>();
             eventAggregator.GetEvent<GameOutputRemovedEvent>().Subscribe(GamePlatformWindowRemoved);
             eventAggregator.GetEvent<GameOutputActivatedEvent>().Subscribe(GamePlatformWindowActivated);
             eventAggregator.GetEvent<GameOutputDeactivatedEvent>().Subscribe(GamePlatformWindowDeactivated);

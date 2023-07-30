@@ -16,7 +16,7 @@ namespace Adamantium.Imaging.Png.Chunks
 
         public byte BitDepth { get; set; }
 
-        public PNGColorType ColorType { get; set; }
+        public PngColorType ColorType { get; set; }
 
         public byte CompressionMethod { get; set; }
 
@@ -24,7 +24,7 @@ namespace Adamantium.Imaging.Png.Chunks
 
         public InterlaceMethod InterlaceMethod { get; set; }
 
-        internal override byte[] GetChunkBytes(PNGState state)
+        internal override byte[] GetChunkBytes(PngState state)
         {
             var bytes = new List<byte>();
             bytes.AddRange(GetNameAsBytes());
@@ -39,7 +39,7 @@ namespace Adamantium.Imaging.Png.Chunks
             return bytes.ToArray();
         }
 
-        internal static IHDR FromState(PNGState state, int width, int height)
+        internal static IHDR FromState(PngState state, int width, int height)
         {
             IHDR header = new IHDR();
             header.Width = width;

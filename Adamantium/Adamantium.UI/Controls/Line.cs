@@ -58,12 +58,9 @@ public class Line : Shape
 
    protected override void OnRender(DrawingContext context)
    {
-      base.OnRender(context);
       var start = new Vector2(X1, Y1);
       var end = new Vector2(X2, Y2);
          
-      context.BeginDraw(this);
       context.DrawLine(start, end, GetPen());
-      context.EndDraw(this);
    }
 }

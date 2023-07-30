@@ -22,7 +22,7 @@ namespace Adamantium.Imaging.Jpeg.IO
         public byte GetNextMarker()
         {
             try { while (true) { ReadJpegByte(); } }
-            catch (JPEGMarkerFoundException ex)
+            catch (JpegMarkerFoundException ex)
             {
                 return ex.Marker;
             }
@@ -100,7 +100,7 @@ namespace Adamantium.Imaging.Jpeg.IO
                 {
                     // Otherwise we've found a new marker.
                     marker = c;
-                    throw new JPEGMarkerFoundException(marker);
+                    throw new JpegMarkerFoundException(marker);
                 }
             }
 

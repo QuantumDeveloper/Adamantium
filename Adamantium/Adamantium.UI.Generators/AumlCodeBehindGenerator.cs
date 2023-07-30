@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -15,8 +16,6 @@ namespace Adamantium.UI.Generators
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
             var aumlFiles = context.AdditionalTextsProvider.Where(file => file.Path.EndsWith(".xml"));
-
-            //Debugger.Launch();
 
             // read their contents and save their name
             var namesAndContents = aumlFiles.Select((text, cancellationToken) => (
@@ -116,6 +115,196 @@ namespace Adamantium.UI.Generators
             return GenerateSources(metaContainer, compilation);
         }
 
+        private string ProcessElements(AumlMetadataContainer container, IAumlAstNode currentNode, TextGenerator textGenerator, ref int id)
+        {
+            var element = currentNode as AumlAstObjectNode;
+            string elementName = string.Empty;
+
+            var typeContainer = container.TypesMap[element.Type.Namespace];
+            var typeInfo = typeContainer.Types.FirstOrDefault(x => x.Name == element.Type.Name);
+            var properties = element.GetProperties();
+            var objects = element.GetObjects();
+
+            if (element != container.RootNode)
+            {
+                if (container.NamedElementsMap.TryGetValue(element, out var name))
+                {
+                    elementName = name;
+                    textGenerator.WriteLine($"{elementName} = new {typeInfo.ToDisplayString()}();");
+                }
+                else
+                {
+                    elementName = $"element_{id}";
+                    textGenerator.WriteLine($"var {elementName} = new {typeInfo.ToDisplayString()}();");
+                    id++;
+                }
+            }
+
+            foreach (var prop in properties)
+            {
+                var propertyRef = prop.Property as AumlAstPropertyReference;
+
+                if (propertyRef.IsAttachedProperty)
+                {
+                    var types = container.TypesMap[propertyRef.OwnerType.Namespace];
+                    var attachedTypeInfo = types.Types.FirstOrDefault(x => x.Name == propertyRef.OwnerType.Name);
+                    //var symbolInfo = typeInfo.GetMemberByName(propertyRef.Name);
+                    //if (symbolInfo.Kind == SymbolKind.Property)
+                    {
+                        textGenerator.WriteLine($"{propertyRef.OwnerType.Name}.Set{propertyRef.Name}({elementName}, {prop.GetTextValue()});");
+                    }
+                }
+                else
+                {
+                    var symbolInfo = typeInfo.GetMemberByName(propertyRef.Name);
+                    string symbolName = string.Empty;
+
+                    symbolName = string.IsNullOrEmpty(elementName) ? propertyRef.Name : $"{elementName}.{propertyRef.Name}";
+
+                    if (symbolInfo.Kind == SymbolKind.Event)
+                    {
+                        if (prop.Values.Count != 1)
+                        {
+                            // Here we need to throw exception because we cannot have more than 1 subscription per 1 event for one property
+                            break;
+                        }
+                        else
+                        {
+                            textGenerator.WriteLine($"{symbolName} += {prop.GetTextValue()};");
+                        }
+                    }
+                    else if (symbolInfo.Kind == SymbolKind.Property)
+                    {
+                        var objectNodes = new List<IAumlAstValueNode>();
+                        foreach (var value in prop.Values)
+                        {
+                            var propertyInfo = (IPropertySymbol)symbolInfo;
+                            if (value.IsTextNode()) // Value is simple text
+                            {
+                                switch (propertyInfo.Type.SpecialType)
+                                {
+                                    case SpecialType.System_String:
+                                        textGenerator.WriteLine($@"{symbolName} = ""{prop.GetTextValue()}"";");
+                                        break;
+
+                                    case SpecialType.None:
+                                        if (propertyInfo.Type.TypeKind == TypeKind.Enum)
+                                        {
+                                            textGenerator.WriteLine($@"{symbolName} = {propertyInfo.Type.Name}.{prop.GetTextValue()};");
+                                        }
+                                        else
+                                        {
+                                            if (propertyInfo.Type.Name == "ImageSource")
+                                            {
+                                                textGenerator.WriteLine($"{symbolName} = new BitmapImage(new Uri(@\"file://{prop.GetTextValue()}\"));");
+                                            }
+                                            else if (propertyInfo.Type.Name == "ColumnDefinitions" || propertyInfo.Type.Name == "RowDefinitions")
+                                            {
+                                                var definitions = value.ToString().Split(new char[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+
+                                                foreach (var def in definitions)
+                                                {
+                                                    if (propertyInfo.Type.Name == "ColumnDefinitions")
+                                                    {
+                                                        textGenerator.WriteLine($@"{symbolName}.Add(new ColumnDefinition(GridLength.Parse(""{def}"")));");
+                                                    }
+                                                    else if (propertyInfo.Type.Name == "RowDefinitions")
+                                                    {
+                                                        textGenerator.WriteLine($@"{symbolName}.Add(new RowDefinition(GridLength.Parse(""{def}"")));");
+                                                    }
+                                                }
+                                            }
+                                            else
+                                            {
+                                                textGenerator.WriteLine($@"{symbolName} = {propertyInfo.Type.Name}.Parse(""{prop.GetTextValue()}"");");
+                                            }
+                                        }
+                                        break;
+                                    case SpecialType.System_Enum:
+                                        textGenerator.WriteLine($@"{symbolName} = {propertyInfo.Type.Name}.{prop.GetTextValue()};");
+                                        break;
+                                    case SpecialType.System_Boolean:
+                                        textGenerator.WriteLine($@"{symbolName} = {prop.GetTextValue().ToLower()};");
+                                        break;
+                                    default:
+                                        textGenerator.WriteLine($@"{symbolName} = {prop.GetTextValue()};");
+                                        break;
+                                }
+                            }
+                            else // Value is Object node
+                            {
+                                objectNodes.Add(value);
+                            }
+                        }
+
+                        foreach (var objectNode in objectNodes)
+                        {
+                            if (objectNode is AumlAstObjectNode)
+                            {
+                                var name = ProcessElements(container, objectNode, textGenerator, ref id);
+
+                                textGenerator.WriteLine($"{symbolName} = {name};");
+                            }
+                        }
+                    }
+                }
+            }
+
+            foreach (var obj in objects)
+            {
+                //stack.Push(obj);
+                var name = ProcessElements(container, obj, textGenerator, ref id);
+
+                var isIContainer = typeInfo.ImplementsInterface("IContainer");
+                if (typeInfo.FindAttributeByName("ContentAttribute", out var property))
+                {
+
+                }
+
+                if (isIContainer)
+                {
+                    if (!string.IsNullOrEmpty(elementName))
+                    {
+                        textGenerator.WriteLine($"((IContainer){elementName}).AddOrSetChildComponent({name});");
+                    }
+                    else
+                    {
+                        textGenerator.WriteLine($"((IContainer)this).AddOrSetChildComponent({name});");
+                    }
+                }
+                else
+                {
+
+                    var isCollection = property.Type.AllInterfaces.FirstOrDefault(x => x.Name.StartsWith("ICollection") || x.Name.StartsWith("IList")) != null;
+                    if (isCollection)
+                    {
+                        if (!string.IsNullOrEmpty(elementName))
+                        {
+                            textGenerator.WriteLine($"{elementName}.{property.Name}.Add({name});");
+                        }
+                        else
+                        {
+                            textGenerator.WriteLine($"{property.Name}.Add({name});");
+                        }
+                    }
+                    else
+                    {
+                        if (!string.IsNullOrEmpty(elementName))
+                        {
+                            textGenerator.WriteLine($"{elementName}.{property.Name} = {name};");
+                        }
+                        else
+                        {
+                            textGenerator.WriteLine($"{property.Name} = {name};");
+                        }
+                    }
+
+                }
+            }
+
+            return elementName;
+        }
+
         private string GenerateSources(AumlMetadataContainer container, Compilation compilation)
         {
             var rootNode = container.RootNode as AumlAstObjectNode;
@@ -175,166 +364,6 @@ namespace Adamantium.UI.Generators
             textGenerator.UnindentAndWriteCloseBrace();
 
             return textGenerator;
-        }
-
-        private string ProcessElements(AumlMetadataContainer container, IAumlAstNode currentNode, TextGenerator textGenerator, ref int id)
-        {
-            var element = currentNode as AumlAstObjectNode;
-            string elementName = string.Empty;
-
-            var typeContainer = container.TypesMap[element.Type.Namespace];
-            var typeInfo = typeContainer.Types.FirstOrDefault(x => x.Name == element.Type.Name);
-            var properties = element.GetProperties();
-            var objects = element.GetObjects();
-
-            if (element != container.RootNode)
-            {
-                if (container.NamedElementsMap.TryGetValue(element, out var name))
-                {
-                    elementName = name;
-                    textGenerator.WriteLine($"{elementName} = new {typeInfo.ToDisplayString()}();");
-                }
-                else
-                {
-                    elementName = $"element_{id}";
-                    textGenerator.WriteLine($"var {elementName} = new {typeInfo.ToDisplayString()}();");
-                    id++;
-                }
-            }
-
-            foreach (var prop in properties)
-            {
-                var propertyRef = prop.Property as AumlAstPropertyReference;
-                var symbolInfo = typeInfo.GetMemberByName(propertyRef.Name);
-                string symbolName = string.Empty;
-
-                if (string.IsNullOrEmpty(elementName))
-                {
-                    symbolName = propertyRef.Name;
-                }
-                else
-                {
-                    symbolName = $"{elementName}.{propertyRef.Name}";
-                }
-
-                if (symbolInfo.Kind == SymbolKind.Event)
-                {
-                    if (prop.Values.Count != 1)
-                    {
-                        // Here we need to throw exception because we cannot have more than 1 subscription per 1 event for one property
-                        break;
-                    }
-                    else
-                    {
-                        textGenerator.WriteLine($"{symbolName} += {prop.GetTextValue()};");
-                    }
-                }
-                else if (symbolInfo.Kind == SymbolKind.Property)
-                {
-                    var objectNodes = new List<IAumlAstValueNode>();
-                    foreach (var value in prop.Values)
-                    {
-                        var propertyInfo = (IPropertySymbol)symbolInfo;
-                        if (value.IsTextNode()) // Value is simple text
-                        {
-                            switch (propertyInfo.Type.SpecialType)
-                            {
-                                case SpecialType.System_String:
-                                    textGenerator.WriteLine($@"{symbolName} = ""{prop.GetTextValue()}"";");
-                                    break;
-
-                                case SpecialType.None:
-                                    if (propertyInfo.Type.TypeKind == TypeKind.Enum)
-                                    {
-                                        textGenerator.WriteLine($@"{symbolName} = {propertyInfo.Type.Name}.{prop.GetTextValue()};");
-                                    }
-                                    else
-                                    {
-                                        textGenerator.WriteLine($@"{symbolName} = {propertyInfo.Type.Name}.Parse(""{prop.GetTextValue()}"");");
-                                    }
-                                    break;
-                                case SpecialType.System_Enum:
-                                    textGenerator.WriteLine($@"{symbolName} = {propertyInfo.Type.Name}.{prop.GetTextValue()};");
-                                    break;
-                                case SpecialType.System_Boolean:
-                                    textGenerator.WriteLine($@"{symbolName} = {prop.GetTextValue().ToLower()};");
-                                    break;
-                                default:
-                                    textGenerator.WriteLine($@"{symbolName} = {prop.GetTextValue()};");
-                                    break;
-                            }
-                        }
-                        else // Value is Object node
-                        {
-                            objectNodes.Add(value);
-                        }
-                    }
-
-                    foreach (var objectNode in objectNodes)
-                    {
-                        if (objectNode is AumlAstObjectNode)
-                        {
-                            var name = ProcessElements(container, objectNode, textGenerator, ref id);
-
-                            textGenerator.WriteLine($"{symbolName} = {name};");
-                        }
-                    }
-                }
-            }
-
-            foreach (var obj in objects)
-            {
-                //stack.Push(obj);
-                var name = ProcessElements(container, obj, textGenerator, ref id);
-
-                var isIContainer = typeInfo.ImplementsInterface("IContainer");
-                if (typeInfo.FindAttributeByName("ContentAttribute", out var property))
-                {
-
-                }
-
-                if (isIContainer)
-                {
-                    if (!string.IsNullOrEmpty(elementName))
-                    {
-                        textGenerator.WriteLine($"((IContainer){elementName}).AddOrSetChildComponent({name});");
-                    }
-                    else
-                    {
-                        textGenerator.WriteLine($"((IContainer)this).AddOrSetChildComponent({name});");
-                    }
-                }
-                else
-                {
-
-                    var isCollection = property.Type.AllInterfaces.FirstOrDefault(x => x.Name.StartsWith("ICollection") || x.Name.StartsWith("IList")) != null;
-                    if (isCollection)
-                    {
-                        if (!string.IsNullOrEmpty(elementName))
-                        {
-                            textGenerator.WriteLine($"{elementName}.{property.Name}.Add({name});");
-                        }
-                        else
-                        {
-                            textGenerator.WriteLine($"{property.Name}.Add({name});");
-                        }
-                    }
-                    else
-                    {
-                        if (!string.IsNullOrEmpty(elementName))
-                        {
-                            textGenerator.WriteLine($"{elementName}.{property.Name} = {name};");
-                        }
-                        else
-                        {
-                            textGenerator.WriteLine($"{property.Name} = {name};");
-                        }
-                    }
-
-                }
-            }
-
-            return elementName;
         }
     }
 }

@@ -1,5 +1,5 @@
-﻿using System;
-using Adamantium.Core;
+﻿using Adamantium.Core;
+using Adamantium.Core.Events;
 using Adamantium.Engine.Graphics;
 using Adamantium.Game.Core.Input;
 using Adamantium.Game.Core.Payloads;
@@ -19,6 +19,8 @@ namespace Adamantium.Game.Core
         internal int OutputId = 1;
 
         public GraphicsDevice GraphicsDevice { get; private set; }
+        
+        protected IEventAggregator EventAggregator { get; }
 
         /// <summary>
         /// Contains <see cref="GameOutput"/> description
@@ -69,8 +71,9 @@ namespace Adamantium.Game.Core
         /// <summary>
         /// Initializes <see cref="GameOutput"/>
         /// </summary>
-        protected GameOutput()
+        protected GameOutput(IEventAggregator eventAggregator)
         {
+            EventAggregator = eventAggregator;
             Viewport = new Viewport();
             Viewport.MaxDepth = 1.0f;
             Scissor = new Rect2D();
@@ -93,11 +96,15 @@ namespace Adamantium.Game.Core
 
         public Viewport Viewport { get; protected set; }
 
+        public virtual void CopyOutput(GraphicsDevice mainDevice)
+        {
+        }
+
         public void DisplayContent()
         {
             if (IsUpToDate())
             {
-                GraphicsDevice.Present(Description);
+                GraphicsDevice.Present();
             }
         }
 
@@ -105,6 +112,12 @@ namespace Adamantium.Game.Core
         {
             GraphicsDevice = graphicsDevice;
             ClearState();
+            OnDeviceSet();
+        }
+
+        protected virtual void OnDeviceSet()
+        {
+            
         }
 
         internal Boolean ResizeRequested { get; set; }
@@ -131,29 +144,30 @@ namespace Adamantium.Game.Core
         {
         }
 
-        public static GameOutput New(GameContext gameContext)
+        public static GameOutput New(IEventAggregator eventAggregator, GameContext gameContext)
         {
             if (gameContext.ContextType == GameContextType.RenderTargetPanel)
             {
-                return new RenderTargetGameOutput(gameContext);
+                return new RenderTargetGameOutput(eventAggregator, gameContext);
             }
             else if (gameContext.ContextType == GameContextType.Window)
             {
-                return new AdamantiumGameOutput(gameContext);
+                return new AdamantiumGameOutput(eventAggregator, gameContext);
             }
             throw new NotSupportedException(gameContext.ContextType + " game context is not currently supported");
         }
 
-        public static GameOutput NewWindow(uint width, uint height)
+        public static GameOutput NewWindow(IEventAggregator eventAggregator, uint width, uint height)
         {
             var wnd = new Window();
             wnd.Width = width;
             wnd.Height = height;
-            return new AdamantiumGameOutput(new GameContext(wnd));
+            return new AdamantiumGameOutput(eventAggregator, new GameContext(wnd));
         }
 
 
         internal static GameOutput New(
+            IEventAggregator eventAggregator,
             GameContext gameContext, 
             SurfaceFormat pixelFormat, 
             DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24, 
@@ -161,7 +175,7 @@ namespace Adamantium.Game.Core
         {
             if (gameContext.ContextType == GameContextType.RenderTargetPanel)
             {
-                return new RenderTargetGameOutput(gameContext, pixelFormat, depthFormat, msaaLevel);
+                return new RenderTargetGameOutput(eventAggregator, gameContext, pixelFormat, depthFormat, msaaLevel);
             }
             throw new NotSupportedException(gameContext.ContextType + " game context is not currently supported");
         }
@@ -244,7 +258,7 @@ namespace Adamantium.Game.Core
         /// <param name="reason"></param>
         internal void OnWindowParametersChanging(ChangeReason reason)
         {
-            ParametersChanging?.Invoke(new GameOutputParametersPayload(this, reason));
+            ParametersChanging?.Invoke(new GameOutputParametersPayload(this, Description, reason));
         }
 
         /// <summary>
@@ -253,7 +267,7 @@ namespace Adamantium.Game.Core
         /// <param name="reason"></param>
         internal void OnWindowParametersChanged(ChangeReason reason)
         {
-            ParametersChanged?.Invoke(new GameOutputParametersPayload(this, reason));
+            ParametersChanged?.Invoke(new GameOutputParametersPayload(this, Description, reason));
         }
 
         /// <summary>
@@ -306,6 +320,11 @@ namespace Adamantium.Game.Core
             base.Dispose(disposeManagedResources);
         }
 
+        protected void RaiseSizeChangedEvent(GameOutputSizeChangedPayload payload)
+        {
+            SizeChanged?.Invoke(payload);
+        }
+
 
         public virtual UInt32 Width
         {
@@ -315,7 +334,7 @@ namespace Adamantium.Game.Core
                 if (Description.Width != value)
                 {
                     Description.Width = value;
-                    ResizeRequested = true;
+                    //ResizeRequested = true;
                     RaisePropertyChanged();
                 }
             }
@@ -329,7 +348,7 @@ namespace Adamantium.Game.Core
                 if (Description.Height != value)
                 {
                     Description.Height = value;
-                    ResizeRequested = true;
+                    //ResizeRequested = true;
                     RaisePropertyChanged();
                 }
             }

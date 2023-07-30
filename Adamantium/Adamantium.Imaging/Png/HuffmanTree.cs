@@ -340,7 +340,7 @@ namespace Adamantium.Imaging.Png
             }
             else
             {
-                BPMLists lists = new BPMLists();
+                BpmLists lists = new BpmLists();
                 BPMNode node = null;
 
                 BPMNode.Sort(ref leaves, numpresent);

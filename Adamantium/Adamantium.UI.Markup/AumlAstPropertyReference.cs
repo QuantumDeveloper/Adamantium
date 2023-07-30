@@ -8,11 +8,15 @@ public class AumlAstPropertyReference : AumlAstNode
     
     public string Name { get; set; }
     
-    public AumlAstPropertyReference(IAumlLineInfo info, 
+    public bool IsAttachedProperty { get; set; }
+    
+    public AumlAstPropertyReference(IAumlLineInfo info,
+        bool isAttachedProperty,
         IAumlAstTypeReference ownerType,
         IAumlAstTypeReference targetType,
         string name) : base(info)
     {
+        IsAttachedProperty = isAttachedProperty;
         OwnerType = ownerType;
         TargetType = targetType;
         Name = name;

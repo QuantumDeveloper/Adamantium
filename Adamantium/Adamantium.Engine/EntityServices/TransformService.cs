@@ -23,6 +23,9 @@ namespace Adamantium.Engine.EntityServices
             
         }
 
+        public override bool IsUpdateService => true;
+        public override bool IsRenderingService => false;
+
         public override void Initialize()
         {
             tools = EntityWorld.DependencyResolver.Resolve<ToolsManager>();

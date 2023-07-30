@@ -104,18 +104,22 @@ public class ParserContext
             {
                 var propName = attribute.Name.LocalName;
                 var ownerType = objectNode.Type;
+                bool isAttachedProperty = false;
 
                 // check does we faced with using of attached property or attached event
                 if (propName.Contains('.'))
                 {
+                    isAttachedProperty = true;
                     var names = propName.Split('.');
                     propName = names[1];
+                    // TODO we need to correctly get namespace for attached types.
+                    // It will not work if attached property will not be from Adamantium.UI assembly
                     var ns = GetNamespaceForAttribute(attribute, element);
-                    ownerType = new AumlAstXmlTypeReference(element.ToLineInfo(), ns, propName);
+                    ownerType = new AumlAstXmlTypeReference(element.ToLineInfo(), type.Namespace, names[0]);
                 }
 
                 var propertyNode = new AumlAstPropertyNode(element.ToLineInfo(), 
-                    new AumlAstPropertyReference(attribute.ToLineInfo(), ownerType, type, propName),
+                    new AumlAstPropertyReference(attribute.ToLineInfo(), isAttachedProperty, ownerType, type, propName),
                     ParseTextOrMarkupExtension(attribute.Value, element, attribute.ToLineInfo()));
                 objectNode.Children.Add(propertyNode);
             }
@@ -130,6 +134,7 @@ public class ParserContext
                     elNode.ToLineInfo(),
                     new AumlAstPropertyReference(
                         elNode.ToLineInfo(),
+                        false,
                         new AumlAstXmlTypeReference(elNode.ToLineInfo(), elNode.Name.NamespaceName, names[1]),
                         type,
                         names[1]),

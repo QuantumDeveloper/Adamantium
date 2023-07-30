@@ -13,8 +13,8 @@ public abstract class GameManagerBase : PropertyChangedBase
     {
         Game = game;
         EntityWorld = game.EntityWorld;
-        DependencyResolver = game.Resolver;
-        EventAggregator = DependencyResolver.Resolve<IEventAggregator>();
+        Container = game.Container;
+        EventAggregator = Container.Resolve<IEventAggregator>();
     }
 
     public bool Enabled
@@ -27,7 +27,7 @@ public abstract class GameManagerBase : PropertyChangedBase
     
     protected EntityWorld EntityWorld { get; }
     
-    protected IDependencyResolver DependencyResolver { get; }
+    protected IDependencyContainer Container { get; }
     
     protected IEventAggregator EventAggregator { get; }
 

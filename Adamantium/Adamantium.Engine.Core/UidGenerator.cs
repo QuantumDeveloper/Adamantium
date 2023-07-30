@@ -17,13 +17,13 @@ namespace Adamantium.Engine.Core
         /// Generate unique int64 number that can be used as UID
         /// </summary>
         /// <returns></returns>
-        public static Int64 Generate()
+        public static UInt128 Generate()
         {
             lock (syncObject)
             {
                 var randomData = new byte[length];
                 RandomGenerator.GetNonZeroBytes(randomData);
-                return BitConverter.ToInt64(randomData, 0);
+                return (UInt128)BitConverter.ToInt64(randomData, 0);
             }
         }
     }

@@ -1,4 +1,5 @@
 ﻿using Adamantium.UI;
+using System;
 
 namespace Adamantium.Game.Playground;
 
@@ -7,9 +8,9 @@ class Program
     static void Main(string[] args)
     {
         var game = new AdamantiumGameApplication();
-        var wnd = new Window();
-        wnd.Width = 1280;
-        wnd.Height = 720;
-        game.Run(wnd);
+        game.IsFixedTimeStep = false;
+        game.DesiredFPS = 300;
+        game.StartupUri = new Uri("MainWindow.xml", UriKind.RelativeOrAbsolute);
+        game.Run();
     }
 }
