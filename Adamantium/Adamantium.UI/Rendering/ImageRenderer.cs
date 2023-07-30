@@ -8,7 +8,7 @@ namespace Adamantium.UI.Rendering;
 
 internal class ImageRenderer : GeometryRenderer
 {
-    public ImageRenderer(GraphicsDevice device, Mesh mesh, Brush brush, ImageSource image) : base(device, mesh, brush)
+    public ImageRenderer(GraphicsDevice device, Geometry geometry, Brush brush, ImageSource image) : base(device, geometry, brush)
     {
         Image = image;
     }

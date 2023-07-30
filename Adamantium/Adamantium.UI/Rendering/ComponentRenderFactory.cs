@@ -7,14 +7,14 @@ namespace Adamantium.UI.Rendering;
 
 internal static class ComponentRenderFactory
 {
-    public static GeometryRenderer CreateGeometryRenderer(GraphicsDevice device, Mesh mesh, Brush brush)
+    public static GeometryRenderer CreateGeometryRenderer(GraphicsDevice device, Geometry geometry, Brush brush)
     {
-        return new GeometryRenderer(device, mesh, brush);
+        return new GeometryRenderer(device, geometry, brush);
     }
 
-    public static ImageRenderer CreateImageRenderer(GraphicsDevice device, Mesh mesh, Brush brush,
+    public static ImageRenderer CreateImageRenderer(GraphicsDevice device, Geometry geometry, Brush brush,
         ImageSource image)
     {
-        return new ImageRenderer(device, mesh, brush, image);
+        return new ImageRenderer(device, geometry, brush, image);
     }
 }

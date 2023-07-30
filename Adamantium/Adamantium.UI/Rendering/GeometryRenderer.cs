@@ -11,8 +11,10 @@ namespace Adamantium.UI.Rendering;
 
 internal class GeometryRenderer : ComponentRenderer
 {
-    public GeometryRenderer(GraphicsDevice device, Mesh mesh, Brush brush) : base(brush)
+    public GeometryRenderer(GraphicsDevice device, Geometry geometry, Brush brush) : base(brush)
     {
+        Geometry = geometry;
+        var mesh = geometry.Mesh;
         var vertices = mesh?.ToMeshVertices();
         if (vertices != null)
         {
@@ -28,6 +30,8 @@ internal class GeometryRenderer : ComponentRenderer
         if (mesh != null) PrimitiveType = mesh.MeshTopology;
         Brush = brush;
     }
+    
+    public Geometry Geometry { get; }
     
     public Buffer VertexBuffer { get; set; }
         
