@@ -8,7 +8,6 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using Adamantium.Imaging.Jpeg.IO;
-using AdamantiumVulkan.Core;
 
 namespace Adamantium.Imaging.Jpeg.Decoder
 {

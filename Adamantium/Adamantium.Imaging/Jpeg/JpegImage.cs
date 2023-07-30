@@ -24,12 +24,7 @@ public class JpegImage : IRawBitmap
     public uint FramesCount => (uint)_frames.Count;
     public byte[] GetRawPixels(uint frameIndex)
     {
-        if (FramesCount == 1)
-        {
-            return _frames[0].PixelData;
-        }
-
-        return _frames[(int)frameIndex].PixelData;
+        return FramesCount == 1 ? _frames[0].PixelData : _frames[(int)frameIndex].PixelData;
     }
 
     internal void AddFrame(JpegFrame frame)
@@ -37,9 +32,9 @@ public class JpegImage : IRawBitmap
         _frames.Add(frame);
     }
 
-    public MipLevelData GetMipLevelData(uint mipLevel)
+    public FrameData GetMipLevelData(uint mipLevel)
     {
-        return new MipLevelData(GetImageDescription(), 0) { Pixels = GetRawPixels(0) };
+        return GetFrameData(0);
     }
 
     public ImageDescription GetImageDescription()

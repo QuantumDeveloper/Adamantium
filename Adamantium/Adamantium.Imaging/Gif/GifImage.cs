@@ -9,7 +9,6 @@ namespace Adamantium.Imaging.Gif
     public class GifImage : IRawBitmap
     {
         private readonly List<GifFrame> frames;
-        private MipLevelData _defaultMipLevelData;
         
         public GifImage()
         {
@@ -170,9 +169,9 @@ namespace Adamantium.Imaging.Gif
             return DecodeFrame(frameIndex);
         }
 
-        public MipLevelData GetMipLevelData(uint mipLevel)
+        public FrameData GetMipLevelData(uint mipLevel)
         {
-            return _defaultMipLevelData ??= new MipLevelData(GetImageDescription(), 0, GetRawPixels(0));
+            return GetFrameData(0);
         }
 
         public ImageDescription GetImageDescription()

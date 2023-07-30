@@ -35,9 +35,9 @@ public class BmpImage : IRawBitmap
         return PixelData;
     }
 
-    public MipLevelData GetMipLevelData(uint mipLevel)
+    public FrameData GetMipLevelData(uint mipLevel)
     {
-        return new MipLevelData(GetImageDescription(), 0, GetRawPixels(0));
+        return GetFrameData(0);
     }
 
     public ImageDescription GetImageDescription()

@@ -5,7 +5,7 @@
         Width="1280"
         Height="720">
     <RenderTargetPanel x:Name="TestGrid1" 
-					   ColumnDefinitions="Auto, *, Auto">
+					   ColumnDefinitions="Auto, Auto, Auto">
 		<!--<Path StrokeThickness="2" -->
 <!--              Fill="Yellow"-->
 <!--              Name="Path1"-->
@@ -45,20 +45,22 @@
 <!--        />-->
         <Image Grid.Column="0" 
 			   HorizontalAlignment="Center"
-               VerticalAlignment="Center"
+               VerticalAlignment="Top"
                CornerRadius="6"
-               Source="Textures\elephant.png"
+               Source="Textures\luxfon.tga"
         />
 		<Image Grid.Column="1" 
 			   HorizontalAlignment="Center"
-               VerticalAlignment="Center"
+               VerticalAlignment="Bottom"
                CornerRadius="6"
+			   Delay="25"
                Source="Textures\infinity.gif"
         />
 		<Image Grid.Column="2" 
 			   HorizontalAlignment="Center"
                VerticalAlignment="Center"
                CornerRadius="6"
+			   Delay="25"
                Source="Textures\APNG-cube.png"
         />
     </RenderTargetPanel>

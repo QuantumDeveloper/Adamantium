@@ -7,21 +7,16 @@ namespace Adamantium.Imaging.Gif
 {
     public static class GIFHelper
     {
-        public static unsafe Image LoadFromMemory(IntPtr pSource, int size, bool makeACopy, GCHandle? handle)
+        public static unsafe IRawBitmap LoadFromMemory(IntPtr pSource, long size)
         {
             var stream = new UnmanagedMemoryStream((byte*)pSource, size);
 
             var decoder = new GifDecoder();
             var gifImage = decoder.Decode(stream);
-            var img = Image.New(gifImage.GetImageDescription(), gifImage);
-            var data = gifImage.DecodeFrame(0);
-            handle = GCHandle.Alloc(data, GCHandleType.Pinned);
-            Utilities.CopyMemory(img.pixelBuffers[0].DataPointer, handle.Value.AddrOfPinnedObject(), data.Length);
-            handle?.Free();
-            return img;
+            return gifImage;
         }
 
-        public static unsafe void SaveToStream(GifImage image, Stream imageStream)
+        public static void SaveToStream(IRawBitmap image, Stream imageStream)
         {
             GifEncoder encoder = new GifEncoder();
             encoder.Encode(image, imageStream);

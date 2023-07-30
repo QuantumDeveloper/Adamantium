@@ -5,9 +5,9 @@ using System;
 
 namespace Adamantium.Imaging.Jpeg.IO
 {
-    internal class JPEGMarkerFoundException : Exception
+    internal class JpegMarkerFoundException : Exception
     {
-        public JPEGMarkerFoundException(byte marker) { Marker = marker; }
+        public JpegMarkerFoundException(byte marker) { Marker = marker; }
         public byte Marker;
     }
 }

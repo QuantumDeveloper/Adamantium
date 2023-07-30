@@ -3,20 +3,20 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Adamantium.Core;
+using Adamantium.Imaging.Bmp;
 using Adamantium.Imaging.Dds;
 using Adamantium.Imaging.Gif;
 using Adamantium.Imaging.Ico;
 using Adamantium.Imaging.Jpeg;
 using Adamantium.Imaging.Png;
-using Adamantium.Imaging.Png.IO;
 using Adamantium.Imaging.Tga;
+using Adamantium.Imaging.Tiff;
 
 namespace Adamantium.Imaging;
 
 public static class BitmapLoader
 {
     public delegate IRawBitmap ImageLoadDelegate(IntPtr dataPointer, long dataSize);
-
     public delegate void ImageSaveDelegate(IRawBitmap image, Stream imageStream);
     
     private static readonly List<LoadSaveDelegates> _loadSaveDelegates;
@@ -24,14 +24,14 @@ public static class BitmapLoader
     static BitmapLoader()
     {
         _loadSaveDelegates = new List<LoadSaveDelegates>();
-        Register(ImageFileType.Gif, LoadGif, SaveGif);
-        Register(ImageFileType.Png, LoadPng, null);
-        Register(ImageFileType.Bmp, LoadBmp, null);
-        Register(ImageFileType.Dds, LoadDds, null);
-        Register(ImageFileType.Ico, LoadIco, null);
-        Register(ImageFileType.Jpg, LoadJpg, null);
-        Register(ImageFileType.Tga, LoadTga, null);
-        Register(ImageFileType.Tiff, LoadTiff, null);
+        Register(ImageFileType.Gif, GIFHelper.LoadFromMemory, GIFHelper.SaveToStream);
+        Register(ImageFileType.Png, PngHelper.LoadFromMemory, PngHelper.SaveToStream);
+        Register(ImageFileType.Bmp, BmpHelper.LoadFromMemory, BmpHelper.SaveToStream);
+        Register(ImageFileType.Dds, DdsHelper.LoadFromMemory, DdsHelper.SaveToStream);
+        Register(ImageFileType.Ico, IcoHelper.LoadFromMemory, IcoHelper.SaveToStream);
+        Register(ImageFileType.Jpg, JpegHelper.LoadFromMemory, JpegHelper.SaveToStream);
+        Register(ImageFileType.Tga, TgaHelper.LoadFromMemory, TgaHelper.SaveToStream);
+        Register(ImageFileType.Tiff, TiffHelper.LoadFromMemory, TiffHelper.SaveToStream);
     }
 
     public static void Register(ImageFileType imageType, ImageLoadDelegate loadDelegate, ImageSaveDelegate saveDelegate)
@@ -40,99 +40,43 @@ public static class BitmapLoader
         _loadSaveDelegates.Add(loader);
     }
     
-    public static unsafe IRawBitmap LoadGif(IntPtr dataPointer, long dataSize)
-    {
-        var stream = new UnmanagedMemoryStream((byte*)dataPointer, dataSize);
-        var decoder = new GifDecoder();
-        var img = decoder.Decode(stream);
-        return img;
-    }
-
-    public static void SaveGif(IRawBitmap image, Stream imageStream)
-    {
-        GIFHelper.SaveToStream((GifImage)image, imageStream);
-    }
-    
-    public static IRawBitmap LoadPng(IntPtr dataPointer, long dataSize)
-    {
-        var stream = new PNGStreamReader(dataPointer, dataSize);
-        var decoder = new PngDecoder(stream);
-        return decoder.Decode();
-    }
-    
-    public static IRawBitmap LoadDds(IntPtr dataPointer, long dataSize)
-    {
-        return DdsHelper.LoadFromMemory(dataPointer, dataSize, false, null);
-    }
-    
-    public static IRawBitmap LoadJpg(IntPtr dataPointer, long dataSize)
-    {
-        return JpegHelper.LoadFromMemory(dataPointer, dataSize);
-    }
-    
-    public static IRawBitmap LoadBmp(IntPtr dataPointer, long dataSize)
-    {
-        return Bmp.BitmapHelper.LoadFromMemory(dataPointer, (ulong)dataSize, false, null);
-    }
-    
-    public static IRawBitmap LoadIco(IntPtr dataPointer, long dataSize)
-    {
-        return IcoHelper.LoadFromMemory(dataPointer, dataSize);
-    }
-    
-    public static IRawBitmap LoadTga(IntPtr dataPointer, long dataSize)
-    {
-        return TgaHelper.LoadFromMemory(dataPointer, dataSize);
-    }
-    
-    public static IRawBitmap LoadTiff(IntPtr dataPointer, long dataSize)
-    {
-        return null;
-    }
-    
-    public static unsafe IRawBitmap Load(string fileName)
+    public static IRawBitmap Load(string fileName)
     {
         if (string.IsNullOrEmpty(fileName))
         {
             throw new ArgumentNullException(nameof(fileName));
         }
 
-        FileStream stream = null;
+        using (var stream = new FileStream(fileName, FileMode.Open, FileAccess.Read))
+        {
+            return Load(stream);
+        }
+    }
+
+    public static unsafe IRawBitmap Load(Stream stream)
+    {
         IntPtr memoryPtr = IntPtr.Zero;
-        long size = 0;
         try
         {
-            stream = new FileStream(fileName, FileMode.Open, FileAccess.Read);
-            
-            size = stream.Length;
+            var size = stream.Length;
             memoryPtr = Utilities.AllocateMemory((int)size);
             var bytes = new Span<byte>(memoryPtr.ToPointer(), (int)size);
             stream.Read(bytes);
-        }
-        catch (Exception)
-        {
-            if (memoryPtr != IntPtr.Zero)
-                Utilities.FreeMemory(memoryPtr);
-            throw;
+            return Load(memoryPtr, size);
         }
         finally
         {
             try
             {
                 stream?.Dispose();
+                if (memoryPtr != IntPtr.Zero)
+                    Utilities.FreeMemory(memoryPtr);
             }
             catch { }
         }
-
-        return Load(memoryPtr, size);
-    }
-
-    public static IRawBitmap Load(Stream stream, ImageFileType fileType)
-    {
-        return null;
     }
     
-    private static IRawBitmap Load(IntPtr dataPointer, long dataSize)
+    public static IRawBitmap Load(IntPtr dataPointer, long dataSize)
     {
         foreach (var loader in _loadSaveDelegates)
         {
@@ -160,10 +104,16 @@ public static class BitmapLoader
         }
         finally
         {
+            stream.Flush();
             stream.Dispose();
         }
     }
     
+    public static void Save(IRawBitmap bitmap, Stream stream, ImageFileType fileType)
+    {
+        var saveDelegate = _loadSaveDelegates.FirstOrDefault(x => x.FileType == fileType);
+        saveDelegate?.Saver?.Invoke(bitmap, stream);
+    }
     
     private class LoadSaveDelegates
     {

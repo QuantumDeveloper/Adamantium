@@ -420,12 +420,12 @@ namespace Adamantium.Imaging
             Utilities.CopyMemory(pDestination, pSource, Math.Min(outSize, inSize));
         }
 
-        public static unsafe void CopyScanline(IntPtr pDestination, IntPtr pSource, int size)
+        public static void CopyScanline(IntPtr pDestination, IntPtr pSource, int size)
         {
             Utilities.CopyMemory(pDestination, pSource, size);
         }
 
-        public static unsafe PixelBuffer[] CreatePixelBuffers(ImageDescription description, IntPtr dataPointer, long offset, Image.PitchFlags pitchFlags = Image.PitchFlags.None)
+        public static unsafe PixelBuffer[] CreatePixelBuffers(ImageDescription description, IntPtr dataPointer, long offset, PitchFlags pitchFlags = PitchFlags.None)
         {
             // Calculate mipmaps
             var mipMapToZIndex = Image.CalculateImageArray(description, pitchFlags, out var pixelBufferCount, out var totalSizeInBytes);
@@ -450,7 +450,7 @@ namespace Adamantium.Imaging
             return pixelBuffers;
         }
 
-        public static byte[] FlipBuffer(byte[] buffer, uint width, uint height, byte bytesPerPixel, FlipBufferOptions flipOptions)
+        public static byte[] FlipBuffer(byte[] buffer, uint width, uint height, int bytesPerPixel, FlipBufferOptions flipOptions)
         {
             var flipped = new byte[buffer.Length];
             var rowStride = width * bytesPerPixel;
@@ -506,6 +506,14 @@ namespace Adamantium.Imaging
             }
 
             return flipped;
+        }
+
+        public static void SetAlpha(byte[] buffer, byte value)
+        {
+            for (int i = 0; i< buffer.Length; i+=4)
+            {
+                buffer[i + 3] = value;
+            }
         }
     }
 }

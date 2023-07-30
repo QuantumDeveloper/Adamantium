@@ -197,6 +197,10 @@
       <Content Include="Textures\luxfon.tga">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
+      <None Remove="Textures\AplhaTestBitmap.bmp" />
+      <Content Include="Textures\AplhaTestBitmap.bmp">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
     </ItemGroup>
 
     <ItemGroup>

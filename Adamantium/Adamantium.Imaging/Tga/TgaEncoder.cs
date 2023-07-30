@@ -66,9 +66,10 @@ public class TgaEncoder
         return true;
     }
     
-    public static unsafe void SaveToTgaStream(byte[] pixelBuffer, ImageDescription description, Stream imageStream)
+    public static unsafe void SaveToTgaStream(IRawBitmap rawBitmap, Stream imageStream)
         {
             TgaHeader header;
+            ImageDescription description = rawBitmap.GetImageDescription();
             TgaConversionFlags flags = TgaConversionFlags.None;
             EncodeTgaHeader(description, out header, ref flags);
 
@@ -84,6 +85,7 @@ public class TgaEncoder
                 Image.ComputePitch(description.Format, (int)description.Width, (int)description.Height, out rowPitch, out slicePitch, out widthCount, out heightCount);
             }
 
+            var pixelBuffer = rawBitmap.GetRawPixels(0);
             var handle = GCHandle.Alloc(pixelBuffer, GCHandleType.Pinned);
             IntPtr pSource = handle.AddrOfPinnedObject();
             var sPitch = description.Width * description.Format.SizeOfInBytes();

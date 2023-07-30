@@ -22,7 +22,7 @@ public interface IRawBitmap
         
     public byte[] GetRawPixels(uint frameIndex);
 
-    public MipLevelData GetMipLevelData(uint mipLevel);
+    public FrameData GetMipLevelData(uint mipLevel);
 
     public ImageDescription GetImageDescription();
 

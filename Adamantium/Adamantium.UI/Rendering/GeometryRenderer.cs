@@ -13,19 +13,19 @@ internal class GeometryRenderer : ComponentRenderer
 {
     public GeometryRenderer(GraphicsDevice device, Mesh mesh, Brush brush) : base(brush)
     {
-        var vertices = mesh.ToMeshVertices();
+        var vertices = mesh?.ToMeshVertices();
         if (vertices != null)
         {
             VertexBuffer = Buffer.Vertex.New(device, vertices);
         }
 
-        if (mesh.HasIndices)
+        if (mesh is { HasIndices: true })
         {
             IndexBuffer = Buffer.Index.New(device, mesh.Indices);
         }
 
         VertexType = typeof(MeshVertex);
-        PrimitiveType = mesh.MeshTopology;
+        if (mesh != null) PrimitiveType = mesh.MeshTopology;
         Brush = brush;
     }
     

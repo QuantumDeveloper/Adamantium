@@ -2,13 +2,14 @@
 using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Imaging.Png.Chunks;
+using AdamantiumVulkan.Core;
 
 namespace Adamantium.Imaging.Png
 {
     internal class PngImage : IRawBitmap
     {
         private readonly PngCompressor compressor;
-        
+
         public PngImage()
         {
             Frames = new List<PngFrame>();
@@ -21,7 +22,7 @@ namespace Adamantium.Imaging.Png
         public uint MipLevelsCount => 0;
         public uint NumberOfReplays => RepeatCount;
 
-        public uint FramesCount { get; internal set; }
+        public uint FramesCount => (uint)Frames.Count;
         
         public byte[] GetRawPixels(uint frameIndex)
         {
@@ -33,9 +34,9 @@ namespace Adamantium.Imaging.Png
             return DecodeFrame(frame, frameIndex);
         }
 
-        public MipLevelData GetMipLevelData(uint mipLevel)
+        public FrameData GetMipLevelData(uint mipLevel)
         {
-            return new MipLevelData(GetImageDescription(), 0) { Pixels = GetRawPixels(0)};
+            return GetFrameData(0);
         }
 
         public ImageDescription GetImageDescription()
@@ -86,10 +87,10 @@ namespace Adamantium.Imaging.Png
             switch (PngColorConversion.GetNumberOfColorChannels(ColorType) * Header.BitDepth)
             {
                 case 8:
-                    return AdamantiumVulkan.Core.Format.R8_UNORM;
+                    return Format.R8_UNORM;
                 case 24:
-                    return AdamantiumVulkan.Core.Format.R8G8B8_UNORM;
-                case 32: return AdamantiumVulkan.Core.Format.R8G8B8A8_UNORM;
+                    return Format.R8G8B8_UNORM;
+                case 32: return Format.R8G8B8A8_UNORM;
             }
 
             return SurfaceFormat.Undefined;
@@ -364,44 +365,43 @@ namespace Adamantium.Imaging.Png
             }
         }
 
-        public static PngImage FromImage(Image image)
+        public static PngImage FromImage(IRawBitmap image)
         {
-            var png = FromPixelBuffers(image.PixelBuffer);
-            png.DefaultImage = GetFrameFromBuffer(image.DefaultImage);
+            var png = FromPixelBuffers(image);
+            png.DefaultImage = GetFrameFromBuffer(image.GetFrameData(0), 0);
             png.Header = new IHDR();
-            png.Header.Width = (int)image.Description.Width;
-            png.Header.Height = (int)image.Description.Height;
+            png.Header.Width = (int)image.Width;
+            png.Header.Height = (int)image.Height;
 
             return png;
         }
 
-        public static PngImage FromPixelBuffers(params PixelBuffer[] buffers)
+        public static PngImage FromPixelBuffers(IRawBitmap image)
         {
             var pngImage = new PngImage();
-            for (int i = 0; i < buffers.Length; ++i)
+            for (uint i = 0; i < image.FramesCount; ++i)
             {
-                var pixelBuffer = buffers[i];
-                var frame = GetFrameFromBuffer(pixelBuffer);
+                var frame = GetFrameFromBuffer(image.GetFrameData(i), i);
                 pngImage.Frames.Add(frame);
             }
 
             return pngImage;
         }
 
-        private static PngFrame GetFrameFromBuffer(PixelBuffer pixelBuffer)
+        private static PngFrame GetFrameFromBuffer(FrameData frameData, uint sequenceNumber)
         {
-            if (pixelBuffer == null)
+            if (frameData == null)
             {
                 return null;
             }
 
-            var pixels = pixelBuffer.GetPixels<byte>();
-            var frame = new PngFrame(pixels, (uint)pixelBuffer.Width, (uint)pixelBuffer.Height, pixelBuffer.PixelSize * 8);
-            frame.DelayNumerator = pixelBuffer.DelayNumerator;
-            frame.DelayDenominator = pixelBuffer.DelayDenominator;
-            frame.XOffset = pixelBuffer.XOffset;
-            frame.YOffset = pixelBuffer.YOffset;
-            frame.SequenceNumberFCTL = pixelBuffer.SequenceNumber;
+            var pixels = frameData.RawPixels;
+            var frame = new PngFrame(pixels, frameData.Description.Width, frameData.Description.Height, frameData.Description.Format.SizeOfInBytes());
+            frame.DelayNumerator = 1;
+            frame.DelayDenominator = 16;
+            frame.XOffset = 0;
+            frame.YOffset = 0;
+            frame.SequenceNumberFCTL = sequenceNumber;
 
             return frame;
         }

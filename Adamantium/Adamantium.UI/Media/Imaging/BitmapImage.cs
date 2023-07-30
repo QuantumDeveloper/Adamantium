@@ -189,7 +189,7 @@ public sealed class BitmapImage : BitmapSource
          DpiXScale,
          DpiYScale,
          PixelFormat,
-         mipData.Pixels,
+         mipData.RawPixels,
          level);
    }
 
@@ -212,20 +212,20 @@ public sealed class BitmapImage : BitmapSource
 
    private BitmapFrame GetFrameFromCache(uint index)
    {
-      return GetFrame(index);
-      // if (!_indexToFrame.TryGetValue(index, out var frame))
-      // {
-      //    frame = GetFrame(index);
-      //    _indexToFrame[index] = frame;
-      //    AddToCache(frame);
-      // }
+      //return GetFrame(index);
+      if (!_indexToFrame.TryGetValue(index, out var frame))
+      {
+         frame = GetFrame(index);
+         _indexToFrame[index] = frame;
+         //AddToCache(frame);
+      }
 
       // if (_indexToFrame.Count > FrameCacheLimit)
       // {
       //    RemoveCacheItems(FrameCacheLimit - (uint)_indexToFrame.Count);
       // }
 
-      //return frame;
+      return frame;
    }
    
    protected override void ReleaseUnmanagedResources()

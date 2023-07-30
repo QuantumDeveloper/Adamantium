@@ -1,3 +1,5 @@
+using System.Linq;
+
 namespace Adamantium.Imaging.Dds;
 
 public class DdsImage : IRawBitmap
@@ -7,7 +9,7 @@ public class DdsImage : IRawBitmap
         Description = description;
     }
     
-    public MipLevelData[] MipLevels { get; set; }
+    //public MipLevelData[] MipLevels { get; set; }
     public FrameData[] PixelBuffers { get; set; }
     public uint Width => Description.Width;
     public uint Height => Description.Height;
@@ -42,10 +44,10 @@ public class DdsImage : IRawBitmap
         return PixelBuffers[0].RawPixels;
     }
 
-    public MipLevelData GetMipLevelData(uint mipLevel)
+    public FrameData GetMipLevelData(uint mipLevel)
     {
-        var mipData = MipLevels[mipLevel];
-        return mipData;
+        var frameData = PixelBuffers.FirstOrDefault(x=>x.MipLevel == mipLevel);
+        return frameData;
     }
 
 

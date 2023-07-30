@@ -409,12 +409,12 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
 
             if (HorizontalAlignment != HorizontalAlignment.Stretch)
             {
-                size.Width = Math.Min(size.Width, DesiredSize.Width);
+                size.Width = Math.Min(size.Width, finalRect.Width);
             }
 
             if (VerticalAlignment != VerticalAlignment.Stretch)
             {
-                size.Height = Math.Min(size.Height, DesiredSize.Height);
+                size.Height = Math.Min(size.Height, finalRect.Height);
             }
 
             size = this.ApplyLayoutConstraints(size);

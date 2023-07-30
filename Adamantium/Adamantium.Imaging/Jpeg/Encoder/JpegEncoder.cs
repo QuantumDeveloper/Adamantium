@@ -12,15 +12,8 @@ using Adamantium.Imaging.Jpeg.Decoder;
 
 namespace Adamantium.Imaging.Jpeg.Encoder
 {
-    public class JpegEncodeProgressChangedArgs : EventArgs
-    {
-        public double EncodeProgress; // 0.0 to 1.0
-    }
-
     public class JpegEncoder
     {
-        JpegEncodeProgressChangedArgs _progress;
-
         DecodedJpeg _input;
         Stream _outStream;
         HuffmanTable _huf;
@@ -42,20 +35,15 @@ namespace Adamantium.Imaging.Jpeg.Encoder
         private static readonly int[] DCtableNumber = { 0, 1, 1 };
         private static readonly int[] ACtableNumber = { 0, 1, 1 };
 
-        public event EventHandler<JpegEncodeProgressChangedArgs> EncodeProgressChanged;
-
-        public JpegEncoder(Image image, int quality, Stream outStream)
-            : this(image.PixelBuffer[0], quality, outStream) { /* see overload */ }
-
         /// <summary>
         /// Encodes a JPEG, preserving the colorspace and metadata of the input JPEG.
         /// </summary>
         /// <param name="decodedJpeg">Decoded Jpeg to start with.</param>
         /// <param name="quality">Quality of the image from 0 to 100.  (Compression from max to min.)</param>
         /// <param name="outStream">Stream where the result will be placed.</param>
-        public JpegEncoder(PixelBuffer decodedJpeg, int quality, Stream outStream)
+        public JpegEncoder(IRawBitmap image, int quality, Stream outStream)
         {
-            _input = new DecodedJpeg(decodedJpeg.ToComponentsBuffer(ComponentBufferType.Jpg));
+            _input = new DecodedJpeg(image.ToComponentsBuffer(ComponentBufferType.Jpg));
 
             /* This encoder requires YCbCr */
             _input.Image.ChangeColorSpace(ColorSpace.YCbCr);
@@ -71,14 +59,9 @@ namespace Adamantium.Imaging.Jpeg.Encoder
 
         public void Encode()
         {
-            _progress = new JpegEncodeProgressChangedArgs();
-
             WriteHeaders();
             CompressTo(_outStream);
             WriteMarker(new byte[] { 0xFF, 0xD9 }); // End of Image
-
-            _progress.EncodeProgress = 1.0;
-            EncodeProgressChanged?.Invoke(this, _progress);
 
             _outStream.Flush();
         }
@@ -312,10 +295,6 @@ namespace Adamantium.Imaging.Jpeg.Encoder
 
             for (r = 0; r < MinBlockHeight; r++)
             {
-                // Keep track of progress
-                _progress.EncodeProgress = (double)r / MinBlockHeight;
-                EncodeProgressChanged?.Invoke(this, _progress);
-
                 for (c = 0; c < MinBlockWidth; c++)
                 {
                     xpos = c * 8;

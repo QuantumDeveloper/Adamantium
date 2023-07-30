@@ -1,13 +1,14 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Adamantium.Imaging.Ico;
 
 public class IcoImage : IRawBitmap
 {
-    private List<MipLevelData> _mipLevels;
+    private List<FrameData> _pixelBuffers;
     public IcoImage(ImageDescription description)
     {
-        _mipLevels = new List<MipLevelData>();
+        _pixelBuffers = new List<FrameData>();
         Description = description;
     }
 
@@ -18,28 +19,26 @@ public class IcoImage : IRawBitmap
     public bool IsMultiFrame => false;
     
     public bool HasMipLevels => MipLevelsCount > 1;
-    public uint MipLevelsCount => (uint)_mipLevels.Count;
+    public uint MipLevelsCount => (uint)PixelBuffers.Count;
     public uint NumberOfReplays => 0;
     public uint FramesCount => 0;
-    
-    public byte[] PixelBuffer { get; set; }
 
-    public void AddMipLevel(MipLevelData mipData)
+    public IReadOnlyList<FrameData> PixelBuffers => _pixelBuffers; 
+
+    public void AddMipLevel(FrameData mipData)
     {
-        mipData.MipLevel = (uint)_mipLevels.Count;
-        _mipLevels.Add(mipData);
+        _pixelBuffers.Add(mipData);
     }
     
     public ImageDescription Description { get; set; }
     public byte[] GetRawPixels(uint frameIndex)
     {
-        return _mipLevels[0].Pixels;
+        return PixelBuffers[0].RawPixels;
     }
 
-    public MipLevelData GetMipLevelData(uint mipLevel)
+    public FrameData GetMipLevelData(uint mipLevel)
     {
-        var level = _mipLevels[(int)mipLevel];
-        return level;
+        return PixelBuffers.FirstOrDefault(x => x.MipLevel == mipLevel);
     }
 
     public ImageDescription GetImageDescription()
@@ -49,6 +48,6 @@ public class IcoImage : IRawBitmap
 
     public FrameData GetFrameData(uint frameIndex)
     {
-        return new FrameData(PixelBuffer, Description);
+        return PixelBuffers[(int)frameIndex];
     }
 }

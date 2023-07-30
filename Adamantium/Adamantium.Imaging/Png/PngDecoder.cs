@@ -161,7 +161,7 @@ namespace Adamantium.Imaging.Png
                 {
                     case "acTL":
                         var actl = stream.ReadacTL(state);
-                        pngImage.FramesCount = actl.FramesCount;
+                        //pngImage.FramesCount = actl.FramesCount;
                         pngImage.RepeatCount = actl.RepeatCout;
                         break;
                     case "fcTL":

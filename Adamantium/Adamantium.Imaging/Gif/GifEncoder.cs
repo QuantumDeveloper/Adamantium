@@ -20,7 +20,7 @@ namespace Adamantium.Imaging.Gif
         {
         }
 
-        public void Encode(GifImage img, Stream stream)
+        public void Encode(IRawBitmap img, Stream stream)
         {
             WriteGifHeader(stream);
             WriteHeader(img.GetImageDescription(), stream);
@@ -89,11 +89,11 @@ namespace Adamantium.Imaging.Gif
             stream.WriteByte(0);
         }
 
-        private void WriteImageData(GifImage img, Stream stream)
+        private void WriteImageData(IRawBitmap img, Stream stream)
         {
             for (uint i = 0; i< img.FramesCount; ++i)
             {
-                img.DecodeFrame(i);
+                img.GetRawPixels(i);
             }
             var quantizerResults = new QuantizerResult[img.FramesCount];
             Parallel.For(

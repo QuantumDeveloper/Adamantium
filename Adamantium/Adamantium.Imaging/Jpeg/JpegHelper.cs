@@ -19,9 +19,9 @@ namespace Adamantium.Imaging.Jpeg
             return image;
         }
 
-        public static void SaveToStream(IRawBitmap img, PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream)
+        public static void SaveToStream(IRawBitmap img, Stream imageStream)
         {
-            JpegEncoder encoder = new JpegEncoder(pixelBuffers[0], 100, imageStream);
+            JpegEncoder encoder = new JpegEncoder(img, 100, imageStream);
             encoder.Encode();
         }
 

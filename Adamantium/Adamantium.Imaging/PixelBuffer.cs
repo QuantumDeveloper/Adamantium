@@ -66,6 +66,20 @@ namespace Adamantium.Imaging
         public uint MipLevel { get; set; }
         
         public MipMapDescription MipMapDescription { get; set; }
+
+        public ImageDescription GetDescription()
+        {
+            return new ImageDescription()
+            {
+                Width = Width,
+                Height = Height,
+                Depth = 1,
+                ArraySize = 1,
+                MipLevels = 1,
+                Dimension = TextureDimension.Texture2D,
+                Format = Format
+            };
+        }
         
         /// <summary>
         /// Gets the width.
@@ -132,21 +146,6 @@ namespace Adamantium.Imaging
         public uint YOffset { get; internal set; }
 
         /// <summary>
-        /// Frame delay fraction numerator
-        /// </summary>
-        public ushort DelayNumerator { get; internal set; }
-        
-        /// <summary>
-        /// Frame delay fraction denominator
-        /// </summary>
-        public ushort DelayDenominator { get; internal set; }
-
-        /// <summary>
-        /// Sequence number of current pixel buffer aka frame
-        /// </summary>
-        public uint SequenceNumber { get; internal set; }
-
-        /// <summary>
         /// Copies this pixel buffer to a destination pixel buffer.
         /// </summary>
         /// <param name="pixelBuffer">The destination pixel buffer.</param>
@@ -157,8 +156,8 @@ namespace Adamantium.Imaging
         public unsafe void CopyTo(PixelBuffer pixelBuffer)
         {
             // Check that buffers are identical
-            if (this.Width != pixelBuffer.Width
-                || this.Height != pixelBuffer.Height
+            if (Width != pixelBuffer.Width
+                || Height != pixelBuffer.Height
                 || PixelSize != pixelBuffer.Format.SizeOfInBytes())
             {
                 throw new ArgumentException("Invalid destination pixelBufferArray. Mush have same Width, Height and Format", nameof(pixelBuffer));
@@ -183,41 +182,6 @@ namespace Adamantium.Imaging
                     dstPointer += pixelBuffer.RowStride;
                 }
             }
-        }
-
-        /// <summary>
-        /// Saves this pixel buffer to a file.
-        /// </summary>
-        /// <param name="fileName">The destination file.</param>
-        /// <param name="fileType">Specify the output format.</param>
-        /// <remarks>This method support the following format: <c>dds, bmp, jpg, png, gif, tiff, wmp, tga</c>.</remarks>
-        public void Save(Image img, string fileName, ImageFileType fileType)
-        {
-            using (var imageStream = new FileStream(fileName, FileMode.Create, FileAccess.Write))
-            {
-                Save(img, imageStream, fileType);
-            }
-        }
-
-        /// <summary>
-        /// Saves this pixel buffer to a stream.
-        /// </summary>
-        /// <param name="imageStream">The destination stream.</param>
-        /// <param name="fileType">Specify the output format.</param>
-        /// <remarks>This method support the following format: <c>dds, bmp, jpg, png, gif, tiff, wmp, tga</c>.</remarks>
-        public void Save(Image img, Stream imageStream, ImageFileType fileType)
-        {
-            var description = new ImageDescription()
-            {
-                Width = Width,
-                Height = Height,
-                Depth = 1,
-                ArraySize = 1,
-                Dimension = TextureDimension.Texture2D,
-                Format = format,
-                MipLevels = 1,
-            };
-            Image.Save(img, new[] { this }, 1, description, imageStream, fileType);
         }
 
         /// <summary>
@@ -385,17 +349,6 @@ namespace Adamantium.Imaging
         public byte[][,] GetComponents()
         {
             return GetComponentArrayFromBuffer(ComponentBufferType.Jpg);
-        }
-
-        public ComponentsBuffer ToComponentsBuffer(ComponentBufferType bufferType)
-        {
-            if (bufferType == ComponentBufferType.Jpg)
-            {
-                var raster = GetComponentArrayFromBuffer(bufferType);
-                var colorModel = new ColorModel() { Colorspace = ColorSpace.RGB, Opaque = true };
-                return new ComponentsBuffer(colorModel, raster);
-            }
-            return null;
         }
 
         private byte[][,] GetComponentArrayFromBuffer(ComponentBufferType bufferType)

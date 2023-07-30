@@ -106,12 +106,6 @@ namespace Adamantium.Engine.Graphics
             stagingBufferMemory.FreeMemory(GraphicsDevice);
         }
         
-        // TODO properly implement texture arrays, texture 3D and texture cube
-        protected Texture(GraphicsDevice device, Image[] img, ImageUsageFlagBits usage, ImageLayout desiredLayout) : base(device)
-        {
-
-        }
-
         private void CreateBuffer(ulong size, BufferUsageFlagBits usage, MemoryPropertyFlags memoryProperties, out VkBuffer buffer, out DeviceMemory bufferMemory)
         {
             var device = (Device)GraphicsDevice;
@@ -339,9 +333,9 @@ namespace Adamantium.Engine.Graphics
         /// <param name="sage">Texture flags</param>
         /// <param name="initialLayout">Resource usage</param>
         /// <returns>A <see cref="Texture"/></returns>
-        public static Texture Load(GraphicsDevice device, Stream stream, ImageUsageFlagBits sage = ImageUsageFlagBits.SampledBit, ImageLayout initialLayout = ImageLayout.ShaderReadOnlyOptimal, ImageFileType fileType = ImageFileType.Unknown)
+        public static Texture Load(GraphicsDevice device, Stream stream, ImageUsageFlagBits sage = ImageUsageFlagBits.SampledBit, ImageLayout initialLayout = ImageLayout.ShaderReadOnlyOptimal)
         {
-            var image = BitmapLoader.Load(stream, fileType);
+            var image = BitmapLoader.Load(stream);
             try
             {
                 return new Texture(device, image, sage, initialLayout);
@@ -376,47 +370,6 @@ namespace Adamantium.Engine.Graphics
             }
         }
 
-        /// <summary>
-        /// Loads a texture from array of strings
-        /// </summary>
-        /// <param name="device">Specify the <see cref="GraphicsDevice"/> used to load and create a texture from a file.</param>
-        /// <param name="filePath">Array of pathes to 6 textures, which will form a <see cref="Texture"/></param>
-        /// <param name="sage">Texture flags</param>
-        /// <param name="initialLayout">Resource usage</param>
-        /// <returns>A <see cref="Texture"/></returns>
-        /// <remarks>This method is used only for loading <see cref="TextureCube"/> texture. Number of strings in array must be equals to 6</remarks>
-        /// <exception cref="ArgumentException"></exception>
-        /// <exception cref="InvalidOperationException"></exception>
-        public static Texture Load(GraphicsDevice device, String[] filePath, ImageUsageFlagBits sage = ImageUsageFlagBits.SampledBit, ImageLayout initialLayout = ImageLayout.ShaderReadOnlyOptimal)
-        {
-            if (filePath?.Length != 6)
-            {
-                throw new ArgumentException("File paths array must contain exactly 6 textures");
-            }
-            Image[] images = new Image[6];
-            try
-            {
-                for (int i = 0; i < filePath.Length; i++)
-                {
-                    images[i] = Image.Load(filePath[i]);
-                }
-                return new Texture(device, images, sage, initialLayout);
-            }
-            catch (Exception exception)
-            {
-                MessageBox.Show(exception.Message + exception.StackTrace + exception.TargetSite);
-            }
-            finally
-            {
-                for (int i = 0; i < images.Length; i++)
-                {
-                    images[i]?.Dispose();
-                }
-            }
-
-            throw new InvalidOperationException("Dimension not supported");
-        }
-
         public void Save(string path, ImageFileType fileType)
         {
            var img = Image.New2D(Width, Height, 1, Description.Format);
@@ -427,7 +380,7 @@ namespace Adamantium.Engine.Graphics
             CopyImageToBuffer(stagingBuffer, vulkanImage, Description);
             unsafe
             {
-                var data = GraphicsDevice.MapMemory(stagingBufferMemory, 0, (ulong)TotalSizeInBytes, 0);
+                var data = GraphicsDevice.MapMemory(stagingBufferMemory, 0, TotalSizeInBytes, 0);
                 System.Buffer.MemoryCopy(data, img.DataPointer.ToPointer(), TotalSizeInBytes, TotalSizeInBytes);
                 GraphicsDevice.UnmapMemory(stagingBufferMemory);
             }

@@ -34,7 +34,7 @@ public interface IWindow : IRootVisualComponent, IContentControl
         
     WindowState State { get; set; }
     
-    internal IWindowRenderer DefaultRenderer { get; set; }
+    IWindowRenderer DefaultRenderer { get; set; }
 
     IWindowRenderer Renderer { get; set; }
 

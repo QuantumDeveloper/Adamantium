@@ -51,7 +51,6 @@ public abstract class WindowBase : ContentControl, IWindow
     {
         
     }
-    
 
     public static readonly RoutedEvent ClientSizeChangedEvent = EventManager.RegisterRoutedEvent("ClientSizeChanged",
         RoutingStrategy.Direct, typeof(SizeChangedEventHandler), typeof(WindowBase));
@@ -61,7 +60,6 @@ public abstract class WindowBase : ContentControl, IWindow
         
     public static readonly RoutedEvent StateChangedEvent = EventManager.RegisterRoutedEvent("StateChanged",
         RoutingStrategy.Direct, typeof(StateChangedHandler), typeof(WindowBase));
-
 
 
     public static readonly AdamantiumProperty LeftProperty = AdamantiumProperty.Register(nameof(Left),

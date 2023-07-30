@@ -5,7 +5,7 @@ using Adamantium.UI.Media.Imaging;
 
 namespace Adamantium.UI.Rendering;
 
-internal class ComponentRenderFactory
+internal static class ComponentRenderFactory
 {
     public static GeometryRenderer CreateGeometryRenderer(GraphicsDevice device, Mesh mesh, Brush brush)
     {
@@ -13,8 +13,8 @@ internal class ComponentRenderFactory
     }
 
     public static ImageRenderer CreateImageRenderer(GraphicsDevice device, Mesh mesh, Brush brush,
-        params ImageSource[] images)
+        ImageSource image)
     {
-        return new ImageRenderer(device, mesh, brush, images);
+        return new ImageRenderer(device, mesh, brush, image);
     }
 }

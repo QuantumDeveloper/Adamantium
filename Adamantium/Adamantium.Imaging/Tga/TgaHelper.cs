@@ -26,9 +26,9 @@ namespace Adamantium.Imaging.Tga
             return image;
         }
 
-        public static void SaveToStream(byte[] pixelBuffer, ImageDescription description, Stream imageStream)
+        public static void SaveToStream(IRawBitmap bitmap, Stream imageStream)
         {
-            TgaEncoder.SaveToTgaStream(pixelBuffer, description, imageStream);
+            TgaEncoder.SaveToTgaStream(bitmap, imageStream);
         }
     }
 }

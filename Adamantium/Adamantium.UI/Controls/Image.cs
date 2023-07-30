@@ -6,6 +6,7 @@ using Adamantium.UI.Media;
 using Adamantium.UI.Media.Imaging;
 using Adamantium.UI.RoutedEvents;
 using Adamantium.UI.Threading;
+using Serilog;
 using Timer = System.Timers.Timer;
 
 namespace Adamantium.UI.Controls;
@@ -228,16 +229,14 @@ public class Image : InputUIComponent
    }
 
    private ReplayDirection _replayDirection;
+
    private void TimerOnElapsed(object sender, ElapsedEventArgs e)
    {
-      if (NumberOfReplays == 0 || _currentReplayIteration >= NumberOfReplays)
+      _timer.Stop();
+
+      _oldFrame = _frame;
+      try
       {
-         _timer.Stop();
-      }
-      
-      Dispatcher.CurrentDispatcher.Invoke(() =>
-      {
-         _oldFrame = _frame;
          switch (ReplayDirection)
          {
             case ReplayDirection.Forward:
@@ -306,10 +305,15 @@ public class Image : InputUIComponent
          {
             _currentReplayIteration++;
          }
-         InvalidateRender(false);
-      });
+      }
+      catch (Exception ex)
+      {
+
+      }
+
+      Dispatcher.CurrentDispatcher.Invoke(() => { InvalidateRender(false); });
    }
-   
+
    protected override Size MeasureOverride(Size availableSize)
    {
       if (Source != null)
@@ -342,7 +346,6 @@ public class Image : InputUIComponent
       
       if (_frame is { IsDisposed: false })
       {
-         //_oldFrame?.Dispose();
          
          //context.DrawRectangle(Brushes.Red, new Rect(Bounds.Size), CornerRadius);
          context.DrawImage(_frame, FilterBrush, new Rect(Bounds.Size), CornerRadius);
@@ -353,7 +356,15 @@ public class Image : InputUIComponent
       }
    }
 
-   public Size CalculateScaling(Stretch stretch, Size destinationSize, Size sourceSize)
+   protected override void OnRenderCompleted()
+   {
+      if (NumberOfReplays == UInt64.MaxValue || _currentReplayIteration <= NumberOfReplays)
+      {
+         _timer?.Start();
+      }
+   }
+
+   private Size CalculateScaling(Stretch stretch, Size destinationSize, Size sourceSize)
    {
       double sizeX = sourceSize.Width;
       double sizeY = sourceSize.Height;

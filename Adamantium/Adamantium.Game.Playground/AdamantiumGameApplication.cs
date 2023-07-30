@@ -11,9 +11,11 @@ public class AdamantiumGameApplication : GameApplication
     
     public AdamantiumGameApplication()
     {
-        EnableGraphicsDebug = true;
+        EnableGraphicsDebug = false;
         // var img = BitmapLoader.Load(@"Textures\infinity.gif");
         // BitmapLoader.Save(img, @"Textures\infinity3.gif", ImageFileType.Gif);
+        var img = BitmapLoader.Load(@"Textures\luxfon.tga");
+        img.Save(@"Textures\luxfon2.tga", ImageFileType.Tga);
     }
         
     protected override void OnStartup()

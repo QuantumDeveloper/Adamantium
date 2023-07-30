@@ -16,8 +16,8 @@ namespace Adamantium.Imaging.Jpeg.Decoder
         public byte precision = 8;
         public byte colorMode = JPEG_COLOR_YCbCr;
 
-        public ushort Width { get; private set; }
-        public ushort Height { get; private set; }
+        public ushort Width { get; internal set; }
+        public ushort Height { get; internal set; }
 
         public JpegScan Scan = new JpegScan();
 
@@ -36,8 +36,8 @@ namespace Adamantium.Imaging.Jpeg.Decoder
 
         public void SetPrecision(byte data) { precision = data; }
 
-        public ushort ScanLines { set { Height = value; } }
-        public ushort SamplesPerLine { set { Width = value; } }
+        public ushort ScanLines { set => Height = value; }
+        public ushort SamplesPerLine { set => Width = value; }
 
         public byte ColorMode =>
             ComponentCount == 1 ?
@@ -87,7 +87,6 @@ namespace Adamantium.Imaging.Jpeg.Decoder
 
             int h = 0, v = 0;
             int x = 0;
-
 
             //TODO: replace this with a loop which knows how much data to expect
             while (true)
@@ -167,7 +166,7 @@ namespace Adamantium.Imaging.Jpeg.Decoder
                // marker or just the next marker in the stream. If
                // it's the next marker in the stream break out of the
                // while loop, if it's just a restart marker skip it
-               catch (JPEGMarkerFoundException ex)
+               catch (JpegMarkerFoundException ex)
                {
                    marker = ex.Marker;
 

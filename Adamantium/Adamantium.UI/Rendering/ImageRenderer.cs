@@ -8,12 +8,12 @@ namespace Adamantium.UI.Rendering;
 
 internal class ImageRenderer : GeometryRenderer
 {
-    public ImageRenderer(GraphicsDevice device, Mesh mesh, Brush brush, ImageSource[] images) : base(device, mesh, brush)
+    public ImageRenderer(GraphicsDevice device, Mesh mesh, Brush brush, ImageSource image) : base(device, mesh, brush)
     {
-        Images = images;
+        Image = image;
     }
 
-    public ImageSource[] Images { get; set; }
+    public ImageSource Image { get; set; }
 
     public override bool PrepareFrame(GraphicsDevice graphicsDevice, IUIComponent component, ImageSource image,
         Matrix4x4F projectionMatrix)
@@ -32,7 +32,7 @@ internal class ImageRenderer : GeometryRenderer
         effect.MeshColor.SetValue(color.Color.ToVector4());
         effect.Transparency.SetValue((float)Brush.Opacity);
         
-        var texture = ((BitmapSource)Images[0])?.Texture;
+        var texture = ((BitmapSource)Image)?.Texture;
 
         if (texture == null)
         {

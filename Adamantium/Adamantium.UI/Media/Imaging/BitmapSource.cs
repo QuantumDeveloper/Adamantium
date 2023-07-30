@@ -27,6 +27,7 @@ public class BitmapSource : ImageSource
       DpiYScale = dpiY;
       PixelFormat = format;
       _pixels = pixels;
+      Depth = 1;
    }
 
    private byte[] _pixels;

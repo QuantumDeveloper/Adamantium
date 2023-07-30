@@ -601,36 +601,49 @@ public class Grid: Panel
          }
       }
 
-      var availableSize = Math.Max(finalSize - totalTakenSize, 0);
-      
-      //row/column offset for each GridSegment
-      var starSegments = segments.Where(x => x.IsStar).ToArray();
-      foreach (var starSegment in starSegments)
+      if (totalTakenSize < finalSize)
       {
-         if (availableSize > 0)
-         {
-            starSegment.Min = Math.Max((availableSize/stars)*starSegment.Stars, 0);
-         }
-      }
 
-      if (starSegments.Length > 0)
-      {
-         availableSize = 0;
-      }
+         var availableSize = Math.Max(finalSize - totalTakenSize, 0);
 
-      if (availableSize != 0)
-      {
-         var autoSegments = segments.Where(x => x.IsAuto).ToArray();
-         var freeSegmentSize = availableSize / autoSegments.Length;
-         foreach (var autoSegment in autoSegments)
+         //row/column offset for each GridSegment
+         var starSegments = segments.Where(x => x.IsStar).ToArray();
+         foreach (var starSegment in starSegments)
          {
             if (availableSize > 0)
             {
-               autoSegment.Min += freeSegmentSize;
+               starSegment.Min = Math.Max((availableSize / stars) * starSegment.Stars, 0);
+            }
+         }
+
+         if (starSegments.Length > 0)
+         {
+            availableSize = 0;
+         }
+
+         if (availableSize != 0)
+         {
+            var autoSegments = segments.Where(x => x.IsAuto).ToArray();
+            var freeSegmentSize = availableSize / autoSegments.Length;
+            foreach (var autoSegment in autoSegments)
+            {
+               if (availableSize > 0)
+               {
+                  autoSegment.Min += freeSegmentSize;
+               }
             }
          }
       }
-      
+      else
+      {
+         var extraRatio = totalTakenSize/finalSize;
+         var autoSegments = segments.Where(x => x.IsAuto).ToArray();
+         foreach (var segment in autoSegments)
+         {
+            segment.Min /= extraRatio;
+         }
+      }
+
       Double offset = 0.0;
       for (int i = 0; i < segments.Length; ++i)
       {
@@ -666,7 +679,7 @@ public class Grid: Panel
       {
          CalculateStarSegments(colSegments, availableSize.Width);
       }
-      //MeasureCells(1);
+      MeasureCells(1);
       MeasureCells(2);
       
       double desiredX = CalculateTotalSize(colSegments);
@@ -687,6 +700,7 @@ public class Grid: Panel
       if (!cellsDictionary.ContainsKey(groupIndex)) return;
 
       var list = cellsDictionary[groupIndex];
+      
       foreach (var cell in list)
       {
          GridSegment row = rowSegments[cell.RowIndex];
@@ -728,7 +742,8 @@ public class Grid: Panel
          {
             if (cell.RowSpan == 1)
             {
-               row.Min = ClampSegment(desired.Height, row.Min, row.Max);
+               // TODO revisit this code in future to make sure that clamping code is correct
+               row.Min = ClampSegment(desired.Height, 0, row.Max);
             }
             else
             {
@@ -740,7 +755,8 @@ public class Grid: Panel
          {
             if (cell.ColSpan == 1)
             {
-               col.Min = ClampSegment(desired.Width, col.Min, col.Max);
+               // TODO revisit this code in future to make sure that clamping code is correct
+               col.Min = ClampSegment(desired.Width, 0, col.Max);
             }
             else
             {

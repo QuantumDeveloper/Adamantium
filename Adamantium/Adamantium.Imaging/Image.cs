@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Adamantium.Core;
 using Adamantium.Imaging.Bmp;
@@ -31,7 +32,6 @@ namespace Adamantium.Imaging
         private List<int> mipMapToZIndex;
         private int zBufferCountPerArraySlice;
         private MipMapDescription[] mipmapDescriptions;
-        private static List<LoadSaveDelegate> loadSaveDelegates = new List<LoadSaveDelegate>();
         private bool isAnimated;
         
         /// <summary>
@@ -114,10 +114,24 @@ namespace Adamantium.Imaging
         {
             Initialize(description, dataPointer, offset, handle, bufferIsDisposable, pitchFlags);
         }
-
+        
         internal Image(ImageDescription description, IRawBitmap multiFrameImage)
         {
             InitializeMultiFrame(description, multiFrameImage);
+        }
+
+        internal Image(IRawBitmap rawBitmap)
+        {
+            if (rawBitmap.IsMultiFrame)
+            {
+                InitializeMultiFrame(rawBitmap.GetImageDescription(), rawBitmap);
+            }
+            else
+            {
+                var data = rawBitmap.GetRawPixels(0);
+                var handle = GCHandle.Alloc(data, GCHandleType.Pinned);
+                Initialize(rawBitmap.GetImageDescription(), handle.AddrOfPinnedObject(), 0, handle, true);
+            }
         }
 
         protected override void Dispose(bool disposeManagedResources)
@@ -198,34 +212,6 @@ namespace Adamantium.Imaging
 
             return this.GetPixelBufferUnsafe(arrayIndex, zIndex, mipmap);
         }
-
-
-        /// <summary>
-        /// Registers a loader/saver for a specified image file type.
-        /// </summary>
-        /// <param name="type">The file type (use integer and explicit casting to <see cref="ImageFileType"/> to register other file format.</param>
-        /// <param name="loader">The loader delegate (can be null).</param>
-        /// <param name="saver">The saver delegate (can be null).</param>
-        /// <exception cref="System.ArgumentException"></exception>
-        public static void Register(ImageFileType type, ImageLoadDelegate loader, ImageSaveDelegate saver)
-        {
-            // If reference equals, then it is null
-            if (ReferenceEquals(loader, saver))
-                throw new ArgumentNullException("loader/saver", "Can set both loader and saver to null");
-
-            var newDelegate = new LoadSaveDelegate(type, loader, saver);
-            for (int i = 0; i < loadSaveDelegates.Count; i++)
-            {
-                var loadSaveDelegate = loadSaveDelegates[i];
-                if (loadSaveDelegate.FileType == type)
-                {
-                    loadSaveDelegates[i] = newDelegate;
-                    return;
-                }
-            }
-            loadSaveDelegates.Add(newDelegate);
-        }
-
 
         /// <summary>
         /// Gets the databox from this image.
@@ -426,55 +412,13 @@ namespace Adamantium.Imaging
         /// <summary>
         /// Loads an image from an unmanaged memory pointer.
         /// </summary>
-        /// <param name="dataPointer">Pointer to an unmanaged memory. If <paramref name="makeACopy"/> is false, this buffer must be allocated with <see cref="Utilities.AllocateMemory"/>.</param>
-        /// <param name="dataSize">Size of the unmanaged buffer.</param>
-        /// <param name="expectedType">Expected file type to improve image loading performance</param>
-        /// <param name="makeACopy">True to copy the content of the buffer to a new allocated buffer, false otherwise.</param>
-        /// <returns>An new image.</returns>
-        /// <remarks>If <paramref name="makeACopy"/> is set to false, the returned image is now the holder of the unmanaged pointer and will release it on Dispose. </remarks>
-        public static Image Load(IntPtr dataPointer, ulong dataSize, ImageFileType expectedType = ImageFileType.Unknown, bool makeACopy = false)
-        {
-            //Find delegate which will try to load image of concrete type
-            foreach (var loadSaveDelegate in loadSaveDelegates)
-            {
-                if (loadSaveDelegate.FileType != expectedType)
-                    continue;
-
-                var image = loadSaveDelegate.Load?.Invoke(dataPointer, dataSize, makeACopy, null);
-                if (image != null)
-                {
-                    return image;
-                }
-                break;
-            }
-
-            //If we couldnt load an image (for ex. image file extention is not of a correct format,
-            //then we will try to load image with other register delegates excluding that delegate, which we previously used
-            foreach (var loadSaveDelegate in loadSaveDelegates)
-            {
-                if (loadSaveDelegate.FileType == expectedType)
-                    continue;
-
-                var image = loadSaveDelegate.Load?.Invoke(dataPointer, dataSize, makeACopy, null);
-                if (image != null)
-                {
-                    return image;
-                }
-            }
-
-            return null;
-        }
-
-        /// <summary>
-        /// Loads an image from an unmanaged memory pointer.
-        /// </summary>
         /// <param name="dataBuffer">Pointer to an unmanaged memory. If <paramref name="makeACopy"/> is false, this buffer must be allocated with <see cref="Utilities.AllocateMemory"/>.</param>
         /// <param name="makeACopy">True to copy the content of the buffer to a new allocated buffer, false otherwhise.</param>
         /// <returns>An new image.</returns>
         /// <remarks>If <paramref name="makeACopy"/> is set to false, the returned image is now the holder of the unmanaged pointer and will release it on Dispose. </remarks>
-        public static Image Load(DataPointer dataBuffer, bool makeACopy = false)
+        public static Image Load(DataPointer dataBuffer, bool makeAcopy = false)
         {
-            return Load(dataBuffer.Pointer, (ulong)dataBuffer.Size, makeACopy);
+            return Load(dataBuffer.Pointer, dataBuffer.Size, makeAcopy);
         }
 
         /// <summary>
@@ -485,9 +429,11 @@ namespace Adamantium.Imaging
         /// <param name="makeACopy">True to copy the content of the buffer to a new allocated buffer, false otherwise.</param>
         /// <returns>An new image.</returns>
         /// <remarks>If <paramref name="makeACopy"/> is set to false, the returned image is now the holder of the unmanaged pointer and will release it on Dispose. </remarks>
-        public static Image Load(IntPtr dataPointer, ulong dataSize, bool makeACopy = false)
+        public static Image Load(IntPtr dataPointer, long dataSize, bool makeAcopy = false)
         {
-            return Load(dataPointer, dataSize, makeACopy, null);
+            var rawBitmap = BitmapLoader.Load(dataPointer, dataSize);
+
+            return new Image(rawBitmap);
         }
 
         /// <summary>
@@ -501,13 +447,15 @@ namespace Adamantium.Imaging
             if (buffer == null)
                 throw new ArgumentNullException(nameof(buffer));
 
-            ulong size = (ulong)buffer.Length;
+            long size = buffer.Length;
 
             // If buffer is allocated on Large Object Heap, then we are going to pin it instead of making a copy.
             if (size > (85 * 1024))
             {
                 var handle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
-                return Load(handle.AddrOfPinnedObject(), size, false, handle);
+                var result = Load(handle.AddrOfPinnedObject(), size);
+                handle.Free();
+                return result;
             }
 
             fixed (void* pBuffer = buffer)
@@ -525,35 +473,6 @@ namespace Adamantium.Imaging
         /// <remarks>This method support the following format: <c>dds, bmp, jpg, png, gif, tiff, wmp, tga</c>.</remarks>
         public static Image Load(Stream imageStream, ImageFileType fileType = ImageFileType.Unknown)
         {
-            // Use fast path using FileStream
-            // TODO: THIS IS NOT OPTIMIZED IN THE CASE THE STREAM IS NOT AN IMAGE. FIND A WAY TO OPTIMIZE THIS CASE.
-            var nativeImageStream = imageStream as FileStream;
-            if (nativeImageStream != null)
-            {
-                var imageBuffer = IntPtr.Zero;
-                Image image = null;
-                try
-                {
-                    unsafe
-                    {
-                        var imageSize = (ulong)nativeImageStream.Length;
-                        imageBuffer = Utilities.AllocateMemory((int)imageSize);
-                        Span<byte> bytes = new Span<byte>(imageBuffer.ToPointer(), (int)imageSize);
-                        nativeImageStream.Read(bytes);
-                        image = Load(imageBuffer, imageSize, fileType);
-                    }
-                }
-                finally
-                {
-                    if (image == null)
-                    {
-                        Utilities.FreeMemory(imageBuffer);
-                    }
-                }
-                return image;
-            }
-
-            // Else Read the whole stream into memory.
             return Load(Utilities.ReadStream(imageStream));
         }
 
@@ -572,13 +491,13 @@ namespace Adamantium.Imaging
 
             FileStream stream = null;
             IntPtr memoryPtr = IntPtr.Zero;
-            ulong size;
+            long size;
             try
             {
                 unsafe
                 {
                     stream = new FileStream(fileName, FileMode.Open, FileAccess.Read);
-                    size = (ulong)stream.Length;
+                    size = stream.Length;
                     memoryPtr = Utilities.AllocateMemory((int)size);
                     Span<byte> bytes = new Span<byte>(memoryPtr.ToPointer(), (int)size);
                     stream.Read(bytes);
@@ -601,7 +520,7 @@ namespace Adamantium.Imaging
 
             var type = GetImageTypeFromFileName(fileName);
             // If everything was fine, load the image from memory
-            return Load(memoryPtr, size, type);
+            return Load(memoryPtr, size);
         }
 
         /// <summary>
@@ -667,7 +586,8 @@ namespace Adamantium.Imaging
         /// <remarks>This method support the following format: <c>dds, bmp, jpg, png, gif, tiff, wmp, tga</c>.</remarks>
         public void Save(Stream imageStream, ImageFileType fileType)
         {
-            Save(this, pixelBuffers, pixelBuffers.Length, Description, imageStream, fileType);
+            var rawBitmap = this.ConvertToRawBitmap();
+            rawBitmap.Save(imageStream, fileType);
         }
 
         public void ApplyPixelBuffer(PixelBuffer pixelBuffer, int index, bool freeBuffer)
@@ -694,66 +614,6 @@ namespace Adamantium.Imaging
                 Utilities.FreeMemory(pixelBuffer.DataPointer);
             }
         }
-
-
-        /// <summary>
-        /// Loads an image from the specified pointer.
-        /// </summary>
-        /// <param name="dataPointer">The data pointer.</param>
-        /// <param name="dataSize">Size of the data.</param>
-        /// <param name="makeACopy">if set to <c>true</c> [make A copy].</param>
-        /// <param name="handle">The handle.</param>
-        /// <returns></returns>
-        /// <exception cref="System.NotSupportedException"></exception>
-        private static Image Load(IntPtr dataPointer, ulong dataSize, bool makeACopy, GCHandle? handle)
-        {
-            foreach (var loadSaveDelegate in loadSaveDelegates)
-            {
-                var image = loadSaveDelegate.Load?.Invoke(dataPointer, dataSize, makeACopy, handle);
-                if (image != null)
-                {
-                    return image;
-                }
-            }
-            return null;
-        }
-
-        /// <summary>
-        /// Saves this instance to a stream.
-        /// </summary>
-        /// <param name="img">Image to save</param>
-        /// <param name="pixelBuffers">The buffers to save.</param>
-        /// <param name="count">The number of buffers to save.</param>
-        /// <param name="description">Global description of the buffer.</param>
-        /// <param name="imageStream">The destination stream.</param>
-        /// <param name="fileType">Specify the output format.</param>
-        /// <remarks>This method support the following format: <c>dds, bmp, jpg, png, gif, tiff, wmp, tga</c>.</remarks>
-        internal static void Save(Image img, PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream, ImageFileType fileType)
-        {
-            foreach (var loadSaveDelegate in loadSaveDelegates)
-            {
-                if (loadSaveDelegate.FileType == fileType)
-                {
-                    loadSaveDelegate.Save(img, pixelBuffers, count, description, imageStream);
-                    return;
-                }
-
-            }
-            throw new NotSupportedException("This file format is not implemented.");
-        }
-
-        static Image()
-        {
-            //Register(ImageFileType.Dds, DDSHelper.LoadFromMemory, DDSHelper.SaveToStream);
-            //Register(ImageFileType.Ico, ICOHelper.LoadFromMemory, ICOHelper.SaveToStream);
-            //Register(ImageFileType.Gif, GIFHelper.LoadFromMemory, GIFHelper.SaveToStream);
-            //Register(ImageFileType.Bmp, BitmapHelper.LoadFromMemory, BitmapHelper.SaveToStream);
-            //Register(ImageFileType.Jpg, JpegHelper.LoadFromMemory, JpegHelper.SaveToStream);
-            //Register(ImageFileType.Png, PNGHelper.LoadFromMemory, PNGHelper.SaveToStream);
-            //Register(ImageFileType.Tga, TGAHelper.LoadFromMemory, TGAHelper.SaveToStream);
-            //Register(ImageFileType.Tiff, WICHelper.LoadFromWICMemory, WICHelper.SaveTiffToWICMemory);
-        }
-
 
         internal unsafe void Initialize(ImageDescription description, IntPtr dataPointer, ulong offset, GCHandle? handle, bool bufferIsDisposable, PitchFlags pitchFlags = PitchFlags.None)
         {
@@ -883,16 +743,6 @@ namespace Adamantium.Imaging
                 MipLevels = mipMapCount,
             };
         }
-
-        [Flags]
-        internal enum PitchFlags
-        {
-            None = 0x0,         // Normal operation
-            LegacyDword = 0x1,  // Assume pitch is DWORD aligned instead of BYTE aligned
-            Bpp24 = 0x10000,    // Override with a legacy 24 bits-per-pixel format size
-            Bpp16 = 0x20000,    // Override with a legacy 16 bits-per-pixel format size
-            Bpp8 = 0x40000,     // Override with a legacy 8 bits-per-pixel format size
-        };
 
         internal static void ComputePitch(Format format, int width, int height, out int rowPitch, out int slicePitch, out int widthCount, out int heightCount, PitchFlags flags = PitchFlags.None)
         {

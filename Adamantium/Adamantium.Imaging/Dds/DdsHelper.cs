@@ -929,9 +929,9 @@ namespace Adamantium.Imaging.Dds
         /// <param name="makeACopy">Whether or not to make a copy of the DDS</param>
         /// <param name="handle"></param>
         /// <returns></returns>
-        public static unsafe IRawBitmap LoadFromMemory(IntPtr pSource, long size, bool makeACopy, GCHandle? handle)
+        public static unsafe IRawBitmap LoadFromMemory(IntPtr pSource, long size)
         {
-            var flags = makeACopy ? DdsFlags.CopyMemory : DdsFlags.None;
+            var flags = DdsFlags.None;
 
             ConversionFlags convFlags;
             ImageDescription metadata;
@@ -952,33 +952,35 @@ namespace Adamantium.Imaging.Dds
 
             if (size < offset)
                 throw new InvalidOperationException();
-            var cpFlags = (flags & DdsFlags.LegacyDword) != 0 ? Image.PitchFlags.LegacyDword : Image.PitchFlags.None;
+            var cpFlags = (flags & DdsFlags.LegacyDword) != 0 ? PitchFlags.LegacyDword : PitchFlags.None;
             metadata.Format = FormatConverter.DXGIToVulkan(dxgiFormat);
             var image = CreateImageFromDDS(pSource, offset, (size - offset), metadata, cpFlags, convFlags, pal8);
             return image;
         }
 
-        public static void SaveToStream(Image img, PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream)
+        public static void SaveToStream(IRawBitmap img, Stream imageStream)
         {
-            SaveToDDSStream(pixelBuffers, count, description, DdsFlags.None, imageStream);
+            SaveToDdsStream(img, DdsFlags.None, imageStream);
         }
 
         //-------------------------------------------------------------------------------------
         // Save a DDS to a stream
         //-------------------------------------------------------------------------------------
-        public unsafe static void SaveToDDSStream(PixelBuffer[] pixelBuffers, int count, ImageDescription metadata, DdsFlags flags, Stream stream)
+        private static unsafe void SaveToDdsStream(IRawBitmap image, DdsFlags flags, Stream stream)
         {
             // Determine memory required
             int totalSize;
             int headerSize = 0;
-            EncodeDDSHeader(metadata, flags, IntPtr.Zero, 0, out totalSize);
+            var description = image.GetImageDescription();
+            EncodeDDSHeader(description, flags, IntPtr.Zero, 0, out totalSize);
             headerSize = totalSize;
 
             int maxSlice = 0;
 
-            for (int i = 0; i < pixelBuffers.Length; ++i)
+            for (uint i = 0; i < image.FramesCount; ++i)
             {
-                int slice = pixelBuffers[i].BufferStride;
+                var frameData = image.GetFrameData(i);
+                int slice = (int)frameData.BufferSize;
                 totalSize += slice;
                 if (slice > maxSlice)
                     maxSlice = slice;
@@ -989,27 +991,30 @@ namespace Adamantium.Imaging.Dds
             // Allocate a single temporary buffer to save the headers and each slice.
             var buffer = new byte[Math.Max(maxSlice, headerSize)];
 
-            fixed (void* pbuffer = buffer)
+            fixed (void* pBuffer = buffer)
             {
-                EncodeDDSHeader(metadata, flags, (IntPtr) pbuffer, headerSize, out var required);
+                EncodeDDSHeader(description, flags, (IntPtr)pBuffer, headerSize, out var required);
                 stream.Write(buffer, 0, headerSize);
             }
 
             int remaining = totalSize - headerSize;
             Debug.Assert(remaining > 0);
 
-            int index = 0;
-            for (int item = 0; item < metadata.ArraySize; ++item)
+            uint index = 0;
+            for (int item = 0; item < description.ArraySize; ++item)
             {
-                uint d = metadata.Depth;
+                uint d = description.Depth;
 
-                for (int level = 0; level < metadata.MipLevels; ++level)
+                for (int level = 0; level < description.MipLevels; ++level)
                 {
                     for (int slice = 0; slice < d; ++slice)
                     {
-                        int pixsize = pixelBuffers[index].BufferStride;
-                        Utilities.Read(pixelBuffers[index].DataPointer, buffer, 0, pixsize);
-                        stream.Write(buffer, 0, pixsize);
+                        var frameData = image.GetFrameData(index);
+                        var pixSize = frameData.BufferSize;
+                        var handle = GCHandle.Alloc(frameData.RawPixels, GCHandleType.Pinned);
+                        Utilities.Read(handle.AddrOfPinnedObject(), buffer, 0, (int)pixSize);
+                        handle.Free();
+                        stream.Write(buffer, 0, (int)pixSize);
                         ++index;
                     }
 
@@ -1036,26 +1041,26 @@ namespace Adamantium.Imaging.Dds
             long offset, 
             long size,
             ImageDescription metadata, 
-            Image.PitchFlags cpFlags, 
+            PitchFlags cpFlags, 
             ConversionFlags convFlags, 
             int* pal8)
         {
             if ((convFlags & ConversionFlags.Expand) != 0)
             {
                 if ((convFlags & ConversionFlags.Format888) != 0)
-                    cpFlags |= Image.PitchFlags.Bpp24;
+                    cpFlags |= PitchFlags.Bpp24;
                 else if ((convFlags & (ConversionFlags.Format565 | ConversionFlags.Format5551 |
                                        ConversionFlags.Format4444 | ConversionFlags.Format8332 |
                                        ConversionFlags.FormatA8P8)) != 0)
-                    cpFlags |= Image.PitchFlags.Bpp16;
+                    cpFlags |= PitchFlags.Bpp16;
                 else if ((convFlags & (ConversionFlags.Format44 | ConversionFlags.Format332 | ConversionFlags.Pal8)) !=
                          0)
-                    cpFlags |= Image.PitchFlags.Bpp8;
+                    cpFlags |= PitchFlags.Bpp8;
             }
 
             // If source image == dest image and no swizzle/alpha is required, we can return it as-is
             var isCopyNeeded = (convFlags & (ConversionFlags.Expand | ConversionFlags.CopyMemory)) != 0 ||
-                               ((cpFlags & Image.PitchFlags.LegacyDword) != 0);
+                               ((cpFlags & PitchFlags.LegacyDword) != 0);
             
             var ddsImage = new DdsImage(metadata);
             var sourcePixelBuffers = ImageHelper.CreatePixelBuffers(metadata, pDDS, offset, cpFlags);
@@ -1064,126 +1069,112 @@ namespace Adamantium.Imaging.Dds
             //Debug.Assert(size <= image.TotalSizeInBytes);
 
             if (!isCopyNeeded && (convFlags & (ConversionFlags.Swizzle | ConversionFlags.NoAlpha)) == 0)
-                return ddsImage;
-
-            var destinationPixelBuffers = ImageHelper.CreatePixelBuffers(metadata, IntPtr.Zero, 0);
-
-            ImageHelper.ScanlineFlags tflags = (convFlags & ConversionFlags.NoAlpha) != 0
-                ? ImageHelper.ScanlineFlags.SetAlpha
-                : ImageHelper.ScanlineFlags.None;
-            if ((convFlags & ConversionFlags.Swizzle) != 0)
-                tflags |= ImageHelper.ScanlineFlags.Legacy;
-
-            int index = 0;
-
-            long checkSize = size;
-
-            for (int arrayIndex = 0; arrayIndex < metadata.ArraySize; arrayIndex++)
             {
-                uint d = metadata.Depth;
-                // Else we need to go through each mips/depth slice to convert all scanlines.
-                for (int level = 0; level < metadata.MipLevels; ++level)
-                {
-                    for (int slice = 0; slice < d; ++slice, ++index)
-                    {
-                        IntPtr pSrc = sourcePixelBuffers[index].DataPointer;
-                        IntPtr pDest = destinationPixelBuffers[index].DataPointer;
-                        checkSize -= sourcePixelBuffers[index].BufferStride;
-                        if (checkSize < 0)
-                            throw new InvalidOperationException("Unexpected end of buffer");
-
-                        if (FormatHelper.IsCompressed(metadata.Format))
-                        {
-                            Utilities.CopyMemory(pDest, pSrc,
-                                Math.Min(sourcePixelBuffers[index].BufferStride,
-                                    destinationPixelBuffers[index].BufferStride));
-                        }
-                        else
-                        {
-                            int spitch = sourcePixelBuffers[index].RowStride;
-                            int dpitch = destinationPixelBuffers[index].RowStride;
-
-                            for (int h = 0; h < sourcePixelBuffers[index].Height; ++h)
-                            {
-                                if ((convFlags & ConversionFlags.Expand) != 0)
-                                {
-#if DIRECTX11_1
-                                if ((convFlags & (ConversionFlags.Format565 | ConversionFlags.Format5551 | ConversionFlags.Format4444)) != 0)
-#else
-                                    if ((convFlags & (ConversionFlags.Format565 | ConversionFlags.Format5551)) != 0)
-#endif
-                                    {
-                                        ImageHelper.ExpandScanline(pDest, dpitch, pSrc, spitch,
-                                            (convFlags & ConversionFlags.Format565) != 0
-                                                ? Format.B5G6R5_UNORM_PACK16
-                                                : Format.B5G5R5A1_UNORM_PACK16, tflags);
-                                    }
-                                    else
-                                    {
-                                        var lformat = FindLegacyFormat(convFlags);
-                                        LegacyExpandScanline(pDest, dpitch, metadata.Format, pSrc, spitch, lformat,
-                                            pal8, tflags);
-                                    }
-                                }
-                                else if ((convFlags & ConversionFlags.Swizzle) != 0)
-                                {
-                                    ImageHelper.SwizzleScanline(pDest, dpitch, pSrc, spitch, metadata.Format, tflags);
-                                }
-                                else
-                                {
-                                    if (pSrc != pDest)
-                                        ImageHelper.CopyScanline(pDest, dpitch, pSrc, spitch, metadata.Format, tflags);
-                                }
-
-                                pSrc = (IntPtr)((byte*)pSrc + spitch);
-                                pDest = (IntPtr)((byte*)pDest + dpitch);
-                            }
-                        }
-                    }
-
-                    if (d > 1)
-                        d >>= 1;
-                }
-            }
-
-            var img = ConvertPixelBuffersToRawData(ddsImage, destinationPixelBuffers);
-            
-            Utilities.FreeMemory(sourcePixelBuffers[0].DataPointer);
-            Utilities.FreeMemory(destinationPixelBuffers[0].DataPointer);
-
-            return img;
-        }
-
-        private static DdsImage ConvertPixelBuffersToRawData(DdsImage image, PixelBuffer[] buffers)
-        {
-            if (image.Description.MipLevels <= 1)
-            {
-                image.PixelBuffers = new FrameData[buffers.Length];
-                for (int i = 0; i < buffers.Length; i++)
-                {
-                    var pixelBuffer = buffers[i];
-                    var description = CreateDescriptionFromPixelBuffer(pixelBuffer, image.Description.Dimension);
-                    var frameData = new FrameData(pixelBuffer.GetPixels<byte>(), description);
-                    image.PixelBuffers[i] = frameData;
-                }
+                ConvertPixelBuffersToRawData(ddsImage, sourcePixelBuffers);
             }
             else
             {
-                image.PixelBuffers = new FrameData[1];
-                image.MipLevels = new MipLevelData[image.Description.MipLevels];
-                for (int i = 0; i < buffers.Length; i++)
+                var destinationPixelBuffers = ImageHelper.CreatePixelBuffers(metadata, IntPtr.Zero, 0);
+
+                ImageHelper.ScanlineFlags tflags = (convFlags & ConversionFlags.NoAlpha) != 0
+                    ? ImageHelper.ScanlineFlags.SetAlpha
+                    : ImageHelper.ScanlineFlags.None;
+                if ((convFlags & ConversionFlags.Swizzle) != 0)
+                    tflags |= ImageHelper.ScanlineFlags.Legacy;
+
+                int index = 0;
+
+                long checkSize = size;
+
+                for (int arrayIndex = 0; arrayIndex < metadata.ArraySize; arrayIndex++)
                 {
-                    var pixelBuffer = buffers[i];
-                    var description = CreateDescriptionFromPixelBuffer(pixelBuffer, image.Description.Dimension);
-                    var mipData = new MipLevelData(description, pixelBuffer.MipLevel, pixelBuffer.GetPixels<byte>());
-                    image.MipLevels[i] = mipData;
+                    uint d = metadata.Depth;
+                    // Else we need to go through each mips/depth slice to convert all scanlines.
+                    for (int level = 0; level < metadata.MipLevels; ++level)
+                    {
+                        for (int slice = 0; slice < d; ++slice, ++index)
+                        {
+                            IntPtr pSrc = sourcePixelBuffers[index].DataPointer;
+                            IntPtr pDest = destinationPixelBuffers[index].DataPointer;
+                            checkSize -= sourcePixelBuffers[index].BufferStride;
+                            if (checkSize < 0)
+                                throw new InvalidOperationException("Unexpected end of buffer");
+
+                            if (FormatHelper.IsCompressed(metadata.Format))
+                            {
+                                Utilities.CopyMemory(pDest, pSrc,
+                                    Math.Min(sourcePixelBuffers[index].BufferStride,
+                                        destinationPixelBuffers[index].BufferStride));
+                            }
+                            else
+                            {
+                                int spitch = sourcePixelBuffers[index].RowStride;
+                                int dpitch = destinationPixelBuffers[index].RowStride;
+
+                                for (int h = 0; h < sourcePixelBuffers[index].Height; ++h)
+                                {
+                                    if ((convFlags & ConversionFlags.Expand) != 0)
+                                    {
+#if DIRECTX11_1
+                                if ((convFlags & (ConversionFlags.Format565 | ConversionFlags.Format5551 | ConversionFlags.Format4444)) != 0)
+#else
+                                        if ((convFlags & (ConversionFlags.Format565 | ConversionFlags.Format5551)) != 0)
+#endif
+                                        {
+                                            ImageHelper.ExpandScanline(pDest, dpitch, pSrc, spitch,
+                                                (convFlags & ConversionFlags.Format565) != 0
+                                                    ? Format.B5G6R5_UNORM_PACK16
+                                                    : Format.B5G5R5A1_UNORM_PACK16, tflags);
+                                        }
+                                        else
+                                        {
+                                            var lformat = FindLegacyFormat(convFlags);
+                                            LegacyExpandScanline(pDest, dpitch, metadata.Format, pSrc, spitch, lformat,
+                                                pal8, tflags);
+                                        }
+                                    }
+                                    else if ((convFlags & ConversionFlags.Swizzle) != 0)
+                                    {
+                                        ImageHelper.SwizzleScanline(pDest, dpitch, pSrc, spitch, metadata.Format,
+                                            tflags);
+                                    }
+                                    else
+                                    {
+                                        if (pSrc != pDest)
+                                            ImageHelper.CopyScanline(pDest, dpitch, pSrc, spitch, metadata.Format,
+                                                tflags);
+                                    }
+
+                                    pSrc = (IntPtr)((byte*)pSrc + spitch);
+                                    pDest = (IntPtr)((byte*)pDest + dpitch);
+                                }
+                            }
+                        }
+
+                        if (d > 1)
+                            d >>= 1;
+                    }
                 }
 
-                var mipData0 = image.GetMipLevelData(0);
-                image.PixelBuffers[0] = new FrameData(mipData0.Pixels, mipData0.Description);
+                ConvertPixelBuffersToRawData(ddsImage, destinationPixelBuffers);
+                Utilities.FreeMemory(destinationPixelBuffers[0].DataPointer);
             }
 
-            return image;
+            Utilities.FreeMemory(sourcePixelBuffers[0].DataPointer);
+            
+            return ddsImage;
+        }
+
+        private static void ConvertPixelBuffersToRawData(DdsImage image, PixelBuffer[] buffers)
+        {
+            image.PixelBuffers = new FrameData[buffers.Length];
+            for (int i = 0; i < buffers.Length; i++)
+            {
+                var pixelBuffer = buffers[i];
+                var description = CreateDescriptionFromPixelBuffer(pixelBuffer, image.Description.Dimension);
+                var frameData = new FrameData(pixelBuffer.GetPixels<byte>(), description, pixelBuffer.MipLevel);
+                image.PixelBuffers[i] = frameData;
+            }
         }
 
         private static ImageDescription CreateDescriptionFromPixelBuffer(PixelBuffer buffer, TextureDimension dimension)

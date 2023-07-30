@@ -19,7 +19,7 @@ namespace Adamantium.Imaging.Ico
                 throw new ArgumentException("Given file is not an ICO file");
             }
 
-            return CreateImageFromICO(pSource, description, iconsInfos.ToArray());
+            return CreateImageFromIco(pSource, description, iconsInfos.ToArray());
         }
 
         private static unsafe bool DecodeIcoHeader(IntPtr headerPtr, long size, out ImageDescription description, out List<IconInfo> iconsInfos)
@@ -49,12 +49,12 @@ namespace Adamantium.Imaging.Ico
             return true;
         }
 
-        private static IRawBitmap CreateImageFromICO(IntPtr pSource, ImageDescription description, IconInfo[] iconsInfos)
+        private static IRawBitmap CreateImageFromIco(IntPtr pSource, ImageDescription description, IconInfo[] iconsInfos)
         {
             var ico = new IcoImage(description);
             for (int i = 0; i < iconsInfos.Length; i++)
             {
-                ProcessIcon(pSource, ico, iconsInfos[i]);
+                ProcessIcon(pSource, ico, iconsInfos[i], (uint)i);
             }
             
             // description.Width = (uint)width;
@@ -74,13 +74,12 @@ namespace Adamantium.Imaging.Ico
             // image.ApplyPixelBuffer(px, 0, true);
 
             var data = ico.GetMipLevelData(0);
-            ico.PixelBuffer = data.Pixels;
             ico.Description = data.Description;
 
             return ico;
         }
 
-        private static unsafe void ProcessIcon(IntPtr pSource, IcoImage image, IconInfo iconInfo)
+        private static unsafe void ProcessIcon(IntPtr pSource, IcoImage image, IconInfo iconInfo, uint mipLevel)
         {
             var dataPtr = IntPtr.Add(pSource, (int)iconInfo.ImageOffset);
 
@@ -93,9 +92,7 @@ namespace Adamantium.Imaging.Ico
             }
 
             var descr = ImageDescription.Default2D((uint)width, (uint)height, SurfaceFormat.R8G8B8A8.UNorm);
-            var icoMipData = new MipLevelData(descr);
-            image.AddMipLevel(icoMipData);
-
+            
             int realBitsCount = iconImageInfo.Header.bitCount;
             bool hasAndMask = /*(realBitsCount < 32) &&*/ (height != iconImageInfo.Header.height);
 
@@ -156,7 +153,10 @@ namespace Adamantium.Imaging.Ico
             stream.Dispose();
             
             var pixelSize = (byte)(realBitsCount / 8);
-            icoMipData.Pixels = ImageHelper.FlipBuffer(buffer, descr.Width, descr.Height, pixelSize, FlipBufferOptions.FlipVertically);
+            
+            var pixels = ImageHelper.FlipBuffer(buffer, descr.Width, descr.Height, pixelSize, FlipBufferOptions.FlipVertically);
+            var icoMipData = new FrameData(pixels, descr, mipLevel);
+            image.AddMipLevel(icoMipData);
             
             // Read AND mask after base color data - 1 BIT MASK
             //if (hasAndMask)
@@ -194,7 +194,7 @@ namespace Adamantium.Imaging.Ico
             //}
         }
 
-        public static unsafe void SaveToStream(Image img, PixelBuffer[] pixelBuffers, int count, ImageDescription description, Stream imageStream)
+        public static unsafe void SaveToStream(IRawBitmap img, Stream imageStream)
         {
 
         }
