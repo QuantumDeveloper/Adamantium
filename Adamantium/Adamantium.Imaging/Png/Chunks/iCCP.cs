@@ -44,23 +44,23 @@ namespace Adamantium.Imaging.Png.Chunks
             }
         }
 
-        internal override byte[] GetChunkBytes(PNGState state)
+        internal override byte[] GetChunkBytes(PngState state)
         {
             var bytes = new List<byte>();
 
-            PNGCompressor compressor = new PNGCompressor();
+            PngCompressor compressor = new PngCompressor();
             var compressedBytes = new List<byte>();
             var result = compressor.Compress(Profile, state.EncoderSettings, compressedBytes);
             if (result > 0)
             {
-                throw new PNGEncoderException(result);
+                throw new PngEncoderException(result);
             }
 
             bytes.AddRange(GetNameAsBytes());
             var iccpProfile = Encoding.ASCII.GetBytes(ICCPName);
             if (iccpProfile.Length < 1 || iccpProfile.Length > 79)
             {
-                throw new PNGEncoderException(89);
+                throw new PngEncoderException(89);
             }
             bytes.AddRange(iccpProfile);
             bytes.Add(0); // null terminator
@@ -93,7 +93,7 @@ namespace Adamantium.Imaging.Png.Chunks
             return Encoding.ASCII.GetString(slice) == "RGB ";
         }
 
-        internal static iCCP FromState(PNGState state)
+        internal static iCCP FromState(PngState state)
         {
             var iccp = new iCCP();
             iccp.ICCPName = state.InfoPng.IccpName;

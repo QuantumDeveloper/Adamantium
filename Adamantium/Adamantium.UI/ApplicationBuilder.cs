@@ -5,15 +5,15 @@ namespace Adamantium.UI;
 
 public static class ApplicationBuilder
 {
-    public static void Build(IDependencyResolver resolver)
+    public static void Build(IDependencyContainer container)
     {
         switch (Configuration.Platform)
         {
             case Platform.Windows:
-                WindowsPlatform.Initialize(resolver);
+                WindowsPlatform.Initialize(container);
                 break;
             case Platform.OSX:
-                MacOSPlatform.Initialize(resolver);
+                MacOSPlatform.Initialize(container);
                 break;
         }
     }

@@ -15,16 +15,16 @@ namespace Adamantium.Imaging.Png.Chunks
 
         public uint BackgroundB { get; set; }
 
-        internal override byte[] GetChunkBytes(PNGState state)
+        internal override byte[] GetChunkBytes(PngState state)
         {
             var bytes = new List<byte>();
             bytes.AddRange(GetNameAsBytes());
-            if (state.ColorModeRaw.ColorType == PNGColorType.Grey || state.ColorModeRaw.ColorType == PNGColorType.GreyAlpha)
+            if (state.ColorModeRaw.ColorType == PngColorType.Grey || state.ColorModeRaw.ColorType == PngColorType.GreyAlpha)
             {
                 bytes.Add((byte)(BackgroundR >> 8));
                 bytes.Add((byte)(BackgroundR & 255));
             }
-            else if (state.ColorModeRaw.ColorType == PNGColorType.RGB || state.ColorModeRaw.ColorType == PNGColorType.RGBA)
+            else if (state.ColorModeRaw.ColorType == PngColorType.RGB || state.ColorModeRaw.ColorType == PngColorType.RGBA)
             {
                 bytes.Add((byte)(BackgroundR >> 8));
                 bytes.Add((byte)(BackgroundR & 255));
@@ -33,7 +33,7 @@ namespace Adamantium.Imaging.Png.Chunks
                 bytes.Add((byte)(BackgroundB >> 8));
                 bytes.Add((byte)(BackgroundB & 255));
             }
-            else if (state.ColorModeRaw.ColorType == PNGColorType.Palette)
+            else if (state.ColorModeRaw.ColorType == PngColorType.Palette)
             {
                 bytes.Add((byte)(BackgroundR & 255)); /*palette index*/
             }
@@ -41,7 +41,7 @@ namespace Adamantium.Imaging.Png.Chunks
             return bytes.ToArray();
         }
 
-        internal static bKGD FromState(PNGState state)
+        internal static bKGD FromState(PngState state)
         {
             var bkgd = new bKGD();
             bkgd.BackgroundR = state.InfoPng.BackgroundR;

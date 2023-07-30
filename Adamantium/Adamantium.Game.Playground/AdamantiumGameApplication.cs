@@ -1,32 +1,30 @@
 using System.Collections.Generic;
 using Adamantium.Game.Core;
+using Adamantium.Imaging;
 using Adamantium.UI.Controls;
+using Image = Adamantium.Imaging.Image;
 
 namespace Adamantium.Game.Playground;
 
 public class AdamantiumGameApplication : GameApplication
 {
-    private List<GameOutput> outputs;
+    
     public AdamantiumGameApplication()
     {
-        outputs = new List<GameOutput>();
+        EnableGraphicsDebug = false;
+        // var img = BitmapLoader.Load(@"Textures\infinity.gif");
+        // BitmapLoader.Save(img, @"Textures\infinity3.gif", ImageFileType.Gif);
+        var img = BitmapLoader.Load(@"Textures\luxfon.tga");
+        img.Save(@"Textures\luxfon2.tga", ImageFileType.Tga);
     }
         
-    protected override Game OnCreateGameInstance()
+    protected override void OnStartup()
     {
-        return new AdamantiumGame();
-    }
-    
-    protected override void OnWindowCreated(IWindow wnd)
-    {
-        outputs.Add(GameOutput.New(new GameContext(wnd)));
-    }
-
-    protected override void OnGameInitialized()
-    {
-        foreach (var window in outputs)
-        {
-            Game.AddOutput(window);
-        }
+        base.OnStartup();
+        if (StartupUri == null) return;
+            
+        var path = StartupUri.OriginalString;
+        MainWindow = new MainWindow();
+        MainWindow.Show();
     }
 }

@@ -17,7 +17,7 @@ namespace Adamantium.CoreTests
         [SetUp]
         public void Setup()
         {
-            container = new AdamantiumDependencyResolver();
+            container = new AdamantiumDependencyContainer();
             eventAggregator = container.Resolve<IEventAggregator>();
             payload = new TestPayload();
         }

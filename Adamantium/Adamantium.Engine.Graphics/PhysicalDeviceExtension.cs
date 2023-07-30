@@ -1,6 +1,7 @@
 ﻿using AdamantiumVulkan.Core;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using AdamantiumVulkan.Windows;
 
@@ -8,46 +9,30 @@ namespace Adamantium.Engine.Graphics
 {
     public static class PhysicalDeviceExtension
     {
-        public static QueueFamilyIndices FindQueueFamilies(this PhysicalDevice device, SurfaceKHR surface)
+        public static QueueFamilyContainer FindQueueFamilies(this PhysicalDevice device)
         {
-            QueueFamilyIndices indices = new QueueFamilyIndices();
+            var container = new QueueFamilyContainer(device);
 
             var queueFamilies = device.GetQueueFamilyProperties();
 
-            uint i = 0;
-            foreach (var queueFamily in queueFamilies)
+            for (uint index = 0; index < queueFamilies.Length; index++)
             {
-                if ((queueFamily.QueueFlags & (uint)QueueFlagBits.GraphicsBit) > 0)
-                {
-                    indices.graphicsFamily = i;
-                }
-
-                //presentSupport = device.GetPhysicalDeviceWin32PresentationSupportKHR(i);
-                bool presentSupport;
-                if (surface != null)
-                {
-                    device.GetPhysicalDeviceSurfaceSupport(i, surface, out presentSupport);
-                }
-                else
-                {
-                    presentSupport = true;
-                }
+                var info = new QueueFamilyInfo();
+                var queueFamily = queueFamilies[index];
+                info.Type = queueFamily.QueueFlags;
+                info.FamilyIndex = index;
+                info.Count = queueFamily.QueueCount;
                 
-                
-                if (queueFamily.QueueCount > 0 && presentSupport)
-                {
-                    indices.presentFamily = i;
-                }
-
-                if (indices.isComplete())
-                {
-                    break;
-                }
-
-                i++;
+                container.AddQueueFamily(info);
             }
 
-            return indices;
+            return container;
+        }
+
+        public static bool CanPresent(this PhysicalDevice device, uint queueFamilyIndex, SurfaceKHR surface)
+        {
+            device.GetPhysicalDeviceSurfaceSupport(queueFamilyIndex, surface, out var presentSupport);
+            return presentSupport;
         }
 
         public static UInt32 FindMemoryIndex(this PhysicalDevice physicalDevice, UInt32 memoryTypeBits, MemoryPropertyFlags propertyFlags)
@@ -66,14 +51,57 @@ namespace Adamantium.Engine.Graphics
         }
     }
 
-    public class QueueFamilyIndices
+    public class QueueFamilyContainer
     {
-        public uint? graphicsFamily;
-        public uint? presentFamily;
+        private List<QueueFamilyInfo> _familyInfos;
+        
+        public PhysicalDevice PhysicalDevice { get; }
 
-        public bool isComplete()
+        public QueueFamilyContainer(PhysicalDevice physicalDevice)
         {
-            return graphicsFamily.HasValue && presentFamily.HasValue;
+            PhysicalDevice = physicalDevice;
+            _familyInfos = new List<QueueFamilyInfo>();
         }
+
+        public IReadOnlyList<QueueFamilyInfo> FamilyInfos => _familyInfos;
+
+        public void AddQueueFamily(QueueFamilyInfo info)
+        {
+            _familyInfos.Add(info);
+        }
+        
+        public bool CanPresent(QueueFamilyInfo info, SurfaceKHR surface)
+        {
+            if (surface == null) return true;
+            
+            PhysicalDevice.GetPhysicalDeviceSurfaceSupport(info.FamilyIndex, surface, out var presentSupport);
+            return presentSupport;
+        }
+
+        public uint GetPresentFamilyIndex(SurfaceKHR surface)
+        {
+            foreach (var familyInfo in _familyInfos)
+            {
+                PhysicalDevice.GetPhysicalDeviceSurfaceSupport(familyInfo.FamilyIndex, surface, out var presentSupport);
+                if (presentSupport) break;
+                return familyInfo.FamilyIndex;
+            }
+
+            return 0;
+        }
+
+        public QueueFamilyInfo GetFamilyInfo(QueueFlagBits flags)
+        {
+            return _familyInfos.FirstOrDefault(x => x.Type.HasFlag(flags));
+        }
+    }
+
+    public class QueueFamilyInfo
+    {
+        public uint FamilyIndex { get; set; }
+        
+        public uint Count { get; set; }
+        
+        public QueueFlagBits Type { get; set; }
     }
 }

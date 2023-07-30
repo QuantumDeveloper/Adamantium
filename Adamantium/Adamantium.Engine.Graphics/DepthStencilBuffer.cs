@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using Adamantium.Imaging;
+﻿using Adamantium.Imaging;
 using AdamantiumVulkan.Core;
 
 namespace Adamantium.Engine.Graphics

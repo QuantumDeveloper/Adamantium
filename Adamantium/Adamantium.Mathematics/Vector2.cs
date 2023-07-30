@@ -371,6 +371,18 @@ namespace Adamantium.Mathematics
       {
          return new(value.X / scale, value.Y / scale);
       }
+      
+      /// <summary>
+      /// Scales a vector by the given value.
+      /// </summary>
+      /// <param name="value">The vector to scale.</param>
+      /// <param name="scale">The amount by which to scale the vector.</param>
+      /// <returns>The scaled vector.</returns>
+      [MethodImpl(MethodImplOptions.AggressiveInlining)]
+      public static Vector2 Divide(Vector2 value1, Vector2 value2)
+      {
+         return new(value1.X / value2.X, value1.Y / value2.Y);
+      }
 
       /// <summary>
       /// Scales a vector by the given value.

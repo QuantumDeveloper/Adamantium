@@ -87,6 +87,5 @@ public class Control : InputUIComponent, IControl
 
    public virtual void OnApplyTemplate()
    {
-      RaiseEvent(new RoutedEventArgs(LoadedEvent, this));
    }
 }

@@ -8,36 +8,11 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using Adamantium.Imaging.Jpeg.IO;
-using AdamantiumVulkan.Core;
 
 namespace Adamantium.Imaging.Jpeg.Decoder
 {
-    public enum BlockUpsamplingMode
-    {
-        /// <summary> The simplest upsampling mode. Produces sharper edges. </summary>
-        BoxFilter,
-        /// <summary> Smoother upsampling. May improve color spread for some images. </summary>
-        Interpolate
-    }
-
-    public class JpegDecodeProgressChangedArgs : EventArgs
-    {
-        public bool SizeReady;
-        public int Width;
-        public int Height;
-
-        public bool Abort;
-        public long ReadPosition; // 0 to input stream length
-        public double DecodeProgress; // 0 to 1.0
-    }
-
     public class JpegDecoder
     {
-        public static long ProgressUpdateByteInterval = 100;
-
-        public event EventHandler<JpegDecodeProgressChangedArgs> DecodeProgressChanged;
-        private JpegDecodeProgressChangedArgs DecodeProgress = new JpegDecodeProgressChangedArgs();
-
         public BlockUpsamplingMode BlockUpsamplingMode { get; set; }
 
         byte majorVersion, minorVersion;
@@ -46,7 +21,6 @@ namespace Adamantium.Imaging.Jpeg.Decoder
         ushort XDensity, YDensity;
         byte Xthumbnail, Ythumbnail;
         byte[] thumbnail;
-        Image image;
 
         bool progressive = false;
 
@@ -70,7 +44,7 @@ namespace Adamantium.Imaging.Jpeg.Decoder
 
         private JPEGBinaryReader jpegReader;
 
-        List<JPEGFrame> jpegFrames = new List<JPEGFrame>();
+        List<JpegFrame> jpegFrames = new List<JpegFrame>();
 
         JpegHuffmanTable[] dcTables = new JpegHuffmanTable[4];
         JpegHuffmanTable[] acTables = new JpegHuffmanTable[4];
@@ -141,12 +115,13 @@ namespace Adamantium.Imaging.Jpeg.Decoder
             return true;
         }
 
-        public Image Decode()
+        public JpegImage Decode()
         {
             // The frames in this jpeg are loaded into a list. There is
             // usually just one frame except in heirarchial progression where
             // there are multiple frames.
-            JPEGFrame frame = null;
+            JpegFrame frame = null;
+            JpegImage jpegImage = new JpegImage();
 
             // The restart interval defines how many MCU's we should have
             // between the 8-modulo restart marker. The restart markers allow
@@ -165,8 +140,6 @@ namespace Adamantium.Imaging.Jpeg.Decoder
             // can be processed.
             while (true)
             {
-                if (DecodeProgress.Abort) return null;
-
                 #region Switch over marker types
                 switch (marker)
                 {
@@ -263,10 +236,10 @@ namespace Adamantium.Imaging.Jpeg.Decoder
                         // Progressive or baseline?
                         progressive = marker == JPEGMarker.SOF2;
 
-                        jpegFrames.Add(new JPEGFrame());
+                        jpegFrames.Add(new JpegFrame());
                         frame = jpegFrames[jpegFrames.Count - 1];
-                        frame.ProgressUpdateMethod = new Action<long>(UpdateStreamProgress);
-
+                        jpegImage.AddFrame(frame);
+                        
                         // Skip the frame length.
                         jpegReader.ReadShort();
                         // Bits precision, either 8 or 12.
@@ -277,16 +250,6 @@ namespace Adamantium.Imaging.Jpeg.Decoder
                         frame.SamplesPerLine = jpegReader.ReadShort();
                         // Number of Color Components (channels).
                         frame.ComponentCount = jpegReader.ReadByte();
-
-                        DecodeProgress.Height = frame.Height;
-                        DecodeProgress.Width = frame.Width;
-                        DecodeProgress.SizeReady = true;
-
-                        if (DecodeProgressChanged != null)
-                        {
-                            DecodeProgressChanged(this, DecodeProgress);
-                            if (DecodeProgress.Abort) return null;
-                        }
 
                         // Add all of the necessary components to the frame.
                         for (int i = 0; i < frame.ComponentCount; i++)
@@ -433,8 +396,12 @@ namespace Adamantium.Imaging.Jpeg.Decoder
                         if (progressive)
                         {
                             frame.DecodeScanProgressive(
-                                successiveApproximation, startSpectralSelection, endSpectralSelection,
-                                numberOfComponents, componentSelector, resetInterval, jpegReader, ref marker);
+                                successiveApproximation, 
+                                startSpectralSelection, 
+                                endSpectralSelection,
+                                numberOfComponents, 
+                                componentSelector, 
+                                resetInterval, jpegReader, ref marker);
 
                             haveMarker = true; // use resultant marker for the next switch(..)
                         }
@@ -466,16 +433,9 @@ namespace Adamantium.Imaging.Jpeg.Decoder
                             frame = orderedFrames.FirstOrDefault(); // Take the biggest frame and continue rasterization
                         }
 
-                        ImageDescription description = new ImageDescription();
-                        description.Width = frame.Width;
-                        description.Height = frame.Height;
-                        description.Depth = 1;
-                        description.Dimension = TextureDimension.Texture2D;
-                        description.ArraySize = 1;
-                        description.MipLevels = 1;
-                        description.Format = Format.R8G8B8A8_UNORM;
-
-                        image = Image.New(description);
+                        jpegImage.Width = frame.Width;
+                        jpegImage.Height = frame.Height;
+                        jpegImage.PixelFormat = SurfaceFormat.R8G8B8A8.UNorm;
 
                         // Only one frame here
                         byte[][,] raster = ComponentsBuffer.CreateRaster(frame.Width, frame.Height, 4);
@@ -492,17 +452,13 @@ namespace Adamantium.Imaging.Jpeg.Decoder
 
                             // 1. Quantize
                             comp.quantizeData();
-                            UpdateProgress(++stepsFinished, totalSteps);
-
+                            
                             // 2. Run iDCT (expensive)
                             comp.idctData();
-                            UpdateProgress(++stepsFinished, totalSteps);
-
+                            
                             // 3. Scale the image and write the data to the raster.
                             comp.writeDataScaled(raster, i, BlockUpsamplingMode);
-
-                            UpdateProgress(++stepsFinished, totalSteps);
-
+                            
                             // Ensure garbage collection.
                             comp = null;
                         }
@@ -536,7 +492,7 @@ namespace Adamantium.Imaging.Jpeg.Decoder
 
                         componentsBuffer.ChangeColorSpace(ColorSpace.RGB);
 
-                        componentsBuffer.CopyPixels(image.DataPointer, frame.Width * frame.Height * 4);
+                        frame.PixelData = componentsBuffer.GetPixelBuffer();
 
                         break;
 
@@ -574,9 +530,7 @@ namespace Adamantium.Imaging.Jpeg.Decoder
                 }
             }
 
-            //DecodedJpeg result = new DecodedJpeg(image, headers);
-
-            return image;
+            return jpegImage;
         }
 
         public IList<JpegHeader> ExtractHeaders()
@@ -597,8 +551,6 @@ namespace Adamantium.Imaging.Jpeg.Decoder
             // that point the headers have been fully extracted
             while (true)
             {
-                if (DecodeProgress.Abort) return null;
-
                 #region Switch over marker types
                 switch (marker)
                 {
@@ -759,29 +711,5 @@ namespace Adamantium.Imaging.Jpeg.Decoder
             };
             return header;
         }
-
-        #region Decode Progress Monitoring
-
-        private void UpdateStreamProgress(long StreamPosition)
-        {
-            if (DecodeProgressChanged != null)
-            {
-                DecodeProgress.ReadPosition = StreamPosition;
-                DecodeProgressChanged(this, DecodeProgress);
-            };
-        }
-
-        private void UpdateProgress(int stepsFinished, int stepsTotal)
-        {
-            if (DecodeProgressChanged != null)
-            {
-                DecodeProgress.DecodeProgress = (double)stepsFinished / stepsTotal;
-                DecodeProgressChanged(this, DecodeProgress);
-            };
-        }
-
-        #endregion
-
-
     }
 }

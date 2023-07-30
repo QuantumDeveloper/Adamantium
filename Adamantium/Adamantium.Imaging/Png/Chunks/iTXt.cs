@@ -19,14 +19,14 @@ namespace Adamantium.Imaging.Png.Chunks
 
         public string Text { get; set; }
 
-        internal override byte[] GetChunkBytes(PNGState state)
+        internal override byte[] GetChunkBytes(PngState state)
         {
             var bytes = new List<byte>();
 
             var keyWord = Encoding.ASCII.GetBytes(Key);
             if (keyWord.Length < 1 || keyWord.Length > 79)
             {
-                throw new PNGEncoderException(89);
+                throw new PngEncoderException(89);
             }
             var langTagBytes = Encoding.ASCII.GetBytes(LangTag);
             var transKeyBytes = Encoding.ASCII.GetBytes(TransKey);
@@ -36,11 +36,11 @@ namespace Adamantium.Imaging.Png.Chunks
             var compressedData = new List<byte>();
             if (state.EncoderSettings.TextCompression)
             {
-                PNGCompressor compressor = new PNGCompressor();
+                PngCompressor compressor = new PngCompressor();
                 var error = compressor.Compress(textBytes, state.EncoderSettings, compressedData);
                 if (error > 0)
                 {
-                    throw new PNGEncoderException(error);
+                    throw new PngEncoderException(error);
                 }
             }
 

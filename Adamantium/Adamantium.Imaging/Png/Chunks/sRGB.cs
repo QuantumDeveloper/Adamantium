@@ -11,7 +11,7 @@ namespace Adamantium.Imaging.Png.Chunks
 
         public RenderingIntent RenderingIntent { get; set; }
 
-        internal override byte[] GetChunkBytes(PNGState state)
+        internal override byte[] GetChunkBytes(PngState state)
         {
             var bytes = new List<byte>();
             bytes.AddRange(GetNameAsBytes());
@@ -20,7 +20,7 @@ namespace Adamantium.Imaging.Png.Chunks
             return bytes.ToArray();
         }
 
-        internal static sRGB FromState(PNGState state)
+        internal static sRGB FromState(PngState state)
         {
             return new sRGB() { RenderingIntent = state.InfoPng.SrgbIntent };
         }

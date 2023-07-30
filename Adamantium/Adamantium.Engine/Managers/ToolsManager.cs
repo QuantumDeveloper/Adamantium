@@ -52,7 +52,7 @@ namespace Adamantium.Engine.Managers
 
         public ToolsManager(IGame game) : base(game)
         {
-            DependencyResolver.RegisterInstance<ToolsManager>(this);
+            Container.RegisterInstance<ToolsManager>(this);
             CameraDragTool = new CameraDragTool(nameof(CameraDragTool));
             MoveTool = new MoveTool(false, 1.0f, new Vector3F(2));
             RotationTool = new RotationTool(false, 2.0f, new Vector3F(2));
@@ -63,7 +63,7 @@ namespace Adamantium.Engine.Managers
 
             PlaneGridTool = new PlaneGridToolTemplate(20, 20, new Vector3F(1), 20).BuildEntity(null, "PlaneGrid");
 
-            inputManager = DependencyResolver.Resolve<GameInputManager>();
+            inputManager = Container.Resolve<GameInputManager>();
             EntityWorld.AddToGroup(MoveTool.Tool, "Tools");
             EntityWorld.AddToGroup(PivotTool.Tool, "Tools");
             EntityWorld.AddToGroup(RotationTool.Tool, "Tools");

@@ -25,6 +25,8 @@ public struct GridLength:IEquatable<GridLength>
    public Double Value { get; private set; }
 
    public static GridLength Auto => new GridLength(0, GridUnitType.Auto);
+   
+   public static GridLength Star => new GridLength(1, GridUnitType.Star);
 
    public Boolean IsAbsolute => unitType == GridUnitType.Pixel;
 
@@ -65,5 +67,26 @@ public struct GridLength:IEquatable<GridLength>
       }
 
       return IsStar ? Value + "*" : Value.ToString();
+   }
+
+   public static GridLength Parse(string value)
+   {
+      switch (value)
+      {
+         case "Auto":
+            return Auto;
+         default:
+         {
+            if (value.EndsWith("*"))
+            {
+               if (value == "*")
+                  return Star;
+               var star = value.Substring(0, value.Length - 1);
+               return new GridLength(Double.Parse(star), GridUnitType.Star);
+            }
+
+            return new GridLength(Double.Parse(value), GridUnitType.Pixel);
+         }
+      }
    }
 }

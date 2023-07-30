@@ -148,9 +148,7 @@ namespace Adamantium.Engine.Graphics.Effects
             {
                 case EffectResourceType.SamplerState:
                     {
-
-                        Sampler[] states = null;
-                        if (!SamplerStates.TryGetValue(parameter, out states))
+                        if (!SamplerStates.TryGetValue(parameter, out var states))
                         {
                             states = new Sampler[parameter.Count];
                             SamplerStates.Add(parameter, states);
@@ -158,13 +156,16 @@ namespace Adamantium.Engine.Graphics.Effects
                         }
 
                         Sampler state = null;
-                        if (value is Sampler)
+                        if (value is Sampler sampler)
                         {
-                            state = value as Sampler;
+                            state = sampler;
+                        }
+                        else if (value is SamplerState samplerState)
+                        {
+                            state = samplerState;
                         }
                         states[index] = state;
-
-                    }
+                    }   
                     break;
                 case EffectResourceType.ShaderResourceView:
                     {

@@ -1,18 +1,24 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using Adamantium.Engine.Graphics;
 using Adamantium.Imaging;
 using Adamantium.UI.Media;
 using Adamantium.UI.Media.Imaging;
 using Adamantium.UI.RoutedEvents;
 using Serilog;
+using Serilog.Core;
 
 namespace Adamantium.UI.Controls;
 
-public unsafe class RenderTargetPanel: Grid
+public class RenderTargetPanel: Grid
 {
-   private RenderTargetImage _renderTarget;
-   
-   public RenderTargetPanel() { }
+   private RenderTargetImage _currentRenderTarget;
+   private RenderTargetImage _nextRenderTarget;
+
+   public RenderTargetPanel()
+   {
+   }
 
    static RenderTargetPanel()
    {
@@ -20,9 +26,9 @@ public unsafe class RenderTargetPanel: Grid
          new PropertyMetadata(true, PropertyMetadataOptions.AffectsMeasure));
    }
 
-   public static readonly AdamantiumProperty PixelFormatProperty = AdamantiumProperty.Register(nameof(PixelFormat),
+   public static readonly AdamantiumProperty SurfaceFormatProperty = AdamantiumProperty.Register(nameof(SurfaceFormat),
       typeof(SurfaceFormat), typeof(RenderTargetPanel),
-      new PropertyMetadata(SurfaceFormat.R8G8B8A8.UNorm, PropertyMetadataOptions.AffectsRender,
+      new PropertyMetadata(SurfaceFormat.B8G8R8A8.UNorm, PropertyMetadataOptions.AffectsRender,
          RenderTargetParametersChanged));
 
    public static readonly AdamantiumProperty HandleProperty = AdamantiumProperty.RegisterReadOnly(nameof(Handle),
@@ -37,10 +43,46 @@ public unsafe class RenderTargetPanel: Grid
       AdamantiumProperty.RegisterReadOnly(nameof(PixelHeight), typeof(Int32), typeof(RenderTargetPanel),
          new PropertyMetadata(0));
 
-   public SurfaceFormat PixelFormat
+   public static readonly AdamantiumProperty CanPresentProperty =
+      AdamantiumProperty.RegisterReadOnly(nameof(CanPresent), typeof(bool), typeof(RenderTargetPanel),
+         new PropertyMetadata(false, OnCanPresentChanged));
+   
+   public static readonly AdamantiumProperty RenderTargetProperty = 
+      AdamantiumProperty.RegisterReadOnly(nameof(RenderTarget), typeof(RenderTargetImage), typeof(RenderTargetPanel),
+         new PropertyMetadata(null, OnRenderTargetChanged));
+
+   private static void OnRenderTargetChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
    {
-      get => GetValue<SurfaceFormat>(PixelFormatProperty);
-      set => SetValue(PixelFormatProperty, value);
+      if (a is RenderTargetPanel panel && e.NewValue is RenderTargetImage)
+      {
+         panel.RaiseRenderTargetCreatedOrUpdatedEvent();
+      }
+   }
+
+   private static void OnCanPresentChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+   {
+      if (a is RenderTargetPanel panel && (bool)e.NewValue)
+      {
+         panel.InvalidateRender(false);
+      }
+   }
+
+   public RenderTargetImage RenderTarget
+   {
+      get => GetValue<RenderTargetImage>(RenderTargetProperty); 
+      private set => SetValue(RenderTargetProperty, value);
+   }
+
+   public bool CanPresent
+   {
+      get => GetValue<bool>(CanPresentProperty);
+      set => SetValue(CanPresentProperty, value);
+   }
+
+   public SurfaceFormat SurfaceFormat
+   {
+      get => GetValue<SurfaceFormat>(SurfaceFormatProperty);
+      set => SetValue(SurfaceFormatProperty, value);
    }
       
    public UInt32 PixelWidth
@@ -73,6 +115,7 @@ public unsafe class RenderTargetPanel: Grid
 
    protected override void OnSizeChanged(SizeChangedEventArgs e)
    {
+      Log.Logger.Debug($"Size changed event. New size: {e.NewSize}");
       UpdateOrCreateRenderTarget();
       sizeChanged = true;
    }
@@ -94,15 +137,12 @@ public unsafe class RenderTargetPanel: Grid
          
          PixelWidth = (uint)ActualWidth;
          PixelHeight = (uint)ActualHeight;
-         var pixelWidth = PixelWidth;
-         var pixelHeight = PixelHeight;
-
-         _renderTarget?.Dispose();
-         _renderTarget = new RenderTargetImage(pixelWidth, pixelHeight, MSAALevel.None, PixelFormat);
-         Handle = new IntPtr(_renderTarget.NativePointer);
-         var args = new RenderTargetEventArgs(Handle, pixelWidth, pixelHeight, PixelFormat);
-         args.RoutedEvent = RenderTargetCreatedOrUpdatedEvent;
-         RaiseEvent(args);
+         
+         
+         CanPresent = false;
+         var wnd = GetWindow();
+         _nextRenderTarget = new RenderTargetImage(wnd.GetDrawingContext(), PixelWidth, PixelHeight, MSAALevel.None, SurfaceFormat);
+         RenderTarget = _nextRenderTarget;
       }
       catch (Exception e)
       {
@@ -111,11 +151,20 @@ public unsafe class RenderTargetPanel: Grid
       }
    }
 
+   private void RaiseRenderTargetCreatedOrUpdatedEvent()
+   {
+      var pixelWidth = PixelWidth;
+      var pixelHeight = PixelHeight;
+      var args = new RenderTargetEventArgs(_nextRenderTarget, pixelWidth, pixelHeight, SurfaceFormat);
+      args.RoutedEvent = RenderTargetCreatedOrUpdatedEvent;
+      RaiseEvent(args);
+   }
+
    protected override void OnInitialized()
    {
       base.OnInitialized();
-      SizeChanged += OnSizeChanged;
       UpdateOrCreateRenderTarget();
+      SizeChanged += OnSizeChanged;
    }
    
    private void OnSizeChanged(object sender, SizeChangedEventArgs e)
@@ -128,19 +177,26 @@ public unsafe class RenderTargetPanel: Grid
 
    protected override void OnRender(DrawingContext context)
    {
-      if (_renderTarget == null) return;
-      
-      if (sizeChanged)
+      context.DrawRectangle(Background, new Rect(new Size(ActualWidth, ActualHeight)));
+      if (CanPresent)
       {
-         context.BeginDraw(this);
-         context.DrawImage(_renderTarget, Brushes.White, new Rect(Bounds.Size), new CornerRadius(0));
-         context.EndDraw(this);
-         sizeChanged = false;
+         _currentRenderTarget?.Dispose();
+         _currentRenderTarget = _nextRenderTarget;
+         unsafe
+         {
+            Handle = new IntPtr(_currentRenderTarget.NativePointer);
+         }
+         context.AddImage(_currentRenderTarget);
+      }
+      else
+      {
+         context.AddImage(_currentRenderTarget);
       }
    }
 
-   public void SaveCurrentFrame(Uri path, ImageFileType fileType)
+
+   public async void SaveCurrentFrame(Uri path, ImageFileType fileType)
    {
-      _renderTarget.Save(path, fileType);
+      await Task.Run(() => _currentRenderTarget.Save(path, fileType));
    }
 }

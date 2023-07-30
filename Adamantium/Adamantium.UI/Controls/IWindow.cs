@@ -1,9 +1,7 @@
 ﻿using System;
-using Adamantium.Core;
-using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.UI.Events;
-using Adamantium.UI.Input;
+using Adamantium.UI.Media;
 using Adamantium.UI.Rendering;
 using Adamantium.UI.RoutedEvents;
 
@@ -35,9 +33,13 @@ public interface IWindow : IRootVisualComponent, IContentControl
     MSAALevel MSAALevel { get; set; }
         
     WindowState State { get; set; }
+    
+    IWindowRenderer DefaultRenderer { get; set; }
 
     IWindowRenderer Renderer { get; set; }
-        
+
+    DrawingContext GetDrawingContext();
+    
     event SizeChangedEventHandler ClientSizeChanged;
     event EventHandler<WindowClosingEventArgs> Closing;
     event MSAALeveChangedHandler MSAALevelChanged;

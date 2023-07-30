@@ -37,7 +37,7 @@ namespace Adamantium.EntityFramework
         }
 
         private Entity owner;
-        private readonly Int64 uid;
+        private readonly UInt128 uid;
         private bool isEnabled;
         private bool isSelected;
         private string name;
@@ -50,7 +50,7 @@ namespace Adamantium.EntityFramework
 
         public Transform Transform { get; internal set; }
 
-        public long Uid => uid;
+        public UInt128 Uid => uid;
 
         public bool IgnoreInCollisionDetection { get; set; }
 
@@ -254,7 +254,7 @@ namespace Adamantium.EntityFramework
                 Console.WriteLine(e);
                 //throw;
             }
-            return new T[0];
+            return Array.Empty<T>();
         }
 
         public bool ContainsComponent<T>() where T : class, IComponent
@@ -346,7 +346,7 @@ namespace Adamantium.EntityFramework
         public Entity Duplicate()
         {
             Entity root = new Entity(null, $"{this.Name} (1)");
-            var entities = new Dictionary<long, Entity>();
+            var entities = new Dictionary<UInt128, Entity>();
             entities.Add(Uid, root);
             CloneComponents(root, this);
             TraverseByLayer(current =>

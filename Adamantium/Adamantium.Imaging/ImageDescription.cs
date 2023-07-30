@@ -76,7 +76,6 @@ namespace Adamantium.Imaging
         /// This field is only valid for <see cref="Texture1D"/>, <see cref="Texture2D"/> and <see cref="TextureCube"/>
         /// </remarks>
         /// <remarks>
-        /// This field is only valid for textures: <see cref="Texture1D"/>, <see cref="Texture2D"/> and <see cref="TextureCube"/>.
         /// </remarks>
         /// <msdn-id>ff476252</msdn-id>	
         /// <unmanaged>unsigned int ArraySize</unmanaged>	
@@ -96,6 +95,10 @@ namespace Adamantium.Imaging
         /// </summary>	
         /// <unmanaged>Vulkan imange Format</unmanaged>	
         public Format Format;
+
+        public long RowStride => Width * Format.SizeOfInBytes();
+
+        public long TotalSizeInBytes => RowStride * Height;
 
         /// <inheritdoc />
         public bool Equals(ImageDescription other)
@@ -164,6 +167,22 @@ namespace Adamantium.Imaging
         {
             return
                $"Dimension: {Dimension}, Width: {Width}, Height: {Height}, Depth: {Depth}, Format: {Format}, ArraySize: {ArraySize}, MipLevels: {MipLevels}";
+        }
+
+        public static ImageDescription Default2D(uint width, uint height, SurfaceFormat format)
+        {
+            var descr = new ImageDescription
+            {
+                Depth = 1,
+                ArraySize = 1,
+                Dimension = TextureDimension.Texture2D,
+                MipLevels = 1,
+                Width = width,
+                Height = height,
+                Format = format
+            };
+
+            return descr;
         }
     }
 }

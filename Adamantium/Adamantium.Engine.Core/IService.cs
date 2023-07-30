@@ -1,4 +1,5 @@
 ﻿using System;
+using Adamantium.Core;
 
 namespace Adamantium.Engine.Core
 {
@@ -11,6 +12,8 @@ namespace Adamantium.Engine.Core
         /// Gets value indicating is service is currently running
         /// </summary>
         bool IsRunning { get; }
+        
+        bool IsInitialized { get; }
 
         /// <summary>
         /// Gets value indicating is service is currently paused
@@ -27,6 +30,8 @@ namespace Adamantium.Engine.Core
         /// </summary>
         /// <param name="context"></param>
         void Run(object context);
+
+        void RunOnce(AppTime time);
 
         /// <summary>
         /// Calling this method will stop running service

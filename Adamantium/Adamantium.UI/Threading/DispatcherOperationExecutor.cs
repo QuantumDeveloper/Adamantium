@@ -18,6 +18,14 @@ internal class DispatcherOperationExecutor
         this.platform = platform;
     }
 
+    public void Invoke(Action action, DispatcherPriority priority)
+    {
+        if (action == null) throw new ArgumentNullException(nameof(action));
+            
+        var operation = new DispatcherOperation(action, priority);
+        AddOperation(operation);
+    }
+
     public Task InvokeAsync(Action action, DispatcherPriority priority)
     {
         if (action == null) throw new ArgumentNullException(nameof(action));

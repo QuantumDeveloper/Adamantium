@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -15,18 +16,14 @@ namespace Adamantium.Imaging.Gif
         private const string GIFHeader = "GIF89a";
         private const string NetscapeAppExt = "NETSCAPE2.0";
 
-        private LZW lzw;
-
         public GifEncoder()
         {
-            lzw = new LZW();
         }
 
-        public void Encode(Image img, Stream stream)
+        public void Encode(IRawBitmap img, Stream stream)
         {
             WriteGifHeader(stream);
-            WriteHeader(ref img.Description, stream);
-            //WriteGraphicsControlExtension(stream, 0, 0);
+            WriteHeader(img.GetImageDescription(), stream);
             WriteApplicationExtension(stream, 0);
             WriteImageData(img, stream);
             stream.WriteByte((byte)GifChunkCodes.Trailer);
@@ -38,7 +35,7 @@ namespace Adamantium.Imaging.Gif
             stream.WriteBytes(header);
         }
 
-        private void WriteHeader(ref ImageDescription description, Stream stream)
+        private void WriteHeader(ImageDescription description, Stream stream)
         {
             stream.WriteUInt16((ushort)description.Width);
             stream.WriteUInt16((ushort)description.Height);
@@ -73,31 +70,39 @@ namespace Adamantium.Imaging.Gif
             stream.WriteByte(0); // Trailer
         }
 
-        private void WriteGraphicsControlExtension(Stream stream, ushort delay, int transparentIndex, DisposalMethod disposalMethod)
+        private void WriteGraphicsControlExtension(Stream stream, UInt16 delay, byte transparentIndex, DisposalMethod disposalMethod)
         {
             stream.WriteByte((byte)GifChunkCodes.ExtensionIntroducer);
 
             stream.WriteByte((byte)GifChunkCodes.GraphicControl);
+            // block size
+            stream.WriteByte(4);
+            
+            // flags
             stream.WriteByte(5);
 
+            //delay
+            stream.WriteUInt16(delay);
+            //transparent index
+            stream.WriteByte(transparentIndex);
+            
             stream.WriteByte(0);
-            stream.WriteUInt16(0);
-            stream.WriteByte(0);
-            stream.WriteByte((byte)disposalMethod);
-
-            stream.WriteByte(0); // Trailer
         }
 
-        private void WriteImageData(Image img, Stream stream)
+        private void WriteImageData(IRawBitmap img, Stream stream)
         {
-            var quantizerResults = new QuantizerResult[img.PixelBuffer.Count];
+            for (uint i = 0; i< img.FramesCount; ++i)
+            {
+                img.GetRawPixels(i);
+            }
+            var quantizerResults = new QuantizerResult[img.FramesCount];
             Parallel.For(
                 0,
-                img.PixelBuffer.Count,
+                img.FramesCount,
                 index =>
                 {
                     var quant = new DistinctSelectionQuantizer();
-                    var result = ImageBuffer.QuantizeImage(img.PixelBuffer[index], quant, null, 256, true, 1);
+                    var result = ImageBuffer.QuantizeImage(img.GetFrameData((uint)index), quant, null, 256, true, 1);
 
                     if (result.ColorTable.Length < 256)
                     {
@@ -110,7 +115,7 @@ namespace Adamantium.Imaging.Gif
 
                         result.ColorTable = lst.ToArray();
                     }
-                    result.CompressedPixels = lzw.Compress(result.IndexTable, 8);
+                    result.CompressedPixels = LZW.Compress(result.IndexTable, 8);
                     quantizerResults[index] = result;
                 }
             );
@@ -132,8 +137,8 @@ namespace Adamantium.Imaging.Gif
                 stream.WriteByte((byte) GifChunkCodes.ImageDescriptor);
                 stream.WriteUInt16(0);
                 stream.WriteUInt16(0);
-                stream.WriteUInt16((ushort) result.Image.Width);
-                stream.WriteUInt16((ushort) result.Image.Height);
+                stream.WriteUInt16((ushort) result.Image.Description.Width);
+                stream.WriteUInt16((ushort) result.Image.Description.Height);
                 stream.WriteByte(fields);
 
                 //Writing local color table
@@ -143,7 +148,7 @@ namespace Adamantium.Imaging.Gif
                 }
 
                 WriteCompressedImage(stream, result.CompressedPixels, 8);
-                WriteGraphicsControlExtension(stream, 0, 0, DisposalMethod.None);
+                WriteGraphicsControlExtension(stream, 4, 127, DisposalMethod.DoNotDispose);
             }
         }
 

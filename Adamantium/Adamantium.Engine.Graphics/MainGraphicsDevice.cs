@@ -12,18 +12,24 @@ namespace Adamantium.Engine.Graphics
 {
     public class MainGraphicsDevice : DisposableBase
     {
+        private uint _availableGraphicsQueueIndex;
+
+        private uint _availableComputeQueueIndex;
+
+        private uint _availableTransferQueueIndex;
+        
         public bool EnableDynamicRendering { get; }
         public VulkanInstance VulkanInstance { get; private set; }
         
         public PhysicalDevice PhysicalDevice { get; private set; }
         
+        public GraphicsDevice ResourceLoaderDevice { get; set; }
+        
         internal Device LogicalDevice { get; private set; }
         
         public uint AvailableQueuesCount { get; private set; }
         
-        //internal Queue GraphicsQueue { get; private set; }
-        
-        internal CommandPool CommandPool { get; private set; }
+        public QueueFamilyContainer QueueFamilyContainer { get; private set; }
         
         public static ReadOnlyCollection<string> DeviceExtensions { get; private set; }
 
@@ -49,8 +55,8 @@ namespace Adamantium.Engine.Graphics
             EnableDynamicRendering = enableDynamicRendering;
             VulkanInstance = VulkanInstance.Create(name, enableDebug);
             PhysicalDevice = VulkanInstance.CurrentDevice;
+            QueueFamilyContainer = PhysicalDevice.FindQueueFamilies();
             CreateLogicalDevice();
-            CreateCommandPool();
             unsafe
             {
                 if (LogicalDevice != null)
@@ -63,34 +69,28 @@ namespace Adamantium.Engine.Graphics
         
         private unsafe void CreateLogicalDevice()
         {
-            var indices = PhysicalDevice.FindQueueFamilies(null);
-
-            var queueInfos = new List<DeviceQueueCreateInfo>();
-            HashSet<uint> uniqueQueueFamilies = new HashSet<uint>() { indices.graphicsFamily.Value, indices.presentFamily.Value };
             float queuePriority = 1.0f;
             var queueFamilies = PhysicalDevice.GetQueueFamilyProperties();
 
             for (int i = 0; i < queueFamilies.Length; ++i)
             {
-                Console.WriteLine($"Queue family {i}. Queue count: {queueFamilies[i].QueueCount}");
+                Console.WriteLine($"Queue family {i}. QueueFlags: {queueFamilies[i].QueueFlags}. Queue count: {queueFamilies[i].QueueCount}");
             }
             
-            AvailableQueuesCount = 2;
+            AvailableQueuesCount = (uint)queueFamilies.Count(x => x.QueueFlags.HasFlag(QueueFlagBits.GraphicsBit));
+            var computeQueuesCount = (uint)queueFamilies.Count(x => x.QueueFlags.HasFlag(QueueFlagBits.ComputeBit));
 
-            if (queueFamilies[0].QueueCount < 2)
-            {
-                Console.WriteLine($"There are only {queueFamilies[0].QueueCount} queues for queue family 0");
-                AvailableQueuesCount = 1;
-            }
+            Console.WriteLine($"{AvailableQueuesCount} queues available for graphics");
+            Console.WriteLine($"{computeQueuesCount} queues available for compute");
+
+            var graphicsFamily = QueueFamilyContainer.GetFamilyInfo(QueueFlagBits.GraphicsBit);
             
-            foreach (var queueFamily in uniqueQueueFamilies)
-            {
-                var queueCreateInfo = new DeviceQueueCreateInfo();
-                queueCreateInfo.QueueFamilyIndex = queueFamily;
-                queueCreateInfo.QueueCount = AvailableQueuesCount;
-                queueCreateInfo.PQueuePriorities = queuePriority;
-                queueInfos.Add(queueCreateInfo);
-            }
+            var queueInfos = new List<DeviceQueueCreateInfo>();
+            var queueCreateInfo = new DeviceQueueCreateInfo();
+            queueCreateInfo.QueueFamilyIndex = graphicsFamily.FamilyIndex;
+            queueCreateInfo.QueueCount = AvailableQueuesCount;
+            queueCreateInfo.PQueuePriorities = queuePriority;
+            queueInfos.Add(queueCreateInfo);
 
             var deviceFeatures = PhysicalDevice.GetPhysicalDeviceFeatures();
             deviceFeatures.SamplerAnisotropy = true;
@@ -112,6 +112,7 @@ namespace Adamantium.Engine.Graphics
                 dynamicRendering.DynamicRendering = VkBool32.TRUE;
 
                 var vulkan12Features = new PhysicalDeviceVulkan12Features();
+                vulkan12Features.SamplerMirrorClampToEdge = true;
                 var dynamicRenderingPtr = NativeUtils.StructOrEnumToPointer(dynamicRendering.ToNative());
                 vulkan12Features.PNext = dynamicRenderingPtr;
                 
@@ -137,7 +138,26 @@ namespace Adamantium.Engine.Graphics
             else
             {
                 var maintenance4FeaturesPtr = NativeUtils.StructOrEnumToPointer(maintenance4Features.ToNative());
-                createInfo.PNext = maintenance4FeaturesPtr;
+                
+                var vulkan12Features = new PhysicalDeviceVulkan12Features();
+                vulkan12Features.SamplerMirrorClampToEdge = true;
+                vulkan12Features.PNext = maintenance4FeaturesPtr;
+                
+                var vulkan11Features = new PhysicalDeviceVulkan11Features();
+                var vulkan12FeaturesPtr = NativeUtils.StructOrEnumToPointer(vulkan12Features.ToNative());
+                vulkan11Features.PNext = vulkan12FeaturesPtr;
+
+                var features2 = new PhysicalDeviceFeatures2();
+                features2.Features = new PhysicalDeviceFeatures();
+                features2.Features.SamplerAnisotropy = VkBool32.TRUE;
+                features2.Features.SampleRateShading = VkBool32.TRUE;
+                
+                var vulkan11FeaturesPtr = NativeUtils.StructOrEnumToPointer(vulkan11Features.ToNative());
+                features2.PNext = vulkan11FeaturesPtr;
+
+                var features2Ptr = NativeUtils.StructOrEnumToPointer(features2.ToNative());
+                
+                createInfo.PNext = features2Ptr;
                 createInfo.PEnabledFeatures = deviceFeatures;
             }
 
@@ -150,18 +170,6 @@ namespace Adamantium.Engine.Graphics
             LogicalDevice = PhysicalDevice.CreateDevice(createInfo);
             
             createInfo.Dispose();
-
-            //GraphicsQueue = LogicalDevice.GetDeviceQueue(indices.graphicsFamily.Value, 0);
-        }
-        
-        private void CreateCommandPool()
-        {
-            var queueFamilyIndices = PhysicalDevice.FindQueueFamilies(null);
-
-            var poolInfo = new CommandPoolCreateInfo();
-            poolInfo.QueueFamilyIndex = queueFamilyIndices.graphicsFamily.Value;
-            poolInfo.Flags = CommandPoolCreateFlagBits.ResetCommandBufferBit;
-            CommandPool = LogicalDevice?.CreateCommandPool(poolInfo);
         }
         
         public Result DeviceWaitIdle()
@@ -184,6 +192,47 @@ namespace Adamantium.Engine.Graphics
             return new(name, enableDynamicRendering, enableDebug);
         }
 
+        public Queue GetAvailableGraphicsQueue()
+        {
+            var graphicsFamily = QueueFamilyContainer.GetFamilyInfo(QueueFlagBits.GraphicsBit);
+            var queue = LogicalDevice.GetDeviceQueue(graphicsFamily.FamilyIndex, _availableGraphicsQueueIndex);
+            _availableGraphicsQueueIndex++;
+            if (_availableGraphicsQueueIndex >= graphicsFamily.Count)
+            {
+                _availableGraphicsQueueIndex = 0;
+            }
+
+            return queue;
+        }
+
+        public Queue GetAvailableComputeQueue()
+        {
+            var computeFamily = QueueFamilyContainer.GetFamilyInfo(QueueFlagBits.ComputeBit);
+            
+            var queue = LogicalDevice.GetDeviceQueue(computeFamily.FamilyIndex, _availableComputeQueueIndex);
+            _availableComputeQueueIndex++;
+            if (_availableComputeQueueIndex >= computeFamily.Count)
+            {
+                _availableComputeQueueIndex = 0;
+            }
+
+            return queue;
+        }
+
+        public Queue GetAvailableTransferQueue()
+        {
+            var transferFamily = QueueFamilyContainer.GetFamilyInfo(QueueFlagBits.TransferBit);
+            
+            var queue = LogicalDevice.GetDeviceQueue(transferFamily.FamilyIndex, _availableTransferQueueIndex);
+            _availableTransferQueueIndex++;
+            if (_availableTransferQueueIndex >= transferFamily.Count)
+            {
+                _availableTransferQueueIndex = 0;
+            }
+
+            return queue;
+        }
+
         public static implicit operator PhysicalDevice(MainGraphicsDevice device)
         {
             return device.PhysicalDevice;
@@ -193,12 +242,13 @@ namespace Adamantium.Engine.Graphics
         {
             Log.Logger.Debug("Start disposing main device");
             LogicalDevice?.DeviceWaitIdle();
-            LogicalDevice?.DestroyCommandPool(CommandPool);
-            CommandPool = null;
             LogicalDevice?.Dispose();
             LogicalDevice = null;
             VulkanInstance?.Dispose();
             VulkanInstance = null;
+            _availableTransferQueueIndex = 0;
+            _availableComputeQueueIndex = 0;
+            _availableGraphicsQueueIndex = 0;
             Log.Logger.Debug("End disposing main device");
         }
     }

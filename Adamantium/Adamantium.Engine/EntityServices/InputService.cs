@@ -41,6 +41,9 @@ namespace Adamantium.Engine.EntityServices
             //audioManager.Dispose();
         }
 
+        public override bool IsUpdateService => true;
+        public override bool IsRenderingService => false;
+
         public override void Update(AppTime gameTime)
         {
             //userControlledEntity = gamePlayManager.SelectedEntity;

@@ -15,7 +15,6 @@ public abstract class WindowRendererBase : IWindowRenderer
     protected Rect2D ClipRect { get; set; }
     protected Matrix4x4F ProjectionMatrix { get; set; }
     protected GraphicsDevice GraphicsDevice { get; set; }
-    protected DrawingContext DrawingContext { get; set; }
     protected PresentationParameters Parameters { get; set; }
     
     protected Effect UiEffect { get; set; }
@@ -33,6 +32,7 @@ public abstract class WindowRendererBase : IWindowRenderer
     
     protected IWindow Window { get; set; }
 
+    public DrawingContext DrawingContext { get; }
     public bool IsRendererUpToDate { get; protected set; }
     
     public void CalculateProjectionMatrix()

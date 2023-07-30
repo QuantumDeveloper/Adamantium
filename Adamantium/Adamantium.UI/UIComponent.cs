@@ -128,12 +128,14 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         }
     }
 
-    public void InvalidateRender()
+    public void InvalidateRender(bool invalidateChildren)
     {
         IsGeometryValid = false;
+        if (!invalidateChildren) return;
+        
         foreach (var uiComponent in VisualChildrenCollection)
         {
-            uiComponent.InvalidateRender();
+            uiComponent.InvalidateRender(true);
         }
     }
 
@@ -149,11 +151,13 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
 
     public void Render(DrawingContext context)
     {
-        if (!IsGeometryValid)
-        {
-            OnRender(context);
-            IsGeometryValid = true;
-        }
+        if (IsGeometryValid) return;
+        
+        context.BeginDraw(this);
+        OnRender(context);
+        context.EndDraw();
+        IsGeometryValid = true;
+        OnRenderCompleted();
     }
 
     /// <summary>
@@ -336,6 +340,10 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     }
 
     protected virtual void OnRender(DrawingContext context)
+    {
+    }
+
+    protected virtual void OnRenderCompleted()
     {
     }
 }

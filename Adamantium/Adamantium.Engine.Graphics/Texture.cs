@@ -2,6 +2,7 @@
 using Adamantium.Imaging;
 using Adamantium.Core;
 using System.IO;
+using System.Runtime.InteropServices;
 using Adamantium.Engine.Core.Content;
 using Adamantium.Win32;
 using VulkanImage = AdamantiumVulkan.Core.Image;
@@ -25,9 +26,9 @@ namespace Adamantium.Engine.Graphics
 
         public SurfaceFormat SurfaceFormat => Description.Format;
 
-        public ImageLayout ImageLayout { get; private set; }
+        public ImageLayout ImageLayout { get; internal set; }
         
-        public long TotalSizeInBytes { get; }
+        public ulong TotalSizeInBytes { get; private set; }
 
         public void* NativePointer => VulkanImage.NativePointer;
         
@@ -38,43 +39,73 @@ namespace Adamantium.Engine.Graphics
         protected Texture(GraphicsDevice device, TextureDescription description) : base(device)
         {
             Description = description;
+            ImageLayout = description.InitialLayout;
             Initialize();
-            TransitionImageLayout(VulkanImage, description.InitialLayout, description.DesiredImageLayout);
+            this.TransitionImageLayout(description.DesiredImageLayout);
         }
 
-        protected Texture(GraphicsDevice device, Image img, ImageUsageFlagBits usage, ImageLayout desiredLayout) : base(device)
+        protected Texture(GraphicsDevice device, Image img, ImageUsageFlagBits usage, ImageLayout desiredLayout) : 
+            base(device)
         {
-            //var formats = GraphicsDevice.VulkanInstance.CurrentDevice.GetPhysicalDeviceFormatProperties()
-            
             Description = img.Description;
             Description.Usage |= ImageUsageFlagBits.TransferDstBit | usage;
             Description.DesiredImageLayout = desiredLayout;
             TotalSizeInBytes = img.TotalSizeInBytes;
 
-            VkBuffer stagingBuffer;
-            DeviceMemory stagingBufferMemory;
-            CreateBuffer((ulong)TotalSizeInBytes, BufferUsageFlagBits.TransferSrcBit, MemoryPropertyFlags.HostVisible| MemoryPropertyFlags.HostCoherent, out stagingBuffer, out stagingBufferMemory);
+            CopyDataToImage(TotalSizeInBytes, img.DataPointer);
+        }
+        
+        protected Texture(GraphicsDevice device, IRawBitmap bitmap, ImageUsageFlagBits usage, ImageLayout desiredLayout) : 
+            base(device)
+        {
+            Description = bitmap.GetImageDescription();
+            Description.Usage |= ImageUsageFlagBits.TransferDstBit | usage;
+            Description.DesiredImageLayout = desiredLayout;
+            TotalSizeInBytes = bitmap.TotalSizeInBytes;
+
+            var pixelData = bitmap.GetRawPixels(0);
+            var handle = GCHandle.Alloc(pixelData, GCHandleType.Pinned);
+
+            CopyDataToImage(TotalSizeInBytes, handle.AddrOfPinnedObject());
             
-            var data = GraphicsDevice.MapMemory(stagingBufferMemory, 0, (ulong)img.TotalSizeInBytes, 0);
-            System.Buffer.MemoryCopy(img.DataPointer.ToPointer(), data, img.TotalSizeInBytes, img.TotalSizeInBytes);
+            handle.Free();
+        }
+        
+        protected Texture(GraphicsDevice device, ImageDescription description, byte[] data, ImageUsageFlagBits usage, ImageLayout desiredLayout) : 
+            base(device)
+        {
+            Description = description;
+            Description.Usage |= ImageUsageFlagBits.TransferDstBit | usage;
+            Description.DesiredImageLayout = desiredLayout;
+            TotalSizeInBytes = (ulong)data.Length;
+
+            var handle = GCHandle.Alloc(data, GCHandleType.Pinned);
+            CopyDataToImage(TotalSizeInBytes, handle.AddrOfPinnedObject());
+            handle.Free();
+        }
+
+        private void CopyDataToImage(ulong totalSizeInBytes, IntPtr pointerToPixelData)
+        {
+            CreateBuffer(TotalSizeInBytes, 
+                BufferUsageFlagBits.TransferSrcBit,
+                MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent, 
+                out var stagingBuffer,
+                out var stagingBufferMemory);
+            
+            var data = GraphicsDevice.MapMemory(stagingBufferMemory, 0, totalSizeInBytes, 0);
+            System.Buffer.MemoryCopy(pointerToPixelData.ToPointer(), data, totalSizeInBytes, totalSizeInBytes);
             GraphicsDevice.UnmapMemory(stagingBufferMemory);
             
             CreateImage(Description, MemoryPropertyFlags.DeviceLocal, out vulkanImage, out vulkanImageMemory);
-            TransitionImageLayout(vulkanImage, ImageLayout.Undefined,ImageLayout.TransferDstOptimal);
+            this.TransitionImageLayout(ImageLayout.TransferDstOptimal);
             CopyBufferToImage(stagingBuffer, vulkanImage, Description);
-            TransitionImageLayout(vulkanImage, ImageLayout.TransferDstOptimal, Description.DesiredImageLayout);
+            this.TransitionImageLayout(Description.DesiredImageLayout);
             CreateImageView(Description);
             
             stagingBuffer.Destroy(GraphicsDevice);
             stagingBufferMemory.FreeMemory(GraphicsDevice);
         }
         
-        // TODO properly implement texture arrays and texture cube
-        protected Texture(GraphicsDevice device, Image[] img, ImageUsageFlagBits usage, ImageLayout desiredLayout) : base(device)
-        {
-
-        }
-
         private void CreateBuffer(ulong size, BufferUsageFlagBits usage, MemoryPropertyFlags memoryProperties, out VkBuffer buffer, out DeviceMemory bufferMemory)
         {
             var device = (Device)GraphicsDevice;
@@ -146,7 +177,6 @@ namespace Adamantium.Engine.Graphics
             GraphicsDevice.EndSingleTimeCommands(commandBuffer);
         }
         
-
         private MemoryPropertyFlags GetStagingMemoryFlags()
         {
             var stagingMemoryFlags = MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent; // Windows
@@ -177,6 +207,7 @@ namespace Adamantium.Engine.Graphics
             }
 
             device.GetImageMemoryRequirements(image, out var memRequirements);
+            TotalSizeInBytes = memRequirements.Size;
 
             var allocInfo = new MemoryAllocateInfo
             {
@@ -220,105 +251,11 @@ namespace Adamantium.Engine.Graphics
 
             ImageView = GraphicsDevice.LogicalDevice.CreateImageView(createInfo);
         }
-
-        public void TransitionImageLayout(VulkanImage image, ImageLayout oldLayout, ImageLayout newLayout)
-        {
-            var commandBuffer = GraphicsDevice.BeginSingleTimeCommands();
-
-            var barrier = new ImageMemoryBarrier
-            {
-                OldLayout = oldLayout,
-                NewLayout = newLayout,
-                SrcQueueFamilyIndex = Constants.VK_QUEUE_FAMILY_IGNORED,
-                DstQueueFamilyIndex = Constants.VK_QUEUE_FAMILY_IGNORED,
-                Image = image,
-                SubresourceRange = new ImageSubresourceRange()
-            };
-            
-            if (newLayout == ImageLayout.DepthStencilAttachmentOptimal)
-            {
-                barrier.SubresourceRange.AspectMask = ImageAspectFlagBits.DepthBit;
-
-                if (SurfaceFormat.HasStencilFormat())
-                {
-                    barrier.SubresourceRange.AspectMask |= ImageAspectFlagBits.StencilBit;
-                }
-            }
-            else
-            {
-                barrier.SubresourceRange.AspectMask = ImageAspectFlagBits.ColorBit;
-            }
-
-            barrier.SubresourceRange.BaseMipLevel = 0;
-            barrier.SubresourceRange.LevelCount = 1;
-            barrier.SubresourceRange.BaseArrayLayer = 0;
-            barrier.SubresourceRange.LayerCount = 1;
-
-            PipelineStageFlagBits sourceStage;
-            PipelineStageFlagBits destinationStage;
-
-            if (oldLayout is ImageLayout.Undefined or ImageLayout.Preinitialized &&
-                newLayout is ImageLayout.TransferDstOptimal or ImageLayout.TransferSrcOptimal)
-            {
-                barrier.SrcAccessMask = 0;
-                barrier.DstAccessMask = AccessFlagBits.TransferWriteBit;
-
-                sourceStage = PipelineStageFlagBits.TopOfPipeBit;
-                destinationStage = PipelineStageFlagBits.TransferBit;
-            }
-            else if (oldLayout is ImageLayout.TransferSrcOptimal or ImageLayout.TransferDstOptimal 
-                     && newLayout == ImageLayout.ShaderReadOnlyOptimal)
-            {
-                barrier.SrcAccessMask = AccessFlagBits.TransferWriteBit;
-                barrier.DstAccessMask = AccessFlagBits.ShaderReadBit;
-
-                sourceStage = PipelineStageFlagBits.TransferBit;
-                destinationStage = PipelineStageFlagBits.FragmentShaderBit;
-            }
-            else if (oldLayout == ImageLayout.Undefined && newLayout == ImageLayout.DepthStencilAttachmentOptimal)
-            {
-                barrier.SrcAccessMask = 0;
-                barrier.DstAccessMask = (AccessFlagBits.DepthStencilAttachmentReadBit |
-                                         AccessFlagBits.DepthStencilAttachmentWriteBit);
-
-                sourceStage = PipelineStageFlagBits.TopOfPipeBit;
-                destinationStage = PipelineStageFlagBits.EarlyFragmentTestsBit;
-            }
-            else if (oldLayout == ImageLayout.Undefined && newLayout == ImageLayout.ColorAttachmentOptimal)
-            {
-                barrier.SrcAccessMask = 0;
-                barrier.DstAccessMask = (AccessFlagBits.ColorAttachmentReadBit| AccessFlagBits.ColorAttachmentWriteBit);
-                sourceStage = PipelineStageFlagBits.TopOfPipeBit;
-                destinationStage = PipelineStageFlagBits.ColorAttachmentOutputBit;
-            }
-            else
-            {
-                throw new ImageLayoutTransitionException(
-                    $"Transition from {ImageLayout} to {newLayout} is not supported");
-            }
-
-            commandBuffer.PipelineBarrier(
-                (uint) sourceStage, 
-                (uint) destinationStage, 
-                0, 
-                0, 
-                null, 
-                0, 
-                null, 
-                1,
-                barrier);
-
-            ImageLayout = newLayout;
-
-            GraphicsDevice.EndSingleTimeCommands(commandBuffer);
-        }
-        
         
         public static uint CalculateMipLevels(int width, int height, MipMapCount mipLevels)
         {
             return CalculateMipLevels(width, height, 1, mipLevels);
         }
-
 
         public static uint CalculateMipLevels(int width, int height, int depth, MipMapCount mipLevels)
         {
@@ -360,17 +297,7 @@ namespace Adamantium.Engine.Graphics
             // TODO: check how this could be implemented
             if (description.Usage.HasFlag(ImageUsageFlagBits.ColorAttachmentBit))
             {
-                //switch (description.Dimension)
-                //{
-                //    case TextureDimension.Texture1D:
-                //        return RenderTarget1D.New(graphicsDevice, description);
-                //    case TextureDimension.Texture2D:
-                //        return RenderTarget2D.New(graphicsDevice, description);
-                //    case TextureDimension.Texture3D:
-                //        return RenderTarget3D.New(graphicsDevice, description);
-                //    case TextureDimension.TextureCube:
-                //        return RenderTargetCube.New(graphicsDevice, description);
-                //}
+                return new RenderTarget(graphicsDevice, description);
             }
             else if (description.Usage.HasFlag(ImageUsageFlagBits.DepthStencilAttachmentBit))
             {
@@ -382,42 +309,43 @@ namespace Adamantium.Engine.Graphics
             }
             return null;
         }
+        
+        public static Texture CreateFrom(
+            GraphicsDevice graphicsDevice, 
+            TextureDescription description, 
+            byte[] pixelData,
+            ImageUsageFlagBits usage = ImageUsageFlagBits.SampledBit, 
+            ImageLayout desiredLayout = ImageLayout.ShaderReadOnlyOptimal)
+        {
+            if (graphicsDevice == null)
+            {
+                throw new ArgumentNullException(nameof(graphicsDevice));
+            }
+
+            return new Texture(graphicsDevice, description, pixelData, usage, desiredLayout);
+        }
 
         /// <summary>
         /// Loads a texture from a stream.
         /// </summary>
-        /// <param name="device">The <see cref="D3DGraphicsDevice"/>.</param>
+        /// <param name="device">The <see cref="GraphicsDevice"/>.</param>
         /// <param name="stream">The stream to load the texture from.</param>
-        /// <param name="flags">Texture flags</param>
-        /// <param name="usage">Resource usage</param>
+        /// <param name="sage">Texture flags</param>
+        /// <param name="initialLayout">Resource usage</param>
         /// <returns>A <see cref="Texture"/></returns>
-        public static Texture Load(GraphicsDevice device, Stream stream, ImageUsageFlagBits flags = ImageUsageFlagBits.SampledBit, ImageLayout usage = ImageLayout.ShaderReadOnlyOptimal, ImageFileType fileType = ImageFileType.Unknown)
+        public static Texture Load(GraphicsDevice device, Stream stream, ImageUsageFlagBits sage = ImageUsageFlagBits.SampledBit, ImageLayout initialLayout = ImageLayout.ShaderReadOnlyOptimal)
         {
-            var image = Image.Load(stream, fileType);
+            var image = BitmapLoader.Load(stream);
             try
             {
-                return GetTextureFromImage(image, device, flags, usage);
+                return new Texture(device, image, sage, initialLayout);
             }
             catch (Exception exception)
             {
                 MessageBox.Show(exception.Message + exception.StackTrace + exception.TargetSite);
             }
-            finally
-            {
-                image?.Dispose();
-            }
 
             throw new InvalidOperationException("Dimension not supported");
-        }
-
-        private static Texture GetTextureFromImage(Image image, GraphicsDevice device, ImageUsageFlagBits flags, ImageLayout usage)
-        {
-            if (image == null)
-            {
-                return null;
-            }
-
-            return new Texture(device, image, flags, usage);
         }
 
         /// <summary>
@@ -425,66 +353,21 @@ namespace Adamantium.Engine.Graphics
         /// </summary>
         /// <param name="device">Specify the <see cref="GraphicsDevice"/> used to load and create a texture from a file.</param>
         /// <param name="filePath">The file to load the texture from.</param>
-        /// <param name="flags">Texture flags</param>
+        /// <param name="sage">Texture flags</param>
         /// <param name="usage">Resource usage</param>
         /// <returns>A <see cref="Texture"/></returns>
-        public static Texture Load(GraphicsDevice device, String filePath, ImageUsageFlagBits flags = ImageUsageFlagBits.SampledBit, ImageLayout layout = ImageLayout.ShaderReadOnlyOptimal)
+        public static Texture Load(GraphicsDevice device, String filePath, ImageUsageFlagBits sage = ImageUsageFlagBits.SampledBit, ImageLayout layout = ImageLayout.ShaderReadOnlyOptimal)
         {
-            var image = Image.Load(filePath);
+            var rawBitmap = BitmapLoader.Load(filePath);
             try
             {
-                return GetTextureFromImage(image, device, flags, layout);
+                return new Texture(device, rawBitmap, sage, layout);
             }
             catch (Exception exception)
             {
                 Console.WriteLine(exception);
                 throw;
             }
-            finally
-            {
-                image?.Dispose();
-            }
-        }
-
-        /// <summary>
-        /// Loads a texture from array of strings
-        /// </summary>
-        /// <param name="device">Specify the <see cref="GraphicsDevice"/> used to load and create a texture from a file.</param>
-        /// <param name="filePath">Array of pathes to 6 textures, which will form a <see cref="Texture"/></param>
-        /// <param name="flags">Texture flags</param>
-        /// <param name="usage">Resource usage</param>
-        /// <returns>A <see cref="Texture"/></returns>
-        /// <remarks>This method is used only for loading <see cref="TextureCube"/> texture. Number of strings in array must be equals to 6</remarks>
-        /// <exception cref="ArgumentException"></exception>
-        /// <exception cref="InvalidOperationException"></exception>
-        public static Texture Load(GraphicsDevice device, String[] filePath, ImageUsageFlagBits flags = ImageUsageFlagBits.SampledBit, ImageLayout usage = ImageLayout.ShaderReadOnlyOptimal)
-        {
-            if (filePath?.Length != 6)
-            {
-                throw new ArgumentException("File paths array must contain exactly 6 textures");
-            }
-            Image[] images = new Image[6];
-            try
-            {
-                for (int i = 0; i < filePath.Length; i++)
-                {
-                    images[i] = Image.Load(filePath[i]);
-                }
-                return new Texture(device, images, flags, usage);
-            }
-            catch (Exception exception)
-            {
-                MessageBox.Show(exception.Message + exception.StackTrace + exception.TargetSite);
-            }
-            finally
-            {
-                for (int i = 0; i < images.Length; i++)
-                {
-                    images[i]?.Dispose();
-                }
-            }
-
-            throw new InvalidOperationException("Dimension not supported");
         }
 
         public void Save(string path, ImageFileType fileType)
@@ -497,7 +380,7 @@ namespace Adamantium.Engine.Graphics
             CopyImageToBuffer(stagingBuffer, vulkanImage, Description);
             unsafe
             {
-                var data = GraphicsDevice.MapMemory(stagingBufferMemory, 0, (ulong)TotalSizeInBytes, 0);
+                var data = GraphicsDevice.MapMemory(stagingBufferMemory, 0, TotalSizeInBytes, 0);
                 System.Buffer.MemoryCopy(data, img.DataPointer.ToPointer(), TotalSizeInBytes, TotalSizeInBytes);
                 GraphicsDevice.UnmapMemory(stagingBufferMemory);
             }

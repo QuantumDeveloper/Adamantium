@@ -16,11 +16,11 @@ namespace Adamantium.Engine.Graphics
             UInt32 height, 
             MSAALevel msaa, 
             SurfaceFormat format, 
+            ImageUsageFlagBits usage = ImageUsageFlagBits.TransferSrcBit,
             ImageLayout desiredLayout = ImageLayout.ColorAttachmentOptimal)
         {
-            var usage = ImageUsageFlagBits.TransientAttachmentBit |
-                        ImageUsageFlagBits.ColorAttachmentBit;
-            
+            usage |= ImageUsageFlagBits.ColorAttachmentBit | ImageUsageFlagBits.SampledBit;
+
             TextureDescription description = new TextureDescription
             {
                 Width = width,

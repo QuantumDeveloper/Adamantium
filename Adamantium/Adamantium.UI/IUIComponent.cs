@@ -36,7 +36,7 @@ public interface IUIComponent : IFundamentalUIComponent
         
     IReadOnlyCollection<IUIComponent> VisualChildren { get; }
 
-    void InvalidateRender();
+    void InvalidateRender(bool invalidateChildren);
 
     void Render(DrawingContext context);
 }

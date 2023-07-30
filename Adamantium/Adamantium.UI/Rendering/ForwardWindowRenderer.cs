@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Adamantium.Core;
 using Adamantium.Engine.Graphics;
+using Adamantium.UI.Controls;
 using Adamantium.UI.RoutedEvents;
 using AdamantiumVulkan.Core;
 
@@ -94,26 +95,25 @@ internal class ForwardWindowRenderer : WindowRendererBase
 
         component.Render(DrawingContext);
 
-        if (!DrawingContext.GetPresentationForComponent(component, out var presentation)) return;
+        if (!DrawingContext.GetContainerForComponent(component, out var renderContainer)) return;
 
-        // if (component.ClipToBounds)
-        // {
-        //     clipRect.Offset.X = (int)component.ClipRectangle.X;
-        //     clipRect.Offset.Y = (int)component.ClipRectangle.Y;
-        //     clipRect.Extent.Width = (uint)component.ClipRectangle.Width;
-        //     clipRect.Extent.Height = (uint)component.ClipRectangle.Height;
-        //
-        //     graphicsDevice.SetScissors(clipRect);
-        // }
-        // else
+        if (component.ClipToBounds)
+        {
+            var clipRect = new Rect2D();
+            clipRect.Offset = new Offset2D();
+            clipRect.Offset.X = (int)component.ClipRectangle.X;
+            clipRect.Offset.Y = (int)component.ClipRectangle.Y;
+            clipRect.Extent = new Extent2D();
+            clipRect.Extent.Width = (uint)component.ClipRectangle.Width;
+            clipRect.Extent.Height = (uint)component.ClipRectangle.Height;
+        
+            GraphicsDevice.SetScissors(clipRect);
+        }
+        else
         {
             GraphicsDevice.SetScissors(Scissor);
         }
-
-        foreach (var item in presentation.Items)
-        {
-            item.GeometryRenderer?.Draw(DrawingContext.GraphicsDevice, component, ProjectionMatrix);
-            item.StrokeRenderer?.Draw(DrawingContext.GraphicsDevice, component, ProjectionMatrix);
-        }
+        
+        renderContainer.Draw(GraphicsDevice, component, ProjectionMatrix);
     }
 }

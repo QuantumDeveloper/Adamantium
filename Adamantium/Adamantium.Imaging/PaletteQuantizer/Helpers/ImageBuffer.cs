@@ -21,7 +21,11 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
         private Int32[] fastByteX;
         private Int32[] fastY;
 
-        private readonly PixelBuffer bitmap;
+        //private readonly PixelBuffer bitmap;
+        private readonly FrameData _frameData;
+        public IntPtr DataPointer { get; }
+        private GCHandle _handle;
+        
         private List<Color> cachedPalette;
         private int[] indicesStream;
         private byte[] sourcePixels;
@@ -62,11 +66,8 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
         /// </summary>
         public List<Color> Palette
         {
-            get { return UpdatePalette(); }
-            set
-            {
-                cachedPalette = value;
-            }
+            get => UpdatePalette();
+            set => cachedPalette = value;
         }
 
         #endregion
@@ -76,31 +77,47 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
         /// <summary>
         /// Initializes a new instance of the <see cref="ImageBuffer"/> class.
         /// </summary>
-        public ImageBuffer(PixelBuffer bitmap, bool usePalette = false)
+        public ImageBuffer(FrameData frameData, bool usePalette = false)
         {
             // locks the image data
-            this.bitmap = bitmap;
+            _frameData = frameData;
 
             // gathers the informations
-            Width = (int)bitmap.Width;
-            Height = (int)bitmap.Height;
-            PixelFormat = bitmap.Format;
+            Width = (int)frameData.Description.Width;
+            Height = (int)frameData.Description.Height;
+            PixelFormat = frameData.Description.Format;
             UsePalette = usePalette;
             BitDepth = PixelFormat.SizeOfInBits();
             BytesPerPixel = Math.Max(1, BitDepth >> 3);
             indicesStream = new int[Width * Height];
 
             // creates internal buffer
-            Stride = bitmap.RowStride;
-            Size = bitmap.BufferStride;
+            Stride = (int)frameData.Description.RowStride;
+            Size = (int)frameData.Description.TotalSizeInBytes;
 
             // precalculates the offsets
             Precalculate();
+            _handle = GCHandle.Alloc(frameData.RawPixels, GCHandleType.Pinned);
+            DataPointer = _handle.AddrOfPinnedObject();
         }
 
         #endregion
 
         #region | Maintenance methods |
+
+        public ImageDescription GetImageDescription()
+        {
+            return new ImageDescription()
+            {
+                Width = (uint)Width,
+                Height = (uint)Height,
+                Depth = 1,
+                ArraySize = 1,
+                Dimension = TextureDimension.Texture2D,
+                Format = PixelFormat,
+                MipLevels = 1
+            };
+        }
 
         private void Precalculate()
         {
@@ -119,7 +136,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
             // precalculates the y-coordinates
             for (Int32 y = 0; y < Height; y++)
             {
-                fastY[y] = y * bitmap.RowStride;
+                fastY[y] = y * (int)_frameData.Description.RowStride;
             }
         }
 
@@ -132,7 +149,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
         {
             // transfers whole image to a working memory
             Byte[] result = new Byte[Size]; 
-            Marshal.Copy(bitmap.DataPointer, result, 0, Size);
+            Marshal.Copy(DataPointer, result, 0, Size);
 
             // returns the backup
             return result;
@@ -141,7 +158,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
         public void Paste(Byte[] buffer)
         {
             // commits the data to a bitmap
-            Marshal.Copy(buffer, 0, bitmap.DataPointer, Size);
+            Marshal.Copy(buffer, 0, DataPointer, Size);
         }
 
         #endregion
@@ -156,7 +173,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
             // reads the pixel from a bitmap
             if (buffer == null)
             {
-                pixel.ReadRawData(bitmap.DataPointer + offset);
+                pixel.ReadRawData(DataPointer + offset);
             }
             else // reads the pixel from a buffer
             {
@@ -249,7 +266,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
             // writes the pixel to a bitmap
             if (buffer == null)
             {
-                pixel.WriteRawData(bitmap.DataPointer + offset);
+                pixel.WriteRawData(DataPointer + offset);
             }
             else // writes the pixel to a buffer
             {
@@ -527,7 +544,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
             ProcessPerPixel(path, scanColors, parallelTaskCount);
         }
 
-        public static void ScanImageColors(PixelBuffer sourceImage, IColorQuantizer quantizer, Int32 parallelTaskCount = 4)
+        public static void ScanImageColors(FrameData sourceImage, IColorQuantizer quantizer, Int32 parallelTaskCount = 4)
         {
             // checks parameters
             Guard.CheckNull(sourceImage, "sourceImage");
@@ -558,7 +575,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
             return quantizer.GetPalette(colorCount);
         }
 
-        public static List<Color> SynthetizeImagePalette(PixelBuffer sourceImage, IColorQuantizer quantizer, Int32 colorCount, Int32 parallelTaskCount = 4)
+        public static List<Color> SynthetizeImagePalette(FrameData sourceImage, IColorQuantizer quantizer, Int32 colorCount, Int32 parallelTaskCount = 4)
         {
             // checks parameters
             Guard.CheckNull(sourceImage, "sourceImage");
@@ -588,7 +605,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
 
             ColorCount = colorCount;
 
-            sourcePixels = bitmap.GetPixels<byte>();
+            sourcePixels = _frameData.RawPixels;
             targetPixels = new byte[Width * Height * target.BytesPerPixel];
 
             // step 1 - prepares the palettes
@@ -638,7 +655,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
             // step 7 - finishes the dithering (optional)
             ditherer?.Finish();
 
-            target.bitmap.SetPixels(targetPixels);
+            target._frameData.RawPixels = targetPixels;
 
             // step 8 - clean-up
             quantizer.Finish();
@@ -657,10 +674,14 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
 
             // creates a target bitmap in an appropriate format
             Format targetPixelFormat = Extend.GetFormatByColorCount(colorCount);
-            var dataPointer = Utilities.AllocateMemory(source.Width * source.Height * source.PixelFormat.SizeOfInBytes());
-            var rowStride = source.Width * targetPixelFormat.SizeOfInBytes();
-            var bufferStride = rowStride * source.Height;
-            var result = new PixelBuffer((uint)source.Width, (uint)source.Height, targetPixelFormat, rowStride, bufferStride, dataPointer);
+            //var dataPointer = Utilities.AllocateMemory(source.Width * source.Height * source.PixelFormat.SizeOfInBytes());
+            //var rowStride = source.Width * targetPixelFormat.SizeOfInBytes();
+            //var bufferStride = rowStride * source.Height;
+            //var result = new PixelBuffer((uint)source.Width, (uint)source.Height, targetPixelFormat, rowStride, bufferStride, dataPointer);
+            var description = source.GetImageDescription();
+            description.Format = targetPixelFormat;
+            var pixels = new byte[source.Width * source.Height * targetPixelFormat.SizeOfInBytes()];
+            var result = new FrameData(pixels, description);
 
             // wraps target image to a buffer
             using (ImageBuffer target = new ImageBuffer(result, usePalette))
@@ -670,13 +691,13 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
             }
         }
 
-        public static QuantizerResult QuantizeImage(PixelBuffer sourceImage, IColorQuantizer quantizer, Int32 colorCount, bool usePalette = true, Int32 parallelTaskCount = 4)
+        public static QuantizerResult QuantizeImage(FrameData sourceImage, IColorQuantizer quantizer, Int32 colorCount, bool usePalette = true, Int32 parallelTaskCount = 4)
         {
             // performs the pure quantization wihout dithering
             return QuantizeImage(sourceImage, quantizer, null, colorCount, usePalette, parallelTaskCount);
         }
 
-        public static QuantizerResult QuantizeImage(PixelBuffer sourceImage, IColorQuantizer quantizer, IColorDitherer ditherer, Int32 colorCount, bool usePalette = true, Int32 parallelTaskCount = 4)
+        public static QuantizerResult QuantizeImage(FrameData sourceImage, IColorQuantizer quantizer, IColorDitherer ditherer, Int32 colorCount, bool usePalette = true, Int32 parallelTaskCount = 4)
         {
             // checks parameters
             Guard.CheckNull(sourceImage, "sourceImage");
@@ -726,7 +747,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
             return source.CalculateMeanError(target, parallelTaskCount);
         }
 
-        public static Double CalculateImageMeanError(ImageBuffer source, PixelBuffer targetImage, Int32 parallelTaskCount = 4)
+        public static Double CalculateImageMeanError(ImageBuffer source, FrameData targetImage, Int32 parallelTaskCount = 4)
         {
             // checks parameters
             Guard.CheckNull(source, "source");
@@ -740,7 +761,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
             }
         }
 
-        public static Double CalculateImageMeanError(PixelBuffer sourceImage, ImageBuffer target, Int32 parallelTaskCount = 4)
+        public static Double CalculateImageMeanError(FrameData sourceImage, ImageBuffer target, Int32 parallelTaskCount = 4)
         {
             // checks parameters
             Guard.CheckNull(sourceImage, "sourceImage");
@@ -753,7 +774,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
             }
         }
 
-        public static Double CalculateImageMeanError(PixelBuffer sourceImage, PixelBuffer targetImage, Int32 parallelTaskCount = 4)
+        public static Double CalculateImageMeanError(FrameData sourceImage, FrameData targetImage, Int32 parallelTaskCount = 4)
         {
             // checks parameters
             Guard.CheckNull(sourceImage, "sourceImage");
@@ -777,7 +798,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
             return CalculateMeanError(target, parallelTaskCount) / 255.0;
         }
 
-        public static Double CalculateImageNormalizedMeanError(ImageBuffer source, PixelBuffer targetImage, Int32 parallelTaskCount = 4)
+        public static Double CalculateImageNormalizedMeanError(ImageBuffer source, FrameData targetImage, Int32 parallelTaskCount = 4)
         {
             // checks parameters
             Guard.CheckNull(source, "source");
@@ -791,7 +812,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
             }
         }
 
-        public static Double CalculateImageNormalizedMeanError(PixelBuffer sourceImage, ImageBuffer target, Int32 parallelTaskCount = 4)
+        public static Double CalculateImageNormalizedMeanError(FrameData sourceImage, ImageBuffer target, Int32 parallelTaskCount = 4)
         {
             // checks parameters
             Guard.CheckNull(sourceImage, "sourceImage");
@@ -813,7 +834,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
             return source.CalculateNormalizedMeanError(target, parallelTaskCount);
         }
 
-        public static Double CalculateImageNormalizedMeanError(PixelBuffer sourceImage, PixelBuffer targetImage, Int32 parallelTaskCount = 4)
+        public static Double CalculateImageNormalizedMeanError(FrameData sourceImage, FrameData targetImage, Int32 parallelTaskCount = 4)
         {
             // checks parameters
             Guard.CheckNull(sourceImage, "sourceImage");
@@ -881,14 +902,18 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
             TransformPerPixel(target, standardPath, changeFormat, parallelTaskCount);
         }
 
-        public static void ChangeFormat(ImageBuffer source, Format targetFormat, IColorQuantizer quantizer, out PixelBuffer targetImage, Int32 parallelTaskCount = 4)
+        public static void ChangeFormat(ImageBuffer source, Format targetFormat, IColorQuantizer quantizer, out FrameData targetImage, Int32 parallelTaskCount = 4)
         {
             // checks parameters
             Guard.CheckNull(source, "source");
 
             // creates a target bitmap in an appropriate format
-            var dataPointer = Utilities.AllocateMemory(source.Width * source.Height * source.PixelFormat.SizeOfInBytes());
-            targetImage = new PixelBuffer((uint)source.Width, (uint)source.Height, targetFormat, source.Stride, source.Size, dataPointer);
+            //targetImage = new PixelBuffer((uint)source.Width, (uint)source.Height, targetFormat, source.Stride, source.Size, dataPointer);
+
+            var description = source.GetImageDescription();
+            description.Format = targetFormat;
+            var pixels = new byte[(uint)source.Width * (uint)source.Height * targetFormat.SizeOfInBytes()];
+            targetImage = new FrameData(pixels, description);
 
             // wraps target image to a buffer
             using (ImageBuffer target = new ImageBuffer(targetImage))
@@ -897,7 +922,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
             }
         }
 
-        public static void ChangeFormat(PixelBuffer sourceImage, Format targetFormat, IColorQuantizer quantizer, out PixelBuffer targetImage, Int32 parallelTaskCount = 4)
+        public static void ChangeFormat(FrameData sourceImage, Format targetFormat, IColorQuantizer quantizer, out FrameData targetImage, Int32 parallelTaskCount = 4)
         {
             // checks parameters
             Guard.CheckNull(sourceImage, "sourceImage");
@@ -937,7 +962,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
             source.Dither(target, ditherer, quantizer, colorCount, parallelTaskCount);
         }
 
-        public static void DitherImage(ImageBuffer source, PixelBuffer targetImage, IColorDitherer ditherer, IColorQuantizer quantizer, Int32 colorCount, Int32 parallelTaskCount = 4)
+        public static void DitherImage(ImageBuffer source, FrameData targetImage, IColorDitherer ditherer, IColorQuantizer quantizer, Int32 colorCount, Int32 parallelTaskCount = 4)
         {
             // checks parameters
             Guard.CheckNull(source, "source");
@@ -951,7 +976,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
             }
         }
 
-        public static void DitherImage(PixelBuffer sourceImage, ImageBuffer target, IColorDitherer ditherer, IColorQuantizer quantizer, Int32 colorCount, Int32 parallelTaskCount = 4)
+        public static void DitherImage(FrameData sourceImage, ImageBuffer target, IColorDitherer ditherer, IColorQuantizer quantizer, Int32 colorCount, Int32 parallelTaskCount = 4)
         {
             // checks parameters
             Guard.CheckNull(sourceImage, "sourceImage");
@@ -964,7 +989,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
             }
         }
 
-        public static void DitherImage(PixelBuffer sourceImage, PixelBuffer targetImage, IColorDitherer ditherer, IColorQuantizer quantizer, Int32 colorCount, Int32 parallelTaskCount = 4)
+        public static void DitherImage(FrameData sourceImage, FrameData targetImage, IColorDitherer ditherer, IColorQuantizer quantizer, Int32 colorCount, Int32 parallelTaskCount = 4)
         {
             // checks parameters
             Guard.CheckNull(sourceImage, "sourceImage");
@@ -1015,7 +1040,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
             ProcessPerPixel(path, correctGamma, parallelTaskCount);
         }
 
-        public static void CorrectImageGamma(PixelBuffer sourceImage, Single gamma, IColorQuantizer quantizer, Int32 parallelTaskCount = 4)
+        public static void CorrectImageGamma(FrameData sourceImage, Single gamma, IColorQuantizer quantizer, Int32 parallelTaskCount = 4)
         {
             // checks parameters
             Guard.CheckNull(sourceImage, "sourceImage");
@@ -1054,6 +1079,7 @@ namespace Adamantium.Imaging.PaletteQuantizer.Helpers
 
         public void Dispose()
         {
+            _handle.Free();
         }
 
         #endregion
