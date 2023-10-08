@@ -97,19 +97,19 @@ internal class ForwardWindowRenderer : WindowRendererBase
 
         if (!DrawingContext.GetContainerForComponent(component, out var renderContainer)) return;
 
-        if (component.ClipToBounds)
-        {
-            var clipRect = new Rect2D();
-            clipRect.Offset = new Offset2D();
-            clipRect.Offset.X = (int)component.ClipRectangle.X;
-            clipRect.Offset.Y = (int)component.ClipRectangle.Y;
-            clipRect.Extent = new Extent2D();
-            clipRect.Extent.Width = (uint)component.ClipRectangle.Width;
-            clipRect.Extent.Height = (uint)component.ClipRectangle.Height;
-        
-            GraphicsDevice.SetScissors(clipRect);
-        }
-        else
+        // if (component.ClipToBounds)
+        // {
+        //     var clipRect = new Rect2D();
+        //     clipRect.Offset = new Offset2D();
+        //     clipRect.Offset.X = (int)component.ClipRectangle.X;
+        //     clipRect.Offset.Y = (int)component.ClipRectangle.Y;
+        //     clipRect.Extent = new Extent2D();
+        //     clipRect.Extent.Width = (uint)component.ClipRectangle.Width;
+        //     clipRect.Extent.Height = (uint)component.ClipRectangle.Height;
+        //
+        //     GraphicsDevice.SetScissors(clipRect);
+        // }
+        // else
         {
             GraphicsDevice.SetScissors(Scissor);
         }

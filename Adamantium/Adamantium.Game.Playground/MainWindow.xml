@@ -4,8 +4,8 @@
         Title="Adamantium Window"
         Width="1280"
         Height="720">
-    <RenderTargetPanel x:Name="TestGrid1" 
-					   ColumnDefinitions="Auto, Auto, Auto">
+<!--    <RenderTargetPanel x:Name="TestGrid1" -->
+<!--					   ColumnDefinitions="Auto, Auto, Auto">-->
 		<!--<Path StrokeThickness="2" -->
 <!--              Fill="Yellow"-->
 <!--              Name="Path1"-->
@@ -43,25 +43,28 @@
 <!--               MipLevel="3"-->
 <!--               Source="Textures\luxfon.tga"-->
 <!--        />-->
-        <Image Grid.Column="0" 
-			   HorizontalAlignment="Center"
-               VerticalAlignment="Top"
-               CornerRadius="6"
-               Source="Textures\luxfon.tga"
-        />
-		<Image Grid.Column="1" 
-			   HorizontalAlignment="Center"
-               VerticalAlignment="Bottom"
-               CornerRadius="6"
-			   Delay="25"
-               Source="Textures\infinity.gif"
-        />
-		<Image Grid.Column="2" 
-			   HorizontalAlignment="Center"
-               VerticalAlignment="Center"
-               CornerRadius="6"
-			   Delay="25"
-               Source="Textures\APNG-cube.png"
-        />
-    </RenderTargetPanel>
+<!--        <Image Grid.Column="0" -->
+<!--			   HorizontalAlignment="Center"-->
+<!--               VerticalAlignment="Top"-->
+<!--               CornerRadius="6"-->
+<!--               Source="Textures\luxfon.tga"-->
+<!--        />-->
+<!--		<Image Grid.Column="1" -->
+<!--			   HorizontalAlignment="Center"-->
+<!--               VerticalAlignment="Bottom"-->
+<!--               CornerRadius="6"-->
+<!--			   Delay="25"-->
+<!--               Source="Textures\infinity.gif"-->
+<!--        />-->
+<!--		<Image Grid.Column="2" -->
+<!--			   HorizontalAlignment="Center"-->
+<!--               VerticalAlignment="Center"-->
+<!--               CornerRadius="6"-->
+<!--			   Delay="25"-->
+<!--               Source="Textures\APNG-cube.png"-->
+<!--        />-->
+		<Thumb x:Name="Thumb1"
+			   VerticalAlignment="Center"
+			   HorizontalAlignment="Center"/>
+<!--    </RenderTargetPanel>-->
 </Window>

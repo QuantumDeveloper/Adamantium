@@ -1,4 +1,6 @@
-﻿using Adamantium.UI.Input;
+﻿using System.Collections.Generic;
+using System.Linq;
+using Adamantium.UI.Input;
 using Adamantium.UI.Media;
 using Adamantium.UI.RoutedEvents;
 
@@ -79,6 +81,7 @@ public class Thumb:Control
    {
    }
 
+   List<Size> sizes = new List<Size>();
    public Thumb()
    {
    }
@@ -137,18 +140,50 @@ public class Thumb:Control
       if (IsDragging)
       {
          var delta = e.GetPosition(this) - dragStartPoint;
-         DragCompletedEventArgs args = new DragCompletedEventArgs(delta, false);
-         args.RoutedEvent = DragCompletedEvent;
+         DragCompletedEventArgs args = new DragCompletedEventArgs(delta, false)
+         {
+            RoutedEvent = DragCompletedEvent
+         };
          RaiseEvent(args);
       }
       IsDragging = false;
    }
 
-   protected override void OnRender(DrawingContext context)
+   protected override Size MeasureOverride(Size availableSize)
    {
-      if (!IsGeometryValid)
+      sizes.Clear();
+      foreach (var child in VisualChildren)
       {
-         context.DrawRectangle(Background, new Rect(new Size(ActualWidth, ActualHeight)));
+         if (child is IMeasurableComponent measurableComponent)
+         {
+            measurableComponent.Measure(availableSize);
+            sizes.Add(measurableComponent.DesiredSize);
+         }
       }
+
+      return sizes[0];
    }
+
+   protected override Size ArrangeOverride(Size finalSize)
+   {
+      Size size = new Size();
+      foreach (var child in VisualChildren)
+      {
+         if (child is IMeasurableComponent measurableComponent)
+         {
+            measurableComponent.Arrange(new Rect(finalSize));
+            size = measurableComponent.Bounds.Size;
+         }
+      }
+
+      return size;
+   }
+
+   // protected override void OnRender(DrawingContext context)
+   // {
+   //    if (!IsGeometryValid)
+   //    {
+   //       context.DrawRectangle(Background, new Rect(new Size(ActualWidth, ActualHeight)));
+   //    }
+   // }
 }

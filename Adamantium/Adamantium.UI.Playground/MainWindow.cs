@@ -10,12 +10,7 @@
 //using Rectangle = Adamantium.UI.Controls.Rectangle;
 //using Shape = Adamantium.UI.Controls.Shape;
 
-using Adamantium.Engine.Effects;
-using Adamantium.Engine.Graphics;
-using Adamantium.Engine.Graphics.Effects;
-using Adamantium.Mathematics;
 using Adamantium.UI.Input;
-using Adamantium.UI.Media;
 using Adamantium.UI.Playground.Effects.Generated;
 using Serilog;
 
@@ -25,6 +20,7 @@ public partial class MainWindow : Window
 {
     public MainWindow()
     {
+        InitializeComponent();
         UIEffect fx;
         KeyDown+= delegate(object sender, KeyEventArgs args)
         {

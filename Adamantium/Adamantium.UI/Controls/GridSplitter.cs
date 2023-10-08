@@ -22,10 +22,9 @@ public class GridSplitter:Thumb
             PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange,
             ResizeBehaviorChanged));
 
-   private static void ResizeSchemenChanged(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs adamantiumPropertyChangedEventArgs)
+   private static void ResizeSchemeChanged(AdamantiumComponent adamantiumComponent, AdamantiumPropertyChangedEventArgs adamantiumPropertyChangedEventArgs)
    {
-      var splitter = adamantiumObject as GridSplitter;
-      if (splitter != null && splitter.grid != null)
+      if (adamantiumComponent is GridSplitter { grid: not null } splitter)
       {
          splitter.PrepareGridSplitter();
       }
@@ -56,18 +55,18 @@ public class GridSplitter:Thumb
    public GridSplitter()
    { }
 
-   private static void ResizeDirectionChanged(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
+   private static void ResizeDirectionChanged(AdamantiumComponent adamantiumComponent, AdamantiumPropertyChangedEventArgs e)
    {
-      var splitter = adamantiumObject as GridSplitter;
+      var splitter = adamantiumComponent as GridSplitter;
       if (splitter != null && splitter.IsAttachedToVisualTree)
       {
          splitter.PrepareGridSplitter();
       }
    }
 
-   private static void ResizeBehaviorChanged(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
+   private static void ResizeBehaviorChanged(AdamantiumComponent adamantiumComponent, AdamantiumPropertyChangedEventArgs e)
    {
-      var splitter = adamantiumObject as GridSplitter;
+      var splitter = adamantiumComponent as GridSplitter;
       if (splitter != null && splitter.IsAttachedToVisualTree)
       {
          splitter.PrepareGridSplitter();

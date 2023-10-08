@@ -62,12 +62,15 @@ public abstract class Panel: InputUIComponent, IContainer
       context.DrawRectangle(Background, new Rect(new Size(ActualWidth, ActualHeight)));
   }
 
-   void IContainer.AddOrSetChildComponent(IMeasurableComponent component)
+   public void AddOrSetChildComponent(object component)
    {
-      Children.Add(component);
+      if (component is IMeasurableComponent measurable)
+      {
+         Children.Add(measurable);
+      }
    }
 
-   void IContainer.RemoveAllChildComponents()
+   public void RemoveAllChildComponents()
    {
       Children.Clear();
    }

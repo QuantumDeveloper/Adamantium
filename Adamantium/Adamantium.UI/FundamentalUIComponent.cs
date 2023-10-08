@@ -3,15 +3,16 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
 using Adamantium.Core.Collections;
-using Adamantium.Core.DependencyInjection;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Data;
+using Adamantium.UI.Resources;
 using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI;
 
 public class FundamentalUIComponent : AnimatableUIComponent, IFundamentalUIComponent
 {
+    private StylesCollection _attachedStyles;
     private IFundamentalUIComponent parent;
     private TrackingCollection<IFundamentalUIComponent> logicalChildren;
     
@@ -29,21 +30,21 @@ public class FundamentalUIComponent : AnimatableUIComponent, IFundamentalUICompo
         typeof(Classes), typeof(FundamentalUIComponent),
         new PropertyMetadata(new Classes(), ClassesChangedCallBack));
     
-    public static readonly AdamantiumProperty UidProperty = AdamantiumProperty.Register(nameof(Uid),
+    public static readonly AdamantiumProperty UidProperty = AdamantiumProperty.Register(nameof(Id),
         typeof(String), typeof(FundamentalUIComponent), new PropertyMetadata(String.Empty));
     
     public static readonly AdamantiumProperty AllowDropProperty = AdamantiumProperty.Register(nameof(AllowDrop),
         typeof(Boolean), typeof(UIComponent), new PropertyMetadata(true));
 
-    private static void DataContextChangedCallBack(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
+    private static void DataContextChangedCallBack(AdamantiumComponent adamantiumAdamantiumComponent, AdamantiumPropertyChangedEventArgs e)
     {
-        var o = adamantiumObject as MeasurableUIComponent;
+        var o = adamantiumAdamantiumComponent as MeasurableUIComponent;
         o?.DataContextChanged?.Invoke(o, e);
     }
     
-    private static void ClassesChangedCallBack(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
+    private static void ClassesChangedCallBack(AdamantiumComponent adamantiumAdamantiumComponent, AdamantiumPropertyChangedEventArgs e)
     {
-        var o = adamantiumObject as MeasurableUIComponent;
+        var o = adamantiumAdamantiumComponent as MeasurableUIComponent;
         if (o == null) return;
 
         if (e.OldValue != null)
@@ -61,8 +62,10 @@ public class FundamentalUIComponent : AnimatableUIComponent, IFundamentalUICompo
 
     public FundamentalUIComponent()
     {
+        ClassNames = new Classes();
         Styles = new StylesCollection();
         Styles.CollectionChanged += StylesOnCollectionChanged;
+        _attachedStyles = new StylesCollection();
     }
 
     private void StylesOnCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
@@ -72,21 +75,16 @@ public class FundamentalUIComponent : AnimatableUIComponent, IFundamentalUICompo
             case NotifyCollectionChangedAction.Add:
             {
                 var styles = (IEnumerable<Style>)e.NewItems;
-                AdamantiumDependencyContainer.Current.Resolve<IThemeManager>().ApplyStyles(styles.ToArray());
+                Style.Apply(this, styles.ToArray());
                 break;
             }
             case NotifyCollectionChangedAction.Remove:
             {
                 var styles = (IEnumerable<Style>)e.NewItems;
-                AdamantiumDependencyContainer.Current.Resolve<IThemeManager>().ApplyStyles(styles.ToArray());
+                Style.UnApply(this, styles.ToArray());
                 break;
             }
         }
-    }
-
-    private void ApplyStyle()
-    {
-        
     }
 
     private void ClassesCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
@@ -112,16 +110,44 @@ public class FundamentalUIComponent : AnimatableUIComponent, IFundamentalUICompo
         set => SetValue(DataContextProperty, value);
     }
 
-    public string Uid
+    public string Id
     {
         get => GetValue<string>(UidProperty);
         set => SetValue(UidProperty, value);
     }
 
+    public Classes ClassNames { get; }
+
     public StylesCollection Styles
     {
         get => GetValue<StylesCollection>(StylesProperty);
-        private set => SetValue(StylesProperty, value);
+        private init => SetValue(StylesProperty, value);
+    }
+
+    public void AttachStyles(params Style[] styles)
+    {
+        foreach (var style in styles)
+        {
+            style.Attach(this);
+        }
+    }
+
+    public void DetachStyles()
+    {
+        foreach (var style in _attachedStyles)
+        {
+            style.Detach(this);
+        }
+        _attachedStyles.Clear();
+    }
+    
+    public void DetachStyles(params Style[] styles)
+    {
+        foreach (var style in styles)
+        {
+            style.Detach(this);
+            _attachedStyles.Remove(style);
+        }
     }
 
     public IFundamentalUIComponent LogicalParent => parent;
@@ -129,6 +155,21 @@ public class FundamentalUIComponent : AnimatableUIComponent, IFundamentalUICompo
     public BindingExpression SetBinding(AdamantiumProperty property, BindingBase bindingBase)
     {
         return null;
+    }
+
+    public BindingExpression SetBinding(string property, BindingBase bindingBase)
+    {
+        throw new NotImplementedException();
+    }
+
+    public void RemoveBinding(AdamantiumProperty property)
+    {
+        throw new NotImplementedException();
+    }
+
+    public void RemoveBinding(string property)
+    {
+        throw new NotImplementedException();
     }
 
     public event AdamantiumPropertyChangedEventHandler DataContextChanged;

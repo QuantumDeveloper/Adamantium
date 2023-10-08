@@ -44,12 +44,6 @@ public abstract class WindowBase : ContentControl, IWindow
     public WindowBase()
     {
         WindowWorkerService = IWindowWorkerService.GetWorker();
-        InitializeComponent();
-    }
-
-    protected virtual void InitializeComponent()
-    {
-        
     }
 
     public static readonly RoutedEvent ClientSizeChangedEvent = EventManager.RegisterRoutedEvent("ClientSizeChanged",
@@ -122,9 +116,9 @@ public abstract class WindowBase : ContentControl, IWindow
         component.RaiseEvent(args);
     }
 
-    private static void ClientWidthChangedCallBack(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
+    private static void ClientWidthChangedCallBack(AdamantiumComponent adamantiumAdamantiumComponent, AdamantiumPropertyChangedEventArgs e)
     {
-        if (!(adamantiumObject is WindowBase component)) return;
+        if (!(adamantiumAdamantiumComponent is WindowBase component)) return;
         Size old = default;
         if (e.OldValue == AdamantiumProperty.UnsetValue)
             return;
@@ -138,9 +132,9 @@ public abstract class WindowBase : ContentControl, IWindow
         component.RaiseEvent(args);
     }
         
-    private static void ClientHeightChangedCallBack(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
+    private static void ClientHeightChangedCallBack(AdamantiumComponent adamantiumAdamantiumComponent, AdamantiumPropertyChangedEventArgs e)
     {
-        if (!(adamantiumObject is WindowBase component)) return;
+        if (!(adamantiumAdamantiumComponent is WindowBase component)) return;
         if (e.OldValue == AdamantiumProperty.UnsetValue)
             return;
             

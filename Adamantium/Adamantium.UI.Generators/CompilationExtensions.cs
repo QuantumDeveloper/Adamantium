@@ -50,7 +50,7 @@ namespace Adamantium.UI.Generators
             return properties;
         }
 
-        public static bool FindAttributeByName(this INamedTypeSymbol typeSymbol, string name, out IPropertySymbol property)
+        public static bool FindPropertyAttributeByName(this INamedTypeSymbol typeSymbol, string name, out IPropertySymbol property)
         {
             var properties = typeSymbol.GetAllProperties();
             property = null;

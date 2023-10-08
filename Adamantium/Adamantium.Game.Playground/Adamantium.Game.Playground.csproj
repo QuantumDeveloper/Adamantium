@@ -28,6 +28,10 @@
       <Content Include="Textures\texture2.jpg">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
+      <None Remove="AumlResources\FluentDarkRepository.xml" />
+      <None Remove="Brushes.xml" />
+      <None Remove="ControlTemplate.auml" />
+      <None Remove="FluentDark.xml" />
       <None Remove="Models\F-15C_Eagle\F-15C_Eagle.aemf" />
       <Content Include="Models\F-15C_Eagle\F-15C_Eagle.aemf">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -201,14 +205,18 @@
       <Content Include="Textures\AplhaTestBitmap.bmp">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
+      <AdditionalFiles Update="ControlTemplate.auml">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </AdditionalFiles>
+      <AdditionalFiles Include="AumlResources\FluentDarkRepository.xml" />
+      <AdditionalFiles Include="ControlTemplate.auml">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </AdditionalFiles>
+      <AdditionalFiles Include="FluentDark.xml" />
     </ItemGroup>
 
     <ItemGroup>
       <Folder Include="Fonts" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <!--<Effect Include="Effects\BasicEffect.fx" />-->
     </ItemGroup>
 
   <ItemGroup>
@@ -225,6 +233,9 @@
     <AdditionalFiles Include="$(ProjectDir)**\*.xml" />
     <AdditionalFiles Include="$(ProjectDir)**\*.fx" />
     <AdditionalFiles Include="$(ProjectDir)**\*.hlsl" />
+    <AdditionalFiles Include="AumlResources\Brushes.xml">
+      <Generator>MSBuild:Compile</Generator>
+    </AdditionalFiles>
     <CompilerVisibleProperty Include="RootNamespace" />
   </ItemGroup>
 

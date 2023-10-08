@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using Adamantium.Core;
 using Adamantium.Core.Collections;
@@ -14,6 +15,7 @@ using Adamantium.UI.Controls;
 using Adamantium.UI.Events;
 using Adamantium.UI.Input;
 using Adamantium.UI.Processors;
+using Adamantium.UI.Resources;
 using Adamantium.UI.RoutedEvents;
 using Adamantium.UI.Services;
 using Adamantium.UI.Threading;
@@ -136,7 +138,7 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
 
     public ShutDownMode ShutDownMode { get; set; }
 
-    public Uri StartupUri { get; set; }
+    public Type StartupType { get; set; }
 
     public AdamantiumDependencyContainer Container { get; private set; }
 
@@ -232,6 +234,8 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
         GraphicsDeviceService.IsInDebugMode = EnableGraphicsDebug;
         GraphicsDeviceService.CreateMainDevice("Adamantium Main", true);
         ThemeManager = new ThemeManager(Container);
+        LoadResources();
+        LoadThemes();
         SubscribeToEvents();
         
         EntityWorld.Initialize();
@@ -247,7 +251,33 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
 
     protected virtual void OnInitialize()
     {
-        
+    }
+
+    private void LoadResources()
+    {
+        var resourceDictionaries = AppDomain.CurrentDomain.GetAssemblies().SelectMany(x => x.GetTypes()).Where(x => x.IsSubclassOf(typeof(ResourceDictionary))).ToList();
+        foreach (var @class in resourceDictionaries)
+        {
+            var resource = (IResourceDictionary)Activator.CreateInstance(@class);
+            ResourceRepository.AddResourceDictionary(resource);
+        }
+
+        var styles = AppDomain.CurrentDomain.GetAssemblies().SelectMany(x => x.GetTypes()).Where(x => x.IsSubclassOf(typeof(StyleSet))).ToList();
+        foreach (var @class in styles)
+        {
+            var resource = (IStyleSet)Activator.CreateInstance(@class);
+            ResourceRepository.AddStyleSet(resource);
+        }
+    }
+
+    private void LoadThemes()
+    {
+        var themes = AppDomain.CurrentDomain.GetAssemblies().SelectMany(x => x.GetTypes()).Where(x => x.IsSubclassOf(typeof(Theme))).ToList();
+        foreach (var @class in themes)
+        {
+            var theme = (Theme)Activator.CreateInstance(@class);
+            ThemeManager.AddTheme(theme.Name, theme);
+        }
     }
 
     private void SubscribeToEvents()
@@ -268,7 +298,7 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
 
     protected virtual void RegisterServices(IContainerRegistry containerRegistry)
     {
-        
+        containerRegistry.RegisterSingleton<IThemeManager>(ThemeManager);
     }
     
     protected virtual void OnWindowCreated(IWindow wnd)
@@ -341,7 +371,12 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
 
     protected virtual void OnStartup()
     {
-        
+        if (StartupType != null && typeof(IWindow).IsAssignableFrom(StartupType))
+        {
+            var window = (IWindow)Activator.CreateInstance(StartupType);
+            MainWindow = window;
+            window?.Show();
+        }
     }
 
     private void ApplicationLoopThread()

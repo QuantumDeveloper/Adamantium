@@ -1,6 +1,9 @@
+using Adamantium.UI.Input;
+using Adamantium.UI.Templates;
+
 namespace Adamantium.UI;
 
-public interface IControl : IMeasurableComponent
+public interface IControl : IInputComponent
 {
     ControlTemplate Template { get; set; }
 

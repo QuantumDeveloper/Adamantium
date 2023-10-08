@@ -15,7 +15,8 @@
                 <RectangleGeometry Rect="35 85 120 30"/>
             </GeometryGroup>
         </Path.Data>
-    </Path>    
+    </Path>
+    
    
     <Path Name="Path2"
           Fill="Black" 

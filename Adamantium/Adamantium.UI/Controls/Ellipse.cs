@@ -21,9 +21,9 @@ public class Ellipse : Shape
          PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsRender,
          StopAngleValueCallback));
 
-   private static object StopAngleValueCallback(AdamantiumComponent adamantiumObject, object baseValue)
+   private static object StopAngleValueCallback(AdamantiumComponent adamantiumComponent, object baseValue)
    {
-      if (adamantiumObject is Ellipse ellipse)
+      if (adamantiumComponent is Ellipse ellipse)
       {
          var stopAngle = (Double)baseValue;
          if (stopAngle > 360.0)
@@ -40,9 +40,9 @@ public class Ellipse : Shape
       return baseValue;
    }
 
-   private static object StartAngleValueCallback(AdamantiumComponent adamantiumObject, object baseValue)
+   private static object StartAngleValueCallback(AdamantiumComponent adamantiumComponent, object baseValue)
    {
-      if (adamantiumObject is Ellipse ellipse)
+      if (adamantiumComponent is Ellipse ellipse)
       {
          var startAngle = (Double)baseValue;
          if (startAngle < 0)

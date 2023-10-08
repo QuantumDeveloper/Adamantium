@@ -6,19 +6,19 @@ namespace Adamantium.UI;
 
 public class EventTrigger : ITrigger
 {
-    private IInputComponent component;
+    private IFundamentalUIComponent component;
     private Dictionary<AdamantiumProperty, object> values;
     private bool applied;
    
     public RoutedEvent Event { get; set; }
     
     public SetterCollection Setters { get; set; }
-    public void Apply(IInputComponent control)
+    public void Apply(IFundamentalUIComponent component)
     {
-        component = control;
+        this.component = component;
         values = new Dictionary<AdamantiumProperty, object>();
         applied = false;
-        component.AddHandler(Event, new RoutedEventHandler(EventHandler));
+        //component.AddHandler(Event, new RoutedEventHandler(EventHandler));
     }
 
     private void EventHandler(object sender, RoutedEventArgs e)

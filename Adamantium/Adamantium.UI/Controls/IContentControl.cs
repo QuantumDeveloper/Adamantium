@@ -5,7 +5,7 @@ using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI.Controls;
 
-public interface IContentControl : IControl
+public interface IContentControl : IControl, IContainer
 {
     object Content { get; set; }
 }

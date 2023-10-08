@@ -5,5 +5,7 @@
         void Initialize();
 
         bool Initialized { get; }
+        
+        bool Initializing { get; }
     }
 }

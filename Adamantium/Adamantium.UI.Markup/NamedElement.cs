@@ -1,7 +1,5 @@
 ﻿
-using Adamantium.UI.Markup;
-
-namespace Adamantium.UI.Generators
+namespace Adamantium.UI.Markup
 {
     public class NamedElement
     {

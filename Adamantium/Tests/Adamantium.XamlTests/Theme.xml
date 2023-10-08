@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Theme Name="AdamantiumDark">
+    <Theme.Resources>
+        <ResourceDictionary Source="Resources/ResourceDictionary1.xml"/>
+        <ResourceDictionary Source="Resources/ResourceDictionary2.xml"/>
+    </Theme.Resources>
+    <Theme.Styles>
+        <StyleRepository Source="Styles/Style1.xml"/>
+        <StyleRepository Source="Styles/Style2.xml"/>
+    </Theme.Styles>
+</Theme>

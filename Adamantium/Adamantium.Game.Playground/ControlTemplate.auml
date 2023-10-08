@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ControlTemplate>
+	<Border Background="Red"
+            Width="200"
+            Height="400"
+            Padding="10"
+            CornerRadius="6"
+            >
+		<Ellipse Fill="Blue"/>
+	</Border>
+</ControlTemplate>

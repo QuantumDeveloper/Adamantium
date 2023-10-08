@@ -1,4 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using Adamantium.Engine.Graphics;
 
 namespace Adamantium.UI;
 
@@ -8,6 +12,18 @@ public struct Thickness
    public Double Top { get; set; }
    public Double Right { get; set; }
    public Double Bottom { get; set; }
+   
+   public Thickness(IEnumerable<double> values)
+   {
+      var lst = values as List<double> ?? values.ToList();
+
+      if (lst.Count < 4) throw new ArgumentOutOfRangeException($"Arguments count for Corner radius should be 4, but provided {lst.Count}");
+
+      Left = lst[0];
+      Top = lst[1];
+      Right = lst[2];
+      Bottom = lst[3];
+   }
 
    public Thickness(Double left, Double top, Double right, Double bottom)
    {
@@ -35,6 +51,24 @@ public struct Thickness
          a.Top + b.Top,
          a.Right + b.Right,
          a.Bottom + b.Bottom);
+   }
+   
+   public static Thickness Parse(string value)
+   {
+      var values = value.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
+
+      if (values.Length == 1)
+      {
+         return new Thickness(double.Parse(values[0], CultureInfo.InvariantCulture));
+      }
+
+      var list = new List<double>();
+      foreach (var v in values)
+      {
+         list.Add(double.Parse(v, CultureInfo.InvariantCulture));
+      }
+
+      return new Thickness(list);
    }
 
    public override string ToString() => $"Left: {Left}, Top: {Top}, Right {Right}, Bottom {Bottom}";

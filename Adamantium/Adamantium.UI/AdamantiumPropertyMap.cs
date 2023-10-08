@@ -158,7 +158,7 @@ public static class AdamantiumPropertyMap
    }
 
 
-   public static AdamantiumProperty FindRegistered(Object o, AdamantiumProperty property)
+   public static AdamantiumProperty FindRegistered(System.Object o, AdamantiumProperty property)
    {
       return FindRegistered(o.GetType(), property);
    }

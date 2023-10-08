@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<Theme xmlns="http://adamantium/ui/resources" 
+	   Name="FluentDark">
+	<Theme.Resources>
+		<MergedDictionaries>
+			<ResourceDictionary Source="AumlResources/Brushes.xml"/>
+		</MergedDictionaries>
+	</Theme.Resources>
+
+	<Theme.StyleSets>
+		<StyleSet Source="AumlResources/FluentDarkRepository.xml"/>
+	</Theme.StyleSets>
+</Theme>

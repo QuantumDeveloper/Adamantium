@@ -7,6 +7,7 @@ using Adamantium.UI.Controls;
 using Adamantium.UI.Events;
 using Adamantium.UI.Extensions;
 using Adamantium.UI.Rendering;
+using Adamantium.UI.Resources;
 using Adamantium.UI.RoutedEvents;
 using AdamantiumVulkan.Core;
 
@@ -17,6 +18,7 @@ public class WindowRenderService : UiRenderService
     private PresentationParameters parameters;
     private IWindowRenderer windowRenderer;
     private IWindowRenderer _pendingRenderer;
+    private IThemeManager _themeManager;
     private readonly AutoResetEvent pauseEvent;
 
     public IWindow Window { get; }
@@ -25,6 +27,7 @@ public class WindowRenderService : UiRenderService
         : base(world)
     {
         Window = window;
+        _themeManager = DependencyResolver.Resolve<IThemeManager>();
         Window.StateChanged += WindowOnStateChanged;
         CreateResources();
         pauseEvent = new AutoResetEvent(false);
@@ -58,7 +61,6 @@ public class WindowRenderService : UiRenderService
         windowRenderer = Window.Renderer ?? new ForwardWindowRenderer(GraphicsDevice);
         windowRenderer.SetWindow(Window);
         Window.DefaultRenderer = windowRenderer;
-        
         Window.RendererChanged += WindowOnRendererChanged;
     }
 
@@ -76,7 +78,7 @@ public class WindowRenderService : UiRenderService
 
     public override void Update(AppTime gameTime)
     {
-        Window.Update(gameTime);
+        Window.Update(_themeManager, gameTime);
     }
 
     public override void Draw(AppTime gameTime)

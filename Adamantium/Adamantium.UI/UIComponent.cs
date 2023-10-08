@@ -34,8 +34,6 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
             PropertyMetadataOptions.AffectsMeasure |
             PropertyMetadataOptions.AffectsRender));
       
-    
-
     public static readonly AdamantiumProperty IsHitTestVisibleProperty =
         AdamantiumProperty.Register(nameof(IsHitTestVisible),
             typeof(Boolean), typeof(UIComponent), new PropertyMetadata(true));

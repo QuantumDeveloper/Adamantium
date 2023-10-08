@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ControlTemplate>
+    <Grid>
+        <Path StrokeThickness="2" Fill="Red">
+            <Path.Data>
+                <GeometryGroup FillRule="EvenOdd">
+                    <RectangleGeometry Rect="25 75 150 50"/>
+                    <RectangleGeometry Rect="35 85 120 30"/>
+                </GeometryGroup>
+            </Path.Data>
+        </Path>
+    </Grid>
+    <ControlTemplate.Overrides>
+        
+    </ControlTemplate.Overrides>
+    <ControlTemplate.Triggers>
+        
+    </ControlTemplate.Triggers>
+</ControlTemplate>

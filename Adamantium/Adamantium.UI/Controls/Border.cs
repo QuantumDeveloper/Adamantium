@@ -55,10 +55,10 @@ public class Border : Decorator
       var child = Child;
       var padding = Padding + BorderThickness;
       var size = availableSize.Deflate(padding);
-      if (child is IMeasurableComponent measurable)
+      if (child != null)
       {
-         measurable.Measure(size);
-         return measurable.DesiredSize.Inflate(padding);
+         child.Measure(size);
+         return child.DesiredSize.Inflate(padding);
       }
       else
       {
@@ -68,11 +68,13 @@ public class Border : Decorator
 
    protected override Size ArrangeOverride(Size finalSize)
    {
+      var padding = Padding + BorderThickness;
       if (Child != null)
       {
-         var padding = Padding + BorderThickness;
-         Arrange(new Rect(finalSize).Deflate(padding));
+         Child.Arrange(new Rect(finalSize).Deflate(padding));
       }
+
+      if (Child != null) return Child.Bounds.Size.Inflate(padding);
       return finalSize;
    }
 

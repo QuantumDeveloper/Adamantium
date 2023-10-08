@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xs:schema id="Bindings"
+           elementFormDefault="qualified"
+
+           xmlns:xs="http://www.w3.org/2001/XMLSchema">
+    <xs:simpleType name="ControlTemplateType">
+        <xs:restriction base="xs:string"/>
+    </xs:simpleType>
+    
+    <xs:complexType name="ControlTemplate">
+        <xs:attribute name="SizeType" type="ControlTemplateType" use="required"/>
+        
+    </xs:complexType>
+</xs:schema>

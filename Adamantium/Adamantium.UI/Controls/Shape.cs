@@ -105,7 +105,7 @@ public abstract class Shape : MeasurableUIComponent
       set => SetValue(StrokeDashOffsetProperty, value);
    }
       
-   private static object CoerceStrokeThickness(AdamantiumComponent adamantiumObject, object baseValue)
+   private static object CoerceStrokeThickness(AdamantiumComponent adamantiumAdamantiumComponent, object baseValue)
    {
       Double value = (Double) baseValue;
       if (value < 0)
