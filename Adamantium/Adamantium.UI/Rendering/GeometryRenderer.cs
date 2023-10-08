@@ -2,6 +2,7 @@ using System;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Models;
 using Adamantium.Engine.Graphics;
+using Adamantium.UI.Controls;
 using Adamantium.UI.Media;
 using Adamantium.UI.Media.Imaging;
 using AdamantiumVulkan.Core;
@@ -44,13 +45,13 @@ internal class GeometryRenderer : ComponentRenderer
     public override bool PrepareFrame(GraphicsDevice graphicsDevice, IUIComponent component, ImageSource image, Matrix4x4F projectionMatrix)
     {
         if (VertexBuffer == null) return false;
-            
+
         graphicsDevice.SetVertexBuffer(VertexBuffer);
         graphicsDevice.VertexType = VertexType;
         graphicsDevice.PrimitiveTopology = PrimitiveType;
 
         var world = Matrix4x4F.Translation((float)component.Location.X, (float)component.Location.Y, 5);
-        
+
         var effect = graphicsDevice.BasicEffect;
         effect.Wvp.SetValue(world * projectionMatrix);
         var color = Brush as SolidColorBrush;

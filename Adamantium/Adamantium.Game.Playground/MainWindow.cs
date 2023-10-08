@@ -12,15 +12,14 @@
 
 using System;
 using System.Linq;
-using System.Threading.Tasks;
 using Adamantium.Engine.Graphics;
 using Adamantium.UI.Input;
 using Adamantium.UI.Controls;
 using Serilog;
 using Adamantium.UI;
-using Adamantium.UI.Media.Imaging;
+using Adamantium.UI.Markup;
 using Adamantium.UI.Processors;
-using Adamantium.UI.RoutedEvents;
+using Adamantium.UI.Templates;
 
 namespace Adamantium.Game.Playground;
 
@@ -28,6 +27,7 @@ public partial class MainWindow : Window
 {
     public MainWindow()
     {
+        InitializeComponent();
         SourceInitialized += OnSourceInitialized;
         KeyDown+= delegate(object sender, KeyEventArgs args)
         {
@@ -46,6 +46,7 @@ public partial class MainWindow : Window
     private void OnSourceInitialized(object sender, EventArgs e)
     {
         //CreateGame();
+        Thumb1.Template = ControlTemplate.Load(AumlParser.Load("ControlTemplate.auml", true));
     }
 
     private void CreateGame()

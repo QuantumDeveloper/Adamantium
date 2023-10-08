@@ -55,9 +55,9 @@ public sealed class BitmapImage : BitmapSource
    public static readonly AdamantiumProperty UriSourceProperty = AdamantiumProperty.Register(nameof(UriSource),
       typeof(Uri), typeof(BitmapImage), new PropertyMetadata(null, UriChangedCallback));
 
-   private static void UriChangedCallback(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
+   private static void UriChangedCallback(AdamantiumComponent adamantiumAdamantiumComponent, AdamantiumPropertyChangedEventArgs e)
    {
-      if (adamantiumObject is BitmapImage bitmap)
+      if (adamantiumAdamantiumComponent is BitmapImage bitmap)
       {
          var uri = (Uri)e.NewValue;
          if (uri.IsFile)

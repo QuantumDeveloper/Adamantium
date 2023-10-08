@@ -1,12 +1,15 @@
-﻿using System;
+﻿using Adamantium.UI.Resources;
+using System;
 
 namespace Adamantium.UI;
 
 public interface ISetter
 {
-   AdamantiumProperty Property { get; set; }
+   string Property { get; set; }
    
    Object Value { get; set; }
    
-   void Apply(IAdamantiumComponent control);
+   void Apply(IFundamentalUIComponent control, ITheme theme);
+   
+   void UnApply(IFundamentalUIComponent control, ITheme theme);
 }

@@ -1,5 +1,5 @@
-﻿
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using System.IO;
 using Adamantium.UI.Markup;
 
 namespace Adamantium.UI.Generators
@@ -28,5 +28,11 @@ namespace Adamantium.UI.Generators
         public Dictionary<string, TypeContainer> TypesMap { get; }
 
         public IAumlAstNode RootNode { get; set; }
+        
+        public string RelativeFilePath { get; set; }
+
+        public string FileName => Path.GetFileNameWithoutExtension(RelativeFilePath);
+        
+        public string RootNamespace { get; set; }
     }
 }

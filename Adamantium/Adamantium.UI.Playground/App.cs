@@ -12,16 +12,5 @@ namespace Adamantium.UI.Playground
         {
             EnableGraphicsDebug = false;
         }
-
-        protected override void OnStartup()
-        {
-            base.OnStartup();
-            if (StartupUri == null) return;
-
-            var path = StartupUri.OriginalString;
-            MainWindow = new MainWindow();
-            MainWindow.Show();
-            Log.Logger.Information("Window is shown");
-        }
     }
 }

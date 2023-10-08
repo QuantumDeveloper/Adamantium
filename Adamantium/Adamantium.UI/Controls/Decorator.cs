@@ -10,24 +10,24 @@ public abstract class Decorator : MeasurableUIComponent, IContainer
          PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange));
 
    public static readonly AdamantiumProperty ChildProperty = AdamantiumProperty.Register(nameof(Child),
-      typeof(UIComponent), typeof(Decorator),
+      typeof(IMeasurableComponent), typeof(Decorator),
       new PropertyMetadata(null,
          PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange, ChildChanged));
 
-   private static void ChildChanged(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
+   private static void ChildChanged(AdamantiumComponent adamantiumAdamantiumComponent, AdamantiumPropertyChangedEventArgs e)
    {
-      if (adamantiumObject is Decorator o)
+      if (adamantiumAdamantiumComponent is Decorator o)
       {
          if (e.OldValue != null && e.OldValue != AdamantiumProperty.UnsetValue)
          {
-            o.LogicalChildrenCollection.Remove((IUIComponent)e.OldValue);
-            o.VisualChildrenCollection.Remove((IUIComponent)e.OldValue);
+            o.LogicalChildrenCollection.Remove((IMeasurableComponent)e.OldValue);
+            o.VisualChildrenCollection.Remove((IMeasurableComponent)e.OldValue);
          }
 
          if (e.NewValue != null)
          {
-            o.LogicalChildrenCollection.Add((IUIComponent)e.NewValue);
-            o.VisualChildrenCollection.Add((IUIComponent)e.NewValue);
+            o.LogicalChildrenCollection.Add((IMeasurableComponent)e.NewValue);
+            o.VisualChildrenCollection.Add((IMeasurableComponent)e.NewValue);
          }
       }
    }
@@ -39,9 +39,9 @@ public abstract class Decorator : MeasurableUIComponent, IContainer
    }
 
    [Content]
-   public IUIComponent Child
+   public IMeasurableComponent Child
    {
-      get => GetValue<IUIComponent>(ChildProperty);
+      get => GetValue<IMeasurableComponent>(ChildProperty);
       set => SetValue(ChildProperty, value);
    }
 
@@ -50,10 +50,10 @@ public abstract class Decorator : MeasurableUIComponent, IContainer
       var content = Child;
       var padding = Padding;
 
-      if (content is IMeasurableComponent measurable)
+      if (content != null)
       {
-         measurable.Measure(availableSize.Deflate(padding));
-         return measurable.DesiredSize.Inflate(padding);
+         content.Measure(availableSize.Deflate(padding));
+         return content.DesiredSize.Inflate(padding);
       }
 
       return new Size(padding.Left + padding.Right, padding.Bottom + padding.Top);
@@ -61,21 +61,23 @@ public abstract class Decorator : MeasurableUIComponent, IContainer
 
    protected override Size ArrangeOverride(Size finalSize)
    {
-      if (Child is IMeasurableComponent measurable)
+      Child?.Arrange(new Rect(finalSize).Deflate(Padding));
+
+      if (Child != null) return Child.Bounds.Size;
+      
+      return finalSize;
+   }
+
+   public void AddOrSetChildComponent(object component)
+   {
+      if (component is IMeasurableComponent uiComponent)
       {
-         measurable.Arrange(new Rect(finalSize).Deflate(Padding));
+         Child = uiComponent;
       }
-
-      return Child.Bounds.Size;
    }
 
-   void IContainer.AddOrSetChildComponent(IMeasurableComponent component)
+   public void RemoveAllChildComponents()
    {
-      Child = component;
-   }
-
-   void IContainer.RemoveAllChildComponents()
-   {
-      throw new System.NotImplementedException();
+      Child = null;
    }
 }

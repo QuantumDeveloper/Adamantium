@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Xml;
 using System.Xml.Linq;
 using Adamantium.Core;
@@ -12,11 +9,21 @@ namespace Adamantium.UI.Markup;
 /// </summary>
 public class AumlParser
 {
-    public static AumlDocument Parse(string aumlString)
+    public static string BasicUiNamespace => "Adamantium.UI";
+
+    public static string UiResourcesNamespace => "Adamantium.UI.Resources";
+
+    public static AumlDocument Load(string path, bool parseTemplates = false)
+    {
+        var content = File.ReadAllText(path);
+        return Parse(content, parseTemplates);
+    }
+    
+    public static AumlDocument Parse(string aumlString, bool parseTemplates = false)
     {
         var root = XDocument.Parse(aumlString, LoadOptions.SetLineInfo).Root;
 
-        var context = new ParserContext(root);
+        var context = new ParserContext(root, parseTemplates);
         var rootNode = context.Parse();
 
         var doc = new AumlDocument()
@@ -36,11 +43,14 @@ public class ParserContext
 
     public Logger Logger { get; }
     
+    public bool ParseTemplates { get; }
+    
     public bool HasErrors { get; private set; }
     
-    public ParserContext(XElement root)
+    public ParserContext(XElement root, bool parseTemplates)
     {
         Logger = new Logger();
+        ParseTemplates = parseTemplates;
         rootElement = root;
     }
 
@@ -74,7 +84,11 @@ public class ParserContext
         }
         if (ns == AumlNamespaces.AumlControls)
         {
-            return new AumlAstClrTypeReference(element.ToLineInfo(), "Adamantium.UI", element.Name.LocalName, string.Empty);
+            return new AumlAstClrTypeReference(element.ToLineInfo(), AumlParser.BasicUiNamespace, element.Name.LocalName, string.Empty);
+        }
+        else if (ns == AumlNamespaces.AumlResources)
+        {
+            return new AumlAstClrTypeReference(element.ToLineInfo(), AumlParser.UiResourcesNamespace, element.Name.LocalName, string.Empty);
         }
 
         return new AumlAstXmlTypeReference(element.ToLineInfo(), element.Name.NamespaceName, element.Name.LocalName);
@@ -83,6 +97,11 @@ public class ParserContext
     private AumlAstObjectNode ParseAumlNode(XElement element, bool isRoot)
     {
         var type = GetTypeReference(element);
+        if (type.Name == "ControlTemplate" && !ParseTemplates)
+        {
+            return new AumlAstTemplateNode(element.ToLineInfo(), type, element.ToString());
+        }
+
         var objectNode = new AumlAstObjectNode(element.ToLineInfo(), type);
 
         foreach (var attribute in element.Attributes())
@@ -216,13 +235,20 @@ public class AumlDocument
     public Dictionary<string, string> NamespaceAliases { get; set; } = new ();
 
     public IAumlAstNode Root { get; set; }
+    
+    public string RelativeFilePath { get; set; }
+
+    public string FileName => Path.GetFileNameWithoutExtension(RelativeFilePath);
+    
+    public string RootNamespace { get; set; }
 }
 
 public static class AumlNamespaces
 {
     public static string AumlDirective => "http://adamantium/ui/xaml/extensions";
 
-    public static string AumlControls => "http://adamantium/ui"; 
+    public static string AumlControls => "http://adamantium/ui";
+    public static string AumlResources => "http://adamantium/ui/resources";
 
     // [assembly: XmlnsDefinition("http://adamantium/ui", "clr-namespace:Adamantium.UI.Controls;assembly:Adamantium.UI")]
     // [assembly: XmlnsDefinition("http://adamantium/ui/xaml/extensions", "clr-namespace:Adamantium.UI.Markup.MarkupExtensions;assembly:Adamantium.UI", "x")]

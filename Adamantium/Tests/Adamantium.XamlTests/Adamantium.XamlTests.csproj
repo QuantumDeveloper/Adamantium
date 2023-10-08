@@ -26,6 +26,34 @@
       <Content Include="XamlTest1.xml">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
+      <None Remove="ControlTemplateTest.xml" />
+      <Content Include="ControlTemplateTest.xml">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="ControlTemplateTest2.xml" />
+      <Content Include="ControlTemplateTest2.xml">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Theme.xml" />
+      <Content Include="Theme.xml">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Styles\StyleRepository1.xml" />
+      <Content Include="Styles\StyleRepository1.xml">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Styles\StyleRepository2.xml" />
+      <Content Include="Styles\StyleRepository2.xml">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Resources\ResourceDictionary2.xml" />
+      <Content Include="Resources\ResourceDictionary2.xml">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Resources\ResourceDictionary1.xml" />
+      <Content Include="Resources\ResourceDictionary1.xml">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
     </ItemGroup>
 
     <ItemGroup>
@@ -38,5 +66,6 @@
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
     </ItemGroup>
+
 
 </Project>

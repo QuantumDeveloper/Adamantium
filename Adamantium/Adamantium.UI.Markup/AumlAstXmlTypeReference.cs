@@ -26,11 +26,11 @@ public class AumlAstXmlTypeReference : AumlAstNode, IAumlAstTypeReference
 
     public string GetFullTypeName()
     {
-        return $"{Namespace}/{Name}";
+        return string.IsNullOrEmpty(Namespace) ? Name : $"{Namespace}/{Name}";
     }
 
     public override string ToString()
     {
-        return $"xml:{Namespace}:{Name}";
+        return string.IsNullOrEmpty(Namespace) ? $"xml:{Name}" : $"xml:{Namespace}:{Name}";
     }
 }

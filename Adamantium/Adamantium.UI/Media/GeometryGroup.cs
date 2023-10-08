@@ -7,7 +7,7 @@ using Polygon = Adamantium.Mathematics.Triangulation.Polygon;
 
 namespace Adamantium.UI.Media;
 
-public class GeometryGroup : Geometry
+public class GeometryGroup : Geometry, IContainer
 {
     private Rect bounds;
     
@@ -127,5 +127,18 @@ public class GeometryGroup : Geometry
 
         var points = polygon.FillIndirect();
         Mesh.SetPoints(points);
+    }
+
+    public void AddOrSetChildComponent(object component)
+    {
+        if (component is Geometry geometry)
+        {
+            Children.Add(geometry);
+        }
+    }
+
+    public void RemoveAllChildComponents()
+    {
+        Children.Clear();
     }
 }

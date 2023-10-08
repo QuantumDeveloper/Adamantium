@@ -74,9 +74,9 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
         remove => RemoveHandler(SizeChangedEvent, value);
     }
 
-    private static void WidthChangedCallBack(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
+    private static void WidthChangedCallBack(AdamantiumComponent adamantiumComponent, AdamantiumPropertyChangedEventArgs e)
     {
-        if (!(adamantiumObject is MeasurableUIComponent o)) return;
+        if (!(adamantiumComponent is MeasurableUIComponent o)) return;
         Size old = default;
         if (e.OldValue == AdamantiumProperty.UnsetValue)
             return;
@@ -90,9 +90,9 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
         o.RaiseEvent(args);
     }
         
-    private static void HeightChangedCallBack(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
+    private static void HeightChangedCallBack(AdamantiumComponent adamantiumComponent, AdamantiumPropertyChangedEventArgs e)
     {
-        if (!(adamantiumObject is MeasurableUIComponent o)) return;
+        if (!(adamantiumComponent is MeasurableUIComponent o)) return;
         if (e.OldValue == AdamantiumProperty.UnsetValue)
             return;
             

@@ -1,6 +1,7 @@
 ﻿using Adamantium.UI.Controls;
 using System;
 using System.Collections.Generic;
+using Adamantium.UI.Resources;
 
 namespace Adamantium.UI;
 

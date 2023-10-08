@@ -107,9 +107,9 @@ public class RenderTargetPanel: Grid
       remove => RemoveHandler(RenderTargetCreatedOrUpdatedEvent, value);
    }
 
-   private static void RenderTargetParametersChanged(AdamantiumComponent adamantiumObject, AdamantiumPropertyChangedEventArgs e)
+   private static void RenderTargetParametersChanged(AdamantiumComponent adamantiumComponent, AdamantiumPropertyChangedEventArgs e)
    {
-      var image = adamantiumObject as RenderTargetPanel;
+      var image = adamantiumComponent as RenderTargetPanel;
       image?.UpdateOrCreateRenderTarget();
    }
 

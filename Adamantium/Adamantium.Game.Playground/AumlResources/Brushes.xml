@@ -1,0 +1,23 @@
+﻿<ResourceDictionary xmlns:x="http://adamantium/ui/xaml/extensions"
+        xmlns="http://adamantium/ui/resources">
+
+    <SolidColorBrush x:Key="GeneralIconBrush" Color="#9B9B9B"/>
+
+    <SolidColorBrush x:Key="LightIconBrush" Color="GhostWhite"/>
+    <SolidColorBrush x:Key="DarkIconBrush" Color="Black"/>
+    <SolidColorBrush x:Key="GeneralImageIconsBrush" Color="GhostWhite"/>
+
+    <SolidColorBrush x:Key="SemitransparentBlackBrush" Color="Black" Opacity="0.6"/>
+
+    <SolidColorBrush x:Key="PanelBackgroundBrush" Color="#171717"/>
+
+    <SolidColorBrush x:Key="AlternationRowBackgroundBrush" Color="#1F1F1F"/>
+
+    <SolidColorBrush x:Key="ApproveBrush" Color="#36B99C"/>
+    <SolidColorBrush x:Key="DeclineBrush" Color="#F25233"/>
+    <SolidColorBrush x:Key="BasicTextColor" Color="#ffffff"/>
+    <SolidColorBrush x:Key="AdditionalSignsBlueBrush" Color="#82AED4"/>
+    <SolidColorBrush x:Key="ExtraMfaSecretTextColor" Color="#808080" />
+    <SolidColorBrush x:Key="MainQrCodeBarTextColor" Color="#b3b3b3"/>
+
+</ResourceDictionary>

@@ -121,6 +121,7 @@ namespace Adamantium.EntityFramework.ComponentsBasics
         }
 
         public bool Initialized => initialized;
+        public bool Initializing { get; private set; }
 
         public virtual IComponent Clone()
         {

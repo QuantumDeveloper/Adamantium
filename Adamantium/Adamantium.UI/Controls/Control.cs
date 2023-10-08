@@ -1,5 +1,6 @@
 ﻿using Adamantium.UI.Media;
 using Adamantium.UI.RoutedEvents;
+using Adamantium.UI.Templates;
 
 namespace Adamantium.UI.Controls;
 
@@ -68,7 +69,7 @@ public class Control : InputUIComponent, IControl
    {
       if (Template == null) return;
       
-      templateResult = Template.Content.Build();
+      templateResult = Template.Build();
       AddVisualChild(templateResult.RootComponent);
       OnApplyTemplate();
    }

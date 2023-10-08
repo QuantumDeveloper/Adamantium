@@ -9,7 +9,6 @@ namespace Adamantium.UI;
 
 public interface IUIComponent : IFundamentalUIComponent
 {
-    
     event EventHandler<VisualParentChangedEventArgs> VisualParentChanged;
         
     Boolean ClipToBounds { get; set; }

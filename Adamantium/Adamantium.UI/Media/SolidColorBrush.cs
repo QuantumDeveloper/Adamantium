@@ -1,7 +1,11 @@
 ﻿namespace Adamantium.UI.Media;
 
-public class SolidColorBrush: Brush
+public sealed class SolidColorBrush: Brush
 {
+   public SolidColorBrush()
+   {
+      
+   }
    public SolidColorBrush(Color color)
    {
       Color = color;

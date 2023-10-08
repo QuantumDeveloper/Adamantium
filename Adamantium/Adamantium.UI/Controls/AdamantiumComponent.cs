@@ -306,15 +306,26 @@ public abstract class AdamantiumComponent : DispatcherComponent, IAdamantiumComp
 
         lock (values)
         {
-            if (property.IsAttached && !values.ContainsKey(property))
+            if (property.IsAttached)
             {
-                values.Add(property, value);
+                values.TryAdd(property, value);
             }
 
             if (values.ContainsKey(property))
             {
                 RunSetValueSequence(property, value, true);
             }
+        }
+    }
+
+    public void SetValue(string property, object value)
+    {
+        if (string.IsNullOrEmpty(property)) return;
+        
+        var adamantiumProperty = AdamantiumPropertyMap.FindRegistered(GetType(), property);
+        if (adamantiumProperty != null)
+        {
+            SetValue(adamantiumProperty, value);
         }
     }
 
@@ -363,7 +374,7 @@ public abstract class AdamantiumComponent : DispatcherComponent, IAdamantiumComp
         var metadata = property.GetDefaultMetadata(GetType());
         if (property.ValidateValueCallBack?.Invoke(value) == false)
         {
-            throw new ArgumentException("Value " + value + "is incorrect!");
+            throw new ArgumentException($"Value {value} is incorrect!");
         }
 
         if (metadata.CoerceValueCallback != null)
@@ -373,7 +384,7 @@ public abstract class AdamantiumComponent : DispatcherComponent, IAdamantiumComp
             {
                 if (property.ValidateValueCallBack?.Invoke(value) == false)
                 {
-                    throw new ArgumentException("Value " + value + "is incorrect!");
+                    throw new ArgumentException($"Value {value} is incorrect!");
                 }
             }
 
@@ -384,14 +395,10 @@ public abstract class AdamantiumComponent : DispatcherComponent, IAdamantiumComp
         values[property] = value;
         metadata.PropertyChangedCallback?.Invoke(this, args);
         var element = this as IUIComponent;
-        if (metadata.AffectsMeasure && element is IMeasurableComponent measurable)
+        if (element is IMeasurableComponent measurable)
         {
-            measurable?.InvalidateMeasure();
-        }
-
-        if (metadata.AffectsArrange  && element is IMeasurableComponent measurable1)
-        {
-            measurable1?.InvalidateArrange();
+            measurable.InvalidateMeasure();
+            measurable.InvalidateArrange();
         }
 
         if (metadata.AffectsRender)
@@ -414,5 +421,4 @@ public abstract class AdamantiumComponent : DispatcherComponent, IAdamantiumComp
     {
         throw new ArgumentException($"Property '{p.Name} not registered on '{this.GetType()}");
     }
-
 }

@@ -2,9 +2,9 @@ namespace Adamantium.UI;
 
 public interface INameScope
 {
-    void RegisterName(string name, IUIComponent component);
+    void RegisterName(string name, object component);
 
     void Unregister(string name);
 
-    IUIComponent Find(string name);
+    object Find(string name);
 }

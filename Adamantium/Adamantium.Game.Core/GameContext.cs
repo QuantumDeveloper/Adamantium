@@ -1,6 +1,7 @@
 ﻿using Adamantium.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.UI.Controls;
+using Object = System.Object;
 
 namespace Adamantium.Game.Core
 {

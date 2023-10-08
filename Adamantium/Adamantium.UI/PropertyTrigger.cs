@@ -33,9 +33,9 @@ public class PropertyTrigger : ITrigger
         {
             foreach (var setter in Setters)
             {
-                var value = component.GetValue(setter.Property);
-                values[setter.Property] = value;
-                setter.Apply(component);
+                // var value = component.GetValue(setter.Property);
+                // values[setter.Property] = value;
+                // setter.Apply(component);
             }
 
             applied = true;

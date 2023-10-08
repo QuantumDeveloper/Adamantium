@@ -146,7 +146,7 @@ public class DrawingContext
       if (currentContainer.ChildUnits.Count == 0)
       {
          var ellipse = new EllipseGeometry(destinationRect, startAngle, stopAngle);
-         ellipse.ProcessGeometry(GeometryType.Both);
+         ellipse.ProcessGeometry(GeometryType.Solid);
          
          currentUnit = new RenderUnit();
          var uiRenderer = ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, ellipse, brush);
