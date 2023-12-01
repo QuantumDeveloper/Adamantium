@@ -9,7 +9,7 @@ public class ThemeManager : IThemeManager
 {
     private IDependencyResolver dependencyResolver;
     private readonly Dictionary<string, ITheme> _themesMap;
-    private Dictionary<Selector, IFundamentalUIComponent> components;
+    private Dictionary<Selector, IUIComponent> components;
     private TrackingCollection<ITheme> _themes;
 
     public IReadOnlyList<ITheme> Themes => _themes;
@@ -19,37 +19,56 @@ public class ThemeManager : IThemeManager
         this.dependencyResolver = dependencyResolver;
         _themes = new TrackingCollection<ITheme>();
         _themesMap = new Dictionary<string, ITheme>();
-        components = new Dictionary<Selector, IFundamentalUIComponent>();
+        components = new Dictionary<Selector, IUIComponent>();
     }
 
-    public void ApplyTheme(ITheme theme)
+    public void ApplyTheme(ITheme theme, IUIComponent component)
     {
         if (theme == null) return;
         
         theme.Initialize();
         CurrentTheme = theme;
+        ApplyStyles(component);
     }
 
-    public void ApplyTheme(string name)
+    public void ApplyTheme(string name, IUIComponent component)
     {
         if (!_themesMap.TryGetValue(name, out var theme)) return;
         
         theme.Initialize();
         CurrentTheme = theme;
+        ApplyStyles(component);
+    }
+    
+    public void ApplyStyles(IUIComponent component, params Style[] styles)
+    {
+        var stack = new Stack<IUIComponent>();
+        stack.Push(component);
+        while (stack.Count > 0)
+        {
+            var control = stack.Pop();
+            control.AttachStyles(styles);
+        
+            var children = control.GetVisualDescendants();
+            foreach (var child in children)
+            {
+                stack.Push(child);
+            }
+        }
     }
 
-    public void ApplyStyles(IFundamentalUIComponent component)
+    public void ApplyStyles(IUIComponent component)
     {
         var styles = FindStylesForComponent(component);
         component.AttachStyles(styles.ToArray());
     }
 
-    public void RemoveStyles(IFundamentalUIComponent component)
+    public void RemoveStyles(IUIComponent component)
     {
         component.DetachStyles();
     }
 
-    public IEnumerable<Style> FindStylesForComponent(IFundamentalUIComponent component)
+    public IEnumerable<Style> FindStylesForComponent(IUIComponent component)
     {
         if (CurrentTheme == null) return Enumerable.Empty<Style>();
 

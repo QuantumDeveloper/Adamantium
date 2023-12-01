@@ -113,7 +113,7 @@ public static class FocusManager
       {
          var scope = GetFocusScopeAncestors(component).FirstOrDefault();
          Focused = component;
-         lastFocued = component;
+         lastFocused = component;
          if (scope != null)
          {
             Scope = scope;
@@ -135,13 +135,13 @@ public static class FocusManager
       return false;
    }
 
-   private static IInputComponent lastFocued;
+   private static IInputComponent lastFocused;
 
    public static bool TryRestoreFocus(IInputComponent scope)
    {
-      if (lastFocued != null)
+      if (lastFocused != null)
       {
-         Focus(lastFocued);
+         Focus(lastFocused);
          return true;
       }
       else

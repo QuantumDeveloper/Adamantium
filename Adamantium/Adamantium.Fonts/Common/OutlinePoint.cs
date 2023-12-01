@@ -1,11 +1,16 @@
 ﻿using Adamantium.Mathematics;
+using MessagePack;
 
 namespace Adamantium.Fonts.Common
 {
+    [MessagePackObject]
     internal struct OutlinePoint
     {
+        [Key(0)]
         public double X { get; set; }
+        [Key(1)]
         public double Y { get; set; }
+        [Key(2)]
         public bool IsControl { get; set; }
 
         public OutlinePoint(double x, double y, bool control = false)

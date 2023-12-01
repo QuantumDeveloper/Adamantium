@@ -31,7 +31,10 @@ public class EffectsGenerator : IIncrementalGenerator
 
         var includesProvider = includesAndContents.Collect();
 
-        var sourceProvider = fxNamesAndContents.Combine(context.CompilationProvider).Combine(context.AnalyzerConfigOptionsProvider).Combine(includesProvider);
+        var sourceProvider = fxNamesAndContents
+            .Combine(context.CompilationProvider)
+            .Combine(context.AnalyzerConfigOptionsProvider)
+            .Combine(includesProvider);
 
         context.RegisterSourceOutput(sourceProvider, (spc, provider) =>
         {

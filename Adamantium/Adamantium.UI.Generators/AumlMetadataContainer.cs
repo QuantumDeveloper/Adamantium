@@ -12,6 +12,7 @@ namespace Adamantium.UI.Generators
             Usings = new List<string>();
             NamedElementsMap = new Dictionary<IAumlAstNode, string>();
             TypesMap = new Dictionary<string, TypeContainer>();
+            SourceText = string.Empty;
         }
 
         public string Namespace { get; set; }
@@ -32,6 +33,10 @@ namespace Adamantium.UI.Generators
         public string RelativeFilePath { get; set; }
 
         public string FileName => Path.GetFileNameWithoutExtension(RelativeFilePath);
+
+        public string ClassName { get; set; }
+
+        public string SourceText { get; set; }
         
         public string RootNamespace { get; set; }
     }

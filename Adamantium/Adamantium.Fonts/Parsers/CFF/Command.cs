@@ -1,14 +1,20 @@
 ﻿using System.Collections.Generic;
 using Adamantium.Fonts.Common;
 using Adamantium.Fonts.Tables.CFF;
+using MessagePack;
 
 namespace Adamantium.Fonts.Parsers.CFF
 {
+    [MessagePackObject]
     internal class Command
     {
+        [Key(0)]
         public OperatorsType Operator;
+        [Key(1)]
         public List<CommandOperand> Operands;
+        [Key(2)]
         public List<CommandOperand> BlendedOperands;
+        [Key(3)]
         public bool IsBlendPresent { get; set; }
 
         public void ApplyBlend(VariationRegionList regionList, float[] variationPoint)

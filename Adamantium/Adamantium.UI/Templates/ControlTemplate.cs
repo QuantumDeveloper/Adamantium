@@ -1,5 +1,6 @@
 using System;
 using Adamantium.UI.Markup;
+using Adamantium.UI.Resources;
 
 namespace Adamantium.UI.Templates;
 

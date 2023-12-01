@@ -1,10 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Reflection;
-using System.Text;
 using Adamantium.Core;
 using Adamantium.UI.Markup;
 using Microsoft.CodeAnalysis;
@@ -44,19 +41,23 @@ namespace Adamantium.UI.Generators
                 aumlDoc.RelativeFilePath = file.path.Replace(projectDir, string.Empty);
                 aumlDoc.RootNamespace = @namespace;
                 var result = TransformAumlDocument(aumlDoc, compilation, ref spc, ref context);
-                spc.AddSource($"{file.name}.g.cs", result);
+                if (string.IsNullOrEmpty(result.ClassName)) return;
+
+                spc.AddSource($"{result.ClassName}.g.cs", result.SourceText);
             });
         }
 
-        private string TransformAumlDocument(
+        private AumlMetadataContainer TransformAumlDocument(
             AumlDocument document, 
             Compilation compilation,
             ref SourceProductionContext spc,
             ref IncrementalGeneratorInitializationContext context)
         {
-            var metaContainer = new AumlMetadataContainer();
-            metaContainer.RelativeFilePath = document.RelativeFilePath;
-            metaContainer.RootNamespace = document.RootNamespace;
+            var metaContainer = new AumlMetadataContainer
+            {
+                RelativeFilePath = document.RelativeFilePath,
+                RootNamespace = document.RootNamespace
+            };
             EntityType entityType = EntityType.Unknown;
             if (document.Root is AumlAstObjectNode root)
             {
@@ -67,39 +68,14 @@ namespace Adamantium.UI.Generators
                             document.FileName,
                             $"{root.Type.GetFullTypeName()} could not be found. Please, check correctness of namespace",
                             DiagnosticSeverity.Error);
-                    return string.Empty;
+                    return metaContainer;
                 }
-                if (rootType.ImplementsInterface("IWindow"))
+                
+                entityType = rootType.GetEntityType();
+
+                if (entityType == EntityType.Unknown)
                 {
-                    entityType = EntityType.Window;
-                }
-                else if (rootType.ImplementsInterface("IPage"))
-                {
-                    entityType = EntityType.Page;
-                }
-                else if (rootType.ImplementsInterface("IView"))
-                {
-                    entityType = EntityType.View;
-                }
-                else if (rootType.ImplementsInterface("ITheme"))
-                {
-                    entityType = EntityType.Theme;
-                }
-                else if (rootType.ImplementsInterface("IUIApplication"))
-                {
-                    entityType = EntityType.UIApplication;
-                }
-                else if (rootType.ImplementsInterface("IResourceDictionary"))
-                {
-                    entityType = EntityType.ResourceDictionary;
-                }
-                else if (rootType.ImplementsInterface("IStyleRepository"))
-                {
-                    entityType = EntityType.StyleRepository;
-                }
-                else
-                {
-                    return String.Empty;
+                    return metaContainer;
                 }
             }
 
@@ -116,7 +92,7 @@ namespace Adamantium.UI.Generators
                     var controlType = compilation.GetTypeByMetadataName(element.Type.GetFullTypeName());
                     // TODO: handle namespaces in auml in more generic way
                     if (element.Type.Name == "ResourceDictionary" ||
-                        element.Type.Name == "StyleRepository" ||
+                        element.Type.Name == "StyleSet" ||
                         element.Type.Name == "Theme")
                     {
                         typeContainer = compilation.GetTypeContainerForNamespace(AumlParser.BasicUiNamespace);
@@ -188,21 +164,19 @@ namespace Adamantium.UI.Generators
 
             metaContainer.RootNode = document.Root;
 
-            return GenerateSources(metaContainer, entityType, compilation, ref spc);
+            metaContainer.SourceText = GenerateSources(metaContainer, entityType, compilation, ref spc);
+
+            return metaContainer;
         }
 
         private string GenerateSources(AumlMetadataContainer container, EntityType entityType, Compilation compilation, ref SourceProductionContext spc)
         {
-            switch (entityType)
+            return entityType switch
             {
-                case EntityType.ResourceDictionary:
-                case EntityType.StyleRepository:
-                    return GenerateResourceFile(container, entityType, compilation, ref spc);
-                case EntityType.Theme:
-                    return GenerateThemeFile(container, entityType, compilation, ref spc);
-                default:
-                    return GenerateControlFile(container, entityType, compilation, ref spc);
-            }
+                EntityType.ResourceDictionary or EntityType.StyleSet => GenerateResourceFile(container, entityType, compilation, ref spc),
+                EntityType.Theme => GenerateThemeFile(container, entityType, compilation, ref spc),
+                _ => GenerateControlFile(container, entityType, compilation, ref spc),
+            };
         }
 
         private string GenerateThemeFile(AumlMetadataContainer container, EntityType entityType, Compilation compilation, ref SourceProductionContext spc)
@@ -212,6 +186,7 @@ namespace Adamantium.UI.Generators
             var rootBaseType = typeContainer.Types.FirstOrDefault(x => x.Name == rootNode.Type.Name);
             var className = $"{container.FileName}{rootBaseType.Name}";
             var @namespace = $"{container.RootNamespace}.Themes";
+            container.ClassName = className;
 
             var textGenerator = new TextGenerator();
             textGenerator.WriteLine("// Autogenerated code");
@@ -225,7 +200,7 @@ namespace Adamantium.UI.Generators
             var properties = element.GetProperties();
             var themeName = string.Empty;
             List<AumlAstObjectNode> resourceDictionaries = null;
-            List<AumlAstObjectNode> styleRepos = new List<AumlAstObjectNode>();
+            List<AumlAstObjectNode> styleRepos = new();
 
             foreach (var prop in properties)
             {
@@ -309,6 +284,7 @@ namespace Adamantium.UI.Generators
             var rootBaseType = typeContainer.Types.FirstOrDefault(x => x.Name == rootNode.Type.Name);
             var className = $"{container.FileName}{rootBaseType.Name}";
             var @namespace = $"{container.RootNamespace}.GeneratedResources";
+            container.ClassName = className;
             
             var textGenerator = new TextGenerator();
             textGenerator.WriteLine("// Autogenerated code");
@@ -330,7 +306,15 @@ namespace Adamantium.UI.Generators
             textGenerator.UnindentAndWriteCloseBrace();
 
             int id = 1;
-            textGenerator.WriteLine($"protected override void OnInitialize()");
+            if (entityType == EntityType.StyleSet)
+            {
+                textGenerator.WriteLine($"protected override void OnInitialize(ITheme theme)");
+            }
+            else
+            {
+                textGenerator.WriteLine($"protected override void OnInitialize()");
+            }
+            
             textGenerator.WriteOpenBraceAndIndent();
             ProcessResourceDictionary(ref spc, entityType, className, container, container.RootNode, textGenerator, ref id);
             textGenerator.UnindentAndWriteCloseBrace();
@@ -347,6 +331,7 @@ namespace Adamantium.UI.Generators
             string @namespace = String.Empty;
             var typeContainer = container.TypesMap[rootNode.Type.Namespace];
             var rootBaseType = typeContainer.Types.FirstOrDefault(x => x.Name == rootNode.Type.Name);
+
             AumlAstDirective classDirective = null;
             foreach (var aumlAstNode in directives)
             {
@@ -362,6 +347,8 @@ namespace Adamantium.UI.Generators
             className = directiveValue.Text.Split('.').Last();
             var rootViewType = compilation.GetTypeByMetadataName(directiveValue.Text);
             @namespace = rootViewType.ContainingNamespace.ToDisplayString();
+
+            container.ClassName = className;
 
             var textGenerator = new TextGenerator();
             textGenerator.WriteLine("// Autogenerated code");
@@ -496,10 +483,6 @@ namespace Adamantium.UI.Generators
                 var name = ProcessControlElements(ref spc, className, container, obj, textGenerator, ref id);
 
                 var isIContainer = typeInfo.ImplementsInterface("IContainer");
-                if (typeInfo.FindPropertyAttributeByName("ContentAttribute", out var property))
-                {
-
-                }
 
                 if (isIContainer)
                 {
@@ -514,31 +497,32 @@ namespace Adamantium.UI.Generators
                 }
                 else
                 {
-
-                    var isCollection = property.Type.AllInterfaces.FirstOrDefault(x => x.Name.StartsWith("ICollection") || x.Name.StartsWith("IList")) != null;
-                    if (isCollection)
+                    if (typeInfo.FindPropertyAttributeByName("ContentAttribute", out var property))
                     {
-                        if (!string.IsNullOrEmpty(elementName))
+                        var isCollection = property.Type.AllInterfaces.FirstOrDefault(x => x.Name.StartsWith("ICollection") || x.Name.StartsWith("IList")) != null;
+                        if (isCollection)
                         {
-                            textGenerator.WriteLine($"{elementName}.{property.Name}.Add({name});");
+                            if (!string.IsNullOrEmpty(elementName))
+                            {
+                                textGenerator.WriteLine($"{elementName}.{property.Name}.Add({name});");
+                            }
+                            else
+                            {
+                                textGenerator.WriteLine($"{property.Name}.Add({name});");
+                            }
                         }
                         else
                         {
-                            textGenerator.WriteLine($"{property.Name}.Add({name});");
+                            if (!string.IsNullOrEmpty(elementName))
+                            {
+                                textGenerator.WriteLine($"{elementName}.{property.Name} = {name};");
+                            }
+                            else
+                            {
+                                textGenerator.WriteLine($"{property.Name} = {name};");
+                            }
                         }
                     }
-                    else
-                    {
-                        if (!string.IsNullOrEmpty(elementName))
-                        {
-                            textGenerator.WriteLine($"{elementName}.{property.Name} = {name};");
-                        }
-                        else
-                        {
-                            textGenerator.WriteLine($"{property.Name} = {name};");
-                        }
-                    }
-
                 }
             }
 
@@ -641,15 +625,22 @@ namespace Adamantium.UI.Generators
             {
                 var name = ProcessResourceDictionary(ref spc, entityType, className, container, obj, textGenerator, ref id);
                 
-                if (entityType == EntityType.StyleRepository && element.Type.Name == "Style")
+                if (entityType == EntityType.StyleSet)
                 {
-                    if (typeInfo.FindPropertyAttributeByName("ContentAttribute", out var property))
+                    if (element.Type.Name == "Style")
                     {
-                        textGenerator.WriteLine($"{elementName}.{property.Name}.Add({name});");
+                        if (typeInfo.FindPropertyAttributeByName("ContentAttribute", out var property))
+                        {
+                            textGenerator.WriteLine($"{elementName}.{property.Name}.Add({name});");
+                        }
+                        else
+                        {
+                            textGenerator.WriteLine($"{elementName}.Triggers.Add({name});");
+                        }
                     }
                     else
                     {
-                        textGenerator.WriteLine($"{elementName}.Triggers.Add({name});");
+                        textGenerator.WriteLine($"Add({name});");
                     }
                 }
             }

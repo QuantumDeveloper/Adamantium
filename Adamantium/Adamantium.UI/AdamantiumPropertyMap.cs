@@ -14,12 +14,12 @@ public static class AdamantiumPropertyMap
    /// <summary>
    /// Native registered properties by type.
    /// </summary>
-   private static readonly Dictionary<Type, List<AdamantiumProperty>> registered = new Dictionary<Type, List<AdamantiumProperty>>();
+   private static readonly Dictionary<Type, AdamantiumPropertyContainer> Registered = new Dictionary<Type, AdamantiumPropertyContainer>();
 
    /// <summary>
    /// Attached registered properties by type.
    /// </summary>
-   private static readonly Dictionary<Type, List<AdamantiumProperty>> attached = new Dictionary<Type, List<AdamantiumProperty>>(); 
+   private static readonly Dictionary<Type, AdamantiumPropertyContainer> Attached = new Dictionary<Type, AdamantiumPropertyContainer>(); 
 
    /// <summary>
    /// Get all attached <see cref="AdamantiumProperty"/>s registered by an owner
@@ -34,12 +34,12 @@ public static class AdamantiumPropertyMap
          throw new ArgumentNullException(nameof(owner));
       }
 
-      List<AdamantiumProperty> list = null;
-      lock (attached)
+      IEnumerable<AdamantiumProperty> list = null;
+      lock (Attached)
       {
-         if (attached.ContainsKey(owner))
+         if (Attached.TryGetValue(owner, out var value))
          {
-            list = attached[owner];
+            list = value.Properties;
          }
       }
       return list;
@@ -53,10 +53,6 @@ public static class AdamantiumPropertyMap
    /// <exception cref="ArgumentNullException"></exception>
    public static IEnumerable<AdamantiumProperty> GetRegistered(AdamantiumComponent o)
    {
-      if (o == null)
-      {
-         throw new ArgumentNullException(nameof(o));
-      }
       return GetRegistered(o.GetType());
    }
 
@@ -78,12 +74,11 @@ public static class AdamantiumPropertyMap
          // Ensure the type's static constructor has been run.
          RuntimeHelpers.RunClassConstructor(type.TypeHandle);
 
-         lock (registered)
+         lock (Registered)
          {
-            if (registered.ContainsKey(type))
+            if (Registered.TryGetValue(type, out var container))
             {
-               List<AdamantiumProperty> properties = registered[type];
-               foreach (var p in properties)
+               foreach (var p in container.Properties)
                {
                   yield return p;
                }
@@ -157,8 +152,7 @@ public static class AdamantiumPropertyMap
       return null;
    }
 
-
-   public static AdamantiumProperty FindRegistered(System.Object o, AdamantiumProperty property)
+   public static AdamantiumProperty FindRegistered(object o, AdamantiumProperty property)
    {
       return FindRegistered(o.GetType(), property);
    }
@@ -185,47 +179,44 @@ public static class AdamantiumPropertyMap
          throw new ArgumentNullException(nameof(type));
       }
 
-      List<AdamantiumProperty> propertyList;
+      AdamantiumPropertyContainer container = null;
 
-      lock (registered)
+      lock (Registered)
       {
-         if (registered.ContainsKey(type))
+         if (Registered.TryGetValue(type, out var value))
          {
-            propertyList = registered[type];
-            if (!propertyList.Contains(property))
+            container = value;
+            if (!container.Exists(property.Name))
             {
-               propertyList.Add(property);
+               container.Add(property);
             }
             else
             {
-               throw new ArgumentNullException("Property "+property.Name +"is already registered for type "+property.OwnerType);
+               throw new ArgumentNullException(
+                  $"Property {property.Name}is already registered for type {property.OwnerType}");
             }
          }
          else
          {
-            registered.Add(type, new List<AdamantiumProperty>() {property});
+            container = new AdamantiumPropertyContainer(type);
+            container.Add(property);
+            Registered.Add(type, container);
          }
       }
 
       if (property.IsAttached)
       {
-         lock (attached)
+         lock (Attached)
          {
-            if (attached.ContainsKey(type))
+            if (Attached.TryGetValue(type, out container))
             {
-               propertyList = attached[type];
-               if (!propertyList.Contains(property))
-               {
-                  propertyList.Add(property);
-               }
-               else
-               {
-                  throw new ArgumentNullException("Property " + property.Name + "is already registered for type " + property.OwnerType);
-               }
+               container.Add(property);
             }
             else
             {
-               attached.Add(type, new List<AdamantiumProperty>() {property});
+               container = new AdamantiumPropertyContainer(type);
+               container.Add(property);
+               Attached.Add(type, container);
             }
          }
       }

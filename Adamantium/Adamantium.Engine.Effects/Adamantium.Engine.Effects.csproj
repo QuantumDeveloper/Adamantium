@@ -20,8 +20,8 @@
     <ItemGroup>
       <PackageReference Include="Adamantium.DXC" Version="1.0.7" />
       <PackageReference Include="AdamantiumVulkan.Spirv" Version="1.0.3" />
-      <PackageReference Include="MessagePack" Version="2.5.108" />
-      <PackageReference Include="MessagePack.Annotations" Version="2.5.108" />
+      <PackageReference Include="MessagePack" Version="2.5.129" />
+      <PackageReference Include="MessagePack.Annotations" Version="2.5.129" />
       <PackageReference Include="QuantumBinding.Utils" Version="1.0.0" />
     </ItemGroup>
 

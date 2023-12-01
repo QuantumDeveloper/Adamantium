@@ -8,6 +8,21 @@ namespace Adamantium.Engine.Graphics
 {
     public struct CornerRadius
     {
+        public bool Equals(CornerRadius other)
+        {
+            return TopLeft.Equals(other.TopLeft) && TopRight.Equals(other.TopRight) && BottomRight.Equals(other.BottomRight) && BottomLeft.Equals(other.BottomLeft);
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is CornerRadius other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(TopLeft, TopRight, BottomRight, BottomLeft);
+        }
+
         public CornerRadius(Double value)
         {
             TopLeft = TopRight = BottomRight = BottomLeft = value;

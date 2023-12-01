@@ -22,10 +22,12 @@
 		<Content Include="Textures\texture.jpg">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
+		<None Remove="ControlTemplateSchema.xsd" />
 		<None Remove="Effects\structs.hlsl" />
 		<None Remove="Effects\structs2.hlsl" />
 		<None Remove="Effects\structs3.hlsl" />
 		<None Remove="Effects\structs4.hlsl" />
+		<None Remove="ResourceDictionarySchema.xsd" />
 		<None Remove="Textures\texture2.jpg" />
 		<Content Include="Textures\texture2.jpg">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -53,6 +55,8 @@
 		<AdditionalFiles Include="$(ProjectDir)**\*.xml" />
 		<AdditionalFiles Include="$(ProjectDir)**\*.fx" />
 		<AdditionalFiles Include="$(ProjectDir)**\*.hlsl" />
+		<AdditionalFiles Include="ControlTemplateSchema.xsd" />
+		<AdditionalFiles Include="ResourceDictionarySchema.xsd" />
 		<CompilerVisibleProperty Include="RootNamespace" />
 	</ItemGroup>
 

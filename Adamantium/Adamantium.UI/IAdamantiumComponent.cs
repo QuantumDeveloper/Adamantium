@@ -1,5 +1,7 @@
 ﻿using System;
 using Adamantium.EntityFramework.ComponentsBasics;
+using Adamantium.UI.Controls;
+using Adamantium.UI.Resources;
 using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI;
@@ -17,13 +19,22 @@ public interface IAdamantiumComponent : IComponent
     /// <summary>
     /// Clear <see cref="AdamantiumProperty"/>`s local value
     /// </summary>
-    /// <param name="property"></param>
-    void ClearValue(AdamantiumProperty property);
+    /// <param name="property">The property.</param>
+    /// <param name="priority">Priority for value</param>
+    void ClearValue(string propertyName, ValuePriority priority = ValuePriority.Local);
+    
+    /// <summary>
+    /// Clear <see cref="AdamantiumProperty"/>`s local value
+    /// </summary>
+    /// <param name="property">The property.</param>
+    /// <param name="priority">Priority for value</param>
+    void ClearValue(AdamantiumProperty property, ValuePriority priority = ValuePriority.Local);
 
     /// <summary>
     /// Gets a <see cref="AdamantiumProperty"/> value.
     /// </summary>
     /// <param name="property">The property.</param>
+    /// <param name="priority">Priority for value</param>
     /// <returns>The value.</returns>
     object GetValue(AdamantiumProperty property);
 
@@ -32,6 +43,7 @@ public interface IAdamantiumComponent : IComponent
     /// </summary>
     /// <typeparam name="T">The type of the property.</typeparam>
     /// <param name="property">The property.</param>
+    /// <param name="priority">Priority for value</param>
     /// <returns>The value.</returns>
     T GetValue<T>(AdamantiumProperty property);
 
@@ -54,21 +66,29 @@ public interface IAdamantiumComponent : IComponent
     /// </summary>
     /// <param name="property">The property.</param>
     /// <param name="value">The value.</param>
-    void SetValue(AdamantiumProperty property, object value);
+    /// <param name="priority">Priority for value</param>
+    void SetValue(AdamantiumProperty property, object value, ValuePriority priority = ValuePriority.Local);
 
     /// <summary>
     /// Sets a <see cref="AdamantiumProperty"/> value.
     /// </summary>
     /// <param name="propertyName">Name of the AdamantiumProperty reference</param>
     /// <param name="value">The value.</param>
-    void SetValue(string propertyName, object value);
+    /// <param name="priority">Priority for value</param>
+    void SetValue(string propertyName, object value, ValuePriority priority = ValuePriority.Local);
 
     /// <summary>
     /// Sets a <see cref="AdamantiumProperty"/> value.
     /// </summary>
     /// <param name="property">The property.</param>
     /// <param name="value">New value.</param>
-    void SetCurrentValue(AdamantiumProperty property, object value);
+    void SetEffectiveValue(AdamantiumProperty property, object value);
+
+    public void SetStyleValue(string propertyName, object value, Style style);
+    
+    public void SetStyleValue(AdamantiumProperty property, object value, Style style);
+
+    public void RemoveStyleValue(string propertyName, Style style);
 
     /// <summary>
     /// Fires when value on <see cref="AdamantiumProperty"/> was changed

@@ -30,10 +30,11 @@ public static class RawBitmapExtension
     private static byte[][,] GetComponentArrayFromBuffer(IRawBitmap bitmap, ComponentBufferType bufferType)
     {
         var pixelSize = bitmap.GetImageDescription().Format.SizeOfInBytes();
-        byte[][,] componentsArray = null;
+        byte[][,] componentsArray;
         if (bufferType == ComponentBufferType.Jpg && pixelSize > 3)
         {
             componentsArray = new byte[3][,];
+            pixelSize = 3;
         }
         else
         {

@@ -418,6 +418,7 @@ namespace Adamantium.Fonts.Parsers
         protected void InitializeBase(string filePath, byte resolution)
         {
             TypeFace = new TypeFace();
+            TypeFace.Parser = this;
             FilePath = filePath;
             Resolution = resolution > 0 ? resolution : (byte)1;
             ReadTables = new HashSet<long>();
@@ -453,6 +454,11 @@ namespace Adamantium.Fonts.Parsers
             
                 ReadFontCollection();
             }
+        }
+
+        public byte[] GetFontBytes()
+        {
+            return FontReader.GetBuffer();
         }
 
         private void SortTables()

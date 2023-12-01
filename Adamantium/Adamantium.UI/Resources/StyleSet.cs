@@ -24,6 +24,14 @@ public class StyleSet : AdamantiumComponent, IStyleSet
         Styles.AddRange(styles);
     }
 
+    public void Add(Style style)
+    {
+        if (!Styles.Contains(style))
+        {
+            Styles.Add(style);
+        }
+    }
+
     public void AddOrSetChildComponent(object component)
     {
         if (component is Style style && !Styles.Contains(style))

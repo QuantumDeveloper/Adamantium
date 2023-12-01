@@ -4,6 +4,7 @@ using Adamantium.Fonts.Common;
 
 namespace Adamantium.Fonts
 {
+    [MessagePack.Union(0, typeof(Font))]
     public interface IFont
     {
         #region Name

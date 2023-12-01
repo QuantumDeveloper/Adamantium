@@ -1,9 +1,12 @@
-﻿using System.Collections.Generic;
+﻿using MessagePack;
+using System.Collections.Generic;
 
 namespace Adamantium.Fonts.Common
 {
+    [MessagePackObject]
     internal class RegionData
     {
+        [Key(0)]
         public List<double> Data;
 
         public RegionData()

@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<FontData>
+	<GlyphTextureSize>64</GlyphTextureSize>
+	<SampleRate>3</SampleRate>
+	<PixelRangle>4</PixelRangle>
+	<StartGlyphIndex>0</StartGlyphIndex>
+	<CustomFont>true</CustomFont>
+	<PathToFont>OTFFonts/GlametrixLight-0zjo.otf</PathToFont>
+</FontData>

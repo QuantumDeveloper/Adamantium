@@ -59,7 +59,8 @@ namespace Adamantium.Fonts.Extensions
             {
                 var startIndex = cffIndex.Offsets[i - 1] - 1;
                 var endIndex = cffIndex.Offsets[i] - 1;
-                var bytes = data[(int)startIndex ..(int)endIndex];
+                var range = endIndex - startIndex;
+                var bytes = data.Skip((int)startIndex).Take((int)range).ToArray();
                 dataByOffset.Add(bytes);
             }
 

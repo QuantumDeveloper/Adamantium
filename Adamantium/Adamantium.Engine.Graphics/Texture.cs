@@ -1,6 +1,5 @@
 ﻿using System;
 using Adamantium.Imaging;
-using Adamantium.Core;
 using System.IO;
 using System.Runtime.InteropServices;
 using Adamantium.Engine.Core.Content;
@@ -307,7 +306,6 @@ namespace Adamantium.Engine.Graphics
             {
                 return new Texture(graphicsDevice, description);
             }
-            return null;
         }
         
         public static Texture CreateFrom(

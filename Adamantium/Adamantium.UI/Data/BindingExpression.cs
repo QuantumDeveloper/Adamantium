@@ -13,9 +13,8 @@ public class BindingExpression : BindingExpressionBase
 
    public void Init()
    {
-      if (ResolvedSource is INotifyPropertyChanged)
+      if (ResolvedSource is INotifyPropertyChanged notify)
       {
-         var notify = ResolvedSource as INotifyPropertyChanged;
          notify.PropertyChanged += SourcePropertyChanged;
       }
 
@@ -31,31 +30,27 @@ public class BindingExpression : BindingExpressionBase
 
    private void SourcePropertyChanged(object sender, PropertyChangedEventArgs e)
    {
-      if (e.PropertyName == SourcePropertyName)
-      {
-         IsDirty = true;
-         UpdateTarget();
-         IsDirty = false;
-      }
+      if (e.PropertyName != SourcePropertyName) return;
+      
+      IsDirty = true;
+      UpdateTarget();
+      IsDirty = false;
    }
 
    public override void UpdateSource()
    {
-      if (IsDirty)
-      {
-         ResolvedSource.GetType()
-            .GetProperty(SourcePropertyName)
-            .SetValue(ResolvedSource, Target.GetValue(TargetProperty));
-
-      }
+      if (!IsDirty) return;
+      
+      ResolvedSource.GetType()
+         .GetProperty(SourcePropertyName)
+         ?.SetValue(ResolvedSource, Target.GetValue(TargetProperty));
    }
 
    public override void UpdateTarget()
    {
-      if (IsDirty)
-      {
-         var sourceValue = ResolvedSource.GetType().GetProperty(SourcePropertyName).GetValue(ResolvedSource);
-         Target.SetCurrentValue(TargetProperty, sourceValue);
-      }
+      if (!IsDirty) return;
+      
+      var sourceValue = ResolvedSource.GetType().GetProperty(SourcePropertyName)?.GetValue(ResolvedSource);
+      Target.SetEffectiveValue(TargetProperty, sourceValue);
    }
 }

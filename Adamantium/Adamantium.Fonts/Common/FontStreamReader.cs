@@ -6,7 +6,7 @@ using System.Text;
 
 namespace Adamantium.Fonts.Common
 {
-    internal class FontStreamReader : MemoryStream
+    public class FontStreamReader : MemoryStream
     {
         public string FilePath { get; }
         
@@ -14,7 +14,7 @@ namespace Adamantium.Fonts.Common
         {
         }
         
-        public FontStreamReader(byte[] buffer, string path = "") : base(buffer)
+        public FontStreamReader(byte[] buffer, string path = "") : base(buffer, 0, buffer.Length, false, true)
         {
             FilePath = path;
         }

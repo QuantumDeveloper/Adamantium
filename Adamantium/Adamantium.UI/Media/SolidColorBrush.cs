@@ -16,7 +16,7 @@ public sealed class SolidColorBrush: Brush
       Color = GetColorFromString(color);
    }
 
-   public static readonly AdamantiumProperty ColorProperty = AdamantiumProperty.Register(nameof(Opacity),
+   public static readonly AdamantiumProperty ColorProperty = AdamantiumProperty.Register(nameof(Color),
       typeof(Color), typeof(SolidColorBrush), new PropertyMetadata(Colors.Transparent));
 
    public Color Color

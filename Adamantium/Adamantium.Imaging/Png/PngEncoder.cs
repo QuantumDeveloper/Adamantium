@@ -1,4 +1,5 @@
 ﻿using System.IO;
+using System.Linq;
 using Adamantium.Imaging.Png.Chunks;
 using Adamantium.Imaging.Png.IO;
 
@@ -82,7 +83,11 @@ namespace Adamantium.Imaging.Png
                 }
                 else
                 {
-                    var frame = pngImage.Frames[0];
+                    var frame = pngImage.DefaultImage;
+                    if (frame == null)
+                    {
+                        frame = pngImage.Frames[0];
+                    }
                     PngColorProfile.AutoChooseColor(info.ColorMode, frame.RawPixelBuffer, frame.EncodedWidth, frame.EncodedHeight, state.ColorModeRaw);
                     //state.InfoRaw.ColorType = info.ColorMode.ColorType;
                     //state.InfoRaw.BitDepth = info.ColorMode.BitDepth;

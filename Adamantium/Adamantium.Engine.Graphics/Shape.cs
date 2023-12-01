@@ -3,7 +3,6 @@ using Adamantium.Core;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Core.Models;
 using Adamantium.Engine.Graphics.Effects;
-using AdamantiumVulkan.Core;
 
 namespace Adamantium.Engine.Graphics
 {
@@ -32,46 +31,7 @@ namespace Adamantium.Engine.Graphics
         {
             Mesh = mesh;
             GraphicsDevice = device;
-
-            int length = mesh.Points.Length;
-
-            var vertices = new MeshVertex[length];
-
-            for (int i = 0; i < length; i++)
-            {
-                var vertex = new MeshVertex() { Position = mesh.Points[i] };
-                if (mesh.IsNormalsPresent)
-                {
-                    vertex.Normal = mesh.Normals[i];
-                }
-                if (mesh.IsUv0Present)
-                {
-                    vertex.UV0 = mesh.UV0[i];
-                }
-                if (mesh.IsUv1Present)
-                {
-                    vertex.UV1 = mesh.UV1[i];
-                }
-                if (mesh.IsUv2Present)
-                {
-                    vertex.UV2 = mesh.UV2[i];
-                }
-                if (mesh.IsUv3Present)
-                {
-                    vertex.UV3 = mesh.UV3[i];
-                }
-                if (mesh.IsColorPresent)
-                {
-                    vertex.Color = mesh.Colors[i].ToVector4();
-                }
-                if (mesh.IsTangetBinormalsPresent)
-                {
-                    vertex.Tangent = mesh.Tangents[i];
-                    vertex.BiTangent = mesh.BiTangents[i];
-                }
-                
-                vertices[i] = vertex;
-            }
+            var vertices = mesh.ToMeshVertices();
 
             VertexBuffer = ToDispose(Buffer.Vertex.New(device, vertices));
             IndexBuffer = ToDispose(Buffer.Index.New(device, mesh.Indices));

@@ -28,6 +28,45 @@ namespace Adamantium.UI.Generators
             return null;
         }
 
+        public static EntityType GetEntityType(this INamedTypeSymbol typeSymbol)
+        {
+            if (typeSymbol == null)
+            {
+                return EntityType.Unknown;
+            }
+
+            if (typeSymbol.ImplementsInterface("IWindow"))
+            {
+                return EntityType.Window;
+            }
+            else if (typeSymbol.ImplementsInterface("IPage"))
+            {
+                return EntityType.Page;
+            }
+            else if (typeSymbol.ImplementsInterface("IView"))
+            {
+                return EntityType.View;
+            }
+            else if (typeSymbol.ImplementsInterface("ITheme"))
+            {
+                return EntityType.Theme;
+            }
+            else if (typeSymbol.ImplementsInterface("IUIApplication"))
+            {
+                return EntityType.UIApplication;
+            }
+            else if (typeSymbol.ImplementsInterface("IResourceDictionary"))
+            {
+                return EntityType.ResourceDictionary;
+            }
+            else if (typeSymbol.ImplementsInterface("IStyleSet"))
+            {
+                return EntityType.StyleSet;
+            }
+
+            return EntityType.Unknown;
+        }
+
         public static List<ISymbol> GetAllProperties(this INamedTypeSymbol typeSymbol)
         {
             if (typeSymbol == null)

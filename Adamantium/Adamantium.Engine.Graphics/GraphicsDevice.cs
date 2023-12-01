@@ -11,7 +11,6 @@ using Adamantium.Mathematics;
 using AdamantiumVulkan.Core;
 using Semaphore = AdamantiumVulkan.Core.Semaphore;
 using Adamantium.Engine.Graphics.Effects.Generated;
-using AdamantiumVulkan.Core.Interop;
 using Serilog;
 using Image = AdamantiumVulkan.Core.Image;
 using Logger = Serilog.Core.Logger;

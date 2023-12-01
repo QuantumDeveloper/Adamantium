@@ -128,8 +128,9 @@ namespace Adamantium.Engine.Effects
         /// <param name="effectData">instance of <see cref="EffectData"/></param>
         public void Save(Stream stream)
         {
-            MessagePackSerializer.Serialize(stream, this);
-            //Scheme.Serialize(stream, this);
+            var options = MessagePackSerializerOptions.Standard
+                .WithCompression(MessagePackCompression.Lz4BlockArray);
+            MessagePackSerializer.Serialize(stream, this, options: options);
         }
 
         /// <summary>
@@ -151,8 +152,9 @@ namespace Adamantium.Engine.Effects
         /// </remarks>
         public static EffectData Load(Stream stream)
         {
-            //var effect = (EffectData)Scheme.Deserialize(stream, null, typeof(EffectData));
-            var effect = MessagePackSerializer.Deserialize<EffectData>(stream);
+            var options = MessagePackSerializerOptions.Standard
+                .WithCompression(MessagePackCompression.Lz4BlockArray);
+            var effect = MessagePackSerializer.Deserialize<EffectData>(stream, options);
             return effect;
         }
 

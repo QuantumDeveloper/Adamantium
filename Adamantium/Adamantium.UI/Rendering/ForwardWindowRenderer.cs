@@ -1,8 +1,6 @@
-using System;
 using System.Collections.Generic;
 using Adamantium.Core;
 using Adamantium.Engine.Graphics;
-using Adamantium.UI.Controls;
 using Adamantium.UI.RoutedEvents;
 using AdamantiumVulkan.Core;
 
@@ -46,11 +44,10 @@ internal class ForwardWindowRenderer : WindowRendererBase
 
     protected override void UnsubscribeFromEvents()
     {
-        if (Window != null)
-        {
-            Window.ClientSizeChanged -= OnClientSizeChanged;
-            Window.MSAALevelChanged -= OnMSAALevelChanged;
-        }
+        if (Window == null) return;
+        
+        Window.ClientSizeChanged -= OnClientSizeChanged;
+        Window.MSAALevelChanged -= OnMSAALevelChanged;
     }
 
     protected override void SubscribeToEvents()

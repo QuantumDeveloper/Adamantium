@@ -34,7 +34,7 @@ namespace Adamantium.Fonts.Parsers
         private ICFFParser cffParser;
 
         private CFFFont cffFont;
-        
+
         static OTFParser()
         {
             commonMandatoryTables = new ReadOnlyCollection<string>(new List<string>
@@ -61,17 +61,17 @@ namespace Adamantium.Fonts.Parsers
                 {"CFF2", "CFF2"}
             };
         }
-        
+
         protected internal OTFParser()
         {
-            
+
         }
 
         protected internal OTFParser(string filePath, byte resolution = 1) : base(filePath, resolution)
         {
         }
 
-        protected internal OTFParser(FontStreamReader fontStreamReader, byte resolution = 0, params TableDirectory[] tableDirectories) 
+        protected internal OTFParser(FontStreamReader fontStreamReader, byte resolution = 0, params TableDirectory[] tableDirectories)
             : base(fontStreamReader, resolution, tableDirectories)
         {
         }
@@ -142,7 +142,7 @@ namespace Adamantium.Fonts.Parsers
 
         private void ReadTableDirectories()
         {
-            foreach (var offset in  ttcHeader.TableDirectoryOffsets)
+            foreach (var offset in ttcHeader.TableDirectoryOffsets)
             {
                 FontReader.Position = offset;
                 ReadTableDirectory();
@@ -163,7 +163,7 @@ namespace Adamantium.Fonts.Parsers
 
             // skip other fields
             FontReader.Position += 6;
-            
+
             // 3rd step - read all table records for current table directory
             ReadTableRecords(tableDirectory);
         }
@@ -171,7 +171,7 @@ namespace Adamantium.Fonts.Parsers
         private void ReadTableRecords(TableDirectory tableDirectory)
         {
             tableDirectory.Tables = new TableEntry[tableDirectory.NumTables];
-            
+
             for (int i = 0; i < tableDirectory.NumTables; ++i)
             {
                 var table = new TableEntry
@@ -226,7 +226,7 @@ namespace Adamantium.Fonts.Parsers
         private void DetermineCFFVersion(TableDirectory tableDirectory)
         {
             if (tableDirectory.OutlineType != OutlineType.CompactFontFormat) return;
-            
+
             if (tableDirectory.TablesOffsets.ContainsKey(cffMandatoryTables["CFF"]))
             {
                 CFFVersion = Tables.CFF.CFFVersion.CFF;
@@ -240,7 +240,7 @@ namespace Adamantium.Fonts.Parsers
         private void ParseCFF(TableEntry entry)
         {
             var offset = entry.Offset;
-            
+
             cffParser = CFFVersion switch
             {
                 Tables.CFF.CFFVersion.CFF => new CFFParser(offset, FontReader),
@@ -252,7 +252,7 @@ namespace Adamantium.Fonts.Parsers
             TypeFace.SetGlyphs(cffFont.Glyphs);
             CurrentFont.VariationData = cffFont.VariationStore;
         }
-        
+
         protected virtual void ReadFvarTable(TableEntry entry)
         {
             FontReader.Position = entry.Offset;
@@ -268,9 +268,9 @@ namespace Adamantium.Fonts.Parsers
 
             FontReader.Position = entry.Offset + axesArrayOffset;
             var currentOffset = FontReader.Position;
-            
-            var axes = new List<VariationAxisRecord>(); 
-            
+
+            var axes = new List<VariationAxisRecord>();
+
             for (var i = 0; i < axisCount; ++i)
             {
                 var axis = new VariationAxisRecord();
@@ -283,13 +283,13 @@ namespace Adamantium.Fonts.Parsers
                 axis.AxisNameID = FontReader.ReadUInt16();
 
                 axes.Add(axis);
-                
+
                 currentOffset += axisSize;
                 FontReader.Position = currentOffset;
             }
 
             var instances = new List<InstanceRecord>();
-            
+
             for (var j = 0; j < instanceCount; ++j)
             {
                 var instance = new InstanceRecord();
@@ -297,7 +297,7 @@ namespace Adamantium.Fonts.Parsers
                 instance.SubfamilyNameID = FontReader.ReadUInt16();
                 instance.Flags = FontReader.ReadUInt16();
                 instance.Coordinates = new List<double>();
-                
+
                 for (var k = 0; k < axisCount; ++k)
                 {
                     instance.Coordinates.Add(FontReader.ReadInt32().FromF16Dot16());
@@ -315,7 +315,7 @@ namespace Adamantium.Fonts.Parsers
                 }
 
                 instances.Add(instance);
-                
+
                 currentOffset += instanceSize;
                 FontReader.Position = currentOffset;
             }
@@ -326,7 +326,7 @@ namespace Adamantium.Fonts.Parsers
         protected virtual void ReadGlyphPositioningTable(TableEntry entry)
         {
             FontReader.Position = entry.Offset;
-            
+
             var gpos = new GlyphPositioningTable();
             gpos.MajorVersion = FontReader.ReadUInt16();
             gpos.MinorVersion = FontReader.ReadUInt16();
@@ -343,11 +343,11 @@ namespace Adamantium.Fonts.Parsers
             gpos.ScriptList = FontReader.ReadScriptList(scriptListOffset);
 
             gpos.FeatureList = FontReader.ReadFeatureList(featureListOffset);
-            
+
             gpos.LookupList = FontReader.ReadGPOSLookupListTable(lookupListOffset);
-            
+
             ProcessFeatures(gpos, FeatureKind.GPOS);
-            
+
         }
 
         protected virtual void ReadGlyphSubstitutionTable(TableEntry entry)
@@ -380,7 +380,7 @@ namespace Adamantium.Fonts.Parsers
         private void ProcessFeatures(IFontLayout layout, FeatureKind featureKind)
         {
             var featureManager = CurrentFont.FeatureService;
-            
+
             foreach (var scriptTable in layout.ScriptList)
             {
                 foreach (var langSysTable in scriptTable.LangSysTables)
@@ -391,7 +391,7 @@ namespace Adamantium.Fonts.Parsers
                         fontLang = new FontLanguage(langInfo);
                         featureManager.AddLanguage(fontLang);
                     }
-                    
+
                     for (int i = 0; i < langSysTable.FeatureIndices.Length; i++)
                     {
                         var featureTable = layout.FeatureList[langSysTable.FeatureIndices[i]];
@@ -402,7 +402,7 @@ namespace Adamantium.Fonts.Parsers
                             feature.FeatureParameters = featureTable.FeatureParameters;
                             featureManager.AddFeature(feature, featureKind);
                         }
-                        
+
                         fontLang.AddFeature(feature, featureKind);
                         var lookups = new List<ILookupTable>();
                         for (int k = 0; k < featureTable.LookupListIndices.Length; ++k)

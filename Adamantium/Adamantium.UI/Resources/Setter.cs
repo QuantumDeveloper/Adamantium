@@ -1,8 +1,7 @@
 ﻿using System;
 using Adamantium.UI.Data;
-using Adamantium.UI.Resources;
 
-namespace Adamantium.UI;
+namespace Adamantium.UI.Resources;
 
 public class Setter : ISetter, IEquatable<Setter>
 {
@@ -19,45 +18,34 @@ public class Setter : ISetter, IEquatable<Setter>
     public string Property { get; set; }
     public Object Value { get; set; }
 
-    public void Apply(IFundamentalUIComponent component, ITheme theme)
+    public void Apply(IFundamentalUIComponent component, Style style, ITheme theme)
     {
         switch (Value)
         {
             case BindingBase binding:
-            {
                 component.SetBinding(Property, binding);
                 break;
-            }
             case ResourceReference resourceReference:
-            {
                 var resource = theme.Resources[resourceReference.Name];
-                component.SetValue(Property, resource);
+                component.SetStyleValue(Property, resource, style);
                 break;
-            }
             default:
-                component.SetValue(Property, Value);
+                var prop = AdamantiumPropertyMap.FindRegistered(component.GetType(), Property);
+                var value = TypeCastFactory.CastFromString(Value, prop.PropertyType);
+                component.SetStyleValue(prop, value, style);
                 break;
         }
     }
 
-    public void UnApply(IFundamentalUIComponent component, ITheme theme)
+    public void Remove(IFundamentalUIComponent component, Style style, ITheme theme)
     {
         switch (Value)
         {
             case BindingBase binding:
-            {
                 component.RemoveBinding(Property);
-
                 break;
-            }
-            case ResourceReference resourceReference:
-            {
-                var resource = theme.Resources[resourceReference.Name];
-                component.SetValue(Property, resource);
-                break;
-            }
             default:
-                component.SetValue(Property, Value);
+                component.RemoveStyleValue(Property, style);
                 break;
         }
     }

@@ -4,6 +4,7 @@ using Adamantium.Engine.Graphics;
 using Adamantium.Game.Core.Input;
 using Adamantium.Game.Core.Payloads;
 using Adamantium.Imaging;
+using Adamantium.Mathematics;
 using Adamantium.UI;
 using Adamantium.UI.Controls;
 using AdamantiumVulkan.Core;

@@ -1,4 +1,4 @@
-﻿using Adamantium.UI;
+﻿using Adamantium.Mathematics;
 
 namespace Adamantium.Game.Core.Payloads
 {

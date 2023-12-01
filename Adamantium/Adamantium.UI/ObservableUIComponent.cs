@@ -39,11 +39,15 @@ public class ObservableUIComponent : UIComponent, IObservableComponent
             var sub = new EventSubscription
             {
                 Handler = handler,
-                HandledEeventToo = handledEventsToo,
+                HandledEventsToo = handledEventsToo,
             };
             subscriptions.Add(sub);
         }
+    }
 
+    public void AddHandler(RoutedEvent routedEvent, RoutedEventHandler handler, bool handledEventsToo = false)
+    {
+        AddHandler(routedEvent, (Delegate)handler, handledEventsToo);
     }
 
     public void RaiseEvent(RoutedEventArgs e)
@@ -88,7 +92,7 @@ public class ObservableUIComponent : UIComponent, IObservableComponent
                 var handlersList = eventHandlers[e.RoutedEvent];
                 foreach (var handler in handlersList)
                 {
-                    if (!e.Handled || handler.HandledEeventToo)
+                    if (!e.Handled || handler.HandledEventsToo)
                     {
                         handler.Handler.DynamicInvoke(this, e);
                     }
