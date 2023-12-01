@@ -4,10 +4,11 @@ using System.Collections.ObjectModel;
 
 namespace Adamantium.UI.Data;
 
-public class Binding:BindingBase
+public class Binding : BindingBase
 {
    public Binding()
-   { }
+   {
+   }
 
    public Binding(string path)
    {
@@ -35,10 +36,9 @@ public class Binding:BindingBase
 
    public override object Clone()
    {
-      ReadOnlyObservableCollection<Int32> col = new ReadOnlyObservableCollection<int>(new ObservableCollection<int>(new List<int>() {15}));
-         
-      return null; 
-   }
+      ReadOnlyObservableCollection<Int32> col =
+         new ReadOnlyObservableCollection<int>(new ObservableCollection<int>(new List<int>() { 15 }));
 
-      
+      return null;
+   }
 }

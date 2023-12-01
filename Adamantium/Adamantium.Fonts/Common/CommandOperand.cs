@@ -1,10 +1,14 @@
-﻿using System;
+﻿using MessagePack;
+using System;
 
 namespace Adamantium.Fonts.Common
 {
+    [MessagePackObject]
     internal class CommandOperand
     {
+        [Key(0)]
         public double Value { get; set; }
+        [Key(1)]
         public RegionData BlendData { get; set; }
 
         public CommandOperand(double value)
@@ -103,7 +107,7 @@ namespace Adamantium.Fonts.Common
 
             if (BlendData != null)
             {
-                blendDataString = $", BlendData: {string.Join(',', BlendData.Data)}";
+                blendDataString = $", BlendData: {string.Join(",", BlendData.Data)}";
             }
 
             return $"{Value}" + blendDataString;
@@ -113,8 +117,8 @@ namespace Adamantium.Fonts.Common
         {
             if (obj == null) return false;
 
-            var instnace = obj as CommandOperand;
-            return Value == instnace.Value && BlendData == instnace.BlendData;
+            var instance = obj as CommandOperand;
+            return Value == instance.Value && BlendData == instance.BlendData;
         }
 
         public override int GetHashCode()

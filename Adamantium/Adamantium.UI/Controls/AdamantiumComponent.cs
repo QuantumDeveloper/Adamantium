@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Adamantium.UI.Resources;
 using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI.Controls;
@@ -8,7 +9,10 @@ public abstract class AdamantiumComponent : DispatcherComponent, IAdamantiumComp
 {
     public UInt128 Uid { get; set; }
 
-    private readonly Dictionary<AdamantiumProperty, object> values = new Dictionary<AdamantiumProperty, object>();
+    private readonly Dictionary<AdamantiumProperty, ValueContainer> values = new Dictionary<AdamantiumProperty, ValueContainer>();
+
+    private readonly Dictionary<string, StyleValueContainer> styleValues =
+        new Dictionary<string, StyleValueContainer>();
 
     private AdamantiumComponent inheritanceParent;
 
@@ -21,7 +25,7 @@ public abstract class AdamantiumComponent : DispatcherComponent, IAdamantiumComp
             var metadata = property.GetDefaultMetadata(GetType());
             if (property.ValidateValueCallBack?.Invoke(metadata.DefaultValue) == false)
             {
-                throw new ArgumentException("Value " + metadata + "is incorrect!");
+                throw new ArgumentException($"Value {metadata} is incorrect!");
             }
 
             if (metadata.CoerceValueCallback != null)
@@ -31,14 +35,19 @@ public abstract class AdamantiumComponent : DispatcherComponent, IAdamantiumComp
                 {
                     if (property.ValidateValueCallBack?.Invoke(coercedValue) == false)
                     {
-                        throw new ArgumentException("Value " + coercedValue + "is incorrect!");
+                        throw new ArgumentException($"Value {coercedValue} is incorrect!");
                     }
 
                     metadata.DefaultValue = coercedValue;
                 }
             }
 
-            values[property] = metadata.DefaultValue;
+            if (!values.ContainsKey(property))
+            {
+                values[property] = new ValueContainer();
+            }
+
+            values[property].SetValue(metadata.DefaultValue, ValuePriority.Default);
             if (metadata.DefaultValue != null)
             {
                 var e = new AdamantiumPropertyChangedEventArgs(property, AdamantiumProperty.UnsetValue,
@@ -122,12 +131,11 @@ public abstract class AdamantiumComponent : DispatcherComponent, IAdamantiumComp
         }
 
         var metadata = e.Property.GetDefaultMetadata(GetType());
-        if (metadata != null)
+        if (metadata == null) return;
+        
+        if (metadata.Inherits && !IsSet(e.Property))
         {
-            if (metadata.Inherits && !IsSet(e.Property))
-            {
-                RaisePropertyChanged(e.Property, e.OldValue, e.NewValue);
-            }
+            RaisePropertyChanged(e.Property, e.OldValue, e.NewValue);
         }
     }
 
@@ -184,24 +192,28 @@ public abstract class AdamantiumComponent : DispatcherComponent, IAdamantiumComp
         {
             return inheritanceParent.GetValue(property);
         }
-        else
-        {
-            return value.DefaultValue;
-        }
+
+        return value.DefaultValue;
+    }
+
+    public void ClearValue(string propertyName, ValuePriority priority = ValuePriority.Local)
+    {
+        var property = AdamantiumPropertyMap.FindRegistered(GetType(), propertyName);
+        if (property == null) return;
+        
+        ClearValue(property, priority);
     }
 
     /// <summary>
     /// Clears a <see cref="AdamantiumProperty"/>'s local value.
     /// </summary>
     /// <param name="property">The property.</param>
-    public void ClearValue(AdamantiumProperty property)
+    /// <param name="priority"></param>
+    public void ClearValue(AdamantiumProperty property, ValuePriority priority = ValuePriority.Local)
     {
-        if (property == null)
-        {
-            throw new ArgumentNullException(nameof(property));
-        }
+        ArgumentNullException.ThrowIfNull(property);
 
-        SetValue(property, AdamantiumProperty.UnsetValue);
+        SetValue(property, AdamantiumProperty.UnsetValue, priority);
     }
 
     /// <summary>
@@ -211,7 +223,9 @@ public abstract class AdamantiumComponent : DispatcherComponent, IAdamantiumComp
     /// <returns>The value.</returns>
     public object GetValue(AdamantiumProperty property)
     {
-        object result = AdamantiumProperty.UnsetValue;
+        ArgumentNullException.ThrowIfNull(property);
+        
+        object result;
         if (!AdamantiumPropertyMap.IsRegistered(this, property))
         {
             ThrowNotRegistered(property);
@@ -219,10 +233,7 @@ public abstract class AdamantiumComponent : DispatcherComponent, IAdamantiumComp
 
         lock (values)
         {
-            if (values.ContainsKey(property))
-            {
-                result = values[property];
-            }
+            result = GetOrCalculateEffectiveValue(property);
         }
 
         if (result == AdamantiumProperty.UnsetValue)
@@ -241,11 +252,6 @@ public abstract class AdamantiumComponent : DispatcherComponent, IAdamantiumComp
     /// <returns>The value.</returns>
     public T GetValue<T>(AdamantiumProperty property)
     {
-        if (property == null)
-        {
-            throw new ArgumentNullException(nameof(property));
-        }
-
         return (T)GetValue(property);
     }
 
@@ -273,13 +279,52 @@ public abstract class AdamantiumComponent : DispatcherComponent, IAdamantiumComp
 
         lock (values)
         {
-            if (values.ContainsKey(property))
+            if (values.TryGetValue(property, out var value))
             {
-                return values[property] != AdamantiumProperty.UnsetValue;
+                return value != AdamantiumProperty.UnsetValue;
             }
         }
 
         return false;
+    }
+
+    public void SetStyleValue(string propertyName, object value, Style style)
+    {
+        var property = AdamantiumPropertyMap.FindRegistered(GetType(), propertyName);
+        SetStyleValue(property, value, style);
+    }
+
+    public void SetStyleValue(AdamantiumProperty property, object value, Style style)
+    {
+        SetValue(property, value, ValuePriority.Style);
+        AddStyleEntry(property.Name, value, style);
+    }
+
+    public void RemoveStyleValue(string propertyName, Style style)
+    {
+        var previousValue = RemoveStyleEntry(propertyName, style);
+        SetValue(propertyName, previousValue, ValuePriority.Style);
+    }
+
+    private void AddStyleEntry(string propertyName, object value, Style style)
+    {
+        if (!styleValues.ContainsKey(propertyName))
+        {
+            styleValues[propertyName] = new StyleValueContainer();
+        }
+        styleValues[propertyName].AddValue(style, value);
+    }
+    
+    private object RemoveStyleEntry(string propertyName, Style style)
+    {
+        if (!styleValues.ContainsKey(propertyName))
+        {
+            return AdamantiumProperty.UnsetValue;
+        }
+        
+        var previousValue = styleValues[propertyName].RemoveAndGetPreviousValue(style);
+        
+        return previousValue;
     }
 
     /// <summary>
@@ -287,17 +332,10 @@ public abstract class AdamantiumComponent : DispatcherComponent, IAdamantiumComp
     /// </summary>
     /// <param name="property">The property.</param>
     /// <param name="value">New value.</param>
-    public void SetValue(AdamantiumProperty property, object value)
+    /// <param name="priority"></param>
+    public void SetValue(AdamantiumProperty property, object value, ValuePriority priority = ValuePriority.Local)
     {
-        if (property == null)
-        {
-            throw new ArgumentNullException(nameof(property));
-        }
-
-        if (!AdamantiumPropertyMap.IsRegistered(this, property))
-        {
-            ThrowNotRegistered(property);
-        }
+        ValidateProperty(property);
 
         if (value == AdamantiumProperty.UnsetValue)
         {
@@ -308,17 +346,27 @@ public abstract class AdamantiumComponent : DispatcherComponent, IAdamantiumComp
         {
             if (property.IsAttached)
             {
-                values.TryAdd(property, value);
+                if (!values.ContainsKey(property))
+                {
+                    values.Add(property, new ValueContainer());
+                }
+                values[property].SetValue(value, priority);
             }
 
             if (values.ContainsKey(property))
             {
-                RunSetValueSequence(property, value, true);
+                RunSetValueSequence(property, value, priority, true);
             }
         }
     }
 
-    public void SetValue(string property, object value)
+    /// <summary>
+    /// Sets a <see cref="AdamantiumProperty"/> value.
+    /// </summary>
+    /// <param name="property">Name of the AdamantiumProperty reference</param>
+    /// <param name="value">The value.</param>
+    /// <param name="priority">Priority for value</param>
+    public void SetValue(string property, object value, ValuePriority priority = ValuePriority.Local)
     {
         if (string.IsNullOrEmpty(property)) return;
         
@@ -334,17 +382,9 @@ public abstract class AdamantiumComponent : DispatcherComponent, IAdamantiumComp
     /// </summary>
     /// <param name="property">The property.</param>
     /// <param name="value">New value.</param>
-    public void SetCurrentValue(AdamantiumProperty property, object value)
+    public void SetEffectiveValue(AdamantiumProperty property, object value)
     {
-        if (property == null)
-        {
-            throw new ArgumentNullException(nameof(property));
-        }
-
-        if (!AdamantiumPropertyMap.IsRegistered(this, property))
-        {
-            ThrowNotRegistered(property);
-        }
+        ValidateProperty(property);
 
         if (value == AdamantiumProperty.UnsetValue)
         {
@@ -358,13 +398,31 @@ public abstract class AdamantiumComponent : DispatcherComponent, IAdamantiumComp
                 return;
             }
 
-            RunSetValueSequence(property, value, false);
+            RunSetValueSequence(property, value, ValuePriority.Effective, false);
         }
     }
 
-    private void RunSetValueSequence(AdamantiumProperty property, object value, bool raiseValueChangedEvent)
+    private object GetOrCalculateEffectiveValue(AdamantiumProperty property)
     {
-        var propertyValue = values[property];
+        if (!values.ContainsKey(property)) return AdamantiumProperty.UnsetValue;
+        
+        var value = values[property].GetValue(ValuePriority.Effective);
+        
+        if (value != AdamantiumProperty.UnsetValue) return value;
+        
+        foreach (var val in values[property].Values)
+        {
+            if (val == AdamantiumProperty.UnsetValue) continue;
+            value = val;
+            break;
+        }
+
+        return value;
+    }
+
+    private void RunSetValueSequence(AdamantiumProperty property, object value, ValuePriority priority, bool raiseValueChangedEvent)
+    {
+        var propertyValue = GetOrCalculateEffectiveValue(property);
 
         if (Equals(propertyValue, value))
         {
@@ -391,14 +449,27 @@ public abstract class AdamantiumComponent : DispatcherComponent, IAdamantiumComp
             value = newValue;
         }
 
-        var args = new AdamantiumPropertyChangedEventArgs(property, values[property], value);
-        values[property] = value;
+        var args = new AdamantiumPropertyChangedEventArgs(property, values[property].GetValue(priority), value);
+        
+        if (!values.ContainsKey(property))
+        {
+            values.Add(property, new ValueContainer());
+        }
+        values[property].SetValue(value, priority);
         metadata.PropertyChangedCallback?.Invoke(this, args);
         var element = this as IUIComponent;
         if (element is IMeasurableComponent measurable)
         {
-            measurable.InvalidateMeasure();
-            measurable.InvalidateArrange();
+            // TODO: think how to improve this code and get rid of type casting
+            if (metadata.AffectsMeasure)
+            {
+                measurable.InvalidateMeasure();
+                measurable.InvalidateArrange();
+            }
+            else if (metadata.AffectsArrange)
+            {
+                measurable.InvalidateArrange();
+            }
         }
 
         if (metadata.AffectsRender)
@@ -420,5 +491,15 @@ public abstract class AdamantiumComponent : DispatcherComponent, IAdamantiumComp
     private void ThrowNotRegistered(AdamantiumProperty p)
     {
         throw new ArgumentException($"Property '{p.Name} not registered on '{this.GetType()}");
+    }
+
+    private void ValidateProperty(AdamantiumProperty property)
+    {
+        ArgumentNullException.ThrowIfNull(property);
+
+        if (!AdamantiumPropertyMap.IsRegistered(this, property))
+        {
+            ThrowNotRegistered(property);
+        }
     }
 }

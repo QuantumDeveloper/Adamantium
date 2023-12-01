@@ -21,6 +21,9 @@ public sealed class EllipseGeometry : Geometry
 
    public static readonly AdamantiumProperty StopAngleProperty = AdamantiumProperty.Register(nameof(StopAngle),
       typeof(Double), typeof(EllipseGeometry), new PropertyMetadata((Double)360, PropertyMetadataOptions.AffectsRender));
+   
+   public static readonly AdamantiumProperty EllipseTypeProperty = AdamantiumProperty.Register(nameof(EllipseType),
+      typeof(EllipseType), typeof(EllipseGeometry), new PropertyMetadata(EllipseType.Sector, PropertyMetadataOptions.AffectsRender));
 
 
    public Double RadiusX
@@ -47,6 +50,12 @@ public sealed class EllipseGeometry : Geometry
       set => SetValue(StopAngleProperty, value);
    }
 
+   public EllipseType EllipseType
+   {
+      get => GetValue<EllipseType>(EllipseTypeProperty);
+      set => SetValue(EllipseTypeProperty, value);
+   }
+
    public Vector2 Center
    {
       get => GetValue<Vector2>(CenterProperty);
@@ -59,7 +68,7 @@ public sealed class EllipseGeometry : Geometry
       TesselationFactor = 80;
    }
 
-   public EllipseGeometry(Rect rect, Double startAngle = 0, Double stopAngle = 360) : this()
+   public EllipseGeometry(Rect rect, Double startAngle = 0, Double stopAngle = 360, EllipseType ellipseType = EllipseType.Sector) : this()
    {
       bounds = rect;
       RadiusX = rect.Width/2;
@@ -67,10 +76,11 @@ public sealed class EllipseGeometry : Geometry
       Center = rect.Center;
       StartAngle = startAngle;
       StopAngle = stopAngle;
+      EllipseType = ellipseType;
       IsClosed = true;
    }
 
-   public EllipseGeometry(Vector2 center, Double radiusX, Double radiusY, Double startAngle = 0, Double stopAngle = 360) : this()
+   public EllipseGeometry(Vector2 center, Double radiusX, Double radiusY, Double startAngle = 0, Double stopAngle = 360, EllipseType ellipseType = EllipseType.Sector) : this()
    {
       bounds = new Rect(center - new Vector2(radiusX, radiusY), new Size(radiusX * 2, radiusY * 2));
       Center = center;
@@ -78,9 +88,10 @@ public sealed class EllipseGeometry : Geometry
       RadiusY = radiusY;
       StartAngle = startAngle;
       StopAngle = stopAngle;
+      EllipseType = ellipseType;
    }
 
-   private void CreateEllipse(Rect rect, GeometryType geometryType, Double startAngle = 0, Double stopAngle = 360)
+   private void CreateEllipse(Rect rect, GeometryType geometryType, Double startAngle = 0, Double stopAngle = 360, EllipseType ellipseType = EllipseType.Sector)
    {
       bounds = rect;
       RadiusX = rect.Width / 2;
@@ -88,12 +99,13 @@ public sealed class EllipseGeometry : Geometry
       Center = rect.Center;
       StartAngle = startAngle;
       StopAngle = stopAngle;
+      EllipseType = ellipseType;
          
       var translation = Matrix4x4.Translation(Center.X, Center.Y, 0);
          
       Mesh = Shapes.Ellipse.GenerateGeometry(
          geometryType, 
-         EllipseType.Sector,
+         EllipseType,
          new Vector2(rect.Width, rect.Height), 
          StartAngle, 
          StopAngle,
@@ -119,6 +131,6 @@ public sealed class EllipseGeometry : Geometry
 
    protected internal override void ProcessGeometryCore(GeometryType geometryType)
    {
-      CreateEllipse(Bounds, geometryType, StartAngle, StopAngle);
+      CreateEllipse(Bounds, geometryType, StartAngle, StopAngle, EllipseType);
    }
 }

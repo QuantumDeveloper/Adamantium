@@ -29,14 +29,14 @@ public sealed class RoutedEvent
    {
       lock (classEventSubscriptions)
       {
-         ClassEventSubsription subsription = new ClassEventSubsription
+         ClassEventSubsription subscription = new ClassEventSubsription
          {
-            HandledEeventToo = handledEventsToo,
+            HandledEventsToo = handledEventsToo,
             Handler = handler,
             TargetType = classType
          };
 
-         classEventSubscriptions.Add(subsription);
+         classEventSubscriptions.Add(subscription);
       }
    }
 
@@ -44,14 +44,14 @@ public sealed class RoutedEvent
    {
       lock (classEventSubscriptions)
       {
-         ClassEventSubsription subsription = new ClassEventSubsription
+         ClassEventSubsription subscription = new ClassEventSubsription
          {
-            HandledEeventToo = handledEventsToo,
+            HandledEventsToo = handledEventsToo,
             Handler = handler,
             TargetType = typeof(T)
          };
 
-         classEventSubscriptions.Add(subsription);
+         classEventSubscriptions.Add(subscription);
       }
    }
 
@@ -59,12 +59,12 @@ public sealed class RoutedEvent
    {
       lock (classEventSubscriptions)
       {
-         foreach (var subsription in classEventSubscriptions)
+         foreach (var subscription in classEventSubscriptions)
          {
-            if (subsription.TargetType.GetTypeInfo().IsAssignableFrom(sender.GetType().GetTypeInfo()) &&
-                (!e.Handled || subsription.HandledEeventToo))
+            if (subscription.TargetType.GetTypeInfo().IsAssignableFrom(sender.GetType().GetTypeInfo()) &&
+                (!e.Handled || subscription.HandledEventsToo))
             {
-               subsription.Handler.DynamicInvoke(sender, e);
+               subscription.Handler.DynamicInvoke(sender, e);
             }
          }
       }

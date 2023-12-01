@@ -300,6 +300,19 @@ namespace Adamantium.Imaging
         {
             return New1D(width, mipMapCount, format, arraySize, IntPtr.Zero);
         }
+        
+        /// <summary>
+        /// Creates a new instance of a 2D <see cref="Image"/>.
+        /// </summary>
+        /// <param name="width">The width.</param>
+        /// <param name="height">The height.</param>
+        /// <param name="format">The format.</param>
+        /// <param name="arraySize">Size of the array.</param>
+        /// <returns>A new image.</returns>
+        public static Image New2D(uint width, uint height, SurfaceFormat format, uint arraySize = 1)
+        {
+            return New2D(width, height, 1, format, arraySize);
+        }
 
         /// <summary>
         /// Creates a new instance of a 2D <see cref="Image"/>.

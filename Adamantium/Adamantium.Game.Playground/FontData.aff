@@ -1,0 +1,11 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<FontData>
+	<GlyphTextureSize>48</GlyphTextureSize>
+	<SampleRate>3</SampleRate>
+	<PixelRangle>4</PixelRangle>
+	<StartGlyphIndex>0</StartGlyphIndex>
+	<GlyphCount>0</GlyphCount>
+	<FontName>Crimson-Italic</FontName>
+	<IsSystemFont>false</IsSystemFont>
+	<PathToFont>Fonts/OtfFonts/Crimson-Italic.otf</PathToFont>
+</FontData>

@@ -8,6 +8,8 @@ public interface IObservableComponent: IUIComponent
 {
     IObservableComponent ObservableParent { get; }
     public void AddHandler(RoutedEvent routedEvent, Delegate handler, bool handledEventsToo = false);
+    
+    public void AddHandler(RoutedEvent routedEvent, RoutedEventHandler handler, bool handledEventsToo = false);
 
     void RemoveHandler(RoutedEvent routedEvent, Delegate handler);
 

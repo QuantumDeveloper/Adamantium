@@ -1,12 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using Adamantium.Engine.Core.Models;
 using Adamantium.Fonts.Common;
 using Adamantium.Mathematics;
-using AdamantiumVulkan.Core;
 
-namespace Adamantium.Fonts
+namespace Adamantium.Fonts.TextureGeneration
 {
     public class MsdfGenerator
     {
@@ -18,11 +15,11 @@ namespace Adamantium.Fonts
             var res = new List<List<MsdfGlyphSegment>>();
             var contour = new List<MsdfGlyphSegment>();
 
-            for (var i = 0; i < (segments.Count - 1); ++i)
+            for (var i = 0; i < segments.Count - 1; ++i)
             {
                 var currentSegment = segments[i];
                 var nextSegment = segments[i + 1];
-                
+
                 contour.Add(currentSegment);
 
                 if (!GlyphSegmentsMath.IsSegmentsConnected(ref currentSegment.Segment, ref nextSegment.Segment))
@@ -31,7 +28,7 @@ namespace Adamantium.Fonts
                     contour = new List<MsdfGlyphSegment>();
                 }
 
-                if (i == (segments.Count - 2))
+                if (i == segments.Count - 2)
                 {
                     contour.Add(nextSegment);
                     res.Add(contour);
@@ -47,7 +44,7 @@ namespace Adamantium.Fonts
             {
                 var currentSeg = contour[i];
 
-                if (i == (contour.Count - 1))
+                if (i == contour.Count - 1)
                 {
                     startIndex = 0;
                 }
@@ -66,12 +63,12 @@ namespace Adamantium.Fonts
 
             return false;
         }
-        
+
         private List<Contour> SplitToEdgedContours()
         {
             var angleThreshold = 135;
 
-            var res = new List<Contour>(); 
+            var res = new List<Contour>();
             var rawContours = SplitToRawContours();
 
             foreach (var contour in rawContours)
@@ -108,29 +105,29 @@ namespace Adamantium.Fonts
                             edgedContour.Edges.Add(currentEdge);
                             currentEdge = new Edge();
                         }
-                        
+
                         cnt++;
                     }
                 }
-                
+
                 res.Add(edgedContour);
             }
 
             return res;
         }
-        
+
         // --- MAIN FUNCS ---
         // edge is a list of connected segments which have no sharp corners within them
         private void ColorEdges()
         {
             var segmentLengthThreshold = 10;
             var contours = SplitToEdgedContours();
-            
+
             segments.Clear();
 
             foreach (var contour in contours)
             {
-                var currentColor = Color.FromRgba(255, contour.Edges.Count == 1 ? (byte) 255 : (byte) 0, 255, 255);
+                var currentColor = Color.FromRgba(255, contour.Edges.Count == 1 ? (byte)255 : (byte)0, 255, 255);
 
                 foreach (var edge in contour.Edges)
                 {
@@ -143,17 +140,19 @@ namespace Adamantium.Fonts
                         segments.Add(currentSeg);
                     }
 
-                    currentColor = currentColor == Color.FromRgba(255, 255, 0, 255) ? Color.FromRgba(0, 255, 255, 255) : Color.FromRgba(255, 255, 0, 255);
+                    currentColor = currentColor == Color.FromRgba(255, 255, 0, 255)
+                        ? Color.FromRgba(0, 255, 255, 255)
+                        : Color.FromRgba(255, 255, 0, 255);
                 }
             }
         }
-        
+
         private ColoredDistance GetColoredDistances(Vector2 point, double range)
         {
-            double closestRedDistance = Double.MaxValue;
-            double closestGreenDistance = Double.MaxValue;
-            double closestBlueDistance = Double.MaxValue;
-            double closestAlphaDistance = Double.MaxValue;
+            double closestRedDistance = double.MaxValue;
+            double closestGreenDistance = double.MaxValue;
+            double closestBlueDistance = double.MaxValue;
+            double closestAlphaDistance = double.MaxValue;
 
             // there can be up to two closest segments in case if point is close to segments' connection
             // we will store both and then determine the signed pseudo-distance
@@ -167,7 +166,7 @@ namespace Adamantium.Fonts
             {
                 var distance = GlyphSegmentsMath.GetDistanceToSegment(segment.Segment, point);
 
-                if (ApplyColorMask(segment.MsdfColor, true, false, false) != Colors.Black
+                if (MsdfGeneratorHelper.ApplyColorMask(segment.MsdfColor, true, false, false) != Colors.Black
                     && distance <= closestRedDistance)
                 {
                     if (distance < closestRedDistance)
@@ -175,11 +174,11 @@ namespace Adamantium.Fonts
                         closestRedSegments.Clear();
                         closestRedDistance = distance;
                     }
-                    
+
                     closestRedSegments.Add(segment.Segment);
                 }
-                
-                if (ApplyColorMask(segment.MsdfColor, false, true, false) != Colors.Black
+
+                if (MsdfGeneratorHelper.ApplyColorMask(segment.MsdfColor, false, true, false) != Colors.Black
                     && distance <= closestGreenDistance)
                 {
                     if (distance < closestGreenDistance)
@@ -187,11 +186,11 @@ namespace Adamantium.Fonts
                         closestGreenSegments.Clear();
                         closestGreenDistance = distance;
                     }
-                    
+
                     closestGreenSegments.Add(segment.Segment);
                 }
-                
-                if (ApplyColorMask(segment.MsdfColor, false, false, true) != Colors.Black
+
+                if (MsdfGeneratorHelper.ApplyColorMask(segment.MsdfColor, false, false, true) != Colors.Black
                     && distance <= closestBlueDistance)
                 {
                     if (distance < closestBlueDistance)
@@ -199,7 +198,7 @@ namespace Adamantium.Fonts
                         closestBlueSegments.Clear();
                         closestBlueDistance = distance;
                     }
-                    
+
                     closestBlueSegments.Add(segment.Segment);
                 }
 
@@ -210,23 +209,27 @@ namespace Adamantium.Fonts
                         closestAlphaSegments.Clear();
                         closestAlphaDistance = distance;
                     }
-                    
+
                     closestAlphaSegments.Add(segment.Segment);
                 }
             }
 
             var coloredDistance = new ColoredDistance();
-            
-            coloredDistance.redDistance = GlyphSegmentsMath.GetSignedDistanceToSegmentsJoint(closestRedSegments, point, true);
-            coloredDistance.greenDistance = GlyphSegmentsMath.GetSignedDistanceToSegmentsJoint(closestGreenSegments, point, true);
-            coloredDistance.blueDistance = GlyphSegmentsMath.GetSignedDistanceToSegmentsJoint(closestBlueSegments, point, true);
-            coloredDistance.alphaDistance = GlyphSegmentsMath.GetSignedDistanceToSegmentsJoint(closestAlphaSegments, point, false);
+
+            coloredDistance.RedDistance =
+                GlyphSegmentsMath.GetSignedDistanceToSegmentsJoint(closestRedSegments, point, true);
+            coloredDistance.GreenDistance =
+                GlyphSegmentsMath.GetSignedDistanceToSegmentsJoint(closestGreenSegments, point, true);
+            coloredDistance.BlueDistance =
+                GlyphSegmentsMath.GetSignedDistanceToSegmentsJoint(closestBlueSegments, point, true);
+            coloredDistance.AlphaDistance =
+                GlyphSegmentsMath.GetSignedDistanceToSegmentsJoint(closestAlphaSegments, point, false);
 
             // prepare distance data for normalization
-            coloredDistance.redDistance = coloredDistance.redDistance / range + 0.5;
-            coloredDistance.greenDistance = coloredDistance.greenDistance / range + 0.5;
-            coloredDistance.blueDistance = coloredDistance.blueDistance / range + 0.5;
-            coloredDistance.alphaDistance = coloredDistance.alphaDistance / range + 0.5;
+            coloredDistance.RedDistance = coloredDistance.RedDistance / range + 0.5;
+            coloredDistance.GreenDistance = coloredDistance.GreenDistance / range + 0.5;
+            coloredDistance.BlueDistance = coloredDistance.BlueDistance / range + 0.5;
+            coloredDistance.AlphaDistance = coloredDistance.AlphaDistance / range + 0.5;
 
             return coloredDistance;
         }
@@ -234,32 +237,43 @@ namespace Adamantium.Fonts
         /// <summary>
         /// Generates MSDF texture
         /// </summary>
-        /// <param name="size">Width and height of MSDF texture</param>
+        /// <param name="originalSize">Width and height of MSDF texture</param>
+        /// <param name="pxRange">Pixel range for generation</param>
         /// <param name="glyphBoundingRectangle">Bounding rectangle of original glyph</param>
+        /// <param name="glyphSegments">array of glyph segments for generation</param>
+        /// <param name="unitsPerEm">Size of glyph width and height in em</param>
+        /// <param name="glyphIndex">Glyph index</param>
         /// <returns>MSDF color data in for of single-dimension array</returns>
-        public Color[,] GenerateDirectMSDF(uint size, double pxRange, Rectangle glyphBoundingRectangle, List<LineSegment2D> glyphSegments, ushort em)
+        public GlyphTextureData GenerateDirectMSDF(
+            uint originalSize, 
+            double pxRange, 
+            Rectangle glyphBoundingRectangle,
+            List<LineSegment2D> glyphSegments, 
+            ushort unitsPerEm, 
+            uint glyphIndex)
         {
-            //var msdf = new List<Color>();
-            var msdf = new Color[size, size];
-
             if (glyphSegments.Count == 0)
             {
-                //return msdf.ToArray();
-                return msdf;
+                return null;
             }
-            
+
             segments = new List<MsdfGlyphSegment>();
 
             foreach (var segment in glyphSegments)
             {
                 segments.Add(new MsdfGlyphSegment(segment.Start, segment.End));
             }
-            
+
+            var widthRatio = (double)(glyphBoundingRectangle.Width) / unitsPerEm;
+            var heightRatio = (double)(glyphBoundingRectangle.Height) / unitsPerEm;
+            var size = new Size(Math.Ceiling(originalSize * widthRatio),
+                Math.Ceiling(originalSize * heightRatio));
+
             // 1. Color all segments
             ColorEdges();
-            
+
             // 2. Calculate boundaries for original glyph (the position of the EM square)
-            var emSquare = new Rectangle(0, 0, em, em);
+            var emSquare = new Rectangle(0, 0, unitsPerEm, unitsPerEm);
 
             // 3. Place EM square so that its center matches glyph center
             var glyphCenter = glyphBoundingRectangle.Center;
@@ -272,30 +286,44 @@ namespace Adamantium.Fonts
             emSquare.Y += (int)diff.Y;
 
             // 4. Generate colored pseudo-distance field
-            var coloredDistances = new ColoredDistance[size, size];
+            var coloredDistances = new ColoredDistance[(int)size.Width, (int)size.Height];
 
-            var scale = size / (double)emSquare.Width;
-            var range = GetRange(pxRange, scale, scale);
+            // var scaleX = size.Width / emSquare.Width;
+            // var scaleY = size.Height / emSquare.Height;
 
-            var additionalSpace = emSquare.Width / 90.0;
-            
+            var scaleX = size.Width / glyphBoundingRectangle.Width;
+            var scaleY = size.Height / glyphBoundingRectangle.Height;
+
+            var range = MsdfGeneratorHelper.GetRange(pxRange, scaleX, scaleY);
+
+            //var additionalSpace = glyphBoundingRectangle.Width * 0.02;
+            var additionalSpace = 0;
+
             ColoredDistance minColoredDistance;
-                        
-            minColoredDistance.redDistance   = (-emSquare.Width / 2) / range + 0.5;
-            minColoredDistance.greenDistance = (-emSquare.Width / 2) / range + 0.5;
-            minColoredDistance.blueDistance  = (-emSquare.Width / 2) / range + 0.5;
-            minColoredDistance.alphaDistance = (-emSquare.Width / 2) / range + 0.5;
-            
-            for (var y = 0; y < size; ++y)
+
+            var value = -emSquare.Width / 2 / range + 0.5;
+            minColoredDistance.RedDistance = value;
+            minColoredDistance.GreenDistance = value;
+            minColoredDistance.BlueDistance = value;
+            minColoredDistance.AlphaDistance = value;
+
+            for (var y = 0; y < size.Height; ++y)
             {
-                for (var x = 0; x < size; ++x)
+                for (var x = 0; x < size.Width; ++x)
                 {
                     // determine the closest segment to current sampling point
                     //var samplingPoint = new Vector2D(originalDimensions.X / size * (x + 0.5), originalDimensions.Y - (originalDimensions.Y / size * (y + 0.5)));
-                    var samplingPoint = new Vector2((emSquare.Width / size * (x + 0.5)) + emSquare.X, emSquare.Height - (emSquare.Height / size * (y + 0.5)) + emSquare.Y);
+                    //var samplingPoint = new Vector2(emSquare.Width / size.Width * (x + 0.5) + emSquare.X, emSquare.Height - emSquare.Height / size.Height * (y + 0.5) + emSquare.Y);
 
-                    if (samplingPoint.X >= (glyphBoundingRectangle.X - additionalSpace) && samplingPoint.X <= (glyphBoundingRectangle.Right + additionalSpace) &&
-                        samplingPoint.Y >= (glyphBoundingRectangle.Y - additionalSpace) && samplingPoint.Y <= (glyphBoundingRectangle.Bottom + additionalSpace))
+                    var samplingPoint =
+                        new Vector2(glyphBoundingRectangle.Width / size.Width * (x + 0.5) + glyphBoundingRectangle.X,
+                            glyphBoundingRectangle.Height - (glyphBoundingRectangle.Height / size.Height * (y + 0.5) -
+                                                             glyphBoundingRectangle.Y));
+
+                    if (samplingPoint.X >= glyphBoundingRectangle.X - additionalSpace &&
+                        samplingPoint.X <= glyphBoundingRectangle.Right + additionalSpace &&
+                        samplingPoint.Y >= glyphBoundingRectangle.Y - additionalSpace &&
+                        samplingPoint.Y <= glyphBoundingRectangle.Bottom + additionalSpace)
                     {
                         coloredDistances[x, y] = GetColoredDistances(samplingPoint, range);
                     }
@@ -305,29 +333,34 @@ namespace Adamantium.Fonts
                     }
                 }
             }
-            
+
             // 5. Fix artefacts
             //FixArtefacts(coloredDistances, size);
-            
+
+            var textureData = new GlyphTextureData((uint)size.Width, (uint)size.Height, glyphIndex);
+
             // 6. Normalize MSDF and SDF to [0 .. 255] range
-            for (var y = 0; y < size; y++)
+            int index = 0;
+            for (var y = 0; y < size.Height; y++)
             {
-                for (var x = 0; x < size; x++)
+                for (var x = 0; x < size.Width; x++)
                 {
-                    var red = PixelFloatToByte(coloredDistances[x, y].redDistance);
-                    var green = PixelFloatToByte(coloredDistances[x, y].greenDistance);
-                    var blue = PixelFloatToByte(coloredDistances[x, y].blueDistance);
-                    var alpha = PixelFloatToByte(coloredDistances[x, y].alphaDistance);
+                    var distance = coloredDistances[x, y];
+                    var red = MsdfGeneratorHelper.PixelFloatToByte(distance.RedDistance);
+                    var green = MsdfGeneratorHelper.PixelFloatToByte(distance.GreenDistance);
+                    var blue = MsdfGeneratorHelper.PixelFloatToByte(distance.BlueDistance);
+                    var alpha = MsdfGeneratorHelper.PixelFloatToByte(distance.AlphaDistance);
 
-                    var color = Color.FromRgba(red, green, blue, alpha);
+                    textureData.Pixels[index + 0] = red;
+                    textureData.Pixels[index + 1] = green;
+                    textureData.Pixels[index + 2] = blue;
+                    textureData.Pixels[index + 3] = alpha;
 
-                    //msdf.Add(color);
-                    msdf[x, y] = color;
+                    index += 4;
                 }
             }
 
-            //return msdf.ToArray();
-            return msdf;
+            return textureData;
         }
 
         // --- ARTEFACT FIXING ---
@@ -337,40 +370,39 @@ namespace Adamantium.Fonts
             const double threshold = 2.5;
 
             var cnt = 0;
-            
-            bool isNeighborRedPositive = (neighbor.redDistance >= 0);
-            bool isNeighborGreenPositive = (neighbor.greenDistance >= 0);
-            bool isNeighborBluePositive = (neighbor.blueDistance >= 0);
 
-            bool isCurrentRedPositive = (current.redDistance >= 0);
-            bool isCurrentGreenPositive = (current.greenDistance >= 0);
-            bool isCurrentBluePositive = (current.blueDistance >= 0);
+            bool isNeighborRedPositive = neighbor.RedDistance >= 0;
+            bool isNeighborGreenPositive = neighbor.GreenDistance >= 0;
+            bool isNeighborBluePositive = neighbor.BlueDistance >= 0;
 
-            if (isNeighborRedPositive ^ isCurrentRedPositive && 
-                Math.Abs(neighbor.redDistance - current.redDistance) > threshold)
-            {
-                ++cnt;
-            }
-            
-            if (isNeighborGreenPositive ^ isCurrentGreenPositive && 
-                Math.Abs(neighbor.greenDistance - current.greenDistance) > threshold)
-            {
-                ++cnt;
-            }
-            
-            if (isNeighborBluePositive ^ isCurrentBluePositive && 
-                Math.Abs(neighbor.blueDistance - current.blueDistance) > threshold)
+            bool isCurrentRedPositive = current.RedDistance >= 0;
+            bool isCurrentGreenPositive = current.GreenDistance >= 0;
+            bool isCurrentBluePositive = current.BlueDistance >= 0;
+
+            if (isNeighborRedPositive ^ isCurrentRedPositive &&
+                Math.Abs(neighbor.RedDistance - current.RedDistance) > threshold)
             {
                 ++cnt;
             }
 
-            return (cnt < 2);
+            if (isNeighborGreenPositive ^ isCurrentGreenPositive &&
+                Math.Abs(neighbor.GreenDistance - current.GreenDistance) > threshold)
+            {
+                ++cnt;
+            }
+
+            if (isNeighborBluePositive ^ isCurrentBluePositive &&
+                Math.Abs(neighbor.BlueDistance - current.BlueDistance) > threshold)
+            {
+                ++cnt;
+            }
+
+            return cnt < 2;
         }
-        
+
         // true - no collision, false - collision
         private bool CheckForCollision(List<ColoredDistance> neighbors, ColoredDistance current)
         {
-            
             foreach (var neighbor in neighbors)
             {
                 if (!CheckNeighbor(neighbor, current))
@@ -404,94 +436,26 @@ namespace Adamantium.Fonts
                         data[x + 1, y + 1]
                     };
 
-                    if (!CheckForCollision(neighbors, current))
-                    {
-                        var correction = new CorrectionLocation
-                        {
-                            X = x,
-                            Y = y
-                        };
+                    if (CheckForCollision(neighbors, current)) continue;
 
-                        correctionList.Add(correction);
-                    }
+                    var correction = new CorrectionLocation
+                    {
+                        X = x,
+                        Y = y
+                    };
+
+                    correctionList.Add(correction);
                 }
             }
 
             foreach (var correction in correctionList)
             {
                 var pixel = data[correction.X, correction.Y];
-                var median = Median(pixel.redDistance, pixel.greenDistance, pixel.blueDistance);
+                var median = MsdfGeneratorHelper.Median(pixel.RedDistance, pixel.GreenDistance, pixel.BlueDistance);
 
-                pixel.redDistance = pixel.greenDistance = pixel.blueDistance = median;
+                pixel.RedDistance = pixel.GreenDistance = pixel.BlueDistance = median;
 
                 data[correction.X, correction.Y] = pixel;
-            }
-        }
-        
-        // --- HELPERS ---
-        private double Median(double a, double b, double c)
-        {
-            return Math.Max(Math.Min(a,b), Math.Min(Math.Max(a,b), c));
-        }
-
-        private double GetRange(double pxRange, double scaleX, double scaleY)
-        {
-            return pxRange / Math.Min(scaleX, scaleY);
-        }
-
-        private byte PixelFloatToByte(double x)
-        {
-            return (byte)(Clamp(256.0 * x, 255.0));
-        }
-        
-        private double Clamp(double n, double b)
-        {
-            var tmp = n > 0 ? 1.0 : 0.0;
-
-            return ((n >= 0 && n <= b) ? n : (tmp * b));
-        }
-
-        private Color ApplyColorMask(Color color, bool redMask, bool greenMask, bool blueMask)
-        {
-            color.R *= redMask ? (byte)1 : (byte)0;
-            color.G *= greenMask ? (byte)1 : (byte)0;
-            color.B *= blueMask ? (byte)1 : (byte)0;
-
-            return color;
-        }
-
-        // --- ADDITIONAL DATA TYPES ---
-        private struct ColoredDistance
-        {
-            public double redDistance;
-            public double greenDistance;
-            public double blueDistance;
-            public double alphaDistance;
-        }
-        
-        private struct CorrectionLocation
-        {
-            public int X;
-            public int Y;
-        }
-        
-        private class Contour
-        {
-            public List<Edge> Edges;
-
-            public Contour()
-            {
-                Edges = new List<Edge>();
-            }
-        }
-        
-        private class Edge
-        {
-            public List<MsdfGlyphSegment> Segments;
-
-            public Edge()
-            {
-                Segments = new List<MsdfGlyphSegment>();
             }
         }
     }

@@ -50,8 +50,8 @@ public class DrawingContext
 
       if (_currentIndex < currentContainer.ChildUnits.Count)
       {
-         int itemsToRemove = currentContainer.ChildUnits.Count - (int)_currentIndex;
-         for (int i = itemsToRemove; i >= 0; --i)
+         //int itemsToRemove = currentContainer.ChildUnits.Count - (int)_currentIndex;
+         for (int i = currentContainer.ChildUnits.Count - 1; i >= (int)_currentIndex; --i)
          {
             currentContainer.ChildUnits[i].Dispose();
             currentContainer.ChildUnits.RemoveAt(i);
@@ -140,12 +140,12 @@ public class DrawingContext
       _currentIndex++;
    }
       
-   public void DrawEllipse(Rect destinationRect, Brush brush, Double startAngle, Double stopAngle, Pen pen = null)
+   public void DrawEllipse(Rect destinationRect, Brush brush, Double startAngle, Double stopAngle, EllipseType ellipseType, Pen pen = null)
    {
       var hash = HashCode.Combine(destinationRect, startAngle, stopAngle);
       if (currentContainer.ChildUnits.Count == 0)
       {
-         var ellipse = new EllipseGeometry(destinationRect, startAngle, stopAngle);
+         var ellipse = new EllipseGeometry(destinationRect, startAngle, stopAngle, ellipseType);
          ellipse.ProcessGeometry(GeometryType.Solid);
          
          currentUnit = new RenderUnit();
@@ -171,7 +171,7 @@ public class DrawingContext
          }
          else
          {
-            var ellipse = new EllipseGeometry(destinationRect, startAngle, stopAngle);
+            var ellipse = new EllipseGeometry(destinationRect, startAngle, stopAngle, ellipseType);
             ellipse.ProcessGeometry(GeometryType.Both);
 
             currentUnit = new RenderUnit();
@@ -213,9 +213,12 @@ public class DrawingContext
          var strokeRenderer = ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, strokeGeometry, pen?.Brush);
          currentUnit.StrokeRenderer = strokeRenderer;
       }
-      
-      currentContainer?.AddItem(currentUnit);
-      _currentIndex++;
+
+      if (currentUnit.GeometryRenderer != null || currentUnit.StrokeRenderer != null)
+      {
+         currentContainer?.AddItem(currentUnit);
+         _currentIndex++;
+      }
    }
 
    public void DrawLine(Vector2 start, Vector2 end, Pen pen)

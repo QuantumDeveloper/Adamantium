@@ -1,11 +1,15 @@
 using Adamantium.Mathematics;
+using MessagePack;
 
 namespace Adamantium.Fonts.Common
 {
+    [MessagePackObject]
     public struct GlyphPosition
     {
+        [Key(0)]
         public Vector2F Offset;
 
+        [Key(1)]
         public Vector2F Advance;
 
         public static GlyphPosition operator +(GlyphPosition left, GlyphPosition right)

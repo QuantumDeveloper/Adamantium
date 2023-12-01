@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
 using Adamantium.Core.Collections;
-using Adamantium.UI.Controls;
 using Adamantium.UI.Media;
 using Adamantium.UI.RoutedEvents;
 
@@ -50,16 +49,12 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         typeof(Double), typeof(UIComponent),
         new PropertyMetadata(1.0, PropertyMetadataOptions.BindsTwoWayByDefault));
 
-    
-
     #endregion
 
     #region Events
     
     public event EventHandler<VisualParentChangedEventArgs> VisualParentChanged;
     
-    
-
     #endregion
 
     #region Properties

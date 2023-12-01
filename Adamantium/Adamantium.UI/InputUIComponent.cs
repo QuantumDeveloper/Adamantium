@@ -13,7 +13,7 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     
     private bool _isLoaded;
 
-    public static readonly RoutedEvent LoadedEvent = EventManager.RegisterRoutedEvent("Loaded",
+    public static readonly RoutedEvent LoadedEvent = EventManager.RegisterRoutedEvent( nameof(Loaded),
         RoutingStrategy.Direct, typeof(RoutedEventHandler), typeof(UIComponent));
     
     public static readonly RoutedEvent UnloadedEvent = EventManager.RegisterRoutedEvent("Unloaded",

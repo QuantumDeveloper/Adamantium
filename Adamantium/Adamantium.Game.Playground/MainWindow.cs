@@ -19,12 +19,31 @@ using Serilog;
 using Adamantium.UI;
 using Adamantium.UI.Markup;
 using Adamantium.UI.Processors;
+using Adamantium.UI.Resources;
 using Adamantium.UI.Templates;
 
 namespace Adamantium.Game.Playground;
 
 public partial class MainWindow : Window
 {
+    private Style CreateStyle()
+    {
+        var style = new Style();
+        style.Selector.Types.Add(typeof(Ellipse));
+        style.Selector.Classes.Add("Ellipse1");
+        var setter = new Setter("Width", 150);
+        style.Setters.Add(setter);
+        setter = new Setter("Height", "50");
+        style.Setters.Add(setter);
+        setter = new Setter("Fill", "CornflowerBlue");
+        style.Setters.Add(setter);
+        setter = new Setter("StartAngle", "90");
+        style.Setters.Add(setter);
+        setter = new Setter("EllipseType", EllipseType.EdgeToEdge);
+        style.Setters.Add(setter);
+        return style;
+    }
+    
     public MainWindow()
     {
         InitializeComponent();
@@ -47,6 +66,8 @@ public partial class MainWindow : Window
     {
         //CreateGame();
         Thumb1.Template = ControlTemplate.Load(AumlParser.Load("ControlTemplate.auml", true));
+        var style = CreateStyle();
+        UIApplication.Current.ThemeManager.ApplyStyles(this, style);
     }
 
     private void CreateGame()

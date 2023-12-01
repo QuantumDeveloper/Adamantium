@@ -10,15 +10,17 @@ public interface IThemeManager
 
     void RemoveTheme(string name);
 
-    void ApplyTheme(ITheme theme);
+    void ApplyTheme(ITheme theme, IUIComponent component);
     
-    void ApplyTheme(string name);
+    void ApplyTheme(string name, IUIComponent component);
 
-    void ApplyStyles(IFundamentalUIComponent component);
+    void ApplyStyles(IUIComponent component, params Style[] styles);
+
+    void ApplyStyles(IUIComponent component);
     
-    void RemoveStyles(IFundamentalUIComponent component);
+    void RemoveStyles(IUIComponent component);
 
-    IEnumerable<Style> FindStylesForComponent(IFundamentalUIComponent component);
+    IEnumerable<Style> FindStylesForComponent(IUIComponent component);
 
     ITheme this[string name] { get; }
     

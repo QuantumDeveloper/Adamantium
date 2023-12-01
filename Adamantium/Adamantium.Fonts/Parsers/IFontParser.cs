@@ -6,5 +6,7 @@ namespace Adamantium.Fonts.Parsers
 
         public void Parse();
 
+        public byte[] GetFontBytes();
+
     }
 }

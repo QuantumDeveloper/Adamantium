@@ -1,11 +1,15 @@
 ﻿using Adamantium.Mathematics;
+using MessagePack;
 
 namespace Adamantium.Fonts.Common
 {
+    [MessagePackObject]
     public class SampledOutline
     {
+        [Key(0)]
         public Vector2[] Points { get; }
-        
+
+        [Key(1)]
         public LineSegment2D[] Segments { get; }
 
         public SampledOutline(Vector2[] points)

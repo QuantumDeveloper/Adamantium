@@ -11,9 +11,11 @@ using Adamantium.Engine.Templates;
 using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
 using Adamantium.Fonts;
+using Adamantium.Fonts.TextureGeneration;
 using Adamantium.Game.Core;
 using Adamantium.Game.Core.Events;
 using Adamantium.Imaging;
+using Adamantium.Imaging.Png;
 using Adamantium.Mathematics;
 using Image = Adamantium.Imaging.Image;
 
@@ -237,11 +239,11 @@ namespace Adamantium.Game.Playground
         
         // --- SUBPIXEL VISUALIZING END ---
 
-        private void SaveAtlas(string path, TextureAtlasData data)
+        private void SaveAtlas(string path, FontAtlasData data)
         {
             var img = Image.New2D((uint)data.AtlasSize.Width, (uint)data.AtlasSize.Height, 1, SurfaceFormat.R8G8B8A8.UNorm);
             var pixels = img.GetPixelBuffer(0, 0);
-            pixels.SetPixels(data.AtlasColors);
+            pixels.SetPixels(data.ImageData);
             img.Save(path, ImageFileType.Png);
         }
 

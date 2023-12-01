@@ -18,9 +18,10 @@ public class Style : AdamantiumComponent
 
     internal ITheme Theme { get; set; }
 
-    public required Selector Selector { get; set; }
-
-    [Content] public SetterCollection Setters { get; }
+    public Selector Selector { get; set; }
+    
+    [Content]
+    public SetterCollection Setters { get; }
 
     public TriggerCollection Triggers { get; }
 
@@ -51,12 +52,12 @@ public class Style : AdamantiumComponent
 
         foreach (var setter in Setters)
         {
-            setter.Apply(component, Theme);
+            setter.Apply(component, this, Theme);
         }
 
         foreach (var trigger in Triggers)
         {
-            trigger.Apply(component);
+            trigger.Apply(component, Theme);
         }
     }
     
@@ -71,12 +72,12 @@ public class Style : AdamantiumComponent
 
         foreach (var setter in Setters)
         {
-            setter.Apply(component, Theme);
+            setter.Remove(component, this, Theme);
         }
 
         foreach (var trigger in Triggers)
         {
-            trigger.Apply(component);
+            trigger.Remove(component);
         }
     }
 }

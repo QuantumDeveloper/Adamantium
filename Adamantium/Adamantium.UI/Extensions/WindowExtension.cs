@@ -11,7 +11,7 @@ public static class WindowExtension
     public static void Update(this IWindow window, IThemeManager themeManager, AppTime appTime)
     {
         ProcessVisualTree(window, themeManager, UpdateComponent);
-        ProcessVisualTree(window, themeManager, UpdateComponentLocation);
+        //ProcessVisualTree(window, themeManager, UpdateComponentLocation);
     }
     
     private static void ProcessVisualTree(IUIComponent component, IThemeManager themeManager, Action<IUIComponent> processAction)
@@ -58,20 +58,16 @@ public static class WindowExtension
                 control.Arrange(new Rect(control.DesiredSize));
             }
         }
-            
-        // if (control.Parent != null)
-        // {
-        //     control.Location = control.Bounds.Location + control.Parent.Location;
-        //     control.ClipPosition = control.ClipRectangle.Location + control.Parent.Location;
-        // }
+        
+        UpdateComponentLocation(visualComponent);
     }
 
     private static void UpdateComponentLocation(IUIComponent visualComponent)
     {
         if (visualComponent.LogicalParent != null)
         {
-            visualComponent.Location = visualComponent.Bounds.Location + ((IUIComponent)(visualComponent.LogicalParent)).Location;
-            visualComponent.ClipPosition = visualComponent.ClipRectangle.Location + ((IUIComponent)(visualComponent.LogicalParent)).Location;
+            visualComponent.Location = visualComponent.Bounds.Location + ((IUIComponent)visualComponent.LogicalParent).Location;
+            visualComponent.ClipPosition = visualComponent.ClipRectangle.Location + ((IUIComponent)visualComponent.LogicalParent).Location;
         }
         else
         {

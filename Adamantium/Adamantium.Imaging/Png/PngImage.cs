@@ -368,7 +368,7 @@ namespace Adamantium.Imaging.Png
         public static PngImage FromImage(IRawBitmap image)
         {
             var png = FromPixelBuffers(image);
-            png.DefaultImage = GetFrameFromBuffer(image.GetFrameData(0), 0);
+            png.Frames.Add(GetFrameFromBuffer(image.GetFrameData(0), 0));
             png.Header = new IHDR();
             png.Header.Width = (int)image.Width;
             png.Header.Height = (int)image.Height;

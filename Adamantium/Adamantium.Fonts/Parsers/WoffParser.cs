@@ -22,6 +22,12 @@ namespace Adamantium.Fonts.Parsers
             reader = filePath.LoadIntoStream();
         }
 
+        protected internal WoffParser(FontStreamReader fontReader, byte resolution)
+        {
+            InitializeBase(string.Empty, resolution);
+            reader = fontReader;
+        }
+
         public override void Parse()
         {
             ReadWoffHeader();
@@ -85,13 +91,13 @@ namespace Adamantium.Fonts.Parsers
                 var compressedBuffer = reader.ReadBytes(table.CompLength, true);
                 if (compressedBuffer.Length == table.OrigLength)
                 {
-                    FontReader.Write(compressedBuffer);
+                    FontReader.Write(compressedBuffer, 0, compressedBuffer.Length);
                 }
                 else
                 {
                     var decompressedBuffer = new byte[table.OrigLength];
                     DecompressWoff(compressedBuffer, decompressedBuffer);
-                    FontReader.Write(decompressedBuffer);
+                    FontReader.Write(decompressedBuffer, 0, decompressedBuffer.Length);
                 }
             }
 
@@ -122,9 +128,9 @@ namespace Adamantium.Fonts.Parsers
 
             otfTableDirectory.CreateTableEntriesMap();
 
-            foreach (var (key, value) in tableDirectory.Tables)
+            foreach (var kvp in tableDirectory.Tables)
             {
-                otfTableDirectory.TablesOffsets[key] = value.ExpectedOffset;
+                otfTableDirectory.TablesOffsets[kvp.Key] = kvp.Value.ExpectedOffset;
             }
         }
 

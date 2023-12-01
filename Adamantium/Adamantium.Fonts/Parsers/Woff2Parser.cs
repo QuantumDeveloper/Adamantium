@@ -10,6 +10,7 @@ using Adamantium.Fonts.Extensions;
 using Adamantium.Fonts.Tables;
 using Adamantium.Fonts.Tables.WOFF;
 using Adamantium.Mathematics;
+using BrotliSharpLib;
 
 namespace Adamantium.Fonts.Parsers
 {
@@ -100,6 +101,13 @@ namespace Adamantium.Fonts.Parsers
             reader = filePath.LoadIntoStream();
         }
 
+        protected internal Woff2Parser(FontStreamReader fontReader, byte resolution)
+        {
+            InitializeBase(string.Empty, resolution);
+            fontEntries = new List<FontCollectionEntry>();
+            reader = fontReader;
+        }
+
         public override void Parse()
         {
             ReadHeader();
@@ -143,6 +151,11 @@ namespace Adamantium.Fonts.Parsers
                 var version = reader.ReadUInt32();
                 var numFonts = reader.Read255UInt16();
                 // ----
+
+                if (numFonts > 1)
+                {
+                    fontEntries.Clear();
+                }
                 
                 for (int i = 0; i < numFonts; ++i)
                 {
@@ -150,11 +163,14 @@ namespace Adamantium.Fonts.Parsers
                     collectionEntry.NumTables = reader.Read255UInt16();
                     collectionEntry.Flavor = reader.ReadUInt32();
                     var indices = new ushort[collectionEntry.NumTables];
+                    collectionEntry.Tables = new Woff2Table[collectionEntry.NumTables];
                     for (int x = 0; x < collectionEntry.NumTables; ++x)
                     {
                         indices[x] = reader.Read255UInt16();
+                        collectionEntry.Tables[x] = fontEntry.Tables[indices[x]];
                     }
                     
+                    fontEntries.Add(collectionEntry);
                 }
             }
         }
@@ -218,7 +234,7 @@ namespace Adamantium.Fonts.Parsers
                 var decompressedStream = new FontStreamReader();
                 try
                 {
-                    using (var brotli = new BrotliStream(compressedStream, CompressionMode.Decompress))
+                    using (var brotli = new BrotliSharpLib.BrotliStream(compressedStream, CompressionMode.Decompress))
                     {
                         brotli.CopyTo(decompressedStream);
                         decompressedStream.Position = 0;
@@ -243,11 +259,11 @@ namespace Adamantium.Fonts.Parsers
 
                 otfTableDirectory.NumTables = fontEntry.NumTables;
                 otfTableDirectory.SfntVersion = fontEntry.Flavor;
-                if (header.Flavor == 0x00010000)
+                if (header.InnerFontType == InnerFontType.TrueType)
                 {
                     otfTableDirectory.OutlineType = OutlineType.TrueType;
                 }
-                else if (header.Flavor == 0x4F54544F)
+                else
                 {
                     otfTableDirectory.OutlineType = OutlineType.CompactFontFormat;
                 }

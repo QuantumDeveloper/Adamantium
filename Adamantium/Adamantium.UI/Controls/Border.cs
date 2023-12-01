@@ -1,4 +1,5 @@
-﻿using Adamantium.Engine.Graphics;
+﻿using System;
+using Adamantium.Engine.Graphics;
 using Adamantium.UI.Media;
 
 namespace Adamantium.UI.Controls;
@@ -69,12 +70,24 @@ public class Border : Decorator
    protected override Size ArrangeOverride(Size finalSize)
    {
       var padding = Padding + BorderThickness;
+      Child?.Arrange(new Rect(finalSize).Deflate(padding));
+
       if (Child != null)
       {
-         Child.Arrange(new Rect(finalSize).Deflate(padding));
-      }
+         var result = Child.Bounds.Size.Inflate(padding);
+         if (!Double.IsNaN(Width))
+         {
+            result.Width = Math.Max(result.Width, Width);
+         }
+            
+         if (!Double.IsNaN(Height))
+         {
+            result.Height = Math.Max(result.Height, Height);
+         }
 
-      if (Child != null) return Child.Bounds.Size.Inflate(padding);
+         return result;
+      }
+      
       return finalSize;
    }
 
