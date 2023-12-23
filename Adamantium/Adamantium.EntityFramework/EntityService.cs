@@ -51,7 +51,7 @@ namespace Adamantium.EntityFramework
             PropertyChanged += OnPropertyChanged;
         }
 
-        // TODO: check does this property should return all available entites
+        // TODO: check does this property should return all available entities
         public IReadOnlyList<Entity> Entities => EntityWorld.RootEntities;
 
         /// <summary>
@@ -123,9 +123,21 @@ namespace Adamantium.EntityFramework
         {
         }
 
+        public IEntityProcessor Processor { get; set; }
+        public void AttachProcessor(IEntityProcessor processor)
+        {
+            Processor = processor;
+            Processor?.Attach(this);
+        }
+
+        public void DetachProcessor()
+        {
+            Processor?.Detach();
+        }
+
         public virtual void Update(AppTime gameTime)
         {
-
+            Processor?.Update(gameTime);
         }
 
         public virtual bool BeginDraw()
@@ -135,7 +147,7 @@ namespace Adamantium.EntityFramework
 
         public virtual void Draw(AppTime gameTime)
         {
-
+            Processor?.Draw(gameTime);
         }
 
         public virtual void EndDraw()
@@ -145,12 +157,12 @@ namespace Adamantium.EntityFramework
 
         public virtual void LoadContent()
         {
-
+            Processor?.LoadContent();
         }
 
         public virtual void UnloadContent()
         {
-
+            Processor?.UnloadContent();
         }
 
         public virtual void DisplayContent()

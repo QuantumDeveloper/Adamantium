@@ -10,6 +10,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using Adamantium.Core;
 using QuantumBinding.Utils;
+using Serilog;
 using Constants = AdamantiumVulkan.Core.Constants;
 
 namespace Adamantium.Engine.Graphics
@@ -192,7 +193,8 @@ namespace Adamantium.Engine.Graphics
         private static uint DebugCallback(DebugUtilsMessageSeverityFlagBitsEXT messageSeverity, DebugUtilsMessageTypeFlagBitsEXT messageTypes, VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData)
         {
             var data = *pCallbackData;
-            Console.WriteLine(new string(data.pMessage));
+            Log.Logger.Debug(new string(data.pMessage));
+            //Console.WriteLine(new string(data.pMessage));
             return 0;
         }
 

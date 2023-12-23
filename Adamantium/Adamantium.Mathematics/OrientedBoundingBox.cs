@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Adamantium.Mathematics
 {
@@ -203,7 +204,7 @@ namespace Adamantium.Mathematics
 
         #endregion
 
-        #region Test vs. BoundingBox
+        #region Test vs BoundingBox
 
         /// <summary>
         /// Determine if box A intersects box B.
@@ -941,7 +942,6 @@ namespace Adamantium.Mathematics
             Array.Copy(corners2, 0, points, 8, 8);
 
             return FromPoints(points);
-
         }
 
         public static OrientedBoundingBox Merge(ref OrientedBoundingBox obb1, Vector3F[] corners)
@@ -952,18 +952,16 @@ namespace Adamantium.Mathematics
             Array.Copy(corners, 0, points, 8, 8);
 
             return FromPoints(points);
-
         }
         
         public static OrientedBoundingBox Merge(ref OrientedBoundingBox obb1, Vector3[] corners)
         {
-            var corners1 = obb1.GetCorners();
+            var corners1 = obb1.GetCorners().Cast<Vector3>().ToArray();
             var points = new Vector3[16];
             Array.Copy(corners1, points, 8);
             Array.Copy(corners, 0, points, 8, 8);
 
             return FromPoints(points);
-
         }
     }
 }

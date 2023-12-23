@@ -5,142 +5,65 @@ using System.Threading.Tasks;
 using Adamantium.Core;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.Engine.Core;
+using Adamantium.EntityFramework.ComponentsBasics;
 using Adamantium.EntityFramework.Templates;
 
 namespace Adamantium.EntityFramework
 {
     public class EntityWorld
     {
-        private object syncObject = new object();
-
-        private readonly List<Entity> rootEntities;
-        private readonly Dictionary<UInt128, Entity> availableEntities;
-        private readonly Dictionary<String, EntityGroup> entitiesByGroup;
-        private readonly List<Entity> entitiesToAdd;
-        private readonly List<Entity> entitiesToRemove;
-
         public EntityWorld(IDependencyResolver container)
         {
-            rootEntities = new List<Entity>();
-            availableEntities = new Dictionary<UInt128, Entity>();
-            entitiesByGroup = new Dictionary<String, EntityGroup>();
-            entitiesToAdd = new List<Entity>();
-            entitiesToRemove = new List<Entity>();
-
             DependencyResolver = container ?? throw new ArgumentNullException($"{nameof(container)} should not be null");
+            EntityManager = new EntityManager(this);
             ServiceManager = new EntityServiceManager(this);
             ServiceManager.FrameEnded += FrameEnded;
         }
 
-        public IReadOnlyList<Entity> RootEntities => rootEntities.AsReadOnly();
-
+        public IReadOnlyList<Entity> RootEntities => EntityManager.RootEntities;
+        public EntityManager EntityManager { get; }
         public EntityServiceManager ServiceManager { get; }
-
         public IDependencyResolver DependencyResolver { get; }
 
         public void Initialize()
         {
+            EntityManager.InitializeResources();
             ServiceManager.InitializeResources();
         }
 
         private void FrameEnded()
         {
-            SyncEntities();
+            EntityManager.SyncEntities();
         }
         
-        private void SyncEntities()
+        public Entity CreateEntity(string name, Entity owner = null, bool createDisabled = false)
         {
-            lock (syncObject)
-            {
-                if (entitiesToRemove.Count > 0)
-                {
-                    foreach (var entity in entitiesToRemove)
-                    {
-                        RemoveEntityInternal(entity);
-                    }
-                    entitiesToRemove.Clear();
-                }
+            return EntityManager.CreateEntity(name, owner, createDisabled);
+        }
 
-                if (entitiesToAdd.Count > 0)
-                {
-                    foreach (var entity in entitiesToAdd)
-                    {
-                        AddEntityInternal(entity);
-                    }
-                    entitiesToAdd.Clear();
-                }
-            }
+        public void AddEntity(Entity root, CameraProjectionType projectionType = CameraProjectionType.Perspective)
+        {
+            EntityManager.AddEntity(root);
+        }
+
+        public void SetCameraProjectionType(Entity rootEntity, CameraProjectionType projectionType)
+        {
+            EntityManager.SetCameraProjectionType(rootEntity, projectionType);
         }
         
-        private void AddEntityInternal(Entity entity)
+        public CameraProjectionType GetCameraProjectionType(Entity rootEntity)
         {
-            if (availableEntities.TryAdd(entity.Uid, entity))
-            {
-                rootEntities.Add(entity);
-                OnEntityAdded(entity);
-            }
+            return EntityManager.GetCameraProjectionType(rootEntity);
         }
 
-        private void RemoveEntityInternal(Entity entity)
+        public CameraProjectionType[] GetAvailableCameraProjectionTypes()
         {
-            if (availableEntities.Remove(entity.Uid))
-            {
-                rootEntities.Remove(entity);
-                OnEntityRemoved(entity);
-            }
-        }
-
-        public Entity CreateEntity(string name, Entity owner = null, bool addToWorld = true, bool createDisabled = false)
-        {
-            lock (this)
-            {
-                Entity entity = new Entity(owner, name);
-                if (addToWorld)
-                {
-                    AddEntity(entity);
-                }
-
-                if (createDisabled)
-                {
-                    entity.IsEnabled = false;
-                }
-
-                return entity;
-            }
-        }
-
-        public void AddEntity(Entity root)
-        {
-            if (root == null)
-            {
-                return;
-            }
-
-            lock (syncObject)
-            {
-                if (availableEntities.ContainsKey(root.Uid)) return;
-                
-                entitiesToAdd.Add(root);
-            }
+            return EntityManager.GetAvailableCameraProjectionTypes();
         }
         
         public void RemoveEntity(Entity root)
         {
-            if (root == null)
-                return;
-
-            if (root.Owner == null && rootEntities.Contains(root))
-            {
-                rootEntities.Remove(root);
-            }
-
-            lock (syncObject)
-            {
-                if (!availableEntities.ContainsKey(root.Uid)) return;
-                
-                root.Owner?.RemoveDependency(root);
-                entitiesToRemove.Add(root);
-            }
+            EntityManager.RemoveEntity(root);
         }
 
         public void RemoveAllEntities()
@@ -150,29 +73,16 @@ namespace Adamantium.EntityFramework
         
         public void RemoveEntities(IEnumerable<Entity> entities)
         {
-            if (entities == null)
-                return;
-
-            foreach (var entity in entities)
-            {
-                RemoveEntity(entity);
-            }
+            EntityManager.RemoveEntities(entities);
         }
 
-        public async Task<Entity> CreateEntityFromTemplate(IEntityTemplate template, Entity owner = null, string name = "", bool addToWorld = true, bool createDisabled = false)
+        public async Task<Entity> CreateEntityFromTemplate(
+            IEntityTemplate template, 
+            Entity owner = null, 
+            string name = "", 
+            bool createDisabled = false)
         {
-            if (template == null)
-            {
-                throw new ArgumentNullException(nameof(template));
-            }
-
-            var entity = CreateEntity(name, owner, false, createDisabled);
-            await template.BuildEntity(entity);
-            if (addToWorld)
-            {
-                AddEntity(entity);
-            }
-            return entity;
+            return await EntityManager.CreateEntityFromTemplate(template, owner, name, createDisabled);
         }
 
         public T GetService<T>() where T : EntityService
@@ -185,12 +95,12 @@ namespace Adamantium.EntityFramework
             return ServiceManager.GetServices<T>();
         }
 
-        private void OnEntityAdded(Entity entity)
+        internal void OnEntityAdded(Entity entity)
         {
             EntityAdded?.Invoke(this, new EntityEventArgs(entity));
         }
 
-        private void OnEntityRemoved(Entity entity)
+        internal void OnEntityRemoved(Entity entity)
         {
             EntityRemoved?.Invoke(this, new EntityEventArgs(entity));
         }
@@ -237,73 +147,91 @@ namespace Adamantium.EntityFramework
 
         public EntityGroup CreateGroup(string groupName)
         {
-            if (string.IsNullOrEmpty(groupName))
-            {
-                throw new ArgumentNullException(nameof(groupName));
-            }
-
-            lock (syncObject)
-            {
-                if (!entitiesByGroup.ContainsKey(groupName))
-                {
-                    var group = new EntityGroup(groupName);
-                    entitiesByGroup.Add(groupName, group);
-                    OnGroupCreated(group);
-                    return group;
-                }
-                else
-                {
-                    return entitiesByGroup[groupName];
-                }
-            }
+            return EntityManager.CreateGroup(groupName);
         }
 
         public void AddGroup(EntityGroup group)
         {
-            if (group == null)
-            {
-                throw new ArgumentNullException(nameof(group));
-            }
-
-            lock (syncObject)
-            {
-                if (!entitiesByGroup.ContainsKey(group.Name))
-                {
-                    entitiesByGroup.Add(group.Name, group);
-                    OnGroupCreated(group);
-                }
-                else
-                {
-                    entitiesByGroup[group.Name].Add(group);
-                }
-            }
+            EntityManager.AddGroup(group);
         }
 
         public void RemoveGroup(string groupName)
         {
-            if (string.IsNullOrEmpty(groupName))
-            {
-                throw new ArgumentNullException(nameof(groupName));
-            }
-
-            lock (syncObject)
-            {
-                if (entitiesByGroup.ContainsKey(groupName))
-                {
-                    var group = entitiesByGroup[groupName];
-                    entitiesByGroup.Remove(groupName);
-                    OnGroupRemoved(group);
-                }
-            }
+            EntityManager.RemoveGroup(groupName);
         }
 
-        protected void OnGroupCreated(EntityGroup group)
+        public void AddToGroup(Entity entity, string groupName, bool createIfNotExists = true)
+        {
+            EntityManager.AddToGroup(entity, groupName, createIfNotExists);
+        }
+
+        public void RemoveFromGroup(Entity entity, string groupName)
+        {
+            EntityManager.RemoveFromGroup(entity, groupName);
+        }
+
+        public void RemoveFromGroup(IEnumerable<Entity> entities, string groupName)
+        {
+            EntityManager.RemoveFromGroup(entities, groupName);
+        }
+
+        public EntityGroup GetGroup(string groupName)
+        {
+            return EntityManager.GetGroup(groupName);
+        }
+
+        public void ResetGroup(string groupName)
+        {
+            EntityManager.ResetGroup(groupName);
+        }
+
+        public string[] GetAllGroupIds()
+        {
+            return EntityManager.GetAllGroupIds();
+        }
+
+        public EntityGroup[] GetAllGroups()
+        {
+            return EntityManager.GetAllGroups();
+        }
+        
+        /// <summary>
+        /// Search entity with given Uid
+        /// </summary>
+        /// <param name="uid"><see cref="IIdentifiable.Uid"/></param>
+        /// <returns>First found entity</returns>
+        public Entity FindEntity(UInt128 uid)
+        {
+            return EntityManager.FindEntity(uid);
+        }
+
+        /// <summary>
+        /// Return first entity with given name
+        /// </summary>
+        /// <param name="name"><see cref="IName.Name"/></param>
+        /// <returns></returns>
+        public Entity FindEntity(string name)
+        {
+            return EntityManager.FindEntity(name);
+        }
+
+        /// <summary>
+        /// Return all entities with given name
+        /// </summary>
+        /// <param name="name"><see cref="IName.Name"/></param>
+        /// <returns></returns>
+        public Entity[] FindEntities(string name)
+        {
+            return EntityManager.FindEntities(name);
+        }
+        
+        internal void OnGroupCreated(EntityGroup group)
         {
             group.GroupChanged += OnGroupChanged;
             GroupCreated?.Invoke(this, new EntityGroupEventArgs(group));
         }
 
-        protected void OnGroupRemoved(EntityGroup group)
+        internal void OnGroupRemoved(EntityGroup group)
         {
             group.GroupChanged -= OnGroupChanged;
             GroupRemoved?.Invoke(this, new EntityGroupEventArgs(group));
@@ -314,230 +242,35 @@ namespace Adamantium.EntityFramework
             GroupChanged?.Invoke(sender, args);
         }
 
-        public void AddToGroup(Entity entity, string groupName, bool createIfNotExists = true)
-        {
-            if (string.IsNullOrEmpty(groupName))
-            {
-                throw new ArgumentNullException(nameof(groupName));
-            }
-
-            lock (syncObject)
-            {
-                EntityGroup group;
-                if (entitiesByGroup.TryGetValue(groupName, out group))
-                {
-                    group.Add(entity);
-                }
-                else
-                {
-                    if (!createIfNotExists)
-                    {
-                        throw new Exception($"No entity group available with name {groupName}");
-                    }
-                    else
-                    {
-                        CreateGroup(groupName);
-                        AddToGroup(entity, groupName);
-                    }
-                }
-            }
-        }
-
-        public void AddToGroup(IEnumerable<Entity> entities, string groupName)
-        {
-            if (string.IsNullOrEmpty(groupName))
-            {
-                throw new ArgumentNullException(nameof(groupName));
-            }
-
-            if (entities == null)
-            {
-                throw new ArgumentNullException(nameof(entities));
-            }
-
-            lock (syncObject)
-            {
-                EntityGroup group;
-                if (entitiesByGroup.TryGetValue(groupName, out group))
-                {
-                    group.Add(entities);
-                }
-                else
-                {
-                    throw new Exception($"No entity group available with name {groupName}");
-                }
-            }
-        }
-        
-        public void RemoveFromGroup(Entity entity, string groupName)
-        {
-            if (string.IsNullOrEmpty(groupName))
-            {
-                throw new ArgumentNullException(nameof(groupName));
-            }
-
-            lock (syncObject)
-            {
-                EntityGroup group;
-                if (entitiesByGroup.TryGetValue(groupName, out group))
-                {
-                    group.Remove(entity);
-                }
-                else
-                {
-                    throw new Exception($"No entity group available with name {groupName}");
-                }
-            }
-        }
-
-        public void RemoveFromGroup(IEnumerable<Entity> entities, string groupName)
-        {
-            if (string.IsNullOrEmpty(groupName))
-            {
-                throw new ArgumentNullException(nameof(groupName));
-            }
-
-            if (entities == null)
-            {
-                throw new ArgumentNullException(nameof(entities));
-            }
-
-            lock (syncObject)
-            {
-                EntityGroup group;
-                if (entitiesByGroup.TryGetValue(groupName, out group))
-                {
-                    group.Remove(entities);
-                }
-                else
-                {
-                    throw new Exception($"No entity group available with name {groupName}");
-                }
-            }
-        }
-
-        public EntityGroup GetGroup(string groupName)
-        {
-            EntityGroup group;
-            entitiesByGroup.TryGetValue(groupName, out group);
-            return group;
-        }
-
-        public void ResetGroup(string groupName)
-        {
-            lock (syncObject)
-            {
-                EntityGroup group;
-                if (entitiesByGroup.TryGetValue(groupName, out group))
-                {
-                    group.Clear();
-                }
-            }
-        }
-
-        public string[] GetAllGroupIds()
-        {
-            string[] groupIds = new string[entitiesByGroup.Count];
-            entitiesByGroup.Keys.CopyTo(groupIds, 0);
-            return groupIds;
-        }
-
-        public EntityGroup[] GetAllGroups()
-        {
-            EntityGroup[] groupIds = new EntityGroup[entitiesByGroup.Count];
-            entitiesByGroup.Values.CopyTo(groupIds, 0);
-            return groupIds;
-        }
-
-        public event EventHandler<EntityGroupEventArgs> GroupCreated;
-        public event EventHandler<EntityGroupEventArgs> GroupRemoved;
-        public event EventHandler<GroupChangedEventArgs> GroupChanged;
-        public event EventHandler<EventArgs> WorldReseted;
-
-        /// <summary>
-        /// Search entity with given Uid
-        /// </summary>
-        /// <param name="uid"><see cref="IIdentifiable.Uid"/></param>
-        /// <returns>First found entity</returns>
-        public Entity FindEntity(UInt128 uid)
-        {
-            lock (syncObject)
-            {
-                availableEntities.TryGetValue(uid, out var entity);
-                return entity;
-            }
-        }
-
-        /// <summary>
-        /// Return first entity with given name
-        /// </summary>
-        /// <param name="name"><see cref="IName.Name"/></param>
-        /// <returns></returns>
-        public Entity FindEntity(string name)
-        {
-            lock (syncObject)
-            {
-                foreach (var availableEntity in availableEntities.Values)
-                {
-                    if (availableEntity.Name == name)
-                    {
-                        return availableEntity;
-                    }
-                }
-                return null;
-            }
-        }
-
-        /// <summary>
-        /// Return all entities with given name
-        /// </summary>
-        /// <param name="name"><see cref="IName.Name"/></param>
-        /// <returns></returns>
-        public Entity[] FindEntities(string name)
-        {
-            lock (syncObject)
-            {
-                List<Entity> entities = new List<Entity>();
-                foreach (var availableEntity in availableEntities.Values)
-                {
-                    if (availableEntity.Name == name)
-                    {
-                        entities.Add(availableEntity);
-                    }
-                }
-                return entities.ToArray();
-            }
-        }
-
         public void Reset()
         {
-            lock (syncObject)
-            {
-                rootEntities.Clear();
-                availableEntities.Clear();
-                entitiesByGroup.Clear();
-                ServiceManager.Reset();
-                WorldReseted?.Invoke(this, EventArgs.Empty);
-            }
+            EntityManager.Reset();
+            ServiceManager.Reset();
+            WorldReseted?.Invoke(this, EventArgs.Empty);
         }
 
         public void Merge(EntityWorld world)
         {
-            foreach (var entity in world.availableEntities)
+            foreach (var entity in world.EntityManager.RootEntities)
             {
-                AddEntity(entity.Value);
+                AddEntity(entity);
             }
 
-            foreach (var group in entitiesByGroup)
+            foreach (var group in world.EntityManager.GetAllGroups())
             {
-                AddGroup(group.Value);
+                AddGroup(group);
             }
         }
 
         public void ForceUpdate()
         {
-            SyncEntities();
+            EntityManager.SyncEntities();
             ServiceManager.SyncServices();
         }
+        
+        public event EventHandler<EntityGroupEventArgs> GroupCreated;
+        public event EventHandler<EntityGroupEventArgs> GroupRemoved;
+        public event EventHandler<GroupChangedEventArgs> GroupChanged;
+        public event EventHandler<EventArgs> WorldReseted;
     }
 }

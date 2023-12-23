@@ -8,12 +8,12 @@ namespace Adamantium.EntityFramework.Components
 {
     public class BoxCollider : Collider
     {
+        private OrientedBoundingBox obb;
         public BoxCollider()
         {
             ColliderData = new Dictionary<CameraBase, OrientedBoundingBox>();
         }
-
-        private OrientedBoundingBox obb;
+        
         protected Dictionary<CameraBase, OrientedBoundingBox> ColliderData { get; }
 
         public override void ClearData()
@@ -36,22 +36,14 @@ namespace Adamantium.EntityFramework.Components
         {
             var bb = obb.Transform(Owner.Transform.Scale, Owner.Transform.Rotation, Owner.Transform.GetMetadata(camera).RelativePosition);
 
-            if (!ColliderData.ContainsKey(camera))
-            {
-                ColliderData.Add(camera, bb);
-            }
-            else
-            {
-                ColliderData[camera] = bb;
-            }
+            ColliderData[camera] = bb;
         }
 
         public override ContainmentType IsInsideCameraFrustum(Camera camera)
         {
-            OrientedBoundingBox data;
-            if (ColliderData.TryGetValue(camera, out data))
+            if (ColliderData.TryGetValue(camera, out var bb))
             {
-                return camera.Frustum.Contains(data.GetCorners());
+                return camera.Frustum.Contains(bb.GetCorners());
             }
             return camera.Frustum.Contains(obb.GetCorners());
         }
@@ -81,7 +73,8 @@ namespace Adamantium.EntityFramework.Components
         public override void Merge(Collider collider)
         {
             var bounds = collider.Bounds;
-            obb = OrientedBoundingBox.Merge(ref obb, bounds.GetCorners());
+            var obb0 = (OrientedBoundingBox)bounds;
+            obb = OrientedBoundingBox.Merge(ref obb, ref obb0);
             Bounds = Bounds.FromBoundingBox(obb);
         }
 

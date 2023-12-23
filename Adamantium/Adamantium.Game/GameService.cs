@@ -15,12 +15,10 @@ public class GameService : IGameService
     private readonly object _locker = new object();
     
     private List<GameKey> _games;
-    private List<Task> _tasks;
 
     public GameService()
     {
         _games = new List<GameKey>();
-        _tasks = new List<Task>();
     }
 
     public IReadOnlyList<IGame> Games
@@ -61,20 +59,17 @@ public class GameService : IGameService
     {
         lock (_locker)
         {
-            
-            foreach (var key in _games)
+            Parallel.ForEach(_games, (item) =>
             {
-                if (key.Service != renderService)  continue;
+                if (item.Service != renderService)  return;
                 
-                _tasks.Add(Task.Run(() => key.Game.RunOnce(time)));
+                item.Game.RunOnce(time);
+            });
+            foreach (var game in _games)
+            {
+                ((Game)game.Game).Submit();
             }
         }
-    }
-
-    public void WaitForGames()
-    {
-        Task.WaitAll(_tasks.ToArray());
-        _tasks.Clear();
     }
 
     public void CopyOutput(GraphicsDevice graphicsDevice)

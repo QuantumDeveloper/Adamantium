@@ -1,15 +1,14 @@
-﻿using Adamantium.Engine.Core.Models;
+﻿using System;
+using Adamantium.Engine.Core.Models;
 using Adamantium.Engine.Graphics;
 using Adamantium.EntityFramework.ComponentsBasics;
 using Adamantium.Mathematics;
-//using Buffer = Adamantium.Engine.Graphics.Buffer;
+using Buffer = Adamantium.Engine.Graphics.Buffer;
 
 namespace Adamantium.EntityFramework.Components
 {
     public abstract class Collider : ActivatableComponent
     {
-        protected Mesh Geometry { get; set; }
-
         public Vector3F Size { get; set; }
 
         public Vector3F LocalCenter => Bounds.Center;
@@ -30,27 +29,25 @@ namespace Adamantium.EntityFramework.Components
             set => SetProperty(ref displayCollider, value);
         }
 
-        //protected Buffer<MeshVertex> VertexBuffer;
-        //protected Buffer<int> IndexBuffer;
-        //protected VertexInputLayout InputLayout;
+        protected Mesh Geometry { get; set; }
+        protected Buffer<MeshVertex> VertexBuffer { get; set; }
+        protected Buffer<int> IndexBuffer { get; set; }
+        protected Type LayoutType { get; set; }
 
         private bool displayCollider;
 
         public override void Initialize()
         {
             var meshData = Owner?.GetComponent<MeshData>();
-            if (meshData != null)
-            {
-                CalculateFromMesh(meshData.Mesh);
-                base.Initialize();
-            }
+            if (meshData == null) return;
+            CalculateFromMesh(meshData.Mesh);
+            base.Initialize();
         }
 
         public abstract void ClearData();
 
 
         public abstract bool ContainsDataFor(CameraBase camera);
-
 
         protected Collider()
         {
@@ -100,77 +97,36 @@ namespace Adamantium.EntityFramework.Components
                 Geometry.AcceptChanges();
             }
 
-            //renderContext.SetVertexBuffer(VertexBuffer);
-            //renderContext.VertexInputLayout = InputLayout;
+            renderContext.SetVertexBuffer(VertexBuffer);
+            renderContext.VertexType = LayoutType;
+            renderContext.PrimitiveTopology = Geometry.MeshTopology;
 
             if (Geometry.Indices != null)
             {
-                //renderContext.SetIndexBuffer(IndexBuffer);
+                renderContext.SetIndexBuffer(IndexBuffer);
             }
 
             if (Geometry.Indices != null)
             {
-//                renderContext.DrawIndexed(Geometry.MeshTopology, Geometry.Indices.Length);
+                renderContext.DrawIndexed(VertexBuffer, IndexBuffer);
             }
             else
             {
-//                renderContext.Draw(Geometry.MeshTopology, Geometry.Positions.Length);
+                renderContext.Draw(VertexBuffer.ElementCount, 1);
             }
         }
 
         protected void CreateVertexData(GraphicsDevice renderContext)
         {
-            int length = Geometry.Points.Length;
+            var meshVertices = Geometry.ToMeshVertices();
 
-            var normals = Geometry.Semantic.HasFlag(VertexSemantic.Normal);
-            var texcoords0 = Geometry.Semantic.HasFlag(VertexSemantic.UV0);
-            var texcoords1 = Geometry.Semantic.HasFlag(VertexSemantic.UV1);
-            var texcoords2 = Geometry.Semantic.HasFlag(VertexSemantic.UV2);
-            var texcoords3 = Geometry.Semantic.HasFlag(VertexSemantic.UV3);
-            var tanBitan = Geometry.Semantic.HasFlag(VertexSemantic.TangentBiNormal);
+            VertexBuffer?.Dispose();
+            VertexBuffer = ToDispose(Buffer.Vertex.New(renderContext, meshVertices));
 
-            var vertices = new MeshVertex[length];
+            IndexBuffer?.Dispose();
+            IndexBuffer = ToDispose(Buffer.Index.New(renderContext, Geometry.Indices));
 
-            for (int i = 0; i < length; ++i)
-            {
-                var vertex = new MeshVertex() { Position = Geometry.Points[i] };
-                if (normals)
-                {
-                    vertex.Normal = Geometry.Normals[i];
-                }
-                if (texcoords0)
-                {
-                    vertex.UV0 = Geometry.UV0[i];
-                }
-                if (texcoords1)
-                {
-                    vertex.UV1 = Geometry.UV1[i];
-                }
-                if (texcoords2)
-                {
-                    vertex.UV2 = Geometry.UV2[i];
-                }
-                if (texcoords3)
-                {
-                    vertex.UV3 = Geometry.UV3[i];
-                }
-
-                if (tanBitan)
-                {
-                    vertex.Tangent = Geometry.Tangents[i];
-                    vertex.BiTangent = Geometry.BiTangents[i];
-                }
-
-                vertices[i] = vertex;
-            }
-
-            //VertexBuffer?.Dispose();
-            //VertexBuffer = ToDispose(Buffer.Vertex.New(renderContext, vertices, ResourceUsage.Dynamic));
-
-            //IndexBuffer?.Dispose();
-            //IndexBuffer = ToDispose(Buffer.Index.New(renderContext, Geometry.Indices, ResourceUsage.Dynamic));
-
-            //InputLayout = VertexInputLayout.FromBuffer(0, VertexBuffer);
+            LayoutType = typeof(MeshVertex);
         }
     }
 }

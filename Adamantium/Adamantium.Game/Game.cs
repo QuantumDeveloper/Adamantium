@@ -46,7 +46,12 @@ namespace Adamantium.Game
 
         private readonly Dictionary<Object, GameContext> contextsMapping;
         
-        public Game(GameMode mode, bool enableDynamicRendering, bool enableDebug, IGraphicsDeviceService graphicsDeviceService = null, IDependencyContainer container = null)
+        public Game(
+            GameMode mode, 
+            bool enableDynamicRendering, 
+            bool enableDebug, 
+            IGraphicsDeviceService graphicsDeviceService = null, 
+            IDependencyContainer container = null)
         {
             Mode = mode;
 
@@ -244,10 +249,9 @@ namespace Adamantium.Game
 
         public void RunOnce(AppTime time)
         {
-            //InitializeBeforeRun();
             MakePreparations();
             Update(time);
-            ExecuteDrawSequence(time);
+            ExecuteDrawSequence2(time);
             FrameFinished?.Invoke(this, EventArgs.Empty);
         }
 
@@ -287,6 +291,11 @@ namespace Adamantium.Game
             {
                 gamePlatform.Run(cancellationTokenSource.Token);
             }
+        }
+
+        public void Submit()
+        {
+            EndScene();
         }
 
         private void OnInitialized()
@@ -474,7 +483,7 @@ namespace Adamantium.Game
                 MessageBox.Show(exception.ToString());
             }
         }
-
+        
         private void ExecuteDrawSequence(AppTime gameTime)
         {
             if (!gamePlatform.HasOutputs) return;
@@ -483,6 +492,17 @@ namespace Adamantium.Game
             {
                 Draw(gameTime);
                 EndScene();
+            }
+        }
+
+        private void ExecuteDrawSequence2(AppTime gameTime)
+        {
+            if (!gamePlatform.HasOutputs) return;
+                
+            if (BeginScene())
+            {
+                Draw(gameTime);
+                //EndScene();
             }
         }
 

@@ -23,7 +23,7 @@ namespace Adamantium.Game.Core
         private Buffer _dstBuffer;
         private bool isExecuted = true;
         private bool _invalidateRender;
-        private RenderTarget _renderTarget;
+        private RenderTarget _destinationTexture;
 
         internal RenderTargetGameOutput(IEventAggregator eventAggregator, GameContext context) : base(eventAggregator)
         {
@@ -55,19 +55,20 @@ namespace Adamantium.Game.Core
             nativeWindow.GotFocus += NativeWindow_GotFocus;
             nativeWindow.LostFocus += NativeWindow_LostFocus;
             Description = new GameWindowDescription(PresenterType.RenderTarget);
-            _renderTarget = nativeWindow.RenderTarget?.Texture as RenderTarget;
+            _destinationTexture = nativeWindow.RenderTarget?.Texture as RenderTarget;
 
             Width = (uint)nativeWindow.ActualWidth;
             Height = (uint)nativeWindow.ActualHeight;
             Handle = nativeWindow.Handle;
             ClientBounds = new Rectangle(0, 0, (int)Description.Width, (int)Description.Height);
             UpdateViewportAndScissor((uint)ClientBounds.Width, (uint)ClientBounds.Height);
+            base.InitializeInternal(context);
         }
 
         public override void CopyOutput(GraphicsDevice mainDevice)
         {
             var rt = GraphicsDevice.Presenter as RenderTargetGraphicsPresenter;
-            mainDevice.CopyImageFromPresenter(rt?.ResolveTexture, _renderTarget);
+            mainDevice.CopyImageFromPresenter(rt?.ResolveTexture, _destinationTexture);
             nativeWindow.CanPresent = true;
         }
 
@@ -79,10 +80,10 @@ namespace Adamantium.Game.Core
         private unsafe void NativeWindowOnRenderTargetCreatedOrUpdated(object sender, RenderTargetEventArgs e)
         {
             Handle = new IntPtr(e.RenderTarget.NativePointer);
-            _renderTarget = e.RenderTarget.Texture as RenderTarget;
+            _destinationTexture = e.RenderTarget.Texture as RenderTarget;
             Log.Logger.Debug($"Updated render target with pointer: {new IntPtr(e.RenderTarget.NativePointer)}");
             ClientBounds = new Rectangle(0, 0, (int)e.Width, (int)e.Height);
-            _renderTarget = e.RenderTarget.Texture as RenderTarget;
+            _destinationTexture = e.RenderTarget.Texture as RenderTarget;
             UpdateViewportAndScissor((uint)ClientBounds.Width, (uint)ClientBounds.Height);
             Width = (uint)nativeWindow.ActualWidth;
             Height = (uint)nativeWindow.ActualHeight;

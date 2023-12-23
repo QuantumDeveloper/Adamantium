@@ -20,6 +20,7 @@ using Adamantium.UI;
 using Adamantium.UI.Markup;
 using Adamantium.UI.Processors;
 using Adamantium.UI.Resources;
+using Adamantium.UI.RoutedEvents;
 using Adamantium.UI.Templates;
 
 namespace Adamantium.Game.Playground;
@@ -47,32 +48,37 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        TestGrid1.Loaded += TestGrid1OnInitialized;
         SourceInitialized += OnSourceInitialized;
         KeyDown+= delegate(object sender, KeyEventArgs args)
         {
             Log.Logger.Information($"Key: {args.Key}");
             if (args.Key == Key.A)
             {
-                UIApplication.Current.EnableGraphicsDebug = true;
+                //UIApplication.Current.EnableGraphicsDebug = true;
             }
             else if (args.Key == Key.S)
             {
-                UIApplication.Current.EnableGraphicsDebug = false;
+                //UIApplication.Current.EnableGraphicsDebug = false;
             }
         };
     }
 
+    private void TestGrid1OnInitialized(object sender, RoutedEventArgs e)
+    {
+        CreateGame();
+    }
+
     private void OnSourceInitialized(object sender, EventArgs e)
     {
-        //CreateGame();
-        Thumb1.Template = ControlTemplate.Load(AumlParser.Load("ControlTemplate.auml", true));
+        //Thumb1.Template = ControlTemplate.Load(AumlParser.Load("ControlTemplate.auml", true));
         var style = CreateStyle();
         UIApplication.Current.ThemeManager.ApplyStyles(this, style);
     }
 
     private void CreateGame()
     {
-        var rt = Content as RenderTargetPanel;
+        var rt = TestGrid1;
         var gameService = Resolver.Resolve<IGameService>();
         var graphicsDeviceService = Resolver.Resolve<IGraphicsDeviceService>();
         // Primary mode
@@ -85,7 +91,9 @@ public partial class MainWindow : Window
             "AdamantiumGame", 
             this, 
             service, 
-            graphicsDeviceService, true, UIApplication.Current.EnableGraphicsDebug);
+            graphicsDeviceService, 
+            true, 
+            UIApplication.Current.EnableGraphicsDebug);
         var drawingContext = GetDrawingContext();
         game.CreateOutputFromContext(rt, drawingContext.GraphicsDevice);
     }

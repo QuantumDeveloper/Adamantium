@@ -1,7 +1,4 @@
-﻿using System;
-using Adamantium.Core;
-using Adamantium.Engine.Graphics;
-using Buffer = Adamantium.Engine.Graphics.Buffer;
+﻿using Adamantium.Engine.Graphics;
 
 namespace Adamantium.EntityFramework.Components
 {

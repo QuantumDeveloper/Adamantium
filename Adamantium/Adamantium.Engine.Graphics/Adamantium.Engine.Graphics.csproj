@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>net7.0</TargetFramework>
+		<TargetFramework>net8.0</TargetFramework>
 		<Platforms>x64</Platforms>
 		<LangVersion>latest</LangVersion>
 		<Configurations>Debug;Release</Configurations>
@@ -9,6 +9,7 @@
 		<BaseOutputPath>..\..\output\Adamantium.Engine.Graphics\bin</BaseOutputPath>
 		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
 		<CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
+		<OutputType>Exe</OutputType>
 	</PropertyGroup>
 
 <!--	<ItemGroup>-->

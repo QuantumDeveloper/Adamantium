@@ -30,13 +30,13 @@ namespace Adamantium.Mathematics
         /// The right.
         /// </summary>
         [Key(2)]
-        public int Right;
+        public int Width;
 
         /// <summary>
         /// The bottom.
         /// </summary>
         [Key(3)]
-        public int Bottom;
+        public int Height;
 
         /// <summary>
         /// An empty rectangle.
@@ -59,15 +59,15 @@ namespace Adamantium.Mathematics
         {
             Left = x;
             Top = y;
-            Right = x + width;
-            Bottom = y + height;
+            Width = width;
+            Height = height;
         }
 
         /// <summary>
         /// Gets or sets the X position.
         /// </summary>
         /// <value>The X position.</value>
-        [Key(4)]
+        [IgnoreMember]
         public int X
         {
             get => Left;
@@ -82,7 +82,7 @@ namespace Adamantium.Mathematics
         /// Gets or sets the Y position.
         /// </summary>
         /// <value>The Y position.</value>
-        [Key(5)]
+        [IgnoreMember]
         public int Y
         {
             get => Top;
@@ -97,22 +97,22 @@ namespace Adamantium.Mathematics
         /// Gets or sets the width.
         /// </summary>
         /// <value>The width.</value>
-        [Key(6)]
-        public int Width
+        [IgnoreMember]
+        public int Right
         {
-            get => Right - Left;
-            set => Right = Left + value;
+            get => Left + Width;
+            set => Width = value - Left;
         }
 
         /// <summary>
         /// Gets or sets the height.
         /// </summary>
         /// <value>The height.</value>
-        [Key(7)]
-        public int Height
+        [IgnoreMember]
+        public int Bottom
         {
-            get => Bottom - Top;
-            set => Bottom = Top + value;
+            get => Top + Height;
+            set => Height = value - Top;
         }
 
         /// <summary>

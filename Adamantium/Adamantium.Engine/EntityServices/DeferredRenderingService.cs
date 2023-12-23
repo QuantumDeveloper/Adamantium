@@ -46,7 +46,6 @@ namespace Adamantium.Engine.EntityServices
 
         public DeferredRenderingService(EntityWorld world, GameOutput window) : base(world, window)
         {
-            //DeferredDevice = GraphicsDevice;
         }
 
         public override void LoadContent()

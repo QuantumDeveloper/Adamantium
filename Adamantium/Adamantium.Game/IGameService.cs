@@ -18,8 +18,6 @@ public interface IGameService
 
     public void RunGames(IRenderService renderService, AppTime time);
 
-    public void WaitForGames();
-
     public void CopyOutput(GraphicsDevice graphicsDevice);
 
     public event Action<IGame> OnGameAdded;

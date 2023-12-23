@@ -1,6 +1,5 @@
 ﻿using System;
 using Adamantium.Core;
-using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.EntityFramework.ComponentsBasics;
 using Buffer = Adamantium.Engine.Graphics.Buffer;
@@ -8,7 +7,7 @@ using Buffer = Adamantium.Engine.Graphics.Buffer;
 namespace Adamantium.EntityFramework.Components
 {
     [RequiredComponets(typeof(MeshData))]
-    public abstract class MeshRendererBase : RenderableComponent
+    public abstract class MeshRendererBase : RenderComponent
     {
         private bool isWireFrame;
 
@@ -27,13 +26,12 @@ namespace Adamantium.EntityFramework.Components
         public override void Initialize()
         {
             var meshData = GetComponent<MeshData>();
-            if (meshData != null)
-            {
-                MeshData = meshData;
-                MeshDataChanged = true;
-                MeshData.MeshDataChanged += MeshData_MeshDataChanged;
-                base.Initialize();
-            }
+            if (meshData == null) return;
+            
+            MeshData = meshData;
+            MeshDataChanged = true;
+            MeshData.MeshDataChanged += MeshData_MeshDataChanged;
+            base.Initialize();
         }
 
         private void MeshData_MeshDataChanged(object sender, EventArgs e)

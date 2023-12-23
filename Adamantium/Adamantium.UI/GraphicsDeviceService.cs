@@ -57,12 +57,11 @@ namespace Adamantium.UI
 
         public void RemoveDeviceById(string deviceId)
         {
-            if (deviceMap.TryGetValue(deviceId, out var device))
-            {
-                device?.Dispose();
-                deviceMap.Remove(deviceId);
-                graphicsDevices.Remove(device);
-            }
+            if (!deviceMap.TryGetValue(deviceId, out var device)) return;
+            
+            device?.Dispose();
+            deviceMap.Remove(deviceId);
+            graphicsDevices.Remove(device);
         }
 
         public GraphicsDevice GetDeviceById(string deviceId)

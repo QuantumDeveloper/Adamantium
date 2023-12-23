@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -56,7 +57,7 @@ namespace Adamantium.Engine.Effects
         /// </summary>
         /// <value>The include directory list.</value>
         public List<string> IncludeDirectoryList => includeDirectoryList;
-        
+
         public ImmutableArray<ShaderFileInfo> Includes { get; set; }
 
         /// <summary>
@@ -106,6 +107,7 @@ namespace Adamantium.Engine.Effects
             do
             {
                 var token = NextToken();
+                Debug.WriteLine(token);
                 if (token.Type == TokenType.EndOfFile)
                     break;
 
@@ -241,7 +243,6 @@ namespace Adamantium.Engine.Effects
         protected virtual Token NextToken()
         {
             var token = InternalNextToken();
-            StringBuilder buider = new StringBuilder();
 
             while (token.Type == TokenType.Preprocessor)
             {
@@ -261,7 +262,7 @@ namespace Adamantium.Engine.Effects
                         }
                     }
                 }
-                else if(Expect("line"))
+                else if (Expect("line"))
                 {
                     if (!ExpectNext(TokenType.Number))
                         return currentToken;
@@ -412,7 +413,7 @@ namespace Adamantium.Engine.Effects
                     case TokenType.RightCurlyBrace:
                         isParseOk = true;
                         continueParsingTecnhique = false;
-                        technique.Span.EndIndex = currentToken.Span.StartIndex+1;
+                        technique.Span.EndIndex = currentToken.Span.StartIndex + 1;
                         break;
 
                     default:

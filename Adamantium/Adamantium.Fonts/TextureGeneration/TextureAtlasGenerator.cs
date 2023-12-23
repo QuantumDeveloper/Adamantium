@@ -60,44 +60,48 @@ namespace Adamantium.Fonts.TextureGeneration
             var totalBytes = atlasData.GlyphData.Sum(x => x.Pixels.Length);
             var totalPixels = totalBytes / 4; 
             var pixelsPerRow = (uint)Math.Ceiling(Math.Sqrt(totalPixels));
+
+            var groups = atlasData.GlyphData
+                .GroupBy(x => x.BoundingRect.Height)
+                .OrderByDescending(x => x.Key)
+                .Select(group => group.OrderByDescending(x => x.BoundingRect.Width))
+                .ToList();
             
-            var groups = atlasData.GlyphData.GroupBy(x => x.Height).OrderByDescending(x=>x.Key).Select(group=>group.OrderByDescending(x=>x.Width)).ToList();
-            
-            uint yOffset = 0;
-            uint xOffset = 0;
+            int yOffset = 0;
+            int xOffset = 0;
             int resultWidth = (int)pixelsPerRow;
-            var heights = new List<uint>();
-            int index = 0;
+            var heights = new List<int>();
             foreach (var group in groups)
             {
                 foreach (var glyphData in group)
                 {
-                    var textureWidth = glyphData.Width;
-                    heights.Add(glyphData.Height);
+                    var textureWidth = glyphData.BoundingRect.Width;
+                    heights.Add(glyphData.BoundingRect.Height);
                     
-                    glyphData.X = (uint)xOffset;
-                    glyphData.Y = (uint)yOffset;
-                    // glyphData.UV = (float)(xOffset / atlasSize.Width);
-                    // glyphData.V = (float)(yOffset / atlasSize.Height);
+                    glyphData.BoundingRect.Left = (int)xOffset;
+                    glyphData.BoundingRect.Top = (int)yOffset;
+                    glyphData.UV.Left = (float)(xOffset / atlasSize.Width);
+                    glyphData.UV.Top = (float)(yOffset / atlasSize.Height);
+                    glyphData.UV.Right = (float)(glyphData.BoundingRect.Right / atlasSize.Width);
+                    glyphData.UV.Bottom = (float)(glyphData.BoundingRect.Bottom / atlasSize.Height);
                     
                     xOffset += textureWidth;
                     if (xOffset >= resultWidth)
                     {
                         xOffset = 0;
                         var maxHeight = heights.Max();
-                        yOffset += (uint)maxHeight;
+                        yOffset += maxHeight;
                         heights.Clear();
-                        glyphData.X = (uint)xOffset;
-                        glyphData.Y = (uint)yOffset;
+                        
+                        glyphData.BoundingRect.Left = (int)xOffset;
+                        glyphData.BoundingRect.Top = (int)yOffset;
                     }
-
-                    index++;
                 }
             }
             if (heights.Count > 0)
             {
                 var maxHeight = heights.Max();
-                yOffset += (uint)maxHeight;
+                yOffset += maxHeight;
                 heights.Clear();
             }
             
@@ -111,11 +115,11 @@ namespace Adamantium.Fonts.TextureGeneration
             {
                 foreach (var glyphData in group)
                 {
-                    var textureWidth = (int)glyphData.Width;
-                    var textureHeight = (int)glyphData.Height;
+                    var textureWidth = glyphData.BoundingRect.Width;
+                    var textureHeight = glyphData.BoundingRect.Height;
                     
-                    xOffset = (uint)(glyphData.X * 4);
-                    yOffset = (uint)glyphData.Y;
+                    xOffset = glyphData.BoundingRect.Left * 4;
+                    yOffset = glyphData.BoundingRect.Top;
 
                     for (int y = 0; y < textureHeight; y++)
                     {

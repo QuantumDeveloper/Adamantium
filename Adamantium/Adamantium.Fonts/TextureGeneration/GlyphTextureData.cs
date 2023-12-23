@@ -6,26 +6,29 @@ namespace Adamantium.Fonts.TextureGeneration
     [MessagePackObject]
     public class GlyphTextureData
     {
+        [SerializationConstructor]
+        public GlyphTextureData()
+        {
+
+        }
+
         public GlyphTextureData(uint width, uint height, uint glyphIndex)
         {
-            Width = width;
-            Height = height;
-            Pixels = new byte[Width * Height * 4];
+            BoundingRect.Width = (int)width;
+            BoundingRect.Height = (int)height;
+            Pixels = new byte[width * height * 4];
             GlyphIndex = glyphIndex;
         }
 
         [Key(0)]
-        public uint X { get; set; }
-        [Key(1)]
-        public uint Y { get; set; }
-        [Key(4)]
-        public uint Width { get; }
-        [Key(5)]
-        public uint Height { get; }
+        public Rectangle BoundingRect;
+        
+        [Key(1)] 
+        public RectangleF UV;
+        
         [Key(2)]
-        public RectangleF UV { get; set; }
-        [Key(6)]
         public uint GlyphIndex { get; }
+
         [IgnoreMember]
         public byte[] Pixels { get; set; }
     }

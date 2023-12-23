@@ -62,6 +62,7 @@ namespace Adamantium.Engine.EntityServices
             //{
             //    userControlledEntity = currentCamera.Owner;
             //}
+            inputManager.Update(gameTime);
             var gamepadState = inputManager.GetGamepadState(0);
             Double cameraMovementSpeed = currentCamera.Velocity * gameTime.FrameTime;
             float rotationAngle = currentCamera.RotationSpeed * (float)gameTime.FrameTime;
@@ -69,7 +70,7 @@ namespace Adamantium.Engine.EntityServices
             if (inputManager.IsMouseButtonDown(MouseButton.Right))
             {
                 currentCamera.RotateRelativeXY(
-                      (-inputManager.RawMouseDelta.Y * currentCamera.MouseSensitivity) *
+                      (inputManager.RawMouseDelta.Y * currentCamera.MouseSensitivity) *
                       (float)gameTime.FrameTime,
                       (-inputManager.RawMouseDelta.X * currentCamera.MouseSensitivity) *
                       (float)gameTime.FrameTime);
@@ -145,7 +146,6 @@ namespace Adamantium.Engine.EntityServices
                 currentCamera.RotateForward(-rotationAngle);
             }
 
-
             if (gamepadState.LeftThumb.Y != 0)
             {
                 currentCamera.TranslateForward(gamepadState.LeftThumb.Y * cameraMovementSpeed);
@@ -176,13 +176,13 @@ namespace Adamantium.Engine.EntityServices
 
             if (inputManager.IsKeyDown(Keys.UpArrow) || inputManager.IsKeyDown(Keys.NumPad8))
             {
-                currentCamera.RotateRight(rotationAngle);
+                currentCamera.RotateRight(-rotationAngle);
                 //userControlledEntity?.Transform.RotateRight(rotationAngle, RotationUnits.Degrees);
             }
 
             if (inputManager.IsKeyDown(Keys.DownArrow) || inputManager.IsKeyDown(Keys.NumPad5))
             {
-                currentCamera.RotateRight(-rotationAngle);
+                currentCamera.RotateRight(rotationAngle);
                 //userControlledEntity?.Transform.RotateRight(-rotationAngle, RotationUnits.Degrees);
             }
 
@@ -224,13 +224,13 @@ namespace Adamantium.Engine.EntityServices
 
             if (inputManager.IsKeyDown(Keys.Q))
             {
-                currentCamera.TranslateUp(-cameraMovementSpeed);
+                currentCamera.TranslateUp(cameraMovementSpeed);
                 //userControlledEntity?.Transform.TranslateUp(-cameraMovementSpeed);
             }
 
             if (inputManager.IsKeyDown(Keys.E))
             {
-                currentCamera.TranslateUp(cameraMovementSpeed);
+                currentCamera.TranslateUp(-cameraMovementSpeed);
                 //userControlledEntity?.Transform.TranslateUp(cameraMovementSpeed);
             }
 
@@ -322,13 +322,7 @@ namespace Adamantium.Engine.EntityServices
                 foreach (var window in gamePlatform.Outputs)
                 {
                     var filename = $"Screenshot_{window.Name}" + DateTime.Now.ToString("dd_MM_yyyy hh_mm_ss_ffff", CultureInfo.InvariantCulture) + ".jpg";
-                    window?.TakeScreenshot(filename, ImageFileType.Jpg);
-                    filename = $"Screenshot_{window.Name}" + DateTime.Now.ToString("dd_MM_yyyy hh_mm_ss_ffff", CultureInfo.InvariantCulture) + ".tga";
-                    window?.TakeScreenshot(filename, ImageFileType.Tga);
-                    filename = $"Screenshot_{window.Name}" + DateTime.Now.ToString("dd_MM_yyyy hh_mm_ss_ffff", CultureInfo.InvariantCulture) + ".bmp";
-                    window?.TakeScreenshot(filename, ImageFileType.Bmp);
-//                    filename = $"Screenshot_{window.Name}" + DateTime.Now.ToString("dd_MM_yyyy hh_mm_ss_ffff", CultureInfo.InvariantCulture) + ".tiff";
-//                    window?.TakeScreenShot(filename, ImageFileType.Tiff);
+                    window?.TakeScreenshot(filename, ImageFileType.Png);
                 }
             }
 

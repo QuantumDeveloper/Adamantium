@@ -129,7 +129,7 @@ namespace Adamantium.EntityFramework.Components
         /// </summary>
         public void UpdateFrustum()
         {
-            Frustum.Matrix4x4F = ViewMatrix * ProjectionMatrix;
+            Frustum.ViewProjection = ViewMatrix * ProjectionMatrix;
         }
 
         private Matrix4x4F _viewProjectionMatrix;
@@ -172,7 +172,6 @@ namespace Adamantium.EntityFramework.Components
             OrthoProjection = Matrix4x4F.OrthoLH(Width / OrthoScaleFactor, Height / OrthoScaleFactor, ZNear, ZFar);
         }
         
-
         private void BuildUiProjection()
         {
             float znear = ZNear;

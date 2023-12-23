@@ -23,24 +23,23 @@ public abstract class GameApplication : UIApplication
         {
             base.OnInitialize();
             GameService = new GameService();
-            EntityWorld.ServiceManager.OnDrawStarted += ServiceManagerOnOnDrawStarted;
+            EntityWorld.ServiceManager.OnDrawStarted += ServiceManagerOnDrawStarted;
             EntityWorld.ServiceManager.OnDrawFinished += ServiceManagerOnOnDrawFinished;
-            GameService.OnGameAdded += GameServiceOnOnGameAdded;
+            GameService.OnGameAdded += GameServiceOnGameAdded;
         }
 
-        private void GameServiceOnOnGameAdded(IGame obj)
+        private void GameServiceOnGameAdded(IGame obj)
         {
             
         }
 
-        private void ServiceManagerOnOnDrawStarted(IRenderService service, AppTime time)
+        private void ServiceManagerOnDrawStarted(IRenderService service, AppTime time)
         {
             GameService.RunGames(service, time);
         }
         
         private void ServiceManagerOnOnDrawFinished(IRenderService arg1, AppTime arg2)
         {
-            GameService.WaitForGames();
             GameService.CopyOutput(arg1.GraphicsDevice);
         }
 
@@ -50,15 +49,15 @@ public abstract class GameApplication : UIApplication
             containerRegistry.RegisterSingleton<IGameService>(GameService);
         }
 
-        private void ServiceManagerOnDrawFinished(object sender, EventArgs e)
-        {
-            GameService.WaitForGames();
-            if (GameService.Games.Count == 0) return;
-            if (GameService.Games[0].Outputs.Count == 0) return;
-            
-            var deviceService = GameService.Games[0].Container.Resolve<IGraphicsDeviceService>();
-            var graphicsDevice = deviceService.GraphicsDevices[1];
-        }
+        // private void ServiceManagerOnDrawFinished(object sender, EventArgs e)
+        // {
+        //     GameService.WaitForGames();
+        //     if (GameService.Games.Count == 0) return;
+        //     if (GameService.Games[0].Outputs.Count == 0) return;
+        //     
+        //     var deviceService = GameService.Games[0].Container.Resolve<IGraphicsDeviceService>();
+        //     var graphicsDevice = deviceService.GraphicsDevices[1];
+        // }
 
         protected override void OnBeforeEndScene()
         {

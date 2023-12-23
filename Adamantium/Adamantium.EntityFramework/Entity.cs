@@ -27,6 +27,11 @@ namespace Adamantium.EntityFramework
             dependenciesReadOnly = new ReadOnlyTrackingCollection<Entity>(dependencies);
             uid = UidGenerator.Generate();
             Owner = owner;
+            rootUid = uid;
+            if (Owner != null)
+            {
+                rootUid = GetRoot().rootUid;
+            }
             IsEnabled = true;
             Visible = true;
             Name = name;
@@ -38,6 +43,7 @@ namespace Adamantium.EntityFramework
 
         private Entity owner;
         private readonly UInt128 uid;
+        private UInt128 rootUid;
         private bool isEnabled;
         private bool isSelected;
         private string name;
@@ -51,6 +57,8 @@ namespace Adamantium.EntityFramework
         public Transform Transform { get; internal set; }
 
         public UInt128 Uid => uid;
+        
+        public UInt128 RootUid => rootUid;
 
         public bool IgnoreInCollisionDetection { get; set; }
 
@@ -85,11 +93,10 @@ namespace Adamantium.EntityFramework
             get => owner;
             set
             {
-                if (owner != value)
-                {
-                    OnOwnerChanged(owner, value);
-                    owner = value;
-                }
+                if (owner == value) return;
+                OnOwnerChanged(owner, value);
+                owner = value;
+                rootUid = GetRoot().rootUid;
             }
         }
 
@@ -304,7 +311,6 @@ namespace Adamantium.EntityFramework
 
         public event EventHandler<EntityComponentEventArgs> ComponentsChanged;
 
-
         public void TraverseInDepth(Action<Entity> action, bool ignoreDisabled = false)
         {
             var stack = new Stack<Entity>();
@@ -312,14 +318,12 @@ namespace Adamantium.EntityFramework
             while (stack.Count > 0)
             {
                 Entity current = stack.Pop();
-                if (ignoreDisabled || current.IsEnabled)
-                {
-                    action(current);
+                if (ignoreDisabled || !current.IsEnabled) continue;
+                action(current);
 
-                    for (int i = 0; i < current.Dependencies.Count; i++)
-                    {
-                        stack.Push(current.Dependencies[i]);
-                    }
+                foreach (var t in current.Dependencies)
+                {
+                    stack.Push(t);
                 }
             }
         }
@@ -331,7 +335,7 @@ namespace Adamantium.EntityFramework
             while (queue.Count > 0)
             {
                 Entity current = queue.Dequeue();
-                if (ignoreDisabled || current.IsEnabled)
+                if (ignoreDisabled && current.IsEnabled)
                 {
                     action(current);
 

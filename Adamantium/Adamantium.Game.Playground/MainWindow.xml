@@ -4,8 +4,8 @@
         Title="Adamantium Window"
         Width="1280"
         Height="720">
-<!--    <RenderTargetPanel x:Name="TestGrid1" -->
-<!--					   ColumnDefinitions="Auto, Auto, Auto">-->
+    <RenderTargetPanel x:Name="TestGrid1" 
+					   ColumnDefinitions="Auto, Auto, Auto">
 		<!--<Path StrokeThickness="2" -->
 <!--              Fill="Yellow"-->
 <!--              Name="Path1"-->
@@ -63,8 +63,8 @@
 <!--			   Delay="25"-->
 <!--               Source="Textures\APNG-cube.png"-->
 <!--        />-->
-		<Thumb x:Name="Thumb1"
-			   VerticalAlignment="Center"
-			   HorizontalAlignment="Center"/>
-<!--    </RenderTargetPanel>-->
+<!--		<Thumb x:Name="Thumb1"-->
+<!--			   VerticalAlignment="Center"-->
+<!--			   HorizontalAlignment="Center"/>-->
+    </RenderTargetPanel>
 </Window>

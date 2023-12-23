@@ -13,4 +13,10 @@ public interface IEntityService : IUpdateService, IRenderService
     bool IsRenderingService { get; }
 
     void Initialize();
+    
+    IEntityProcessor Processor { get; set; }
+
+    void AttachProcessor(IEntityProcessor processor);
+
+    void DetachProcessor();
 }

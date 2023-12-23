@@ -8,6 +8,8 @@ namespace Adamantium.Fonts;
 [XmlRoot(ElementName = "FontData")]
 public class FontData
 {
+    [XmlElement(ElementName = "Name")]
+    public String Name { get; set; }
     [XmlElement(ElementName = "GlyphTextureSize")]
     public UInt32 GlyphTextureSize { get; set; }
     [XmlElement(ElementName = "SampleRate")]
