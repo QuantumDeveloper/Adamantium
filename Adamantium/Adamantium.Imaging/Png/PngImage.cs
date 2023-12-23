@@ -271,9 +271,12 @@ namespace Adamantium.Imaging.Png
             frame.Height = (uint)Header.Height;
             ConvertColorsIfNeeded(frame, State);
 
-            if (index == 0) return;
+            if (frame.EncodedWidth == 0 || frame.EncodedHeight == 0)
+            {
+                return;
+            }
 
-            var baseFrame = Frames[(int)index - 1];
+            var baseFrame = Frames[(int)index];
             byte[] pixels = new byte[baseFrame.RawPixelBuffer.Length];
             if (frame.DisposeOp == DisposeOp.None)
             {
@@ -318,7 +321,7 @@ namespace Adamantium.Imaging.Png
                 }
                 catch (Exception e)
                 {
-                    int x = 0;
+                    
                 }
             }
 
@@ -343,7 +346,7 @@ namespace Adamantium.Imaging.Png
             else
             {
                 /*color conversion needed; sort of copy of the data*/
-                if (!(state.ColorModeRaw.ColorType == PngColorType.RGB || state.ColorModeRaw.ColorType == PngColorType.RGBA)
+                if (!(state.ColorModeRaw.ColorType is PngColorType.RGB or PngColorType.RGBA)
                     && state.ColorModeRaw.BitDepth != 8)
                 {
                     /*unsupported color mode conversion*/
@@ -352,6 +355,12 @@ namespace Adamantium.Imaging.Png
 
                 var width = (int)frame.EncodedWidth;
                 var height = (int)frame.EncodedHeight;
+
+                if (width == 0 || height == 0)
+                {
+                    width = Header.Width;
+                    height = Header.Height;
+                }
 
                 int rawBufferSize = (int)PngDecoder.GetRawSizeLct(width, height, state.ColorModeRaw);
                 var outBuffer = new byte[rawBufferSize];

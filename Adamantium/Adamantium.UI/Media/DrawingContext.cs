@@ -108,6 +108,7 @@ public class DrawingContext
       var hash = HashCode.Combine(destinationRect, corners);
       if (currentContainer.ChildUnits.Count == 0)
       {
+         currentUnit = new RenderUnit();
          ProcessRectangleGeometry(destinationRect, corners, brush, hash);
          ProcessStrokeRenderer(pen);
 
@@ -115,14 +116,14 @@ public class DrawingContext
       }
       else
       {
-         var unit = currentContainer.ChildUnits.FirstOrDefault(x => x.GeometryParametersHash == hash);
-         if (unit != null)
+         currentUnit = currentContainer.ChildUnits.FirstOrDefault(x => x.GeometryParametersHash == hash);
+         if (currentUnit != null)
          {
-            var index = currentContainer.ChildUnits.IndexOf(unit);
-            unit.GeometryRenderer.Brush = brush;
+            var index = currentContainer.ChildUnits.IndexOf(currentUnit);
+            currentUnit.GeometryRenderer.Brush = brush;
             if (index != _currentIndex)
             {
-               currentContainer.ChildUnits.Insert((int)_currentIndex, unit);
+               currentContainer.ChildUnits.Insert((int)_currentIndex, currentUnit);
             }
 
             ProcessStrokeRenderer(pen);

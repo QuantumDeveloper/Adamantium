@@ -1,8 +1,7 @@
 ﻿using Adamantium.EntityFramework;
 using Adamantium.Mathematics;
 
-
-namespace Adamantium.Engine.Templates.Camera
+namespace Adamantium.Engine.Templates.CameraTemplates
 {
     public class CameraTemplate
     {

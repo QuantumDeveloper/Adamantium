@@ -1,14 +1,12 @@
 ﻿using System;
 using Adamantium.Core;
-using Adamantium.Engine.Core;
-using Adamantium.Engine.Core.Models;
 using Adamantium.Engine.Graphics;
 using Adamantium.EntityFramework.ComponentsBasics;
 using Buffer = Adamantium.Engine.Graphics.Buffer;
 
 namespace Adamantium.EntityFramework.Components
 {
-    public abstract class RenderableComponent: ActivatableComponent
+    public abstract class RenderComponent: ActivatableComponent
     {
         protected Type VertexType { get; set; }
 

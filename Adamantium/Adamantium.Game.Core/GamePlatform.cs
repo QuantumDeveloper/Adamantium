@@ -149,15 +149,7 @@ namespace Adamantium.Game.Core
                 {
                     var wnd = windowsToAdd[i];
                     
-                    GraphicsDevice device = null;
-                    if (Game.Mode is GameMode.Standalone or GameMode.Primary)
-                    {
-                        device = GraphicsDeviceService.CreateRenderDevice(wnd.Description);
-                    }
-                    else
-                    {
-                        device = GraphicsDeviceService.CreateRenderDevice(wnd.Description);
-                    }
+                    var device = GraphicsDeviceService.CreateRenderDevice(wnd.Description);
                     wnd.SetGraphicsDevice(device);
                     SubscribeToEvents(wnd);
                     

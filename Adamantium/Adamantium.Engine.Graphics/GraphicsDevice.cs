@@ -223,8 +223,6 @@ namespace Adamantium.Engine.Graphics
         internal Semaphore[] RenderFinishedSemaphores { get; private set; }
         internal Fence[] InFlightFences { get; private set; }
         
-        internal Fence[] SyncFences { get; private set; }
-        
         public PresenterState LastPresenterState { get; private set; }
 
         public event Action FrameFinished;
@@ -424,11 +422,6 @@ namespace Adamantium.Engine.Graphics
             CreateGraphicsPresenter(presentationParameters);
             CreateCommandBuffers();
             CreateSyncObjects();
-            
-            var fenceInfo = new FenceCreateInfo();
-            fenceInfo.Flags = FenceCreateFlagBits.SignaledBit;
-
-            SyncFences = LogicalDevice.CreateFences(fenceInfo, MaxFramesInFlight);
         }
 
         private void InitializeSecondaryRenderingDevice(GraphicsDevice primaryDevice, PresentationParameters presentationParameters)
@@ -554,10 +547,7 @@ namespace Adamantium.Engine.Graphics
 
             ImageAvailableSemaphores = LogicalDevice.CreateSemaphores(semaphoreInfo, MaxFramesInFlight);
             RenderFinishedSemaphores = LogicalDevice.CreateSemaphores(semaphoreInfo, MaxFramesInFlight);
-            if (InFlightFences == null)
-            {
-                InFlightFences = LogicalDevice.CreateFences(fenceInfo, MaxFramesInFlight);
-            }
+            InFlightFences ??= LogicalDevice.CreateFences(fenceInfo, MaxFramesInFlight);
         }
 
         public Queue GetDeviceQueue(uint queueFamilyIndex, uint queueIndex)
@@ -720,8 +710,18 @@ namespace Adamantium.Engine.Graphics
 
         }
 
+        private Mutex _submissionSync;
+
         public void Submit()
         {
+            if (!Mutex.TryOpenExisting("submission", out _submissionSync))
+            {
+                _submissionSync = new Mutex(false, "submission");
+            }
+            _submissionSync.WaitOne();
+            
+            //Log.Logger.Debug($"Enter Submit for device {DeviceId}");
+            
             var commandBuffer = CurrentCommandBuffer;
             var result = commandBuffer.EndCommandBuffer();
             if (result != Result.Success)
@@ -741,7 +741,7 @@ namespace Adamantium.Engine.Graphics
             {
                 ExecuteCommands();
             }
-
+            
             commandBuffersArray[0] = commandBuffer;
 
             var submitInfo = new SubmitInfo();
@@ -765,14 +765,18 @@ namespace Adamantium.Engine.Graphics
             submitInfos[0] = submitInfo;
 
             var renderFence = InFlightFences[CurrentFrame];
+            //var renderFence = MainDevice.SyncFences[CurrentFrame];
 
+            
             result = LogicalDevice.ResetFences(1, renderFence);
+            //result = LogicalDevice.ResetFences(2, renderFence, syncFence);
 
             if (result != Result.Success)
             {
                 throw new Exception($"failed to reset fences. Result: {result}");
             }
 
+            
             result = GraphicsQueue.QueueSubmit(1, submitInfos, renderFence);
             LogicalDevice.WaitForFences(1, renderFence, true, ulong.MaxValue);
             
@@ -781,8 +785,11 @@ namespace Adamantium.Engine.Graphics
                 throw new Exception($"failed to submit draw command buffer! Result was {result}");
             }
 
+            GraphicsQueue.QueueWaitIdle();
             CanPresent = true;
             FrameFinished?.Invoke();
+            _submissionSync.ReleaseMutex();
+            //Log.Logger.Debug($"Exit Submit for device {DeviceId}");
         }
 
         private void BeginRendering(CommandBuffer commandBuffer, float depth = 1.0f, uint stencil = 0)
@@ -1032,14 +1039,14 @@ namespace Adamantium.Engine.Graphics
 
         public CommandBuffer BeginSingleTimeCommands()
         {
-            mutex?.WaitOne();
+            _submissionSync?.WaitOne();
             return LogicalDevice.BeginSingleTimeCommand(CommandPool);
         }
 
         public void EndSingleTimeCommands(CommandBuffer commandBuffer)
         {
             LogicalDevice.EndSingleTimeCommands(resourceQueue, CommandPool, commandBuffer);
-            mutex?.ReleaseMutex();
+            _submissionSync?.ReleaseMutex();
         }
 
         public unsafe void* MapMemory(DeviceMemory memory, ulong offset, ulong size, uint flags)

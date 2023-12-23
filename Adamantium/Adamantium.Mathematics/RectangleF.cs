@@ -500,6 +500,11 @@ namespace Adamantium.Mathematics
       {
          return new Rectangle((int)value.X, (int)value.Y, (int)value.Width, (int)value.Height);
       }
+      
+      public static implicit operator Vector4F(RectangleF value)
+      {
+         return new Vector4F(value.X, value.Y, value.Width, value.Height);
+      }
 
       public RectangleF Merge(RectangleF value)
       {

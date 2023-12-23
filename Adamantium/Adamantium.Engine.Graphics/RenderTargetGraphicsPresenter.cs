@@ -7,7 +7,6 @@ namespace Adamantium.Engine.Graphics
 {
    public class RenderTargetGraphicsPresenter : GraphicsPresenter
    {
-      private bool isShared = false;
       private Texture _resolveTexture;
 
       public RenderTargetGraphicsPresenter(GraphicsDevice graphicsDevice, PresentationParameters description,
@@ -35,7 +34,7 @@ namespace Adamantium.Engine.Graphics
       }
 
       /// <summary>
-      /// Resize graphics presenter backbuffer according to width and height
+      /// Resize graphics presenter backBuffer according to width and height
       /// </summary>
       /// <param name="parameters"></param>
       public override bool Resize(PresentationParameters parameters)

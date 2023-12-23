@@ -2,16 +2,17 @@
 
 	<PropertyGroup>
 		<OutputType>Exe</OutputType>
-		<TargetFramework>net7.0</TargetFramework>
+		<TargetFramework>net8.0</TargetFramework>
 		<Platforms>x64</Platforms>
 		<Configurations>Debug;Release</Configurations>
 		<LangVersion>latest</LangVersion>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<BaseOutputPath>..\..\output\Adamantium.Game.Playground\bin</BaseOutputPath>
+		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+		<CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
 	</PropertyGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\Adamantium.Fonts\Adamantium.Fonts.csproj" />
 		<ProjectReference Include="..\Adamantium.Game\Adamantium.Game.csproj" />
 	</ItemGroup>
 
@@ -209,14 +210,7 @@
 		<AdditionalFiles Update="ControlTemplate.auml">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</AdditionalFiles>
-		<AdditionalFiles Include="ControlTemplate.auml">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</AdditionalFiles>
-		<AdditionalFiles Include="FontData.aff" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<Folder Include="Fonts" />
+		<None Include="FontData._aff" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -227,6 +221,7 @@
 		<ProjectReference Include="..\Adamantium.Engine.Generators\Adamantium.Engine.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=netstandard2.0" />
 		<ProjectReference Include="..\Adamantium.Engine.Effects\Adamantium.Engine.Effects.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" />
 		<ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" SetTargetFramework="TargetFramework=netstandard2.0" />
+		<ProjectReference Include="..\Adamantium.Fonts\Adamantium.Fonts.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" SetTargetFramework="TargetFramework=netstandard2.0"/>
 	</ItemGroup>
 
 	<ItemGroup>

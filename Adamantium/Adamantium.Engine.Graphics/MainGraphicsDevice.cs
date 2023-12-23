@@ -32,7 +32,7 @@ namespace Adamantium.Engine.Graphics
         public QueueFamilyContainer QueueFamilyContainer { get; private set; }
         
         public static ReadOnlyCollection<string> DeviceExtensions { get; private set; }
-
+        
         static MainGraphicsDevice()
         {
             var deviceExt = new List<string>();
@@ -168,7 +168,8 @@ namespace Adamantium.Engine.Graphics
             }
 
             LogicalDevice = PhysicalDevice.CreateDevice(createInfo);
-            
+            var fenceInfo = new FenceCreateInfo();
+            fenceInfo.Flags = FenceCreateFlagBits.SignaledBit;
             createInfo.Dispose();
         }
         

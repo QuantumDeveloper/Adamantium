@@ -20,8 +20,8 @@ namespace Adamantium.FontTests
             //var t = TypeFace.LoadSystemFont("times", 3);
             var typeface = TypeFace.LoadFont(@"OTFFonts/SourceSans3-Regular.otf", 3);
             var font = typeface.GetFont(0);
-            uint mtsdfTextureSize = 48;
-            byte sampleRate = 10;
+            uint mtsdfTextureSize = 64;
+            byte sampleRate = 3;
             var atlasGen = new TextureAtlasGenerator();
             var timer = Stopwatch.StartNew();
             var atlasData = atlasGen.GenerateTextureAtlas(typeface, font, mtsdfTextureSize, sampleRate, 4, 0, typeface.GlyphCount);

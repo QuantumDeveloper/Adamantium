@@ -24,7 +24,7 @@ namespace Adamantium.Engine.Managers
     {
         private readonly Object syncRoot = new object();
         private const float DefaultZNear = 0.1f;
-        private const float DefaultZFar = 100000000.0f;
+        private const float DefaultZFar = 1000000.0f;
 
         ///<summary>
         ///Collection of all cameras.
@@ -54,7 +54,7 @@ namespace Adamantium.Engine.Managers
 
         private Entity CameraIcon;
         private Entity CameraVisual;
-        private RenderableComponent cameraIconRenderer;
+        private RenderComponent cameraIconRenderer;
         private IEventAggregator eventAggregator;
 
         private Entity SelectedCamera;
@@ -98,7 +98,7 @@ namespace Adamantium.Engine.Managers
         private void CreateCameraIcon()
         {
             CameraIcon = new CameraIconTemplate().BuildEntity(null, "Camera icon");
-            cameraIconRenderer = CameraIcon.GetComponent<RenderableComponent>();
+            cameraIconRenderer = CameraIcon.GetComponent<RenderComponent>();
         }
 
         private void CreateCameraVisual()
@@ -183,7 +183,7 @@ namespace Adamantium.Engine.Managers
 
         private Camera CreateCamera(uint width, uint height, string name)
         {
-            Vector3 position = Vector3.Zero;
+            var position = Vector3.Zero;
             if (UserControlledCamera != null)
             {
                 position = (CameraIcon.GetDiameter() * 2 * (Vector3)UserControlledCamera.Forward) + UserControlledCamera.GetOwnerPosition();
@@ -482,7 +482,7 @@ namespace Adamantium.Engine.Managers
             if (SelectedCamera == null || !SelectedCamera.IsEnabled)
                 return;
 
-            var cameraRender = CameraVisual.GetComponent<RenderableComponent>();
+            var cameraRender = CameraVisual.GetComponent<RenderComponent>();
             lock (syncRoot)
             {
                 var view = camera.ViewMatrix;

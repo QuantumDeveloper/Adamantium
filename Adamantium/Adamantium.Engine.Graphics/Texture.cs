@@ -29,6 +29,8 @@ namespace Adamantium.Engine.Graphics
         
         public ulong TotalSizeInBytes { get; private set; }
 
+        public IntPtr ManagedPointer => new IntPtr(NativePointer);
+
         public void* NativePointer => VulkanImage.NativePointer;
         
         protected VulkanImage VulkanImage => vulkanImage;
@@ -328,15 +330,15 @@ namespace Adamantium.Engine.Graphics
         /// </summary>
         /// <param name="device">The <see cref="GraphicsDevice"/>.</param>
         /// <param name="stream">The stream to load the texture from.</param>
-        /// <param name="sage">Texture flags</param>
+        /// <param name="usage">Texture flags</param>
         /// <param name="initialLayout">Resource usage</param>
         /// <returns>A <see cref="Texture"/></returns>
-        public static Texture Load(GraphicsDevice device, Stream stream, ImageUsageFlagBits sage = ImageUsageFlagBits.SampledBit, ImageLayout initialLayout = ImageLayout.ShaderReadOnlyOptimal)
+        public static Texture Load(GraphicsDevice device, Stream stream, ImageUsageFlagBits usage = ImageUsageFlagBits.SampledBit, ImageLayout initialLayout = ImageLayout.ShaderReadOnlyOptimal)
         {
             var image = BitmapLoader.Load(stream);
             try
             {
-                return new Texture(device, image, sage, initialLayout);
+                return new Texture(device, image, usage, initialLayout);
             }
             catch (Exception exception)
             {
@@ -351,15 +353,15 @@ namespace Adamantium.Engine.Graphics
         /// </summary>
         /// <param name="device">Specify the <see cref="GraphicsDevice"/> used to load and create a texture from a file.</param>
         /// <param name="filePath">The file to load the texture from.</param>
-        /// <param name="sage">Texture flags</param>
+        /// <param name="usage">Texture flags</param>
         /// <param name="usage">Resource usage</param>
         /// <returns>A <see cref="Texture"/></returns>
-        public static Texture Load(GraphicsDevice device, String filePath, ImageUsageFlagBits sage = ImageUsageFlagBits.SampledBit, ImageLayout layout = ImageLayout.ShaderReadOnlyOptimal)
+        public static Texture Load(GraphicsDevice device, String filePath, ImageUsageFlagBits usage = ImageUsageFlagBits.SampledBit, ImageLayout layout = ImageLayout.ShaderReadOnlyOptimal)
         {
             var rawBitmap = BitmapLoader.Load(filePath);
             try
             {
-                return new Texture(device, rawBitmap, sage, layout);
+                return new Texture(device, rawBitmap, usage, layout);
             }
             catch (Exception exception)
             {

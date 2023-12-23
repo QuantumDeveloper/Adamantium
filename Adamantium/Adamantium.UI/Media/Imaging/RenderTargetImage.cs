@@ -27,5 +27,5 @@ public sealed unsafe class RenderTargetImage : BitmapSource
        Texture = RenderTarget.New(drawingContext.GraphicsDevice, width, height, msaa, format, ImageUsageFlagBits.TransferDstBit, desiredLayout);
     }
 
-    public void* NativePointer => Texture.NativePointer;
+    public void* NativePointer => Texture == null ? null : Texture.NativePointer;
 }

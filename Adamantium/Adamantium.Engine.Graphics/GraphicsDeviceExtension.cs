@@ -1,36 +1,46 @@
 using System;
+using System.Diagnostics;
 using AdamantiumVulkan.Core;
 
 namespace Adamantium.Engine.Graphics;
 
 public static class GraphicsDeviceExtension
 {
-    public static void CopyImageFromPresenter(this GraphicsDevice graphicsDevice, Texture resolveTexture, Texture destinationTexture)
+    public static void CopyImageFromPresenter(this GraphicsDevice graphicsDevice, Texture sourceTexture, Texture destinationTexture)
         {
-            ArgumentNullException.ThrowIfNull(resolveTexture);
-            ArgumentNullException.ThrowIfNull(destinationTexture);
+            if (sourceTexture == null)
+            {
+                Debug.WriteLine("Resolve Texture is null");
+                return;
+            }
+            
+            if (destinationTexture == null)
+            {
+                Debug.WriteLine("Destination Texture is null");
+                return;
+            }
             
             var commandBuffer = graphicsDevice.CurrentCommandBuffer;
-            var copy = new ImageCopy();
-            copy.Extent = new Extent3D();
-            copy.SrcOffset = new Offset3D();
-            copy.DstOffset = new Offset3D();
-            copy.Extent.Depth = 1;
-            copy.Extent.Width = resolveTexture.Description.Width;
-            copy.Extent.Height = resolveTexture.Description.Height;
-            copy.SrcSubresource = new ImageSubresourceLayers
+            var imageCopy = new ImageCopy();
+            imageCopy.Extent = new Extent3D();
+            imageCopy.SrcOffset = new Offset3D();
+            imageCopy.DstOffset = new Offset3D();
+            imageCopy.Extent.Depth = 1;
+            imageCopy.Extent.Width = sourceTexture.Description.Width;
+            imageCopy.Extent.Height = sourceTexture.Description.Height;
+            imageCopy.SrcSubresource = new ImageSubresourceLayers
             {
                 AspectMask = ImageAspectFlagBits.ColorBit, 
                 LayerCount = 1
             };
-            copy.DstSubresource = new ImageSubresourceLayers
+            imageCopy.DstSubresource = new ImageSubresourceLayers
             {
                 AspectMask = ImageAspectFlagBits.ColorBit,
                 LayerCount = 1
             };
 
-            // resolveTexture.TransitionImageLayout(ImageLayout.TransferSrcOptimal);
-            // dstTexture.TransitionImageLayout(ImageLayout.TransferDstOptimal);
+            sourceTexture.TransitionImageLayout(ImageLayout.TransferSrcOptimal);
+            destinationTexture.TransitionImageLayout(ImageLayout.TransferDstOptimal);
             
             var range = new ImageSubresourceRange();
             range.AspectMask = ImageAspectFlagBits.ColorBit;
@@ -39,7 +49,7 @@ public static class GraphicsDeviceExtension
             range.BaseArrayLayer = 0;
             range.LayerCount = (~0U);
             graphicsDevice.InsertImageMemoryBarrier(commandBuffer,
-                resolveTexture,
+                sourceTexture,
                 AccessFlagBits.ColorAttachmentWriteBit,
                 AccessFlagBits.TransferReadBit,
                 ImageLayout.ColorAttachmentOptimal,
@@ -64,12 +74,12 @@ public static class GraphicsDeviceExtension
                 PipelineStageFlagBits.TransferBit,
                 range);
             
-            commandBuffer.CopyImage(resolveTexture, 
+            commandBuffer.CopyImage(sourceTexture, 
                 ImageLayout.TransferSrcOptimal, 
                 destinationTexture,
                 ImageLayout.TransferDstOptimal,
                 1,
-                copy);
+                imageCopy);
             
             range = new ImageSubresourceRange();
             range.AspectMask = ImageAspectFlagBits.ColorBit;
@@ -78,7 +88,7 @@ public static class GraphicsDeviceExtension
             range.BaseArrayLayer = 0;
             range.LayerCount = (~0U);
             graphicsDevice.InsertImageMemoryBarrier(commandBuffer,
-                resolveTexture,
+                sourceTexture,
                 AccessFlagBits.TransferReadBit,
                 AccessFlagBits.ColorAttachmentWriteBit,
                 ImageLayout.TransferSrcOptimal,
@@ -104,7 +114,7 @@ public static class GraphicsDeviceExtension
                 range);
             
             
-            //resolveTexture.TransitionImageLayout(ImageLayout.ColorAttachmentOptimal);
-            //dstTexture.TransitionImageLayout(ImageLayout.ShaderReadOnlyOptimal);
+            sourceTexture.TransitionImageLayout(ImageLayout.ColorAttachmentOptimal);
+            destinationTexture.TransitionImageLayout(ImageLayout.ShaderReadOnlyOptimal);
         }
 }

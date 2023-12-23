@@ -236,10 +236,7 @@ namespace Adamantium.Engine.Graphics
                 throw new ArgumentException("Length of TData is larger than size of buffer");
 
             var data = GraphicsDevice.MapMemory(BufferMemory, 0, (ulong)toData.Size, 0);
-            unsafe
-            {
-                System.Buffer.MemoryCopy(data, toData.Pointer.ToPointer(), toData.Size, toData.Size);
-            }
+            System.Buffer.MemoryCopy(data, toData.Pointer.ToPointer(), toData.Size, toData.Size);
             GraphicsDevice.UnmapMemory(BufferMemory);
         }
 

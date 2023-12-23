@@ -99,6 +99,7 @@ namespace Adamantium.Game.Core
 
         public virtual void CopyOutput(GraphicsDevice mainDevice)
         {
+            
         }
 
         public void DisplayContent()

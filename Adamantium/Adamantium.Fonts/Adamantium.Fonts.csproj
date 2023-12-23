@@ -11,10 +11,6 @@
     <ItemGroup>
       <None Remove="atomicage-regular.ttf" />
       <None Remove="azoft-sans.ttf" />
-      <None Remove="Docs.txt" />
-      <Content Include="Docs.txt">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </Content>
       <None Remove="PlayfairDisplay-Regular.ttf" />
       <None Remove="Windsong.ttf" />
       <None Remove="OTFFonts\Poppins-Medium.otf" />

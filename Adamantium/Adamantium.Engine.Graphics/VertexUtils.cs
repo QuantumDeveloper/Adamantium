@@ -21,9 +21,9 @@ namespace Adamantium.Engine.Graphics
         
         public static VertexInputBindingDescription GetBindingDescription(Type vertexType)
         {
-            if (vertexInputDescriptions.ContainsKey(vertexType))
+            if (vertexInputDescriptions.TryGetValue(vertexType, out var description))
             {
-                return vertexInputDescriptions[vertexType];
+                return description;
             }
             
             var desc = new VertexInputBindingDescription

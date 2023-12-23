@@ -61,7 +61,7 @@ namespace Adamantium.Engine.EntityServices
                 {
                     if (camera.Owner == current)
                     {
-                        //continue;
+                        continue;
                     }
 
                     current.Transform.CalculateFinalTransform(camera, generalCenter);

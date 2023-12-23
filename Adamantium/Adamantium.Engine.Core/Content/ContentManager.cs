@@ -167,7 +167,6 @@ namespace Adamantium.Engine.Core.Content
 
             return result;
         }
-            
 
         protected object GetAssetLocker(AssetKey assetKey, bool create)
         {

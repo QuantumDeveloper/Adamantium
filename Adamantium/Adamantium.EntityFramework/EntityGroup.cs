@@ -7,7 +7,7 @@ namespace Adamantium.EntityFramework
 {
     public class EntityGroup : IEnumerable<Entity>, IEntitySearch
     {
-        private AdamantiumCollection<Entity> entities;
+        private readonly AdamantiumCollection<Entity> entities;
 
         public String Name { get; }
 
@@ -24,16 +24,14 @@ namespace Adamantium.EntityFramework
 
         public void Add(Entity entity)
         {
-            if (!entities.Contains(entity))
-            {
-                entities.Add(entity);
-                OnGroupChanged(new GroupChangedEventArgs(GroupState.Add, null, entity));
-            }
+            if (entities.Contains(entity)) return;
+            entities.Add(entity);
+            OnGroupChanged(new GroupChangedEventArgs(GroupState.Add, null, entity));
         }
 
         public void Add(IEnumerable<Entity> inEntities)
         {
-            List<Entity> addedEntities = new List<Entity>();
+            var addedEntities = new List<Entity>();
             foreach (var entity in inEntities)
             {
                 if (!entities.Contains(entity))
@@ -84,28 +82,23 @@ namespace Adamantium.EntityFramework
 
         public Entity this[int index]
         {
-            get { return entities[index]; }
-            set
-            {
-                Set(index, value);
-            }
+            get => entities[index];
+            set => Set(index, value);
         }
 
         public void Clear()
         {
-            if (entities.Count > 0)
-            {
-                var entitiesArray = entities.ToArray();
-                entities.Clear();
-                OnGroupChanged(new GroupChangedEventArgs(GroupState.Reset, entitiesArray));
-            }
+            if (entities.Count <= 0) return;
+            var entitiesArray = entities.ToArray();
+            entities.Clear();
+            OnGroupChanged(new GroupChangedEventArgs(GroupState.Reset, entitiesArray));
         }
 
         public Entity Get(string name)
         {
             foreach (var entity in entities)
             {
-                Queue<Entity> queue = new Queue<Entity>();
+                var queue = new Queue<Entity>();
                 queue.Enqueue(entity);
                 while (queue.Count > 0)
                 {
