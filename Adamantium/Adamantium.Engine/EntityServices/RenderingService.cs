@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading;
 using Adamantium.Core;
 using Adamantium.Engine.Core.Content;
@@ -10,6 +11,7 @@ using Adamantium.Game;
 using Adamantium.Game.Core;
 using Adamantium.Game.Core.Input;
 using Adamantium.Game.Core.Payloads;
+using AdamantiumVulkan.Core;
 using Keys = Adamantium.Game.Core.Input.Keys;
 
 namespace Adamantium.Engine.EntityServices
@@ -20,6 +22,7 @@ namespace Adamantium.Engine.EntityServices
         
         public override bool IsUpdateService => false;
         public override bool IsRenderingService => true;
+        public override EntityServiceType ServiceType => EntityServiceType.Render;
         protected IContentManager Content { get; }
         public GameOutput Window { get; }
 
@@ -144,7 +147,7 @@ namespace Adamantium.Engine.EntityServices
             GraphicsDevice.Submit();
         }
 
-        public override void DisplayContent()
+        public override void Present()
         {
             GraphicsDevice.Present();
         }

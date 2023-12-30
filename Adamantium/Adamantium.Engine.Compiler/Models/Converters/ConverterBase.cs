@@ -48,7 +48,7 @@ namespace Adamantium.Engine.Compiler.Converter.Converters
          SceneDataContainer = new SceneData {Name = FileName};
       }
 
-      public virtual SceneData StartConvertion()
+      public virtual SceneData StartConversion()
       {
          try
          {

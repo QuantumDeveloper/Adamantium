@@ -75,6 +75,7 @@ public class WindowRenderService : UiRenderService
     }
 
     public override bool IsUpdateService => true;
+    public override EntityServiceType ServiceType => EntityServiceType.Update | EntityServiceType.Render;
 
     public override void Update(AppTime gameTime)
     {

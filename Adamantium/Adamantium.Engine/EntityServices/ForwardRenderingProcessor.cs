@@ -141,7 +141,7 @@ public class ForwardRenderingProcessor : RenderingProcessor
 
     protected void DrawTools(Camera activeCamera)
     {
-        var tools = EntityWorld.GetGroup("Tools");
+        var tools = EntityWorld.EntityManager.GetGroup("Tools");
         foreach (var tool in tools)
         {
             try
@@ -167,7 +167,7 @@ public class ForwardRenderingProcessor : RenderingProcessor
 
     protected void DrawCommonTools(Camera activeCamera)
     {
-        var tools = EntityWorld.GetGroup("Common");
+        var tools = EntityWorld.EntityManager.GetGroup("Common");
 //            DeferredDevice.RasterizerState = DeferredDevice.RasterizerStates.CullNoneClipEnabled;
 //            DeferredDevice.BlendState = DeferredDevice.BlendStates.NonPremultiplied;
 //            DeferredDevice.DepthStencilState = DeferredDevice.DepthStencilStates.DepthEnableGreaterEqual;
@@ -188,7 +188,7 @@ public class ForwardRenderingProcessor : RenderingProcessor
 
     protected void DrawHUD()
     {
-        var tools = EntityWorld.GetGroup("HUD");
+        var tools = EntityWorld.EntityManager.GetGroup("HUD");
 //            DeferredDevice.ClearTargets(Colors.Gray, ClearOptions.DepthBuffer);
 //            DeferredDevice.RasterizerState = DeferredDevice.RasterizerStates.CullBackClipDisabled;
 //            DeferredDevice.BlendState = DeferredDevice.BlendStates.Opaque;

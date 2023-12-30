@@ -238,7 +238,7 @@ namespace Adamantium.Engine.Managers
                 if (!cameraGroup.Contains(camera.Owner))
                 {
                     cameraGroup.Add(camera.Owner);
-                    game.EntityWorld.AddEntity(camera.Owner);
+                    game.EntityWorld.EntityManager.AddEntity(camera.Owner);
                 }
             }
         }

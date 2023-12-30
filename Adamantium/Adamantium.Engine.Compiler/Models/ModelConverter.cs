@@ -86,7 +86,7 @@ namespace Adamantium.Engine.Compiler.Models
 
         public SceneData ImportFileAsync(string path)
         {
-            return ModelConverterFactory.GetConverter(path, new ConversionConfig(true)).StartConvertion();
+            return ModelConverterFactory.GetConverter(path, new ConversionConfig(true)).StartConversion();
         }
 
         #region Методы по обработке файлов

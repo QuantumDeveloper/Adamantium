@@ -32,6 +32,8 @@ namespace Adamantium.EntityFramework
         
         public abstract bool IsUpdateService { get; }
         public abstract bool IsRenderingService { get; }
+        public abstract EntityServiceType ServiceType { get; }
+        
         protected AppTime AppTime { get; set; }
         protected IDependencyResolver DependencyResolver { get; }
 
@@ -82,7 +84,6 @@ namespace Adamantium.EntityFramework
 
         public virtual void Submit()
         {
-            
         }
 
         public bool IsVisible 
@@ -165,7 +166,7 @@ namespace Adamantium.EntityFramework
             Processor?.UnloadContent();
         }
 
-        public virtual void DisplayContent()
+        public virtual void Present()
         {
 
         }

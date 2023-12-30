@@ -1083,13 +1083,15 @@ public class Mesh
                     case UpAxis.Y_DOWN_RH:
                         for (int i = 0; i < Points.Length; i++)
                         {
-                            // position = Positions[i];
-                            // //Меняем позиции вершин
-                            // position.Z = -position.Z;
-                            // Positions[i] = position;
-
+                            position = Points[i];
+                            //Меняем позиции вершин
+                            position.Y = -position.Y;
+                            Points[i] = position;
+                        
                             ConvertUVs(i);
                         }
+
+                        //ReverseWinding();
                         break;
                 }
                 break;

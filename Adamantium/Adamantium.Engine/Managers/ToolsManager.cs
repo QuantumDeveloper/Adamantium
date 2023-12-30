@@ -64,12 +64,12 @@ namespace Adamantium.Engine.Managers
             PlaneGridTool = new PlaneGridToolTemplate(20, 20, new Vector3F(1), 20).BuildEntity(null, "PlaneGrid");
 
             inputManager = Container.Resolve<GameInputManager>();
-            EntityWorld.AddToGroup(MoveTool.Tool, "Tools");
-            EntityWorld.AddToGroup(PivotTool.Tool, "Tools");
-            EntityWorld.AddToGroup(RotationTool.Tool, "Tools");
-            EntityWorld.AddToGroup(ScaleTool.Tool, "Tools");
-            EntityWorld.AddToGroup(OrientationTool.Tool, "HUD");
-            EntityWorld.AddToGroup(PlaneGridTool, "Common");
+            EntityWorld.EntityManager.AddToGroup(MoveTool.Tool, "Tools");
+            EntityWorld.EntityManager.AddToGroup(PivotTool.Tool, "Tools");
+            EntityWorld.EntityManager.AddToGroup(RotationTool.Tool, "Tools");
+            EntityWorld.EntityManager.AddToGroup(ScaleTool.Tool, "Tools");
+            EntityWorld.EntityManager.AddToGroup(OrientationTool.Tool, "HUD");
+            EntityWorld.EntityManager.AddToGroup(PlaneGridTool, "Common");
         }
 
 

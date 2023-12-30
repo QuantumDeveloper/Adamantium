@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Adamantium.Core;
@@ -65,15 +66,16 @@ public class GameService : IGameService
                 
                 item.Game.RunOnce(time);
             });
-            foreach (var game in _games)
+            foreach (var key in _games)
             {
-                ((Game)game.Game).Submit();
+                key.Game.Submit();
             }
         }
     }
 
     public void CopyOutput(GraphicsDevice graphicsDevice)
     {
+        var timer = Stopwatch.StartNew();
         foreach (var game in Games)
         {
             foreach (var gameOutput in game.Outputs)
@@ -81,6 +83,8 @@ public class GameService : IGameService
                 gameOutput.CopyOutput(graphicsDevice);
             }
         }
+        timer.Stop();
+        //Debug.WriteLine($"Image Copy time: {timer.ElapsedMilliseconds}");
     }
 
     public event Action<IGame> OnGameAdded;

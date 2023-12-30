@@ -177,7 +177,7 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
         {
             window.InvalidateRender(true);
         }
-        GraphicsDeviceService.ChangeOrCreateDevice("Adamantium Main", true);
+        GraphicsDeviceService.ChangeOrCreateMainDevice("Adamantium Main", true);
         foreach (var window in Windows)
         {
             CreateWindowService(window);
@@ -192,7 +192,7 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
         windowToSystem.Add(window, windowService);
         var entity = new Entity();
         entity.AddComponent(window);
-        EntityWorld.AddEntity(entity);
+        EntityWorld.EntityManager.AddEntity(entity);
         EntityWorld.ForceUpdate();
     }
     
@@ -542,9 +542,15 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
         
     }
 
+    // protected virtual void Submit()
+    // {
+    //     
+    // }
+
     protected void EndScene()
     {
-        EntityWorld.ServiceManager.DisplayContent();
+        GraphicsDeviceService.RaiseFrameFinished();
+        EntityWorld.ServiceManager.Present();
     }
 
     public void ShutDown()

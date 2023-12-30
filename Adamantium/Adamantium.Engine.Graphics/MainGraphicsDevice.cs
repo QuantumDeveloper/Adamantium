@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading;
 using Adamantium.Core;
 using AdamantiumVulkan.Core;
 using AdamantiumVulkan.Core.Interop;
@@ -18,6 +19,11 @@ namespace Adamantium.Engine.Graphics
 
         private uint _availableTransferQueueIndex;
         
+        private readonly List<GraphicsDevice> graphicsDevices;
+        
+        private readonly Dictionary<string, GraphicsDevice> deviceMap;
+        private Mutex _submissionSync;
+        
         public bool EnableDynamicRendering { get; }
         public VulkanInstance VulkanInstance { get; private set; }
         
@@ -33,6 +39,16 @@ namespace Adamantium.Engine.Graphics
         
         public static ReadOnlyCollection<string> DeviceExtensions { get; private set; }
         
+        internal Fence[] InFlightFences { get; private set; }
+        
+        public uint MaxFramesInFlight { get; private set; }
+        
+        public uint CurrentFrame { get; private set; }
+        
+        public Dictionary<uint, Queue> UsedGraphicsQueues { get; }
+
+        public IReadOnlyList<GraphicsDevice> GraphicsDevices => graphicsDevices.AsReadOnly();
+        
         static MainGraphicsDevice()
         {
             var deviceExt = new List<string>();
@@ -41,6 +57,7 @@ namespace Adamantium.Engine.Graphics
             deviceExt.Add(Constants.VK_GOOGLE_HLSL_FUNCTIONALITY_1_EXTENSION_NAME);
             deviceExt.Add(Constants.VK_GOOGLE_USER_TYPE_EXTENSION_NAME);
             deviceExt.Add(Constants.VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+            deviceExt.Add(Constants.VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
             DeviceExtensions = new ReadOnlyCollection<string>(deviceExt);
         }
 
@@ -52,11 +69,15 @@ namespace Adamantium.Engine.Graphics
 
         private MainGraphicsDevice(string name, bool enableDynamicRendering, bool enableDebug)
         {
+            graphicsDevices = new List<GraphicsDevice>();
+            deviceMap = new Dictionary<string, GraphicsDevice>();
+            UsedGraphicsQueues = new Dictionary<uint, Queue>();
             EnableDynamicRendering = enableDynamicRendering;
             VulkanInstance = VulkanInstance.Create(name, enableDebug);
             PhysicalDevice = VulkanInstance.CurrentDevice;
             QueueFamilyContainer = PhysicalDevice.FindQueueFamilies();
             CreateLogicalDevice();
+            InitializeMutex();
             unsafe
             {
                 if (LogicalDevice != null)
@@ -65,6 +86,40 @@ namespace Adamantium.Engine.Graphics
                         $"Main device created. Vulkan Instance addr: {VulkanInstance.NativePointer} LogicalDevice addr: {new IntPtr(LogicalDevice.NativePointer)}");
                 }
             }
+        }
+        
+        public void RemoveDevice(GraphicsDevice device)
+        {
+            deviceMap.Remove(device.DeviceId);
+            graphicsDevices.Remove(device);
+            device?.Dispose();
+        }
+
+        public void RemoveDeviceById(string deviceId)
+        {
+            if (!deviceMap.TryGetValue(deviceId, out var device)) return;
+            
+            device?.Dispose();
+            deviceMap.Remove(deviceId);
+            graphicsDevices.Remove(device);
+        }
+
+        public GraphicsDevice GetDeviceById(string deviceId)
+        {
+            return graphicsDevices.FirstOrDefault(x => x.DeviceId == deviceId);
+        }
+
+        public GraphicsDevice UpdateDevice(string deviceId, PresentationParameters parameters)
+        {
+            if (!deviceMap.TryGetValue(deviceId, out var device)) return null;
+            
+            device?.Dispose();
+            deviceMap.Remove(deviceId);
+            graphicsDevices.Remove(device);
+            var newDevice = CreateRenderDevice(parameters);
+            deviceMap.Add(deviceId, newDevice);
+            graphicsDevices.Add(newDevice);
+            return newDevice;
         }
         
         private unsafe void CreateLogicalDevice()
@@ -133,7 +188,12 @@ namespace Adamantium.Engine.Graphics
                 maintenance4Features.PNext = features2Ptr;
                 var maintenance4FeaturesPtr = NativeUtils.StructOrEnumToPointer(maintenance4Features.ToNative());
                 
-                createInfo.PNext = maintenance4FeaturesPtr;
+                var shaderObjectFeatures = new PhysicalDeviceShaderObjectFeaturesEXT();
+                shaderObjectFeatures.ShaderObject = true;
+                shaderObjectFeatures.PNext = maintenance4FeaturesPtr;
+                var shaderObjectPtr = NativeUtils.StructOrEnumToPointer(shaderObjectFeatures.ToNative());
+                
+                createInfo.PNext = shaderObjectPtr;
             }
             else
             {
@@ -167,9 +227,11 @@ namespace Adamantium.Engine.Graphics
                 createInfo.PEnabledLayerNames = VulkanInstance.ValidationLayers.ToArray();
             }
 
+            MaxFramesInFlight = 3;
             LogicalDevice = PhysicalDevice.CreateDevice(createInfo);
             var fenceInfo = new FenceCreateInfo();
             fenceInfo.Flags = FenceCreateFlagBits.SignaledBit;
+            InFlightFences ??= LogicalDevice.CreateFences(fenceInfo, MaxFramesInFlight);
             createInfo.Dispose();
         }
         
@@ -180,7 +242,10 @@ namespace Adamantium.Engine.Graphics
 
         public GraphicsDevice CreateRenderDevice(PresentationParameters parameters)
         {
-            return GraphicsDevice.Create(this, parameters);
+            var renderDevice = GraphicsDevice.Create(this, parameters);
+            deviceMap.Add(renderDevice.DeviceId, renderDevice);
+            graphicsDevices.Add(renderDevice);
+            return renderDevice;
         }
 
         public GraphicsDevice CreateResourceLoaderDevice()
@@ -192,17 +257,26 @@ namespace Adamantium.Engine.Graphics
         {
             return new(name, enableDynamicRendering, enableDebug);
         }
+        
+        private void InitializeMutex()
+        {
+            // if (!Mutex.TryOpenExisting("submission", out _submissionSync))
+            // {
+            //     _submissionSync = new Mutex(false, "submission");
+            // }
+        }
 
         public Queue GetAvailableGraphicsQueue()
         {
             var graphicsFamily = QueueFamilyContainer.GetFamilyInfo(QueueFlagBits.GraphicsBit);
             var queue = LogicalDevice.GetDeviceQueue(graphicsFamily.FamilyIndex, _availableGraphicsQueueIndex);
+            UsedGraphicsQueues[_availableGraphicsQueueIndex] = queue;
             _availableGraphicsQueueIndex++;
             if (_availableGraphicsQueueIndex >= graphicsFamily.Count)
             {
                 _availableGraphicsQueueIndex = 0;
             }
-
+            
             return queue;
         }
 
@@ -233,6 +307,42 @@ namespace Adamantium.Engine.Graphics
 
             return queue;
         }
+        
+        public void Submit(Queue queue, params SubmitInfo[] submitInfos)
+        {
+            _submissionSync.WaitOne();
+            
+            var renderFence = InFlightFences[CurrentFrame];
+
+            var result = LogicalDevice.ResetFences(1, renderFence);
+
+            if (result != Result.Success)
+            {
+                throw new Exception($"failed to reset fences. Result: {result}");
+            }
+
+            result = queue.QueueSubmit((uint)submitInfos.Length, submitInfos, renderFence);
+            LogicalDevice.WaitForFences(1, renderFence, true, ulong.MaxValue);
+                
+            if (result != Result.Success)
+            {
+                throw new Exception($"failed to submit draw command buffer! Result was {result}");
+            }
+            CurrentFrame = (CurrentFrame + 1) % MaxFramesInFlight;
+            
+            _submissionSync.ReleaseMutex();
+        }
+        
+        public void UpdateDescriptorSets(uint currentFrame, params WriteDescriptorSet[] writeDescriptorSets)
+        {
+            if (writeDescriptorSets == null || writeDescriptorSets.Length == 0) return;
+            
+            // TODO: decide does wait for fences really need here
+            var renderFence = InFlightFences[currentFrame];
+            var result = LogicalDevice.WaitForFences(1, renderFence, true, ulong.MaxValue);
+           
+            LogicalDevice.UpdateDescriptorSets((uint)writeDescriptorSets.Length, writeDescriptorSets, 0, out var copySets);
+        }
 
         public static implicit operator PhysicalDevice(MainGraphicsDevice device)
         {
@@ -243,6 +353,13 @@ namespace Adamantium.Engine.Graphics
         {
             Log.Logger.Debug("Start disposing main device");
             LogicalDevice?.DeviceWaitIdle();
+            foreach (var device in graphicsDevices)
+            {
+                device?.Dispose();
+            }
+            graphicsDevices.Clear();
+            deviceMap.Clear();
+            
             LogicalDevice?.Dispose();
             LogicalDevice = null;
             VulkanInstance?.Dispose();
@@ -252,5 +369,12 @@ namespace Adamantium.Engine.Graphics
             _availableGraphicsQueueIndex = 0;
             Log.Logger.Debug("End disposing main device");
         }
+
+        public void OnFrameFinished()
+        {
+            FrameFinished?.Invoke();
+        }
+        
+        public event Action FrameFinished;
     }
 }

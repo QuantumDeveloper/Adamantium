@@ -130,7 +130,7 @@ namespace Adamantium.Engine.NoiseGenerator
 //         MarchingCubesEffect.Parameters["decal"].SetValue(decals);
 //         MarchingCubesEffect.Parameters["isolevel"].SetValue(-0.5f);
          string name = technique == 0 ? "Root Perlin MC" : "Root Simplex MC";
-         var root = entityWorld.CreateEntity(name);
+         var root = entityWorld.EntityManager.CreateEntity(name);
          for (int k = 0; k < blockCount; ++k)
          {
             for (int i = 0; i < blockCount; ++i)
@@ -158,7 +158,7 @@ namespace Adamantium.Engine.NoiseGenerator
                   //var data = streamOut.GetData();
 
                   name = technique == 0 ? "Perlin MC" : "Simplex MC";
-                  var entity = entityWorld.CreateEntity(name, root);
+                  var entity = entityWorld.EntityManager.CreateEntity(name, root);
 
                   var collider = new BoxCollider();
                   collider.CalculateFromPoints(new [] { blockOrigin, blockOrigin + chunkSize, });

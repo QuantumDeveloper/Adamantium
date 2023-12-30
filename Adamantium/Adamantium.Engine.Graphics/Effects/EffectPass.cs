@@ -73,7 +73,7 @@ namespace Adamantium.Engine.Graphics.Effects
             writeDescriptorSets = new List<WriteDescriptorSet>();
             PropertiesKey = PrepareProperties(logger, pass.Properties);
             IsSubPass = pass.IsSubPass;
-            graphicsDevice.FrameFinished += GraphicsDeviceOnFrameFinished;
+            graphicsDevice.MainDevice.FrameFinished += GraphicsDeviceOnFrameFinished;
             
             descriptorEntrySets = new List<DescriptorEntrySet>();
 

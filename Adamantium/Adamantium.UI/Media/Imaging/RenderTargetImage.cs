@@ -7,17 +7,17 @@ namespace Adamantium.UI.Media.Imaging;
 
 public sealed unsafe class RenderTargetImage : BitmapSource
 {
-   public RenderTargetImage(DrawingContext drawingContext, 
-      UInt32 width, 
-       UInt32 height, 
-       MSAALevel msaa, 
-       SurfaceFormat format, 
-       ImageLayout desiredLayout = ImageLayout.ShaderReadOnlyOptimal)
+   public RenderTargetImage(DrawingContext drawingContext,
+      UInt32 width,
+      UInt32 height,
+      MSAALevel msaa,
+      SurfaceFormat format,
+      ImageLayout desiredLayout = ImageLayout.ShaderReadOnlyOptimal)
    {
-       CreateTexture(drawingContext, width, height, msaa, format, desiredLayout);
-    }
+      CreateTexture(drawingContext, width, height, msaa, format, desiredLayout);
+   }
 
-    private void CreateTexture(DrawingContext drawingContext,
+   private void CreateTexture(DrawingContext drawingContext,
        UInt32 width, 
        UInt32 height, 
        MSAALevel msaa, 

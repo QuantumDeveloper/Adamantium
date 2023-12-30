@@ -10,4 +10,5 @@ public class UIApplicationService : EntityService
 
     public override bool IsUpdateService => true;
     public override bool IsRenderingService => true;
+    public override EntityServiceType ServiceType => EntityServiceType.Update | EntityServiceType.Render;
 }

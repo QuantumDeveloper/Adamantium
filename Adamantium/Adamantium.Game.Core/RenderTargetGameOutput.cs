@@ -68,7 +68,7 @@ namespace Adamantium.Game.Core
         public override void CopyOutput(GraphicsDevice mainDevice)
         {
             var rt = GraphicsDevice.Presenter as RenderTargetGraphicsPresenter;
-            mainDevice.CopyImageFromPresenter(rt?.ResolveTexture, _destinationTexture);
+            mainDevice.CopyImage(rt?.ResolveTexture, _destinationTexture);
             nativeWindow.CanPresent = true;
         }
 
@@ -83,7 +83,6 @@ namespace Adamantium.Game.Core
             _destinationTexture = e.RenderTarget.Texture as RenderTarget;
             Log.Logger.Debug($"Updated render target with pointer: {new IntPtr(e.RenderTarget.NativePointer)}");
             ClientBounds = new Rectangle(0, 0, (int)e.Width, (int)e.Height);
-            _destinationTexture = e.RenderTarget.Texture as RenderTarget;
             UpdateViewportAndScissor((uint)ClientBounds.Width, (uint)ClientBounds.Height);
             Width = (uint)nativeWindow.ActualWidth;
             Height = (uint)nativeWindow.ActualHeight;

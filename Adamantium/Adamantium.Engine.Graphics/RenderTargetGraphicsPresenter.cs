@@ -1,5 +1,4 @@
-﻿using System.Threading;
-using AdamantiumVulkan.Core;
+﻿using AdamantiumVulkan.Core;
 using Serilog;
 using Image = AdamantiumVulkan.Core.Image;
 
@@ -23,15 +22,9 @@ namespace Adamantium.Engine.Graphics
 
       public Texture ResolveTexture => _resolveTexture;
 
-      public override Image GetImage(uint index)
-      {
-         return _resolveTexture;
-      }
+      public override Image GetImage(uint index) => _resolveTexture;
 
-      public override ImageView GetImageView(uint index)
-      {
-         return _resolveTexture;
-      }
+      public override ImageView GetImageView(uint index) => _resolveTexture;
 
       /// <summary>
       /// Resize graphics presenter backBuffer according to width and height

@@ -31,7 +31,7 @@ public abstract class UiRenderService : EntityService
         GraphicsDevice.Submit();
     }
     
-    public override void DisplayContent()
+    public override void Present()
     {
         GraphicsDevice.Present();
     }

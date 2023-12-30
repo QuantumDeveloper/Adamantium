@@ -12,6 +12,7 @@ using AdamantiumVulkan.Core;
 using Semaphore = AdamantiumVulkan.Core.Semaphore;
 using Adamantium.Engine.Graphics.Effects.Generated;
 using Serilog;
+using Exception = System.Exception;
 using Image = AdamantiumVulkan.Core.Image;
 using Logger = Serilog.Core.Logger;
 
@@ -42,8 +43,8 @@ namespace Adamantium.Engine.Graphics
         private TrackingCollection<Viewport> viewports;
         private TrackingCollection<Rect2D> scissors;
         private TrackingCollection<DynamicState> dynamicStates;
-        
-        private readonly PipelineStageFlagBits[] waitStages = {PipelineStageFlagBits.ColorAttachmentOutputBit};
+
+        private readonly PipelineStageFlagBits[] waitStages = { PipelineStageFlagBits.ColorAttachmentOutputBit };
         
         private PipelineManager pipelineManager;
         
@@ -55,16 +56,14 @@ namespace Adamantium.Engine.Graphics
         
         internal bool ShouldChangeGraphicsPipeline { get; private set; }
         
-        private Mutex mutex;
-        private static string MutextGuid = Guid.NewGuid().ToString();
-        
         private Semaphore[] waitSemaphoresArray = new Semaphore[1];
         private Semaphore[] signalSemaphoresArray = new Semaphore[1];
         private CommandBuffer[] commandBuffersArray = new CommandBuffer[1];
+        
+        private SyncObject _submissionSync;
+        private static string SyncGuid = Guid.NewGuid().ToString();
 
         private List<GraphicsResource> _graphicsResources = new List<GraphicsResource>();
-
-        private Queue<GraphicsCommand> _graphicsCommandQueue = new Queue<GraphicsCommand>();
 
         static GraphicsDevice()
         {
@@ -92,7 +91,7 @@ namespace Adamantium.Engine.Graphics
         private void CreateResourceLoadingDevice(MainGraphicsDevice mainDevice)
         {
             DeviceType = GraphicsDeviceType.ResourceLoader;
-            //InitializeMutex();
+            InitializeSyncObject();
             DeviceId = Guid.NewGuid().ToString();
             MainDevice = mainDevice;
             MaxFramesInFlight = 1;
@@ -103,7 +102,7 @@ namespace Adamantium.Engine.Graphics
         private void CreatePrimaryDevice(MainGraphicsDevice mainDevice, PresentationParameters presentationParameters)
         {
             DeviceType = GraphicsDeviceType.Primary;
-            InitializeMutex();
+            InitializeSyncObject();
             var timer = Stopwatch.StartNew();
             var timer2 = Stopwatch.StartNew();
             DeviceId = Guid.NewGuid().ToString();
@@ -165,7 +164,8 @@ namespace Adamantium.Engine.Graphics
             scissors = new TrackingCollection<Rect2D>();
 
             BlendState = BlendStates.Fonts;
-            RasterizerState = RasterizerStates.CullNoneClipDisabled;
+            //RasterizerState = RasterizerStates.CullNoneClipDisabled;
+            RasterizerState = RasterizerStates.CullBackClipDisabled;
             DepthStencilState = DepthStencilStates.Default;
             SamplerStates = new SamplerStateCollection(this);
             Sampler = SamplerStates.Default;
@@ -175,36 +175,6 @@ namespace Adamantium.Engine.Graphics
             pipelineManager = new PipelineManager(this);
         }
 
-        public void ClearExecution()
-        {
-            lock (_locker)
-            {
-                _graphicsCommandQueue.Clear();
-            }
-        }
-
-        public void AddGraphicsCommand(GraphicsCommand command)
-        {
-            lock (_locker)
-            {
-                _graphicsCommandQueue.Enqueue(command);
-            }
-        }
-
-        private void ExecuteGraphicsCommands()
-        {
-            lock (_locker)
-            {
-                if (_graphicsCommandQueue.Count == 0) return;
-
-                while (_graphicsCommandQueue.Count > 0)
-                {
-                    var command = _graphicsCommandQueue.Dequeue();
-                    command.Execute();
-                }
-            }
-        }
-        
         public GraphicsDeviceType DeviceType { get; private set; }
 
         public bool IsPrimaryDevice => DeviceType == GraphicsDeviceType.Primary;
@@ -216,16 +186,14 @@ namespace Adamantium.Engine.Graphics
         public bool IsResourceLoaderDevice => DeviceType == GraphicsDeviceType.ResourceLoader;
         
         public bool EnableDynamicRendering { get; private set; }
-        
-        public CommandPool CommandPool { get; private set; }
 
+        //public CommandPool CommandPool => MainDevice.GraphicsCommandPool;
+        public CommandPool CommandPool { get; private set; }
         internal Semaphore[] ImageAvailableSemaphores { get; private set; }
         internal Semaphore[] RenderFinishedSemaphores { get; private set; }
         internal Fence[] InFlightFences { get; private set; }
         
         public PresenterState LastPresenterState { get; private set; }
-
-        public event Action FrameFinished;
 
         public uint CurrentFrame { get; private set; }
 
@@ -355,13 +323,12 @@ namespace Adamantium.Engine.Graphics
         public Rect2D[] Scissors => scissors.ToArray();
 
         public bool IsDynamic => dynamicStates.Count > 0;
+        
+        public bool CommandBufferStarted { get; private set; }
 
-        private void InitializeMutex()
+        private void InitializeSyncObject()
         {
-            if (!Mutex.TryOpenExisting(MutextGuid, out mutex))
-            {
-                mutex = new Mutex(false, MutextGuid);
-            }
+            _submissionSync = new SyncObject(SyncGuid);
         }
 
         public void ApplyViewports(params Viewport[] viewports)
@@ -429,13 +396,6 @@ namespace Adamantium.Engine.Graphics
             var graphicsFamily = MainDevice.QueueFamilyContainer.GetFamilyInfo(QueueFlagBits.GraphicsBit);
             MainDevice.QueueFamilyContainer.CanPresent(graphicsFamily, surface);
 
-            var poolInfo = new CommandPoolCreateInfo
-            {
-                QueueFamilyIndex = graphicsFamily.FamilyIndex,
-                Flags = CommandPoolCreateFlagBits.ResetCommandBufferBit
-            };
-            CommandPool = LogicalDevice.CreateCommandPool(poolInfo);
-            
             resourceQueue = MainDevice.GetAvailableTransferQueue();
             
             CreateGraphicsPresenter(presentationParameters);
@@ -505,7 +465,6 @@ namespace Adamantium.Engine.Graphics
                 Flags = CommandPoolCreateFlagBits.ResetCommandBufferBit
             };
             CommandPool = LogicalDevice.CreateCommandPool(poolInfo);
-            
             GraphicsQueue = MainDevice.GetAvailableGraphicsQueue();
             unsafe
             {
@@ -532,7 +491,8 @@ namespace Adamantium.Engine.Graphics
 
             var allocInfo = new CommandBufferAllocateInfo();
             allocInfo.CommandPool = CommandPool;
-            allocInfo.Level = IsPrimaryDevice ? CommandBufferLevel.Primary : CommandBufferLevel.Secondary;
+            //allocInfo.Level = IsPrimaryDevice ? CommandBufferLevel.Primary : CommandBufferLevel.Secondary;
+            allocInfo.Level = CommandBufferLevel.Primary;
             allocInfo.CommandBufferCount = buffersCount;
 
             commandBuffers = LogicalDevice.AllocateCommandBuffers(allocInfo);
@@ -601,13 +561,14 @@ namespace Adamantium.Engine.Graphics
         {
             CanPresent = false;
             Result result;
-            if (IsPrimaryDevice)
+            //if (IsPrimaryDevice)
             {
                 var renderFence = InFlightFences[CurrentFrame];
                 result = LogicalDevice.WaitForFences(1, renderFence, true, ulong.MaxValue);
-
-                if (result != Result.Success)
+                
+                if (result != Result.Success && result != Result.Timeout)
                 {
+                    Log.Logger.Information($"Wait for fences result: {result}");
                     return false;
                 }
             }
@@ -648,7 +609,7 @@ namespace Adamantium.Engine.Graphics
             }
 
             result = commandBuffer.ResetCommandBuffer(0);
-
+            
             if (result != Result.Success)
             {
                 throw new Exception("failed to begin recording command buffer!");
@@ -658,6 +619,11 @@ namespace Adamantium.Engine.Graphics
 
             //Log.Logger.Information($"Begin Command buffer on {DeviceType} device {DeviceId}");
             result = commandBuffer.BeginCommandBuffer(beginInfo);
+            // unsafe
+            // {
+            //     Log.Logger.Debug($"BeginCommandBuffer was called for {new IntPtr(commandBuffer.NativePointer)}");
+            // }
+            
             if (result != Result.Success)
             {
                 throw new Exception("failed to begin recording command buffer!");
@@ -667,131 +633,7 @@ namespace Adamantium.Engine.Graphics
 
             return true;
         }
-
-        public bool CommandBufferStarted { get; private set; }
-
-        public void EndDraw()
-        {
-            var commandBuffer = commandBuffers[ImageIndex];
-            
-            if (EnableDynamicRendering)
-            {
-                commandBuffer.EndRendering();
-
-                if (Presenter is SwapChainGraphicsPresenter)
-                {
-                    ImageSubresourceRange range = new ImageSubresourceRange();
-                    range.AspectMask = ImageAspectFlagBits.ColorBit;
-                    range.BaseMipLevel = 0;
-                    range.LevelCount = (~0U);
-                    range.BaseArrayLayer = 0;
-                    range.LayerCount = (~0U);
-
-                    InsertImageMemoryBarrier(commandBuffer,
-                        Presenter.GetImage(imageIndex),
-                        AccessFlagBits.ColorAttachmentWriteBit,
-                        0,
-                        ImageLayout.ColorAttachmentOptimal,
-                        ImageLayout.PresentSrcKhr,
-                        PipelineStageFlagBits.ColorAttachmentOutputBit,
-                        PipelineStageFlagBits.BottomOfPipeBit,
-                        range);
-                }
-            }
-            else
-            {
-                if (DeviceType == GraphicsDeviceType.Primary)
-                {
-                    commandBuffer.EndRenderPass();
-                }
-            }
-            
-            ExecuteGraphicsCommands();
-
-        }
-
-        private Mutex _submissionSync;
-
-        public void Submit()
-        {
-            if (!Mutex.TryOpenExisting("submission", out _submissionSync))
-            {
-                _submissionSync = new Mutex(false, "submission");
-            }
-            _submissionSync.WaitOne();
-            
-            //Log.Logger.Debug($"Enter Submit for device {DeviceId}");
-            
-            var commandBuffer = CurrentCommandBuffer;
-            var result = commandBuffer.EndCommandBuffer();
-            if (result != Result.Success)
-            {
-                throw new Exception("failed to record command buffer!");
-            }
-
-            CommandBufferStarted = false;
-
-            if (DeviceType == GraphicsDeviceType.Secondary)
-            {
-                CanPresent = true;
-                return;
-            }
-
-            if (DeviceType == GraphicsDeviceType.Primary)
-            {
-                ExecuteCommands();
-            }
-            
-            commandBuffersArray[0] = commandBuffer;
-
-            var submitInfo = new SubmitInfo();
-
-            if (Presenter is SwapChainGraphicsPresenter)
-            {
-                waitSemaphoresArray[0] = ImageAvailableSemaphores[CurrentFrame];
-                submitInfo.WaitSemaphoreCount = (uint)waitSemaphoresArray.Length;
-                submitInfo.PWaitSemaphores = waitSemaphoresArray;
-                
-                signalSemaphoresArray[0] = RenderFinishedSemaphores[CurrentFrame];
-
-                submitInfo.SignalSemaphoreCount = (uint)signalSemaphoresArray.Length;
-                submitInfo.PSignalSemaphores = signalSemaphoresArray;
-            }
-
-            submitInfo.PWaitDstStageMask = waitStages;
-            submitInfo.CommandBufferCount = (uint)commandBuffersArray.Length;
-            submitInfo.PCommandBuffers = commandBuffersArray;
-
-            submitInfos[0] = submitInfo;
-
-            var renderFence = InFlightFences[CurrentFrame];
-            //var renderFence = MainDevice.SyncFences[CurrentFrame];
-
-            
-            result = LogicalDevice.ResetFences(1, renderFence);
-            //result = LogicalDevice.ResetFences(2, renderFence, syncFence);
-
-            if (result != Result.Success)
-            {
-                throw new Exception($"failed to reset fences. Result: {result}");
-            }
-
-            
-            result = GraphicsQueue.QueueSubmit(1, submitInfos, renderFence);
-            LogicalDevice.WaitForFences(1, renderFence, true, ulong.MaxValue);
-            
-            if (result != Result.Success)
-            {
-                throw new Exception($"failed to submit draw command buffer! Result was {result}");
-            }
-
-            GraphicsQueue.QueueWaitIdle();
-            CanPresent = true;
-            FrameFinished?.Invoke();
-            _submissionSync.ReleaseMutex();
-            //Log.Logger.Debug($"Exit Submit for device {DeviceId}");
-        }
-
+        
         private void BeginRendering(CommandBuffer commandBuffer, float depth = 1.0f, uint stencil = 0)
         {
             var clearColorValue = new ClearValue
@@ -914,6 +756,163 @@ namespace Adamantium.Engine.Graphics
             ShouldChangeGraphicsPipeline = true;
         }
 
+        public void EndDraw()
+        {
+            var commandBuffer = commandBuffers[ImageIndex];
+            
+            if (EnableDynamicRendering)
+            {
+                commandBuffer.EndRendering();
+
+                if (Presenter is SwapChainGraphicsPresenter)
+                {
+                    ImageSubresourceRange range = new ImageSubresourceRange();
+                    range.AspectMask = ImageAspectFlagBits.ColorBit;
+                    range.BaseMipLevel = 0;
+                    range.LevelCount = (~0U);
+                    range.BaseArrayLayer = 0;
+                    range.LayerCount = (~0U);
+
+                    InsertImageMemoryBarrier(commandBuffer,
+                        Presenter.GetImage(imageIndex),
+                        AccessFlagBits.ColorAttachmentWriteBit,
+                        0,
+                        ImageLayout.ColorAttachmentOptimal,
+                        ImageLayout.PresentSrcKhr,
+                        PipelineStageFlagBits.ColorAttachmentOutputBit,
+                        PipelineStageFlagBits.BottomOfPipeBit,
+                        range);
+                }
+            }
+            else
+            {
+                if (DeviceType == GraphicsDeviceType.Primary)
+                {
+                    commandBuffer.EndRenderPass();
+                }
+            }
+        }
+
+        public SubmitInfo PrepareSubmit()
+        {
+            if (!CommandBufferStarted) return null;
+            
+            var commandBuffer = CurrentCommandBuffer;
+            var result = commandBuffer.EndCommandBuffer();
+            if (result != Result.Success)
+            {
+                return null;
+                //throw new Exception("failed to record command buffer!");
+            }
+            CommandBufferStarted = false;
+            CanPresent = true;
+            
+            //Log.Logger.Debug($"Current frame index in PrepareSubmit: {CurrentFrame}");
+            
+            commandBuffersArray[0] = CurrentCommandBuffer;
+            var submitInfo = new SubmitInfo();
+
+            if (Presenter is SwapChainGraphicsPresenter)
+            {
+                waitSemaphoresArray[0] = ImageAvailableSemaphores[CurrentFrame];
+                submitInfo.WaitSemaphoreCount = (uint)waitSemaphoresArray.Length;
+                submitInfo.PWaitSemaphores = waitSemaphoresArray;
+                
+                signalSemaphoresArray[0] = RenderFinishedSemaphores[CurrentFrame];
+
+                submitInfo.SignalSemaphoreCount = (uint)signalSemaphoresArray.Length;
+                submitInfo.PSignalSemaphores = signalSemaphoresArray;
+            }
+
+            submitInfo.PWaitDstStageMask = waitStages;
+            submitInfo.CommandBufferCount = (uint)commandBuffersArray.Length;
+            submitInfo.PCommandBuffers = commandBuffersArray;
+
+            return submitInfo;
+        }
+
+        public void Submit()
+        {
+            if (!CommandBufferStarted) return;
+
+            _submissionSync?.Wait();
+            
+            //Log.Logger.Debug($"Enter Submit for device {DeviceId}");
+            
+            var commandBuffer = CurrentCommandBuffer;
+            var result = commandBuffer.EndCommandBuffer();
+            // unsafe
+            // {
+            //     Log.Logger.Debug($"EndCommandBuffer was called for {new IntPtr(commandBuffer.NativePointer)}");
+            // }
+            
+            if (result != Result.Success)
+            {
+                throw new Exception("failed to record command buffer!");
+            }
+
+            CommandBufferStarted = false;
+
+            if (DeviceType == GraphicsDeviceType.Secondary)
+            {
+                CanPresent = true;
+                return;
+            }
+            
+            // if (DeviceType == GraphicsDeviceType.Primary)
+            // {
+            //     ExecuteCommands();
+            // }
+            
+            commandBuffersArray[0] = CurrentCommandBuffer;
+
+            var submitInfo = new SubmitInfo();
+
+            if (Presenter is SwapChainGraphicsPresenter)
+            {
+                waitSemaphoresArray[0] = ImageAvailableSemaphores[CurrentFrame];
+                submitInfo.WaitSemaphoreCount = (uint)waitSemaphoresArray.Length;
+                submitInfo.PWaitSemaphores = waitSemaphoresArray;
+                
+                signalSemaphoresArray[0] = RenderFinishedSemaphores[CurrentFrame];
+
+                submitInfo.SignalSemaphoreCount = (uint)signalSemaphoresArray.Length;
+                submitInfo.PSignalSemaphores = signalSemaphoresArray;
+            }
+
+            submitInfo.PWaitDstStageMask = waitStages;
+            submitInfo.CommandBufferCount = (uint)commandBuffersArray.Length;
+            submitInfo.PCommandBuffers = commandBuffersArray;
+
+            submitInfos[0] = submitInfo;
+
+            var renderFence = InFlightFences[CurrentFrame];
+            
+            result = LogicalDevice.ResetFences(1, renderFence);
+
+            if (result != Result.Success)
+            {
+                Log.Logger.Error($"failed to reset fences. Result: {result}");
+                //throw new Exception($"failed to reset fences. Result: {result}");
+            }
+            
+            result = GraphicsQueue.QueueSubmit(1, submitInfos, renderFence);
+            // This call speedup rendering on 50 fps WTF???
+            //result = GraphicsQueue.QueueSubmit(1, submitInfos, null);
+            LogicalDevice.WaitForFences(1, renderFence, true, ulong.MaxValue);
+            
+            if (result != Result.Success)
+            {
+                Log.Logger.Error($"failed to submit draw command buffer! Result was {result}");
+                //throw new Exception($"failed to submit draw command buffer! Result was {result}");
+            }
+
+            //GraphicsQueue.QueueWaitIdle();
+            CanPresent = true;
+            
+            _submissionSync?.Release();
+        }
+
         private void ExecuteCommands()
         {
             if (DeviceType != GraphicsDeviceType.Primary || SecondaryDevices.Count == 0)
@@ -1028,25 +1027,25 @@ namespace Adamantium.Engine.Graphics
 
         public void UpdateDescriptorSets(params WriteDescriptorSet[] writeDescriptorSets)
         {
+            //MainDevice.UpdateDescriptorSets(CurrentFrame, writeDescriptorSets);
             if (writeDescriptorSets == null || writeDescriptorSets.Length == 0) return;
             
-            // TODO: decide does wait for fences really need here
             var renderFence = InFlightFences[CurrentFrame];
             var result = LogicalDevice.WaitForFences(1, renderFence, true, ulong.MaxValue);
-           
+            
             LogicalDevice.UpdateDescriptorSets((uint)writeDescriptorSets.Length, writeDescriptorSets, 0, out var copySets);
         }
 
         public CommandBuffer BeginSingleTimeCommands()
         {
-            _submissionSync?.WaitOne();
             return LogicalDevice.BeginSingleTimeCommand(CommandPool);
         }
 
         public void EndSingleTimeCommands(CommandBuffer commandBuffer)
         {
+            _submissionSync?.Wait();
             LogicalDevice.EndSingleTimeCommands(resourceQueue, CommandPool, commandBuffer);
-            _submissionSync?.ReleaseMutex();
+            _submissionSync?.Release();
         }
 
         public unsafe void* MapMemory(DeviceMemory memory, ulong offset, ulong size, uint flags)
@@ -1110,7 +1109,8 @@ namespace Adamantium.Engine.Graphics
         {
             if (!CanPresent)
             {
-                Console.WriteLine("Cannot call Present() because BeginDraw() was not called");
+                UpdateCurrentFrameNumber();
+                //Console.WriteLine("Cannot call Present() because BeginDraw() was not called");
                 return;
             }
 
@@ -1132,6 +1132,7 @@ namespace Adamantium.Engine.Graphics
 
         internal Semaphore GetRenderFinishedSemaphoreForCurrentFrame()
         {
+            //Log.Logger.Debug($"Current frame index in GetRenderFinishedSemaphoreForCurrentFrame: {CurrentFrame}");
             return RenderFinishedSemaphores[CurrentFrame];
         }
 
@@ -1187,6 +1188,7 @@ namespace Adamantium.Engine.Graphics
                 disposableObject?.Dispose();
             }
             
+            _submissionSync?.Dispose();
             _graphicsResources?.Clear();
         }
 

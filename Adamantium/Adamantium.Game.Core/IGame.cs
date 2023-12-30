@@ -19,6 +19,8 @@ namespace Adamantium.Game.Core
         GameOutput MainOutput { get; }
 
         public void InitializeGame();
+
+        public void Submit();
         
         /// <summary>
         /// Game services which could be added to the game
