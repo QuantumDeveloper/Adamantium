@@ -11,6 +11,8 @@ public interface IEntityService : IUpdateService, IRenderService
     bool IsUpdateService { get; }
     
     bool IsRenderingService { get; }
+    
+    EntityServiceType ServiceType { get; }
 
     void Initialize();
     

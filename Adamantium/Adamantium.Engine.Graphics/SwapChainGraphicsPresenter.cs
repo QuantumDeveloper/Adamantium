@@ -4,6 +4,7 @@ using AdamantiumVulkan.Core;
 using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using Serilog;
 using VulkanImage = AdamantiumVulkan.Core.Image;
 
 namespace Adamantium.Engine.Graphics

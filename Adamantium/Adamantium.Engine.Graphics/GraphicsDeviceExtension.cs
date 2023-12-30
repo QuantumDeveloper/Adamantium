@@ -6,7 +6,7 @@ namespace Adamantium.Engine.Graphics;
 
 public static class GraphicsDeviceExtension
 {
-    public static void CopyImageFromPresenter(this GraphicsDevice graphicsDevice, Texture sourceTexture, Texture destinationTexture)
+    public static void CopyImage(this GraphicsDevice graphicsDevice, Texture sourceTexture, Texture destinationTexture)
         {
             if (sourceTexture == null)
             {
@@ -112,7 +112,6 @@ public static class GraphicsDeviceExtension
                 PipelineStageFlagBits.TransferBit,
                 PipelineStageFlagBits.FragmentShaderBit,
                 range);
-            
             
             sourceTexture.TransitionImageLayout(ImageLayout.ColorAttachmentOptimal);
             destinationTexture.TransitionImageLayout(ImageLayout.ShaderReadOnlyOptimal);

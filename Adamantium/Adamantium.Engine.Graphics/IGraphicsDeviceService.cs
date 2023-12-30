@@ -17,15 +17,9 @@ namespace Adamantium.Engine.Graphics
 
       GraphicsDevice CreateRenderDevice(PresentationParameters parameters);
 
-      void RemoveDevice(GraphicsDevice device);
+      void ChangeOrCreateMainDevice(string name, bool forceUpdate);
 
-      void RemoveDeviceById(string deviceId);
-
-      GraphicsDevice GetDeviceById(string deviceId);
-
-      GraphicsDevice UpdateDevice(string deviceId, PresentationParameters parameters);
-
-      void ChangeOrCreateDevice(string name, bool forceUpdate);
+      void RaiseFrameFinished();
       
       bool IsReady { get; }
       

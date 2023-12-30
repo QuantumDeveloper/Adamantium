@@ -63,7 +63,7 @@ namespace Adamantium.Engine.Managers
             lights = new List<Light>();
             _lights = new ReadOnlyCollection<Light>(lights);
             _lightsGroup = new EntityGroup("Lights");
-            EntityWorld.AddGroup(_lightsGroup);
+            EntityWorld.EntityManager.AddGroup(_lightsGroup);
 
             SpotLightMesh = new SpotLightMeshTemplate().BuildEntity();
             PointLightMesh = new PointLightMeshTemplate().BuildEntity();
@@ -82,9 +82,9 @@ namespace Adamantium.Engine.Managers
             PointLightTool.Enabled = true;
             DirectionalLightTool.Enabled = true;
 
-            EntityWorld.AddToGroup(SpotLightTool.Tool, "Lights");
-            EntityWorld.AddToGroup(PointLightTool.Tool, "Lights");
-            EntityWorld.AddToGroup(DirectionalLightTool.Tool, "Lights");
+            EntityWorld.EntityManager.AddToGroup(SpotLightTool.Tool, "Lights");
+            EntityWorld.EntityManager.AddToGroup(PointLightTool.Tool, "Lights");
+            EntityWorld.EntityManager.AddToGroup(DirectionalLightTool.Tool, "Lights");
 
             //Task.Run(() => CreateLightsIcons());
             //Task.Run(() => CreateLightsVisual());
@@ -173,7 +173,7 @@ namespace Adamantium.Engine.Managers
                 lights.Add(lightComponent);
             }
             
-            EntityWorld.AddEntity(light);
+            EntityWorld.EntityManager.AddEntity(light);
         }
 
         public void RemoveLight(Entity light)

@@ -85,7 +85,7 @@ namespace Adamantium.Engine
             {
                 primitive.Transform.SetPosition(initialPosition.Value);
             }
-            entityWorld.AddEntity(primitive);
+            entityWorld.EntityManager.AddEntity(primitive);
             return primitive;
         }
 

@@ -224,7 +224,7 @@ namespace Adamantium.Game.Core
                     if ((graphicsDeviceChanged || reason == ChangeReason.FullUpdate) && wndObj.Key.Type != GameWindowType.RenderTarget)
                     {
                         OnWindowParametersChanging(wnd, wnd.Description, ChangeReason.FullUpdate);
-                        var device = GraphicsDeviceService.UpdateDevice(wnd.GraphicsDevice.DeviceId, wnd.Description);
+                        var device = GraphicsDeviceService.MainGraphicsDevice.UpdateDevice(wnd.GraphicsDevice.DeviceId, wnd.Description);
                         wnd.SetGraphicsDevice(device);
                         OnWindowParametersChanged(wnd, wnd.Description, ChangeReason.FullUpdate);
                     }

@@ -19,11 +19,6 @@ public sealed class EntityManager
     private readonly Dictionary<UInt128, EntityParameters> entityParametersMap;
     private readonly List<CameraProjectionType> availableProjectionTypes;
 
-    private Action<Entity> OnEntityAdded;
-    private Action<Entity> OnEntityRemoved;
-    private Action<EntityGroup> OnGroupCreated;
-    private Action<EntityGroup> OnGroupRemoved;
-
     internal EntityManager(EntityWorld world)
     {
         rootEntities = new List<Entity>();
@@ -39,10 +34,6 @@ public sealed class EntityManager
     
     internal void InitializeResources()
     {
-        OnEntityAdded = World.OnEntityAdded;
-        OnEntityRemoved = World.OnEntityRemoved;
-        OnGroupCreated = World.OnGroupCreated;
-        OnGroupRemoved = World.OnGroupRemoved;
     }
 
     public EntityWorld World { get; }
@@ -80,8 +71,18 @@ public sealed class EntityManager
         if (availableEntities.TryAdd(entity.Uid, entity))
         {
             rootEntities.Add(entity);
-            OnEntityAdded?.Invoke(entity);
+            OnEntityAdded(entity);
         }
+    }
+    
+    private void OnEntityAdded(Entity entity)
+    {
+        EntityAdded?.Invoke(this, new EntityEventArgs(entity));
+    }
+
+    private void OnEntityRemoved(Entity entity)
+    {
+        EntityRemoved?.Invoke(this, new EntityEventArgs(entity));
     }
 
     private void RemoveEntityInternal(Entity entity)
@@ -89,7 +90,7 @@ public sealed class EntityManager
         if (availableEntities.Remove(entity.Uid))
         {
             rootEntities.Remove(entity);
-            OnEntityRemoved?.Invoke(entity);
+            OnEntityRemoved(entity);
         }
     }
 
@@ -223,7 +224,7 @@ public sealed class EntityManager
 
             group = new EntityGroup(groupName);
             entitiesByGroup.Add(groupName, group);
-            OnGroupCreated?.Invoke(group);
+            OnGroupCreated(group);
             return group;
         }
     }
@@ -239,7 +240,7 @@ public sealed class EntityManager
         {
             if (entitiesByGroup.TryAdd(group.Name, group))
             {
-                OnGroupCreated?.Invoke(group);
+                OnGroupCreated(group);
             }
             else
             {
@@ -260,9 +261,26 @@ public sealed class EntityManager
             if (entitiesByGroup.TryGetValue(groupName, out var group))
             {
                 entitiesByGroup.Remove(groupName);
-                OnGroupRemoved?.Invoke(group);
+                OnGroupRemoved(group);
             }
         }
+    }
+    
+    private void OnGroupCreated(EntityGroup group)
+    {
+        group.GroupChanged += OnGroupChanged;
+        GroupCreated?.Invoke(this, new EntityGroupEventArgs(group));
+    }
+
+    private void OnGroupRemoved(EntityGroup group)
+    {
+        group.GroupChanged -= OnGroupChanged;
+        GroupRemoved?.Invoke(this, new EntityGroupEventArgs(group));
+    }
+
+    private void OnGroupChanged(object sender, GroupChangedEventArgs args)
+    {
+        GroupChanged?.Invoke(sender, args);
     }
 
     public void AddToGroup(Entity entity, string groupName, bool createIfNotExists = true)
@@ -435,4 +453,10 @@ public sealed class EntityManager
             availableProjectionTypes.Clear();
         }
     }
+    
+    public event EventHandler<EntityEventArgs> EntityAdded;
+    public event EventHandler<EntityEventArgs> EntityRemoved;
+    public event EventHandler<EntityGroupEventArgs> GroupCreated;
+    public event EventHandler<EntityGroupEventArgs> GroupRemoved;
+    public event EventHandler<GroupChangedEventArgs> GroupChanged;
 }

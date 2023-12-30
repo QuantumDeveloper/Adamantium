@@ -34,8 +34,6 @@ namespace Adamantium.Game.Playground
 
         private void OnWindowCreated(GameOutput output)
         {
-            // EntityWorld.CreateService<InputService>(EntityWorld);
-            // EntityWorld.CreateService<TransformService>(EntityWorld);
             var renderingService = EntityWorld.CreateService<RenderingService>(EntityWorld, output);
             var processor = new ForwardRenderingProcessor();
             renderingService.AttachProcessor(processor);
@@ -81,10 +79,7 @@ namespace Adamantium.Game.Playground
         private async void LoadModels()
         {
             var entity = await ImportModel(@"Models\F15C\F-15C_Eagle.dae");
-            EntityWorld.AddEntity(entity);
-            var ent = entity.Dependencies[0];
-            //ent.Transform.SetScaleFactor(100);
-            ent.Transform.SetPosition(new Vector3(0, 0, -150));
+            EntityWorld.EntityManager.AddEntity(entity);
         }
 
     }

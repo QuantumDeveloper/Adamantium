@@ -30,7 +30,7 @@ namespace Adamantium.Engine.EntityServices
         {
             gamePlayManager = DependencyResolver.Resolve<GamePlayManager>();
             toolsManager = DependencyResolver.Resolve<ToolsManager>();
-            EntityWorld.EntityRemoved += EntityManagerEntityRemoved;
+            EntityWorld.EntityManager.EntityRemoved += EntityManagerEntityRemoved;
             inputManager = DependencyResolver.Resolve<GameInputManager>();
             //audioManager = new AudioManager();
             gamePlatform = world.DependencyResolver.Resolve<IGamePlatform>();
@@ -43,6 +43,7 @@ namespace Adamantium.Engine.EntityServices
 
         public override bool IsUpdateService => true;
         public override bool IsRenderingService => false;
+        public override EntityServiceType ServiceType => EntityServiceType.Update;
 
         public override void Update(AppTime gameTime)
         {

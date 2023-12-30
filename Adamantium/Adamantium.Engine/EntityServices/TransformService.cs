@@ -25,6 +25,7 @@ namespace Adamantium.Engine.EntityServices
 
         public override bool IsUpdateService => true;
         public override bool IsRenderingService => false;
+        public override EntityServiceType ServiceType => EntityServiceType.Update;
 
         public override void Initialize()
         {

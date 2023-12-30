@@ -2,6 +2,9 @@
 {
    public enum FileType
    {
-      Undefinied, Collada, AutoDesk3DS, Obj
+      Undefinied, 
+      Collada, 
+      AutoDesk3DS, 
+      Obj
    }
 }

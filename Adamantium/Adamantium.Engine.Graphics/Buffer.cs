@@ -80,16 +80,13 @@ namespace Adamantium.Engine.Graphics
 
         private void Initialize(DataPointer dataPointer)
         {
-            VulkanBuffer stagingBuffer;
-            DeviceMemory stagingBufferMemory;
-
             var stagingMemoryFlags = MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent; // Windows
             // if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             // {
             //     stagingMemoryFlags = MemoryPropertyFlags.DeviceLocal | MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent | MemoryPropertyFlags.HostCached; // MacOS
             // }
 
-            CreateBuffer(TotalSize, BufferUsageFlags.TransferSrc, stagingMemoryFlags, out stagingBuffer, out stagingBufferMemory);
+            CreateBuffer(TotalSize, BufferUsageFlags.TransferSrc, stagingMemoryFlags, out var stagingBuffer, out var stagingBufferMemory);
 
             UpdateBufferContent(stagingBufferMemory, dataPointer);
             CreateBuffer(TotalSize, 
@@ -153,7 +150,7 @@ namespace Adamantium.Engine.Graphics
 
             BufferCopy copyRegin = new BufferCopy();
             copyRegin.Size = (ulong)size;
-            var regions = new BufferCopy[1] { copyRegin };
+            var regions = new BufferCopy[] { copyRegin };
             commandBuffer.CopyBuffer(srcBuffer, dstBuffer, 1, regions);
 
             GraphicsDevice.EndSingleTimeCommands(commandBuffer);

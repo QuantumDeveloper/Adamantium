@@ -502,7 +502,6 @@ namespace Adamantium.Game
             if (BeginScene())
             {
                 Draw(gameTime);
-                //EndScene();
             }
         }
 
@@ -590,6 +589,9 @@ namespace Adamantium.Game
             {
                 output.DisplayContent();
             }
+            
+            //EntityWorld.ServiceManager.Submit();
+            //EntityWorld.ServiceManager.Present();
             EntityWorld.ServiceManager.OnFrameEnded();
         }
 

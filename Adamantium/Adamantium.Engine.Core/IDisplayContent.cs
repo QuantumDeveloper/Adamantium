@@ -6,6 +6,6 @@
     public interface IDisplayContent
     {
         bool CanDisplayContent { get; }
-        void DisplayContent();
+        void Present();
     }
 }

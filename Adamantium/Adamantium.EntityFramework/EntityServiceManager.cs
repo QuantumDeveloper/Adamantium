@@ -157,20 +157,19 @@ namespace Adamantium.EntityFramework
                 foreach (var service in Services)
                 {
                     if (!service.IsRenderingService) continue;
+
+                    if (!service.BeginDraw()) continue;
                     
-                    if (service.BeginDraw())
-                    {
-                        OnDrawStarted?.Invoke(service, gameTime);
-                        service.Draw(gameTime);
-                        service.EndDraw();
-                        OnDrawFinished?.Invoke(service, gameTime);
-                        service.Submit();
-                    }
+                    OnDrawStarted?.Invoke(service, gameTime);
+                    service.Draw(gameTime);
+                    service.EndDraw();
+                    OnDrawFinished?.Invoke(service, gameTime);
+                    service.Submit();
                 }
             }
         }
 
-        public void DisplayContent()
+        public void Present()
         {
             lock (syncObject)
             {
@@ -178,7 +177,7 @@ namespace Adamantium.EntityFramework
                 {
                     if (service.CanDisplayContent)
                     {
-                        service.DisplayContent();
+                        service.Present();
                     }
                 }
             }

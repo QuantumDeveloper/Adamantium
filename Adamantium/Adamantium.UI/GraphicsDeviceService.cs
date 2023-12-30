@@ -11,8 +11,6 @@ namespace Adamantium.UI
         private MainGraphicsDevice mainGraphicsDevice;
 
         private bool isInDebugMode;
-        private readonly List<GraphicsDevice> graphicsDevices;
-        private readonly Dictionary<string, GraphicsDevice> deviceMap;
 
         public MainGraphicsDevice MainGraphicsDevice
         {
@@ -22,14 +20,12 @@ namespace Adamantium.UI
 
         public GraphicsDevice ResourceLoaderDevice { get; private set; }
 
-        public IReadOnlyList<GraphicsDevice> GraphicsDevices => graphicsDevices.AsReadOnly();
+        public IReadOnlyList<GraphicsDevice> GraphicsDevices => MainGraphicsDevice.GraphicsDevices;
         
         public bool DeviceUpdateNeeded { get; set; }
 
         public GraphicsDeviceService(bool isInDebug)
         {
-            graphicsDevices = new List<GraphicsDevice>();
-            deviceMap = new Dictionary<string, GraphicsDevice>();
             IsInDebugMode = isInDebug;
         }
 
@@ -42,64 +38,24 @@ namespace Adamantium.UI
 
         public GraphicsDevice CreateRenderDevice(PresentationParameters parameters)
         {
-            var renderDevice = MainGraphicsDevice.CreateRenderDevice(parameters);
-            deviceMap.Add(renderDevice.DeviceId, renderDevice);
-            graphicsDevices.Add(renderDevice);
-            return renderDevice;
+            return MainGraphicsDevice.CreateRenderDevice(parameters);
         }
 
-        public void RemoveDevice(GraphicsDevice device)
+        public void RaiseFrameFinished()
         {
-            deviceMap.Remove(device.DeviceId);
-            graphicsDevices.Remove(device);
-            device?.Dispose();
-        }
-
-        public void RemoveDeviceById(string deviceId)
-        {
-            if (!deviceMap.TryGetValue(deviceId, out var device)) return;
-            
-            device?.Dispose();
-            deviceMap.Remove(deviceId);
-            graphicsDevices.Remove(device);
-        }
-
-        public GraphicsDevice GetDeviceById(string deviceId)
-        {
-            return graphicsDevices.FirstOrDefault(x => x.DeviceId == deviceId);
-        }
-
-        public GraphicsDevice UpdateDevice(string deviceId, PresentationParameters parameters)
-        {
-            if (deviceMap.TryGetValue(deviceId, out var device))
-            {
-                device?.Dispose();
-                deviceMap.Remove(deviceId);
-                graphicsDevices.Remove(device);
-                var newDevice = MainGraphicsDevice.CreateRenderDevice(parameters);
-                deviceMap.Add(deviceId, newDevice);
-                graphicsDevices.Add(newDevice);
-                return newDevice;
-            }
-
-            return null;
+            MainGraphicsDevice?.OnFrameFinished();
         }
 
         public bool IsReady => MainGraphicsDevice != null;
 
-        public void ChangeOrCreateDevice(string name, bool forceUpdate)
+        public void ChangeOrCreateMainDevice(string name, bool forceUpdate)
         {
             if (DeviceUpdateNeeded || forceUpdate)
             {
                 MainGraphicsDevice.DeviceWaitIdle();
                 OnDeviceChangeBegin();
                 ResourceLoaderDevice?.Dispose();
-                foreach (var device in graphicsDevices)
-                {
-                    device?.Dispose();
-                }
-                graphicsDevices.Clear();
-                deviceMap.Clear();
+
                 CreateMainDevice(name, IsInDebugMode);
                 
                 DeviceUpdateNeeded = false;
