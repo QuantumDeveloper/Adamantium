@@ -62,6 +62,22 @@ namespace Adamantium.Mathematics
             Width = width;
             Height = height;
         }
+        
+        public Rectangle(Vector2F origin, int width, int height)
+        {
+            Left = (int)origin.X;
+            Top = (int)origin.Y;
+            Width = width;
+            Height = height;
+        }
+        
+        public Rectangle(Vector2F origin, Size size)
+        {
+            Left = (int)origin.X;
+            Top = (int)origin.Y;
+            Width = (int)size.Width;
+            Height = (int)size.Height;
+        }
 
         /// <summary>
         /// Gets or sets the X position.

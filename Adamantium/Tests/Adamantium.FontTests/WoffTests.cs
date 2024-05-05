@@ -19,7 +19,7 @@ namespace Adamantium.FontTests
         [Test]
         public void LoadWoffFont()
         {
-            var typeFace = TypeFace.LoadFont(WoffFonts.Sarabun_Regular, 3);
+            var typeFace = Typeface.LoadFont(WoffFonts.Sarabun_Regular, 3);
         }
     }
 }

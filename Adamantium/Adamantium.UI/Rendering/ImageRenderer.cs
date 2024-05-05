@@ -8,7 +8,7 @@ namespace Adamantium.UI.Rendering;
 
 internal class ImageRenderer : GeometryRenderer
 {
-    public ImageRenderer(GraphicsDevice device, Geometry geometry, Brush brush, ImageSource image) : base(device, geometry, brush)
+    public ImageRenderer(GraphicsDevice device, Geometry geometry, Brush background, ImageSource image) : base(device, geometry, background, null)
     {
         Image = image;
     }
@@ -21,6 +21,10 @@ internal class ImageRenderer : GeometryRenderer
         if (VertexBuffer == null) return false;
             
         graphicsDevice.SetVertexBuffer(VertexBuffer);
+        if (IndexBuffer != null)
+        {
+            graphicsDevice.SetIndexBuffer(IndexBuffer);
+        }
         graphicsDevice.VertexType = VertexType;
         graphicsDevice.PrimitiveTopology = PrimitiveType;
 
@@ -28,9 +32,9 @@ internal class ImageRenderer : GeometryRenderer
         
         var effect = graphicsDevice.BasicEffect;
         effect.Wvp.SetValue(world * projectionMatrix);
-        var color = Brush as SolidColorBrush;
+        var color = Foreground as SolidColorBrush;
         effect.MeshColor.SetValue(color.Color.ToVector4());
-        effect.Transparency.SetValue((float)Brush.Opacity);
+        effect.Transparency.SetValue((float)Foreground.Opacity);
         
         var texture = ((BitmapSource)Image)?.Texture;
 

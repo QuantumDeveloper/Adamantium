@@ -97,6 +97,30 @@ namespace Adamantium.Fonts.Parsers
 
             ReadFontCollection();
         }
+        
+        public override void ReadFontName()
+        {
+            IsOTFCollection();
+            FontReader.Position = 0;
+            if (!IsFontCollection)
+            {
+                ReadTableDirectory();
+            }
+            else // read TTC Header
+            {
+                ReadTTCHeader();
+                ReadTableDirectories();
+            }
+            var font = new Font(Typeface);
+            Typeface.AddFont(font);
+            CurrentFont = font;
+            var nameTable =
+                TableDirectories.SelectMany(x=>x.Tables).FirstOrDefault(x => x.Name == TableNames.name);
+            if (nameTable != null)
+            {
+                ReadNameTable(nameTable);
+            }
+        }
 
         protected override void ReadTable(TableEntry entry)
         {
@@ -249,7 +273,7 @@ namespace Adamantium.Fonts.Parsers
             };
 
             cffFont = cffParser.Parse();
-            TypeFace.SetGlyphs(cffFont.Glyphs);
+            Typeface.SetGlyphs(cffFont.Glyphs);
             CurrentFont.VariationData = cffFont.VariationStore;
         }
 

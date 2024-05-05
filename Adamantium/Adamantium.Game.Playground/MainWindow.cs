@@ -13,6 +13,7 @@
 using System;
 using System.Linq;
 using Adamantium.Engine.Graphics;
+using Adamantium.Mathematics;
 using Adamantium.UI.Input;
 using Adamantium.UI.Controls;
 using Serilog;
@@ -48,9 +49,10 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        //MSAALevel = MSAALevel.None;
         TestGrid1.Loaded += TestGrid1OnInitialized;
         SourceInitialized += OnSourceInitialized;
-        KeyDown+= delegate(object sender, KeyEventArgs args)
+        KeyDown += delegate(object sender, KeyEventArgs args)
         {
             Log.Logger.Information($"Key: {args.Key}");
             if (args.Key == Key.A)
@@ -66,7 +68,7 @@ public partial class MainWindow : Window
 
     private void TestGrid1OnInitialized(object sender, RoutedEventArgs e)
     {
-        CreateGame();
+        //CreateGame();
     }
 
     private void OnSourceInitialized(object sender, EventArgs e)
@@ -83,7 +85,7 @@ public partial class MainWindow : Window
         var graphicsDeviceService = Resolver.Resolve<IGraphicsDeviceService>();
         // Primary mode
         //var game = gameService.CreateGame<AdamantiumGame>("AdamantiumGame", true, UIApplication.Current.EnableGraphicsDebug);
-        
+       
         // Fully slave mode
         var service = UIApplication.Current.EntityWorld.ServiceManager.GetServices<UiRenderService>()
             .Cast<WindowRenderService>().FirstOrDefault(x => x.Window == this);

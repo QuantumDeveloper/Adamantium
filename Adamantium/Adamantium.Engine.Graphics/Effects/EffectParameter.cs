@@ -37,8 +37,7 @@ namespace Adamantium.Engine.Graphics.Effects
             Size = parameterDescription.Size;
 
             // If the expecting Matrix4x4F is column_major or the expected size is != from Matrix4x4F, than we need to remap SharpDX.Matrix4x4F to it.
-            if (ParameterClass == EffectParameterClass.MatrixRows ||
-                ParameterClass == EffectParameterClass.MatrixColumns)
+            if (ParameterClass is EffectParameterClass.MatrixRows or EffectParameterClass.MatrixColumns)
             {
                 var isMatrixToMap = RowCount != 4 || ColumnCount != 4 ||
                                     ParameterClass == EffectParameterClass.MatrixRows;

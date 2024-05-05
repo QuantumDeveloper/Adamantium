@@ -23,6 +23,10 @@ namespace Adamantium.Fonts.Common
             {
                 return;
             }
+            
+            if (container.IsFeatureApplied(Info.Tag)) return;
+            
+            container.FeatureApplied(Info.Tag);
 
             // optimization, reset unprocessed glyphs counter
             container.NewProcessingStart();

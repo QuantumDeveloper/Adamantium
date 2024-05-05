@@ -1,99 +1,172 @@
-﻿using Adamantium.Fonts;
+﻿using System;
+using Adamantium.Fonts;
 using Adamantium.Fonts.TextureGeneration;
 using Adamantium.Mathematics;
 using AdamantiumVulkan.Core;
 using System.Collections.Generic;
+using Adamantium.Imaging;
+using Adamantium.Imaging.PaletteQuantizer.Extensions;
 
 namespace Adamantium.Engine.Graphics.Fonts
 {
     public class FontAtlas : GraphicsResource
     {
+        private TextureAtlasGenerator atlasGenerator;
+        private Dictionary<uint, Glyph> processedGlyphs;
+        
+        private SamplerState assignedSamplerState;
+        private BlendState assignedBlendState;
+        private DepthStencilState assignedDepthStencilState;
+        private RasterizerState assignedRasterizerState;
+        private BlendState oldBlendState;
+        private DepthStencilState oldDepthStencilState;
+        private RasterizerState oldRasterizerState;
+        private Color foregroundColor;
+        private TextRenderingParameters renderingParameters;
+
         protected FontAtlasData AtlasData { get; }
 
-        protected TypeFace TypeFace { get; }
+        protected Typeface Typeface { get; }
+        
+        protected IFont Font { get; }
 
-        protected Texture Atlas { get; set; }
+        internal Texture Atlas { get; set; }
 
-        private GlyphLayoutContainer layoutContainer;
+        public uint MSDFTextureSize { get; }
+        
+        public byte SampleRate { get; }
+        
+        public float PixelRange { get; }
+        
+        public uint StartGlyphIndex { get; }
+        
+        public uint GlyphCount { get; }
 
-        public FontAtlas(GraphicsDevice device, FontAtlasData atlasData) : base(device)
+        public double LineSpacingMultiplier { get; set; }
+
+        public FontAtlas(GraphicsDevice device, Typeface typeface, FontParameters parameters) : base(device)
         {
-            AtlasData = atlasData;
-            TypeFace = TypeFace.LoadFont(AtlasData.FontData, 3);
+            processedGlyphs = new Dictionary<uint, Glyph>();
+            
+            Typeface = typeface;
+            Font = Typeface.GetFont(0);
+            MSDFTextureSize = parameters.MsdfTextureSize;
+            SampleRate = parameters.SampleRate;
+            PixelRange = parameters.PixelRange;
+            StartGlyphIndex = parameters.StartGlyphIndex;
+            GlyphCount = parameters.GlyphCount;
+            LineSpacingMultiplier = Font.LineSpacingMultiplier;
+            
+            atlasGenerator = new TextureAtlasGenerator(
+                Typeface, 
+                Font, 
+                MSDFTextureSize, 
+                SampleRate,
+                PixelRange, 
+                StartGlyphIndex, 
+                GlyphCount);
+            
+            AtlasData = atlasGenerator.PrepareTextureAtlas();
+            
             var description = new TextureDescription();
             description.Width = (uint)AtlasData.AtlasSize.Width;
             description.Height = (uint)AtlasData.AtlasSize.Height;
             description.Depth = 1;
             description.ArrayLayers = 1;
             description.MipLevels = 1;
+            description.Samples = MSAALevel.None;
             description.Format = Format.R8G8B8A8_UNORM;
             description.InitialLayout = ImageLayout.Preinitialized;
+            description.DesiredImageLayout = ImageLayout.ShaderReadOnlyOptimal;
             description.ImageType = ImageType._2d;
             description.ImageAspect = ImageAspectFlagBits.ColorBit;
-            Atlas = Texture.CreateFrom(GraphicsDevice, description, AtlasData.ImageData);
-            layoutContainer = new GlyphLayoutContainer(TypeFace);
+            description.Usage = ImageUsageFlagBits.SampledBit | ImageUsageFlagBits.TransferDstBit | ImageUsageFlagBits.TransferSrcBit;
+            description.Dimension = TextureDimension.Texture2D;
+            
+            Atlas = Texture.New(GraphicsDevice, description);
         }
 
-        public Size MeasureString(string text, double fontSize, FontRenderingParameters renderingParameters)
+        private Glyph[] GetNotProcessedGlyphs(IEnumerable<Glyph> glyphs)
         {
-            var font = TypeFace.GetFont(0);
-            var glyphs = font.TranslateIntoGlyphs(text);
-            layoutContainer.AddGlyphs(glyphs);
-            
-            double penPosition = 0.0;
-            var ascenderLineDiff = fontSize * (font.UnitsPerEm - font.Ascender) / font.UnitsPerEm;
-            var glyphList = new List<SpriteBatchItem>();
-            
-            // try to apply GPOS kern
-            var kernApplied = font.FeatureService.ApplyFeature(FeatureNames.kern, layoutContainer, 0, (uint)glyphs.Length);
-            var subApp = font.FeatureService.ApplyFeature(FeatureNames.aalt, layoutContainer, 0, (uint)glyphs.Length);
-            
-            for (var i = 0; i < layoutContainer.Count; i++)
+            var processed = new List<Glyph>();
+            foreach (var glyph in glyphs)
             {
-                var glyph = layoutContainer.GetGlyph(i); // @TODO move everything inside Layout Container, and remove GetGlyph method
-                glyph.CalculateEmRelatedMultipliers(font.UnitsPerEm); // @TODO: need to somehow calculate this at glyph creation time (for each glyph, maybe at parser)
-
-                var positionMultiplier = glyph.EmRelatedCenterToBaseLineMultiplier;
-
-                double left = penPosition - fontSize * positionMultiplier.X;
-
-                // if GPOS kern is not applied - try TTF kern approach
-                if (!kernApplied)
+                if (!processedGlyphs.ContainsKey(glyph.Index))
                 {
-                    if (i > 0)
-                    {
-                        Glyph prevGlyph = layoutContainer.GetGlyph(i - 1); // @TODO move everything inside Layout Container, and remove GetGlyph method
-                        left += fontSize * font.GetKerningValue((ushort)prevGlyph.Index, (ushort)glyph.Index) / (double)font.UnitsPerEm;
-                    }
-                }
-
-                double top = fontSize * positionMultiplier.Y - ascenderLineDiff;
-
-                double right = left + fontSize;
-                double bottom = top + fontSize;
-                var fontItem = new SpriteBatchItem();
-                fontItem.Destination = new Vector4F((float)left, (float)top, (float)(right - left), (float)(bottom - top));
-
-                fontItem.Source= AtlasData.GetTextureAtlasUVCoordinates(glyph.Index);
-                glyphList.Add(fontItem);
-                
-                penPosition += fontSize * glyph.EmRelatedAdvanceWidthMultiplier;
-
-                // if GPOS kern is applied - modify the advance for current glyph
-                if (kernApplied)
-                {
-                    penPosition += fontSize * layoutContainer.GetAdvance((uint)i).X / font.UnitsPerEm;
+                    processed.Add(glyph);
                 }
             }
-            
-            return Size.Zero;
+
+            return processed.ToArray();
         }
 
-        public void DrawString(string text, FontRenderingParameters parameters, RenderTarget renderTarget)
+        private void ProcessGlyphs(params Glyph[] glyphs)
         {
-            // GraphicsDevice.BasicEffect.Parameters["foregroundColor"].SetValue(material.AmbientColor);
-            // GraphicsDevice.BasicEffect.Parameters["sampleType"].SetResource(smallGlyphTextureSampler);
-            // GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["SmallGlyph"].Apply();
+            var uniqueGlyphs = glyphs.Distinct(x => x.Index);
+            var glyphsToProcess = GetNotProcessedGlyphs(uniqueGlyphs);
+            var textureDataArray = atlasGenerator.GenerateTextureForGlyphs(glyphsToProcess);
+
+            if (textureDataArray.Length > 0)
+            {
+                ProcessTextureData(textureDataArray);
+            }
+
+            foreach (var glyph in glyphsToProcess)
+            {
+                processedGlyphs[glyph.Index] = glyph;
+            }
+        }
+
+        private void ProcessTextureData(GlyphTextureData[] textureDataArray)
+        {
+            Atlas.TransitionImageLayout(ImageLayout.TransferDstOptimal);
+            var commandBuffer = GraphicsDevice.BeginSingleTimeCommands();
+            var buffers = new List<Buffer>();
+
+            foreach (var textureData in textureDataArray)
+            {
+                if (textureData.IsEmpty) continue;
+
+                var buffer = Buffer.New(
+                    GraphicsDevice,
+                    textureData.Pixels,
+                    BufferUsageFlags.TransferSrc,
+                    MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent);
+                buffers.Add(buffer);
+
+                BufferImageCopy region = new BufferImageCopy();
+                region.BufferOffset = 0;
+                region.BufferRowLength = (uint)textureData.BoundingRect.Width;
+                region.BufferImageHeight = (uint)textureData.BoundingRect.Height;
+                region.ImageSubresource = new ImageSubresourceLayers();
+                region.ImageSubresource.AspectMask = ImageAspectFlagBits.ColorBit;
+                region.ImageSubresource.MipLevel = 0;
+                region.ImageSubresource.BaseArrayLayer = 0;
+                region.ImageSubresource.LayerCount = 1;
+                region.ImageOffset = new Offset3D()
+                    { X = textureData.BoundingRect.Left, Y = textureData.BoundingRect.Top, Z = 0 };
+                region.ImageExtent = new Extent3D() { Width = (uint)textureData.BoundingRect.Width, Height = (uint)textureData.BoundingRect.Height, Depth = 1 };
+
+                commandBuffer.CopyBufferToImage(buffer, Atlas, ImageLayout.TransferDstOptimal, 1, region);
+            }
+
+            GraphicsDevice.EndSingleTimeCommands(commandBuffer);
+            Atlas.TransitionImageLayout(Atlas.Description.DesiredImageLayout);
+            foreach (var buffer in buffers)
+            {
+                buffer?.Dispose();
+            }
+        }
+
+        public RectangleF GetUVCoordinatesForGlyph(uint glyphIndex)
+        {
+            return AtlasData.GetUVCoordinatesForGlyph(glyphIndex);
+        }
+
+        public void Update(string text)
+        {
+            var glyphs = Font.TranslateIntoGlyphs(text);
+            ProcessGlyphs(glyphs);
         }
     }
 }

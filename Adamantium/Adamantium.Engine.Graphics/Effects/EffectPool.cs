@@ -169,6 +169,12 @@ namespace Adamantium.Engine.Graphics.Effects
             }
             return shader;
         }
+        
+        internal byte[] GetShaderBytecode(EffectShaderType shaderType, int index)
+        {
+            var bytecode = RegisteredShaders[index].Bytecode;
+            return bytecode;
+        }
 
         internal EffectConstantBuffer GetOrCreateConstantBuffer(GraphicsDevice context, EffectData.ConstantBuffer bufferRaw)
         {
@@ -394,7 +400,7 @@ namespace Adamantium.Engine.Graphics.Effects
 
         private static Buffer DefaultConstantBufferAllocator(GraphicsDevice device, EffectPool pool, EffectConstantBuffer constantBuffer)
         {
-            return Buffer.Uniform.New(device, (int)constantBuffer.BackingBuffer.Size);
+            return Buffer.Uniform.New(device, constantBuffer.BackingBuffer.Size);
         }
 
         private void OnEffectAdded(EffectPoolEventArgs e)

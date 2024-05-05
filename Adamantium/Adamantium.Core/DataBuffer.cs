@@ -34,7 +34,7 @@ namespace Adamantium.Core
         private unsafe sbyte* _buffer;
         private GCHandle _gCHandle;
         private readonly bool _ownsBuffer;
-        private long _size;
+        private ulong _size;
 
         /// <summary>
         /// Creates the specified user buffer.
@@ -60,7 +60,7 @@ namespace Adamantium.Core
                 var indexOffset = index * Utilities.SizeOf<T>();
 
                 var handle = GCHandle.Alloc(userBuffer, GCHandleType.Pinned);
-                buffer = new DataBuffer(indexOffset + (byte*)handle.AddrOfPinnedObject(), sizeOfBuffer - indexOffset, handle);
+                buffer = new DataBuffer(indexOffset + (byte*)handle.AddrOfPinnedObject(), (ulong)(sizeOfBuffer - indexOffset), handle);
 
                 return buffer;
             }
@@ -72,7 +72,7 @@ namespace Adamantium.Core
         /// <param name = "sizeInBytes">The size of the buffer to be allocated, in bytes.</param>
         /// <exception cref = "T:System.ArgumentOutOfRangeException">
         ///   <paramref name = "sizeInBytes" /> is less than 1.</exception>
-        public DataBuffer(long sizeInBytes)
+        public DataBuffer(ulong sizeInBytes)
         {
             unsafe
             {
@@ -89,7 +89,7 @@ namespace Adamantium.Core
         /// </summary>
         /// <param name="dataPointer">The data pointer.</param>
         public DataBuffer(DataPointer dataPointer)
-            : this(dataPointer.Pointer, (long)dataPointer.Size)
+            : this(dataPointer.Pointer, dataPointer.Size)
         {
         }
 
@@ -99,13 +99,13 @@ namespace Adamantium.Core
         /// </summary>
         /// <param name = "userBuffer">A pointer to the buffer to be used as a backing store.</param>
         /// <param name = "sizeInBytes">The size of the buffer provided, in bytes.</param>
-        public unsafe DataBuffer(IntPtr userBuffer, long sizeInBytes)
+        public unsafe DataBuffer(IntPtr userBuffer, ulong sizeInBytes)
             : this((void*)userBuffer, sizeInBytes, false)
         {
         }
 
 
-        internal unsafe DataBuffer(void* buffer, long sizeInBytes, GCHandle handle)
+        internal unsafe DataBuffer(void* buffer, ulong sizeInBytes, GCHandle handle)
         {
             System.Diagnostics.Debug.Assert(sizeInBytes > 0);
 
@@ -115,7 +115,7 @@ namespace Adamantium.Core
             _ownsBuffer = false;
         }
 
-        internal unsafe DataBuffer(void* buffer, long sizeInBytes, bool makeCopy)
+        internal unsafe DataBuffer(void* buffer, ulong sizeInBytes, bool makeCopy)
         {
             System.Diagnostics.Debug.Assert(sizeInBytes > 0);
 
@@ -327,7 +327,7 @@ namespace Adamantium.Core
         ///   Gets the length in bytes of the buffer.
         /// </summary>
         /// <value>A long value representing the length of the buffer in bytes.</value>
-        public long Size => _size;
+        public ulong Size => _size;
 
         /// <summary>
         /// Performs an explicit conversion from <see cref="SharpDX.DataBuffer"/> to <see cref="SharpDX.DataPointer"/>.

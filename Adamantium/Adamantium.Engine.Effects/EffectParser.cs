@@ -309,6 +309,7 @@ namespace Adamantium.Engine.Effects
             return currentToken;
         }
 
+        int tokenIndex = 0;
         protected Token InternalNextToken()
         {
             // TODO: token preview is not safe with NewLine count
@@ -342,6 +343,7 @@ namespace Adamantium.Engine.Effects
                         currentPreviewTokens.Add(currentToken);
                     return currentToken;
                 }
+                tokenIndex++;
             }
 
             currentToken = EndOfFile;

@@ -49,7 +49,7 @@ namespace Adamantium.Engine.Graphics.Effects
             // By default, all constant buffers are cleared with 0
             BackingBuffer.Clear();
 
-            NativeBuffer = ToDispose(Buffer.Uniform.New(device, (int)BackingBuffer.Size));
+            NativeBuffer = ToDispose(Buffer.Uniform.New(device, BackingBuffer.Size));
 
             // The buffer is considered dirty for the first usage.
             IsDirty = true;
@@ -92,7 +92,7 @@ namespace Adamantium.Engine.Graphics.Effects
                 throw new ArgumentOutOfRangeException(nameof(toBuffer), "Size of the source and destination buffer are not the same");
             }
 
-            Utilities.CopyMemory(toBuffer.BackingBuffer.DataPointer, BackingBuffer.DataPointer, BackingBuffer.Size);
+            Utilities.CopyMemory(toBuffer.BackingBuffer.DataPointer, BackingBuffer.DataPointer, (long)BackingBuffer.Size);
             toBuffer.IsDirty = true;
         }
 

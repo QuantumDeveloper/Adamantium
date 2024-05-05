@@ -90,5 +90,44 @@ namespace Adamantium.Engine.Graphics
         {
             return new PresentationParameters(this);
         }
+        
+        public static PresentationParameters SwapchainParameters(
+            uint width, 
+            uint height, 
+            IntPtr handle,
+            MSAALevel msaaLevel,
+            Format imageFormat = Format.B8G8R8A8_UNORM, 
+            DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24, 
+            uint buffers = 3)
+        {
+            return new PresentationParameters(
+                PresenterType.Swapchain, 
+                width, 
+                height, 
+                handle, 
+                msaaLevel,
+                imageFormat, 
+                depthFormat, 
+                buffers);
+        }
+
+        public static PresentationParameters RenderTargetParameters(
+            uint width, 
+            uint height, 
+            MSAALevel msaaLevel,
+            Format imageFormat = Format.B8G8R8A8_UNORM, 
+            DepthFormat depthFormat = DepthFormat.Depth32Stencil8X24, 
+            uint buffers = 3)
+        {
+            return new PresentationParameters(
+                PresenterType.RenderTarget, 
+                width, 
+                height, 
+                IntPtr.Zero, 
+                msaaLevel,
+                imageFormat, 
+                depthFormat, 
+                buffers);
+        }
     }
 }

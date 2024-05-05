@@ -16,19 +16,18 @@ namespace Adamantium.Fonts.TextureGeneration
 
     public class TextureAtlasGenerator
     {
-        private object objLocker = new object();
-
         private FontAtlasData atlasData;
         private Size atlasSize;
         private UInt32 glyphTextureSize;
         private byte sampleRate;
         private double pxRange;
-        private TypeFace typeFace;
+        private Typeface typeface;
         private IFont font;
         private uint startGlyphIndex;
+        private uint glyphCount;
 
-        public FontAtlasData GenerateTextureAtlas(
-            TypeFace typeFace, 
+        public TextureAtlasGenerator(
+            Typeface typeface, 
             IFont font, 
             uint glyphTextureSize,
             byte sampleRate, 
@@ -36,27 +35,21 @@ namespace Adamantium.Fonts.TextureGeneration
             uint startGlyphIndex, 
             uint glyphCount)
         {
-            if (glyphCount <= 0)
-            {
-                return default;
-            }
-
             this.glyphTextureSize = glyphTextureSize;
             this.sampleRate = sampleRate;
             this.pxRange = pxRange;
-            this.typeFace = typeFace;
+            this.typeface = typeface;
             this.font = font;
             this.startGlyphIndex = startGlyphIndex;
+            this.glyphCount = glyphCount;
+            atlasData = new FontAtlasData(glyphTextureSize);
+        }
 
-            var timer1 = Stopwatch.StartNew();
-
-            atlasData = new FontAtlasData();
-
+        public FontAtlasData PrepareTextureAtlas()
+        {
             Parallel.For((int)startGlyphIndex, (int)(startGlyphIndex + glyphCount),
-                new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount }, GenerateTextureForGlyph);
-
-            timer1.Stop();
-            var timer2 = Stopwatch.StartNew();
+                new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount }, CalculateTextureDataForGlyph);
+            
             var totalBytes = atlasData.GlyphData.Sum(x => x.Pixels.Length);
             var totalPixels = totalBytes / 4; 
             var pixelsPerRow = (uint)Math.Ceiling(Math.Sqrt(totalPixels));
@@ -71,6 +64,7 @@ namespace Adamantium.Fonts.TextureGeneration
             int xOffset = 0;
             int resultWidth = (int)pixelsPerRow;
             var heights = new List<int>();
+            
             foreach (var group in groups)
             {
                 foreach (var glyphData in group)
@@ -78,12 +72,8 @@ namespace Adamantium.Fonts.TextureGeneration
                     var textureWidth = glyphData.BoundingRect.Width;
                     heights.Add(glyphData.BoundingRect.Height);
                     
-                    glyphData.BoundingRect.Left = (int)xOffset;
-                    glyphData.BoundingRect.Top = (int)yOffset;
-                    glyphData.UV.Left = (float)(xOffset / atlasSize.Width);
-                    glyphData.UV.Top = (float)(yOffset / atlasSize.Height);
-                    glyphData.UV.Right = (float)(glyphData.BoundingRect.Right / atlasSize.Width);
-                    glyphData.UV.Bottom = (float)(glyphData.BoundingRect.Bottom / atlasSize.Height);
+                    glyphData.BoundingRect.Left = xOffset;
+                    glyphData.BoundingRect.Top = yOffset;
                     
                     xOffset += textureWidth;
                     if (xOffset >= resultWidth)
@@ -93,8 +83,8 @@ namespace Adamantium.Fonts.TextureGeneration
                         yOffset += maxHeight;
                         heights.Clear();
                         
-                        glyphData.BoundingRect.Left = (int)xOffset;
-                        glyphData.BoundingRect.Top = (int)yOffset;
+                        glyphData.BoundingRect.Left = xOffset;
+                        glyphData.BoundingRect.Top = yOffset;
                     }
                 }
             }
@@ -104,9 +94,89 @@ namespace Adamantium.Fonts.TextureGeneration
                 yOffset += maxHeight;
                 heights.Clear();
             }
-            
             atlasSize = new Size(resultWidth, yOffset);
+            atlasData.ImageData = new byte[(int)atlasSize.Width * (int)atlasSize.Height * 4];
+            atlasData.AtlasSize = atlasSize;
             
+            foreach (var group in groups)
+            {
+                foreach (var glyphData in group)
+                {
+                    glyphData.CalculateUV(atlasSize);
+                }
+            }
+            
+            return atlasData;
+        }
+
+        public GlyphTextureData[] GenerateTextureForGlyphs(Glyph[] glyphs)
+        {
+            if (glyphs == null || glyphs.Length == 0)
+            {
+                return Array.Empty<GlyphTextureData>();
+            }
+
+            Parallel.ForEach(glyphs,
+                new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount }, GenerateTextureForGlyph);
+            
+            return atlasData.GetGlyphData(glyphs.Select(x=>x.Index).ToArray());
+        }
+
+        public FontAtlasData GenerateTextureAtlas()
+        {
+            if (glyphCount <= 0)
+            {
+                return default;
+            }
+
+            Parallel.For((int)startGlyphIndex, (int)(startGlyphIndex + glyphCount),
+                new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount }, GenerateTextureForGlyph);
+
+            var totalBytes = atlasData.GlyphData.Sum(x => x.Pixels.Length);
+            var totalPixels = totalBytes / 4; 
+            var pixelsPerRow = (uint)Math.Ceiling(Math.Sqrt(totalPixels));
+
+            var groups = atlasData.GlyphData
+                .GroupBy(x => x.BoundingRect.Height)
+                .OrderByDescending(x => x.Key)
+                .Select(group => group.OrderByDescending(x => x.BoundingRect.Width))
+                .ToList();
+            
+            int yOffset = 0;
+            int xOffset = 0;
+            int resultWidth = (int)pixelsPerRow;
+            var heights = new List<int>();
+            atlasSize = new Size(resultWidth, yOffset);
+            foreach (var group in groups)
+            {
+                foreach (var glyphData in group)
+                {
+                    var textureWidth = glyphData.BoundingRect.Width;
+                    heights.Add(glyphData.BoundingRect.Height);
+                    
+                    glyphData.BoundingRect.Left = xOffset;
+                    glyphData.BoundingRect.Top = yOffset;
+                    
+                    xOffset += textureWidth;
+                    if (xOffset >= resultWidth)
+                    {
+                        xOffset = 0;
+                        var maxHeight = heights.Max();
+                        yOffset += maxHeight;
+                        heights.Clear();
+                        
+                        glyphData.BoundingRect.Left = xOffset;
+                        glyphData.BoundingRect.Top = yOffset;
+                    }
+                }
+            }
+            if (heights.Count > 0)
+            {
+                var maxHeight = heights.Max();
+                yOffset += maxHeight;
+                heights.Clear();
+            }
+            atlasSize = new Size(resultWidth, yOffset);
             atlasData.ImageData = new byte[(int)atlasSize.Width * (int)atlasSize.Height * 4];
             atlasData.AtlasSize = atlasSize;
             
@@ -129,31 +199,40 @@ namespace Adamantium.Fonts.TextureGeneration
                     }
                 }
             }
-            timer2.Stop();
 
             return atlasData;
         }
 
         private void GenerateTextureForGlyph(int glyphIndex)
         {
-            typeFace.GetGlyphByIndex((uint)glyphIndex, out var glyph);
+            typeface.GetGlyphByIndex((uint)glyphIndex, out var glyph);
             glyph.Sample(sampleRate);
 
-            GlyphTextureData rawGlyph = glyph.GenerateDirectMSDF(glyphTextureSize, pxRange, font.UnitsPerEm);
-            if (rawGlyph == null) return;
-
-            lock (objLocker)
-            {
-                atlasData.GlyphData.Add(rawGlyph);
-            }
+            var textureData = glyph.GenerateDirectMSDF(glyphTextureSize, pxRange, font.UnitsPerEm);
+            if (textureData == null) return;
+            
+            atlasData.AddGlyphData(textureData);
         }
-
-        private Size CalculateAtlasDimensions(uint glyphCount)
+        
+        private void GenerateTextureForGlyph(Glyph glyph)
         {
-            var glyphsPerRow = (uint)Math.Ceiling(Math.Sqrt(glyphCount));
-            var glyphsPerColumn = (uint)Math.Ceiling((double)glyphCount / glyphsPerRow);
+            glyph.CalculateEmRelatedMultipliers(font.UnitsPerEm);
+            glyph.Sample(sampleRate);
+            var textureData = atlasData.GetGlyphData(glyph.Index);
+            if (textureData == null) return;
+            
+            glyph.GenerateGlyphData(textureData, pxRange, font.UnitsPerEm);
+        }
+        
+        private void CalculateTextureDataForGlyph(int glyphIndex)
+        {
+            typeface.GetGlyphByIndex((uint)glyphIndex, out var glyph);
+            glyph.Sample(sampleRate);
 
-            return new Size(glyphsPerRow, glyphsPerColumn);
+            var textureData = glyph.IsEmpty ? null : glyph.PrepareData(glyphTextureSize, font.UnitsPerEm);
+            if (textureData == null) return;
+            
+            atlasData.AddGlyphData(textureData);
         }
     }
 }

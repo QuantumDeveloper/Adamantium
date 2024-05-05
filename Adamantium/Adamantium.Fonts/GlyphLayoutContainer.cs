@@ -7,22 +7,36 @@ namespace Adamantium.Fonts
     public class GlyphLayoutContainer : IGlyphPositioning, IGlyphSubstitutions
     {
         private readonly List<Glyph> displayedGlyphs;
-        private Dictionary<uint, FeatureCache> glyphCacheMap;
-        private TypeFace typeFace;
+        private readonly Dictionary<uint, FeatureCache> glyphCacheMap;
+        private readonly HashSet<string> appliedFeatures;
+        private readonly Typeface typeface;
+        private readonly IFont font;
         private int unprocessedGlyphs;
+        private string text;
 
         public bool IsProcessingDone => unprocessedGlyphs == 0;
         
-        public GlyphLayoutContainer(TypeFace typeFace)
+        public GlyphLayoutContainer(Typeface typeface, IFont font)
         {
-            this.typeFace = typeFace;
+            this.typeface = typeface;
+            this.font = font;
             displayedGlyphs = new List<Glyph>();
             glyphCacheMap = new Dictionary<uint, FeatureCache>();
+            appliedFeatures = new HashSet<string>();
         }
 
-        public void AddGlyphs(params Glyph[] glyphs)
+        public void SetText(string text)
         {
+            if (string.IsNullOrEmpty(text)) return;
+            
+            if (this.text == text) return;
+            
+            this.text = text;
+            var glyphs = font.TranslateIntoGlyphs(text);
+            displayedGlyphs.Clear();
             displayedGlyphs.AddRange(glyphs);
+            glyphCacheMap.Clear();
+            appliedFeatures.Clear();
         }
 
         public void ReplaceGlyph(int index, Glyph glyph)
@@ -55,7 +69,7 @@ namespace Adamantium.Fonts
                 glyphCacheMap[glyphIndex] = featureCache;
             }
 
-            if (typeFace.GetGlyphByIndex(substitutionGlyphIndex, out var glyph))
+            if (typeface.GetGlyphByIndex(substitutionGlyphIndex, out var glyph))
             {
                 displayedGlyphs.RemoveAt((int)glyphIndex);
                 displayedGlyphs.Insert((int)glyphIndex, glyph); 
@@ -87,7 +101,7 @@ namespace Adamantium.Fonts
                 glyphCacheMap[glyphIndex] = featureCache;
             }
 
-            if (typeFace.GetGlyphByIndex(substitutionArray[0], out var glyph))
+            if (typeface.GetGlyphByIndex(substitutionArray[0], out var glyph))
             {
                 displayedGlyphs.RemoveAt((int)glyphIndex);
                 displayedGlyphs.Insert((int)glyphIndex, glyph); 
@@ -107,7 +121,7 @@ namespace Adamantium.Fonts
             }
 
             // many to one replacement (e.g. ligatures)
-            if (typeFace.GetGlyphByIndex(newGlyphIndex, out var glyph))
+            if (typeface.GetGlyphByIndex(newGlyphIndex, out var glyph))
             {
                 displayedGlyphs.RemoveRange((int)glyphIndex, removeLength);
                 displayedGlyphs.Insert((int)glyphIndex, glyph); 
@@ -116,7 +130,7 @@ namespace Adamantium.Fonts
             unprocessedGlyphs -= removeLength;
             
             featureCache.AddToFeatureCache(featureInfo, newGlyphIndex);
-            //TODO: need to check does this logic is correct
+            //TODO: need to check does this logic correct
         }
 
         public GlyphClassDefinition GetGlyphClassDefinition(uint index)
@@ -156,6 +170,16 @@ namespace Adamantium.Fonts
         {
             glyphCacheMap.TryGetValue(glyphIndex, out var featureCache);
             return featureCache != null ? featureCache.Layout.Position.Advance : new Vector2F(0, 0);
+        }
+
+        public bool IsFeatureApplied(string featureName)
+        {
+            return appliedFeatures.Contains(featureName);
+        }
+
+        public void FeatureApplied(string featureName)
+        {
+            appliedFeatures.Add(featureName);
         }
 
         public void NewProcessingStart()

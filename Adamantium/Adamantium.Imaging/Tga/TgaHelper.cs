@@ -5,7 +5,7 @@ namespace Adamantium.Imaging.Tga
 {
     internal class TgaHelper
     {
-        public static TgaImage LoadFromMemory(IntPtr source, long size)
+        public static TgaImage LoadFromMemory(IntPtr source, ulong size)
         {
             TgaConversionFlags conversionFlags = 0;
             ImageDescription description;

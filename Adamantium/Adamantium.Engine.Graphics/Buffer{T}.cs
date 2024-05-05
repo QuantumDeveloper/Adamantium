@@ -14,7 +14,7 @@ namespace Adamantium.Engine.Graphics
         {
         }
 
-        internal Buffer(GraphicsDevice device, BufferCreateInfo bufferInfo, uint count, MemoryPropertyFlags memoryFlags)
+        internal Buffer(GraphicsDevice device, BufferCreateInfo bufferInfo, ulong count, MemoryPropertyFlags memoryFlags)
            : base(device, bufferInfo, count, memoryFlags)
         {
         }

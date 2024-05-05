@@ -11,7 +11,7 @@ namespace Adamantium.Imaging.Png.IO
     {
         internal static byte[] PngHeader = { 137, 80, 78, 71, 13, 10, 26, 10 };
 
-        public PNGStreamReader(IntPtr pSource, long size) : base((byte*)pSource, size)
+        public PNGStreamReader(IntPtr pSource, ulong size) : base((byte*)pSource, (long)size)
         {
         }
 

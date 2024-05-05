@@ -5,7 +5,7 @@ using MessagePack;
 namespace Adamantium.Fonts.Common
 {
     [MessagePackObject]
-    internal class OutlineSegment
+    public class OutlineSegment
     {
         [Key(0)]
         public List<Vector2> Points { get; }

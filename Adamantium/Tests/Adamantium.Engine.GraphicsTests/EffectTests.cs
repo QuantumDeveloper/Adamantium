@@ -16,7 +16,7 @@ namespace Adamantium.Engine.GraphicsTests
         {
             var main = MainGraphicsDevice.Create("TestApp", true, true);
             var device = main.CreateRenderDevice(new PresentationParameters(PresenterType.RenderTarget, 100, 100, IntPtr.Zero));
-            var effect = Effect.CompileFromFile(Path.Combine("EffectsData", "UIEffect.fx"), device);
+            var effect = Effect.CompileFromFile(Path.Combine("EffectsData", "FontEffect.fx"), device);
         }
     }
 }

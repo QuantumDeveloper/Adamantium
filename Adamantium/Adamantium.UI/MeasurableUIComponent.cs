@@ -516,12 +516,14 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
 
     public void InvalidateMeasure()
     {
+        if (!IsMeasureValid) return;
+        
         IsMeasureValid = false;
         IsArrangeValid = false;
         IsGeometryValid = false;
         _previousMeasure = null;
         _previousArrange = null;
-
+        
         if (LogicalParent is IMeasurableComponent parent)
         {
             parent?.InvalidateMeasure();
@@ -530,6 +532,8 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
 
     public void InvalidateArrange()
     {
+        if (!IsArrangeValid) return;
+        
         IsArrangeValid = false;
 
         _previousArrange = null;

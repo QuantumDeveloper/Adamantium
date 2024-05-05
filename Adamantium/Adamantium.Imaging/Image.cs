@@ -1,16 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Adamantium.Core;
-using Adamantium.Imaging.Bmp;
-using Adamantium.Imaging.Dds;
-using Adamantium.Imaging.Gif;
-using Adamantium.Imaging.Ico;
-using Adamantium.Imaging.Jpeg;
-using Adamantium.Imaging.Png;
-using Adamantium.Imaging.Tga;
 using AdamantiumVulkan.Core;
 
 namespace Adamantium.Imaging
@@ -442,7 +434,7 @@ namespace Adamantium.Imaging
         /// <param name="makeACopy">True to copy the content of the buffer to a new allocated buffer, false otherwise.</param>
         /// <returns>An new image.</returns>
         /// <remarks>If <paramref name="makeACopy"/> is set to false, the returned image is now the holder of the unmanaged pointer and will release it on Dispose. </remarks>
-        public static Image Load(IntPtr dataPointer, long dataSize, bool makeAcopy = false)
+        public static Image Load(IntPtr dataPointer, ulong dataSize, bool makeAcopy = false)
         {
             var rawBitmap = BitmapLoader.Load(dataPointer, dataSize);
 
@@ -460,7 +452,7 @@ namespace Adamantium.Imaging
             if (buffer == null)
                 throw new ArgumentNullException(nameof(buffer));
 
-            long size = buffer.Length;
+            ulong size = (ulong)buffer.Length;
 
             // If buffer is allocated on Large Object Heap, then we are going to pin it instead of making a copy.
             if (size > (85 * 1024))
@@ -504,14 +496,14 @@ namespace Adamantium.Imaging
 
             FileStream stream = null;
             IntPtr memoryPtr = IntPtr.Zero;
-            long size;
+            ulong size;
             try
             {
                 unsafe
                 {
                     stream = new FileStream(fileName, FileMode.Open, FileAccess.Read);
-                    size = stream.Length;
-                    memoryPtr = Utilities.AllocateMemory((int)size);
+                    size = (ulong)stream.Length;
+                    memoryPtr = Utilities.AllocateMemory((uint)size);
                     Span<byte> bytes = new Span<byte>(memoryPtr.ToPointer(), (int)size);
                     stream.Read(bytes);
                 }

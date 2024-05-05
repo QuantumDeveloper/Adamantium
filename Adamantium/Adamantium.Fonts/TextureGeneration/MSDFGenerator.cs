@@ -5,12 +5,20 @@ using Adamantium.Mathematics;
 
 namespace Adamantium.Fonts.TextureGeneration
 {
-    public class MsdfGenerator
+    public static class MSDFGenerator
     {
-        private List<MsdfGlyphSegment> segments;
-
+        public static void GenerateGlyphData(this Glyph glyph, GlyphTextureData textureData, double pxRange, ushort unitsPerEm)
+        {
+            GenerateMSDFForExistingTextureData(glyph, textureData, pxRange, unitsPerEm);
+        }
+        
+        public static GlyphTextureData PrepareData(this Glyph glyph, uint size, ushort unitsPerEm)
+        {
+            return CalculateBasicTextureData(glyph, size, unitsPerEm);
+        }
+        
         // --- PREPROCESSORS ---
-        private List<List<MsdfGlyphSegment>> SplitToRawContours()
+        private static List<List<MsdfGlyphSegment>> SplitToRawContours(List<MsdfGlyphSegment> segments)
         {
             var res = new List<List<MsdfGlyphSegment>>();
             var contour = new List<MsdfGlyphSegment>();
@@ -38,7 +46,7 @@ namespace Adamantium.Fonts.TextureGeneration
             return res;
         }
 
-        private bool FindFirstSharpAngle(List<MsdfGlyphSegment> contour, int angleThreshold, out int startIndex)
+        private static bool FindFirstSharpAngle(List<MsdfGlyphSegment> contour, int angleThreshold, out int startIndex)
         {
             for (int i = startIndex = 0; i < contour.Count; i++)
             {
@@ -64,12 +72,12 @@ namespace Adamantium.Fonts.TextureGeneration
             return false;
         }
 
-        private List<Contour> SplitToEdgedContours()
+        private static List<Contour> SplitToEdgedContours(List<MsdfGlyphSegment> segments)
         {
             var angleThreshold = 135;
 
             var res = new List<Contour>();
-            var rawContours = SplitToRawContours();
+            var rawContours = SplitToRawContours(segments);
 
             foreach (var contour in rawContours)
             {
@@ -118,10 +126,10 @@ namespace Adamantium.Fonts.TextureGeneration
 
         // --- MAIN FUNCS ---
         // edge is a list of connected segments which have no sharp corners within them
-        private void ColorEdges()
+        private static void ColorEdges(List<MsdfGlyphSegment> segments)
         {
             var segmentLengthThreshold = 10;
-            var contours = SplitToEdgedContours();
+            var contours = SplitToEdgedContours(segments);
 
             segments.Clear();
 
@@ -147,7 +155,7 @@ namespace Adamantium.Fonts.TextureGeneration
             }
         }
 
-        private ColoredDistance GetColoredDistances(Vector2 point, double range)
+        private static ColoredDistance GetColoredDistances(List<MsdfGlyphSegment> segments, Vector2 point, double range, bool isTtf)
         {
             double closestRedDistance = double.MaxValue;
             double closestGreenDistance = double.MaxValue;
@@ -225,6 +233,14 @@ namespace Adamantium.Fonts.TextureGeneration
             coloredDistance.AlphaDistance =
                 GlyphSegmentsMath.GetSignedDistanceToSegmentsJoint(closestAlphaSegments, point, false);
 
+            if (isTtf)
+            {
+                coloredDistance.RedDistance = -coloredDistance.RedDistance;
+                coloredDistance.GreenDistance = -coloredDistance.GreenDistance;
+                coloredDistance.BlueDistance = -coloredDistance.BlueDistance;
+                coloredDistance.AlphaDistance = -coloredDistance.AlphaDistance;
+            }
+
             // prepare distance data for normalization
             coloredDistance.RedDistance = coloredDistance.RedDistance / range + 0.5;
             coloredDistance.GreenDistance = coloredDistance.GreenDistance / range + 0.5;
@@ -232,6 +248,22 @@ namespace Adamantium.Fonts.TextureGeneration
             coloredDistance.AlphaDistance = coloredDistance.AlphaDistance / range + 0.5;
 
             return coloredDistance;
+        }
+
+        public static GlyphTextureData CalculateBasicTextureData(
+            Glyph glyph,
+            uint originalSize,
+            ushort unitsPerEm)
+        {
+            var glyphBoundingRectangle = glyph.BoundingRectangle;
+            var widthRatio = (double)(glyphBoundingRectangle.Width) / unitsPerEm;
+            var heightRatio = (double)(glyphBoundingRectangle.Height) / unitsPerEm;
+            var size = new Size(Math.Ceiling(originalSize * widthRatio),
+                Math.Ceiling(originalSize * heightRatio));
+            
+            var textureData = new GlyphTextureData((uint)size.Width, (uint)size.Height, glyph.Index);
+
+            return textureData;
         }
 
         /// <summary>
@@ -244,33 +276,33 @@ namespace Adamantium.Fonts.TextureGeneration
         /// <param name="unitsPerEm">Size of glyph width and height in em</param>
         /// <param name="glyphIndex">Glyph index</param>
         /// <returns>MSDF color data in for of single-dimension array</returns>
-        public GlyphTextureData GenerateDirectMSDF(
+        public static GlyphTextureData GenerateDirectMSDF(
+            this Glyph glyph,
             uint originalSize, 
-            double pxRange, 
-            Rectangle glyphBoundingRectangle,
-            List<LineSegment2D> glyphSegments, 
-            ushort unitsPerEm, 
-            uint glyphIndex)
+            double pxRange,
+            ushort unitsPerEm)
         {
+            var glyphSegments = glyph.GetMergedOutlineSegments();
             if (glyphSegments.Count == 0)
             {
                 return null;
             }
 
-            segments = new List<MsdfGlyphSegment>();
+            var segments = new List<MsdfGlyphSegment>();
 
             foreach (var segment in glyphSegments)
             {
                 segments.Add(new MsdfGlyphSegment(segment.Start, segment.End));
             }
 
+            var glyphBoundingRectangle = glyph.BoundingRectangle;
             var widthRatio = (double)(glyphBoundingRectangle.Width) / unitsPerEm;
             var heightRatio = (double)(glyphBoundingRectangle.Height) / unitsPerEm;
             var size = new Size(Math.Ceiling(originalSize * widthRatio),
                 Math.Ceiling(originalSize * heightRatio));
 
             // 1. Color all segments
-            ColorEdges();
+            ColorEdges(segments);
 
             // 2. Calculate boundaries for original glyph (the position of the EM square)
             var emSquare = new Rectangle(0, 0, unitsPerEm, unitsPerEm);
@@ -298,6 +330,8 @@ namespace Adamantium.Fonts.TextureGeneration
 
             //var additionalSpace = glyphBoundingRectangle.Width * 0.02;
             var additionalSpace = 0;
+            
+            var textureData = new GlyphTextureData((uint)size.Width, (uint)size.Height, glyph.Index);
 
             ColoredDistance minColoredDistance;
 
@@ -325,7 +359,7 @@ namespace Adamantium.Fonts.TextureGeneration
                         samplingPoint.Y >= glyphBoundingRectangle.Y - additionalSpace &&
                         samplingPoint.Y <= glyphBoundingRectangle.Bottom + additionalSpace)
                     {
-                        coloredDistances[x, y] = GetColoredDistances(samplingPoint, range);
+                        coloredDistances[x, y] = GetColoredDistances(segments, samplingPoint, range, glyph.OutlineType == OutlineType.TrueType);
                     }
                     else
                     {
@@ -336,8 +370,6 @@ namespace Adamantium.Fonts.TextureGeneration
 
             // 5. Fix artefacts
             //FixArtefacts(coloredDistances, size);
-
-            var textureData = new GlyphTextureData((uint)size.Width, (uint)size.Height, glyphIndex);
 
             // 6. Normalize MSDF and SDF to [0 .. 255] range
             int index = 0;
@@ -362,10 +394,116 @@ namespace Adamantium.Fonts.TextureGeneration
 
             return textureData;
         }
+        
+        public static void GenerateMSDFForExistingTextureData(
+            Glyph glyph,
+            GlyphTextureData textureData,
+            double pxRange,
+            ushort unitsPerEm)
+        {
+            var glyphSegments = glyph.GetMergedOutlineSegments();
+            if (glyphSegments.Count == 0)
+            {
+                return;
+            }
+
+            var segments = new List<MsdfGlyphSegment>();
+
+            foreach (var segment in glyphSegments)
+            {
+                segments.Add(new MsdfGlyphSegment(segment.Start, segment.End));
+            }
+
+            // 1. Color all segments
+            ColorEdges(segments);
+
+            // 2. Calculate boundaries for original glyph (the position of the EM square)
+            var emSquare = new Rectangle(0, 0, unitsPerEm, unitsPerEm);
+
+            var glyphBoundingRectangle = glyph.BoundingRectangle;
+
+            // 3. Place EM square so that its center matches glyph center
+            var glyphCenter = glyphBoundingRectangle.Center;
+            var emSquareCenter = emSquare.Center;
+            var diff = glyphCenter - emSquareCenter;
+            diff.X = Math.Floor(diff.X);
+            diff.Y = Math.Floor(diff.Y);
+
+            emSquare.X += (int)diff.X;
+            emSquare.Y += (int)diff.Y;
+
+            var size = textureData.BoundingRect.Size;
+            // 4. Generate colored pseudo-distance field
+            var coloredDistances = new ColoredDistance[(int)size.Width, (int)size.Height];
+
+            var scaleX = size.Width / glyphBoundingRectangle.Width;
+            var scaleY = size.Height / glyphBoundingRectangle.Height;
+
+            var range = MsdfGeneratorHelper.GetRange(pxRange, scaleX, scaleY);
+
+            //var additionalSpace = glyphBoundingRectangle.Width * 0.02;
+            var additionalSpace = 0;
+            
+            ColoredDistance minColoredDistance;
+
+            var value = -emSquare.Width / 2 / range + 0.5;
+            minColoredDistance.RedDistance = value;
+            minColoredDistance.GreenDistance = value;
+            minColoredDistance.BlueDistance = value;
+            minColoredDistance.AlphaDistance = value;
+
+            for (var y = 0; y < size.Height; ++y)
+            {
+                for (var x = 0; x < size.Width; ++x)
+                {
+                    // determine the closest segment to current sampling point
+                    var samplingPoint =
+                        new Vector2(glyphBoundingRectangle.Width / size.Width * (x + 0.5) + glyphBoundingRectangle.X,
+                            glyphBoundingRectangle.Height - (glyphBoundingRectangle.Height / size.Height * (y + 0.5) -
+                                                             glyphBoundingRectangle.Y));
+
+                    if (samplingPoint.X >= glyphBoundingRectangle.X - additionalSpace &&
+                        samplingPoint.X <= glyphBoundingRectangle.Right + additionalSpace &&
+                        samplingPoint.Y >= glyphBoundingRectangle.Y - additionalSpace &&
+                        samplingPoint.Y <= glyphBoundingRectangle.Bottom + additionalSpace)
+                    {
+                        coloredDistances[x, y] = GetColoredDistances(segments, samplingPoint, range, glyph.OutlineType == OutlineType.TrueType);
+                    }
+                    else
+                    {
+                        coloredDistances[x, y] = minColoredDistance;
+                    }
+                }
+            }
+
+            // 5. Fix artefacts
+            //FixArtefacts(coloredDistances, size);
+
+            // 6. Normalize MSDF and SDF to [0 .. 255] range
+            int index = 0;
+            for (var y = 0; y < size.Height; y++)
+            {
+                for (var x = 0; x < size.Width; x++)
+                {
+                    var distance = coloredDistances[x, y];
+                    var red = MsdfGeneratorHelper.PixelFloatToByte(distance.RedDistance);
+                    var green = MsdfGeneratorHelper.PixelFloatToByte(distance.GreenDistance);
+                    var blue = MsdfGeneratorHelper.PixelFloatToByte(distance.BlueDistance);
+                    var alpha = MsdfGeneratorHelper.PixelFloatToByte(distance.AlphaDistance);
+
+                    textureData.Pixels[index + 0] = red;
+                    textureData.Pixels[index + 1] = green;
+                    textureData.Pixels[index + 2] = blue;
+                    textureData.Pixels[index + 3] = alpha;
+
+                    index += 4;
+                }
+            }
+        }
 
         // --- ARTEFACT FIXING ---
         // true - no collision, false - collision
-        private bool CheckNeighbor(ColoredDistance neighbor, ColoredDistance current)
+        private static bool CheckNeighbor(ColoredDistance neighbor, ColoredDistance current)
         {
             const double threshold = 2.5;
 
@@ -401,7 +539,7 @@ namespace Adamantium.Fonts.TextureGeneration
         }
 
         // true - no collision, false - collision
-        private bool CheckForCollision(List<ColoredDistance> neighbors, ColoredDistance current)
+        private static bool CheckForCollision(List<ColoredDistance> neighbors, ColoredDistance current)
         {
             foreach (var neighbor in neighbors)
             {
@@ -414,7 +552,7 @@ namespace Adamantium.Fonts.TextureGeneration
             return true;
         }
 
-        private void FixArtefacts(ColoredDistance[,] data, uint textureSize)
+        private static void FixArtefacts(ColoredDistance[,] data, uint textureSize)
         {
             var correctionList = new List<CorrectionLocation>();
 

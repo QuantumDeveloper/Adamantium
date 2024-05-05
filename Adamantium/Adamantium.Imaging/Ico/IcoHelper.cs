@@ -12,7 +12,7 @@ namespace Adamantium.Imaging.Ico
 {
     public static class IcoHelper
     {
-        public static IRawBitmap LoadFromMemory(IntPtr pSource, long size)
+        public static IRawBitmap LoadFromMemory(IntPtr pSource, ulong size)
         {
             if (!DecodeIcoHeader(pSource, size, out var description, out List<IconInfo> iconsInfos))
             {
@@ -22,7 +22,7 @@ namespace Adamantium.Imaging.Ico
             return CreateImageFromIco(pSource, description, iconsInfos.ToArray());
         }
 
-        private static unsafe bool DecodeIcoHeader(IntPtr headerPtr, long size, out ImageDescription description, out List<IconInfo> iconsInfos)
+        private static unsafe bool DecodeIcoHeader(IntPtr headerPtr, ulong size, out ImageDescription description, out List<IconInfo> iconsInfos)
         {
             description = new ImageDescription();
             iconsInfos = new List<IconInfo>();

@@ -42,7 +42,7 @@ public abstract class WindowRendererBase : IWindowRenderer
             (float)Window.ClientWidth, 
             0, 
             (float)Window.ClientHeight,
-            0.01f,
+            0f,
             100000f);
     }
 

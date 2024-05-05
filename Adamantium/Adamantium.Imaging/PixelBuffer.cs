@@ -496,7 +496,7 @@ namespace Adamantium.Imaging
                 }
             }
 
-            var ptr = Utilities.AllocateMemory(bufferStride);
+            var ptr = Utilities.AllocateMemory((uint)bufferStride);
             Utilities.Write(ptr, flipped, 0, bufferStride);
             return new PixelBuffer(width, height, pixelBuffer.Format, rowStride, bufferStride, ptr);
         }

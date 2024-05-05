@@ -7,7 +7,7 @@
         <LangVersion>latest</LangVersion>
         <Nullable>disable</Nullable>
 		<BaseOutputPath>..\..\output\Adamantium.Engine.Generators\bin</BaseOutputPath>
-        <!--<IsRoslynComponent>true</IsRoslynComponent>-->
+        <IsRoslynComponent>true</IsRoslynComponent>
 		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
 		<CompilerGeneratedFilesOutputPath>Generated</CompilerGeneratedFilesOutputPath>
         <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
@@ -40,7 +40,7 @@
 	<ItemGroup>
          <!--Generator dependencies-->
 		
-		<PackageReference Include="Adamantium.DXC" Version="1.0.7" GeneratePathProperty="true" PrivateAssets="all" />
+		<PackageReference Include="Adamantium.DXC" Version="1.0.8" GeneratePathProperty="true" PrivateAssets="all" />
 		<PackageReference Include="AdamantiumVulkan.Spirv" Version="1.0.3" GeneratePathProperty="true" PrivateAssets="all" />
         <PackageReference Include="QuantumBinding.Utils" Version="1.0.0" GeneratePathProperty="true" PrivateAssets="all" />
         <PackageReference Include="MessagePack" Version="2.5.129" GeneratePathProperty="true" PrivateAssets="all" />
@@ -50,12 +50,6 @@
         <!--<None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />-->
     </ItemGroup>
     
-	<ItemGroup>
-      <Content Update="C:\Users\dzapo\.nuget\packages\adamantium.dxc\1.0.2\contentFiles\any\netstandard2.0\dxcompiler.dll">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </Content>
-    </ItemGroup>
-
     <PropertyGroup>
         <GetTargetPathDependsOn>$(GetTargetPathDependsOn);GetDependencyTargetPaths</GetTargetPathDependsOn>
     </PropertyGroup>

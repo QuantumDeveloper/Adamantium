@@ -57,7 +57,7 @@ namespace Adamantium.Engine.Graphics
             deviceExt.Add(Constants.VK_GOOGLE_HLSL_FUNCTIONALITY_1_EXTENSION_NAME);
             deviceExt.Add(Constants.VK_GOOGLE_USER_TYPE_EXTENSION_NAME);
             deviceExt.Add(Constants.VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
-            deviceExt.Add(Constants.VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+            //deviceExt.Add(Constants.VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
             DeviceExtensions = new ReadOnlyCollection<string>(deviceExt);
         }
 
@@ -150,6 +150,12 @@ namespace Adamantium.Engine.Graphics
             var deviceFeatures = PhysicalDevice.GetPhysicalDeviceFeatures();
             deviceFeatures.SamplerAnisotropy = true;
             deviceFeatures.SampleRateShading = true;
+            
+            // enumerate all available device extensions
+            uint propCount = 0;
+            PhysicalDevice.EnumerateDeviceExtensionProperties(null, ref propCount, null);
+            ExtensionProperties[] properties = new ExtensionProperties[propCount];
+            PhysicalDevice.EnumerateDeviceExtensionProperties(null, ref propCount, properties);
 
             var createInfo = new DeviceCreateInfo();
             createInfo.QueueCreateInfoCount = (uint)queueInfos.Count;
@@ -176,10 +182,13 @@ namespace Adamantium.Engine.Graphics
                 vulkan11Features.PNext = vulkan12FeaturesPtr;
 
                 var features2 = new PhysicalDeviceFeatures2();
-                features2.Features = new PhysicalDeviceFeatures();
-                features2.Features.SamplerAnisotropy = VkBool32.TRUE;
-                features2.Features.SampleRateShading = VkBool32.TRUE;
-                
+                features2.Features = new PhysicalDeviceFeatures
+                {
+                    SamplerAnisotropy = VkBool32.TRUE,
+                    SampleRateShading = VkBool32.TRUE,
+                    GeometryShader = true
+                };
+
                 var vulkan11FeaturesPtr = NativeUtils.StructOrEnumToPointer(vulkan11Features.ToNative());
                 features2.PNext = vulkan11FeaturesPtr;
 
@@ -208,10 +217,13 @@ namespace Adamantium.Engine.Graphics
                 vulkan11Features.PNext = vulkan12FeaturesPtr;
 
                 var features2 = new PhysicalDeviceFeatures2();
-                features2.Features = new PhysicalDeviceFeatures();
-                features2.Features.SamplerAnisotropy = VkBool32.TRUE;
-                features2.Features.SampleRateShading = VkBool32.TRUE;
-                
+                features2.Features = new PhysicalDeviceFeatures
+                {
+                    SamplerAnisotropy = VkBool32.TRUE,
+                    SampleRateShading = VkBool32.TRUE,
+                    GeometryShader = true
+                };
+
                 var vulkan11FeaturesPtr = NativeUtils.StructOrEnumToPointer(vulkan11Features.ToNative());
                 features2.PNext = vulkan11FeaturesPtr;
 

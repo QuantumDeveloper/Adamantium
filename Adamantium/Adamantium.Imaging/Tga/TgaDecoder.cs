@@ -7,14 +7,14 @@ namespace Adamantium.Imaging.Tga;
 
 public static class TgaDecoder
 {
-    public static unsafe bool DecodeTgaHeader(IntPtr source, long size, out ImageDescription description, out long offset, out TgaConversionFlags convFlags)
+    public static unsafe bool DecodeTgaHeader(IntPtr source, ulong size, out ImageDescription description, out ulong offset, out TgaConversionFlags convFlags)
         {
             if (source == IntPtr.Zero)
             {
                 throw new ArgumentException("Source cannot be IntPtr.Zero");
             }
 
-            if (size < Utilities.SizeOf<TgaHeader>())
+            if (size < (ulong)Utilities.SizeOf<TgaHeader>())
             {
                 throw new ArgumentException("File contains invalid data");
             }
@@ -108,7 +108,7 @@ public static class TgaDecoder
                 convFlags |= TgaConversionFlags.InvertY;
             }
 
-            offset = Utilities.SizeOf<TgaHeader>();
+            offset = (ulong)Utilities.SizeOf<TgaHeader>();
 
             if (header->IDLength != 0)
             {
@@ -118,8 +118,9 @@ public static class TgaDecoder
             return true;
         }
     
-    public static unsafe TgaImage CreateImageFromTGA(IntPtr pTGA,
-        long offset,
+    public static unsafe TgaImage CreateImageFromTGA(
+        IntPtr pTGA,
+        ulong offset,
         ImageDescription description,
         TgaConversionFlags convFlags)
     {

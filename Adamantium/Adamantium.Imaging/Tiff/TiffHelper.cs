@@ -5,7 +5,7 @@ namespace Adamantium.Imaging.Tiff;
 
 public static class TiffHelper
 {
-    public static IRawBitmap LoadFromMemory(IntPtr source, long size)
+    public static IRawBitmap LoadFromMemory(IntPtr source, ulong size)
     {
         return null;
     }

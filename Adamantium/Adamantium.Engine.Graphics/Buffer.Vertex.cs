@@ -21,7 +21,7 @@ namespace Adamantium.Engine.Graphics
             /// <param name="size">The size in bytes.</param>
             /// <param name="memoryFlags">The memoryFlags.</param>
             /// <returns>A Vertex buffer</returns>
-            public static Buffer New(GraphicsDevice device, int size, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal)
+            public static Buffer New(GraphicsDevice device, ulong size, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal)
             {
                 return Buffer.New(device, size, BufferUsage, memoryFlags);
             }

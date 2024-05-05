@@ -88,27 +88,6 @@ float4 BasicVertexColored_PS(PS_OUTPUT_BASIC input) : SV_TARGET
     return input.color;
 }
 
-float median(float a, float b, float c)
-{
-    return max(min(a,b), min(max(a,b), c));
-}
-
-float4 MSDF_PS(PS_OUTPUT_BASIC input) : SV_TARGET
-{
-    float3 sample = shaderTexture.Sample(sampleType, input.uv).rgb;
-    int2 sz;
-    shaderTexture.GetDimensions(sz.x, sz.y);
-    float dx = ddx( input.uv.x ) * sz.x;
-    float dy = ddy( input.uv.y ) * sz.y;
-    float toPixels = 5.0 * rsqrt( dx * dx + dy * dy );
-    float sigDist = median( sample.r, sample.g, sample.b ) - 0.5;
-    float opacity = clamp( sigDist * toPixels + 0.5, 0.0, 1.0 );
-    
-    float4 color = float4(foregroundColor.r, foregroundColor.g, foregroundColor.b, opacity);
-    
-    return color;
-}
-
 float4 EncodedToBrightness(float4 encoded)
 {
     return pow(encoded, gamma);
@@ -204,13 +183,6 @@ technique Basic
         PixelShader = BasicVertexColored_PS;
     }
 
-    pass MSDF
-    {
-        Profile = 5.1;
-        VertexShader = Basic_VS;
-        PixelShader = MSDF_PS;
-    }
-    
     pass Subpixel
     {
         Profile = 5.1;

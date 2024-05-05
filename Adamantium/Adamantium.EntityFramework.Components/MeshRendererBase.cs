@@ -102,7 +102,7 @@ namespace Adamantium.EntityFramework.Components
                 return false;
             }
 
-            if (VertexBuffer != null && vertices.Length <= VertexBuffer.ElementCount)
+            if (VertexBuffer != null && (ulong)vertices.Length <= VertexBuffer.ElementCount)
             {
                 VertexBuffer.SetData(graphicsContext, vertices);
             }

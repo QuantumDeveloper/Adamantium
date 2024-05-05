@@ -425,7 +425,7 @@ namespace Adamantium.Imaging
             Utilities.CopyMemory(pDestination, pSource, size);
         }
 
-        public static unsafe PixelBuffer[] CreatePixelBuffers(ImageDescription description, IntPtr dataPointer, long offset, PitchFlags pitchFlags = PitchFlags.None)
+        public static unsafe PixelBuffer[] CreatePixelBuffers(ImageDescription description, IntPtr dataPointer, ulong offset, PitchFlags pitchFlags = PitchFlags.None)
         {
             // Calculate mipmaps
             var mipMapToZIndex = Image.CalculateImageArray(description, pitchFlags, out var pixelBufferCount, out var totalSizeInBytes);

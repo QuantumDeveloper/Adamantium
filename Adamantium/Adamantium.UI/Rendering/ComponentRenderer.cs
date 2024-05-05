@@ -7,12 +7,15 @@ namespace Adamantium.UI.Rendering;
 
 internal abstract class ComponentRenderer : DisposableObject
 {
-    protected ComponentRenderer(Brush brush)
+    protected ComponentRenderer(Brush background, Brush foreground)
     {
-        Brush = brush;
+        Background = background;
+        Foreground = foreground;
     }
     
-    public Brush Brush { get; set; }
+    public Brush Background { get; set; }
+    
+    public Brush Foreground { get; set; }
 
     public abstract bool PrepareFrame(GraphicsDevice graphicsDevice, IUIComponent component, ImageSource image,
         Matrix4x4F projectionMatrix);

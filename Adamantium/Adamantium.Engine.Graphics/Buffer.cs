@@ -19,17 +19,17 @@ namespace Adamantium.Engine.Graphics
 
         public uint ElementSize { get; private set; }
 
-        public uint ElementCount { get; private set; }
+        public ulong ElementCount { get; private set; }
 
-        public int TotalSize => (int)(ElementSize * ElementCount);
+        public ulong TotalSize => (ElementSize * ElementCount);
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Buffer" /> class.
         /// </summary>
         /// <param name="device">The <see cref="GraphicsDevice"/>.</param>
-        /// <param name="description">The description.</param>
+        /// <param name="memoryFlags">Memory flags.</param>
         /// <param name="bufferFlags">Type of the buffer.</param>
-        /// <param name="viewFormat">The view format.</param>
+        /// <param name="sharingMode">Sharing mode.</param>
         /// <param name="dataPointer">The data pointer.</param>
         protected Buffer(GraphicsDevice device, 
             BufferUsageFlags bufferFlags, 
@@ -48,27 +48,22 @@ namespace Adamantium.Engine.Graphics
 
         protected Buffer(GraphicsDevice device, 
             BufferCreateInfo description, 
-            uint count, 
-            MemoryPropertyFlags memoryFlags) : base(device)
+            ulong count, 
+            MemoryPropertyFlags memoryFlags) : this(device, (BufferUsageFlags)description.Usage, description.Size, count, memoryFlags, description.SharingMode)
         {
-            Usage = (BufferUsageFlags)description.Usage;
-            MemoryFlags = memoryFlags;
-            SharingMode = description.SharingMode;
-            ElementSize = (uint)(description.Size / count);
-            ElementCount = count;
         }
 
         protected Buffer(GraphicsDevice device,
             BufferUsageFlags bufferFlags,
-            int size,
-            uint count,
+            ulong size,
+            ulong count,
             MemoryPropertyFlags memoryFlags,
             SharingMode sharingMode) : base(device)
         {
             Usage = bufferFlags;
             MemoryFlags = memoryFlags;
             SharingMode = sharingMode;
-            ElementSize = (uint)size / count;
+            ElementSize = (uint)(size / count);
             ElementCount = count;
 
             CreateBuffer(size,
@@ -102,8 +97,8 @@ namespace Adamantium.Engine.Graphics
 
         private unsafe void UpdateBufferContent(DeviceMemory bufferMemory, DataPointer dataPointer, ulong offset = 0)
         {
-            var data = GraphicsDevice.MapMemory(bufferMemory, offset, (ulong)TotalSize, 0);
-            System.Buffer.MemoryCopy(dataPointer.Pointer.ToPointer(), data, TotalSize, dataPointer.Size);
+            var data = GraphicsDevice.MapMemory(bufferMemory, offset, dataPointer.Size, 0);
+            System.Buffer.MemoryCopy(dataPointer.Pointer.ToPointer(), data, dataPointer.Size, dataPointer.Size);
             GraphicsDevice.UnmapMemory(bufferMemory);
         }
 
@@ -120,10 +115,10 @@ namespace Adamantium.Engine.Graphics
         //    return new Buffer(GraphicsDevice, stagingDesc, BufferUsageFlags, ViewFormat, IntPtr.Zero);
         //}
 
-        private void CreateBuffer(int size, BufferUsageFlags usage, MemoryPropertyFlags memoryProperties, out VulkanBuffer buffer, out DeviceMemory bufferMemory)
+        private void CreateBuffer(ulong size, BufferUsageFlags usage, MemoryPropertyFlags memoryProperties, out VulkanBuffer buffer, out DeviceMemory bufferMemory)
         {
             BufferCreateInfo bufferInfo = new BufferCreateInfo();
-            bufferInfo.Size = (ulong)size;
+            bufferInfo.Size = size;
             bufferInfo.Usage = (BufferUsageFlagBits)usage;
             bufferInfo.SharingMode = SharingMode.Exclusive;
 
@@ -144,12 +139,12 @@ namespace Adamantium.Engine.Graphics
             }
         }
 
-        private void CopyBuffer(VulkanBuffer srcBuffer, VulkanBuffer dstBuffer, int size)
+        private void CopyBuffer(VulkanBuffer srcBuffer, VulkanBuffer dstBuffer, ulong size)
         {
             var commandBuffer = GraphicsDevice.BeginSingleTimeCommands();
 
             BufferCopy copyRegin = new BufferCopy();
-            copyRegin.Size = (ulong)size;
+            copyRegin.Size = size;
             var regions = new BufferCopy[] { copyRegin };
             commandBuffer.CopyBuffer(srcBuffer, dstBuffer, 1, regions);
 
@@ -169,7 +164,7 @@ namespace Adamantium.Engine.Graphics
         /// <unmanaged-short>ID3D11DeviceContext::Map</unmanaged-short>	
         public TData[] GetData<TData>() where TData : struct
         {
-            var toData = new TData[TotalSize / Utilities.SizeOf<TData>()];
+            var toData = new TData[TotalSize / (ulong)Utilities.SizeOf<TData>()];
             GetData(toData);
             return toData;
         }
@@ -190,7 +185,7 @@ namespace Adamantium.Engine.Graphics
         public void GetData<TData>(ref TData toData) where TData : struct
         {
             GCHandle handle = GCHandle.Alloc(toData, GCHandleType.Pinned);
-            GetData(new DataPointer(handle.AddrOfPinnedObject(), Utilities.SizeOf<TData>()));
+            GetData(new DataPointer(handle.AddrOfPinnedObject(), (ulong)Utilities.SizeOf<TData>()));
             handle.Free();
         }
 
@@ -210,7 +205,7 @@ namespace Adamantium.Engine.Graphics
         public void GetData<TData>(TData[] toData) where TData : struct
         {
             GCHandle handle = GCHandle.Alloc(toData, GCHandleType.Pinned);
-            GetData(new DataPointer(handle.AddrOfPinnedObject(), toData.Length * Utilities.SizeOf<TData>()));
+            GetData(new DataPointer(handle.AddrOfPinnedObject(), (ulong)(toData.Length * Utilities.SizeOf<TData>())));
             handle.Free();
         }
 
@@ -313,7 +308,7 @@ namespace Adamantium.Engine.Graphics
         public void SetData<TData>(GraphicsDevice device, ref TData fromData, uint offsetInBytes = 0) where TData : struct
         {
             GCHandle handle = GCHandle.Alloc(fromData, GCHandleType.Pinned);
-            SetData(device, new DataPointer(handle.AddrOfPinnedObject(), Utilities.SizeOf<TData>()), offsetInBytes);
+            SetData(device, new DataPointer(handle.AddrOfPinnedObject(), (ulong)Utilities.SizeOf<TData>()), offsetInBytes);
             handle.Free();
         }
 
@@ -341,7 +336,7 @@ namespace Adamantium.Engine.Graphics
             var sizeOfT = Utilities.SizeOf<TData>();
             var sourcePtr = (IntPtr)(bytePtr + startIndex * sizeOfT);
             var sizeOfData = (elementCount == 0 ? (uint)fromData.Length : elementCount) * sizeOfT;
-            SetData(device, new DataPointer(sourcePtr, (int)sizeOfData), offsetInBytes);
+            SetData(device, new DataPointer(sourcePtr, (ulong)sizeOfData), offsetInBytes);
             handle.Free();
         }
 
@@ -393,9 +388,9 @@ namespace Adamantium.Engine.Graphics
         /// <msdn-id>ff476501</msdn-id>
         /// <unmanaged>HRESULT ID3D11Device::CreateBuffer([In] const D3D11_BUFFER_DESC* pDesc,[In, Optional] const D3D11_SUBRESOURCE_DATA* pInitialData,[Out, Fast] ID3D11Buffer** ppBuffer)</unmanaged>
         /// <unmanaged-short>ID3D11Device::CreateBuffer</unmanaged-short>
-        public static Buffer New(GraphicsDevice device, int bufferSize, BufferUsageFlags bufferFlags, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal)
+        public static Buffer New(GraphicsDevice device, ulong bufferSize, BufferUsageFlags bufferFlags, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal)
         {
-            return New(device, bufferSize, bufferSize, bufferFlags, memoryFlags, SharingMode.Exclusive);
+            return New(device, bufferSize, (int)bufferSize, bufferFlags, memoryFlags, SharingMode.Exclusive);
         }
 
         /// <summary>
@@ -405,16 +400,19 @@ namespace Adamantium.Engine.Graphics
         /// <param name="elementCount">Number of T elements in this buffer.</param>
         /// <param name="bufferFlags">The buffer flags to specify the type of buffer.</param>
         /// <param name="memoryFlags">The memoryFlags.</param>
+        /// <param name="sharingMode">Sharing mode</param>
         /// <returns>An instance of a new <see cref="Buffer" /></returns>
-        /// <msdn-id>ff476501</msdn-id>
-        /// <unmanaged>HRESULT ID3D11Device::CreateBuffer([In] const D3D11_BUFFER_DESC* pDesc,[In, Optional] const D3D11_SUBRESOURCE_DATA* pInitialData,[Out, Fast] ID3D11Buffer** ppBuffer)</unmanaged>
-        /// <unmanaged-short>ID3D11Device::CreateBuffer</unmanaged-short>
-        public static Buffer<T> New<T>(GraphicsDevice device, uint elementCount, BufferUsageFlags bufferFlags, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal, SharingMode sharingMode = SharingMode.Exclusive) where T : struct
+        public static Buffer<T> New<T>(
+            GraphicsDevice device, 
+            ulong elementCount, 
+            BufferUsageFlags bufferFlags, 
+            MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal, 
+            SharingMode sharingMode = SharingMode.Exclusive) where T : struct
         {
-            int elementSize = Utilities.SizeOf<T>();
-            var bufferSize = elementSize * elementCount;
+            var elementSize = Utilities.SizeOf<T>();
+            var bufferSize = (ulong)elementSize * elementCount;
             var info = new BufferCreateInfo();
-            info.SharingMode = SharingMode.Exclusive;
+            info.SharingMode = sharingMode;
             info.Size = (ulong)bufferSize;
             info.Usage = (BufferUsageFlagBits)bufferFlags;
 
@@ -433,9 +431,9 @@ namespace Adamantium.Engine.Graphics
         /// <msdn-id>ff476501</msdn-id>
         /// <unmanaged>HRESULT ID3D11Device::CreateBuffer([In] const D3D11_BUFFER_DESC* pDesc,[In, Optional] const D3D11_SUBRESOURCE_DATA* pInitialData,[Out, Fast] ID3D11Buffer** ppBuffer)</unmanaged>
         /// <unmanaged-short>ID3D11Device::CreateBuffer</unmanaged-short>
-        public static Buffer New(GraphicsDevice device, int bufferSize, int elementSize, BufferUsageFlags bufferFlags, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal, SharingMode sharingMode = SharingMode.Exclusive)
+        public static Buffer New(GraphicsDevice device, ulong bufferSize, int elementSize, BufferUsageFlags bufferFlags, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal, SharingMode sharingMode = SharingMode.Exclusive)
         {
-            uint count = (uint)(bufferSize / elementSize);
+            uint count = (uint)(bufferSize / (ulong)elementSize);
 
             return new Buffer(device, bufferFlags, bufferSize, count, memoryFlags, sharingMode);
         }
@@ -452,7 +450,7 @@ namespace Adamantium.Engine.Graphics
         /// <msdn-id>ff476501</msdn-id>
         /// <unmanaged>HRESULT ID3D11Device::CreateBuffer([In] const D3D11_BUFFER_DESC* pDesc,[In, Optional] const D3D11_SUBRESOURCE_DATA* pInitialData,[Out, Fast] ID3D11Buffer** ppBuffer)</unmanaged>
         /// <unmanaged-short>ID3D11Device::CreateBuffer</unmanaged-short>
-        public static Buffer New(GraphicsDevice device, int bufferSize, int elementSize, BufferUsageFlags bufferFlags, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal)
+        public static Buffer New(GraphicsDevice device, ulong bufferSize, int elementSize, BufferUsageFlags bufferFlags, MemoryPropertyFlags memoryFlags = MemoryPropertyFlags.DeviceLocal)
         {
             return New(device, bufferSize, elementSize, bufferFlags, memoryFlags, SharingMode.Exclusive);
         }
@@ -474,9 +472,9 @@ namespace Adamantium.Engine.Graphics
             GCHandle handle = GCHandle.Alloc(value, GCHandleType.Pinned);
             try
             {
-                int bufferSize = Utilities.SizeOf<T>();
+                ulong bufferSize = (ulong)Utilities.SizeOf<T>();
                 int elementSize = Utilities.SizeOf<T>();
-                var data = new DataPointer(handle.AddrOfPinnedObject(), bufferSize, (uint)(bufferSize / elementSize));
+                var data = new DataPointer(handle.AddrOfPinnedObject(), bufferSize, (uint)(bufferSize / (ulong)elementSize));
 
                 return new Buffer<T>(device, bufferFlags, data, memoryFlags);
             }
@@ -521,7 +519,7 @@ namespace Adamantium.Engine.Graphics
             try
             {
                 int elementSize = Utilities.SizeOf<T>();
-                int bufferSize = elementSize * initialValue.Length;
+                ulong bufferSize = (ulong)(elementSize * initialValue.Length);
                 var data = new DataPointer(handle.AddrOfPinnedObject(), bufferSize, (uint)initialValue.Length);
 
                 return new Buffer<T>(device, bufferFlags, data, memoryFlags, sharingMode);
@@ -549,7 +547,7 @@ namespace Adamantium.Engine.Graphics
             GCHandle handle = GCHandle.Alloc(initialValue, GCHandleType.Pinned);
             try
             {
-                int bufferSize = initialValue.Length;
+                ulong bufferSize = (ulong)initialValue.Length;
                 var data = new DataPointer(handle.AddrOfPinnedObject(), bufferSize, (uint)initialValue.Length);
 
                 return new Buffer(device, bufferFlags, data, memoryFlags, SharingMode.Exclusive);

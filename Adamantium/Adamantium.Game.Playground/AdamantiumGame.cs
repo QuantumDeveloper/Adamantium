@@ -4,6 +4,7 @@ using Adamantium.Engine.Core.Content;
 using Adamantium.Engine.Core.Models;
 using Adamantium.Engine.EntityServices;
 using Adamantium.Engine.Graphics;
+using Adamantium.Engine.Graphics.Fonts;
 using Adamantium.Engine.Templates;
 using Adamantium.EntityFramework;
 using Adamantium.Fonts;
@@ -78,9 +79,8 @@ namespace Adamantium.Game.Playground
 
         private async void LoadModels()
         {
-            var entity = await ImportModel(@"Models\F15C\F-15C_Eagle.dae");
-            EntityWorld.EntityManager.AddEntity(entity);
+            //var entity = await ImportModel(@"Models\F15C\F-15C_Eagle.dae");
+            //EntityWorld.EntityManager.AddEntity(entity);
         }
-
     }
 }

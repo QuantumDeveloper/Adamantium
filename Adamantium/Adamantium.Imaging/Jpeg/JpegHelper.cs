@@ -7,10 +7,10 @@ namespace Adamantium.Imaging.Jpeg
 {
     public static class JpegHelper
     {
-        public static unsafe JpegImage LoadFromMemory(IntPtr pSource, long size)
+        public static unsafe JpegImage LoadFromMemory(IntPtr pSource, ulong size)
         {
             JpegImage image = null;
-            using (var stream = new UnmanagedMemoryStream((byte*)pSource, size))
+            using (var stream = new UnmanagedMemoryStream((byte*)pSource, (long)size))
             {
                 var decoder = new JpegDecoder(stream);
                 image = decoder.Decode();
