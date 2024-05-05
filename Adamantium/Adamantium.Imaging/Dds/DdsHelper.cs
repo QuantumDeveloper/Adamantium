@@ -240,7 +240,7 @@ namespace Adamantium.Imaging.Dds
         /// <exception cref="ArgumentException">If the argument headerPtr is null</exception>
         /// <exception cref="InvalidOperationException">If the DDS header contains invalid data.</exception>
         /// <returns>True if the decoding is successful, false if this is not a DDS header.</returns>
-        private static unsafe bool DecodeDDSHeader(IntPtr headerPtr, long size, DdsFlags flags, out ImageDescription description, out DXGIFormat dxgiFormat, out ConversionFlags convFlags)
+        private static unsafe bool DecodeDDSHeader(IntPtr headerPtr, ulong size, DdsFlags flags, out ImageDescription description, out DXGIFormat dxgiFormat, out ConversionFlags convFlags)
         {
             description = new ImageDescription();
             convFlags = ConversionFlags.None;
@@ -249,7 +249,7 @@ namespace Adamantium.Imaging.Dds
             if (headerPtr == IntPtr.Zero)
                 throw new ArgumentException("Pointer to DDS header cannot be null", "headerPtr");
 
-            if (size < (Utilities.SizeOf<Header>() + sizeof (uint)))
+            if (size < (ulong)(Utilities.SizeOf<Header>() + sizeof (uint)))
                 return false;
 
             // DDS files always start with the same magic number ("DDS ")
@@ -271,7 +271,7 @@ namespace Adamantium.Imaging.Dds
             if ((header.PixelFormat.Flags & PixelFormatFlags.FourCC) != 0 && (new FourCC('D', 'X', '1', '0') == header.PixelFormat.FourCC))
             {
                 // Buffer must be big enough for both headers and magic value
-                if (size < (Utilities.SizeOf<Header>() + sizeof (uint) + Utilities.SizeOf<HeaderDXT10>()))
+                if (size < (ulong)(Utilities.SizeOf<Header>() + sizeof(uint) + Utilities.SizeOf<HeaderDXT10>()))
                     return false;
 
                 var headerDX10 = *(HeaderDXT10*) ((byte*) headerPtr + sizeof (int) + Utilities.SizeOf<Header>());
@@ -929,7 +929,7 @@ namespace Adamantium.Imaging.Dds
         /// <param name="makeACopy">Whether or not to make a copy of the DDS</param>
         /// <param name="handle"></param>
         /// <returns></returns>
-        public static unsafe IRawBitmap LoadFromMemory(IntPtr pSource, long size)
+        public static unsafe IRawBitmap LoadFromMemory(IntPtr pSource, ulong size)
         {
             var flags = DdsFlags.None;
 
@@ -939,9 +939,9 @@ namespace Adamantium.Imaging.Dds
             if (!DecodeDDSHeader(pSource, size, flags, out metadata, out var dxgiFormat, out convFlags))
                 throw new ArgumentException("Given file is not a DDS file");
 
-            long offset = sizeof (uint) + Utilities.SizeOf<Header>();
+            ulong offset = (ulong)(sizeof(uint) + Utilities.SizeOf<Header>());
             if ((convFlags & ConversionFlags.DX10) != 0)
-                offset += Utilities.SizeOf<HeaderDXT10>();
+                offset += (ulong)Utilities.SizeOf<HeaderDXT10>();
 
             var pal8 = (int*) 0;
             if ((convFlags & ConversionFlags.Pal8) != 0)
@@ -1038,8 +1038,8 @@ namespace Adamantium.Imaging.Dds
         /// <returns></returns>
         private static unsafe IRawBitmap CreateImageFromDDS(
             IntPtr pDDS, 
-            long offset, 
-            long size,
+            ulong offset, 
+            ulong size,
             ImageDescription metadata, 
             PitchFlags cpFlags, 
             ConversionFlags convFlags, 
@@ -1084,7 +1084,7 @@ namespace Adamantium.Imaging.Dds
 
                 int index = 0;
 
-                long checkSize = size;
+                var checkSize = size;
 
                 for (int arrayIndex = 0; arrayIndex < metadata.ArraySize; arrayIndex++)
                 {
@@ -1096,7 +1096,7 @@ namespace Adamantium.Imaging.Dds
                         {
                             IntPtr pSrc = sourcePixelBuffers[index].DataPointer;
                             IntPtr pDest = destinationPixelBuffers[index].DataPointer;
-                            checkSize -= sourcePixelBuffers[index].BufferStride;
+                            checkSize -= (ulong)sourcePixelBuffers[index].BufferStride;
                             if (checkSize < 0)
                                 throw new InvalidOperationException("Unexpected end of buffer");
 

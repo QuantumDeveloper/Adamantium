@@ -16,7 +16,7 @@ namespace Adamantium.Imaging;
 
 public static class BitmapLoader
 {
-    public delegate IRawBitmap ImageLoadDelegate(IntPtr dataPointer, long dataSize);
+    public delegate IRawBitmap ImageLoadDelegate(IntPtr dataPointer, ulong dataSize);
     public delegate void ImageSaveDelegate(IRawBitmap image, Stream imageStream);
     
     private static readonly List<LoadSaveDelegates> _loadSaveDelegates;
@@ -58,7 +58,7 @@ public static class BitmapLoader
         IntPtr memoryPtr = IntPtr.Zero;
         try
         {
-            var size = stream.Length;
+            var size = (ulong)stream.Length;
             memoryPtr = Utilities.AllocateMemory((int)size);
             var bytes = new Span<byte>(memoryPtr.ToPointer(), (int)size);
             stream.Read(bytes);
@@ -76,7 +76,7 @@ public static class BitmapLoader
         }
     }
     
-    public static IRawBitmap Load(IntPtr dataPointer, long dataSize)
+    public static IRawBitmap Load(IntPtr dataPointer, ulong dataSize)
     {
         foreach (var loader in _loadSaveDelegates)
         {

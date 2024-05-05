@@ -21,7 +21,7 @@ namespace Adamantium.FontTests
         {
             //var typeFace = TypeFace.LoadFont(Path.Combine("WoffFonts", "Woff2Collection", "ASANA.woff2"), 3);
             
-            var typeFace = TypeFace.LoadFont(Path.Combine("WoffFonts", "Woff2Collection", "NotoSansCJK-Regular.woff2"), 3);
+            var typeFace = Typeface.LoadFont(Path.Combine("WoffFonts", "Woff2Collection", "NotoSansCJK-Regular.woff2"), 3);
             //var typeFace = TypeFace.LoadFont(WoffFonts.Sarabun_Regular, 3);
             //var typeFace = TypeFace.LoadFont(Path.Combine("WoffFonts", "RobotoSlab-VariableFont_wght.woff2"), 3);
         }
@@ -29,14 +29,14 @@ namespace Adamantium.FontTests
         [Test]
         public void LoadWoff2FontCollectionAsana()
         {
-            var typeFace = TypeFace.LoadFont(Path.Combine("WoffFonts", "Woff2Collection", "ASANA.woff2"), 3);
+            var typeFace = Typeface.LoadFont(Path.Combine("WoffFonts", "Woff2Collection", "ASANA.woff2"), 3);
             
         }
         
         [Test]
         public void LoadWoff2FontCollectionNotoSans()
         {
-            var typeFace = TypeFace.LoadFont(Path.Combine("WoffFonts", "Woff2Collection", "NotoSansCJK-Regular.woff2"), 3);
+            var typeFace = Typeface.LoadFont(Path.Combine("WoffFonts", "Woff2Collection", "NotoSansCJK-Regular.woff2"), 3);
             
         }
     }

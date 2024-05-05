@@ -81,7 +81,7 @@ public class EffectsGenerator : IIncrementalGenerator
                 category: "EffectParser",
                 (DiagnosticSeverity)message.Type,
                 isEnabledByDefault: true);
-            var diagnostic = Diagnostic.Create(descriptor, Location.None, filePath, message.Text);
+            var diagnostic = Diagnostic.Create(descriptor, Location.None, filePath, message.ToString());
             spc.ReportDiagnostic(diagnostic);
         }
     }

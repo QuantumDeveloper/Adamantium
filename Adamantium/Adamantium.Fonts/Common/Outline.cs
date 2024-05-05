@@ -5,7 +5,7 @@ using System.Collections.Generic;
 namespace Adamantium.Fonts.Common
 {
     [MessagePackObject]
-    internal class Outline
+    public class Outline
     {
         [Key(0)]
         public List<OutlinePoint> Points { get; }

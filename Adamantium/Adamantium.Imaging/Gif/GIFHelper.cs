@@ -7,9 +7,9 @@ namespace Adamantium.Imaging.Gif
 {
     public static class GIFHelper
     {
-        public static unsafe IRawBitmap LoadFromMemory(IntPtr pSource, long size)
+        public static unsafe IRawBitmap LoadFromMemory(IntPtr pSource, ulong size)
         {
-            var stream = new UnmanagedMemoryStream((byte*)pSource, size);
+            var stream = new UnmanagedMemoryStream((byte*)pSource, (long)size);
 
             var decoder = new GifDecoder();
             var gifImage = decoder.Decode(stream);

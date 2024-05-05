@@ -111,14 +111,14 @@ namespace Adamantium.Engine.Graphics
         {
             var device = (Device)GraphicsDevice;
             
-            BufferCreateInfo bufferInfo = new BufferCreateInfo();
+            var bufferInfo = new BufferCreateInfo();
             bufferInfo.Size = size;
             bufferInfo.Usage = usage;
             bufferInfo.SharingMode = SharingMode.Exclusive;
 
             buffer = GraphicsDevice.LogicalDevice.CreateBuffer(bufferInfo);
 
-            MemoryRequirements memoryRequirements = GraphicsDevice.LogicalDevice.GetBufferMemoryRequirements(buffer);
+            var memoryRequirements = GraphicsDevice.LogicalDevice.GetBufferMemoryRequirements(buffer);
 
             var allocInfo = new MemoryAllocateInfo
             {
@@ -142,7 +142,7 @@ namespace Adamantium.Engine.Graphics
         {
             var commandBuffer = GraphicsDevice.BeginSingleTimeCommands();
 
-            BufferImageCopy region = new BufferImageCopy();
+            var region = new BufferImageCopy();
             region.BufferOffset = 0;
             region.BufferRowLength = 0;
             region.BufferImageHeight = 0;
@@ -158,11 +158,11 @@ namespace Adamantium.Engine.Graphics
             GraphicsDevice.EndSingleTimeCommands(commandBuffer);
         }
         
-        private void CopyImageToBuffer(VkBuffer buffer, VulkanImage image, TextureDescription description)
+        private void CopyImageToBuffer(VkBuffer buffer)
         {
             var commandBuffer = GraphicsDevice.BeginSingleTimeCommands();
 
-            BufferImageCopy region = new BufferImageCopy();
+            var region = new BufferImageCopy();
             region.BufferOffset = 0;
             region.BufferRowLength = 0;
             region.BufferImageHeight = 0;
@@ -172,9 +172,9 @@ namespace Adamantium.Engine.Graphics
             region.ImageSubresource.BaseArrayLayer = 0;
             region.ImageSubresource.LayerCount = 1;
             region.ImageOffset = new Offset3D() { X = 0, Y = 0, Z = 0};
-            region.ImageExtent = new Extent3D() {Width = description.Width, Height = description.Height, Depth = 1}; 
+            region.ImageExtent = new Extent3D() {Width = Width, Height = Height, Depth = 1}; 
             
-            commandBuffer.CopyImageToBuffer(image, ImageLayout.TransferDstOptimal, buffer, 1, region);
+            commandBuffer.CopyImageToBuffer(vulkanImage, ImageLayout, buffer, 1, region);
             GraphicsDevice.EndSingleTimeCommands(commandBuffer);
         }
         
@@ -202,7 +202,8 @@ namespace Adamantium.Engine.Graphics
         {
             var device = (Device)GraphicsDevice;
             var imageInfo = description.ToImageCreateInfo();
-            if (device.CreateImage(imageInfo, null, out image) != Result.Success)
+            var result = device.CreateImage(imageInfo, null, out image);
+            if (result != Result.Success)
             {
                 throw new Exception("failed to create image!");
             }
@@ -232,7 +233,7 @@ namespace Adamantium.Engine.Graphics
             createInfo.Image = VulkanImage;
             createInfo.ViewType = (ImageViewType)description.Dimension;
             createInfo.Format = SurfaceFormat;
-            ComponentMapping componentMapping = new ComponentMapping
+            var componentMapping = new ComponentMapping
             {
                 R = ComponentSwizzle.Identity,
                 G = ComponentSwizzle.Identity,
@@ -240,7 +241,7 @@ namespace Adamantium.Engine.Graphics
                 A = ComponentSwizzle.Identity
             };
             createInfo.Components = componentMapping;
-            ImageSubresourceRange subresourceRange = new ImageSubresourceRange
+            var subresourceRange = new ImageSubresourceRange
             {
                 AspectMask = description.ImageAspect,
                 BaseMipLevel = 0,
@@ -353,8 +354,8 @@ namespace Adamantium.Engine.Graphics
         /// </summary>
         /// <param name="device">Specify the <see cref="GraphicsDevice"/> used to load and create a texture from a file.</param>
         /// <param name="filePath">The file to load the texture from.</param>
-        /// <param name="usage">Texture flags</param>
         /// <param name="usage">Resource usage</param>
+        /// <param name="layout">Desired image layout</param>
         /// <returns>A <see cref="Texture"/></returns>
         public static Texture Load(GraphicsDevice device, String filePath, ImageUsageFlagBits usage = ImageUsageFlagBits.SampledBit, ImageLayout layout = ImageLayout.ShaderReadOnlyOptimal)
         {
@@ -372,21 +373,38 @@ namespace Adamantium.Engine.Graphics
 
         public void Save(string path, ImageFileType fileType)
         {
-           var img = Image.New2D(Width, Height, 1, Description.Format);
-            
+            // CopyImageToMemoryInfoEXT copy = new CopyImageToMemoryInfoEXT();
+            // var region = new ImageToMemoryCopyEXT();
+            // region.ImageSubresource = new ImageSubresourceLayers();
+            // region.ImageExtent = new Extent3D() { Width = Description.Width, Height = Description.Height, Depth = 1 };
+            // region.ImageOffset = new Offset3D();
+            // region.MemoryImageHeight = Description.Height;
+            // region.MemoryRowLength = Description.Width;
+            // region.PHostPointer = img.DataPointer.ToPointer();
+            // copy.SrcImage = this;
+            // copy.SrcImageLayout = ImageLayout.General;
+            // copy.PRegions = region;
+            // copy.RegionCount = 1;
+
+            //GraphicsDevice.LogicalDevice.CopyImageToMemoryEXT(copy);
+            var img = Image.New2D(Width, Height, 1, Description.Format);
             VkBuffer stagingBuffer;
             DeviceMemory stagingBufferMemory;
-            CreateBuffer((ulong)TotalSizeInBytes, BufferUsageFlagBits.TransferSrcBit, MemoryPropertyFlags.HostVisible| MemoryPropertyFlags.HostCoherent, out stagingBuffer, out stagingBufferMemory);
-            CopyImageToBuffer(stagingBuffer, vulkanImage, Description);
+            CreateBuffer(img.TotalSizeInBytes, BufferUsageFlagBits.TransferSrcBit | BufferUsageFlagBits.TransferDstBit,
+                MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent, out stagingBuffer,
+                out stagingBufferMemory);
+            this.TransitionImageLayout(ImageLayout.TransferSrcOptimal);
+            CopyImageToBuffer(stagingBuffer);
+            this.TransitionImageLayout(Description.DesiredImageLayout);
             unsafe
             {
                 var data = GraphicsDevice.MapMemory(stagingBufferMemory, 0, TotalSizeInBytes, 0);
-                System.Buffer.MemoryCopy(data, img.DataPointer.ToPointer(), TotalSizeInBytes, TotalSizeInBytes);
+                System.Buffer.MemoryCopy(data, img.DataPointer.ToPointer(),
+                    img.TotalSizeInBytes, img.TotalSizeInBytes);
                 GraphicsDevice.UnmapMemory(stagingBufferMemory);
             }
 
             img.Save(path, fileType);
-           
             stagingBuffer.Destroy(GraphicsDevice);
             stagingBufferMemory.FreeMemory(GraphicsDevice);
         }

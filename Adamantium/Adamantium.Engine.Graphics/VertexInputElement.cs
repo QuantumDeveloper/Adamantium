@@ -542,7 +542,7 @@ namespace Adamantium.Engine.Graphics
          if (typeof(Int3) == typeT)
             return Format.R32G32B32_UINT;
          if (typeof(int) == typeT)
-            return Format.R32_UINT;
+            return Format.R32_SINT;
          if (typeof(uint) == typeT)
             return Format.R32_UINT;
 

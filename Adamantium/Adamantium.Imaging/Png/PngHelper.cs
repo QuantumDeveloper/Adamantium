@@ -9,7 +9,7 @@ namespace Adamantium.Imaging.Png
     public static class PngHelper
     {
         // TODO: Rework to support Image class
-        public static unsafe IRawBitmap LoadFromMemory(IntPtr pSource, long size)
+        public static unsafe IRawBitmap LoadFromMemory(IntPtr pSource, ulong size)
         {
             var stream = new PNGStreamReader(pSource, size);
             var decoder = new PngDecoder(stream);

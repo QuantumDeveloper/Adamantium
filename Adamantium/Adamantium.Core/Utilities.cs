@@ -41,7 +41,6 @@ namespace Adamantium.Core
             return new IntPtr(ptr);
         }
 #endif
-
         public static unsafe IntPtr AllocateMemory(int sizeInBytes, int align = 1)
         {
             int mask = align - 1;

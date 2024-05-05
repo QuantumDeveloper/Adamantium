@@ -8,7 +8,9 @@ using NUnit.Framework;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using Adamantium.Imaging;
+using Adamantium.Imaging.PaletteQuantizer.Extensions;
 
 namespace Adamantium.FontTests
 {
@@ -18,21 +20,27 @@ namespace Adamantium.FontTests
         public void MSDFGenerator()
         {
             //var t = TypeFace.LoadSystemFont("times", 3);
-            var typeface = TypeFace.LoadFont(@"OTFFonts/SourceSans3-Regular.otf", 3);
+            var timer = Stopwatch.StartNew();
+            var typeface = Typeface.LoadFont(@"OTFFonts/Crimson-Italic.otf", 3);
             var font = typeface.GetFont(0);
             uint mtsdfTextureSize = 64;
             byte sampleRate = 3;
-            var atlasGen = new TextureAtlasGenerator();
-            var timer = Stopwatch.StartNew();
-            var atlasData = atlasGen.GenerateTextureAtlas(typeface, font, mtsdfTextureSize, sampleRate, 4, 0, typeface.GlyphCount);
+            var atlasGen = new TextureAtlasGenerator(typeface, font, mtsdfTextureSize, sampleRate, 4, 0, typeface.GlyphCount);
+            //var atlasData = atlasGen.GenerateTextureAtlas(typeface, font, mtsdfTextureSize, sampleRate, 4, 0, typeface.GlyphCount);
+            var atlasData = atlasGen.PrepareTextureAtlas();
+            timer.Stop();
+            var timer2 = Stopwatch.StartNew();
             //var atlasData = atlasGen.GenerateTextureAtlas(typeface, font, mtsdfTextureSize, sampleRate, 4, 0, 10);
-
+            var glyphs = font.TranslateIntoGlyphs("Hello string");
+            glyphs = glyphs.Distinct(x=>x.Index).ToArray();
+            var textureData = atlasGen.GenerateTextureForGlyphs(glyphs);
+            timer2.Stop();
+            
             var img = Image.New2D((uint)atlasData.AtlasSize.Width, (uint)atlasData.AtlasSize.Height, SurfaceFormat.R8G8B8A8.UNorm);
             var pixels = img.GetPixelBuffer(0, 0);
             pixels.SetPixels(atlasData.ImageData);
             img.Save("msdf.png", ImageFileType.Png);
-
-            timer.Stop();
+            
             Assert.Pass($"Atlas data for {font.GlyphCount} was generated in {timer.ElapsedMilliseconds}ms");
         }
 
@@ -56,9 +64,9 @@ namespace Adamantium.FontTests
             var stream = new MemoryStream();
 
             var timer = Stopwatch.StartNew();
-            var typeface = TypeFace.LoadFont(@"OTFFonts/SourceSans3-Regular.otf", 3);
+            var typeface = Typeface.LoadFont(@"OTFFonts/SourceSans3-Regular.otf", 3);
             
-            var result = MessagePackSerializer.Serialize<TypeFace>(typeface, StandardResolverAllowPrivate.Options);
+            var result = MessagePackSerializer.Serialize<Typeface>(typeface, StandardResolverAllowPrivate.Options);
             timer.Stop();
             typeface.GetGlyphByIndex(150, out var glyph);
             //var result = MessagePackSerializer.Serialize<Glyph>(glyph, options);

@@ -36,19 +36,18 @@ namespace Adamantium.Fonts
         private readonly Dictionary<uint, SampledOutline[]> sampledOutlinesCache;
         [Key(5)]
         private List<Command> commandList;
-        [IgnoreMember]
-        private MsdfGenerator msdfGenerator;
-
         [Key(0)]
         public uint Index { get; }
         [Key(1)]
         public OutlineType OutlineType { get; internal set; }
         [Key(6)]
-        public double EmRelatedLeftSideBearingMultiplier { get; private set; }
+        public double LeftSideBearingMultiplier { get; private set; }
+        public double TopSideBearingMultiplier { get; private set; }
         [Key(7)]
-        public double EmRelatedAdvanceWidthMultiplier { get; private set; }
+        public double AdvanceWidthMultiplier { get; private set; }
+        
         [Key(8)]
-        public Vector2 EmRelatedCenterToBaseLineMultiplier { get; private set; }
+        public Vector2 CenterToBaseLineMultiplier { get; private set; }
         [Key(10)]
         public bool IsEmpty { get; }
         [IgnoreMember]
@@ -99,7 +98,6 @@ namespace Adamantium.Fonts
             unicodes = new List<uint>();
             uniqueUnicodes = new HashSet<uint>();
             CompositeGlyphComponents = new List<CompositeGlyphComponent>();
-            msdfGenerator = new MsdfGenerator();
             OutlineType = outlineType;
         }
 
@@ -108,38 +106,20 @@ namespace Adamantium.Fonts
             IsEmpty = isEmpty;
         }
 
-        public Vector2[] GetTextureAtlasUVCoordinates(uint glyphTextureSize, uint atlasStartGlyphIndex, uint glyphCount)
-        {
-            var uv = new Vector2[2];
-
-            var glyphsPerRow = (uint) Math.Ceiling(Math.Sqrt(glyphCount));
-            var glyphsPerColumn = (uint) Math.Ceiling((double) glyphCount / glyphsPerRow);
-
-            var atlasDimensions = new Size(glyphsPerRow, glyphsPerColumn);
-
-            var relativeGlyphIndex = Index - atlasStartGlyphIndex;
-
-            var startX = (relativeGlyphIndex % (int) atlasDimensions.Width) * glyphTextureSize;
-            var startY = (relativeGlyphIndex / (int) atlasDimensions.Width) * glyphTextureSize;
-
-            Size atlasSize = new Size(atlasDimensions.Width * glyphTextureSize,
-                atlasDimensions.Height * glyphTextureSize);
-
-            var uvStart = new Vector2(startX / atlasSize.Width, startY / atlasSize.Height);
-            var uvEnd = new Vector2((startX + glyphTextureSize) / atlasSize.Width,
-                (startY + glyphTextureSize) / atlasSize.Height);
-
-            uv[0] = uvStart;
-            uv[1] = uvEnd;
-
-            return uv;
-        }
-
         public void CalculateEmRelatedMultipliers(ushort unitsPerEm)
         {
-            CalculateEmRelatedLeftSideBearingMultiplier(unitsPerEm);
-            CalculateEmRelatedCenterToBaseLineMultiplier(unitsPerEm);
-            CalculateEmRelatedAdvanceWidthMultiplier(unitsPerEm);
+            LeftSideBearingMultiplier = (double)LeftSideBearing / unitsPerEm;
+            TopSideBearingMultiplier = (double)TopSideBearing / unitsPerEm;
+            AdvanceWidthMultiplier = (double)AdvanceWidth / unitsPerEm;
+
+            if (AdvanceWidthMultiplier == 0.0)
+            {
+                AdvanceWidthMultiplier = (double)AdvanceWidth / unitsPerEm;
+            }
+            
+            var emSquare = new Rectangle(0, 0, unitsPerEm, unitsPerEm);
+            var diff = emSquare.Center - BoundingRectangle.Center;
+            CenterToBaseLineMultiplier = new Vector2(diff.X / unitsPerEm, diff.Y / unitsPerEm);
         }
 
         public Vector3F[] Sample(byte rate)
@@ -159,12 +139,11 @@ namespace Adamantium.Fonts
                     SplitOnSegments();
                 }
 
-                // if (sampledOutlinesCache.TryGetValue(rate, out var sampledOutlines))
-                // {
-                //     return sampledOutlines;
-                // }
-                var sampledOutlines = this.GenerateOutlines(rate);
-                sampledOutlinesCache[rate] = sampledOutlines;
+                if (!sampledOutlinesCache.TryGetValue(rate, out var sampledOutlines))
+                {
+                    sampledOutlines = this.GenerateOutlines(rate);
+                    sampledOutlinesCache[rate] = sampledOutlines;
+                }
                 var points = RemoveSelfIntersections(sampledOutlines);
 
                 //AutoHint();
@@ -177,24 +156,6 @@ namespace Adamantium.Fonts
             }
         }
 
-        private void CalculateEmRelatedLeftSideBearingMultiplier(ushort unitsPerEm)
-        {
-            EmRelatedLeftSideBearingMultiplier = (double)LeftSideBearing / unitsPerEm;
-        }
-
-        private void CalculateEmRelatedAdvanceWidthMultiplier(ushort unitsPerEm)
-        {
-            EmRelatedAdvanceWidthMultiplier = (double)AdvanceWidth / unitsPerEm;
-        }
-        
-        private void CalculateEmRelatedCenterToBaseLineMultiplier(ushort unitsPerEm)
-        {
-            var emSquare = new Rectangle(0, 0, unitsPerEm, unitsPerEm);
-            var diff = emSquare.Center - BoundingRectangle.Center;
-
-            EmRelatedCenterToBaseLineMultiplier = new Vector2(diff.X / unitsPerEm, diff.Y / unitsPerEm);
-        }
-        
         private void SplitOnSegments()
         {
             if (OutlineType == OutlineType.TrueType)
@@ -341,9 +302,28 @@ namespace Adamantium.Fonts
             return transformedOutlines.ToArray();
         }
 
+        public List<Outline> TransformBasicOutlines(Matrix3x2 matrix)
+        {
+            List<Outline> transformedOutlines = new List<Outline>();
+            foreach (var outline in outlines)
+            {
+                var transformOutline = TransformOutline(outline.Points, matrix);
+                transformedOutlines.Add(transformOutline);
+            }
+
+            return transformedOutlines;
+        }
+
+        public List<LineSegment2D> GetMergedOutlineSegments() => new(mergedOutlinesSegments);
+
         internal void SetOutlinesForRate(byte rate, SampledOutline[] outlines)
         {
             sampledOutlinesCache[rate] = outlines;
+        }
+        
+        internal void SetOutlines(IEnumerable<Outline> transformed)
+        {
+            outlines = new List<Outline>(transformed);
         }
 
         private Vector2[] TransformPoints(IEnumerable<Vector2> points, Matrix3x2 matrix)
@@ -356,6 +336,18 @@ namespace Adamantium.Fonts
             }
 
             return transformedPoints.ToArray();
+        }
+        
+        private Outline TransformOutline(IEnumerable<OutlinePoint> points, Matrix3x2 matrix)
+        {
+            var transformedOutline = new Outline();
+            foreach (var point in points)
+            {
+                var transformed = Matrix3x2.TransformPoint(matrix, point);
+                transformedOutline.Points.Add(new OutlinePoint(transformed, point.IsControl));
+            }
+
+            return transformedOutline;
         }
 
         internal void SetUnicodes(IEnumerable<UInt32> unicodeSet)
@@ -504,7 +496,7 @@ namespace Adamantium.Fonts
                 points.Add(new Vector3F((float)segment.Start.X, (float)segment.Start.Y, 0));
                 points.Add(new Vector3F((float)segment.End.X, (float)segment.End.Y, 0));
             }
-
+            
             return points.ToArray();
         }
 
@@ -565,19 +557,6 @@ namespace Adamantium.Fonts
                     var hintedNextSegment = new LineSegment2D(hintedCurrentEnd, nextSegment.End);
                     mergedOutlinesSegments[nextIndex] = hintedNextSegment;
                 }
-            }
-        }
-        
-        public GlyphTextureData GenerateDirectMSDF(uint size, double pxRange, ushort unitsPerEm)
-        {
-            try
-            {
-                Monitor.TryEnter(lockObject);
-                return msdfGenerator.GenerateDirectMSDF(size, pxRange, BoundingRectangle, mergedOutlinesSegments, unitsPerEm, Index);
-            }
-            finally
-            {
-                Monitor.Exit(lockObject);
             }
         }
 

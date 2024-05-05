@@ -10,6 +10,12 @@ public sealed class SolidColorBrush: Brush
    {
       Color = color;
    }
+   
+   public SolidColorBrush(Color color, double opacity)
+   {
+      Color = color;
+      Opacity = opacity;
+   }
 
    public SolidColorBrush(string color)
    {

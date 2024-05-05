@@ -22,14 +22,25 @@ namespace Adamantium.Fonts.TextureGeneration
 
         [Key(0)]
         public Rectangle BoundingRect;
+
+        public RectangleF UVRect;
         
-        [Key(1)] 
-        public RectangleF UV;
-        
-        [Key(2)]
+        [Key(1)]
         public uint GlyphIndex { get; }
 
         [IgnoreMember]
         public byte[] Pixels { get; set; }
+
+        public bool IsEmpty => Pixels == null || Pixels.Length == 0;
+
+        public void CalculateUV(Size atlasSize)
+        {
+            RectangleF uvRect;
+            uvRect.Left = (float)(BoundingRect.Left / atlasSize.Width);
+            uvRect.Top = (float)(BoundingRect.Top / atlasSize.Height);
+            uvRect.Right = (float)(BoundingRect.Right / atlasSize.Width);
+            uvRect.Bottom = (float)(BoundingRect.Bottom / atlasSize.Height);
+            UVRect = uvRect;
+        }
     }
 }

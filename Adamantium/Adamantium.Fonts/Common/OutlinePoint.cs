@@ -4,7 +4,7 @@ using MessagePack;
 namespace Adamantium.Fonts.Common
 {
     [MessagePackObject]
-    internal struct OutlinePoint
+    public struct OutlinePoint
     {
         [Key(0)]
         public double X { get; set; }
@@ -17,6 +17,13 @@ namespace Adamantium.Fonts.Common
         {
             X = x;
             Y = y;
+            IsControl = control;
+        }
+
+        public OutlinePoint(Vector2 point, bool control = false)
+        {
+            X = point.X;
+            Y = point.Y;
             IsControl = control;
         }
 

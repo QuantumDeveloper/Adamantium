@@ -2,7 +2,9 @@
 using System.Threading;
 using Adamantium.Core;
 using Adamantium.Engine.Graphics;
+using Adamantium.Engine.Graphics.Fonts;
 using Adamantium.EntityFramework;
+using Adamantium.Fonts;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Events;
 using Adamantium.UI.Extensions;
@@ -55,7 +57,7 @@ public class WindowRenderService : UiRenderService
         };
             
         GraphicsDevice = GraphicsDeviceService.CreateRenderDevice(@parameters);
-        GraphicsDevice.ClearColor = Colors.White;
+        GraphicsDevice.ClearColor = Colors.CornflowerBlue;
         GraphicsDevice.AddDynamicStates(DynamicState.Viewport, DynamicState.Scissor);
 
         windowRenderer = Window.Renderer ?? new ForwardWindowRenderer(GraphicsDevice);
@@ -63,7 +65,7 @@ public class WindowRenderService : UiRenderService
         Window.DefaultRenderer = windowRenderer;
         Window.RendererChanged += WindowOnRendererChanged;
     }
-
+    
     private void WindowOnRendererChanged(object sender, WindowRendererChangedEventArgs e)
     {
         _pendingRenderer = e.NewRenderer;

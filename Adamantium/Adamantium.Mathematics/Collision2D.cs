@@ -265,7 +265,7 @@ namespace Adamantium.Mathematics
         public static double Distance(Vector2 v1, Vector2 v2)
         {
             //return Math.Sqrt(Math.Pow(v2.X - v1.X, 2) + Math.Pow(v2.Y - v1.Y, 2));
-            return Math.Sqrt((v2.X - v1.X) * (v2.X - v1.X) + (v2.Y - v1.Y) * (v2.Y - v1.Y));
+            return (v2 - v1).Length(); //Math.Sqrt((v2.X - v1.X) * (v2.X - v1.X) + (v2.Y - v1.Y) * (v2.Y - v1.Y));
         }
         
         public static double Distance(double x1, double y1, double x2, double y2)

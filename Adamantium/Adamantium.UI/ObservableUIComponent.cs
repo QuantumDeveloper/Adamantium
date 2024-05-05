@@ -14,15 +14,9 @@ public class ObservableUIComponent : UIComponent, IObservableComponent
 
     public void AddHandler(RoutedEvent routedEvent, Delegate handler, bool handledEventsToo = false)
     {
-        if (routedEvent == null)
-        {
-            throw new ArgumentNullException(nameof(routedEvent));
-        }
+        ArgumentNullException.ThrowIfNull(routedEvent);
 
-        if (handler == null)
-        {
-            throw new ArgumentNullException(nameof(handler));
-        }
+        ArgumentNullException.ThrowIfNull(handler);
 
         lock (eventHandlers)
         {

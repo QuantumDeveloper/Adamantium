@@ -111,6 +111,16 @@
         Decrement,
 
         /// <summary>
+        /// A '*'.
+        /// </summary>
+        Multiply,
+
+        /// <summary>
+        /// A '/'.
+        /// </summary>
+        Divide,
+
+        /// <summary>
         /// A 'standard comment staring from //'.
         /// </summary>
         Comment,

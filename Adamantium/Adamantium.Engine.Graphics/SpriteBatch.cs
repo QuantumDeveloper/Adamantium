@@ -441,48 +441,6 @@ namespace Adamantium.Engine.Graphics
                layerDepth);
         }
 
-        // public void DrawString(FontAtlas font, string text, Vector2F position, Color color)
-        // {
-        //     if (font == null)
-        //     {
-        //         throw new ArgumentNullException(nameof(font));
-        //     }
-        //     if (String.IsNullOrEmpty(text))
-        //     {
-        //         return;
-        //     }
-        //     var drawCommand = new SpriteFont.InternalDrawCommand(this, position, color, 0f, vecto2Zero, baseScale, SpriteEffects.None, 0f);
-        //     font.InternalDraw(text, ref drawCommand);
-        // }
-        //
-        // public void DrawString(FontAtlas font, StringBuilder text, Vector2F position, Color color)
-        // {
-        //     if (font == null)
-        //     {
-        //         throw new ArgumentNullException(nameof(font));
-        //     }
-        //     if (text.Length == 0)
-        //     {
-        //         return;
-        //     }
-        //     var drawCommand = new SpriteFont.InternalDrawCommand(this, position, color, 0f, vecto2Zero, baseScale, SpriteEffects.None, 0f);
-        //     font.InternalDraw(text.ToString(), ref drawCommand);
-        // }
-        //
-        // public void DrawString(FontAtlas font, string text, Vector2F position, Color color, float rotation, Vector2F rotationCenter, Vector2F scale, SpriteEffects effects = SpriteEffects.None, float depth = 0f)
-        // {
-        //     if (font == null)
-        //     {
-        //         throw new ArgumentNullException(nameof(font));
-        //     }
-        //     if (String.IsNullOrEmpty(text))
-        //     {
-        //         return;
-        //     }
-        //     var drawCommand = new SpriteFont.InternalDrawCommand(this, position, color, rotation, rotationCenter, scale, effects, depth);
-        //     font.InternalDraw(text, ref drawCommand);
-        // }
-
         private Vector4F RectangleToVector4(RectangleF rectangle)
         {
             return new Vector4F(rectangle.X, rectangle.Y, rectangle.Width, rectangle.Height);
@@ -558,7 +516,7 @@ namespace Adamantium.Engine.Graphics
                     destination.Z *= width;
                     destination.W *= height;
                 }
-                item->Destination = destination;
+                item->ArrangeRect = destination;
                 item->Origin = origin;
                 item->SpriteEffects = (int)spriteEffects;
                 item->Rotation = rotation;
@@ -638,7 +596,7 @@ namespace Adamantium.Engine.Graphics
             spriteItemsCount = 0;
         }
 
-        private unsafe void UpdateSpriteItemsBuffer(uint startIndex, uint elementCount)
+        private void UpdateSpriteItemsBuffer(uint startIndex, uint elementCount)
         {
             var offsetInBytes = startIndex * Utilities.SizeOf<SpriteBatchItem>();
             vertexBuffer.SetData(spriteItems, startIndex, elementCount, (uint)offsetInBytes);
@@ -646,7 +604,7 @@ namespace Adamantium.Engine.Graphics
 
         private void PrepareForFlushing()
         {
-            Matrix4x4F ortho = Matrix4x4F.OrthoOffCenterLH(0, currentScreenSize.X, currentScreenSize.Y, 0, 0.0f, 1.0f);
+            Matrix4x4F ortho = Matrix4x4F.OrthoOffCenter(0, currentScreenSize.X, currentScreenSize.Y, 0, 0.0f, 1.0f);
             Matrix4x4F.Multiply(ref transformMatrix, ref ortho, out final);
 
             if (assignedBlendState != null)

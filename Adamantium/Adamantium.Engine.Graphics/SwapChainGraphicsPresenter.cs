@@ -244,7 +244,7 @@ namespace Adamantium.Engine.Graphics
             var presentInfo = new PresentInfoKHR();
             presentInfo.WaitSemaphoreCount = 1;
             presentInfo.PWaitSemaphores = waitSemaphores;
-            presentInfo.SwapchainCount = 1;
+            presentInfo.SwapchainCount = (uint)swapchains.Length;
             presentInfo.PSwapchains = swapchains;
             presentInfo.PImageIndices = imageIndices;
 

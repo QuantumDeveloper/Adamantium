@@ -68,6 +68,7 @@ namespace Adamantium.Engine.Graphics
             BlendFactor sourceBlend, 
             BlendFactor destinationBlend, 
             BlendOp colorBlendOp, 
+            BlendOp alphaBlendOp,
             ColorComponentFlagBits colorWriteMask)
         {
             var state = PipelineColorBlendStateCreateInfo.Default();

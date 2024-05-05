@@ -8,6 +8,7 @@ using Adamantium.Core;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Effects;
 using AdamantiumVulkan.Core;
+using AdamantiumVulkan.Core.Interop;
 using Serilog;
 
 namespace Adamantium.Engine.Graphics.Effects
@@ -32,6 +33,7 @@ namespace Adamantium.Engine.Graphics.Effects
         private readonly GraphicsDevice graphicsDevice;
         
         private List<StageBlock> pipelineStages;
+        private List<ShaderObject> shadersObjects;
 
         internal EffectTechnique Technique;
 
@@ -67,6 +69,7 @@ namespace Adamantium.Engine.Graphics.Effects
             Effect = effect;
             graphicsDevice = effect.GraphicsDevice;
             pipelineStages = new List<StageBlock>();
+            shadersObjects = new List<ShaderObject>();
 
             shaderStages = new List<PipelineShaderStageCreateInfo>();
             layoutBindings = new List<DescriptorSetLayoutBinding>();
@@ -399,7 +402,14 @@ namespace Adamantium.Engine.Graphics.Effects
                 stageBlock.Index = link.Index;
                 stageBlock.EntryPoint = link.EntryPoint;
 
+                var shaderObject = new ShaderObject(graphicsDevice, link.ShaderType);
+                shadersObjects.Add(shaderObject);
+                shaderObject.Index = link.Index;
+                shaderObject.EntryPoint = link.EntryPoint;
+
                 InitStageBlock(stageBlock, logger);
+                
+                // InitShaderObject(shaderObject, logger);
             }
 
             CreateDescriptorSetLayout(layoutBindings);
@@ -499,6 +509,153 @@ namespace Adamantium.Engine.Graphics.Effects
                 }
             }
 
+            var constantBufferLinks = new List<ConstantBufferLink>();
+
+            // Declare all resource parameters at the effect level.
+            foreach (var parameterRaw in shaderRaw.ResourceParameters)
+            {
+                EffectParameter parameter;
+                var previousParameter = Effect.Parameters[parameterRaw.Name];
+
+                // Skip empty constant buffers.
+                if (parameterRaw.Type == EffectParameterType.ConstantBuffer &&
+                    Effect.ConstantBuffers[parameterRaw.Name] == null)
+                {
+                    continue;
+                }
+
+                if (previousParameter == null)
+                {
+                    var paramType = EffectResourceTypeHelper.ConvertFromParameterType(parameterRaw.Type);
+                    parameter = new EffectParameter(
+                       parameterRaw,
+                       paramType,
+                       Effect.ResourceLinker.Count,
+                       Effect.ResourceLinker);
+                    
+                    Effect.Parameters.Add(parameter);
+
+                    Effect.ResourceLinker.Count += parameterRaw.Count;
+                }
+                else
+                {
+                    if (CompareResourceParameter(
+                       parameterRaw,
+                       (EffectData.ResourceParameter)previousParameter.ParameterDescription))
+                    {
+                        // If registered parameters is different
+                        logger.Error(
+                           "Resource Parameter [{0}] is already defined with a different definition [{1}]",
+                           parameterRaw,
+                           previousParameter.ParameterDescription);
+                    }
+                    parameter = previousParameter;
+                }
+
+                CreateAndAddLayoutBinding(parameterRaw.Slot, ConvertFromEffectParameterType(parameterRaw.Type),
+                    EffectShaderTypeToShaderStage(stageBlock.Type));
+
+                // For constant buffers, we need to store explicit link
+                if (parameter.ResourceType == EffectResourceType.ConstantBuffer)
+                {
+                    constantBufferLinks.Add(new ConstantBufferLink(Effect.ConstantBuffers[parameter.Name], parameter));
+                }
+
+                if (stageBlock.Parameters == null)
+                {
+                    stageBlock.Parameters = new List<ParameterBinding>(shaderRaw.ResourceParameters.Count);
+                }
+
+                stageBlock.Parameters.Add(new ParameterBinding(parameter, parameterRaw.Slot));
+            }
+
+            stageBlock.ConstantBufferLinks = constantBufferLinks.ToArray();
+        }
+
+        private void InitShaderObject(ShaderObject shaderObject, Logger logger)
+        {
+            // If null shader, then skip init
+            var shaderIndex = shaderObject.Index;
+            if (shaderIndex < 0)
+            {
+                return;
+            }
+
+            shaderObject.Bytecode = Effect.Pool.GetShaderBytecode(shaderObject.Type, shaderIndex);
+
+            if (shaderObject.Bytecode == null)
+            {
+                logger.Error(
+                   "Unsupported shader profile [{0} / {1}] on current GraphicsDevice in (effect [{2}] Technique [{3}] Pass: [{4}])",
+                   shaderObject.Type,
+                   Effect.Name,
+                   Technique.Name,
+                   Name);
+                return;
+            }
+
+            // var shaderStageInfo = new PipelineShaderStageCreateInfo();
+            // shaderStageInfo.Stage = EffectShaderTypeToShaderStage(shaderObject.Type);
+            // shaderStageInfo.Module = stageBlock.Shader;
+            // shaderStageInfo.PName = stageBlock.EntryPoint;
+            //
+            // shaderStages.Add(shaderStageInfo);
+
+            var shaderRaw = Effect.Pool.RegisteredShaders[shaderIndex];
+            var layouts = new List<DescriptorSetLayoutBinding>();
+
+            for (int i = 0; i < shaderRaw.ConstantBuffers.Count; i++)
+            {
+                var constantBufferRaw = shaderRaw.ConstantBuffers[i];
+
+                // Constant buffers with a null size are skipped
+                if (constantBufferRaw.Size == 0)
+                    continue;
+
+                var constantBuffer = Effect.GetOrCreateConstantBuffer(Effect.GraphicsDevice, constantBufferRaw);
+                // IF constant buffer is null, it means that there is a conflict
+                if (constantBuffer == null)
+                {
+                    logger.Error(
+                       "Constant buffer [{0}] cannot have multiple size or different content declaration inside the same effect pool",
+                       constantBufferRaw.Name);
+                    continue;
+                }
+
+                var layout = CreateAndAddLayoutBinding(constantBuffer.Description.Slot, DescriptorType.UniformBuffer, EffectShaderTypeToShaderStage(shaderObject.Type));
+                layouts.Add(layout);
+
+                // Test if this constant buffer is not already part of the effect
+                if (Effect.ConstantBuffers[constantBufferRaw.Name] == null)
+                {
+                    // Add the declared constant buffer to the effect shader.
+                    Effect.ConstantBuffers.Add(constantBuffer);
+
+                    // Declare all parameter from constant buffer at the effect level.
+                    foreach (var parameter in constantBuffer.Parameters)
+                    {
+                        var previousParameter = Effect.Parameters[parameter.Name];
+                        if (previousParameter == null)
+                        {
+                            // Add an effect parameter linked to the appropriate constant buffer at the effect level.
+                            Effect.Parameters.Add(
+                               new EffectParameter(
+                                  (EffectData.ValueTypeParameter)parameter.ParameterDescription,
+                                  constantBuffer));
+                        }
+                        else if (parameter.ParameterDescription != previousParameter.ParameterDescription ||
+                                 parameter.Buffer != previousParameter.Buffer)
+                        {
+                            // If registered parameters is different
+                            logger.Error(
+                               "Parameter [{0}] defined in Constant buffer [{0}] is already defined by another constant buffer with the definition [{2}]",
+                               parameter,
+                               constantBuffer.Name,
+                               previousParameter);
+                        }
+                    }
+                }
+            }
 
             var constantBufferLinks = new List<ConstantBufferLink>();
 
@@ -542,8 +699,9 @@ namespace Adamantium.Engine.Graphics.Effects
                     parameter = previousParameter;
                 }
 
-                CreateAndAddLayoutBinding(parameterRaw.Slot, ConvertFromEffectParameterType(parameterRaw.Type),
-                    EffectShaderTypeToShaderStage(stageBlock.Type));
+                var layout = CreateAndAddLayoutBinding(parameterRaw.Slot, ConvertFromEffectParameterType(parameterRaw.Type),
+                    EffectShaderTypeToShaderStage(shaderObject.Type));
+                layouts.Add(layout);
 
                 // For constant buffers, we need to store explicit link
                 if (parameter.ResourceType == EffectResourceType.ConstantBuffer)
@@ -551,19 +709,21 @@ namespace Adamantium.Engine.Graphics.Effects
                     constantBufferLinks.Add(new ConstantBufferLink(Effect.ConstantBuffers[parameter.Name], parameter));
                 }
 
-                if (stageBlock.Parameters == null)
-                {
-                    stageBlock.Parameters = new List<ParameterBinding>(shaderRaw.ResourceParameters.Count);
-                }
-
-                stageBlock.Parameters.Add(new ParameterBinding(parameter, parameterRaw.Slot));
+                // if (shaderObject.Parameters == null)
+                // {
+                //     shaderObject.Parameters = new List<ParameterBinding>(shaderRaw.ResourceParameters.Count);
+                // }
+                //
+                // stageBlock.Parameters.Add(new ParameterBinding(parameter, parameterRaw.Slot));
             }
 
-            stageBlock.ConstantBufferLinks = constantBufferLinks.ToArray();
-
+            var descriptor = CreateDescriptorSetLayout2(layouts);
+            shaderObject.Layouts = new DescriptorSetLayout[] { descriptor };
+            shaderObject.CreateShader();
+            // stageBlock.ConstantBufferLinks = constantBufferLinks.ToArray();
         }
 
-        private void CreateAndAddLayoutBinding(uint slot, DescriptorType descriptorType, ShaderStageFlagBits stageFlags)
+        private DescriptorSetLayoutBinding CreateAndAddLayoutBinding(uint slot, DescriptorType descriptorType, ShaderStageFlagBits stageFlags)
         {
             var binding = layoutBindings.FirstOrDefault(x=>x.Binding == slot);
 
@@ -581,6 +741,8 @@ namespace Adamantium.Engine.Graphics.Effects
 
                 layoutBindings.Add(resourceBinding);
             }
+            
+            return binding;
         }
 
         private void CreateDescriptorSetLayout(List<DescriptorSetLayoutBinding> bindings)
@@ -590,6 +752,15 @@ namespace Adamantium.Engine.Graphics.Effects
             layoutInfo.PBindings = bindings.ToArray();
 
             descriptorSetLayout = graphicsDevice.CreateDescriptorSetLayout(layoutInfo);
+        }
+        
+        private DescriptorSetLayout CreateDescriptorSetLayout2(List<DescriptorSetLayoutBinding> bindings)
+        {
+            var layoutInfo = new DescriptorSetLayoutCreateInfo();
+            layoutInfo.BindingCount = (uint)bindings.Count;
+            layoutInfo.PBindings = bindings.ToArray();
+
+            return graphicsDevice.CreateDescriptorSetLayout(layoutInfo);
         }
 
         private void CreatePipelineLayout()
@@ -722,7 +893,7 @@ namespace Adamantium.Engine.Graphics.Effects
         }
 
 
-        private ShaderStageFlagBits EffectShaderTypeToShaderStage(EffectShaderType type)
+        public static ShaderStageFlagBits EffectShaderTypeToShaderStage(EffectShaderType type)
         {
             switch (type)
             {
@@ -949,7 +1120,7 @@ namespace Adamantium.Engine.Graphics.Effects
             public int Index;
 
             public ShaderModule Shader;
-
+            
             public string EntryPoint;
 
             public readonly EffectShaderType Type;
@@ -1028,8 +1199,61 @@ namespace Adamantium.Engine.Graphics.Effects
                 base.Dispose(disposeManagedResources);
             }
         }
-        
-        
+
+        private class ShaderObject : DisposableObject
+        {
+            public GraphicsDevice GraphicsDevice { get; }
+            
+            public int Index;
+
+            public string EntryPoint;
+
+            public ShaderStageFlagBits Stage;
+            
+            public VkShaderStageFlags NextStage;
+
+            public byte[] Bytecode;
+            
+            public EffectShaderType Type { get; }
+
+            public ShaderEXT Shader { get; set; }
+
+
+            public DescriptorSetLayout[] Layouts;
+
+            public ShaderObject(GraphicsDevice device,
+                EffectShaderType type)
+            {
+                GraphicsDevice = device;
+                Type = type;
+                Stage = EffectShaderTypeToShaderStage(type);
+            }
+
+            public void CreateShader()
+            {
+                var shaderCreateInfo = new ShaderCreateInfoEXT();
+                shaderCreateInfo.Stage = Stage;
+                shaderCreateInfo.NextStage = NextStage;
+                shaderCreateInfo.CodeType = ShaderCodeTypeEXT.BinaryExt;
+                shaderCreateInfo.CodeSize = (uint)Bytecode.Length;
+                shaderCreateInfo.PCode = Bytecode;
+                shaderCreateInfo.PName = EntryPoint;
+                shaderCreateInfo.PSetLayouts = Layouts;
+                shaderCreateInfo.SetLayoutCount = (uint)Layouts.Length;
+
+                Shader = GraphicsDevice.LogicalDevice.CreateShader(shaderCreateInfo);
+            }
+            
+            protected override void Dispose(bool disposeManagedResources)
+            {
+                if (disposeManagedResources)
+                {
+                    GraphicsDevice.LogicalDevice.DestroyShaderEXT(Shader);
+                    Shader = null;
+                }
+                base.Dispose(disposeManagedResources);
+            }
+        }
 
         #endregion
     }

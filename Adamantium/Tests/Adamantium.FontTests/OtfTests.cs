@@ -51,49 +51,49 @@ namespace Adamantium.FontTests
         [Test]
         public void LoadOtfCff1Font_Glametrix()
         {
-            var typeFace = TypeFace.LoadFont(CFF1Fonts.Glametrix, 2);
+            var typeFace = Typeface.LoadFont(CFF1Fonts.Glametrix, 2);
         }
         
         [Test]
         public void LoadOtfCff1Font_SourceSans3()
         {
-            var typeFace = TypeFace.LoadFont(CFF1Fonts.SourceSans3_Regular, 2);
+            var typeFace = Typeface.LoadFont(CFF1Fonts.SourceSans3_Regular, 2);
         }
         
         [Test]
         public void LoadOtfCff1Font_Quicksand_Regular()
         {
-            var typeFace = TypeFace.LoadFont(CFF1Fonts.Quicksand_Regular, 2);
+            var typeFace = Typeface.LoadFont(CFF1Fonts.Quicksand_Regular, 2);
         }
         
         [Test]
         public void LoadOtfCff2Font_AdobeVPPrototype()
         {
-            var typeFace = TypeFace.LoadFont(CFF2Fonts.AdobeVFPrototype, 2);
+            var typeFace = Typeface.LoadFont(CFF2Fonts.AdobeVFPrototype, 2);
         }
         
         [Test]
         public void LoadOtfCff2Font_SourceHanSerifVFProtoJP()
         {
-            var typeFace = TypeFace.LoadFont(CFF2Fonts.SourceHanSerifVFProtoJP, 2);
+            var typeFace = Typeface.LoadFont(CFF2Fonts.SourceHanSerifVFProtoJP, 2);
         }
         
         [Test]
         public void LoadOtfCff1FontCollection_NotoSansCJK_Regular()
         {
-            var typeFace = TypeFace.LoadFont(FontCollections.Cff1_NotoSansCJK_Regular, 2);
+            var typeFace = Typeface.LoadFont(FontCollections.Cff1_NotoSansCJK_Regular, 2);
         }
         
         [Test]
         public void LoadOtfCff1FontCollection_Asana()
         {
-            var typeFace = TypeFace.LoadFont(FontCollections.Ttf_Asana, 2);
+            var typeFace = Typeface.LoadFont(FontCollections.Ttf_Asana, 2);
         }
         
         [Test]
         public void OutputFeatures_SourceSans3_Regular()
         {
-            var typeFace = TypeFace.LoadFont(CFF1Fonts.SourceSans3_Regular, 2);
+            var typeFace = Typeface.LoadFont(CFF1Fonts.SourceSans3_Regular, 2);
             foreach (var font in typeFace.Fonts)
             {
                 font.FeatureService.EnableFeature("kern", true);
@@ -120,13 +120,13 @@ namespace Adamantium.FontTests
         {
             var fontManager = await FontService.LoadTypeFaceAsync(CFF1Fonts.SourceSans3_Regular);
             var font = fontManager.GetTypeFace(0).GetFont(0);
-            font.FeatureService.EnableFeature(FeatureNames.kern, true);
-            var layoutContainer = new GlyphLayoutContainer(fontManager.GetTypeFace(0));
+            font.FeatureService.EnableFeature(Features.kern, true);
+            var layoutContainer = new GlyphLayoutContainer(fontManager.GetTypeFace(0), font);
             var demoString = "rw";
             var glyphs = font.TranslateIntoGlyphs(demoString);
-            layoutContainer.AddGlyphs(glyphs);
+            layoutContainer.SetText(demoString);
 
-            var result = font.FeatureService.ApplyFeature(FeatureNames.liga, layoutContainer, 0, (uint)glyphs.Length);
+            var result = font.FeatureService.ApplyFeature(Features.liga, layoutContainer, 0, (uint)glyphs.Length);
             
         }
     }

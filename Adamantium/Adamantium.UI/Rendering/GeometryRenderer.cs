@@ -1,8 +1,6 @@
 using System;
 using Adamantium.Engine.Core;
-using Adamantium.Engine.Core.Models;
 using Adamantium.Engine.Graphics;
-using Adamantium.UI.Controls;
 using Adamantium.UI.Media;
 using Adamantium.UI.Media.Imaging;
 using AdamantiumVulkan.Core;
@@ -12,7 +10,7 @@ namespace Adamantium.UI.Rendering;
 
 internal class GeometryRenderer : ComponentRenderer
 {
-    public GeometryRenderer(GraphicsDevice device, Geometry geometry, Brush brush) : base(brush)
+    public GeometryRenderer(GraphicsDevice device, Geometry geometry, Brush background, Brush foreground, Texture texture = null) : base(background, foreground)
     {
         Geometry = geometry;
         var mesh = geometry.Mesh;
@@ -29,7 +27,8 @@ internal class GeometryRenderer : ComponentRenderer
 
         VertexType = typeof(MeshVertex);
         if (mesh != null) PrimitiveType = mesh.MeshTopology;
-        Brush = brush;
+
+        Texture = texture;
     }
     
     public Geometry Geometry { get; }
@@ -41,38 +40,11 @@ internal class GeometryRenderer : ComponentRenderer
     public Type VertexType { get; set; }
         
     public PrimitiveType PrimitiveType { get; set; }
+    
+    public Texture Texture { get; set; }
 
     public override bool PrepareFrame(GraphicsDevice graphicsDevice, IUIComponent component, ImageSource image, Matrix4x4F projectionMatrix)
     {
-        if (VertexBuffer == null) return false;
-
-        graphicsDevice.SetVertexBuffer(VertexBuffer);
-        graphicsDevice.VertexType = VertexType;
-        graphicsDevice.PrimitiveTopology = PrimitiveType;
-
-        var world = Matrix4x4F.Translation((float)component.Location.X, (float)component.Location.Y, 5);
-
-        var effect = graphicsDevice.BasicEffect;
-        effect.Wvp.SetValue(world * projectionMatrix);
-        var color = Brush as SolidColorBrush;
-        effect.MeshColor.SetValue(color.Color.ToVector4());
-        effect.Transparency.SetValue((float)Brush.Opacity);
-        
-        var texture = ((BitmapSource)image)?.Texture;
-
-        if (texture == null)
-        {
-            effect.BasicColoredPass.Apply();
-        }
-        else
-        {
-            if (texture.ImageLayout != ImageLayout.ShaderReadOnlyOptimal) return false;
-        
-            effect.SampleType.SetResource(graphicsDevice.SamplerStates.AnisotropicClampToEdge);
-            effect.ShaderTexture.SetResource(texture);
-            effect.BasicTexturedPass.Apply();
-        }
-
         return true;
     }
     
@@ -83,10 +55,39 @@ internal class GeometryRenderer : ComponentRenderer
 
     public override void Draw(GraphicsDevice graphicsDevice, IUIComponent component, ImageSource image, Matrix4x4F projectionMatrix)
     {
-        if (!PrepareFrame(graphicsDevice, component, image, projectionMatrix)) return;
+        if (VertexBuffer == null) return;
+
+        graphicsDevice.SetVertexBuffer(VertexBuffer);
+
+        graphicsDevice.VertexType = VertexType;
+        graphicsDevice.PrimitiveTopology = PrimitiveType;
+
+        var world = Matrix4x4F.Translation((float)component.Location.X, (float)component.Location.Y, 5);
+
+        var effect = graphicsDevice.BasicEffect;
+        effect.Wvp.SetValue(world * projectionMatrix);
+        var color = Background as SolidColorBrush;
+        effect.MeshColor.SetValue(color.Color.ToVector4());
+        effect.Transparency.SetValue((float)Background.Opacity);
+        
+        //var texture = ((BitmapSource)image)?.Texture;
+
+        if (Texture == null)
+        {
+            effect.BasicColoredPass.Apply();
+        }
+        else
+        {
+            if (Texture.ImageLayout != ImageLayout.ShaderReadOnlyOptimal) return;
+        
+            effect.SampleType.SetResource(graphicsDevice.SamplerStates.AnisotropicClampToEdge);
+            effect.ShaderTexture.SetResource(Texture);
+            effect.BasicTexturedPass.Apply();
+        }
         
         if (IndexBuffer != null)
         {
+            graphicsDevice.SetIndexBuffer(IndexBuffer);
             graphicsDevice.DrawIndexed(VertexBuffer, IndexBuffer);
         }
         else

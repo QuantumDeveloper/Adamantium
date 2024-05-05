@@ -1,7 +1,7 @@
 // ReSharper disable InconsistentNaming
 namespace Adamantium.Fonts
 {
-    public static class FeatureNames
+    public static class Features
     {
         public static string aalt => "aalt";
         public static string abvf => "abvf";

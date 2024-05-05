@@ -23,9 +23,6 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     public static readonly AdamantiumProperty LayoutTransformProperty =
         AdamantiumProperty.Register(nameof(LayoutTransform), typeof(Transform), typeof(UIComponent));
 
-    public static readonly AdamantiumProperty LocationProperty = AdamantiumProperty.Register(nameof(Location),
-        typeof (Vector2), typeof (UIComponent), new PropertyMetadata(Vector2.Zero));
-
     public static readonly AdamantiumProperty VisibilityProperty = AdamantiumProperty.Register(nameof(Visibility),
         typeof(Visibility), typeof(UIComponent),
         new PropertyMetadata(Visibility.Visible,
@@ -58,20 +55,14 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     #endregion
 
     #region Properties
-    
-    public Vector2 Location
-    {
-        get => GetValue<Vector2>(LocationProperty);
-        set => SetValue(LocationProperty, value);
-    }
+
+    public Vector2 Location { get; set; }
 
     public Visibility Visibility
     {
         get => GetValue<Visibility>(VisibilityProperty);
         set => SetValue(VisibilityProperty, value);
     }
-
-    
 
     public Boolean ClipToBounds
     {

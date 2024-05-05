@@ -2,9 +2,11 @@ namespace Adamantium.Fonts.Parsers
 {
     internal interface IFontParser
     {
-        public TypeFace TypeFace { get; }
+        public Typeface Typeface { get; }
 
         public void Parse();
+
+        public void ReadFontName();
 
         public byte[] GetFontBytes();
 

@@ -1220,7 +1220,7 @@ namespace Adamantium.Engine.Effects
                 var parameterBuffer = new EffectData.ConstantBuffer()
                 {
                     Name = description.Name,
-                    Size = (int)description.Size,
+                    Size = description.Size,
                     Slot = description.SlotIndex,
                     Parameters = new List<EffectData.ValueTypeParameter>(),
                 };

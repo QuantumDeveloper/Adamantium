@@ -64,6 +64,12 @@ public class RenderingProcessor : EntityProcessor<RenderingService>, IDisposable
         CameraManager = EntityWorld.DependencyResolver.Resolve<CameraManager>();
         ToolsManager = EntityWorld.DependencyResolver.Resolve<ToolsManager>();
         SpriteBatch = new SpriteBatch(GraphicsDevice, 80000);
+        LoadContent();
+    }
+
+    protected virtual void LoadContent()
+    {
+        
     }
 
     private void DeviceChangeEnd(object sender, EventArgs e)

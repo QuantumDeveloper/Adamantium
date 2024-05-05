@@ -485,14 +485,14 @@ namespace Adamantium.Mathematics
             return angle;
         }
 
-        public static float Cross2D(Vector3F v0, Vector3F v1)
+        public static float Cross2D(Vector3F v1, Vector3F v2)
         {
-            return v0.X * v1.Y - v0.Y * v1.X;
+            return v1.X * v2.Y - v1.Y * v2.X;
         }
         
-        public static double Cross2D(Vector2 v0, Vector2 v1)
+        public static double Cross2D(Vector2 v1, Vector2 v2)
         {
-            return v0.X * v1.Y - v0.Y * v1.X;
+            return v1.X * v2.Y - v2.X * v1.Y;
         }
 
         public static float AngleBetween(Vector3F vector0, Vector3F vector1, Vector3F normal)

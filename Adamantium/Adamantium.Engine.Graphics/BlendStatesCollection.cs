@@ -53,14 +53,13 @@ namespace Adamantium.Engine.Graphics
 
         internal BlendStatesCollection()
         {
-            Fonts = Add(BlendState.New(nameof(Fonts), true, BlendFactor.SrcAlpha, BlendFactor.OneMinusSrcAlpha, BlendOp.Add, DefaultColorWriteMask));
-            Additive = Add(BlendState.New(nameof(Additive), true, BlendFactor.SrcAlpha, BlendFactor.One, BlendOp.Add, DefaultColorWriteMask));
-            LightMap = Add(BlendState.New(nameof(LightMap), true, BlendFactor.One, BlendFactor.One, BlendOp.Add, DefaultColorWriteMask));
-            AlphaBlend = Add(BlendState.New(nameof(AlphaBlend), true, BlendFactor.One, BlendFactor.OneMinusSrcAlpha, BlendOp.Add, DefaultColorWriteMask));
-            NonPremultiplied = Add(BlendState.New(nameof(NonPremultiplied), true, BlendFactor.SrcAlpha, BlendFactor.OneMinusSrcAlpha, BlendOp.Add, DefaultColorWriteMask));
-            Opaque = Add(BlendState.New(nameof(Opaque), false, BlendFactor.One, BlendFactor.Zero, BlendOp.Add, ColorComponentFlagBits.ABit));
+            Fonts = Add(BlendState.New(nameof(Fonts), true, BlendFactor.SrcAlpha, BlendFactor.OneMinusSrcAlpha, BlendOp.Add, BlendOp.Subtract, DefaultColorWriteMask));
+            Additive = Add(BlendState.New(nameof(Additive), true, BlendFactor.SrcAlpha, BlendFactor.One, BlendOp.Add, BlendOp.Add, DefaultColorWriteMask));
+            LightMap = Add(BlendState.New(nameof(LightMap), true, BlendFactor.One, BlendFactor.One, BlendOp.Add, BlendOp.Add, DefaultColorWriteMask));
+            AlphaBlend = Add(BlendState.New(nameof(AlphaBlend), true, BlendFactor.One, BlendFactor.OneMinusSrcAlpha, BlendOp.Add, BlendOp.Add, DefaultColorWriteMask));
+            NonPremultiplied = Add(BlendState.New(nameof(NonPremultiplied), true, BlendFactor.SrcAlpha, BlendFactor.OneMinusSrcAlpha, BlendOp.Add, BlendOp.Add, DefaultColorWriteMask));
+            Opaque = Add(BlendState.New(nameof(Opaque), false, BlendFactor.One, BlendFactor.Zero, BlendOp.Add, BlendOp.Add, ColorComponentFlagBits.ABit));
             Default = Add(BlendState.New(nameof(Default), PipelineColorBlendStateCreateInfo.Default()));
-            //DoNotWriteToColorChannels = Add(BlendState.New(nameof(DoNotWriteToColorChannels), false, BlendFactor.One, BlendFactor.Zero, BlendOp.Add, DefaultColorWriteMask));
         }
     }
 }

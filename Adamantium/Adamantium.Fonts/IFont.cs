@@ -50,7 +50,30 @@ namespace Adamantium.Fonts
         
         public ushort UnitsPerEm { get; }
         
-        public Int16 Ascender { get; }  
+        public Int16 Ascender { get; } 
+        
+        public Int16 Descender { get; }
+        
+        public Int16 CapsHeight { get; }
+        
+        public Int16 LineGap { get; }
+        
+        public Int16 Baseline { get; }
+        /// <summary>
+        /// smallest readable size in pixels
+        /// </summary>
+        public UInt16 LowestRecPPEM { get; }
+
+        /// <summary>
+        /// space between lines
+        /// </summary>
+        public Double LineSpacingMultiplier { get; }
+
+        public DateTime Created { get; }
+
+        public DateTime Modified { get; }
+
+        public IReadOnlyCollection<Glyph> Glyphs { get; }
 
         internal void UpdateGlyphNamesCache();
 

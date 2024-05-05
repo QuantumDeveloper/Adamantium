@@ -4,20 +4,20 @@ namespace Adamantium.Core
 {
     public struct DataPointer
     {
-        public DataPointer(IntPtr pointer, long size, uint count)
+        public DataPointer(IntPtr pointer, ulong size, uint count)
         {
             Pointer = pointer;
             Size = size;
             Count = count;
         }
 
-        public DataPointer(IntPtr pointer, long size) : this(pointer, size, 0)
+        public DataPointer(IntPtr pointer, ulong size) : this(pointer, size, 0)
         {
         }
 
         public IntPtr Pointer;
 
-        public long Size;
+        public ulong Size;
 
         public uint Count;
 

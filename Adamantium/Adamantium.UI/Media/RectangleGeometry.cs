@@ -28,6 +28,11 @@ public sealed class RectangleGeometry : Geometry
    {
       
    }
+   
+   public RectangleGeometry(Size size) : this(new Rect(size), new CornerRadius(0))
+   {
+      
+   }
 
    public RectangleGeometry(Rect size, CornerRadius corners) : this()
    {

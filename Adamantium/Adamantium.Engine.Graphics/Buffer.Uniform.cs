@@ -15,7 +15,7 @@ namespace Adamantium.Engine.Graphics
             /// <param name="size">The size in bytes.</param>
             /// <param name="memoryFlags">The memoryFlags.</param>
             /// <returns>A index buffer</returns>
-            public static Buffer New(GraphicsDevice device, int size)
+            public static Buffer New(GraphicsDevice device, ulong size)
             {
                 return Buffer.New(device, size, BufferUsageFlags.UniformBuffer, MemoryFlags);
             }

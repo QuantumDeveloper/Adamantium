@@ -242,7 +242,7 @@ namespace Adamantium.Fonts.Parsers
                 }
                 catch (Exception e)
                 {
-                    TypeFace.AddErrorMessage(e.Message);
+                    Typeface.AddErrorMessage(e.Message);
                 }
 
                 return decompressedStream;
@@ -450,7 +450,7 @@ namespace Adamantium.Fonts.Parsers
                 glyphs[i].SetInstructions(FontReader.ReadBytes(tempGlyph.InstructionsLength, true));
             }
             
-            TypeFace.SetGlyphs(glyphs);
+            Typeface.SetGlyphs(glyphs);
         }
 
         private void BuildSimpleGlyph(

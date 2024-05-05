@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using Adamantium.Core;
 using Adamantium.Engine.Graphics;
+using Adamantium.Engine.Graphics.Fonts;
+using Adamantium.Fonts;
 using Adamantium.UI.RoutedEvents;
 using AdamantiumVulkan.Core;
 
@@ -8,9 +10,10 @@ namespace Adamantium.UI.Rendering;
 
 internal class ForwardWindowRenderer : WindowRendererBase
 {
+    private FontAtlas fontAtlas;
+    
     public ForwardWindowRenderer(GraphicsDevice device) : base(device)
     {
-        
     }
         
     private void OnClientSizeChanged(object sender, SizeChangedEventArgs e)
@@ -28,7 +31,7 @@ internal class ForwardWindowRenderer : WindowRendererBase
     {
         var width = (uint)Window.ClientWidth;
         var height = (uint)Window.ClientHeight;
-            
+
         Viewport.Width = width;
         Viewport.Height = height;
 
@@ -41,7 +44,7 @@ internal class ForwardWindowRenderer : WindowRendererBase
         Parameters.Height = height;
         CalculateProjectionMatrix();
     }
-
+    
     protected override void UnsubscribeFromEvents()
     {
         if (Window == null) return;
@@ -67,6 +70,15 @@ internal class ForwardWindowRenderer : WindowRendererBase
         
         GraphicsDevice.SetViewports(Viewport);
         ProcessVisualTree();
+        //fontAtlas.DrawString("Приветствую вас, майне либе камрадосег", 14, new Vector2F(0,0), Colors.Black);
+        //fontAtlas.DrawString("Hello string!\nComrade General, please respond", 14, new Vector2F(100,100), Colors.Black);
+        // fontAtlas.DrawString(
+        //     "Привет, камрадяка. Как ваши дела?", 
+        //     120, 
+        //     new Rectangle(10, 0, 550, 250), 
+        //     TextWrapping.WrapBySymbols,
+        //     TextTrimming.CharEllipses,
+        //     Colors.White);
     }
 
     private void ProcessVisualTree()

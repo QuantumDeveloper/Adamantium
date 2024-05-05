@@ -22,15 +22,15 @@ namespace Adamantium.Fonts
         [Key(4)]
         private Dictionary<string, List<Feature>> featuresMap;
         [IgnoreMember]
-        internal TypeFace TypeFace { get; }
+        internal Typeface Typeface { get; }
         [Key(6)]
         internal VariationStore VariationData { get; set; }
         [Key(7)]
         internal List<InstanceRecord> InstanceData { get; set; }
 
-        public Font(TypeFace typeFace)
+        public Font(Typeface typeface)
         {
-            TypeFace = typeFace;
+            Typeface = typeface;
             glyphs = new List<Glyph>();
             unicodes = new List<uint>();
 
@@ -119,6 +119,12 @@ namespace Adamantium.Fonts
         public ushort UnitsPerEm { get; internal set; }
         [Key(30)]
         public Int16 Ascender { get; internal set; }
+        public Int16 Descender { get; internal set; }
+        public Int16 CapsHeight { get; internal set; }
+        
+        public short LineGap { get; internal set; }
+        
+        public Int16 Baseline { get; internal set; }
 
         /// <summary>
         /// smallest readable size in pixels
@@ -130,7 +136,7 @@ namespace Adamantium.Fonts
         /// space between lines
         /// </summary>
         [Key(32)]
-        public Int32 LineSpace { get; internal set; }
+        public Double LineSpacingMultiplier { get; internal set; }
 
         [Key(33)]
         public DateTime Created { get; internal set; }
@@ -192,7 +198,7 @@ namespace Adamantium.Fonts
                 unicodes.AddRange(kvp.Value);
                 foreach (var unicode in kvp.Value)
                 {
-                    if (TypeFace.GetGlyphByIndex(kvp.Key, out var glyph))
+                    if (Typeface.GetGlyphByIndex(kvp.Key, out var glyph))
                     {
                         unicodeToGlyph[unicode] = glyph;
                     }
@@ -206,6 +212,10 @@ namespace Adamantium.Fonts
             foreach (var character in input)
             {
                 var glyph = GetGlyphByCharacter(character);
+                if (glyph == null)
+                {
+                    Typeface.GetGlyphByIndex(0U, out glyph);
+                }
                 translatedGlyphs.Add(glyph);
             }
 
@@ -216,7 +226,7 @@ namespace Adamantium.Fonts
         {
             if (index >= glyphs.Count)
             {
-                TypeFace.GetGlyphByIndex(0, out var glyph);
+                Typeface.GetGlyphByIndex(0, out var glyph);
                 return glyph;
             }
             

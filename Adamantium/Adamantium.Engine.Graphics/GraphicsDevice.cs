@@ -44,6 +44,9 @@ namespace Adamantium.Engine.Graphics
         private TrackingCollection<Rect2D> scissors;
         private TrackingCollection<DynamicState> dynamicStates;
 
+        private RenderTarget renderTarget;
+        private DepthStencilBuffer depthBuffer;
+
         private readonly PipelineStageFlagBits[] waitStages = { PipelineStageFlagBits.ColorAttachmentOutputBit };
         
         private PipelineManager pipelineManager;
@@ -561,16 +564,13 @@ namespace Adamantium.Engine.Graphics
         {
             CanPresent = false;
             Result result;
-            //if (IsPrimaryDevice)
-            {
-                var renderFence = InFlightFences[CurrentFrame];
-                result = LogicalDevice.WaitForFences(1, renderFence, true, ulong.MaxValue);
+            var renderFence = InFlightFences[CurrentFrame];
+            result = LogicalDevice.WaitForFences(1, renderFence, true, ulong.MaxValue);
                 
-                if (result != Result.Success && result != Result.Timeout)
-                {
-                    Log.Logger.Information($"Wait for fences result: {result}");
-                    return false;
-                }
+            if (result != Result.Success && result != Result.Timeout)
+            {
+                Log.Logger.Information($"Wait for fences result: {result}");
+                return false;
             }
 
             if (Presenter is SwapChainGraphicsPresenter swapchain)
@@ -597,6 +597,7 @@ namespace Adamantium.Engine.Graphics
 
             var beginInfo = new CommandBufferBeginInfo();
             beginInfo.Flags = CommandBufferUsageFlagBits.SimultaneousUseBit;
+            
             if (DeviceType == GraphicsDeviceType.Secondary)
             {
                 beginInfo.PInheritanceInfo = new CommandBufferInheritanceInfo();
@@ -657,14 +658,15 @@ namespace Adamantium.Engine.Graphics
                 var colorAttachmentInfo = new RenderingAttachmentInfo();
                 colorAttachmentInfo.SType = StructureType.RenderingAttachmentInfo;
                 colorAttachmentInfo.ImageLayout = ImageLayout.ColorAttachmentOptimal;
-                colorAttachmentInfo.ResolveMode = ResolveModeFlagBits.None;
                 colorAttachmentInfo.LoadOp = AttachmentLoadOp.Clear;
                 colorAttachmentInfo.StoreOp = AttachmentStoreOp.Store;
                 colorAttachmentInfo.ClearValue = clearColorValue;
                 if (Presenter.Description.MSAALevel != MSAALevel.None)
                 {
                     colorAttachmentInfo.ImageView = Presenter.RenderTarget;
-                    colorAttachmentInfo.ResolveImageView = Presenter.GetImageView(imageIndex);
+                    colorAttachmentInfo.ResolveImageView = Presenter.GetImageView(ImageIndex);
+                    colorAttachmentInfo.ResolveMode = ResolveModeFlagBits.AverageBit;
+                    colorAttachmentInfo.ResolveImageLayout = ImageLayout.ColorAttachmentOptimal;
                 }
                 else
                 {
@@ -691,7 +693,7 @@ namespace Adamantium.Engine.Graphics
                 renderingInfo.PStencilAttachment = depthAttachmentInfo;
                 renderingInfo.LayerCount = 1;
                 
-                ImageSubresourceRange range = new ImageSubresourceRange
+                var range = new ImageSubresourceRange
                 {
                     AspectMask = ImageAspectFlagBits.ColorBit,
                     BaseMipLevel = 0,
@@ -700,7 +702,7 @@ namespace Adamantium.Engine.Graphics
                     LayerCount = (~0U)
                 };
 
-                ImageSubresourceRange depthRange = new ImageSubresourceRange
+                var depthRange = new ImageSubresourceRange
                 {
                     AspectMask = ImageAspectFlagBits.DepthBit | ImageAspectFlagBits.StencilBit,
                     BaseMipLevel = 0,
@@ -710,7 +712,7 @@ namespace Adamantium.Engine.Graphics
                 };
 
                 InsertImageMemoryBarrier(commandBuffer,
-                    Presenter.GetImage(imageIndex),
+                    Presenter.GetImage(ImageIndex),
                     0,
                     AccessFlagBits.ColorAttachmentWriteBit,
                     ImageLayout.Undefined,
@@ -764,25 +766,26 @@ namespace Adamantium.Engine.Graphics
             {
                 commandBuffer.EndRendering();
 
-                if (Presenter is SwapChainGraphicsPresenter)
+                if (Presenter is not SwapChainGraphicsPresenter) return;
+                
+                var range = new ImageSubresourceRange
                 {
-                    ImageSubresourceRange range = new ImageSubresourceRange();
-                    range.AspectMask = ImageAspectFlagBits.ColorBit;
-                    range.BaseMipLevel = 0;
-                    range.LevelCount = (~0U);
-                    range.BaseArrayLayer = 0;
-                    range.LayerCount = (~0U);
+                    AspectMask = ImageAspectFlagBits.ColorBit,
+                    BaseMipLevel = 0,
+                    LevelCount = (~0U),
+                    BaseArrayLayer = 0,
+                    LayerCount = (~0U)
+                };
 
-                    InsertImageMemoryBarrier(commandBuffer,
-                        Presenter.GetImage(imageIndex),
-                        AccessFlagBits.ColorAttachmentWriteBit,
-                        0,
-                        ImageLayout.ColorAttachmentOptimal,
-                        ImageLayout.PresentSrcKhr,
-                        PipelineStageFlagBits.ColorAttachmentOutputBit,
-                        PipelineStageFlagBits.BottomOfPipeBit,
-                        range);
-                }
+                InsertImageMemoryBarrier(commandBuffer,
+                    Presenter.GetImage(ImageIndex),
+                    AccessFlagBits.ColorAttachmentWriteBit,
+                    0,
+                    ImageLayout.ColorAttachmentOptimal,
+                    ImageLayout.PresentSrcKhr,
+                    PipelineStageFlagBits.ColorAttachmentOutputBit,
+                    PipelineStageFlagBits.BottomOfPipeBit,
+                    range);
             }
             else
             {
@@ -897,14 +900,11 @@ namespace Adamantium.Engine.Graphics
             }
             
             result = GraphicsQueue.QueueSubmit(1, submitInfos, renderFence);
-            // This call speedup rendering on 50 fps WTF???
-            //result = GraphicsQueue.QueueSubmit(1, submitInfos, null);
             LogicalDevice.WaitForFences(1, renderFence, true, ulong.MaxValue);
             
             if (result != Result.Success)
             {
                 Log.Logger.Error($"failed to submit draw command buffer! Result was {result}");
-                //throw new Exception($"failed to submit draw command buffer! Result was {result}");
             }
 
             //GraphicsQueue.QueueWaitIdle();
@@ -947,6 +947,16 @@ namespace Adamantium.Engine.Graphics
             CurrentCommandBuffer.SetScissor(0, (uint)scissors.Length, scissors);
         }
 
+        public void SetRenderTarget(RenderTarget renderTarget)
+        {
+            this.renderTarget = renderTarget;
+        }
+
+        public void SetDepthBuffer(DepthStencilBuffer depthBuffer)
+        {
+            this.depthBuffer = depthBuffer;
+        }
+
         public void SetVertexBuffer(Buffer vertexBuffer)
         {
             ulong offset = 0;
@@ -968,6 +978,11 @@ namespace Adamantium.Engine.Graphics
         {
             var commandBuffer = commandBuffers[ImageIndex];
             commandBuffer.BindIndexBuffer(indexBuffer, 0, IndexType.Uint32);
+        }
+
+        public void Draw(ulong vertexCount, uint instanceCount, uint firstVertex = 0, uint firstInstance = 0)
+        {
+            Draw((uint)vertexCount, instanceCount, firstVertex, firstInstance);
         }
 
         public void Draw(uint vertexCount, uint instanceCount, uint firstVertex = 0, uint firstInstance = 0)
@@ -1022,7 +1037,7 @@ namespace Adamantium.Engine.Graphics
 
             commandBuffer.BindIndexBuffer(indexBuffer, 0, IndexType.Uint32);
 
-            commandBuffer.DrawIndexed(indexBuffer.ElementCount, 1, 0, 0, 0);
+            commandBuffer.DrawIndexed((uint)indexBuffer.ElementCount, 1, 0, 0, 0);
         }
 
         public void UpdateDescriptorSets(params WriteDescriptorSet[] writeDescriptorSets)
@@ -1088,23 +1103,6 @@ namespace Adamantium.Engine.Graphics
             return true;
         }
 
-        public void Present(PresentationParameters parameters)
-        {
-            if (!CanPresent)
-            {
-                //Console.WriteLine("Cannot call Present() because BeginDraw() was not called");
-                return;
-            }
-            
-            LastPresenterState = Presenter.Present();
-            // if (presentResult is Result.SuboptimalKhr or Result.ErrorOutOfDateKhr)
-            // {
-            //     ResizePresenter(parameters.Width, parameters.Height, parameters.BuffersCount, parameters.ImageFormat, parameters.DepthFormat);
-            // }
-            
-            UpdateCurrentFrameNumber();
-        }
-        
         public void Present()
         {
             if (!CanPresent)
@@ -1116,7 +1114,6 @@ namespace Adamantium.Engine.Graphics
 
             LastPresenterState = Presenter.Present();
             
-            //LastPresenterState = Presenter.Present();
             UpdateCurrentFrameNumber();
         }
 

@@ -26,7 +26,7 @@ namespace Adamantium.Fonts
 
         public FontType GetFontType()
         {
-            if (IsOTF())
+            if (IsOTF() || Path.GetExtension(fontPath)?.ToLower() == ".ttc")
             {
                 return FontType.Otf;
             }

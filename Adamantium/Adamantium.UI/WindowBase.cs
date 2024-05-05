@@ -264,7 +264,7 @@ public abstract class WindowBase : ContentControl, IWindow
             Closed?.Invoke(this, EventArgs.Empty);
         }
     }
-    
+
     public event EventHandler<WindowClosingEventArgs> Closing;
     public event EventHandler<EventArgs> Closed;
     public event EventHandler<WindowRendererChangedEventArgs> RendererChanged;

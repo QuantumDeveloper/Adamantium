@@ -11,7 +11,7 @@ namespace Adamantium.Imaging.Bmp
     {
         private const UInt16 fileType = 0x4D42;
 
-        public static IRawBitmap LoadFromMemory(IntPtr pSource, long size)
+        public static IRawBitmap LoadFromMemory(IntPtr pSource, ulong size)
         {
             if (!DecodeBitmapHeader(pSource, size, out var description, out var dataOffset, out var compression))
             {
@@ -21,7 +21,7 @@ namespace Adamantium.Imaging.Bmp
             return CreateImageFromBitmap(pSource, dataOffset, description);
         }
         
-        private static bool DecodeBitmapHeader(IntPtr headerPtr, long size, out ImageDescription description, out int dataOffset, out BitmapCompressionMode compressionMode)
+        private static bool DecodeBitmapHeader(IntPtr headerPtr, ulong size, out ImageDescription description, out int dataOffset, out BitmapCompressionMode compressionMode)
         {
             dataOffset = 0;
             compressionMode = BitmapCompressionMode.RGB;
@@ -29,7 +29,7 @@ namespace Adamantium.Imaging.Bmp
             if (headerPtr == IntPtr.Zero)
                 throw new ArgumentException("Pointer to Bitmap header cannot be null", nameof(headerPtr));
 
-            if (size < (Utilities.SizeOf<BitmapFileHeader>()))
+            if (size < (ulong)Utilities.SizeOf<BitmapFileHeader>())
                 return false;
 
             var fileHeader = Utilities.Read<BitmapFileHeader>(headerPtr);

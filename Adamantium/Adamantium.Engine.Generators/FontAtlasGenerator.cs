@@ -60,7 +60,7 @@ namespace Adamantium.Engine.Generators
 
             try
             {
-                var typeface = TypeFace.LoadFont(fontData.PathToFont, 3);
+                var typeface = Typeface.LoadFont(fontData.PathToFont, 3);
 
                 var font = typeface.GetFont(0);
                 if (fontData.GlyphCount == 0)
@@ -68,8 +68,7 @@ namespace Adamantium.Engine.Generators
                     fontData.GlyphCount = typeface.GlyphCount;
                 }
 
-                var atlasGen = new TextureAtlasGenerator();
-                var atlasData = atlasGen.GenerateTextureAtlas(
+                var atlasGen = new TextureAtlasGenerator(
                     typeface,
                     font,
                     fontData.GlyphTextureSize,
@@ -77,6 +76,7 @@ namespace Adamantium.Engine.Generators
                     fontData.PixelRangle,
                     fontData.StartGlyphIndex,
                     fontData.GlyphCount);
+                var atlasData = atlasGen.GenerateTextureAtlas();
 
                 atlasData.FontData = typeface.GetFontAsBytesArray();
                 if (!string.IsNullOrEmpty(fontData.Name))

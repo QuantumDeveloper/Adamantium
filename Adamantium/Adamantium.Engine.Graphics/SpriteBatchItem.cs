@@ -14,7 +14,7 @@ public struct SpriteBatchItem
     /// Sprite destination rectangle where sprite item will be placed
     /// </summary>
     [VertexInputElement("SV_Position")]
-    public Vector4F Destination;
+    public Vector4F ArrangeRect;
 
     /// <summary>
     /// Sprite source rectangle which texture data for rendering will be taken from

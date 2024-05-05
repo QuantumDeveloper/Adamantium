@@ -255,7 +255,8 @@ namespace Adamantium.Fonts.Extensions
             table.StartSize = reader.ReadUInt16();
             table.EndSize = reader.ReadUInt16();
             table.DeltaFormat = (DeltaFormatValues)reader.ReadUInt16();
-            table.DeltaValues = reader.ReadUInt16Array(table.EndSize - table.StartSize);
+            // TODO: not sure that this is corect way of reading Delta Values
+            table.DeltaValues = reader.ReadUInt16Array(Math.Abs(table.EndSize - table.StartSize));
 
             return table;
         }
@@ -389,30 +390,34 @@ namespace Adamantium.Fonts.Extensions
             
             var ligatureArrayTable = new LigatureArrayTable();
             var ligatureCount = reader.ReadUInt16();
+            var offsets = reader.ReadUInt16Array(ligatureCount);
             ligatureArrayTable.AttachTables = new LigatureAttachTable[ligatureCount];
             for (int k = 0; k < ligatureCount; ++k)
             {
+                reader.Position = subTableOffset + offsets[k];
+                
                 var ligatureAttachTable = new LigatureAttachTable();
                 ligatureArrayTable.AttachTables[k] = ligatureAttachTable;
-
+                
                 var componentCount = reader.ReadUInt16();
                 ligatureAttachTable.ComponentRecords = new ComponentRecord[componentCount];
                 for (int i = 0; i < componentCount; ++i)
                 {
                     var componentRecord = new ComponentRecord();
+                    ligatureAttachTable.ComponentRecords[i] = componentRecord;
                     componentRecord.Anchors = new AnchorPointTable[markClassCount];
                     
                     var anchorOffsetArray = reader.ReadUInt16Array(markClassCount);
                     
-                    for (int m = 0; m < markClassCount; ++m)
+                    for (int m = 0; m < anchorOffsetArray.Length; ++m)
                     {
-                        long offset = anchorOffsetArray[i];
+                        long offset = anchorOffsetArray[m];
                     
                         if (offset <= 0) continue;
 
                         offset += subTableOffset;
-                    
-                        componentRecord.Anchors[i] = reader.ReadAnchorTable(offset);
+
+                        componentRecord.Anchors[m] = reader.ReadAnchorTable(offset);
                     }
                 }
             }

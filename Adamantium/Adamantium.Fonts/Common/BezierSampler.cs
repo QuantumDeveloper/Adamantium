@@ -10,7 +10,7 @@ namespace Adamantium.Fonts.Common
         {
             return glyph.OutlineType switch
             {
-                OutlineType.TrueType => GenerateQuadraticBezierOutlines(glyph.Outlines, rate), // @TODO fix such that it should return segments
+                OutlineType.TrueType => GenerateQuadraticBezierOutlines(glyph.Outlines, rate),
                 OutlineType.CompactFontFormat => GenerateCubicBezierOutlines(glyph.Outlines, rate),
                 _ => Array.Empty<SampledOutline>(),
             };
@@ -92,6 +92,7 @@ namespace Adamantium.Fonts.Common
             {
                 var sampledOutline = GenerateQuadraticBezierCurves(outline, rate);
                 if (sampledOutline == SampledOutline.Empty) continue;
+
                 sampledOutlines.Add(sampledOutline);
             }
 
@@ -135,8 +136,16 @@ namespace Adamantium.Fonts.Common
 
             // close contour by adding first point to the end of points list
             points.Add(points[0]);
+            
+            List<LineSegment2D> segments = new List<LineSegment2D>();
+            
+            for (var i = 0; i < (points.Count - 1); i++)
+            {
+                var sampledSegment = new LineSegment2D(points[i], points[i + 1]);
+                segments.Add(sampledSegment);
+            }
 
-            return new SampledOutline(points.ToArray());
+            return new SampledOutline(segments.ToArray());
         }
 
         private static Vector2 GetQuadraticCurvePoint(Vector2 begin, Vector2 control, Vector2 end, double t)

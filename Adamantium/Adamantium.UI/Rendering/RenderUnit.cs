@@ -8,12 +8,19 @@ internal class RenderUnit : DisposableObject
 {
     private GeometryRenderer geometryRenderer;
     private GeometryRenderer strokeRenderer;
+    private TextRenderer textRenderer;
 
     public RenderUnit()
     {
     }
     
     public ImageSource Image { get; set; }
+
+    public TextRenderer TextRenderer
+    {
+        get => textRenderer;
+        set => textRenderer = ToDispose(value);
+    }
 
     public GeometryRenderer GeometryRenderer
     {
@@ -43,5 +50,6 @@ internal class RenderUnit : DisposableObject
     {
         geometryRenderer?.Draw(graphicsDevice, component, Image, projectionMatrix);
         strokeRenderer?.Draw(graphicsDevice, component, projectionMatrix);
+        textRenderer?.Draw(graphicsDevice, component, projectionMatrix);
     }
 }

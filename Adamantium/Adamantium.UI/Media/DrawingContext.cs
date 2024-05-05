@@ -2,8 +2,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Engine.Graphics;
+using Adamantium.Engine.Graphics.Fonts;
 using Adamantium.UI.Media.Imaging;
 using Adamantium.UI.Rendering;
+using Adamantium.UI.Text;
 using Serilog;
 
 namespace Adamantium.UI.Media;
@@ -36,7 +38,6 @@ public class DrawingContext
       {
          currentContainer = new UIRenderContainer();
       }
-      //currentContainer?.DisposeAndClearItems();
       _currentIndex = 0;
       currentComponent = visualComponent;
    }
@@ -50,7 +51,6 @@ public class DrawingContext
 
       if (_currentIndex < currentContainer.ChildUnits.Count)
       {
-         //int itemsToRemove = currentContainer.ChildUnits.Count - (int)_currentIndex;
          for (int i = currentContainer.ChildUnits.Count - 1; i >= (int)_currentIndex; --i)
          {
             currentContainer.ChildUnits[i].Dispose();
@@ -75,7 +75,7 @@ public class DrawingContext
          var strokeGeometry = new StrokeGeometry(pen, currentUnit.GeometryRenderer.Geometry);
          strokeGeometry.ProcessGeometry(GeometryType.Solid);
          var strokeRenderer =
-            ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, strokeGeometry, pen?.Brush);
+            ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, strokeGeometry, pen?.Brush, null);
          currentUnit.StrokeParametersHash = HashCode.Combine(pen);
          currentUnit.StrokeRenderer = strokeRenderer;
       }
@@ -89,7 +89,7 @@ public class DrawingContext
       currentUnit = new RenderUnit();
       currentUnit.GeometryParametersHash = hash;
       currentUnit.GeometryRenderer =
-         ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, rectangle, brush);
+         ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, rectangle, brush, null);
    }
    
    private void ProcessImageGeometry(Rect destinationRect, CornerRadius corners, Brush brush, ImageSource image, int hash)
@@ -120,7 +120,7 @@ public class DrawingContext
          if (currentUnit != null)
          {
             var index = currentContainer.ChildUnits.IndexOf(currentUnit);
-            currentUnit.GeometryRenderer.Brush = brush;
+            currentUnit.GeometryRenderer.Foreground = brush;
             if (index != _currentIndex)
             {
                currentContainer.ChildUnits.Insert((int)_currentIndex, currentUnit);
@@ -150,7 +150,7 @@ public class DrawingContext
          ellipse.ProcessGeometry(GeometryType.Solid);
          
          currentUnit = new RenderUnit();
-         var uiRenderer = ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, ellipse, brush);
+         var uiRenderer = ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, ellipse, brush, null);
          currentUnit.GeometryRenderer = uiRenderer;
          currentUnit.GeometryParametersHash = hash;
          
@@ -163,7 +163,7 @@ public class DrawingContext
          if (unit != null)
          {
             var index = currentContainer.ChildUnits.IndexOf(unit);
-            unit.GeometryRenderer.Brush = brush;
+            unit.GeometryRenderer.Foreground = brush;
             ProcessStrokeRenderer(pen);
             if (index != _currentIndex)
             {
@@ -176,7 +176,7 @@ public class DrawingContext
             ellipse.ProcessGeometry(GeometryType.Both);
 
             currentUnit = new RenderUnit();
-            var uiRenderer = ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, ellipse, brush);
+            var uiRenderer = ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, ellipse, brush, null);
             currentUnit.GeometryRenderer = uiRenderer;
             currentUnit.GeometryParametersHash = hash;
             
@@ -205,13 +205,13 @@ public class DrawingContext
       currentUnit = new RenderUnit();
       if (geometry.Mesh.HasPoints)
       {
-         var uiRenderer = ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, geometry, brush);
+         var uiRenderer = ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, geometry, brush, null);
          currentUnit.GeometryRenderer = uiRenderer;
       }
 
       if (strokeGeometry != null && strokeGeometry.Mesh.HasPoints)
       {
-         var strokeRenderer = ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, strokeGeometry, pen?.Brush);
+         var strokeRenderer = ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, strokeGeometry, pen?.Brush, null);
          currentUnit.StrokeRenderer = strokeRenderer;
       }
 
@@ -234,7 +234,7 @@ public class DrawingContext
 
       currentUnit = new RenderUnit();
          
-      var strokeRenderer = ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, strokeGeometry, pen.Brush);
+      var strokeRenderer = ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, strokeGeometry, pen.Brush, null);
       currentUnit.StrokeRenderer = strokeRenderer;
          
       currentContainer?.AddItem(currentUnit);
@@ -262,7 +262,7 @@ public class DrawingContext
          {
             var index = currentContainer.ChildUnits.IndexOf(unit);
             ((ImageRenderer)unit.GeometryRenderer).Image = image;
-            unit.GeometryRenderer.Brush = filter;
+            unit.GeometryRenderer.Foreground = filter;
             if (index != _currentIndex)
             {
                currentContainer.ChildUnits.Insert((int)_currentIndex, unit);
@@ -283,5 +283,22 @@ public class DrawingContext
    public void AddImage(ImageSource imageSource)
    {
       currentUnit.Image = imageSource;
+   }
+
+   public void DrawText(TextRenderingParameters renderingParameters, Size desiredSize, TextLayout textLayout, Brush foreground, Brush background)
+   {
+      textLayout.Update(GraphicsDevice);
+      currentUnit = currentContainer.ChildUnits.FirstOrDefault(x =>
+         x.TextRenderer != null && x.TextRenderer.TextLayout.Guid == textLayout.Guid);
+      if (currentUnit == null)
+      {
+         currentUnit = new RenderUnit();
+         var rectangle = new RectangleGeometry(desiredSize);
+         rectangle.ProcessGeometry(GeometryType.Solid);
+         currentUnit.TextRenderer =
+            ComponentRenderFactory.CreateTextRenderer(GraphicsDevice, rectangle, textLayout, renderingParameters, foreground, background);
+         currentContainer.AddItem(currentUnit);
+      }
+      _currentIndex++;
    }
 }

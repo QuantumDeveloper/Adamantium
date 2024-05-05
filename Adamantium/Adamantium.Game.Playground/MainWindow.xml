@@ -5,8 +5,9 @@
         Width="1280"
         Height="720">
     <RenderTargetPanel x:Name="TestGrid1" 
-					   ColumnDefinitions="Auto, Auto, Auto">
-		<!--<Path StrokeThickness="2" -->
+                       Background="CornflowerBlue"
+					   ColumnDefinitions="Auto">
+<!--		<Path StrokeThickness="2" -->
 <!--              Fill="Yellow"-->
 <!--              Name="Path1"-->
 <!--		      HorizontalAlignment="Right">-->
@@ -66,5 +67,17 @@
 <!--		<Thumb x:Name="Thumb1"-->
 <!--			   VerticalAlignment="Center"-->
 <!--			   HorizontalAlignment="Center"/>-->
+        <TextBlock Text="Камрадяка, давайте писать адамань вместе!"
+                   Grid.ColumnSpan="3"
+                   Background="Black"
+                   Foreground="White"
+                   Width="300"
+                   TextWrapping="WrapByWords"
+                   TextTrimming="CharEllipses"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   HorizontalTextAlignment="Center"
+                   VerticalTextAlignment="Center"
+                   FontSize="40"/>
     </RenderTargetPanel>
 </Window>

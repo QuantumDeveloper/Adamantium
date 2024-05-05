@@ -143,6 +143,10 @@ public class RenderTargetPanel: Grid
          var wnd = GetWindow();
          _nextRenderTarget = new RenderTargetImage(wnd.GetDrawingContext(), PixelWidth, PixelHeight, MSAALevel.None, SurfaceFormat);
          RenderTarget = _nextRenderTarget;
+         unsafe
+         {
+            Handle = new IntPtr(RenderTarget.NativePointer);
+         }
       }
       catch (Exception e)
       {
@@ -186,6 +190,7 @@ public class RenderTargetPanel: Grid
          {
             Handle = new IntPtr(_currentRenderTarget.NativePointer);
          }
+
          context.AddImage(_currentRenderTarget);
       }
       else

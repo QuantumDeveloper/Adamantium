@@ -3,7 +3,7 @@
     public enum TextWrapping
     {
         NoWrap,
-        Wrap,
-        WrapWithOverflow
+        WrapByWords,
+        WrapBySymbols
     }
 }

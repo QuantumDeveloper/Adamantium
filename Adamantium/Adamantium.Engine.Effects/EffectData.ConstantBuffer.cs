@@ -20,7 +20,7 @@ namespace Adamantium.Engine.Effects
             /// Size in bytes of this constant buffer.
             /// </summary>
             [Key(1)]
-            public int Size;
+            public ulong Size;
 
             /// <summary>
             /// Binding index
@@ -54,7 +54,7 @@ namespace Adamantium.Engine.Effects
                 unchecked
                 {
                     int hashCode = Name.GetHashCode();
-                    hashCode = (hashCode * 397) ^ Size;
+                    hashCode = (hashCode * 397) ^ (int)Size;
                     hashCode = (hashCode * 397) ^ (int)Slot;
                     hashCode = (hashCode * 397) ^ Parameters.Count;
                     return hashCode;

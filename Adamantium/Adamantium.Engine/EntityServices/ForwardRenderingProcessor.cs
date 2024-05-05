@@ -1,8 +1,10 @@
 using System;
 using System.Linq;
 using Adamantium.Core;
+using Adamantium.Engine.Graphics.Fonts;
 using Adamantium.EntityFramework;
 using Adamantium.EntityFramework.Components;
+using Adamantium.Fonts;
 using Adamantium.Mathematics;
 using Adamantium.Win32;
 
@@ -10,8 +12,15 @@ namespace Adamantium.Engine.EntityServices;
 
 public class ForwardRenderingProcessor : RenderingProcessor
 {
+    private FontAtlas fontAtlas;
+    
     public ForwardRenderingProcessor()
     {
+    }
+
+    protected override void LoadContent()
+    {
+        base.LoadContent();
     }
 
     public override void Draw(AppTime gameTime)
@@ -21,7 +30,7 @@ public class ForwardRenderingProcessor : RenderingProcessor
             OnDraw(entity, gameTime);
         }
     }
-
+    
     private void OnDraw(Entity entity, AppTime gameTime)
     {
         try
