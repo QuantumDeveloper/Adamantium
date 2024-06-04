@@ -41,6 +41,10 @@ namespace Adamantium.Engine.Graphics.Fonts
         public uint StartGlyphIndex { get; }
         
         public uint GlyphCount { get; }
+        
+        public GlyphSortingVariant SortingVariant { get; }
+        
+        public uint GlyphMargin { get; }
 
         public double LineSpacingMultiplier { get; set; }
 
@@ -54,7 +58,9 @@ namespace Adamantium.Engine.Graphics.Fonts
             SampleRate = parameters.SampleRate;
             PixelRange = parameters.PixelRange;
             StartGlyphIndex = parameters.StartGlyphIndex;
-            GlyphCount = parameters.GlyphCount;
+            GlyphCount = parameters.GlyphCount == uint.MaxValue? typeface.GlyphCount : parameters.GlyphCount;
+            SortingVariant = parameters.SortingVariant;
+            GlyphMargin = parameters.GlyphMargin;
             LineSpacingMultiplier = Font.LineSpacingMultiplier;
             
             atlasGenerator = new TextureAtlasGenerator(
@@ -63,8 +69,10 @@ namespace Adamantium.Engine.Graphics.Fonts
                 MSDFTextureSize, 
                 SampleRate,
                 PixelRange, 
-                StartGlyphIndex, 
-                GlyphCount);
+                StartGlyphIndex,
+                GlyphCount,
+                SortingVariant,
+                GlyphMargin);
             
             AtlasData = atlasGenerator.PrepareTextureAtlas();
             
@@ -136,8 +144,8 @@ namespace Adamantium.Engine.Graphics.Fonts
 
                 BufferImageCopy region = new BufferImageCopy();
                 region.BufferOffset = 0;
-                region.BufferRowLength = (uint)textureData.BoundingRect.Width;
-                region.BufferImageHeight = (uint)textureData.BoundingRect.Height;
+                region.BufferRowLength = (uint)textureData.FullGlyphSize.Width;
+                region.BufferImageHeight = (uint)textureData.FullGlyphSize.Height;
                 region.ImageSubresource = new ImageSubresourceLayers();
                 region.ImageSubresource.AspectMask = ImageAspectFlagBits.ColorBit;
                 region.ImageSubresource.MipLevel = 0;
@@ -145,7 +153,7 @@ namespace Adamantium.Engine.Graphics.Fonts
                 region.ImageSubresource.LayerCount = 1;
                 region.ImageOffset = new Offset3D()
                     { X = textureData.BoundingRect.Left, Y = textureData.BoundingRect.Top, Z = 0 };
-                region.ImageExtent = new Extent3D() { Width = (uint)textureData.BoundingRect.Width, Height = (uint)textureData.BoundingRect.Height, Depth = 1 };
+                region.ImageExtent = new Extent3D() { Width = (uint)textureData.FullGlyphSize.Width, Height = (uint)textureData.FullGlyphSize.Height, Depth = 1 };
 
                 commandBuffer.CopyBufferToImage(buffer, Atlas, ImageLayout.TransferDstOptimal, 1, region);
             }

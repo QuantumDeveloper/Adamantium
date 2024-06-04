@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Core;
 using Adamantium.Fonts;
+using Adamantium.Fonts.TextureGeneration;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Engine.Graphics.Fonts;
@@ -81,7 +82,8 @@ public class TextLayout : DisposableObject
         Size textArea,
         TextWrapping textWrapping, 
         TextTrimming textTrimming,
-        HorizontalTextAlignment horizontalTextAlignment)
+        HorizontalTextAlignment horizontalTextAlignment,
+        VerticalTextAlignment verticalTextAlignment)
     {
         if (Double.IsNaN(textArea.Width))
         {
@@ -94,6 +96,7 @@ public class TextLayout : DisposableObject
         var @params = new TextRenderingParameters()
             { 
                 HorizontalTextAlignment = horizontalTextAlignment, 
+                VerticalTextAlignment = verticalTextAlignment,
                 TextWrapping = textWrapping, 
                 TextTrimming = textTrimming,
                 TextArea = new Rectangle(Vector2F.Zero, textArea)
@@ -141,6 +144,8 @@ public class TextLayout : DisposableObject
         var words = text.Split(' ');
         var glyphsData = new List<GlyphWordData>();
         int wordIndex = 0;
+        int lineIndex = 0;
+        int positionInString = 0;
         for (var index = 0; index < words.Length; index++)
         {
             wordIndex = index;
@@ -154,12 +159,15 @@ public class TextLayout : DisposableObject
 
             if (wordIndex < words.Length - 1)
             {
+                var rect = new RectangleF((float)Math.Ceiling(cursorPosition),
+                    (float)Math.Ceiling(height + baseLine),
+                    (float)Math.Ceiling(spaceWidth),
+                    0f); 
                 // add space after word
                 glyphsData.Add(new GlyphWordData(spaceGlyph, ' ',
-                    new RectangleF((float)Math.Ceiling(cursorPosition), 
-                        (float)Math.Ceiling(height + baseLine), 
-                        (float)Math.Ceiling(spaceWidth), 
-                        0f), -1));
+                    rect,
+                    -1,
+                    lineIndex));
                 cursorPosition += spaceWidth;
             }
         }
@@ -168,8 +176,22 @@ public class TextLayout : DisposableObject
         height = _wordData.Max(x => x.Rect.Bottom);
         
         CalculateRealTextDimensions();
+        
         var maxX = _wordData.Max(x => x.Rect.Right);
-        CalculatedLayoutSize = new Size(Math.Ceiling(maxX), Math.Ceiling(height));
+        var finalRect = new Size(Math.Ceiling(maxX), Math.Ceiling(height));
+        if (renderingParameters.TextArea.Width != Int32.MaxValue)
+        {
+            finalRect.Width = renderingParameters.TextArea.Width;
+        }
+        
+        if (renderingParameters.TextArea.Height != Int32.MaxValue)
+        {
+            finalRect.Height = renderingParameters.TextArea.Height;
+        }
+        
+        ArrangeText();
+        
+        CalculatedLayoutSize = finalRect;
         
         return CalculatedLayoutSize;
 
@@ -186,6 +208,7 @@ public class TextLayout : DisposableObject
                     case '\n':
                         height += lineHeight;
                         cursorPosition = 0;
+                        lineIndex++;
                         break;
                     case ' ':
                     {
@@ -207,111 +230,59 @@ public class TextLayout : DisposableObject
 
                         cursorPosition += Math.Ceiling(glyph.AdvanceWidth * scale);
                         
-                        glyphsData.Add(new GlyphWordData(glyph, symbol, glyphRect, i));
+                        glyphsData.Add(new GlyphWordData(glyph, symbol, glyphRect, i, lineIndex));
 
                         switch (renderingParameters.TextWrapping)
                         {
                             case TextWrapping.NoWrap:
-                                switch (renderingParameters.TextTrimming)
+                                if (cursorPosition > textArea.Width)
                                 {
-                                    case TextTrimming.None:
-                                    case TextTrimming.CharEllipses:
-                                    case TextTrimming.WordEllipses:
-                                        if (cursorPosition > textArea.Width)
-                                        {
-                                            if (!IsLastGlyph(i, text.Length))
-                                            {
-                                                var glyphsDataCopy = glyphsData.ToArray();
-                                                PrepareDataAndTrim(glyphsDataCopy, i, glyphBase);
-                                                return false;
-                                            }
-                                        }
-                                        break;
+                                    if (!IsLastGlyph(i, text.Length))
+                                    {
+                                        var glyphsDataCopy = glyphsData.ToArray();
+                                        PrepareDataAndTrim(glyphsDataCopy, i, glyphBase);
+                                        return false;
+                                    }
                                 }
                                 break;
                             case TextWrapping.WrapBySymbols:
-                                switch (renderingParameters.TextTrimming)
                                 {
-                                    case TextTrimming.None:
-                                    case TextTrimming.CharEllipses:
-                                    case TextTrimming.WordEllipses:
+                                    if (cursorPosition > textArea.Width)
                                     {
-                                        if (cursorPosition > textArea.Width)
+                                        var glyphsDataCopy = glyphsData.ToArray();
+                                        // We have more vertical space for text
+                                        if (height + lineHeight < textArea.Height)
                                         {
-                                            var glyphsDataCopy = glyphsData.ToArray();
-                                            // We have more vertical space for text
-                                            if (height + lineHeight < textArea.Height)
-                                            {
-                                                height += lineHeight;
-                                                glyphBase = height + baseLine;
-                                                RearrangeData(glyphsDataCopy, glyphBase);
-                                            }
-                                            else if (!IsLastGlyph(i, text.Length))
-                                            {
-                                                PrepareDataAndTrim(glyphsDataCopy, i, glyphBase);
-                                                return false;
-                                            }
+                                            lineIndex++;
+                                            height += lineHeight;
+                                            glyphBase = height + baseLine;
+                                            RearrangeData(glyphsDataCopy, glyphBase);
                                         }
-
-                                        break;
+                                        else if (!IsLastGlyph(i, text.Length))
+                                        {
+                                            PrepareDataAndTrim(glyphsDataCopy, i, glyphBase);
+                                            return false;
+                                        }
                                     }
                                 }
                                 break;
                             case TextWrapping.WrapByWords:
-                                switch (renderingParameters.TextTrimming)
+                                if (wordStartPosition + wordWidth > textArea.Width && wordIndex > 0)
                                 {
-                                    case TextTrimming.None:
-                                    case TextTrimming.CharEllipses:
-                                    case TextTrimming.WordEllipses:
+                                    if (height + lineHeight < textArea.Height)
                                     {
-                                        if (cursorPosition > textArea.Width && wordIndex == 0)
-                                        {
-                                            var glyphsDataCopy = glyphsData.ToArray();
-                                            if (height + lineHeight < textArea.Height)
-                                            {
-                                                height += lineHeight;
-                                                glyphBase = height + baseLine;
-                                                RearrangeData(glyphsDataCopy, glyphBase);
-                                            }
-                                            else if (!IsLastGlyph(i, word.Length))
-                                            {
-                                                PrepareDataAndTrim(glyphsDataCopy, i, glyphBase);
-                                                return false;
-                                            }
-                                        }
-                                        if (wordStartPosition + wordWidth > textArea.Width && wordIndex > 0)
-                                        {
-                                            if (height + lineHeight < textArea.Height)
-                                            {
-                                                wordStartPosition = 0;
-                                                cursorPosition = 0;
-                                                height += lineHeight;
-                                                glyphBase = height + baseLine;
-
-                                                var dataCopy = glyphsData.TakeLast(i + 1).ToArray();
-                                                for (var index = dataCopy.Length - 1; index >= 0; index--)
-                                                {
-                                                    var data = dataCopy[index];
-                                                    glyphRect = CalculateGlyphPosition(data.Glyph,
-                                                        cursorPosition,
-                                                        glyphBase,
-                                                        kernApplied,
-                                                        data.PositionInString,
-                                                        fontSize,
-                                                        scale);
-                                                    data.Rect = glyphRect;
-                                                    cursorPosition += glyphRect.Width;
-                                                }
-                                            }
-                                            else if (!IsLastGlyph(i, word.Length))
-                                            {
-                                                var glyphsDataCopy = glyphsData.ToArray();
-                                                PrepareDataAndTrim(glyphsDataCopy, i, glyphBase);
-                                                return false;
-                                            }
-                                        }
-
-                                        break;
+                                        wordStartPosition = 0;
+                                        lineIndex++;
+                                        height += lineHeight;
+                                        glyphBase = height + baseLine;
+                                        var glyphsDataCopy = glyphsData.ToArray();
+                                        RearrangeData(glyphsDataCopy, glyphBase);
+                                    }
+                                    else if (!IsLastGlyph(i, word.Length))
+                                    {
+                                        var glyphsDataCopy = glyphsData.ToArray();
+                                        PrepareDataAndTrim(glyphsDataCopy, i, glyphBase);
+                                        return false;
                                     }
                                 }
                                 break;
@@ -323,6 +294,105 @@ public class TextLayout : DisposableObject
             return true;
         }
 
+        void ArrangeText()
+        {
+            var minX = _wordData.Min(x => x.Rect.Left);
+            var maxX = _wordData.Max(x => x.Rect.Right);
+            var minY = _wordData.Min(x => x.Rect.Top);
+            var maxY = _wordData.Max(x => x.Rect.Bottom);
+            switch (renderingParameters.HorizontalTextAlignment)
+            {
+                case HorizontalTextAlignment.Center:
+                {
+                    var maxLines = _wordData.Max(x => x.LineIndex);
+                    for (int i = 0; i <= maxLines; ++i)
+                    {
+                        var glyphsForLine = _wordData.Where(x => x.LineIndex == i).ToArray();
+                        if (glyphsForLine.Length == 0) break;
+                        
+                        minX = glyphsForLine.Min(x => x.Rect.Left);
+                        maxX = glyphsForLine.Max(x => x.Rect.Right);
+                        var lineWidth = maxX - minX;
+                        var diff = (finalRect.Width - lineWidth) / 2;
+                        foreach (var glyphWordData in glyphsForLine)
+                        {
+                            var rect = glyphWordData.Rect;
+                            rect.X += (float)diff;
+                            glyphWordData.Rect = rect;
+                        }
+                    }
+                }
+                break;
+                case HorizontalTextAlignment.Right:
+                {
+                    var maxLines = _wordData.Max(x => x.LineIndex);
+                    for (int i = 0; i <= maxLines; ++i)
+                    {
+                        var glyphsForLine = _wordData.Where(x => x.LineIndex == i).ToArray();
+                        if (glyphsForLine.Length == 0) break;
+                        
+                        // get max right point ignoring spaces in the end of the line
+                        maxX = glyphsForLine.Where(x=>x.Symbol != ' ').Max(x => x.Rect.Right);
+                        var diff = (finalRect.Width - maxX);
+                        foreach (var glyphWordData in glyphsForLine)
+                        {
+                            var rect = glyphWordData.Rect;
+                            rect.X += (float)diff;
+                            glyphWordData.Rect = rect;
+                        }
+                    }
+                }
+                break;
+                case HorizontalTextAlignment.Justify:
+                {
+                    var maxLines = _wordData.Max(x => x.LineIndex);
+                    for (int i = 0; i <= maxLines; ++i)
+                    {
+                        var glyphsForLine = _wordData.Where(x => x.LineIndex == i && x.Symbol != ' ').ToArray();
+                        if (glyphsForLine.Length == 0) break;
+                        
+                        var lineWidth = glyphsForLine.Take(glyphsForLine.Length - 1).Sum(x => x.Rect.Width);
+                        var diff = Math.Floor((finalRect.Width - lineWidth) / (glyphsForLine.Length - 1));
+                        var cursor = 0;
+
+                        int cnt = 0;
+                        foreach (var glyphWordData in glyphsForLine)
+                        {
+                            var leftSideBearing = (int)Math.Floor(glyphWordData.Glyph.LeftSideBearing * scale);
+                            if (cnt == 0)
+                            {
+                                leftSideBearing = 0;
+                            }
+                            var rect = glyphWordData.Rect;
+                            rect.X = cursor + leftSideBearing;
+                            glyphWordData.Rect = rect;
+                            cursor = (int)(rect.Right + diff);
+                            cnt++;
+                        }
+                    }
+                }
+                break;
+            }
+            
+            switch (renderingParameters.VerticalTextAlignment)
+            {
+                case VerticalTextAlignment.Center:
+                {
+                    var realTextSize = RealTextDimensions;
+                    var center = (Vector2)(finalRect - realTextSize)/2;
+                    var diff = center.Y - minY;
+                    foreach (var glyphWordData in _wordData)
+                    {
+                        var rect = glyphWordData.Rect;
+                        rect.Y += (float)diff;
+                        glyphWordData.Rect = rect;
+                    }
+                    
+                }
+                break;
+            }
+        }
+
         void RearrangeData(GlyphWordData[] glyphsDataCopy, double glyphBase)
         {
             var rearrangeList = new List<GlyphWordData>();
@@ -330,8 +400,23 @@ public class TextLayout : DisposableObject
             {
                 var data = glyphsData[k];
                 cursorPosition -= Math.Ceiling(data.Glyph.AdvanceWidth * scale);
+                var wordsLeft = glyphsDataCopy.Take(k).Count(x => x.Symbol == ' ') + 1;
                 rearrangeList.Add(data);
-                if (cursorPosition <= textArea.Width)
+                if (wordIndex > 0 && 
+                    cursorPosition <= textArea.Width && 
+                    renderingParameters.TextWrapping == TextWrapping.WrapByWords && 
+                    data.Symbol == ' ')
+                {
+                    break;
+                }
+                else if (cursorPosition <= textArea.Width && 
+                         renderingParameters.TextWrapping == TextWrapping.WrapBySymbols)
+                {
+                    break;
+                }
+                else if (wordsLeft == 1 &&
+                         cursorPosition > textArea.Width &&
+                         renderingParameters.TextWrapping == TextWrapping.WrapByWords)
                 {
                     break;
                 }
@@ -354,6 +439,7 @@ public class TextLayout : DisposableObject
                     scale);
 
                 glyphData.Rect = glyphRect;
+                glyphData.LineIndex = lineIndex;
                 cursorPosition += Math.Ceiling(glyphData.Glyph.AdvanceWidth * scale);
             }
         }
@@ -410,7 +496,7 @@ public class TextLayout : DisposableObject
                     position,
                     fontSize,
                     scale);
-                glyphsData.Add(new GlyphWordData(dotGlyph, '.', glyphRect, -1));
+                glyphsData.Add(new GlyphWordData(dotGlyph, '.', glyphRect, -1, lineIndex));
 
                 cursorPosition += Math.Ceiling(dotGlyph.AdvanceWidth * scale);
             }
@@ -421,7 +507,7 @@ public class TextLayout : DisposableObject
     {
         if (!_textUpdated) return;
         
-        FontAtlas ??= FontAtlasStore.GetOrCreateFrom(graphicsDevice, Typeface, 64);
+        FontAtlas ??= FontAtlasStore.GetOrCreateFrom(graphicsDevice, Typeface, FontParameters.Default(sortingVariant:GlyphSortingVariant.ByIndex));
         FontAtlas.Update(Text+".");
         ElementsCount = 0;
         VertexBuffer ??= Buffer.Vertex.New<FontItem>(graphicsDevice, MaxItemsCount);

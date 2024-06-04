@@ -32,7 +32,7 @@ public class TextBlock : InputUIComponent
     
     public static readonly AdamantiumProperty FontFamilyProperty = AdamantiumProperty.Register(nameof(FontFamily),
         typeof(FontFamily), typeof(TextBlock),
-        //new PropertyMetadata(new FontFamily(new Uri("J:\\AdamantiumProject\\Adamantium\\Adamantium.Game.Playground\\Fonts\\TTFFonts\\SourceSans3-ExtraLight.ttf")), PropertyMetadataOptions.AffectsRender));
+        //new PropertyMetadata(new FontFamily(new Uri("J:\\AdamantiumProject\\Adamantium\\Adamantium.Game.Playground\\Fonts\\TTFFonts\\SourceSans3-Regular.ttf")), PropertyMetadataOptions.AffectsRender));
         new PropertyMetadata(new FontFamily(new Uri("J:\\AdamantiumProject\\Adamantium\\Adamantium.Game.Playground\\Fonts\\OTFFonts\\Crimson-Italic.otf")), PropertyMetadataOptions.AffectsRender));
         //new PropertyMetadata(new FontFamily("Cambria"), PropertyMetadataOptions.AffectsRender));
     
@@ -126,7 +126,8 @@ public class TextBlock : InputUIComponent
             new Size(Width, Height), 
             TextWrapping, 
             TextTrimming,
-            HorizontalTextAlignment);
+            HorizontalTextAlignment,
+            VerticalTextAlignment);
         
         return size;
     }
@@ -138,7 +139,8 @@ public class TextBlock : InputUIComponent
             new Size(Width, Height), 
             TextWrapping, 
             TextTrimming,
-            HorizontalTextAlignment);
+            HorizontalTextAlignment,
+            VerticalTextAlignment);
 
         return size;
     }
@@ -146,22 +148,11 @@ public class TextBlock : InputUIComponent
     TextRenderingParameters GetTextRenderingParameters()
     {
         var textPos = new Vector2F();
-        if (HorizontalTextAlignment == HorizontalTextAlignment.Center)
-        {
-            var textDimensions = _textLayout.RealTextDimensions;
-            textPos.X = (float)(DesiredSize.Width - textDimensions.Width) / 2;
-        }
-
-        if (VerticalTextAlignment == VerticalTextAlignment.Center)
-        {
-            var textDimensions = _textLayout.RealTextDimensions;
-            textPos.Y = (float)(DesiredSize.Height - textDimensions.Height) / 2;
-            textPos.Y *= -1;
-        }
 
         return new TextRenderingParameters()
         {
             HorizontalTextAlignment = HorizontalTextAlignment,
+            VerticalTextAlignment = VerticalTextAlignment,
             TextTrimming = TextTrimming,
             TextWrapping = TextWrapping,
             Color = ((SolidColorBrush)Foreground).Color,

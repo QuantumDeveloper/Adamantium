@@ -119,12 +119,13 @@ namespace Adamantium.EntityFramework
         }
 
         public virtual bool CanDisplayContent => true;
+        
+        public IEntityProcessor Processor { get; set; }
 
         public virtual void Initialize()
         {
         }
-
-        public IEntityProcessor Processor { get; set; }
+        
         public void AttachProcessor(IEntityProcessor processor)
         {
             Processor = processor;

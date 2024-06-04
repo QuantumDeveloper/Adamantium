@@ -73,6 +73,7 @@ namespace Adamantium.Engine.Graphics
                 SamplerAddressMode.ClampToEdge));
             AnisotropicMirror = Add(GetSamplerSate(device, nameof(AnisotropicMirror), Filter.Linear,
                 SamplerAddressMode.MirrorClampToEdge));
+            //LinearFont = Add(GetSamplerSate(device, nameof(LinearFont), Filter.Linear, SamplerAddressMode.Repeat, anisotropyEnabled:false, unnormalizedCoordinates:true));
             LinearFont = Add(GetSamplerSate(device, nameof(LinearFont), Filter.Linear, SamplerAddressMode.Repeat));
             NearestFont = Add(GetSamplerSate(device, nameof(NearestFont), Filter.Nearest, SamplerAddressMode.Repeat));
             

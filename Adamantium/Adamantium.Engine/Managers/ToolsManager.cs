@@ -34,10 +34,8 @@ namespace Adamantium.Engine.Managers
 
         public String Text { get; private set; }
 
-        private EntityWorld entityWorld;
-        private IDependencyResolver dependencyResolver;
-
-        private GameInputManager inputManager;
+        private readonly GameInputManager inputManager;
+        
         private float limitDistance = 0.06f;
 
         private ToolBase currentTool = null;

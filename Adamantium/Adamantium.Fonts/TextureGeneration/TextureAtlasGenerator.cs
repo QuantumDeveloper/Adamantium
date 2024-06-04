@@ -4,16 +4,9 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Adamantium.Mathematics;
-using Color = Adamantium.Mathematics.Color;
 
 namespace Adamantium.Fonts.TextureGeneration
 {
-    public enum AtlasGeneratorKind
-    {
-        Msdf,
-        Subpixel
-    }
-
     public class TextureAtlasGenerator
     {
         private FontAtlasData atlasData;
@@ -25,6 +18,8 @@ namespace Adamantium.Fonts.TextureGeneration
         private IFont font;
         private uint startGlyphIndex;
         private uint glyphCount;
+        private GlyphSortingVariant sortingVariant;
+        private uint glyphMargin;
 
         public TextureAtlasGenerator(
             Typeface typeface, 
@@ -33,7 +28,9 @@ namespace Adamantium.Fonts.TextureGeneration
             byte sampleRate, 
             double pxRange, 
             uint startGlyphIndex, 
-            uint glyphCount)
+            uint glyphCount,
+            GlyphSortingVariant sortingVariant,
+            uint glyphMargin)
         {
             this.glyphTextureSize = glyphTextureSize;
             this.sampleRate = sampleRate;
@@ -42,6 +39,8 @@ namespace Adamantium.Fonts.TextureGeneration
             this.font = font;
             this.startGlyphIndex = startGlyphIndex;
             this.glyphCount = glyphCount;
+            this.sortingVariant = sortingVariant;
+            this.glyphMargin = glyphMargin;
             atlasData = new FontAtlasData(glyphTextureSize);
         }
 
@@ -54,39 +53,57 @@ namespace Adamantium.Fonts.TextureGeneration
             var totalPixels = totalBytes / 4; 
             var pixelsPerRow = (uint)Math.Ceiling(Math.Sqrt(totalPixels));
 
-            var groups = atlasData.GlyphData
+            return sortingVariant == GlyphSortingVariant.ByIndex
+                ? CalculateForSortingByIndex(pixelsPerRow)
+                : CalculateForSortingBySize(pixelsPerRow);
+        }
+
+        private FontAtlasData CalculateForSortingBySize(uint pixelsPerRow)
+        {
+            var textureData = atlasData.GlyphData
                 .GroupBy(x => x.BoundingRect.Height)
                 .OrderByDescending(x => x.Key)
-                .Select(group => group.OrderByDescending(x => x.BoundingRect.Width))
+                .SelectMany(group => group.OrderByDescending(x => x.BoundingRect.Width))
                 .ToList();
             
+            return CalculateFontAtlasData(textureData, pixelsPerRow);
+        }
+        
+        public FontAtlasData CalculateForSortingByIndex(uint pixelsPerRow)
+        {
+            var textureData = atlasData.GlyphData
+                .OrderBy(x => x.GlyphIndex)
+                .ToList();
+
+            return CalculateFontAtlasData(textureData, pixelsPerRow);
+        }
+
+        private FontAtlasData CalculateFontAtlasData(List<GlyphTextureData> textureData, uint pixelsPerRow, bool makeFullCalculations = false)
+        {
             int yOffset = 0;
             int xOffset = 0;
             int resultWidth = (int)pixelsPerRow;
             var heights = new List<int>();
             
-            foreach (var group in groups)
+            foreach (var glyphData in textureData)
             {
-                foreach (var glyphData in group)
+                var textureWidth = (int)glyphData.FullGlyphSize.Width;
+                heights.Add((int)glyphData.FullGlyphSize.Height);
+
+                glyphData.BoundingRect.Left = xOffset;
+                glyphData.BoundingRect.Top = yOffset;
+                
+                if (xOffset + textureWidth >= resultWidth)
                 {
-                    var textureWidth = glyphData.BoundingRect.Width;
-                    heights.Add(glyphData.BoundingRect.Height);
-                    
+                    xOffset = 0;
+                    var maxHeight = heights.Max();
+                    yOffset += maxHeight;
+                    heights.Clear();
+                        
                     glyphData.BoundingRect.Left = xOffset;
                     glyphData.BoundingRect.Top = yOffset;
-                    
-                    xOffset += textureWidth;
-                    if (xOffset >= resultWidth)
-                    {
-                        xOffset = 0;
-                        var maxHeight = heights.Max();
-                        yOffset += maxHeight;
-                        heights.Clear();
-                        
-                        glyphData.BoundingRect.Left = xOffset;
-                        glyphData.BoundingRect.Top = yOffset;
-                    }
                 }
+                xOffset += textureWidth;
             }
             if (heights.Count > 0)
             {
@@ -98,9 +115,27 @@ namespace Adamantium.Fonts.TextureGeneration
             atlasData.ImageData = new byte[(int)atlasSize.Width * (int)atlasSize.Height * 4];
             atlasData.AtlasSize = atlasSize;
             
-            foreach (var group in groups)
+            resultWidth = (int)atlasSize.Width * 4;
+            foreach (var glyphData in textureData)
             {
-                foreach (var glyphData in group)
+                // used when we need to copy all data to the resulting texture
+                if (makeFullCalculations)
+                {
+                    var textureWidth = (int)glyphData.FullGlyphSize.Width;
+                    var textureHeight = (int)glyphData.FullGlyphSize.Height;
+
+                    xOffset = glyphData.BoundingRect.Left * 4;
+                    yOffset = glyphData.BoundingRect.Top;
+
+                    for (int y = 0; y < textureHeight; y++)
+                    {
+                        var sourceIndex = y * textureWidth * 4;
+                        var destinationIndex = xOffset + ((yOffset + y) * resultWidth);
+                        Array.Copy(glyphData.Pixels, sourceIndex, atlasData.ImageData, destinationIndex,
+                            textureWidth * 4);
+                    }
+                }
+                else
                 {
                     glyphData.CalculateUV(atlasSize);
                 }
@@ -136,102 +171,42 @@ namespace Adamantium.Fonts.TextureGeneration
             var totalPixels = totalBytes / 4; 
             var pixelsPerRow = (uint)Math.Ceiling(Math.Sqrt(totalPixels));
 
-            var groups = atlasData.GlyphData
+            var textureData = atlasData.GlyphData
                 .GroupBy(x => x.BoundingRect.Height)
                 .OrderByDescending(x => x.Key)
-                .Select(group => group.OrderByDescending(x => x.BoundingRect.Width))
+                .SelectMany(group => group.OrderByDescending(x => x.BoundingRect.Width))
                 .ToList();
             
-            int yOffset = 0;
-            int xOffset = 0;
-            int resultWidth = (int)pixelsPerRow;
-            var heights = new List<int>();
-            atlasSize = new Size(resultWidth, yOffset);
-            foreach (var group in groups)
-            {
-                foreach (var glyphData in group)
-                {
-                    var textureWidth = glyphData.BoundingRect.Width;
-                    heights.Add(glyphData.BoundingRect.Height);
-                    
-                    glyphData.BoundingRect.Left = xOffset;
-                    glyphData.BoundingRect.Top = yOffset;
-                    
-                    xOffset += textureWidth;
-                    if (xOffset >= resultWidth)
-                    {
-                        xOffset = 0;
-                        var maxHeight = heights.Max();
-                        yOffset += maxHeight;
-                        heights.Clear();
-                        
-                        glyphData.BoundingRect.Left = xOffset;
-                        glyphData.BoundingRect.Top = yOffset;
-                    }
-                }
-            }
-            if (heights.Count > 0)
-            {
-                var maxHeight = heights.Max();
-                yOffset += maxHeight;
-                heights.Clear();
-            }
-            atlasSize = new Size(resultWidth, yOffset);
-            atlasData.ImageData = new byte[(int)atlasSize.Width * (int)atlasSize.Height * 4];
-            atlasData.AtlasSize = atlasSize;
-            
-            resultWidth = (int)atlasSize.Width * 4;
-            foreach (var group in groups)
-            {
-                foreach (var glyphData in group)
-                {
-                    var textureWidth = glyphData.BoundingRect.Width;
-                    var textureHeight = glyphData.BoundingRect.Height;
-                    
-                    xOffset = glyphData.BoundingRect.Left * 4;
-                    yOffset = glyphData.BoundingRect.Top;
-
-                    for (int y = 0; y < textureHeight; y++)
-                    {
-                        var sourceIndex = y * textureWidth * 4;
-                        var destinationIndex = xOffset + ((yOffset + y) * resultWidth);
-                        Array.Copy(glyphData.Pixels, sourceIndex, atlasData.ImageData, destinationIndex, textureWidth * 4);
-                    }
-                }
-            }
-
-            return atlasData;
+            return CalculateFontAtlasData(textureData, pixelsPerRow, true);
         }
-
+        
         private void GenerateTextureForGlyph(int glyphIndex)
         {
             typeface.GetGlyphByIndex((uint)glyphIndex, out var glyph);
             glyph.Sample(sampleRate);
 
-            var textureData = glyph.GenerateDirectMSDF(glyphTextureSize, pxRange, font.UnitsPerEm);
+            var textureData = glyph.GenerateDirectMSDF(glyphTextureSize, pxRange, font.UnitsPerEm, glyphMargin);
             if (textureData == null) return;
             
             atlasData.AddGlyphData(textureData);
         }
-        
+
         private void GenerateTextureForGlyph(Glyph glyph)
         {
             glyph.CalculateEmRelatedMultipliers(font.UnitsPerEm);
             glyph.Sample(sampleRate);
             var textureData = atlasData.GetGlyphData(glyph.Index);
             if (textureData == null) return;
-            
+
             glyph.GenerateGlyphData(textureData, pxRange, font.UnitsPerEm);
         }
-        
+
         private void CalculateTextureDataForGlyph(int glyphIndex)
         {
             typeface.GetGlyphByIndex((uint)glyphIndex, out var glyph);
             glyph.Sample(sampleRate);
-
-            var textureData = glyph.IsEmpty ? null : glyph.PrepareData(glyphTextureSize, font.UnitsPerEm);
+            var textureData = glyph.IsEmpty ? null : glyph.PrepareData(glyphTextureSize, font.UnitsPerEm, glyphMargin);
             if (textureData == null) return;
-            
             atlasData.AddGlyphData(textureData);
         }
     }

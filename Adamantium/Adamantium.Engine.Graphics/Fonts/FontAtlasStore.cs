@@ -10,16 +10,8 @@ namespace Adamantium.Engine.Graphics.Fonts
         {
             _fontAtlasMap = new Dictionary<FontParameters, FontAtlas>();
         }
-        public static FontAtlas GetOrCreateFrom(GraphicsDevice graphicsDevice, Typeface typeface, uint glyphTextureSize)
+        public static FontAtlas GetOrCreateFrom(GraphicsDevice graphicsDevice, Typeface typeface, FontParameters fontParameters)
         {
-            var fontParameters = new FontParameters(
-            glyphTextureSize,
-            5,
-            4,
-            0,
-            typeface.GlyphCount
-            );
-
             if (!_fontAtlasMap.TryGetValue(fontParameters, out var atlas))
             {
                 atlas = new FontAtlas(graphicsDevice, typeface, fontParameters);

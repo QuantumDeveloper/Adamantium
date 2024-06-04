@@ -33,6 +33,7 @@ public class FontRenderer : GraphicsResource
     private EffectParameter effectFontSizeThreshold;
     private EffectParameter effectFontSharpness;
     private EffectParameter effectPixelRange;
+    private EffectParameter effectAtlasSize;
     private EffectPass glyphEffectPass;
 
     private Vector2F currentScreenSize;
@@ -64,6 +65,7 @@ public class FontRenderer : GraphicsResource
         effectFontSizeThreshold = fontEffect.FontSizeThreshold;
         effectFontSharpness = fontEffect.FontSharpness;
         effectPixelRange = fontEffect.PXRange;
+        effectAtlasSize = fontEffect.MSDFAtlasSize;
         glyphEffectPass = fontEffect.FontBatchRenderPass;
     }
 
@@ -150,6 +152,8 @@ public class FontRenderer : GraphicsResource
 
     private void DrawInternal(TextLayout layout, Color foreground)
     {
+        if (layout.ElementsCount == 0) return;
+        
         var vp = new Viewport();
         vp.Width = currentScreenSize.X;
         vp.Height = currentScreenSize.Y;
@@ -183,6 +187,7 @@ public class FontRenderer : GraphicsResource
         effectFontSizeThreshold.SetValue(FontSizeThreshold);
         effectFontSharpness.SetValue(FontSharpness);
         effectPixelRange.SetValue(layout.FontAtlas.PixelRange);
+        effectAtlasSize.SetValue(new Vector2F(layout.FontAtlas.Atlas.Width, layout.FontAtlas.Atlas.Height));
         GraphicsDevice.VertexType = vertexType;
         GraphicsDevice.SetVertexBuffer(layout.VertexBuffer);
         GraphicsDevice.PrimitiveTopology = PrimitiveTopology.PointList;

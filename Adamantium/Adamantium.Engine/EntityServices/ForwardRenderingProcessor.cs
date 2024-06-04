@@ -12,8 +12,6 @@ namespace Adamantium.Engine.EntityServices;
 
 public class ForwardRenderingProcessor : RenderingProcessor
 {
-    private FontAtlas fontAtlas;
-    
     public ForwardRenderingProcessor()
     {
     }

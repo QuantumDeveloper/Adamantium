@@ -184,6 +184,7 @@ namespace Adamantium.Engine.Graphics
         {
             if (!IsDirty) return;
 
+            Console.WriteLine("New Graphics Pipeline is creating!!!");
             var shaderStages = EffectPass.ShaderStages.ToArray();
 
             var presenter = GraphicsDevice.Presenter;

@@ -2,20 +2,6 @@ using Adamantium.Core;
 
 namespace Adamantium.EntityFramework;
 
-public interface IEntityProcessor
-{
-    public void Update(AppTime gameTime);
-
-    public void Draw(AppTime gameTime);
-
-    public void LoadContent();
-
-    public void UnloadContent();
-
-    void Attach(IEntityService service);
-
-    void Detach();
-}
 public abstract class EntityProcessor<T>: IEntityProcessor where T: class, IEntityService
 {
     protected T AssociatedService { get; private set; }

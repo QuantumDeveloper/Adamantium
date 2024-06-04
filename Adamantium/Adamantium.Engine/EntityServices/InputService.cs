@@ -338,8 +338,6 @@ namespace Adamantium.Engine.EntityServices
             }
         }
 
-
-
         private void EntityManagerEntityRemoved(object sender, EntityEventArgs e)
         {
             var cameraService = DependencyResolver.Resolve<CameraManager>();
