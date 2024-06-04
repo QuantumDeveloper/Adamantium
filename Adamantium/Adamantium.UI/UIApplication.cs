@@ -21,6 +21,7 @@ using Adamantium.UI.Services;
 using Adamantium.UI.Threading;
 using AdamantiumVulkan;
 using Serilog;
+using Serilog.Sinks.SystemConsole.Themes;
 using UnhandledExceptionEventArgs = Adamantium.UI.RoutedEvents.UnhandledExceptionEventArgs;
 using UnhandledExceptionEventHandler = Adamantium.UI.RoutedEvents.UnhandledExceptionEventHandler;
 
@@ -83,7 +84,7 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
     {
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Debug()
-            .WriteTo.Console()
+            .WriteTo.Console(theme: AnsiConsoleTheme.Code)
             .WriteTo.File("logs/uilogs.txt", rollingInterval: RollingInterval.Day)
             .CreateLogger();
     }

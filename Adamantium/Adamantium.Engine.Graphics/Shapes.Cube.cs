@@ -80,9 +80,9 @@ namespace Adamantium.Engine.Graphics
                 double depth = 1,
                 int tessellation = 1)
             {
-                Vector2F uvFactor = Vector2F.One;
+                var uvFactor = Vector2F.One;
                 var lineWidth = tessellation + 1;
-                int quads = (tessellation * tessellation);
+                var quads = (tessellation * tessellation);
                 var indices = new List<int>(quads * 36);
 
                 var sizeX = width / 2;
@@ -100,17 +100,17 @@ namespace Adamantium.Engine.Graphics
                 var top = new List<Vector3>();
                 var bottom = new List<Vector3>();
 
-                List<Vector2F> frontUV = new List<Vector2F>();
-                List<Vector2F> rightUV = new List<Vector2F>();
-                List<Vector2F> backUV = new List<Vector2F>();
-                List<Vector2F> leftUV = new List<Vector2F>();
-                List<Vector2F> topUV = new List<Vector2F>();
-                List<Vector2F> bottomUV = new List<Vector2F>();
+                var frontUV = new List<Vector2F>();
+                var rightUV = new List<Vector2F>();
+                var backUV = new List<Vector2F>();
+                var leftUV = new List<Vector2F>();
+                var topUV = new List<Vector2F>();
+                var bottomUV = new List<Vector2F>();
 
                 //Generate frame
-                for (int y = 0; y < lineWidth; y++)
+                for (var y = 0; y < lineWidth; y++)
                 {
-                    for (int x = 0; x < lineWidth; x++)
+                    for (var x = 0; x < lineWidth; x++)
                     {
                         var pos = new Vector3(-sizeX + deltaX * x, -sizeY + deltaY * y, -sizeZ);
                         var uv = new Vector2F(1.0f - (1.0f * x / tessellation * uvFactor.X), 1.0f - (1.0f * y / tessellation * uvFactor.Y));
@@ -118,7 +118,7 @@ namespace Adamantium.Engine.Graphics
                         frontUV.Add(uv);
                     }
 
-                    for (int z = 0; z < lineWidth; z++)
+                    for (var z = 0; z < lineWidth; z++)
                     {
                         var pos = new Vector3(sizeX, -sizeY + deltaY * y, -sizeZ + deltaZ * z);
                         var uv = new Vector2F(1.0f - (1.0f * z / tessellation * uvFactor.X), 1.0f - (1.0f * y / tessellation * uvFactor.Y));
@@ -126,7 +126,7 @@ namespace Adamantium.Engine.Graphics
                         rightUV.Add(uv);
                     }
 
-                    for (int x = 0; x < lineWidth; x++)
+                    for (var x = 0; x < lineWidth; x++)
                     {
                         var pos = new Vector3(sizeX - deltaX * x, -sizeY + deltaY * y, sizeZ);
                         var uv = new Vector2F(1.0f - (1.0f * x / tessellation * uvFactor.X), 1.0f - (1.0f * y / tessellation * uvFactor.Y));
@@ -134,7 +134,7 @@ namespace Adamantium.Engine.Graphics
                         backUV.Add(uv);
                     }
 
-                    for (int z = 0; z < lineWidth; z++)
+                    for (var z = 0; z < lineWidth; z++)
                     {
                         var pos = new Vector3(-sizeX, -sizeY + deltaY * y, sizeZ - deltaZ * z);
                         var uv = new Vector2F(1.0f - (1.0f * z / tessellation * uvFactor.X), 1.0f - (1.0f * y / tessellation * uvFactor.Y));
@@ -144,9 +144,9 @@ namespace Adamantium.Engine.Graphics
                 }
 
                 //Generate top cap
-                for (int z = 0; z < lineWidth; z++)
+                for (var z = 0; z < lineWidth; z++)
                 {
-                    for (int x = 0; x < lineWidth; x++)
+                    for (var x = 0; x < lineWidth; x++)
                     {
                         var pos = new Vector3(-sizeX + deltaX * x, sizeY, -sizeZ + deltaZ * z);
                         var uv = new Vector2F( 1.0f - (1.0f * x / tessellation * uvFactor.X), 1.0f - (1.0f * z / tessellation * uvFactor.Y));
@@ -158,9 +158,9 @@ namespace Adamantium.Engine.Graphics
                 var rot = Quaternion.RotationAxis(Vector3.UnitX, MathHelper.DegreesToRadians(180));
                 var rotationMatrix = Matrix4x4.RotationQuaternion(rot);
                 //Generate bottom cap
-                for (int z = 0; z < lineWidth; z++)
+                for (var z = 0; z < lineWidth; z++)
                 {
-                    for (int x = 0; x < lineWidth; x++)
+                    for (var x = 0; x < lineWidth; x++)
                     {
                         var pos = new Vector3(-sizeX + deltaX * x, sizeY, -sizeZ + deltaZ * z);
                         var uv = new Vector2F( 1.0f - (1.0f * x / tessellation * uvFactor.X), 1.0f - (1.0f * z / tessellation * uvFactor.Y));
@@ -195,15 +195,15 @@ namespace Adamantium.Engine.Graphics
                 */
 
                 var vertexStart = 0;
-                for (int i = 0; i < 6; i++)
+                for (var i = 0; i < 6; i++)
                 {
-                    for (int z = 0; z < tessellation; z++)
+                    for (var z = 0; z < tessellation; z++)
                     {
-                        for (int x = 0; x < tessellation; x++)
+                        for (var x = 0; x < tessellation; x++)
                         {
                             // Six indices (two triangles) per face.
                             //1st triangle 
-                            int vbase = lineWidth * z + x;
+                            var vbase = lineWidth * z + x;
                             indices.Add(vbase + vertexStart);
                             indices.Add(vbase + 1 + vertexStart);
                             indices.Add(vbase + tessellation + 2 + vertexStart);

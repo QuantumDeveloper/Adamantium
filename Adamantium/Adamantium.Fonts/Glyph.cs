@@ -83,6 +83,8 @@ namespace Adamantium.Fonts
         [Key(24)]
         internal byte[] Instructions { get; private set; }
         
+        public List<char> RelatedCharacters { get; }
+        
         internal static Glyph EmptyGlyph(uint index)
         {
             return new Glyph(index, true, OutlineType.Unknown);
@@ -99,6 +101,7 @@ namespace Adamantium.Fonts
             uniqueUnicodes = new HashSet<uint>();
             CompositeGlyphComponents = new List<CompositeGlyphComponent>();
             OutlineType = outlineType;
+            RelatedCharacters = new List<char>();
         }
 
         private Glyph(uint index, bool isEmpty, OutlineType outlineType) : this(index, outlineType)

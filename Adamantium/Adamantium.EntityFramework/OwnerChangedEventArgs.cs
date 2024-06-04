@@ -4,11 +4,11 @@
     {
         public OwnerChangedEventArgs(Entity oldOwner, Entity newOwner)
         {
-            OlOwner = oldOwner;
+            OldOwner = oldOwner;
             NewOwner = newOwner;
         }
 
-        public Entity OlOwner { get; private set; }
+        public Entity OldOwner { get; private set; }
 
         public Entity NewOwner { get; private set; }
     }

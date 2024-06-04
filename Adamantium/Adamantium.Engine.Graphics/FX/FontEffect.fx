@@ -28,6 +28,7 @@ float FontSize;
 float FontSizeThreshold;
 float FontSharpness;
 float PXRange;
+float2 MSDFAtlasSize;
 
 void GenerateSprite(FontItem item, inout TriangleStream<PSInput> triStream)
 {
@@ -74,16 +75,16 @@ void GenerateSprite(FontItem item, inout TriangleStream<PSInput> triStream)
     }
 }
 
-float median(float a, float b, float c)
+float median(float r, float g, float b)
 {
-    return max(min(a,b), min(max(a,b), c));
+    return max(min(r,g), min(max(r,g), b));
 }
 
 float screenPxRange(float2 uv) 
 {
-    uint2 textureSize;
-    Texture.GetDimensions(textureSize.x, textureSize.y);
-    float2 unitRange = float2(PXRange, PXRange) / textureSize;
+//    uint2 textureSize;
+//    Texture.GetDimensions(textureSize.x, textureSize.y);
+    float2 unitRange = float2(PXRange, PXRange) / MSDFAtlasSize;
     float2 screenTexSize = float2(1.0, 1.0)/fwidth(uv);
     return max(0.5*dot(unitRange, screenTexSize), 1.0);
 }
@@ -108,8 +109,15 @@ float4 FontPixelShader(PSInput input) : SV_TARGET
     float pxDist = screenPxRange(input.UV) * (dist - 0.5);
     float opacity = clamp(pxDist + 0.5, 0.0, 1.0);
 
-    color = float4(ForegroundColor.rgb, opacity);
-
+    float4 outside = float4(ForegroundColor.rgb, 0);
+    float4 inside = float4(ForegroundColor.rgb, 1);
+    color = lerp(outside, inside, opacity);
+    //color = float4(ForegroundColor.rgb, opacity);
+    
+//    float blendedAlpha = dist * ForegroundColor.a;
+//    if (blendedAlpha < 0.55) discard;
+//    
+//    color = float4(ForegroundColor.rgb, blendedAlpha);
     return color;
 }
 

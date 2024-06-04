@@ -67,17 +67,16 @@
 <!--		<Thumb x:Name="Thumb1"-->
 <!--			   VerticalAlignment="Center"-->
 <!--			   HorizontalAlignment="Center"/>-->
-        <TextBlock Text="Камрадяка, давайте писать адамань вместе!"
+        <TextBlock Text="Камрадяка, приветствую вас, майне либе!"
                    Grid.ColumnSpan="3"
-                   Background="Black"
-                   Foreground="White"
-                   Width="300"
+                   Background="White"
+                   Foreground="Black"
+                   Width="400"                   
                    TextWrapping="WrapByWords"
                    TextTrimming="CharEllipses"
                    HorizontalAlignment="Center"
-                   VerticalAlignment="Center"
-                   HorizontalTextAlignment="Center"
-                   VerticalTextAlignment="Center"
+                   VerticalAlignment="Top"
+                   HorizontalTextAlignment="Left"
                    FontSize="40"/>
     </RenderTargetPanel>
 </Window>

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Adamantium.Fonts.Common;
 using Adamantium.Mathematics;
 
@@ -12,9 +13,9 @@ namespace Adamantium.Fonts.TextureGeneration
             GenerateMSDFForExistingTextureData(glyph, textureData, pxRange, unitsPerEm);
         }
         
-        public static GlyphTextureData PrepareData(this Glyph glyph, uint size, ushort unitsPerEm)
+        public static GlyphTextureData PrepareData(this Glyph glyph, uint size, ushort unitsPerEm, uint margin)
         {
-            return CalculateBasicTextureData(glyph, size, unitsPerEm);
+            return CalculateBasicTextureData(glyph, size, unitsPerEm, margin);
         }
         
         // --- PREPROCESSORS ---
@@ -253,7 +254,8 @@ namespace Adamantium.Fonts.TextureGeneration
         public static GlyphTextureData CalculateBasicTextureData(
             Glyph glyph,
             uint originalSize,
-            ushort unitsPerEm)
+            ushort unitsPerEm,
+            uint margin)
         {
             var glyphBoundingRectangle = glyph.BoundingRectangle;
             var widthRatio = (double)(glyphBoundingRectangle.Width) / unitsPerEm;
@@ -261,7 +263,7 @@ namespace Adamantium.Fonts.TextureGeneration
             var size = new Size(Math.Ceiling(originalSize * widthRatio),
                 Math.Ceiling(originalSize * heightRatio));
             
-            var textureData = new GlyphTextureData((uint)size.Width, (uint)size.Height, glyph.Index);
+            var textureData = new GlyphTextureData((uint)size.Width, (uint)size.Height, glyph.Index, margin, glyph.RelatedCharacters.FirstOrDefault());
 
             return textureData;
         }
@@ -269,18 +271,18 @@ namespace Adamantium.Fonts.TextureGeneration
         /// <summary>
         /// Generates MSDF texture
         /// </summary>
+        /// <param name="glyph">glyph to process</param>
         /// <param name="originalSize">Width and height of MSDF texture</param>
         /// <param name="pxRange">Pixel range for generation</param>
-        /// <param name="glyphBoundingRectangle">Bounding rectangle of original glyph</param>
-        /// <param name="glyphSegments">array of glyph segments for generation</param>
         /// <param name="unitsPerEm">Size of glyph width and height in em</param>
-        /// <param name="glyphIndex">Glyph index</param>
+        /// <param name="margin"></param>
         /// <returns>MSDF color data in for of single-dimension array</returns>
         public static GlyphTextureData GenerateDirectMSDF(
             this Glyph glyph,
             uint originalSize, 
             double pxRange,
-            ushort unitsPerEm)
+            ushort unitsPerEm,
+            uint margin)
         {
             var glyphSegments = glyph.GetMergedOutlineSegments();
             if (glyphSegments.Count == 0)
@@ -298,8 +300,8 @@ namespace Adamantium.Fonts.TextureGeneration
             var glyphBoundingRectangle = glyph.BoundingRectangle;
             var widthRatio = (double)(glyphBoundingRectangle.Width) / unitsPerEm;
             var heightRatio = (double)(glyphBoundingRectangle.Height) / unitsPerEm;
-            var size = new Size(Math.Ceiling(originalSize * widthRatio),
-                Math.Ceiling(originalSize * heightRatio));
+            var size = new Size(Math.Floor(originalSize * widthRatio),
+                Math.Floor(originalSize * heightRatio));
 
             // 1. Color all segments
             ColorEdges(segments);
@@ -331,7 +333,7 @@ namespace Adamantium.Fonts.TextureGeneration
             //var additionalSpace = glyphBoundingRectangle.Width * 0.02;
             var additionalSpace = 0;
             
-            var textureData = new GlyphTextureData((uint)size.Width, (uint)size.Height, glyph.Index);
+            var textureData = new GlyphTextureData((uint)size.Width, (uint)size.Height, glyph.Index, margin, glyph.RelatedCharacters.FirstOrDefault());
 
             ColoredDistance minColoredDistance;
 
@@ -423,7 +425,7 @@ namespace Adamantium.Fonts.TextureGeneration
             var glyphBoundingRectangle = glyph.BoundingRectangle;
 
             // 3. Place EM square so that its center matches glyph center
-            var glyphCenter = glyphBoundingRectangle.Center;
+            var glyphCenter = glyphBoundingRectangle.Center+2;
             var emSquareCenter = emSquare.Center;
             var diff = glyphCenter - emSquareCenter;
             diff.X = Math.Floor(diff.X);
@@ -433,6 +435,8 @@ namespace Adamantium.Fonts.TextureGeneration
             emSquare.Y += (int)diff.Y;
 
             var size = textureData.BoundingRect.Size;
+            // size.Width += 4;
+            // size.Height += 4;
             // 4. Generate colored pseudo-distance field
             var coloredDistances = new ColoredDistance[(int)size.Width, (int)size.Height];
 
@@ -480,9 +484,11 @@ namespace Adamantium.Fonts.TextureGeneration
             //FixArtefacts(coloredDistances, size);
 
             // 6. Normalize MSDF and SDF to [0 .. 255] range
-            int index = 0;
+            var margin = (int)textureData.Margin;
+            var rowStride = (size.Width + (margin * 2)) * 4;
             for (var y = 0; y < size.Height; y++)
             {
+                var index = (int)(rowStride * (y + margin)) + (margin * 4);
                 for (var x = 0; x < size.Width; x++)
                 {
                     var distance = coloredDistances[x, y];
@@ -552,13 +558,13 @@ namespace Adamantium.Fonts.TextureGeneration
             return true;
         }
 
-        private static void FixArtefacts(ColoredDistance[,] data, uint textureSize)
+        private static void FixArtefacts(ColoredDistance[,] data, SizeF textureSize)
         {
             var correctionList = new List<CorrectionLocation>();
 
-            for (var y = 1; y < textureSize - 1; y++)
+            for (var y = 1; y < textureSize.Height - 1; y++)
             {
-                for (var x = 1; x < textureSize - 1; x++)
+                for (var x = 1; x < textureSize.Width - 1; x++)
                 {
                     var current = data[x, y];
                     var neighbors = new List<ColoredDistance>

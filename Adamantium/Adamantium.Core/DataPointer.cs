@@ -11,7 +11,7 @@ namespace Adamantium.Core
             Count = count;
         }
 
-        public DataPointer(IntPtr pointer, ulong size) : this(pointer, size, 0)
+        public DataPointer(IntPtr pointer, ulong size) : this(pointer, size, 0U)
         {
         }
 

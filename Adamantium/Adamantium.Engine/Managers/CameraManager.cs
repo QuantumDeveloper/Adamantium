@@ -90,9 +90,8 @@ namespace Adamantium.Engine.Managers
             eventAggregator.GetEvent<GameOutputDeactivatedEvent>().Subscribe(GameBaseWindowDeactivated);
             eventAggregator.GetEvent<GameOutputSizeChanged>().Subscribe(WindowSizeChanged);
 
-            // TODO: uncomment when we will fix triangulator
-            //CreateCameraIcon();
-            //CreateCameraVisual();
+            CreateCameraIcon();
+            CreateCameraVisual();
         }
 
         private void CreateCameraIcon()
@@ -123,9 +122,9 @@ namespace Adamantium.Engine.Managers
 
         private void GameBaseWindowActivated(GameOutput output)
         {
-            if (activeCameras.ContainsKey(output))
+            if (activeCameras.TryGetValue(output, out var camera))
             {
-                UserControlledCamera = activeCameras[output];
+                UserControlledCamera = camera;
             }
         }
 

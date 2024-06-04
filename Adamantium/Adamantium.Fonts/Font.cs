@@ -216,6 +216,7 @@ namespace Adamantium.Fonts
                 {
                     Typeface.GetGlyphByIndex(0U, out glyph);
                 }
+                glyph.RelatedCharacters.Add(character);
                 translatedGlyphs.Add(glyph);
             }
 

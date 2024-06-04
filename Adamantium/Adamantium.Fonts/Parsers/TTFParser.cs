@@ -1123,6 +1123,11 @@ namespace Adamantium.Fonts.Parsers
             CurrentFont.Descender = os2.sTypoDescender;
             CurrentFont.CapsHeight = os2.sCapHeight;
             CurrentFont.LineGap = os2.sTypoLineGap;
+            
+            if (CurrentFont.LineGap == 0)
+            {
+                CurrentFont.LineGap = (short)(CurrentFont.Ascender - CurrentFont.Descender);
+            }
 
             CurrentFont.Baseline = (Int16)((CurrentFont.UnitsPerEm - CurrentFont.Ascender) + CurrentFont.LineGap +
                                     CurrentFont.CapsHeight);
