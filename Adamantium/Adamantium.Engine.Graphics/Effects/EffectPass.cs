@@ -407,9 +407,9 @@ namespace Adamantium.Engine.Graphics.Effects
                 shaderObject.Index = link.Index;
                 shaderObject.EntryPoint = link.EntryPoint;
 
-                InitStageBlock(stageBlock, logger);
+                //InitStageBlock(stageBlock, logger);
                 
-                // InitShaderObject(shaderObject, logger);
+                InitShaderObject(shaderObject, logger);
             }
 
             CreateDescriptorSetLayout(layoutBindings);

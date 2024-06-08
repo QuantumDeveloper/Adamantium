@@ -91,6 +91,9 @@ namespace Adamantium.Engine.Graphics
             
             createInfo.PEnabledExtensionNames = extensions.Select(x => x.ExtensionName).ToArray();//.Except(new []{"VK_KHR_surface_protected_capabilities"}).ToArray();
             createInfo.EnabledExtensionCount = (uint)createInfo.PEnabledExtensionNames.Length;
+            // var ext = new string[] {"VK_KHR_surface", "VK_KHR_win32_surface", "VK_KHR_get_physical_device_properties2", "VK_EXT_debug_utils" };
+            // createInfo.PEnabledExtensionNames = ext;//.Except(new []{"VK_KHR_surface_protected_capabilities"}).ToArray();
+            // createInfo.EnabledExtensionCount = (uint)ext.Length;
 
             if (IsInDebugMode)
             {

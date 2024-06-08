@@ -215,6 +215,8 @@
 		<Content Include="Fonts\OTFFonts\Crimson-Italic.otf">
 		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
+		<AdditionalFiles Remove="obj\**" />
+		<None Remove="obj\**" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -232,8 +234,15 @@
 		<AdditionalFiles Include="$(ProjectDir)**\*.xml" />
 		<AdditionalFiles Include="$(ProjectDir)**\*.fx" />
 		<AdditionalFiles Include="$(ProjectDir)**\*.hlsl" />
-		<AdditionalFiles Include="$(ProjectDir)**\*.aff" />
 		<CompilerVisibleProperty Include="RootNamespace" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Compile Remove="obj\**" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <EmbeddedResource Remove="obj\**" />
 	</ItemGroup>
 
 	<!--    <Import Project="$(SolutionDir)Adamantium.targets" />-->

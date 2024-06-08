@@ -7,7 +7,7 @@
         <LangVersion>latest</LangVersion>
         <Nullable>disable</Nullable>
 		<BaseOutputPath>..\..\output\Adamantium.Engine.Generators\bin</BaseOutputPath>
-        <IsRoslynComponent>true</IsRoslynComponent>
+        <IsRoslynComponent>false</IsRoslynComponent>
 		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
 		<CompilerGeneratedFilesOutputPath>Generated</CompilerGeneratedFilesOutputPath>
         <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
@@ -25,7 +25,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.9.2" PrivateAssets="all" />
         <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" PrivateAssets="all" />
         <CompilerVisibleItemMetadata Include="AdditionalFiles" />
     </ItemGroup>
@@ -43,15 +43,34 @@
 		<PackageReference Include="Adamantium.DXC" Version="1.0.8" GeneratePathProperty="true" PrivateAssets="all" />
 		<PackageReference Include="AdamantiumVulkan.Spirv" Version="1.0.3" GeneratePathProperty="true" PrivateAssets="all" />
         <PackageReference Include="QuantumBinding.Utils" Version="1.0.0" GeneratePathProperty="true" PrivateAssets="all" />
-        <PackageReference Include="MessagePack" Version="2.5.129" GeneratePathProperty="true" PrivateAssets="all" />
-        <PackageReference Include="MessagePack.Annotations" Version="2.5.129" GeneratePathProperty="true" PrivateAssets="all" />
+        <PackageReference Include="MessagePack" Version="2.5.168" GeneratePathProperty="true" PrivateAssets="all" />
+        <PackageReference Include="MessagePack.Annotations" Version="2.5.168" GeneratePathProperty="true" PrivateAssets="all" />
 		<PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.0.0" GeneratePathProperty="true" PrivateAssets="all" />
 
         <!--<None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />-->
     </ItemGroup>
     
+    <ItemGroup>
+        <EmbeddedResource Include="dxcompiler.dll"/>
+        <EmbeddedResource Include="spirv-cross-c-shared.dll"/>
+    </ItemGroup>
+
+	<ItemGroup>
+	  <Content Remove="C:\Users\dzapo\.nuget\packages\adamantiumvulkan.spirv\1.0.3\contentFiles\any\netstandard2.0\spirv-cross-c-shared.dll" />
+	</ItemGroup>
+    
     <PropertyGroup>
         <GetTargetPathDependsOn>$(GetTargetPathDependsOn);GetDependencyTargetPaths</GetTargetPathDependsOn>
+    </PropertyGroup>
+    
+    <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x64' ">
+      <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+      <NoWarn>1701;1702;RS1035</NoWarn>
+    </PropertyGroup>
+    
+    <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
+      <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+      <NoWarn>1701;1702;RS1035</NoWarn>
     </PropertyGroup>
 
     <Target Name="GetDependencyTargetPaths">

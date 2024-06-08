@@ -9,7 +9,6 @@
 		<BaseOutputPath>..\..\output\Adamantium.Engine.Graphics\bin</BaseOutputPath>
 		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
 		<CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
-		<OutputType>Exe</OutputType>
 	</PropertyGroup>
 
 <!--	<ItemGroup>-->
@@ -38,6 +37,19 @@
 		<AdditionalFiles Include="$(ProjectDir)**\*.fx" />
 		<AdditionalFiles Include="$(ProjectDir)**\*.hlsl" />
 		<CompilerVisibleProperty Include="RootNamespace" />
+		<AdditionalFiles Remove="obj\**" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Compile Remove="obj\**" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <EmbeddedResource Remove="obj\**" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Remove="obj\**" />
 	</ItemGroup>
 
 </Project>

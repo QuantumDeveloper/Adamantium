@@ -13,6 +13,8 @@ public class EffectsGenerator : IIncrementalGenerator
 {
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
+        DxcLibraryLoader.LoadNativeDxLibrary();
+        
         var effectFiles = context.AdditionalTextsProvider.Where(file => file.Path.EndsWith(".fx"));
         var includeFiles = context.AdditionalTextsProvider.Where(file => file.Path.EndsWith(".hlsl"));
 
@@ -68,36 +70,6 @@ public class EffectsGenerator : IIncrementalGenerator
                 CreateDiagnostic(ref spc, file.name, ex.Message, DiagnosticSeverity.Error);
             }
         });
-    }
-
-    private void CreateDiagnostic(ref SourceProductionContext spc, EffectCompilerResult result, string filePath)
-    {
-        foreach (var message in result.Logger.Messages)
-        {
-            var descriptor = new DiagnosticDescriptor(
-                id: "EffectGenerator",
-                title: "Effects parsing error",
-                messageFormat: "Error while parsing {0}: {1}",
-                category: "EffectParser",
-                (DiagnosticSeverity)message.Type,
-                isEnabledByDefault: true);
-            var diagnostic = Diagnostic.Create(descriptor, Location.None, filePath, message.ToString());
-            spc.ReportDiagnostic(diagnostic);
-        }
-    }
-
-    private void CreateDiagnostic(ref SourceProductionContext spc, string filePath, string diagnosticText, DiagnosticSeverity severity)
-    {
-        var descriptor = new DiagnosticDescriptor(
-            id: "EffectGenerator",
-            title: "Effects parsing error",
-            messageFormat: "{0}: {1}",
-            category: "EffectParser",
-            severity,
-            isEnabledByDefault: true);
-        var diagnostic = Diagnostic.Create(descriptor, Location.None, $"{filePath}.fx", diagnosticText);
-        spc.ReportDiagnostic(diagnostic);
-
     }
 
     private string GenerateEffect(EffectCompilerResult result, Compilation compilation, string fxName, string @namespace)
@@ -205,5 +177,35 @@ public class EffectsGenerator : IIncrementalGenerator
         }
 
         return bufferAsText.ToString();
+    }
+    
+    private void CreateDiagnostic(ref SourceProductionContext spc, EffectCompilerResult result, string filePath)
+    {
+        foreach (var message in result.Logger.Messages)
+        {
+            var descriptor = new DiagnosticDescriptor(
+                id: "EffectGenerator",
+                title: "Effects parsing error",
+                messageFormat: "Error while parsing {0}: {1}",
+                category: "EffectParser",
+                (DiagnosticSeverity)message.Type,
+                isEnabledByDefault: true);
+            var diagnostic = Diagnostic.Create(descriptor, Location.None, filePath, message.ToString());
+            spc.ReportDiagnostic(diagnostic);
+        }
+    }
+
+    private void CreateDiagnostic(ref SourceProductionContext spc, string filePath, string diagnosticText, DiagnosticSeverity severity)
+    {
+        var descriptor = new DiagnosticDescriptor(
+            id: "EffectGenerator",
+            title: "Effects parsing error",
+            messageFormat: "{0}: {1}",
+            category: "EffectParser",
+            severity,
+            isEnabledByDefault: true);
+        var diagnostic = Diagnostic.Create(descriptor, Location.None, filePath, diagnosticText);
+        spc.ReportDiagnostic(diagnostic);
+
     }
 }

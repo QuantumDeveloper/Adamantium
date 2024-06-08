@@ -22,5 +22,14 @@
 		<ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" />
 		<ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
 	</ItemGroup>
+	<ItemGroup>
+	  <Compile Remove="obj\**" />
+	</ItemGroup>
+	<ItemGroup>
+	  <EmbeddedResource Remove="obj\**" />
+	</ItemGroup>
+	<ItemGroup>
+	  <None Remove="obj\**" />
+	</ItemGroup>
 
 </Project>
