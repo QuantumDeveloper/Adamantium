@@ -54,10 +54,10 @@ namespace Adamantium.Engine.Graphics
             var deviceExt = new List<string>();
             deviceExt.Add(Constants.VK_KHR_SWAPCHAIN_EXTENSION_NAME);
             deviceExt.Add(Constants.VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
-            deviceExt.Add(Constants.VK_GOOGLE_HLSL_FUNCTIONALITY_1_EXTENSION_NAME);
-            deviceExt.Add(Constants.VK_GOOGLE_USER_TYPE_EXTENSION_NAME);
+            //deviceExt.Add(Constants.VK_GOOGLE_HLSL_FUNCTIONALITY_1_EXTENSION_NAME);
+            //deviceExt.Add(Constants.VK_GOOGLE_USER_TYPE_EXTENSION_NAME);
             deviceExt.Add(Constants.VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
-            //deviceExt.Add(Constants.VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+            deviceExt.Add(Constants.VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
             DeviceExtensions = new ReadOnlyCollection<string>(deviceExt);
         }
 
@@ -77,7 +77,6 @@ namespace Adamantium.Engine.Graphics
             PhysicalDevice = VulkanInstance.CurrentDevice;
             QueueFamilyContainer = PhysicalDevice.FindQueueFamilies();
             CreateLogicalDevice();
-            InitializeMutex();
             unsafe
             {
                 if (LogicalDevice != null)
@@ -131,9 +130,11 @@ namespace Adamantium.Engine.Graphics
             {
                 Console.WriteLine($"Queue family {i}. QueueFlags: {queueFamilies[i].QueueFlags}. Queue count: {queueFamilies[i].QueueCount}");
             }
-            
-            AvailableQueuesCount = (uint)queueFamilies.Count(x => x.QueueFlags.HasFlag(QueueFlagBits.GraphicsBit));
-            var computeQueuesCount = (uint)queueFamilies.Count(x => x.QueueFlags.HasFlag(QueueFlagBits.ComputeBit));
+
+            var graphicsQueues = queueFamilies.FirstOrDefault(x => x.QueueFlags.HasFlag(QueueFlagBits.GraphicsBit));
+            AvailableQueuesCount = graphicsQueues?.QueueCount ?? 0;
+            var computeQueues = queueFamilies.FirstOrDefault(x => x.QueueFlags.HasFlag(QueueFlagBits.ComputeBit));
+            var computeQueuesCount = computeQueues?.QueueCount ?? 0;
 
             Console.WriteLine($"{AvailableQueuesCount} queues available for graphics");
             Console.WriteLine($"{computeQueuesCount} queues available for compute");
@@ -270,14 +271,6 @@ namespace Adamantium.Engine.Graphics
             return new(name, enableDynamicRendering, enableDebug);
         }
         
-        private void InitializeMutex()
-        {
-            // if (!Mutex.TryOpenExisting("submission", out _submissionSync))
-            // {
-            //     _submissionSync = new Mutex(false, "submission");
-            // }
-        }
-
         public Queue GetAvailableGraphicsQueue()
         {
             var graphicsFamily = QueueFamilyContainer.GetFamilyInfo(QueueFlagBits.GraphicsBit);

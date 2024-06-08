@@ -93,10 +93,10 @@ namespace Adamantium.Engine.Graphics
 
         private void CreateResourceLoadingDevice(MainGraphicsDevice mainDevice)
         {
+            MainDevice = mainDevice;
             DeviceType = GraphicsDeviceType.ResourceLoader;
             InitializeSyncObject();
             DeviceId = Guid.NewGuid().ToString();
-            MainDevice = mainDevice;
             MaxFramesInFlight = 1;
             InitializeResourceLoadingDevice();
             Log.Logger.Debug($"Resource loader device created. Id: {DeviceId}");
@@ -104,12 +104,13 @@ namespace Adamantium.Engine.Graphics
 
         private void CreatePrimaryDevice(MainGraphicsDevice mainDevice, PresentationParameters presentationParameters)
         {
+            MainDevice = mainDevice;
             DeviceType = GraphicsDeviceType.Primary;
             InitializeSyncObject();
             var timer = Stopwatch.StartNew();
             var timer2 = Stopwatch.StartNew();
             DeviceId = Guid.NewGuid().ToString();
-            MainDevice = mainDevice;
+            
             _secondaryDevices = new List<GraphicsDevice>();
 
             EnableDynamicRendering = mainDevice.EnableDynamicRendering;
@@ -331,7 +332,7 @@ namespace Adamantium.Engine.Graphics
 
         private void InitializeSyncObject()
         {
-            _submissionSync = new SyncObject(SyncGuid);
+            _submissionSync = new SyncObject(SyncGuid, MainDevice.QueueFamilyContainer.IsGraphicsQueueEqualsTransferQueue());
         }
 
         public void ApplyViewports(params Viewport[] viewports)

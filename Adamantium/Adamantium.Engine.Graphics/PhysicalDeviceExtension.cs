@@ -94,6 +94,14 @@ namespace Adamantium.Engine.Graphics
         {
             return _familyInfos.FirstOrDefault(x => x.Type.HasFlag(flags));
         }
+
+        public bool IsGraphicsQueueEqualsTransferQueue()
+        {
+            var graphicsQueue = _familyInfos.FirstOrDefault(x => x.Type.HasFlag(QueueFlagBits.GraphicsBit));
+            var transferQueue = _familyInfos.FirstOrDefault(x => x.Type.HasFlag(QueueFlagBits.TransferBit) && !x.Type.HasFlag(QueueFlagBits.GraphicsBit));
+
+            return graphicsQueue == transferQueue;
+        }
     }
 
     public class QueueFamilyInfo

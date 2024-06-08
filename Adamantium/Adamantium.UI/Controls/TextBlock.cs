@@ -33,8 +33,8 @@ public class TextBlock : InputUIComponent
     public static readonly AdamantiumProperty FontFamilyProperty = AdamantiumProperty.Register(nameof(FontFamily),
         typeof(FontFamily), typeof(TextBlock),
         //new PropertyMetadata(new FontFamily(new Uri("J:\\AdamantiumProject\\Adamantium\\Adamantium.Game.Playground\\Fonts\\TTFFonts\\SourceSans3-Regular.ttf")), PropertyMetadataOptions.AffectsRender));
-        new PropertyMetadata(new FontFamily(new Uri("J:\\AdamantiumProject\\Adamantium\\Adamantium.Game.Playground\\Fonts\\OTFFonts\\Crimson-Italic.otf")), PropertyMetadataOptions.AffectsRender));
-        //new PropertyMetadata(new FontFamily("Cambria"), PropertyMetadataOptions.AffectsRender));
+        //new PropertyMetadata(new FontFamily(new Uri("J:\\AdamantiumProject\\Adamantium\\Adamantium.Game.Playground\\Fonts\\OTFFonts\\Crimson-Italic.otf")), PropertyMetadataOptions.AffectsRender));
+        new PropertyMetadata(new FontFamily("Cambria"), PropertyMetadataOptions.AffectsRender));
     
     public static readonly AdamantiumProperty FontSizeProperty = AdamantiumProperty.Register(nameof(FontSize),
         typeof(double), typeof(TextBlock),

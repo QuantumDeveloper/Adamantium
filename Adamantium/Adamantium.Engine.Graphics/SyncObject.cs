@@ -8,23 +8,28 @@ public class SyncObject : IDisposable
     private Mutex _mutex;
     
     private string SyncObjectName { get; }
+    private bool IsSyncEnabled { get; }
 
-    public SyncObject(string name)
+    public SyncObject(string name, bool enableSync)
     {
         SyncObjectName = name;
         if (!Mutex.TryOpenExisting(name, out _mutex))
         {
             _mutex = new Mutex(false, name);
         }
+
+        IsSyncEnabled = enableSync;
     }
 
     public void Wait()
     {
+        if (!IsSyncEnabled) return;
         _mutex.WaitOne();
     }
 
     public void Release()
     {
+        if (!IsSyncEnabled) return;
         _mutex.ReleaseMutex();
     }
 

@@ -1,9 +1,7 @@
 float4x4 wvp;
 float3 meshColor;
 float transparency;
-//[[vk::binding(1)]] 
 sampler sampleType;
-//[[vk::binding(2)]] 
 Texture2D shaderTexture;
 float gamma;
 float4 foregroundColor;

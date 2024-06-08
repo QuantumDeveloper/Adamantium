@@ -15,4 +15,16 @@
 		<ProjectReference Include="..\Adamantium.Win32\Adamantium.Win32.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <Compile Remove="obj\**" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <EmbeddedResource Remove="obj\**" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Remove="obj\**" />
+	</ItemGroup>
+
 </Project>
