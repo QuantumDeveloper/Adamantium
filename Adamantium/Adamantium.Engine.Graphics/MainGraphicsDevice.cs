@@ -58,6 +58,7 @@ namespace Adamantium.Engine.Graphics
             //deviceExt.Add(Constants.VK_GOOGLE_USER_TYPE_EXTENSION_NAME);
             deviceExt.Add(Constants.VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
             deviceExt.Add(Constants.VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+            deviceExt.Add(Constants.VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
             DeviceExtensions = new ReadOnlyCollection<string>(deviceExt);
         }
 
@@ -155,14 +156,24 @@ namespace Adamantium.Engine.Graphics
             // enumerate all available device extensions
             uint propCount = 0;
             PhysicalDevice.EnumerateDeviceExtensionProperties(null, ref propCount, null);
-            ExtensionProperties[] properties = new ExtensionProperties[propCount];
-            PhysicalDevice.EnumerateDeviceExtensionProperties(null, ref propCount, properties);
+            var supportedDeviceExtensions = new ExtensionProperties[propCount];
+            PhysicalDevice.EnumerateDeviceExtensionProperties(null, ref propCount, supportedDeviceExtensions);
+
+            var availableDeviceExtensions = supportedDeviceExtensions.Select(x => x.ExtensionName).ToArray();
+            var finalDeviceExtensions = new List<string>();
+            foreach (var extension in DeviceExtensions)
+            {
+                if (availableDeviceExtensions.Contains(extension))
+                {
+                    finalDeviceExtensions.Add(extension);
+                }
+            }
 
             var createInfo = new DeviceCreateInfo();
             createInfo.QueueCreateInfoCount = (uint)queueInfos.Count;
             createInfo.PQueueCreateInfos = queueInfos.ToArray();
-            createInfo.EnabledExtensionCount = (uint)DeviceExtensions.Count;
-            createInfo.PEnabledExtensionNames = DeviceExtensions.ToArray();
+            createInfo.EnabledExtensionCount = (uint)finalDeviceExtensions.Count;
+            createInfo.PEnabledExtensionNames = finalDeviceExtensions.ToArray();
 
             var maintenance4Features = new PhysicalDeviceMaintenance4Features();
             maintenance4Features.SType = StructureType.PhysicalDeviceMaintenance4Features;
@@ -197,13 +208,19 @@ namespace Adamantium.Engine.Graphics
 
                 maintenance4Features.PNext = features2Ptr;
                 var maintenance4FeaturesPtr = NativeUtils.StructOrEnumToPointer(maintenance4Features.ToNative());
-                
-                var shaderObjectFeatures = new PhysicalDeviceShaderObjectFeaturesEXT();
-                shaderObjectFeatures.ShaderObject = true;
-                shaderObjectFeatures.PNext = maintenance4FeaturesPtr;
-                var shaderObjectPtr = NativeUtils.StructOrEnumToPointer(shaderObjectFeatures.ToNative());
-                
-                createInfo.PNext = shaderObjectPtr;
+
+                if (finalDeviceExtensions.Contains(Constants.VK_EXT_SHADER_OBJECT_EXTENSION_NAME))
+                {
+                    var shaderObjectFeatures = new PhysicalDeviceShaderObjectFeaturesEXT();
+                    shaderObjectFeatures.ShaderObject = true;
+                    shaderObjectFeatures.PNext = maintenance4FeaturesPtr;
+                    var shaderObjectPtr = NativeUtils.StructOrEnumToPointer(shaderObjectFeatures.ToNative());
+                    createInfo.PNext = shaderObjectPtr;
+                }
+                else
+                {
+                    createInfo.PNext = maintenance4FeaturesPtr;
+                }
             }
             else
             {
@@ -242,6 +259,7 @@ namespace Adamantium.Engine.Graphics
 
             MaxFramesInFlight = 3;
             LogicalDevice = PhysicalDevice.CreateDevice(createInfo);
+            LogicalDevice.InitShaderObjectExtension();
             var fenceInfo = new FenceCreateInfo();
             fenceInfo.Flags = FenceCreateFlagBits.SignaledBit;
             InFlightFences ??= LogicalDevice.CreateFences(fenceInfo, MaxFramesInFlight);

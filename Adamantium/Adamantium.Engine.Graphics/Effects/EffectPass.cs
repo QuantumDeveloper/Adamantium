@@ -9,6 +9,7 @@ using Adamantium.Engine.Core;
 using Adamantium.Engine.Effects;
 using AdamantiumVulkan.Core;
 using AdamantiumVulkan.Core.Interop;
+using QuantumBinding.Utils;
 using Serilog;
 
 namespace Adamantium.Engine.Graphics.Effects
@@ -194,8 +195,10 @@ namespace Adamantium.Engine.Graphics.Effects
             // ----------------------------------------------
             // Iterate on each stage to setup all inputs
             // ----------------------------------------------
+            //for (int stageIndex = 0; stageIndex < shadersObjects.Count; stageIndex++)
             for (int stageIndex = 0; stageIndex < pipelineStages.Count; stageIndex++)
             {
+                //var stageBlock = shadersObjects[stageIndex];
                 var stageBlock = pipelineStages[stageIndex];
                 if (stageBlock == null)
                 {
@@ -274,6 +277,8 @@ namespace Adamantium.Engine.Graphics.Effects
                 } 
                 
                 graphicsDevice.UpdateDescriptorSets(writeDescriptorSets.ToArray());
+                
+                //graphicsDevice.LogicalDevice.BindShader(graphicsDevice.CurrentCommandBuffer, stageBlock.Stage, stageBlock.Shader);
             }
             
             appliesCounter++;
@@ -407,9 +412,9 @@ namespace Adamantium.Engine.Graphics.Effects
                 shaderObject.Index = link.Index;
                 shaderObject.EntryPoint = link.EntryPoint;
 
-                //InitStageBlock(stageBlock, logger);
+                InitStageBlock(stageBlock, logger);
                 
-                InitShaderObject(shaderObject, logger);
+                //InitShaderObject(shaderObject, logger);
             }
 
             CreateDescriptorSetLayout(layoutBindings);
@@ -594,15 +599,8 @@ namespace Adamantium.Engine.Graphics.Effects
                 return;
             }
 
-            // var shaderStageInfo = new PipelineShaderStageCreateInfo();
-            // shaderStageInfo.Stage = EffectShaderTypeToShaderStage(shaderObject.Type);
-            // shaderStageInfo.Module = stageBlock.Shader;
-            // shaderStageInfo.PName = stageBlock.EntryPoint;
-            //
-            // shaderStages.Add(shaderStageInfo);
-
             var shaderRaw = Effect.Pool.RegisteredShaders[shaderIndex];
-            var layouts = new List<DescriptorSetLayoutBinding>();
+            var layouts1 = new List<DescriptorSetLayoutBinding>();
 
             for (int i = 0; i < shaderRaw.ConstantBuffers.Count; i++)
             {
@@ -622,8 +620,7 @@ namespace Adamantium.Engine.Graphics.Effects
                     continue;
                 }
 
-                var layout = CreateAndAddLayoutBinding(constantBuffer.Description.Slot, DescriptorType.UniformBuffer, EffectShaderTypeToShaderStage(shaderObject.Type));
-                layouts.Add(layout);
+                CreateAndAddLayoutBinding(constantBuffer.Description.Slot, DescriptorType.UniformBuffer, EffectShaderTypeToShaderStage(shaderObject.Type));
 
                 // Test if this constant buffer is not already part of the effect
                 if (Effect.ConstantBuffers[constantBufferRaw.Name] == null)
@@ -701,7 +698,7 @@ namespace Adamantium.Engine.Graphics.Effects
 
                 var layout = CreateAndAddLayoutBinding(parameterRaw.Slot, ConvertFromEffectParameterType(parameterRaw.Type),
                     EffectShaderTypeToShaderStage(shaderObject.Type));
-                layouts.Add(layout);
+                layouts1.Add(layout);
 
                 // For constant buffers, we need to store explicit link
                 if (parameter.ResourceType == EffectResourceType.ConstantBuffer)
@@ -709,18 +706,18 @@ namespace Adamantium.Engine.Graphics.Effects
                     constantBufferLinks.Add(new ConstantBufferLink(Effect.ConstantBuffers[parameter.Name], parameter));
                 }
 
-                // if (shaderObject.Parameters == null)
-                // {
-                //     shaderObject.Parameters = new List<ParameterBinding>(shaderRaw.ResourceParameters.Count);
-                // }
-                //
-                // stageBlock.Parameters.Add(new ParameterBinding(parameter, parameterRaw.Slot));
+                if (shaderObject.Parameters == null)
+                {
+                    shaderObject.Parameters = new List<ParameterBinding>(shaderRaw.ResourceParameters.Count);
+                }
+                
+                shaderObject.Parameters.Add(new ParameterBinding(parameter, parameterRaw.Slot));
             }
 
-            var descriptor = CreateDescriptorSetLayout2(layouts);
+            var descriptor = CreateDescriptorSetLayout2(layouts1);
             shaderObject.Layouts = new DescriptorSetLayout[] { descriptor };
+            shaderObject.ConstantBufferLinks = constantBufferLinks.ToArray();
             shaderObject.CreateShader();
-            // stageBlock.ConstantBufferLinks = constantBufferLinks.ToArray();
         }
 
         private DescriptorSetLayoutBinding CreateAndAddLayoutBinding(uint slot, DescriptorType descriptorType, ShaderStageFlagBits stageFlags)
@@ -740,6 +737,7 @@ namespace Adamantium.Engine.Graphics.Effects
                 resourceBinding.StageFlags = stageFlags;
 
                 layoutBindings.Add(resourceBinding);
+                binding = resourceBinding;
             }
             
             return binding;
@@ -1208,7 +1206,7 @@ namespace Adamantium.Engine.Graphics.Effects
 
             public string EntryPoint;
 
-            public ShaderStageFlagBits Stage;
+            public readonly ShaderStageFlagBits Stage;
             
             public VkShaderStageFlags NextStage;
 
@@ -1220,6 +1218,13 @@ namespace Adamantium.Engine.Graphics.Effects
 
 
             public DescriptorSetLayout[] Layouts;
+            
+            public List<ParameterBinding> Parameters;
+            public readonly List<SlotLink> SamplerStateSlotLinks;
+            public readonly List<SlotLink> ShaderResourceViewSlotLinks;
+            public readonly List<SlotLink> UnorderedAccessViewSlotLinks;
+
+            public ConstantBufferLink[] ConstantBufferLinks;
 
             public ShaderObject(GraphicsDevice device,
                 EffectShaderType type)
@@ -1227,6 +1232,9 @@ namespace Adamantium.Engine.Graphics.Effects
                 GraphicsDevice = device;
                 Type = type;
                 Stage = EffectShaderTypeToShaderStage(type);
+                SamplerStateSlotLinks = new List<SlotLink>();
+                ShaderResourceViewSlotLinks = new List<SlotLink>();
+                UnorderedAccessViewSlotLinks = new List<SlotLink>();
             }
 
             public void CreateShader()
@@ -1234,7 +1242,7 @@ namespace Adamantium.Engine.Graphics.Effects
                 var shaderCreateInfo = new ShaderCreateInfoEXT();
                 shaderCreateInfo.Stage = Stage;
                 shaderCreateInfo.NextStage = NextStage;
-                shaderCreateInfo.CodeType = ShaderCodeTypeEXT.BinaryExt;
+                shaderCreateInfo.CodeType = ShaderCodeTypeEXT.SpirvExt;
                 shaderCreateInfo.CodeSize = (uint)Bytecode.Length;
                 shaderCreateInfo.PCode = Bytecode;
                 shaderCreateInfo.PName = EntryPoint;
