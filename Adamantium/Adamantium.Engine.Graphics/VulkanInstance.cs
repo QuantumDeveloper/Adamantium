@@ -29,7 +29,7 @@ namespace Adamantium.Engine.Graphics
 
         public static ReadOnlyCollection<string> ValidationLayers { get; private set; }
 
-        private Dictionary<IntPtr, SurfaceKHR> availableSurfaces;
+        private readonly Dictionary<IntPtr, SurfaceKHR> availableSurfaces;
 
         static VulkanInstance()
         {
@@ -40,23 +40,28 @@ namespace Adamantium.Engine.Graphics
             ValidationLayers = new ReadOnlyCollection<string>(validationLayers);
         }
 
-        public AdamantiumCollection<PhysicalDevice> PhysicalDevices { get; private set; }
+        public AdamantiumCollection<GraphicsAdapter> GraphicsAdapters { get; private set; }
 
-        public PhysicalDevice MainDevice
+        public GraphicsAdapter MainGraphicsAdapter
         {
-            get
-            {
-                var devices = PhysicalDevices;
-                if (devices != null && devices.Count >= 1)
-                {
-                    return PhysicalDevices[0];
-                }
-
-                return null;
-            }
+            get;
+            set;
         }
         
         public PhysicalDevice CurrentDevice { get; set; }
+
+        private GraphicsAdapter FindBestSuitableAdapter()
+        {
+            var discreteAdapter = GraphicsAdapters.FirstOrDefault(x => x.DeviceType == PhysicalDeviceType.DiscreteGpu);
+            if (discreteAdapter == null)
+            {
+                discreteAdapter =
+                    GraphicsAdapters.FirstOrDefault(x => x.DeviceType == PhysicalDeviceType.IntegratedGpu) ??
+                    GraphicsAdapters[0];
+            }
+
+            return discreteAdapter;
+        }
 
         private VulkanInstance(string appName, bool enableDebug)
         {
@@ -65,9 +70,9 @@ namespace Adamantium.Engine.Graphics
             ApplicationName = appName;
             IsInDebugMode = enableDebug;
             CreateInstance(appName);
-            PhysicalDevices = new AdamantiumCollection<PhysicalDevice>();
-            EnumerateDevices();
-            CurrentDevice = PhysicalDevices[0];
+            GraphicsAdapters = new AdamantiumCollection<GraphicsAdapter>();
+            EnumerateGraphicAdapters();
+            CurrentDevice = GraphicsAdapters[0];
         }
         
         private void CreateInstance(string appName)
@@ -127,11 +132,16 @@ namespace Adamantium.Engine.Graphics
 
         public IntPtr NativePointer { get; private set; }
 
-        public void EnumerateDevices()
+        public void EnumerateGraphicAdapters()
         {
             var devices = instance.EnumeratePhysicalDevices();
-            PhysicalDevices.Clear();
-            PhysicalDevices.AddRange(devices);
+            GraphicsAdapters.Clear();
+            foreach (var physicalDevice in devices)
+            {
+                GraphicsAdapters.Add(new GraphicsAdapter(physicalDevice));
+            }
+
+            MainGraphicsAdapter = FindBestSuitableAdapter();
         }
 
         public static VulkanInstance Create(string appName, bool enableDebug)
@@ -220,7 +230,7 @@ namespace Adamantium.Engine.Graphics
 
             instance?.Dispose();
             instance = null;
-            PhysicalDevices.Clear();
+            GraphicsAdapters.Clear();
         }
     }
 }
