@@ -28,34 +28,39 @@ namespace Adamantium.Imaging.Png
                 case 1:
                     colorType = PngColorType.Grey;
                     break;
-                case 4:
-                    colorType = PngColorType.RGBA;
-                    break;
                 default:
                     colorType = PngColorType.RGBA;
                     break;
             }
 
-            PngEncoder encoder = new PngEncoder(imageStream);
-            PngState state = new PngState();
-            state.EncoderSettings.BType = 2;
-            state.EncoderSettings.UseLZ77 = true;
-            state.InfoPng.InterlaceMethod = InterlaceMethod.None;
-            state.EncoderSettings.FilterStrategy = FilterStrategy.MinSum;
-            state.EncoderSettings.AutoConvert = true;
-            state.ColorModeRaw.ColorType = colorType;
-            state.ColorModeRaw.BitDepth = (uint)description.Format.SizeOfInBits() / (uint)description.Format.SizeOfInBytes();
-
-            state.InfoPng.FramesCount = img.FramesCount;
-            //if (img.DefaultImage != null)
+            var encoder = new PngEncoder(imageStream);
+            var state = new PngState
             {
-                state.InfoPng.FramesCount--;
-            }
+                EncoderSettings =
+                {
+                    BType = 2,
+                    UseLZ77 = true,
+                    FilterStrategy = FilterStrategy.MinSum,
+                    AutoConvert = true
+                },
+                InfoPng =
+                {
+                    InterlaceMethod = InterlaceMethod.None,
+                    FramesCount = img.FramesCount
+                },
+                ColorModeRaw =
+                {
+                    ColorType = colorType,
+                    BitDepth = (uint)description.Format.SizeOfInBits() / (uint)description.Format.SizeOfInBytes()
+                }
+            };
+
+            state.InfoPng.FramesCount--;
             state.InfoPng.RepeatCount = img.NumberOfReplays;
             state.InfoPng.ColorMode.ColorType = colorType;
             state.InfoPng.ColorMode.BitDepth = (uint)description.Format.SizeOfInBits() / (uint)description.Format.SizeOfInBytes();
 
-            PngImage pngImage = PngImage.FromImage(img);
+            var pngImage = img is PngImage image ? image : PngImage.FromImage(img);
 
             encoder.Encode(pngImage, state);
 

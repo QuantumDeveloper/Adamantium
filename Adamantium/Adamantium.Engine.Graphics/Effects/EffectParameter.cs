@@ -91,13 +91,14 @@ namespace Adamantium.Engine.Graphics.Effects
             ElementCount = parameterDescription.Count;
             Offset = offset;
             SlotIndex = parameterDescription.Slot;
+            DescriptorSet = parameterDescription.DescriptorSet;
         }
 
         /// <summary>
         /// A unique index of this parameter instance inside the <see cref="EffectParameterCollection"/> of an effect. See remarks.
         /// </summary>
         /// <remarks>
-        /// This unique index can be used between different instance of the effect with different deferred <see cref="D3DGraphicsDevice"/>.
+        /// This unique index can be used between different instance of the effect with different deferred <see cref="GraphicsDevice"/>.
         /// </remarks>
         public int Index { get; internal set; }
 
@@ -154,15 +155,16 @@ namespace Adamantium.Engine.Graphics.Effects
         /// </remarks>
         public int Offset
         {
-            get { return offset; }
-
-            internal set { offset = value; }
+            get => offset;
+            internal set => offset = value;
         }
 
         /// <summary>
         /// Index of the resource to be set inside <see cref="CommonShaderStage"/>
         /// </summary>
         public int SlotIndex { get; internal set; }
+        
+        public uint DescriptorSet { get; internal set; }
 
         /// <summary>
         /// Gets a single value to the associated parameter in the constant buffer.
@@ -182,8 +184,7 @@ namespace Adamantium.Engine.Graphics.Effects
         /// <returns>The value of this parameter.</returns>
         public T GetValue<T>(int index) where T : struct
         {
-            int size;
-            AlignedToFloat4<T>(out size);
+            AlignedToFloat4<T>(out var size);
             return Buffer.BackingBuffer.Get<T>(offset + index * size);
         }
 
@@ -194,8 +195,7 @@ namespace Adamantium.Engine.Graphics.Effects
         /// <returns>The value of this parameter.</returns>
         public T[] GetValueArray<T>(int count) where T : struct
         {
-            int size;
-            if (AlignedToFloat4<T>(out size))
+            if (AlignedToFloat4<T>(out var size))
             {
                 var values = new T[count];
                 int localOffset = offset;
@@ -254,7 +254,6 @@ namespace Adamantium.Engine.Graphics.Effects
                     pMatrix[i] = GetMatrixImpl(localOffset);
             }
 
-            Buffer.IsDirty = true;
             return result;
         }
 
@@ -346,7 +345,6 @@ namespace Adamantium.Engine.Graphics.Effects
             Buffer.IsDirty = true;
         }
 
-
         /// <summary>
         /// Sets an array of raw values to the associated parameter in the constant buffer.
         /// </summary>
@@ -364,8 +362,7 @@ namespace Adamantium.Engine.Graphics.Effects
         /// <param name = "values">An array of values to be written to the current buffer.</param>
         public void SetValue<T>(T[] values) where T : struct
         {
-            int size;
-            if (AlignedToFloat4<T>(out size))
+            if (AlignedToFloat4<T>(out var size))
             {
                 int localOffset = offset;
                 for (int i = 0; i < values.Length; i++, localOffset += size)
@@ -389,8 +386,7 @@ namespace Adamantium.Engine.Graphics.Effects
         /// <param name = "value">The value to write to the buffer.</param>
         public void SetValue<T>(int index, ref T value) where T : struct
         {
-            int size;
-            AlignedToFloat4<T>(out size);
+            AlignedToFloat4<T>(out var size);
             Buffer.BackingBuffer.Set(offset + size * index, ref value);
             Buffer.IsDirty = true;
         }
@@ -403,8 +399,7 @@ namespace Adamantium.Engine.Graphics.Effects
         /// <param name = "value">The value to write to the buffer.</param>
         public void SetValue<T>(int index, T value) where T : struct
         {
-            int size;
-            AlignedToFloat4<T>(out size);
+            AlignedToFloat4<T>(out var size);
             Buffer.BackingBuffer.Set(offset + size * index, ref value);
             Buffer.IsDirty = true;
         }
@@ -417,8 +412,7 @@ namespace Adamantium.Engine.Graphics.Effects
         /// <param name = "values">An array of values to be written to the current buffer.</param>
         public void SetValue<T>(int index, T[] values) where T : struct
         {
-            int size;
-            if (AlignedToFloat4<T>(out size))
+            if (AlignedToFloat4<T>(out var size))
             {
                 int localOffset = offset + size * index;
                 for (int i = 0; i < values.Length; i++, localOffset += size)

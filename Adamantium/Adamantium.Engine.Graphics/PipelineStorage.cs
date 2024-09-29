@@ -229,6 +229,8 @@ namespace Adamantium.Engine.Graphics
             pipelineInfo.RenderPass = null;
             pipelineInfo.PDepthStencilState = DepthStencilState;
             pipelineInfo.Subpass = 0;
+
+            pipelineInfo.Flags = PipelineCreateFlagBits.DescriptorBufferBitExt; 
             
             if (!GraphicsDevice.EnableDynamicRendering)
             {

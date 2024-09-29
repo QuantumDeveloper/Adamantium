@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using Adamantium.Core;
+using Adamantium.Core.Collections;
 using Adamantium.Engine.Effects;
 using AdamantiumVulkan.Core;
 using Serilog;
@@ -25,7 +26,7 @@ namespace Adamantium.Engine.Graphics.Effects
         internal readonly List<EffectData.Shader> RegisteredShaders;
         private readonly List<ShaderModule>[] compiledShadersGroup;
         private readonly GraphicsDevice graphicsDevice;
-        private readonly List<Effect> effects;
+        private readonly AdamantiumCollection<Effect> effects;
 
         // GraphicsDevice => (ConstantBufferName => (EffectConstantBufferKey => EffectConstantBuffer))
         private readonly Dictionary<GraphicsDevice, Dictionary<string, Dictionary<EffectConstantBufferKey, EffectConstantBuffer>>> mapNameToConstantBuffer;
@@ -46,7 +47,7 @@ namespace Adamantium.Engine.Graphics.Effects
             }
 
             registered = new Dictionary<EffectData, EffectData.Effect>();
-            effects = new List<Effect>();
+            effects = new AdamantiumCollection<Effect>();
             graphicsDevice = device;
             constantBufferAllocator = DefaultConstantBufferAllocator;
             graphicsDevice.EffectPools.Add(this);
@@ -114,7 +115,7 @@ namespace Adamantium.Engine.Graphics.Effects
         /// <summary>
         /// Readonly collection of registered effects
         /// </summary>
-        public ReadOnlyCollection<Effect> RegisteredEffects
+        public IReadOnlyCollection<Effect> RegisteredEffects
         {
             get
             {

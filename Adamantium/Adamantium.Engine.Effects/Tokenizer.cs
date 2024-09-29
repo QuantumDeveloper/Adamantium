@@ -28,6 +28,8 @@ namespace Adamantium.Engine.Effects
             @"(?<gt>\>)|" +
             @"(?<increment>\++)|" +
             @"(?<decrement>\--)|" +
+            @"(?<plus>\+)|" +
+            @"(?<minus>\-)|" +
             @"(?<multiply>\*)|" +
             @"(?<divide>\/)|" +
             @"(?<comment>\//)|" +

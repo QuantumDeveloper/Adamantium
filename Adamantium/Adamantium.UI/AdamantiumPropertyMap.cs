@@ -120,15 +120,12 @@ public static class AdamantiumPropertyMap
       return null;
    }
 
-   /// <summary>
-   /// Returns registered <see cref="AdamantiumProperty"/> on a Type by property Name 
-   /// </summary>
-   /// <param name="type"></param>
-   /// <param name="property"></param>
-   /// <returns></returns>
-   /// <exception cref="ArgumentNullException"></exception>
-   /// <exception cref="ArgumentException"></exception>
-   public static AdamantiumProperty FindRegistered(Type type, AdamantiumProperty property)
+   public static bool IsRegistered(object o, AdamantiumProperty property)
+   {
+      return IsRegistered(o.GetType(), property);
+   }
+
+   public static bool IsRegistered(Type type, AdamantiumProperty property)
    {
       if (type == null)
       {
@@ -140,31 +137,28 @@ public static class AdamantiumPropertyMap
          throw new ArgumentNullException(nameof(property));
       }
 
-      var results = GetRegistered(type);
-
-      foreach (var p in results)
+      if (property.IsRegisteredForType(type)) return true;
+      
+      while (type != null)
       {
-         if (p == property)
+         // Ensure the type's static constructor has been run.
+         RuntimeHelpers.RunClassConstructor(type.TypeHandle);
+
+         lock (Registered)
          {
-            return property;
+            if (Registered.TryGetValue(type, out var container))
+            {
+               if (container.Exists(property.Name))
+               {
+                  property.AddRegisteredType(type);
+                  return true;
+               }
+            }
          }
+         type = type.GetTypeInfo().BaseType;
       }
-      return null;
-   }
 
-   public static AdamantiumProperty FindRegistered(object o, AdamantiumProperty property)
-   {
-      return FindRegistered(o.GetType(), property);
-   }
-
-   public static bool IsRegistered(object o, AdamantiumProperty property)
-   {
-      return IsRegistered(o.GetType(), property);
-   }
-
-   public static bool IsRegistered(Type type, AdamantiumProperty property)
-   {
-      return FindRegistered(type, property) != null;
+      return false;
    }
 
    public static void Register(Type type, AdamantiumProperty property)

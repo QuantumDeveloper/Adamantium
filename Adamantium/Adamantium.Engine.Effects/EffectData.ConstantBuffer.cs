@@ -27,11 +27,14 @@ namespace Adamantium.Engine.Effects
             /// </summary>
             [Key(2)]
             public uint Slot;
+            
+            [Key(3)]
+            public byte DescriptorSet;
 
             /// <summary>
             /// List of parameters in this constant buffer.
             /// </summary>
-            [Key(3)]
+            [Key(4)]
             public List<ValueTypeParameter> Parameters;
 
             public bool Equals(ConstantBuffer other)

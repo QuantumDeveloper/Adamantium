@@ -1,5 +1,7 @@
+using System;
 using Adamantium.Engine.Core.Models;
 using Adamantium.Engine.Graphics;
+using Adamantium.UI.Controls;
 using Adamantium.UI.Media;
 using Adamantium.UI.Media.Imaging;
 using AdamantiumVulkan.Core;
@@ -19,7 +21,7 @@ internal class ImageRenderer : GeometryRenderer
         Matrix4x4F projectionMatrix)
     {
         if (VertexBuffer == null) return false;
-            
+
         graphicsDevice.SetVertexBuffer(VertexBuffer);
         if (IndexBuffer != null)
         {

@@ -12,7 +12,9 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
 {
    public static readonly object UnsetValue = new Unset();
 
-   private Dictionary<Type, PropertyMetadata> defaultValues; 
+   private Dictionary<Type, PropertyMetadata> defaultValues;
+
+   private HashSet<Type> registeredTypes;
 
    private static Int32 nextPropertyId = 1;
 
@@ -40,7 +42,16 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
       return false;
    }
 
+   internal bool IsRegisteredForType(Type type)
+   {
+      return registeredTypes.Contains(type);
+   }
 
+   internal void AddRegisteredType(Type type)
+   {
+      registeredTypes.Add(type);
+   }
+   
    public bool IsValidValue(object value)
    {
       return IsValidType(value);
@@ -110,6 +121,7 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
          throw new ArgumentException(" 'Name' could not contain periods");
       }
 
+      registeredTypes = new HashSet<Type>();
       defaultValues = new Dictionary<Type, PropertyMetadata>();
       IsAttached = false;
       ReadOnly = false;
@@ -131,6 +143,7 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
       {
          throw new ArgumentException("'Name' could not contain periods");
       }
+      registeredTypes = new HashSet<Type>();
       defaultValues = new Dictionary<Type, PropertyMetadata>();
       IsAttached = false;
       ReadOnly = false;
@@ -151,6 +164,7 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
       {
          throw new ArgumentException(" 'Name' could not contain periods");
       }
+      registeredTypes = new HashSet<Type>();
       defaultValues = new Dictionary<Type, PropertyMetadata>();
       IsAttached = false;
       ReadOnly = false;

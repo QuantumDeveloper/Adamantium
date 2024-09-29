@@ -11,7 +11,7 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
 
     static MeasurableUIComponent()
     {
-        SizeChangedEvent.RegisterClassHandler<UIComponent>(new SizeChangedEventHandler(SizeChangedHandler));
+        //SizeChangedEvent.RegisterClassHandler<UIComponent>(new SizeChangedEventHandler(SizeChangedHandler));
     }
         
     public MeasurableUIComponent()
@@ -87,6 +87,7 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
         var newSize = new Size((double)e.NewValue, o.Height);
         var args = new SizeChangedEventArgs(old, newSize, true, false);
         args.RoutedEvent = SizeChangedEvent;
+        o.OnSizeChanged(args);
         o.RaiseEvent(args);
     }
         
@@ -100,13 +101,8 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
         var newSize = new Size(o.Width, (double)e.NewValue);
         var args = new SizeChangedEventArgs(old, newSize, false, true);
         args.RoutedEvent = SizeChangedEvent;
+        o.OnSizeChanged(args);
         o?.RaiseEvent(args);
-    }
-    
-    private static void SizeChangedHandler(object sender, SizeChangedEventArgs e)
-    {
-        var measurable = sender as MeasurableUIComponent;
-        measurable?.OnSizeChanged(e);
     }
     
     protected virtual void OnSizeChanged(SizeChangedEventArgs e)

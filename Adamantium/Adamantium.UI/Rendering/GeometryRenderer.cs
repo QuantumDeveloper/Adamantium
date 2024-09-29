@@ -1,6 +1,7 @@
 using System;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
+using Adamantium.UI.Controls;
 using Adamantium.UI.Media;
 using Adamantium.UI.Media.Imaging;
 using AdamantiumVulkan.Core;
@@ -56,6 +57,8 @@ internal class GeometryRenderer : ComponentRenderer
     public override void Draw(GraphicsDevice graphicsDevice, IUIComponent component, ImageSource image, Matrix4x4F projectionMatrix)
     {
         if (VertexBuffer == null) return;
+        
+        
 
         graphicsDevice.SetVertexBuffer(VertexBuffer);
 
@@ -80,7 +83,7 @@ internal class GeometryRenderer : ComponentRenderer
         {
             if (Texture.ImageLayout != ImageLayout.ShaderReadOnlyOptimal) return;
         
-            effect.SampleType.SetResource(graphicsDevice.SamplerStates.AnisotropicClampToEdge);
+            effect.SampleType.SetResource(graphicsDevice.SamplerStates.Default);
             effect.ShaderTexture.SetResource(Texture);
             effect.BasicTexturedPass.Apply();
         }

@@ -21,7 +21,7 @@ public class FontRenderer : GraphicsResource
     private float currentFontSize;
     private Size dotGlyphsSize;
     
-    private const float FontSizeThreshold = 24;
+    private const float FontSizeThreshold = 14;
     private float FontSharpness = 5;
 
     private EffectParameter effectSampler;
@@ -64,14 +64,14 @@ public class FontRenderer : GraphicsResource
         effectFontSize = fontEffect.FontSize;
         effectFontSizeThreshold = fontEffect.FontSizeThreshold;
         effectFontSharpness = fontEffect.FontSharpness;
-        effectPixelRange = fontEffect.PXRange;
+        effectPixelRange = fontEffect.PxRange;
         effectAtlasSize = fontEffect.MSDFAtlasSize;
         glyphEffectPass = fontEffect.FontBatchRenderPass;
     }
 
-    public void DrawLayout(TextLayout textLayout, Color foreground)
+    public void DrawLayout(TextLayout textLayout, Color foreground, Color stroke)
     {
-        DrawInternal(textLayout, foreground);
+        DrawInternal(textLayout, foreground, stroke);
     }
 
     public void DrawString(string text, string fontName, double fontSize, Rectangle textArea, TextWrapping textWrapping,
@@ -94,7 +94,6 @@ public class FontRenderer : GraphicsResource
         renderingParameters = parameters;
         transformMatrix = Matrix4x4F.Translation(parameters.TextArea.X, parameters.TextArea.Y, 2);
         effectMatrixTransform.SetValue(transformMatrix);
-        //DrawInternal();
     }
 
     public void SetState(
@@ -150,9 +149,11 @@ public class FontRenderer : GraphicsResource
     //     GraphicsDevice.RasterizerState = assignedRasterizerState;
     // }
 
-    private void DrawInternal(TextLayout layout, Color foreground)
+    private void DrawInternal(TextLayout layout, Color foreground, Color stroke)
     {
         if (layout.ElementsCount == 0) return;
+        
+        // layout.FontAtlas.Atlas.Save("Atlas.png", ImageFileType.Png);
         
         var vp = new Viewport();
         vp.Width = currentScreenSize.X;
@@ -183,6 +184,7 @@ public class FontRenderer : GraphicsResource
         effectMatrixTransform.SetValue(finalMatrix);
         effectUVCornerCoords.SetValue(UVCornerCoords);
         effectForegroundColor.SetValue(foreground.ToVector4());
+        //effectForegroundColor.SetValue(Colors.White.ToVector4());
         effectFontSize.SetValue(layout.FontSize);
         effectFontSizeThreshold.SetValue(FontSizeThreshold);
         effectFontSharpness.SetValue(FontSharpness);
@@ -191,9 +193,19 @@ public class FontRenderer : GraphicsResource
         GraphicsDevice.VertexType = vertexType;
         GraphicsDevice.SetVertexBuffer(layout.VertexBuffer);
         GraphicsDevice.PrimitiveTopology = PrimitiveTopology.PointList;
-        glyphEffectPass.Apply();
+        fontEffect.StrokeColor.SetValue(stroke.ToVector4());
+        
+        if (stroke == Colors.Transparent)
+        {
+            glyphEffectPass.Apply();
+        }
+        else
+        {
+            fontEffect.FontBatchStrokedTextPass.Apply();
+        }
+        
         GraphicsDevice.Draw(layout.ElementsCount, 1, 0);
-        glyphEffectPass.UnApply(true);
+        //glyphEffectPass.UnApply(true);
     }
 
     public void RestoreState()

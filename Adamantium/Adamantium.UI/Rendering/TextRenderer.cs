@@ -1,3 +1,4 @@
+using System;
 using Adamantium.Engine.Graphics;
 using Adamantium.Engine.Graphics.Fonts;
 using Adamantium.UI.Controls;
@@ -54,6 +55,7 @@ internal class TextRenderer : GeometryRenderer
     public override void Draw(GraphicsDevice graphicsDevice, IUIComponent component, ImageSource image, Matrix4x4F projectionMatrix)
     {
         var textBlock = (TextBlock)component;
+        
         var location = new Vector3F(TextRenderingParameters.TextArea.X,
             TextRenderingParameters.TextArea.Y, 
             5);
@@ -62,10 +64,11 @@ internal class TextRenderer : GeometryRenderer
         resolveTexture.TransitionImageLayout(ImageLayout.ColorAttachmentOptimal);
 
         var foreground = ((SolidColorBrush)Foreground).Color;
+        var stroke = ((SolidColorBrush)textBlock.Stroke).Color;
         _renderToTextureDevice.ClearColor = ((SolidColorBrush)Background).Color;
         _renderToTextureDevice.BeginDraw(1, 0);
         FontRenderer.SetState(null, null, null, null, location, _renderToTextureDevice.Presenter.RenderTarget);
-        FontRenderer.DrawLayout(TextLayout, foreground);
+        FontRenderer.DrawLayout(TextLayout, foreground, stroke);
         FontRenderer.RestoreState();
         _renderToTextureDevice.EndDraw();
         _renderToTextureDevice.Submit();

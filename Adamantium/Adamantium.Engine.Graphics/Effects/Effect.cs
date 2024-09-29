@@ -268,6 +268,7 @@ namespace Adamantium.Engine.Graphics.Effects
                         subPass.ComputeSlotLinks();
                     }
                     pass.ComputeSlotLinks();
+                    pass.PrepareDescriptorSets();
                 }
             }
 

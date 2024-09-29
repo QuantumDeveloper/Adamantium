@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.Linq;
 using Adamantium.Imaging.Png.Chunks;
 using Adamantium.Imaging.Png.IO;
@@ -154,7 +155,7 @@ namespace Adamantium.Imaging.Png
             {
                 foreach (PngFrame frame in pngImage.Frames)
                 {
-                    var compressedBuffer = new byte[0];
+                    var compressedBuffer = Array.Empty<byte>();
                     state.Error = PreprocessScanlines(ref compressedBuffer, frame.RawPixelBuffer, frame.EncodedWidth, frame.EncodedHeight, info, state.EncoderSettings);
                     frame.FrameData = compressedBuffer;
                     if (state.Error > 0)

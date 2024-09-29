@@ -97,14 +97,11 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
 
     private static void GraphicsDebugChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
-        if (a is UIApplication ui)
+        if (a is UIApplication { GraphicsDeviceService: not null } ui)
         {
-            if (ui.GraphicsDeviceService != null)
-            {
-                Log.Logger.Debug("GraphicsDebugChangedCallback called");
-                ui.GraphicsDeviceService.IsInDebugMode = (bool)e.NewValue;
-                ui.GraphicsDeviceService.DeviceUpdateNeeded = true;
-            }
+            Log.Logger.Debug("GraphicsDebugChangedCallback called");
+            ui.GraphicsDeviceService.IsInDebugMode = (bool)e.NewValue;
+            ui.GraphicsDeviceService.DeviceUpdateNeeded = true;
         }
     }
     

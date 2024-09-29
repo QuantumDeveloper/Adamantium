@@ -25,14 +25,38 @@ namespace Adamantium.Engine.Graphics
 
         IndirectBuffer = 256,
 
-        ConditionalRenderingExt = 512,
+        ShaderDeviceAddress = 131072,
 
-        RayTracingNv = 1024,
+        VideoDecodeSrcKhr = 8192,
+
+        VideoDecodeDstKhr = 16384,
 
         TransformFeedbackBufferExt = 2048,
 
         TransformFeedbackCounterBufferExt = 4096,
 
-        ShaderDeviceAddressExt = 131072,
+        ConditionalRenderingExt = 512,
+
+        AccelerationStructureBuildInputReadOnlyKhr = 524288,
+
+        AccelerationStructureStorageKhr = 1048576,
+
+        ShaderBindingTableKhr = 1024,
+
+        VideoEncodeDstKhr = 32768,
+
+        VideoEncodeSrcKhr = 65536,
+
+        SamplerDescriptorBufferExt = 2097152,
+
+        ResourceDescriptorBufferExt = 4194304,
+
+        PushDescriptorsDescriptorBufferExt = 67108864,
+
+        MicromapBuildInputReadOnlyExt = 8388608,
+
+        MicromapStorageExt = 16777216,
+
+        FlagsMaxEnum = 2147483647,
     }
 }

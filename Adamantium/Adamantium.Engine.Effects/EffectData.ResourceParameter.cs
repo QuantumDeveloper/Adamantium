@@ -20,11 +20,16 @@ namespace Adamantium.Engine.Effects
          [Key(4)]
          public byte Count;
 
+         [Key(5)]
+         public byte DescriptorSet;
+
          public bool Equals(ResourceParameter other)
          {
             if (ReferenceEquals(null, other)) return false;
             if (ReferenceEquals(this, other)) return true;
-            return base.Equals(other) && Slot == other.Slot && Count == other.Count;
+            return base.Equals(other) && Slot == other.Slot && 
+                   DescriptorSet == other.DescriptorSet &&
+                   Count == other.Count;
          }
 
          public override bool Equals(object obj)
@@ -40,6 +45,7 @@ namespace Adamantium.Engine.Effects
             {
                int hashCode = base.GetHashCode();
                hashCode = (hashCode * 397) ^ Slot.GetHashCode();
+               hashCode = (hashCode * 397) ^ DescriptorSet.GetHashCode();
                hashCode = (hashCode * 397) ^ Count.GetHashCode();
                return hashCode;
             }

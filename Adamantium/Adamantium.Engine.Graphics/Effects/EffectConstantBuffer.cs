@@ -14,11 +14,6 @@ namespace Adamantium.Engine.Graphics.Effects
     public sealed class EffectConstantBuffer : DisposableObject, IEquatable<EffectConstantBuffer>
     {
         /// <summary>
-        /// Reference to <see cref="Adamantium.Engine.Graphics.Buffer"/>
-        /// </summary>
-        public readonly Buffer NativeBuffer;
-
-        /// <summary>
         /// <see cref="DataBuffer"/> for buffering variables
         /// </summary>
         public readonly DataBuffer BackingBuffer;
@@ -49,8 +44,6 @@ namespace Adamantium.Engine.Graphics.Effects
             // By default, all constant buffers are cleared with 0
             BackingBuffer.Clear();
 
-            NativeBuffer = ToDispose(Buffer.Uniform.New(device, BackingBuffer.Size));
-
             // The buffer is considered dirty for the first usage.
             IsDirty = true;
         }
@@ -70,14 +63,6 @@ namespace Adamantium.Engine.Graphics.Effects
         public readonly EffectParameterCollection Parameters;
 
         /// <summary>
-        /// Updates the specified constant buffer from all parameters value.
-        /// </summary>
-        public void Update()
-        {
-            Update(device);
-        }
-
-        /// <summary>
         /// Copies the CPU content of this buffer to another constant buffer. 
         /// Destination buffer will be flagged as dirty.
         /// </summary>
@@ -94,21 +79,6 @@ namespace Adamantium.Engine.Graphics.Effects
 
             Utilities.CopyMemory(toBuffer.BackingBuffer.DataPointer, BackingBuffer.DataPointer, (long)BackingBuffer.Size);
             toBuffer.IsDirty = true;
-        }
-
-        /// <summary>
-        /// Updates the specified constant buffer from all parameters value.
-        /// </summary>
-        /// <param name="graphicsDevice">The device.</param>
-        public void Update(GraphicsDevice graphicsDevice)
-        {
-            if (IsDirty)
-            {
-                pointer.Pointer = BackingBuffer.DataPointer;
-                pointer.Size = BackingBuffer.Size;
-                NativeBuffer.SetData(graphicsDevice, pointer);
-                IsDirty = false;
-            }
         }
 
         public void CopyTo(Buffer buffer)
@@ -153,16 +123,6 @@ namespace Adamantium.Engine.Graphics.Effects
         public static bool operator !=(EffectConstantBuffer left, EffectConstantBuffer right)
         {
             return !Equals(left, right);
-        }
-
-        public static implicit operator AdamantiumVulkan.Core.Buffer(EffectConstantBuffer from)
-        {
-            return from.NativeBuffer;
-        }
-
-        public static implicit operator Buffer(EffectConstantBuffer from)
-        {
-            return from.NativeBuffer;
         }
     }
 }

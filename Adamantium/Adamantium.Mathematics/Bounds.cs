@@ -18,7 +18,7 @@ namespace Adamantium.Mathematics
 
       public double Radius;
 
-      public double Diameter => Radius * Radius;
+      public double Diameter => Radius * 2;
 
       public Quaternion Orientation;
 

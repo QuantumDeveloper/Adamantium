@@ -59,7 +59,6 @@ public static class ImageExtension
                         {
                             img.DefaultImage = frame;
                         }
-
                         img.Frames.Add(frame);
                     }
 

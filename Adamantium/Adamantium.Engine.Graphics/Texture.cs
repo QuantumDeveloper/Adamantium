@@ -124,7 +124,7 @@ namespace Adamantium.Engine.Graphics
             {
                 AllocationSize = memoryRequirements.Size,
                 MemoryTypeIndex =
-                    GraphicsDevice.VulkanInstance.CurrentDevice.FindMemoryIndex(memoryRequirements.MemoryTypeBits, memoryProperties)
+                    GraphicsDevice.VulkanInstance.MainGraphicsAdapter.Adapter.FindMemoryIndex(memoryRequirements.MemoryTypeBits, memoryProperties)
             };
 
             if (device.AllocateMemory(allocInfo, null, out bufferMemory) != Result.Success)
@@ -209,13 +209,17 @@ namespace Adamantium.Engine.Graphics
             }
 
             device.GetImageMemoryRequirements(image, out var memRequirements);
-            TotalSizeInBytes = memRequirements.Size;
+            TotalSizeInBytes = CalculateTextureSize(description.Width, 
+                description.Height, 
+                description.Depth,
+                description.MipLevels, 
+                (uint)description.Format.SizeOfInBytes());
 
             var allocInfo = new MemoryAllocateInfo
             {
                 AllocationSize = memRequirements.Size,
                 MemoryTypeIndex =
-                    GraphicsDevice.VulkanInstance.CurrentDevice.FindMemoryIndex(memRequirements.MemoryTypeBits, memoryProperties)
+                    GraphicsDevice.VulkanInstance.MainGraphicsAdapter.Adapter.FindMemoryIndex(memRequirements.MemoryTypeBits, memoryProperties)
             };
 
             if (device.AllocateMemory(allocInfo, null, out imageMemory) != Result.Success)
@@ -388,11 +392,9 @@ namespace Adamantium.Engine.Graphics
 
             //GraphicsDevice.LogicalDevice.CopyImageToMemoryEXT(copy);
             var img = Image.New2D(Width, Height, 1, Description.Format);
-            VkBuffer stagingBuffer;
-            DeviceMemory stagingBufferMemory;
             CreateBuffer(img.TotalSizeInBytes, BufferUsageFlagBits.TransferSrcBit | BufferUsageFlagBits.TransferDstBit,
-                MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent, out stagingBuffer,
-                out stagingBufferMemory);
+                MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent, out var stagingBuffer,
+                out var stagingBufferMemory);
             this.TransitionImageLayout(ImageLayout.TransferSrcOptimal);
             CopyImageToBuffer(stagingBuffer);
             this.TransitionImageLayout(Description.DesiredImageLayout);
@@ -424,6 +426,23 @@ namespace Adamantium.Engine.Graphics
             VulkanImage?.Destroy(GraphicsDevice);
             ImageView?.Destroy(GraphicsDevice);
             ImageMemory?.FreeMemory(GraphicsDevice);
+        }
+        
+        static ulong CalculateTextureSize(uint width, uint height, uint depth, uint mipLevels, uint blockSize)
+        {
+            ulong totalSize = 0;
+
+            for (uint level = 0; level < mipLevels; level++)
+            {
+                uint mipWidth = Math.Max(1u, width >> (int)level);
+                uint mipHeight = Math.Max(1u, height >> (int)level);
+                uint mipDepth = Math.Max(1u, depth >> (int)level);
+
+                ulong levelSize = (ulong)(mipWidth * mipHeight * mipDepth) * blockSize;
+                totalSize += levelSize;
+            }
+
+            return totalSize;
         }
     }
 }

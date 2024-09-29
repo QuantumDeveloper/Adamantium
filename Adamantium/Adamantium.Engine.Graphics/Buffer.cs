@@ -6,6 +6,21 @@ using VulkanBuffer = AdamantiumVulkan.Core.Buffer;
 
 namespace Adamantium.Engine.Graphics
 {
+    /*
+    Member VMA_ALLOCATION_CREATE_USER_DATA_COPY_STRING_BIT
+    Preserved for backward compatibility. Consider using vmaSetAllocationName() instead.
+    Member VMA_MEMORY_USAGE_CPU_COPY
+    Obsolete, preserved for backward compatibility. Prefers not VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT.
+    Member VMA_MEMORY_USAGE_CPU_ONLY
+    Obsolete, preserved for backward compatibility. Guarantees VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT and VK_MEMORY_PROPERTY_HOST_COHERENT_BIT.
+    Member VMA_MEMORY_USAGE_CPU_TO_GPU
+    Obsolete, preserved for backward compatibility. Guarantees VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, prefers VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT.
+    Member VMA_MEMORY_USAGE_GPU_ONLY
+    Obsolete, preserved for backward compatibility. Prefers VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT.
+    Member VMA_MEMORY_USAGE_GPU_TO_CPU
+    Obsolete, preserved for backward compatibility. Guarantees VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, prefers VK_MEMORY_PROPERTY_HOST_CACHED_BIT.
+    */
+    
     public partial class Buffer : GraphicsResource
     {
         private VulkanBuffer VulkanBuffer;
@@ -128,7 +143,7 @@ namespace Adamantium.Engine.Graphics
 
             MemoryAllocateInfo allocInfo = new MemoryAllocateInfo();
             allocInfo.AllocationSize = memoryRequirements.Size;
-            allocInfo.MemoryTypeIndex = GraphicsDevice.VulkanInstance.CurrentDevice.FindMemoryIndex(memoryRequirements.MemoryTypeBits, memoryProperties);
+            allocInfo.MemoryTypeIndex = GraphicsDevice.VulkanInstance.MainGraphicsAdapter.Adapter.FindMemoryIndex(memoryRequirements.MemoryTypeBits, memoryProperties);
 
             bufferMemory = GraphicsDevice.LogicalDevice.AllocateMemory(allocInfo);
 
@@ -227,8 +242,18 @@ namespace Adamantium.Engine.Graphics
             if (toData.Size > TotalSize)
                 throw new ArgumentException("Length of TData is larger than size of buffer");
 
-            var data = GraphicsDevice.MapMemory(BufferMemory, 0, (ulong)toData.Size, 0);
+            var data = GraphicsDevice.MapMemory(BufferMemory, 0, toData.Size, 0);
             System.Buffer.MemoryCopy(data, toData.Pointer.ToPointer(), toData.Size, toData.Size);
+            GraphicsDevice.UnmapMemory(BufferMemory);
+        }
+
+        public unsafe void* MapMemory()
+        {
+            return GraphicsDevice.MapMemory(BufferMemory, 0, TotalSize, 0);
+        }
+
+        public void UnmapMemory()
+        {
             GraphicsDevice.UnmapMemory(BufferMemory);
         }
 
@@ -361,6 +386,14 @@ namespace Adamantium.Engine.Graphics
                 throw new ArgumentException("Size of data to upload + offset is larger than size of buffer");
 
             UpdateBufferContent(BufferMemory, fromData, offsetInBytes);
+        }
+        
+        public UInt64 GetDeviceAddress()
+        {
+            var bufferDeviceAddressInfo = new BufferDeviceAddressInfo();
+            bufferDeviceAddressInfo.SType  = StructureType.BufferDeviceAddressInfo;
+            bufferDeviceAddressInfo.Buffer = VulkanBuffer;
+            return GraphicsDevice.LogicalDevice.GetBufferDeviceAddress(bufferDeviceAddressInfo);
         }
 
         /// <summary>

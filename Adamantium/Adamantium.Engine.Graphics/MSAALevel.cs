@@ -1,6 +1,6 @@
 ﻿namespace Adamantium.Engine.Graphics
 {
-   public enum MSAALevel
+   public enum MSAALevel : uint
    {
         None = 1,
         X2 = 2,
