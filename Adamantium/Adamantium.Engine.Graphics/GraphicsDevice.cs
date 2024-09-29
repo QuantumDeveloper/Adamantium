@@ -11,6 +11,7 @@ using Adamantium.Mathematics;
 using AdamantiumVulkan.Core;
 using Semaphore = AdamantiumVulkan.Core.Semaphore;
 using Adamantium.Engine.Graphics.Effects.Generated;
+using AdamantiumVulkan.Core.Interop;
 using Serilog;
 using Exception = System.Exception;
 using Image = AdamantiumVulkan.Core.Image;
@@ -40,9 +41,13 @@ namespace Adamantium.Engine.Graphics
         private PrimitiveTopology primitiveTopology;
         private EffectPass currentEffectPass;
         
+        // -- Drawing States
+        
         private TrackingCollection<Viewport> viewports;
         private TrackingCollection<Rect2D> scissors;
         private TrackingCollection<DynamicState> dynamicStates;
+        
+        // --- End of drawing states
 
         private RenderTarget renderTarget;
         private DepthStencilBuffer depthBuffer;
@@ -191,7 +196,6 @@ namespace Adamantium.Engine.Graphics
         
         public bool EnableDynamicRendering { get; private set; }
 
-        //public CommandPool CommandPool => MainDevice.GraphicsCommandPool;
         public CommandPool CommandPool { get; private set; }
         internal Semaphore[] ImageAvailableSemaphores { get; private set; }
         internal Semaphore[] RenderFinishedSemaphores { get; private set; }
@@ -269,6 +273,8 @@ namespace Adamantium.Engine.Graphics
                 }
             }
         }
+        
+        
 
         public RenderPass RenderPass
         {
@@ -290,7 +296,6 @@ namespace Adamantium.Engine.Graphics
             {
                 if (SetProperty(ref vertexType, value))
                 {
-                    vertexType = value;
                     ShouldChangeGraphicsPipeline = true;
                 }
             } 
@@ -303,11 +308,49 @@ namespace Adamantium.Engine.Graphics
             {
                 if (SetProperty(ref primitiveTopology, value))
                 {
-                    primitiveTopology = value;
                     ShouldChangeGraphicsPipeline = true;
                 }
             }
         }
+        
+        public bool RasterizerDiscardEnabled { get; set; }
+        
+        public VkColorBlendEquationEXT ColorBlendEquationExt { get; set; }
+        
+        public bool PrimitiveRestartEnable { get; set; }
+        
+        public MSAALevel RasterizationSamples { get; set; }
+
+        public uint SampleMask => (uint)RasterizationSamples;
+        
+        public bool AlphaToCoverageEnable { get; set; }
+        
+        public bool IsWireFrame { get; set; }
+
+        public Single LineWidth { get; set; } = 1.0f;
+
+        public FrontFace FrontFace { get; set; } = FrontFace.Clockwise;
+
+        public bool DepthTestEnabled { get; set; } = true;
+        
+        public CompareOp DepthCompareFunction { get; set; }
+
+        public bool DepthBoundsTestEnabled { get; set; } = false;
+        
+        public bool DepthBiasEnabled { get; set; } = false;
+        
+        public bool StencilTestEnabled { get; set; } = false;
+        
+        public bool LogicOperationsEnabled { get; set; } = false;
+        
+        public LogicOp LogicOperation { get; set; }
+        
+        public bool ColorBlendEnabled { get; set; } = true;
+
+        public ColorComponentFlagBits ColorComponentFlags { get; set; } = ColorComponentFlagBits.RBit |
+                                                                          ColorComponentFlagBits.GBit |
+                                                                          ColorComponentFlagBits.BBit |
+                                                                          ColorComponentFlagBits.ABit;
 
         public EffectPass CurrentEffectPass
         {
@@ -316,7 +359,6 @@ namespace Adamantium.Engine.Graphics
             {
                 if (SetProperty(ref currentEffectPass, value))
                 {
-                    currentEffectPass = value;
                     ShouldChangeGraphicsPipeline = true;
                 }
             }
@@ -421,6 +463,11 @@ namespace Adamantium.Engine.Graphics
         public RenderPass CreateRenderPass(RenderPassCreateInfo createInfo)
         {
             return LogicalDevice.CreateRenderPass(createInfo);
+        }
+
+        public uint AlignSize(uint size, uint alignment)
+        {
+            return (size + alignment - 1) & ~(alignment - 1);
         }
 
         public DescriptorPool CreateDescriptorPool(DescriptorPoolCreateInfo info)
@@ -842,7 +889,7 @@ namespace Adamantium.Engine.Graphics
             _submissionSync?.Wait();
             
             //Log.Logger.Debug($"Enter Submit for device {DeviceId}");
-            
+
             var commandBuffer = CurrentCommandBuffer;
             var result = commandBuffer.EndCommandBuffer();
             // unsafe
@@ -869,7 +916,6 @@ namespace Adamantium.Engine.Graphics
             // }
             
             commandBuffersArray[0] = CurrentCommandBuffer;
-
             var submitInfo = new SubmitInfo();
 
             if (Presenter is SwapChainGraphicsPresenter)
@@ -981,6 +1027,16 @@ namespace Adamantium.Engine.Graphics
             commandBuffer.BindIndexBuffer(indexBuffer, 0, IndexType.Uint32);
         }
 
+        private void SetDrawingState(CommandBuffer commandBuffer)
+        {
+            commandBuffer.SetViewportWithCountEXT((uint)viewports.Count, viewports);
+            commandBuffer.SetScissorWithCountEXT((uint)viewports.Count, scissors);
+            
+            var bindingDescription = VertexUtils.GetBindingDescription2(VertexType);
+            var attributes = VertexUtils.GetVertexAttributeDescription2(VertexType);
+            commandBuffer.SetVertexInputEXT(1, bindingDescription, (uint)attributes.Length, attributes);
+        }
+
         public void Draw(ulong vertexCount, uint instanceCount, uint firstVertex = 0, uint firstInstance = 0)
         {
             Draw((uint)vertexCount, instanceCount, firstVertex, firstInstance);
@@ -994,19 +1050,21 @@ namespace Adamantium.Engine.Graphics
             }
             
             var commandBuffer = commandBuffers[ImageIndex];
-            var pipeline = pipelineManager.GetOrCreateGraphicsPipeline(this);
+            SetDrawingState(commandBuffer);
+            
+            //var pipeline = pipelineManager.GetOrCreateGraphicsPipeline(this);
 
-            ShouldChangeGraphicsPipeline = false;
+            //ShouldChangeGraphicsPipeline = false;
 
-            commandBuffer.BindPipeline(pipeline.BindPoint, pipeline);
-            commandBuffer.BindDescriptorSets(
-                PipelineBindPoint.Graphics, 
-                CurrentEffectPass.PipelineLayout, 
-                0, 
-                1, 
-                CurrentEffectPass.CurrentDescriptors[(int) ImageIndex], 
-                0, 
-                0);
+            // commandBuffer.BindPipeline(pipeline.BindPoint, pipeline);
+            // commandBuffer.BindDescriptorSets(
+            //     PipelineBindPoint.Graphics, 
+            //     CurrentEffectPass.PipelineLayout, 
+            //     0, 
+            //     1, 
+            //     CurrentEffectPass.CurrentDescriptors[(int) ImageIndex], 
+            //     0, 
+            //     0);
 
             commandBuffer.Draw(vertexCount, instanceCount, firstVertex, firstInstance);
         }
@@ -1015,24 +1073,26 @@ namespace Adamantium.Engine.Graphics
         {
             ulong offset = 0;
             var commandBuffer = commandBuffers[ImageIndex];
+            
+            SetDrawingState(commandBuffer);
 
-            if (ShouldChangeGraphicsPipeline)
-            {
-                var pipeline = pipelineManager.GetOrCreateGraphicsPipeline(this);
+            // if (ShouldChangeGraphicsPipeline)
+            // {
+            //     var pipeline = pipelineManager.GetOrCreateGraphicsPipeline(this);
+            //
+            //     ShouldChangeGraphicsPipeline = false;
+            //
+            //     commandBuffer.BindPipeline(pipeline.BindPoint, pipeline);
+            // }
 
-                ShouldChangeGraphicsPipeline = false;
-
-                commandBuffer.BindPipeline(pipeline.BindPoint, pipeline);
-            }
-
-            commandBuffer.BindDescriptorSets(
-                PipelineBindPoint.Graphics,
-                CurrentEffectPass.PipelineLayout,
-                0,
-                1,
-                CurrentEffectPass.CurrentDescriptors[(int) ImageIndex],
-                0,
-                0);
+            // commandBuffer.BindDescriptorSets(
+            //     PipelineBindPoint.Graphics,
+            //     CurrentEffectPass.PipelineLayout,
+            //     0,
+            //     1,
+            //     CurrentEffectPass.CurrentDescriptors[(int) ImageIndex],
+            //     0,
+            //     0);
 
             commandBuffer.BindVertexBuffers(0, 1, vertexBuffer, offset);
 

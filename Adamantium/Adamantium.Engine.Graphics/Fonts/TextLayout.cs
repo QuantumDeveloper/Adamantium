@@ -228,7 +228,7 @@ public class TextLayout : DisposableObject
                             fontSize,
                             scale);
 
-                        cursorPosition += Math.Ceiling(glyph.AdvanceWidth * scale);
+                        cursorPosition += glyph.AdvanceWidth * scale;
                         
                         glyphsData.Add(new GlyphWordData(glyph, symbol, glyphRect, i, lineIndex));
 
@@ -352,19 +352,19 @@ public class TextLayout : DisposableObject
                         if (glyphsForLine.Length == 0) break;
                         
                         var lineWidth = glyphsForLine.Take(glyphsForLine.Length - 1).Sum(x => x.Rect.Width);
-                        var diff = Math.Floor((finalRect.Width - lineWidth) / (glyphsForLine.Length - 1));
+                        var diff = (finalRect.Width - lineWidth) / (glyphsForLine.Length - 1);
                         var cursor = 0;
 
                         int cnt = 0;
                         foreach (var glyphWordData in glyphsForLine)
                         {
-                            var leftSideBearing = (int)Math.Floor(glyphWordData.Glyph.LeftSideBearing * scale);
+                            var leftSideBearing = glyphWordData.Glyph.LeftSideBearing * scale;
                             if (cnt == 0)
                             {
                                 leftSideBearing = 0;
                             }
                             var rect = glyphWordData.Rect;
-                            rect.X = cursor + leftSideBearing;
+                            rect.X = (float)(cursor + leftSideBearing);
                             glyphWordData.Rect = rect;
                             cursor = (int)(rect.Right + diff);
                             cnt++;
@@ -399,7 +399,7 @@ public class TextLayout : DisposableObject
             for (int k = glyphsDataCopy.Length - 1; k >= 0; k--)
             {
                 var data = glyphsData[k];
-                cursorPosition -= Math.Ceiling(data.Glyph.AdvanceWidth * scale);
+                cursorPosition -= data.Glyph.AdvanceWidth * scale;
                 var wordsLeft = glyphsDataCopy.Take(k).Count(x => x.Symbol == ' ') + 1;
                 rearrangeList.Add(data);
                 if (wordIndex > 0 && 
@@ -440,7 +440,7 @@ public class TextLayout : DisposableObject
 
                 glyphData.Rect = glyphRect;
                 glyphData.LineIndex = lineIndex;
-                cursorPosition += Math.Ceiling(glyphData.Glyph.AdvanceWidth * scale);
+                cursorPosition += glyphData.Glyph.AdvanceWidth * scale;
             }
         }
 
@@ -449,7 +449,7 @@ public class TextLayout : DisposableObject
             for (int k = glyphsDataCopy.Length - 1; k >= 0; k--)
             {
                 var data = glyphsData[k];
-                cursorPosition -= Math.Ceiling(data.Glyph.AdvanceWidth * scale);
+                cursorPosition -= data.Glyph.AdvanceWidth * scale;
                 glyphsData.RemoveAt(k);
                 if (renderingParameters.TextTrimming == TextTrimming.None &&
                     cursorPosition <= textArea.Width)
@@ -498,7 +498,7 @@ public class TextLayout : DisposableObject
                     scale);
                 glyphsData.Add(new GlyphWordData(dotGlyph, '.', glyphRect, -1, lineIndex));
 
-                cursorPosition += Math.Ceiling(dotGlyph.AdvanceWidth * scale);
+                cursorPosition += dotGlyph.AdvanceWidth * scale;
             }
         }
     }
@@ -542,7 +542,7 @@ public class TextLayout : DisposableObject
         double wordWidth = 0;
         for (int k = 0; k < wordGlyphs.Length; ++k)
         {
-            wordWidth += Math.Ceiling(wordGlyphs[k].BoundingRectangle.Width * scale);
+            wordWidth += wordGlyphs[k].BoundingRectangle.Width * scale;
         }
 
         return wordWidth;
@@ -568,9 +568,9 @@ public class TextLayout : DisposableObject
         var verticalShift = -glyph.BoundingRectangle.Y * scale;
         var horizontalShift = glyph.LeftSideBearing * scale;
 
-        var glyphWidth = Math.Ceiling(glyph.BoundingRectangle.Width * scale);
-        var glyphHeight = Math.Ceiling(glyph.BoundingRectangle.Height * scale);
-        var glyphTop = Math.Ceiling((glyphBase - glyphHeight) + verticalShift);
+        var glyphWidth = glyph.BoundingRectangle.Width * scale;
+        var glyphHeight = glyph.BoundingRectangle.Height * scale;
+        var glyphTop = (glyphBase - glyphHeight) + verticalShift;
         if (position > 0)
         {
             glyphLeft += horizontalShift;
@@ -579,7 +579,7 @@ public class TextLayout : DisposableObject
         // if GPOS kern is applied - modify the advance for current glyph
         if (kernApplied && position > 0)
         {
-            glyphLeft += fontSize * layoutContainer.GetAdvance((uint)position).X * scale;
+            //glyphLeft += fontSize * layoutContainer.GetAdvance((uint)position).X * scale;
         }
 
         return new Rectangle((int)glyphLeft, (int)glyphTop, (int)glyphWidth, (int)glyphHeight);

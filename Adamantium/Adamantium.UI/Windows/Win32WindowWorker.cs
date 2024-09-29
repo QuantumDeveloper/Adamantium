@@ -352,7 +352,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
             var tm = new TRACKMOUSEEVENT
             {
                 cbSize = Marshal.SizeOf(typeof(TRACKMOUSEEVENT)),
-                dwFlags = 2,
+                dwFlags = 2, // we are tracking only MouseLease event
                 hwndTrack = window.Handle,
                 dwHoverTime = 0,
             };

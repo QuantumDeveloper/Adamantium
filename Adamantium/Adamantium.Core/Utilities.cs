@@ -15,7 +15,7 @@ namespace Adamantium.Core
         public static unsafe void FreeMemory(IntPtr pointer)
         {
             if (pointer == IntPtr.Zero) return;
-            Marshal.FreeHGlobal(((IntPtr*)pointer)[-1]);
+            Marshal.FreeHGlobal(pointer);
         }
 
         public static unsafe void ClearMemory(ref IntPtr dest, byte value, int sizeInBytesToClear)
@@ -41,13 +41,13 @@ namespace Adamantium.Core
             return new IntPtr(ptr);
         }
 #endif
-        public static unsafe IntPtr AllocateMemory(int sizeInBytes, int align = 1)
+        public static IntPtr AllocateMemory(int sizeInBytes, int align = 1)
         {
-            int mask = align - 1;
-            var memPtr = Marshal.AllocHGlobal(sizeInBytes + mask + IntPtr.Size);
-            var ptr = (long)((byte*)memPtr + sizeof(void*) + mask) & ~mask;
-            ((IntPtr*)ptr)[-1] = memPtr;
-            return new IntPtr((void*)ptr);
+            var allocatedMemory = Marshal.AllocHGlobal(sizeInBytes + align);
+            long baseAddress = allocatedMemory.ToInt64();
+            // align pointer
+            long alignedAddress = (baseAddress + align - 1) & ~(align - 1);
+            return new IntPtr(alignedAddress);
         }
 
         public static byte[] ReadStream(Stream stream)
@@ -116,6 +116,7 @@ namespace Adamantium.Core
             IntPtr source = AllocateMemory(SizeOf<T>());
             Marshal.StructureToPtr(value, source, false);
             CopyMemory(destination, source, size);
+            Marshal.FreeHGlobal(source);
         }
 
         public static IntPtr Write<T>(IntPtr destination, T[] data, int offset, int count) where T : struct

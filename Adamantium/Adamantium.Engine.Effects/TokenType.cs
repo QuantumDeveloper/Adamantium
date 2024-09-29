@@ -111,6 +111,16 @@
         Decrement,
 
         /// <summary>
+        /// A '+'.
+        /// </summary>
+        Plus,
+
+        /// <summary>
+        /// A '-'.
+        /// </summary>
+        Minus,
+
+        /// <summary>
         /// A '*'.
         /// </summary>
         Multiply,

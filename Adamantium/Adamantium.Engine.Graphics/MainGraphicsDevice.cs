@@ -27,7 +27,7 @@ namespace Adamantium.Engine.Graphics
         public bool EnableDynamicRendering { get; }
         public VulkanInstance VulkanInstance { get; private set; }
         
-        public PhysicalDevice PhysicalDevice { get; private set; }
+        public GraphicsAdapter GraphicsAdapter { get; private set; }
         
         public GraphicsDevice ResourceLoaderDevice { get; set; }
         
@@ -55,7 +55,7 @@ namespace Adamantium.Engine.Graphics
             deviceExt.Add(Constants.VK_KHR_SWAPCHAIN_EXTENSION_NAME);
             deviceExt.Add(Constants.VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
             //deviceExt.Add(Constants.VK_GOOGLE_HLSL_FUNCTIONALITY_1_EXTENSION_NAME);
-            //deviceExt.Add(Constants.VK_GOOGLE_USER_TYPE_EXTENSION_NAME);
+            deviceExt.Add(Constants.VK_GOOGLE_USER_TYPE_EXTENSION_NAME);
             deviceExt.Add(Constants.VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
             deviceExt.Add(Constants.VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
             deviceExt.Add(Constants.VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
@@ -75,8 +75,8 @@ namespace Adamantium.Engine.Graphics
             UsedGraphicsQueues = new Dictionary<uint, Queue>();
             EnableDynamicRendering = enableDynamicRendering;
             VulkanInstance = VulkanInstance.Create(name, enableDebug);
-            PhysicalDevice = VulkanInstance.CurrentDevice;
-            QueueFamilyContainer = PhysicalDevice.FindQueueFamilies();
+            GraphicsAdapter = VulkanInstance.MainGraphicsAdapter;
+            QueueFamilyContainer = GraphicsAdapter.Adapter.FindQueueFamilies();
             CreateLogicalDevice();
             unsafe
             {
@@ -125,7 +125,7 @@ namespace Adamantium.Engine.Graphics
         private unsafe void CreateLogicalDevice()
         {
             float queuePriority = 1.0f;
-            var queueFamilies = PhysicalDevice.GetQueueFamilyProperties();
+            var queueFamilies = GraphicsAdapter.Adapter.GetQueueFamilyProperties();
 
             for (int i = 0; i < queueFamilies.Length; ++i)
             {
@@ -149,15 +149,15 @@ namespace Adamantium.Engine.Graphics
             queueCreateInfo.PQueuePriorities = queuePriority;
             queueInfos.Add(queueCreateInfo);
 
-            var deviceFeatures = PhysicalDevice.GetPhysicalDeviceFeatures();
+            var deviceFeatures = GraphicsAdapter.Adapter.GetPhysicalDeviceFeatures();
             deviceFeatures.SamplerAnisotropy = true;
             deviceFeatures.SampleRateShading = true;
             
             // enumerate all available device extensions
             uint propCount = 0;
-            PhysicalDevice.EnumerateDeviceExtensionProperties(null, ref propCount, null);
+            GraphicsAdapter.Adapter.EnumerateDeviceExtensionProperties(null, ref propCount, null);
             var supportedDeviceExtensions = new ExtensionProperties[propCount];
-            PhysicalDevice.EnumerateDeviceExtensionProperties(null, ref propCount, supportedDeviceExtensions);
+            GraphicsAdapter.Adapter.EnumerateDeviceExtensionProperties(null, ref propCount, supportedDeviceExtensions);
 
             var availableDeviceExtensions = supportedDeviceExtensions.Select(x => x.ExtensionName).ToArray();
             var finalDeviceExtensions = new List<string>();
@@ -169,86 +169,63 @@ namespace Adamantium.Engine.Graphics
                 }
             }
 
+            var maintenance4Features = new PhysicalDeviceMaintenance4Features();
+            maintenance4Features.SType = StructureType.PhysicalDeviceMaintenance4Features;
+            maintenance4Features.Maintenance4 = VkBool32.TRUE;
+            
+            var bufferDeviceAddressFeature = new PhysicalDeviceBufferDeviceAddressFeatures();
+            bufferDeviceAddressFeature.SType = StructureType.PhysicalDeviceBufferDeviceAddressFeaturesExt;
+            bufferDeviceAddressFeature.BufferDeviceAddress = true;
+            bufferDeviceAddressFeature.PNext = NativeUtils.StructOrEnumToPointer(maintenance4Features.ToNative());
+
+            var descriptorBufferFeature = new PhysicalDeviceDescriptorBufferFeaturesEXT();
+            descriptorBufferFeature.SType = StructureType.PhysicalDeviceDescriptorBufferFeaturesExt;
+            descriptorBufferFeature.DescriptorBuffer = true;
+            descriptorBufferFeature.PNext = NativeUtils.StructOrEnumToPointer(bufferDeviceAddressFeature.ToNative());
+            
+            var vulkan11Features = new PhysicalDeviceVulkan11Features();
+            vulkan11Features.PNext = NativeUtils.StructOrEnumToPointer(descriptorBufferFeature.ToNative());
+            
+            var vulkan12Features = new PhysicalDeviceVulkan12Features();
+            vulkan12Features.SamplerMirrorClampToEdge = true;
+            vulkan12Features.PNext = NativeUtils.StructOrEnumToPointer(vulkan11Features.ToNative());
+                
+            var features2 = new PhysicalDeviceFeatures2();
+            features2.Features = new PhysicalDeviceFeatures
+            {
+                SamplerAnisotropy = VkBool32.TRUE,
+                SampleRateShading = VkBool32.TRUE,
+                GeometryShader = true
+            };
+            features2.PNext = NativeUtils.StructOrEnumToPointer(vulkan12Features.ToNative());
+            
             var createInfo = new DeviceCreateInfo();
             createInfo.QueueCreateInfoCount = (uint)queueInfos.Count;
             createInfo.PQueueCreateInfos = queueInfos.ToArray();
             createInfo.EnabledExtensionCount = (uint)finalDeviceExtensions.Count;
             createInfo.PEnabledExtensionNames = finalDeviceExtensions.ToArray();
-
-            var maintenance4Features = new PhysicalDeviceMaintenance4Features();
-            maintenance4Features.SType = StructureType.PhysicalDeviceMaintenance4Features;
-            maintenance4Features.Maintenance4 = VkBool32.TRUE;
             
             if (EnableDynamicRendering)
             {
                 var dynamicRendering = new PhysicalDeviceDynamicRenderingFeatures();
                 dynamicRendering.DynamicRendering = VkBool32.TRUE;
-
-                var vulkan12Features = new PhysicalDeviceVulkan12Features();
-                vulkan12Features.SamplerMirrorClampToEdge = true;
-                var dynamicRenderingPtr = NativeUtils.StructOrEnumToPointer(dynamicRendering.ToNative());
-                vulkan12Features.PNext = dynamicRenderingPtr;
-                
-                var vulkan11Features = new PhysicalDeviceVulkan11Features();
-                var vulkan12FeaturesPtr = NativeUtils.StructOrEnumToPointer(vulkan12Features.ToNative());
-                vulkan11Features.PNext = vulkan12FeaturesPtr;
-
-                var features2 = new PhysicalDeviceFeatures2();
-                features2.Features = new PhysicalDeviceFeatures
-                {
-                    SamplerAnisotropy = VkBool32.TRUE,
-                    SampleRateShading = VkBool32.TRUE,
-                    GeometryShader = true
-                };
-
-                var vulkan11FeaturesPtr = NativeUtils.StructOrEnumToPointer(vulkan11Features.ToNative());
-                features2.PNext = vulkan11FeaturesPtr;
-
-                var features2Ptr = NativeUtils.StructOrEnumToPointer(features2.ToNative());
-
-                maintenance4Features.PNext = features2Ptr;
-                var maintenance4FeaturesPtr = NativeUtils.StructOrEnumToPointer(maintenance4Features.ToNative());
+                dynamicRendering.PNext = NativeUtils.StructOrEnumToPointer(features2.ToNative());
 
                 if (finalDeviceExtensions.Contains(Constants.VK_EXT_SHADER_OBJECT_EXTENSION_NAME))
                 {
                     var shaderObjectFeatures = new PhysicalDeviceShaderObjectFeaturesEXT();
                     shaderObjectFeatures.ShaderObject = true;
-                    shaderObjectFeatures.PNext = maintenance4FeaturesPtr;
-                    var shaderObjectPtr = NativeUtils.StructOrEnumToPointer(shaderObjectFeatures.ToNative());
-                    createInfo.PNext = shaderObjectPtr;
+                    shaderObjectFeatures.PNext = NativeUtils.StructOrEnumToPointer(dynamicRendering.ToNative());;
+                    createInfo.PNext = NativeUtils.StructOrEnumToPointer(shaderObjectFeatures.ToNative());
                 }
                 else
                 {
-                    createInfo.PNext = maintenance4FeaturesPtr;
+                    createInfo.PNext = NativeUtils.StructOrEnumToPointer(dynamicRendering.ToNative());
                 }
             }
             else
             {
-                var maintenance4FeaturesPtr = NativeUtils.StructOrEnumToPointer(maintenance4Features.ToNative());
-                
-                var vulkan12Features = new PhysicalDeviceVulkan12Features();
-                vulkan12Features.SamplerMirrorClampToEdge = true;
-                vulkan12Features.PNext = maintenance4FeaturesPtr;
-                
-                var vulkan11Features = new PhysicalDeviceVulkan11Features();
-                var vulkan12FeaturesPtr = NativeUtils.StructOrEnumToPointer(vulkan12Features.ToNative());
-                vulkan11Features.PNext = vulkan12FeaturesPtr;
-
-                var features2 = new PhysicalDeviceFeatures2();
-                features2.Features = new PhysicalDeviceFeatures
-                {
-                    SamplerAnisotropy = VkBool32.TRUE,
-                    SampleRateShading = VkBool32.TRUE,
-                    GeometryShader = true
-                };
-
-                var vulkan11FeaturesPtr = NativeUtils.StructOrEnumToPointer(vulkan11Features.ToNative());
-                features2.PNext = vulkan11FeaturesPtr;
-
-                var features2Ptr = NativeUtils.StructOrEnumToPointer(features2.ToNative());
-                
-                createInfo.PNext = features2Ptr;
-                createInfo.PEnabledFeatures = deviceFeatures;
+                createInfo.PNext = NativeUtils.StructOrEnumToPointer(features2.ToNative());
             }
 
             if (VulkanInstance.IsInDebugMode)
@@ -258,8 +235,8 @@ namespace Adamantium.Engine.Graphics
             }
 
             MaxFramesInFlight = 3;
-            LogicalDevice = PhysicalDevice.CreateDevice(createInfo);
-            LogicalDevice.InitShaderObjectExtension();
+            LogicalDevice = GraphicsAdapter.Adapter.CreateDevice(createInfo);
+            LogicalDevice.InitializeExtensions();
             var fenceInfo = new FenceCreateInfo();
             fenceInfo.Flags = FenceCreateFlagBits.SignaledBit;
             InFlightFences ??= LogicalDevice.CreateFences(fenceInfo, MaxFramesInFlight);
@@ -369,7 +346,7 @@ namespace Adamantium.Engine.Graphics
 
         public static implicit operator PhysicalDevice(MainGraphicsDevice device)
         {
-            return device.PhysicalDevice;
+            return device.GraphicsAdapter;
         }
 
         protected override void Dispose(bool disposeManaged)

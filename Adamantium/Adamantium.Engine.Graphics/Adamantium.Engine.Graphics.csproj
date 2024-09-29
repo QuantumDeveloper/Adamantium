@@ -9,11 +9,12 @@
 		<BaseOutputPath>..\..\output\Adamantium.Engine.Graphics\bin</BaseOutputPath>
 		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
 		<CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
+		<OutputType>Library</OutputType>
 	</PropertyGroup>
 
-<!--	<ItemGroup>-->
-<!--		<ProjectReference Include="..\Adamantium.Engine.Generators\Adamantium.Engine.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />-->
-<!--	</ItemGroup>-->
+	<!--<ItemGroup>
+		<ProjectReference Include="..\Adamantium.Engine.Generators\Adamantium.Engine.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+	</ItemGroup>-->
 
 	<ItemGroup>
 		<ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.Core\AdamantiumVulkan.Core.csproj" />

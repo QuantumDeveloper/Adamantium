@@ -19,6 +19,11 @@ namespace Adamantium.Engine.Graphics
             {
                 return Buffer.New(device, size, BufferUsageFlags.UniformBuffer, MemoryFlags);
             }
+            
+            public static Buffer New(GraphicsDevice device, ulong size, BufferUsageFlags usageFlags)
+            {
+                return Buffer.New(device, size, usageFlags | BufferUsageFlags.UniformBuffer, MemoryFlags);
+            }
 
             /// <summary>
             /// Creates a new index buffer with <see cref="MemoryPropertyFlags.Immutable"/> memoryFlags by default.

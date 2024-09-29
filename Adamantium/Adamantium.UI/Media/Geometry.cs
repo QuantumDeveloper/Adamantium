@@ -103,4 +103,9 @@ public abstract class Geometry : AdamantiumComponent
    }
 
    public static Geometry Parse(string xamlString) => new SVGParser().Parse(xamlString); 
+   
+   public static CombinedGeometry Combine(Geometry geometry1, Geometry geometry2, GeometryCombineMode combineMode, Transform transform = null)
+   {
+      return new CombinedGeometry(){Geometry1 = geometry1, Geometry2 = geometry2, GeometryCombineMode = combineMode, Transform = transform};
+   }
 }

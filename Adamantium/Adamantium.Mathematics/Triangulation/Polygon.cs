@@ -181,6 +181,7 @@ namespace Adamantium.Mathematics.Triangulation
             if (localContourContainers.Count == 1 && localContourContainers[0].Contours.Count == 1)
             {
                 contourList.Add(localContourContainers[0].Contours[0]);
+                localContourContainers.Clear();
                 return contourList;
             }
 

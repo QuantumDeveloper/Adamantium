@@ -6,7 +6,7 @@ using Buffer = Adamantium.Engine.Graphics.Buffer;
 
 namespace Adamantium.EntityFramework.Components
 {
-    [RequiredComponets(typeof(MeshData))]
+    [RequiredComponent(typeof(MeshData))]
     public abstract class MeshRendererBase : RenderComponent
     {
         private bool isWireFrame;

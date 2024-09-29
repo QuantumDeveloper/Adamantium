@@ -190,7 +190,7 @@ public class RenderTargetPanel: Grid
          {
             Handle = new IntPtr(_currentRenderTarget.NativePointer);
          }
-
+      
          context.AddImage(_currentRenderTarget);
       }
       else

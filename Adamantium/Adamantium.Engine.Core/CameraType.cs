@@ -35,9 +35,7 @@ namespace Adamantium.Engine.Core
 
         public Boolean IsThirdPerson()
         {
-            if (Value == CameraClass.ThirdPersonFree ||
-                Value == CameraClass.ThirdPersonFreeAlt ||
-                Value == CameraClass.ThirdPersonLocked)
+            if (Value is CameraClass.ThirdPersonFree or CameraClass.ThirdPersonFreeAlt or CameraClass.ThirdPersonLocked)
             {
                 return true;
             }

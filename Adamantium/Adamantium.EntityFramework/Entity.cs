@@ -166,7 +166,7 @@ namespace Adamantium.EntityFramework
             if (component == null)
             {
                 component = new T();
-                componentCollection.Add(component);
+                AddComponent(component);
             }
 
             return component;
@@ -184,44 +184,41 @@ namespace Adamantium.EntityFramework
                 if (ContainsComponent(component.GetType()) || componentCollection.Contains(component))
                     return;
 
-                if (component is IInitializable initializable)
+                var customAttribute = component.GetType().GetCustomAttributes(typeof(RequiredComponentAttribute), true);
+                foreach (RequiredComponentAttribute attribute in customAttribute)
                 {
-                    pendingComponents.Add(initializable);
-                }
-                else
-                {
-                    componentCollection.Add(component);
-                }
-
-                var customAttribute = component.GetType().GetCustomAttributes(typeof(RequiredComponetsAttribute), true);
-                foreach (RequiredComponetsAttribute attribute in customAttribute)
-                {
-                    var types = attribute.Components;
-                    foreach (var type in types)
+                    if (!ContainsComponent(attribute.Component))
                     {
-                        if (!ContainsComponent(type))
+                        var required = (IComponent)Activator.CreateInstance(attribute.Component);
+                        if (required is IEntityOwner entityOwner)
                         {
-                            var required = (IComponent)Activator.CreateInstance(type);
-                            if (required is IEntityOwner entityOwner)
-                            {
-                                entityOwner.Owner = this;
-                            }
+                            entityOwner.Owner = this;
+                        }
 
-                            if (required is IInitializable init)
-                            {
-                                pendingComponents.Add(init);
-                            }
+                        if (required is IInitializable init)
+                        {
+                            pendingComponents.Add(init);
+                        }
+                        else
+                        {
+                            componentCollection.Add(required);
                         }
                     }
                 }
 
                 foreach (var pendingComponent in pendingComponents)
                 {
-                    pendingComponent.Initialize();
                     if (pendingComponent is IComponent pending)
                     {
                         componentCollection.Add(pending);
                     }
+                    pendingComponent.Initialize();
+                }
+
+                componentCollection.Add(component);
+                if (component is IInitializable initializable)
+                {
+                    initializable.Initialize();
                 }
                 pendingComponents.Clear();
             }
@@ -318,7 +315,7 @@ namespace Adamantium.EntityFramework
             while (stack.Count > 0)
             {
                 Entity current = stack.Pop();
-                if (ignoreDisabled || !current.IsEnabled) continue;
+                if (ignoreDisabled && !current.IsEnabled) continue;
                 action(current);
 
                 foreach (var t in current.Dependencies)
@@ -335,7 +332,7 @@ namespace Adamantium.EntityFramework
             while (queue.Count > 0)
             {
                 Entity current = queue.Dequeue();
-                if (ignoreDisabled && current.IsEnabled)
+                if (ignoreDisabled && !current.IsEnabled)
                 {
                     action(current);
 

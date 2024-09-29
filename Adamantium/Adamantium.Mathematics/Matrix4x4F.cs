@@ -1954,6 +1954,34 @@ namespace Adamantium.Mathematics
             BillboardRH(ref objectPosition, ref cameraPosition, ref cameraUpVector, ref cameraForwardVector, out result);
             return result;
         }
+        
+        public static Matrix4x4F BillboardForOrthoProjection(Vector3F position, Vector3F cameraUp, Vector3F cameraRight, Vector3F cameraForward)
+        {
+            Matrix4x4F billboardMatrix = new Matrix4x4F
+            {
+                M11 = cameraRight.X,
+                M12 = cameraRight.Y,
+                M13 = cameraRight.Z,
+                M14 = 0.0f,
+
+                M21 = cameraUp.X,
+                M22 = cameraUp.Y,
+                M23 = cameraUp.Z,
+                M24 = 0.0f,
+
+                M31 = cameraForward.X,
+                M32 = cameraForward.Y,
+                M33 = cameraForward.Z,
+                M34 = 0.0f,
+
+                M41 = position.X,
+                M42 = position.Y,
+                M43 = position.Z,
+                M44 = 1.0f
+            };
+
+            return billboardMatrix;
+        }
 
         /// <summary>
         /// Creates a left-handed, look-at matrix.

@@ -48,6 +48,10 @@ public class TextBlock : InputUIComponent
         typeof (Brush), typeof (TextBlock),
         new PropertyMetadata(Brushes.White, PropertyMetadataOptions.BindsTwoWayByDefault|PropertyMetadataOptions.AffectsRender));
 
+    public static readonly AdamantiumProperty StrokeProperty = AdamantiumProperty.Register(nameof(Stroke),
+    typeof(Brush), typeof(TextBlock),
+    new PropertyMetadata(Brushes.Transparent, PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsRender));
+
     private static void TextParametersChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
         
@@ -117,6 +121,12 @@ public class TextBlock : InputUIComponent
     {
         get => GetValue<Brush>(ForegroundProperty);
         set => SetValue(ForegroundProperty, value);
+    }
+
+    public Brush Stroke
+    {
+        get => GetValue<Brush>(StrokeProperty);
+        set => SetValue(StrokeProperty, value);
     }
 
     protected override Size MeasureOverride(Size availableSize)

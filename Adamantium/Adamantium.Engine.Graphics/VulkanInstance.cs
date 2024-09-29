@@ -18,10 +18,11 @@ namespace Adamantium.Engine.Graphics
     public unsafe class VulkanInstance : DisposableBase
     {
         private const string EngineName = "AdamantiumEngine";
-
-        private Instance instance;
+        
         private delegate* unmanaged<DebugUtilsMessageSeverityFlagBitsEXT, DebugUtilsMessageTypeFlagBitsEXT, VkDebugUtilsMessengerCallbackDataEXT*, void*, uint> debugCallback;
         private DebugUtilsMessengerEXT debugMessenger;
+        
+        internal Instance VkInstance { get; private set; }
 
         public string ApplicationName { get; set; }
 
@@ -47,8 +48,6 @@ namespace Adamantium.Engine.Graphics
             get;
             set;
         }
-        
-        public PhysicalDevice CurrentDevice { get; set; }
 
         private GraphicsAdapter FindBestSuitableAdapter()
         {
@@ -72,7 +71,7 @@ namespace Adamantium.Engine.Graphics
             CreateInstance(appName);
             GraphicsAdapters = new AdamantiumCollection<GraphicsAdapter>();
             EnumerateGraphicAdapters();
-            CurrentDevice = GraphicsAdapters[0];
+            MainGraphicsAdapter = FindBestSuitableAdapter();
         }
         
         private void CreateInstance(string appName)
@@ -106,8 +105,8 @@ namespace Adamantium.Engine.Graphics
                 createInfo.PEnabledLayerNames = ValidationLayers.ToArray();
             }
 
-            instance = Instance.Create(createInfo);
-            NativePointer = new IntPtr(instance.NativePointer);
+            VkInstance = Instance.Create(createInfo);
+            NativePointer = new IntPtr(VkInstance.NativePointer);
 
             createInfo.Dispose();
 
@@ -134,14 +133,12 @@ namespace Adamantium.Engine.Graphics
 
         public void EnumerateGraphicAdapters()
         {
-            var devices = instance.EnumeratePhysicalDevices();
+            var devices = VkInstance.EnumeratePhysicalDevices();
             GraphicsAdapters.Clear();
             foreach (var physicalDevice in devices)
             {
-                GraphicsAdapters.Add(new GraphicsAdapter(physicalDevice));
+                GraphicsAdapters.Add(new GraphicsAdapter(physicalDevice, this));
             }
-
-            MainGraphicsAdapter = FindBestSuitableAdapter();
         }
 
         public static VulkanInstance Create(string appName, bool enableDebug)
@@ -161,7 +158,7 @@ namespace Adamantium.Engine.Graphics
                 var surfaceInfo = new Win32SurfaceCreateInfoKHR();
                 surfaceInfo.Hwnd = parameters.OutputHandle;
                 surfaceInfo.Hinstance = parameters.HInstanceHandle;
-                var surface = instance.CreateWin32Surface(surfaceInfo);
+                var surface = VkInstance.CreateWin32Surface(surfaceInfo);
 
                 availableSurfaces.Add(parameters.OutputHandle, surface);
 
@@ -172,7 +169,7 @@ namespace Adamantium.Engine.Graphics
             {
                 var surfaceInfo = new MacOSSurfaceCreateInfoMVK();
                 surfaceInfo.PView = parameters.OutputHandle.ToPointer();
-                var surface = instance.CreateMacOSSurfaceMVK(surfaceInfo);
+                var surface = VkInstance.CreateMacOSSurfaceMVK(surfaceInfo);
 
                 availableSurfaces.Add(parameters.OutputHandle, surface);
 
@@ -185,10 +182,10 @@ namespace Adamantium.Engine.Graphics
         private Result CreateDebugUtilsMessenger(DebugUtilsMessengerCreateInfoEXT pCreateInfo, out DebugUtilsMessengerEXT pDebugMessenger)
         {
             pDebugMessenger = null;
-            var ptr = instance.GetInstanceProcAddr("vkCreateDebugUtilsMessengerEXT");
+            var ptr = VkInstance.GetInstanceProcAddr("vkCreateDebugUtilsMessengerEXT");
             var func = new PFN_vkCreateDebugUtilsMessengerEXT(ptr);
             var infoPtr = NativeUtils.StructOrEnumToPointer(pCreateInfo.ToNative());
-            var result = func.Invoke(instance, infoPtr, null, out var pDebugMessenger_t);
+            var result = func.Invoke(VkInstance, infoPtr, null, out var pDebugMessenger_t);
             pCreateInfo.Dispose();
             NativeUtils.Free(infoPtr);
             pDebugMessenger = new DebugUtilsMessengerEXT(pDebugMessenger_t);
@@ -197,9 +194,9 @@ namespace Adamantium.Engine.Graphics
 
         private void DestroyDebugUtilsMessenger(DebugUtilsMessengerEXT debugMessenger)
         {
-            var ptr = instance.GetInstanceProcAddr("vkDestroyDebugUtilsMessengerEXT");
+            var ptr = VkInstance.GetInstanceProcAddr("vkDestroyDebugUtilsMessengerEXT");
             var func = new PFN_vkDestroyDebugUtilsMessengerEXT(ptr);
-            func.Invoke(instance, debugMessenger, null);
+            func.Invoke(VkInstance, debugMessenger, null);
         }
 
         [UnmanagedCallersOnly]
@@ -213,14 +210,14 @@ namespace Adamantium.Engine.Graphics
 
         public static implicit operator Instance(VulkanInstance vkInstance)
         {
-            return vkInstance.instance;
+            return vkInstance.VkInstance;
         }
 
         protected override void Dispose(bool disposeManaged)
         {
             foreach (var surface in availableSurfaces)
             {
-                instance?.DestroySurfaceKHR(surface.Value);
+                VkInstance?.DestroySurfaceKHR(surface.Value);
             }
 
             if (IsInDebugMode)
@@ -228,8 +225,8 @@ namespace Adamantium.Engine.Graphics
                 DestroyDebugUtilsMessenger(debugMessenger);
             }
 
-            instance?.Dispose();
-            instance = null;
+            VkInstance?.Dispose();
+            VkInstance = null;
             GraphicsAdapters.Clear();
         }
     }

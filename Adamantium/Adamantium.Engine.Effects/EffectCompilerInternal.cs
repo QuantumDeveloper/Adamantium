@@ -25,6 +25,9 @@ namespace Adamantium.Engine.Effects
         private static readonly Regex replaceBackSlash = new Regex(@"\\+");
         private static readonly List<char> xyzwrgbaComponents = new List<char>() { 'x', 'y', 'z', 'w', 'r', 'g', 'b', 'a' };
 
+        readonly string commentPattern = @"//.*?$\n";
+        readonly string multiLineCommentPattern = @"/\*.*?\*/";
+
         private static readonly Dictionary<string, ValueConverter> ValueConverters =
             new Dictionary<string, ValueConverter>()
               {
@@ -217,6 +220,12 @@ namespace Adamantium.Engine.Effects
                 var includeFiles = Directory.GetFiles(directory, "*.hlsl");
                 includes = includeFiles.Select(x => new ShaderFileInfo()
                 { Content = File.ReadAllText(x), Path = x, FileName = Path.GetFileName(x) }).ToImmutableArray();
+
+                foreach (var include in includes)
+                {
+                    include.Content = Regex.Replace(include.Content, commentPattern, String.Empty, RegexOptions.Multiline);
+                    include.Content = Regex.Replace(include.Content, multiLineCommentPattern, String.Empty, RegexOptions.Singleline);
+                }
             }
 
             var includeParser = new IncludeParser() { Logger = logger };
@@ -230,6 +239,9 @@ namespace Adamantium.Engine.Effects
                     include.Content = result.PreprocessedSource;
                 }
             }
+            
+            sourceCode = Regex.Replace(sourceCode, commentPattern, String.Empty, RegexOptions.Multiline);
+            sourceCode = Regex.Replace(sourceCode, multiLineCommentPattern, String.Empty, RegexOptions.Singleline);
 
             var parser = new EffectParser { Logger = logger };
             parser.Macros.AddRange(macros);
@@ -1026,8 +1038,8 @@ namespace Adamantium.Engine.Effects
             compilerOptions.Add(CompilerArguments.AllResourcesBound);
             compilerOptions.Add(CompilerArguments.SpvUseDxLayout);
             compilerOptions.Add($"{CompilerArguments.SpvTargetEnv}vulkan1.1");
-            // compilerOptions.Add($"{CompilerArguments.SpvExtension}SPV_GOOGLE_hlsl_functionality1");
-            // compilerOptions.Add($"{CompilerArguments.SpvExtension}SPV_GOOGLE_user_type");
+            compilerOptions.Add($"{CompilerArguments.SpvExtension}SPV_GOOGLE_hlsl_functionality1");
+            compilerOptions.Add($"{CompilerArguments.SpvExtension}SPV_GOOGLE_user_type");
             compilerOptions.Add(CompilerArguments.SpvReflect);
 
             var targetProfile = $"{StageTypeToString(shaderKind)}_{GetShaderModelFromProfile(profile)}";
@@ -1292,6 +1304,7 @@ namespace Adamantium.Engine.Effects
                 Name = name,
                 Class = EffectParameterClass.Object,
                 Slot = (byte)variableBinding.SlotIndex,
+                DescriptorSet = (byte)variableBinding.DescriptorSet,
                 Count = (byte)variableBinding.ElementCount,
             };
 

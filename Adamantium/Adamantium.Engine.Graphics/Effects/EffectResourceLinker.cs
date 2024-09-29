@@ -1,10 +1,39 @@
 ﻿using System.Collections.Generic;
+using Adamantium.Core;
 using Adamantium.Engine.Effects;
 using AdamantiumVulkan.Core;
 using VulkanBuffer = AdamantiumVulkan.Core.Buffer;
 
 namespace Adamantium.Engine.Graphics.Effects
 {
+    internal class ResourceInfo<T> : PropertyChangedBase where T : class
+    {
+        private T resource;
+
+        public ResourceInfo()
+        {
+            
+        }
+
+        public T Resource
+        {
+            get => resource;
+            set
+            {
+                if (SetProperty(ref resource, value))
+                {
+                    IsDirty = true;
+                }
+            }
+        }
+
+        public int SlotIndex { get; set; }
+        
+        public int DescriptorSet { get; set; } 
+        
+        public bool IsDirty { get; set; }
+    }
+    
     internal class EffectResourceLinker
     {
         /// <summary>
@@ -17,14 +46,15 @@ namespace Adamantium.Engine.Graphics.Effects
         /// </summary>
         public int Count;
 
-        public Dictionary<EffectData.Parameter, Sampler[]> SamplerStates;
-        public Dictionary<EffectData.Parameter, Texture[]> ShaderResourceViews;
+        // public Dictionary<EffectData.Parameter, Sampler[]> SamplerStates;
+        public Dictionary<EffectData.Parameter, ResourceInfo<Sampler>[]> SamplerStates;
+        public Dictionary<EffectData.Parameter, ResourceInfo<Texture>[]> ShaderResourceViews;
         public Dictionary<EffectData.Parameter, BufferView[]> UnorderedAccessViews;
         public Dictionary<EffectData.Parameter, object> BoundResources;
 
-        private static Sampler[] EmptySamplers = new Sampler[0];
-        private static Texture[] EmptyResourceViews = new Texture[0];
-        private static BufferView[] EmptyUAVs = new BufferView[0];
+        private static ResourceInfo<Sampler>[] EmptySamplers = [];
+        private static ResourceInfo<Texture>[] EmptyResourceViews = [];
+        private static BufferView[] EmptyUAVs = [];
 
         /// <summary>
         /// Initializes this instance.
@@ -33,27 +63,25 @@ namespace Adamantium.Engine.Graphics.Effects
         {
             ConstantBuffers = new Dictionary<EffectData.Parameter, EffectConstantBuffer>();
 
-            SamplerStates = new Dictionary<EffectData.Parameter, Sampler[]>();
-            ShaderResourceViews = new Dictionary<EffectData.Parameter, Texture[]>();
+            SamplerStates = new Dictionary<EffectData.Parameter, ResourceInfo<Sampler>[]>();
+            ShaderResourceViews = new Dictionary<EffectData.Parameter, ResourceInfo<Texture>[]>();
             UnorderedAccessViews = new Dictionary<EffectData.Parameter, BufferView[]>();
             BoundResources = new Dictionary<EffectData.Parameter, object>();
         }
 
         public T GetResource<T>(EffectData.Parameter resourceName) where T : class
         {
-            object res;
-            BoundResources.TryGetValue(resourceName, out res);
+            BoundResources.TryGetValue(resourceName, out var res);
             return (T)res;
         }
 
         public T[] GetResources<T>(EffectData.Parameter resourceName) where T : class
         {
-            object res;
-            BoundResources.TryGetValue((EffectData.ResourceParameter)resourceName, out res);
+            BoundResources.TryGetValue((EffectData.ResourceParameter)resourceName, out var res);
             return (T[])res;
         }
 
-        public Texture[] GetShaderResources(EffectData.Parameter resourceName)
+        public ResourceInfo<Texture>[] GetShaderResources(EffectData.Parameter resourceName)
         {
             if (ShaderResourceViews.TryGetValue(resourceName, out var views))
             {
@@ -62,10 +90,9 @@ namespace Adamantium.Engine.Graphics.Effects
             return EmptyResourceViews;
         }
 
-        public Sampler[] GetSamplers(EffectData.Parameter resourceName)
+        public ResourceInfo<Sampler>[] GetSamplers(EffectData.Parameter resourceName)
         {
-            Sampler[] samplers;
-            if (SamplerStates.TryGetValue(resourceName, out samplers))
+            if (SamplerStates.TryGetValue(resourceName, out var samplers))
             {
                 return samplers;
             }
@@ -150,7 +177,7 @@ namespace Adamantium.Engine.Graphics.Effects
                     {
                         if (!SamplerStates.TryGetValue(parameter, out var states))
                         {
-                            states = new Sampler[parameter.Count];
+                            states = new ResourceInfo<Sampler>[parameter.Count];
                             SamplerStates.Add(parameter, states);
                             BoundResources.Add(parameter, states);
                         }
@@ -164,21 +191,32 @@ namespace Adamantium.Engine.Graphics.Effects
                         {
                             state = samplerState;
                         }
-                        states[index] = state;
+
+                        if (states[index] == null)
+                        {
+                            states[index] = new ResourceInfo<Sampler>();
+                        }
+                        
+                        states[index].Resource = state;
                     }   
                     break;
                 case EffectResourceType.ShaderResourceView:
                     {
                         if (!ShaderResourceViews.TryGetValue(parameter, out var views))
                         {
-                            views = new Texture[parameter.Count];
+                            views = new ResourceInfo<Texture>[parameter.Count];
                             ShaderResourceViews.Add(parameter, views);
                             BoundResources.Add(parameter, views);
                         }
                         
-                        if (value is Texture)
+                        if (views[index] == null)
                         {
-                            views[index] = (Texture)value;
+                            views[index] = new ResourceInfo<Texture>();
+                        }
+                        
+                        if (value is Texture texture)
+                        {
+                            views[index].Resource = texture;
                         }
                     }
                     break;

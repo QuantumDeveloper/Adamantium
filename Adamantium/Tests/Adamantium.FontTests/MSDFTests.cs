@@ -28,6 +28,7 @@ namespace Adamantium.FontTests
             var atlasGen = new TextureAtlasGenerator(typeface, font, mtsdfTextureSize, sampleRate, 4, 0, typeface.GlyphCount, GlyphSortingVariant.ByIndex, 2);
             //var atlasData = atlasGen.GenerateTextureAtlas(typeface, font, mtsdfTextureSize, sampleRate, 4, 0, typeface.GlyphCount);
             var atlasData = atlasGen.PrepareTextureAtlas();
+            
             timer.Stop();
             var timer2 = Stopwatch.StartNew();
             //var atlasData = atlasGen.GenerateTextureAtlas(typeface, font, mtsdfTextureSize, sampleRate, 4, 0, 10);
