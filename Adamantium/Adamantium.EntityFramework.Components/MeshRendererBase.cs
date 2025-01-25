@@ -2,6 +2,7 @@
 using Adamantium.Core;
 using Adamantium.Engine.Graphics;
 using Adamantium.EntityFramework.ComponentsBasics;
+using AdamantiumVulkan.Core;
 using Buffer = Adamantium.Engine.Graphics.Buffer;
 
 namespace Adamantium.EntityFramework.Components
@@ -66,6 +67,8 @@ namespace Adamantium.EntityFramework.Components
             graphicsContext.SetVertexBuffer(VertexBuffer);
             graphicsContext.VertexType = VertexType;
             graphicsContext.PrimitiveTopology = MeshData.Mesh.MeshTopology;
+            graphicsContext.PolygonMode = PolygonMode.Fill;
+            graphicsContext.CullMode = CullModeFlagBits.None;
 
             if (MeshData.Mesh.HasIndices)
             {
@@ -78,6 +81,7 @@ namespace Adamantium.EntityFramework.Components
             {
                 prevRasterState = graphicsContext.RasterizerState;
                 graphicsContext.RasterizerState = GraphicsDevice.RasterizerStates.WireFrameCullNoneClipDisabled;
+                graphicsContext.PolygonMode = PolygonMode.Line;
             }
 
             if (MeshData.Mesh.HasIndices)

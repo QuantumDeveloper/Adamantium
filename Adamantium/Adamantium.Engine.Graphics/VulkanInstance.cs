@@ -43,11 +43,7 @@ namespace Adamantium.Engine.Graphics
 
         public AdamantiumCollection<GraphicsAdapter> GraphicsAdapters { get; private set; }
 
-        public GraphicsAdapter MainGraphicsAdapter
-        {
-            get;
-            set;
-        }
+        public GraphicsAdapter MainGraphicsAdapter { get; set; }
 
         private GraphicsAdapter FindBestSuitableAdapter()
         {
@@ -81,7 +77,7 @@ namespace Adamantium.Engine.Graphics
             appInfo.ApplicationVersion = AdamantiumVulkan.Core.Constants.VK_MAKE_API_VERSION(1, 0, 0, 0);
             appInfo.PEngineName = EngineName;
             appInfo.EngineVersion = AdamantiumVulkan.Core.Constants.VK_MAKE_API_VERSION(1, 0, 0, 0);
-            appInfo.ApiVersion = AdamantiumVulkan.Core.Constants.VK_MAKE_API_VERSION(1, 3, 224, 0);
+            appInfo.ApiVersion = AdamantiumVulkan.Core.Constants.VK_MAKE_API_VERSION(1, 4, 304, 0);
 
             var createInfo = new InstanceCreateInfo();
             createInfo.PApplicationInfo = appInfo;

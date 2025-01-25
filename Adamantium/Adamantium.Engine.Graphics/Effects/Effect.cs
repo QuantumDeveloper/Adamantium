@@ -179,10 +179,7 @@ namespace Adamantium.Engine.Graphics.Effects
 
                     var pass = ToDispose(new EffectPass(logger, this, technique, passRaw, name));
 
-                    var timer = Stopwatch.StartNew();
                     pass.Initialize(logger);
-                    timer.Stop();
-                    Console.WriteLine($"pass init time: {timer.ElapsedMilliseconds} ms");
 
                     // If this is a subpass, add it to the parent pass
                     if (passRaw.IsSubPass)

@@ -1,6 +1,7 @@
 using System;
 using Adamantium.Engine.Core;
 using Adamantium.Engine.Graphics;
+using Adamantium.Engine.Graphics.Effects;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Media;
 using Adamantium.UI.Media.Imaging;
@@ -58,12 +59,10 @@ internal class GeometryRenderer : ComponentRenderer
     {
         if (VertexBuffer == null) return;
         
-        
-
         graphicsDevice.SetVertexBuffer(VertexBuffer);
-
         graphicsDevice.VertexType = VertexType;
         graphicsDevice.PrimitiveTopology = PrimitiveType;
+        graphicsDevice.ColorBlendEquationExt = GraphicsDevice.DefaultColorBlendEquation;
 
         var world = Matrix4x4F.Translation((float)component.Location.X, (float)component.Location.Y, 5);
 
@@ -74,7 +73,7 @@ internal class GeometryRenderer : ComponentRenderer
         effect.Transparency.SetValue((float)Background.Opacity);
         
         //var texture = ((BitmapSource)image)?.Texture;
-
+        
         if (Texture == null)
         {
             effect.BasicColoredPass.Apply();
