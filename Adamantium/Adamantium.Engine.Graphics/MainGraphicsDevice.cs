@@ -54,7 +54,7 @@ namespace Adamantium.Engine.Graphics
             var deviceExt = new List<string>();
             deviceExt.Add(Constants.VK_KHR_SWAPCHAIN_EXTENSION_NAME);
             deviceExt.Add(Constants.VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
-            //deviceExt.Add(Constants.VK_GOOGLE_HLSL_FUNCTIONALITY_1_EXTENSION_NAME);
+            deviceExt.Add(Constants.VK_GOOGLE_HLSL_FUNCTIONALITY_1_EXTENSION_NAME);
             deviceExt.Add(Constants.VK_GOOGLE_USER_TYPE_EXTENSION_NAME);
             deviceExt.Add(Constants.VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
             deviceExt.Add(Constants.VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
@@ -167,6 +167,12 @@ namespace Adamantium.Engine.Graphics
                 {
                     finalDeviceExtensions.Add(extension);
                 }
+            }
+
+            if (finalDeviceExtensions.Count != DeviceExtensions.Count)
+            {
+                var diff = DeviceExtensions.Except(finalDeviceExtensions).ToArray();
+                throw new ExtensionNotSupportedException(GraphicsAdapter.AdapterProperties.DeviceName, diff);
             }
 
             var maintenance4Features = new PhysicalDeviceMaintenance4Features();

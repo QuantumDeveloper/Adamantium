@@ -178,6 +178,9 @@ public class FontRenderer : GraphicsResource
         GraphicsDevice.SetRenderTarget(renderTarget);
         GraphicsDevice.DepthStencilState = GraphicsDevice.DepthStencilStates.DepthEnableLessEqual;
         GraphicsDevice.BlendState = GraphicsDevice.BlendStates.Fonts;
+        GraphicsDevice.ColorBlendEnabled = true;
+        GraphicsDevice.ColorBlendEquationExt = GraphicsDevice.FontColorBlendEquation;
+        GraphicsDevice.PrimitiveRestartEnable = true;
 
         effectSampler.SetResource(GraphicsDevice.SamplerStates.LinearFont);
         effectTexture.SetResource(layout.FontAtlas.Atlas);
@@ -194,7 +197,7 @@ public class FontRenderer : GraphicsResource
         GraphicsDevice.SetVertexBuffer(layout.VertexBuffer);
         GraphicsDevice.PrimitiveTopology = PrimitiveTopology.PointList;
         fontEffect.StrokeColor.SetValue(stroke.ToVector4());
-        
+        GraphicsDevice.DepthTestEnabled = true;
         if (stroke == Colors.Transparent)
         {
             glyphEffectPass.Apply();

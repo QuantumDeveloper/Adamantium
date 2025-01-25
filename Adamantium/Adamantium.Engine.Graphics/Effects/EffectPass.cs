@@ -32,7 +32,7 @@ public sealed class EffectPass : DisposableObject
     private readonly EffectData.Pass pass;
     private readonly GraphicsDevice graphicsDevice;
         
-    private List<StageBlock> pipelineStages;
+    private readonly List<StageBlock> pipelineStages;
 
     internal EffectTechnique Technique;
 
@@ -49,6 +49,8 @@ public sealed class EffectPass : DisposableObject
     private List<DescriptorEntrySet> descriptorEntrySets;
     
     private readonly VkDeviceSize[] offsets = new VkDeviceSize[1];
+    
+    private readonly List<StageBlock> stages = new List<StageBlock>();
 
     private uint appliesCounter = 0;
     public ReadOnlyCollection<PipelineShaderStageCreateInfo> ShaderStages => shaderStages.AsReadOnly();
@@ -155,6 +157,8 @@ public sealed class EffectPass : DisposableObject
         graphicsDevice.CurrentEffectPass = this;
             
         DescriptorEntrySet descriptorEntry;
+        
+        stages.Clear();
 
         if (descriptorEntrySets.Count > appliesCounter)
         {
@@ -244,13 +248,23 @@ public sealed class EffectPass : DisposableObject
                 CreateUAVWriteDescriptor(resources, links.SlotIndex, (int) graphicsDevice.ImageIndex);
             }
             
-            graphicsDevice.LogicalDevice.BindShader(graphicsDevice.CurrentCommandBuffer, stageBlock.Stage, stageBlock.ShaderObject);
+            stages.Add(stageBlock);
         }
         
         BindDescriptors();
+
+        foreach (var stage in stages)
+        {
+            graphicsDevice.LogicalDevice.BindShader(graphicsDevice.CurrentCommandBuffer, stage.Stage, stage.ShaderObject);
+        }
+        
+        if (!geometryStagePresent)
+        {
+            graphicsDevice.LogicalDevice.BindShader(graphicsDevice.CurrentCommandBuffer, ShaderStageFlagBits.GeometryBit, null);
+        }
         
         appliesCounter++;
-    }
+    } 
 
     private void BindDescriptors()
     {
@@ -405,14 +419,15 @@ public sealed class EffectPass : DisposableObject
             stageBlock.EntryPoint = link.EntryPoint;
 
             InitStageBlock(stageBlock, logger);
-                
-        }
-        
-        //PrepareDescriptorSets();
 
-        //CreateDescriptorSetLayout(0, layoutBindings);
-        //CreatePipelineLayout();
+            if (stageBlock.Stage == ShaderStageFlagBits.GeometryBit)
+            {
+                geometryStagePresent = true;
+            }
+        }
     }
+
+    private bool geometryStagePresent = false;
 
     internal void PrepareDescriptorSets()
     {
@@ -435,7 +450,7 @@ public sealed class EffectPass : DisposableObject
             DescriptorDataSets[i] = new DescriptorData(descriptorSets[i]);
         }
         CreateDescriptorSetLayout(0, layoutBindings);
-        //CreatePipelineLayout();
+        CreatePipelineLayout();
         CreateShaderObjects();
     }
 
@@ -720,15 +735,11 @@ public sealed class EffectPass : DisposableObject
         var dataPtr = descriptorData.Buffer.MapMemory();
         for (uint i = 0; i < images.Length; i++)
         {
-            if (!images[i].IsDirty) continue;
-            
             var imageInfo = new DescriptorImageInfo
             {
                 ImageView = images[i].Resource,
                 ImageLayout = images[i].Resource.ImageLayout
             };
-
-            images[i].IsDirty = false;
                 
             var bufferDescriptorInfo = new DescriptorGetInfoEXT();
             bufferDescriptorInfo.SType = StructureType.DescriptorGetInfoExt;
@@ -744,7 +755,6 @@ public sealed class EffectPass : DisposableObject
                 (void*)((IntPtr)dataPtr + (appliesCounter * descriptorData.Size) + offset));
         }
         descriptorData.Buffer.UnmapMemory();
-
     }
         
     private unsafe void CreateSamplerDescriptor(ResourceInfo<Sampler>[] samplers, uint bindingIndex, uint descriptorSet)
@@ -753,13 +763,9 @@ public sealed class EffectPass : DisposableObject
         var dataPtr = descriptorData.Buffer.MapMemory();
         for (uint i = 0; i < samplers.Length; i++)
         {
-            if (!samplers[i].IsDirty) continue;
-            
             var sampleInfo = new DescriptorImageInfo();
             sampleInfo.Sampler = samplers[i].Resource;
 
-            samplers[i].IsDirty = false;
-                
             var bufferDescriptorInfo = new DescriptorGetInfoEXT();
             bufferDescriptorInfo.SType = StructureType.DescriptorGetInfoExt;
             bufferDescriptorInfo.Type  = DescriptorType.Sampler;
@@ -775,18 +781,33 @@ public sealed class EffectPass : DisposableObject
         descriptorData.Buffer.UnmapMemory();
     }
         
-    private WriteDescriptorSet CreateUAVWriteDescriptor(BufferView[] texelBuffers, uint bindingIndex, int descriptorSetIndex)
+    private unsafe void CreateUAVWriteDescriptor(ResourceInfo<Buffer>[] texelBuffers, uint bindingIndex, int descriptorSet)
     {
-        var writeDescriptor = new WriteDescriptorSet();
-        writeDescriptor.DescriptorCount = (uint)texelBuffers.Length;
-        writeDescriptor.DescriptorType = DescriptorType.UniformTexelBuffer;
-        writeDescriptor.DstBinding = bindingIndex;
-        //writeDescriptor.DstSet = CurrentDescriptors[descriptorSetIndex];
-        writeDescriptor.PTexelBufferView = texelBuffers;
+        var addrInfo = new DescriptorAddressInfoEXT();
+        addrInfo.SType = StructureType.DescriptorAddressInfoExt;
+        addrInfo.Address = texelBuffers[0].Resource.GetDeviceAddress();
+        addrInfo.Range   = texelBuffers[0].Resource.TotalSize;
+        addrInfo.Format  = Format.UNDEFINED;
 
-        return writeDescriptor;
+        var descriptorData = DescriptorDataSets[descriptorSet];
+        var dataPtr = descriptorData.Buffer.MapMemory();
+        for (uint i = 0; i < texelBuffers.Length; i++)
+        {
+            var bufferDescriptorInfo = new DescriptorGetInfoEXT();
+            bufferDescriptorInfo.SType = StructureType.DescriptorGetInfoExt;
+            bufferDescriptorInfo.Type  = DescriptorType.UniformTexelBuffer;
+            bufferDescriptorInfo.Data = new DescriptorDataEXT();
+            bufferDescriptorInfo.Data.PStorageTexelBuffer = addrInfo;
+                
+            var offset =
+                graphicsDevice.LogicalDevice.GetDescriptorSetLayoutOffset(descriptorData.Layout,
+                    bindingIndex + i);
+            
+            graphicsDevice.LogicalDevice.GetDescriptor(bufferDescriptorInfo, descriptorData.ImageDescriptorSize, 
+                (void*)((IntPtr)dataPtr + (appliesCounter * descriptorData.Size) + offset));
+        }
+        descriptorData.Buffer.UnmapMemory();
     }
-
 
     public static ShaderStageFlagBits EffectShaderTypeToShaderStage(EffectShaderType type)
     {

@@ -210,7 +210,6 @@
 		<AdditionalFiles Update="ControlTemplate.auml">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</AdditionalFiles>
-		<None Include="FontData._aff" />
 		<None Remove="Fonts\OTFFonts\Crimson-Italic.otf" />
 		<Content Include="Fonts\OTFFonts\Crimson-Italic.otf">
 		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

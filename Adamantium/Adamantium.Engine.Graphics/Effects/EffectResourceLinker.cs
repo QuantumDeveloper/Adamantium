@@ -8,30 +8,20 @@ namespace Adamantium.Engine.Graphics.Effects
 {
     internal class ResourceInfo<T> : PropertyChangedBase where T : class
     {
-        private T resource;
-
         public ResourceInfo()
         {
             
         }
-
-        public T Resource
+        
+        public ResourceInfo(T resource)
         {
-            get => resource;
-            set
-            {
-                if (SetProperty(ref resource, value))
-                {
-                    IsDirty = true;
-                }
-            }
+            Resource = resource;
         }
+        public T Resource { get; set; }
 
         public int SlotIndex { get; set; }
         
         public int DescriptorSet { get; set; } 
-        
-        public bool IsDirty { get; set; }
     }
     
     internal class EffectResourceLinker
@@ -49,12 +39,12 @@ namespace Adamantium.Engine.Graphics.Effects
         // public Dictionary<EffectData.Parameter, Sampler[]> SamplerStates;
         public Dictionary<EffectData.Parameter, ResourceInfo<Sampler>[]> SamplerStates;
         public Dictionary<EffectData.Parameter, ResourceInfo<Texture>[]> ShaderResourceViews;
-        public Dictionary<EffectData.Parameter, BufferView[]> UnorderedAccessViews;
+        public Dictionary<EffectData.Parameter, ResourceInfo<Buffer>[]> UnorderedAccessViews;
         public Dictionary<EffectData.Parameter, object> BoundResources;
 
         private static ResourceInfo<Sampler>[] EmptySamplers = [];
         private static ResourceInfo<Texture>[] EmptyResourceViews = [];
-        private static BufferView[] EmptyUAVs = [];
+        private static ResourceInfo<Buffer>[] EmptyUAVs = [];
 
         /// <summary>
         /// Initializes this instance.
@@ -65,7 +55,7 @@ namespace Adamantium.Engine.Graphics.Effects
 
             SamplerStates = new Dictionary<EffectData.Parameter, ResourceInfo<Sampler>[]>();
             ShaderResourceViews = new Dictionary<EffectData.Parameter, ResourceInfo<Texture>[]>();
-            UnorderedAccessViews = new Dictionary<EffectData.Parameter, BufferView[]>();
+            UnorderedAccessViews = new Dictionary<EffectData.Parameter, ResourceInfo<Buffer>[]>();
             BoundResources = new Dictionary<EffectData.Parameter, object>();
         }
 
@@ -99,7 +89,7 @@ namespace Adamantium.Engine.Graphics.Effects
             return EmptySamplers;
         }
 
-        public BufferView[] GetUAVs(EffectData.Parameter resourceName)
+        public ResourceInfo<Buffer>[] GetUAVs(EffectData.Parameter resourceName)
         {
             if (UnorderedAccessViews.TryGetValue(resourceName, out var uavs))
             {
@@ -224,16 +214,14 @@ namespace Adamantium.Engine.Graphics.Effects
                     {
                         if (!UnorderedAccessViews.TryGetValue(parameter, out var uavs))
                         {
-                            uavs = new BufferView[parameter.Count];
+                            uavs = new ResourceInfo<Buffer>[parameter.Count];
                             UnorderedAccessViews.Add(parameter, uavs);
                             BoundResources.Add(parameter, uavs);
                         }
 
-                        BufferView view = null;
-                        if (value is BufferView)
+                        if (value is Buffer buffer)
                         {
-                            view = value as BufferView;
-                            uavs[index] = view;
+                            uavs[index] = new ResourceInfo<Buffer>(buffer);
                         }
                     }
                     break;

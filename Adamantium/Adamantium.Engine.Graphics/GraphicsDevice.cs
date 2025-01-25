@@ -72,12 +72,33 @@ namespace Adamantium.Engine.Graphics
         private static string SyncGuid = Guid.NewGuid().ToString();
 
         private List<GraphicsResource> _graphicsResources = new List<GraphicsResource>();
+        
+        public static ColorBlendEquationEXT DefaultColorBlendEquation { get; set; }
 
+        public static ColorBlendEquationEXT FontColorBlendEquation { get; set; }
+        
         static GraphicsDevice()
         {
             BlendStates = new BlendStatesCollection();
             RasterizerStates = new RasterizerStateCollection();
             DepthStencilStates = new DepthStencilStatesCollection();
+            
+            DefaultColorBlendEquation = new ColorBlendEquationEXT();
+            DefaultColorBlendEquation.SrcColorBlendFactor = BlendFactor.One;
+            DefaultColorBlendEquation.SrcAlphaBlendFactor = BlendFactor.One;
+            DefaultColorBlendEquation.DstColorBlendFactor = BlendFactor.Zero;
+            DefaultColorBlendEquation.DstAlphaBlendFactor = BlendFactor.Zero;
+            DefaultColorBlendEquation.ColorBlendOp = BlendOp.Add;
+            DefaultColorBlendEquation.AlphaBlendOp = BlendOp.Add;
+
+            FontColorBlendEquation = new ColorBlendEquationEXT();
+            FontColorBlendEquation.SrcColorBlendFactor = BlendFactor.SrcAlpha;
+            FontColorBlendEquation.SrcAlphaBlendFactor = BlendFactor.SrcAlpha;
+            FontColorBlendEquation.DstColorBlendFactor = BlendFactor.OneMinusSrcAlpha;
+            FontColorBlendEquation.DstAlphaBlendFactor = BlendFactor.OneMinusSrcAlpha;
+            FontColorBlendEquation.ColorBlendOp = BlendOp.Add;
+            FontColorBlendEquation.AlphaBlendOp = BlendOp.Subtract;
+            
         }
 
         private GraphicsDevice(MainGraphicsDevice mainDevice)
@@ -135,6 +156,8 @@ namespace Adamantium.Engine.Graphics
             Log.Logger.Information($"Effect initialization time: {diff}");
             
             Log.Logger.Debug($"Primary render device created. Id: {DeviceId}");
+
+            SampleMask = [0xF];
         }
 
         private void CreateSecondaryDevice(GraphicsDevice primary, PresentationParameters presentationParameters)
@@ -314,26 +337,32 @@ namespace Adamantium.Engine.Graphics
         }
         
         public bool RasterizerDiscardEnabled { get; set; }
-        
-        public VkColorBlendEquationEXT ColorBlendEquationExt { get; set; }
+
+        public ColorBlendEquationEXT ColorBlendEquationExt { get; set; } = new ColorBlendEquationEXT();
         
         public bool PrimitiveRestartEnable { get; set; }
         
         public MSAALevel RasterizationSamples { get; set; }
-
-        public uint SampleMask => (uint)RasterizationSamples;
         
         public bool AlphaToCoverageEnable { get; set; }
         
+        public PolygonMode PolygonMode { get; set; }
+
+        public CullModeFlagBits CullMode { get; set; } = CullModeFlagBits.None;
+        
         public bool IsWireFrame { get; set; }
+        
+        public VkSampleMask[] SampleMask { get; set; }
 
         public Single LineWidth { get; set; } = 1.0f;
 
         public FrontFace FrontFace { get; set; } = FrontFace.Clockwise;
 
         public bool DepthTestEnabled { get; set; } = true;
-        
-        public CompareOp DepthCompareFunction { get; set; }
+
+        public bool DepthWriteEnable { get; set; } = true;
+
+        public CompareOp DepthCompareFunction { get; set; } = CompareOp.LessOrEqual;
 
         public bool DepthBoundsTestEnabled { get; set; } = false;
         
@@ -1029,12 +1058,37 @@ namespace Adamantium.Engine.Graphics
 
         private void SetDrawingState(CommandBuffer commandBuffer)
         {
-            commandBuffer.SetViewportWithCountEXT((uint)viewports.Count, viewports);
-            commandBuffer.SetScissorWithCountEXT((uint)viewports.Count, scissors);
+            LogicalDevice.SetViewportWithCountEXT(commandBuffer, viewports.ToArray());
+            LogicalDevice.SetScissorsWithCountEXT(commandBuffer, scissors.ToArray());
+            LogicalDevice.SetRasterizerDiscardEnableEXT(commandBuffer, RasterizerDiscardEnabled);
             
             var bindingDescription = VertexUtils.GetBindingDescription2(VertexType);
             var attributes = VertexUtils.GetVertexAttributeDescription2(VertexType);
-            commandBuffer.SetVertexInputEXT(1, bindingDescription, (uint)attributes.Length, attributes);
+            LogicalDevice.SetVertexInputEXT(commandBuffer,1, bindingDescription, (uint)attributes.Length, attributes);
+            LogicalDevice.SetPrimitiveTopologyEXT(commandBuffer, PrimitiveTopology);
+            LogicalDevice.SetPrimitiveRestartEnableEXT(commandBuffer, PrimitiveRestartEnable);
+            LogicalDevice.SetRasterizationSamplesEXT(commandBuffer, (SampleCountFlagBits)Presenter.Description.MSAALevel);
+            LogicalDevice.SetSampleMaskEXT(commandBuffer, (SampleCountFlagBits)Presenter.Description.MSAALevel, SampleMask);
+            LogicalDevice.SetAlphaToCoverageEnableEXT(commandBuffer, AlphaToCoverageEnable);
+            LogicalDevice.SetPolygonModeEXT(commandBuffer, PolygonMode);
+            if (PolygonMode == PolygonMode.Line)
+            {
+                commandBuffer.SetLineWidth(LineWidth);  
+            }
+            
+            LogicalDevice.SetCullModeEXT(commandBuffer, CullMode);
+            LogicalDevice.SetFrontFaceEXT(commandBuffer, FrontFace);
+            LogicalDevice.SetDepthWriteEnableEXT(commandBuffer, DepthWriteEnable);
+            LogicalDevice.SetDepthTestEnableEXT(commandBuffer, DepthTestEnabled);
+            LogicalDevice.SetDepthCompareOpEXT(commandBuffer, DepthCompareFunction);
+            LogicalDevice.SetDepthBoundsTestEnableEXT(commandBuffer, DepthBoundsTestEnabled);
+            LogicalDevice.SetDepthBiasEnableEXT(commandBuffer, DepthBiasEnabled);
+            LogicalDevice.SetStencilTestEnableEXT(commandBuffer, StencilTestEnabled);
+            LogicalDevice.SetLogicOpEnableEXT(commandBuffer, LogicOperationsEnabled);
+            
+            LogicalDevice.SetColorBlendEquationEXT(commandBuffer, 0, 1, ColorBlendEquationExt);
+            LogicalDevice.SetColorBlendEnableEXT(commandBuffer, ColorBlendEnabled);
+            LogicalDevice.SetColorWriteMaskEXT(commandBuffer, ColorComponentFlags);
         }
 
         public void Draw(ulong vertexCount, uint instanceCount, uint firstVertex = 0, uint firstInstance = 0)

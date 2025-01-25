@@ -46,13 +46,6 @@ namespace Adamantium.FontTests
         }
 
         [Test]
-        public void DeserializeFontData()
-        {
-            var text = File.ReadAllText(@"OtfFontData.xml");
-            var data = FontData.Parse(text);
-        }
-
-        [Test]
         public void TypeFaceSerializationTest()
         {
             var resolver = CompositeResolver.Create(

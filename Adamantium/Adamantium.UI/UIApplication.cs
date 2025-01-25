@@ -93,7 +93,7 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
 
     public static readonly AdamantiumProperty EnableGraphicsDebugProperty =
         AdamantiumProperty.Register(nameof(EnableGraphicsDebugProperty), typeof(bool), typeof(UIApplication),
-            new PropertyMetadata(true, GraphicsDebugChangedCallback));
+            new PropertyMetadata(false, GraphicsDebugChangedCallback));
 
     private static void GraphicsDebugChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
