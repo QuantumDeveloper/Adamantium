@@ -1,9 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using Adamantium.Core.DependencyInjection;
-using Adamantium.Engine.Core;
-using Adamantium.Engine.Graphics;
-using Adamantium.EntityFramework;
+﻿using Adamantium.Core.DependencyInjection;
+using Adamantium.ECS;
+using Adamantium.Graphics;
+using Adamantium.Graphics.Core;
 using Adamantium.UI;
 
 namespace Adamantium.Game.Core

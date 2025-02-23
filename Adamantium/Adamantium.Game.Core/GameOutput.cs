@@ -1,8 +1,10 @@
 ﻿using Adamantium.Core;
 using Adamantium.Core.Events;
-using Adamantium.Engine.Graphics;
 using Adamantium.Game.Core.Input;
 using Adamantium.Game.Core.Payloads;
+using Adamantium.Graphics;
+using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Core.Presentation;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
 using Adamantium.UI;
@@ -19,7 +21,7 @@ namespace Adamantium.Game.Core
     {
         internal int OutputId = 1;
 
-        public GraphicsDevice GraphicsDevice { get; private set; }
+        public IGraphicsDevice GraphicsDevice { get; private set; }
         
         protected IEventAggregator EventAggregator { get; }
 
@@ -97,7 +99,7 @@ namespace Adamantium.Game.Core
 
         public Viewport Viewport { get; protected set; }
 
-        public virtual void CopyOutput(GraphicsDevice mainDevice)
+        public virtual void CopyOutput(IGraphicsDevice mainDevice)
         {
             
         }
@@ -110,7 +112,7 @@ namespace Adamantium.Game.Core
             }
         }
 
-        public void SetGraphicsDevice(GraphicsDevice graphicsDevice)
+        public void SetGraphicsDevice(IGraphicsDevice graphicsDevice)
         {
             GraphicsDevice = graphicsDevice;
             ClearState();
@@ -182,9 +184,9 @@ namespace Adamantium.Game.Core
             throw new NotSupportedException(gameContext.ContextType + " game context is not currently supported");
         }
 
-        public virtual void TakeScreenshot(string path, ImageFileType fileType)
+        public virtual async Task TakeScreenshotAsync(string path, ImageFileType fileType)
         {
-            GraphicsDevice?.TakeScreenshot(path, fileType);
+            await GraphicsDevice?.TakeScreenshotAsync(path, fileType);
         }
 
         public void UpdatePresenter()

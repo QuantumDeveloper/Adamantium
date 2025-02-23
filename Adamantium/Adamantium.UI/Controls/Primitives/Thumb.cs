@@ -1,7 +1,5 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
 using Adamantium.UI.Input;
-using Adamantium.UI.Media;
 using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI.Controls.Primitives;

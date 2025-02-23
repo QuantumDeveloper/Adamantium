@@ -24,8 +24,9 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\Adamantium.EntityFramework.Components\Adamantium.EntityFramework.Components.csproj" />
-		<ProjectReference Include="..\Adamantium.EntityFramework\Adamantium.EntityFramework.csproj" />
+		<ProjectReference Include="..\Adamantium.ECS.Components\Adamantium.ECS.Components.csproj" />
+		<ProjectReference Include="..\Adamantium.ECS\Adamantium.ECS.csproj" />
+		<ProjectReference Include="..\Adamantium.ProceduralGeometry\Adamantium.ProceduralGeometry.csproj" />
 		<ProjectReference Include="..\Adamantium.MacOS\Adamantium.MacOS.csproj" />
 		<ProjectReference Include="..\Adamantium.UI.Markup\Adamantium.UI.Markup.csproj" />
 		<ProjectReference Include="..\Adamantium.Win32\Adamantium.Win32.csproj" />

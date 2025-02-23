@@ -1,6 +1,5 @@
 ﻿using System;
-using Adamantium.Engine.Core;
-using Adamantium.Engine.Core.Models;
+using Adamantium.Graphics.Core.Models;
 
 namespace Adamantium.Engine.Compiler.Converter.Converters
 {

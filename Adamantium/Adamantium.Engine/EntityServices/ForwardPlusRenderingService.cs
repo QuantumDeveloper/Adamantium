@@ -1,18 +1,18 @@
 ﻿using Adamantium.Core;
-using Adamantium.EntityFramework;
-using Adamantium.EntityFramework.Components;
+using Adamantium.ECS;
+using Adamantium.ECS.Components;
 using Adamantium.Game;
 using Adamantium.Game.Core;
 
-//using Texture2D = Adamantium.Engine.Graphics.Texture2D;
+//using Texture2D = Adamantium.Graphics.Texture2D;
 
-namespace Adamantium.Engine.EntityServices
+namespace Adamantium.Engine.EntityServices;
+
+public class ForwardPlusRenderingService : RenderingService
 {
-    public class ForwardPlusRenderingService : RenderingService
+    public ForwardPlusRenderingService(EntityWorld world, GameOutput window) : base(world, window)
     {
-        public ForwardPlusRenderingService(EntityWorld world, GameOutput window) : base(world, window)
-        {
-        }
+    }
 
 //        private Texture2D backBuffer;
 //        private ViewportF viewPort;
@@ -39,30 +39,30 @@ namespace Adamantium.Engine.EntityServices
 //        private Texture2D _specularMap;
 //        private Texture2D _emissiveMap;
 
-        private void CreateResources()
-        {
+    private void CreateResources()
+    {
 //            GraphicsDevice.SetTargets(null);
 //            SpriteBatch = new SpriteBatch(GraphicsDevice, 2500);
-        }
+    }
 
-        public override void LoadContent()
-        {
+    public override void LoadContent()
+    {
 //            SpriteBatch = new SpriteBatch(GraphicsDevice, 2500);
 //            CreateSystemResources();
-        }
+    }
 
-        protected override void OnWindowParametersChanging(ChangeReason reason)
-        {
-            UnloadContent();
-        }
+    protected override void OnWindowParametersChanging(ChangeReason reason)
+    {
+        UnloadContent();
+    }
 
-        protected override void OnWindowParametersChanged(ChangeReason reason)
-        {
-            LoadContent();
-        }
+    protected override void OnWindowParametersChanged(ChangeReason reason)
+    {
+        LoadContent();
+    }
 
-        private void CreateWindowResources()
-        {
+    private void CreateWindowResources()
+    {
 //            Texture2DDescription rendertoTextureDescription = new Texture2DDescription();
 //            rendertoTextureDescription.Width = Window.Width;
 //            rendertoTextureDescription.Height = Window.Height;
@@ -113,27 +113,27 @@ namespace Adamantium.Engine.EntityServices
 //
 //            LoadEffects();
 //            LoadDefaultTextures();
-        }
+    }
 
-        private void LoadEffects()
-        {
+    private void LoadEffects()
+    {
 //            _mainEffect = Effect.Load("Content/Effects/ForwardPlusShading/ForwardPlusMain.fx.compiled", GraphicsDevice);
 //            _reconstructZBuffer = Effect.Load("Content/Effects/ForwardPlusShading/ReconstructDepth.fx.compiled", GraphicsDevice);
 //            _clearGBuffer = Effect.Load("Content/Effects/ForwardPlusShading/ClearGBuffer.fx.compiled", GraphicsDevice);
 //            _lighting = Effect.Load("Content/Effects/ForwardPlusShading/Lighting.fx.compiled", GraphicsDevice);
-        }
+    }
 
-        private void LoadDefaultTextures()
-        {
+    private void LoadDefaultTextures()
+    {
 //            _normalMap = Content.Load<Texture2D>("Textures/ForwardPlusDefaultTextures/DefaultNormal.tga");
 //            _diffuseMap = Content.Load<Texture2D>("Textures/ForwardPlusDefaultTextures/DefaultDiffuse.tga");
 //            _specularMap = Content.Load<Texture2D>("Textures/ForwardPlusDefaultTextures/DefaultSpecular.tga");
 //            _emissiveMap = Content.Load<Texture2D>("Textures/ForwardPlusDefaultTextures/DefaultEmissive.tga");
-        }
+    }
 
 
-        public override void UnloadContent()
-        {
+    public override void UnloadContent()
+    {
 //            SpriteBatch?.Dispose();
 //            D2dDevice?.Dispose();
 //            _clearGBuffer?.Dispose();
@@ -142,27 +142,27 @@ namespace Adamantium.Engine.EntityServices
 //            _lighting?.Dispose();
 //
 //            base.UnloadContent();
-        }
+    }
 
-        public sealed override void CreateSystemResources()
-        {
-            CreateWindowResources();
-        }
+    public sealed override void CreateSystemResources()
+    {
+        CreateWindowResources();
+    }
 
-        protected override void OnDeviceChangeEnd()
-        {
-            base.OnDeviceChangeEnd();
-            CreateResources();
-        }
+    protected override void OnDeviceChangeEnd()
+    {
+        base.OnDeviceChangeEnd();
+        CreateResources();
+    }
 
-        protected override void OnDeviceChangeBegin()
-        {
-            //SpriteBatch?.Dispose();
-        }
+    protected override void OnDeviceChangeBegin()
+    {
+        //SpriteBatch?.Dispose();
+    }
 
 
-        public override void EndDraw()
-        {
+    public override void EndDraw()
+    {
 //            if (_outputBufferRT.Description.Width == Window.Width &&
 //                _outputBufferRT.Description.Height == Window.Height)
 //            {
@@ -178,17 +178,17 @@ namespace Adamantium.Engine.EntityServices
 //                SpriteBatch.End();
 //            }
 //            base.EndDraw();
+    }
+
+    public override void Draw(AppTime gameTime)
+    {
+        base.Draw(gameTime);
+        if (ActiveCamera == null)
+        {
+            return;
         }
 
-        public override void Draw(AppTime gameTime)
-        {
-            base.Draw(gameTime);
-            if (ActiveCamera == null)
-            {
-                return;
-            }
-
-            ComputeFrustumCorners(ActiveCamera);
+        ComputeFrustumCorners(ActiveCamera);
 
 //            GraphicsDevice.SetRenderTargets(_depthStencilBuffer, _normalBufferRT, _depthBufferRT);
 //            DeferredDevice.ClearDepthStencil(_depthStencilBuffer, DepthStencilClearFlags.Depth, 0, 0);
@@ -244,20 +244,20 @@ namespace Adamantium.Engine.EntityServices
 //            DrawAdditionalStuff();
 //
 //            Text = "FPS: " + gameTime.FpsCount + "\n";
-        }
+    }
 
-        private bool _showDebug = true;
+    private bool _showDebug = true;
 
-        protected override void Debug()
-        {
-            //output our final composition into the backbuffer. We could output it into a
-            //post-process fx, or to an object diffuse texture, or or or...well, its up to you =)
-            //Just remember that we are using a floating point buffer, so we should use Point Clamp here
-            //spriteBatch.Begin(SpriteSortMode.NoSort,
-            //    GraphicsDevice.BlendStates.Opaque,
-            //    GraphicsDevice.SamplersStates.PointWrap,
-            //    GraphicsDevice.DepthStencilStates.DepthEnableLessEqual,
-            //    GraphicsDevice.RasterizerStates.CullNoneClipDisabled);
+    protected override void Debug()
+    {
+        //output our final composition into the backbuffer. We could output it into a
+        //post-process fx, or to an object diffuse texture, or or or...well, its up to you =)
+        //Just remember that we are using a floating point buffer, so we should use Point Clamp here
+        //spriteBatch.Begin(SpriteSortMode.NoSort,
+        //    GraphicsDevice.BlendStates.Opaque,
+        //    GraphicsDevice.SamplersStates.PointWrap,
+        //    GraphicsDevice.DepthStencilStates.DepthEnableLessEqual,
+        //    GraphicsDevice.RasterizerStates.CullNoneClipDisabled);
 
 //            SpriteBatch.Begin(SpriteSortMode.NoSort,
 //                GraphicsDevice.BlendStates.Opaque,
@@ -274,10 +274,10 @@ namespace Adamantium.Engine.EntityServices
 //            SpriteBatch.Draw(_lightBufferRT, new Rectangle(smallWidth * 2, 0, smallWidth, smallHeigth), Colors.White);
 //            //spriteBatch.Draw(_testTexture, new RectangleF(0, smallHeigth, 100, 50), Colors.White);
 //            SpriteBatch.End();
-        }
+    }
 
-        private void RenderLights(Camera camera)
-        {
+    private void RenderLights(Camera camera)
+    {
 //            _lighting.Parameters["GBufferPixelSize"].SetValue(new Vector2F(0.5f / camera.Width, 0.5f / camera.Height));
 //            _lighting.Parameters["DepthBuffer"].SetResource(_depthBufferRT);
 //            _lighting.Parameters["DepthSampler"].SetResource(GraphicsDevice.SamplersStates.PointClamp);
@@ -420,10 +420,10 @@ namespace Adamantium.Engine.EntityServices
 //                _lighting.CurrentTechnique.Passes[0].Apply();
 //                LightService.DrawSpotLightMesh(GraphicsDevice, GameTime);
 //            }
-        }
+    }
 
-        private void RenderToGBuffer(Camera camera)
-        {
+    private void RenderToGBuffer(Camera camera)
+    {
 //            foreach (var entity in Entities)
 //            {
 //                _mainEffect.CurrentTechnique = _mainEffect.Techniques[0];
@@ -450,10 +450,10 @@ namespace Adamantium.Engine.EntityServices
 //                        meshRenderer.Draw(GraphicsDevice, GameTime);
 //                    });
 //            }
-        }
+    }
 
-        private void ReconstructShading(Camera camera)
-        {
+    private void ReconstructShading(Camera camera)
+    {
 //            foreach (var entity in Entities)
 //            {
 //                _mainEffect.CurrentTechnique = _mainEffect.Techniques[1];
@@ -498,11 +498,11 @@ namespace Adamantium.Engine.EntityServices
 //                        meshRenderer.Draw(GraphicsDevice, GameTime);
 //                    });
 //            }
-        }
+    }
 
-        private void ReconstructZBuffer(Camera camera)
-        {
-            //bind effect
+    private void ReconstructZBuffer(Camera camera)
+    {
+        //bind effect
 //            _reconstructZBuffer.Parameters["GBufferPixelSize"].SetValue(new Vector2F(0.5f / camera.Width, 0.5f / camera.Height));
 //            _reconstructZBuffer.Parameters["DepthBuffer"].SetResource(_depthBufferRT);
 //            _reconstructZBuffer.Parameters["DepthSampler"].SetResource(GraphicsDevice.SamplersStates.PointClamp);
@@ -523,10 +523,10 @@ namespace Adamantium.Engine.EntityServices
 //            //with our z-buffer reconstructed we only need to read it
 //            GraphicsDevice.DepthStencilState = GraphicsDevice.DepthStencilStates.DepthReadGreaterEqual;
 //            GraphicsDevice.BlendState = oldBlendState;
-        }
+    }
 
-        private void ComputeFrustumCorners(Camera camera)
-        {
+    private void ComputeFrustumCorners(Camera camera)
+    {
 //            camera.Frustum.GetCorners(_cornersWorldSpace);
 //            Matrix4x4F view = camera.ViewMatrix; //this is the inverse of our camera transform
 //            Vector3F.TransformCoordinate(_cornersWorldSpace, ref view, _cornersViewSpace); //put the frustum into view space
@@ -537,17 +537,17 @@ namespace Adamantium.Engine.EntityServices
 //            Vector3F temp = _currentFrustumCorners[3];
 //            _currentFrustumCorners[3] = _currentFrustumCorners[2];
 //            _currentFrustumCorners[2] = temp;
-        }
+    }
 
-        /// <summary>
-        /// This method computes the frustum corners applied to a quad that can be smaller than
-        /// our screen. This is useful because instead of drawing a full-screen quad for each
-        /// point light, we can draw smaller quads that fit the light's bounding sphere in screen-space,
-        /// avoiding unecessary pixel shader operations
-        /// </summary>
-        /// <param name="effect">The effect we want to apply those corners</param>
-        /// <param name="topLeftVertex"> The top left vertex, in screen space [-1..1]</param>
-        /// <param name="bottomRightVertex">The bottom right vertex, in screen space [-1..1]</param>
+    /// <summary>
+    /// This method computes the frustum corners applied to a quad that can be smaller than
+    /// our screen. This is useful because instead of drawing a full-screen quad for each
+    /// point light, we can draw smaller quads that fit the light's bounding sphere in screen-space,
+    /// avoiding unecessary pixel shader operations
+    /// </summary>
+    /// <param name="effect">The effect we want to apply those corners</param>
+    /// <param name="topLeftVertex"> The top left vertex, in screen space [-1..1]</param>
+    /// <param name="bottomRightVertex">The bottom right vertex, in screen space [-1..1]</param>
 //        private void ApplyFrustumCorners(Effect effect, Vector2F topLeftVertex, Vector2F bottomRightVertex)
 //        {
 //            float dx = _currentFrustumCorners[1].X - _currentFrustumCorners[0].X;
@@ -572,5 +572,4 @@ namespace Adamantium.Engine.EntityServices
 //
 //            effect.Parameters["FrustumCorners"].SetValue(localFrustumCorners);
 //        }
-    }
 }

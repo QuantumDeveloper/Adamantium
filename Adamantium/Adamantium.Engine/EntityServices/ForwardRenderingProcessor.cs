@@ -1,10 +1,11 @@
 using System;
 using System.Linq;
 using Adamantium.Core;
-using Adamantium.Engine.Graphics.Fonts;
-using Adamantium.EntityFramework;
-using Adamantium.EntityFramework.Components;
+using Adamantium.ECS;
+using Adamantium.ECS.Components;
 using Adamantium.Fonts;
+using Adamantium.FX.Effects.Generated;
+using Adamantium.Graphics.Core.EffectsFramework;
 using Adamantium.Mathematics;
 using Adamantium.Win32;
 
@@ -18,9 +19,12 @@ public class ForwardRenderingProcessor : RenderingProcessor
 
     protected override void LoadContent()
     {
+        BasicEffect = new BasicEffect(GraphicsDevice);
         base.LoadContent();
     }
-
+    
+    private BasicEffect BasicEffect { get; set; }
+    
     public override void Draw(AppTime gameTime)
     {
         foreach (var entity in Entities)
@@ -62,11 +66,11 @@ public class ForwardRenderingProcessor : RenderingProcessor
                 {
                     var transform = entity.Transform.GetMetadata(ActiveCamera);
                     var wvp = transform.WorldMatrixF * ActiveCamera.ViewMatrix * ActiveCamera.ProjectionMatrix;
-                    GraphicsDevice.BasicEffect.Wvp.SetValue(wvp);
-                    GraphicsDevice.BasicEffect.MeshColor.SetValue(Colors.White.ToVector3());
-                    GraphicsDevice.BasicEffect.BasicColoredPass.Apply();
+                    BasicEffect.Wvp.SetValue(wvp);
+                    BasicEffect.MeshColor.SetValue(Colors.White.ToVector3());
+                    BasicEffect.BasicColoredPass.Apply();
                     collider.Draw(GraphicsDevice, ActiveCamera);
-                    GraphicsDevice.BasicEffect.BasicColoredPass.UnApply();
+                    BasicEffect.BasicColoredPass.UnApply();
                 }
             }
         }
@@ -99,9 +103,9 @@ public class ForwardRenderingProcessor : RenderingProcessor
             //var orthoProj = Matrix4x4F.OrthoOffCenter(0, Window.Width, 0, Window.Height, 1f, 100000f);
             //var wvp = transformation.WorldMatrixF * ActiveCamera.UiProjection;
             //var wvp = transformation.WorldMatrix * Matrix4x4F.Scaling(1, -1, 1) * Matrix4x4F.Scaling(2.0f / Window.Width, 2.0f/Window.Height, 1.0f / (100000f - 1f));
-            GraphicsDevice.BasicEffect.Wvp.SetValue(wvp);
-            GraphicsDevice.BasicEffect.MeshColor.SetValue(Colors.Black.ToVector3());
-            GraphicsDevice.BasicEffect.Transparency.SetValue(1f);
+            BasicEffect.Wvp.SetValue(wvp);
+            BasicEffect.MeshColor.SetValue(Colors.Black.ToVector3());
+            BasicEffect.Transparency.SetValue(1f);
             
             //GraphicsDevice.BasicEffect.Parameters["worldMatrix"].SetValue(transformation.WorldMatrix);
             //GraphicsDevice.BasicEffect.SetValue(Matrix4x4F.Transpose(Matrix4x4F.Invert(transformation.WorldMatrix)));
@@ -111,8 +115,8 @@ public class ForwardRenderingProcessor : RenderingProcessor
 
             if (material?.Texture != null)
             {
-                GraphicsDevice.BasicEffect.SampleType.SetResource(GraphicsDevice.SamplerStates.LinearRepeat);
-                GraphicsDevice.BasicEffect.ShaderTexture.SetResource(material.Texture);
+                BasicEffect.SampleType.SetResource(GraphicsDevice.SamplerStates.LinearRepeat);
+                BasicEffect.ShaderTexture.SetResource(material.Texture);
             }
             /*else
                 {
@@ -121,7 +125,7 @@ public class ForwardRenderingProcessor : RenderingProcessor
 
             if (component is SkinnedMeshRenderer)
             {
-                GraphicsDevice.BasicEffect.Techniques["Basic"].Passes["Skinned"].Apply();
+                BasicEffect.Techniques["Basic"].Passes["Skinned"].Apply();
                 component.Draw(GraphicsDevice, gameTime);
             }
 
@@ -134,11 +138,11 @@ public class ForwardRenderingProcessor : RenderingProcessor
 
                 if (material?.Texture != null)
                 {
-                    GraphicsDevice.BasicEffect.BasicTexturedPass.Apply();
+                    BasicEffect.BasicTexturedPass.Apply();
                 }
                 else
                 {
-                    GraphicsDevice.BasicEffect.BasicColoredPass.Apply();
+                    BasicEffect.BasicColoredPass.Apply();
                 }
                 
                 component.Draw(GraphicsDevice, gameTime);

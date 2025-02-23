@@ -1,7 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Threading;
-using Adamantium.Engine.Graphics;
+﻿using Adamantium.Graphics;
+using Adamantium.Graphics.Core;
 using Adamantium.Imaging;
 
 namespace Adamantium.Game.Core

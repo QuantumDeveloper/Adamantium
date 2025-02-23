@@ -1,29 +1,32 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Adamantium.Engine.Graphics;
-using Adamantium.Engine.Graphics.Fonts;
+using Adamantium.FX.Effects.Generated;
+using Adamantium.ProceduralGeometry;
+using Adamantium.ProceduralGeometry.Shapes;
+using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Fonts;
 using Adamantium.UI.Media.Imaging;
 using Adamantium.UI.Rendering;
-using Adamantium.UI.Text;
-using Serilog;
 
 namespace Adamantium.UI.Media;
 
 public class DrawingContext
 {
-   public GraphicsDevice GraphicsDevice { get; }
+   public IGraphicsDevice GraphicsDevice { get; }
       
    private readonly Dictionary<IUIComponent, UIRenderContainer> visualPresentations;
 
    private UIRenderContainer currentContainer;
    private RenderUnit currentUnit;
    private IUIComponent currentComponent;
+   private BasicEffect basicEffect;
    private uint _currentIndex;
 
-   internal DrawingContext(GraphicsDevice d3dDevice)
+   internal DrawingContext(IGraphicsDevice d3dDevice)
    {
       GraphicsDevice = d3dDevice;
+      basicEffect = new BasicEffect(GraphicsDevice);
       visualPresentations = new Dictionary<IUIComponent, UIRenderContainer>();
    }
 
@@ -75,7 +78,7 @@ public class DrawingContext
          var strokeGeometry = new StrokeGeometry(pen, currentUnit.GeometryRenderer.Geometry);
          strokeGeometry.ProcessGeometry(GeometryType.Solid);
          var strokeRenderer =
-            ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, strokeGeometry, pen?.Brush, null);
+            ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, strokeGeometry, pen?.Brush, null, basicEffect);
          currentUnit.StrokeParametersHash = HashCode.Combine(pen);
          currentUnit.StrokeRenderer = strokeRenderer;
       }
@@ -89,7 +92,7 @@ public class DrawingContext
       currentUnit = new RenderUnit();
       currentUnit.GeometryParametersHash = hash;
       currentUnit.GeometryRenderer =
-         ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, rectangle, brush, null);
+         ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, rectangle, brush, null, basicEffect);
    }
    
    private void ProcessImageGeometry(Rect destinationRect, CornerRadius corners, Brush brush, ImageSource image, int hash)
@@ -100,7 +103,7 @@ public class DrawingContext
       currentUnit = new RenderUnit();
       currentUnit.GeometryParametersHash = hash;
       currentUnit.GeometryRenderer =
-         ComponentRenderFactory.CreateImageRenderer(GraphicsDevice, rectangle, brush, image);
+         ComponentRenderFactory.CreateImageRenderer(GraphicsDevice, rectangle, brush, image, basicEffect);
    }
 
    public void DrawRectangle(Brush brush, Rect destinationRect, CornerRadius corners, Pen pen = null)
@@ -150,7 +153,7 @@ public class DrawingContext
          ellipse.ProcessGeometry(GeometryType.Solid);
          
          currentUnit = new RenderUnit();
-         var uiRenderer = ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, ellipse, brush, null);
+         var uiRenderer = ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, ellipse, brush, null, basicEffect);
          currentUnit.GeometryRenderer = uiRenderer;
          currentUnit.GeometryParametersHash = hash;
          
@@ -176,7 +179,7 @@ public class DrawingContext
             ellipse.ProcessGeometry(GeometryType.Both);
 
             currentUnit = new RenderUnit();
-            var uiRenderer = ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, ellipse, brush, null);
+            var uiRenderer = ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, ellipse, brush, null, basicEffect);
             currentUnit.GeometryRenderer = uiRenderer;
             currentUnit.GeometryParametersHash = hash;
             
@@ -205,13 +208,13 @@ public class DrawingContext
       currentUnit = new RenderUnit();
       if (geometry.Mesh.HasPoints)
       {
-         var uiRenderer = ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, geometry, brush, null);
+         var uiRenderer = ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, geometry, brush, null, basicEffect);
          currentUnit.GeometryRenderer = uiRenderer;
       }
 
       if (strokeGeometry != null && strokeGeometry.Mesh.HasPoints)
       {
-         var strokeRenderer = ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, strokeGeometry, pen?.Brush, null);
+         var strokeRenderer = ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, strokeGeometry, pen?.Brush, null, basicEffect);
          currentUnit.StrokeRenderer = strokeRenderer;
       }
 
@@ -234,7 +237,7 @@ public class DrawingContext
 
       currentUnit = new RenderUnit();
          
-      var strokeRenderer = ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, strokeGeometry, pen.Brush, null);
+      var strokeRenderer = ComponentRenderFactory.CreateGeometryRenderer(GraphicsDevice, strokeGeometry, pen.Brush, null, basicEffect);
       currentUnit.StrokeRenderer = strokeRenderer;
          
       currentContainer?.AddItem(currentUnit);
@@ -296,7 +299,7 @@ public class DrawingContext
          var rectangle = new RectangleGeometry(desiredSize);
          rectangle.ProcessGeometry(GeometryType.Solid);
          currentUnit.TextRenderer =
-            ComponentRenderFactory.CreateTextRenderer(GraphicsDevice, rectangle, textLayout, renderingParameters, foreground, background);
+            ComponentRenderFactory.CreateTextRenderer(GraphicsDevice, rectangle, textLayout, renderingParameters, foreground, background, basicEffect);
          currentContainer.AddItem(currentUnit);
       }
       _currentIndex++;

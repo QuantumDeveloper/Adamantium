@@ -1,7 +1,7 @@
 using System;
 using System.Diagnostics;
-using Adamantium.Engine.Graphics;
 using Adamantium.Mathematics;
+using Adamantium.ProceduralGeometry;
 using Adamantium.UI;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Controls.Primitives;
@@ -15,10 +15,10 @@ namespace Adamantium.UITests
    {
       private class LayoutPoker : Panel
       {
-         public Size MeasureResult = new Size(0, 0);
-         public Size MeasureArg = new Size(0, 0);
-         public Size ArrangeResult = new Size(0, 0);
-         public Size ArrangeArg = new Size(0, 0);
+         public Size MeasureResult = Size.Zero;
+         public Size MeasureArg = Size.Zero;
+         public Size ArrangeResult = Size.Zero;
+         public Size ArrangeArg = Size.Zero;
          public Func<Size> ArrangeFunc;
          public Func<Size> MeasureFunc;
 

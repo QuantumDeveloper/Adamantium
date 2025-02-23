@@ -1,14 +1,10 @@
-﻿using Adamantium.Engine.Graphics;
+﻿namespace Adamantium.Engine;
 
-
-namespace Adamantium.Engine
+public class CelestialBodyGenerator
 {
-   public class CelestialBodyGenerator
-   {
-      public CelestialBodyGenerator()
-      {         
-      }
+   public CelestialBodyGenerator()
+   {         
+   }
 
       
-   }
 }

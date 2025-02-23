@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using Adamantium.Engine.Graphics;
+using Adamantium.Graphics;
 using Adamantium.Mathematics.Triangulation;
+using Adamantium.ProceduralGeometry;
 
 namespace Adamantium.UI.Media;
 

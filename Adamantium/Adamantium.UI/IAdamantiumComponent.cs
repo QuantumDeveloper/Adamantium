@@ -1,5 +1,5 @@
 ﻿using System;
-using Adamantium.EntityFramework.ComponentsBasics;
+using Adamantium.ECS.ComponentsBasics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Resources;
 using Adamantium.UI.RoutedEvents;

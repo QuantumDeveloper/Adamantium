@@ -1,18 +1,18 @@
 using System;
-using Adamantium.Engine.Core;
-using Adamantium.Engine.Graphics;
-using Adamantium.Engine.Graphics.Effects;
-using Adamantium.UI.Controls;
+using Adamantium.FX.Effects.Generated;
+using Adamantium.Graphics;
+using Adamantium.Graphics.Core;
 using Adamantium.UI.Media;
 using Adamantium.UI.Media.Imaging;
 using AdamantiumVulkan.Core;
-using Buffer = Adamantium.Engine.Graphics.Buffer;
+using Buffer = Adamantium.Graphics.Buffer;
 
 namespace Adamantium.UI.Rendering;
 
 internal class GeometryRenderer : ComponentRenderer
 {
-    public GeometryRenderer(GraphicsDevice device, Geometry geometry, Brush background, Brush foreground, Texture texture = null) : base(background, foreground)
+    public GeometryRenderer(IGraphicsDevice device, Geometry geometry, Brush background, Brush foreground,
+        BasicEffect basicEffect, Texture texture = null) : base(background, foreground, basicEffect)
     {
         Geometry = geometry;
         var mesh = geometry.Mesh;
@@ -32,7 +32,7 @@ internal class GeometryRenderer : ComponentRenderer
 
         Texture = texture;
     }
-    
+
     public Geometry Geometry { get; }
     
     public Buffer VertexBuffer { get; set; }
@@ -43,30 +43,30 @@ internal class GeometryRenderer : ComponentRenderer
         
     public PrimitiveType PrimitiveType { get; set; }
     
-    public Texture Texture { get; set; }
+    public ITexture Texture { get; set; }
 
-    public override bool PrepareFrame(GraphicsDevice graphicsDevice, IUIComponent component, ImageSource image, Matrix4x4F projectionMatrix)
+    public override bool PrepareFrame(IGraphicsDevice graphicsDevice, IUIComponent component, ImageSource image, Matrix4x4F projectionMatrix)
     {
         return true;
     }
     
-    public override void Draw(GraphicsDevice graphicsDevice, IUIComponent component, Matrix4x4F projectionMatrix)
+    public override void Draw(IGraphicsDevice graphicsDevice, IUIComponent component, Matrix4x4F projectionMatrix)
     {
         Draw(graphicsDevice, component, null, projectionMatrix);
     }
 
-    public override void Draw(GraphicsDevice graphicsDevice, IUIComponent component, ImageSource image, Matrix4x4F projectionMatrix)
+    public override void Draw(IGraphicsDevice graphicsDevice, IUIComponent component, ImageSource image, Matrix4x4F projectionMatrix)
     {
         if (VertexBuffer == null) return;
         
         graphicsDevice.SetVertexBuffer(VertexBuffer);
         graphicsDevice.VertexType = VertexType;
         graphicsDevice.PrimitiveTopology = PrimitiveType;
-        graphicsDevice.ColorBlendEquationExt = GraphicsDevice.DefaultColorBlendEquation;
+        graphicsDevice.ColorBlendEquation = ColorBlendEquations.Default;
 
         var world = Matrix4x4F.Translation((float)component.Location.X, (float)component.Location.Y, 5);
 
-        var effect = graphicsDevice.BasicEffect;
+        var effect = BasicEffect;
         effect.Wvp.SetValue(world * projectionMatrix);
         var color = Background as SolidColorBrush;
         effect.MeshColor.SetValue(color.Color.ToVector4());

@@ -1,4 +1,4 @@
-using Adamantium.EntityFramework;
+using Adamantium.ECS;
 
 namespace Adamantium.Game;
 

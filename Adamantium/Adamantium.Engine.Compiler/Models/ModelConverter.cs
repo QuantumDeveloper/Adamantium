@@ -3,7 +3,7 @@ using System.Threading;
 using Adamantium.Core;
 using Adamantium.Engine.Compiler.Converter;
 using Adamantium.Engine.Compiler.Converter.Configs;
-using Adamantium.Engine.Core.Models;
+using Adamantium.Graphics.Core.Models;
 
 namespace Adamantium.Engine.Compiler.Models
 {
@@ -82,7 +82,6 @@ namespace Adamantium.Engine.Compiler.Models
         {
             cancellationToken = new CancellationTokenSource();
         }
-
 
         public SceneData ImportFileAsync(string path)
         {

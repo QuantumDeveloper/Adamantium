@@ -1,63 +1,62 @@
 ﻿using Adamantium.Engine.Managers;
 using Adamantium.Engine.Services;
 using Adamantium.Engine.Templates.Lights;
-using Adamantium.EntityFramework;
-using Adamantium.EntityFramework.Components.Extensions;
+using Adamantium.ECS;
+using Adamantium.ECS.Components.Extensions;
 using Adamantium.Game.Core.Input;
 
-namespace Adamantium.Engine.Tools
+namespace Adamantium.Engine.Tools;
+
+public class DirectionalLightTool : LightToolBase
 {
-    public class DirectionalLightTool : LightToolBase
+    public DirectionalLightTool(string name) : base(name)
     {
-        public DirectionalLightTool(string name) : base(name)
+        Tool = new DirectionalLightVisualTemplate().BuildEntity(null, "Directional");
+    }
+
+    public override void Process(Entity targetEntity, CameraManager cameraManager, GameInputManager inputManager)
+    {
+        if (!CheckTargetEntity(targetEntity))
+            return;
+
+        HighlightSelectedTool(false);
+        var camera = cameraManager.UserControlledCamera;
+
+        SetIsLocked(inputManager);
+
+        if (!IsLocked)
         {
-            Tool = new DirectionalLightVisualTemplate().BuildEntity(null, "Directional");
-        }
+            Tool.IsEnabled = true;
+            UpdateToolTransform(targetEntity, cameraManager, false, true, true);
 
-        public override void Process(Entity targetEntity, CameraManager cameraManager, GameInputManager inputManager)
-        {
-            if (!CheckTargetEntity(targetEntity))
-                return;
+            var collisionMode = CollisionMode.CollidersOnly;
 
-            HighlightSelectedTool(false);
-            var camera = cameraManager.UserControlledCamera;
+            toolIntersectionResult = Tool.Intersects(
+                camera,
+                inputManager.RelativePosition,
+                collisionMode,
+                CompareOrder.Less,
+                0.05f);
 
-            SetIsLocked(inputManager);
-
-            if (!IsLocked)
+            if (toolIntersectionResult.Intersects)
             {
-                Tool.IsEnabled = true;
-                UpdateToolTransform(targetEntity, cameraManager, false, true, true);
-
-                var collisionMode = CollisionMode.CollidersOnly;
-
-                toolIntersectionResult = Tool.Intersects(
-                    camera,
-                    inputManager.RelativePosition,
-                    collisionMode,
-                    CompareOrder.Less,
-                    0.05f);
-
-                if (toolIntersectionResult.Intersects)
-                {
-                    selectedTool = toolIntersectionResult.Entity;
-                    previousCoordinates = toolIntersectionResult.IntersectionPoint;
-                    HighlightSelectedTool(true);
-                }
-
-                IsLocked = CheckIsLocked(inputManager);
-
-                if (IsLocked)
-                {
-                    HighlightSelectedTool(true);
-                }
-                else
-                {
-                    ShouldStayVisible(inputManager);
-                }
+                selectedTool = toolIntersectionResult.Entity;
+                previousCoordinates = toolIntersectionResult.IntersectionPoint;
+                HighlightSelectedTool(true);
             }
 
-            Transform(Tool, cameraManager);
+            IsLocked = CheckIsLocked(inputManager);
+
+            if (IsLocked)
+            {
+                HighlightSelectedTool(true);
+            }
+            else
+            {
+                ShouldStayVisible(inputManager);
+            }
         }
+
+        Transform(Tool, cameraManager);
     }
 }

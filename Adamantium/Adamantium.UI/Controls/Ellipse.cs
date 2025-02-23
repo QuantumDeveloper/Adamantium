@@ -1,5 +1,5 @@
 ﻿using System;
-using Adamantium.Engine.Graphics;
+using Adamantium.ProceduralGeometry.Shapes;
 using Adamantium.UI.Media;
 
 namespace Adamantium.UI.Controls;

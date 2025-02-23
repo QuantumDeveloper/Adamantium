@@ -1,16 +1,14 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Adamantium.Engine.Core.Content;
-using Adamantium.Engine.Core.Models;
 using Adamantium.Engine.EntityServices;
-using Adamantium.Engine.Graphics;
-using Adamantium.Engine.Graphics.Fonts;
 using Adamantium.Engine.Templates;
-using Adamantium.EntityFramework;
-using Adamantium.Fonts;
+using Adamantium.ECS;
 using Adamantium.Game.Core;
 using Adamantium.Game.Core.Events;
-using Adamantium.Mathematics;
+using Adamantium.Graphics;
+using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Core.Content;
+using Adamantium.Graphics.Core.Models;
 
 namespace Adamantium.Game.Playground
 {
@@ -19,16 +17,15 @@ namespace Adamantium.Game.Playground
         public AdamantiumGame(
             bool enableDynamicRendering, 
             bool enableDebug) :
-            base(GameMode.Primary, enableDynamicRendering, enableDebug)
+            base(GameMode.Primary, enableDebug)
         {
             EventAggregator.GetEvent<GameOutputCreatedEvent>().Subscribe(OnWindowCreated);
         }
 
         public AdamantiumGame(
             IGraphicsDeviceService graphicsDeviceService, 
-            bool enableDynamicRendering,
             bool enableDebug) :
-            base(GameMode.Slave, enableDynamicRendering, enableDebug, graphicsDeviceService)
+            base(GameMode.Slave, enableDebug, graphicsDeviceService)
         {
             EventAggregator.GetEvent<GameOutputCreatedEvent>().Subscribe(OnWindowCreated);
         }

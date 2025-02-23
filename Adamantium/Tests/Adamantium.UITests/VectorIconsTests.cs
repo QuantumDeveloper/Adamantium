@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
-using Adamantium.Engine.Graphics;
+using Adamantium.Graphics;
+using Adamantium.ProceduralGeometry;
 using Adamantium.UI.Media;
 using NUnit.Framework;
 

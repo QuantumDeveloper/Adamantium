@@ -1,6 +1,4 @@
-using System;
-using Adamantium.Engine.Graphics;
-using Adamantium.Engine.Graphics.Fonts;
+using Adamantium.Graphics.Fonts;
 using Adamantium.UI.Media;
 using Adamantium.UI.RoutedEvents;
 using Adamantium.UI.Text;

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using Adamantium.Engine.Graphics;
-using Adamantium.EntityFramework;
+using Adamantium.ECS;
+using Adamantium.Graphics.Core;
 
 namespace Adamantium.UI.Processors;
 

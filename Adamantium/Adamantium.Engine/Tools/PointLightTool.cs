@@ -3,215 +3,214 @@ using System.Diagnostics;
 using Adamantium.Engine.Managers;
 using Adamantium.Engine.Services;
 using Adamantium.Engine.Templates.Lights;
-using Adamantium.EntityFramework;
-using Adamantium.EntityFramework.Components;
-using Adamantium.EntityFramework.Components.Extensions;
+using Adamantium.ECS;
+using Adamantium.ECS.Components;
+using Adamantium.ECS.Components.Extensions;
 using Adamantium.Game.Core.Input;
 using Adamantium.Mathematics;
 
-namespace Adamantium.Engine.Tools
+namespace Adamantium.Engine.Tools;
+
+public class PointLightTool : LightToolBase
 {
-    public class PointLightTool : LightToolBase
+    private Vector3F _scale;
+    private Entity anchorRight;
+    private Entity anchorForward;
+    private Entity anchorLeft;
+    private Entity anchorBackward;
+    private Entity anchorUp;
+    private Entity anchorDown;
+    private float _minRadius = 0.01f;
+
+    private float _previousScaleFactor;
+    private Vector2F startPosition;
+
+    public PointLightTool(string name) : base(name)
     {
-        private Vector3F _scale;
-        private Entity anchorRight;
-        private Entity anchorForward;
-        private Entity anchorLeft;
-        private Entity anchorBackward;
-        private Entity anchorUp;
-        private Entity anchorDown;
-        private float _minRadius = 0.01f;
+        Tool = new PointLightVisualTemplate().BuildEntity(null, "Point");
+        anchorRight = Tool.Get("AnchorPointRight");
+        anchorForward = Tool.Get("AnchorPointForward");
+        anchorLeft = Tool.Get("AnchorPointLeft");
+        anchorBackward = Tool.Get("AnchorPointBackward");
+        anchorUp = Tool.Get("AnchorPointUp");
+        anchorDown = Tool.Get("AnchorPointDown");
+    }
 
-        private float _previousScaleFactor;
-        private Vector2F startPosition;
+    public override void Process(Entity targetEntity, CameraManager cameraManager, GameInputManager inputManager)
+    {
+        if (!CheckTargetEntity(targetEntity))
+            return;
 
-        public PointLightTool(string name) : base(name)
+        HighlightSelectedTool(false);
+        var camera = cameraManager.UserControlledCamera;
+
+        SetIsLocked(inputManager);
+
+        if (!IsLocked)
         {
-            Tool = new PointLightVisualTemplate().BuildEntity(null, "Point");
-            anchorRight = Tool.Get("AnchorPointRight");
-            anchorForward = Tool.Get("AnchorPointForward");
-            anchorLeft = Tool.Get("AnchorPointLeft");
-            anchorBackward = Tool.Get("AnchorPointBackward");
-            anchorUp = Tool.Get("AnchorPointUp");
-            anchorDown = Tool.Get("AnchorPointDown");
-        }
+            Tool.IsEnabled = true;
+            UpdateToolTransform(targetEntity, cameraManager, false, true, true);
 
-        public override void Process(Entity targetEntity, CameraManager cameraManager, GameInputManager inputManager)
-        {
-            if (!CheckTargetEntity(targetEntity))
-                return;
+            var collisionMode = CollisionMode.CollidersOnly;
 
-            HighlightSelectedTool(false);
-            var camera = cameraManager.UserControlledCamera;
+            toolIntersectionResult = Tool.Intersects(
+                camera,
+                inputManager.VirtualPosition,
+                collisionMode,
+                CompareOrder.Less,
+                0.05f);
 
-            SetIsLocked(inputManager);
-
-            if (!IsLocked)
+            if (toolIntersectionResult.Intersects)
             {
-                Tool.IsEnabled = true;
-                UpdateToolTransform(targetEntity, cameraManager, false, true, true);
-
-                var collisionMode = CollisionMode.CollidersOnly;
-
-                toolIntersectionResult = Tool.Intersects(
-                    camera,
-                    inputManager.VirtualPosition,
-                    collisionMode,
-                    CompareOrder.Less,
-                    0.05f);
-
-                if (toolIntersectionResult.Intersects)
-                {
-                    selectedTool = toolIntersectionResult.Entity;
-                    previousCoordinates = toolIntersectionResult.IntersectionPoint;
-                    _previousScaleFactor = CurrentLight.Range;
-                    HighlightSelectedTool(true);
-                }
-
-                IsLocked = CheckIsLocked(inputManager);
-
-                if (IsLocked)
-                {
-                    startPosition = inputManager.VirtualPosition;
-                    HighlightSelectedTool(true);
-                }
-                else
-                {
-                    ShouldStayVisible(inputManager);
-                }
-            }
-
-            if (IsLocked && Enabled)
-            {
+                selectedTool = toolIntersectionResult.Entity;
+                previousCoordinates = toolIntersectionResult.IntersectionPoint;
+                _previousScaleFactor = CurrentLight.Range;
                 HighlightSelectedTool(true);
-                var intersects = GetRayPlaneIntersectionPoint(camera, inputManager, out var interPoint);
-                if (intersects)
-                {
-                    ScalePointLight(targetEntity, inputManager, interPoint);
-                }
             }
 
-            Transform(Tool, cameraManager);
-        }
+            IsLocked = CheckIsLocked(inputManager);
 
-        private void ScalePointLight(Entity lightToTransform, GameInputManager input, Vector3F rayPlaneInterPoint)
-        {
-            var res = input.VirtualPosition / startPosition;
-            
-            if (!float.IsInfinity(_scale.X) && !float.IsInfinity(_scale.Y) && !float.IsInfinity(_scale.Z))
+            if (IsLocked)
             {
-                //var avg = Vector2F.Max(res);
-                var avg = Vector2F.Average(res);
-
-                _scale.X = _scale.Y = _scale.Z = avg;
-            }
-
-
-            if (!float.IsNaN(_scale.X) && !float.IsInfinity(_scale.X) && !MathHelper.IsZero(_scale.X))
-            {
-                if (_scale.X < MinimumAllowedRange)
-                {
-                    _scale.X = MinimumAllowedRange;
-                }
-
-                CurrentLight.Range = _previousScaleFactor * _scale.X;
-                selectedTool.Owner.Transform.ScaleFactor = new Vector3F(CurrentLight.Range);
-            }
-
-            KeepScaleForAnchors();
-            PositionAnchors(lightToTransform);
-        }
-
-        private void KeepScaleForAnchors()
-        {
-            anchorRight.Transform.SetScaleFactor(toolScale);
-            anchorForward.Transform.SetScaleFactor(toolScale);
-            anchorLeft.Transform.SetScaleFactor(toolScale);
-            anchorBackward.Transform.SetScaleFactor(toolScale);
-            anchorUp.Transform.SetScaleFactor(toolScale);
-            anchorDown.Transform.SetScaleFactor(toolScale);
-        }
-
-        protected override void HighlightSelectedTool(bool value)
-        {
-            if (selectedTool == null)
-            {
-                return;
-            }
-
-            selectedTool.TraverseByLayer(
-                current =>
-                {
-                    current.IsSelected = false;
-                },
-                true);
-
-            selectedTool.IsSelected = value;
-        }
-
-        protected override void UpdateToolTransform(Entity target, CameraManager cameraManager, bool isLocalAxis, bool useTargetCenter, bool calculateTransform)
-        {
-            var camera = cameraManager.UserControlledCamera;
-            // Set tool to the local coordinates center of the target Entity (not geometrical center)
-            if (useTargetCenter)
-            {
-                Tool.TraverseByLayer(
-                    current =>
-                    {
-                        current.Transform.Position = target.GetCenterAbsolute();
-                    },
-                    true);
+                startPosition = inputManager.VirtualPosition;
+                HighlightSelectedTool(true);
             }
             else
             {
-                Tool.TraverseByLayer(
-                    current =>
-                    {
-                        current.Transform.Position = target.Transform.Pivot;
-                    },
-                    true);
+                ShouldStayVisible(inputManager);
+            }
+        }
+
+        if (IsLocked && Enabled)
+        {
+            HighlightSelectedTool(true);
+            var intersects = GetRayPlaneIntersectionPoint(camera, inputManager, out var interPoint);
+            if (intersects)
+            {
+                ScalePointLight(targetEntity, inputManager, interPoint);
+            }
+        }
+
+        Transform(Tool, cameraManager);
+    }
+
+    private void ScalePointLight(Entity lightToTransform, GameInputManager input, Vector3F rayPlaneInterPoint)
+    {
+        var res = input.VirtualPosition / startPosition;
+            
+        if (!float.IsInfinity(_scale.X) && !float.IsInfinity(_scale.Y) && !float.IsInfinity(_scale.Z))
+        {
+            //var avg = Vector2F.Max(res);
+            var avg = Vector2F.Average(res);
+
+            _scale.X = _scale.Y = _scale.Z = avg;
+        }
+
+
+        if (!float.IsNaN(_scale.X) && !float.IsInfinity(_scale.X) && !MathHelper.IsZero(_scale.X))
+        {
+            if (_scale.X < MinimumAllowedRange)
+            {
+                _scale.X = MinimumAllowedRange;
             }
 
+            CurrentLight.Range = _previousScaleFactor * _scale.X;
+            selectedTool.Owner.Transform.ScaleFactor = new Vector3F(CurrentLight.Range);
+        }
+
+        KeepScaleForAnchors();
+        PositionAnchors(lightToTransform);
+    }
+
+    private void KeepScaleForAnchors()
+    {
+        anchorRight.Transform.SetScaleFactor(toolScale);
+        anchorForward.Transform.SetScaleFactor(toolScale);
+        anchorLeft.Transform.SetScaleFactor(toolScale);
+        anchorBackward.Transform.SetScaleFactor(toolScale);
+        anchorUp.Transform.SetScaleFactor(toolScale);
+        anchorDown.Transform.SetScaleFactor(toolScale);
+    }
+
+    protected override void HighlightSelectedTool(bool value)
+    {
+        if (selectedTool == null)
+        {
+            return;
+        }
+
+        selectedTool.TraverseByLayer(
+            current =>
+            {
+                current.IsSelected = false;
+            },
+            true);
+
+        selectedTool.IsSelected = value;
+    }
+
+    protected override void UpdateToolTransform(Entity target, CameraManager cameraManager, bool isLocalAxis, bool useTargetCenter, bool calculateTransform)
+    {
+        var camera = cameraManager.UserControlledCamera;
+        // Set tool to the local coordinates center of the target Entity (not geometrical center)
+        if (useTargetCenter)
+        {
             Tool.TraverseByLayer(
                 current =>
                 {
-                    current.Transform.Rotation = target.Transform.Rotation;
-                    current.Transform.ScaleFactor = new Vector3F(CurrentLight.Range);
+                    current.Transform.Position = target.GetCenterAbsolute();
                 },
                 true);
-            toolScale = target.GetRelativePosition(camera).Length() * MathHelper.DegreesToRadians(camera.Fov) * camera.AspectRatio * 0.1f;
-            KeepScaleForAnchors();
-            PositionAnchors(target);
-
-            if (calculateTransform)
-            {
-                Tool.TraverseByLayer(
-                    current =>
-                    {
-                        current.Transform.CalculateFinalTransform(camera, Vector3F.Zero);
-                    });
-            }
         }
-
-        private void PositionAnchors(Entity targetEntity)
+        else
         {
-            var scale = new Vector3F(CurrentLight.Range);
-            var position = targetEntity.Transform.Position;
-            var rot = targetEntity.Transform.GetRotationMatrixF();
-
-            var rightPos = position + (((scale.X) / 2 - 0.5f * toolScale) * rot.Right);
-            var forwardPos = position + ((scale.X / 2 - 0.5f * toolScale) * rot.Forward);
-            var leftPos = position + ((scale.X / 2 - 0.5f * toolScale) * rot.Left);
-            var backwardPos = position + ((scale.X / 2 - 0.5f * toolScale) * rot.Backward);
-            var upPos = position + ((scale.X / 2 - 0.5f * toolScale) * rot.Up);
-            var downPos = position + ((scale.X / 2 - 0.5f * toolScale) * rot.Down);
-
-            anchorRight.Transform.SetPosition(rightPos);
-            anchorForward.Transform.SetPosition(forwardPos);
-            anchorLeft.Transform.SetPosition(leftPos);
-            anchorBackward.Transform.SetPosition(backwardPos);
-            anchorUp.Transform.SetPosition(upPos);
-            anchorDown.Transform.SetPosition(downPos);
+            Tool.TraverseByLayer(
+                current =>
+                {
+                    current.Transform.Position = target.Transform.Pivot;
+                },
+                true);
         }
+
+        Tool.TraverseByLayer(
+            current =>
+            {
+                current.Transform.Rotation = target.Transform.Rotation;
+                current.Transform.ScaleFactor = new Vector3F(CurrentLight.Range);
+            },
+            true);
+        toolScale = target.GetRelativePosition(camera).Length() * MathHelper.DegreesToRadians(camera.Fov) * camera.AspectRatio * 0.1f;
+        KeepScaleForAnchors();
+        PositionAnchors(target);
+
+        if (calculateTransform)
+        {
+            Tool.TraverseByLayer(
+                current =>
+                {
+                    current.Transform.CalculateFinalTransform(camera, Vector3F.Zero);
+                });
+        }
+    }
+
+    private void PositionAnchors(Entity targetEntity)
+    {
+        var scale = new Vector3F(CurrentLight.Range);
+        var position = targetEntity.Transform.Position;
+        var rot = targetEntity.Transform.GetRotationMatrixF();
+
+        var rightPos = position + (((scale.X) / 2 - 0.5f * toolScale) * rot.Right);
+        var forwardPos = position + ((scale.X / 2 - 0.5f * toolScale) * rot.Forward);
+        var leftPos = position + ((scale.X / 2 - 0.5f * toolScale) * rot.Left);
+        var backwardPos = position + ((scale.X / 2 - 0.5f * toolScale) * rot.Backward);
+        var upPos = position + ((scale.X / 2 - 0.5f * toolScale) * rot.Up);
+        var downPos = position + ((scale.X / 2 - 0.5f * toolScale) * rot.Down);
+
+        anchorRight.Transform.SetPosition(rightPos);
+        anchorForward.Transform.SetPosition(forwardPos);
+        anchorLeft.Transform.SetPosition(leftPos);
+        anchorBackward.Transform.SetPosition(backwardPos);
+        anchorUp.Transform.SetPosition(upPos);
+        anchorDown.Transform.SetPosition(downPos);
     }
 }

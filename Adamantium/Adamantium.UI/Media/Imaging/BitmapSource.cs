@@ -1,5 +1,5 @@
 ﻿using System;
-using Adamantium.Engine.Graphics;
+using Adamantium.Graphics;
 using Adamantium.Imaging;
 using AdamantiumVulkan.Core;
 

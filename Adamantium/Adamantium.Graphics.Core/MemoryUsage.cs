@@ -1,0 +1,15 @@
+﻿namespace Adamantium.Graphics.Core;
+
+public enum MemoryUsage
+{
+    // Prefers not VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT.
+    CpuCopy,
+    // Guarantees VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT and VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+    CpuOnly,
+    // VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, prefers VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+    CpuToGpu,
+    // Prefers VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+    GpuOnly,
+    // Guarantees VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, prefers VK_MEMORY_PROPERTY_HOST_CACHED_BIT.
+    GpuToCpu,
+}

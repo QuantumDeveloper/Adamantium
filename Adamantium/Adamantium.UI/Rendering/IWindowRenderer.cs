@@ -1,6 +1,7 @@
 using System;
 using Adamantium.Core;
-using Adamantium.Engine.Graphics;
+using Adamantium.Graphics;
+using Adamantium.Graphics.Core.Presentation;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Media;
 

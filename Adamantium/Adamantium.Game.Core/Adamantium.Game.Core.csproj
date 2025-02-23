@@ -18,8 +18,8 @@
 
     <ItemGroup>
       <ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" />
-      <ProjectReference Include="..\Adamantium.Engine.Graphics\Adamantium.Engine.Graphics.csproj" />
-      <ProjectReference Include="..\Adamantium.EntityFramework\Adamantium.EntityFramework.csproj" />
+      <ProjectReference Include="..\Adamantium.Graphics\Adamantium.Graphics.csproj" />
+      <ProjectReference Include="..\Adamantium.ECS\Adamantium.ECS.csproj" />
       <ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
       <ProjectReference Include="..\Adamantium.UI\Adamantium.UI.csproj" />
       <ProjectReference Include="..\Adamantium.XInput\Adamantium.XInput.csproj" />

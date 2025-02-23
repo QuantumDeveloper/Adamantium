@@ -7,17 +7,17 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Win32", "Adamant
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Mathematics", "Adamantium.Mathematics\Adamantium.Mathematics.csproj", "{9A399CD8-EC18-4407-A6C0-82337D9089C7}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.EntityFramework", "Adamantium.EntityFramework\Adamantium.EntityFramework.csproj", "{9CB44D45-0B39-4EA6-9C98-1FF6302AF245}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.ECS", "Adamantium.ECS\Adamantium.ECS.csproj", "{9CB44D45-0B39-4EA6-9C98-1FF6302AF245}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.XInput", "Adamantium.XInput\Adamantium.XInput.csproj", "{94CBD019-9119-473C-BFE6-4175EBBD95AE}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.XInput.Playground", "Adamantium.XInput.Playground\Adamantium.XInput.Playground.csproj", "{4CAC9288-F82E-42CB-AB83-11C01A51D8FC}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Engine.Core", "Adamantium.Engine.Core\Adamantium.Engine.Core.csproj", "{2E2654CD-90B4-4834-8B63-19254C51B817}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Graphics.Core", "Adamantium.Graphics.Core\Adamantium.Graphics.Core.csproj", "{2E2654CD-90B4-4834-8B63-19254C51B817}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Core", "Adamantium.Core\Adamantium.Core.csproj", "{6153B7E7-EAFD-40D1-B454-22A140EC5C98}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Engine.Graphics", "Adamantium.Engine.Graphics\Adamantium.Engine.Graphics.csproj", "{FC037CF8-2D12-4B69-9AE7-082FFA4EFF92}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Graphics", "Adamantium.Graphics\Adamantium.Graphics.csproj", "{FC037CF8-2D12-4B69-9AE7-082FFA4EFF92}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AdamantiumVulkan.Core", "..\..\AdamantiumVulkan\AdamantiumVulkan.Core\AdamantiumVulkan.Core.csproj", "{DA22CB4A-2E3E-4161-9453-BCD3C49AC9D8}"
 EndProject
@@ -25,7 +25,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AdamantiumVulkan", "..\..\A
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AdamantiumVulkan.Windows", "..\..\AdamantiumVulkan\AdamantiumVulkan.Windows\AdamantiumVulkan.Windows.csproj", "{B0D8F9C6-9BEF-453B-B491-90D1C4833DF6}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.EntityFramework.Components", "Adamantium.EntityFramework.Components\Adamantium.EntityFramework.Components.csproj", "{76BFB7BF-3501-440E-A189-A4C74673E96D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.ECS.Components", "Adamantium.ECS.Components\Adamantium.ECS.Components.csproj", "{76BFB7BF-3501-440E-A189-A4C74673E96D}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Game", "Adamantium.Game\Adamantium.Game.csproj", "{A02907D8-8A1C-4D77-A397-C57CB4323021}"
 EndProject
@@ -143,13 +143,17 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.UI.Generators", 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Game.Core", "Adamantium.Game.Core\Adamantium.Game.Core.csproj", "{E74790EB-75A8-4D70-ABD4-EDB61C4209CD}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Engine.Effects", "Adamantium.Engine.Effects\Adamantium.Engine.Effects.csproj", "{E0093086-D17A-490E-93DB-AB9B73EF18A0}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.EffectsCompiler", "Adamantium.EffectsCompiler\Adamantium.EffectsCompiler.csproj", "{E0093086-D17A-490E-93DB-AB9B73EF18A0}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Engine.Generators", "Adamantium.Engine.Generators\Adamantium.Engine.Generators.csproj", "{4B40C0E5-C9E4-49BF-A045-CD7F319ACB20}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuantumBinding.Utils", "..\..\QuantumBinding\QuantumBinding.Utils\QuantumBinding.Utils.csproj", "{3F365370-F1B0-4BCC-A0F9-444ECCAC9ED0}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AdamantiumVulkan.Spirv", "..\..\AdamantiumVulkan\AdamantiumVulkan.Spirv\AdamantiumVulkan.Spirv.csproj", "{2D615292-EF62-4CE3-8BDD-C7A52AD2DF83}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.FX", "Adamantium.FX\Adamantium.FX.csproj", "{EDFED276-8D13-42CE-AB74-ECD428286799}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.ProceduralGeometry", "Adamantium.ProceduralGeometry\Adamantium.ProceduralGeometry.csproj", "{EA77B1C1-583E-4375-9F78-5546A8911CC1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -739,6 +743,38 @@ Global
 		{2D615292-EF62-4CE3-8BDD-C7A52AD2DF83}.Release|x64.Build.0 = Release|x64
 		{2D615292-EF62-4CE3-8BDD-C7A52AD2DF83}.Release|x86.ActiveCfg = Release|x64
 		{2D615292-EF62-4CE3-8BDD-C7A52AD2DF83}.Release|x86.Build.0 = Release|x64
+		{EDFED276-8D13-42CE-AB74-ECD428286799}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EDFED276-8D13-42CE-AB74-ECD428286799}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EDFED276-8D13-42CE-AB74-ECD428286799}.Debug|arm64.ActiveCfg = Debug|Any CPU
+		{EDFED276-8D13-42CE-AB74-ECD428286799}.Debug|arm64.Build.0 = Debug|Any CPU
+		{EDFED276-8D13-42CE-AB74-ECD428286799}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{EDFED276-8D13-42CE-AB74-ECD428286799}.Debug|x64.Build.0 = Debug|Any CPU
+		{EDFED276-8D13-42CE-AB74-ECD428286799}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{EDFED276-8D13-42CE-AB74-ECD428286799}.Debug|x86.Build.0 = Debug|Any CPU
+		{EDFED276-8D13-42CE-AB74-ECD428286799}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EDFED276-8D13-42CE-AB74-ECD428286799}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EDFED276-8D13-42CE-AB74-ECD428286799}.Release|arm64.ActiveCfg = Release|Any CPU
+		{EDFED276-8D13-42CE-AB74-ECD428286799}.Release|arm64.Build.0 = Release|Any CPU
+		{EDFED276-8D13-42CE-AB74-ECD428286799}.Release|x64.ActiveCfg = Release|Any CPU
+		{EDFED276-8D13-42CE-AB74-ECD428286799}.Release|x64.Build.0 = Release|Any CPU
+		{EDFED276-8D13-42CE-AB74-ECD428286799}.Release|x86.ActiveCfg = Release|Any CPU
+		{EDFED276-8D13-42CE-AB74-ECD428286799}.Release|x86.Build.0 = Release|Any CPU
+		{EA77B1C1-583E-4375-9F78-5546A8911CC1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EA77B1C1-583E-4375-9F78-5546A8911CC1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EA77B1C1-583E-4375-9F78-5546A8911CC1}.Debug|arm64.ActiveCfg = Debug|Any CPU
+		{EA77B1C1-583E-4375-9F78-5546A8911CC1}.Debug|arm64.Build.0 = Debug|Any CPU
+		{EA77B1C1-583E-4375-9F78-5546A8911CC1}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{EA77B1C1-583E-4375-9F78-5546A8911CC1}.Debug|x64.Build.0 = Debug|Any CPU
+		{EA77B1C1-583E-4375-9F78-5546A8911CC1}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{EA77B1C1-583E-4375-9F78-5546A8911CC1}.Debug|x86.Build.0 = Debug|Any CPU
+		{EA77B1C1-583E-4375-9F78-5546A8911CC1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EA77B1C1-583E-4375-9F78-5546A8911CC1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EA77B1C1-583E-4375-9F78-5546A8911CC1}.Release|arm64.ActiveCfg = Release|Any CPU
+		{EA77B1C1-583E-4375-9F78-5546A8911CC1}.Release|arm64.Build.0 = Release|Any CPU
+		{EA77B1C1-583E-4375-9F78-5546A8911CC1}.Release|x64.ActiveCfg = Release|Any CPU
+		{EA77B1C1-583E-4375-9F78-5546A8911CC1}.Release|x64.Build.0 = Release|Any CPU
+		{EA77B1C1-583E-4375-9F78-5546A8911CC1}.Release|x86.ActiveCfg = Release|Any CPU
+		{EA77B1C1-583E-4375-9F78-5546A8911CC1}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

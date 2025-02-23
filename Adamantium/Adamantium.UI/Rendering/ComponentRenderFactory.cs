@@ -1,5 +1,7 @@
-using Adamantium.Engine.Graphics;
-using Adamantium.Engine.Graphics.Fonts;
+using Adamantium.FX.Effects.Generated;
+using Adamantium.Graphics;
+using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Fonts;
 using Adamantium.UI.Media;
 using Adamantium.UI.Media.Imaging;
 
@@ -7,19 +9,22 @@ namespace Adamantium.UI.Rendering;
 
 internal static class ComponentRenderFactory
 {
-    public static GeometryRenderer CreateGeometryRenderer(GraphicsDevice device, Geometry geometry, Brush background, Brush foreground, Texture texture = null)
+    public static GeometryRenderer CreateGeometryRenderer(IGraphicsDevice device, Media.Geometry geometry, Brush background, Brush foreground, BasicEffect basicEffect, Texture texture = null)
     {
-        return new GeometryRenderer(device, geometry, background, foreground, texture);
+        return new GeometryRenderer(device, geometry, background, foreground, basicEffect, texture);
     }
 
-    public static ImageRenderer CreateImageRenderer(GraphicsDevice device, Geometry geometry, Brush background,
-        ImageSource image)
+    public static ImageRenderer CreateImageRenderer(IGraphicsDevice device, Media.Geometry geometry, Brush background,
+        ImageSource image, BasicEffect basicEffect)
     {
-        return new ImageRenderer(device, geometry, background, image);
+        return new ImageRenderer(device, geometry, background, image, basicEffect);
     }
-    
-    public static TextRenderer CreateTextRenderer(GraphicsDevice device, Geometry geometry, TextLayout layout, TextRenderingParameters renderingParameters, Brush brush, Brush background)
+
+    public static TextRenderer CreateTextRenderer(IGraphicsDevice device, 
+        Geometry geometry, 
+        TextLayout layout,
+        TextRenderingParameters renderingParameters, Brush brush, Brush background, BasicEffect basicEffect)
     {
-        return new TextRenderer(device, geometry, layout, renderingParameters, brush, background);
+        return new TextRenderer(device, geometry, layout, renderingParameters, brush, background, basicEffect);
     }
 }

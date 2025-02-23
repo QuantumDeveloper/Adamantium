@@ -1,10 +1,9 @@
 ﻿using System.Diagnostics;
 using System.Threading;
 using Adamantium.Core;
-using Adamantium.Engine.Graphics;
-using Adamantium.Engine.Graphics.Fonts;
-using Adamantium.EntityFramework;
-using Adamantium.Fonts;
+using Adamantium.ECS;
+using Adamantium.Graphics;
+using Adamantium.Graphics.Core.Presentation;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Events;
 using Adamantium.UI.Extensions;
@@ -56,9 +55,9 @@ public class WindowRenderService : UiRenderService
             HInstanceHandle = Process.GetCurrentProcess().Handle
         };
             
-        GraphicsDevice = GraphicsDeviceService.CreateRenderDevice(@parameters);
+        GraphicsDevice = (GraphicsDevice)GraphicsDeviceService.CreateRenderDevice(@parameters);
         GraphicsDevice.ClearColor = Colors.CornflowerBlue;
-        GraphicsDevice.AddDynamicStates(DynamicState.Viewport, DynamicState.Scissor);
+        //GraphicsDevice.AddDynamicStates(DynamicState.Viewport, DynamicState.Scissor);
 
         windowRenderer = Window.Renderer ?? new ForwardWindowRenderer(GraphicsDevice);
         windowRenderer.SetWindow(Window);

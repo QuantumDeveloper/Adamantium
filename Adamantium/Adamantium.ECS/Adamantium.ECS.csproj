@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<Platforms>x64</Platforms>
+		<Configurations>Debug;Release</Configurations>
+		<LangVersion>latest</LangVersion>
+		<BaseOutputPath>..\..\output\Adamantium.EntityFramework\bin</BaseOutputPath>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" />
+		<ProjectReference Include="..\Adamantium.Graphics.Core\Adamantium.Graphics.Core.csproj" />
+		<ProjectReference Include="..\Adamantium.Graphics\Adamantium.Graphics.csproj" />
+		<ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
+		<ProjectReference Include="..\Adamantium.Win32\Adamantium.Win32.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Compile Remove="obj\**" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <EmbeddedResource Remove="obj\**" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Remove="obj\**" />
+	</ItemGroup>
+
+</Project>

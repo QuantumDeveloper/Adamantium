@@ -24,8 +24,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Adamantium.Engine.Core\Adamantium.Engine.Core.csproj" />
-    <ProjectReference Include="..\..\Adamantium.Engine.Graphics\Adamantium.Engine.Graphics.csproj" />
+    <ProjectReference Include="..\..\Adamantium.Graphics.Core\Adamantium.Graphics.Core.csproj" />
+    <ProjectReference Include="..\..\Adamantium.Graphics\Adamantium.Graphics.csproj" />
     <ProjectReference Include="..\..\Adamantium.Imaging\Adamantium.Imaging.csproj" />
   </ItemGroup>
 

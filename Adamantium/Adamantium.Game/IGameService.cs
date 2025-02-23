@@ -1,9 +1,10 @@
 using System;
 using System.Collections.Generic;
 using Adamantium.Core;
-using Adamantium.Engine.Graphics;
-using Adamantium.EntityFramework;
+using Adamantium.ECS;
 using Adamantium.Game.Core;
+using Adamantium.Graphics;
+using Adamantium.Graphics.Core;
 using Adamantium.UI.Controls;
 
 namespace Adamantium.Game;
@@ -18,7 +19,7 @@ public interface IGameService
 
     public void RunGames(IRenderService renderService, AppTime time);
 
-    public void CopyOutput(GraphicsDevice graphicsDevice);
+    public void CopyOutput(IGraphicsDevice graphicsDevice);
 
     public event Action<IGame> OnGameAdded;
 }

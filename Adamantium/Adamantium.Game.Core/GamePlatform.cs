@@ -1,10 +1,11 @@
 ﻿using Adamantium.Core.Collections;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.Core.Events;
-using Adamantium.Engine.Graphics;
 using Adamantium.Game.Core.Events;
 using Adamantium.Game.Core.Input;
 using Adamantium.Game.Core.Payloads;
+using Adamantium.Graphics;
+using Adamantium.Graphics.Core;
 using Adamantium.Imaging;
 using Adamantium.UI;
 using Adamantium.UI.Controls;

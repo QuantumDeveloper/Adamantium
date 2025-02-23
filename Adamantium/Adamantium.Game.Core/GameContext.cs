@@ -1,5 +1,6 @@
 ﻿using Adamantium.Core;
-using Adamantium.Engine.Graphics;
+using Adamantium.Graphics;
+using Adamantium.Graphics.Core;
 using Adamantium.UI.Controls;
 using Object = System.Object;
 
@@ -16,7 +17,7 @@ namespace Adamantium.Game.Core
        /// <param name="context">Object that represents surface on which Graphics content will be drawn</param>
        /// <param name="graphicsDevice">Graphics device on which current context was created</param>
        /// <exception cref="NotSupportedException"></exception>
-       public GameContext(Object context, GraphicsDevice graphicsDevice = null)
+       public GameContext(Object context, IGraphicsDevice graphicsDevice = null)
       {
          var type = context.GetType();
          if (Utilities.IsTypeInheritFrom(type, typeof(IWindow)))
@@ -48,7 +49,7 @@ namespace Adamantium.Game.Core
       /// <summary>
       /// Device on which context was created 
       /// </summary>
-      public GraphicsDevice GraphicsDevice { get; }
+      public IGraphicsDevice GraphicsDevice { get; }
 
       /// <summary>
       /// Determines whether the specified object is equal to the current object.
