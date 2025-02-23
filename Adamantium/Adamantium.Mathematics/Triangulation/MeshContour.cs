@@ -271,6 +271,13 @@ public class MeshContour
         
         copy.Points = new Vector2[Points.Length];
         Array.Copy(Points, copy.Points, Points.Length);
+        
+        for (var i = 0; i < copy.Points.Length; i++)
+        {
+            var point = copy.Points[i];
+            copy.Points[i] = Vector2.Round(point, 3);
+        }
+        
         if (GeometryPoints != null) copy.GeometryPoints = new List<GeometryIntersection>(GeometryPoints);
         copy.Name = Name;
         copy.IsGeometryClosed = IsGeometryClosed;

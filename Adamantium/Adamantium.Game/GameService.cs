@@ -4,9 +4,10 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Adamantium.Core;
-using Adamantium.Engine.Graphics;
-using Adamantium.EntityFramework;
+using Adamantium.ECS;
 using Adamantium.Game.Core;
+using Adamantium.Graphics;
+using Adamantium.Graphics.Core;
 using Adamantium.UI.Controls;
 
 namespace Adamantium.Game;
@@ -73,7 +74,7 @@ public class GameService : IGameService
         }
     }
 
-    public void CopyOutput(GraphicsDevice graphicsDevice)
+    public void CopyOutput(IGraphicsDevice graphicsDevice)
     {
         var timer = Stopwatch.StartNew();
         foreach (var game in Games)

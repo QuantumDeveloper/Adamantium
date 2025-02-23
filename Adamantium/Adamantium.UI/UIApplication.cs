@@ -7,9 +7,9 @@ using Adamantium.Core;
 using Adamantium.Core.Collections;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.Core.Events;
-using Adamantium.Engine.Core;
-using Adamantium.Engine.Graphics;
-using Adamantium.EntityFramework;
+using Adamantium.ECS;
+using Adamantium.Graphics;
+using Adamantium.Graphics.Core;
 using Adamantium.UI.AggregatorEvents;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Events;
@@ -70,7 +70,7 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
         Container = AdamantiumDependencyContainer.Current;
         EventAggregator = Container.Resolve<IEventAggregator>();
 
-        GraphicsDeviceService = new GraphicsDeviceService(EnableGraphicsDebug);
+        GraphicsDeviceService = new GraphicsDeviceService(Container.Resolve<IGraphicsDeviceFactory>(), EnableGraphicsDebug);
         
         EntityWorld = new EntityWorld(Container);
         RegisterBasicServices(Container);
@@ -138,7 +138,7 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
 
     public Type StartupType { get; set; }
 
-    public AdamantiumDependencyContainer Container { get; private set; }
+    public IDependencyContainer Container { get; private set; }
 
     protected IGraphicsDeviceService GraphicsDeviceService { get; private set; }
     
@@ -208,9 +208,8 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
 
     private void OnWindowRemoved(IWindow window)
     {
-        if (!windowToSystem.ContainsKey(window)) return;
-        
-        var service = windowToSystem[window];
+        if (!windowToSystem.TryGetValue(window, out var service)) return;
+
         service.UnloadContent();
         windowToSystem.Remove(window);
         windowsCollection.Remove(window);
@@ -230,7 +229,7 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
         cancellationTokenSource = new CancellationTokenSource();
         Dispatcher.Initialize();
         GraphicsDeviceService.IsInDebugMode = EnableGraphicsDebug;
-        GraphicsDeviceService.CreateMainDevice("Adamantium Main", true);
+        GraphicsDeviceService.CreateMainDevice("Adamantium Main");
         ThemeManager = new ThemeManager(Container);
         LoadResources();
         LoadThemes();

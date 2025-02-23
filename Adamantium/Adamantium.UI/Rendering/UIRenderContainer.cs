@@ -1,5 +1,6 @@
 using System.Collections.Generic;
-using Adamantium.Engine.Graphics;
+using Adamantium.Graphics;
+using Adamantium.Graphics.Core;
 
 namespace Adamantium.UI.Rendering;
 
@@ -26,7 +27,7 @@ internal class UIRenderContainer
         ChildUnits.Clear();
     }
 
-    public void Draw(GraphicsDevice device, IUIComponent component, Matrix4x4F projectionMatrix)
+    public void Draw(IGraphicsDevice device, IUIComponent component, Matrix4x4F projectionMatrix)
     {
         foreach (var renderUnit in ChildUnits)
         {

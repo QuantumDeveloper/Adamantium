@@ -1,7 +1,9 @@
 using System.Diagnostics;
 using Adamantium.Core;
-using Adamantium.Engine.Graphics;
-using Adamantium.Engine.Graphics.Effects;
+using Adamantium.Graphics;
+using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Core.EffectsFramework;
+using Adamantium.Graphics.Core.Presentation;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Media;
 using AdamantiumVulkan.Core;
@@ -14,12 +16,12 @@ public abstract class WindowRendererBase : IWindowRenderer
     protected Rect2D Scissor { get; set; }
     protected Rect2D ClipRect { get; set; }
     protected Matrix4x4F ProjectionMatrix { get; set; }
-    protected GraphicsDevice GraphicsDevice { get; set; }
+    protected IGraphicsDevice GraphicsDevice { get; set; }
     protected PresentationParameters Parameters { get; set; }
     
     protected Effect UiEffect { get; set; }
     
-    protected WindowRendererBase(GraphicsDevice device)
+    protected WindowRendererBase(IGraphicsDevice device)
     {
         Viewport = new Viewport();
         Scissor = new Rect2D();

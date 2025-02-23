@@ -1,5 +1,6 @@
 using Adamantium.Core;
-using Adamantium.Engine.Graphics;
+using Adamantium.Graphics;
+using Adamantium.Graphics.Core;
 using Adamantium.UI.Media.Imaging;
 
 namespace Adamantium.UI.Rendering;
@@ -46,7 +47,7 @@ internal class RenderUnit : DisposableObject
         StrokeRenderer?.Dispose();
     }
 
-    public void Draw(GraphicsDevice graphicsDevice, IUIComponent component, Matrix4x4F projectionMatrix)
+    public void Draw(IGraphicsDevice graphicsDevice, IUIComponent component, Matrix4x4F projectionMatrix)
     {
         geometryRenderer?.Draw(graphicsDevice, component, Image, projectionMatrix);
         strokeRenderer?.Draw(graphicsDevice, component, projectionMatrix);

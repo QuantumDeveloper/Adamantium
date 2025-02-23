@@ -1,15 +1,15 @@
 ﻿using Adamantium.Core;
-using Adamantium.EntityFramework;
+using Adamantium.ECS;
 using Adamantium.Game;
 using Adamantium.Game.Core;
 
-//using Texture2D = Adamantium.Engine.Graphics.Texture2D;
+//using Texture2D = Adamantium.Graphics.Texture2D;
 
-namespace Adamantium.Engine.EntityServices
+namespace Adamantium.Engine.EntityServices;
+
+public class DeferredRenderingService : RenderingService
 {
-    public class DeferredRenderingService : RenderingService
-    {
-        //Clear Shader
+    //Clear Shader
 //        Effect Clear;
 //        //GBuffer Shader
 //        Effect GBuffer;
@@ -44,41 +44,41 @@ namespace Adamantium.Engine.EntityServices
 //        private RenderTarget2D _albedoBufferRT;
 //        private RenderTarget2D _normalsBufferRT;
 
-        public DeferredRenderingService(EntityWorld world, GameOutput window) : base(world, window)
-        {
-        }
+    public DeferredRenderingService(EntityWorld world, GameOutput window) : base(world, window)
+    {
+    }
 
-        public override void LoadContent()
-        {
-            CreateResources();
-            CreateSystemResources();
-        }
+    public override void LoadContent()
+    {
+        CreateResources();
+        CreateSystemResources();
+    }
 
-        protected override void OnWindowParametersChanging(ChangeReason reason)
-        {
-            DisposeSystemResources();
-        }
+    protected override void OnWindowParametersChanging(ChangeReason reason)
+    {
+        DisposeSystemResources();
+    }
 
-        protected override void OnWindowParametersChanged(ChangeReason reason)
-        {
-            CreateSystemResources();
-        }
+    protected override void OnWindowParametersChanged(ChangeReason reason)
+    {
+        CreateSystemResources();
+    }
 
-        public override void UnloadContent()
-        {
-            DisposeSystemResources();
-            base.UnloadContent();
-        }
+    public override void UnloadContent()
+    {
+        DisposeSystemResources();
+        base.UnloadContent();
+    }
 
-        protected override void OnDeviceChangeEnd()
-        {
-            base.OnDeviceChangeEnd();
-            //DeferredDevice = GraphicsDevice;
-            CreateResources();
-        }
+    protected override void OnDeviceChangeEnd()
+    {
+        base.OnDeviceChangeEnd();
+        //DeferredDevice = GraphicsDevice;
+        CreateResources();
+    }
 
-        private void CreateResources()
-        {
+    private void CreateResources()
+    {
 //            Clear = Content.Load<Effect>("Effects/DeferredShading/Clear");
 //            GBuffer = Content.Load<Effect>("Effects/DeferredShading/GBuffer");
 //            directionalLight = Content.Load<Effect>("Effects/DeferredShading/DirectionalLight");
@@ -86,17 +86,17 @@ namespace Adamantium.Engine.EntityServices
 //            pointLight = Content.Load<Effect>("Effects/DeferredShading/PointLight");
 //            compose = Content.Load<Effect>("Effects/DeferredShading/Composition");
 //            LoadTextures();
-        }
+    }
 
-        private void LoadTextures()
-        {
+    private void LoadTextures()
+    {
 //            AlbedoTexture = Content.Load<Texture2D>("Textures/ForwardPlusDefaultTextures/DefaultDiffuse.tga");
 //            NormalTexture = Content.Load<Texture2D>("Textures/ForwardPlusDefaultTextures/DefaultNormal.tga");
 //            SpecularTexture = Content.Load<Texture2D>("Textures/ForwardPlusDefaultTextures/DefaultSpecular.tga");
-        }
+    }
 
-        private void DisposeSystemResources()
-        {
+    private void DisposeSystemResources()
+    {
 //            D2dDevice?.Dispose();
 //            LightMap?.Dispose();
 //            ShadowMapCube?.Dispose();
@@ -107,10 +107,10 @@ namespace Adamantium.Engine.EntityServices
 //            _albedoBufferRT?.Dispose();
 //            _normalsBufferRT?.Dispose();
 //            _depthBufferRT?.Dispose();
-        }
+    }
 
-        public sealed override void CreateSystemResources()
-        {
+    public sealed override void CreateSystemResources()
+    {
 //            GBufferTextureSize = new Vector2F(Window.Width, Window.Height);
 //            depthStencilBuffer = DepthStencilBuffer.New(GraphicsDevice, Window.Width, Window.Height, DepthFormat.Depth32Stencil8X24);
 //            //shadowDepthBuffer = DepthStencilBuffer.New(GraphicsDevice, 1024, 1024, Window.DepthFormat);
@@ -119,7 +119,7 @@ namespace Adamantium.Engine.EntityServices
 //            _depthBufferRT = RenderTarget2D.New(GraphicsDevice, Window.Width, Window.Height, 1, SurfaceFormat.R32G32.Float);
 //            LightMap = RenderTarget2D.New(GraphicsDevice, Window.Width, Window.Height, 1, SurfaceFormat.R16G16B16A16.Float);
 //            Final = RenderTarget2D.New(GraphicsDevice, Window.Width, Window.Height, 1, Window.PixelFormat);
-            //ShadowMap = RenderTarget2D.New(GraphicsDevice, 1024, 1024, 1, SurfaceFormat.R32.Float);
+        //ShadowMap = RenderTarget2D.New(GraphicsDevice, 1024, 1024, 1, SurfaceFormat.R32.Float);
 
 //            Texture2DDescription description = new Texture2DDescription();
 //            description.Width = 1024;
@@ -133,17 +133,17 @@ namespace Adamantium.Engine.EntityServices
 //            description.Usage = ResourceUsage.Default;
 //            description.CpuAccessFlags = CpuAccessFlags.None;
 
-            //ShadowMapCube = RenderTargetCube.New(GraphicsDevice, description);
+        //ShadowMapCube = RenderTargetCube.New(GraphicsDevice, description);
 
 //            D2dDevice = D2DGraphicDevice.New(DeferredDevice, Final);
-        }
+    }
 
-        private void MakeLightMap()
+    private void MakeLightMap()
+    {
+        if (Entities.Count == 0)
         {
-            if (Entities.Count == 0)
-            {
-                return;
-            }
+            return;
+        }
 
 //            DeferredDevice.ResetTargets();
 //            DeferredDevice.SetTargets(LightMap, null);
@@ -311,7 +311,7 @@ namespace Adamantium.Engine.EntityServices
 //            DeferredDevice.RasterizerState  = DeferredDevice.RasterizerStates.CullNoneClipDisabled;
 //            DeferredDevice.DepthStencilState = DeferredDevice.DepthStencilStates.DepthEnableGreaterEqual;
 
-        }
+    }
 
 //        private void MakeFinal(RenderTarget2D output)
 //        {
@@ -332,8 +332,8 @@ namespace Adamantium.Engine.EntityServices
 //            compose.CurrentTechnique.Passes[0].UnApply();
 //        }
 
-        private void MakeGBuffer()
-        {
+    private void MakeGBuffer()
+    {
 //            DeferredDevice.SetRenderTargets(depthStencilBuffer, _albedoBufferRT, _normalsBufferRT, _depthBufferRT);
 //            DeferredDevice.DepthStencilState = DeferredDevice.DepthStencilStates.DepthEnableGreaterEqual;
 //            DeferredDevice.RasterizerState = DeferredDevice.RasterizerStates.CullBackClipDisabled;
@@ -349,10 +349,10 @@ namespace Adamantium.Engine.EntityServices
 //            {
 //                entity.TraverseInDepth(DrawEntity);
 //            }
-        }
+    }
 
-        private void DrawEntity(Entity current)
-        {
+    private void DrawEntity(Entity current)
+    {
 //            var meshRenderer = current.GetComponent<MeshRendererBase>();
 //            if (meshRenderer == null)
 //            {
@@ -393,10 +393,10 @@ namespace Adamantium.Engine.EntityServices
 //            }
 //
 //            meshRenderer.Draw(GraphicsDevice, GameTime);
-        }
+    }
 
-        private void ClearGBuffer()
-        {
+    private void ClearGBuffer()
+    {
 //            DeferredDevice.DepthStencilState = DeferredDevice.DepthStencilStates.None;
 //            DeferredDevice.BlendState = GraphicsDevice.BlendStates.Opaque;
 //            DeferredDevice.RasterizerState = GraphicsDevice.RasterizerStates.CullNoneClipDisabled;
@@ -406,10 +406,10 @@ namespace Adamantium.Engine.EntityServices
 //            Clear.Parameters["AlbedoColor"].SetValue(Colors.Transparent.ToVector4());
 //            Clear.CurrentTechnique.Passes[0].Apply();
 //            DeferredDevice.Quad.DrawRaw();
-        }
+    }
 
-        public override void Draw(AppTime gameTime)
-        {
+    public override void Draw(AppTime gameTime)
+    {
 //            base.Draw(gameTime);
 //            if (ActiveCamera == null)
 //            {
@@ -442,10 +442,10 @@ namespace Adamantium.Engine.EntityServices
 //            DrawLightIcons();
 //            DrawCameraIcons();
 //            DrawAdditionalStuff();
-        }
+    }
 
-        protected override void Debug()
-        {
+    protected override void Debug()
+    {
 //            SpriteBatch.Begin(SpriteSortMode.NoSort, 
 //                GraphicsDeviceService.GraphicsDevice.BlendStates.Opaque, 
 //                GraphicsDeviceService.GraphicsDevice.SamplersStates.PointClamp,
@@ -465,10 +465,10 @@ namespace Adamantium.Engine.EntityServices
 //
 //            //End SpriteBatch
 //            SpriteBatch.End();
-        }
+    }
 
-        public override void EndDraw()
-        {
+    public override void EndDraw()
+    {
 //            if (GraphicsDevice.IsD2dSupportEnabled)
 //            {
 //                D2dDevice.BeginDraw();
@@ -491,7 +491,5 @@ namespace Adamantium.Engine.EntityServices
 //                SpriteBatch.End();
 //            }
 //            base.EndDraw();
-        }
     }
 }
-

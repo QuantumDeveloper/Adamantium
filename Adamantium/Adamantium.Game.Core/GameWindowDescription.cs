@@ -1,9 +1,9 @@
-﻿using System;
-using Adamantium.Core;
-using Adamantium.Engine.Graphics;
+﻿using Adamantium.Core;
+using Adamantium.Graphics;
+using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Core.Presentation;
 using Adamantium.Imaging;
 using AdamantiumVulkan.Core;
-using Buffer = Adamantium.Engine.Graphics.Buffer;
 
 namespace Adamantium.Game.Core
 {

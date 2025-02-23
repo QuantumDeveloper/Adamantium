@@ -3,7 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using Adamantium.Core;
-using Adamantium.Engine.Effects;
+using Adamantium.EffectsCompiler;
 using Microsoft.CodeAnalysis;
 
 namespace Adamantium.Engine.Generators;
@@ -75,9 +75,9 @@ public class EffectsGenerator : IIncrementalGenerator
     private string GenerateEffect(EffectCompilerResult result, Compilation compilation, string fxName, string @namespace)
     {
         var textGenerator = new TextGenerator();
-        textGenerator.WriteLine("using Adamantium.Engine.Effects;");
-        textGenerator.WriteLine("using Adamantium.Engine.Graphics;");
-        textGenerator.WriteLine("using Adamantium.Engine.Graphics.Effects;");
+        textGenerator.WriteLine("using Adamantium.EffectsCompiler;");
+        textGenerator.WriteLine("using Adamantium.Graphics.Core;");
+        textGenerator.WriteLine("using Adamantium.Graphics.Core.EffectsFramework;");
 
         textGenerator.NewLine();
 
@@ -96,7 +96,7 @@ public class EffectsGenerator : IIncrementalGenerator
 
         textGenerator.NewLine();
 
-        textGenerator.WriteLine($"public {fxName}(GraphicsDevice device, EffectPool effectPool = null) " +
+        textGenerator.WriteLine($"public {fxName}(IGraphicsDevice device, EffectPool effectPool = null) " +
                                 $": base(device, bytecode, effectPool)");
         textGenerator.WriteOpenBraceAndIndent();
 
@@ -147,7 +147,7 @@ public class EffectsGenerator : IIncrementalGenerator
 
         foreach (var pass in effectPasses)
         {
-            textGenerator.WriteLine($"public EffectPass {pass} {{get;}}");
+            textGenerator.WriteLine($"public IEffectPass {pass} {{get;}}");
         }
 
         textGenerator.NewLine();

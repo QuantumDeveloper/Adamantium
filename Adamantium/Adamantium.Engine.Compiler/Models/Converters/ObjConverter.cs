@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using Adamantium.Engine.Compiler.Converter.Configs;
 using Adamantium.Engine.Compiler.Converter.Containers;
-using Adamantium.Engine.Core.Models;
 using Adamantium.Engine.Compiler.Converter.Parsers;
 using Adamantium.Engine.Compiler.Models.ConversionUtils;
+using Adamantium.Graphics.Core.Models;
 
 namespace Adamantium.Engine.Compiler.Converter.Converters
 {

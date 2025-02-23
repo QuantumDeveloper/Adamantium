@@ -1,4 +1,4 @@
-using Adamantium.Engine.Core.Models;
+using Adamantium.Graphics.Core.Models;
 
 namespace Adamantium.UI.Extensions;
 

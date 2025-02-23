@@ -2,238 +2,238 @@
 using System.Collections.ObjectModel;
 using System.Linq;
 using Adamantium.Core;
-using Adamantium.Engine.Core.Models;
-using Adamantium.Engine.Graphics;
 using Adamantium.Engine.Templates.Lights;
 using Adamantium.Engine.Tools;
-using Adamantium.EntityFramework;
-using Adamantium.EntityFramework.Components;
-using Adamantium.EntityFramework.Components.Extensions;
+using Adamantium.ECS;
+using Adamantium.ECS.Components;
+using Adamantium.ECS.Components.Extensions;
 using Adamantium.Game.Core;
 using Adamantium.Game.Core.Input;
+using Adamantium.Graphics;
+using Adamantium.Graphics.Core.Models;
 using Adamantium.Mathematics;
 
-namespace Adamantium.Engine.Managers
+namespace Adamantium.Engine.Managers;
+
+public class LightManager : GameManagerBase
 {
-    public class LightManager : GameManagerBase
-    {
-        private List<Light> lights;
-        //private Effect depthWriter;
-        //private Game game;
+    private List<Light> lights;
+    //private Effect depthWriter;
+    //private Game game;
 
-        private object _syncObj = new object();
+    private object _syncObj = new object();
 
-        private ReadOnlyCollection<Light> _lights;
-        public ReadOnlyCollection<Light> Lights => _lights;
+    private ReadOnlyCollection<Light> _lights;
+    public ReadOnlyCollection<Light> Lights => _lights;
 
-        public List<Light> SpotLights { get; private set; }
-        public List<Light> PointLights { get; private set; }
-        public List<Light> DirectionalLights { get; private set; }
+    public List<Light> SpotLights { get; private set; }
+    public List<Light> PointLights { get; private set; }
+    public List<Light> DirectionalLights { get; private set; }
 
-        private Entity DirectionalLightIcon;
-        private Entity PointLightIcon;
-        private Entity SpotLightIcon;
-        private Entity DirectionalLightVisual;
-        private Entity PointLightVisual;
-        private Entity SpotLightVisual;
+    private Entity DirectionalLightIcon;
+    private Entity PointLightIcon;
+    private Entity SpotLightIcon;
+    private Entity DirectionalLightVisual;
+    private Entity PointLightVisual;
+    private Entity SpotLightVisual;
 
-        private Collider directionalCollider;
-        private Collider pointCollider;
-        private Collider spotCollider;
+    private Collider directionalCollider;
+    private Collider pointCollider;
+    private Collider spotCollider;
         
-        private EntityGroup _lightsGroup;
+    private EntityGroup _lightsGroup;
 
-        private Entity SpotLightMesh;
-        private Entity PointLightMesh;
+    private Entity SpotLightMesh;
+    private Entity PointLightMesh;
 
-        private MeshRenderer spotLightRenderer;
-        private MeshRenderer pointLightRenderer;
-        private LightToolBase currentToolBase;
+    private MeshRenderer spotLightRenderer;
+    private MeshRenderer pointLightRenderer;
+    private LightToolBase currentToolBase;
 
-        private DirectionalLightTool DirectionalLightTool { get; set; }
+    private DirectionalLightTool DirectionalLightTool { get; set; }
 
-        private SpotLightTool SpotLightTool { get; set; }
+    private SpotLightTool SpotLightTool { get; set; }
 
-        private PointLightTool PointLightTool { get; set; }
+    private PointLightTool PointLightTool { get; set; }
 
-        public LightManager(IGame game): base(game)
+    public LightManager(IGame game): base(game)
+    {
+        Container.RegisterInstance<LightManager>(this);
+        //depthWriter = game.Content.Load<Effect>("Effects/DeferredShading/DepthWriter");
+        lights = new List<Light>();
+        _lights = new ReadOnlyCollection<Light>(lights);
+        _lightsGroup = new EntityGroup("Lights");
+        EntityWorld.EntityManager.AddGroup(_lightsGroup);
+
+        SpotLightMesh = new SpotLightMeshTemplate().BuildEntity();
+        PointLightMesh = new PointLightMeshTemplate().BuildEntity();
+
+        spotLightRenderer = SpotLightMesh.GetComponent<MeshRenderer>();
+        pointLightRenderer = PointLightMesh.GetComponent<MeshRenderer>();
+
+        DirectionalLights = new List<Light>();
+        SpotLights = new List<Light>();
+        PointLights = new List<Light>();
+
+        SpotLightTool = new SpotLightTool(nameof(Tools.SpotLightTool));
+        PointLightTool = new PointLightTool(nameof(Tools.PointLightTool));
+        DirectionalLightTool = new DirectionalLightTool(nameof(Tools.DirectionalLightTool));
+        SpotLightTool.Enabled = true;
+        PointLightTool.Enabled = true;
+        DirectionalLightTool.Enabled = true;
+
+        EntityWorld.EntityManager.AddToGroup(SpotLightTool.Tool, "Lights");
+        EntityWorld.EntityManager.AddToGroup(PointLightTool.Tool, "Lights");
+        EntityWorld.EntityManager.AddToGroup(DirectionalLightTool.Tool, "Lights");
+
+        //Task.Run(() => CreateLightsIcons());
+        //Task.Run(() => CreateLightsVisual());
+    }
+
+    public void Update()
+    {
+        DirectionalLights.Clear();
+        DirectionalLights = _lights.Where(x => x.Type == LightType.Directional).ToList();
+
+        SpotLights.Clear();
+        SpotLights = _lights.Where(x => x.Type == LightType.Spot).ToList();
+
+        PointLights.Clear();
+        PointLights = _lights.Where(x => x.Type == LightType.Point).ToList();
+    }
+
+    private void CreateLightsIcons()
+    {
+        DirectionalLightIcon = new DirectionalLightIconTemplate().BuildEntity(null, "Directional Light Icon");
+        PointLightIcon = new PointLightIconTemplate().BuildEntity(null, "Point light icon");
+        SpotLightIcon = new SpotLightIconTemplate().BuildEntity(null, "Spot light icon");
+
+        directionalCollider = DirectionalLightIcon.GetComponent<Collider>();
+        pointCollider = PointLightIcon.GetComponent<Collider>(); 
+        spotCollider = SpotLightIcon.GetComponent<Collider>();
+    }
+
+    private void CreateLightsVisual()
+    {
+        DirectionalLightVisual = new DirectionalLightVisualTemplate().BuildEntity(null, "Directional Light Visual");
+        PointLightVisual = new PointLightVisualTemplate().BuildEntity(null, "Point light visual");
+        SpotLightVisual = new SpotLightVisualTemplate().BuildEntity(null, "Spot light visual");
+    }
+
+    public Entity CreateLight(Camera camera, LightType type, string name)
+    {
+        Entity light = null;
+        if (string.IsNullOrEmpty(name))
         {
-            Container.RegisterInstance<LightManager>(this);
-            //depthWriter = game.Content.Load<Effect>("Effects/DeferredShading/DepthWriter");
-            lights = new List<Light>();
-            _lights = new ReadOnlyCollection<Light>(lights);
-            _lightsGroup = new EntityGroup("Lights");
-            EntityWorld.EntityManager.AddGroup(_lightsGroup);
-
-            SpotLightMesh = new SpotLightMeshTemplate().BuildEntity();
-            PointLightMesh = new PointLightMeshTemplate().BuildEntity();
-
-            spotLightRenderer = SpotLightMesh.GetComponent<MeshRenderer>();
-            pointLightRenderer = PointLightMesh.GetComponent<MeshRenderer>();
-
-            DirectionalLights = new List<Light>();
-            SpotLights = new List<Light>();
-            PointLights = new List<Light>();
-
-            SpotLightTool = new SpotLightTool(nameof(Tools.SpotLightTool));
-            PointLightTool = new PointLightTool(nameof(Tools.PointLightTool));
-            DirectionalLightTool = new DirectionalLightTool(nameof(Tools.DirectionalLightTool));
-            SpotLightTool.Enabled = true;
-            PointLightTool.Enabled = true;
-            DirectionalLightTool.Enabled = true;
-
-            EntityWorld.EntityManager.AddToGroup(SpotLightTool.Tool, "Lights");
-            EntityWorld.EntityManager.AddToGroup(PointLightTool.Tool, "Lights");
-            EntityWorld.EntityManager.AddToGroup(DirectionalLightTool.Tool, "Lights");
-
-            //Task.Run(() => CreateLightsIcons());
-            //Task.Run(() => CreateLightsVisual());
+            name = type.ToString();
         }
-
-        public void Update()
+        light = new LightTemplate().BuildEntity(null, name, type);
+        double diameter = 0;
+        switch (type)
         {
-            DirectionalLights.Clear();
-            DirectionalLights = _lights.Where(x => x.Type == LightType.Directional).ToList();
-
-            SpotLights.Clear();
-            SpotLights = _lights.Where(x => x.Type == LightType.Spot).ToList();
-
-            PointLights.Clear();
-            PointLights = _lights.Where(x => x.Type == LightType.Point).ToList();
+            case LightType.Directional:
+                diameter = DirectionalLightIcon.GetDiameter();
+                break;
+            case LightType.Point:
+                diameter = PointLightIcon.GetDiameter();
+                break;
+            case LightType.Spot:
+                diameter = SpotLightIcon.GetDiameter();
+                break;
         }
-
-        private void CreateLightsIcons()
-        {
-            DirectionalLightIcon = new DirectionalLightIconTemplate().BuildEntity(null, "Directional Light Icon");
-            PointLightIcon = new PointLightIconTemplate().BuildEntity(null, "Point light icon");
-            SpotLightIcon = new SpotLightIconTemplate().BuildEntity(null, "Spot light icon");
-
-            directionalCollider = DirectionalLightIcon.GetComponent<Collider>();
-            pointCollider = PointLightIcon.GetComponent<Collider>(); 
-            spotCollider = SpotLightIcon.GetComponent<Collider>();
-        }
-
-        private void CreateLightsVisual()
-        {
-            DirectionalLightVisual = new DirectionalLightVisualTemplate().BuildEntity(null, "Directional Light Visual");
-            PointLightVisual = new PointLightVisualTemplate().BuildEntity(null, "Point light visual");
-            SpotLightVisual = new SpotLightVisualTemplate().BuildEntity(null, "Spot light visual");
-        }
-
-        public Entity CreateLight(Camera camera, LightType type, string name)
-        {
-            Entity light = null;
-            if (string.IsNullOrEmpty(name))
-            {
-                name = type.ToString();
-            }
-            light = new LightTemplate().BuildEntity(null, name, type);
-            double diameter = 0;
-            switch (type)
-            {
-                case LightType.Directional:
-                    diameter = DirectionalLightIcon.GetDiameter();
-                    break;
-                case LightType.Point:
-                    diameter = PointLightIcon.GetDiameter();
-                    break;
-                case LightType.Spot:
-                    diameter = SpotLightIcon.GetDiameter();
-                    break;
-            }
             
-            light.Transform.SetPosition(light.GetPositionForNewObject(camera, diameter));
-            AddLight(light);
-            return light;
+        light.Transform.SetPosition(light.GetPositionForNewObject(camera, diameter));
+        AddLight(light);
+        return light;
+    }
+
+    public void AddLight(Entity light)
+    {
+        var lightComponent = light.GetComponent<Light>();
+        if (lightComponent == null)
+            return;
+
+        _lightsGroup.Add(light);
+
+        switch (lightComponent.Type)
+        {
+            case LightType.Directional:
+                DirectionalLights.Add(lightComponent);
+                break;
+            case LightType.Point:
+                PointLights.Add(lightComponent);
+                break;
+            case LightType.Spot:
+                SpotLights.Add(lightComponent);
+                break;
         }
 
-        public void AddLight(Entity light)
+        lock (_syncObj)
         {
-            var lightComponent = light.GetComponent<Light>();
-            if (lightComponent == null)
-                return;
-
-            _lightsGroup.Add(light);
-
-            switch (lightComponent.Type)
-            {
-                case LightType.Directional:
-                    DirectionalLights.Add(lightComponent);
-                    break;
-                case LightType.Point:
-                    PointLights.Add(lightComponent);
-                    break;
-                case LightType.Spot:
-                    SpotLights.Add(lightComponent);
-                    break;
-            }
-
-            lock (_syncObj)
-            {
-                lights.Add(lightComponent);
-            }
+            lights.Add(lightComponent);
+        }
             
-            EntityWorld.EntityManager.AddEntity(light);
-        }
+        EntityWorld.EntityManager.AddEntity(light);
+    }
 
-        public void RemoveLight(Entity light)
+    public void RemoveLight(Entity light)
+    {
+        _lightsGroup.Remove(light);
+
+        var lightComponent = light.GetComponent<Light>();
+        if (lightComponent == null)
+            return;
+
+        lights.Remove(lightComponent);
+    }
+
+    public bool Contains(Entity light)
+    {
+        return _lightsGroup.Contains(light);
+    }
+
+    public CollisionResult Intersects(Camera camera, Vector2F cursorPosition, CollisionMode collisionMode)
+    {
+        lock (_syncObj)
         {
-            _lightsGroup.Remove(light);
-
-            var lightComponent = light.GetComponent<Light>();
-            if (lightComponent == null)
-                return;
-
-            lights.Remove(lightComponent);
-        }
-
-        public bool Contains(Entity light)
-        {
-            return _lightsGroup.Contains(light);
-        }
-
-        public CollisionResult Intersects(Camera camera, Vector2F cursorPosition, CollisionMode collisionMode)
-        {
-            lock (_syncObj)
+            CollisionResult collisionResult = new CollisionResult(CompareOrder.Less);
+            var projectionMatrix = camera.ProjectionMatrix;
+            foreach (var light in lights)
             {
-                CollisionResult collisionResult = new CollisionResult(CompareOrder.Less);
-                var projectionMatrix = camera.ProjectionMatrix;
-                foreach (var light in lights)
+                var transform = light.Owner.Transform.GetMetadata(camera);
+                var billboard = Matrix4x4F.BillboardLH(transform.RelativePosition, Vector3F.Zero, transform.WorldMatrixF.Up, camera.Forward);
+                var rotation = MathHelper.GetRotationFromMatrix(billboard);
+                var world = Matrix4x4F.RotationQuaternion(rotation) * Matrix4x4F.Translation(transform.RelativePosition);
+                var ray = Collisions.CalculateRay(cursorPosition, camera, world, projectionMatrix, true);
+
+                var collision = GetColliderForLightType(light);
+                if (collision != null)
                 {
-                    var transform = light.Owner.Transform.GetMetadata(camera);
-                    var billboard = Matrix4x4F.BillboardLH(transform.RelativePosition, Vector3F.Zero, transform.WorldMatrixF.Up, camera.Forward);
-                    var rotation = MathHelper.GetRotationFromMatrix(billboard);
-                    var world = Matrix4x4F.RotationQuaternion(rotation) * Matrix4x4F.Translation(transform.RelativePosition);
-                    var ray = Collisions.CalculateRay(cursorPosition, camera, world, projectionMatrix, true);
-
-                    var collision = GetColliderForLightType(light);
-                    if (collision != null)
+                    Vector3F point;
+                    var intersects = collision.Intersects(ref ray, out point);
+                    if (intersects)
                     {
-                        Vector3F point;
-                        var intersects = collision.Intersects(ref ray, out point);
-                        if (intersects)
-                        {
-                            collisionResult.ValidateAndSetValues(light.Owner, (Vector3)point, true);
-                        }
+                        collisionResult.ValidateAndSetValues(light.Owner, (Vector3)point, true);
                     }
                 }
-                return collisionResult;
             }
+            return collisionResult;
         }
+    }
 
-        private Collider GetColliderForLightType(Light light)
+    private Collider GetColliderForLightType(Light light)
+    {
+        switch (light.Type)
         {
-            switch (light.Type)
-            {
-                case LightType.Directional:
-                    return directionalCollider;
-                case LightType.Point:
-                    return pointCollider;
-                case LightType.Spot:
-                    return spotCollider;
-            }
-            return null;
+            case LightType.Directional:
+                return directionalCollider;
+            case LightType.Point:
+                return pointCollider;
+            case LightType.Spot:
+                return spotCollider;
         }
+        return null;
+    }
 
 //        public void DrawIcons(Effect effect, Camera camera, GraphicsDevice drawingContext, IGameTime gametime)
 //        {
@@ -347,43 +347,42 @@ namespace Adamantium.Engine.Managers
 //            }
 //        }
 
-        public void DrawPointLightMesh(GraphicsDevice device, AppTime gameTime)
+    public void DrawPointLightMesh(GraphicsDevice device, AppTime gameTime)
+    {
+        pointLightRenderer.Draw(device, gameTime);
+    }
+
+    public void DrawSpotLightMesh(GraphicsDevice device, AppTime gameTime)
+    {
+        spotLightRenderer.Draw(device, gameTime);
+    }
+
+    public bool ProcessLight(Entity lightEntity, CameraManager cameraManager, GameInputManager inputManager)
+    {
+        if (!Contains(lightEntity))
+            return false;
+
+        var light = lightEntity.GetComponent<Light>();
+
+        if (light == null)
         {
-            pointLightRenderer.Draw(device, gameTime);
+            return false;
         }
-
-        public void DrawSpotLightMesh(GraphicsDevice device, AppTime gameTime)
-        {
-            spotLightRenderer.Draw(device, gameTime);
-        }
-
-        public bool ProcessLight(Entity lightEntity, CameraManager cameraManager, GameInputManager inputManager)
-        {
-            if (!Contains(lightEntity))
-                return false;
-
-            var light = lightEntity.GetComponent<Light>();
-
-            if (light == null)
-            {
-                return false;
-            }
             
 
-            switch (light.Type)
-            {
-                case LightType.Directional:
-                    currentToolBase = DirectionalLightTool;
-                    break;
-                case LightType.Point:
-                    currentToolBase = PointLightTool;
-                    break;
-                case LightType.Spot:
-                    currentToolBase = SpotLightTool;
-                    break;
-            }
-
-            return currentToolBase.Process(lightEntity, light, cameraManager, inputManager);
+        switch (light.Type)
+        {
+            case LightType.Directional:
+                currentToolBase = DirectionalLightTool;
+                break;
+            case LightType.Point:
+                currentToolBase = PointLightTool;
+                break;
+            case LightType.Spot:
+                currentToolBase = SpotLightTool;
+                break;
         }
+
+        return currentToolBase.Process(lightEntity, light, cameraManager, inputManager);
     }
 }

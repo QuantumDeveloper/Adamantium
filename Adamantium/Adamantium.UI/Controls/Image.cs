@@ -1,12 +1,11 @@
 ﻿using System;
 using System.Threading.Tasks;
 using System.Timers;
-using Adamantium.Engine.Graphics;
+using Adamantium.ProceduralGeometry;
 using Adamantium.UI.Media;
 using Adamantium.UI.Media.Imaging;
 using Adamantium.UI.RoutedEvents;
 using Adamantium.UI.Threading;
-using Serilog;
 using Timer = System.Timers.Timer;
 
 namespace Adamantium.UI.Controls;

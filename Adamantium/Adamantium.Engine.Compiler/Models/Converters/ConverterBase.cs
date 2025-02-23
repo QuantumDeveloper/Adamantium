@@ -5,8 +5,8 @@ using System.Linq;
 using Adamantium.Engine.Compiler.Converter.Configs;
 using Adamantium.Engine.Compiler.Converter.Parsers;
 using Adamantium.Engine.Compiler.Models.ConversionUtils;
-using Adamantium.Engine.Core;
-using Adamantium.Engine.Core.Models;
+using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Core.Models;
 using Adamantium.Mathematics;
 using Adamantium.Win32;
 
@@ -126,60 +126,60 @@ namespace Adamantium.Engine.Compiler.Converter.Converters
       }
 
       //Алгоритм оптимизации мешей
-      public SceneData.Geometry OptimizeMesh(SceneData.Geometry nonOptimizedGeometry)
+      public SceneData.GeometryData OptimizeMesh(SceneData.GeometryData nonOptimizedGeometryData)
       {
          //Оптимальный алгоритм, работает очень быстро
          var vertexDict = new Dictionary<Vertex, int>();
-         var newGeometry = new SceneData.Geometry
+         var newGeometry = new SceneData.GeometryData
          {
-            Semantic = nonOptimizedGeometry.Semantic,
-            MaterialId = nonOptimizedGeometry.MaterialId,
-            MeshTopology = nonOptimizedGeometry.MeshTopology
+            Semantic = nonOptimizedGeometryData.Semantic,
+            MaterialId = nonOptimizedGeometryData.MaterialId,
+            MeshTopology = nonOptimizedGeometryData.MeshTopology
          };
 
          int uniqueIndex = 0;
-         for (int i = 0; i < nonOptimizedGeometry.Positions.Count; ++i)
+         for (int i = 0; i < nonOptimizedGeometryData.Positions.Count; ++i)
          {
-            Vector2F uv0 = nonOptimizedGeometry.UV0.Count - 1 >= i ? nonOptimizedGeometry.UV0[i] : Vector2F.Zero;
-            Vector2F uv1 = nonOptimizedGeometry.UV1.Count - 1 >= i ? nonOptimizedGeometry.UV1[i] : Vector2F.Zero;
-            Vector2F uv2 = nonOptimizedGeometry.UV2.Count - 1 >= i ? nonOptimizedGeometry.UV2[i] : Vector2F.Zero;
-            Vector2F uv3 = nonOptimizedGeometry.UV2.Count - 1 >= i ? nonOptimizedGeometry.UV2[i] : Vector2F.Zero;
-            Color color = nonOptimizedGeometry.Colors.Count - 1 >= i ? nonOptimizedGeometry.Colors[i] : Colors.White;
-            Vector4F jointIndex = nonOptimizedGeometry.JointIndices.Count - 1 >= i ? nonOptimizedGeometry.JointIndices[i] : Vector4F.Zero;
-            Vector4F jointWeight = nonOptimizedGeometry.JointWeights.Count - 1 >= i ? nonOptimizedGeometry.JointWeights[i] : Vector4F.Zero;
-            var vertex = new Vertex(nonOptimizedGeometry.Positions[i], uv0, uv1, uv2, uv3, color, jointIndex, jointWeight);
+            Vector2F uv0 = nonOptimizedGeometryData.UV0.Count - 1 >= i ? nonOptimizedGeometryData.UV0[i] : Vector2F.Zero;
+            Vector2F uv1 = nonOptimizedGeometryData.UV1.Count - 1 >= i ? nonOptimizedGeometryData.UV1[i] : Vector2F.Zero;
+            Vector2F uv2 = nonOptimizedGeometryData.UV2.Count - 1 >= i ? nonOptimizedGeometryData.UV2[i] : Vector2F.Zero;
+            Vector2F uv3 = nonOptimizedGeometryData.UV2.Count - 1 >= i ? nonOptimizedGeometryData.UV2[i] : Vector2F.Zero;
+            Color color = nonOptimizedGeometryData.Colors.Count - 1 >= i ? nonOptimizedGeometryData.Colors[i] : Colors.White;
+            Vector4F jointIndex = nonOptimizedGeometryData.JointIndices.Count - 1 >= i ? nonOptimizedGeometryData.JointIndices[i] : Vector4F.Zero;
+            Vector4F jointWeight = nonOptimizedGeometryData.JointWeights.Count - 1 >= i ? nonOptimizedGeometryData.JointWeights[i] : Vector4F.Zero;
+            var vertex = new Vertex(nonOptimizedGeometryData.Positions[i], uv0, uv1, uv2, uv3, color, jointIndex, jointWeight);
 
             if (!vertexDict.ContainsKey(vertex))
             {
                vertexDict.Add(vertex, uniqueIndex);
-               newGeometry.Positions.Add(nonOptimizedGeometry.Positions[i]);
+               newGeometry.Positions.Add(nonOptimizedGeometryData.Positions[i]);
                newGeometry.IndexBuffer.Add(uniqueIndex);
                uniqueIndex++;
-               if (nonOptimizedGeometry.Semantic.HasFlag(VertexSemantic.UV0))
+               if (nonOptimizedGeometryData.Semantic.HasFlag(VertexSemantic.UV0))
                {
                   newGeometry.UV0.Add(vertex.UV0);
                }
-               if (nonOptimizedGeometry.Semantic.HasFlag(VertexSemantic.UV1))
+               if (nonOptimizedGeometryData.Semantic.HasFlag(VertexSemantic.UV1))
                {
                   newGeometry.UV1.Add(vertex.UV1);
                }
-               if (nonOptimizedGeometry.Semantic.HasFlag(VertexSemantic.UV2))
+               if (nonOptimizedGeometryData.Semantic.HasFlag(VertexSemantic.UV2))
                {
                   newGeometry.UV2.Add(vertex.UV2);
                }
-               if (nonOptimizedGeometry.Semantic.HasFlag(VertexSemantic.UV3))
+               if (nonOptimizedGeometryData.Semantic.HasFlag(VertexSemantic.UV3))
                {
                   newGeometry.UV3.Add(vertex.UV3);
                }
-               if (nonOptimizedGeometry.Semantic.HasFlag(VertexSemantic.Color))
+               if (nonOptimizedGeometryData.Semantic.HasFlag(VertexSemantic.Color))
                {
                   newGeometry.Colors.Add(vertex.Color);
                }
-               if (nonOptimizedGeometry.Semantic.HasFlag(VertexSemantic.JointIndices))
+               if (nonOptimizedGeometryData.Semantic.HasFlag(VertexSemantic.JointIndices))
                {
                   newGeometry.JointIndices.Add(vertex.JointIndex);
                }
-               if (nonOptimizedGeometry.Semantic.HasFlag(VertexSemantic.JointWeights))
+               if (nonOptimizedGeometryData.Semantic.HasFlag(VertexSemantic.JointWeights))
                {
                   newGeometry.JointWeights.Add(vertex.JointWeight);
                }
@@ -191,55 +191,55 @@ namespace Adamantium.Engine.Compiler.Converter.Converters
             }
          }
 
-         nonOptimizedGeometry = newGeometry;
-         return nonOptimizedGeometry;
+         nonOptimizedGeometryData = newGeometry;
+         return nonOptimizedGeometryData;
       }
 
       //Считает мягкие нормали для каждой вершины
-      protected void CalculateNormals(SceneData.Geometry geometryData)
+      protected void CalculateNormals(SceneData.GeometryData geometryDataData)
       {
-         if (geometryData.MeshTopology != PrimitiveType.LineList)
+         if (geometryDataData.MeshTopology != PrimitiveType.LineList)
          {
-            Vector3F[] normals = new Vector3F[geometryData.Positions.Count];
-            for (int i = 0; i < geometryData.IndexBuffer.Count; i += 3)
+            Vector3F[] normals = new Vector3F[geometryDataData.Positions.Count];
+            for (int i = 0; i < geometryDataData.IndexBuffer.Count; i += 3)
             {
-               Vector3F v0 = geometryData.Positions[geometryData.IndexBuffer[i + 1]] -
-                            geometryData.Positions[geometryData.IndexBuffer[i]];
-               Vector3F v1 = geometryData.Positions[geometryData.IndexBuffer[i + 2]] -
-                            geometryData.Positions[geometryData.IndexBuffer[i]];
+               Vector3F v0 = geometryDataData.Positions[geometryDataData.IndexBuffer[i + 1]] -
+                            geometryDataData.Positions[geometryDataData.IndexBuffer[i]];
+               Vector3F v1 = geometryDataData.Positions[geometryDataData.IndexBuffer[i + 2]] -
+                            geometryDataData.Positions[geometryDataData.IndexBuffer[i]];
 
                Vector3F normal = Vector3F.Cross(v0, v1);
 
-               normals[geometryData.IndexBuffer[i]] += normal;
-               normals[geometryData.IndexBuffer[i + 1]] += normal;
-               normals[geometryData.IndexBuffer[i + 2]] += normal;
+               normals[geometryDataData.IndexBuffer[i]] += normal;
+               normals[geometryDataData.IndexBuffer[i + 1]] += normal;
+               normals[geometryDataData.IndexBuffer[i + 2]] += normal;
             }
 
             for (int i = 0; i < normals.Length; i++)
             {
                normals[i] = Vector3F.Normalize(normals[i]);
             }
-            geometryData.Normals = normals.ToList();
-            geometryData.Semantic |= VertexSemantic.Normal;
+            geometryDataData.Normals = normals.ToList();
+            geometryDataData.Semantic |= VertexSemantic.Normal;
          }
       }
 
       //Вычисление тангентов и бинормалей
-      protected void CalculateTangentsAndBinormals(SceneData.Geometry geometryData)
+      protected void CalculateTangentsAndBinormals(SceneData.GeometryData geometryDataData)
       {
-         if (geometryData.MeshTopology == PrimitiveType.TriangleList)
+         if (geometryDataData.MeshTopology == PrimitiveType.TriangleList)
          {
-            Vector3F[] tan1 = new Vector3F[geometryData.Positions.Count];
-            Vector3F[] tan2 = new Vector3F[geometryData.Positions.Count];
-            for (int i = 0; i < geometryData.IndexBuffer.Count; i += 3)
+            Vector3F[] tan1 = new Vector3F[geometryDataData.Positions.Count];
+            Vector3F[] tan2 = new Vector3F[geometryDataData.Positions.Count];
+            for (int i = 0; i < geometryDataData.IndexBuffer.Count; i += 3)
             {
-               Vector3F v1 = geometryData.Positions[geometryData.IndexBuffer[i]];
-               Vector3F v2 = geometryData.Positions[geometryData.IndexBuffer[i + 1]];
-               Vector3F v3 = geometryData.Positions[geometryData.IndexBuffer[i + 2]];
+               Vector3F v1 = geometryDataData.Positions[geometryDataData.IndexBuffer[i]];
+               Vector3F v2 = geometryDataData.Positions[geometryDataData.IndexBuffer[i + 1]];
+               Vector3F v3 = geometryDataData.Positions[geometryDataData.IndexBuffer[i + 2]];
 
-               Vector2F UV1 = (Vector2F)geometryData.UV0[geometryData.IndexBuffer[i]];
-               Vector2F UV2 = (Vector2F)geometryData.UV0[geometryData.IndexBuffer[i + 1]];
-               Vector2F UV3 = (Vector2F)geometryData.UV0[geometryData.IndexBuffer[i + 2]];
+               Vector2F UV1 = (Vector2F)geometryDataData.UV0[geometryDataData.IndexBuffer[i]];
+               Vector2F UV2 = (Vector2F)geometryDataData.UV0[geometryDataData.IndexBuffer[i + 1]];
+               Vector2F UV3 = (Vector2F)geometryDataData.UV0[geometryDataData.IndexBuffer[i + 2]];
 
                Vector3F v1v0 = v2 - v1;
                Vector3F v2v0 = v3 - v1;
@@ -255,20 +255,20 @@ namespace Adamantium.Engine.Compiler.Converter.Converters
                Vector3F vDirection = new Vector3F((s1 * v2v0.X - s2 * v1v0.X), (s1 * v2v0.Y - s2 * v1v0.Y),
                   (s1 * v2v0.Z - s2 * v1v0.Z));
 
-               tan1[geometryData.IndexBuffer[i]] += uDirection;
-               tan1[geometryData.IndexBuffer[i + 1]] += uDirection;
-               tan1[geometryData.IndexBuffer[i + 2]] += uDirection;
+               tan1[geometryDataData.IndexBuffer[i]] += uDirection;
+               tan1[geometryDataData.IndexBuffer[i + 1]] += uDirection;
+               tan1[geometryDataData.IndexBuffer[i + 2]] += uDirection;
 
-               tan2[geometryData.IndexBuffer[i]] += vDirection;
-               tan2[geometryData.IndexBuffer[i + 1]] += vDirection;
-               tan2[geometryData.IndexBuffer[i + 2]] += vDirection;
+               tan2[geometryDataData.IndexBuffer[i]] += vDirection;
+               tan2[geometryDataData.IndexBuffer[i + 1]] += vDirection;
+               tan2[geometryDataData.IndexBuffer[i + 2]] += vDirection;
             }
 
-            Vector3F[] tangentArray = new Vector3F[geometryData.Positions.Count];
-            Vector3F[] bitangentArray = new Vector3F[geometryData.Positions.Count];
-            for (int a = 0; a < geometryData.Positions.Count; a++)
+            Vector3F[] tangentArray = new Vector3F[geometryDataData.Positions.Count];
+            Vector3F[] bitangentArray = new Vector3F[geometryDataData.Positions.Count];
+            for (int a = 0; a < geometryDataData.Positions.Count; a++)
             {
-               Vector3F normal = geometryData.Normals[a];
+               Vector3F normal = geometryDataData.Normals[a];
 
                // Gram-Schmidt orthogonalize
                var value = tan1[a] - normal * Vector3F.Dot(normal, tan1[a]);
@@ -288,62 +288,62 @@ namespace Adamantium.Engine.Compiler.Converter.Converters
                   tangentArray[a].W;
                 */
             }
-            geometryData.Bitangents.AddRange(bitangentArray);
-            geometryData.Tangents.AddRange(tangentArray);
-            geometryData.Semantic |= VertexSemantic.TangentBiNormal;
+            geometryDataData.Bitangents.AddRange(bitangentArray);
+            geometryDataData.Tangents.AddRange(tangentArray);
+            geometryDataData.Semantic |= VertexSemantic.TangentBiNormal;
          }
       }
 
-      private void ConvertUVs(SceneData.Geometry geometry, int index)
+      private void ConvertUVs(SceneData.GeometryData geometryData, int index)
       {
          Vector2F uv;
          if (Config.ConvertToLHDirectX || Config.ConvertToRHDirectX)
          {
-            if (geometry.Semantic.HasFlag(VertexSemantic.UV0))
+            if (geometryData.Semantic.HasFlag(VertexSemantic.UV0))
             {
-               uv = geometry.UV0[index];
+               uv = geometryData.UV0[index];
                uv.Y = 1.0f - uv.Y;
-               geometry.UV0[index] = uv;
+               geometryData.UV0[index] = uv;
             }
 
-            if (geometry.Semantic.HasFlag(VertexSemantic.UV1))
+            if (geometryData.Semantic.HasFlag(VertexSemantic.UV1))
             {
-               uv = geometry.UV1[index];
+               uv = geometryData.UV1[index];
                uv.Y = 1.0f - uv.Y;
-               geometry.UV1[index] = uv;
+               geometryData.UV1[index] = uv;
             }
 
-            if (geometry.Semantic.HasFlag(VertexSemantic.UV2))
+            if (geometryData.Semantic.HasFlag(VertexSemantic.UV2))
             {
-               uv = geometry.UV2[index];
+               uv = geometryData.UV2[index];
                uv.Y = 1.0f - uv.Y;
-               geometry.UV2[index] = uv;
+               geometryData.UV2[index] = uv;
             }
 
-            if (geometry.Semantic.HasFlag(VertexSemantic.UV3))
+            if (geometryData.Semantic.HasFlag(VertexSemantic.UV3))
             {
-               uv = geometry.UV3[index];
+               uv = geometryData.UV3[index];
                uv.Y = 1.0f - uv.Y;
-               geometry.UV3[index] = uv;
+               geometryData.UV3[index] = uv;
             }
          }
       }
 
       //Меняем порядок отрисовки с "против часовой стрелки" на "по часовой стрелке" путём изменения порядка индексов
       //в индексном массиве (меняем каждый второй и третий индексы местами)
-      public void ChangeDrawOrder(SceneData.Geometry geometryData)
+      public void ChangeDrawOrder(SceneData.GeometryData geometryDataData)
       {
          Vector3F temp = new Vector3F();
-         if (geometryData.MeshTopology == PrimitiveType.TriangleList)
+         if (geometryDataData.MeshTopology == PrimitiveType.TriangleList)
          {
             try
             {
-               for (int i = 0; i < geometryData.IndexBuffer.Count; i += 3)
+               for (int i = 0; i < geometryDataData.IndexBuffer.Count; i += 3)
                {
-                  temp.Y = geometryData.IndexBuffer[i + 1];
-                  temp.Z = geometryData.IndexBuffer[i + 2];
-                  geometryData.IndexBuffer[i + 1] = (int)temp.Z;
-                  geometryData.IndexBuffer[i + 2] = (int)temp.Y;
+                  temp.Y = geometryDataData.IndexBuffer[i + 1];
+                  temp.Z = geometryDataData.IndexBuffer[i + 2];
+                  geometryDataData.IndexBuffer[i + 1] = (int)temp.Z;
+                  geometryDataData.IndexBuffer[i + 2] = (int)temp.Y;
                }
             }
             catch (Exception e)

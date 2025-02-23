@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using Adamantium.Engine.Compiler.Converter.Configs;
 using Adamantium.Engine.Compiler.Converter.Containers;
-using Adamantium.Engine.Core.Models;
+using Adamantium.Graphics.Core.Models;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Engine.Compiler.Models.ConversionUtils

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Collections.Specialized;
-using Adamantium.Engine.Graphics;
+using Adamantium.Graphics;
+using Adamantium.ProceduralGeometry;
 using Adamantium.UI.Controls;
 using Adamantium.UI.RoutedEvents;
 using Polygon = Adamantium.Mathematics.Triangulation.Polygon;

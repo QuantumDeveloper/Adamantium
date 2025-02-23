@@ -100,7 +100,7 @@ namespace Adamantium.Mathematics.Triangulation
                 localContourContainers[i].RemoveContoursSelfIntersections(FillRule);
             });
             
-            // process non intersecting contours - only when the whole container not intersects with other containers and contains only single contour
+            // process non-intersecting contours - only when the whole container not intersects with other containers and contains only single contour
             // such container is removed from list
             var nonIntersectedContours = GetNonIntersectingContours(localContourContainers);
             

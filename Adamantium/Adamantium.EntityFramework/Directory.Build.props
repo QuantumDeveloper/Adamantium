@@ -1,5 +1,0 @@
-﻿<Project>
-	<PropertyGroup>
-		<BaseIntermediateOutputPath>..\..\output\Adamantium.EntityFramework\obj\</BaseIntermediateOutputPath>
-	</PropertyGroup>
-</Project>

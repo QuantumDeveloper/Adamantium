@@ -1,6 +1,9 @@
 using System;
-using Adamantium.Engine.Graphics;
-using Adamantium.Engine.Graphics.Fonts;
+using Adamantium.FX.Effects.Generated;
+using Adamantium.Graphics;
+using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Core.Presentation;
+using Adamantium.Graphics.Fonts;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Media;
 using Adamantium.UI.Media.Imaging;
@@ -11,16 +14,18 @@ namespace Adamantium.UI.Rendering;
 internal class TextRenderer : GeometryRenderer
 {
     public TextRenderer(
-        GraphicsDevice device, 
+        IGraphicsDevice device, 
         Geometry geometry, 
         TextLayout textLayout, 
         TextRenderingParameters renderingParameters, 
         Brush background, 
-        Brush foreground) : 
+        Brush foreground,
+        BasicEffect basicEffect) : 
         base(device, 
             geometry, 
             background, 
-            foreground)
+            foreground,
+            basicEffect)
     {
         TextLayout = textLayout;
         TextRenderingParameters = renderingParameters;
@@ -28,7 +33,7 @@ internal class TextRenderer : GeometryRenderer
             (uint)geometry.Bounds.Width, 
             (uint)geometry.Bounds.Height,
             MSAALevel.X4);
-        _renderToTextureDevice = device.MainDevice.CreateRenderDevice(renderTargetParams);
+        _renderToTextureDevice = (GraphicsDevice)device.MainDevice.CreateRenderDevice(renderTargetParams);
         _renderToTextureDevice.AddDynamicStates(DynamicState.Viewport, DynamicState.Scissor);
         FontRenderer = new FontRenderer(_renderToTextureDevice);
     }
@@ -41,18 +46,18 @@ internal class TextRenderer : GeometryRenderer
     
     public FontRenderer FontRenderer { get; }
 
-    public override bool PrepareFrame(GraphicsDevice graphicsDevice, IUIComponent component, ImageSource image,
+    public override bool PrepareFrame(IGraphicsDevice graphicsDevice, IUIComponent component, ImageSource image,
         Matrix4x4F projectionMatrix)
     {
         return true;
     }
 
-    public override void Draw(GraphicsDevice graphicsDevice, IUIComponent component, Matrix4x4F projectionMatrix)
+    public override void Draw(IGraphicsDevice graphicsDevice, IUIComponent component, Matrix4x4F projectionMatrix)
     {
         Draw(graphicsDevice, component, null, projectionMatrix);
     }
 
-    public override void Draw(GraphicsDevice graphicsDevice, IUIComponent component, ImageSource image, Matrix4x4F projectionMatrix)
+    public override void Draw(IGraphicsDevice graphicsDevice, IUIComponent component, ImageSource image, Matrix4x4F projectionMatrix)
     {
         var textBlock = (TextBlock)component;
         
@@ -67,7 +72,7 @@ internal class TextRenderer : GeometryRenderer
         var stroke = ((SolidColorBrush)textBlock.Stroke).Color;
         _renderToTextureDevice.ClearColor = ((SolidColorBrush)Background).Color;
         _renderToTextureDevice.BeginDraw(1, 0);
-        FontRenderer.SetState(null, null, null, null, location, _renderToTextureDevice.Presenter.RenderTarget);
+        FontRenderer.SetState(null, location, _renderToTextureDevice.Presenter.RenderTarget);
         FontRenderer.DrawLayout(TextLayout, foreground, stroke);
         FontRenderer.RestoreState();
         _renderToTextureDevice.EndDraw();

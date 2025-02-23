@@ -1,27 +1,26 @@
 ﻿using Adamantium.Core.DependencyInjection;
-using Adamantium.EntityFramework;
+using Adamantium.ECS;
 
-namespace Adamantium.Engine
+namespace Adamantium.Engine;
+
+public class GamePlayManager
 {
-   public class GamePlayManager
+   public Entity UserControlledEntity { get; private set; }
+
+   public Entity SelectedEntity { get; set; }
+
+   public GamePlayManager(IContainerRegistry container)
    {
-      public Entity UserControlledEntity { get; private set; }
+      container.RegisterInstance<GamePlayManager>(this);
+   }
 
-      public Entity SelectedEntity { get; set; }
+   public void SetUserControlled(Entity entity)
+   {
+      UserControlledEntity = entity;
+   }
 
-      public GamePlayManager(IContainerRegistry container)
-      {
-         container.RegisterInstance<GamePlayManager>(this);
-      }
-
-      public void SetUserControlled(Entity entity)
-      {
-         UserControlledEntity = entity;
-      }
-
-      public void SetSelected(Entity entity)
-      {
-         SelectedEntity = entity;
-      }
+   public void SetSelected(Entity entity)
+   {
+      SelectedEntity = entity;
    }
 }

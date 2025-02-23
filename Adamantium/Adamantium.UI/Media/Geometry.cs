@@ -1,6 +1,7 @@
 ﻿using System;
-using Adamantium.Engine.Core.Models;
-using Adamantium.Engine.Graphics;
+using Adamantium.Graphics;
+using Adamantium.Graphics.Core.Models;
+using Adamantium.ProceduralGeometry;
 using Adamantium.UI.Controls;
 using Adamantium.UI.RoutedEvents;
 

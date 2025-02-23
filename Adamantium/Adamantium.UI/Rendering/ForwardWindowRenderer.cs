@@ -1,9 +1,10 @@
 using System;
 using System.Collections.Generic;
 using Adamantium.Core;
-using Adamantium.Engine.Graphics;
-using Adamantium.Engine.Graphics.Fonts;
 using Adamantium.Fonts;
+using Adamantium.Graphics;
+using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Fonts;
 using Adamantium.UI.RoutedEvents;
 using AdamantiumVulkan.Core;
 
@@ -13,7 +14,7 @@ internal class ForwardWindowRenderer : WindowRendererBase
 {
     private FontAtlas fontAtlas;
     
-    public ForwardWindowRenderer(GraphicsDevice device) : base(device)
+    public ForwardWindowRenderer(IGraphicsDevice device) : base(device)
     {
     }
         

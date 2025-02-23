@@ -1,4 +1,6 @@
 using Adamantium.Core.DependencyInjection;
+using Adamantium.Graphics;
+using Adamantium.Graphics.Core;
 using Adamantium.UI;
 using Adamantium.UI.Threading;
 
@@ -8,6 +10,7 @@ public static class GameBuilder
 {
     public static void Build(IDependencyContainer container)
     {
+        container.Register<IGraphicsDeviceFactory, GraphicsDeviceFactory>();
         switch (Configuration.Platform)
         {
             case Platform.Windows:

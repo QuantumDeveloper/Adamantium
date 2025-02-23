@@ -6,8 +6,8 @@ using System.Linq;
 using Adamantium.Engine.Compiler.Converter.Configs;
 using Adamantium.Engine.Compiler.Converter.Containers;
 using Adamantium.Engine.Compiler.Models.ConversionUtils;
-using Adamantium.Engine.Core;
-using Adamantium.Engine.Core.Models;
+using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Core.Models;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Engine.Compiler.Converter.Parsers

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using Adamantium.Engine.Core;
-using Adamantium.Engine.Core.Models;
+using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Core.Models;
 
 namespace Adamantium.Engine.Compiler.Models.ConversionUtils
 {

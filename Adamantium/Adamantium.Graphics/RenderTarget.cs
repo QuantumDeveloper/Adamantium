@@ -1,0 +1,46 @@
+using System;
+using Adamantium.Graphics.Core;
+using Adamantium.Imaging;
+using AdamantiumVulkan.Core;
+
+namespace Adamantium.Graphics
+{
+    public class RenderTarget : Texture, IRenderTarget
+    {
+        internal RenderTarget(IGraphicsDevice device, TextureDescription description) : base(device, description)
+        {
+            
+        }
+
+        public static RenderTarget New(IGraphicsDevice graphicsDevice, 
+            UInt32 width, 
+            UInt32 height, 
+            MSAALevel msaa, 
+            SurfaceFormat format, 
+            ImageUsageFlagBits usage = ImageUsageFlagBits.TransferSrcBit,
+            ImageLayout desiredLayout = ImageLayout.ColorAttachmentOptimal)
+        {
+            usage |= ImageUsageFlagBits.ColorAttachmentBit | ImageUsageFlagBits.SampledBit;
+
+            TextureDescription description = new TextureDescription
+            {
+                Width = width,
+                Height = height,
+                Depth = 1,
+                Dimension = TextureDimension.Texture2D,
+                ArrayLayers = 1,
+                Usage = usage,
+                Format = format,
+                DesiredImageLayout = desiredLayout,
+                ImageTiling = ImageTiling.Optimal,
+                ImageType = ImageType._2d,
+                MipLevels = 1,
+                SharingMode = SharingMode.Exclusive,
+                ImageAspect = ImageAspectFlagBits.ColorBit,
+                Samples = msaa
+            };
+
+            return new RenderTarget(graphicsDevice, description);
+        }
+    }
+}

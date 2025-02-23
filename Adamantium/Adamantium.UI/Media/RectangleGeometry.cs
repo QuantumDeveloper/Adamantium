@@ -1,4 +1,6 @@
-﻿using Adamantium.Engine.Graphics;
+﻿using Adamantium.ProceduralGeometry;
+using Adamantium.ProceduralGeometry.Shapes;
+using Adamantium.Graphics;
 
 namespace Adamantium.UI.Media;
 

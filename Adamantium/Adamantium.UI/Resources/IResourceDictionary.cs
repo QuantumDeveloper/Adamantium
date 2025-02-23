@@ -1,6 +1,6 @@
 using System;
 using Adamantium.Core.Collections;
-using Adamantium.Engine.Core;
+using Adamantium.Graphics.Core;
 
 namespace Adamantium.UI.Resources;
 

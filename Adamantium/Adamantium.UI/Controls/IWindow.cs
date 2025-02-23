@@ -1,5 +1,6 @@
 ﻿using System;
-using Adamantium.Engine.Graphics;
+using Adamantium.Graphics;
+using Adamantium.Graphics.Core;
 using Adamantium.UI.Events;
 using Adamantium.UI.Media;
 using Adamantium.UI.Rendering;

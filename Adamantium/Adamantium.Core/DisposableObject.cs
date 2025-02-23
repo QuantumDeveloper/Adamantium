@@ -65,7 +65,7 @@ namespace Adamantium.Core
       protected internal bool IsDisposing { get; private set; }
 
       /// <summary>
-      /// Occurs when when Dispose is called.
+      /// Occurs when Dispose is called.
       /// </summary>
       public event EventHandler<EventArgs> Disposing;
 

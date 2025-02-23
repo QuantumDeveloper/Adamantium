@@ -1,13 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
-using Adamantium.Engine.Graphics;
+using Adamantium.Graphics;
+using Adamantium.Graphics.Core;
 using Adamantium.Imaging;
 using Adamantium.UI.Media;
 using Adamantium.UI.Media.Imaging;
 using Adamantium.UI.RoutedEvents;
 using Serilog;
-using Serilog.Core;
 
 namespace Adamantium.UI.Controls;
 

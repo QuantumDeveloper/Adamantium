@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using Adamantium.Engine.Core;
+using Adamantium.Graphics.Core;
 using NUnit.Framework;
 
 namespace Adamantium.UITests

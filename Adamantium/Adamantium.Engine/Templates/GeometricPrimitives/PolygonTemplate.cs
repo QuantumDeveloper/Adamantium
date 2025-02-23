@@ -1,38 +1,39 @@
 ﻿using System.Threading.Tasks;
-using Adamantium.Engine.Graphics;
-using Adamantium.EntityFramework;
-using Adamantium.EntityFramework.Components;
+using Adamantium.ECS;
+using Adamantium.ECS.Components;
+using Adamantium.Graphics;
 using Adamantium.Mathematics;
+using Adamantium.ProceduralGeometry;
+using Adamantium.ProceduralGeometry.Shapes;
 
-namespace Adamantium.Engine.Templates.GeometricPrimitives
+namespace Adamantium.Engine.Templates.GeometricPrimitives;
+
+public class PolygonTemplate : PrimitiveTemplate
 {
-    public class PolygonTemplate : PrimitiveTemplate
+    private Vector2 diameter;
+
+    public PolygonTemplate(
+        GeometryType geometryType,
+        Vector2 diameter,
+        int tessellation,
+        Matrix4x4? transform = null) : base(geometryType, tessellation, transform)
     {
-        private Vector2 diameter;
+        this.diameter = diameter;
+    }
 
-        public PolygonTemplate(
-            GeometryType geometryType,
-            Vector2 diameter,
-            int tessellation,
-            Matrix4x4? transform = null) : base(geometryType, tessellation, transform)
-        {
-            this.diameter = diameter;
-        }
+    protected override void FillMetadata(
+        MeshMetadata metadata)
+    {
+        metadata.GeometryType = GeometryType;
+        metadata.ShapeType = ShapeType.Polygon;
+        metadata.Width = diameter.X;
+        metadata.Height = diameter.Y;
+        metadata.TessellationFactor = Tessellation;
+    }
 
-        protected override void FillMetadata(
-            MeshMetadata metadata)
-        {
-            metadata.GeometryType = GeometryType;
-            metadata.ShapeType = ShapeType.Polygon;
-            metadata.Width = diameter.X;
-            metadata.Height = diameter.Y;
-            metadata.TessellationFactor = Tessellation;
-        }
-
-        public override Task<Entity> BuildEntity(Entity owner)
-        {
-            var primitive = Shapes.Polygon.GenerateGeometry(GeometryType, diameter, Tessellation, Transform);
-            return Task.FromResult(BuildEntityFromPrimitive(owner, primitive));
-        }
+    public override Task<Entity> BuildEntity(Entity owner)
+    {
+        var primitive = Shapes.Polygon.GenerateGeometry(GeometryType, diameter, Tessellation, Transform);
+        return Task.FromResult(BuildEntityFromPrimitive(owner, primitive));
     }
 }

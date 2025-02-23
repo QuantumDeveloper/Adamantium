@@ -1,41 +1,42 @@
 ﻿using System.Collections.Generic;
-using Adamantium.Engine.Core.Models;
-using Adamantium.Engine.Graphics;
-using Adamantium.EntityFramework;
+using Adamantium.ECS;
+using Adamantium.Graphics;
+using Adamantium.Graphics.Core.Models;
 using Adamantium.Mathematics;
+using Adamantium.ProceduralGeometry;
+using Adamantium.ProceduralGeometry.Shapes;
 
-namespace Adamantium.Engine.Templates.Lights
+namespace Adamantium.Engine.Templates.Lights;
+
+public class DirectionalLightVisualTemplate : LightVisualTemplate
 {
-    public class DirectionalLightVisualTemplate : LightVisualTemplate
+    public override Entity BuildEntity(Entity owner, string name)
     {
-        public override Entity BuildEntity(Entity owner, string name)
+        var ellipse = Shapes.Ellipse.GenerateGeometry(GeometryType.Outlined, EllipseType.EdgeToEdge, new Vector2(2), 0, 360, true, 40);
+
+        var indices = new List<int>();
+        var directions = new List<Vector3>();
+        int lastIndex = 0;
+        for (int i = 0; i < ellipse.Points.Length - 1; i++)
         {
-            var ellipse = Shapes.Ellipse.GenerateGeometry(GeometryType.Outlined, EllipseType.EdgeToEdge, new Vector2(2), 0, 360, true, 40);
+            if (i % 2 != 0)
+                continue;
 
-            var indices = new List<int>();
-            var directions = new List<Vector3>();
-            int lastIndex = 0;
-            for (int i = 0; i < ellipse.Points.Length - 1; i++)
-            {
-                if (i % 2 != 0)
-                    continue;
-
-                var lineStart = ellipse.Points[i];
-                var lineEnd = lineStart + Vector3.ForwardRH * 3;
-                directions.Add(lineStart);
-                directions.Add(lineEnd);
-                indices.Add(lastIndex++);
-                indices.Add(lastIndex++);
-                indices.Add(-1);
-            }
-            var directionsMesh = new Mesh();
-            directionsMesh.SetPoints(directions);
-            directionsMesh.SetIndices(indices);
-            MergeInstance instance = new MergeInstance(directionsMesh, Matrix4x4.Identity, false);
-            ellipse.Merge(new[] { instance });
-
-            return BuildSubEntity(owner, name, Colors.Yellow, ellipse, BoundingVolume.OrientedBox);
+            var lineStart = ellipse.Points[i];
+            var lineEnd = lineStart + Vector3.ForwardRH * 3;
+            directions.Add(lineStart);
+            directions.Add(lineEnd);
+            indices.Add(lastIndex++);
+            indices.Add(lastIndex++);
+            indices.Add(-1);
         }
+        var directionsMesh = new Mesh();
+        directionsMesh.SetPoints(directions);
+        directionsMesh.SetIndices(indices);
+        MergeInstance instance = new MergeInstance(directionsMesh, Matrix4x4.Identity, false);
+        ellipse.Merge(new[] { instance });
 
+        return BuildSubEntity(owner, name, Colors.Yellow, ellipse, BoundingVolume.OrientedBox);
     }
+
 }

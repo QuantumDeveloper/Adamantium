@@ -1,5 +1,5 @@
 //using Adamantium.Core.Collections;
-//using Adamantium.Engine.Graphics;
+//using Adamantium.Graphics;
 //using Adamantium.Mathematics;
 //using Adamantium.UI.Controls;
 //using Adamantium.UI.Input;
@@ -12,8 +12,10 @@
 
 using System;
 using System.Linq;
-using Adamantium.Engine.Graphics;
+using Adamantium.Graphics;
+using Adamantium.Graphics.Core;
 using Adamantium.Mathematics;
+using Adamantium.ProceduralGeometry.Shapes;
 using Adamantium.UI.Input;
 using Adamantium.UI.Controls;
 using Serilog;

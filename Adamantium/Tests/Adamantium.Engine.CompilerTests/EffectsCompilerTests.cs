@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using Adamantium.Engine.Effects;
+using Adamantium.EffectsCompiler;
 using MessagePack;
 using NUnit.Framework;
 

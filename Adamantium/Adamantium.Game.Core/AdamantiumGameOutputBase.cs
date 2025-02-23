@@ -1,7 +1,8 @@
 ﻿using System.Collections.Generic;
 using Adamantium.Core.Events;
-using Adamantium.Engine.Graphics;
 using Adamantium.Game.Core.Input;
+using Adamantium.Graphics;
+using Adamantium.Graphics.Core;
 using Adamantium.Imaging;
 using Adamantium.UI;
 using Adamantium.UI.Input;

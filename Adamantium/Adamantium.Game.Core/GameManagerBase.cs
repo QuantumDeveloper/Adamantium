@@ -1,7 +1,7 @@
 using Adamantium.Core;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.Core.Events;
-using Adamantium.EntityFramework;
+using Adamantium.ECS;
 
 namespace Adamantium.Game.Core;
 

@@ -1,6 +1,6 @@
 ﻿using Adamantium.Core;
 using Adamantium.Core.Events;
-using Adamantium.EntityFramework;
+using Adamantium.ECS;
 using Adamantium.Game.Core.Events;
 using Adamantium.Game.Core.Payloads;
 using Adamantium.Mathematics;

@@ -28,7 +28,7 @@ namespace Adamantium.Core
    /// A lightweight base class providing possibility to assign Name and a Tag to class.
    /// </summary>
    [DataContract]
-   public abstract class NamedObject : PropertyChangedBase, IName
+   public abstract class NamedObject : PropertyChangedBase, INamedObject
    {
       /// <summary>
       /// Occurs while this component is disposing and before it is disposed.

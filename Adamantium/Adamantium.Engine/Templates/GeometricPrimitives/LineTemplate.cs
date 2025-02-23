@@ -1,42 +1,43 @@
 ﻿using System.Threading.Tasks;
-using Adamantium.Engine.Graphics;
-using Adamantium.EntityFramework;
-using Adamantium.EntityFramework.Components;
+using Adamantium.ECS;
+using Adamantium.ECS.Components;
+using Adamantium.Graphics;
 using Adamantium.Mathematics;
+using Adamantium.ProceduralGeometry;
+using Adamantium.ProceduralGeometry.Shapes;
 
-namespace Adamantium.Engine.Templates.GeometricPrimitives
+namespace Adamantium.Engine.Templates.GeometricPrimitives;
+
+public class LineTemplate : PrimitiveTemplate
 {
-    public class LineTemplate : PrimitiveTemplate
+    private float thickness;
+    private Vector3 startPoint;
+    private Vector3 endPoint;
+
+    public LineTemplate(
+        GeometryType geometryType,
+        Vector3 startPoint,
+        Vector3 endPoint,
+        float thickness,
+        Matrix4x4? transform = null) : base(geometryType, 1, transform)
     {
-        private float thickness;
-        private Vector3 startPoint;
-        private Vector3 endPoint;
+        this. startPoint = startPoint;
+        this. endPoint = endPoint;
+        this.thickness = thickness;
+    }
 
-        public LineTemplate(
-            GeometryType geometryType,
-            Vector3 startPoint,
-            Vector3 endPoint,
-            float thickness,
-            Matrix4x4? transform = null) : base(geometryType, 1, transform)
-        {
-           this. startPoint = startPoint;
-           this. endPoint = endPoint;
-           this.thickness = thickness;
-        }
+    protected override void FillMetadata(
+        MeshMetadata metadata)
+    {
+        metadata.GeometryType = GeometryType;
+        metadata.ShapeType = ShapeType.Ellipse;
+        metadata.Thickness = thickness;
+        metadata.TessellationFactor = Tessellation;
+    }
 
-        protected override void FillMetadata(
-            MeshMetadata metadata)
-        {
-            metadata.GeometryType = GeometryType;
-            metadata.ShapeType = ShapeType.Ellipse;
-            metadata.Thickness = thickness;
-            metadata.TessellationFactor = Tessellation;
-        }
-
-        public override Task<Entity> BuildEntity(Entity owner)
-        {
-            var primitive3D = Shapes.Line.GenerateGeometry(GeometryType.Solid, startPoint, endPoint, thickness);
-            return Task.FromResult(BuildEntityFromPrimitive(owner, primitive3D));
-        }
+    public override Task<Entity> BuildEntity(Entity owner)
+    {
+        var primitive3D = Shapes.Line.GenerateGeometry(GeometryType.Solid, startPoint, endPoint, thickness);
+        return Task.FromResult(BuildEntityFromPrimitive(owner, primitive3D));
     }
 }

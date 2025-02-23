@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Engine.Compiler.Converter.Configs;
-using Adamantium.Engine.Core.Models;
+using Adamantium.Graphics.Core.Models;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Engine.Compiler.Models.ConversionUtils

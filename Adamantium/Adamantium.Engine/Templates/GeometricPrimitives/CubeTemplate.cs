@@ -1,45 +1,46 @@
 ﻿using System.Threading.Tasks;
-using Adamantium.Engine.Graphics;
-using Adamantium.EntityFramework;
-using Adamantium.EntityFramework.Components;
+using Adamantium.ECS;
+using Adamantium.ECS.Components;
+using Adamantium.Graphics;
 using Adamantium.Mathematics;
+using Adamantium.ProceduralGeometry;
+using Adamantium.ProceduralGeometry.Shapes;
 
-namespace Adamantium.Engine.Templates.GeometricPrimitives
+namespace Adamantium.Engine.Templates.GeometricPrimitives;
+
+public class CubeTemplate : PrimitiveTemplate
 {
-    public class CubeTemplate : PrimitiveTemplate
+    private float width, height, depth;
+    private GeometryType geometryType;
+
+    public CubeTemplate(
+        GeometryType geometryType,
+        float width = 1,
+        float height = 1,
+        float depth = 1,
+        int tessellation = 1,
+        Matrix4x4? transform = null) : base(geometryType, tessellation, transform)
     {
-        private float width, height, depth;
-        private GeometryType geometryType;
+        this.width = width;
+        this.height = height;
+        this.depth = depth;
+        this.geometryType = geometryType;
+    }
 
-        public CubeTemplate(
-            GeometryType geometryType,
-            float width = 1,
-            float height = 1,
-            float depth = 1,
-            int tessellation = 1,
-            Matrix4x4? transform = null) : base(geometryType, tessellation, transform)
-        {
-            this.width = width;
-            this.height = height;
-            this.depth = depth;
-            this.geometryType = geometryType;
-        }
+    protected override void FillMetadata(
+        MeshMetadata metadata)
+    {
+        metadata.GeometryType = GeometryType;
+        metadata.ShapeType = ShapeType.Cube;
+        metadata.Width = width;
+        metadata.Height = height;
+        metadata.Depth = depth;
+        metadata.TessellationFactor = Tessellation;
+    }
 
-        protected override void FillMetadata(
-            MeshMetadata metadata)
-        {
-            metadata.GeometryType = GeometryType;
-            metadata.ShapeType = ShapeType.Cube;
-            metadata.Width = width;
-            metadata.Height = height;
-            metadata.Depth = depth;
-            metadata.TessellationFactor = Tessellation;
-        }
-
-        public override Task<Entity> BuildEntity(Entity owner)
-        {
-            var primitive3D = Shapes.Cube.GenerateGeometry(geometryType, width, height, depth, Tessellation);
-            return Task.FromResult(BuildEntityFromPrimitive(owner, primitive3D));
-        }
+    public override Task<Entity> BuildEntity(Entity owner)
+    {
+        var primitive3D = Shapes.Cube.GenerateGeometry(geometryType, width, height, depth, Tessellation);
+        return Task.FromResult(BuildEntityFromPrimitive(owner, primitive3D));
     }
 }

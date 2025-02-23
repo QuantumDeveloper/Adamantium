@@ -1,7 +1,5 @@
-using System;
-using Adamantium.Engine.Core.Models;
-using Adamantium.Engine.Graphics;
-using Adamantium.UI.Controls;
+using Adamantium.FX.Effects.Generated;
+using Adamantium.Graphics.Core;
 using Adamantium.UI.Media;
 using Adamantium.UI.Media.Imaging;
 using AdamantiumVulkan.Core;
@@ -10,14 +8,15 @@ namespace Adamantium.UI.Rendering;
 
 internal class ImageRenderer : GeometryRenderer
 {
-    public ImageRenderer(GraphicsDevice device, Geometry geometry, Brush background, ImageSource image) : base(device, geometry, background, null)
+    public ImageRenderer(IGraphicsDevice device, Geometry geometry, Brush background, ImageSource image, BasicEffect basicEffect) : base(
+        device, geometry, background, null, basicEffect)
     {
         Image = image;
     }
 
     public ImageSource Image { get; set; }
 
-    public override bool PrepareFrame(GraphicsDevice graphicsDevice, IUIComponent component, ImageSource image,
+    public override bool PrepareFrame(IGraphicsDevice graphicsDevice, IUIComponent component, ImageSource image,
         Matrix4x4F projectionMatrix)
     {
         if (VertexBuffer == null) return false;
@@ -32,7 +31,7 @@ internal class ImageRenderer : GeometryRenderer
 
         var world = Matrix4x4F.Translation((float)component.Location.X, (float)component.Location.Y, 5);
         
-        var effect = graphicsDevice.BasicEffect;
+        var effect = BasicEffect;
         effect.Wvp.SetValue(world * projectionMatrix);
         var color = Foreground as SolidColorBrush;
         effect.MeshColor.SetValue(color.Color.ToVector4());
