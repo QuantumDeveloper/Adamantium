@@ -5,7 +5,6 @@ using Adamantium.Core.DependencyInjection;
 using Adamantium.Core.Events;
 using Adamantium.ECS.Events;
 using Adamantium.ECS.Payloads;
-using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 
 namespace Adamantium.ECS
@@ -154,7 +153,7 @@ namespace Adamantium.ECS
 
         public virtual void EndDraw()
         {
-
+            Processor?.EndDraw();
         }
 
         public virtual void LoadContent()

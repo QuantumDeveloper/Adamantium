@@ -38,9 +38,9 @@ public sealed class GraphicsDeviceService : PropertyChangedBase, IGraphicsDevice
         DeviceCreated?.Invoke(this, EventArgs.Empty);
     }
 
-    public IGraphicsDevice CreateRenderDevice(PresentationParameters parameters)
+    public IGraphicsDevice CreateRenderDevice()
     {
-        return MainGraphicsDevice.CreateRenderDevice(parameters);
+        return MainGraphicsDevice.CreateRenderDevice();
     }
 
     public void RaiseFrameFinished()
@@ -110,7 +110,7 @@ public sealed class GraphicsDeviceService : PropertyChangedBase, IGraphicsDevice
     internal void CreateMainDevice(string name, bool debugEnabled = true)
     {
         MainGraphicsDevice?.Dispose();
-        MainGraphicsDevice = MainGraphicsDevice.Create(GraphicsDeviceFactory, name, debugEnabled);
+        MainGraphicsDevice = MainGraphicsDevice.Create(GraphicsDeviceFactory, 3, name, debugEnabled);
            
         ResourceLoaderDevice = MainGraphicsDevice.CreateResourceLoaderDevice();
 

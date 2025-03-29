@@ -6,7 +6,8 @@ namespace Adamantium.Graphics;
 
 public class DepthStencilBuffer : Texture, IDepthStencilBuffer
 {
-    internal DepthStencilBuffer(IGraphicsDevice device, TextureDescription description) : base(device, description)
+    internal DepthStencilBuffer(IGraphicsDevice device, TextureDescription description, string name = "") : base(device,
+        description, name)
     {
     }
 
@@ -15,7 +16,8 @@ public class DepthStencilBuffer : Texture, IDepthStencilBuffer
         uint height, 
         DepthFormat format, 
         MSAALevel msaa,
-        ImageAspectFlagBits imageAspect = ImageAspectFlagBits.DepthBit)
+        ImageAspectFlagBits imageAspect = ImageAspectFlagBits.DepthBit,
+        string name = "")
     {
         if (imageAspect.HasFlag(ImageAspectFlagBits.DepthBit))
         {
@@ -40,6 +42,6 @@ public class DepthStencilBuffer : Texture, IDepthStencilBuffer
             Samples = msaa
         };
 
-        return new DepthStencilBuffer(graphicsDevice, description);
+        return new DepthStencilBuffer(graphicsDevice, description, name);
     }
 }

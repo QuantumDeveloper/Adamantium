@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Threading;
 using Adamantium.Core;
 using Adamantium.Engine.Managers;
@@ -9,10 +8,8 @@ using Adamantium.Game;
 using Adamantium.Game.Core;
 using Adamantium.Game.Core.Input;
 using Adamantium.Game.Core.Payloads;
-using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Content;
-using AdamantiumVulkan.Core;
 using Keys = Adamantium.Game.Core.Input.Keys;
 
 namespace Adamantium.Engine.EntityServices;
@@ -114,6 +111,8 @@ public class RenderingService : EntityService
 
         GraphicsDevice.SetViewports(Window.Viewport);
         GraphicsDevice.SetScissors(Window.Scissor);
+        GraphicsDevice.SetRenderTargets(Window.Presenter.RenderTarget);
+        GraphicsDevice.SetDepthBuffer(Window.Presenter.DepthBuffer);
         return true;
     }
 
@@ -141,6 +140,7 @@ public class RenderingService : EntityService
     public override void EndDraw()
     {
         GraphicsDevice.EndDraw();
+        Processor?.EndDraw();
     }
 
     public override void Submit()
@@ -150,6 +150,11 @@ public class RenderingService : EntityService
 
     public override void Present()
     {
-        GraphicsDevice.Present();
+        Window.DisplayContent();
+    }
+
+    public override void FrameEnded()
+    {
+        GraphicsDevice.FrameEnded();
     }
 }

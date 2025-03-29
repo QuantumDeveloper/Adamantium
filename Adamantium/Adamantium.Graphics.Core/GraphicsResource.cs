@@ -23,10 +23,11 @@ public abstract class GraphicsResource: DisposableObject
    /// </summary>
    /// <param name="graphicsDevice"></param>
    /// <exception cref="ArgumentNullException"></exception>
-   protected GraphicsResource(IGraphicsDevice graphicsDevice)
+   protected GraphicsResource(IGraphicsDevice graphicsDevice, string name = "")
    {
       ArgumentNullException.ThrowIfNull(graphicsDevice);
       GraphicsDevice = graphicsDevice;
       GraphicsDevice.AddResource(this);
+      Name = name;
    }
 }

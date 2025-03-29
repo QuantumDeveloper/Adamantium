@@ -40,7 +40,7 @@ public interface IWindow : IRootVisualComponent, IContentControl
     IWindowRenderer Renderer { get; set; }
 
     DrawingContext GetDrawingContext();
-    
+
     event SizeChangedEventHandler ClientSizeChanged;
     event EventHandler<WindowClosingEventArgs> Closing;
     event MSAALeveChangedHandler MSAALevelChanged;

@@ -16,6 +16,11 @@ public abstract class EntityProcessor<T>: IEntityProcessor where T: class, IEnti
         
     }
 
+    public virtual void EndDraw()
+    {
+        
+    }
+
     public virtual void LoadContent()
     {
         

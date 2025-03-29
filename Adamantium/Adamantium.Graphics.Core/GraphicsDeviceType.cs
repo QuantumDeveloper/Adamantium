@@ -1,7 +1,7 @@
-namespace Adamantium.Graphics;
+namespace Adamantium.Graphics.Core;
 
 public enum GraphicsDeviceType
 {
     ResourceLoader,
-    Primary,
+    Rendering,
 }

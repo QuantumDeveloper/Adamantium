@@ -66,19 +66,6 @@ namespace Adamantium.ECS
             ServiceRemoved?.Invoke(this, new EntityServiceEventArgs(service));
         }
 
-        public void OnFrameEnded()
-        {
-            lock (syncObject)
-            {
-                foreach (var service in services)
-                {
-                    service.FrameEnded();
-                }
-            }
-            FrameEnded?.Invoke();
-            SyncServices();
-        }
-
         public T GetService<T>() where T : EntityService
         {
             foreach (var service in Services)
@@ -182,6 +169,19 @@ namespace Adamantium.ECS
                 }
             }
             OnFrameEnded();
+        }
+        
+        public void OnFrameEnded()
+        {
+            lock (syncObject)
+            {
+                foreach (var service in services)
+                {
+                    service.FrameEnded();
+                }
+            }
+            FrameEnded?.Invoke();
+            SyncServices();
         }
 
         internal void SyncServices()

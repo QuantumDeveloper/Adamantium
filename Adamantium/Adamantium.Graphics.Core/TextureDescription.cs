@@ -1,10 +1,9 @@
 ﻿using System;
 using System.Runtime.InteropServices;
-using Adamantium.Graphics.Core;
 using Adamantium.Imaging;
 using AdamantiumVulkan.Core;
 
-namespace Adamantium.Graphics
+namespace Adamantium.Graphics.Core
 {
     /// <summary>
     /// Decribes texture parameters which will be used to create or load texture

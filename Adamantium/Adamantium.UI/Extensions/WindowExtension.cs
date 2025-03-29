@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Adamantium.Core;
+using Adamantium.Graphics.Core;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Resources;
 
@@ -11,7 +12,6 @@ public static class WindowExtension
     public static void Update(this IWindow window, IThemeManager themeManager, AppTime appTime)
     {
         ProcessVisualTree(window, themeManager, UpdateComponent);
-        //ProcessVisualTree(window, themeManager, UpdateComponentLocation);
     }
     
     private static void ProcessVisualTree(IUIComponent component, IThemeManager themeManager, Action<IUIComponent> processAction)

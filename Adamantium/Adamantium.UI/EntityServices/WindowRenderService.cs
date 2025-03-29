@@ -2,7 +2,7 @@
 using System.Threading;
 using Adamantium.Core;
 using Adamantium.ECS;
-using Adamantium.Graphics;
+using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Presentation;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Events;
@@ -10,13 +10,11 @@ using Adamantium.UI.Extensions;
 using Adamantium.UI.Rendering;
 using Adamantium.UI.Resources;
 using Adamantium.UI.RoutedEvents;
-using AdamantiumVulkan.Core;
 
-namespace Adamantium.UI.Processors;
+namespace Adamantium.UI.EntityServices;
 
 public class WindowRenderService : UiRenderService
 {
-    private PresentationParameters parameters;
     private IWindowRenderer windowRenderer;
     private IWindowRenderer _pendingRenderer;
     private IThemeManager _themeManager;
@@ -44,20 +42,8 @@ public class WindowRenderService : UiRenderService
 
     private void CreateResources()
     {
-        parameters = new PresentationParameters(
-            PresenterType.Swapchain,
-            (uint)Window.ClientWidth,
-            (uint)Window.ClientHeight,
-            Window.SurfaceHandle,
-            Window.MSAALevel
-        )
-        {
-            HInstanceHandle = Process.GetCurrentProcess().Handle
-        };
-            
-        GraphicsDevice = (GraphicsDevice)GraphicsDeviceService.CreateRenderDevice(@parameters);
+        GraphicsDevice = GraphicsDeviceService.CreateRenderDevice();
         GraphicsDevice.ClearColor = Colors.CornflowerBlue;
-        //GraphicsDevice.AddDynamicStates(DynamicState.Viewport, DynamicState.Scissor);
 
         windowRenderer = Window.Renderer ?? new ForwardWindowRenderer(GraphicsDevice);
         windowRenderer.SetWindow(Window);
@@ -68,6 +54,11 @@ public class WindowRenderService : UiRenderService
     private void WindowOnRendererChanged(object sender, WindowRendererChangedEventArgs e)
     {
         _pendingRenderer = e.NewRenderer;
+    }
+    
+    public override void Present()
+    {
+        windowRenderer?.Present();
     }
 
     public override void UnloadContent()
@@ -82,6 +73,15 @@ public class WindowRenderService : UiRenderService
     {
         Window.Update(_themeManager, gameTime);
     }
+    
+    public override bool BeginDraw()
+    {
+        GraphicsDevice.SetRenderTargets(windowRenderer.Presenter.RenderTarget);
+        GraphicsDevice.SetDepthBuffer(windowRenderer.Presenter.DepthBuffer);
+        GraphicsDevice.MSAALevel = windowRenderer.Presenter.MSAALevel;
+        GraphicsDevice.Presenter = windowRenderer.Presenter;
+        return base.BeginDraw();
+    }
 
     public override void Draw(AppTime gameTime)
     {
@@ -94,16 +94,21 @@ public class WindowRenderService : UiRenderService
 
         windowRenderer?.Render(gameTime);
     }
+    
+    public override void EndDraw()
+    {
+        GraphicsDevice.EndDraw();
+        GraphicsDevice.BlitImage(GraphicsDevice.CurrentRenderTarget.ResolveTexture,
+            windowRenderer.Presenter.GetCurrentImage());
+    }
 
     public override void FrameEnded()
     {
         base.FrameEnded();
-        parameters.Width = (uint)Window.ClientWidth;
-        parameters.Height = (uint)Window.ClientHeight;
-        
+        GraphicsDevice.FrameEnded();
         if (!windowRenderer.IsRendererUpToDate)
         {
-            windowRenderer.ResizePresenter(parameters);
+            windowRenderer.ResizePresenter((uint)Window.ClientWidth, (uint)Window.ClientHeight);
         }
 
         if (_pendingRenderer != null)

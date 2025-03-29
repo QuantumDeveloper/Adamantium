@@ -19,7 +19,7 @@ namespace Adamantium.Game.Core
     /// </summary>
     public abstract class GameOutput : DisposableObject
     {
-        internal int OutputId = 1;
+        public Guid Id { get; } 
 
         public IGraphicsDevice GraphicsDevice { get; private set; }
         
@@ -81,6 +81,7 @@ namespace Adamantium.Game.Core
             Viewport.MaxDepth = 1.0f;
             Scissor = new Rect2D();
             GenerateWindowName();
+            Id = Guid.NewGuid();
         }
         
         /// <summary>
@@ -98,23 +99,26 @@ namespace Adamantium.Game.Core
         public Rect2D Scissor { get; protected set; }
 
         public Viewport Viewport { get; protected set; }
+        
+        public GraphicsPresenter Presenter { get; protected set; }
 
-        public virtual void CopyOutput(IGraphicsDevice mainDevice)
+        public virtual void CopyOutput(IGraphicsDevice graphicsDevice)
         {
-            
+            graphicsDevice.BlitImage(GraphicsDevice.CurrentRenderTarget, Presenter.GetCurrentImage());
         }
 
         public void DisplayContent()
         {
             if (IsUpToDate())
             {
-                GraphicsDevice.Present();
+                Presenter.Present();
             }
         }
 
         public void SetGraphicsDevice(IGraphicsDevice graphicsDevice)
         {
             GraphicsDevice = graphicsDevice;
+            Presenter = GraphicsPresenter.Create(graphicsDevice, Description.ToPresentationParameters());
             ClearState();
             OnDeviceSet();
         }
@@ -169,7 +173,6 @@ namespace Adamantium.Game.Core
             return new AdamantiumGameOutput(eventAggregator, new GameContext(wnd));
         }
 
-
         internal static GameOutput New(
             IEventAggregator eventAggregator,
             GameContext gameContext, 
@@ -186,7 +189,7 @@ namespace Adamantium.Game.Core
 
         public virtual async Task TakeScreenshotAsync(string path, ImageFileType fileType)
         {
-            await GraphicsDevice?.TakeScreenshotAsync(path, fileType);
+            await Presenter?.TakeScreenshotAsync(path, fileType);
         }
 
         public void UpdatePresenter()
@@ -197,7 +200,7 @@ namespace Adamantium.Game.Core
 
         internal void ResizePresenter()
         {
-            GraphicsDevice.ResizePresenter(Description);
+            Presenter.Resize(Description);
         }
 
         internal void SetPresentOptions()

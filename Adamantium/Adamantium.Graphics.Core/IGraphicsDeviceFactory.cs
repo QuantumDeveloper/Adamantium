@@ -4,7 +4,5 @@ namespace Adamantium.Graphics.Core;
 
 public interface IGraphicsDeviceFactory
 {
-    IGraphicsDevice Create(MainGraphicsDevice mainDevice);
-
-    IGraphicsDevice Create(MainGraphicsDevice mainDevice, PresentationParameters parameters);
+    IGraphicsDevice Create(MainGraphicsDevice mainDevice, GraphicsDeviceType deviceType);
 }

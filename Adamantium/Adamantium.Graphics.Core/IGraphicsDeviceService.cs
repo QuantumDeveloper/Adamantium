@@ -18,7 +18,7 @@ namespace Adamantium.Graphics.Core
       /// </summary>
       void CreateMainDevice(string name);
 
-      IGraphicsDevice CreateRenderDevice(PresentationParameters parameters);
+      IGraphicsDevice CreateRenderDevice();
 
       void ChangeOrCreateMainDevice(string name, bool forceUpdate);
 

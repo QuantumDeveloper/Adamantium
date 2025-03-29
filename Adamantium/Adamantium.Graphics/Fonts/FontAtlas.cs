@@ -85,7 +85,7 @@ namespace Adamantium.Graphics.Fonts
             description.Usage = ImageUsageFlagBits.SampledBit | ImageUsageFlagBits.TransferDstBit | ImageUsageFlagBits.TransferSrcBit;
             description.Dimension = TextureDimension.Texture2D;
             
-            Atlas = Texture.New(GraphicsDevice, description);
+            Atlas = Texture.New(GraphicsDevice, description, "Font Atlas");
         }
 
         private Glyph[] GetNotProcessedGlyphs(IEnumerable<Glyph> glyphs)

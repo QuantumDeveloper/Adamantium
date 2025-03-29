@@ -8,13 +8,12 @@ using Adamantium.Core.Collections;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.Core.Events;
 using Adamantium.ECS;
-using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.UI.AggregatorEvents;
 using Adamantium.UI.Controls;
+using Adamantium.UI.EntityServices;
 using Adamantium.UI.Events;
 using Adamantium.UI.Input;
-using Adamantium.UI.Processors;
 using Adamantium.UI.Resources;
 using Adamantium.UI.RoutedEvents;
 using Adamantium.UI.Services;
@@ -467,7 +466,6 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
         appTime.FrameTime = elapsed;
         appTime.TotalTime = totalTime;
         CalculateFps(ref appTime);
-
     }
 
     /// <summary>
@@ -538,11 +536,6 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
     {
         
     }
-
-    // protected virtual void Submit()
-    // {
-    //     
-    // }
 
     protected void EndScene()
     {

@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using Adamantium.Core;
-using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.EffectsFramework;
 using Adamantium.Graphics.Core.Presentation;
@@ -20,6 +19,8 @@ public abstract class WindowRendererBase : IWindowRenderer
     protected PresentationParameters Parameters { get; set; }
     
     protected Effect UiEffect { get; set; }
+    
+    public GraphicsPresenter Presenter { get; private set; }
     
     protected WindowRendererBase(IGraphicsDevice device)
     {
@@ -81,6 +82,8 @@ public abstract class WindowRendererBase : IWindowRenderer
         {
             HInstanceHandle = Process.GetCurrentProcess().Handle
         };
+
+        Presenter = GraphicsPresenter.Create(GraphicsDevice, Parameters, "Window presenter");
     }
 
     protected virtual void InitializeWindowResources()
@@ -93,8 +96,19 @@ public abstract class WindowRendererBase : IWindowRenderer
 
     public void ResizePresenter(PresentationParameters parameters)
     {
-        GraphicsDevice.ResizePresenter(parameters);
+        Presenter.Resize(parameters);
         IsRendererUpToDate = true;
+    }
+
+    public void ResizePresenter(uint width, uint height)
+    {
+        Presenter.Resize(width, height);
+        IsRendererUpToDate = true;
+    }
+
+    public virtual void Present()
+    {
+        Presenter?.Present();
     }
     
     public void Dispose()
