@@ -1,15 +1,10 @@
-﻿using Adamantium.Graphics.Core;
-using Adamantium.Graphics.Core.Presentation;
-using AdamantiumVulkan.Core;
-using Image = AdamantiumVulkan.Core.Image;
+﻿using Adamantium.Graphics.Core.Presentation;
 
-namespace Adamantium.Graphics
+namespace Adamantium.Graphics.Core
 {
    public class RenderTargetGraphicsPresenter : GraphicsPresenter
    {
-      private ITexture _resolveTexture;
-
-      public RenderTargetGraphicsPresenter(GraphicsDevice graphicsDevice, PresentationParameters description,
+      public RenderTargetGraphicsPresenter(IGraphicsDevice graphicsDevice, PresentationParameters description,
          string name = "") : base(graphicsDevice, description, name)
       {
          CreateRenderTarget();
@@ -18,14 +13,9 @@ namespace Adamantium.Graphics
       private void CreateRenderTarget()
       {
          renderTarget = ToDispose(GraphicsDevice.CreateRenderTarget(Width, Height, MSAALevel, SurfaceFormat));
-         _resolveTexture = ToDispose(GraphicsDevice.CreateRenderTarget(Width, Height, MSAALevel.None, SurfaceFormat));
       }
 
-      public ITexture ResolveTexture => _resolveTexture;
-
-      public override Image GetImage(uint index) => _resolveTexture.GetImage();
-
-      public override ImageView GetImageView(uint index) => _resolveTexture.GetImageView();
+      public ITexture ResolveTexture => renderTarget.ResolveTexture;
 
       /// <summary>
       /// Resize graphics presenter backBuffer according to width and height
@@ -40,7 +30,6 @@ namespace Adamantium.Graphics
          
          RemoveAndDispose(ref depthBuffer);
          RemoveAndDispose(ref renderTarget);
-         RemoveAndDispose(ref _resolveTexture);
          
          CreateDepthBuffer();
          CreateRenderTarget();
@@ -48,6 +37,9 @@ namespace Adamantium.Graphics
          return true;
       }
 
+      public override ITexture GetImageByIndex(uint index) => ResolveTexture;
+      public override ITexture GetCurrentImage() => ResolveTexture;
+      
       /// <summary>
       /// Present rendered image on screen
       /// </summary>

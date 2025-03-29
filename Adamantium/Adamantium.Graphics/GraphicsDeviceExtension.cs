@@ -42,37 +42,23 @@ public static class GraphicsDeviceExtension
             sourceTexture.TransitionImageLayout(ImageLayout.TransferSrcOptimal);
             destinationTexture.TransitionImageLayout(ImageLayout.TransferDstOptimal);
             
-            var range = new ImageSubresourceRange();
-            range.AspectMask = ImageAspectFlagBits.ColorBit;
-            range.BaseMipLevel = 0;
-            range.LevelCount = (~0U);
-            range.BaseArrayLayer = 0;
-            range.LayerCount = (~0U);
             graphicsDevice.InsertImageMemoryBarrier(commandBuffer,
-                sourceTexture.GetImage(),
+                sourceTexture,
                 AccessFlagBits.ColorAttachmentWriteBit,
                 AccessFlagBits.TransferReadBit,
                 ImageLayout.ColorAttachmentOptimal,
                 ImageLayout.TransferSrcOptimal,
                 PipelineStageFlagBits.ColorAttachmentOutputBit,
-                PipelineStageFlagBits.TransferBit,
-                range);
+                PipelineStageFlagBits.TransferBit);
             
-            range = new ImageSubresourceRange();
-            range.AspectMask = ImageAspectFlagBits.ColorBit;
-            range.BaseMipLevel = 0;
-            range.LevelCount = (~0U);
-            range.BaseArrayLayer = 0;
-            range.LayerCount = (~0U);
             graphicsDevice.InsertImageMemoryBarrier(commandBuffer,
-                destinationTexture.GetImage(),
+                destinationTexture,
                 AccessFlagBits.ShaderReadBit,
                 AccessFlagBits.TransferWriteBit,
                 ImageLayout.ShaderReadOnlyOptimal,
                 ImageLayout.TransferDstOptimal,
                 PipelineStageFlagBits.FragmentShaderBit,
-                PipelineStageFlagBits.TransferBit,
-                range);
+                PipelineStageFlagBits.TransferBit);
             
             commandBuffer.CopyImage(sourceTexture.GetImage(), 
                 ImageLayout.TransferSrcOptimal, 
@@ -81,37 +67,23 @@ public static class GraphicsDeviceExtension
                 1,
                 imageCopy);
             
-            range = new ImageSubresourceRange();
-            range.AspectMask = ImageAspectFlagBits.ColorBit;
-            range.BaseMipLevel = 0;
-            range.LevelCount = (~0U);
-            range.BaseArrayLayer = 0;
-            range.LayerCount = (~0U);
             graphicsDevice.InsertImageMemoryBarrier(commandBuffer,
-                sourceTexture.GetImage(),
+                sourceTexture,
                 AccessFlagBits.TransferReadBit,
                 AccessFlagBits.ColorAttachmentWriteBit,
                 ImageLayout.TransferSrcOptimal,
                 ImageLayout.ColorAttachmentOptimal,
                 PipelineStageFlagBits.TransferBit,
-                PipelineStageFlagBits.ColorAttachmentOutputBit,
-                range);
+                PipelineStageFlagBits.ColorAttachmentOutputBit);
             
-            range = new ImageSubresourceRange();
-            range.AspectMask = ImageAspectFlagBits.ColorBit;
-            range.BaseMipLevel = 0;
-            range.LevelCount = (~0U);
-            range.BaseArrayLayer = 0;
-            range.LayerCount = (~0U);
             graphicsDevice.InsertImageMemoryBarrier(commandBuffer,
-                destinationTexture.GetImage(),
+                destinationTexture,
                 AccessFlagBits.TransferWriteBit,
                 AccessFlagBits.ShaderReadBit,
                 ImageLayout.TransferDstOptimal,
                 ImageLayout.ShaderReadOnlyOptimal,
                 PipelineStageFlagBits.TransferBit,
-                PipelineStageFlagBits.FragmentShaderBit,
-                range);
+                PipelineStageFlagBits.FragmentShaderBit);
             
             sourceTexture.TransitionImageLayout(ImageLayout.ColorAttachmentOptimal);
             destinationTexture.TransitionImageLayout(ImageLayout.ShaderReadOnlyOptimal);

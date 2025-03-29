@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Adamantium.ECS;
 using Adamantium.Graphics.Core;
 
-namespace Adamantium.UI.Processors;
+namespace Adamantium.UI.EntityServices;
 
 public abstract class UiRenderService : EntityService
 {
@@ -29,11 +29,6 @@ public abstract class UiRenderService : EntityService
     public override void Submit()
     {
         GraphicsDevice.Submit();
-    }
-    
-    public override void Present()
-    {
-        GraphicsDevice.Present();
     }
 
     public void TraverseInDepth(IUIComponent visualComponent, Action<IUIComponent> action)

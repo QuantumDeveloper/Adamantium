@@ -21,6 +21,7 @@ public unsafe class Texture : GraphicsResource, ITexture
     public uint Width => Description.Width;
 
     public uint Height => Description.Height;
+    public uint Depth => Description.Depth;
 
     public SurfaceFormat SurfaceFormat => Description.Format;
     public ImageLayout ImageLayout { get; set; }
@@ -29,17 +30,41 @@ public unsafe class Texture : GraphicsResource, ITexture
     public IntPtr ManagedPointer => new IntPtr(NativePointer);
 
     public void* NativePointer => VulkanImage.NativePointer;
-        
+    public MSAALevel MSAALevel => Description.Samples;
+    public ImageAspectFlagBits ImageAspect => Description.ImageAspect;
+
+    private bool _disposeImage = true;
+
     protected VulkanImage VulkanImage => vulkanImage;
     protected DeviceMemory ImageMemory => vulkanImageMemory;
     protected ImageView ImageView { get; set; }
 
-    protected Texture(IGraphicsDevice device, TextureDescription description) : base(device)
+    protected Texture(IGraphicsDevice device, TextureDescription description, string name = "") : base(device, name)
     {
         Description = description;
         ImageLayout = description.InitialLayout;
         Initialize();
         this.TransitionImageLayout(description.DesiredImageLayout);
+    }
+    
+    protected Texture(IGraphicsDevice device, 
+        VulkanImage vulkanImage, 
+        TextureDescription description,
+        ImageUsageFlagBits usage,
+        string name = "") : 
+        base(device, name)
+    {
+        Description = description;
+        Description.Usage |= ImageUsageFlagBits.TransferDstBit | usage;
+        ImageLayout = description.DesiredImageLayout;
+        TotalSizeInBytes = CalculateTextureSize(Width, Height, Depth, Description.MipLevels,
+            (uint)description.Format.SizeOfInBytes());
+        this.vulkanImage = vulkanImage;
+        _disposeImage = false;
+        if (GraphicsDevice.MainDevice.IsInDebugMode)
+        {
+            GraphicsDevice.SetObjectDebugName((ulong)VulkanImage.NativePointer, ObjectType.Image, Name);
+        }
     }
 
     protected Texture(IGraphicsDevice device, Image img, ImageUsageFlagBits usage, ImageLayout desiredLayout) : 
@@ -192,6 +217,10 @@ public unsafe class Texture : GraphicsResource, ITexture
     {
         CreateImage(Description, MemoryPropertyFlags.DeviceLocal, out vulkanImage, out vulkanImageMemory);
         CreateImageView(Description);
+        if (GraphicsDevice.MainDevice.IsInDebugMode)
+        {
+            GraphicsDevice.SetObjectDebugName((ulong)VulkanImage.NativePointer, ObjectType.Image, Name);
+        }
     }
 
     protected void CreateImage(TextureDescription description, MemoryPropertyFlags memoryProperties, out VulkanImage image, out DeviceMemory imageMemory)
@@ -288,25 +317,22 @@ public unsafe class Texture : GraphicsResource, ITexture
     /// <param name="description">The description.</param>
     /// <returns>A Texture instance, either a RenderTarget or DepthStencilBuffer or Texture, depending on Binding flags.</returns>
     /// <exception cref="ArgumentNullException"></exception>
-    public static Texture New(IGraphicsDevice graphicsDevice, TextureDescription description)
+    public static Texture New(IGraphicsDevice graphicsDevice, TextureDescription description, string name = "")
     {
-        if (graphicsDevice == null)
-        {
-            throw new ArgumentNullException(nameof(graphicsDevice));
-        }
+        ArgumentNullException.ThrowIfNull(graphicsDevice);
 
         // TODO: check how this could be implemented
         if (description.Usage.HasFlag(ImageUsageFlagBits.ColorAttachmentBit))
         {
-            return new RenderTarget(graphicsDevice, description);
+            return new RenderTarget(graphicsDevice, description, name);
         }
         else if (description.Usage.HasFlag(ImageUsageFlagBits.DepthStencilAttachmentBit))
         {
-            return new DepthStencilBuffer(graphicsDevice, description);
+            return new DepthStencilBuffer(graphicsDevice, description, name);
         }
         else
         {
-            return new Texture(graphicsDevice, description);
+            return new Texture(graphicsDevice, description, name);
         }
     }
         
@@ -317,12 +343,21 @@ public unsafe class Texture : GraphicsResource, ITexture
         ImageUsageFlagBits usage = ImageUsageFlagBits.SampledBit, 
         ImageLayout desiredLayout = ImageLayout.ShaderReadOnlyOptimal)
     {
-        if (graphicsDevice == null)
-        {
-            throw new ArgumentNullException(nameof(graphicsDevice));
-        }
+        ArgumentNullException.ThrowIfNull(graphicsDevice);
 
         return new Texture(graphicsDevice, description, pixelData, usage, desiredLayout);
+    }
+    
+    public static Texture CreateFrom(
+        IGraphicsDevice graphicsDevice,
+        VulkanImage vulkanImage,
+        TextureDescription description, 
+        ImageUsageFlagBits usage = ImageUsageFlagBits.SampledBit,
+        string name = "")
+    {
+        ArgumentNullException.ThrowIfNull(graphicsDevice);
+
+        return new Texture(graphicsDevice, vulkanImage, description, usage, name);
     }
 
     /// <summary>
@@ -380,6 +415,11 @@ public unsafe class Texture : GraphicsResource, ITexture
         return ImageView;
     }
 
+    public void SetImageView(ImageView imageView)
+    {
+        ImageView = imageView;
+    }
+
     public void Save(string path, ImageFileType fileType)
     {
         // CopyImageToMemoryInfoEXT copy = new CopyImageToMemoryInfoEXT();
@@ -428,7 +468,11 @@ public unsafe class Texture : GraphicsResource, ITexture
 
     protected override void Dispose(bool disposeManaged)
     {
-        GraphicsDevice.Destroy(VulkanImage);
+        if (_disposeImage)
+        {
+            GraphicsDevice.Destroy(VulkanImage);
+        }
+
         GraphicsDevice.Destroy(ImageView);
         GraphicsDevice.Destroy(ImageMemory);
     }

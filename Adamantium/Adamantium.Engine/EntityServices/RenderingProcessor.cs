@@ -86,6 +86,11 @@ public class RenderingProcessor : EntityProcessor<RenderingService>, IDisposable
         SpriteBatch?.Dispose();
     }
 
+    public override void EndDraw()
+    {
+        Window.CopyOutput(GraphicsDevice);
+    }
+
     protected virtual void OnDeviceChangeEnd()
     {
         SpriteBatch = new SpriteBatch(GraphicsDevice, 25000);

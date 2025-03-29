@@ -8,6 +8,8 @@ public interface IEntityProcessor
 
     public void Draw(AppTime gameTime);
 
+    public void EndDraw();
+
     public void LoadContent();
 
     public void UnloadContent();

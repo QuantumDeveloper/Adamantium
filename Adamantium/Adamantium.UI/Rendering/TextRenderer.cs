@@ -1,9 +1,8 @@
-using System;
 using Adamantium.FX.Effects.Generated;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
-using Adamantium.Graphics.Core.Presentation;
 using Adamantium.Graphics.Fonts;
+using Adamantium.Imaging;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Media;
 using Adamantium.UI.Media.Imaging;
@@ -29,16 +28,19 @@ internal class TextRenderer : GeometryRenderer
     {
         TextLayout = textLayout;
         TextRenderingParameters = renderingParameters;
-        var renderTargetParams = PresentationParameters.RenderTargetParameters(
-            (uint)geometry.Bounds.Width, 
+        _renderToTextureDevice = (GraphicsDevice)device.MainDevice.CreateRenderDevice();
+        renderTarget = RenderTarget.New(_renderToTextureDevice, 
+            (uint)geometry.Bounds.Width,
             (uint)geometry.Bounds.Height,
-            MSAALevel.X4);
-        _renderToTextureDevice = (GraphicsDevice)device.MainDevice.CreateRenderDevice(renderTargetParams);
-        _renderToTextureDevice.AddDynamicStates(DynamicState.Viewport, DynamicState.Scissor);
+            MSAALevel.X4, 
+            SurfaceFormat.R8G8B8A8.UNorm,
+            name:"TextRenderer");
         FontRenderer = new FontRenderer(_renderToTextureDevice);
     }
 
     private GraphicsDevice _renderToTextureDevice;
+
+    private RenderTarget renderTarget;
     
     public TextRenderingParameters TextRenderingParameters { get; }
     
@@ -65,14 +67,15 @@ internal class TextRenderer : GeometryRenderer
             TextRenderingParameters.TextArea.Y, 
             5);
         
-        var resolveTexture = ((RenderTargetGraphicsPresenter)_renderToTextureDevice.Presenter).ResolveTexture;
+        var resolveTexture = renderTarget.ResolveTexture;
         resolveTexture.TransitionImageLayout(ImageLayout.ColorAttachmentOptimal);
 
         var foreground = ((SolidColorBrush)Foreground).Color;
         var stroke = ((SolidColorBrush)textBlock.Stroke).Color;
         _renderToTextureDevice.ClearColor = ((SolidColorBrush)Background).Color;
-        _renderToTextureDevice.BeginDraw(1, 0);
-        FontRenderer.SetState(null, location, _renderToTextureDevice.Presenter.RenderTarget);
+        _renderToTextureDevice.MSAALevel = renderTarget.MSAALevel;
+        //_renderToTextureDevice.BeginDraw(1, 0);
+        FontRenderer.SetState(null, location, renderTarget);
         FontRenderer.DrawLayout(TextLayout, foreground, stroke);
         FontRenderer.RestoreState();
         _renderToTextureDevice.EndDraw();

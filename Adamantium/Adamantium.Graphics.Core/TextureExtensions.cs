@@ -1,8 +1,7 @@
 using System;
-using Adamantium.Graphics.Core;
 using AdamantiumVulkan.Core;
 
-namespace Adamantium.Graphics;
+namespace Adamantium.Graphics.Core;
 
 public static class TextureExtensions
 {
@@ -94,6 +93,10 @@ public static class TextureExtensions
                 imageMemoryBarrier.SrcAccessMask = AccessFlagBits.ShaderReadBit;
                 sourceStage = PipelineStageFlagBits.FragmentShaderBit;
                 break;
+            case ImageLayout.PresentSrcKhr:
+                imageMemoryBarrier.SrcAccessMask = AccessFlagBits.None;
+                sourceStage = PipelineStageFlagBits.BottomOfPipeBit;
+                break;
             default:
                 throw new ArgumentException(
                     $"Transferring from {texture.ImageLayout} image layout is not supported yet");
@@ -131,14 +134,12 @@ public static class TextureExtensions
                 break;
 
             case ImageLayout.ShaderReadOnlyOptimal:
-                // Image will be read in a shader (sampler, input attachment)
-                // Make sure any writes to the image have been finished
-                // if (imageMemoryBarrier.SrcAccessMask == 0)
-                // {
-                //     imageMemoryBarrier.SrcAccessMask = AccessFlagBits.HostWriteBit | AccessFlagBits.TransferWriteBit;
-                // }
                 imageMemoryBarrier.DstAccessMask = AccessFlagBits.ShaderReadBit;
                 destinationStage = PipelineStageFlagBits.FragmentShaderBit;
+                break;
+            case ImageLayout.PresentSrcKhr:
+                imageMemoryBarrier.DstAccessMask = AccessFlagBits.None;
+                destinationStage = PipelineStageFlagBits.BottomOfPipeBit;
                 break;
             default:
                 throw new ArgumentException($"Transferring to {newLayout} is not handled yet");
@@ -158,5 +159,62 @@ public static class TextureExtensions
         texture.ImageLayout = newLayout;
 
         texture.GraphicsDevice.EndSingleTimeCommand(commandBuffer);
+    }
+
+    public static void BlitImage(this IGraphicsDevice graphicsDevice, ITexture srcTexture, ITexture dstTexture)
+    {
+        var blit = new ImageBlit();
+        blit.SrcSubresource = new ImageSubresourceLayers();
+        blit.SrcSubresource.AspectMask     = ImageAspectFlagBits.ColorBit;
+        blit.SrcSubresource.BaseArrayLayer = 0;
+        blit.SrcSubresource.LayerCount     = 1;
+        blit.SrcSubresource.MipLevel       = 0;
+        blit.SrcOffsets = new Offset3D[2];
+        blit.SrcOffsets[0] = new Offset3D() {X = 0, Y = 0, Z = 0};
+        blit.SrcOffsets[1] = new Offset3D() {X = (int)srcTexture.Width, Y = (int)srcTexture.Height, Z = 1};
+
+        // Copy color from source to destination of screen size
+        blit.DstSubresource = new ImageSubresourceLayers();
+        blit.DstSubresource.AspectMask     = ImageAspectFlagBits.ColorBit;
+        blit.DstSubresource.BaseArrayLayer = 0;
+        blit.DstSubresource.LayerCount     = 1;
+        blit.DstSubresource.MipLevel       = 0;
+        blit.DstOffsets = new Offset3D[2];
+        blit.DstOffsets[0] = new Offset3D() {X = 0, Y = 0, Z = 0};
+        blit.DstOffsets[1] = new Offset3D() {X = (int)dstTexture.Width, Y = (int)dstTexture.Height, Z = 1};
+        
+        graphicsDevice.InsertImageMemoryBarrier(graphicsDevice.CurrentCommandBuffer,
+            srcTexture,
+            AccessFlagBits.ColorAttachmentWriteBit,
+            AccessFlagBits.TransferReadBit,
+            //ImageLayout.ColorAttachmentOptimal,
+            srcTexture.ImageLayout,
+            ImageLayout.TransferSrcOptimal,
+            PipelineStageFlagBits.ColorAttachmentOutputBit,
+            PipelineStageFlagBits.TransferBit
+        );
+        
+        // destination (swapchain) texture
+        graphicsDevice.InsertImageMemoryBarrier(graphicsDevice.CurrentCommandBuffer,
+            dstTexture,
+            0,
+            AccessFlagBits.TransferWriteBit,
+            ImageLayout.Undefined,
+            ImageLayout.TransferDstOptimal,
+            PipelineStageFlagBits.TopOfPipeBit,
+            PipelineStageFlagBits.TransferBit
+        );
+
+        var commandBuffer = graphicsDevice.CurrentCommandBuffer;
+
+        commandBuffer.BlitImage(
+            srcTexture.GetImage(), 
+            srcTexture.ImageLayout, 
+            dstTexture.GetImage(),
+            dstTexture.ImageLayout, 
+            1, 
+            blit, 
+            Filter.Linear);
+
     }
 }

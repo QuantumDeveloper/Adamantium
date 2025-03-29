@@ -4,7 +4,6 @@ using Adamantium.Core;
 using Adamantium.Graphics.Core.Presentation;
 using Adamantium.Imaging;
 using AdamantiumVulkan.Core;
-using Image = AdamantiumVulkan.Core.Image;
 
 namespace Adamantium.Graphics.Core
 {
@@ -14,6 +13,7 @@ namespace Adamantium.Graphics.Core
         protected IDepthStencilBuffer depthBuffer;
         
         private PresentInterval presentInterval;
+        protected uint currentImageIndex;
         
         public IGraphicsDevice GraphicsDevice { get; private set; }
 
@@ -37,6 +37,10 @@ namespace Adamantium.Graphics.Core
         public Viewport Viewport { get; protected set; }
         
         public PresenterType PresenterType { get; private set; }
+        
+        public uint CurrentImageIndex => currentImageIndex;
+        
+        public bool CanPresent { get; protected set; }
 
         public PresentInterval PresentInterval
         {
@@ -62,7 +66,7 @@ namespace Adamantium.Graphics.Core
 
         protected void CreateDepthBuffer()
         {
-            depthBuffer = ToDispose(GraphicsDevice.CreateDepthBuffer(Width, Height, DepthFormat, MSAALevel));
+            depthBuffer = ToDispose(GraphicsDevice.CreateDepthBuffer(Width, Height, DepthFormat, MSAALevel, name: $"{Name}+DepthBuffer"));
         }
 
         private void CreateViewPort()
@@ -100,20 +104,22 @@ namespace Adamantium.Graphics.Core
             return true;
         }
         
-        public virtual ImageView GetImageView(uint index)
+        public abstract ITexture GetImageByIndex(uint index);
+
+        public abstract ITexture GetCurrentImage();
+
+        public virtual bool AcquireNextImage(Fence fence, Semaphore semaphore)
         {
-            return null;
-        }
-        
-        public virtual Image GetImage(uint index)
-        {
-            return null;
+            CanPresent = true;
+            return true;
         }
 
         /// <summary>
         /// Present rendered image on screen
         /// </summary>
         public abstract PresenterState Present();
+        
+        public PresenterState LastPresenterState { get; protected set; }
 
         protected PresenterState ConvertState(Result result)
         {
@@ -137,6 +143,21 @@ namespace Adamantium.Graphics.Core
                     return PresenterState.FullScreenExclusiveModeLost;
                 default:
                     return PresenterState.Unknown;
+            }
+        }
+        
+        public static GraphicsPresenter Create(IGraphicsDevice graphicsDevice, PresentationParameters parameters, string name = "")
+        {
+            switch (parameters.PresenterType)
+            {
+                case PresenterType.Swapchain:
+                    return new SwapChainGraphicsPresenter(graphicsDevice, parameters, name);
+                    break;
+                case PresenterType.RenderTarget:
+                    return new RenderTargetGraphicsPresenter(graphicsDevice, parameters, name);
+                    break;
+                default:
+                    throw new NotSupportedException($"Presenter type: {parameters.PresenterType} is not supported");
             }
         }
 

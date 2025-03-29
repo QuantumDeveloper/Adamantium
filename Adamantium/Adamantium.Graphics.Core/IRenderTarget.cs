@@ -2,5 +2,5 @@
 
 public interface IRenderTarget : ITexture
 {
-    
+    ITexture ResolveTexture { get; }
 }

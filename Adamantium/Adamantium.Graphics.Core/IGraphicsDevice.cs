@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Threading.Tasks;
 using Adamantium.Core;
 using Adamantium.EffectsCompiler;
 using Adamantium.Graphics.Core.EffectsFramework;
@@ -7,6 +6,7 @@ using Adamantium.Graphics.Core.Presentation;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
 using AdamantiumVulkan.Core;
+using AdamantiumVulkan.Core.Interop;
 using Buffer = AdamantiumVulkan.Core.Buffer;
 using EffectTechnique = Adamantium.Graphics.Core.EffectsFramework.EffectTechnique;
 using Image = AdamantiumVulkan.Core.Image;
@@ -19,6 +19,8 @@ public interface IDrawableDevice
     void EndDraw();
 
     void Submit();
+
+    void FrameEnded();
 
     void Draw(ulong vertexCount, uint instanceCount, uint firstVertex = 0, uint firstInstance = 0);
     
@@ -45,17 +47,43 @@ public interface IDynamicStateDevice
     
     bool ColorBlendEnabled { get; set; }
     
+    MSAALevel MSAALevel { get; set; }
+        
+    bool AlphaToCoverageEnable { get; set; }
+    
     PolygonMode PolygonMode { get; set; }
     
     CullModeFlagBits CullMode { get; set; }
     
+    bool IsWireFrame { get; set; }
+        
+    VkSampleMask[] SampleMask { get; set; }
+
+    Single LineWidth { get; set; }
+
+    FrontFace FrontFace { get; set; }
+    
     ColorBlendEquationEXT ColorBlendEquation { get; set; }
+    
+    bool DepthWriteEnable { get; set; }
+
+    CompareOp DepthCompareFunction { get; set; }
+
+    bool DepthBoundsTestEnabled { get; set; }
+        
+    bool DepthBiasEnabled { get; set; }
+        
+    bool StencilTestEnabled { get; set; }
+        
+    bool LogicOperationsEnabled { get; set; }
+        
+    LogicOp LogicOperation { get; set; }
     
     public void SetViewports(params Viewport[] viewports);
     
     public void SetScissors(params Rect2D[] scissors);
 
-    void SetRenderTarget(IRenderTarget renderTarget);
+    void SetRenderTargets(params IRenderTarget[] renderTargets);
 
     void SetDepthBuffer(IDepthStencilBuffer depthBuffer);
     
@@ -66,6 +94,14 @@ public interface IDynamicStateDevice
     void SetVertexBuffers(params IBuffer[] vertexBuffers);
     
     public SamplerStateCollection SamplerStates { get; }
+    
+    Queue GraphicsQueue { get; }
+    
+    IRenderTarget CurrentRenderTarget { get; }
+    
+    IDepthStencilBuffer CurrentDepthStencilBuffer { get; }
+    
+    UInt32 CurrentFrame { get; }
 }
 
 public unsafe interface IGraphicsDevice : IDrawableDevice, IDynamicStateDevice, IDestroyableDevice, IDisposable
@@ -132,46 +168,52 @@ public unsafe interface IGraphicsDevice : IDrawableDevice, IDynamicStateDevice, 
     
     GraphicsAdapter Adapter { get; }
     
+    GraphicsPresenter Presenter { get; set; }
+    
     MainGraphicsDevice MainDevice { get; }
-    
-    GraphicsPresenter Presenter { get;  }
 
-    PresentInfoKHR FillPresentInfo(SwapchainKHR[] swapchains);
+    Fence GetCurrentFence();
 
-    void Present();
+    Semaphore GetRenderFinishedSemaphore();
 
-    bool ResizePresenter(uint width, uint height);
-
-    bool ResizePresenter(PresentationParameters parameters);
-    
     PrimitiveTopology PrimitiveTopology { get; set; }
     
     Type VertexType { get; set; }
-
-    Task TakeScreenshotAsync(string path, ImageFileType fileType);
 
     IDepthStencilBuffer CreateDepthBuffer(uint width, 
         uint height, 
         DepthFormat format, 
         MSAALevel msaa,
-        ImageAspectFlagBits imageAspect = ImageAspectFlagBits.DepthBit);
+        ImageAspectFlagBits imageAspect = ImageAspectFlagBits.DepthBit,
+        string name = "");
     
     IRenderTarget CreateRenderTarget(UInt32 width, 
         UInt32 height, 
         MSAALevel msaa, 
         SurfaceFormat format, 
         ImageUsageFlagBits usage = ImageUsageFlagBits.TransferSrcBit,
-        ImageLayout desiredLayout = ImageLayout.ColorAttachmentOptimal);
+        ImageLayout desiredLayout = ImageLayout.ColorAttachmentOptimal,
+        string name = "");
+
+    ITexture CreateTextureFromImage(Image image, 
+        UInt32 width, 
+        UInt32 height, 
+        MSAALevel msaa, 
+        SurfaceFormat format, 
+        ImageUsageFlagBits usage = ImageUsageFlagBits.TransferSrcBit,
+        ImageLayout desiredLayout = ImageLayout.ColorAttachmentOptimal,
+        string name = "");
     
     SurfaceKHR GetOrCreateSurface(PresentationParameters parameters);
 
     void InsertImageMemoryBarrier(CommandBuffer commandBuffer,
-        Image image,
+        ITexture texture,
         AccessFlagBits sourceAccessMask,
         AccessFlagBits destinationAccessMask,
         ImageLayout oldLayout,
         ImageLayout newLayout,
         PipelineStageFlagBits sourceStageMask,
-        PipelineStageFlagBits destinationStageMask,
-        ImageSubresourceRange subresourceRange);
+        PipelineStageFlagBits destinationStageMask);
+
+    void SetObjectDebugName(ulong objectHandle, ObjectType objectType, string name);
 }

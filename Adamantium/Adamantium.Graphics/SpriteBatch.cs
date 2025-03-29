@@ -112,6 +112,7 @@ namespace Adamantium.Graphics
         }
 
         private void SaveState(
+            Vector2 screenSize,
             SpriteSortMode sortMode,
             SamplerState samplerState,
             Effect effect, 
@@ -122,8 +123,7 @@ namespace Adamantium.Graphics
                 throw new Exception("You need to call End() before you can call Begin() again");
             }
 
-            var presenterDescription = graphicsDevice.Presenter.Description;
-            currentScreenSize = new Vector2F(presenterDescription.Width, presenterDescription.Height);
+            currentScreenSize = screenSize;
             spriteSortMode = sortMode;
             transformMatrix = transformationMatrix;
 
@@ -147,10 +147,10 @@ namespace Adamantium.Graphics
         /// </summary>
         /// <param name="sortMode"></param>
         /// /// <param name="effect"></param>
-        public void Begin(SpriteSortMode sortMode = SpriteSortMode.NoSort, Effect effect = null)
+        public void Begin(Vector2 screenSize, SpriteSortMode sortMode = SpriteSortMode.NoSort, Effect effect = null)
         {
             spriteSortMode = sortMode;
-            SaveState(sortMode, null, effect, Matrix4x4F.Identity);
+            SaveState(screenSize, sortMode, null, effect, Matrix4x4F.Identity);
         }
 
         /// <summary>
@@ -165,11 +165,12 @@ namespace Adamantium.Graphics
         /// <param name="rasterizerState">The <see cref="RasterizerState"/></param>
         /// <param name="effect">Custom <see cref="Effect"/></param>
         public void Begin(
+            Vector2 screenSize,
             SpriteSortMode sortMode,
             SamplerState samplerState = null,
             Effect effect = null)
         {
-            SaveState(sortMode, samplerState, effect, Matrix4x4F.Identity);
+            SaveState(screenSize, sortMode, samplerState, effect, Matrix4x4F.Identity);
         }
 
         /// <summary>
@@ -183,12 +184,13 @@ namespace Adamantium.Graphics
         /// <param name="effect">Custom <see cref="Effect"/></param>
         /// <param name="transformationMatrix">Transformation matrix</param>
         public void Begin(
+            Vector2 screenSize,
             SpriteSortMode sortMode, 
             SamplerState samplerState,
             Effect effect,
             Matrix4x4F transformationMatrix)
         {
-            SaveState(sortMode, samplerState, effect, transformationMatrix);
+            SaveState(screenSize, sortMode, samplerState, effect, transformationMatrix);
         }
 
         /// <summary>

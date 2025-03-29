@@ -1,23 +1,20 @@
 ﻿using System;
-using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Presentation;
 using AdamantiumVulkan.Core;
 using Serilog;
-using VulkanImage = AdamantiumVulkan.Core.Image;
 
-namespace Adamantium.Graphics
+namespace Adamantium.Graphics.Core
 {
     public class SwapChainGraphicsPresenter : GraphicsPresenter
     {
         private SwapchainKHR swapchain;
         private SurfaceKHR surface;
-        private VulkanImage[] images;
-        private ImageView[] imageViews;
+        private ITexture[] swapchainTextures;
         private Queue presentQueue;
         private SwapchainKHR[] swapchains;
 
         public SwapChainGraphicsPresenter(
-            GraphicsDevice graphicsDevice, 
+            IGraphicsDevice graphicsDevice, 
             PresentationParameters description,
             string name = "") : base(graphicsDevice, description, name)
         {
@@ -28,7 +25,6 @@ namespace Adamantium.Graphics
             CreateSurface();
             CreateSwapchain();
             CreateRenderTarget();
-            CreateImageViews();
         }
 
         class SwapChainSupportDetails
@@ -45,7 +41,7 @@ namespace Adamantium.Graphics
 
         private void CreateRenderTarget()
         {
-            renderTarget = ToDispose(Graphics.RenderTarget.New(GraphicsDevice, Width, Height, MSAALevel, SurfaceFormat));
+            renderTarget = ToDispose(GraphicsDevice.CreateRenderTarget(Width, Height, MSAALevel, SurfaceFormat, name: $"{Name}+RenderTarget"));
         }
 
         SwapChainSupportDetails QuerySwapChainSupport(PhysicalDevice device)
@@ -76,7 +72,7 @@ namespace Adamantium.Graphics
                 imageCount = swapChainSupport.Capabilities.MaxImageCount;
             }
 
-            SwapchainCreateInfoKHR createInfo = new SwapchainCreateInfoKHR();
+            var createInfo = new SwapchainCreateInfoKHR();
             createInfo.Surface = surface;
 
             createInfo.MinImageCount = imageCount;
@@ -84,7 +80,7 @@ namespace Adamantium.Graphics
             createInfo.ImageColorSpace = surfaceFormat.ColorSpace;
             createInfo.ImageExtent = extent;
             createInfo.ImageArrayLayers = 1;
-            createInfo.ImageUsage = ImageUsageFlagBits.ColorAttachmentBit;
+            createInfo.ImageUsage = ImageUsageFlagBits.ColorAttachmentBit | ImageUsageFlagBits.TransferDstBit;
 
             var graphicsFamily =
                 GraphicsDevice.MainDevice.QueueFamilyContainer.GetFamilyInfo(QueueFlagBits.GraphicsBit);
@@ -114,19 +110,32 @@ namespace Adamantium.Graphics
 
             createInfo.Dispose();
 
-            images = logicalDevice.GetSwapchainImagesKHR(swapchain);
+            var images = logicalDevice.GetSwapchainImagesKHR(swapchain);
+            swapchainTextures = new ITexture[images.Length];
+            for (int i = 0; i < images.Length; i++)
+            {
+                swapchainTextures[i] =
+                    GraphicsDevice.CreateTextureFromImage(
+                        images[i], 
+                        Width, 
+                        Height, 
+                        Description.MSAALevel,
+                        SurfaceFormat,
+                        desiredLayout: ImageLayout.Undefined,
+                        name:$"SwapchainImage_{i}");
+            }
+            CreateImageViews();
             swapchains[0] = swapchain;
         }
 
         private void CreateImageViews()
         {
             Device logicalDevice = GraphicsDevice.LogicalDevice;
-            imageViews = new ImageView[images.Length];
 
-            for (int i = 0; i < images.Length; i++)
+            for (int i = 0; i < swapchainTextures.Length; i++)
             {
                 var createInfo = new ImageViewCreateInfo();
-                createInfo.Image = images[i];
+                createInfo.Image = swapchainTextures[i].GetImage();
                 createInfo.ViewType = ImageViewType._2d;
                 createInfo.Format = SurfaceFormat;
                 ComponentMapping componentMapping = new ComponentMapping();
@@ -143,7 +152,7 @@ namespace Adamantium.Graphics
                 subresourceRange.LayerCount = 1;
                 createInfo.SubresourceRange = subresourceRange;
 
-                imageViews[i] = logicalDevice.CreateImageView(createInfo);
+                swapchainTextures[i].SetImageView(logicalDevice.CreateImageView(createInfo));
             }
         }
         
@@ -194,20 +203,86 @@ namespace Adamantium.Graphics
             return actualExtent;
         }
 
+        public override ITexture GetImageByIndex(uint index)
+        {
+            return swapchainTextures[index];
+        }
+
+        public override ITexture GetCurrentImage()
+        {
+            return swapchainTextures[CurrentImageIndex];
+        }
+
+        public override bool AcquireNextImage(Fence fence, Semaphore semaphore)
+        {
+            var result =
+                GraphicsDevice.LogicalDevice.AcquireNextImageKHR(
+                    this, 
+                    ulong.MaxValue, 
+                    semaphore, null,
+                    ref currentImageIndex);
+            
+            if (result == Result.ErrorOutOfDateKhr)
+            {
+                LastPresenterState = ConvertState(result);
+                CanPresent = false;
+                return false;
+            }
+            
+            if (result != Result.Success && result != Result.SuboptimalKhr)
+            {
+                Log.Logger.Error("Failed to acquire swap chain image! Operation result was: {result}");
+                CanPresent = false;
+                return false;
+            }
+
+            CanPresent = true;
+            return CanPresent;
+        }
+
         /// <summary>
         /// Present rendered image on screen
         /// </summary>
         public override PresenterState Present()
         {
-            var presentInfo =  GraphicsDevice.FillPresentInfo(swapchains);
+            //var fence = GraphicsDevice.GetCurrentFence();
+            // GraphicsDevice.LogicalDevice.WaitForFences(1U, fence, true, ulong.MaxValue);
+            // GraphicsDevice.LogicalDevice.ResetFences(1u, fence);
 
+            if (!CanPresent) return LastPresenterState;
+
+            var presenterImage = GetCurrentImage();
+
+            if (presenterImage.ImageLayout != ImageLayout.PresentSrcKhr)
+            {
+                presenterImage.TransitionImageLayout(ImageLayout.PresentSrcKhr);
+            }
+            
+            //GraphicsDevice.LogicalDevice.WaitForFences(1U, fence, true, ulong.MaxValue);
+            var presentInfo = FillPresentInfo(CurrentImageIndex);
             var result = presentQueue.QueuePresentKHR(presentInfo);
+            
             if (result != Result.Success && result != Result.SuboptimalKhr)
             {
-                Log.Logger.Information("Failed to present swap chain image");
+                Log.Logger.Error($"Failed to present swap chain image. Operation result was: {result}");
             }
+            
+            LastPresenterState = ConvertState(result);
 
-            return ConvertState(result);
+            return LastPresenterState;
+        }
+        
+        private PresentInfoKHR FillPresentInfo(uint imageIndex)
+        {
+            var presentInfo = new PresentInfoKHR();
+            presentInfo.WaitSemaphoreCount = 1;
+            presentInfo.PWaitSemaphores = [GraphicsDevice.GetRenderFinishedSemaphore()];
+
+            presentInfo.SwapchainCount = (uint)swapchains.Length;
+            presentInfo.PSwapchains = swapchains;
+            presentInfo.PImageIndices = [imageIndex];
+        
+            return presentInfo;
         }
 
         /// <summary>
@@ -234,30 +309,19 @@ namespace Adamantium.Graphics
             return true;
         }
 
-        public override ImageView GetImageView(uint index)
-        {
-            return imageViews[index];
-        }
-        
-        public override VulkanImage GetImage(uint index)
-        {
-            return images[index];
-        }
-
         private void RecreateSwapchain()
         {
             CleanupSwapChain();
             CreateSwapchain();
             CreateRenderTarget();
             CreateDepthBuffer();
-            CreateImageViews();
         }
 
         protected override void CleanupSwapChain()
         {
-            foreach (var view in imageViews)
+            foreach (var texture in swapchainTextures)
             {
-                GraphicsDevice.Destroy(view);
+                texture?.Dispose();
             }
 
             RemoveAndDispose(ref depthBuffer);

@@ -69,7 +69,7 @@ public class RenderTargetGameOutput : AdamantiumGameOutputBase
 
     public override void CopyOutput(IGraphicsDevice mainDevice)
     {
-        var rt = GraphicsDevice.Presenter as RenderTargetGraphicsPresenter;
+        var rt = Presenter as RenderTargetGraphicsPresenter;
         mainDevice.CopyImage(rt?.ResolveTexture, _destinationTexture);
         nativeWindow.CanPresent = true;
     }

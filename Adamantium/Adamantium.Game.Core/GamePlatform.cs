@@ -150,7 +150,7 @@ namespace Adamantium.Game.Core
                 {
                     var wnd = windowsToAdd[i];
                     
-                    var device = GraphicsDeviceService.CreateRenderDevice(wnd.Description);
+                    var device = GraphicsDeviceService.CreateRenderDevice();
                     wnd.SetGraphicsDevice(device);
                     SubscribeToEvents(wnd);
                     
@@ -225,7 +225,7 @@ namespace Adamantium.Game.Core
                     if ((graphicsDeviceChanged || reason == ChangeReason.FullUpdate) && wndObj.Key.Type != GameWindowType.RenderTarget)
                     {
                         OnWindowParametersChanging(wnd, wnd.Description, ChangeReason.FullUpdate);
-                        var device = GraphicsDeviceService.MainGraphicsDevice.UpdateDevice(wnd.GraphicsDevice.DeviceId, wnd.Description);
+                        var device = GraphicsDeviceService.MainGraphicsDevice.UpdateDevice(wnd.GraphicsDevice.DeviceId);
                         wnd.SetGraphicsDevice(device);
                         OnWindowParametersChanged(wnd, wnd.Description, ChangeReason.FullUpdate);
                     }

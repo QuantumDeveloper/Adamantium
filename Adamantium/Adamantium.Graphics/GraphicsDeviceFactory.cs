@@ -1,17 +1,11 @@
 ﻿using Adamantium.Graphics.Core;
-using Adamantium.Graphics.Core.Presentation;
 
 namespace Adamantium.Graphics;
 
 public class GraphicsDeviceFactory : IGraphicsDeviceFactory
 {
-    public IGraphicsDevice Create(MainGraphicsDevice mainGraphicsDevice)
+    public IGraphicsDevice Create(MainGraphicsDevice mainDevice, GraphicsDeviceType deviceType)
     {
-        return GraphicsDevice.Create(mainGraphicsDevice);
-    }
-
-    public IGraphicsDevice Create(MainGraphicsDevice mainDevice, PresentationParameters parameters)
-    {
-        return GraphicsDevice.Create(mainDevice, parameters);
+        return GraphicsDevice.Create(mainDevice, deviceType);
     }
 }

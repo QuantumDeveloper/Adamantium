@@ -2,7 +2,6 @@ using System;
 using Adamantium.FX.Effects.Generated;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.EffectsFramework;
-using Adamantium.Graphics.Effects;
 using Adamantium.Mathematics;
 using AdamantiumVulkan.Core;
 
@@ -99,6 +98,8 @@ public class FontRenderer : GraphicsResource
         this.renderTarget = renderTarget;
         currentScreenSize = new Vector2F(renderTarget.Width, renderTarget.Height);
         transformMatrix = Matrix4x4F.Translation(translation);
+        GraphicsDevice.SetRenderTargets(renderTarget);
+        GraphicsDevice.BeginDraw();
 
         // assignedSamplerState = samplerState ?? GraphicsDevice.SamplerStates.LinearFont;
         // assignedBlendState = blendState ?? GraphicsDevice.BlendStates.Fonts;
@@ -162,7 +163,7 @@ public class FontRenderer : GraphicsResource
         Matrix4x4F.Multiply(ref transformMatrix, ref orthoProjection, out finalMatrix);
         GraphicsDevice.SetViewports(vp);
         GraphicsDevice.SetScissors(scissor);
-        GraphicsDevice.SetRenderTarget(renderTarget);
+        GraphicsDevice.SetRenderTargets(renderTarget);
         GraphicsDevice.ColorBlendEnabled = true;
         GraphicsDevice.ColorBlendEquation = ColorBlendEquations.Fonts;
         GraphicsDevice.PrimitiveRestartEnable = true;
@@ -172,7 +173,6 @@ public class FontRenderer : GraphicsResource
         effectMatrixTransform.SetValue(finalMatrix);
         effectUVCornerCoords.SetValue(UVCornerCoords);
         effectForegroundColor.SetValue(foreground.ToVector4());
-        //effectForegroundColor.SetValue(Colors.White.ToVector4());
         effectFontSize.SetValue(layout.FontSize);
         effectFontSizeThreshold.SetValue(FontSizeThreshold);
         effectFontSharpness.SetValue(FontSharpness);

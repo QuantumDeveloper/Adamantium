@@ -7,9 +7,18 @@ namespace Adamantium.Graphics
 {
     public class RenderTarget : Texture, IRenderTarget
     {
-        internal RenderTarget(IGraphicsDevice device, TextureDescription description) : base(device, description)
+        internal RenderTarget(IGraphicsDevice device, TextureDescription description, string name = "") : base(device, description, name)
         {
-            
+            if (description.Samples != MSAALevel.None)
+            {
+                var clonedDesc = description;
+                clonedDesc.Samples = MSAALevel.None;
+                ResolveTexture = ToDispose(Texture.New(device, clonedDesc, $"{name}:Resolve"));
+            }
+            else
+            {
+                ResolveTexture = this;
+            }
         }
 
         public static RenderTarget New(IGraphicsDevice graphicsDevice, 
@@ -18,11 +27,12 @@ namespace Adamantium.Graphics
             MSAALevel msaa, 
             SurfaceFormat format, 
             ImageUsageFlagBits usage = ImageUsageFlagBits.TransferSrcBit,
-            ImageLayout desiredLayout = ImageLayout.ColorAttachmentOptimal)
+            ImageLayout desiredLayout = ImageLayout.ColorAttachmentOptimal,
+            string name = "")
         {
             usage |= ImageUsageFlagBits.ColorAttachmentBit | ImageUsageFlagBits.SampledBit;
 
-            TextureDescription description = new TextureDescription
+            var description = new TextureDescription
             {
                 Width = width,
                 Height = height,
@@ -40,7 +50,9 @@ namespace Adamantium.Graphics
                 Samples = msaa
             };
 
-            return new RenderTarget(graphicsDevice, description);
+            return new RenderTarget(graphicsDevice, description, name);
         }
+
+        public ITexture ResolveTexture { get; }
     }
 }
