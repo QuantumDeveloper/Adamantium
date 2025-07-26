@@ -2,14 +2,18 @@ using System;
 using Adamantium.FX.Effects.Generated;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
-using Adamantium.UI.Media;
-using Adamantium.UI.Media.Imaging;
+using Adamantium.Graphics.Core.Extensions;
+using Adamantium.Graphics.Core.Vertices;
+using Adamantium.Mathematics;
+using Adamantium.UI.Core;
+using Adamantium.UI.Core.Media;
+using Adamantium.UI.Core.Media.Imaging;
 using AdamantiumVulkan.Core;
 using Buffer = Adamantium.Graphics.Buffer;
 
 namespace Adamantium.UI.Rendering;
 
-internal class GeometryRenderer : ComponentRenderer
+public class GeometryRenderer : ComponentRenderer
 {
     public GeometryRenderer(IGraphicsDevice device, Geometry geometry, Brush background, Brush foreground,
         BasicEffect basicEffect, Texture texture = null) : base(background, foreground, basicEffect)
@@ -62,7 +66,7 @@ internal class GeometryRenderer : ComponentRenderer
         graphicsDevice.SetVertexBuffer(VertexBuffer);
         graphicsDevice.VertexType = VertexType;
         graphicsDevice.PrimitiveTopology = PrimitiveType;
-        graphicsDevice.ColorBlendEquation = ColorBlendEquations.Default;
+        graphicsDevice.ColorBlendEquation = ColorBlendEquations.AlphaBlend;
 
         var world = Matrix4x4F.Translation((float)component.Location.X, (float)component.Location.Y, 5);
 
@@ -71,8 +75,6 @@ internal class GeometryRenderer : ComponentRenderer
         var color = Background as SolidColorBrush;
         effect.MeshColor.SetValue(color.Color.ToVector4());
         effect.Transparency.SetValue((float)Background.Opacity);
-        
-        //var texture = ((BitmapSource)image)?.Texture;
         
         if (Texture == null)
         {

@@ -1,11 +1,12 @@
 using Adamantium.Core;
-using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
-using Adamantium.UI.Media.Imaging;
+using Adamantium.Mathematics;
+using Adamantium.UI.Core;
+using Adamantium.UI.Core.Media.Imaging;
 
 namespace Adamantium.UI.Rendering;
 
-internal class RenderUnit : DisposableObject
+public class RenderUnit : DisposableObject
 {
     private GeometryRenderer geometryRenderer;
     private GeometryRenderer strokeRenderer;

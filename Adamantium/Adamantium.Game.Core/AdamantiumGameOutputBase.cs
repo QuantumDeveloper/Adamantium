@@ -5,7 +5,8 @@ using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Imaging;
 using Adamantium.UI;
-using Adamantium.UI.Input;
+using Adamantium.UI.Core;
+using Adamantium.UI.Core.Input;
 using GameMouseButtons = Adamantium.Game.Core.Input.MouseButton;
 
 

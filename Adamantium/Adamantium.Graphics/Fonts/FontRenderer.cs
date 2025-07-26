@@ -35,13 +35,17 @@ public class FontRenderer : GraphicsResource
     private static readonly Vector2F[] UVCornerCoords = [Vector2F.Zero, Vector2F.UnitX, Vector2F.UnitY, Vector2F.One];
     private Matrix4x4F finalMatrix;
     private SamplerState assignedSamplerState;
-    private SamplerState oldSamplerState;
+    private SamplerState _oldSamplerState;
     private TextRenderingParameters renderingParameters;
     private IRenderTarget renderTarget;
 
     private TextLayout _textLayout;
 
-    public FontRenderer(GraphicsDevice device) : base(device)
+    private Color _oldClearColor;
+    private IRenderTarget _oldRenderTargets;
+    private IDepthStencilBuffer _oldDepthStencilBuffer;
+
+    public FontRenderer(IGraphicsDevice device) : base(device)
     {
         fontEffect = new FontEffect(device);
 
@@ -95,11 +99,23 @@ public class FontRenderer : GraphicsResource
             throw new Exception("You need to call RestoreState() before you can call Begin() again");
         }
 
+        assignedSamplerState = samplerState;
         this.renderTarget = renderTarget;
         currentScreenSize = new Vector2F(renderTarget.Width, renderTarget.Height);
         transformMatrix = Matrix4x4F.Translation(translation);
+        
+        GraphicsDevice.EndDraw();
+
+        _oldClearColor = GraphicsDevice.ClearColor;
+        _oldRenderTargets = GraphicsDevice.CurrentRenderTarget;
+        _oldDepthStencilBuffer = GraphicsDevice.CurrentDepthStencilBuffer;
+
+        GraphicsDevice.ClearColor = Colors.Transparent;
         GraphicsDevice.SetRenderTargets(renderTarget);
-        GraphicsDevice.BeginDraw();
+        GraphicsDevice.SetDepthBuffer(null);
+        var device = (GraphicsDevice)GraphicsDevice;
+        device.TransitionImagesForRendering(device.CurrentCommandBuffer, device.CurrentRenderTarget, device.CurrentRenderTarget.ResolveTexture);
+        GraphicsDevice.BeginRendering(GraphicsDevice.CurrentCommandBuffer);
 
         // assignedSamplerState = samplerState ?? GraphicsDevice.SamplerStates.LinearFont;
         // assignedBlendState = blendState ?? GraphicsDevice.BlendStates.Fonts;
@@ -160,15 +176,18 @@ public class FontRenderer : GraphicsResource
         scissor.Extent.Height = (uint)currentScreenSize.Y;
         
         var orthoProjection = Matrix4x4F.OrthoOffCenter(0, currentScreenSize.X, 0, currentScreenSize.Y, 0f, 100000f);
-        Matrix4x4F.Multiply(ref transformMatrix, ref orthoProjection, out finalMatrix);
+        finalMatrix = transformMatrix * orthoProjection;
         GraphicsDevice.SetViewports(vp);
         GraphicsDevice.SetScissors(scissor);
-        GraphicsDevice.SetRenderTargets(renderTarget);
         GraphicsDevice.ColorBlendEnabled = true;
         GraphicsDevice.ColorBlendEquation = ColorBlendEquations.Fonts;
         GraphicsDevice.PrimitiveRestartEnable = true;
+        GraphicsDevice.MSAALevel = renderTarget.MSAALevel;
+        GraphicsDevice.DepthTestEnabled = false;
+        GraphicsDevice.DepthWriteEnable = false;
 
-        effectSampler.SetResource(GraphicsDevice.SamplerStates.LinearFont);
+        //effectSampler.SetResource(GraphicsDevice.SamplerStates.LinearFont);
+        effectSampler.SetResource(assignedSamplerState);
         effectTexture.SetResource(layout.FontAtlas.Atlas);
         effectMatrixTransform.SetValue(finalMatrix);
         effectUVCornerCoords.SetValue(UVCornerCoords);
@@ -181,18 +200,19 @@ public class FontRenderer : GraphicsResource
         GraphicsDevice.VertexType = vertexType;
         GraphicsDevice.SetVertexBuffer(layout.VertexBuffer);
         GraphicsDevice.PrimitiveTopology = PrimitiveTopology.PointList;
-        fontEffect.StrokeColor.SetValue(stroke.ToVector4());
-        GraphicsDevice.DepthTestEnabled = true;
+        //GraphicsDevice.DepthTestEnabled = true;
         if (stroke == Colors.Transparent)
         {
-            glyphEffectPass.Apply();
+            //glyphEffectPass.Apply();
+            fontEffect.FontBatchRenderPass.Apply();
         }
         else
         {
+            fontEffect.StrokeColor.SetValue(stroke.ToVector4());
             fontEffect.FontBatchStrokedTextPass.Apply();
         }
         
-        GraphicsDevice.Draw(layout.ElementsCount, 1, 0);
+        GraphicsDevice.Draw(layout.ElementsCount, 1);
         //glyphEffectPass.UnApply(true);
     }
 
@@ -202,6 +222,34 @@ public class FontRenderer : GraphicsResource
         {
             throw new Exception("SetState must be called before end");
         }
+        
+        GraphicsDevice.EndDraw();
+        var device = (GraphicsDevice)GraphicsDevice;
+
+        device.TransitionImagesAfterRendering(device.CurrentCommandBuffer, device.CurrentRenderTarget.ResolveTexture);
+
+        GraphicsDevice.ClearColor = _oldClearColor;
+        GraphicsDevice.MSAALevel = _oldRenderTargets.MSAALevel;
+        var viewport = new Viewport() {Width = _oldRenderTargets.Width, Height = _oldRenderTargets.Height, MaxDepth = 1};
+        GraphicsDevice.SetViewports(viewport);
+        var scissor = new Rect2D();
+        scissor.Offset = new Offset2D();
+        // scissor.Offset.X = renderingParameters.TextArea.X;
+        // scissor.Offset.Y = renderingParameters.TextArea.Y;
+        scissor.Extent = new Extent2D();
+        // scissor.Extent.Width = (uint)renderingParameters.TextArea.Width;
+        // scissor.Extent.Height = (uint)renderingParameters.TextArea.Height;
+        scissor.Extent.Width = (uint)viewport.Width;
+        scissor.Extent.Height = (uint)viewport.Height;
+        GraphicsDevice.SetScissors(scissor);
+        GraphicsDevice.SetRenderTargets(_oldRenderTargets);
+        GraphicsDevice.SetDepthBuffer(_oldDepthStencilBuffer);
+        GraphicsDevice.DepthTestEnabled = true;
+        GraphicsDevice.DepthWriteEnable = true;
+        GraphicsDevice.DepthCompareFunction = CompareOp.Always;
+        GraphicsDevice.ColorBlendEnabled = true;
+        GraphicsDevice.ColorBlendEquation = ColorBlendEquations.AlphaBlend;
+        GraphicsDevice.BeginRendering(GraphicsDevice.CurrentCommandBuffer, true);
 
         // if (oldSamplerState != null)
         // {

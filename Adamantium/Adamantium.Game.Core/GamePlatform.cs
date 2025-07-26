@@ -9,6 +9,8 @@ using Adamantium.Graphics.Core;
 using Adamantium.Imaging;
 using Adamantium.UI;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Controls.Panels;
+using Adamantium.UI.Core;
 using Serilog;
 
 namespace Adamantium.Game.Core

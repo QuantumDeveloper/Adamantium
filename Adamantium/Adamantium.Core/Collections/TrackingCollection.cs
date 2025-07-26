@@ -119,7 +119,7 @@ namespace Adamantium.Core.Collections
             NotifyReplace(oldItem, newItem, index);
         }
 
-        protected override void OnClear()
+        protected override void OnClear(T[] items)
         {
             NotifyReset();
         }

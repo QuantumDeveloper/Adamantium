@@ -16,6 +16,9 @@ namespace Adamantium.Graphics.Core;
 public interface IDrawableDevice
 {
     bool BeginDraw(float depth = 1.0f, uint stencil = 0);
+
+    void BeginRendering(CommandBuffer commandBuffer, bool continueRendering = false, float depth = 1.0f, uint stencil = 0);
+    
     void EndDraw();
 
     void Submit();
@@ -46,6 +49,8 @@ public interface IDynamicStateDevice
     bool PrimitiveRestartEnable { get; set; }
     
     bool ColorBlendEnabled { get; set; }
+    
+    ColorComponentFlagBits ColorComponentFlags { get; set; }
     
     MSAALevel MSAALevel { get; set; }
         
@@ -203,6 +208,8 @@ public unsafe interface IGraphicsDevice : IDrawableDevice, IDynamicStateDevice, 
         ImageUsageFlagBits usage = ImageUsageFlagBits.TransferSrcBit,
         ImageLayout desiredLayout = ImageLayout.ColorAttachmentOptimal,
         string name = "");
+
+    ITexture CreateTexture(TextureDescription description, byte[] pixelData);
     
     SurfaceKHR GetOrCreateSurface(PresentationParameters parameters);
 

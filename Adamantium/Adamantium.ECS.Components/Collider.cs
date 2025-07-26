@@ -2,7 +2,9 @@
 using Adamantium.ECS.ComponentsBasics;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Core.Extensions;
 using Adamantium.Graphics.Core.Models;
+using Adamantium.Graphics.Core.Vertices;
 using Adamantium.Mathematics;
 using Buffer = Adamantium.Graphics.Buffer;
 

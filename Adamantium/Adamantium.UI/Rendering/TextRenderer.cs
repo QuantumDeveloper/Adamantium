@@ -3,14 +3,14 @@ using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Fonts;
 using Adamantium.Imaging;
-using Adamantium.UI.Controls;
-using Adamantium.UI.Media;
-using Adamantium.UI.Media.Imaging;
-using AdamantiumVulkan.Core;
+using Adamantium.Mathematics;
+using Adamantium.UI.Core;
+using Adamantium.UI.Core.Media;
+using Adamantium.UI.Core.Media.Imaging;
 
 namespace Adamantium.UI.Rendering;
 
-internal class TextRenderer : GeometryRenderer
+public class TextRenderer : GeometryRenderer
 {
     public TextRenderer(
         IGraphicsDevice device, 
@@ -28,7 +28,7 @@ internal class TextRenderer : GeometryRenderer
     {
         TextLayout = textLayout;
         TextRenderingParameters = renderingParameters;
-        _renderToTextureDevice = (GraphicsDevice)device.MainDevice.CreateRenderDevice();
+        _renderToTextureDevice = device;
         renderTarget = RenderTarget.New(_renderToTextureDevice, 
             (uint)geometry.Bounds.Width,
             (uint)geometry.Bounds.Height,
@@ -38,7 +38,7 @@ internal class TextRenderer : GeometryRenderer
         FontRenderer = new FontRenderer(_renderToTextureDevice);
     }
 
-    private GraphicsDevice _renderToTextureDevice;
+    private IGraphicsDevice _renderToTextureDevice;
 
     private RenderTarget renderTarget;
     
@@ -61,28 +61,26 @@ internal class TextRenderer : GeometryRenderer
 
     public override void Draw(IGraphicsDevice graphicsDevice, IUIComponent component, ImageSource image, Matrix4x4F projectionMatrix)
     {
-        var textBlock = (TextBlock)component;
+        //var textBlock = (TextBlock)component;
         
         var location = new Vector3F(TextRenderingParameters.TextArea.X,
             TextRenderingParameters.TextArea.Y, 
             5);
         
         var resolveTexture = renderTarget.ResolveTexture;
-        resolveTexture.TransitionImageLayout(ImageLayout.ColorAttachmentOptimal);
 
         var foreground = ((SolidColorBrush)Foreground).Color;
-        var stroke = ((SolidColorBrush)textBlock.Stroke).Color;
+        //var stroke = ((SolidColorBrush)textBlock.Stroke).Color;
         _renderToTextureDevice.ClearColor = ((SolidColorBrush)Background).Color;
-        _renderToTextureDevice.MSAALevel = renderTarget.MSAALevel;
-        //_renderToTextureDevice.BeginDraw(1, 0);
+        var back = ((SolidColorBrush)Background).Color;
+        back.A = 128;
+        back.R = 128;
+        _renderToTextureDevice.ClearColor = back; 
         FontRenderer.SetState(null, location, renderTarget);
-        FontRenderer.DrawLayout(TextLayout, foreground, stroke);
+        FontRenderer.DrawLayout(TextLayout, foreground, Colors.Transparent);
         FontRenderer.RestoreState();
-        _renderToTextureDevice.EndDraw();
-        _renderToTextureDevice.Submit();
-
+        
         Texture = resolveTexture;
-        resolveTexture.TransitionImageLayout(ImageLayout.ShaderReadOnlyOptimal);
         base.Draw(graphicsDevice, component, image, projectionMatrix);
     }
 }

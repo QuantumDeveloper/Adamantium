@@ -8,17 +8,17 @@ namespace Adamantium.Core.DependencyInjection
     {
         private Dictionary<Type, DependencyInjectionDetails> _registrations;
         
-        public static AdamantiumDependencyContainer Current { get; }
-
-        static AdamantiumDependencyContainer()
-        {
-            Current = new AdamantiumDependencyContainer();
-        }
+        // public static AdamantiumDependencyContainer Current { get; }
+        //
+        // static AdamantiumDependencyContainer()
+        // {
+        //     Current = new AdamantiumDependencyContainer();
+        // }
 
         public AdamantiumDependencyContainer()
         {
             _registrations = new Dictionary<Type, DependencyInjectionDetails>();
-            ((IContainerRegistry)this).RegisterSingleton<IEventAggregator, EventAggregator>();
+            RegisterSingleton<IEventAggregator, EventAggregator>();
         }
 
         public bool IsRegistered<T>()
@@ -49,7 +49,7 @@ namespace Adamantium.Core.DependencyInjection
             return this;
         }
 
-        IContainerRegistry IContainerRegistry.RegisterSingleton<TService, TImplementation>()
+        public IContainerRegistry RegisterSingleton<TService, TImplementation>()
         {
             ((IContainerRegistry)this).RegisterSingleton(typeof(TService), typeof(TImplementation));
             return this;

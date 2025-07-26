@@ -19,17 +19,20 @@ public class GeometrySegment
     public Vector2 Direction { get; }
     public Vector2 DirectionNormalized { get; }
 
-    public GeometrySegment(MeshContour parent, GeometryIntersection end1, GeometryIntersection end2)
+    public GeometrySegment(MeshContour parent, GeometryIntersection start, GeometryIntersection end)
     {
         Parent = parent;
+
+        // start.Coordinates = Vector2.Round(start.Coordinates, 3);
+        // end.Coordinates = Vector2.Round(end.Coordinates, 3);
         
-        Direction = end2.Coordinates - end1.Coordinates;
+        Direction = end.Coordinates - start.Coordinates;
         DirectionNormalized = Vector2.Normalize(Direction);
         
         SegmentEnds = new List<GeometryIntersection>
         {
-            end1,
-            end2
+            start,
+            end
         };
 
         AddSelfToConnectedSegments();

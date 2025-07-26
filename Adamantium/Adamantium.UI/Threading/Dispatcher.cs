@@ -3,7 +3,10 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Adamantium.Core.DependencyInjection;
+using Adamantium.UI.Core;
+using Adamantium.UI.Core.Dispatcher;
 using Adamantium.UI.Exceptions;
+using Adamantium.UI.Platforms;
 
 namespace Adamantium.UI.Threading;
 
@@ -21,17 +24,12 @@ public sealed class Dispatcher : IDispatcher
     
     public static bool Initialized { get; private set; }
         
-    // static Dispatcher()
-    // {
-    //     Initialize();
-    // }
-
-    internal static void Initialize()
+    internal static void Initialize(IUIContext uiContext)
     {
         if (Initialized) return;
         
         dispatchers = new Dictionary<DispatcherContext, Dispatcher>();
-        CurrentDispatcher = new Dispatcher(AdamantiumDependencyContainer.Current.Resolve<IApplicationPlatform>());
+        CurrentDispatcher = new Dispatcher(uiContext.Resolve<IApplicationPlatform>());
         SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(CurrentDispatcher));
         
         Initialized = true;

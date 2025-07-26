@@ -1,25 +1,12 @@
-using System.Globalization;
+using Adamantium.Core.TypeParsing;
 using Adamantium.Mathematics;
+using Adamantium.ProceduralGeometry.TypeParsers;
 
 namespace Adamantium.ProceduralGeometry
 {
-    public struct CornerRadius
+    [TypeParser(typeof(CornerRadiusParser))]
+    public struct CornerRadius : IEquatable<CornerRadius>
     {
-        public bool Equals(CornerRadius other)
-        {
-            return TopLeft.Equals(other.TopLeft) && TopRight.Equals(other.TopRight) && BottomRight.Equals(other.BottomRight) && BottomLeft.Equals(other.BottomLeft);
-        }
-
-        public override bool Equals(object obj)
-        {
-            return obj is CornerRadius other && Equals(other);
-        }
-
-        public override int GetHashCode()
-        {
-            return HashCode.Combine(TopLeft, TopRight, BottomRight, BottomLeft);
-        }
-
         public CornerRadius(Double value)
         {
             TopLeft = TopRight = BottomRight = BottomLeft = value;
@@ -53,6 +40,21 @@ namespace Adamantium.ProceduralGeometry
 
         public Double BottomLeft;
         
+        public bool Equals(CornerRadius other)
+        {
+            return TopLeft.Equals(other.TopLeft) && TopRight.Equals(other.TopRight) && BottomRight.Equals(other.BottomRight) && BottomLeft.Equals(other.BottomLeft);
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is CornerRadius other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(TopLeft, TopRight, BottomRight, BottomLeft);
+        }
+        
         public override string ToString()
         {
             return $"{nameof(TopLeft)}: {TopLeft} {nameof(TopRight)}: {TopRight} {nameof(BottomRight)}: {BottomRight} {nameof(BottomLeft)}: {BottomLeft}";
@@ -76,25 +78,6 @@ namespace Adamantium.ProceduralGeometry
         public static bool operator !=(CornerRadius radius1, CornerRadius radius2)
         {
             return !(radius1 == radius2);
-        }
-
-
-        public static CornerRadius Parse(string value)
-        {
-            var values = value.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
-
-            if (values.Length == 1)
-            {
-                return new CornerRadius(double.Parse(values[0], CultureInfo.InvariantCulture));
-            }
-
-            var list = new List<double>();
-            foreach (var v in values)
-            {
-                list.Add(double.Parse(v, CultureInfo.InvariantCulture));
-            }
-
-            return new CornerRadius(list);
         }
     }
 }

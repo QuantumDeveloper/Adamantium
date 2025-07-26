@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using Adamantium.ECS;
 using Adamantium.Graphics.Core;
+using Adamantium.UI.Controls.Base;
+using Adamantium.UI.Core;
 
 namespace Adamantium.UI.EntityServices;
 

@@ -150,6 +150,18 @@ namespace Adamantium.Mathematics.Triangulation
 
         public List<Vector3> FillDirect(List<GeometryIntersection> points, List<GeometrySegment> segments)
         {
+            foreach (var point in points)
+            {
+                point.Coordinates = Vector2.Round(point.Coordinates, 3);
+            }
+            
+            for (int i = 0; i < segments.Count; i++)
+            {
+                var segment = segments[i];
+                segment.SegmentEnds[0].Coordinates = Vector2.Round(segment.Start, 3);
+                segment.SegmentEnds[1].Coordinates = Vector2.Round(segment.End, 3);
+            }
+            
             MergedPoints.AddRange(points);
             MergedSegments.AddRange(segments);
             UpdateLeftmostXCoord();

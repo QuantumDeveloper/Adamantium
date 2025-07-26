@@ -8,8 +8,9 @@ using Adamantium.Graphics.Core.Presentation;
 using Adamantium.Imaging;
 using Adamantium.UI;
 using Adamantium.UI.Controls;
-using Adamantium.UI.Media.Imaging;
-using Adamantium.UI.RoutedEvents;
+using Adamantium.UI.Controls.Panels;
+using Adamantium.UI.Core;
+using Adamantium.UI.Core.RoutedEvents;
 using Serilog;
 using Buffer = Adamantium.Graphics.Buffer;
 using Rectangle = Adamantium.Mathematics.Rectangle;
@@ -22,7 +23,6 @@ namespace Adamantium.Game.Core;
 public class RenderTargetGameOutput : AdamantiumGameOutputBase
 {
     private RenderTargetPanel nativeWindow;
-    private Buffer _dstBuffer;
     private bool isExecuted = true;
     private bool _invalidateRender;
     private RenderTarget _destinationTexture;
@@ -71,7 +71,6 @@ public class RenderTargetGameOutput : AdamantiumGameOutputBase
     {
         var rt = Presenter as RenderTargetGraphicsPresenter;
         mainDevice.CopyImage(rt?.ResolveTexture, _destinationTexture);
-        nativeWindow.CanPresent = true;
     }
 
     private void NativeWindowOnSizeChanged(object sender, SizeChangedEventArgs e)

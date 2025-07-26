@@ -26,10 +26,10 @@ public struct Thickness
 
    public Thickness(Double left, Double top, Double right, Double bottom)
    {
-      Left = left;
-      Top = top;
-      Right = right;
-      Bottom = bottom;
+      Left = Double.IsNaN(left) ? 0 : left;
+      Top = Double.IsNaN(top) ? 0 : top;
+      Right = Double.IsNaN(right) ? 0 : right;
+      Bottom = Double.IsNaN(bottom) ? 0 : bottom;
    }
 
    public Thickness(Double uniformValue)
@@ -52,22 +52,31 @@ public struct Thickness
          a.Bottom + b.Bottom);
    }
    
-   public static Thickness Parse(string value)
+   public static Thickness operator -(Thickness a, Thickness b)
    {
-      var values = value.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
-
-      if (values.Length == 1)
-      {
-         return new Thickness(double.Parse(values[0], CultureInfo.InvariantCulture));
-      }
-
-      var list = new List<double>();
-      foreach (var v in values)
-      {
-         list.Add(double.Parse(v, CultureInfo.InvariantCulture));
-      }
-
-      return new Thickness(list);
+      return new Thickness(
+         a.Left - b.Left,
+         a.Top - b.Top,
+         a.Right - b.Right,
+         a.Bottom - b.Bottom);
+   }
+   
+   public static Thickness operator *(Thickness a, double value)
+   {
+      return new Thickness(
+         a.Left * value,
+         a.Top * value,
+         a.Right * value,
+         a.Bottom * value);
+   }
+   
+   public static Thickness operator /(Thickness a, double value)
+   {
+      return new Thickness(
+         a.Left / value,
+         a.Top / value,
+         a.Right / value,
+         a.Bottom / value);
    }
 
    public override string ToString() => $"Left: {Left}, Top: {Top}, Right {Right}, Bottom {Bottom}";

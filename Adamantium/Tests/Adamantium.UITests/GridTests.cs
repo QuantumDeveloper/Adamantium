@@ -2,12 +2,15 @@ using System;
 using System.Diagnostics;
 using Adamantium.Mathematics;
 using Adamantium.ProceduralGeometry;
-using Adamantium.UI;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Controls.Decorators;
+using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Controls.Primitives;
-using Adamantium.UI.Media;
+using Adamantium.UI.Controls.Shapes;
+using Adamantium.UI.Core;
+using Adamantium.UI.Core.Media;
 using NUnit.Framework;
-using Rectangle = Adamantium.UI.Controls.Rectangle;
+using Rectangle = Adamantium.UI.Controls.Shapes.Rectangle;
 
 namespace Adamantium.UITests
 {
@@ -83,7 +86,7 @@ namespace Adamantium.UITests
          rectangle2.VerticalAlignment = VerticalAlignment.Stretch;
 
 
-         Ellipse el = new Ellipse();
+         var el = new Ellipse();
          el.Name = "el";
          el.Width = 350;
          el.Height = 350;

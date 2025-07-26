@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using Adamantium.Graphics.Core.Vertices;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Graphics.Fonts;

@@ -111,56 +111,10 @@ float2 SafeNormalize(in float2 v)
 
 float4 FontPixelShader(PSInput input) : SV_TARGET
 {
-    // we have small text 
-    if (FontSize < FontSizeThreshold)
-    {
-        float dist = Texture.Sample(TextureSampler, input.UV).a;
-
-        float blendedAlpha = dist * ForegroundColor.a;
-
-        float4 color = float4(ForegroundColor.r, ForegroundColor.g, ForegroundColor.b, blendedAlpha);
-    
-        return color;
-    
     /*
-    
-        float2 uv = input.UV * MSDFAtlasSize;
-    
-        // Calculate derivatives
-        float2 Jdx = ddx(uv);
-        float2 Jdy = ddy(uv);
-    
-        // Sample texture
-        float3 samp = Texture.Sample(TextureSampler, input.UV).rgb;
-    
-        // Calculate the signed distance (in texels)
-        float sigDist = Median(samp.r, samp.g, samp.b) - 0.5f;
-    
-        // For proper anti-aliasing we need to calculate the signed distance in pixels.
-        // We do this using the derivatives.	
-        float2 gradDist = SafeNormalize(float2(ddx(sigDist), ddy(sigDist)));
-        float2 grad = float2(gradDist.x * Jdx.x + gradDist.y * Jdy.x, gradDist.x * Jdx.y + gradDist.y * Jdy.y);
-    
-        // Apply anti-aliasing
-        const float thickness = 0.125f;
-        const float normalization = thickness * 0.5f * sqrt(2.0f);
-    
-        float afWidth = min(normalization * length(grad), 0.5f);
-        float opacity = smoothstep(0.0f - afWidth, 0.0f + afWidth, sigDist);
-    
-        // Apply pre-multiplied alpha with gamma correction
-        float4 color;
-        color.a = pow(abs(ForegroundColor.a * opacity), 1.0f / 2.2f);
-        if (color.a > 0)
-        {
-            color.a = 1;
-        }
-        color.rgb = ForegroundColor.rgb * color.a;
-        return color;
-        */
-    }
-    else
-    {   
+    // Large text
+    if (FontSize > FontSizeThreshold)
+    {
         float2 msdfUnit = PxRange / MSDFAtlasSize;
         float3 samp = Texture.Sample(TextureSampler, input.UV).rgb;
     
@@ -168,8 +122,38 @@ float4 FontPixelShader(PSInput input) : SV_TARGET
         sigDist = sigDist * dot(msdfUnit, 0.5f / fwidth(input.UV));
     
         float opacity = clamp(sigDist + 0.5f, 0.0f, 1.0f);
-        return ForegroundColor * opacity;
-    }    
+        return input.Color * opacity;
+    }
+    else // Small text
+    */
+    {
+        float2 uv = input.UV * MSDFAtlasSize;
+        float2 Jdx = ddx(uv);
+        float2 Jdy = ddy(uv);
+        float3 samp = Texture.Sample(TextureSampler, input.UV).rgb;
+    
+        // Calculate the signed distance (in texels)
+        float sigDist = Median(samp.r, samp.g, samp.b) - 0.5f;
+    
+        // For proper anti-aliasing we need to calculate the signed distance in pixels.
+        // We do this using the derivatives.
+        float2 gradDist = SafeNormalize(float2(ddx(sigDist), ddy(sigDist)));
+        float2 grad = float2(gradDist.x * Jdx.x + gradDist.y * Jdy.x, gradDist.x * Jdx.y + gradDist.y * Jdy.y);
+        
+        // Apply anti-aliasing
+        const float thickness = 0.125f;
+        const float normalization = thickness * 0.5f * sqrt(2.0f);
+        
+        float afWidth = min(normalization * length(grad), 0.5f);
+        float opacity = smoothstep(0.0f - afWidth, 0.0f + afWidth, sigDist);
+        
+        // Apply pre-multiplied alpha with gamma correction
+        
+        float4 color;
+        color.a = pow(abs(ForegroundColor.a * opacity), 1.0f / 2.2f);
+        color.rgb = ForegroundColor.rgb * color.a;
+        return color;
+    }
 }
 
 float4 StrokedTextPS(PSInput input) : SV_TARGET
@@ -189,16 +173,8 @@ float4 StrokedTextPS(PSInput input) : SV_TARGET
         float opacity = clamp(sigDist + 0.5f, 0.0f, 1.0f);
         float strokeOpacity = clamp(strokeDist + 0.5f, 0.0f, 1.0f);
         return lerp(StrokeColor, ForegroundColor, opacity) * max(opacity, strokeOpacity);
-        
-        //const float smoothing = 1.0 / 16.0;
-        //const float outlineWidth = 3.0 / 16.0;
-        //const float outerEdgeCenter = 0.5 - outlineWidth;
-        //float alpha = smoothstep(outerEdgeCenter - smoothing, outerEdgeCenter + smoothing, sigDist);
-        //float border = smoothstep(0.5 - smoothing, 0.5 + smoothing, sigDist);
-        //return lerp(StrokeColor, ForegroundColor, border) * max(opacity, strokeOpacity);
-        
     }
-    else
+    else // small stroked text
     {
         float2 uv = input.UV * MSDFAtlasSize;
         float2 Jdx = ddx(uv);

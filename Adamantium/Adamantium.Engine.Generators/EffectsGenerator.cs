@@ -16,7 +16,7 @@ public class EffectsGenerator : IIncrementalGenerator
         DxcLibraryLoader.LoadNativeDxLibrary();
         
         var effectFiles = context.AdditionalTextsProvider.Where(file => file.Path.EndsWith(".fx"));
-        var includeFiles = context.AdditionalTextsProvider.Where(file => file.Path.EndsWith(".hlsl"));
+        var includeFiles = context.AdditionalTextsProvider.Where(file => file.Path.EndsWith(".fxh"));
 
         var fxNamesAndContents = effectFiles.Select((text, cancellationToken) => (
             name: Path.GetFileName(text.Path),

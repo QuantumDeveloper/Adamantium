@@ -1,8 +1,9 @@
 using System;
 using System.Diagnostics;
+using Adamantium.Core.TypeParsing;
 using Adamantium.Graphics;
 using Adamantium.ProceduralGeometry;
-using Adamantium.UI.Media;
+using Adamantium.UI.Core.Media;
 using NUnit.Framework;
 
 namespace Adamantium.UITests;
@@ -28,7 +29,7 @@ public class VectorIconsTests
         var timer = Stopwatch.StartNew();
         for (int i = 0; i < 1000; ++i)
         {
-            var geometry = Geometry.Parse(xamlString);
+            var geometry = TypeParser.Parse<Geometry>(xamlString);
             geometry.ProcessGeometry(GeometryType.Solid);
         }
 

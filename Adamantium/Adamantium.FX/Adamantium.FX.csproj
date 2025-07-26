@@ -10,14 +10,6 @@
         <CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
     </PropertyGroup>
 
-<!--    <ItemGroup>-->
-<!--      <AdditionalFiles Include="BasicEffect.fx" />-->
-<!--      <AdditionalFiles Include="BasicEffect_0.fx" />-->
-<!--      <AdditionalFiles Include="FontEffect.fx" />-->
-<!--      <AdditionalFiles Include="FullScreenQuad.fx" />-->
-<!--      <AdditionalFiles Include="SpriteEffect.fx" />-->
-<!--    </ItemGroup>-->
-
     <ItemGroup>
         <ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" SetTargetFramework="TargetFramework=netstandard2.0" />
         <ProjectReference Include="..\Adamantium.Graphics.Core\Adamantium.Graphics.Core.csproj" />
@@ -28,7 +20,7 @@
 
     <ItemGroup>
         <AdditionalFiles Include="$(ProjectDir)**\*.fx" />
-        <AdditionalFiles Include="$(ProjectDir)**\*.hlsl" />
+        <AdditionalFiles Include="$(ProjectDir)**\*.fxh" />
         <CompilerVisibleProperty Include="RootNamespace" />
         <AdditionalFiles Remove="obj\**" />
     </ItemGroup>

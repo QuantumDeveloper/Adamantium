@@ -1,5 +1,6 @@
-﻿using Adamantium.Graphics;
-using Adamantium.Graphics.Core;
+﻿using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Core.Extensions;
+using Adamantium.Graphics.Core.Vertices;
 
 namespace Adamantium.ECS.Components
 {

@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Adamantium.Core;
 using Adamantium.Core.Collections;
 using Adamantium.Core.DependencyInjection;
@@ -10,25 +10,30 @@ using Adamantium.Core.Events;
 using Adamantium.ECS;
 using Adamantium.Graphics.Core;
 using Adamantium.UI.AggregatorEvents;
-using Adamantium.UI.Controls;
+using Adamantium.UI.Core;
+using Adamantium.UI.Core.Dispatcher;
+using Adamantium.UI.Core.Graphics;
+using Adamantium.UI.Core.Input;
+using Adamantium.UI.Core.Resources;
+using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.UI.EntityServices;
 using Adamantium.UI.Events;
-using Adamantium.UI.Input;
-using Adamantium.UI.Resources;
-using Adamantium.UI.RoutedEvents;
+using Adamantium.UI.Platforms.MacOS;
+using Adamantium.UI.Platforms.Windows;
+using Adamantium.UI.Rendering;
 using Adamantium.UI.Services;
-using Adamantium.UI.Threading;
+using Adamantium.UI.Themes;
 using AdamantiumVulkan;
 using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;
-using UnhandledExceptionEventArgs = Adamantium.UI.RoutedEvents.UnhandledExceptionEventArgs;
-using UnhandledExceptionEventHandler = Adamantium.UI.RoutedEvents.UnhandledExceptionEventHandler;
+using UnhandledExceptionEventArgs = Adamantium.UI.Core.RoutedEvents.UnhandledExceptionEventArgs;
+using UnhandledExceptionEventHandler = Adamantium.UI.Core.RoutedEvents.UnhandledExceptionEventHandler;
 
 namespace Adamantium.UI;
 
-public abstract class UIApplication : AdamantiumComponent, IService, IUIApplication, IWindowPlatformService
+public abstract class UIApplication : FundamentalUIComponent, IService, IUIApplication, IWindowPlatformService
 {
-    private object applicationLocker = new object();
+    private readonly object applicationLocker = new object();
     
     private Dictionary<IWindow, WindowRenderService> windowToSystem;
     
@@ -50,12 +55,12 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
     static UIApplication()
     {
         VulkanDllMap.Register();
-        ApplicationBuilder.Build(AdamantiumDependencyContainer.Current);
     }
 
     protected UIApplication()
     {
         Current = this;
+        UIAppContext.Initialize(this, this);
         DesiredFPS = 60;
         appTime = new AppTime();
         ShutDownMode = ShutDownMode.OnMainWindowClosed;
@@ -65,18 +70,44 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
         windowsCollection = new AdamantiumCollection<IWindow>();
         
         preciseTimer = new PreciseTimer();
-        
-        Container = AdamantiumDependencyContainer.Current;
+
+        Container = new AdamantiumDependencyContainer();
         EventAggregator = Container.Resolve<IEventAggregator>();
+        ApplicationBuilder.Build(Container);
+        ThemeManager = CreateThemeManager(Container);
+        UIContext =  new UIContext(Container, this);
 
         GraphicsDeviceService = new GraphicsDeviceService(Container.Resolve<IGraphicsDeviceFactory>(), EnableGraphicsDebug);
-        
+        Container.RegisterInstance<IGraphicsDeviceService>(GraphicsDeviceService);
+        Container.RegisterSingleton<IResourceFactory, ResourceFactory>();
+        Container.RegisterSingleton<IGraphicsContext, GraphicsContext>();
+        GraphicsContext = Container.Resolve<IGraphicsContext>();
         EntityWorld = new EntityWorld(Container);
         RegisterBasicServices(Container);
         
         applicationLoopThread = new Thread(ApplicationLoopThread);
+        Keyboard.KeyDownEvent.RegisterClassHandler<IUIComponent>(new KeyEventHandler(KeyEventHandler), true);
         
         ConfigureLogging();
+    }
+
+    private void KeyEventHandler(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.UpArrow)
+        {
+            var fluentDark = ThemeManager["FluentDark"];
+            ThemeManager.SetTheme(fluentDark);
+        }
+        else if (e.Key == Key.DownArrow)
+        {
+            var fluentLight = ThemeManager["FluentLight"];
+            ThemeManager.SetTheme(fluentLight);
+        }
+    }
+
+    protected virtual IThemeManager CreateThemeManager(IDependencyContainer container)
+    {
+        return new ThemeManager(Container);
     }
 
     private void ConfigureLogging()
@@ -130,8 +161,53 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
     public IWindow ActiveWindow { get; private set; }
 
     public IThemeManager ThemeManager { get; private set; }
+    public IDispatcher Dispatcher { get; private set; }
+    public IUIContext UIContext { get; private set; }
+
+    public void AddWindow(IWindow window)
+    {
+        OnWindowAdded(window);
+    }
+
+    public void RemoveWindow(IWindow window)
+    {
+        OnWindowRemoved(window);
+    }
+
+    public void SetActiveWindow(IWindow window)
+    {
+        ActiveWindow = window;
+    }
+
+    public void InactivateWindow(IWindow window)
+    {
+        if (ActiveWindow == window) 
+            ActiveWindow = null;
+    }
+
+    public void ExecuteOnUIThread(Action action)
+    {
+        Dispatcher.Invoke(action);
+    }
+
+    public async Task ExecuteOnUIThreadAsync(Action action)
+    {
+        await Dispatcher.InvokeAsync(action);
+    }
 
     public IReadOnlyList<IWindow> Windows => windowsCollection;
+    public IWindowWorkerService GetWindowWorker(IUIContext uiContext)
+    {
+        switch (Configuration.Platform)
+        {
+            case Platform.Windows:
+                return new Win32WindowWorker(uiContext);
+            case Platform.OSX:
+                return new MacOSWindowWorker(uiContext);
+            default:
+                throw new NotSupportedException($"{Configuration.Platform} does not yet supported for windowing system");
+        }
+    }
 
     public ShutDownMode ShutDownMode { get; set; }
 
@@ -140,6 +216,8 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
     public IDependencyContainer Container { get; private set; }
 
     protected IGraphicsDeviceService GraphicsDeviceService { get; private set; }
+    
+    public IGraphicsContext GraphicsContext { get; private set; }
     
     protected IEventAggregator EventAggregator { get; private set; }
     
@@ -226,11 +304,10 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
         if (IsInitialized) return;
         
         cancellationTokenSource = new CancellationTokenSource();
-        Dispatcher.Initialize();
+        Threading.Dispatcher.Initialize(UIContext);
+        Dispatcher = Threading.Dispatcher.CurrentDispatcher;
         GraphicsDeviceService.IsInDebugMode = EnableGraphicsDebug;
         GraphicsDeviceService.CreateMainDevice("Adamantium Main");
-        ThemeManager = new ThemeManager(Container);
-        LoadResources();
         LoadThemes();
         SubscribeToEvents();
         
@@ -249,31 +326,13 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
     {
     }
 
-    private void LoadResources()
-    {
-        var resourceDictionaries = AppDomain.CurrentDomain.GetAssemblies().SelectMany(x => x.GetTypes()).Where(x => x.IsSubclassOf(typeof(ResourceDictionary))).ToList();
-        foreach (var @class in resourceDictionaries)
-        {
-            var resource = (IResourceDictionary)Activator.CreateInstance(@class);
-            ResourceRepository.AddResourceDictionary(resource);
-        }
-
-        var styles = AppDomain.CurrentDomain.GetAssemblies().SelectMany(x => x.GetTypes()).Where(x => x.IsSubclassOf(typeof(StyleSet))).ToList();
-        foreach (var @class in styles)
-        {
-            var resource = (IStyleSet)Activator.CreateInstance(@class);
-            ResourceRepository.AddStyleSet(resource);
-        }
-    }
-
     private void LoadThemes()
     {
-        var themes = AppDomain.CurrentDomain.GetAssemblies().SelectMany(x => x.GetTypes()).Where(x => x.IsSubclassOf(typeof(Theme))).ToList();
-        foreach (var @class in themes)
-        {
-            var theme = (Theme)Activator.CreateInstance(@class);
-            ThemeManager.AddTheme(theme.Name, theme);
-        }
+        var theme = new FluentDark();
+        ThemeManager.AddTheme(theme.Name, theme);
+        var lightTheme = new FluentLight();
+        ThemeManager.AddTheme(lightTheme.Name, lightTheme);
+        ThemeManager.SetTheme(theme);
     }
 
     private void SubscribeToEvents()
@@ -289,7 +348,6 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
         containerRegistry.RegisterInstance<IService>(this);
         containerRegistry.RegisterInstance<IUIApplication>(this);
         containerRegistry.RegisterInstance<EntityWorld>(EntityWorld);
-        containerRegistry.RegisterInstance<IGraphicsDeviceService>(GraphicsDeviceService);
     }
 
     protected virtual void RegisterServices(IContainerRegistry containerRegistry)
@@ -327,18 +385,15 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
         Initialize();
         OnStartupInternal();
         applicationLoopThread.Start();
-        Dispatcher.CurrentDispatcher.Run(cancellationTokenSource.Token);
+        Dispatcher.Run(cancellationTokenSource.Token);
     }
 
     public void Run(IWindow window)
     {
         if (IsRunning) return;
         
-        Dispatcher.Initialize();
-
         MainWindow = window ?? throw new ArgumentNullException($"{nameof(window)}");
-        MainWindow.Show();
-        
+
         Run();
     }
 
@@ -370,14 +425,18 @@ public abstract class UIApplication : AdamantiumComponent, IService, IUIApplicat
         if (StartupType != null && typeof(IWindow).IsAssignableFrom(StartupType))
         {
             var window = (IWindow)Activator.CreateInstance(StartupType);
+            if (window == null) 
+                return;
+            
             MainWindow = window;
-            window?.Show();
+            MainWindow.AttachContextAndInitialize(UIContext);
+            MainWindow.Show();
         }
     }
 
     private void ApplicationLoopThread()
     {
-        Dispatcher.CurrentDispatcher.UIThread = Thread.CurrentThread;
+        Dispatcher.UIThread = Thread.CurrentThread;
 
         while (!cancellationTokenSource.IsCancellationRequested)
         {

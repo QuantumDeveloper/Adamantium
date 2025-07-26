@@ -3,7 +3,7 @@
            elementFormDefault="qualified"
 
            xmlns:xs="http://www.w3.org/2001/XMLSchema">
-    <xs:complexType name="ResorceDictionary">
+    <xs:complexType name="ResourceDictionary">
         
     </xs:complexType>
 </xs:schema>

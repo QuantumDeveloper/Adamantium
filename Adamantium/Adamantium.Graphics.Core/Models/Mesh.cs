@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Core;
 using Adamantium.Core.Collections;
@@ -14,11 +13,19 @@ public class Mesh
     private MeshContour defaultMeshContour;
 
     public static int RoundPrecision => 4;
+    
+    public string Name { get; set; }
 
-    public Mesh()
+    public Mesh() : this(PrimitiveType.TriangleList)
+    {
+        
+    }
+    
+    public Mesh(PrimitiveType primitiveType)
     {
         Initialize();
         defaultMeshContour = new MeshContour();
+        MeshTopology = primitiveType;
     }
 
     private void Initialize()
@@ -26,20 +33,20 @@ public class Mesh
         MeshTopology = PrimitiveType.TriangleList;
         UpAxis = UpAxis.Y_DOWN_RH;
 
-        Points = Array.Empty<Vector3>();
-        Colors = Array.Empty<Color>();
-        Normals = Array.Empty<Vector3F>();
-        UV0 = Array.Empty<Vector2F>();
-        UV1 = Array.Empty<Vector2F>();
-        UV2 = Array.Empty<Vector2F>();
-        UV3 = Array.Empty<Vector2F>();
-        Tangents = Array.Empty<Vector4F>();
-        BiTangents = Array.Empty<Vector3F>();
-        JointWeights = Array.Empty<Vector4F>();
-        JointIndices = Array.Empty<Vector4F>();
-        Indices = Array.Empty<int>();
+        Points = [];
+        Colors = [];
+        Normals = [];
+        UV0 = [];
+        UV1 = [];
+        UV2 = [];
+        UV3 = [];
+        Tangents = [];
+        BiTangents = [];
+        JointWeights = [];
+        JointIndices = [];
+        Indices = [];
 
-        Contours = new AdamantiumCollection<MeshContour>();
+        Contours = [];
     }
 
     public int ContoursCount => Contours.Count;
@@ -471,9 +478,15 @@ public class Mesh
         {
             return points;
         }
-
+        
         var transformed = new Vector3[points.Length];
-        Vector3.TransformCoordinate(points, ref transform, transformed);
+        for (int i = 0; i < points.Length; i++)
+        {
+            var position = points[i];
+            Vector3.TransformCoordinate(ref position, ref transform, out position);
+            transformed[i] = Vector3.Round(position, RoundPrecision);
+        }
+
         return transformed;
     }
 

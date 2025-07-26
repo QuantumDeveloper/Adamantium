@@ -103,14 +103,17 @@ namespace Adamantium.ProceduralGeometry.Shapes
                 {
                     vertices.Add(new Vector3(-halfWidth, halfHeight));
                 }
-                
+
                 if (transform is { IsIdentity: false })
                 {
                     vertices = Mesh.ApplyTransform(vertices, transform.Value).ToList();
                 }
+                else
+                {
+                    vertices = vertices.Round().ToList();
+                }
 
-                Mesh mesh = new Mesh();
-                mesh.MeshTopology = primitiveType;
+                var mesh = new Mesh(primitiveType);
                 switch (type)
                 {
                     case GeometryType.Solid:

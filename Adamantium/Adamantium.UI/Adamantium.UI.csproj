@@ -28,20 +28,34 @@
 		<ProjectReference Include="..\Adamantium.ECS\Adamantium.ECS.csproj" />
 		<ProjectReference Include="..\Adamantium.ProceduralGeometry\Adamantium.ProceduralGeometry.csproj" />
 		<ProjectReference Include="..\Adamantium.MacOS\Adamantium.MacOS.csproj" />
+		<ProjectReference Include="..\Adamantium.UI.Controls\Adamantium.UI.Controls.csproj" />
+		<ProjectReference Include="..\Adamantium.UI.Core\Adamantium.UI.Core.csproj" />
 		<ProjectReference Include="..\Adamantium.UI.Markup\Adamantium.UI.Markup.csproj" />
+		<ProjectReference Include="..\Adamantium.UI.Themes\Adamantium.UI.Themes.csproj" />
 		<ProjectReference Include="..\Adamantium.Win32\Adamantium.Win32.csproj" />
 		<ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan\AdamantiumVulkan.csproj" />
 		<ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.Core\AdamantiumVulkan.Core.csproj" />
 		<ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.MacOS\AdamantiumVulkan.MacOS.csproj" />
 		<ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.Windows\AdamantiumVulkan.Windows.csproj" />
 	</ItemGroup>
-
+	
 	<ItemGroup>
-		<Effect Include="Shaders\UIEffect.fx" />
+		<ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" SetTargetFramework="TargetFramework=netstandard2.0"/>
+		<ProjectReference Include="..\Adamantium.Graphics.Core\Adamantium.Graphics.Core.csproj"/>
+		<ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" SetTargetFramework="TargetFramework=netstandard2.0"/>
+		<ProjectReference Include="..\Adamantium.EffectsCompiler\Adamantium.EffectsCompiler.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true"/>
+		<ProjectReference Include="..\Adamantium.Engine.Generators\Adamantium.Engine.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=netstandard2.0"/>
 	</ItemGroup>
 
 	<ItemGroup>
 		<PackageReference Include="System.ObjectModel" Version="4.0.12" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<AdditionalFiles Include="$(ProjectDir)**\*.fx" />
+		<AdditionalFiles Include="$(ProjectDir)**\*.fxh" />
+		<CompilerVisibleProperty Include="RootNamespace" />
+		<AdditionalFiles Remove="obj\**" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -54,5 +68,15 @@
 
 	<ItemGroup>
 	  <None Remove="obj\**" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="Controls\" />
+	  <Folder Include="Events\" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <AdditionalFiles Include="Effects\CommonData.fxh" />
+	  <AdditionalFiles Include="Effects\UIBasicEffect.fx" />
 	</ItemGroup>
 </Project>
