@@ -2,19 +2,19 @@ using Adamantium.FX.Effects.Generated;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Fonts;
-using Adamantium.UI.Media;
-using Adamantium.UI.Media.Imaging;
+using Adamantium.UI.Core.Media;
+using Adamantium.UI.Core.Media.Imaging;
 
 namespace Adamantium.UI.Rendering;
 
 internal static class ComponentRenderFactory
 {
-    public static GeometryRenderer CreateGeometryRenderer(IGraphicsDevice device, Media.Geometry geometry, Brush background, Brush foreground, BasicEffect basicEffect, Texture texture = null)
+    public static GeometryRenderer CreateGeometryRenderer(IGraphicsDevice device, Geometry geometry, Brush background, Brush foreground, BasicEffect basicEffect, Texture texture = null)
     {
         return new GeometryRenderer(device, geometry, background, foreground, basicEffect, texture);
     }
 
-    public static ImageRenderer CreateImageRenderer(IGraphicsDevice device, Media.Geometry geometry, Brush background,
+    public static ImageRenderer CreateImageRenderer(IGraphicsDevice device, Geometry geometry, Brush background,
         ImageSource image, BasicEffect basicEffect)
     {
         return new ImageRenderer(device, geometry, background, image, basicEffect);

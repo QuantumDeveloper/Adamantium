@@ -24,6 +24,9 @@ namespace Adamantium.Core.Collections
             get => items.Length;
             set
             {
+                if (IsFixedSize)
+                    throw new InvalidOperationException("Cannot add items to a fixed-size collection.");
+                
                 if (value != items.Length)
                 {
                     if (value > 0)
@@ -37,7 +40,7 @@ namespace Adamantium.Core.Collections
                     }
                     else
                     {
-                        items = Array.Empty<T>();
+                        items = [];
                     }
                 }
             }
@@ -48,7 +51,7 @@ namespace Adamantium.Core.Collections
         /// </summary>
         public AdamantiumCollection()
         {
-            items = Array.Empty<T>();
+            items = new T[defaultCapacity];
         }
 
         /// <summary>
@@ -133,9 +136,9 @@ namespace Adamantium.Core.Collections
             {
                 if (currentIndex > 0)
                 {
-                    OnClearing();
+                    OnClearing(items);
                     ClearItems();
-                    OnClear();
+                    OnClear(items);
                 }
             }
         }
@@ -145,6 +148,9 @@ namespace Adamantium.Core.Collections
         /// </summary>
         protected virtual void ClearItems()
         {
+            if (IsFixedSize)
+                throw new InvalidOperationException("Cannot add items to a fixed-size collection.");
+            
             Array.Clear(items, 0, currentIndex);
             Capacity = 0;
             currentIndex = 0;
@@ -157,6 +163,9 @@ namespace Adamantium.Core.Collections
         /// <param name="range"><see cref="IEnumerable{T}"/> of items to insert</param>
         public void InsertRange(int index, IEnumerable<T> range)
         {
+            if (IsFixedSize)
+                throw new InvalidOperationException("Cannot add items to a fixed-size collection.");
+            
             lock (SyncRoot)
             {
                 var enumerable = range as T[] ?? range.ToArray();
@@ -213,9 +222,18 @@ namespace Adamantium.Core.Collections
         {
             lock (SyncRoot)
             {
-                for (int i = arrayIndex; i < array.Length; ++i)
+                if (array == null)
+                    throw new ArgumentNullException(nameof(array));
+
+                if (arrayIndex < 0)
+                    throw new ArgumentOutOfRangeException(nameof(arrayIndex), "Index must be non-negative.");
+
+                if (array.Length - arrayIndex < Count)
+                    throw new ArgumentException("Destination array is not large enough to copy all the items.");
+
+                lock (SyncRoot)
                 {
-                    array[i] = items[i];
+                    Array.Copy(items, 0, array, arrayIndex, Count);
                 }
             }
         }
@@ -287,6 +305,9 @@ namespace Adamantium.Core.Collections
             {
                 return;
             }
+            
+            if (IsFixedSize)
+                throw new InvalidOperationException("Cannot add items to a fixed-size collection.");
 
             lock (SyncRoot)
             {
@@ -353,6 +374,9 @@ namespace Adamantium.Core.Collections
         /// <exception cref="T:System.NotSupportedException">The <see cref="T:System.Collections.Generic.IList`1"/> is read-only.</exception>
         public void Insert(int index, T item)
         {
+            if (IsFixedSize)
+                throw new InvalidOperationException("Cannot add items to a fixed-size collection.");
+            
             lock (SyncRoot)
             {
                 InsertItem(index, item);
@@ -379,9 +403,9 @@ namespace Adamantium.Core.Collections
 
         protected virtual void OnRemoveItem(int index, T item) { }
         
-        protected virtual void OnClearing() { }
+        protected virtual void OnClearing(T[] items) { }
 
-        protected virtual void OnClear() { }
+        protected virtual void OnClear(T[] items) { }
 
         /// <summary>
         /// Removes the item at the specified index.

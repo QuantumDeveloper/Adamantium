@@ -6,7 +6,9 @@ using Adamantium.Core.Collections;
 using Adamantium.EffectsCompiler;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.EffectsFramework;
+using Adamantium.Graphics.Core.Extensions;
 using Adamantium.Graphics.Core.Presentation;
+using Adamantium.Graphics.Core.Vertices;
 using Adamantium.Graphics.Effects;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
@@ -175,6 +177,11 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         string name = "")
     {
         return RenderTarget.New(this, width, height, msaa, format, usage, desiredLayout, name);
+    }
+
+    public ITexture CreateTexture(TextureDescription description, byte[] pixelData)
+    {
+        return Texture.CreateFrom(this, description, pixelData);
     }
 
     public ITexture CreateTextureFromImage(Image image, 
@@ -489,7 +496,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         texture.ImageLayout = newLayout;
     }
 
-    public void TransitionImagesForRendering(CommandBuffer commandBuffer, params IRenderTarget[] inputTargets)
+    public void TransitionImagesForRendering(CommandBuffer commandBuffer, params ITexture[] inputTargets)
     {
         var barriers = new List<ImageMemoryBarrier2>();
         foreach (var renderTarget in inputTargets)
@@ -563,7 +570,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         commandBuffer.PipelineBarrier2(dependencyInfo);
     }
 
-    public void TransitionImagesAfterRendering(CommandBuffer commandBuffer, params IRenderTarget[] inputTargets)
+    public void TransitionImagesAfterRendering(CommandBuffer commandBuffer, params ITexture[] inputTargets)
     {
         var barriers = new List<ImageMemoryBarrier2>();
         foreach (var renderTarget in inputTargets)
@@ -581,17 +588,17 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
             barrier.Image = renderTarget.GetImage();
             barrier.SubresourceRange = new ImageSubresourceRange()
             {
-                AspectMask = ImageAspectFlagBits.ColorBit,
+                AspectMask = renderTarget.ImageAspect,
                 BaseMipLevel = 0,
-                LevelCount = (~0U),
+                LevelCount = 1,
                 BaseArrayLayer = 0,
-                LayerCount = (~0U)
+                LayerCount = 1
             };
             barriers.Add(barrier);
 
             renderTarget.ImageLayout = ImageLayout.ShaderReadOnlyOptimal;
         }
-
+        
         var dependencyInfo = new DependencyInfo();
         dependencyInfo.SType = StructureType.DependencyInfo;
         dependencyInfo.PImageMemoryBarriers = barriers.ToArray();
@@ -696,13 +703,16 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         {
             throw new Exception("failed to begin recording command buffer!");
         }
+        
+        TransitionImagesForRendering(commandBuffer, renderTargets);
+        TransitionDepthBufferForRendering(commandBuffer, depthBuffer);
 
-        BeginRendering(commandBuffer, depth, stencil);
+        BeginRendering(commandBuffer, false, depth, stencil);
 
         return true;
     }
         
-    private void BeginRendering(CommandBuffer commandBuffer, float depth = 1.0f, uint stencil = 0)
+    public void BeginRendering(CommandBuffer commandBuffer, bool continueRendering = false, float depth = 1.0f, uint stencil = 0)
     {
         var clearColorValue = new ClearValue
         {
@@ -720,6 +730,9 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
                 Stencil = stencil
             }
         };
+        
+        var loadOperation = continueRendering ? AttachmentLoadOp.Load : AttachmentLoadOp.Clear;
+        
         if (EnableDynamicRendering)
         {
             var colorAttachments = new RenderingAttachmentInfo[renderTargets.Length];
@@ -729,7 +742,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
                 var colorAttachmentInfo = new RenderingAttachmentInfo();
                 colorAttachmentInfo.SType = StructureType.RenderingAttachmentInfo;
                 colorAttachmentInfo.ImageLayout = ImageLayout.ColorAttachmentOptimal;
-                colorAttachmentInfo.LoadOp = AttachmentLoadOp.Clear;
+                colorAttachmentInfo.LoadOp = loadOperation;
                 colorAttachmentInfo.StoreOp = AttachmentStoreOp.Store;
                 colorAttachmentInfo.ClearValue = clearColorValue;
                 if (renderTarget.MSAALevel != MSAALevel.None)
@@ -754,8 +767,8 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
             depthAttachmentInfo.ImageView = depthBuffer?.GetImageView();
             depthAttachmentInfo.ImageLayout = ImageLayout.DepthStencilAttachmentOptimal;
             depthAttachmentInfo.ResolveMode = ResolveModeFlagBits.None;
-            depthAttachmentInfo.LoadOp = AttachmentLoadOp.Clear;
-            depthAttachmentInfo.StoreOp = AttachmentStoreOp.DontCare;
+            depthAttachmentInfo.LoadOp = loadOperation;
+            depthAttachmentInfo.StoreOp = AttachmentStoreOp.Store;
             depthAttachmentInfo.ClearValue = clearDepthValue;
 
             var renderingInfo = new RenderingInfo();
@@ -792,9 +805,6 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
             //     PipelineStageFlagBits.EarlyFragmentTestsBit | PipelineStageFlagBits.LateFragmentTestsBit,
             //     PipelineStageFlagBits.EarlyFragmentTestsBit | PipelineStageFlagBits.LateFragmentTestsBit
             // );
-            
-            TransitionImagesForRendering(commandBuffer, renderTargets);
-            TransitionDepthBufferForRendering(commandBuffer, depthBuffer);
                 
             commandBuffer.BeginRendering(renderingInfo);
         }
@@ -807,7 +817,8 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         if (EnableDynamicRendering)
         {
             commandBuffer.EndRendering();
-            //TransitionImagesAfterRendering(commandBuffer, renderTargets);
+            //InsertMemoryBarrier();
+            // TransitionImagesAfterRendering(commandBuffer, renderTargets);
             // TransitionDepthBufferAfterRendering(commandBuffer, depthBuffer);
 
             // InsertImageMemoryBarrier(commandBuffer,
@@ -826,6 +837,27 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
             //     commandBuffer.EndRenderPass();
             // }
         }
+    }
+
+    public void InsertMemoryBarrier()
+    {
+        var memoryBarrier = new MemoryBarrier2
+        {
+            SType = StructureType.MemoryBarrier2,
+            SrcStageMask = PipelineStageFlagBits2.ColorAttachmentOutputBit,
+            SrcAccessMask = AccessFlagBits2.ColorAttachmentWriteBit,
+            DstStageMask = PipelineStageFlagBits2.ColorAttachmentOutputBit,
+            DstAccessMask = AccessFlagBits2.ColorAttachmentReadBit
+        };
+
+        var dependencyInfo = new DependencyInfo
+        {
+            SType = StructureType.DependencyInfo,
+            MemoryBarrierCount = 1,
+            PMemoryBarriers = [memoryBarrier]
+        };
+
+        CurrentCommandBuffer.PipelineBarrier2(dependencyInfo);
     }
 
     public void Submit()
@@ -982,8 +1014,8 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         LogicalDevice.SetScissorsWithCountEXT(commandBuffer, scissors.ToArray());
         LogicalDevice.SetRasterizerDiscardEnableEXT(commandBuffer, RasterizerDiscardEnabled);
             
-        var bindingDescription = VertexUtils.GetBindingDescription2(VertexType);
-        var attributes = VertexUtils.GetVertexAttributeDescription2(VertexType);
+        var bindingDescription = VertexType.GetBindingDescription2();
+        var attributes = VertexType.GetVertexAttributeDescription2();
         LogicalDevice.SetVertexInputEXT(commandBuffer,1, bindingDescription, (uint)attributes.Length, attributes);
         LogicalDevice.SetPrimitiveTopologyEXT(commandBuffer, PrimitiveTopology);
         LogicalDevice.SetPrimitiveRestartEnableEXT(commandBuffer, PrimitiveRestartEnable);

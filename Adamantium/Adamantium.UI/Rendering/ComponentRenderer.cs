@@ -1,13 +1,14 @@
 using Adamantium.Core;
 using Adamantium.FX.Effects.Generated;
-using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
-using Adamantium.UI.Media;
-using Adamantium.UI.Media.Imaging;
+using Adamantium.Mathematics;
+using Adamantium.UI.Core;
+using Adamantium.UI.Core.Media;
+using Adamantium.UI.Core.Media.Imaging;
 
 namespace Adamantium.UI.Rendering;
 
-internal abstract class ComponentRenderer : DisposableObject
+public abstract class ComponentRenderer : DisposableObject
 {
     protected ComponentRenderer(Brush background, Brush foreground, BasicEffect basicEffect)
     {

@@ -1,5 +1,4 @@
-﻿using Adamantium.UI.Windows;
-using Adamantium.UI;
+﻿using Adamantium.UI;
 using System;
 using System.IO;
 using Adamantium.UI.Controls;

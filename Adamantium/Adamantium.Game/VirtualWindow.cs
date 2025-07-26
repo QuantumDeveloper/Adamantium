@@ -5,10 +5,11 @@ using Adamantium.Graphics.Core;
 using Adamantium.Mathematics;
 using Adamantium.UI;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Core;
+using Adamantium.UI.Core.Graphics;
+using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.UI.Events;
-using Adamantium.UI.Media;
 using Adamantium.UI.Rendering;
-using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.Game;
 
@@ -22,6 +23,11 @@ public class VirtualWindow : ContentControl, IVirtualWindow
     public Vector2 PointToScreen(Vector2 point)
     {
         throw new NotImplementedException();
+    }
+
+    public void AttachContextAndInitialize(IUIContext context)
+    {
+        UIContext = context;
     }
 
     public void Show()
@@ -44,6 +50,7 @@ public class VirtualWindow : ContentControl, IVirtualWindow
     public bool IsClosed { get; protected set; }
     public double ClientWidth { get; set; }
     public double ClientHeight { get; set; }
+    public IUIContext UIContext { get; private set; }
     public IntPtr SurfaceHandle { get; }
     public double Left { get; set; }
     public double Top { get; set; }
@@ -54,7 +61,10 @@ public class VirtualWindow : ContentControl, IVirtualWindow
     public IWindowRenderer Renderer { get; set; }
     
     public GameOutput RootWindow { get; set; }
-    public DrawingContext GetDrawingContext()
+
+    public bool ShouldDisplayWindow { get; }
+
+    public IDrawingContext GetDrawingContext()
     {
         if (Renderer != null)
         {
@@ -65,6 +75,16 @@ public class VirtualWindow : ContentControl, IVirtualWindow
             return DefaultRenderer.DrawingContext;
 
         throw new ArgumentException("Window does not contain renderer and could not return DrawingContext");
+    }
+
+    public Vector2 ScreenToClient(Vector2 p)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Vector2 ClientToScreen(Vector2 p)
+    {
+        throw new NotImplementedException();
     }
 
     public event SizeChangedEventHandler ClientSizeChanged;

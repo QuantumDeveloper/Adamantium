@@ -1,10 +1,11 @@
 using System.Collections.Generic;
-using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
+using Adamantium.Mathematics;
+using Adamantium.UI.Core;
 
 namespace Adamantium.UI.Rendering;
 
-internal class UIRenderContainer
+public class UIRenderContainer
 {
     public List<RenderUnit> ChildUnits { get; }
 

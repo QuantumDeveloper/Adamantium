@@ -1,4 +1,6 @@
 ﻿
+using Adamantium.UI.Markup.AST;
+
 namespace Adamantium.UI.Markup
 {
     public class NamedElement

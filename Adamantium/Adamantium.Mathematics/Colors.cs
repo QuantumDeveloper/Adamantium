@@ -162,7 +162,8 @@ namespace Adamantium.Mathematics
             if (name.StartsWith("#"))
             {
                 var colorText = name.Replace("#", "");
-                return Color.FromRgba(Convert.ToUInt32(colorText, 16));
+                return Color.FromBgra(Convert.ToUInt32(colorText, 16));
+                //return Color.FromRgba(Convert.ToUInt32(colorText, 16));
             }
 
             return ColorsMap[name];

@@ -1,15 +1,14 @@
-﻿using System.Diagnostics;
-using System.Threading;
+﻿using System.Threading;
 using Adamantium.Core;
 using Adamantium.ECS;
 using Adamantium.Graphics.Core;
-using Adamantium.Graphics.Core.Presentation;
-using Adamantium.UI.Controls;
-using Adamantium.UI.Events;
+using Adamantium.Mathematics;
+using Adamantium.UI.Core;
+using Adamantium.UI.Core.Graphics;
+using Adamantium.UI.Core.Resources;
+using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.UI.Extensions;
 using Adamantium.UI.Rendering;
-using Adamantium.UI.Resources;
-using Adamantium.UI.RoutedEvents;
 
 namespace Adamantium.UI.EntityServices;
 
@@ -45,7 +44,7 @@ public class WindowRenderService : UiRenderService
         GraphicsDevice = GraphicsDeviceService.CreateRenderDevice();
         GraphicsDevice.ClearColor = Colors.CornflowerBlue;
 
-        windowRenderer = Window.Renderer ?? new ForwardWindowRenderer(GraphicsDevice);
+        windowRenderer = Window.Renderer ?? new ForwardWindowRenderer(GraphicsDevice, new RenderUnitFactory(GraphicsDevice, DependencyResolver.Resolve<IResourceFactory>()));
         windowRenderer.SetWindow(Window);
         Window.DefaultRenderer = windowRenderer;
         Window.RendererChanged += WindowOnRendererChanged;
@@ -106,6 +105,7 @@ public class WindowRenderService : UiRenderService
     {
         base.FrameEnded();
         GraphicsDevice.FrameEnded();
+        windowRenderer.OnFrameEnded();
         if (!windowRenderer.IsRendererUpToDate)
         {
             windowRenderer.ResizePresenter((uint)Window.ClientWidth, (uint)Window.ClientHeight);

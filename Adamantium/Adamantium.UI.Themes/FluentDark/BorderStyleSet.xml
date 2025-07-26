@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<StyleSet
+        xmlns="http://adamantium/ui/resources"
+        xmlns:local="http://adamantium/ui/resources">
+    <Style Selector="Border">
+        <Setter Property="Thickness" Value="3"/>
+        <Setter Property="Grid.Column" Value="2"/>
+        <Setter Property="Width" Value="275"/>
+        <Setter Property="Height" Value="175"/>
+        <Setter Property="BorderBrush" Value="{local:ResourceReference PanelBackgroundBrush}"/>
+        <Setter Property="Background" Value="{ResourceReference ApproveBrush}"/>
+    </Style>
+</StyleSet>

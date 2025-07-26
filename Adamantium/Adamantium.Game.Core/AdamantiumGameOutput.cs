@@ -5,8 +5,8 @@ using Adamantium.Graphics.Core.Presentation;
 using Adamantium.Mathematics;
 using Adamantium.UI;
 using Adamantium.UI.Controls;
-using Adamantium.UI.Input;
-using Adamantium.UI.RoutedEvents;
+using Adamantium.UI.Core;
+using Adamantium.UI.Core.RoutedEvents;
 using Rectangle = Adamantium.Mathematics.Rectangle;
 
 namespace Adamantium.Game.Core

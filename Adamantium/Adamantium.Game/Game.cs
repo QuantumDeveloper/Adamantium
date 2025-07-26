@@ -17,6 +17,8 @@ using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Content;
 using Adamantium.Imaging;
 using Adamantium.UI;
+using Adamantium.UI.Core;
+using Adamantium.UI.Services;
 using Adamantium.Win32;
 
 namespace Adamantium.Game;
@@ -95,7 +97,6 @@ public class Game : PropertyChangedBase, IGame
         Container.RegisterInstance<IService>(this);
         Container.RegisterInstance<IGraphicsDeviceService>(GraphicsDeviceService);
         Container.RegisterInstance<EntityWorld>(EntityWorld);
-        Container.RegisterSingleton<IGraphicsDeviceFactory, GraphicsDeviceFactory>();
             
         InputManager = new GameInputManager(this);
         GamePlayManager = new GamePlayManager(Container);

@@ -1,0 +1,59 @@
+﻿using System.ComponentModel;
+using Adamantium.UI.Core.RoutedEvents;
+
+namespace Adamantium.UI.Core.Data;
+
+public class BindingExpression : BindingExpressionBase
+{
+   public object DataSource { get; set; }
+   public Binding ParentBinding { get; set; }
+   public String SourcePropertyName { get; set; }
+   public object ResolvedSource { get; set; }
+
+   public void Init()
+   {
+      if (ResolvedSource is INotifyPropertyChanged notify)
+      {
+         notify.PropertyChanged += SourcePropertyChanged;
+      }
+
+      Target.PropertyChanged += TargetPropertyChanged;
+   }
+
+   internal static BindingExpressionBase CreateBindingExpression()
+   {
+      return new BindingExpression();
+   }
+
+   private void TargetPropertyChanged(object sender, AdamantiumPropertyChangedEventArgs e)
+   {
+      IsDirty = true;
+      UpdateSource();
+      IsDirty = false;
+   }
+
+   private void SourcePropertyChanged(object sender, PropertyChangedEventArgs e)
+   {
+      if (e.PropertyName != SourcePropertyName) return;
+      
+      IsDirty = true;
+      UpdateTarget();
+      IsDirty = false;
+   }
+
+   public override void UpdateSource()
+   {
+      if (!IsDirty) return;
+      
+      ResolvedSource.GetType()
+         .GetProperty(SourcePropertyName)?.SetValue(ResolvedSource, Target.GetValue(TargetProperty));
+   }
+
+   public override void UpdateTarget()
+   {
+      if (!IsDirty) return;
+      
+      var sourceValue = ResolvedSource.GetType().GetProperty(SourcePropertyName)?.GetValue(ResolvedSource);
+      Target.SetEffectiveValue(TargetProperty, sourceValue);
+   }
+}

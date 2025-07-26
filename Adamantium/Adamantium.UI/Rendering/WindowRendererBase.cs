@@ -1,10 +1,11 @@
 using System.Diagnostics;
 using Adamantium.Core;
 using Adamantium.Graphics.Core;
-using Adamantium.Graphics.Core.EffectsFramework;
 using Adamantium.Graphics.Core.Presentation;
-using Adamantium.UI.Controls;
-using Adamantium.UI.Media;
+using Adamantium.Mathematics;
+using Adamantium.UI.Core;
+using Adamantium.UI.Core.Graphics;
+using Adamantium.UI.Effects.Generated;
 using AdamantiumVulkan.Core;
 
 namespace Adamantium.UI.Rendering;
@@ -15,14 +16,16 @@ public abstract class WindowRendererBase : IWindowRenderer
     protected Rect2D Scissor { get; set; }
     protected Rect2D ClipRect { get; set; }
     protected Matrix4x4F ProjectionMatrix { get; set; }
-    protected IGraphicsDevice GraphicsDevice { get; set; }
+    protected IGraphicsDevice GraphicsDevice { get; }
+    
+    protected IRenderUnitFactory RenderUnitFactory { get; } 
     protected PresentationParameters Parameters { get; set; }
     
-    protected Effect UiEffect { get; set; }
+    protected UIBasicEffect UiEffect { get; set; }
     
     public GraphicsPresenter Presenter { get; private set; }
     
-    protected WindowRendererBase(IGraphicsDevice device)
+    protected WindowRendererBase(IGraphicsDevice device, IRenderUnitFactory renderUnitFactory)
     {
         Viewport = new Viewport();
         Scissor = new Rect2D();
@@ -30,24 +33,15 @@ public abstract class WindowRendererBase : IWindowRenderer
         ClipRect.Offset = new Offset2D();
         ClipRect.Extent = new Extent2D();
         GraphicsDevice = device;
-        DrawingContext = new DrawingContext(GraphicsDevice);
+        DrawingContext = new DrawingContext();
+        RenderUnitFactory = renderUnitFactory;
     }
     
     protected IWindow Window { get; set; }
 
-    public DrawingContext DrawingContext { get; }
+    public IDrawingContext DrawingContext { get; }
     public bool IsRendererUpToDate { get; protected set; }
-    
-    public void CalculateProjectionMatrix()
-    {
-        ProjectionMatrix = Matrix4x4F.OrthoOffCenter(
-            0, 
-            (float)Window.ClientWidth, 
-            0, 
-            (float)Window.ClientHeight,
-            0f,
-            100000f);
-    }
+    public bool FirstFrameProcessed { get; private set; }
 
     protected virtual void UnsubscribeFromEvents()
     {
@@ -65,6 +59,7 @@ public abstract class WindowRendererBase : IWindowRenderer
             
         UnsubscribeFromEvents();
         Window = window;
+        Window.Renderer = this;
         FillParameters();
         SubscribeToEvents();
         InitializeWindowResources();
@@ -83,7 +78,7 @@ public abstract class WindowRendererBase : IWindowRenderer
             HInstanceHandle = Process.GetCurrentProcess().Handle
         };
 
-        Presenter = GraphicsPresenter.Create(GraphicsDevice, Parameters, "Window presenter");
+        Presenter = GraphicsPresenter.Create(GraphicsDevice, Parameters, "Window_presenter");
     }
 
     protected virtual void InitializeWindowResources()
@@ -106,9 +101,23 @@ public abstract class WindowRendererBase : IWindowRenderer
         IsRendererUpToDate = true;
     }
 
+    public virtual void OnFrameEnded()
+    {
+        FirstFrameProcessed = true;
+    }
+
     public virtual void Present()
     {
         Presenter?.Present();
+        
+        if (Window.ShouldDisplayWindow)
+        {
+            // Dispatcher.CurrentDispatcher.Invoke(() =>
+            // {
+            //     Window.Show();
+            // });
+            Window.UIContext.UIApplication.ExecuteOnUIThread(() => Window.Show());
+        }
     }
     
     public void Dispose()

@@ -1,0 +1,117 @@
+﻿using Adamantium.Mathematics;
+using Adamantium.ProceduralGeometry;
+using Adamantium.UI.Core;
+using Adamantium.UI.Core.Graphics;
+using Adamantium.UI.Core.Media;
+
+namespace Adamantium.UI.Controls.Decorators;
+
+public class Border : Decorator
+{
+   public static readonly AdamantiumProperty BorderBrushProperty = AdamantiumProperty.Register(nameof(BorderBrush),
+      typeof (Brush), typeof (Border),
+      new PropertyMetadata(Brushes.Transparent, PropertyMetadataOptions.AffectsRender));
+
+   public static readonly AdamantiumProperty CornerRadiusProperty = AdamantiumProperty.Register(nameof(CornerRadius),
+      typeof (CornerRadius), typeof (Border),
+      new PropertyMetadata(default(CornerRadius), PropertyMetadataOptions.AffectsMeasure));
+
+   public static readonly AdamantiumProperty BorderThicknessProperty =
+      AdamantiumProperty.Register(nameof(BorderThickness),
+         typeof (Thickness), typeof (Border),
+         new PropertyMetadata(default(Thickness), PropertyMetadataOptions.AffectsMeasure));
+
+   public static readonly AdamantiumProperty BackgroundProperty = AdamantiumProperty.Register(nameof(Background),
+      typeof (Brush), typeof (Border),
+      new PropertyMetadata(Brushes.Transparent, PropertyMetadataOptions.AffectsRender));
+
+   public Brush BorderBrush
+   {
+      get => GetValue<Brush>(BorderBrushProperty);
+      set => SetValue(BorderBrushProperty, value);
+   }
+
+   public Brush Background
+   {
+      get => GetValue<Brush>(BackgroundProperty);
+      set => SetValue(BackgroundProperty, value);
+   }
+
+   public CornerRadius CornerRadius
+   {
+      get => GetValue<CornerRadius>(CornerRadiusProperty);
+      set => SetValue(CornerRadiusProperty, value);
+   }
+
+   public Thickness BorderThickness
+   {
+      get => GetValue<Thickness>(BorderThicknessProperty);
+      set => SetValue(BorderThicknessProperty, value);
+   }
+
+   public Border()
+   {
+   }
+
+   protected override Size MeasureOverride(Size availableSize)
+   {
+      var child = Child;
+      var padding = Padding + (BorderThickness / 2);
+      var size = availableSize.Deflate(padding);
+      if (child != null)
+      {
+         child.Measure(size);
+         return child.DesiredSize.Inflate(padding);
+      }
+      else
+      {
+         return new Size(padding.Left + padding.Right, padding.Bottom + padding.Top);
+      }
+   }
+
+   protected override Size ArrangeOverride(Size finalSize)
+   {
+      var padding = Padding + (BorderThickness / 2);
+      Child?.Arrange(new Rect(finalSize).Deflate(padding));
+
+      if (Child != null)
+      {
+         var result = Child.Bounds.Size.Inflate(padding);
+         if (!Double.IsNaN(Width))
+         {
+            result.Width = Math.Max(result.Width, Width);
+         }
+            
+         if (!Double.IsNaN(Height))
+         {
+            result.Height = Math.Max(result.Height, Height);
+         }
+
+         return result;
+      }
+      
+      return finalSize;
+   }
+
+   protected override void OnRender(IDrawingContext context)
+   {
+      var size = new Size(ActualWidth, ActualHeight);
+      var borderThickness = BorderThickness;
+      var cornerRadius = CornerRadius;
+      base.OnRender(context);
+
+      var outerGeometry = new RectangleGeometry(new Rect(size), cornerRadius);
+      var innerSize = size.Deflate(BorderThickness / 2);
+      var innerRect = new Rect(new Vector2(borderThickness.Left / 2, borderThickness.Top / 2), innerSize);
+      var innerGeometry = new RectangleGeometry(innerRect, cornerRadius);
+      
+      var combined = new CombinedGeometry();
+      combined.GeometryCombineMode = GeometryCombineMode.Exclude;
+      combined.Geometry1 = outerGeometry;
+      combined.Geometry2 = innerGeometry;
+
+      context.ForControl(this)
+         .DrawRectangle(Background, innerRect, CornerRadius)
+         .DrawGeometry(BorderBrush, combined);
+   }
+}

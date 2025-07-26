@@ -1,15 +1,18 @@
-using System.Collections.Generic;
 using Adamantium.Core;
 using Adamantium.Graphics.Core;
-using Adamantium.UI.RoutedEvents;
+using Adamantium.UI.Core;
+using Adamantium.UI.Core.Graphics;
+using Adamantium.UI.Core.RoutedEvents;
 using AdamantiumVulkan.Core;
 
 namespace Adamantium.UI.Rendering;
 
-internal class ForwardWindowRenderer : WindowRendererBase
+public class ForwardWindowRenderer : WindowRendererBase
 {
-    public ForwardWindowRenderer(IGraphicsDevice device) : base(device)
+    private readonly RenderCache _renderCache;
+    public ForwardWindowRenderer(IGraphicsDevice device, IRenderUnitFactory renderUnitFactory) : base(device, renderUnitFactory)
     {
+        _renderCache = new RenderCache(DrawingContext, renderUnitFactory);
     }
         
     private void OnClientSizeChanged(object sender, SizeChangedEventArgs e)
@@ -38,7 +41,7 @@ internal class ForwardWindowRenderer : WindowRendererBase
         
         Parameters.Width = width;
         Parameters.Height = height;
-        CalculateProjectionMatrix();
+        base.InitializeWindowResources();
     }
     
     protected override void UnsubscribeFromEvents()
@@ -65,33 +68,16 @@ internal class ForwardWindowRenderer : WindowRendererBase
         if (Window == null) return;
         
         GraphicsDevice.SetViewports(Viewport);
-        ProcessVisualTree();
-    }
-
-    private void ProcessVisualTree()
-    {
-        var queue = new Queue<IUIComponent>();
-        queue.Enqueue(Window);
-        while (queue.Count > 0)
-        {
-            var component = queue.Dequeue();
-                
-            RenderComponent(component);
-
-            foreach (var visual in component.VisualChildren)
-            {
-                queue.Enqueue(visual);
-            }
-        }
+        GraphicsDevice.SetScissors(Scissor);
+        _renderCache.BuildFromVisualTree(Window);
+        _renderCache.ProcessCommands(Window.GetProjectionMatrix());
     }
 
     private void RenderComponent(IUIComponent component)
     {
         if (component.Visibility != Visibility.Visible) return;
 
-        component.Render(DrawingContext);
-
-        if (!DrawingContext.GetContainerForComponent(component, out var renderContainer)) return;
+        //if (!DrawingContext.GetContainerForComponent(component, out var renderContainer)) return;
 
         // if (component.ClipToBounds)
         // {
@@ -110,6 +96,6 @@ internal class ForwardWindowRenderer : WindowRendererBase
             GraphicsDevice.SetScissors(Scissor);
         }
         
-        renderContainer.Draw(GraphicsDevice, component, ProjectionMatrix);
+        //renderContainer.Draw(GraphicsDevice, component, ProjectionMatrix);
     }
 }

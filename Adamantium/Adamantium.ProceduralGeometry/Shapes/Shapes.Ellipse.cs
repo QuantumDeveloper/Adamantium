@@ -15,14 +15,14 @@ namespace Adamantium.ProceduralGeometry.Shapes
                EllipseType ellipseType,
                Vector2 diameter,
                double startAngle = 0,
-               double stopAngle = 360,
+               double sweepAngle = 360,
                bool isClockWise = true,
                int tessellation = 36,
                Matrix4x4? transform = null)
             {
-                if (Math.Abs(stopAngle - startAngle) > 360)
+                if (sweepAngle is > 360 or < -360)
                 {
-                    stopAngle = startAngle + 360;
+                    sweepAngle %= 360;
                 }
 
                 Mesh mesh = null;
@@ -30,11 +30,11 @@ namespace Adamantium.ProceduralGeometry.Shapes
                 switch (geometryType)
                 {
                     case GeometryType.Solid:
-                        mesh = GenerateSolidGeometry(ellipseType, diameter, startAngle, stopAngle, isClockWise, tessellation, transform);
+                        mesh = GenerateSolidGeometry(ellipseType, diameter, startAngle, sweepAngle, isClockWise, tessellation, transform);
                         break;
                     case GeometryType.Both:
                     {
-                        var contour = GenerateOutlinedGeometry(ellipseType, diameter, startAngle, stopAngle,
+                        var contour = GenerateOutlinedGeometry(ellipseType, diameter, startAngle, sweepAngle,
                             isClockWise, tessellation, transform);
                         mesh = new Mesh();
                         mesh.AddContour(contour, true);
@@ -44,7 +44,7 @@ namespace Adamantium.ProceduralGeometry.Shapes
                     }
                     case GeometryType.Outlined:
                     {
-                        var contour = GenerateOutlinedGeometry(ellipseType, diameter, startAngle, stopAngle,
+                        var contour = GenerateOutlinedGeometry(ellipseType, diameter, startAngle, sweepAngle,
                             isClockWise, tessellation, transform);
                         mesh = new Mesh();
                         mesh.AddContour(contour, true);
@@ -59,21 +59,18 @@ namespace Adamantium.ProceduralGeometry.Shapes
                 EllipseType ellipseType,
                 Vector2 diameter,
                 double startAngle = 0,
-                double stopAngle = 360,
+                double sweepAngle = 360,
                 bool isClockWise = true,
                 int tessellation = 36,
                 Matrix4x4? transform = null)
             {
-                if (startAngle < 0) startAngle = 0;
-                if (stopAngle > 360) stopAngle = 360;
-                
                 var vertices = new List<Vector2>();
                 List<Vector2F> uvs = new List<Vector2F>();
                 var center = Vector3.Zero;
                 var radiusX = diameter.X / 2;
                 var radiusY = diameter.Y / 2;
 
-                var range = stopAngle - startAngle;
+                var range = sweepAngle;
                 var angle = range / (tessellation - 1);
                 
                 float sign = -1;
@@ -104,9 +101,9 @@ namespace Adamantium.ProceduralGeometry.Shapes
                     vertices.Add(vertex);
 
                     currentAngle += angle;
-                    if (currentAngle > stopAngle)
+                    if (currentAngle > sweepAngle)
                     {
-                        currentAngle = stopAngle;
+                        currentAngle = sweepAngle;
 
                         if (currentAngle == 360)
                         {
@@ -142,7 +139,7 @@ namespace Adamantium.ProceduralGeometry.Shapes
                 EllipseType ellipseType,
                 Vector2 diameter,
                 double startAngle = 0,
-                double stopAngle = 360,
+                double sweepAngle = 360,
                 bool isClockWise = true,
                 int tessellation = 36,
                 Matrix4x4? transform = null)
@@ -152,7 +149,7 @@ namespace Adamantium.ProceduralGeometry.Shapes
                 var radiusX = diameter.X / 2;
                 var radiusY = diameter.Y / 2;
 
-                var range = Math.Abs(stopAngle) - Math.Abs(startAngle);
+                var range = sweepAngle;
                 var angle = range / tessellation;
 
                 float sign = 1;
