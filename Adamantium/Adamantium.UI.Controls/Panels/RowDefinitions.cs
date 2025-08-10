@@ -11,4 +11,10 @@ public class RowDefinitions: TrackingCollection<RowDefinition>
    {
          
    }
+
+   protected override void InsertItem(int index, RowDefinition item)
+   {
+      ArgumentNullException.ThrowIfNull(item);
+      base.InsertItem(index, item);
+   }
 }

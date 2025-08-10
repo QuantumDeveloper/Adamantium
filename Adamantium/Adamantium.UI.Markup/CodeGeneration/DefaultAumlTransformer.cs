@@ -36,19 +36,34 @@ public class DefaultAumlTransformer : IAumlTransformer
                     if (propertyNode.Property is AumlAstPropertyReference reference)
                     {
                         reference.OwnerType = ProcessTypeReference(reference.OwnerType, reference.GetLineInfo());
-                        reference.TargetType = ProcessTypeReference(reference.TargetType, reference.GetLineInfo());
+                        if (reference.IsAttachedProperty)
+                        {
+                            reference.TargetType = ProcessTypeReference(reference.TargetType, reference.GetLineInfo());
+                        }
+                        else
+                        {
+                            reference.TargetType = ResolvePropertyType(reference, reference.TargetType, reference.GetLineInfo());
+                        }
                     }
                     break;
                 case AumlAstPropertyReference propertyReference:
                     propertyReference.OwnerType = ProcessTypeReference(propertyReference.OwnerType, propertyReference.GetLineInfo());
-                    propertyReference.TargetType = ProcessTypeReference(propertyReference.TargetType, propertyReference.GetLineInfo());
+                    if (propertyReference.IsAttachedProperty)
+                    {
+                        propertyReference.TargetType = ProcessTypeReference(propertyReference.TargetType, propertyReference.GetLineInfo());
+                    }
+                    else
+                    {
+                        propertyReference.TargetType = ResolvePropertyType(propertyReference, propertyReference.TargetType, propertyReference.GetLineInfo());
+                    }
+                    
                     break;
                 case AumlAstMarkupExtensionNode markupExtension:
                     markupExtension.TypeReference = ProcessTypeReference(markupExtension.TypeReference, markupExtension.GetLineInfo());
                     break;
-                case AumlAstMarkupExtensionLiteral literal:
-                    literal.TypeReference = ProcessTypeReference(literal.TypeReference, literal.GetLineInfo());
-                    break;
+                //case AumlAstMarkupExtensionLiteral literal:
+                //    literal.TypeReference = ProcessTypeReference(literal.TypeReference, literal.GetLineInfo());
+                //    break;
             }
         }
 
@@ -80,6 +95,66 @@ public class DefaultAumlTransformer : IAumlTransformer
                 }
 
                 return CreateResolved(typeInfo, lineInfo);
+            }
+
+            // not XmlNamespaceDeclaration
+            if (string.IsNullOrEmpty(typeReference.Assembly) || string.IsNullOrEmpty(typeReference.Namespace))
+            {
+                return ResolveByNameOnly(typeReference, lineInfo);
+            }
+
+            // CLR type reference
+            var clrTypeContainer = typeResolver.ResolveAssembly(typeReference.Assembly);
+            if (clrTypeContainer != null)
+            {
+                var typeInfo = clrTypeContainer.Types.FirstOrDefault(x => x.Name == typeReference.Name);
+                if (typeInfo == null)
+                {
+                    diagnostics.ReportError(document.FileName, $"Type {typeReference.Name} could not be found in namespace {typeReference.Namespace}. {lineInfo}");
+                    return typeReference;
+                }
+                return CreateResolved(typeInfo, lineInfo);
+            }
+
+            throw new TypeNotAvailableException($"Type {typeReference.Name} is not available");
+        }
+        
+        IAumlAstTypeReference ResolvePropertyType(AumlAstPropertyReference propertyReference, IAumlAstTypeReference typeReference, IAumlLineInfo lineInfo)
+        {
+            if (typeReference == null || typeReference.IsResolved)
+                return typeReference;
+
+            if (typeReference.IsXmlNamespaceDeclaration)
+            {
+                if (string.IsNullOrEmpty(typeReference.Namespace))
+                {
+                    return ResolveByNameOnly(typeReference, lineInfo);
+                }
+
+                var typeContainer = typeResolver.GetResolvedAssemblyByXmlDefinition(typeReference.Namespace);
+
+                if (typeContainer == null)
+                {
+                    diagnostics.ReportError(document.FileName, $"Xml namespace {typeReference.Namespace} could not be found. {lineInfo}");
+                    return typeReference;
+                }
+
+                var typeInfo = typeContainer.Types.FirstOrDefault(x => x.Name == typeReference.Name);
+                if (typeInfo == null)
+                {
+                    diagnostics.ReportError(document.FileName, $"Type {typeReference.Name} could not be found in namespace {typeReference.Namespace}. {lineInfo}");
+                    return typeReference;
+                }
+                
+                var propertyInfo = typeInfo.GetAllProperties().FirstOrDefault(x=>x.Name == propertyReference.Name);
+
+                if (propertyInfo == null)
+                {
+                    diagnostics.ReportError(document.FileName, $"Property {propertyReference.Name} could not be found in {typeReference.Name}. {lineInfo}");
+                    return typeReference;
+                }
+
+                return CreateResolved(propertyInfo.PropertyType, lineInfo);
             }
 
             // not XmlNamespaceDeclaration

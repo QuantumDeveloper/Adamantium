@@ -79,8 +79,8 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
             classStyle, 
             wndStyleEx, 
             wndStyle, 
-            (int)window.Location.X,
-            (int)window.Location.Y, 
+            (int)window.Left,
+            (int)window.Top, 
             (int)window.Width, 
             (int)window.Height, 
             IntPtr.Zero);

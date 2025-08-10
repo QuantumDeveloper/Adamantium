@@ -63,10 +63,8 @@ public class Border : Decorator
          child.Measure(size);
          return child.DesiredSize.Inflate(padding);
       }
-      else
-      {
-         return new Size(padding.Left + padding.Right, padding.Bottom + padding.Top);
-      }
+
+      return new Size(padding.Left + padding.Right, padding.Bottom + padding.Top);
    }
 
    protected override Size ArrangeOverride(Size finalSize)

@@ -1,6 +1,5 @@
-﻿using System.Threading;
-using Adamantium.Core.DependencyInjection;
-using Adamantium.UI.Threading;
+﻿using Adamantium.Core.DependencyInjection;
+using Adamantium.UI.Platforms;
 
 namespace Adamantium.Game.Core
 {

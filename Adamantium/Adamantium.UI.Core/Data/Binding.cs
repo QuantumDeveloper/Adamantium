@@ -25,23 +25,33 @@ public class Binding : BindingBase
          PropertyPathChanged = true;
       }
    }
-
-   public bool IsAsync { get; set; }
-   public BindingMode Mode { get; set; }
-   public object Source { get; set; }
-   public IValueConverter Converter { get; set; }
-   public object ConverterParameter { get; set; }
-
+   
    protected override BindingExpressionBase CreateBindingExpression()
    {
-      return BindingExpression.CreateBindingExpression();
+      throw new NotImplementedException();
    }
 
    public override object Clone()
    {
-      ReadOnlyObservableCollection<Int32> col =
-         new ReadOnlyObservableCollection<int>(new ObservableCollection<int>(new List<int>() { 15 }));
-
-      return null;
+      return new Binding()
+      {
+         Mode = Mode,
+         Source = Source,
+         Converter = Converter,
+         ConverterParameter = ConverterParameter,
+         UpdateSourceTrigger = UpdateSourceTrigger,
+         Path = Path,
+         IsAsync = IsAsync,
+         Delay = Delay,
+         FallbackValue = FallbackValue,
+         StringFormat = StringFormat,
+         TargetNullValue = TargetNullValue,
+      };
    }
+   
+   public BindingMode Mode { get; set; }
+   public object Source { get; set; }
+   public IValueConverter Converter { get; set; }
+   public object ConverterParameter { get; set; }
+   public UpdateSourceTrigger UpdateSourceTrigger { get; set; }
 }

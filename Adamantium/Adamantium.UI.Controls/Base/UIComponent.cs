@@ -14,6 +14,8 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     
     protected bool sizeChanged;
     protected Size previousRenderSize;
+    private Matrix4x4F _cachedWorldTransform;
+    private bool _isTransformDirty = true;
 
     #region Adamantium properties
     
@@ -56,7 +58,7 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
 
     #region Properties
 
-    public Vector2 Location { get; internal set; }
+    //public Vector2 Location { get; internal set; }
 
     public Visibility Visibility
     {
@@ -227,6 +229,53 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         get => GetValue<Transform>(LayoutTransformProperty);
         set => SetValue(LayoutTransformProperty, value);
     }
+    
+    public Matrix4x4F WorldTransform
+    {
+        get
+        {
+            if (_isTransformDirty)
+            {
+                // Локальная трансформация (смещение относительно родителя)
+                var localTransform = Matrix4x4F.Translation((float)Bounds.Location.X, (float)Bounds.Location.Y, 0);
+
+                if (VisualParent != null)
+                {
+                    // Рекурсивно получаем трансформацию родителя и умножаем на свою
+                    _cachedWorldTransform = localTransform * VisualParent.WorldTransform;
+                }
+                else
+                {
+                    // Если родителя нет, наша локальная трансформация и есть мировая
+                    _cachedWorldTransform = localTransform;
+                }
+
+                // Сбрасываем флаг, теперь данные актуальны
+                _isTransformDirty = false;
+            }
+
+            return _cachedWorldTransform;
+        }
+    }
+    
+    protected void InvalidateTransform()
+    {
+        // Если уже помечен, ничего не делаем, чтобы избежать лишней работы
+        if (_isTransformDirty)
+        {
+            return;
+        }
+
+        _isTransformDirty = true;
+
+        // Рекурсивно инвалидируем всех визуальных потомков
+        foreach (var child in VisualChildren)
+        {
+            // Предполагая, что у потомка тоже есть этот метод
+            (child as UIComponent)?.InvalidateTransform();
+        }
+    }
+
     
     public IReadOnlyCollection<IUIComponent> GetVisualDescendants()
     {

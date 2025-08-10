@@ -6,7 +6,7 @@ namespace Adamantium.UI.Core;
 /// <summary>
 /// Defines a rectangle, which can be transformed by a matrix
 /// </summary>
-public struct Rect
+public struct Rect : IEquatable<Rect>
 {
    /// <summary>
    /// An empty rectangle.
@@ -474,5 +474,10 @@ public struct Rect
       double.Parse(parsedValues[2], CultureInfo.InvariantCulture), 
       double.Parse(parsedValues[3], CultureInfo.InvariantCulture));
       return rect;
+   }
+
+   public bool Equals(Rect other)
+   {
+      return X.Equals(other.X) && Y.Equals(other.Y) && Width.Equals(other.Width) && Height.Equals(other.Height);
    }
 }

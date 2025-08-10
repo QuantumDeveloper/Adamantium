@@ -34,6 +34,10 @@ public interface IWindow : IRootVisualComponent, IContentControl
     Vector2 ScreenToClient(Vector2 p);
 
     Vector2 ClientToScreen(Vector2 p);
+    
+    double Left { get; set; }
+    
+    double Top { get; set; }
 
     event SizeChangedEventHandler ClientSizeChanged;
     event EventHandler<WindowClosingEventArgs> Closing;

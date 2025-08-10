@@ -6,29 +6,64 @@ namespace Adamantium.UI.Core.Data;
 public class BindingExpression : BindingExpressionBase
 {
    public object DataSource { get; set; }
-   public Binding ParentBinding { get; set; }
    public String SourcePropertyName { get; set; }
    public object ResolvedSource { get; set; }
+   
+   public Binding Binding { get; set; }
+   
+   public UpdateSourceTrigger UpdateSourceTrigger { get; set; }
+   
+   public BindingMode Mode { get; set; }
 
-   public void Init()
+   private BindingExpression(AdamantiumComponent target, AdamantiumProperty targetProperty, BindingBase bindingBase)
    {
-      if (ResolvedSource is INotifyPropertyChanged notify)
+      Target = target;
+      TargetProperty = targetProperty;
+      BindingBase = bindingBase;
+      Binding = (Binding)bindingBase;
+      UpdateSourceTrigger = Binding.UpdateSourceTrigger;
+      Mode = Binding.Mode;
+   }
+
+   private void Init()
+   {
+      if (ResolvedSource is INotifyPropertyChanged notify) 
       {
          notify.PropertyChanged += SourcePropertyChanged;
       }
 
-      Target.PropertyChanged += TargetPropertyChanged;
+      if (Binding.Mode == BindingMode.TwoWay)
+      {
+         Target.PropertyChanged += TargetPropertyChanged;
+      }
    }
 
-   internal static BindingExpressionBase CreateBindingExpression()
+   private void DeInit()
    {
-      return new BindingExpression();
+      if (ResolvedSource is INotifyPropertyChanged notify)
+      {
+         notify.PropertyChanged -= SourcePropertyChanged;
+      }
+
+      Target.PropertyChanged -= TargetPropertyChanged;
+   }
+
+   public static BindingExpressionBase CreateBindingExpression(AdamantiumComponent target, AdamantiumProperty targetProperty,
+      BindingBase bindingBase)
+   {
+      var expression = new BindingExpression(target, targetProperty, bindingBase);
+      expression.Init();
+      return expression;
    }
 
    private void TargetPropertyChanged(object sender, AdamantiumPropertyChangedEventArgs e)
    {
       IsDirty = true;
-      UpdateSource();
+      if (Mode == BindingMode.TwoWay)
+      {
+         UpdateSource();
+      }
+
       IsDirty = false;
    }
 
@@ -55,5 +90,10 @@ public class BindingExpression : BindingExpressionBase
       
       var sourceValue = ResolvedSource.GetType().GetProperty(SourcePropertyName)?.GetValue(ResolvedSource);
       Target.SetEffectiveValue(TargetProperty, sourceValue);
+   }
+
+   public override void Close()
+   {
+      DeInit();
    }
 }

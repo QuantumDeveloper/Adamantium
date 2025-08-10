@@ -4,13 +4,15 @@ namespace Adamantium.UI.Core.Data;
 
 public abstract class BindingBase: MarkupExtension, ICloneable
 {
-   public int Delay { get; set; }
+   public uint Delay { get; set; }
 
    public object FallbackValue { get; set; }
 
    public string StringFormat { get; set; }
 
    public object TargetNullValue { get; set; }
+   
+   public bool IsAsync { get; set; }
    
    public override object ProvideObject(MarkupContext context)
    {

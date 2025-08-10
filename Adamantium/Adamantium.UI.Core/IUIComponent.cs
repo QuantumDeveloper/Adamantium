@@ -17,7 +17,7 @@ public interface IUIComponent : IFundamentalUIComponent
     Boolean IsHitTestVisible { get; set; }
     bool IsGeometryValid { get; }
     Size RenderSize { get; set; }
-    Vector2 Location { get; }
+    //Vector2 Location { get; }
     Visibility Visibility { get; set; }
     Rect Bounds { get; set; }
     Rect ClipRectangle { get; }
@@ -30,6 +30,8 @@ public interface IUIComponent : IFundamentalUIComponent
     Transform LayoutTransform { get; set; }
     
     Transform RenderTransform { get; set; }
+
+    Matrix4x4F WorldTransform { get; }
 
     IReadOnlyCollection<IUIComponent> GetVisualDescendants();
         

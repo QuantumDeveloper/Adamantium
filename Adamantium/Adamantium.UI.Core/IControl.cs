@@ -1,14 +1,8 @@
-using Adamantium.UI.Core.Templates;
+using Adamantium.UI.Core.Controls;
 
 namespace Adamantium.UI.Core;
 
-public interface IControl : IInputComponent
+public interface IControl : ITemplatedUIComponent
 {
-    ControlTemplate Template { get; set; }
-
-    void OnApplyTemplate();
     
-    void OnRemoveTemplate();
-
-    IAdamantiumComponent GetTemplateChild(string name);
 }

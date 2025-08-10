@@ -6,7 +6,7 @@ public class PropertyTrigger : TriggerBase
 {
     private IFundamentalUIComponent component;
     
-    public AdamantiumProperty Property { get; set; }
+    public string Property { get; set; }
     
     public Object Value { get; set; }
     
@@ -14,12 +14,12 @@ public class PropertyTrigger : TriggerBase
     {
         component = uiComponent;
         Theme = theme;
-        Property.NotifyChanged += PropertyChanged;
+        //Property.NotifyChanged += PropertyChanged;
     }
 
     public override void Remove(IFundamentalUIComponent uiComponent)
     {
-        Property.NotifyChanged -= PropertyChanged;
+        //Property.NotifyChanged -= PropertyChanged;
         foreach (var setter in Setters)
         {
             RemoveSetter(setter, uiComponent);

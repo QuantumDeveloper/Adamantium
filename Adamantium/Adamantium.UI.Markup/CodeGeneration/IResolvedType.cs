@@ -34,6 +34,8 @@ public interface IResolvedType
 
     bool ImplementsInterface(string interfaceName);
 
+    bool IsCollection();
+
     IResolvedType GetInterface(string interfaceName);
 
     bool InheritsFromMarkupExtension(string fullyQualifiedName);
@@ -43,4 +45,6 @@ public interface IResolvedType
     ResolvedSpecialType SpecialType { get; }
 
     ResolvedTypeKind TypeKind { get; }
+    
+    ResolvedMemberKind MemberKind { get; }
 }

@@ -4,7 +4,7 @@ namespace Adamantium.UI.Core.Media;
 
 public static class Brushes
 {
-   public static readonly SolidColorBrush Transparent = new SolidColorBrush(Colors.Transparent);
+   public static readonly SolidColorBrush Transparent = new SolidColorBrush(Colors.Transparent, 0);
 
    public static readonly SolidColorBrush AliceBlue = new SolidColorBrush(Colors.AliceBlue);
 

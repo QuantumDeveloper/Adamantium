@@ -24,7 +24,7 @@ public class Setter : ISetter, IEquatable<Setter>
         switch (Value)
         {
             case BindingBase binding:
-                component.SetBinding(Property, binding);
+                component.SetBinding(Property, (BindingBase)binding.Clone());
                 break;
             case ResourceReference resourceReference:
                 if (theme.GetResource(resourceReference.Name) == null)

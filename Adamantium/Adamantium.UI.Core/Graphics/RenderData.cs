@@ -5,17 +5,17 @@ namespace Adamantium.UI.Core.Graphics;
 
 public class RenderData
 {
-    public RenderData(float opacity, Vector2 location, bool clipToBounds, Rect clipRect)
+    public RenderData(float opacity, Matrix4x4F transform, bool clipToBounds, Rect clipRect)
     {
+        TransformMatrix = transform;
         Opacity = opacity;
-        Location = location;
         ClipToBounds = clipToBounds;
         ClipRect = clipRect;
     }
 
     public float Opacity { get; }
     
-    public Vector2 Location { get; }
+    public Matrix4x4F TransformMatrix { get; set; }
     
     public bool ClipToBounds { get; }
     

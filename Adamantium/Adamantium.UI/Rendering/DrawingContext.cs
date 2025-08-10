@@ -25,7 +25,9 @@ public class DrawingContext : IDrawingContext, IDrawingContextInternal, IDrawing
 
    protected void CreateCommand(object payload)
    {
-      var command = new DrawCommand(_currentComponent.RenderId, 
+      var command = new DrawCommand(
+         _currentComponent, 
+         _currentComponent.RenderId, 
          payload, 
          GetRenderDataFromComponent());
       drawCommands.Add(command);
@@ -121,7 +123,7 @@ public class DrawingContext : IDrawingContext, IDrawingContextInternal, IDrawing
    private RenderData GetRenderDataFromComponent()
    {
       var renderData = new RenderData((float)_currentComponent.Opacity, 
-         _currentComponent.Location,
+         _currentComponent.WorldTransform,
          _currentComponent.ClipToBounds, 
          _currentComponent.ClipRectangle);
       //renderData.CustomEffect = _currentComponent.Effect TODO: implement custom effects for controls
