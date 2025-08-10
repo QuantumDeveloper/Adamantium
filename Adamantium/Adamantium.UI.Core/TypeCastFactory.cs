@@ -1,7 +1,6 @@
 using Adamantium.Core.TypeParsing;
 using Adamantium.Mathematics;
 using Adamantium.UI.Core.Media;
-using Adamantium.UI.Core.TypeParsers;
 
 namespace Adamantium.UI.Core;
 
@@ -14,15 +13,19 @@ public static class TypeCastFactory
         
         if (finalType.IsPrimitive)
         {
+            if (finalType == typeof(Double) && input.ToString() == "Auto")
+            {
+                return Double.NaN;
+            }
             return Convert.ChangeType(input, finalType);
         }
         if (finalType.IsSubclassOf(typeof(Brush)) || finalType == typeof(Brush))
         {
-            return new BrushParser().Parse(input.ToString());
+            return TypeParser.Parse<Brush>(input.ToString());
         }
         if (finalType == typeof(Thickness))
         {
-            return new ThicknessParser().Parse(input.ToString());
+            return TypeParser.Parse<Thickness>(input.ToString());
         }
 
         throw new NotSupportedException($"Casting {input} to {finalType.Name} is not supported");

@@ -8,7 +8,7 @@ public abstract class BindingExpressionBase
 
    public bool IsDirty { get; set; }
 
-   public BindingBase ParentBindingBase { get; }
+   public BindingBase BindingBase { get; internal set;}
 
    public BindingStatus Status { get; internal set; }
 
@@ -21,5 +21,7 @@ public abstract class BindingExpressionBase
 
    public virtual void UpdateTarget()
    { }
+
+   public abstract void Close();
 
 }

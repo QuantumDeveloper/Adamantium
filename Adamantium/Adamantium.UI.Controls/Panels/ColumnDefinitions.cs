@@ -11,4 +11,10 @@ public class ColumnDefinitions:TrackingCollection<ColumnDefinition>
    {
          
    }
+
+   protected override void InsertItem(int index, ColumnDefinition item)
+   {
+      ArgumentNullException.ThrowIfNull(item);
+      base.InsertItem(index, item);
+   }
 }

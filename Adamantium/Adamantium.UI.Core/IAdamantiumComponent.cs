@@ -82,6 +82,8 @@ public interface IAdamantiumComponent : IComponent
     /// <param name="value">New value.</param>
     void SetEffectiveValue(AdamantiumProperty property, object value);
 
+    AdamantiumProperty GetProperty(string propertyName);
+
     public void SetStyleValue(string propertyName, object value, Style style);
     
     public void SetStyleValue(AdamantiumProperty property, object value, Style style);

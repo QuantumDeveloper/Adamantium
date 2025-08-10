@@ -3,6 +3,7 @@ using Adamantium.Core;
 using Adamantium.Graphics.Core;
 using Adamantium.Mathematics;
 using Adamantium.ProceduralGeometry;
+using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
 using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.Media.Imaging;
@@ -44,10 +45,12 @@ public abstract class RenderUnit<TPayload> : DisposableObject, IRenderUnit where
     protected IDrawCommand DrawCommand { get; set; }
     protected IGraphicsDevice GraphicsDevice { get; }
 
-    public void Update(Matrix4x4F projection)
+    public IUIComponent Component => DrawCommand.Component;
+
+    public void Update(Matrix4x4F transform, Matrix4x4F projection)
     {
-        GeometryRenderer?.Update(projection);
-        StrokeRenderer?.Update(projection);
+        GeometryRenderer?.Update(transform, projection);
+        StrokeRenderer?.Update(transform, projection);
     }
 
     public virtual void Render()
@@ -78,7 +81,7 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
     {
         if (drawCommand.Payload is not GeometryPayload inputPayload) return;
         
-        Console.WriteLine($"Location: {drawCommand.RenderData.Location}");
+        Console.WriteLine($"Location: {drawCommand.RenderData.TransformMatrix.TranslationVector}");
         if (Payload.RequiresBufferRebuild(inputPayload))
         {
             inputPayload.Geometry.ProcessGeometry(GeometryType.Both);
@@ -142,13 +145,13 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
     {
         if (drawCommand.Payload is not RectanglePayload inputPayload) return;
         
-        var rectangleGeometry = new RectangleGeometry(Payload.DestinationRect, Payload.CornerRadius);
+        var rectangleGeometry = new RectangleGeometry(inputPayload.DestinationRect, inputPayload.CornerRadius);
         if (Payload.RequiresBufferRebuild(inputPayload))
         {
             rectangleGeometry.ProcessGeometry(GeometryType.Both);
             GeometryRenderer?.Dispose();
             GeometryRenderer = null;
-            GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, rectangleGeometry.Mesh, Payload.Brush);
+            GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, rectangleGeometry.Mesh, inputPayload.Brush);
         }
         DrawCommand = drawCommand;
         Payload = inputPayload;
@@ -181,7 +184,7 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
     {
         if (drawCommand.Payload is not EllipsePayload inputPayload) return;
         
-        var rectangleGeometry = new EllipseGeometry(Payload.DestinationRect, Payload.StartAngle, Payload.SweepAngle,
+        var rectangleGeometry = new EllipseGeometry(inputPayload.DestinationRect, inputPayload.StartAngle, inputPayload.SweepAngle,
             Payload.EllipseType);
         if (Payload.RequiresBufferRebuild(inputPayload))
         {
@@ -224,7 +227,7 @@ public class ImageRenderUnit : RenderUnit<ImagePayload>
     {
         if (drawCommand.Payload is not ImagePayload inputPayload) return;
         
-        var rectangleGeometry = new RectangleGeometry(Payload.DestinationRect, Payload.CornerRadius);
+        var rectangleGeometry = new RectangleGeometry(inputPayload.DestinationRect, inputPayload.CornerRadius);
         if (Payload.RequiresBufferRebuild(inputPayload))
         {
             rectangleGeometry.ProcessGeometry(GeometryType.Both);
@@ -272,19 +275,19 @@ public class TextRenderUnit : RenderUnit<TextPayload>
         
         if (Payload.RequiresBufferRebuild(inputPayload))
         {
-            var rectangleGeometry = new RectangleGeometry(Payload.DesiredSize);
-            Payload.TextLayout.Update(GraphicsDevice);
+            var rectangleGeometry = new RectangleGeometry(inputPayload.DesiredSize);
+            inputPayload.TextLayout.Update(GraphicsDevice);
             rectangleGeometry.ProcessGeometry(GeometryType.Both);
             GeometryRenderer?.Dispose();
             GeometryRenderer = new TextRenderComponent(GraphicsDevice, 
                 UIBasicEffect,
                 rectangleGeometry.Mesh,
                 ResourceFactory.GetFontRenderer(GraphicsDevice), 
-                Payload.TextLayout,
-                Payload.TextRenderingParameters, 
-                Payload.Background, 
-                Payload.Foreground,
-                Payload.Stroke);
+                inputPayload.TextLayout,
+                inputPayload.TextRenderingParameters, 
+                inputPayload.Background, 
+                inputPayload.Foreground,
+                inputPayload.Stroke);
         }
             
         DrawCommand = drawCommand;

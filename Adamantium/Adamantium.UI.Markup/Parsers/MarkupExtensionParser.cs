@@ -80,7 +80,7 @@ public class MarkupExtensionParser
             return Parse(value, info, namespaceMappings);
         }
 
-        return new AumlAstMarkupExtensionLiteral(info) { Text = value  };
+        return new AumlAstMarkupExtensionLiteral(info, value);
     }
     
     private static List<string> SplitByCommasRespectingBraces(string input)

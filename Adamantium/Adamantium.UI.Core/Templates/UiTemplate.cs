@@ -29,4 +29,9 @@ public abstract class UiTemplate
     {
         return _nameScope.Find(name);
     }
+
+    public void SetBindingInstruction()
+    {
+        
+    }
 }

@@ -2,6 +2,6 @@
 
 namespace Adamantium.UI.Core.Resources;
 
-public class SetterCollection:AdamantiumCollection<ISetter>
+public class SetterCollection : AdamantiumCollection<ISetter>
 {
 }

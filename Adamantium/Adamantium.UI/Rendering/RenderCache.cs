@@ -22,6 +22,7 @@ public class RenderCache
     public RenderCache(IDrawingContext context, IRenderUnitFactory renderUnitFactory)
     {
         _drawingContext = context;
+        _drawingContextInternal = (IDrawingContextInternal)context;
         _renderUnitFactory = renderUnitFactory;
     }
     
@@ -35,7 +36,8 @@ public class RenderCache
     {
         foreach (var unit in _renderUnits)
         {
-            unit.Update(projectionMatrix);
+            var transform = unit.Component.WorldTransform;
+            unit.Update(transform, projectionMatrix);
             unit.Render();
         }
     }
@@ -44,17 +46,28 @@ public class RenderCache
     {
         _renderUnits.Clear();
         var projectionMatrix = visualRoot.GetProjectionMatrix();
-        var queue = new Queue<IUIComponent>();
-        queue.Enqueue(visualRoot);
-        while (queue.Count > 0)
+        var stack = new Stack<IUIComponent>();
+        stack.Push(visualRoot);
+        while (stack.Count > 0)
         {
-            var component = queue.Dequeue();
+            var component = stack.Pop();
                 
             if (component.Visibility != Visibility.Visible) return;
 
             _drawingContextInternal.Clear();
             component.Render(_drawingContext);
-            var drawCommands = _drawingContextInternal.GetDrawCommands();
+            ProcessRenderCommands(component, projectionMatrix);
+
+            foreach (var uiComponent in component.VisualChildren.Reverse())
+            {
+                stack.Push(uiComponent);
+            }
+        }
+    }
+
+    private void ProcessRenderCommands(IUIComponent component, Matrix4x4F projectionMatrix)
+    {
+        var drawCommands = _drawingContextInternal.GetDrawCommands();
             if (drawCommands.Any())
             {
                 bool isNewControl = false;
@@ -109,12 +122,6 @@ public class RenderCache
                     _renderUnits.AddRange(units);
                 }
             }
-
-            foreach (var visual in component.VisualChildren)
-            {
-                queue.Enqueue(visual);
-            }
-        }
     }
 
     private void OnComponentDetachedFromVisualTree(object sender, VisualTreeAttachmentEventArgs e)

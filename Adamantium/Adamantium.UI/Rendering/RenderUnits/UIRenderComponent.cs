@@ -60,8 +60,9 @@ public abstract class UIRenderComponent : DisposableObject
     public ColorBlendEquationEXT ColorBlendEquation { get; set; }
 
 
-    public void Update(Matrix4x4F projectionMatrix)
+    public void Update(Matrix4x4F transform, Matrix4x4F projectionMatrix)
     {
+        RenderData.TransformMatrix = transform;
         RenderData.ProjectionMatrix = projectionMatrix;
     }
 
@@ -102,7 +103,8 @@ public class StrokeRenderComponent : UIRenderComponent
 
     public override void Render()
     {
-        var world = Matrix4x4F.Translation((float)RenderData.Location.X, (float)RenderData.Location.Y, 5);
+        //var world = Matrix4x4F.Translation((float)RenderData.Location.X, (float)RenderData.Location.Y, 5);
+        var world = RenderData.TransformMatrix;
         UIBasicEffect.Wvp.SetValue(world * RenderData.ProjectionMatrix);
         UIBasicEffect.Opacity.SetValue(RenderData.Opacity);
         if (Pen.Brush is SolidColorBrush solidColor)
@@ -125,7 +127,7 @@ public class GeometryRenderComponent : UIRenderComponent
     
     public override void Render()
     {
-        var world = Matrix4x4F.Translation((float)RenderData.Location.X, (float)RenderData.Location.Y, 5);
+        var world = RenderData.TransformMatrix;
         UIBasicEffect.Wvp.SetValue(world * RenderData.ProjectionMatrix);
         UIBasicEffect.Opacity.SetValue(RenderData.Opacity);
         if (Background is SolidColorBrush solidColor)
@@ -158,7 +160,7 @@ public class ImageRenderComponent : UIRenderComponent
 
     public override void Render()
     {
-        var world = Matrix4x4F.Translation((float)RenderData.Location.X, (float)RenderData.Location.Y, 5);
+        var world = RenderData.TransformMatrix;;
         UIBasicEffect.Wvp.SetValue(world * RenderData.ProjectionMatrix);
         UIBasicEffect.Opacity.SetValue(RenderData.Opacity);
         

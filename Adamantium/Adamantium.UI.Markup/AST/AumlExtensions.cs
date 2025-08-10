@@ -1,4 +1,6 @@
-﻿namespace Adamantium.UI.Markup.AST
+﻿using Adamantium.UI.Markup.AST.MarkupExtension;
+
+namespace Adamantium.UI.Markup.AST
 {
     public static class AumlExtensions
     {
@@ -65,6 +67,15 @@
         public static bool IsTextNode(this IAumlAstValueNode valueNode)
         {
             return valueNode is AumlAstTextNode;
+        }
+
+        public static string GetTextValue(this IAumlAstValueNode valueNode)
+        {
+            return valueNode switch
+            {
+                AumlAstTextNode textNode => textNode.Text,
+                _ => string.Empty
+            };
         }
 
         public static int GetPropertyValuesCount(this IAumlAstNode node)

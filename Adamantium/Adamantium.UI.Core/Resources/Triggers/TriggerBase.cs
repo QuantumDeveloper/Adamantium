@@ -51,6 +51,12 @@ public abstract class TriggerBase : ITrigger
 
     public SetterCollection Setters { get; set; }
 
+    public void Add(ISetter setter)
+    {
+        Setters ??= [];
+        Setters.Add(setter);
+    }
+
     public abstract void Apply(IFundamentalUIComponent uiComponent, ITheme theme);
 
     public abstract void Remove(IFundamentalUIComponent uiComponent);

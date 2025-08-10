@@ -80,8 +80,8 @@ public class RoslynResolvedType : IResolvedType
 
     public bool HasAttribute(string attributeName)
     {
-        return _symbol.GetAttributes().Any(attr =>
-            attr.AttributeClass?.ToDisplayString() == attributeName);
+        var result = _symbol.GetAttributes().Any(attr => (attr.AttributeClass.ToDisplayString().EndsWith(attributeName)));
+        return result;
     }
 
     public IResolvedAttribute GetAttribute(string attributeName)
@@ -122,6 +122,11 @@ public class RoslynResolvedType : IResolvedType
     {
         var @interface = _symbol.AllInterfaces.FirstOrDefault(x => x.Name == interfaceName);
         return @interface != null;
+    }
+
+    public bool IsCollection()
+    {
+        return ImplementsInterface("ICollection") || ImplementsInterface("IList");
     }
 
     public IResolvedType GetInterface(string interfaceName)
@@ -183,10 +188,16 @@ public class RoslynResolvedType : IResolvedType
             Microsoft.CodeAnalysis.SpecialType.System_Int64 => ResolvedSpecialType.System_Int64,
             Microsoft.CodeAnalysis.SpecialType.System_UInt16 => ResolvedSpecialType.System_UInt16,
             Microsoft.CodeAnalysis.SpecialType.System_UInt32 => ResolvedSpecialType.System_UInt32,
-            Microsoft.CodeAnalysis.SpecialType.System_UInt64 => ResolvedSpecialType.System_UInt16,
+            Microsoft.CodeAnalysis.SpecialType.System_UInt64 => ResolvedSpecialType.System_UInt64,
+            Microsoft.CodeAnalysis.SpecialType.System_Single => ResolvedSpecialType.System_Single,
+            Microsoft.CodeAnalysis.SpecialType.System_Decimal => ResolvedSpecialType.System_Decimal,
+            Microsoft.CodeAnalysis.SpecialType.System_SByte => ResolvedSpecialType.System_SByte,
+            Microsoft.CodeAnalysis.SpecialType.System_Byte => ResolvedSpecialType.System_Byte,
             Microsoft.CodeAnalysis.SpecialType.System_String => ResolvedSpecialType.System_String,
             Microsoft.CodeAnalysis.SpecialType.System_Object => ResolvedSpecialType.System_Object,
+            Microsoft.CodeAnalysis.SpecialType.System_Boolean => ResolvedSpecialType.System_Boolean,
             Microsoft.CodeAnalysis.SpecialType.System_Enum => ResolvedSpecialType.System_Enum,
+            Microsoft.CodeAnalysis.SpecialType.System_Array => ResolvedSpecialType.System_Array,
         };
 
     public ResolvedTypeKind TypeKind =>
@@ -197,6 +208,16 @@ public class RoslynResolvedType : IResolvedType
             Microsoft.CodeAnalysis.TypeKind.Struct => ResolvedTypeKind.Struct,
             Microsoft.CodeAnalysis.TypeKind.Interface => ResolvedTypeKind.Interface,
             Microsoft.CodeAnalysis.TypeKind.Enum => ResolvedTypeKind.Enum,
+        };
+    
+    public ResolvedMemberKind MemberKind =>
+        _symbol.Kind switch
+        {
+            SymbolKind.Field => ResolvedMemberKind.Field,
+            SymbolKind.Property => ResolvedMemberKind.Property,
+            SymbolKind.Method => ResolvedMemberKind.Method,
+            SymbolKind.Event => ResolvedMemberKind.Event,
+            _ => ResolvedMemberKind.Unknown
         };
 
     public EntityType EntityType

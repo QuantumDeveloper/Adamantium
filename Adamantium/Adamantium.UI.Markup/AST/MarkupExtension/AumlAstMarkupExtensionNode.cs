@@ -38,18 +38,9 @@ public class MarkupArgument : AumlAstNode, IAumlAstMarkupExtensionArgument
     }
 }
 
-public class AumlAstMarkupExtensionLiteral : AumlAstNode, IAumlAstMarkupExtensionLiteral
+public class AumlAstMarkupExtensionLiteral : AumlAstTextNode, IAumlAstMarkupExtensionLiteral
 {
-    public AumlAstMarkupExtensionLiteral(IAumlLineInfo info) : base(info)
+    public AumlAstMarkupExtensionLiteral(IAumlLineInfo info, string text) : base(info, text)
     {
-    }
-
-    public IAumlAstTypeReference TypeReference { get; set; }
-    
-    public string Text { get; set; }
-
-    public override string ToString()
-    {
-        return Text;
     }
 }

@@ -14,6 +14,7 @@ public interface IFundamentalUIComponent : IAdamantiumComponent, IDispatcherComp
     public void DetachStyles(params Style[] styles);
     public object DataContext { get; set; }
     public IFundamentalUIComponent LogicalParent { get; }
+    public AdamantiumComponent TemplatedParent { get; }
 
     public event AdamantiumPropertyChangedEventHandler DataContextChanged;
 

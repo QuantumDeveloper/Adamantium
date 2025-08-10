@@ -176,7 +176,6 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         set => SetValue(property, value);
     }
     
-    
 
     /// <summary>
     /// Gets the default value for a property.
@@ -284,6 +283,11 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         }
 
         return false;
+    }
+
+    public AdamantiumProperty GetProperty(string propertyName)
+    {
+        return AdamantiumPropertyMap.FindRegistered(GetType(), propertyName);
     }
 
     public void SetStyleValue(string propertyName, object value, Style style)

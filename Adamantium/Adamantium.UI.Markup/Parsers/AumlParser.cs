@@ -72,7 +72,7 @@ public class ParserContext
 
     private AumlAstObjectNode ParseAumlNode(XElement element, bool isRoot)
     {
-        var type = element.GetTypeReference();
+        var targetType = element.GetTypeReference();
         // if (type.Name is "ControlTemplate" or "DataTemplate" or "HierarchicalDataTemplate")
         // {
         //     var templateNode = new AumlAstTemplateNode(element.ToLineInfo(), type, element.ToString());
@@ -81,16 +81,16 @@ public class ParserContext
         // }
 
         AumlAstObjectNode objectNode = null;
-        switch (type.Name)
+        switch (targetType.Name)
         {
             case "ControlTemplate":
             case "DataTemplate":
             case "HierarchicalDataTemplate":
-                var templateNode = new AumlAstTemplateNode(element.ToLineInfo(), type, element.ToString());
+                var templateNode = new AumlAstTemplateNode(element.ToLineInfo(), targetType, element.ToString());
                 objectNode = templateNode;
                 break;
             default:
-                objectNode = new AumlAstObjectNode(element.ToLineInfo(), type);
+                objectNode = new AumlAstObjectNode(element.ToLineInfo(), targetType);
                 break;
         }
 
@@ -122,11 +122,11 @@ public class ParserContext
                     isAttachedProperty = true;
                     var names = propName.Split('.');
                     propName = names[1];
-                    ownerType = new AumlAstXmlTypeReference(element.ToLineInfo(), type.Namespace, names[0]);
+                    ownerType = new AumlAstXmlTypeReference(element.ToLineInfo(), targetType.Namespace, names[0]);
                 }
 
                 var propertyNode = new AumlAstPropertyNode(element.ToLineInfo(), 
-                    new AumlAstPropertyReference(attribute.ToLineInfo(), isAttachedProperty, objectNode, ownerType, type, propName),
+                    new AumlAstPropertyReference(attribute.ToLineInfo(), isAttachedProperty, objectNode, ownerType, targetType, propName),
                     ParseTextOrMarkupExtension(attribute.Value, element, attribute.ToLineInfo()));
                 objectNode.Children.Add(propertyNode);
             }
@@ -144,7 +144,7 @@ public class ParserContext
                         false,
                         objectNode,
                         new AumlAstXmlTypeReference(elNode.ToLineInfo(), elNode.Name.NamespaceName, names[0]),
-                        type,
+                        targetType,
                         names[1]),
                     ParseValueNodes(elNode)
                     );

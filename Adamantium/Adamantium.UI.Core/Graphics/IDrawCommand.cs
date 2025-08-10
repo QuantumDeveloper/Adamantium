@@ -2,6 +2,7 @@
 
 public interface IDrawCommand
 {
+    IUIComponent Component { get; }
     Guid Id { get; }
     
     RenderData RenderData { get; }

@@ -1,6 +1,5 @@
 ﻿using System.Collections.Specialized;
 using System.Diagnostics;
-using Adamantium.Mathematics;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
 using Adamantium.UI.Core.Media;
@@ -194,7 +193,7 @@ public class Grid: Panel
    private bool IsDefinitionsEmpty =>
       (rowDefinitions == null || rowDefinitions.Count == 0) && (columnDefinitions == null || columnDefinitions.Count == 0);
 
-   //Zero based Group index
+   //Zero-based Group index
    private const int MaxGroupIndex = 2;
    private const double MaxStartsCount = 1e30; //Constraint to 
    private const double MaxDefinitionSize = 1e27; //Maximum possible size for each Grid definition
@@ -316,8 +315,8 @@ public class Grid: Panel
       {
          for (int i = 0; i < colCount; ++i)
          {
-            ColumnDefinition def = ColumnDefinitions[i];
-            GridLength width = def.Width;
+            var def = ColumnDefinitions[i];
+            var width = def.Width;
 
             double margin = IndividualColumnSpacing ? def.Margin : ColumnSpacing;
 
@@ -457,7 +456,8 @@ public class Grid: Panel
    {
       measureTimer = Stopwatch.StartNew();
       PrepareInnerData(availableSize);
-      return MeasureGrid(availableSize);
+      var size = MeasureGrid(availableSize);
+      return size;
    }
 
    /// <summary>
@@ -708,8 +708,8 @@ public class Grid: Panel
       
       foreach (var cell in list)
       {
-         GridSegment row = rowSegments[cell.RowIndex];
-         GridSegment col = colSegments[cell.ColumnIndex];
+         var row = rowSegments[cell.RowIndex];
+         var col = colSegments[cell.ColumnIndex];
          bool ignoreMeasuredRow = false;
          bool ignoreMeasuredColumn = false;
 

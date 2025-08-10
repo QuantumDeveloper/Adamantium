@@ -1,5 +1,4 @@
-﻿using Adamantium.Mathematics;
-using Adamantium.UI.Core;
+﻿using Adamantium.UI.Core;
 using Adamantium.UI.Core.RoutedEvents;
 
 namespace Adamantium.UI.Controls.Base;
@@ -8,6 +7,7 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
 {
     private Size? _previousMeasure;
     private Rect? _previousArrange;
+    
 
     static MeasurableUIComponent()
     {
@@ -313,16 +313,16 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
             _previousArrange = rect;
         }
         
-        if (LogicalParent != null)
-        {
-            Location = Bounds.Location + ((IUIComponent)LogicalParent).Location;
-            ClipPosition = ClipRectangle.Location + ((IUIComponent)LogicalParent).Location;
-        }
-        else
-        {
-            Location = Bounds.Location;
-            ClipPosition = ClipRectangle.Location;
-        }
+        // if (LogicalParent != null)
+        // {
+        //     Location = Bounds.Location + ((IUIComponent)LogicalParent).Location;
+        //     ClipPosition = ClipRectangle.Location + ((IUIComponent)LogicalParent).Location;
+        // }
+        // else
+        // {
+        //     Location = Bounds.Location;
+        //     ClipPosition = ClipRectangle.Location;
+        // }
     }
 
     /// <summary>
@@ -492,7 +492,12 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
             ClipRectangle = new Rect(clipOriginX, clipOriginY,
                 size.Width, size.Height);
 
-            Bounds = new Rect(originX, originY, ActualWidth, ActualHeight);
+            var newBounds = new Rect(originX, originY, ActualWidth, ActualHeight);
+            if (Bounds != newBounds)
+            {
+                Bounds = newBounds;
+                InvalidateTransform();
+            }
 
             if (sizeChanged)
             {
@@ -542,6 +547,7 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
         if (!IsArrangeValid) return;
         
         IsArrangeValid = false;
+        IsGeometryValid = false;
 
         _previousArrange = null;
 
@@ -551,5 +557,4 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
         }
 
     }
-
 }

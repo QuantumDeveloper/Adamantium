@@ -167,23 +167,26 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
     }
 
     public IFundamentalUIComponent LogicalParent => parent;
+    
+    public AdamantiumComponent TemplatedParent { get; internal set; }
 
+    public BindingExpression SetBinding(string property, BindingBase bindingBase)
+    {
+        var adamantiumProperty = GetProperty(property);
+        return SetBinding(adamantiumProperty, bindingBase);
+    }
+    
     public BindingExpression SetBinding(AdamantiumProperty property, BindingBase bindingBase)
     {
         return null;
     }
-
-    public BindingExpression SetBinding(string property, BindingBase bindingBase)
+    
+    public void RemoveBinding(string property)
     {
-        throw new NotImplementedException();
+        var adamantiumProperty = GetProperty(property);
     }
 
     public void RemoveBinding(AdamantiumProperty property)
-    {
-        throw new NotImplementedException();
-    }
-
-    public void RemoveBinding(string property)
     {
         throw new NotImplementedException();
     }

@@ -5,21 +5,22 @@
     <Style Selector="Button">
         <Setter Property="Width" Value="Auto"/>
         <Setter Property="Height" Value="Auto"/>
-        <Setter Property="Background" Value="DarkGrey"/>
+        <Setter Property="Background" Value="DarkGray"/>
         <Setter Property="BorderBrush" Value="Red" />
-    </Style>   
+    </Style>
     
     <Style Selector="Button">
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <controls:Grid>
+                    <controls:Grid  HorizontalAlignment="Center" VerticalAlignment="Center">
                         <controls:Border x:Name="InnerBorder" 
-                                CornerRadius="2" 
-                                Background="DarkGrey"
-                                BorderBrush="{ResourceReference ApproveBrush}"
-                                BorderThickness="2"
-                        />                            
+                                Margin="10"
+                                CornerRadius="4" 
+                                Background="DarkOrange"
+                                BorderBrush="{ResourceReference DeclineBrush}"
+                                BorderThickness="4"
+                        />
                     </controls:Grid>
                     <ControlTemplate.Triggers>
                         <PropertyTrigger Property="IsMouseOver" Value="true">

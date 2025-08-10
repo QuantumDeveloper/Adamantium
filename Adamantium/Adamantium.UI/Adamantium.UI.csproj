@@ -59,24 +59,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <Compile Remove="obj\**" />
-	</ItemGroup>
-
-	<ItemGroup>
-	  <EmbeddedResource Remove="obj\**" />
-	</ItemGroup>
-
-	<ItemGroup>
 	  <None Remove="obj\**" />
-	</ItemGroup>
-
-	<ItemGroup>
-	  <Folder Include="Controls\" />
-	  <Folder Include="Events\" />
-	</ItemGroup>
-
-	<ItemGroup>
-	  <AdditionalFiles Include="Effects\CommonData.fxh" />
-	  <AdditionalFiles Include="Effects\UIBasicEffect.fx" />
 	</ItemGroup>
 </Project>

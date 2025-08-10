@@ -68,7 +68,8 @@ public class GeometryRenderer : ComponentRenderer
         graphicsDevice.PrimitiveTopology = PrimitiveType;
         graphicsDevice.ColorBlendEquation = ColorBlendEquations.AlphaBlend;
 
-        var world = Matrix4x4F.Translation((float)component.Location.X, (float)component.Location.Y, 5);
+        //var world = Matrix4x4F.Translation((float)component.Location.X, (float)component.Location.Y, 5);
+        var world = component.WorldTransform;
 
         var effect = BasicEffect;
         effect.Wvp.SetValue(world * projectionMatrix);
