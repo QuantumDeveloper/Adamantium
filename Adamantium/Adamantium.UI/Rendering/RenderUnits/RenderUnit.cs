@@ -1,5 +1,4 @@
 ﻿using System;
-using Adamantium.Core;
 using Adamantium.Graphics.Core;
 using Adamantium.Mathematics;
 using Adamantium.ProceduralGeometry;
@@ -12,9 +11,13 @@ using Adamantium.UI.Rendering.Payloads;
 
 namespace Adamantium.UI.Rendering.RenderUnits;
 
-public abstract class RenderUnit<TPayload> : DisposableObject, IRenderUnit where TPayload : class
+public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUnit where TPayload : class
 {
-    protected RenderUnit(IDrawCommand command, IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, IResourceFactory resourceFactory)
+    protected RenderUnit(
+        IDrawCommand command, 
+        IGraphicsDevice graphicsDevice, 
+        UIBasicEffect uiBasicEffect,
+        IResourceFactory resourceFactory) : base(graphicsDevice)
     {
         DrawCommand = command;
         Payload = DrawCommand.Payload as TPayload;
@@ -22,7 +25,7 @@ public abstract class RenderUnit<TPayload> : DisposableObject, IRenderUnit where
         ResourceFactory = resourceFactory;
         UIBasicEffect = uiBasicEffect;
     }
-    
+
     public TPayload Payload { get; protected set; }
     
     public UIBasicEffect UIBasicEffect { get; }
@@ -85,8 +88,13 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
         if (Payload.RequiresBufferRebuild(inputPayload))
         {
             inputPayload.Geometry.ProcessGeometry(GeometryType.Both);
-            GeometryRenderer?.Dispose();
+            GeometryRenderer?.DeferDispose();
             GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, inputPayload.Geometry.Mesh, Payload.Brush);
+        }
+        else
+        {
+            var geometryRenderer = (GeometryRenderComponent)GeometryRenderer;
+            geometryRenderer.Background = inputPayload.Brush;
         }
             
         DrawCommand = drawCommand;
@@ -149,9 +157,13 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
         if (Payload.RequiresBufferRebuild(inputPayload))
         {
             rectangleGeometry.ProcessGeometry(GeometryType.Both);
-            GeometryRenderer?.Dispose();
-            GeometryRenderer = null;
+            GeometryRenderer?.DeferDispose();
             GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, rectangleGeometry.Mesh, inputPayload.Brush);
+        }
+        else
+        {
+            var renderer = (GeometryRenderComponent)GeometryRenderer;
+            renderer.Background = inputPayload.Brush;
         }
         DrawCommand = drawCommand;
         Payload = inputPayload;
@@ -189,7 +201,7 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
         if (Payload.RequiresBufferRebuild(inputPayload))
         {
             rectangleGeometry.ProcessGeometry(GeometryType.Both);
-            GeometryRenderer?.Dispose();
+            GeometryRenderer?.DeferDispose();
             GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, rectangleGeometry.Mesh,
                 inputPayload.Brush);
         }
@@ -231,7 +243,7 @@ public class ImageRenderUnit : RenderUnit<ImagePayload>
         if (Payload.RequiresBufferRebuild(inputPayload))
         {
             rectangleGeometry.ProcessGeometry(GeometryType.Both);
-            GeometryRenderer?.Dispose();
+            GeometryRenderer?.DeferDispose();
             if (Payload.Image is BitmapImage bitmapImage)
             {
                 var image = bitmapImage.GetOrCreateTexture(ResourceFactory);
@@ -278,7 +290,7 @@ public class TextRenderUnit : RenderUnit<TextPayload>
             var rectangleGeometry = new RectangleGeometry(inputPayload.DesiredSize);
             inputPayload.TextLayout.Update(GraphicsDevice);
             rectangleGeometry.ProcessGeometry(GeometryType.Both);
-            GeometryRenderer?.Dispose();
+            GeometryRenderer?.DeferDispose();
             GeometryRenderer = new TextRenderComponent(GraphicsDevice, 
                 UIBasicEffect,
                 rectangleGeometry.Mesh,

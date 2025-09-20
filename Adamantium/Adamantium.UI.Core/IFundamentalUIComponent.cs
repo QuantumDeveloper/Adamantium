@@ -14,11 +14,15 @@ public interface IFundamentalUIComponent : IAdamantiumComponent, IDispatcherComp
     public void DetachStyles(params Style[] styles);
     public object DataContext { get; set; }
     public IFundamentalUIComponent LogicalParent { get; }
-    public AdamantiumComponent TemplatedParent { get; }
+    public IAdamantiumComponent TemplatedParent { get; }
 
     public event AdamantiumPropertyChangedEventHandler DataContextChanged;
 
     public IReadOnlyCollection<IFundamentalUIComponent> LogicalChildren { get; }
+
+    void AddLogicalChild(IFundamentalUIComponent child);
+
+    void RemoveLogicalChild(IFundamentalUIComponent child);
 
     public BindingExpression SetBinding(AdamantiumProperty property, BindingBase bindingBase);
     

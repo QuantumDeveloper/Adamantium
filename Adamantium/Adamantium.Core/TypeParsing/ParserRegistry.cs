@@ -13,6 +13,7 @@ public static class ParserRegistry
         _parsers = new Dictionary<Type, Type>();
         Register(typeof(Color), typeof(ColorParser));
         Register(typeof(Thickness), typeof(ThicknessParser));
+        Register(typeof(Uri), typeof(UriParser));
     }
 
     public static void Register(Type targetType, Type parserType)

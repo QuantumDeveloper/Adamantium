@@ -8,12 +8,13 @@ public class CodeGenerationContext
 {
     public string ParentName { get; private set; }
     public Stack<string> ElementStack { get; }
+    private readonly Stack<string> _templateStack = new();
 
     public Stack<IResolvedType> TargetTypeContext { get; }
     public TextGenerator TextGenerator { get; }
     public AumlMetadataContainer Metadata { get; }
     public int Id { get; set; }
-    
+
     public EntityType EntityType { get; }
 
     public CodeGenerationContext(TextGenerator textGenerator, AumlMetadataContainer metadata, EntityType entityType)
@@ -34,7 +35,7 @@ public class CodeGenerationContext
         ElementStack.Push(name);
         ParentName = name;
     }
-    
+
     public string PeekElement() => ElementStack.Count > 0 ? ElementStack.Peek() : null;
 
     public void PopElement()
@@ -42,24 +43,27 @@ public class CodeGenerationContext
         ElementStack.Pop();
         ParentName = ElementStack.Count > 0 ? ElementStack.Peek() : string.Empty;
     }
+    
+    private void PushTemplate(string templateVar) => _templateStack.Push(templateVar);
+    private void PopTemplate() { if (_templateStack.Count > 0) _templateStack.Pop(); }
+    private string CurrentTemplate => _templateStack.Count > 0 ? _templateStack.Peek() : null;
 
     public void PushTypeContext(IResolvedType resolvedType)
     {
         TargetTypeContext.Push(resolvedType);
     }
-    
+
     public void PopTypeContext()
     {
         TargetTypeContext.Pop();
     }
-    
+
     private IResolvedType GetEffectiveTargetType(IResolvedType fallback)
     {
         if (TargetTypeContext.Count > 0)
             return TargetTypeContext.Peek();
         return fallback;
     }
-
     
     public void WithElement(string name, Action action)
     {
@@ -93,12 +97,20 @@ public class CodeGenerationContext
         {
             elementName = "this";
         }
+
         if (!isRoot)
         {
-            elementName = Metadata.NamedElementsMap.TryGetValue(element, out var named) ? named : GenerateNextElementName();
+            var isNamed = Metadata.NamedElementsMap.TryGetValue(element, out var named);
+            elementName = isNamed
+                ? named
+                : GenerateNextElementName();
             TextGenerator.WriteLine($"var {elementName} = new {typeInfo.FullName}();");
+            if (isNamed && CurrentTemplate != null)
+            {
+                TextGenerator.WriteLine($"{CurrentTemplate}.RegisterName(\"{named}\", {elementName});");
+            }
         }
-        
+
         var directives = element.Children.Where(x => x is AumlAstDirective).ToList();
         string key = string.Empty;
         foreach (var aumlAstNode in directives)
@@ -111,7 +123,7 @@ public class CodeGenerationContext
                 break;
             }
         }
-        
+
         PushTypeContext(typeInfo);
 
         void ProcessProperties(IEnumerable<AumlAstPropertyNode> propertyNodes)
@@ -140,7 +152,8 @@ public class CodeGenerationContext
 
                 if (resolvedType == null)
                 {
-                    diagnostics.ReportError(Metadata.ClassName, $"Unknown property {propRef.Name} on type {propertyType.FullName}");
+                    diagnostics.ReportError(Metadata.ClassName,
+                        $"Unknown property {propRef.Name} on type {propertyType.FullName}");
                     continue;
                 }
 
@@ -152,60 +165,153 @@ public class CodeGenerationContext
 
                 var value = prop.Values[0];
 
+                
                 if (value.TypeReference.GetFullTypeName() == Metadata.DefaultTypeContainer.ControlTemplate.FullName)
                 {
                     var templateName = GenerateNextElementName("controlTemplate");
-                    TextGenerator.WriteLine($"var {templateName} = new {value.TypeReference.GetFullTypeName()}(() =>");
-                    TextGenerator.WriteLine("{");
-                    TextGenerator.PushIndent();
-                    var child = value.GetLogicalChildrenObjects().FirstOrDefault();
-                    var childName = ProcessControlElements(child, diagnostics, false);
-                    TextGenerator.WriteLine($"return {childName};");
-                    TextGenerator.PopIndent();
-                    TextGenerator.WriteLine("});");
+                    var templateTypeName = value.TypeReference.GetFullTypeName();
                     
+                    var templateBuilderMethod = $"Build_{templateName}";
+
+                    TextGenerator.WriteLine($"var {templateName} = new {templateTypeName}({templateBuilderMethod});");
                     TextGenerator.WriteLine($"{CurrentParent}.{propRef.Name} = {templateName};");
                     
+                    TextGenerator.NewLine();
+                    TextGenerator.WriteLine($"{Metadata.DefaultTypeContainer.TemplateResult.FullName} {templateBuilderMethod}()");
+                    TextGenerator.WriteOpenBraceAndIndent();
+                    
+                    TextGenerator.WriteLine($"var result = new {Metadata.DefaultTypeContainer.TemplateResult.FullName}();");
+                    
+                    PushTemplate("result");
+
+                    var child = value.GetLogicalChildrenObjects().FirstOrDefault();
+                    
+                    var childName = ProcessControlElements(child, diagnostics, false);
+                    TextGenerator.WriteLine($"result.RootComponent = {childName};");
+                    
                     var templateProperties = value.GetProperties().ToList();
-                    PushElement(templateName);
+                    WithElement("result", () => // Temporary Context for object "result"
+                    {
+                        PushTypeContext(Metadata.DefaultTypeContainer.ControlTemplate);
+                        foreach (var templateProp in templateProperties)
+                        {
+                            var templatePropRef = (AumlAstPropertyReference)templateProp.Property;
+                            if (templatePropRef.Name == "Triggers")
+                            {
+                                foreach (var triggerValueNode in templateProp.Values)
+                                {
+                                    if (triggerValueNode is AumlAstObjectNode triggerObjectNode)
+                                    {
+                                        var triggerVariableName = ProcessControlElements(triggerObjectNode, diagnostics, isResource);
+                                        TextGenerator.WriteLine($"result.Triggers.Add({triggerVariableName});");
+                                    }
+                                }
+                            }
+                        }
+                        PopTypeContext();
+                    });
 
-                    PushTypeContext(Metadata.DefaultTypeContainer.ControlTemplate);
+                    PopTemplate();
                     
-                    ProcessProperties(templateProperties);
-
-                    PopTypeContext();
-                    
-                    PopElement();
+                    TextGenerator.WriteLine($"return result;");
+                    TextGenerator.UnindentAndWriteCloseBrace();
+                    continue;
                 }
-                else if (value is AumlAstMarkupExtensionNode extension && (extension.TypeReference.Name == "ResourceReference"))
+                else if (value is AumlAstMarkupExtensionLiteral literal)
                 {
-                    var key = extension.Arguments[0].Value.GetTextValue();
-                    if (isResource && element.TypeReference.Namespace == "Adamantium.UI.Core.Resources")
+                    var typeContainer = Metadata.TypeResolver.GetResolvedAssembly(literal.TypeReference.Assembly);
+                    var typeInfo = typeContainer.Types.FirstOrDefault(x => x.Name == literal.TypeReference.Name);
+                    var literalName = GenerateNextElementName();
+                    TextGenerator.WriteLine($"var {literalName} = new {typeInfo.FullName}();");
+                }
+                else if (value is AumlAstMarkupExtensionNode extension)
+                {
+                    switch (extension.TypeReference.Name)
                     {
-                        TextGenerator.WriteLine($"{symbolName} = new {Metadata.DefaultTypeContainer.ResourceReference.FullName}(\"{key}\");");
-                    }
-                    else
-                    {
-                        TextGenerator.WriteLine($"{symbolName} = {Metadata.DefaultTypeContainer.ResourceResolver.FullName}.Resolve<{resolvedType.FullName}>(\"{key}\");");
+                        case "ResourceReference":
+                        {
+                            var key = extension.Arguments[0].Value.GetTextValue();
+                            if (isResource && element.TypeReference.Namespace == "Adamantium.UI.Core.Resources")
+                            {
+                                TextGenerator.WriteLine(
+                                    $"{symbolName} = new {Metadata.DefaultTypeContainer.ResourceReference.FullName}(\"{key}\");");
+                            }
+                            else
+                            {
+                                TextGenerator.WriteLine(
+                                    $"{symbolName} = {Metadata.DefaultTypeContainer.ResourceResolver.FullName}.Resolve<{resolvedType.FullName}>(\"{key}\");");
+                            }
+
+                            break;
+                        }
+                        case "TemplateBinding":
+                        {
+                            var tbVar = GenerateNextElementName("tb");
+                            TextGenerator.WriteLine($"var {tbVar} = new {extension.TypeReference.GetFullTypeName()}();");
+
+                            foreach (var argument in extension.Arguments)
+                            {
+                                if (string.IsNullOrEmpty(argument.Name))
+                                {
+                                    TextGenerator.WriteLine($"{tbVar}.Path = \"{argument.Value.GetTextValue()}\";");
+                                }
+                                else
+                                {
+                                    TextGenerator.WriteLine(
+                                        $"{tbVar}.{argument.Name} = {argument.Value.TypeReference.GetFullTypeName()}.{argument.Value.GetTextValue()};");
+                                }
+                            }
+
+                            if (CurrentTemplate == null)
+                            {
+                                diagnostics.ReportError(Metadata.ClassName,
+                                    "TemplateBinding can only be used inside ControlTemplate.");
+                            }
+                            else
+                            {
+                                TextGenerator.WriteLine(
+                                    $"{CurrentTemplate}.AddTemplateBinding({CurrentParent}, \"{propRef.Name}\", {tbVar});");
+                            }
+
+                            break;
+                        }
+                        default:
+                            string nestedName = ProcessNestedValue(extension, diagnostics, isResource);
+                            if (propRef.IsAttachedProperty)
+                            {
+                                TextGenerator.WriteLine(
+                                    $"{propRef.OwnerType.GetFullTypeName()}.Set{propRef.Name}({elementName}, {nestedName});");
+                            }
+                            else
+                            {
+                                TextGenerator.WriteLine(
+                                    $"{propRef.OwnerType.GetFullTypeName()}.{propRef.Name} = {nestedName};");
+                            }
+                            break;
                     }
                 }
                 else if (propRef.IsAttachedProperty)
                 {
                     var textVale = prop.GetTextValue();
-                    TextGenerator.WriteLine($"{propRef.OwnerType.GetFullTypeName()}.Set{propRef.Name}({CurrentParent}, {textVale});");
+                    TextGenerator.WriteLine(
+                        $"{propRef.OwnerType.GetFullTypeName()}.Set{propRef.Name}({CurrentParent}, {textVale});");
                 }
                 else if (resolvedType.IsCollection() && !resolvedType.HasAttribute("TypeParserAttribute"))
                 {
-                    TextGenerator.WriteLine($"{symbolName} = new {resolvedType.FullName}();");
+                    if (resolvedMember.MemberKind == ResolvedMemberKind.Property && resolvedMember.HasSetter())
+                    {
+                        TextGenerator.WriteLine($"{symbolName} = new {resolvedType.FullName}();");
+                    }
+                    
                     foreach (var propertyValue in prop.Values)
                     {
                         string nestedName = ProcessNestedValue(propertyValue, diagnostics, isResource);
                         TextGenerator.WriteLine($"{symbolName}.Add({nestedName});");
                     }
                 }
-                else if(resolvedType.FullName == "System.Type")
+                else if (resolvedType.FullName == "System.Type")
                 {
-                    var type = Metadata.TypeResolver.ResolveByShortName(prop.GetTextValue());
+                    var type = Metadata.TypeResolver.Resolve(prop.GetFullTypeValue());
                     if (type == null)
                     {
                         diagnostics.ReportError(Metadata.ClassName, $"Cannot find type {prop.GetTextValue()} for property {propRef.Name}");
@@ -233,9 +339,6 @@ public class CodeGenerationContext
             foreach (var child in childNodes)
             {
                 var childName = ProcessControlElements(child, diagnostics, isResource);
-
-                // Тут нужно отдельно обработать кейс, когда мы работаем с контрол темплейтом или вообще с темплейтами,
-                // потому что генератор не знает как корректно добавлять контент в него
 
                 if (element.TypeReference.Name == "Style")
                 {
@@ -341,16 +444,16 @@ public class CodeGenerationContext
 
         if (value is AumlAstMarkupExtensionLiteral literal)
         {
-            var type = Metadata.TypeResolver.GetResolvedAssembly(literal.TypeReference.Assembly)
-                .Types.First(x => x.Name == literal.TypeReference.Name);
+            var resolvedAssembly = Metadata.TypeResolver.ResolveAssembly(literal.TypeReference.Assembly);
+            var type = resolvedAssembly.Types.First(x => x.Name == literal.TypeReference.Name);
             var name = GenerateNextElementName();
-            TextGenerator.WriteLine($"var {name} = new {type.FullName}();");
+            GenerateSimpleAssignment($"var {name}", literal.Text, type);
             return name;
         }
 
         if (value is AumlAstMarkupExtensionNode extension)
         {
-            var type = Metadata.TypeResolver.GetResolvedAssembly(extension.TypeReference.Assembly)
+            var type = Metadata.TypeResolver.ResolveAssembly(extension.TypeReference.Assembly)
                 .Types.First(x => x.Name == extension.TypeReference.Name);
             var name = GenerateNextElementName();
             TextGenerator.WriteLine($"var {name} = new {type.FullName}();");
@@ -358,15 +461,22 @@ public class CodeGenerationContext
             foreach (var arg in extension.Arguments)
             {
                 var target = $"{name}.{arg.Name}";
-                if (arg.Value.IsTextNode())
+
+                if (arg.Value is AumlAstTypeReferenceValueNode typeValueNode)
                 {
-                    //GenerateSimpleAssignment(target, arg.Value.GetTextValue(), new StubResolvedMember(target, arg.Value.GetTextValue()));
-                    GenerateSimpleAssignment(target, arg.Value.GetTextValue(), new StubResolvedMember(target, arg.Value.GetTextValue()).MemberType);
+                    var fullTypeName = typeValueNode.TypeReference.GetFullTypeName();
+                    TextGenerator.WriteLine($"{target} = typeof({fullTypeName});");
                 }
-                else
+                else if (arg.Value is IAumlAstMarkupExtensionLiteral or IAumlAstMarkupExtensionNode || arg.Value is AumlAstObjectNode)
                 {
                     var nested = ProcessNestedValue(arg.Value, diagnostics, isResource);
                     TextGenerator.WriteLine($"{target} = {nested};");
+                }
+                else
+                {
+                    var resolvedMember = Metadata.TypeResolver.ResolveAssembly(arg.Value.TypeReference.Assembly).Types
+                        .First(x => x.Name == arg.Value.TypeReference.Name);
+                    GenerateSimpleAssignment(target, arg.Value.GetTextValue(), resolvedMember);
                 }
             }
 
@@ -375,20 +485,28 @@ public class CodeGenerationContext
 
         return "null";
     }
-    
+
     private class StubResolvedMember : IResolvedMember
     {
         public string Name { get; }
         public string DummyValue { get; }
+
         public StubResolvedMember(string name, string value)
         {
             Name = name;
             DummyValue = value;
         }
+
         public string FullName => Name;
+
         public bool HasAttribute(string attributeMetadataName)
         {
             return false;
+        }
+
+        public bool HasSetter()
+        {
+            return true;
         }
 
         public ResolvedMemberKind MemberKind => ResolvedMemberKind.Property;

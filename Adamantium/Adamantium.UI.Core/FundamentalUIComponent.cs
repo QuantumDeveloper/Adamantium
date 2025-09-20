@@ -139,6 +139,8 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
         get => GetValue<StylesCollection>(StylesProperty);
         private init => SetValue(StylesProperty, value);
     }
+    
+    public bool IsStyleApplied { get; private set; }
 
     public void AttachStyles(params Style[] styles)
     {
@@ -168,7 +170,7 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
 
     public IFundamentalUIComponent LogicalParent => parent;
     
-    public AdamantiumComponent TemplatedParent { get; internal set; }
+    public IAdamantiumComponent TemplatedParent { get; internal set; }
 
     public BindingExpression SetBinding(string property, BindingBase bindingBase)
     {
@@ -227,6 +229,16 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
     {
         get => GetValue<String>(NameProperty);
         set => SetValue(NameProperty, value);
+    }
+
+    public void AddLogicalChild(IFundamentalUIComponent child)
+    {
+        LogicalChildrenCollection.Add(child);
+    }
+    
+    public void RemoveLogicalChild(IFundamentalUIComponent child)
+    {
+        LogicalChildrenCollection.Remove(child);
     }
     
     private void LogicalChildrenCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
@@ -301,24 +313,36 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
 
             if (parent != null)
             {
-                InvalidateStyles();
+                ApplyCurrentTheme();
 
                 var e = new LogicalTreeAttachmentEventArgs(parent);
                 OnAttachedToLogicalTree(e);
             }
-
         }
+    }
+
+    public void ApplyCurrentTheme()
+    {
+        if (UIAppContext.Current == null)
+            return;
+        
+        UIAppContext.Current.UIContext.ThemeContext.ApplyCurrentTheme(this);
+        UIAppContext.Current.UIContext.ThemeContext.ApplyExternalStyles(this, Styles.ToArray());
+        
+        IsStyleApplied = true;
+        
+        //((IMeasurableComponent)this).InvalidateMeasure();
     }
     
     public void InvalidateStyles()
     {
         if (UIAppContext.Current == null) 
             return;
+
+        IsStyleApplied = false;
         
-        UIAppContext.Current.UIContext.ThemeContext.ApplyCurrentTheme(this);
-        UIAppContext.Current.UIContext.ThemeContext.ApplyExternalStyles(this, Styles.ToArray());
-        
-        ((IMeasurableComponent)this).InvalidateMeasure();
+        // UIAppContext.Current.UIContext.ThemeContext.ApplyCurrentTheme(this);
+        // UIAppContext.Current.UIContext.ThemeContext.ApplyExternalStyles(this, Styles.ToArray());
         
         foreach (var component in LogicalChildrenCollection)
         {

@@ -22,4 +22,11 @@ public class TypesCollection : TrackingCollection<Type>
 
         return new Classes(ids);
     }
+
+    public override string ToString()
+    {
+        var result = string.Join(' ', this);
+        
+        return result;
+    }
 }

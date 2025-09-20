@@ -13,7 +13,7 @@ public class DefaultAumlTransformer : IAumlTransformer
         var container = new AumlMetadataContainer(typeResolver)
         {
             RelativeFilePath = document.RelativeFilePath,
-            RootNamespace = document.RootNamespace,
+            AssemblyName = document.RootNamespace,
         };
 
         typeResolver.ScanXmlnsAttributes();
@@ -21,7 +21,14 @@ public class DefaultAumlTransformer : IAumlTransformer
         {
             if (mapping.IsClrNamespace)
             {
-                typeResolver.ResolveAssembly(mapping.Assembly);
+                if (string.IsNullOrEmpty(mapping.Assembly))
+                {
+                    typeResolver.FindAssemblyByNamespace(mapping.Namespace);
+                }
+                else
+                {
+                    typeResolver.ResolveAssembly(mapping.Assembly);
+                }
             }
         }
 
@@ -59,11 +66,51 @@ public class DefaultAumlTransformer : IAumlTransformer
                     
                     break;
                 case AumlAstMarkupExtensionNode markupExtension:
-                    markupExtension.TypeReference = ProcessTypeReference(markupExtension.TypeReference, markupExtension.GetLineInfo());
+                    ProcessMarkupExtension(markupExtension);
                     break;
                 //case AumlAstMarkupExtensionLiteral literal:
                 //    literal.TypeReference = ProcessTypeReference(literal.TypeReference, literal.GetLineInfo());
                 //    break;
+            }
+        }
+
+        void ProcessMarkupExtension(IAumlAstMarkupExtensionNode markupExtension)
+        {
+            markupExtension.TypeReference = ProcessTypeReference(markupExtension.TypeReference, markupExtension.GetLineInfo());
+            var resolvedAssembly = typeResolver.GetResolvedAssembly(markupExtension.TypeReference.Assembly);
+
+            if (resolvedAssembly == null)
+            {
+                diagnostics.ReportError(document.FileName,
+                    $"Assembly {markupExtension.TypeReference.Assembly} could not be found. {markupExtension.GetLineInfo()}");
+                return;           
+            }
+            
+            var type = resolvedAssembly.GetTypeByFullName(markupExtension.TypeReference.GetFullTypeName());
+            
+            foreach (var argument in markupExtension.Arguments)
+            {
+                var transformedValue = ProcessValueNode(argument.Value);
+                argument.Value = transformedValue;
+                
+                IResolvedProperty property = null;
+                if (string.IsNullOrEmpty(argument.Name))
+                {
+                    var result = type.FindPropertyWithAttribute("Adamantium.UI.Core.MarkupExtensions.DefaultPropertyAttribute", out property);
+                }
+                else
+                {
+                    property = type.GetAllProperties().FirstOrDefault(x => x.Name == argument.Name);
+                }
+
+                if (property == null)
+                    diagnostics.ReportError(document.FileName,
+                        $"Property {argument.Name} could not be found in {markupExtension.TypeReference.GetFullTypeName()}. {markupExtension.GetLineInfo()}");
+                
+                if (transformedValue is AumlAstMarkupExtensionLiteral literal)
+                {
+                    literal.TypeReference = CreateResolved(property.PropertyType, markupExtension.GetLineInfo());
+                }
             }
         }
 
@@ -98,9 +145,16 @@ public class DefaultAumlTransformer : IAumlTransformer
             }
 
             // not XmlNamespaceDeclaration
-            if (string.IsNullOrEmpty(typeReference.Assembly) || string.IsNullOrEmpty(typeReference.Namespace))
+            if (string.IsNullOrEmpty(typeReference.Assembly))
             {
-                return ResolveByNameOnly(typeReference, lineInfo);
+                if (string.IsNullOrEmpty(typeReference.Namespace))
+                {
+                    return ResolveByNameOnly(typeReference, lineInfo);
+                }
+                else
+                {
+                    return ResolveByFullTypeNameWithoutAssembly(typeReference, lineInfo);
+                }
             }
 
             // CLR type reference
@@ -178,7 +232,22 @@ public class DefaultAumlTransformer : IAumlTransformer
 
             throw new TypeNotAvailableException($"Type {typeReference.Name} is not available");
         }
+
+        IAumlAstTypeReference ResolveByFullTypeNameWithoutAssembly(IAumlAstTypeReference typeReference, IAumlLineInfo lineInfo)
+        {
+            var typeInfo = typeResolver.FindAssemblyByNamespace(typeReference.Namespace);
+
+            if (typeInfo == null)
+            {
+                diagnostics.ReportError(document.FileName, $"Type {typeReference.Name} could not be found in any linked assembly. {lineInfo}");
+                return typeReference;
+            }
             
+            var type = typeInfo.Types.FirstOrDefault(x => x.FullName == typeReference.GetFullTypeName());
+
+            return CreateResolved(type, lineInfo);
+        }
+
         IAumlAstTypeReference ResolveByNameOnly(IAumlAstTypeReference typeReference, IAumlLineInfo lineInfo)
         {
             var typeInfo = typeResolver.ResolveByShortName(typeReference.Name);
@@ -203,6 +272,53 @@ public class DefaultAumlTransformer : IAumlTransformer
                 typeInfo.AssemblyName,
                 isMarkupExtension
             );
+        }
+        
+        // --- НОВЫЙ МЕТОД ДЛЯ ОБРАБОТКИ ВСЕХ ТИПОВ ЗНАЧЕНИЙ ---
+        IAumlAstValueNode ProcessValueNode(IAumlAstValueNode valueNode)
+        {
+            switch (valueNode)
+            {
+                // Если значение - это директива (например, из {x:Type ...})
+                case AumlAstDirective directive:
+                    return ProcessDirectiveValue(directive);
+                
+                // Если значение - обычное расширение разметки (не директива)
+                case AumlAstMarkupExtensionNode markupExtension:
+                    ProcessMarkupExtension(markupExtension);
+                    return markupExtension;
+
+                // Если это текстовое значение или любой другой узел, оставляем как есть
+                default:
+                    return valueNode;
+            }
+        }
+        
+        IAumlAstValueNode ProcessDirectiveValue(AumlAstDirective directive)
+        {
+            var directiveBody = (directive.Value as AumlAstTextNode)?.Text;
+            if (string.IsNullOrWhiteSpace(directiveBody))
+            {
+                diagnostics.ReportError(document.FileName, $"Directive '{directive.Name}' is missing a value. {directive.GetLineInfo()}");
+                return directive;
+            }
+
+            switch (directive.Name)
+            {
+                case "Type":
+                    // Используем тот же механизм, что и в парсере, чтобы распознать имя типа
+                    var typeRef = MarkupExtensionParser.ParseTypeName(new ParserContext(null), directiveBody, directive.GetLineInfo(), document.NamespaceMappings.ToList());
+                    
+                    // Резолвим его в конкретный IResolvedType
+                    var resolvedTypeRef = ProcessTypeReference(typeRef, directive.GetLineInfo());
+
+                    // Возвращаем наш новый узел, который несет в себе информацию о типе
+                    return new AumlAstTypeReferenceValueNode(directive.GetLineInfo(), resolvedTypeRef);
+               
+                default:
+                    diagnostics.ReportError(document.FileName, $"Unknown directive 'x:{directive.Name}'. {directive.GetLineInfo()}");
+                    return directive;
+            }
         }
            
         var entityType = EntityType.Unknown;
@@ -239,31 +355,36 @@ public class DefaultAumlTransformer : IAumlTransformer
             switch (element)
             {
                 case AumlAstObjectNode objectNode:
-                    if (objectNode is AumlAstTemplateNode)
-                    {
-                        int x = 0;
-                    }
                     foreach (var child in objectNode.Children)
                     {
                         queue.Enqueue(child);
                     }
                     break;
                 case AumlAstPropertyNode propertyNode:
-                    if (propertyNode.Property is AumlAstPropertyReference propertyReference)
+                    
+                    for (int i = 0; i < propertyNode.Values.Count; i++)
                     {
-                        if (propertyReference.Name == "Name")
-                        {
-                            if (propertyNode.Values[0] is AumlAstTextNode textNode)
-                            {
-                                container.NamedElements.Add(new NamedElement(textNode.Text, propertyReference.ParentNode));
-                            }
-                        }
-                        
-                        foreach (var value in propertyNode.Values)
-                        {
-                            queue.Enqueue(value);
-                        }
+                        var transformedValue = ProcessValueNode(propertyNode.Values[i]);
+                        propertyNode.Values[i] = transformedValue;
+                        queue.Enqueue(transformedValue);
                     }
+                    
+                    //if (propertyNode.Property is AumlAstPropertyReference propertyReference)
+                    //{
+                    //    if (propertyReference.Name == "Name")
+                    //    {
+                    //        if (propertyNode.Values[0] is AumlAstTextNode textNode)
+                    //        {
+                    //            container.NamedElements.Add(new NamedElement(textNode.Text, propertyReference.ParentNode));
+                    //        }
+                    //    }
+                        
+                    //    foreach (var value in propertyNode.Values)
+                    //    {
+                    //        queue.Enqueue(value);
+                    //    }
+                    //}
+                    
                     break;
                 case AumlAstDirective directive:
                     if (directive.Name == "Name")
@@ -286,6 +407,10 @@ public class DefaultAumlTransformer : IAumlTransformer
                         {
                             queue.Enqueue(extNode);
                         }
+                        else if (ext.Value is AumlAstObjectNode objectNode)
+                        {
+                            queue.Enqueue(objectNode);
+                        }
                     }
                     break;
             }
@@ -303,11 +428,6 @@ public class DefaultAumlTransformer : IAumlTransformer
 
         container.RootNode = document.Root;
         container.HasSemanticErrors = diagnostics.HasErrors;
-
-        if (container.FileName.StartsWith("ButtonStyleSet"))
-        {
-            int x = 0;
-        }
 
         return container;
     }

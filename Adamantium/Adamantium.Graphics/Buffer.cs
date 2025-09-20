@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Runtime.InteropServices;
+using System.Threading;
 using Adamantium.Core;
 using Adamantium.Graphics.Core;
 using AdamantiumVulkan.Core;
+using QuantumBinding.Utils;
 using VulkanBuffer = AdamantiumVulkan.Core.Buffer;
 
 namespace Adamantium.Graphics
@@ -65,7 +67,8 @@ namespace Adamantium.Graphics
         protected Buffer(IGraphicsDevice device, 
             BufferCreateInfo description, 
             ulong count, 
-            MemoryPropertyFlags memoryFlags) : this(device, (BufferUsageFlags)description.Usage, description.Size, count, memoryFlags, description.SharingMode)
+            MemoryPropertyFlags memoryFlags) : 
+            this(device, (BufferUsageFlags)description.Usage, description.Size, count, memoryFlags, description.SharingMode)
         {
         }
 
@@ -81,7 +84,7 @@ namespace Adamantium.Graphics
             SharingMode = sharingMode;
             ElementSize = (uint)(size / count);
             ElementCount = count;
-
+            
             CreateBuffer(size,
                 BufferUsageFlags.TransferDst | Usage,
                 MemoryFlags | MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent,
@@ -91,14 +94,10 @@ namespace Adamantium.Graphics
 
         private void Initialize(DataPointer dataPointer)
         {
-            var stagingMemoryFlags = MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent; // Windows
-            // if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            // {
-            //     stagingMemoryFlags = MemoryPropertyFlags.DeviceLocal | MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent | MemoryPropertyFlags.HostCached; // MacOS
-            // }
+            var stagingMemoryFlags = MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent;
 
             CreateBuffer(TotalSize, BufferUsageFlags.TransferSrc, stagingMemoryFlags, out var stagingBuffer, out var stagingBufferMemory);
-
+            
             UpdateBufferContent(stagingBufferMemory, dataPointer);
             CreateBuffer(TotalSize, 
                 BufferUsageFlags.TransferDst | Usage, 
@@ -140,11 +139,22 @@ namespace Adamantium.Graphics
 
             buffer = GraphicsDevice.LogicalDevice.CreateBuffer(bufferInfo);
 
-            MemoryRequirements memoryRequirements = GraphicsDevice.LogicalDevice.GetBufferMemoryRequirements(buffer);
+            var memoryRequirements = GraphicsDevice.LogicalDevice.GetBufferMemoryRequirements(buffer);
 
-            MemoryAllocateInfo allocInfo = new MemoryAllocateInfo();
+            var allocInfo = new MemoryAllocateInfo();
             allocInfo.AllocationSize = memoryRequirements.Size;
             allocInfo.MemoryTypeIndex = GraphicsDevice.Adapter.FindMemoryIndex(memoryRequirements.MemoryTypeBits, memoryProperties);
+            
+            var allocFlagsInfo = new MemoryAllocateFlagsInfo();
+
+            if (usage.HasFlag(BufferUsageFlags.ShaderDeviceAddress))
+            {
+                allocFlagsInfo.Flags = MemoryAllocateFlagBits.DeviceAddressBit;
+                unsafe
+                {
+                    allocInfo.PNext = NativeUtils.StructOrEnumToPointer(allocFlagsInfo.ToNative());
+                }
+            }
 
             bufferMemory = GraphicsDevice.LogicalDevice.AllocateMemory(allocInfo);
 

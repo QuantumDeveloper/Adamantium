@@ -17,7 +17,7 @@ public class RoslynResolvedAssembly : IResolvedAssembly
         _types = new List<IResolvedType>();
 
         var nsStack = new Stack<INamespaceSymbol>();
-        nsStack.Push(currentNamespace);
+        nsStack.Push(_assemblySymbol.GlobalNamespace);
         while (nsStack.Count > 0)
         {
             var nsSymbol = nsStack.Pop();
@@ -48,5 +48,19 @@ public class RoslynResolvedAssembly : IResolvedAssembly
     public IResolvedType GetTypeByFullName(string fullName)
     {
         return _types.FirstOrDefault(x => x.FullName == fullName);
+    }
+
+    public void AddType(IResolvedType type)
+    {
+        // this type already exists in this assembly
+        if (_types.FirstOrDefault(x=>x.FullName == type.FullName) != null)
+            return;
+        
+        _types.Add(type);
+    }
+
+    public override string ToString()
+    {
+        return Name;
     }
 }

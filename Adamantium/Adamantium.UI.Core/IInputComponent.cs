@@ -138,6 +138,12 @@ public interface IInputComponent: IMeasurableComponent
 
    public event RoutedEventHandler LostFocus;
 
+   event RoutedEventHandler Loaded;
+
+   public event RoutedEventHandler Unloaded;
+
+   public event RoutedEventHandler Initialized;
+
    /// <summary>
    /// Occurs when the keyboard is focused on this element.
    /// </summary>

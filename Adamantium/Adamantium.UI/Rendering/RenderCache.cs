@@ -38,6 +38,13 @@ public class RenderCache
         {
             var transform = unit.Component.WorldTransform;
             unit.Update(transform, projectionMatrix);
+        }
+    }
+    
+    public void Render()
+    {
+        foreach (var unit in _renderUnits)
+        {
             unit.Render();
         }
     }

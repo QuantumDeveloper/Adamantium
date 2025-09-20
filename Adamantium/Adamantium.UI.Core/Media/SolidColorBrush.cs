@@ -37,4 +37,9 @@ public sealed class SolidColorBrush: Brush
    {
       return Colors.Get(color);
    }
+
+   public override string ToString()
+   {
+      return $"Color: {Color}, Opacity: {Opacity}";
+   }
 }

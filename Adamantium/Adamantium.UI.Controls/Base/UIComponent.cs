@@ -1,6 +1,5 @@
 ﻿using System.Collections.Specialized;
 using Adamantium.Core.Collections;
-using Adamantium.Mathematics;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
 using Adamantium.UI.Core.Media;

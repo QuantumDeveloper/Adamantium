@@ -9,6 +9,7 @@ public class ThemeManager : IThemeManager
     private readonly Dictionary<string, ITheme> _themesMap;
     private Dictionary<Selector, IUIComponent> components;
     private TrackingCollection<ITheme> _themes;
+    private IResourceManager _resourceManager;
 
     public IReadOnlyList<ITheme> Themes => _themes;
 
@@ -18,12 +19,14 @@ public class ThemeManager : IThemeManager
         _themes = new TrackingCollection<ITheme>();
         _themesMap = new Dictionary<string, ITheme>();
         components = new Dictionary<Selector, IUIComponent>();
+        _resourceManager = UIAppContext.Current.ResourceManager;
     }
 
     public void SetTheme(ITheme theme)
     {
         if (CurrentTheme == theme) return;
         
+        _resourceManager.RemoveSources(CurrentTheme);
         CurrentTheme = theme;
         var windows = UIAppContext.Current.Windows;
         foreach (var window in windows)
@@ -47,6 +50,9 @@ public class ThemeManager : IThemeManager
     
     public void ApplyExternalStyles(IFundamentalUIComponent component, params Style[] styles)
     {
+        if (styles.Length == 0) 
+            return;
+        
         component.AttachStyles(styles);
     }
 
@@ -55,7 +61,10 @@ public class ThemeManager : IThemeManager
         if (theme == null) return;
 
         var styles = theme.FindStylesForComponent(component);
-        component.AttachStyles(styles);
+        if (styles.Length > 0)
+        {
+            component.AttachStyles(styles);
+        }
     }
 
     public void ApplyStyles(IFundamentalUIComponent component)

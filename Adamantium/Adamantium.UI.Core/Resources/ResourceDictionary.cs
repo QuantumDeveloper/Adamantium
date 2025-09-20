@@ -11,49 +11,14 @@ public class ResourceDictionary : IResourceDictionary
 
     public ResourceDictionary()
     {
-        MergedDictionaries = new TrackingCollection<ResourceDictionary>();
-        MergedDictionaries.CollectionChanged += MergedDictionaries_CollectionChanged;
         resourceCache = new AdamantiumDictionary<string, object>();
     }
 
-    private void MergedDictionaries_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
-    {
-        switch (e.Action)
-        {
-            case System.Collections.Specialized.NotifyCollectionChangedAction.Reset:
-                resourceCache.Clear();
-                break;
-        }
-    }
-    
-    public Uri Source { get; set; }
-
-    public TrackingCollection<ResourceDictionary> MergedDictionaries { get; }
-
     public object FindName(string name)
     {
-        if (resourceCache.TryGetValue(name, out var findName)) return findName;
-
-        var stack = new Stack<ResourceDictionary>();
-        stack.Push(this);
-
-        while(stack.Count > 0)
-        {
-            var item = stack.Pop();
-
-            if (item.TryGetValue(name, out var obj))
-            {
-                resourceCache[name] = obj;
-                return obj;
-            }
-
-            foreach (var dict in item.MergedDictionaries)
-            {
-                stack.Push(dict);
-            }
-        }
-
-        return null;
+        resourceCache.TryGetValue(name, out var findName);
+        
+        return findName;
     }
 
     public void Add(string key, object value)

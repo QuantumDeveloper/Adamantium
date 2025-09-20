@@ -1,4 +1,5 @@
 ﻿using Adamantium.UI.Markup.AST.MarkupExtension;
+using Adamantium.UI.Markup.AST.TypeReference;
 
 namespace Adamantium.UI.Markup.AST
 {
@@ -24,6 +25,16 @@ namespace Adamantium.UI.Markup.AST
             }
 
             return Array.Empty<AumlAstObjectNode>();
+        }
+
+        public static bool IsOfType(this IAumlAstNode node, string type)
+        {
+            if (node is AumlAstObjectNode objectNode)
+            {
+                return objectNode.TypeReference.Name == type;
+            }
+
+            return false;
         }
 
         public static IEnumerable<AumlAstPropertyNode> GetResourceDictionaries(this IAumlAstNode node)
@@ -93,10 +104,29 @@ namespace Adamantium.UI.Markup.AST
             return property.Values[index].ToString();
         }
 
+        public static string GetFullTypeValue(this AumlAstPropertyNode property, int index = 0)
+        {
+            if (property.Values[index] is IAumlAstValueNode node)
+            {
+                return node.TypeReference.GetFullTypeName();
+            }
+            return property.Values[index].ToString();
+        }
+
         public static bool IsSetter(this AumlAstPropertyNode property)
         {
             return property.Property is AumlAstPropertyReference propertyReference &&
                    propertyReference.OwnerType.Name == "Setter";
+        }
+        
+        public static IAumlAstTypeReference GetTypeReference(this IAumlAstNode node)
+        {
+            if (node is IAumlAstValueNode valueNode)
+            {
+                return valueNode.TypeReference;
+            }
+            
+            return null;
         }
     }
 }

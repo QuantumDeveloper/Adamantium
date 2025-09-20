@@ -2,11 +2,13 @@ namespace Adamantium.UI.Core;
 
 public enum ValuePriority : int
 {
-    Local = 0,
-    Animation = 1,
+    Animation = 0,
+    Local = 1,
     Binding = 2,
     Trigger = 3,
-    Style = 4,
-    Effective,
+    Template = 4,
+    Style = 5,
+    Inherited = 6,
     Default,
+    Effective
 }

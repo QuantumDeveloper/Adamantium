@@ -8,7 +8,6 @@ using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.EffectsFramework;
 using Adamantium.Graphics.Core.Extensions;
 using Adamantium.Graphics.Core.Presentation;
-using Adamantium.Graphics.Core.Vertices;
 using Adamantium.Graphics.Effects;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
@@ -37,6 +36,8 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     private Type vertexType;
     private PrimitiveTopology primitiveTopology;
     private IEffectPass currentEffectPass;
+
+    private Queue<DisposableObject>[] _deferedDisposeQueue;
         
     // -- Drawing States
         
@@ -88,6 +89,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         InitializeSyncObject();
         DeviceId = Guid.NewGuid();
         MaxFramesInFlight = 1;
+        InitializeDeferQueue();
         InitializeResourceLoadingDevice();
         Log.Logger.Debug($"Resource loader device created. Id: {DeviceId}");
     }
@@ -104,6 +106,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         EffectPools = new List<EffectPool>();
         DefaultEffectPool = EffectPool.New(this);
         MaxFramesInFlight = mainDevice.BuffersCount;
+        InitializeDeferQueue();
             
         InitializeRenderDevice();
         InitializePipeline();
@@ -111,6 +114,15 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         Log.Logger.Debug($"Primary render device created. Id: {DeviceId}");
 
         SampleMask = [0xF];
+    }
+
+    private void InitializeDeferQueue()
+    {
+        _deferedDisposeQueue = new Queue<DisposableObject>[MaxFramesInFlight];
+        for (int i = 0; i < MaxFramesInFlight; i++)
+        {
+            _deferedDisposeQueue[i] = new Queue<DisposableObject>();
+        }
     }
 
     private void InitializePipeline()
@@ -279,6 +291,8 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     public bool DepthBoundsTestEnabled { get; set; } = false;
         
     public bool DepthBiasEnabled { get; set; } = false;
+    
+    public bool DepthClampEnable { get; set; } = false;
         
     public bool StencilTestEnabled { get; set; } = false;
         
@@ -333,6 +347,11 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     public void AddResource(GraphicsResource resource)
     {
         _graphicsResources.Add(resource);
+    }
+
+    public void AddToDeferDisposeQueue(DisposableObject obj)
+    {
+        _deferedDisposeQueue[CurrentFrame].Enqueue(obj);
     }
 
     public IEffectResourceLinker CreateEffectResourceLinker()
@@ -641,13 +660,25 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         
         commandBuffer.PipelineBarrier2(dependencyInfo);
     }
+    
+    private void DisposeDeferredObjects(uint currentFrame)
+    {
+        var queue = _deferedDisposeQueue[currentFrame];
+        foreach (var obj in queue)
+        {
+            obj?.Dispose();
+        }
+        queue.Clear();
+    }
 
     public bool BeginDraw(float depth = 1.0f, uint stencil = 0)
     {
         CanPresent = false;
         var renderFence = InFlightFences[CurrentFrame];
         var result = LogicalDevice.WaitForFences(1, renderFence, true, ulong.MaxValue);
-
+        
+        DisposeDeferredObjects(CurrentFrame);
+        
         if (result != Result.Success && result != Result.Timeout)
         {
             Log.Logger.Information($"Wait for fences result: {result}");
@@ -915,14 +946,12 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         }
             
         result = GraphicsQueue.QueueSubmit(1, submitInfos, renderFence);
-        LogicalDevice.WaitForFences(1, renderFence, true, ulong.MaxValue);
             
         if (result != Result.Success)
         {
             Log.Logger.Error($"failed to submit draw command buffer! Result was {result}");
         }
 
-        //GraphicsQueue.QueueWaitIdle();
         CanPresent = true;
             
         _submissionSync?.Release();
@@ -1035,6 +1064,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         LogicalDevice.SetDepthCompareOpEXT(commandBuffer, DepthCompareFunction);
         LogicalDevice.SetDepthBoundsTestEnableEXT(commandBuffer, DepthBoundsTestEnabled);
         LogicalDevice.SetDepthBiasEnableEXT(commandBuffer, DepthBiasEnabled);
+        LogicalDevice.SetDepthClampEnableEXT(commandBuffer, DepthClampEnable);
         LogicalDevice.SetStencilTestEnableEXT(commandBuffer, StencilTestEnabled);
         LogicalDevice.SetLogicOpEnableEXT(commandBuffer, LogicOperationsEnabled);
             

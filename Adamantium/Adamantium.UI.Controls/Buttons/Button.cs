@@ -1,6 +1,8 @@
 ﻿using Adamantium.ProceduralGeometry;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Media;
+using Adamantium.UI.Core.RoutedEvents;
 
 namespace Adamantium.UI.Controls.Buttons;
 
@@ -29,10 +31,33 @@ public class Button : ContentControl
         new PropertyMetadata(default(Thickness),
             PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange));
     
+    public static readonly AdamantiumProperty CommandProperty = AdamantiumProperty.Register(nameof(Command),
+        typeof(ICommand), typeof(Button),
+        new PropertyMetadata(null));
+    
+    public static readonly AdamantiumProperty IsPressedProperty = AdamantiumProperty.Register(nameof(IsPressed),
+        typeof(bool), typeof(Button), new PropertyMetadata(false));
+    
+    public static readonly RoutedEvent ClickEvent =
+        EventManager.RegisterRoutedEvent( nameof(Click),
+            RoutingStrategy.Bubble, typeof(RoutedEventHandler), typeof(Button));
+    
+    public event RoutedEventHandler Click
+    {
+        add => AddHandler(ClickEvent, value);
+        remove => RemoveHandler(ClickEvent, value);
+    }
+    
     public Thickness Padding
     {
         get => GetValue<Thickness>(PaddingProperty);
         set => SetValue(PaddingProperty, value);
+    }
+
+    public bool IsPressed
+    {
+        get => GetValue<bool>(IsPressedProperty);
+        set => SetValue(IsPressedProperty, value);
     }
 
     public Brush BorderBrush
@@ -53,6 +78,37 @@ public class Button : ContentControl
         set => SetValue(BorderThicknessProperty, value);
     }
     
+    public ICommand Command
+    {
+        get => GetValue<ICommand>(CommandProperty);
+        set => SetValue(CommandProperty, value);
+    }
+
+    protected override void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        OnClick();
+    }
+
+    protected virtual void OnClick()
+    {
+        if (Command != null && Command.CanExecute())
+        {
+            Command.Execute();
+        }
+        
+        var eventArgs = new RoutedEventArgs(ClickEvent, this)
+        {
+            RoutedEvent = ClickEvent
+        };
+        RaiseEvent(eventArgs);
+    }
+
+    public override void OnApplyTemplate()
+    {
+        base.OnApplyTemplate();
+    }
+
     // protected override Size MeasureOverride(Size availableSize)
     // {
     //     var padding = Padding;

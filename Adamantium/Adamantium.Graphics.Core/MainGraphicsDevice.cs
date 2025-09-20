@@ -4,9 +4,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading;
 using Adamantium.Core;
-using Adamantium.Graphics.Core.Presentation;
 using AdamantiumVulkan.Core;
-using AdamantiumVulkan.Core.Interop;
 using QuantumBinding.Utils;
 using Serilog;
 
@@ -19,9 +17,9 @@ namespace Adamantium.Graphics.Core
         private uint _availableComputeQueueIndex;
 
         private uint _availableTransferQueueIndex;
-        
+
         private readonly List<IGraphicsDevice> graphicsDevices;
-        
+
         private readonly Dictionary<Guid, IGraphicsDevice> deviceMap;
         private Mutex _submissionSync;
 
@@ -29,29 +27,29 @@ namespace Adamantium.Graphics.Core
 
         public bool EnableDynamicRendering { get; }
         public VulkanInstance VulkanInstance { get; private set; }
-        
+
         public GraphicsAdapter GraphicsAdapter { get; private set; }
-        
+
         public IGraphicsDevice ResourceLoaderDevice { get; set; }
-        
+
         public Device LogicalDevice { get; private set; }
-        
+
         public uint AvailableQueuesCount { get; private set; }
-        
+
         public QueueFamilyContainer QueueFamilyContainer { get; private set; }
-        
+
         public static ReadOnlyCollection<string> DeviceExtensions { get; private set; }
-        
+
         internal Fence[] InFlightFences { get; private set; }
-        
+
         public uint CurrentFrame { get; private set; }
-        
+
         public Dictionary<uint, Queue> UsedGraphicsQueues { get; }
 
         public IReadOnlyList<IGraphicsDevice> GraphicsDevices => graphicsDevices.AsReadOnly();
-        
+
         private IGraphicsDeviceFactory _graphicsDeviceFactory;
-        
+
         static MainGraphicsDevice()
         {
             var deviceExt = new List<string>();
@@ -62,7 +60,7 @@ namespace Adamantium.Graphics.Core
             deviceExt.Add(Constants.VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
             deviceExt.Add(Constants.VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
             deviceExt.Add(Constants.VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
-            deviceExt.Add(Constants.VK_EXT_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+            deviceExt.Add(Constants.VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
             deviceExt.Add(Constants.VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
             DeviceExtensions = new ReadOnlyCollection<string>(deviceExt);
         }
@@ -73,7 +71,8 @@ namespace Adamantium.Graphics.Core
             set => VulkanInstance.IsInDebugMode = value;
         }
 
-        private MainGraphicsDevice(IGraphicsDeviceFactory deviceFactory, uint buffersCount, string name, bool enableDebug)
+        private MainGraphicsDevice(IGraphicsDeviceFactory deviceFactory, uint buffersCount, string name,
+            bool enableDebug)
         {
             _graphicsDeviceFactory = deviceFactory;
             graphicsDevices = new List<IGraphicsDevice>();
@@ -94,7 +93,7 @@ namespace Adamantium.Graphics.Core
                 }
             }
         }
-        
+
         public void RemoveDevice(IGraphicsDevice device)
         {
             deviceMap.Remove(device.DeviceId);
@@ -105,7 +104,7 @@ namespace Adamantium.Graphics.Core
         public void RemoveDeviceById(Guid deviceId)
         {
             if (!deviceMap.TryGetValue(deviceId, out var device)) return;
-            
+
             device?.Dispose();
             deviceMap.Remove(deviceId);
             graphicsDevices.Remove(device);
@@ -119,7 +118,7 @@ namespace Adamantium.Graphics.Core
         public IGraphicsDevice UpdateDevice(Guid deviceId)
         {
             if (!deviceMap.TryGetValue(deviceId, out var device)) return null;
-            
+
             device?.Dispose();
             deviceMap.Remove(deviceId);
             graphicsDevices.Remove(device);
@@ -128,14 +127,15 @@ namespace Adamantium.Graphics.Core
             graphicsDevices.Add(newDevice);
             return newDevice;
         }
-        
+
         private unsafe void CreateLogicalDevice()
         {
             var queueFamilies = GraphicsAdapter.Adapter.GetQueueFamilyProperties();
 
             for (int i = 0; i < queueFamilies.Length; ++i)
             {
-                Console.WriteLine($"Queue family {i}. QueueFlags: {queueFamilies[i].QueueFlags}. Queue count: {queueFamilies[i].QueueCount}");
+                Console.WriteLine(
+                    $"Queue family {i}. QueueFlags: {queueFamilies[i].QueueFlags}. Queue count: {queueFamilies[i].QueueCount}");
             }
 
             var graphicsQueues = queueFamilies.FirstOrDefault(x => x.QueueFlags.HasFlag(QueueFlagBits.GraphicsBit));
@@ -152,7 +152,7 @@ namespace Adamantium.Graphics.Core
             }
 
             var graphicsFamily = QueueFamilyContainer.GetFamilyInfo(QueueFlagBits.GraphicsBit);
-            
+
             var queueInfos = new List<DeviceQueueCreateInfo>();
             var queueCreateInfo = new DeviceQueueCreateInfo();
             queueCreateInfo.QueueFamilyIndex = graphicsFamily.FamilyIndex;
@@ -160,10 +160,6 @@ namespace Adamantium.Graphics.Core
             queueCreateInfo.PQueuePriorities = queuePriorities;
             queueInfos.Add(queueCreateInfo);
 
-            var deviceFeatures = GraphicsAdapter.Adapter.GetPhysicalDeviceFeatures();
-            deviceFeatures.SamplerAnisotropy = true;
-            deviceFeatures.SampleRateShading = true;
-            
             // enumerate all available device extensions
             uint propCount = 0;
             GraphicsAdapter.Adapter.EnumerateDeviceExtensionProperties(null, ref propCount, null);
@@ -186,69 +182,68 @@ namespace Adamantium.Graphics.Core
                 throw new ExtensionNotSupportedException(GraphicsAdapter.AdapterProperties.DeviceName, diff);
             }
 
-            var bufferDeviceAddressFeature = new PhysicalDeviceBufferDeviceAddressFeatures();
-            bufferDeviceAddressFeature.SType = StructureType.PhysicalDeviceBufferDeviceAddressFeaturesExt;
-            bufferDeviceAddressFeature.BufferDeviceAddress = true;
-
-            var descriptorBufferFeature = new PhysicalDeviceDescriptorBufferFeaturesEXT();
-            descriptorBufferFeature.SType = StructureType.PhysicalDeviceDescriptorBufferFeaturesExt;
-            descriptorBufferFeature.DescriptorBuffer = true;
-            descriptorBufferFeature.PNext = NativeUtils.StructOrEnumToPointer(bufferDeviceAddressFeature.ToNative());
-            
-            var vulkan11Features = new PhysicalDeviceVulkan11Features();
-            vulkan11Features.PNext = NativeUtils.StructOrEnumToPointer(descriptorBufferFeature.ToNative());
-            
-            var vulkan12Features = new PhysicalDeviceVulkan12Features();
-            vulkan12Features.SamplerMirrorClampToEdge = true;
-            vulkan12Features.TimelineSemaphore = true;
-            vulkan12Features.PNext = NativeUtils.StructOrEnumToPointer(vulkan11Features.ToNative());
-            
-            var vulkan13Features = new PhysicalDeviceVulkan13Features();
-            vulkan13Features.SType = StructureType.PhysicalDeviceVulkan13Features;
-            vulkan13Features.Synchronization2 = true;
-            vulkan13Features.DynamicRendering = true;
-            vulkan13Features.PNext = NativeUtils.StructOrEnumToPointer(vulkan12Features.ToNative());
-                
-            var features2 = new PhysicalDeviceFeatures2();
-            features2.Features = new PhysicalDeviceFeatures
+            var descriptorBufferFeature = new PhysicalDeviceDescriptorBufferFeaturesEXT
             {
-                SamplerAnisotropy = VkBool32.TRUE,
-                SampleRateShading = VkBool32.TRUE,
-                GeometryShader = true
+                SType = StructureType.PhysicalDeviceDescriptorBufferFeaturesExt,
+                DescriptorBuffer = true,
+                DescriptorBufferCaptureReplay = true
             };
-            features2.PNext = NativeUtils.StructOrEnumToPointer(vulkan13Features.ToNative());
-            
+
+            var vulkan12Features = new PhysicalDeviceVulkan12Features
+            {
+                TimelineSemaphore = true,
+                BufferDeviceAddress = true,
+                BufferDeviceAddressCaptureReplay = true,
+                SamplerMirrorClampToEdge = true,
+            };
+
+            var vulkan13Features = new PhysicalDeviceVulkan13Features
+            {
+                SType = StructureType.PhysicalDeviceVulkan13Features,
+                Synchronization2 = true,
+                DynamicRendering = true,
+            };
+
+            var deviceFeatures2 = GraphicsAdapter.Adapter.GetPhysicalDeviceFeatures2();
+
+            void* lastInChain = NativeUtils.StructOrEnumToPointer(descriptorBufferFeature.ToNative());
+
+            vulkan12Features.PNext = lastInChain;
+            lastInChain = NativeUtils.StructOrEnumToPointer(vulkan12Features.ToNative());
+
+            vulkan13Features.PNext = lastInChain;
+            lastInChain = NativeUtils.StructOrEnumToPointer(vulkan13Features.ToNative());
+
+            if (EnableDynamicRendering &&
+                finalDeviceExtensions.Contains(Constants.VK_EXT_SHADER_OBJECT_EXTENSION_NAME))
+            {
+                var shaderObjectFeatures = new PhysicalDeviceShaderObjectFeaturesEXT
+                {
+                    ShaderObject = true,
+                    PNext = lastInChain
+                };
+                lastInChain = NativeUtils.StructOrEnumToPointer(shaderObjectFeatures.ToNative());
+            }
+
+            deviceFeatures2.PNext = lastInChain;
+
+            deviceFeatures2.Features.SamplerAnisotropy = true;
+            deviceFeatures2.Features.SampleRateShading = true;
+            deviceFeatures2.Features.GeometryShader = true;
+
             var createInfo = new DeviceCreateInfo();
             createInfo.QueueCreateInfoCount = (uint)queueInfos.Count;
             createInfo.PQueueCreateInfos = queueInfos.ToArray();
             createInfo.EnabledExtensionCount = (uint)finalDeviceExtensions.Count;
             createInfo.PEnabledExtensionNames = finalDeviceExtensions.ToArray();
-            
-            if (EnableDynamicRendering)
-            {
-                if (finalDeviceExtensions.Contains(Constants.VK_EXT_SHADER_OBJECT_EXTENSION_NAME))
-                {
-                    var shaderObjectFeatures = new PhysicalDeviceShaderObjectFeaturesEXT();
-                    shaderObjectFeatures.ShaderObject = true;
-                    shaderObjectFeatures.PNext = NativeUtils.StructOrEnumToPointer(features2.ToNative());;
-                    createInfo.PNext = NativeUtils.StructOrEnumToPointer(shaderObjectFeatures.ToNative());
-                }
-                else
-                {
-                    createInfo.PNext = NativeUtils.StructOrEnumToPointer(features2.ToNative());
-                }
-            }
-            else
-            {
-                createInfo.PNext = NativeUtils.StructOrEnumToPointer(features2.ToNative());
-            }
+            createInfo.PNext = NativeUtils.StructOrEnumToPointer(deviceFeatures2.ToNative());
 
             if (VulkanInstance.IsInDebugMode)
             {
                 createInfo.EnabledLayerCount = (uint)VulkanInstance.ValidationLayers.Count;
                 createInfo.PEnabledLayerNames = VulkanInstance.ValidationLayers.ToArray();
             }
-            
+
             LogicalDevice = GraphicsAdapter.Adapter.CreateDevice(createInfo);
             LogicalDevice.InitializeExtensions();
             var fenceInfo = new FenceCreateInfo();
@@ -256,7 +251,7 @@ namespace Adamantium.Graphics.Core
             InFlightFences ??= LogicalDevice.CreateFences(fenceInfo, BuffersCount);
             createInfo.Dispose();
         }
-        
+
         public Result DeviceWaitIdle()
         {
             return LogicalDevice?.DeviceWaitIdle() ?? Result.Success;
@@ -275,11 +270,12 @@ namespace Adamantium.Graphics.Core
             return _graphicsDeviceFactory.Create(this, GraphicsDeviceType.ResourceLoader);
         }
 
-        public static MainGraphicsDevice Create(IGraphicsDeviceFactory deviceFactory, uint buffersCount, string name, bool enableDebug)
+        public static MainGraphicsDevice Create(IGraphicsDeviceFactory deviceFactory, uint buffersCount, string name,
+            bool enableDebug)
         {
             return new(deviceFactory, buffersCount, name, enableDebug);
         }
-        
+
         public Queue GetAvailableGraphicsQueue()
         {
             var graphicsFamily = QueueFamilyContainer.GetFamilyInfo(QueueFlagBits.GraphicsBit);
@@ -290,14 +286,14 @@ namespace Adamantium.Graphics.Core
             {
                 _availableGraphicsQueueIndex = 0;
             }
-            
+
             return queue;
         }
 
         public Queue GetAvailableComputeQueue()
         {
             var computeFamily = QueueFamilyContainer.GetFamilyInfo(QueueFlagBits.ComputeBit);
-            
+
             var queue = LogicalDevice.GetDeviceQueue(computeFamily.FamilyIndex, _availableComputeQueueIndex);
             _availableComputeQueueIndex++;
             if (_availableComputeQueueIndex >= computeFamily.Count)
@@ -311,7 +307,7 @@ namespace Adamantium.Graphics.Core
         public Queue GetAvailableTransferQueue()
         {
             var transferFamily = QueueFamilyContainer.GetFamilyInfo(QueueFlagBits.TransferBit);
-            
+
             var queue = LogicalDevice.GetDeviceQueue(transferFamily.FamilyIndex, _availableTransferQueueIndex);
             _availableTransferQueueIndex++;
             if (_availableTransferQueueIndex >= transferFamily.Count)
@@ -321,11 +317,11 @@ namespace Adamantium.Graphics.Core
 
             return queue;
         }
-        
+
         public void Submit(Queue queue, params SubmitInfo[] submitInfos)
         {
             _submissionSync.WaitOne();
-            
+
             var renderFence = InFlightFences[CurrentFrame];
 
             var result = LogicalDevice.ResetFences(1, renderFence);
@@ -337,13 +333,14 @@ namespace Adamantium.Graphics.Core
 
             result = queue.QueueSubmit((uint)submitInfos.Length, submitInfos, renderFence);
             LogicalDevice.WaitForFences(1, renderFence, true, ulong.MaxValue);
-                
+
             if (result != Result.Success)
             {
                 throw new Exception($"failed to submit draw command buffer! Result was {result}");
             }
+
             CurrentFrame = (CurrentFrame + 1) % BuffersCount;
-            
+
             _submissionSync.ReleaseMutex();
         }
 
@@ -360,9 +357,10 @@ namespace Adamantium.Graphics.Core
             {
                 device?.Dispose();
             }
+
             graphicsDevices.Clear();
             deviceMap.Clear();
-            
+
             LogicalDevice?.Dispose();
             LogicalDevice = null;
             VulkanInstance?.Dispose();
@@ -377,7 +375,7 @@ namespace Adamantium.Graphics.Core
         {
             FrameFinished?.Invoke();
         }
-        
+
         public event Action FrameFinished;
     }
 }

@@ -22,7 +22,7 @@ using Adamantium.UI.Platforms.MacOS;
 using Adamantium.UI.Platforms.Windows;
 using Adamantium.UI.Rendering;
 using Adamantium.UI.Services;
-using Adamantium.UI.Themes;
+using Adamantium.UI.Themes.FluentDarkTheme;
 using AdamantiumVulkan;
 using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;
@@ -74,6 +74,7 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
         Container = new AdamantiumDependencyContainer();
         EventAggregator = Container.Resolve<IEventAggregator>();
         ApplicationBuilder.Build(Container);
+        ResourceManager = CreateResourceManager();
         ThemeManager = CreateThemeManager(Container);
         UIContext =  new UIContext(Container, this);
 
@@ -108,6 +109,13 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
     protected virtual IThemeManager CreateThemeManager(IDependencyContainer container)
     {
         return new ThemeManager(Container);
+    }
+
+    protected virtual IResourceManager CreateResourceManager()
+    {
+        var resourceManager = new ResourceManager();
+        
+        return resourceManager;
     }
 
     private void ConfigureLogging()
@@ -160,6 +168,7 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
     
     public IWindow ActiveWindow { get; private set; }
 
+    public IResourceManager ResourceManager { get; }
     public IThemeManager ThemeManager { get; private set; }
     public IDispatcher Dispatcher { get; private set; }
     public IUIContext UIContext { get; private set; }

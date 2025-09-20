@@ -27,11 +27,10 @@ public class Setter : ISetter, IEquatable<Setter>
                 component.SetBinding(Property, (BindingBase)binding.Clone());
                 break;
             case ResourceReference resourceReference:
-                if (theme.GetResource(resourceReference.Name) == null)
+                if (!theme.TryGetResource(resourceReference.Name, out var resource))
                     throw new ResourceNotFoundException(
                         $"Resource {resourceReference.Name} is not found for theme: {theme.Name} and control: {component.GetType().Name}");
                     
-                var resource = theme.Resources[resourceReference.Name];
                 component.SetStyleValue(Property, resource, style);
                 break;
             default:

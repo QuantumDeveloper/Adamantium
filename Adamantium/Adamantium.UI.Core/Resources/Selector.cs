@@ -73,4 +73,9 @@ public class Selector
     {
         return HashCode.Combine(Types, Classes, Id);
     }
+
+    public override string ToString()
+    {
+        return $"{Types} {Classes} {Id}";
+    }
 }

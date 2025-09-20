@@ -5,10 +5,6 @@ namespace Adamantium.UI.Core.Resources;
 
 public interface IResourceDictionary : IResourceContainer, IName, IInitializable
 {
-    public Uri Source { get; set; }
-
-    public TrackingCollection<ResourceDictionary> MergedDictionaries { get; }
-
     public object FindName(string name);
 
     public void Add(string key, object value);

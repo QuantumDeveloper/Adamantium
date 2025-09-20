@@ -11,6 +11,8 @@ public interface IUIApplication
     IWindow ActiveWindow { get; }
 
     IReadOnlyList<IWindow> Windows { get; }
+    
+    IResourceManager ResourceManager { get; }
 
     IThemeManager ThemeManager { get; }
     

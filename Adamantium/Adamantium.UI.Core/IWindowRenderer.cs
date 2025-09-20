@@ -14,6 +14,8 @@ public interface IWindowRenderer : IDisposable
     public void SetWindow(IWindow window);
         
     public void Render(AppTime appTime);
+
+    public void PrepareData();
     
     public GraphicsPresenter Presenter { get; }
 

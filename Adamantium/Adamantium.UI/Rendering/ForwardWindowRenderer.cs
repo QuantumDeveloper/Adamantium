@@ -69,6 +69,13 @@ public class ForwardWindowRenderer : WindowRendererBase
         
         GraphicsDevice.SetViewports(Viewport);
         GraphicsDevice.SetScissors(Scissor);
+        _renderCache.Render();
+    }
+    
+    public override void PrepareData()
+    {
+        if (Window == null) return;
+        
         _renderCache.BuildFromVisualTree(Window);
         _renderCache.ProcessCommands(Window.GetProjectionMatrix());
     }

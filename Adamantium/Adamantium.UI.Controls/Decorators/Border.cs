@@ -103,10 +103,12 @@ public class Border : Decorator
       var innerRect = new Rect(new Vector2(borderThickness.Left / 2, borderThickness.Top / 2), innerSize);
       var innerGeometry = new RectangleGeometry(innerRect, cornerRadius);
       
-      var combined = new CombinedGeometry();
-      combined.GeometryCombineMode = GeometryCombineMode.Exclude;
-      combined.Geometry1 = outerGeometry;
-      combined.Geometry2 = innerGeometry;
+      var combined = new CombinedGeometry
+      {
+         GeometryCombineMode = GeometryCombineMode.Exclude,
+         Geometry1 = outerGeometry,
+         Geometry2 = innerGeometry
+      };
 
       context.ForControl(this)
          .DrawRectangle(Background, innerRect, CornerRadius)

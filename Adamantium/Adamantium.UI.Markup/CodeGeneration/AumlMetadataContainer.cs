@@ -43,5 +43,7 @@ public class AumlMetadataContainer
 
     public string SourceText { get; set; }
         
-    public string RootNamespace { get; set; }
+    public string AssemblyName { get; set; }
+    
+    public string FullClassName => $"{Namespace}.{ClassName}";
 }

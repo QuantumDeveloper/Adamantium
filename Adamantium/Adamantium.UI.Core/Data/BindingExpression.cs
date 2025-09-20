@@ -15,7 +15,17 @@ public class BindingExpression : BindingExpressionBase
    
    public BindingMode Mode { get; set; }
 
-   private BindingExpression(AdamantiumComponent target, AdamantiumProperty targetProperty, BindingBase bindingBase)
+   public BindingExpression(IFundamentalUIComponent target, string targetPropertyName, BindingBase bindingBase)
+   {
+      Target = target;
+      TargetProperty = target.GetProperty(targetPropertyName);
+      BindingBase = bindingBase;
+      Binding = (Binding)bindingBase;
+      UpdateSourceTrigger = Binding.UpdateSourceTrigger;
+      Mode = Binding.Mode;
+   }
+
+   public BindingExpression(IFundamentalUIComponent target, AdamantiumProperty targetProperty, BindingBase bindingBase)
    {
       Target = target;
       TargetProperty = targetProperty;
@@ -48,9 +58,18 @@ public class BindingExpression : BindingExpressionBase
       Target.PropertyChanged -= TargetPropertyChanged;
    }
 
-   public static BindingExpressionBase CreateBindingExpression(AdamantiumComponent target, AdamantiumProperty targetProperty,
+   public static BindingExpressionBase CreateBindingExpression(IFundamentalUIComponent target, AdamantiumProperty targetProperty,
       BindingBase bindingBase)
    {
+      var expression = new BindingExpression(target, targetProperty, bindingBase);
+      expression.Init();
+      return expression;
+   }
+   
+   public static BindingExpressionBase CreateBindingExpression(IFundamentalUIComponent target, string targetPropertyName,
+      BindingBase bindingBase)
+   {
+      var targetProperty = target.GetProperty(targetPropertyName);
       var expression = new BindingExpression(target, targetProperty, bindingBase);
       expression.Init();
       return expression;
@@ -76,6 +95,11 @@ public class BindingExpression : BindingExpressionBase
       IsDirty = false;
    }
 
+   public override void EstablishConnection()
+   {
+      Init();
+   }
+
    public override void UpdateSource()
    {
       if (!IsDirty) return;
@@ -89,10 +113,10 @@ public class BindingExpression : BindingExpressionBase
       if (!IsDirty) return;
       
       var sourceValue = ResolvedSource.GetType().GetProperty(SourcePropertyName)?.GetValue(ResolvedSource);
-      Target.SetEffectiveValue(TargetProperty, sourceValue);
+      Target.SetValue(TargetProperty, sourceValue, ValuePriority.Binding);
    }
 
-   public override void Close()
+   public override void CloseConnection()
    {
       DeInit();
    }

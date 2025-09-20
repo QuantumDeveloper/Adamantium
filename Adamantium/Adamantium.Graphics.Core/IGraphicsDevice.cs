@@ -115,6 +115,8 @@ public unsafe interface IGraphicsDevice : IDrawableDevice, IDynamicStateDevice, 
     
     void AddResource(GraphicsResource resource);
     
+    void AddToDeferDisposeQueue(DisposableObject obj);
+    
     IEffectResourceLinker CreateEffectResourceLinker();
     
     IEffectPass CreateEffectPass(Logger logger, Effect effect, EffectTechnique technique, EffectData.Pass pass, string name);

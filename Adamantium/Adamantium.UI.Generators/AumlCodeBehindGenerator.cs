@@ -1,6 +1,8 @@
-﻿using Adamantium.UI.Markup;
+﻿using System.Collections.Generic;
+using Adamantium.UI.Markup;
 using Microsoft.CodeAnalysis;
-using System.IO;
+using System.Linq;
+using Adamantium.UI.Markup.AST;
 using Adamantium.UI.Markup.CodeGeneration;
 using Adamantium.UI.Markup.CodeGeneration.Roslyn;
 using Adamantium.UI.Markup.Parsers;
@@ -12,51 +14,116 @@ namespace Adamantium.UI.Generators
     {
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
-            var aumlFiles = context.AdditionalTextsProvider.Where(file => file.Path.EndsWith(".xml"));
+           var filesProvider = context.AdditionalTextsProvider
+                .Where(file => file.Path.EndsWith(".xml"))
+                .Select((text, cancellationToken) => (
+                    Path: text.Path,
+                    Content: text.GetText(cancellationToken)!.ToString()))
+                .Collect();
 
-            // read their contents and save their name
-            var namesAndContents = aumlFiles.Select((text, cancellationToken) => (
-                path: text.Path,
-                name: Path.GetFileNameWithoutExtension(text.Path),
-                content: text.GetText(cancellationToken)!.ToString()));
+            var compilationProvider = context.CompilationProvider.Combine(context.AnalyzerConfigOptionsProvider);
+            var sourceProvider = filesProvider.Combine(compilationProvider);
 
-            var sourceProvider = namesAndContents.Combine(context.CompilationProvider).Combine(context.AnalyzerConfigOptionsProvider);
-            
-            context.RegisterSourceOutput(sourceProvider, (spc, provider) =>
+            context.RegisterSourceOutput(sourceProvider, (spc, source) =>
             {
-                var ((file, compilation), configOptions) = provider;
-                configOptions.GlobalOptions.TryGetValue("build_property.RootNamespace", out var @namespace);
-                var diagnostics = new RoslynDiagnosticSink(spc);
-                if (string.IsNullOrEmpty(@namespace))
-                {
-                    diagnostics.ReportError(file.name,
-                        "No RootNamespace Compiler option provided in project file. Please, add <CompilerVisibleProperty Include=\"RootNamespace\" /> to your csproj file");
+                var (collectedFiles, (compilation, configOptions)) = source;
 
-                }
+                var resourceDictionaries = new List<ResourceDictionaryInfo>();
+
+                configOptions.GlobalOptions.TryGetValue("build_property.RootNamespace", out var rootNamespace);
                 configOptions.GlobalOptions.TryGetValue("build_property.projectdir", out var projectDir);
-                var text = file.content;
-                var aumlDoc = AumlParser.Parse(text);
-                if (aumlDoc.HasErrors)
+
+                if (string.IsNullOrEmpty(rootNamespace))
                 {
-                    foreach (var message in aumlDoc.Logger.Messages)
-                    {
-                        diagnostics.ReportLogMessage(file.name, message);
-                    }
-                    
+                    spc.ReportDiagnostic(Diagnostic.Create("AUI001", "Build", "No RootNamespace Compiler option provided. Please add <CompilerVisibleProperty Include=\"RootNamespace\" /> to your csproj file.", DiagnosticSeverity.Error, DiagnosticSeverity.Error, true, 0));
                     return;
                 }
-                // Get relative file path for further calculations
-                aumlDoc.RelativeFilePath = file.path.Replace(projectDir, string.Empty);
-                aumlDoc.RootNamespace = @namespace;
-                var transformer = new DefaultAumlTransformer();
+
                 var typeResolver = new RoslynTypeResolver(compilation);
-                var aumlMetadataContainer = transformer.Transform(aumlDoc, typeResolver, diagnostics);
-                if (!diagnostics.HasErrors)
+                var transformer = new DefaultAumlTransformer();
+                var codeGenerator = new AumlSourceGenerator();
+                
+                var metadata = new List<AumlDocument>();
+
+                // Phase 1 - parsing and metadata collection
+                foreach (var file in collectedFiles)
                 {
-                    var codeGenerator = new AumlSourceGenerator();
+                    var diagnostics = new RoslynDiagnosticSink(spc);
+
+                    if (file.Path.EndsWith("FluentDark.xml"))
+                    {
+                        int x = 0;
+                    }
+
+                    var aumlDoc = AumlParser.Parse(file.Content);
+                    if (aumlDoc.HasErrors)
+                    {
+                        foreach (var message in aumlDoc.Logger.Messages)
+                        {
+                            diagnostics.ReportLogMessage(file.Path, message);
+                        }
+                        continue;
+                    }
+
+                    // Get a relative file path for further calculations
+                    var relativePath = file.Path.Replace(projectDir, string.Empty).Replace("\\", "/");
+                    if (relativePath.StartsWith("/"))
+                    {
+                        relativePath = relativePath.Substring(1);
+                    }
+                    
+                    aumlDoc.RelativeFilePath = relativePath;
+                    aumlDoc.RootNamespace = rootNamespace;
+                    
+                    metadata.Add(aumlDoc);
+                }
+
+                // Phase 2 - metadata transform and code generation based on sorted metadata
+                var sortedMetadata = metadata.OrderBy(meta => GetGenerationPriority(meta.Root));
+
+                foreach (var aumlDoc in sortedMetadata)
+                {
+                    if (aumlDoc.Root.TypeReference.Name == "Window")
+                    {
+                        int x = 0;
+                    }
+                    
+                    var diagnostics = new RoslynDiagnosticSink(spc);
+                    
+                    var aumlMetadataContainer = transformer.Transform(aumlDoc, typeResolver, diagnostics);
+                    if (diagnostics.HasErrors)
+                    {
+                        continue;
+                    }
+                    
                     codeGenerator.GenerateSourceCode(aumlMetadataContainer, new RoslynOutputSink(spc), diagnostics);
+
+                    if (aumlMetadataContainer.RootEntityType == EntityType.ResourceDictionary)
+                    {
+                        var info = new ResourceDictionaryInfo(
+                            $"/{aumlDoc.RelativeFilePath}",
+                            $"{aumlMetadataContainer.FullClassName}");
+                        resourceDictionaries.Add(info);
+                    }
+                }
+
+                if (resourceDictionaries.Any())
+                {
+                    codeGenerator.GenerateResourceMap(new RoslynOutputSink(spc), resourceDictionaries);
+                    codeGenerator.GenerateAssemblyAttribute(new RoslynOutputSink(spc));
                 }
             });
+        }
+        
+        private int GetGenerationPriority(AumlAstObjectNode rootNode)
+        {
+            return rootNode.TypeReference.Name switch
+            {
+                "ResourceDictionary" => 0,
+                "StyleSet" => 1,
+                "Theme" => 2,
+                _ => 99
+            };
         }
     }
 }

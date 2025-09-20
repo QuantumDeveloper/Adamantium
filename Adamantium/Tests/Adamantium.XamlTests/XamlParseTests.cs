@@ -1,6 +1,5 @@
 using System.IO;
 using Adamantium.UI.Core.Templates;
-using Adamantium.UI.Markup;
 using Adamantium.UI.Markup.Parsers;
 using NUnit.Framework;
 
@@ -37,7 +36,7 @@ public class XamlParseTests
         var str = File.ReadAllText("ControlTemplateTest2.xml");
         var res = AumlParser.Parse(str);
         var ct = ControlTemplate.Load(res);
-        ct.Build();
+        ct.Build(null);
     }
     
     [Test]

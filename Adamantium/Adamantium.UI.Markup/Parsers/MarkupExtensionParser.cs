@@ -7,7 +7,7 @@ namespace Adamantium.UI.Markup.Parsers;
 
 public class MarkupExtensionParser
 {
-    public static IAumlAstValueNode Parse(string markup, IAumlLineInfo info, List<NamespaceMapping> namespaceMappings)
+    public static IAumlAstValueNode Parse(ParserContext context, string markup, IAumlLineInfo info, List<NamespaceMapping> namespaceMappings)
     {
         markup = markup.Trim();
         
@@ -31,26 +31,24 @@ public class MarkupExtensionParser
             body = markup.Substring(space + 1).Trim();
         }
 
-        IAumlAstTypeReference typeRef = null;
-        if (typeName.Contains(":"))
-        {
-            var parts = typeName.Split(':');
-            var mapping = namespaceMappings.FirstOrDefault(x => x.Prefix == parts[0]);
-            if (mapping.IsClrNamespace)
-            {
-                typeRef = new AumlAstClrTypeReference(info, mapping.Namespace, parts[1], mapping.Assembly);
-            }
-            else
-            {
-                typeRef = new AumlAstXmlTypeReference(info, mapping.Namespace, parts[1]);
-            }
-        }
-        else
-        {
-            typeRef = new AumlAstClrTypeReference(info, string.Empty, typeName, string.Empty);
-        }
-        var result = new AumlAstMarkupExtensionNode(info, typeRef);
+        var extensionTypeRef = ParseTypeName(context, typeName, info, namespaceMappings);
 
+        if (extensionTypeRef is AumlAstXmlTypeReference xmlTypeRef
+            && xmlTypeRef.Namespace == AumlNamespaces.AumlDirective)
+        {
+            var directive = new AumlAstDirective(
+                info,
+                null,
+                xmlTypeRef.Namespace,
+                xmlTypeRef.Name,
+                new AumlAstTextNode(info, body))
+            {
+                TypeReference = extensionTypeRef,
+            };
+            return directive;
+        }
+
+        var result = new AumlAstMarkupExtensionNode(info, extensionTypeRef);
         var splitedParts = SplitByCommasRespectingBraces(body);
 
         foreach (var part in splitedParts)
@@ -60,24 +58,56 @@ public class MarkupExtensionParser
             {
                 string key = part.Substring(0, eq).Trim();
                 string value = part.Substring(eq + 1).Trim();
-                var res = ParseValue(value, info, namespaceMappings);
+                var res = ParseValue(context, value, info, namespaceMappings);
                 result.Arguments.Add(new MarkupArgument(info, key, res));
             }
             else if (!string.IsNullOrWhiteSpace(part))
             {
-                var res = ParseValue(part.Trim(), info, namespaceMappings);
+                var res = ParseValue(context, part.Trim(), info, namespaceMappings);
                 result.Arguments.Add(new MarkupArgument(info, string.Empty, res));
             }
         }
 
         return result;
     }
-    
-    private static IAumlAstValueNode ParseValue(string value, IAumlLineInfo info, List<NamespaceMapping> namespaceMappings)
+
+    public static IAumlAstTypeReference ParseTypeName(ParserContext context, string name, IAumlLineInfo info,
+        List<NamespaceMapping> namespaceMappings)
+    {
+        name = name.Trim();
+        if (name.Contains(":"))
+        {
+            var parts = name.Split(':');
+            var prefix = parts[0];
+            var typeName = parts[1];
+            var mapping = namespaceMappings.FirstOrDefault(x => x.Prefix == prefix);
+            if (mapping == null)
+            {
+                context.Logger.Error($"Prefix {prefix} is not defined in root element.");
+                // Log diagnostic error here
+                return new AumlAstXmlTypeReference(info, string.Empty, typeName);
+            }
+
+            if (mapping.IsClrNamespace)
+            {
+                return new AumlAstClrTypeReference(info, mapping.Namespace, typeName, mapping.Assembly);
+            }
+
+            return new AumlAstXmlTypeReference(info, mapping.Namespace, typeName);
+        }
+        else
+        {
+            // If there is no prefix - this is type withpout namespace (can be in C#)
+
+            return new AumlAstClrTypeReference(info, string.Empty, name, string.Empty);
+        }
+    }
+
+    private static IAumlAstValueNode ParseValue(ParserContext context, string value, IAumlLineInfo info, List<NamespaceMapping> namespaceMappings)
     {
         if (value.StartsWith("{") && value.EndsWith("}"))
         {
-            return Parse(value, info, namespaceMappings);
+            return Parse(context, value, info, namespaceMappings);
         }
 
         return new AumlAstMarkupExtensionLiteral(info, value);

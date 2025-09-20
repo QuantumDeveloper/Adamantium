@@ -66,6 +66,7 @@ public class TextBlock : InputUIComponent
 
     public TextBlock()
     {
+        Id = Guid.NewGuid().ToString();
         _textLayout = new TextLayout(FontFamily.Typeface, FontFamily.Fonts[0]);
     }
 
@@ -166,7 +167,7 @@ public class TextBlock : InputUIComponent
             TextTrimming = TextTrimming,
             TextWrapping = TextWrapping,
             Color = ((SolidColorBrush)Foreground).Color,
-            TextArea = new Mathematics.Rectangle(textPos, DesiredSize)
+            TextArea = new Rectangle(textPos, DesiredSize)
         };
     }
 

@@ -80,7 +80,7 @@ public interface IAdamantiumComponent : IComponent
     /// </summary>
     /// <param name="property">The property.</param>
     /// <param name="value">New value.</param>
-    void SetEffectiveValue(AdamantiumProperty property, object value);
+    // void SetEffectiveValue(AdamantiumProperty property, object value);
 
     AdamantiumProperty GetProperty(string propertyName);
 
@@ -89,6 +89,9 @@ public interface IAdamantiumComponent : IComponent
     public void SetStyleValue(AdamantiumProperty property, object value, Style style);
 
     public void RemoveStyleValue(string propertyName, Style style);
+
+    public void SetTriggerValue(string property, object value);
+    public void SetTriggerValue(AdamantiumProperty property, object value);
 
     /// <summary>
     /// Fires when value on <see cref="AdamantiumProperty"/> was changed

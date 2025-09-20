@@ -1,5 +1,5 @@
-using Adamantium.UI.Core.Collections;
-using Adamantium.UI.Core.Resources;
+using Adamantium.UI.Core.Extensions;
+using Adamantium.UI.Core.Resources.Triggers;
 using Adamantium.UI.Markup.Parsers;
 
 namespace Adamantium.UI.Core.Templates;
@@ -8,27 +8,54 @@ public class ControlTemplate : UiTemplate
 {
     public Type TargetType { get; set; }
     
-    public TriggerCollection Triggers { get; set; }
-    
-    public TemplateOverridesCollection Overrides { get; set; }
-    
-    private Func<IUIComponent> _buildTree { get; }
+    private readonly Func<TemplateResult> _templateBuilder;
 
     public ControlTemplate()
     {
         
     }
-
-    public ControlTemplate(Func<IUIComponent> buildTree)
+   
+    public ControlTemplate(Func<TemplateResult> templateBuilder)
     {
-        _buildTree = buildTree;
+        _templateBuilder = templateBuilder ?? throw new ArgumentNullException(nameof(templateBuilder));
     }
-    
-    public override TemplateResult Build()
+        
+    public override TemplateResult Build(IUIComponent templatedParent)
     {
-        if (_buildTree != null)
+        if (_templateBuilder != null)
         {
-            return new TemplateResult() { RootComponent = _buildTree() };
+            var result = _templateBuilder();
+            
+            result.HostComponent = templatedParent;
+            
+            result.RootComponent.TraverseVisualTree(component =>
+            {
+                var fundamental = (FundamentalUIComponent)component;
+                fundamental.TemplatedParent = templatedParent;
+            });
+
+            foreach (var binding in result.TemplateBindings)
+            {
+                binding.Source = templatedParent;
+                binding.EstablishConnection();
+            }
+            
+            foreach (var binding in result.Bindings)
+            {
+                binding.EstablishConnection();
+            }
+
+            if (result.Triggers.Count > 0)
+            {
+                foreach (var trigger in result.Triggers)
+                {
+                    var context = new TemplateTriggerExecutionContext(result.RootComponent, UIAppContext.Current.ThemeManager.CurrentTheme, result);
+                    var activator = trigger.Apply(context);
+                    result.Activators.Add(activator);
+                }
+            }
+
+            return result;
         }
         else
         {
