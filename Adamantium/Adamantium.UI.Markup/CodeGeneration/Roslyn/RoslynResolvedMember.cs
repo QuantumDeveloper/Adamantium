@@ -36,7 +36,21 @@ public class RoslynResolvedMember : IResolvedMember
         return _symbol.GetAttributes().Any(attr =>
             attr.AttributeClass?.ToDisplayString() == attributeMetadataName);
     }
-    
+
+    public bool HasSetter()
+    {
+        return _symbol switch
+        {
+            IPropertySymbol prop => prop.SetMethod is not null && 
+                                    prop.SetMethod.DeclaredAccessibility == Accessibility.Public,
+
+            IFieldSymbol field => !field.IsReadOnly && 
+                                  field.DeclaredAccessibility == Accessibility.Public,
+
+            _ => false
+        };
+    }
+
     public ResolvedMemberKind MemberKind =>
         _symbol.Kind switch
         {

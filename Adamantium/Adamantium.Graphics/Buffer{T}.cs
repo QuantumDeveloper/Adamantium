@@ -8,7 +8,7 @@ namespace Adamantium.Graphics
     /// A buffer with typed information.
     /// </summary>
     /// <typeparam name="T">Type of an element of this buffer.</typeparam>
-    public class Buffer<T> : Adamantium.Graphics.Buffer where T : struct
+    public class Buffer<T> : Buffer where T : struct
     {
         internal Buffer(IGraphicsDevice device, BufferUsageFlags bufferFlags, DataPointer dataPointer,
             MemoryPropertyFlags memoryFlags, SharingMode sharingMode = SharingMode.Exclusive)

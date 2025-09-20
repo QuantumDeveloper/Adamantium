@@ -3,8 +3,6 @@
 public class StyleSet : AdamantiumComponent, IStyleSet
 {
     public StylesCollection Styles { get; }
-    
-    public Uri Source { get; set; }
 
     public StyleSet()
     {

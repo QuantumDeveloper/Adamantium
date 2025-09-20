@@ -97,6 +97,7 @@ public class WindowRenderService : UiRenderService
     public override void EndDraw()
     {
         GraphicsDevice.EndDraw();
+        windowRenderer.PrepareData();
         GraphicsDevice.BlitImage(GraphicsDevice.CurrentRenderTarget.ResolveTexture,
             windowRenderer.Presenter.GetCurrentImage());
     }
@@ -111,10 +112,9 @@ public class WindowRenderService : UiRenderService
             windowRenderer.ResizePresenter((uint)Window.ClientWidth, (uint)Window.ClientHeight);
         }
 
-        if (_pendingRenderer != null)
-        {
-            windowRenderer = _pendingRenderer;
-            _pendingRenderer = null;
-        }
+        if (_pendingRenderer == null) return;
+        
+        windowRenderer = _pendingRenderer;
+        _pendingRenderer = null;
     }
 }

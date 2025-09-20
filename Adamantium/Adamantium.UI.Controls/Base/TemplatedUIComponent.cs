@@ -1,6 +1,5 @@
 ﻿using Adamantium.UI.Core;
 using Adamantium.UI.Core.Controls;
-using Adamantium.UI.Core.Extensions;
 using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.UI.Core.Templates;
 
@@ -29,7 +28,7 @@ public class TemplatedUIComponent : InputUIComponent, ITemplatedUIComponent
             }
         }
     }
-
+    
     public ControlTemplate Template
     {
         get => GetValue<ControlTemplate>(TemplateProperty);
@@ -47,36 +46,55 @@ public class TemplatedUIComponent : InputUIComponent, ITemplatedUIComponent
     {
         if (Template == null) return;
       
-        templateResult = Template.Build();
+        templateResult = Template.Build(this);
         if (templateResult != null)
         {
+            // var overrides = ControlTemplateOverride.GetOverrides(this);
+            // if (overrides != null)
+            // {
+            //     foreach (var @override in overrides)
+            //     {
+            //         // TODO: add here logic for applying overrides
+            //     }
+            // }
+            
             AddTemplateChild(templateResult.RootComponent);
-            // TODO: применить здесь триггеры
             OnApplyTemplate();
         }
     }
 
     private void RemoveTemplate()
     {
-        templateResult = null;
+        TraverseVisualTreeAndUnload(templateResult.RootComponent);
         RemoveVisualChildren();
+        templateResult.Destroy();
+        templateResult = null;
         OnRemoveTemplate();
     }
     
     protected void AddTemplateChild(IUIComponent child)
     {
-        child.TraverseVisualTree(component =>
-        {
-            var fundamental = (FundamentalUIComponent)component;
-            fundamental.TemplatedParent = this;
-        });
         AddVisualChild(child);
     }
 
     public virtual void OnRemoveTemplate()
     {
-        RaiseEvent(new RoutedEventArgs(UnloadedEvent, this));
+        
     }
+    
+    private void TraverseVisualTreeAndUnload(IUIComponent component)
+    {
+        foreach (var child in component.VisualChildren)
+        {
+            TraverseVisualTreeAndUnload(child);
+        }
+
+        if (component is ObservableUIComponent observableUiComponent)
+        {
+            observableUiComponent.RaiseEvent(new RoutedEventArgs(UnloadedEvent, component));
+        }
+    }
+
 
     public AdamantiumComponent TemplatedParent { get; internal set;}
 

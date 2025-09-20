@@ -37,6 +37,11 @@ public static class WindowExtension
     {
         var control = (MeasurableUIComponent)visualComponent;
         var parent = control.LogicalParent as IMeasurableComponent;
+        if (!control.IsStyleApplied)
+        {
+            control.ApplyCurrentTheme();
+        }
+        
         if (!control.IsMeasureValid)
         {
             if (control is IWindow wnd)
@@ -54,20 +59,6 @@ public static class WindowExtension
             control.Arrange(parent != null ? new Rect(parent.DesiredSize) : new Rect(control.DesiredSize));
         }
     }
-
-    // private static void UpdateComponentLocation(IUIComponent visualComponent)
-    // {
-    //     if (visualComponent.LogicalParent != null)
-    //     {
-    //         visualComponent.Location = visualComponent.Bounds.Location + ((IUIComponent)visualComponent.LogicalParent).Location;
-    //         visualComponent.ClipPosition = visualComponent.ClipRectangle.Location + ((IUIComponent)visualComponent.LogicalParent).Location;
-    //     }
-    //     else
-    //     {
-    //         visualComponent.Location = visualComponent.Bounds.Location;
-    //         visualComponent.ClipPosition = visualComponent.ClipRectangle.Location;
-    //     }
-    // }
 
     private static void MeasureControl(IMeasurableComponent control, Double width, Double height)
     {

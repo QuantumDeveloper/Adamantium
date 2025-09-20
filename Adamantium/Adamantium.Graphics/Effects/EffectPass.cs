@@ -186,8 +186,9 @@ public sealed class EffectPass : DisposableObject, IEffectPass
                     if (!descriptorEntry.TryGetConstantBuffer(link.Parameter.DescriptorSet, link.ResourceIndex,
                             out var entry))
                     {
-                        var nativeBuffer = ToDispose(Buffer.Uniform.New((GraphicsDevice)graphicsDevice,
-                            link.ConstantBuffer.BackingBuffer.Size, BufferUsageFlags.ShaderDeviceAddress));
+                        var alignedSize = graphicsDevice.AlignSize((uint)link.ConstantBuffer.BackingBuffer.Size, 16);
+                        var nativeBuffer = ToDispose(Buffer.Uniform.New((GraphicsDevice)graphicsDevice, alignedSize,
+                            BufferUsageFlags.ShaderDeviceAddress));
                         entry = new BufferEntry(nativeBuffer, link.Parameter.DescriptorSet, link.ResourceIndex);
                         descriptorEntry.ConstantBufferEntries.Add(entry);
                     }
@@ -716,7 +717,6 @@ public sealed class EffectPass : DisposableObject, IEffectPass
         bufferDescriptorInfo.Data.PUniformBuffer = addrInfo;
 
         var descriptorData = DescriptorDataSets[descriptorSet];
-        ;
         var dataPtr = descriptorData.Buffer.MapMemory();
         var offset = graphicsDevice.GetDescriptorSetLayoutOffset(descriptorData.Layout,
             bindingIndex);

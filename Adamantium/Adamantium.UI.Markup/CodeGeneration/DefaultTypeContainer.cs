@@ -11,6 +11,8 @@ public class DefaultTypeContainer
         StyleSet =  typeResolver.ResolveByShortName("StyleSet");
         ITheme = typeResolver.ResolveByShortName("ITheme");
         ControlTemplate = typeResolver.ResolveByShortName("ControlTemplate");
+        TemplateBindingExpression = typeResolver.ResolveByShortName("TemplateBindingExpression");
+        TemplateResult = typeResolver.ResolveByShortName("TemplateResult");
     }
     
     public IResolvedType TypeParser { get; }
@@ -26,6 +28,9 @@ public class DefaultTypeContainer
     public IResolvedType ITheme { get; }
     
     public IResolvedType ControlTemplate { get; }
+    
+    public IResolvedType TemplateBindingExpression { get; }
+    public IResolvedType TemplateResult { get; }
 
     public static DefaultTypeContainer ResolveFrom(ITypeResolver typeResolver)
     {

@@ -4,6 +4,7 @@ namespace Adamantium.UI.Core.Data;
 
 public class TemplateBinding : MarkupExtension
 {
+    [DefaultProperty]
     public string Path { get; set; }
 
     public BindingMode Mode { get; set; } = BindingMode.OneWay;

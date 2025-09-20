@@ -8,6 +8,6 @@
         <Setter Property="Width" Value="Auto"/>
         <Setter Property="Height" Value="Auto"/>
         <Setter Property="BorderBrush" Value="{local:ResourceReference PanelBackgroundBrush}"/>
-        <Setter Property="Background" Value="{ResourceReference ApproveBrush}"/>
+        <Setter Property="Background" Value="{ResourceReference LightIconBrush}"/>
     </Style>
 </StyleSet>

@@ -4,7 +4,6 @@ namespace Adamantium.UI.Core.Resources.Triggers;
 
 public abstract class TriggerBase : ITrigger
 {
-    protected ITheme Theme;
     protected TriggerBase()
     {
         
@@ -20,11 +19,10 @@ public abstract class TriggerBase : ITrigger
                 component.SetBinding(setterProperty, binding);
                 break;
             case ResourceReference resourceReference:
-                if (!theme.Resources.ContainsKey(resourceReference.Name))
+                if (!theme.TryGetResource(resourceReference.Name, out var resource))
                     throw new ResourceNotFoundException(
                         $"Resource {resourceReference.Name} is not found for theme: {theme.Name} and control: {component.GetType().Name}");
                 
-                var resource = theme.Resources[resourceReference.Name];
                 component.SetValue(setterProperty, resource, ValuePriority.Trigger);
                 break;
             default:
@@ -57,7 +55,5 @@ public abstract class TriggerBase : ITrigger
         Setters.Add(setter);
     }
 
-    public abstract void Apply(IFundamentalUIComponent uiComponent, ITheme theme);
-
-    public abstract void Remove(IFundamentalUIComponent uiComponent);
+    public abstract ITriggerActivator Apply(ITriggerExecutionContext context);
 }

@@ -17,4 +17,8 @@ public interface ITypeResolver
     List<IResolvedAssembly> ScanXmlnsAttributes();
 
     IResolvedAssembly GetOrCreateTypeContainerForAssembly(string assemblyName, string xmlNamespace = "");
+    
+    IResolvedAssembly FindAssemblyByNamespace(string targetNamespace);
+
+    void RegisterGeneratedType(IResolvedType type);
 }

@@ -54,7 +54,7 @@ public class ParserContext
 
     public Logger Logger { get; }
     
-    public bool HasErrors { get; private set; }
+    public bool HasErrors => Logger.HasErrors;
     
     public List<NamespaceMapping> NamespaceMappings { get; }
     
@@ -73,12 +73,6 @@ public class ParserContext
     private AumlAstObjectNode ParseAumlNode(XElement element, bool isRoot)
     {
         var targetType = element.GetTypeReference();
-        // if (type.Name is "ControlTemplate" or "DataTemplate" or "HierarchicalDataTemplate")
-        // {
-        //     var templateNode = new AumlAstTemplateNode(element.ToLineInfo(), type, element.ToString());
-        //     
-        //     return templateNode;
-        // }
 
         AumlAstObjectNode objectNode = null;
         switch (targetType.Name)
@@ -205,7 +199,7 @@ public class ParserContext
     
     private IAumlAstValueNode ParseMarkupExtension(string input, IAumlLineInfo info)
     {
-        var result = MarkupExtensionParser.Parse(input, info, NamespaceMappings);
+        var result = MarkupExtensionParser.Parse(this, input, info, NamespaceMappings);
         return result;
     }
 }

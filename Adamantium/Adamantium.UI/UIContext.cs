@@ -10,10 +10,13 @@ internal class UIContext : IUIContext
     internal UIContext(IDependencyResolver resolver, IUIApplication uiApplication)
     {
         Resolver = resolver;
+        ResourceManager = uiApplication.ResourceManager;
         ThemeContext = uiApplication.ThemeManager;
         UIApplication = uiApplication;
     }
     public IDependencyResolver Resolver { get; }
+    
+    public IResourceManager ResourceManager { get; }
     
     public IThemeContext ThemeContext { get; }
     

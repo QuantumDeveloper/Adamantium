@@ -12,16 +12,17 @@ public abstract class BindingExpressionBase
 
    public BindingStatus Status { get; internal set; }
 
-   public AdamantiumComponent Target { get; set; }
+   public IFundamentalUIComponent Target { get; set; }
 
    public AdamantiumProperty TargetProperty { get; set; }
-
+   
    public virtual void UpdateSource()
    { }
 
    public virtual void UpdateTarget()
    { }
 
-   public abstract void Close();
+   public abstract void EstablishConnection();
+   public abstract void CloseConnection();
 
 }

@@ -9,6 +9,8 @@ public interface IResolvedMember
     IResolvedType DeclaringType { get; }
     
     bool HasAttribute(string attributeMetadataName);
+
+    bool HasSetter();
     
     ResolvedMemberKind MemberKind { get; }
 }

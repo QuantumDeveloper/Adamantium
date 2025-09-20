@@ -27,7 +27,7 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
             RoutingStrategy.Tunnel, typeof(TextInputEventHandler), typeof(UIComponent));
         
     public static readonly RoutedEvent MouseLeftButtonDownEvent =
-        EventManager.RegisterRoutedEvent("MouseLeftButtonDown",
+        EventManager.RegisterRoutedEvent( nameof(MouseLeftButtonDown),
             RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UIComponent));
 
     public static readonly RoutedEvent RawMouseLeftButtonDownEvent =

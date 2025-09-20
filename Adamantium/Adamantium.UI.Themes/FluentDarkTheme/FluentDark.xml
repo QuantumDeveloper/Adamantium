@@ -1,0 +1,14 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<Theme xmlns="http://adamantium/ui/resources"
+       xmlns:x="http://adamantium/ui/xaml/extensions"
+       xmlns:fluentDark="clr-namespace:Adamantium.UI.Themes.FluentDarkTheme"
+	   Name="FluentDark"
+       ResourceContext.Source="{ResourceLink Source={x:Type fluentDark:Brushes}, Scope=Theme}">
+
+	<Theme.StyleIncludes>
+		<StyleInclude Source="{x:Type fluentDark:RectangleStyleSet}"/>
+		<StyleInclude Source="{x:Type fluentDark:BorderStyleSet}"/>
+		<StyleInclude Source="{x:Type fluentDark:ButtonStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:ContentControlStyleSet}"/>
+	</Theme.StyleIncludes>
+</Theme>

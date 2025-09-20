@@ -5,7 +5,7 @@ namespace Adamantium.UI.Core.Controls;
 public interface ITemplatedUIComponent : IInputComponent
 {
     ControlTemplate Template { get; set; }
-
+    
     void OnApplyTemplate();
     
     void OnRemoveTemplate();

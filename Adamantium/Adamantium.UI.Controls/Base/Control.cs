@@ -5,7 +5,6 @@ namespace Adamantium.UI.Controls.Base;
 
 public class Control : TemplatedUIComponent, IControl
 {
-   
    public Control()
    {
 

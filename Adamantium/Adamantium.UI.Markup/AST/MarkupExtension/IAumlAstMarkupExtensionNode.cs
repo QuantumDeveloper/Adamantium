@@ -2,4 +2,5 @@
 
 public interface IAumlAstMarkupExtensionNode : IAumlAstValueNode
 {
+    List<IAumlAstMarkupExtensionArgument> Arguments { get; }
 }

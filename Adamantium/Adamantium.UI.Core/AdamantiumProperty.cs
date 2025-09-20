@@ -242,6 +242,11 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
       return property;
    }
 
+   public static AdamantiumProperty RegisterAttached<T>(String name, Type ownerType)
+   {
+      return RegisterAttached(name, typeof(T), ownerType, new PropertyMetadata(null));
+   }
+
    public static AdamantiumProperty RegisterAttached(String name, Type propertyType, Type ownerType, PropertyMetadata propertyMetadata)
    {
       AdamantiumProperty property = new AdamantiumProperty(name, propertyType, ownerType, propertyMetadata)

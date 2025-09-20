@@ -8,6 +8,8 @@ public class ResourceReference : MarkupExtension
     {
         Name = resourceName;
     }
+    
+    [DefaultProperty]
     public string Name { get; }
     public override object ProvideObject(MarkupContext context)
     {

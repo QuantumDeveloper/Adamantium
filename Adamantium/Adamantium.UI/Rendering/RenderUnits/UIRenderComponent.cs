@@ -15,9 +15,9 @@ using Buffer = Adamantium.Graphics.Buffer;
 
 namespace Adamantium.UI.Rendering.RenderUnits;
 
-public abstract class UIRenderComponent : DisposableObject
+public abstract class UIRenderComponent : DeferredDisposableObject
 {
-    protected UIRenderComponent(IGraphicsDevice device, UIBasicEffect uiBasicEffect, Mesh mesh)
+    protected UIRenderComponent(IGraphicsDevice device, UIBasicEffect uiBasicEffect, Mesh mesh) : base(device)
     {
         GraphicsDevice = device;
         Mesh = mesh;
@@ -133,6 +133,10 @@ public class GeometryRenderComponent : UIRenderComponent
         if (Background is SolidColorBrush solidColor)
         {
             UIBasicEffect.FillColor.SetValue(solidColor.Color.ToVector4());
+            if (solidColor == Brushes.Transparent)
+            {
+                UIBasicEffect.Opacity.SetValue(0f);
+            }
             UIBasicEffect.BasicSolidColorPass.Apply();
         }
         

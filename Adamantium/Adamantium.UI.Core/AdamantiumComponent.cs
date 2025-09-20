@@ -289,6 +289,17 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
     {
         return AdamantiumPropertyMap.FindRegistered(GetType(), propertyName);
     }
+    
+    public void SetTriggerValue(string propertyName, object value)
+    {
+        var property = AdamantiumPropertyMap.FindRegistered(GetType(), propertyName);
+        SetTriggerValue(property, value);
+    }
+
+    public void SetTriggerValue(AdamantiumProperty property, object value)
+    {
+        SetValue(property, value, ValuePriority.Trigger);
+    }
 
     public void SetStyleValue(string propertyName, object value, Style style)
     {
@@ -339,11 +350,6 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
     {
         ValidateProperty(property);
 
-        if (value == AdamantiumProperty.UnsetValue)
-        {
-            return;
-        }
-
         lock (values)
         {
             if (property.IsAttached)
@@ -384,33 +390,31 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
     /// </summary>
     /// <param name="property">The property.</param>
     /// <param name="value">New value.</param>
-    public void SetEffectiveValue(AdamantiumProperty property, object value)
-    {
-        ValidateProperty(property);
-
-        if (value == AdamantiumProperty.UnsetValue)
-        {
-            return;
-        }
-
-        lock (values)
-        {
-            if (!values.ContainsKey(property))
-            {
-                return;
-            }
-
-            RunSetValueSequence(property, value, ValuePriority.Effective, false);
-        }
-    }
+    // public void SetEffectiveValue(AdamantiumProperty property, object value)
+    // {
+    //     ValidateProperty(property);
+    //
+    //     if (value == AdamantiumProperty.UnsetValue)
+    //     {
+    //         return;
+    //     }
+    //
+    //     lock (values)
+    //     {
+    //         if (!values.ContainsKey(property))
+    //         {
+    //             return;
+    //         }
+    //
+    //         RunSetValueSequence(property, value, ValuePriority.Effective, false);
+    //     }
+    // }
 
     private object GetOrCalculateEffectiveValue(AdamantiumProperty property)
     {
         if (!values.ContainsKey(property)) return AdamantiumProperty.UnsetValue;
         
-        var value = values[property].GetValue(ValuePriority.Effective);
-        
-        if (value != AdamantiumProperty.UnsetValue) return value;
+        var value = AdamantiumProperty.UnsetValue;
         
         foreach (var val in values[property].Values)
         {
@@ -418,18 +422,16 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
             value = val;
             break;
         }
+        
+        values[property].SetValue(value, ValuePriority.Effective);
+
 
         return value;
     }
 
     private void RunSetValueSequence(AdamantiumProperty property, object value, ValuePriority priority, bool raiseValueChangedEvent)
     {
-        var propertyValue = GetOrCalculateEffectiveValue(property);
-
-        if (Equals(propertyValue, value))
-        {
-            return;
-        }
+        var oldEffectiveValue = GetOrCalculateEffectiveValue(property);
 
         var metadata = property.GetDefaultMetadata(GetType());
         if (property.ValidateValueCallBack?.Invoke(value) == false)
@@ -459,6 +461,13 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         }
         values[property].SetValue(value, priority);
         metadata.PropertyChangedCallback?.Invoke(this, args);
+        
+        var newEffectiveValue = GetOrCalculateEffectiveValue(property);
+        if (Equals(oldEffectiveValue, newEffectiveValue))
+        {
+            return;
+        }
+        
         var element = this as IUIComponent;
         if (element is IMeasurableComponent measurable)
         {
@@ -481,7 +490,7 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
 
         if (raiseValueChangedEvent)
         {
-            RaisePropertyChanged(property, args.OldValue, args.NewValue);
+            RaisePropertyChanged(property, oldEffectiveValue, newEffectiveValue);
         }
     }
 

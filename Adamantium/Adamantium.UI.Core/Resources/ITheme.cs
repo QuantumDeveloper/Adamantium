@@ -1,24 +1,25 @@
-using Adamantium.Core.Collections;
 using Adamantium.Graphics.Core;
 using Adamantium.UI.Core.Media;
 
 namespace Adamantium.UI.Core.Resources;
 
-public interface ITheme: IInitializable
+public interface ITheme: IInitializable, IAdamantiumComponent
 {
     string Name { get; }
     
     Brush AccentColor { get; set; }
     
-    ResourceDictionary Resources { get; }
+    StyleSetCollection StyleSets { get; }
+    
+    StyleIncludeCollection StyleIncludes { get; }
 
-    TrackingCollection<StyleSet> StyleSets { get; }
-
-    void AddResource(StyleSet styleSet);
+    void AddStyleSet(StyleSet styleSet);
     
     StyleSet MergedStyles { get; }
 
     Style[] FindStylesForComponent(IFundamentalUIComponent component);
     
     object GetResource(string key);
+    
+    bool TryGetResource(string key, out object value);
 }

@@ -1,6 +1,8 @@
+using Adamantium.UI.Markup.AST.TypeReference;
+
 namespace Adamantium.UI.Markup.AST;
 
-public class AumlAstDirective : AumlAstNode
+public class AumlAstDirective : AumlAstNode, IAumlAstValueNode
 {
     public string Namespace { get; set; }
     
@@ -22,4 +24,6 @@ public class AumlAstDirective : AumlAstNode
     {
         return $"{Namespace}:{Name}";
     }
+
+    public IAumlAstTypeReference TypeReference { get; set; }
 }

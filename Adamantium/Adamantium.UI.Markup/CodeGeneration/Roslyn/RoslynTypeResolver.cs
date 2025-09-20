@@ -9,6 +9,7 @@ public class RoslynTypeResolver : ITypeResolver
     private IDictionary<string, IResolvedAssembly> _resolvedAssembliesMap;
     private List<IResolvedAssembly> _resolvedAssemblies;
     private IDictionary<string, IResolvedAssembly> _resolvedXmlAssemblies;
+    private IDictionary<string, IResolvedAssembly> _namespaceToAssembleMap;
     
     public RoslynTypeResolver(Compilation compilation)
     {
@@ -16,6 +17,7 @@ public class RoslynTypeResolver : ITypeResolver
         _resolvedAssembliesMap = new Dictionary<string, IResolvedAssembly>();
         _resolvedAssemblies = new List<IResolvedAssembly>();
         _resolvedXmlAssemblies = new Dictionary<string, IResolvedAssembly>();
+        _namespaceToAssembleMap = new Dictionary<string, IResolvedAssembly>();
     }
     
     public IReadOnlyList<IResolvedAssembly> ResolvedAssemblies => _resolvedAssemblies;
@@ -27,12 +29,21 @@ public class RoslynTypeResolver : ITypeResolver
 
     public IResolvedAssembly GetResolvedAssemblyByXmlDefinition(string xmlDefinition)
     {
-        _resolvedXmlAssemblies.TryGetValue(xmlDefinition, out var result);
+        _resolvedXmlAssemblies.TryGetValue(xmlDefinition.Trim('/'), out var result);
         return result;
     }
 
     public IResolvedType Resolve(string metadataName)
     {
+        foreach(var assembly in _resolvedAssemblies)
+        {
+            var resolvedType = assembly.GetTypeByFullName(metadataName);
+            if (resolvedType != null)
+            {
+                return resolvedType;
+            }
+        }
+
         var symbol = _compilation.GetTypeByMetadataName(metadataName);
         return symbol != null ? new RoslynResolvedType(symbol) :  null;
     }
@@ -112,7 +123,7 @@ public class RoslynTypeResolver : ITypeResolver
 
         return result;
     }
-
+    
     public IResolvedAssembly GetOrCreateTypeContainerForAssembly(string assemblyName, string xmlNamespace = "")
     {
         if (_resolvedAssembliesMap.TryGetValue(assemblyName, out var resolvedAssembly))
@@ -145,5 +156,79 @@ public class RoslynTypeResolver : ITypeResolver
         {
             _resolvedXmlAssemblies[xmlDefinition] = assembly;
         }
+    }
+    
+    // Find assembly by namespace when assembly is not specified in the markup
+    public IResolvedAssembly FindAssemblyByNamespace(string targetNamespace)
+    {
+        IResolvedAssembly foundAssembly = null;
+
+        foreach(var assembly in _resolvedAssemblies)
+        {
+            if (DoesAssemblyContainNamespace(assembly, targetNamespace))
+            {
+                foundAssembly = assembly;
+                return assembly;
+            }
+        }
+
+        // Find in the local assembly first
+        var localAssembly = GetLocalAssembly();
+        if (DoesAssemblyContainNamespace(localAssembly, targetNamespace))
+        {
+            foundAssembly = localAssembly;
+        }
+
+        // If there is no namespace in a local assembly, try to find in referenced assemblies
+        if (foundAssembly == null)
+        {
+            foreach (var referencedAssembly in GetReferencedAssemblies())
+            {
+                if (DoesAssemblyContainNamespace(referencedAssembly, targetNamespace))
+                {
+                    foundAssembly = referencedAssembly;
+                    
+                    break; 
+                }
+            }
+        }
+
+        if (foundAssembly != null)
+        {
+            _namespaceToAssembleMap[targetNamespace] = foundAssembly;
+        }
+        
+        return foundAssembly;
+    }
+
+    public void RegisterGeneratedType(IResolvedType type)
+    {
+        var assemblyName = type.AssemblyName;
+        if (!_resolvedAssembliesMap.TryGetValue(assemblyName, out var resolvedAssembly))
+        {
+            var assemblySymbol = _compilation.Assembly;
+            resolvedAssembly = GetOrCreateTypeContainerForAssemblyInternal(assemblySymbol);
+            _resolvedAssembliesMap[assemblyName] = resolvedAssembly;
+        }
+        
+        resolvedAssembly.AddType(type);
+    }
+
+    private IResolvedAssembly GetLocalAssembly()
+    {
+        return new RoslynResolvedAssembly(_compilation.Assembly);
+    }
+
+    private IEnumerable<IResolvedAssembly> GetReferencedAssemblies()
+    {
+        return _compilation.References
+            .Select(r => _compilation.GetAssemblyOrModuleSymbol(r) as IAssemblySymbol)
+            .Where(s => s != null)
+            .Select(s => new RoslynResolvedAssembly(s));
+    }
+
+    private bool DoesAssemblyContainNamespace(IResolvedAssembly assembly, string namespaceName)
+    {
+        return assembly.Types.Any(t => t.Namespace == namespaceName);
     }
 }

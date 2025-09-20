@@ -11,4 +11,6 @@ public interface IResolvedAssembly
     IEnumerable<IResolvedType> GetTypesByNamespace(string @namespace);
 
     IResolvedType GetTypeByFullName(string fullName);
+    
+    void AddType(IResolvedType type);
 }

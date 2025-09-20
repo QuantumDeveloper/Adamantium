@@ -505,7 +505,11 @@ public class Grid: Panel
       
    protected override void OnRender(IDrawingContext context)
    {
-      context.ForControl(this).DrawRectangle(Background, new Rect(new Size(ActualWidth, ActualHeight)));
+      if (Background != Brushes.Transparent)
+      {
+         context.ForControl(this).DrawRectangle(Background, new Rect(new Size(ActualWidth, ActualHeight)));
+      }
+
       if (ShowGridLines && rowSegments != null)
       {
          var lineBrush = Brushes.Black;
@@ -575,7 +579,10 @@ public class Grid: Panel
       double size = 0;
       for (int i = 0; i < segments.Length; ++i)
       {
-         //size += segments[i].Min;
+         size += segments[i].FullSizeWithMargin;
+         
+         // TODO: check if this is correct
+         /*
          if (segments[i].IsAuto)
          {
             size += segments[i].FullSizeWithMargin;
@@ -584,7 +591,7 @@ public class Grid: Panel
          {
             size += segments[i].MeasuredSize + segments[i].Padding + segments[i].Margin;
          }
-         
+         */
       }
       return size;
    }
@@ -690,10 +697,17 @@ public class Grid: Panel
       double desiredX = CalculateTotalSize(colSegments);
       double desiredY = CalculateTotalSize(rowSegments);
       //Debug.WriteLine("Grid measure time = " + measureTimer.ElapsedMilliseconds);
-      
-      desiredX = Math.Max(availableSize.Width, desiredX);
-      desiredY = Math.Max(availableSize.Height, desiredY);
-      
+
+      // if (!double.IsInfinity(availableSize.Width))
+      // {
+      //    desiredX = Math.Max(availableSize.Width, desiredX);
+      // }
+      //
+      // if (!double.IsInfinity(availableSize.Height))
+      // {
+      //    desiredY = Math.Max(availableSize.Height, desiredY);
+      // }
+
       return new Size(desiredX, desiredY);
    }
 
@@ -866,7 +880,7 @@ public class Grid: Panel
          if (segment[i].IsStar)
          {
             allStars += segment[i].Stars;
-            takenSize += segment[i].Margin+ segment[i].Padding;
+            takenSize += segment[i].Margin + segment[i].Padding;
          }
          else
          {
@@ -883,7 +897,7 @@ public class Grid: Panel
          {
             if (segment[i].IsStar)
             {
-               segment[i].MeasuredSize = Math.Max(((finalAvailableSize/allStars)*segment[i].Stars), 0);
+               segment[i].MeasuredSize = Math.Max(((finalAvailableSize / allStars) * segment[i].Stars), 0);
             }
          }
       }

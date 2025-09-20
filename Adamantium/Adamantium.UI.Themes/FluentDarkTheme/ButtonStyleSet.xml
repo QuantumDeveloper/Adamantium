@@ -6,21 +6,28 @@
         <Setter Property="Width" Value="Auto"/>
         <Setter Property="Height" Value="Auto"/>
         <Setter Property="Background" Value="DarkGray"/>
-        <Setter Property="BorderBrush" Value="Red" />
+        <Setter Property="BorderBrush" Value="Yellow" />
     </Style>
     
     <Style Selector="Button">
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <controls:Grid  HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <controls:Border x:Name="InnerBorder" 
-                                Margin="10"
+                    <controls:Grid>
+                        <controls:Border x:Name="InnerBorder"
+                                Width="{TemplateBinding Width}"
+                                Height="{TemplateBinding Height}"
                                 CornerRadius="4" 
-                                Background="DarkOrange"
+                                Background="{TemplateBinding Background}"
                                 BorderBrush="{ResourceReference DeclineBrush}"
-                                BorderThickness="4"
-                        />
+                                BorderThickness="4">
+                                     <controls:ContentPresenter
+                                             HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                             VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                             Content="{TemplateBinding Content}"
+                                             ContentTemplate="{TemplateBinding ContentTemplate}"
+                                             ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                        </controls:Border>
                     </controls:Grid>
                     <ControlTemplate.Triggers>
                         <PropertyTrigger Property="IsMouseOver" Value="true">

@@ -5,6 +5,9 @@ namespace Adamantium.UI.Core.Resources;
 public class Style : AdamantiumComponent
 {
     private Dictionary<AdamantiumProperty, ISetter> settersDict;
+    
+    private static readonly AdamantiumProperty ActiveActivatorsProperty =
+        AdamantiumProperty.RegisterAttached<List<ITriggerActivator>>("ActiveActivators", typeof(AdamantiumComponent));
 
     public Style()
     {
@@ -73,9 +76,17 @@ public class Style : AdamantiumComponent
             setter.Apply(component, this, Theme);
         }
 
-        foreach (var trigger in Triggers)
+        if (Triggers.Count > 0)
         {
-            trigger.Apply(component, Theme);
+            var activators = GetOrCreateActiveActivators(component);
+            foreach (var trigger in Triggers)
+            {
+                var context = new StyleTriggerExecutionContext(component, Theme);
+
+                var activator = trigger.Apply(context);
+                
+                activators.Add(activator);
+            }
         }
     }
     
@@ -93,9 +104,34 @@ public class Style : AdamantiumComponent
             setter.Remove(component, this, Theme);
         }
 
-        foreach (var trigger in Triggers)
+        var activators = GetActiveActivators(component);
+        if (activators != null)
         {
-            trigger.Remove(component);
+            foreach (var activator in activators)
+            {
+                activator.Deactivate();
+            }
         }
+    }
+    
+    private static List<ITriggerActivator> GetActiveActivators(IFundamentalUIComponent component)
+    {
+        return component.GetValue<List<ITriggerActivator>>(ActiveActivatorsProperty);
+    }
+
+    private static List<ITriggerActivator> GetOrCreateActiveActivators(IFundamentalUIComponent component)
+    {
+        var activators = GetActiveActivators(component);
+        if (activators == null)
+        {
+            activators = new List<ITriggerActivator>();
+            component.SetValue(ActiveActivatorsProperty, activators);
+        }
+        return activators;
+    }
+
+    public override string ToString()
+    {
+        return $"{Selector}";
     }
 }

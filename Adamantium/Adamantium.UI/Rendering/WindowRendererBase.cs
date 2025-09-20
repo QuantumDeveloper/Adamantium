@@ -22,7 +22,12 @@ public abstract class WindowRendererBase : IWindowRenderer
     protected PresentationParameters Parameters { get; set; }
     
     protected UIBasicEffect UiEffect { get; set; }
-    
+
+    public virtual void PrepareData()
+    {
+        
+    }
+
     public GraphicsPresenter Presenter { get; private set; }
     
     protected WindowRendererBase(IGraphicsDevice device, IRenderUnitFactory renderUnitFactory)
