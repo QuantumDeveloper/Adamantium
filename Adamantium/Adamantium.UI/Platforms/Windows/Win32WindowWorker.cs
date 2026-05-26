@@ -97,7 +97,6 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         this.window.ClientWidth = (uint)client.Width;
         this.window.ClientHeight = (uint)client.Height;
 
-        //this.window.OnApplyTemplate();
         UIContext.ThemeContext.ApplyCurrentTheme(this.window);
         UIContext.UIApplication.AddWindow(this.window);
                 

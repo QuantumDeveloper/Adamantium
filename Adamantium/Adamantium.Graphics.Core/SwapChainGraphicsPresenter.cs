@@ -1,4 +1,5 @@
 ﻿using System;
+using Adamantium.Graphics.Core.Extensions;
 using Adamantium.Graphics.Core.Presentation;
 using AdamantiumVulkan.Core;
 using Serilog;
@@ -10,8 +11,10 @@ namespace Adamantium.Graphics.Core
         private SwapchainKHR swapchain;
         private SurfaceKHR surface;
         private ITexture[] swapchainTextures;
-        private Queue presentQueue;
-        private SwapchainKHR[] swapchains;
+        private readonly Queue presentQueue;
+        private readonly SwapchainKHR[] _swapchains;
+        private Semaphore[] _waitSemaphores;
+        private uint[] _imageIndicesArray;
 
         public SwapChainGraphicsPresenter(
             IGraphicsDevice graphicsDevice, 
@@ -20,7 +23,9 @@ namespace Adamantium.Graphics.Core
         {
             BackBuffers = new ITexture[BuffersCount];
             presentQueue = graphicsDevice.GraphicsQueue;
-            swapchains = new SwapchainKHR[1];
+            _swapchains = new SwapchainKHR[1];
+            _waitSemaphores = new Semaphore[1];
+            _imageIndicesArray = new uint[1];
             
             CreateSurface();
             CreateSwapchain();
@@ -108,8 +113,6 @@ namespace Adamantium.Graphics.Core
             Description.Height = extent.Height;
             Description.ImageFormat = surfaceFormat.Format;
 
-            createInfo.Dispose();
-
             var images = logicalDevice.GetSwapchainImagesKHR(swapchain);
             swapchainTextures = new ITexture[images.Length];
             for (int i = 0; i < images.Length; i++)
@@ -125,7 +128,7 @@ namespace Adamantium.Graphics.Core
                         name:$"SwapchainImage_{i}");
             }
             CreateImageViews();
-            swapchains[0] = swapchain;
+            _swapchains[0] = swapchain;
         }
 
         private void CreateImageViews()
@@ -274,13 +277,16 @@ namespace Adamantium.Graphics.Core
         
         private PresentInfoKHR FillPresentInfo(uint imageIndex)
         {
+            _waitSemaphores[0] = GraphicsDevice.GetRenderFinishedSemaphore();
+            _imageIndicesArray[0] = imageIndex;
+            
             var presentInfo = new PresentInfoKHR();
             presentInfo.WaitSemaphoreCount = 1;
-            presentInfo.PWaitSemaphores = [GraphicsDevice.GetRenderFinishedSemaphore()];
+            presentInfo.PWaitSemaphores = _waitSemaphores;
 
-            presentInfo.SwapchainCount = (uint)swapchains.Length;
-            presentInfo.PSwapchains = swapchains;
-            presentInfo.PImageIndices = [imageIndex];
+            presentInfo.SwapchainCount = (uint)_swapchains.Length;
+            presentInfo.PSwapchains = _swapchains;
+            presentInfo.PImageIndices = _imageIndicesArray;
         
             return presentInfo;
         }
@@ -311,6 +317,7 @@ namespace Adamantium.Graphics.Core
 
         private void RecreateSwapchain()
         {
+            GraphicsDevice.LogicalDevice.DeviceWaitIdle();
             CleanupSwapChain();
             CreateSwapchain();
             CreateRenderTarget();

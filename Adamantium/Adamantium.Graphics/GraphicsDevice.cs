@@ -37,7 +37,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     private PrimitiveTopology primitiveTopology;
     private IEffectPass currentEffectPass;
 
-    private Queue<DisposableObject>[] _deferedDisposeQueue;
+    private Queue<IDisposable>[] _deferedDisposeQueue;
         
     // -- Drawing States
         
@@ -118,10 +118,10 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
     private void InitializeDeferQueue()
     {
-        _deferedDisposeQueue = new Queue<DisposableObject>[MaxFramesInFlight];
+        _deferedDisposeQueue = new Queue<IDisposable>[MaxFramesInFlight];
         for (int i = 0; i < MaxFramesInFlight; i++)
         {
-            _deferedDisposeQueue[i] = new Queue<DisposableObject>();
+            _deferedDisposeQueue[i] = new Queue<IDisposable>();
         }
     }
 
@@ -144,7 +144,8 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         
     public bool EnableDynamicRendering { get; private set; }
 
-    public CommandPool CommandPool { get; private set; }
+    public CommandPool GraphicsCommandPool { get; private set; }
+    public CommandPool TransferCommandPool { get; private set; }
     internal Semaphore[] ImageAvailableSemaphores { get; private set; }
     internal Semaphore[] RenderFinishedSemaphores { get; private set; }
     internal Fence[] InFlightFences { get; private set; }
@@ -349,7 +350,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         _graphicsResources.Add(resource);
     }
 
-    public void AddToDeferDisposeQueue(DisposableObject obj)
+    public void AddToDeferDisposeQueue(IDisposable obj)
     {
         _deferedDisposeQueue[CurrentFrame].Enqueue(obj);
     }
@@ -372,11 +373,6 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     public RenderPass CreateRenderPass(RenderPassCreateInfo createInfo)
     {
         return LogicalDevice.CreateRenderPass(createInfo);
-    }
-
-    public uint AlignSize(uint size, uint alignment)
-    {
-        return (size + alignment - 1) & ~(alignment - 1);
     }
 
     public DescriptorPool CreateDescriptorPool(DescriptorPoolCreateInfo info)
@@ -412,13 +408,22 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     private void CreateCommandPool()
     {
         var graphicsFamily = MainDevice.QueueFamilyContainer.GetFamilyInfo(QueueFlagBits.GraphicsBit);
+        var resourceFamily = MainDevice.QueueFamilyContainer.GetFamilyInfo(QueueFlagBits.TransferBit);
 
         var poolInfo = new CommandPoolCreateInfo
         {
             QueueFamilyIndex = graphicsFamily.FamilyIndex,
             Flags = CommandPoolCreateFlagBits.ResetCommandBufferBit
         };
-        CommandPool = LogicalDevice.CreateCommandPool(poolInfo);
+        GraphicsCommandPool = LogicalDevice.CreateCommandPool(poolInfo);
+        
+        poolInfo = new CommandPoolCreateInfo
+        {
+            QueueFamilyIndex = resourceFamily.FamilyIndex,
+            Flags = CommandPoolCreateFlagBits.TransientBit
+        };
+        
+        TransferCommandPool = LogicalDevice.CreateCommandPool(poolInfo);
         GraphicsQueue = MainDevice.GetAvailableGraphicsQueue();
         unsafe
         {
@@ -435,7 +440,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         commandBuffers = new CommandBuffer[buffersCount];
 
         var allocInfo = new CommandBufferAllocateInfo();
-        allocInfo.CommandPool = CommandPool;
+        allocInfo.CommandPool = GraphicsCommandPool;
         //allocInfo.Level = IsPrimaryDevice ? CommandBufferLevel.Primary : CommandBufferLevel.Secondary;
         allocInfo.Level = CommandBufferLevel.Primary;
         allocInfo.CommandBufferCount = buffersCount;
@@ -491,7 +496,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
             LayerCount = (~0U)
         };
         
-        ImageMemoryBarrier barrier = new ImageMemoryBarrier();
+        var barrier = new ImageMemoryBarrier();
         barrier.SrcQueueFamilyIndex = (~0U);
         barrier.DstQueueFamilyIndex = (~0U);
         barrier.SrcAccessMask = sourceAccessMask;
@@ -502,8 +507,8 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         barrier.SubresourceRange = range;
 
         commandBuffer.PipelineBarrier(
-            (uint)sourceStageMask,
-            (uint)destinationStageMask,
+            sourceStageMask,
+            destinationStageMask,
             0,
             0,
             null,
@@ -521,7 +526,6 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         foreach (var renderTarget in inputTargets)
         {
             var barrier = new ImageMemoryBarrier2();
-            barrier.SType = StructureType.ImageMemoryBarrier2;
             barrier.SrcStageMask = PipelineStageFlagBits2.TopOfPipeBit;
             barrier.SrcAccessMask = AccessFlagBits2.None;
             barrier.DstStageMask = PipelineStageFlagBits2.ColorAttachmentOutputBit;
@@ -545,7 +549,6 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         }
 
         var dependencyInfo = new DependencyInfo();
-        dependencyInfo.SType = StructureType.DependencyInfo;
         dependencyInfo.PImageMemoryBarriers = barriers.ToArray();
         dependencyInfo.ImageMemoryBarrierCount = (uint)barriers.Count;
         
@@ -559,7 +562,6 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         var barriers = new List<ImageMemoryBarrier2>();
 
         var barrier = new ImageMemoryBarrier2();
-        barrier.SType = StructureType.ImageMemoryBarrier2;
         barrier.SrcStageMask = PipelineStageFlagBits2.TopOfPipeBit;
         barrier.SrcAccessMask = AccessFlagBits2.None;
         barrier.DstStageMask = PipelineStageFlagBits2.EarlyFragmentTestsBit | PipelineStageFlagBits2.LateFragmentTestsBit;
@@ -582,7 +584,6 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         depthBuffer.ImageLayout = ImageLayout.DepthStencilAttachmentOptimal;
 
         var dependencyInfo = new DependencyInfo();
-        dependencyInfo.SType = StructureType.DependencyInfo;
         dependencyInfo.PImageMemoryBarriers = barriers.ToArray();
         dependencyInfo.ImageMemoryBarrierCount = (uint)barriers.Count;
         
@@ -595,7 +596,6 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         foreach (var renderTarget in inputTargets)
         {
             var barrier = new ImageMemoryBarrier2();
-            barrier.SType = StructureType.ImageMemoryBarrier2;
             barrier.SrcStageMask = PipelineStageFlagBits2.ColorAttachmentOutputBit;
             barrier.SrcAccessMask = AccessFlagBits2.ColorAttachmentWriteBit;
             barrier.DstStageMask = PipelineStageFlagBits2.FragmentShaderBit;
@@ -619,7 +619,6 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         }
         
         var dependencyInfo = new DependencyInfo();
-        dependencyInfo.SType = StructureType.DependencyInfo;
         dependencyInfo.PImageMemoryBarriers = barriers.ToArray();
         dependencyInfo.ImageMemoryBarrierCount = (uint)barriers.Count;
         
@@ -633,7 +632,6 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         var barriers = new List<ImageMemoryBarrier2>();
 
         var barrier = new ImageMemoryBarrier2();
-        barrier.SType = StructureType.ImageMemoryBarrier2;
         barrier.SrcStageMask = PipelineStageFlagBits2.EarlyFragmentTestsBit | PipelineStageFlagBits2.LateFragmentTestsBit;
         barrier.SrcAccessMask = AccessFlagBits2.DepthStencilAttachmentWriteBit;
         barrier.DstStageMask = PipelineStageFlagBits2.FragmentShaderBit | PipelineStageFlagBits2.ComputeShaderBit;
@@ -654,7 +652,6 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         barriers.Add(barrier);
 
         var dependencyInfo = new DependencyInfo();
-        dependencyInfo.SType = StructureType.DependencyInfo;
         dependencyInfo.PImageMemoryBarriers = barriers.ToArray();
         dependencyInfo.ImageMemoryBarrierCount = (uint)barriers.Count;
         
@@ -771,7 +768,6 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
             {
                 var renderTarget = renderTargets[i];
                 var colorAttachmentInfo = new RenderingAttachmentInfo();
-                colorAttachmentInfo.SType = StructureType.RenderingAttachmentInfo;
                 colorAttachmentInfo.ImageLayout = ImageLayout.ColorAttachmentOptimal;
                 colorAttachmentInfo.LoadOp = loadOperation;
                 colorAttachmentInfo.StoreOp = AttachmentStoreOp.Store;
@@ -794,7 +790,6 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
             var height = renderTargets[0].Height;
 
             var depthAttachmentInfo = new RenderingAttachmentInfo();
-            depthAttachmentInfo.SType = StructureType.RenderingAttachmentInfo;
             depthAttachmentInfo.ImageView = depthBuffer?.GetImageView();
             depthAttachmentInfo.ImageLayout = ImageLayout.DepthStencilAttachmentOptimal;
             depthAttachmentInfo.ResolveMode = ResolveModeFlagBits.None;
@@ -803,7 +798,6 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
             depthAttachmentInfo.ClearValue = clearDepthValue;
 
             var renderingInfo = new RenderingInfo();
-            renderingInfo.SType = StructureType.RenderingInfo;
             renderingInfo.RenderArea = new Rect2D();
             renderingInfo.RenderArea.Extent = new Extent2D(){ Width = width, Height = height};
             renderingInfo.RenderArea.Offset = new Offset2D();
@@ -836,7 +830,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
             //     PipelineStageFlagBits.EarlyFragmentTestsBit | PipelineStageFlagBits.LateFragmentTestsBit,
             //     PipelineStageFlagBits.EarlyFragmentTestsBit | PipelineStageFlagBits.LateFragmentTestsBit
             // );
-                
+            
             commandBuffer.BeginRendering(renderingInfo);
         }
     }
@@ -848,6 +842,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         if (EnableDynamicRendering)
         {
             commandBuffer.EndRendering();
+
             //InsertMemoryBarrier();
             // TransitionImagesAfterRendering(commandBuffer, renderTargets);
             // TransitionDepthBufferAfterRendering(commandBuffer, depthBuffer);
@@ -874,7 +869,6 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     {
         var memoryBarrier = new MemoryBarrier2
         {
-            SType = StructureType.MemoryBarrier2,
             SrcStageMask = PipelineStageFlagBits2.ColorAttachmentOutputBit,
             SrcAccessMask = AccessFlagBits2.ColorAttachmentWriteBit,
             DstStageMask = PipelineStageFlagBits2.ColorAttachmentOutputBit,
@@ -883,9 +877,8 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
         var dependencyInfo = new DependencyInfo
         {
-            SType = StructureType.DependencyInfo,
             MemoryBarrierCount = 1,
-            PMemoryBarriers = [memoryBarrier]
+            PMemoryBarriers = new[] {memoryBarrier}
         };
 
         CurrentCommandBuffer.PipelineBarrier2(dependencyInfo);
@@ -944,7 +937,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
             Log.Logger.Error($"failed to reset fences. Result: {result}");
             //throw new Exception($"failed to reset fences. Result: {result}");
         }
-            
+
         result = GraphicsQueue.QueueSubmit(1, submitInfos, renderFence);
             
         if (result != Result.Success)
@@ -1025,10 +1018,10 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     {
         if (vertexBuffers == null || vertexBuffers.Length == 0) return;
 
-        ulong[] offset = new ulong[vertexBuffers.Length];
+        var offsets = new VkDeviceSize[vertexBuffers.Length];
         var commandBuffer = commandBuffers[CurrentFrame];
         var buffers = vertexBuffers.Select(x=>x.GetBuffer()).ToArray();
-        commandBuffer.BindVertexBuffers(0, (uint)buffers.Length, buffers, offset);
+        commandBuffer.BindVertexBuffers(0, (uint)buffers.Length, buffers, offsets);
     }
 
     public void SetIndexBuffer(IBuffer indexBuffer)
@@ -1039,38 +1032,65 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
     private void SetDrawingState(CommandBuffer commandBuffer)
     {
-        LogicalDevice.SetViewportWithCountEXT(commandBuffer, viewports.ToArray());
-        LogicalDevice.SetScissorsWithCountEXT(commandBuffer, scissors.ToArray());
-        LogicalDevice.SetRasterizerDiscardEnableEXT(commandBuffer, RasterizerDiscardEnabled);
+        commandBuffer.SetViewportWithCount((uint)viewports.Count, viewports.ToArray());
+        commandBuffer.SetScissorWithCount((uint)scissors.Count, scissors.ToArray());
+        commandBuffer.SetRasterizerDiscardEnable(RasterizerDiscardEnabled);
+        
+        //LogicalDevice.SetViewportWithCountEXT(commandBuffer, viewports.ToArray());
+        //LogicalDevice.SetScissorsWithCountEXT(commandBuffer, scissors.ToArray());
+        //LogicalDevice.SetRasterizerDiscardEnableEXT(commandBuffer, RasterizerDiscardEnabled);
             
         var bindingDescription = VertexType.GetBindingDescription2();
         var attributes = VertexType.GetVertexAttributeDescription2();
-        LogicalDevice.SetVertexInputEXT(commandBuffer,1, bindingDescription, (uint)attributes.Length, attributes);
-        LogicalDevice.SetPrimitiveTopologyEXT(commandBuffer, PrimitiveTopology);
-        LogicalDevice.SetPrimitiveRestartEnableEXT(commandBuffer, PrimitiveRestartEnable);
-        LogicalDevice.SetRasterizationSamplesEXT(commandBuffer, (SampleCountFlagBits)MSAALevel);
-        LogicalDevice.SetSampleMaskEXT(commandBuffer, (SampleCountFlagBits)MSAALevel, SampleMask);
-        LogicalDevice.SetAlphaToCoverageEnableEXT(commandBuffer, AlphaToCoverageEnable);
-        LogicalDevice.SetPolygonModeEXT(commandBuffer, PolygonMode);
+        commandBuffer.SetVertexInputEXT(1, bindingDescription, (uint)attributes.Length, attributes);
+        commandBuffer.SetPrimitiveTopology(PrimitiveTopology);
+        commandBuffer.SetPrimitiveRestartEnable(PrimitiveRestartEnable);
+        commandBuffer.SetRasterizationSamplesEXT((SampleCountFlagBits)MSAALevel);
+        commandBuffer.SetSampleMaskEXT((SampleCountFlagBits)MSAALevel, SampleMask);
+        commandBuffer.SetAlphaToCoverageEnableEXT(AlphaToCoverageEnable);
+        commandBuffer.SetPolygonModeEXT(PolygonMode);
+        
+        //LogicalDevice.SetVertexInputEXT(commandBuffer,1, bindingDescription, (uint)attributes.Length, attributes);
+        //LogicalDevice.SetPrimitiveTopologyEXT(commandBuffer, PrimitiveTopology);
+        //LogicalDevice.SetPrimitiveRestartEnableEXT(commandBuffer, PrimitiveRestartEnable);
+        //LogicalDevice.SetRasterizationSamplesEXT(commandBuffer, (SampleCountFlagBits)MSAALevel);
+        //LogicalDevice.SetSampleMaskEXT(commandBuffer, (SampleCountFlagBits)MSAALevel, SampleMask);
+        //LogicalDevice.SetAlphaToCoverageEnableEXT(commandBuffer, AlphaToCoverageEnable);
+        //LogicalDevice.SetPolygonModeEXT(commandBuffer, PolygonMode);
         if (PolygonMode == PolygonMode.Line)
         {
             commandBuffer.SetLineWidth(LineWidth);  
         }
             
-        LogicalDevice.SetCullModeEXT(commandBuffer, CullMode);
-        LogicalDevice.SetFrontFaceEXT(commandBuffer, FrontFace);
-        LogicalDevice.SetDepthWriteEnableEXT(commandBuffer, DepthWriteEnable);
-        LogicalDevice.SetDepthTestEnableEXT(commandBuffer, DepthTestEnabled);
-        LogicalDevice.SetDepthCompareOpEXT(commandBuffer, DepthCompareFunction);
-        LogicalDevice.SetDepthBoundsTestEnableEXT(commandBuffer, DepthBoundsTestEnabled);
-        LogicalDevice.SetDepthBiasEnableEXT(commandBuffer, DepthBiasEnabled);
-        LogicalDevice.SetDepthClampEnableEXT(commandBuffer, DepthClampEnable);
-        LogicalDevice.SetStencilTestEnableEXT(commandBuffer, StencilTestEnabled);
-        LogicalDevice.SetLogicOpEnableEXT(commandBuffer, LogicOperationsEnabled);
+        commandBuffer.SetCullMode(CullMode);
+        commandBuffer.SetFrontFace(FrontFace);
+        commandBuffer.SetDepthWriteEnable(DepthWriteEnable);
+        commandBuffer.SetDepthTestEnable(DepthTestEnabled);
+        commandBuffer.SetDepthCompareOp(DepthCompareFunction);
+        commandBuffer.SetDepthBoundsTestEnable(DepthBoundsTestEnabled);
+        commandBuffer.SetDepthBiasEnable(DepthBiasEnabled);
+        commandBuffer.SetDepthClampEnableEXT(DepthClampEnable);
+        commandBuffer.SetStencilTestEnable(StencilTestEnabled);
+        commandBuffer.SetLogicOpEnableEXT(LogicOperationsEnabled);
+        
+        commandBuffer.SetColorBlendEquationEXT(0, 1, ColorBlendEquation);
+        commandBuffer.SetColorBlendEnableEXT(0, 1, ColorBlendEnabled);
+        commandBuffer.SetColorWriteMaskEXT(0, 1, ColorComponentFlags);
+        
+        // LogicalDevice.SetCullModeEXT(commandBuffer, CullMode);
+        // LogicalDevice.SetFrontFaceEXT(commandBuffer, FrontFace);
+        // LogicalDevice.SetDepthWriteEnableEXT(commandBuffer, DepthWriteEnable);
+        // LogicalDevice.SetDepthTestEnableEXT(commandBuffer, DepthTestEnabled);
+        // LogicalDevice.SetDepthCompareOpEXT(commandBuffer, DepthCompareFunction);
+        // LogicalDevice.SetDepthBoundsTestEnableEXT(commandBuffer, DepthBoundsTestEnabled);
+        // LogicalDevice.SetDepthBiasEnableEXT(commandBuffer, DepthBiasEnabled);
+        // LogicalDevice.SetDepthClampEnableEXT(commandBuffer, DepthClampEnable);
+        // LogicalDevice.SetStencilTestEnableEXT(commandBuffer, StencilTestEnabled);
+        // LogicalDevice.SetLogicOpEnableEXT(commandBuffer, LogicOperationsEnabled);
             
-        LogicalDevice.SetColorBlendEquationEXT(commandBuffer, 0, 1, ColorBlendEquation);
-        LogicalDevice.SetColorBlendEnableEXT(commandBuffer, ColorBlendEnabled);
-        LogicalDevice.SetColorWriteMaskEXT(commandBuffer, ColorComponentFlags);
+        // LogicalDevice.SetColorBlendEquationEXT(commandBuffer, 0, 1, ColorBlendEquation);
+        // LogicalDevice.SetColorBlendEnableEXT(commandBuffer, ColorBlendEnabled);
+        // LogicalDevice.SetColorWriteMaskEXT(commandBuffer, ColorComponentFlags);
     }
 
     public void Draw(ulong vertexCount, uint instanceCount, uint firstVertex = 0, uint firstInstance = 0)
@@ -1102,13 +1122,13 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
     public CommandBuffer BeginSingleTimeCommand()
     {
-        return LogicalDevice.BeginSingleTimeCommand(CommandPool);
+        _submissionSync?.Wait();
+        return LogicalDevice.BeginSingleTimeCommand(TransferCommandPool);
     }
 
     public void EndSingleTimeCommand(CommandBuffer commandBuffer)
     {
-        _submissionSync?.Wait();
-        LogicalDevice.EndSingleTimeCommands(resourceQueue, CommandPool, commandBuffer);
+        LogicalDevice.EndSingleTimeCommands(resourceQueue, TransferCommandPool, commandBuffer);
         _submissionSync?.Release();
     }
 
@@ -1127,12 +1147,12 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         LogicalDevice.BindDescriptorBuffers(commandBuffer, bindings);
     }
 
-    public void SetDescriptorBufferOffsets(CommandBuffer commandBuffer, PipelineBindPoint pipelineBindPoint, PipelineLayout layout,
-        uint dataSet, uint setCount, uint[] bufferIndices, ulong[] offsets)
-    {
-        LogicalDevice.SetDescriptorBufferOffsets(commandBuffer, pipelineBindPoint, layout, dataSet, setCount,
-            bufferIndices, offsets);
-    }
+    // public void SetDescriptorBufferOffsets(CommandBuffer commandBuffer, PipelineBindPoint pipelineBindPoint, PipelineLayout layout,
+    //     uint dataSet, uint setCount, uint[] bufferIndices, ulong[] offsets)
+    // {
+    //     LogicalDevice.SetDescriptorBufferOffsets(commandBuffer, pipelineBindPoint, layout, dataSet, setCount,
+    //         bufferIndices, offsets);
+    // }
 
     public uint GetDescriptorSetLayoutSize(DescriptorSetLayout layout)
     {
@@ -1147,9 +1167,9 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
     public uint DescriptorBufferOffsetAlignment => (uint)MainDevice.GraphicsAdapter
         .DeviceBufferProperties.DescriptorBufferOffsetAlignment;
-    public unsafe void GetDescriptor(DescriptorGetInfoEXT descriptorGetInfoExt, uint descriptorSize, void* descriptorPtr)
+    public void GetDescriptor(DescriptorGetInfoEXT descriptorGetInfoExt, uint descriptorSize, nuint descriptorPtr)
     {
-        LogicalDevice.GetDescriptor(descriptorGetInfoExt, descriptorSize, descriptorPtr);
+        LogicalDevice.GetDescriptorEXT(descriptorGetInfoExt, descriptorSize, descriptorPtr);
     }
 
     public void Destroy(DescriptorSetLayout layout)
@@ -1192,7 +1212,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         swapchain.Destroy(LogicalDevice);
     }
 
-    public unsafe void* MapMemory(DeviceMemory memory, ulong offset, ulong size, uint flags)
+    public nuint MapMemory(DeviceMemory memory, ulong offset, ulong size, MemoryMapFlagBits flags)
     {
         return LogicalDevice.MapMemory(memory, offset, size, flags);
     }
@@ -1237,8 +1257,9 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         if (IsResourceLoaderDevice)
         {
             Log.Logger.Debug("Disposing Resource loading device");
-            LogicalDevice?.FreeCommandBuffers(CommandPool, (uint)commandBuffers.Length, commandBuffers);
-            LogicalDevice?.DestroyCommandPool(CommandPool);
+            LogicalDevice?.FreeCommandBuffers(GraphicsCommandPool, (uint)commandBuffers.Length, commandBuffers);
+            LogicalDevice?.DestroyCommandPool(GraphicsCommandPool);
+            LogicalDevice?.DestroyCommandPool(TransferCommandPool);
         }
         else
         {
@@ -1252,8 +1273,8 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
                 LogicalDevice?.DestroyFence(InFlightFences[i]);
             }
             
-            LogicalDevice?.FreeCommandBuffers(CommandPool, (uint)commandBuffers.Length, commandBuffers);
-            LogicalDevice?.DestroyCommandPool(CommandPool);
+            LogicalDevice?.FreeCommandBuffers(GraphicsCommandPool, (uint)commandBuffers.Length, commandBuffers);
+            LogicalDevice?.DestroyCommandPool(GraphicsCommandPool);
             
             SamplerStates?.Dispose();
         }

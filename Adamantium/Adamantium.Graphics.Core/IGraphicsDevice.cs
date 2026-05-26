@@ -113,9 +113,11 @@ public unsafe interface IGraphicsDevice : IDrawableDevice, IDynamicStateDevice, 
 {
     Guid DeviceId { get; }
     
+    uint MaxFramesInFlight { get; }
+    
     void AddResource(GraphicsResource resource);
     
-    void AddToDeferDisposeQueue(DisposableObject obj);
+    void AddToDeferDisposeQueue(IDisposable obj);
     
     IEffectResourceLinker CreateEffectResourceLinker();
     
@@ -129,7 +131,7 @@ public unsafe interface IGraphicsDevice : IDrawableDevice, IDynamicStateDevice, 
     
     EffectPool DefaultEffectPool { get; }
 
-    unsafe void* MapMemory(DeviceMemory memory, ulong offset, ulong size, uint flags);
+    nuint MapMemory(DeviceMemory memory, ulong offset, ulong size, MemoryMapFlagBits flags);
 
     public void UnmapMemory(DeviceMemory memory);
     
@@ -153,7 +155,7 @@ public unsafe interface IGraphicsDevice : IDrawableDevice, IDynamicStateDevice, 
     
     void BindDescriptorBuffers(CommandBuffer commandBuffer, params DescriptorBufferBindingInfoEXT[] bindings);
     
-    void SetDescriptorBufferOffsets(CommandBuffer commandBuffer, PipelineBindPoint pipelineBindPoint, PipelineLayout layout, uint dataSet, uint setCount, uint[] bufferIndices, ulong[] offsets);
+    // void SetDescriptorBufferOffsets(CommandBuffer commandBuffer, PipelineBindPoint pipelineBindPoint, PipelineLayout layout, uint dataSet, uint setCount, uint[] bufferIndices, ulong[] offsets);
     
     uint GetDescriptorSetLayoutSize(DescriptorSetLayout layout);
     
@@ -162,12 +164,10 @@ public unsafe interface IGraphicsDevice : IDrawableDevice, IDynamicStateDevice, 
     ulong SamplerDescriptorSize { get; }
     
     ulong SampledImageDescriptorSize { get; }
-
-    uint AlignSize(uint size, uint alignment);
     
     uint DescriptorBufferOffsetAlignment { get; }
 
-    void GetDescriptor(DescriptorGetInfoEXT descriptorGetInfoExt, uint descriptorSize, void* descriptorPtr);
+    void GetDescriptor(DescriptorGetInfoEXT descriptorGetInfoExt, uint descriptorSize, nuint descriptorPtr);
     
     Color ClearColor { get; set; }
     

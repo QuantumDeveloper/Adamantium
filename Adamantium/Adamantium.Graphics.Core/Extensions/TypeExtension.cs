@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Adamantium.Graphics.Core
+namespace Adamantium.Graphics.Core.Extensions
 {
    public static class TypeExtension
    {

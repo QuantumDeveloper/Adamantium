@@ -2,6 +2,7 @@
 using System.IO;
 using System.Runtime.InteropServices;
 using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Core.Extensions;
 using Adamantium.Imaging;
 using Adamantium.Win32;
 using AdamantiumVulkan.Core;
@@ -116,7 +117,7 @@ public unsafe class Texture : GraphicsResource, ITexture
             out var stagingBufferMemory);
             
         var data = GraphicsDevice.MapMemory(stagingBufferMemory, 0, totalSizeInBytes, 0);
-        System.Buffer.MemoryCopy(pointerToPixelData.ToPointer(), data, totalSizeInBytes, totalSizeInBytes);
+        System.Buffer.MemoryCopy(pointerToPixelData.ToPointer(), (void*)data, totalSizeInBytes, totalSizeInBytes);
         GraphicsDevice.UnmapMemory(stagingBufferMemory);
             
         CreateImage(Description, MemoryPropertyFlags.DeviceLocal, out vulkanImage, out vulkanImageMemory);
@@ -446,7 +447,7 @@ public unsafe class Texture : GraphicsResource, ITexture
         unsafe
         {
             var data = GraphicsDevice.MapMemory(stagingBufferMemory, 0, TotalSizeInBytes, 0);
-            System.Buffer.MemoryCopy(data, img.DataPointer.ToPointer(),
+            System.Buffer.MemoryCopy((void*)data, img.DataPointer.ToPointer(),
                 img.TotalSizeInBytes, img.TotalSizeInBytes);
             GraphicsDevice.UnmapMemory(stagingBufferMemory);
         }

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Adamantium.Mathematics;
@@ -10,50 +9,35 @@ namespace Adamantium.Fonts.TextureGeneration
     public class TextureAtlasGenerator
     {
         private FontAtlasData atlasData;
-        private Size atlasSize;
-        private UInt32 glyphTextureSize;
-        private byte sampleRate;
-        private double pxRange;
         private Typeface typeface;
+        private FontParameters parameters;
         private IFont font;
-        private uint startGlyphIndex;
-        private uint glyphCount;
-        private GlyphSortingVariant sortingVariant;
-        private uint glyphMargin;
-
+        
         public TextureAtlasGenerator(
             Typeface typeface, 
             IFont font, 
-            uint glyphTextureSize,
-            byte sampleRate, 
-            double pxRange, 
-            uint startGlyphIndex, 
-            uint glyphCount,
-            GlyphSortingVariant sortingVariant,
-            uint glyphMargin)
+            FontAtlasData atlasData,
+            FontParameters parameters)
         {
-            this.glyphTextureSize = glyphTextureSize;
-            this.sampleRate = sampleRate;
-            this.pxRange = pxRange;
+            this.atlasData = atlasData;
+            this.parameters = parameters;
             this.typeface = typeface;
             this.font = font;
-            this.startGlyphIndex = startGlyphIndex;
-            this.glyphCount = glyphCount;
-            this.sortingVariant = sortingVariant;
-            this.glyphMargin = glyphMargin;
-            atlasData = new FontAtlasData(glyphTextureSize);
         }
 
+        // This method is needed when we want to create a texture for a certain number of glyphs
+        // before we start to process them 
         public FontAtlasData PrepareTextureAtlas(bool useProportionalSize = true)
         {
-            Parallel.For((int)startGlyphIndex, (int)(startGlyphIndex + glyphCount),
-                new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount }, (index) => CalculateTextureDataForGlyph(index, useProportionalSize));
-
+            Parallel.For((int)parameters.StartGlyphIndex, (int)(parameters.StartGlyphIndex + parameters.GlyphCount),
+                new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount },
+                (index) => CalculateTextureDataForGlyph((uint)index, useProportionalSize));
+        
             var totalBytes = atlasData.GlyphData.Sum(x => x.Pixels.Length);
             var totalPixels = totalBytes / 4; 
             var pixelsPerRow = (uint)Math.Ceiling(Math.Sqrt(totalPixels));
-
-            return sortingVariant == GlyphSortingVariant.ByIndex
+        
+            return parameters.SortingVariant == GlyphSortingVariant.ByIndex
                 ? CalculateForSortingByIndex(pixelsPerRow)
                 : CalculateForSortingBySize(pixelsPerRow);
         }
@@ -76,6 +60,23 @@ namespace Adamantium.Fonts.TextureGeneration
                 .ToList();
 
             return CalculateFontAtlasData(textureData, pixelsPerRow);
+        }
+
+        private void CalculateTextureDataForAtlas(GlyphTextureData[] textureData)
+        {
+            uint itemsInRow = (uint)atlasData.AtlasSize.Width / parameters.MsdfTextureSize;
+
+            foreach (var glyphData in textureData)
+            {
+                var indexInAtlas = glyphData.IndexInAtlas;
+                var positionInRow = indexInAtlas % itemsInRow;
+                var positionInColumn = indexInAtlas / itemsInRow;
+                
+                glyphData.BoundingRect.Left = (int)(parameters.MsdfTextureSize * positionInRow);
+                glyphData.BoundingRect.Top = (int)(parameters.MsdfTextureSize * positionInColumn);
+                
+                glyphData.CalculateUV(atlasData.AtlasSize);
+            }
         }
 
         private FontAtlasData CalculateFontAtlasData(List<GlyphTextureData> textureData, uint pixelsPerRow, bool makeFullCalculations = false)
@@ -111,7 +112,7 @@ namespace Adamantium.Fonts.TextureGeneration
                 yOffset += maxHeight;
                 heights.Clear();
             }
-            atlasSize = new Size(resultWidth, yOffset);
+            var atlasSize = new Size(resultWidth, yOffset);
             atlasData.ImageData = new byte[(int)atlasSize.Width * (int)atlasSize.Height * 4];
             atlasData.AtlasSize = atlasSize;
             
@@ -144,27 +145,69 @@ namespace Adamantium.Fonts.TextureGeneration
             return atlasData;
         }
 
-        public GlyphTextureData[] GenerateTextureForGlyphs(Glyph[] glyphs)
+        public void CopyTextureDataToImage(IReadOnlyList<GlyphTextureData> textureData)
         {
-            if (glyphs == null || glyphs.Length == 0)
+            var atlasWidth = atlasData.AtlasSize.Width;
+            var bytesPerPixel = 4;
+            var atlasStride = atlasWidth * bytesPerPixel;
+            var bytes = (ulong)(atlasData.AtlasSize.Width * atlasData.AtlasSize.Height * 4);
+            atlasData.ImageData = new byte[bytes];
+            foreach (var glyph in textureData)
             {
-                return Array.Empty<GlyphTextureData>();
+                var glyphPixels = glyph.Pixels;
+                var glyphWidth = glyph.BoundingRect.Width;
+                var glyphHeight = glyph.BoundingRect.Height;
+                var glyphStride = glyphWidth * bytesPerPixel;
+
+                var destPixelX = glyph.BoundingRect.X;
+                var destPixelY = glyph.BoundingRect.Y;
+        
+                for (int y = 0; y < glyphHeight; ++y)
+                {
+                    var sourceIndex = y * glyphStride;
+
+                    var destinationIndex = (int)((destPixelY + y) * atlasStride + (destPixelX * bytesPerPixel));
+
+                    Buffer.BlockCopy(
+                        src: glyphPixels, 
+                        srcOffset: sourceIndex, 
+                        dst: atlasData.ImageData, 
+                        dstOffset: destinationIndex, 
+                        count: glyphStride);
+                }
+            }
+        }
+
+        public IReadOnlyList<GlyphTextureData> GenerateTextureForGlyphs(IReadOnlyList<Glyph> glyphs)
+        {
+            if (glyphs == null || glyphs.Count == 0)
+            {
+                return [];
             }
 
             Parallel.ForEach(glyphs,
                 new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount }, GenerateTextureForGlyph);
 
-            return atlasData.GetGlyphData(glyphs.Select(x=>x.Index).ToArray());
+            var data = atlasData.GetGlyphData(glyphs.Select(x=>x.Index).ToArray());
+            foreach (var glyphTextureData in data)
+            {
+                glyphTextureData.IndexInAtlas = atlasData.NextIndexInArray;
+                glyphTextureData.DepthLayer = atlasData.CurrentDepthLayer;
+            }
+            
+            CalculateTextureDataForAtlas(data);
+
+            return data;
         }
 
         public FontAtlasData GenerateTextureAtlas()
         {
-            if (glyphCount <= 0)
+            if (parameters.GlyphCount <= 0)
             {
-                return default;
+                return null;
             }
 
-            Parallel.For((int)startGlyphIndex, (int)(startGlyphIndex + glyphCount),
+            Parallel.For((int)parameters.StartGlyphIndex, (int)(parameters.StartGlyphIndex + parameters.GlyphCount),
                 new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount }, GenerateTextureForGlyph);
 
             var totalBytes = atlasData.GlyphData.Sum(x => x.Pixels.Length);
@@ -183,31 +226,34 @@ namespace Adamantium.Fonts.TextureGeneration
         private void GenerateTextureForGlyph(int glyphIndex)
         {
             typeface.GetGlyphByIndex((uint)glyphIndex, out var glyph);
-            glyph.Sample(sampleRate);
+            glyph.Sample(parameters.SampleRate);
 
-            var textureData = glyph.GenerateDirectMSDF(glyphTextureSize, pxRange, font.UnitsPerEm, glyphMargin);
-            if (textureData == null) return;
-            
-            atlasData.AddGlyphData(textureData);
+            GenerateTextureForGlyph(glyph);
         }
 
         private void GenerateTextureForGlyph(Glyph glyph)
         {
             glyph.CalculateEmRelatedMultipliers(font.UnitsPerEm);
-            glyph.Sample(sampleRate);
-            var textureData = atlasData.GetGlyphData(glyph.Index);
-            if (textureData == null) return;
-
-            glyph.GenerateGlyphData(textureData, pxRange, font.UnitsPerEm);
+            glyph.Sample(parameters.SampleRate);
+            var textureData = glyph.GenerateDirectMSDF(parameters.PlacingVariant, parameters.MsdfTextureSize, parameters.PixelRange, font.UnitsPerEm, parameters.GlyphMargin);
+            
+            if (textureData == null) 
+                return;
+            
+            atlasData.AddGlyphData(textureData);
         }
 
-        private void CalculateTextureDataForGlyph(int glyphIndex, bool useProportionalSize = true)
+        private GlyphTextureData CalculateTextureDataForGlyph(uint glyphIndex, bool useProportionalSize = true)
         {
-            typeface.GetGlyphByIndex((uint)glyphIndex, out var glyph);
-            glyph.Sample(sampleRate);
-            var textureData = glyph.IsEmpty ? null : glyph.PrepareData(glyphTextureSize, font.UnitsPerEm, glyphMargin, useProportionalSize);
-            if (textureData == null) return;
+            typeface.GetGlyphByIndex(glyphIndex, out var glyph);
+            glyph.Sample(parameters.SampleRate);
+            var textureData = glyph.IsEmpty ? null : glyph.PrepareData(parameters.MsdfTextureSize, font.UnitsPerEm, parameters.GlyphMargin, useProportionalSize);
+            
+            if (textureData == null) 
+                return null;
+            
             atlasData.AddGlyphData(textureData);
+            return textureData;
         }
     }
 }

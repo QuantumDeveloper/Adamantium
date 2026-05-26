@@ -23,7 +23,8 @@ namespace Adamantium.Fonts.Extensions
 
         public static string GetString(this uint tag)
         {
-            byte[] bytes = BitConverter.GetBytes(tag).Reverse().ToArray();
+            byte[] bytes = BitConverter.GetBytes(tag);
+            Array.Reverse(bytes);
             return Encoding.UTF8.GetString(bytes, 0, bytes.Length);
         }
     }

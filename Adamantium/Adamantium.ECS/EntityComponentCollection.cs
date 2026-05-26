@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Adamantium.Core.Collections;
 using Adamantium.ECS.ComponentsBasics;
 using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Core.Extensions;
 
 namespace Adamantium.ECS
 {

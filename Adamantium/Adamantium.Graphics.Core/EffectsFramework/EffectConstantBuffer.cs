@@ -16,15 +16,18 @@ public sealed class EffectConstantBuffer : DisposableObject, IEquatable<EffectCo
     /// <see cref="DataBuffer"/> for buffering variables
     /// </summary>
     public readonly DataBuffer BackingBuffer;
+    public Guid Id { get; } = Guid.NewGuid();
 
-    public EffectData.ConstantBuffer Description;
+    public readonly EffectData.ConstantBuffer Description;
     
     private readonly int hashCode;
-    private DataPointer pointer;
+    
+    private ulong _contentHash;
 
     public EffectConstantBuffer(EffectData.ConstantBuffer description)
     {
-        BackingBuffer = new DataBuffer(description.Size);
+        var alignedSize = Utilities.AlignSize((uint)description.Size, 16);
+        BackingBuffer = new DataBuffer(alignedSize);
         Description = description;
         Name = description.Name;
         Parameters = new EffectParameterCollection(description.Parameters.Count);
@@ -52,12 +55,33 @@ public sealed class EffectConstantBuffer : DisposableObject, IEquatable<EffectCo
     /// When using Set(value) methods on this buffer, this property must be set to true to ensure that the buffer will
     /// be uploaded.
     /// </remarks>
-    public bool IsDirty;
+    public bool IsDirty { get; private set; }
 
     /// <summary>
     /// Gets the parameters registered for this constant buffer.
     /// </summary>
     public readonly EffectParameterCollection Parameters;
+    
+    public void CheckForChanges()
+    {
+        var newHash = CalculateHash();
+        if (newHash != _contentHash)
+        {
+            _contentHash = newHash;
+            IsDirty = true;
+        }
+        else
+        {
+            IsDirty = false;
+        }
+    }
+
+    private unsafe ulong CalculateHash()
+    {
+        var dataSpan = new Span<byte>(BackingBuffer.DataPointer.ToPointer(), (int)BackingBuffer.Size);
+        // Use a quick non-cryptographic hash function
+        return System.IO.Hashing.Crc64.HashToUInt64(dataSpan);
+    }
 
     /// <summary>
     /// Copies the CPU content of this buffer to another constant buffer. 

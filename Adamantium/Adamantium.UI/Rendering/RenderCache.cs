@@ -75,60 +75,60 @@ public class RenderCache
     private void ProcessRenderCommands(IUIComponent component, Matrix4x4F projectionMatrix)
     {
         var drawCommands = _drawingContextInternal.GetDrawCommands();
-            if (drawCommands.Any())
+        if (drawCommands.Any())
+        {
+            bool isNewControl = false;
+            if (!_unitsByControl.TryGetValue(component.RenderId, out var units))
             {
-                bool isNewControl = false;
-                if (!_unitsByControl.TryGetValue(component.RenderId, out var units))
-                {
-                    units = new List<IRenderUnit>();
-                    _unitsByControl[component.RenderId] = units;
-                    isNewControl = true;
-                }
+                units = new List<IRenderUnit>();
+                _unitsByControl[component.RenderId] = units;
+                isNewControl = true;
+            }
 
-                for (int i = 0; i < drawCommands.Count; i++)
+            for (int i = 0; i < drawCommands.Count; i++)
+            {
+                var command = drawCommands[i];
+                command.RenderData.ProjectionMatrix = projectionMatrix;
+                if (i > units.Count || isNewControl)
                 {
-                    var command = drawCommands[i];
-                    command.RenderData.ProjectionMatrix = projectionMatrix;
-                    if (i > units.Count || isNewControl)
+                    var unit = _renderUnitFactory.CreateRenderUnitFromCommand(command);
+                    units.Add(unit);
+                }
+                else
+                {
+                    var unit = units[i];
+                    if (unit.Match(command))
                     {
-                        var unit = _renderUnitFactory.CreateRenderUnitFromCommand(command);
-                        units.Add(unit);
+                        unit.UpdateWithDrawCommand(command);
                     }
                     else
                     {
-                        var unit = units[i];
-                        if (unit.Match(command))
-                        {
-                            unit.UpdateWithDrawCommand(command);
-                        }
-                        else
-                        {
-                            unit.Dispose();
-                            unit = _renderUnitFactory.CreateRenderUnitFromCommand(command);
-                            units[i] = unit;
-                        }
+                        unit.Dispose();
+                        unit = _renderUnitFactory.CreateRenderUnitFromCommand(command);
+                        units[i] = unit;
                     }
                 }
-                
-                // Remove extra units
-                if (units.Count > drawCommands.Count)
-                {
-                    for (int i = drawCommands.Count; i < units.Count; i++)
-                        units[i].Dispose();
+            }
 
-                    units.RemoveRange(drawCommands.Count, units.Count - drawCommands.Count);
-                }
-                
-                _unitsByControl[component.RenderId] = units;
+            // Remove extra units
+            if (units.Count > drawCommands.Count)
+            {
+                for (int i = drawCommands.Count; i < units.Count; i++)
+                    units[i].Dispose();
+
+                units.RemoveRange(drawCommands.Count, units.Count - drawCommands.Count);
+            }
+
+            _unitsByControl[component.RenderId] = units;
+            _renderUnits.AddRange(units);
+        }
+        else
+        {
+            if (_unitsByControl.TryGetValue(component.RenderId, out var units))
+            {
                 _renderUnits.AddRange(units);
             }
-            else
-            {
-                if (_unitsByControl.TryGetValue(component.RenderId, out var units))
-                {
-                    _renderUnits.AddRange(units);
-                }
-            }
+        }
     }
 
     private void OnComponentDetachedFromVisualTree(object sender, VisualTreeAttachmentEventArgs e)

@@ -1,8 +1,9 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
-using System.Threading;
 using Adamantium.Core;
 using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Core.Extensions;
 using AdamantiumVulkan.Core;
 using QuantumBinding.Utils;
 using VulkanBuffer = AdamantiumVulkan.Core.Buffer;
@@ -113,7 +114,7 @@ namespace Adamantium.Graphics
         private unsafe void UpdateBufferContent(DeviceMemory bufferMemory, DataPointer dataPointer, ulong offset = 0)
         {
             var data = GraphicsDevice.MapMemory(bufferMemory, offset, dataPointer.Size, 0);
-            System.Buffer.MemoryCopy(dataPointer.Pointer.ToPointer(), data, dataPointer.Size, dataPointer.Size);
+            System.Buffer.MemoryCopy(dataPointer.Pointer.ToPointer(), (void*)data, dataPointer.Size, dataPointer.Size);
             GraphicsDevice.UnmapMemory(bufferMemory);
         }
 
@@ -150,10 +151,7 @@ namespace Adamantium.Graphics
             if (usage.HasFlag(BufferUsageFlags.ShaderDeviceAddress))
             {
                 allocFlagsInfo.Flags = MemoryAllocateFlagBits.DeviceAddressBit;
-                unsafe
-                {
-                    allocInfo.PNext = NativeUtils.StructOrEnumToPointer(allocFlagsInfo.ToNative());
-                }
+                allocInfo.PNext = allocFlagsInfo;
             }
 
             bufferMemory = GraphicsDevice.LogicalDevice.AllocateMemory(allocInfo);
@@ -169,10 +167,9 @@ namespace Adamantium.Graphics
         {
             var commandBuffer = GraphicsDevice.BeginSingleTimeCommand();
 
-            BufferCopy copyRegin = new BufferCopy();
-            copyRegin.Size = size;
-            var regions = new BufferCopy[] { copyRegin };
-            commandBuffer.CopyBuffer(srcBuffer, dstBuffer, 1, regions);
+            var copyRegion = new BufferCopy();
+            copyRegion.Size = size;
+            commandBuffer.CopyBuffer(srcBuffer, dstBuffer, 1, copyRegion);
 
             GraphicsDevice.EndSingleTimeCommand(commandBuffer);
         }
@@ -264,11 +261,11 @@ namespace Adamantium.Graphics
                 throw new ArgumentException("Length of TData is larger than size of buffer");
 
             var data = GraphicsDevice.MapMemory(BufferMemory, 0, toData.Size, 0);
-            System.Buffer.MemoryCopy(data, toData.Pointer.ToPointer(), toData.Size, toData.Size);
+            System.Buffer.MemoryCopy((void*)data, toData.Pointer.ToPointer(), toData.Size, toData.Size);
             GraphicsDevice.UnmapMemory(BufferMemory);
         }
 
-        public unsafe void* MapMemory()
+        public nuint MapMemory()
         {
             return GraphicsDevice.MapMemory(BufferMemory, 0, TotalSize, 0);
         }
@@ -350,7 +347,6 @@ namespace Adamantium.Graphics
         public UInt64 GetDeviceAddress()
         {
             var bufferDeviceAddressInfo = new BufferDeviceAddressInfo();
-            bufferDeviceAddressInfo.SType  = StructureType.BufferDeviceAddressInfo;
             bufferDeviceAddressInfo.Buffer = VulkanBuffer;
             return GraphicsDevice.LogicalDevice.GetBufferDeviceAddress(bufferDeviceAddressInfo);
         }

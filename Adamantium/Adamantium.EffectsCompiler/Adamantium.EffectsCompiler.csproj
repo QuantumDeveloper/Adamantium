@@ -24,7 +24,6 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\..\QuantumBinding\QuantumBinding.Utils\QuantumBinding.Utils.csproj" />
       <ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" />
       <ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
     </ItemGroup>

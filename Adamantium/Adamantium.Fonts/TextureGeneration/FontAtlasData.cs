@@ -29,12 +29,37 @@ namespace Adamantium.Fonts.TextureGeneration
         public string Name { get; set; }
         
         public uint GlyphTextureSize { get; }
+        
+        public uint CurrentIndexInArray { get; private set; }
+        
+        public uint CurrentDepthLayer { get; private set; }
+        
+        public uint NextIndexInArray
+        {
+            get
+            {
+                var index = CurrentIndexInArray++;
+                if (index > 255)
+                {
+                    CurrentIndexInArray = 0;
+                    index = 0;
+                    CurrentDepthLayer++;
+                }
+                return index;
+            }
+        }
 
         public FontAtlasData(uint glyphTextureSize)
         {
             GlyphTextureSize = glyphTextureSize;
             glyphData = new List<GlyphTextureData>();
             glyphDataMap = new Dictionary<uint, GlyphTextureData>();
+            CurrentDepthLayer = 1;
+        }
+
+        public FontAtlasData(uint glyphTextureSize, Size atlasSize) : this(glyphTextureSize)
+        {
+            AtlasSize = atlasSize;
         }
 
         public void GenerateGlyphDataMap()
@@ -84,8 +109,8 @@ namespace Adamantium.Fonts.TextureGeneration
         public static FontAtlasData Load(byte[] data)
         {
             var resolver = CompositeResolver.Create(
-               new IMessagePackFormatter[] { TypelessFormatter.Instance },
-               new IFormatterResolver[] { StandardResolverAllowPrivate.Instance });
+                [TypelessFormatter.Instance],
+                [StandardResolverAllowPrivate.Instance]);
 
             var options = MessagePackSerializerOptions.Standard
                 .WithCompression(MessagePackCompression.Lz4BlockArray)
@@ -99,8 +124,8 @@ namespace Adamantium.Fonts.TextureGeneration
         public byte[] Save()
         {
             var resolver = CompositeResolver.Create(
-               new IMessagePackFormatter[] { TypelessFormatter.Instance },
-               new IFormatterResolver[] { StandardResolverAllowPrivate.Instance });
+                [TypelessFormatter.Instance],
+                [StandardResolverAllowPrivate.Instance]);
 
             var options = MessagePackSerializerOptions.Standard
                 .WithCompression(MessagePackCompression.Lz4BlockArray)

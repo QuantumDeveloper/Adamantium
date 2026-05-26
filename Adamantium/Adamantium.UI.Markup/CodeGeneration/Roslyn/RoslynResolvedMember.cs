@@ -21,7 +21,7 @@ public class RoslynResolvedMember : IResolvedMember
             return _symbol switch
             {
                 IPropertySymbol prop => new RoslynResolvedType(prop.Type),
-                IFieldSymbol field => new RoslynResolvedType(field.Type),
+                IFieldSymbol f => new RoslynResolvedType(f.Type),
                 IMethodSymbol method => new RoslynResolvedType(method.ReturnType),
                 IEventSymbol evt => new RoslynResolvedType(evt.Type),
                 _ => null

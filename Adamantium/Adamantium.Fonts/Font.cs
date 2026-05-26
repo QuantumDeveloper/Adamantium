@@ -206,7 +206,7 @@ namespace Adamantium.Fonts
             }
         }
         
-        public Glyph[] TranslateIntoGlyphs(string input)
+        public IReadOnlyList<Glyph> TranslateIntoGlyphs(string input)
         {
             var translatedGlyphs = new List<Glyph>();
             foreach (var character in input)
@@ -220,7 +220,7 @@ namespace Adamantium.Fonts
                 translatedGlyphs.Add(glyph);
             }
 
-            return translatedGlyphs.ToArray();
+            return translatedGlyphs;
         }
 
         public Glyph GetGlyphByIndex(uint index)

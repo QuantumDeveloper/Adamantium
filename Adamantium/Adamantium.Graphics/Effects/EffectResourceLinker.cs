@@ -10,20 +10,36 @@ namespace Adamantium.Graphics.Effects;
 
 internal class ResourceInfo<T> : PropertyChangedBase where T : class
 {
+    private T resource;
+
     public ResourceInfo()
     {
-            
     }
         
     public ResourceInfo(T resource)
     {
         Resource = resource;
     }
-    public T Resource { get; set; }
+
+    public T Resource
+    {
+        get => resource;
+        set
+        {
+            if (resource != value)
+            {
+                IsDirty = true;
+            }
+            
+            resource = value;
+        }
+    }
 
     public int SlotIndex { get; set; }
         
     public int DescriptorSet { get; set; } 
+    
+    public bool IsDirty { get; private set; }
 }
     
 internal class EffectResourceLinker : IEffectResourceLinker

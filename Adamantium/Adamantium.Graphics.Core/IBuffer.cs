@@ -102,9 +102,9 @@ public interface IBuffer: IDisposable
     /// <msdn-id>ff476457</msdn-id>	
     /// <unmanaged>HRESULT ID3D11DeviceContext::Map([In] ID3D11Resource* pResource,[In] unsigned int Subresource,[In] D3D11_MAP MapType,[In] D3D11_MAP_FLAG MapFlags,[Out] D3D11_MAPPED_SUBRESOURCE* pMappedResource)</unmanaged>	
     /// <unmanaged-short>ID3D11DeviceContext::Map</unmanaged-short>	
-    unsafe void GetData(DataPointer toData);
+    void GetData(DataPointer toData);
 
-    unsafe void* MapMemory();
+    nuint MapMemory();
     void UnmapMemory();
 
     /// <summary>

@@ -49,25 +49,23 @@ namespace Adamantium.Core
             unsafe
             {
                 if (userBuffer == null)
-                    throw new ArgumentNullException("userBuffer");
+                    throw new ArgumentNullException(nameof(userBuffer));
 
                 if (index < 0 || index > userBuffer.Length)
                     throw new ArgumentException("Index is out of range [0, userBuffer.Length-1]", "index");
-
-                DataBuffer buffer;
 
                 var sizeOfBuffer = Utilities.SizeOf(userBuffer);
                 var indexOffset = index * Utilities.SizeOf<T>();
 
                 var handle = GCHandle.Alloc(userBuffer, GCHandleType.Pinned);
-                buffer = new DataBuffer(indexOffset + (byte*)handle.AddrOfPinnedObject(), (ulong)(sizeOfBuffer - indexOffset), handle);
+                var buffer = new DataBuffer(indexOffset + (byte*)handle.AddrOfPinnedObject(), (ulong)(sizeOfBuffer - indexOffset), handle);
 
                 return buffer;
             }
         }
 
         /// <summary>
-        ///   Initializes a new instance of the <see cref = "SharpDX.DataBuffer" /> class, and allocates a new buffer to use as a backing store.
+        ///   Initializes a new instance of the <see cref = "DataBuffer" /> class, and allocates a new buffer to use as a backing store.
         /// </summary>
         /// <param name = "sizeInBytes">The size of the buffer to be allocated, in bytes.</param>
         /// <exception cref = "T:System.ArgumentOutOfRangeException">
@@ -95,7 +93,7 @@ namespace Adamantium.Core
 
 
         /// <summary>
-        ///   Initializes a new instance of the <see cref = "SharpDX.DataBuffer" /> class, using an unmanaged buffer as a backing store.
+        ///   Initializes a new instance of the <see cref = "DataBuffer" /> class, using an unmanaged buffer as a backing store.
         /// </summary>
         /// <param name = "userBuffer">A pointer to the buffer to be used as a backing store.</param>
         /// <param name = "sizeInBytes">The size of the buffer provided, in bytes.</param>

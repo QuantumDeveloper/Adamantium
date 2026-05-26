@@ -3,10 +3,12 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
-using Adamantium.Mathematics;
+using Vector2 = Adamantium.Mathematics.Vector2;
+using Vector3 = Adamantium.Mathematics.Vector3;
 
 namespace Adamantium.Core
 {
@@ -197,21 +199,46 @@ namespace Adamantium.Core
 
             return (ushort)(b1 << 8 | b2 << 0);
         }
-
-        public static IEnumerable<byte> GetBytesWithReversedEndian(int value)
+        
+        #if NET9_0_OR_GREATER
+        public static IEnumerable<byte> GetBytesWithReversedEndian<T>(T value) where T : unmanaged, IBinaryInteger<T>
         {
-            return BitConverter.GetBytes(value).Reverse();
+            int size = System.Runtime.CompilerServices.Unsafe.SizeOf<T>();
+            byte[] bytes = new byte[size];
+
+            if (BitConverter.IsLittleEndian)
+            {
+                value.WriteBigEndian(bytes);
+            }
+            else
+            {
+                value.WriteLittleEndian(bytes);
+            }
+
+            return bytes;
+        }
+        #endif
+        
+        public static IEnumerable<byte> GetBytesWithReversedEndian(uint value, int size)
+        {
+            byte[] bytes = new byte[size];
+        
+            for (int i = 0; i < size; i++)
+            {
+                bytes[size - 1 - i] = (byte)(value >> (i * 8));
+            }
+
+            return bytes;
         }
 
-        public static IEnumerable<byte> GetBytesWithReversedEndian(uint value)
-        {
-            return BitConverter.GetBytes(value).Reverse();
-        }
+        public static IEnumerable<byte> GetBytesWithReversedEndian(int value) 
+            => GetBytesWithReversedEndian((uint)value, sizeof(int));
 
-        public static IEnumerable<byte> GetBytesWithReversedEndian(ushort value)
-        {
-            return BitConverter.GetBytes(value).Reverse();
-        }
+        public static IEnumerable<byte> GetBytesWithReversedEndian(uint value) 
+            => GetBytesWithReversedEndian(value, sizeof(uint));
+
+        public static IEnumerable<byte> GetBytesWithReversedEndian(ushort value) 
+            => GetBytesWithReversedEndian(value, sizeof(ushort));
 
         public static void Dispose<T>(ref T arg) where T: IDisposable
         {
@@ -422,6 +449,11 @@ namespace Adamantium.Core
             }
 
             return collection.ToArray();
+        }
+        
+        public static uint AlignSize(uint size, uint alignment)
+        {
+            return (size + alignment - 1) & ~(alignment - 1);
         }
     }
 }
