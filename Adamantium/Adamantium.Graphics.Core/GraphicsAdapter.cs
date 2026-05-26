@@ -1,3 +1,4 @@
+using System;
 using AdamantiumVulkan.Core;
 using AdamantiumVulkan.Core.Interop;
 using QuantumBinding.Utils;
@@ -8,7 +9,6 @@ public unsafe class GraphicsAdapter
 {
     private PhysicalDevice _physicalDevice;
     private VulkanInstance _vkInstance;
-    private PFN_vkGetPhysicalDeviceProperties2 _deviceProperties2Delegate;
 
     public GraphicsAdapter(PhysicalDevice device, VulkanInstance vkInstance)
     {
@@ -17,24 +17,35 @@ public unsafe class GraphicsAdapter
         Adapter = device;
         device.GetPhysicalDeviceProperties(out var properties);
         AdapterProperties = properties;
+        UpdateData();
+    }
+
+    public void UpdateData()
+    {
+        var heapPropertiesNative = new VkPhysicalDeviceDescriptorHeapPropertiesEXT();
+        heapPropertiesNative.sType = StructureType.PhysicalDeviceDescriptorHeapPropertiesExt;
+        var heapPtr = (IntPtr)NativeUtils.StructOrEnumToPointer(heapPropertiesNative);
         var descriptorBufferProperties = new VkPhysicalDeviceDescriptorBufferPropertiesEXT();
         descriptorBufferProperties.sType = StructureType.PhysicalDeviceDescriptorBufferPropertiesExt;
+        descriptorBufferProperties.pNext = (void*)heapPtr;
         var properties2 = new PhysicalDeviceProperties2();
-        properties2.PNext = NativeUtils.StructOrEnumToPointer(descriptorBufferProperties);
+        var bufferPtr = (IntPtr)NativeUtils.StructOrEnumToPointer(descriptorBufferProperties);
+        properties2.PNext = bufferPtr;
+        properties2.Properties = new PhysicalDeviceProperties();
 
-        _deviceProperties2Delegate = (PFN_vkGetPhysicalDeviceProperties2)vkInstance.VkInstance.GetInstanceProcAddr("vkGetPhysicalDeviceProperties2");
-        var nativeStruct = properties2.ToNative();
-        var properties2Ptr = NativeUtils.StructOrEnumToPointer(nativeStruct);
-        _deviceProperties2Delegate.Invoke(device, properties2Ptr);
-        properties2 = new PhysicalDeviceProperties2(*properties2Ptr);
-        descriptorBufferProperties = *(VkPhysicalDeviceDescriptorBufferPropertiesEXT*)properties2.PNext;
+        _physicalDevice.GetPhysicalDeviceProperties2(ref properties2);
+        var bufferProperties = *(VkPhysicalDeviceDescriptorBufferPropertiesEXT*)bufferPtr;
+        var heapProperties = *(VkPhysicalDeviceDescriptorHeapPropertiesEXT*)heapPtr;
         AdapterProperties = properties2.Properties;
-        DeviceBufferProperties = new PhysicalDeviceDescriptorBufferPropertiesEXT(descriptorBufferProperties);
+        DeviceBufferProperties = new PhysicalDeviceDescriptorBufferPropertiesEXT(bufferProperties);
+        DeviceHeapProperties = new PhysicalDeviceDescriptorHeapPropertiesEXT(heapProperties);
     }
     
-    public PhysicalDeviceProperties AdapterProperties { get; }
+    public PhysicalDeviceProperties AdapterProperties { get; private set; }
     
-    public PhysicalDeviceDescriptorBufferPropertiesEXT DeviceBufferProperties { get; }
+    public PhysicalDeviceDescriptorBufferPropertiesEXT DeviceBufferProperties { get; private set; }
+    
+    public PhysicalDeviceDescriptorHeapPropertiesEXT DeviceHeapProperties { get; private set; }
 
     public PhysicalDeviceType DeviceType => AdapterProperties.DeviceType;
     

@@ -49,11 +49,17 @@ public sealed class EffectPass : DisposableObject, IEffectPass
 
     private List<DescriptorBufferBindingInfoEXT> bindingInfos;
 
-    private List<DescriptorEntrySet> descriptorEntrySets;
+    private List<DescriptorEntrySet>[] descriptorEntrySets;
 
-    private readonly ulong[] offsets = new ulong[1];
+    private readonly VkDeviceSize[] offsets = new VkDeviceSize[1];
+    private readonly uint[] _bufferIndices = new uint[1];
 
     private readonly List<StageBlock> stages = new List<StageBlock>();
+    
+    private readonly DescriptorAddressInfoEXT _reusableAddrInfo = new();
+    private readonly DescriptorGetInfoEXT _reusableDescriptorInfo = new();
+    private readonly DescriptorDataEXT _reusableDescriptorData = new();
+    private readonly List<DescriptorBufferBindingInfoEXT> _reusableBindingInfos;
 
     private uint appliesCounter = 0;
     private bool geometryStagePresent = false;
@@ -81,9 +87,12 @@ public sealed class EffectPass : DisposableObject, IEffectPass
         PropertiesKey = PrepareProperties(logger, pass.Properties);
         graphicsDevice.MainDevice.FrameFinished += GraphicsDeviceOnFrameFinished;
 
-        descriptorEntrySets = new List<DescriptorEntrySet>();
         bindingInfos = new List<DescriptorBufferBindingInfoEXT>();
-        
+        descriptorEntrySets = new List<DescriptorEntrySet>[graphicsDevice.MaxFramesInFlight];
+        for (int i = 0; i < graphicsDevice.MaxFramesInFlight; i++)
+        {
+            descriptorEntrySets[i] = new List<DescriptorEntrySet>();
+        }
     }
 
     private void GraphicsDeviceOnFrameFinished()
@@ -93,19 +102,21 @@ public sealed class EffectPass : DisposableObject, IEffectPass
 
     private void ClearDescriptorsCache()
     {
-        foreach (var entrySet in descriptorEntrySets)
+        for (int i = 0; i < descriptorEntrySets.Length; i++)
         {
-            entrySet?.Dispose();
+            foreach (var entry in descriptorEntrySets[i])
+            {
+                graphicsDevice.AddToDeferDisposeQueue(entry);
+            }
+            descriptorEntrySets[i].Clear();
         }
-
-        descriptorEntrySets.Clear();
     }
 
     private void ClearLayoutBindings()
     {
         foreach (var binding in layoutBindings)
         {
-            binding?.Dispose();
+            //binding?.Dispose();
         }
 
         layoutBindings.Clear();
@@ -140,18 +151,20 @@ public sealed class EffectPass : DisposableObject, IEffectPass
         // Sets the current pass on the graphics device
         graphicsDevice.CurrentEffectPass = this;
 
-        DescriptorEntrySet descriptorEntry;
-
         stages.Clear();
 
-        if (descriptorEntrySets.Count > appliesCounter)
+        var poolForCurrentFrame = descriptorEntrySets[graphicsDevice.CurrentFrame];
+        
+        DescriptorEntrySet descriptorEntry;
+
+        if (poolForCurrentFrame.Count > appliesCounter)
         {
-            descriptorEntry = descriptorEntrySets[(int)appliesCounter];
+            descriptorEntry = poolForCurrentFrame[(int)appliesCounter];
         }
         else
         {
             descriptorEntry = new DescriptorEntrySet();
-            descriptorEntrySets.Add(descriptorEntry);
+            poolForCurrentFrame.Add(descriptorEntry);
         }
 
         // ----------------------------------------------
@@ -178,16 +191,21 @@ public sealed class EffectPass : DisposableObject, IEffectPass
             // ----------------------------------------------
             // Setup Constant buffers
             // ----------------------------------------------
-            for (int i = 0; i < stageBlock.ConstantBufferLinks.Length; ++i)
+            for (int i = 0; i < stageBlock.ConstantBufferLinks.Count; ++i)
             {
                 var link = stageBlock.ConstantBufferLinks[i];
-                if (link.ConstantBuffer.IsDirty)
+                
+                link.ConstantBuffer.CheckForChanges();
+
+                // TODO: check why new parameters are not correctly applied if we are using CheckForChanges() method
+                //if (link.ConstantBuffer.IsDirty)
                 {
+
                     if (!descriptorEntry.TryGetConstantBuffer(link.Parameter.DescriptorSet, link.ResourceIndex,
                             out var entry))
                     {
-                        var alignedSize = graphicsDevice.AlignSize((uint)link.ConstantBuffer.BackingBuffer.Size, 16);
-                        var nativeBuffer = ToDispose(Buffer.Uniform.New((GraphicsDevice)graphicsDevice, alignedSize,
+                        var nativeBuffer = ToDispose(Buffer.Uniform.New((GraphicsDevice)graphicsDevice,
+                            link.ConstantBuffer.BackingBuffer.Size,
                             BufferUsageFlags.ShaderDeviceAddress));
                         entry = new BufferEntry(nativeBuffer, link.Parameter.DescriptorSet, link.ResourceIndex);
                         descriptorEntry.ConstantBufferEntries.Add(entry);
@@ -199,6 +217,7 @@ public sealed class EffectPass : DisposableObject, IEffectPass
                         entry.UniformBuffer,
                         link.ConstantBuffer.Description.Slot,
                         link.ConstantBuffer.Description.DescriptorSet);
+
                 }
             }
 
@@ -261,26 +280,33 @@ public sealed class EffectPass : DisposableObject, IEffectPass
         foreach (var descriptorData in DescriptorDataSets)
         {
             var bindingInfoExt = new DescriptorBufferBindingInfoEXT();
-            bindingInfoExt.SType = StructureType.DescriptorBufferBindingInfoExt;
             bindingInfoExt.Address = descriptorData.Buffer.GetDeviceAddress();
             bindingInfoExt.Usage = (BufferUsageFlagBits)descriptorData.UsageFlags;
             bindingInfos.Add(bindingInfoExt);
         }
 
-        graphicsDevice.BindDescriptorBuffers(graphicsDevice.CurrentCommandBuffer, bindingInfos.ToArray());
-        bindingInfos.ForEach((item) => item.Dispose());
+        graphicsDevice.CurrentCommandBuffer.BindDescriptorBuffersEXT((uint)bindingInfos.Count, bindingInfos.ToArray());
+        //graphicsDevice.BindDescriptorBuffers(graphicsDevice.CurrentCommandBuffer, bindingInfos.ToArray());
 
         for (int i = 0; i < DescriptorDataSets.Length; ++i)
         {
             offsets[0] = appliesCounter * DescriptorDataSets[0].Size;
-            graphicsDevice.SetDescriptorBufferOffsets(
-                graphicsDevice.CurrentCommandBuffer,
+            graphicsDevice.CurrentCommandBuffer.SetDescriptorBufferOffsetsEXT(
                 PipelineBindPoint.Graphics,
                 PipelineLayout,
                 (uint)i,
                 1,
-                [0],
+                _bufferIndices,
                 offsets);
+            
+            // graphicsDevice.SetDescriptorBufferOffsets(
+            //     graphicsDevice.CurrentCommandBuffer,
+            //     PipelineBindPoint.Graphics,
+            //     PipelineLayout,
+            //     (uint)i,
+            //     1,
+            //     [0],
+            //     offsets);
         }
     }
 
@@ -422,7 +448,7 @@ public sealed class EffectPass : DisposableObject, IEffectPass
         PrepareDescriptorSets();
     }
 
-    internal void PrepareDescriptorSets()
+    private void PrepareDescriptorSets()
     {
         var descriptorSets = new List<uint>();
         for (var index = 0; index < pipelineStages.Count; index++)
@@ -560,7 +586,7 @@ public sealed class EffectPass : DisposableObject, IEffectPass
             }
         }
 
-        var constantBufferLinks = new List<ConstantBufferLink>();
+        stageBlock.ConstantBufferLinks.Clear();
 
         // Declare all resource parameters at the effect level.
         foreach (var parameterRaw in shaderRaw.ResourceParameters)
@@ -611,14 +637,12 @@ public sealed class EffectPass : DisposableObject, IEffectPass
             // For constant buffers, we need to store explicit link
             if (parameter.ResourceType == EffectResourceType.ConstantBuffer)
             {
-                constantBufferLinks.Add(new ConstantBufferLink(Effect.ConstantBuffers[parameter.Name], parameter));
+                stageBlock.ConstantBufferLinks.Add(new ConstantBufferLink(Effect.ConstantBuffers[parameter.Name], parameter));
             }
 
             stageBlock.Parameters ??= new List<ParameterBinding>(shaderRaw.ResourceParameters.Count);
             stageBlock.Parameters.Add(new ParameterBinding(parameter, parameterRaw.Slot, parameterRaw.DescriptorSet));
         }
-
-        stageBlock.ConstantBufferLinks = constantBufferLinks.ToArray();
     }
 
     private DescriptorSetLayoutBinding CreateAndAddLayoutBinding(uint descriptorSet, uint slot, uint descriptorCount,
@@ -647,7 +671,7 @@ public sealed class EffectPass : DisposableObject, IEffectPass
 
     private void CreateDescriptorSetLayout(uint descriptorSet, List<DescriptorSetLayoutBinding> bindings)
     {
-        InitDescriptorBuffer(descriptorSet, bindings.ToArray());
+        InitDescriptorBuffer(descriptorSet, bindings);
 
         var layoutInfo = new DescriptorSetLayoutCreateInfo();
         layoutInfo.BindingCount = (uint)bindings.Count;
@@ -658,12 +682,12 @@ public sealed class EffectPass : DisposableObject, IEffectPass
         descriptorSetLayouts = DescriptorDataSets.Select(x => x.Layout).ToArray();
     }
 
-    private void InitDescriptorBuffer(uint descriptorSetIndex, params DescriptorSetLayoutBinding[] bindings)
+    private void InitDescriptorBuffer(uint descriptorSetIndex, List<DescriptorSetLayoutBinding> bindings)
     {
-        if (bindings == null || bindings.Length == 0) return;
+        if (bindings == null || bindings.Count == 0) return;
 
         var layoutInfo = new DescriptorSetLayoutCreateInfo();
-        layoutInfo.BindingCount = (uint)bindings.Length;
+        layoutInfo.BindingCount = (uint)bindings.Count;
         layoutInfo.PBindings = bindings.ToArray();
         layoutInfo.Flags = DescriptorSetLayoutCreateFlagBits.DescriptorBufferBitExt;
 
@@ -676,7 +700,7 @@ public sealed class EffectPass : DisposableObject, IEffectPass
         descriptorData.SamplerDescriptorSize = (uint)graphicsDevice.SamplerDescriptorSize;
         descriptorData.ImageDescriptorSize = (uint)graphicsDevice.SampledImageDescriptorSize;
 
-        descriptorData.Size = graphicsDevice.AlignSize(size, graphicsDevice.DescriptorBufferOffsetAlignment);
+        descriptorData.Size = Utilities.AlignSize(size, graphicsDevice.DescriptorBufferOffsetAlignment);
 
         var bufferFlags = BufferUsageFlags.ResourceDescriptorBufferExt | BufferUsageFlags.ShaderDeviceAddress;
         if (descriptorTypes.Contains(DescriptorType.Sampler) || descriptorTypes.Contains(DescriptorType.SampledImage))
@@ -705,13 +729,11 @@ public sealed class EffectPass : DisposableObject, IEffectPass
     private unsafe void CreateUniformBufferDescriptor(Buffer buffer, uint bindingIndex, uint descriptorSet)
     {
         var addrInfo = new DescriptorAddressInfoEXT();
-        addrInfo.SType = StructureType.DescriptorAddressInfoExt;
         addrInfo.Address = buffer.GetDeviceAddress();
         addrInfo.Range = buffer.TotalSize;
         addrInfo.Format = Format.UNDEFINED;
 
         var bufferDescriptorInfo = new DescriptorGetInfoEXT();
-        bufferDescriptorInfo.SType = StructureType.DescriptorGetInfoExt;
         bufferDescriptorInfo.Type = DescriptorType.UniformBuffer;
         bufferDescriptorInfo.Data = new DescriptorDataEXT();
         bufferDescriptorInfo.Data.PUniformBuffer = addrInfo;
@@ -722,12 +744,12 @@ public sealed class EffectPass : DisposableObject, IEffectPass
             bindingIndex);
 
         graphicsDevice.GetDescriptor(bufferDescriptorInfo, descriptorData.UniformBufferDescriptorSize,
-            (void*)((IntPtr)dataPtr + (appliesCounter * descriptorData.Size) + offset));
+            (nuint)((IntPtr)dataPtr + (appliesCounter * descriptorData.Size) + offset));
 
         descriptorData.Buffer.UnmapMemory();
     }
 
-    private unsafe void CreateImageViewDescriptor(ResourceInfo<Texture>[] images, uint bindingIndex, uint descriptorSet)
+    private void CreateImageViewDescriptor(ResourceInfo<Texture>[] images, uint bindingIndex, uint descriptorSet)
     {
         var descriptorData = DescriptorDataSets[descriptorSet];
         var dataPtr = descriptorData.Buffer.MapMemory();
@@ -740,7 +762,6 @@ public sealed class EffectPass : DisposableObject, IEffectPass
             };
 
             var bufferDescriptorInfo = new DescriptorGetInfoEXT();
-            bufferDescriptorInfo.SType = StructureType.DescriptorGetInfoExt;
             bufferDescriptorInfo.Type = DescriptorType.SampledImage;
             bufferDescriptorInfo.Data = new DescriptorDataEXT();
             bufferDescriptorInfo.Data.PSampledImage = imageInfo;
@@ -750,7 +771,7 @@ public sealed class EffectPass : DisposableObject, IEffectPass
                     bindingIndex + i);
 
             graphicsDevice.GetDescriptor(bufferDescriptorInfo, descriptorData.ImageDescriptorSize,
-                (void*)((IntPtr)dataPtr + (appliesCounter * descriptorData.Size) + offset));
+                (nuint)((IntPtr)dataPtr + (appliesCounter * descriptorData.Size) + offset));
         }
 
         descriptorData.Buffer.UnmapMemory();
@@ -766,7 +787,6 @@ public sealed class EffectPass : DisposableObject, IEffectPass
             sampleInfo.Sampler = samplers[i].Resource;
 
             var bufferDescriptorInfo = new DescriptorGetInfoEXT();
-            bufferDescriptorInfo.SType = StructureType.DescriptorGetInfoExt;
             bufferDescriptorInfo.Type = DescriptorType.Sampler;
             bufferDescriptorInfo.Data = new DescriptorDataEXT();
             bufferDescriptorInfo.Data.PSampledImage = sampleInfo;
@@ -775,7 +795,7 @@ public sealed class EffectPass : DisposableObject, IEffectPass
                 graphicsDevice.GetDescriptorSetLayoutOffset(descriptorData.Layout,
                     bindingIndex + i);
             graphicsDevice.GetDescriptor(bufferDescriptorInfo, descriptorData.SamplerDescriptorSize,
-                (void*)((IntPtr)dataPtr + (appliesCounter * descriptorData.Size) + offset));
+                (nuint)((IntPtr)dataPtr + (appliesCounter * descriptorData.Size) + offset));
         }
 
         descriptorData.Buffer.UnmapMemory();
@@ -785,7 +805,6 @@ public sealed class EffectPass : DisposableObject, IEffectPass
         uint descriptorSet)
     {
         var addrInfo = new DescriptorAddressInfoEXT();
-        addrInfo.SType = StructureType.DescriptorAddressInfoExt;
         addrInfo.Address = texelBuffers[0].Resource.GetDeviceAddress();
         addrInfo.Range = texelBuffers[0].Resource.TotalSize;
         addrInfo.Format = Format.UNDEFINED;
@@ -795,7 +814,6 @@ public sealed class EffectPass : DisposableObject, IEffectPass
         for (uint i = 0; i < texelBuffers.Length; i++)
         {
             var bufferDescriptorInfo = new DescriptorGetInfoEXT();
-            bufferDescriptorInfo.SType = StructureType.DescriptorGetInfoExt;
             bufferDescriptorInfo.Type = DescriptorType.UniformTexelBuffer;
             bufferDescriptorInfo.Data = new DescriptorDataEXT();
             bufferDescriptorInfo.Data.PStorageTexelBuffer = addrInfo;
@@ -805,7 +823,7 @@ public sealed class EffectPass : DisposableObject, IEffectPass
                     bindingIndex + i);
 
             graphicsDevice.GetDescriptor(bufferDescriptorInfo, descriptorData.ImageDescriptorSize,
-                (void*)((IntPtr)dataPtr + (appliesCounter * descriptorData.Size) + offset));
+                (nuint)((IntPtr)dataPtr + (appliesCounter * descriptorData.Size) + offset));
         }
 
         descriptorData.Buffer.UnmapMemory();
@@ -1045,7 +1063,7 @@ public sealed class EffectPass : DisposableObject, IEffectPass
         public readonly ShaderStageFlagBits Stage;
         public ShaderStageFlagBits NextStage;
 
-        public ConstantBufferLink[] ConstantBufferLinks;
+        public List<ConstantBufferLink> ConstantBufferLinks;
         public int Index;
 
         public ShaderModule ShaderModule;
@@ -1066,6 +1084,7 @@ public sealed class EffectPass : DisposableObject, IEffectPass
             SamplerStateSlotLinks = new List<SlotLink>();
             ShaderResourceViewSlotLinks = new List<SlotLink>();
             UnorderedAccessViewSlotLinks = new List<SlotLink>();
+            ConstantBufferLinks = new List<ConstantBufferLink>();
         }
 
         public void CreateShader()

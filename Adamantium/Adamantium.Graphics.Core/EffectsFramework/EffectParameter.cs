@@ -1,4 +1,5 @@
-﻿using Adamantium.Core;
+﻿using System;
+using Adamantium.Core;
 using Adamantium.EffectsCompiler;
 using Adamantium.Mathematics;
 
@@ -24,7 +25,7 @@ public sealed class EffectParameter : NamedObject
         : base(parameterDescription.Name)
     {
         ParameterDescription = parameterDescription;
-        this.Buffer = buffer;
+        Buffer = buffer;
 
         ResourceType = EffectResourceType.None;
         IsValueType = true;
@@ -265,7 +266,6 @@ public sealed class EffectParameter : NamedObject
     public void SetValue<T>(ref T value) where T : struct
     {
         Buffer.BackingBuffer.Set(offset, ref value);
-        Buffer.IsDirty = true;
     }
 
     /// <summary>
@@ -276,7 +276,6 @@ public sealed class EffectParameter : NamedObject
     public void SetValue<T>(T value) where T : struct
     {
         Buffer.BackingBuffer.Set(offset, value);
-        Buffer.IsDirty = true;
     }
 
     /// <summary>
@@ -286,7 +285,6 @@ public sealed class EffectParameter : NamedObject
     public void SetValue(ref Matrix4x4F value)
     {
         CopyMatrix(ref value, offset);
-        Buffer.IsDirty = true;
     }
 
     /// <summary>
@@ -296,7 +294,6 @@ public sealed class EffectParameter : NamedObject
     public void SetValue(Matrix4x4F value)
     {
         CopyMatrix(ref value, offset);
-        Buffer.IsDirty = true;
     }
 
     /// <summary>
@@ -312,8 +309,6 @@ public sealed class EffectParameter : NamedObject
             for (int i = 0; i < values.Length; i++, localOffset += matrixSize)
                 CopyMatrix(ref pMatrix[i], localOffset);
         }
-
-        Buffer.IsDirty = true;
     }
 
     /// <summary>
@@ -324,7 +319,6 @@ public sealed class EffectParameter : NamedObject
     public void SetValue(int index, Matrix4x4F value)
     {
         CopyMatrix(ref value, offset + index * matrixSize);
-        Buffer.IsDirty = true;
     }
 
     /// <summary>
@@ -341,8 +335,6 @@ public sealed class EffectParameter : NamedObject
             for (int i = 0; i < values.Length; i++, localOffset += matrixSize)
                 CopyMatrix(ref pMatrix[i], localOffset);
         }
-
-        Buffer.IsDirty = true;
     }
 
     /// <summary>
@@ -352,7 +344,6 @@ public sealed class EffectParameter : NamedObject
     public void SetRawValue(byte[] values)
     {
         Buffer.BackingBuffer.Set(offset, values);
-        Buffer.IsDirty = true;
     }
 
     /// <summary>
@@ -374,8 +365,6 @@ public sealed class EffectParameter : NamedObject
         {
             Buffer.BackingBuffer.Set(offset, values);
         }
-
-        Buffer.IsDirty = true;
     }
 
     /// <summary>
@@ -388,7 +377,6 @@ public sealed class EffectParameter : NamedObject
     {
         AlignedToFloat4<T>(out var size);
         Buffer.BackingBuffer.Set(offset + size * index, ref value);
-        Buffer.IsDirty = true;
     }
 
     /// <summary>
@@ -401,7 +389,6 @@ public sealed class EffectParameter : NamedObject
     {
         AlignedToFloat4<T>(out var size);
         Buffer.BackingBuffer.Set(offset + size * index, ref value);
-        Buffer.IsDirty = true;
     }
 
     /// <summary>
@@ -424,8 +411,6 @@ public sealed class EffectParameter : NamedObject
         {
             Buffer.BackingBuffer.Set(offset + size * index, values);
         }
-
-        Buffer.IsDirty = true;
     }
 
     /// <summary>

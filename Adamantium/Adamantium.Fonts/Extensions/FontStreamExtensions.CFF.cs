@@ -52,7 +52,8 @@ namespace Adamantium.Fonts.Extensions
                 }
             }
 
-            var data = reader.ReadBytes((int)cffIndex.Offsets.Last() - 1).Reverse().ToArray();
+            var data = reader.ReadBytes((int)cffIndex.Offsets.Last() - 1);
+            Array.Reverse(data);
             var dataByOffset = new List<byte[]>();
 
             for (int i = 1; i < cffIndex.Offsets.Count; ++i)

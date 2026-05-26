@@ -1,7 +1,7 @@
 using System;
 using AdamantiumVulkan.Core;
 
-namespace Adamantium.Graphics.Core;
+namespace Adamantium.Graphics.Core.Extensions;
 
 public static class TextureExtensions
 {
@@ -146,8 +146,8 @@ public static class TextureExtensions
         }
 
         commandBuffer.PipelineBarrier(
-            (uint)sourceStage,
-            (uint)destinationStage,
+            sourceStage,
+            destinationStage,
             0,
             0,
             null,
@@ -161,7 +161,7 @@ public static class TextureExtensions
         texture.GraphicsDevice.EndSingleTimeCommand(commandBuffer);
     }
 
-    public static void BlitImage(this IGraphicsDevice graphicsDevice, ITexture srcTexture, ITexture dstTexture)
+    public static void BlitImage(this IGraphicsDevice graphicsDevice, CommandBuffer commandBuffer, ITexture srcTexture, ITexture dstTexture)
     {
         var blit = new ImageBlit();
         blit.SrcSubresource = new ImageSubresourceLayers();
@@ -169,9 +169,10 @@ public static class TextureExtensions
         blit.SrcSubresource.BaseArrayLayer = 0;
         blit.SrcSubresource.LayerCount     = 1;
         blit.SrcSubresource.MipLevel       = 0;
-        blit.SrcOffsets = new Offset3D[2];
-        blit.SrcOffsets[0] = new Offset3D() {X = 0, Y = 0, Z = 0};
-        blit.SrcOffsets[1] = new Offset3D() {X = (int)srcTexture.Width, Y = (int)srcTexture.Height, Z = 1};
+        var srcOffsets = new Offset3D[2];
+        srcOffsets[0] = new Offset3D() {X = 0, Y = 0, Z = 0};
+        srcOffsets[1] = new Offset3D() {X = (int)srcTexture.Width, Y = (int)srcTexture.Height, Z = 1};
+        blit.SrcOffsets = srcOffsets; 
 
         // Copy color from source to destination of screen size
         blit.DstSubresource = new ImageSubresourceLayers();
@@ -179,11 +180,12 @@ public static class TextureExtensions
         blit.DstSubresource.BaseArrayLayer = 0;
         blit.DstSubresource.LayerCount     = 1;
         blit.DstSubresource.MipLevel       = 0;
-        blit.DstOffsets = new Offset3D[2];
-        blit.DstOffsets[0] = new Offset3D() {X = 0, Y = 0, Z = 0};
-        blit.DstOffsets[1] = new Offset3D() {X = (int)dstTexture.Width, Y = (int)dstTexture.Height, Z = 1};
-        
-        graphicsDevice.InsertImageMemoryBarrier(graphicsDevice.CurrentCommandBuffer,
+        var dstOffsets = new Offset3D[2];
+        dstOffsets[0] = new Offset3D() {X = 0, Y = 0, Z = 0};
+        dstOffsets[1] = new Offset3D() {X = (int)dstTexture.Width, Y = (int)dstTexture.Height, Z = 1};
+        blit.DstOffsets = dstOffsets;
+
+        graphicsDevice.InsertImageMemoryBarrier(commandBuffer,
             srcTexture,
             AccessFlagBits.ColorAttachmentWriteBit,
             AccessFlagBits.TransferReadBit,
@@ -195,7 +197,7 @@ public static class TextureExtensions
         );
         
         // destination (swapchain) texture
-        graphicsDevice.InsertImageMemoryBarrier(graphicsDevice.CurrentCommandBuffer,
+        graphicsDevice.InsertImageMemoryBarrier(commandBuffer,
             dstTexture,
             0,
             AccessFlagBits.TransferWriteBit,
@@ -204,8 +206,6 @@ public static class TextureExtensions
             PipelineStageFlagBits.TopOfPipeBit,
             PipelineStageFlagBits.TransferBit
         );
-
-        var commandBuffer = graphicsDevice.CurrentCommandBuffer;
 
         commandBuffer.BlitImage(
             srcTexture.GetImage(), 

@@ -125,7 +125,7 @@ public class TextLayout : DisposableObject
         layoutContainer.SetText(text);
 
         // try to apply GPOS kern
-        var kernApplied = Font.FeatureService.ApplyFeature(Features.kern, layoutContainer, 0, (uint)glyphs.Length);
+        var kernApplied = Font.FeatureService.ApplyFeature(Features.kern, layoutContainer, 0, (uint)glyphs.Count);
         // var subApp = font.FeatureService.ApplyFeature(Features.aalt, layoutContainer, 0, (uint)glyphs.Length);
 
         var scale = fontSize / Font.UnitsPerEm;
@@ -541,7 +541,7 @@ public class TextLayout : DisposableObject
     {
         var wordGlyphs = Font.TranslateIntoGlyphs(word);
         double wordWidth = 0;
-        for (int k = 0; k < wordGlyphs.Length; ++k)
+        for (int k = 0; k < wordGlyphs.Count; ++k)
         {
             wordWidth += wordGlyphs[k].BoundingRectangle.Width * scale;
         }

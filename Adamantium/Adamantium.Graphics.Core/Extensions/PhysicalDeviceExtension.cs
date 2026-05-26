@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using AdamantiumVulkan.Core;
 
-namespace Adamantium.Graphics.Core
+namespace Adamantium.Graphics.Core.Extensions
 {
     public static class PhysicalDeviceExtension
     {
@@ -39,7 +39,7 @@ namespace Adamantium.Graphics.Core
             for (uint i = 0; i < memProperties.MemoryTypeCount; i++)
             {
                 if (((memoryTypeBits >> (int)i) & 1) == 1 &&
-                    ((MemoryPropertyFlags)memProperties.MemoryTypes[i].PropertyFlags).HasFlag(propertyFlags))
+                    ((MemoryPropertyFlags)memProperties.MemoryTypes.Span[(int)i].PropertyFlags).HasFlag(propertyFlags))
                 {
                     return i;
                 }

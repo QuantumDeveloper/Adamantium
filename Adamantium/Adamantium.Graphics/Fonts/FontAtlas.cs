@@ -1,7 +1,10 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using Adamantium.Fonts;
 using Adamantium.Fonts.TextureGeneration;
 using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Core.Extensions;
 using Adamantium.Imaging;
 using Adamantium.Imaging.PaletteQuantizer.Extensions;
 using Adamantium.Mathematics;
@@ -42,7 +45,7 @@ namespace Adamantium.Graphics.Fonts
 
         public double LineSpacingMultiplier { get; set; }
 
-        public FontAtlas(IGraphicsDevice device, Typeface typeface, FontParameters parameters) : base(device)
+        public FontAtlas(IGraphicsDevice device, Typeface typeface, FontParameters parameters, uint atlasSize = 1024) : base(device)
         {
             processedGlyphs = new Dictionary<uint, Glyph>();
             
@@ -57,35 +60,32 @@ namespace Adamantium.Graphics.Fonts
             GlyphMargin = parameters.GlyphMargin;
             LineSpacingMultiplier = Font.LineSpacingMultiplier;
             
+            AtlasData = new FontAtlasData(MSDFTextureSize, new Size(atlasSize, atlasSize));
+            
             atlasGenerator = new TextureAtlasGenerator(
                 Typeface, 
-                Font, 
-                MSDFTextureSize, 
-                SampleRate,
-                PixelRange, 
-                StartGlyphIndex,
-                GlyphCount,
-                SortingVariant,
-                GlyphMargin);
+                Font,
+                AtlasData,
+                parameters);
             
-            AtlasData = atlasGenerator.PrepareTextureAtlas();
-            
-            var description = new TextureDescription();
-            description.Width = (uint)AtlasData.AtlasSize.Width;
-            description.Height = (uint)AtlasData.AtlasSize.Height;
-            description.Depth = 1;
-            description.ArrayLayers = 1;
-            description.MipLevels = 1;
-            description.Samples = MSAALevel.None;
-            description.Format = Format.R8G8B8A8_UNORM;
-            description.InitialLayout = ImageLayout.Preinitialized;
-            description.DesiredImageLayout = ImageLayout.ShaderReadOnlyOptimal;
-            description.ImageType = ImageType._2d;
-            description.ImageAspect = ImageAspectFlagBits.ColorBit;
-            description.Usage = ImageUsageFlagBits.SampledBit | ImageUsageFlagBits.TransferDstBit | ImageUsageFlagBits.TransferSrcBit;
-            description.Dimension = TextureDimension.Texture2D;
-            
-            Atlas = Texture.New(GraphicsDevice, description, "Font Atlas");
+            var description = new TextureDescription
+            {
+                Width = atlasSize,
+                Height = atlasSize,
+                Depth = 1,
+                ArrayLayers = 1,
+                MipLevels = 1,
+                Samples = MSAALevel.None,
+                Format = Format.R8G8B8A8_UNORM,
+                InitialLayout = ImageLayout.Preinitialized,
+                DesiredImageLayout = ImageLayout.ShaderReadOnlyOptimal,
+                ImageType = ImageType._2d,
+                ImageAspect = ImageAspectFlagBits.ColorBit,
+                Usage = ImageUsageFlagBits.SampledBit | ImageUsageFlagBits.TransferDstBit | ImageUsageFlagBits.TransferSrcBit,
+                Dimension = TextureDimension.Texture2D
+            };
+
+            Atlas = Texture.New(GraphicsDevice, description, "Dynamic Font Atlas");
         }
 
         private Glyph[] GetNotProcessedGlyphs(IEnumerable<Glyph> glyphs)
@@ -102,13 +102,13 @@ namespace Adamantium.Graphics.Fonts
             return processed.ToArray();
         }
 
-        private void ProcessGlyphs(params Glyph[] glyphs)
+        private void ProcessGlyphs(IReadOnlyList<Glyph> glyphs)
         {
             var uniqueGlyphs = glyphs.Distinct(x => x.Index);
             var glyphsToProcess = GetNotProcessedGlyphs(uniqueGlyphs);
             var textureDataArray = atlasGenerator.GenerateTextureForGlyphs(glyphsToProcess);
 
-            if (textureDataArray.Length > 0)
+            if (textureDataArray.Count > 0)
             {
                 ProcessTextureData(textureDataArray);
             }
@@ -119,7 +119,7 @@ namespace Adamantium.Graphics.Fonts
             }
         }
 
-        private void ProcessTextureData(GlyphTextureData[] textureDataArray)
+        private void ProcessTextureData(IReadOnlyList<GlyphTextureData> textureDataArray)
         {
             Atlas.TransitionImageLayout(ImageLayout.TransferDstOptimal);
             var commandBuffer = GraphicsDevice.BeginSingleTimeCommand();
@@ -136,7 +136,7 @@ namespace Adamantium.Graphics.Fonts
                     MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent);
                 buffers.Add(buffer);
 
-                BufferImageCopy region = new BufferImageCopy();
+                var region = new BufferImageCopy();
                 region.BufferOffset = 0;
                 region.BufferRowLength = (uint)textureData.FullGlyphSize.Width;
                 region.BufferImageHeight = (uint)textureData.FullGlyphSize.Height;
@@ -146,14 +146,29 @@ namespace Adamantium.Graphics.Fonts
                 region.ImageSubresource.BaseArrayLayer = 0;
                 region.ImageSubresource.LayerCount = 1;
                 region.ImageOffset = new Offset3D()
-                    { X = textureData.BoundingRect.Left, Y = textureData.BoundingRect.Top, Z = 0 };
-                region.ImageExtent = new Extent3D() { Width = (uint)textureData.FullGlyphSize.Width, Height = (uint)textureData.FullGlyphSize.Height, Depth = 1 };
+                {
+                    X = textureData.BoundingRect.Left,
+                    Y = textureData.BoundingRect.Top,
+                    Z = 0
+                };
+                region.ImageExtent = new Extent3D()
+                {
+                    Width = (uint)textureData.FullGlyphSize.Width, 
+                    Height = (uint)textureData.FullGlyphSize.Height, 
+                    Depth = textureData.DepthLayer
+                };
 
                 commandBuffer.CopyBufferToImage(buffer, Atlas, ImageLayout.TransferDstOptimal, 1, region);
             }
 
             GraphicsDevice.EndSingleTimeCommand(commandBuffer);
             Atlas.TransitionImageLayout(Atlas.Description.DesiredImageLayout);
+
+            foreach (var textureData in textureDataArray)
+            {
+                textureData.Pixels = [];
+            }
+            
             foreach (var buffer in buffers)
             {
                 buffer?.Dispose();
@@ -167,7 +182,8 @@ namespace Adamantium.Graphics.Fonts
 
         public void Update(string text)
         {
-            var glyphs = Font.TranslateIntoGlyphs(text);
+            var uniqueSymbols = new string(text.Distinct().ToArray());
+            var glyphs = Font.TranslateIntoGlyphs(uniqueSymbols);
             ProcessGlyphs(glyphs);
         }
     }

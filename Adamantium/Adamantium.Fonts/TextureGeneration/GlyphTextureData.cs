@@ -41,6 +41,10 @@ namespace Adamantium.Fonts.TextureGeneration
         public uint Margin { get; }
 
         public Size FullGlyphSize { get; }
+        
+        public uint IndexInAtlas { get; set; }
+        
+        public uint DepthLayer { get; set; }
 
         public void CalculateUV(Size atlasSize)
         {
@@ -50,13 +54,6 @@ namespace Adamantium.Fonts.TextureGeneration
             uvRect.Right = (float)((BoundingRect.Right + Margin) / atlasSize.Width);
             uvRect.Bottom = (float)((BoundingRect.Bottom + Margin) / atlasSize.Height);
             UVRect = uvRect;
-            
-            // RectangleF uvRect;
-            // uvRect.Left = (BoundingRect.Left + Margin);
-            // uvRect.Top = (BoundingRect.Top + Margin);
-            // uvRect.Right = (BoundingRect.Right + Margin);
-            // uvRect.Bottom = (BoundingRect.Bottom + Margin);
-            // UVRect = uvRect;
         }
 
         public override string ToString()

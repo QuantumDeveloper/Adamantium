@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading;
 using Adamantium.Core;
+using Adamantium.Graphics.Core.Extensions;
 using AdamantiumVulkan.Core;
 using QuantumBinding.Utils;
 using Serilog;
@@ -62,6 +63,7 @@ namespace Adamantium.Graphics.Core
             deviceExt.Add(Constants.VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
             deviceExt.Add(Constants.VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
             deviceExt.Add(Constants.VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
+            deviceExt.Add(Constants.VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
             DeviceExtensions = new ReadOnlyCollection<string>(deviceExt);
         }
 
@@ -128,7 +130,7 @@ namespace Adamantium.Graphics.Core
             return newDevice;
         }
 
-        private unsafe void CreateLogicalDevice()
+        private void CreateLogicalDevice()
         {
             var queueFamilies = GraphicsAdapter.Adapter.GetQueueFamilyProperties();
 
@@ -184,7 +186,6 @@ namespace Adamantium.Graphics.Core
 
             var descriptorBufferFeature = new PhysicalDeviceDescriptorBufferFeaturesEXT
             {
-                SType = StructureType.PhysicalDeviceDescriptorBufferFeaturesExt,
                 DescriptorBuffer = true,
                 DescriptorBufferCaptureReplay = true
             };
@@ -199,33 +200,35 @@ namespace Adamantium.Graphics.Core
 
             var vulkan13Features = new PhysicalDeviceVulkan13Features
             {
-                SType = StructureType.PhysicalDeviceVulkan13Features,
                 Synchronization2 = true,
                 DynamicRendering = true,
+            };
+            
+            var heapFeatures = new PhysicalDeviceDescriptorHeapFeaturesEXT
+            {
+                DescriptorHeap = true,
             };
 
             var deviceFeatures2 = GraphicsAdapter.Adapter.GetPhysicalDeviceFeatures2();
 
-            void* lastInChain = NativeUtils.StructOrEnumToPointer(descriptorBufferFeature.ToNative());
-
-            vulkan12Features.PNext = lastInChain;
-            lastInChain = NativeUtils.StructOrEnumToPointer(vulkan12Features.ToNative());
-
-            vulkan13Features.PNext = lastInChain;
-            lastInChain = NativeUtils.StructOrEnumToPointer(vulkan13Features.ToNative());
+            deviceFeatures2.PNext = vulkan12Features;
+            vulkan12Features.PNext = vulkan13Features;
+            vulkan13Features.PNext = descriptorBufferFeature;
 
             if (EnableDynamicRendering &&
                 finalDeviceExtensions.Contains(Constants.VK_EXT_SHADER_OBJECT_EXTENSION_NAME))
             {
                 var shaderObjectFeatures = new PhysicalDeviceShaderObjectFeaturesEXT
                 {
-                    ShaderObject = true,
-                    PNext = lastInChain
+                    ShaderObject = true
                 };
-                lastInChain = NativeUtils.StructOrEnumToPointer(shaderObjectFeatures.ToNative());
+                descriptorBufferFeature.PNext = shaderObjectFeatures;
+                shaderObjectFeatures.PNext = heapFeatures;
             }
-
-            deviceFeatures2.PNext = lastInChain;
+            else
+            {
+                descriptorBufferFeature.PNext = heapFeatures;
+            }
 
             deviceFeatures2.Features.SamplerAnisotropy = true;
             deviceFeatures2.Features.SampleRateShading = true;
@@ -236,20 +239,13 @@ namespace Adamantium.Graphics.Core
             createInfo.PQueueCreateInfos = queueInfos.ToArray();
             createInfo.EnabledExtensionCount = (uint)finalDeviceExtensions.Count;
             createInfo.PEnabledExtensionNames = finalDeviceExtensions.ToArray();
-            createInfo.PNext = NativeUtils.StructOrEnumToPointer(deviceFeatures2.ToNative());
-
-            if (VulkanInstance.IsInDebugMode)
-            {
-                createInfo.EnabledLayerCount = (uint)VulkanInstance.ValidationLayers.Count;
-                createInfo.PEnabledLayerNames = VulkanInstance.ValidationLayers.ToArray();
-            }
+            createInfo.PNext = deviceFeatures2;
 
             LogicalDevice = GraphicsAdapter.Adapter.CreateDevice(createInfo);
             LogicalDevice.InitializeExtensions();
             var fenceInfo = new FenceCreateInfo();
             fenceInfo.Flags = FenceCreateFlagBits.SignaledBit;
             InFlightFences ??= LogicalDevice.CreateFences(fenceInfo, BuffersCount);
-            createInfo.Dispose();
         }
 
         public Result DeviceWaitIdle()

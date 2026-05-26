@@ -50,7 +50,7 @@ public static class BufferExtensions
         {
             var sourceData = source.GraphicsDevice.MapMemory(source, 0, (ulong)source.TotalSize, 0);
             var destinationData = destination.GraphicsDevice.MapMemory(destination, 0, (ulong)destination.TotalSize, 0);
-            System.Buffer.MemoryCopy(sourceData, destinationData, destination.TotalSize, source.TotalSize);
+            System.Buffer.MemoryCopy((void*)sourceData, (void*)destinationData, destination.TotalSize, source.TotalSize);
             source.GraphicsDevice.UnmapMemory(source);
             destination.GraphicsDevice.UnmapMemory(destination);
         }

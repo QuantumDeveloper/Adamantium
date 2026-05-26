@@ -126,7 +126,7 @@ namespace Adamantium.FontTests
             var glyphs = font.TranslateIntoGlyphs(demoString);
             layoutContainer.SetText(demoString);
 
-            var result = font.FeatureService.ApplyFeature(Features.liga, layoutContainer, 0, (uint)glyphs.Length);
+            var result = font.FeatureService.ApplyFeature(Features.liga, layoutContainer, 0, (uint)glyphs.Count);
             
         }
     }

@@ -1,7 +1,6 @@
 using System;
-using Adamantium.Fonts.TextureGeneration;
 
-namespace Adamantium.Graphics.Fonts;
+namespace Adamantium.Fonts.TextureGeneration;
 
 public class FontParameters
 {
@@ -12,6 +11,7 @@ public class FontParameters
         uint startGlyphIndex,
         uint glyphCount,
         GlyphSortingVariant sortingVariant,
+        GlyphPlacingVariant placingVariant,
         uint glyphMargin)
     {
         MsdfTextureSize = msdfTextureSize;
@@ -20,6 +20,7 @@ public class FontParameters
         StartGlyphIndex = startGlyphIndex;
         GlyphCount = glyphCount;
         SortingVariant = sortingVariant;
+        PlacingVariant = placingVariant;
         GlyphMargin = glyphMargin;
     }
 
@@ -35,6 +36,8 @@ public class FontParameters
 
     public GlyphSortingVariant SortingVariant { get; }
     
+    public GlyphPlacingVariant PlacingVariant { get; }
+    
     public uint GlyphMargin { get; }
 
     public override bool Equals(object obj)
@@ -47,6 +50,7 @@ public class FontParameters
                    fontParameters.StartGlyphIndex == StartGlyphIndex &&
                    fontParameters.GlyphCount == GlyphCount &&
                    fontParameters.SortingVariant == SortingVariant &&
+                   fontParameters.PlacingVariant == PlacingVariant &&
                    fontParameters.GlyphMargin == GlyphMargin;
         }
 
@@ -55,13 +59,26 @@ public class FontParameters
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(MsdfTextureSize, SampleRate, PixelRange, StartGlyphIndex, GlyphCount, SortingVariant, GlyphMargin);
+        unchecked
+        {
+            int hashCode = 17;
+            hashCode = hashCode * 23 + MsdfTextureSize.GetHashCode();
+            hashCode = hashCode * 23 + SampleRate.GetHashCode();
+            hashCode = hashCode * 23 + PixelRange.GetHashCode();
+            hashCode = hashCode * 23 + StartGlyphIndex.GetHashCode();
+            hashCode = hashCode * 23 + GlyphCount.GetHashCode();
+            hashCode = hashCode * 23 + SortingVariant.GetHashCode();
+            hashCode = hashCode * 23 + PlacingVariant.GetHashCode();
+            hashCode = hashCode * 23 + GlyphMargin.GetHashCode();
+            return hashCode;
+        }
     }
 
     public static FontParameters Default(
         uint glyphTextureSize = 64, 
         byte sampleRate = 5, 
-        GlyphSortingVariant sortingVariant = GlyphSortingVariant.ByIndex)
+        GlyphSortingVariant sortingVariant = GlyphSortingVariant.ByIndex,
+        GlyphPlacingVariant placingVariant = GlyphPlacingVariant.Square)
     {
         var fontParameters = new FontParameters(
             glyphTextureSize,
@@ -70,7 +87,8 @@ public class FontParameters
             0,
             UInt32.MaxValue, 
             sortingVariant,
-            4
+            placingVariant,
+            0
         );
         return fontParameters;
     }

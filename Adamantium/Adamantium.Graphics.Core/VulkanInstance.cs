@@ -19,7 +19,7 @@ namespace Adamantium.Graphics.Core
     {
         private const string EngineName = "AdamantiumEngine";
         
-        private delegate* unmanaged<DebugUtilsMessageSeverityFlagBitsEXT, DebugUtilsMessageTypeFlagBitsEXT, VkDebugUtilsMessengerCallbackDataEXT*, void*, uint> debugCallback;
+        private delegate* unmanaged<DebugUtilsMessageSeverityFlagBitsEXT, DebugUtilsMessageTypeFlagBitsEXT, VkDebugUtilsMessengerCallbackDataEXT*, void*, VkBool32> debugCallback;
         private DebugUtilsMessengerEXT debugMessenger;
         
         internal Instance VkInstance { get; private set; }
@@ -74,10 +74,10 @@ namespace Adamantium.Graphics.Core
         {
             var appInfo = new ApplicationInfo();
             appInfo.PApplicationName = appName;
-            appInfo.ApplicationVersion = AdamantiumVulkan.Core.Constants.VK_MAKE_API_VERSION(1, 0, 0, 0);
+            appInfo.ApplicationVersion = Constants.VK_MAKE_API_VERSION(1, 0, 0, 0);
             appInfo.PEngineName = EngineName;
-            appInfo.EngineVersion = AdamantiumVulkan.Core.Constants.VK_MAKE_API_VERSION(1, 0, 0, 0);
-            appInfo.ApiVersion = AdamantiumVulkan.Core.Constants.VK_MAKE_API_VERSION(1, 4, 304, 0);
+            appInfo.EngineVersion = Constants.VK_MAKE_API_VERSION(1, 0, 0, 0);
+            appInfo.ApiVersion = Constants.VK_MAKE_API_VERSION(1, 4, 309, 0);
 
             var createInfo = new InstanceCreateInfo();
             createInfo.PApplicationInfo = appInfo;
@@ -89,7 +89,7 @@ namespace Adamantium.Graphics.Core
             //createInfo.EnabledExtensionCount = (uint)ext.Length;
             //createInfo.PpEnabledExtensionNames = ext.ToArray();
             
-            createInfo.PEnabledExtensionNames = extensions.Select(x => x.ExtensionName).ToArray();//.Except(new []{"VK_KHR_surface_protected_capabilities"}).ToArray();
+            createInfo.PEnabledExtensionNames = extensions.Select(x => x.ExtensionName).ToArray();
             createInfo.EnabledExtensionCount = (uint)createInfo.PEnabledExtensionNames.Length;
             // var ext = new string[] {"VK_KHR_surface", "VK_KHR_win32_surface", "VK_KHR_get_physical_device_properties2", "VK_EXT_debug_utils" };
             // createInfo.PEnabledExtensionNames = ext;//.Except(new []{"VK_KHR_surface_protected_capabilities"}).ToArray();
@@ -103,8 +103,6 @@ namespace Adamantium.Graphics.Core
 
             VkInstance = Instance.Create(createInfo);
             NativePointer = new IntPtr(VkInstance.NativePointer);
-
-            createInfo.Dispose();
 
             if (IsInDebugMode)
             {
@@ -164,7 +162,7 @@ namespace Adamantium.Graphics.Core
             if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
                 var surfaceInfo = new MacOSSurfaceCreateInfoMVK();
-                surfaceInfo.PView = parameters.OutputHandle.ToPointer();
+                surfaceInfo.PView = (nuint)parameters.OutputHandle;
                 var surface = VkInstance.CreateMacOSSurfaceMVK(surfaceInfo);
 
                 availableSurfaces.Add(parameters.OutputHandle, surface);
@@ -178,13 +176,13 @@ namespace Adamantium.Graphics.Core
         private Result CreateDebugUtilsMessenger(DebugUtilsMessengerCreateInfoEXT pCreateInfo, out DebugUtilsMessengerEXT pDebugMessenger)
         {
             pDebugMessenger = null;
-            var ptr = VkInstance.GetInstanceProcAddr("vkCreateDebugUtilsMessengerEXT");
-            var func = new PFN_vkCreateDebugUtilsMessengerEXT(ptr);
-            var infoPtr = NativeUtils.StructOrEnumToPointer(pCreateInfo.ToNative());
-            var result = func.Invoke(VkInstance, infoPtr, null, out var pDebugMessenger_t);
-            pCreateInfo.Dispose();
-            NativeUtils.Free(infoPtr);
-            pDebugMessenger = new DebugUtilsMessengerEXT(pDebugMessenger_t);
+            var result = VkInstance.CreateDebugUtilsMessengerEXT(pCreateInfo, null, out pDebugMessenger);
+            // var ptr = VkInstance.GetInstanceProcAddr("vkCreateDebugUtilsMessengerEXT");
+            // var func = new PFN_vkCreateDebugUtilsMessengerEXT(ptr);
+            // var infoPtr = NativeUtils.StructOrEnumToPointer(pCreateInfo.ToNative());
+            // var result = func.Invoke(VkInstance, infoPtr, null, out var pDebugMessenger_t);
+            // NativeUtils.Free(infoPtr);
+            // pDebugMessenger = new DebugUtilsMessengerEXT(pDebugMessenger_t);
             return result;
         }
 
@@ -196,7 +194,7 @@ namespace Adamantium.Graphics.Core
         }
 
         [UnmanagedCallersOnly]
-        private static uint DebugCallback(DebugUtilsMessageSeverityFlagBitsEXT messageSeverity, DebugUtilsMessageTypeFlagBitsEXT messageTypes, VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData)
+        private static VkBool32 DebugCallback(DebugUtilsMessageSeverityFlagBitsEXT messageSeverity, DebugUtilsMessageTypeFlagBitsEXT messageTypes, VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData)
         {
             var data = *pCallbackData;
             Log.Logger.Debug(new string(data.pMessage));

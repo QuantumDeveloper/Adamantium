@@ -115,13 +115,15 @@ namespace Adamantium.Fonts.Common
         public String ReadString(int length)
         {
             var bytes = ReadBytes(length);
-            return Encoding.ASCII.GetString(bytes.Reverse().ToArray(), 0, bytes.Length);
+            Array.Reverse(bytes);
+            return Encoding.ASCII.GetString(bytes, 0, bytes.Length);
         }
         
         public String ReadString(int length, Encoding encoding)
         {
             var bytes = ReadBytes(length);
-            return encoding.GetString(bytes.Reverse().ToArray(), 0, bytes.Length);
+            Array.Reverse(bytes);
+            return encoding.GetString(bytes, 0, bytes.Length);
         }
     }
 }

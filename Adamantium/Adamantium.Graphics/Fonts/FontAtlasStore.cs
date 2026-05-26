@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using Adamantium.Fonts;
+using Adamantium.Fonts.TextureGeneration;
 using Adamantium.Graphics.Core;
 
 namespace Adamantium.Graphics.Fonts

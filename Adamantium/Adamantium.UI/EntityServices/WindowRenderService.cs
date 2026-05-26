@@ -1,7 +1,7 @@
 ﻿using System.Threading;
 using Adamantium.Core;
 using Adamantium.ECS;
-using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Core.Extensions;
 using Adamantium.Mathematics;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
@@ -98,7 +98,8 @@ public class WindowRenderService : UiRenderService
     {
         GraphicsDevice.EndDraw();
         windowRenderer.PrepareData();
-        GraphicsDevice.BlitImage(GraphicsDevice.CurrentRenderTarget.ResolveTexture,
+        GraphicsDevice.BlitImage(GraphicsDevice.CurrentCommandBuffer,
+            GraphicsDevice.CurrentRenderTarget.ResolveTexture,
             windowRenderer.Presenter.GetCurrentImage());
     }
 

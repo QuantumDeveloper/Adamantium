@@ -3,6 +3,7 @@ using Adamantium.Core.Events;
 using Adamantium.Game.Core.Input;
 using Adamantium.Game.Core.Payloads;
 using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Core.Extensions;
 using Adamantium.Graphics.Core.Presentation;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
@@ -104,7 +105,9 @@ namespace Adamantium.Game.Core
 
         public virtual void CopyOutput(IGraphicsDevice graphicsDevice)
         {
-            graphicsDevice.BlitImage(GraphicsDevice.CurrentRenderTarget, Presenter.GetCurrentImage());
+            graphicsDevice.BlitImage(GraphicsDevice.CurrentCommandBuffer, 
+                GraphicsDevice.CurrentRenderTarget,
+                Presenter.GetCurrentImage());
         }
 
         public void DisplayContent()

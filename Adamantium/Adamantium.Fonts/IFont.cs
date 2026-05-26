@@ -79,7 +79,7 @@ namespace Adamantium.Fonts
 
         internal void SetGlyphUnicodes(Dictionary<uint, List<uint>> glyphMapping);
 
-        Glyph[] TranslateIntoGlyphs(string input);
+        IReadOnlyList<Glyph> TranslateIntoGlyphs(string input);
 
         Glyph GetGlyphByIndex(uint index);
 
