@@ -15,6 +15,9 @@ namespace Adamantium.Graphics.Core
         private readonly SwapchainKHR[] _swapchains;
         private Semaphore[] _waitSemaphores;
         private uint[] _imageIndicesArray;
+        
+        private Semaphore[] imageAvailableSemaphores;
+        private Semaphore[] renderFinishedSemaphores;
 
         public SwapChainGraphicsPresenter(
             IGraphicsDevice graphicsDevice, 
@@ -38,6 +41,9 @@ namespace Adamantium.Graphics.Core
             public SurfaceFormatKHR[] Formats;
             public PresentModeKHR[] PresentModes;
         };
+        
+        public Semaphore CurrentRenderFinishedSemaphore => renderFinishedSemaphores[currentImageIndex];
+        public Semaphore CurrentImageAvailableSemaphore => imageAvailableSemaphores[currentImageIndex];
 
         private void CreateSurface()
         {
@@ -129,6 +135,16 @@ namespace Adamantium.Graphics.Core
             }
             CreateImageViews();
             _swapchains[0] = swapchain;
+            
+            var semaphoreInfo = new SemaphoreCreateInfo();
+            imageAvailableSemaphores = new Semaphore[swapchainTextures.Length];
+            renderFinishedSemaphores = new Semaphore[swapchainTextures.Length];
+
+            for (int i = 0; i < swapchainTextures.Length; i++)
+            {
+                imageAvailableSemaphores[i] = logicalDevice.CreateSemaphore(semaphoreInfo);
+                renderFinishedSemaphores[i] = logicalDevice.CreateSemaphore(semaphoreInfo);
+            }
         }
 
         private void CreateImageViews()
@@ -277,7 +293,7 @@ namespace Adamantium.Graphics.Core
         
         private PresentInfoKHR FillPresentInfo(uint imageIndex)
         {
-            _waitSemaphores[0] = GraphicsDevice.GetRenderFinishedSemaphore();
+            _waitSemaphores[0] = renderFinishedSemaphores[imageIndex];
             _imageIndicesArray[0] = imageIndex;
             
             var presentInfo = new PresentInfoKHR();
@@ -333,6 +349,15 @@ namespace Adamantium.Graphics.Core
 
             RemoveAndDispose(ref depthBuffer);
             RemoveAndDispose(ref renderTarget);
+            
+            if (imageAvailableSemaphores != null)
+            {
+                for (int i = 0; i < imageAvailableSemaphores.Length; i++)
+                {
+                    GraphicsDevice.Destroy(imageAvailableSemaphores[i]);
+                    GraphicsDevice.Destroy(renderFinishedSemaphores[i]);
+                }
+            }
 
             GraphicsDevice.Destroy(swapchain);
         }

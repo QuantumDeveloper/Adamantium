@@ -451,7 +451,7 @@ namespace Adamantium.Core
             return collection.ToArray();
         }
         
-        public static uint AlignSize(uint size, uint alignment)
+        public static ulong AlignSize(ulong size, ulong alignment)
         {
             return (size + alignment - 1) & ~(alignment - 1);
         }

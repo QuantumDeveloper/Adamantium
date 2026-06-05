@@ -106,6 +106,7 @@ public class StrokeRenderComponent : UIRenderComponent
         //var world = Matrix4x4F.Translation((float)RenderData.Location.X, (float)RenderData.Location.Y, 5);
         var world = RenderData.TransformMatrix;
         UIBasicEffect.Wvp.SetValue(world * RenderData.ProjectionMatrix);
+        //UIBasicEffect.World.SetValue(world);
         UIBasicEffect.Opacity.SetValue(RenderData.Opacity);
         if (Pen.Brush is SolidColorBrush solidColor)
         {

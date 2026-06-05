@@ -39,9 +39,11 @@ internal class ResourceInfo<T> : PropertyChangedBase where T : class
         
     public int DescriptorSet { get; set; } 
     
-    public bool IsDirty { get; private set; }
-}
+    public bool IsDirty { get; internal set; }
     
+    public uint GlobalHeapOffset { get; internal set; } = uint.MaxValue;
+}
+
 internal class EffectResourceLinker : IEffectResourceLinker
 {
     /// <summary>
@@ -55,14 +57,21 @@ internal class EffectResourceLinker : IEffectResourceLinker
     public int Count { get; set; }
 
     // public Dictionary<EffectData.Parameter, Sampler[]> SamplerStates;
-    public Dictionary<EffectData.Parameter, ResourceInfo<Sampler>[]> SamplerStates;
+    public Dictionary<EffectData.Parameter, ResourceInfo<SamplerState>[]> SamplerStates;
     public Dictionary<EffectData.Parameter, ResourceInfo<Texture>[]> ShaderResourceViews;
     public Dictionary<EffectData.Parameter, ResourceInfo<Buffer>[]> UnorderedAccessViews;
     public Dictionary<EffectData.Parameter, object> BoundResources;
 
-    private static ResourceInfo<Sampler>[] EmptySamplers = [];
+    private static ResourceInfo<SamplerState>[] EmptySamplers = [];
     private static ResourceInfo<Texture>[] EmptyResourceViews = [];
     private static ResourceInfo<Buffer>[] EmptyUAVs = [];
+
+    internal DescriptorHeapManager DescriptorHeapManager { get; }
+
+    public EffectResourceLinker(DescriptorHeapManager descriptorHeapManager)
+    {
+        DescriptorHeapManager = descriptorHeapManager;
+    }
 
     /// <summary>
     /// Initializes this instance.
@@ -71,7 +80,7 @@ internal class EffectResourceLinker : IEffectResourceLinker
     {
         ConstantBuffers = new Dictionary<EffectData.Parameter, EffectConstantBuffer>();
 
-        SamplerStates = new Dictionary<EffectData.Parameter, ResourceInfo<Sampler>[]>();
+        SamplerStates = new Dictionary<EffectData.Parameter, ResourceInfo<SamplerState>[]>();
         ShaderResourceViews = new Dictionary<EffectData.Parameter, ResourceInfo<Texture>[]>();
         UnorderedAccessViews = new Dictionary<EffectData.Parameter, ResourceInfo<Buffer>[]>();
         BoundResources = new Dictionary<EffectData.Parameter, object>();
@@ -94,7 +103,7 @@ internal class EffectResourceLinker : IEffectResourceLinker
         return ShaderResourceViews.GetValueOrDefault(resourceName, EmptyResourceViews);
     }
 
-    public ResourceInfo<Sampler>[] GetSamplers(EffectData.Parameter resourceName)
+    public ResourceInfo<SamplerState>[] GetSamplers(EffectData.Parameter resourceName)
     {
         return SamplerStates.GetValueOrDefault(resourceName, EmptySamplers);
     }
@@ -114,7 +123,8 @@ internal class EffectResourceLinker : IEffectResourceLinker
         ResolveResource(paramDescription, type, value, 0);
     }
 
-    public void SetResource<T>(EffectData.ResourceParameter resourceName, EffectResourceType type, params T[] valueArray) where T : class
+    public void SetResource<T>(EffectData.ResourceParameter resourceName, EffectResourceType type,
+        params T[] valueArray) where T : class
     {
         for (int i = 0; i < valueArray.Length; ++i)
         {
@@ -132,7 +142,8 @@ internal class EffectResourceLinker : IEffectResourceLinker
         BoundResources[resourceName] = value;
     }
 
-    public void SetResource(EffectData.ResourceParameter resourceName, EffectResourceType type, VulkanBuffer[] valueArray, int[] uavInitialCount)
+    public void SetResource(EffectData.ResourceParameter resourceName, EffectResourceType type,
+        VulkanBuffer[] valueArray, int[] uavInitialCount)
     {
         for (int i = 0; i < valueArray.Length; ++i)
         {
@@ -170,7 +181,8 @@ internal class EffectResourceLinker : IEffectResourceLinker
         }
     }
 
-    private void ProcessReferenceResources(EffectData.ResourceParameter parameter, EffectResourceType type, object value, int index)
+    private void ProcessReferenceResources(EffectData.ResourceParameter parameter, EffectResourceType type,
+        object value, int index)
     {
         if (index >= parameter.Count)
         {
@@ -183,28 +195,39 @@ internal class EffectResourceLinker : IEffectResourceLinker
             {
                 if (!SamplerStates.TryGetValue(parameter, out var states))
                 {
-                    states = new ResourceInfo<Sampler>[parameter.Count];
+                    states = new ResourceInfo<SamplerState>[parameter.Count];
                     SamplerStates.Add(parameter, states);
                     BoundResources.Add(parameter, states);
                 }
 
-                Sampler state = null;
-                if (value is Sampler sampler)
-                {
-                    state = sampler;
-                }
-                else if (value is SamplerState samplerState)
+                SamplerState state = null;
+                if (value is SamplerState samplerState)
                 {
                     state = samplerState;
                 }
 
                 if (states[index] == null)
                 {
-                    states[index] = new ResourceInfo<Sampler>();
+                    states[index] = new ResourceInfo<SamplerState>();
                 }
-                        
+
                 states[index].Resource = state;
-            }   
+
+                if (state != null)
+                {
+                    if (states[index].GlobalHeapOffset == uint.MaxValue)
+                    {
+                        uint descSize = (uint)DescriptorHeapManager.DeviceHeapProperties.SamplerDescriptorSize;
+                        states[index].GlobalHeapOffset = DescriptorHeapManager.AllocateSamplerOffset(descSize);
+                    }
+
+                    if (states[index].IsDirty)
+                    {
+                        DescriptorHeapManager.WriteSampler(states[index].GlobalHeapOffset, state);
+                        states[index].IsDirty = false;
+                    }
+                }
+            }
                 break;
             case EffectResourceType.ShaderResourceView:
             {
@@ -214,15 +237,29 @@ internal class EffectResourceLinker : IEffectResourceLinker
                     ShaderResourceViews.Add(parameter, views);
                     BoundResources.Add(parameter, views);
                 }
-                        
+
                 if (views[index] == null)
                 {
                     views[index] = new ResourceInfo<Texture>();
                 }
-                        
+
                 if (value is Texture texture)
                 {
                     views[index].Resource = texture;
+
+                    if (views[index].GlobalHeapOffset == uint.MaxValue)
+                    {
+                        uint descSize = (uint)DescriptorHeapManager.DeviceHeapProperties.ImageDescriptorSize;
+                        uint descAlignment = (uint)DescriptorHeapManager.DeviceHeapProperties.ImageDescriptorAlignment;
+                        views[index].GlobalHeapOffset = DescriptorHeapManager.AllocateResourceOffset(descSize, descAlignment);
+                    }
+
+                    if (views[index].IsDirty)
+                    {
+                        DescriptorHeapManager.WriteTexture(views[index].GlobalHeapOffset, texture,
+                            DescriptorType.SampledImage);
+                        views[index].IsDirty = false;
+                    }
                 }
             }
                 break;
@@ -237,7 +274,30 @@ internal class EffectResourceLinker : IEffectResourceLinker
 
                 if (value is Buffer buffer)
                 {
-                    uavs[index] = new ResourceInfo<Buffer>(buffer);
+                    if (uavs[index] == null)
+                    {
+                        uavs[index] = new ResourceInfo<Buffer>();
+                    }
+                    
+                    uavs[index].Resource = buffer;
+
+                    if (uavs[index].GlobalHeapOffset == uint.MaxValue)
+                    {
+                        uint descSize = (uint)DescriptorHeapManager.DeviceHeapProperties.BufferDescriptorSize;
+                        uint descAlignment = (uint)(ulong)DescriptorHeapManager.DeviceHeapProperties.BufferDescriptorAlignment;
+                        uavs[index].GlobalHeapOffset = DescriptorHeapManager.AllocateResourceOffset(descSize, descAlignment);
+                    }
+
+                    if (uavs[index].IsDirty)
+                    {
+                        DescriptorHeapManager.WriteBuffer(
+                            uavs[index].GlobalHeapOffset, 
+                            buffer,
+                            0,
+                            buffer.TotalSize,
+                            DescriptorType.StorageBuffer);
+                        uavs[index].IsDirty = false;
+                    }
                 }
             }
                 break;

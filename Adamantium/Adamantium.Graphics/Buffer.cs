@@ -174,14 +174,14 @@ namespace Adamantium.Graphics
             GraphicsDevice.EndSingleTimeCommand(commandBuffer);
         }
 
-        public void CopyFrom(DataBuffer buffer)
+        public void CopyFrom(DataBuffer buffer, ulong offset = 0)
         {
-            DataPointer pointer = new DataPointer
+            var pointer = new DataPointer
             {
                 Pointer = buffer.DataPointer,
                 Size = buffer.Size
             };
-            SetData(pointer);
+            SetData(pointer, offset);
         }
 
         /// <summary>
@@ -335,7 +335,7 @@ namespace Adamantium.Graphics
         /// <remarks>
         /// See the unmanaged documentation about Map/UnMap for usage and restrictions.
         /// </remarks>
-        public void SetData(DataPointer fromData, uint offsetInBytes = 0)
+        public void SetData(DataPointer fromData, ulong offsetInBytes = 0)
         {
             // Check size validity of data to copy to
             if ((fromData.Size + offsetInBytes) > TotalSize)

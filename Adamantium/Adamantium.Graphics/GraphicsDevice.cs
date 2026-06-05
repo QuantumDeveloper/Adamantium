@@ -110,6 +110,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
             
         InitializeRenderDevice();
         InitializePipeline();
+        DescriptorHeapManager = new DescriptorHeapManager(this);
 
         Log.Logger.Debug($"Primary render device created. Id: {DeviceId}");
 
@@ -151,6 +152,8 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     internal Fence[] InFlightFences { get; private set; }
 
     public uint CurrentFrame => frame;
+    
+    public DescriptorHeapManager DescriptorHeapManager { get; private set; }
 
     public uint MaxFramesInFlight { get; private set; }
 
@@ -159,7 +162,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     public EffectPool DefaultEffectPool { get; private set; }
 
     public MainGraphicsDevice MainDevice { get; private set; }
-
+    
     public Fence GetCurrentFence()
     {
         return InFlightFences[CurrentFrame];
@@ -357,7 +360,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
     public IEffectResourceLinker CreateEffectResourceLinker()
     {
-        return new EffectResourceLinker();
+        return new EffectResourceLinker(DescriptorHeapManager);
     }
 
     public IEffectPass CreateEffectPass(Logger logger, Effect effect, EffectTechnique technique, EffectData.Pass pass, string name)
@@ -397,7 +400,9 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
     public ShaderEXT CreateShader(ShaderCreateInfoEXT shaderCreateInfo)
     {
-        return LogicalDevice.CreateShader(shaderCreateInfo);
+        //return LogicalDevice.CreateShader(shaderCreateInfo);
+        LogicalDevice.CreateShadersEXT(1, shaderCreateInfo, null, out var shaderObject);
+        return shaderObject[0];
     }
 
     public void DestroyShader(ShaderEXT shaderObject)
@@ -456,10 +461,10 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         fenceInfo.Flags = FenceCreateFlagBits.SignaledBit;
 
         ImageAvailableSemaphores = LogicalDevice.CreateSemaphores(semaphoreInfo, MaxFramesInFlight);
-        RenderFinishedSemaphores = LogicalDevice.CreateSemaphores(semaphoreInfo, MaxFramesInFlight);
+        //RenderFinishedSemaphores = LogicalDevice.CreateSemaphores(semaphoreInfo, MaxFramesInFlight);
         InFlightFences ??= LogicalDevice.CreateFences(fenceInfo, MaxFramesInFlight);
     }
-
+    
     public Queue GetDeviceQueue(uint queueFamilyIndex, uint queueIndex)
     {
         return LogicalDevice.GetDeviceQueue(queueFamilyIndex, queueIndex);
@@ -832,6 +837,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
             // );
             
             commandBuffer.BeginRendering(renderingInfo);
+            DescriptorHeapManager.BindDescriptorHeaps();
         }
     }
 
@@ -910,13 +916,13 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         var submitInfo = new SubmitInfo();
 
         
-        if (Presenter is SwapChainGraphicsPresenter)
+        if (Presenter is SwapChainGraphicsPresenter swapChainGraphicsPresenter)
         {
             waitSemaphoresArray[0] = ImageAvailableSemaphores[CurrentFrame];
             submitInfo.WaitSemaphoreCount = (uint)waitSemaphoresArray.Length;
             submitInfo.PWaitSemaphores = waitSemaphoresArray;
                 
-            signalSemaphoresArray[0] = RenderFinishedSemaphores[CurrentFrame];
+            signalSemaphoresArray[0] = swapChainGraphicsPresenter.CurrentRenderFinishedSemaphore;
         
             submitInfo.SignalSemaphoreCount = (uint)signalSemaphoresArray.Length;
             submitInfo.PSignalSemaphores = signalSemaphoresArray;
@@ -1211,6 +1217,11 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     {
         swapchain.Destroy(LogicalDevice);
     }
+    
+    public void Destroy(Semaphore semaphore)
+    {
+        LogicalDevice?.DestroySemaphore(semaphore);
+    }
 
     public nuint MapMemory(DeviceMemory memory, ulong offset, ulong size, MemoryMapFlagBits flags)
     {
@@ -1226,7 +1237,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     {
         return SamplerState.New(this, name, samplerInfo);
     }
-        
+
     internal Semaphore GetImageAvailableSemaphoreForCurrentFrame()
     {
         return ImageAvailableSemaphores[CurrentFrame];
@@ -1268,7 +1279,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
             
             for (int i = 0; i < commandBuffers.Length; i++)
             {
-                LogicalDevice?.DestroySemaphore(RenderFinishedSemaphores[i]);
+                //LogicalDevice?.DestroySemaphore(RenderFinishedSemaphores[i]);
                 LogicalDevice?.DestroySemaphore(ImageAvailableSemaphores[i]);
                 LogicalDevice?.DestroyFence(InFlightFences[i]);
             }

@@ -48,7 +48,7 @@ public interface IBuffer: IDisposable
     /// </summary>
     IGraphicsDevice GraphicsDevice { get; }
 
-    void CopyFrom(DataBuffer buffer);
+    void CopyFrom(DataBuffer buffer, ulong offset = 0);
 
     /// <summary>
     /// Gets the content of this buffer to an array of data.
@@ -151,7 +151,7 @@ public interface IBuffer: IDisposable
     /// <remarks>
     /// See the unmanaged documentation about Map/UnMap for usage and restrictions.
     /// </remarks>
-    void SetData(DataPointer fromData, uint offsetInBytes = 0);
+    void SetData(DataPointer fromData, ulong offsetInBytes = 0);
 
     UInt64 GetDeviceAddress();
 

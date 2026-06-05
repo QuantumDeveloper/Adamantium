@@ -204,17 +204,29 @@ namespace Adamantium.Graphics.Core
                 DynamicRendering = true,
             };
             
+            var features14 = new PhysicalDeviceVulkan14Features();
+
+            var primitiveRestart = new PhysicalDevicePrimitiveTopologyListRestartFeaturesEXT
+            {
+                PrimitiveTopologyListRestart = true,
+            };
+            
             var heapFeatures = new PhysicalDeviceDescriptorHeapFeaturesEXT
             {
                 DescriptorHeap = true,
+                // Enable only if the device actually supports it — otherwise vkCreateDevice will fail.
+                DescriptorHeapCaptureReplay = GraphicsAdapter.SupportsDescriptorHeapCaptureReplay
             };
 
             var deviceFeatures2 = GraphicsAdapter.Adapter.GetPhysicalDeviceFeatures2();
 
             deviceFeatures2.PNext = vulkan12Features;
             vulkan12Features.PNext = vulkan13Features;
-            vulkan13Features.PNext = descriptorBufferFeature;
-
+            vulkan13Features.PNext = features14;
+            //vulkan13Features.PNext = descriptorBufferFeature;
+            features14.PNext = primitiveRestart;
+            primitiveRestart.PNext = descriptorBufferFeature;
+            
             if (EnableDynamicRendering &&
                 finalDeviceExtensions.Contains(Constants.VK_EXT_SHADER_OBJECT_EXTENSION_NAME))
             {
