@@ -39,6 +39,17 @@ public unsafe class GraphicsAdapter
         AdapterProperties = properties2.Properties;
         DeviceBufferProperties = new PhysicalDeviceDescriptorBufferPropertiesEXT(bufferProperties);
         DeviceHeapProperties = new PhysicalDeviceDescriptorHeapPropertiesEXT(heapProperties);
+
+        // Detect whether the device supports capture/replay for the descriptor heap (needed by tools like NSight).
+        var heapFeaturesNative = new VkPhysicalDeviceDescriptorHeapFeaturesEXT();
+        heapFeaturesNative.sType = StructureType.PhysicalDeviceDescriptorHeapFeaturesExt;
+        var heapFeatPtr = (IntPtr)NativeUtils.StructOrEnumToPointer(heapFeaturesNative);
+        var features2 = new PhysicalDeviceFeatures2();
+        features2.PNext = heapFeatPtr;
+        _physicalDevice.GetPhysicalDeviceFeatures2(ref features2);
+        var heapFeatures = *(VkPhysicalDeviceDescriptorHeapFeaturesEXT*)heapFeatPtr;
+        SupportsDescriptorHeapCaptureReplay = heapFeatures.descriptorHeapCaptureReplay != 0;
+        Console.WriteLine($"DescriptorHeap supported={heapFeatures.descriptorHeap != 0}, captureReplay supported={SupportsDescriptorHeapCaptureReplay}");
     }
     
     public PhysicalDeviceProperties AdapterProperties { get; private set; }
@@ -46,6 +57,8 @@ public unsafe class GraphicsAdapter
     public PhysicalDeviceDescriptorBufferPropertiesEXT DeviceBufferProperties { get; private set; }
     
     public PhysicalDeviceDescriptorHeapPropertiesEXT DeviceHeapProperties { get; private set; }
+
+    public bool SupportsDescriptorHeapCaptureReplay { get; private set; }
 
     public PhysicalDeviceType DeviceType => AdapterProperties.DeviceType;
     

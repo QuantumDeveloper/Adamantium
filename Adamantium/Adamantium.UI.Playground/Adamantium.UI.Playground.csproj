@@ -56,6 +56,7 @@
 		<AdditionalFiles Include="ControlTemplateSchema.xsd" />
 		<AdditionalFiles Include="ResourceDictionarySchema.xsd" />
 		<CompilerVisibleProperty Include="RootNamespace" />
+		<CompilerVisibleProperty Include="ProjectDir" />
 		<AdditionalFiles Remove="obj\**" />
 	</ItemGroup>
 

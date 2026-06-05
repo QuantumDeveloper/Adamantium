@@ -1037,9 +1037,9 @@ namespace Adamantium.EffectsCompiler
             var compilerOptions = new CompilerOptions();
             compilerOptions.Add(CompilerArguments.AllResourcesBound);
             compilerOptions.Add(CompilerArguments.SpvUseDxLayout);
-            compilerOptions.Add($"{CompilerArguments.SpvTargetEnv}vulkan1.1");
-            compilerOptions.Add($"{CompilerArguments.SpvExtension}SPV_GOOGLE_hlsl_functionality1");
-            compilerOptions.Add($"{CompilerArguments.SpvExtension}SPV_GOOGLE_user_type");
+            compilerOptions.Add(CompilerArguments.SpvTargetEnvVulkan1_3);
+            compilerOptions.Add(CompilerArguments.SpvcExtensionGoogleHlslFunctionality1);
+            compilerOptions.Add(CompilerArguments.SpvcExtensionGoogleUserType);
             compilerOptions.Add(CompilerArguments.SpvReflect);
 
             var targetProfile = $"{StageTypeToString(shaderKind)}_{GetShaderModelFromProfile(profile)}";

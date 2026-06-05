@@ -1,4 +1,4 @@
-<Window x:Class="Adamantium.UI.Playground.MainWindow"
+<Window x:Namespace="Adamantium.UI.Playground.MainWindow"
         xmlns:x="http://adamantium/ui/xaml/extensions"
         xmlns="http://adamantium/ui"
         Title="Adamantium Window"

@@ -104,7 +104,14 @@ public class CodeGenerationContext
             elementName = isNamed
                 ? named
                 : GenerateNextElementName();
-            TextGenerator.WriteLine($"var {elementName} = new {typeInfo.FullName}();");
+            // A named element in a control file has a backing field (declared in GenerateControlFile) — assign to
+            // the field, otherwise a local var would shadow it (the field would stay null). Inside a ControlTemplate and in
+            // theme/resource files there is no field → local var (+ RegisterName for the template below).
+            var hasBackingField = isNamed
+                && CurrentTemplate == null
+                && EntityType is not (EntityType.ResourceDictionary or EntityType.StyleSet or EntityType.Theme);
+            var declaration = hasBackingField ? elementName : $"var {elementName}";
+            TextGenerator.WriteLine($"{declaration} = new {typeInfo.FullName}();");
             if (isNamed && CurrentTemplate != null)
             {
                 TextGenerator.WriteLine($"{CurrentTemplate}.RegisterName(\"{named}\", {elementName});");

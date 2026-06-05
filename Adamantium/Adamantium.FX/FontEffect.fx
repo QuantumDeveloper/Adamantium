@@ -19,9 +19,10 @@ struct PSInput
     float4 Color : COLOR;
 };
 
-Texture2D Texture;
+Texture2D Texture : register(t1);
+SamplerState TextureSampler : register(s1);
+
 matrix MatrixTransform;
-SamplerState TextureSampler;
 float2 TextureCornerCoords[4];
 float4 ForegroundColor;
 float FontSize;

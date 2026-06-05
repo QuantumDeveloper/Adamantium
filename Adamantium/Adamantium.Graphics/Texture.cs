@@ -281,6 +281,7 @@ public unsafe class Texture : GraphicsResource, ITexture
         createInfo.SubresourceRange = subresourceRange;
 
         ImageView = GraphicsDevice.LogicalDevice.CreateImageView(createInfo);
+        Info = createInfo;
     }
         
     public static uint CalculateMipLevels(int width, int height, MipMapCount mipLevels)
@@ -456,6 +457,8 @@ public unsafe class Texture : GraphicsResource, ITexture
         GraphicsDevice.Destroy(stagingBuffer);
         GraphicsDevice.Destroy(stagingBufferMemory);
     }
+
+    public ImageViewCreateInfo Info { get; private set; }
 
     public static implicit operator VulkanImage (Texture texture)
     {

@@ -178,25 +178,37 @@ public class AumlSourceGenerator : IAumlSourceGenerator
     private string GenerateControlFile(AumlMetadataContainer container, EntityType entityType, IDiagnosticSink diagnostics)
     {
         var rootNode = container.RootNode as AumlAstObjectNode;
-        var directives = rootNode.Children.Where(x => x is AumlAstDirective).ToList();
         string className = container.FileName;
-        string @namespace = String.Empty;
         var typeContainer = container.TypeResolver.GetResolvedAssembly(rootNode.TypeReference.Assembly);
         var rootBaseType = typeContainer.GetTypeByFullName(rootNode.TypeReference.GetFullTypeName());
 
-        AumlAstDirective classDirective = null;
-        foreach (var aumlAstNode in directives)
+        // Namespace: an explicit x:Namespace directive (the WPF x:Class analog) takes priority; otherwise derive it
+        // from AssemblyName + relative path (as GenerateThemeFile/GenerateResourceFile do).
+        var namespaceDirective = rootNode.Children
+            .OfType<AumlAstDirective>()
+            .FirstOrDefault(d => d.Name == AumlDirectives.Namespace);
+
+        string @namespace;
+        if (namespaceDirective?.Value is AumlAstTextNode directiveValue && !string.IsNullOrEmpty(directiveValue.Text))
         {
-            var directive = (AumlAstDirective)aumlAstNode;
-            if (directive.Name == AumlDirectives.Namespace)
+            // The value is a full type name "Namespace.ClassName" (like x:Class), or already a bare namespace.
+            // Strip the class name (= file name) if it is present at the end.
+            var value = directiveValue.Text;
+            @namespace = value.EndsWith($".{className}")
+                ? value.Substring(0, value.Length - className.Length - 1)
+                : value;
+        }
+        else
+        {
+            var additionalPath = Path.GetDirectoryName(container.RelativeFilePath);
+            @namespace = container.AssemblyName;
+            if (!string.IsNullOrEmpty(additionalPath))
             {
-                classDirective = directive;
-                break;
+                additionalPath = additionalPath.ToNamespace();
+                @namespace = $"{@namespace}.{additionalPath}";
             }
         }
-        
-        var directiveValue = classDirective.Value as AumlAstTextNode;
-        @namespace = directiveValue.Text;
+
         container.Namespace = @namespace;
         container.ClassName = className;
 

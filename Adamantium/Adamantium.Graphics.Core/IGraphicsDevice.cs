@@ -39,7 +39,8 @@ public interface IDestroyableDevice
     void Destroy(DeviceMemory deviceMemory);
     void Destroy(Image image);
     void Destroy(ImageView imageView);
-    void Destroy(SwapchainKHR swapchain);    
+    void Destroy(SwapchainKHR swapchain);
+    void Destroy(Semaphore semaphore);
 }
 
 public interface IDynamicStateDevice

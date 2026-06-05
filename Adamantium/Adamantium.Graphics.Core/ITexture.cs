@@ -40,7 +40,9 @@ public interface ITexture : INamedObject
     
     void SetImageView(ImageView imageView);
 
-    unsafe void Save(string path, ImageFileType fileType);
+    void Save(string path, ImageFileType fileType);
+    
+    ImageViewCreateInfo Info { get; }
 
     /// <summary>
     /// Releases unmanaged and - optionally - managed resources

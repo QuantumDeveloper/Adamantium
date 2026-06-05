@@ -23,8 +23,6 @@ namespace Adamantium.Graphics.Core
 
         IndirectBuffer = 256,
 
-        ShaderDeviceAddress = 131072,
-
         VideoDecodeSrcKhr = 8192,
 
         VideoDecodeDstKhr = 16384,
@@ -34,6 +32,10 @@ namespace Adamantium.Graphics.Core
         TransformFeedbackCounterBufferExt = 4096,
 
         ConditionalRenderingExt = 512,
+
+        ExecutionGraphScratchAmdx = 33554432,
+
+        DescriptorHeapExt = 268435456,
 
         AccelerationStructureBuildInputReadOnlyKhr = 524288,
 
@@ -55,6 +57,8 @@ namespace Adamantium.Graphics.Core
 
         MicromapStorageExt = 16777216,
 
-        FlagsMaxEnum = 2147483647,
+        TileMemoryQcom = 134217728,
+
+        ShaderDeviceAddress = 131072,
     }
 }
