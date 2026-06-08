@@ -15,7 +15,7 @@ namespace Adamantium.UI.Generators
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
            var filesProvider = context.AdditionalTextsProvider
-                .Where(file => file.Path.EndsWith(".xml"))
+                .Where(file => file.Path.EndsWith(".xml") || file.Path.EndsWith(".auml"))
                 .Select((text, cancellationToken) => (
                     Path: text.Path,
                     Content: text.GetText(cancellationToken)!.ToString()))
@@ -50,7 +50,7 @@ namespace Adamantium.UI.Generators
                 {
                     var diagnostics = new RoslynDiagnosticSink(spc);
 
-                    if (file.Path.EndsWith("FluentDark.xml"))
+                    if (file.Path.EndsWith("FluentDark.auml"))
                     {
                         int x = 0;
                     }

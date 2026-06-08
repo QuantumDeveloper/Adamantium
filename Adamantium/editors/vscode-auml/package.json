@@ -1,0 +1,67 @@
+{
+  "name": "adamantium-auml",
+  "displayName": "Adamantium AUML",
+  "description": "Language support (completion, diagnostics) for Adamantium UI markup (.auml).",
+  "version": "0.2.0",
+  "publisher": "adamantium",
+  "icon": "icons/icon.png",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:auml"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "auml",
+        "aliases": [
+          "AUML",
+          "Adamantium UI Markup"
+        ],
+        "extensions": [
+          ".auml"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/auml.svg",
+          "dark": "./icons/auml.svg"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "auml",
+        "scopeName": "text.xml.auml",
+        "path": "./syntaxes/auml.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "Adamantium AUML",
+      "properties": {
+        "auml.serverPath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional override: absolute path to a local Adamantium.UI.LanguageServer build (for development). If empty, the server bundled inside the extension is used."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.0"
+  }
+}

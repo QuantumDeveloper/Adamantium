@@ -1,0 +1,10 @@
+<svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+  <!-- full-width element plate (background to everything) -->
+  <rect x="1" y="1" width="38" height="38" rx="6" fill="#34465A" stroke="#5E7286" stroke-width="1.8"/>
+  <!-- atomic number, beyond the periodic table -->
+  <text x="5.5" y="13" font-family="Arial, Helvetica, sans-serif" font-size="8" font-weight="600" fill="#9FB3C4">137</text>
+  <!-- &lt;Au&gt; — symbol wrapped in markup brackets -->
+  <text x="20" y="28" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" text-anchor="middle">
+    <tspan fill="#2BB3C5">&lt;</tspan><tspan fill="#EAF0F5">Au</tspan><tspan fill="#2BB3C5">&gt;</tspan>
+  </text>
+</svg>

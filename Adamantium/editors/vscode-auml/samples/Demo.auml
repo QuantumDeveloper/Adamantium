@@ -1,0 +1,10 @@
+<Window x:Namespace="Demo.MainWindow"
+        xmlns:x="http://adamantium/ui/xaml/extensions"
+        xmlns="http://adamantium/ui"
+        Title="Demo"
+        Width="800"
+        Height="600">
+    <RenderTargetPanel x:Name="Root">
+        <Border Width="200" Height="120" Background="Blue" CornerRadius="20" />
+    </RenderTargetPanel>
+</Window>

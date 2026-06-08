@@ -22,6 +22,8 @@ public class RoslynTypeResolver : ITypeResolver
     
     public IReadOnlyList<IResolvedAssembly> ResolvedAssemblies => _resolvedAssemblies;
 
+    public IReadOnlyCollection<string> XmlnsDefinitions => _resolvedXmlAssemblies.Keys.ToArray();
+
     public IResolvedAssembly GetResolvedAssembly(string assemblyName)
     {
         return _resolvedAssemblies.FirstOrDefault(x => x.Name == assemblyName);

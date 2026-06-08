@@ -28,11 +28,13 @@ public class AumlParser
         if (!rootNode.TypeReference.ContainsValidData())
         {
             context.Logger.Error($"Xmlns declaration is missing for root element: {rootNode.TypeReference.Name}");
-            
+
             return new AumlDocument()
             {
                 Logger = context.Logger,
                 HasErrors = true,
+                Root = rootNode,                                  // keep the AST; consumers gate on HasErrors, tooling can still inspect it
+                NamespaceMappings = context.NamespaceMappings.ToArray(),
             };
         }
 

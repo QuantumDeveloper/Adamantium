@@ -329,3 +329,17 @@ ASALocalRun/
 # MFractors (Xamarin productivity tool) working folder 
 .mfractor/
 Adamantium/Adamantium.Imaging/Adamantium.Imaging.xml
+
+# --- AUML tooling / build output ---
+# Engine build output (custom BaseOutputPath redirect; everything here is generated)
+/output/
+
+# VS Code AUML extension build artifacts (node_modules is already ignored globally)
+/Adamantium/editors/vscode-auml/out/
+/Adamantium/editors/vscode-auml/server/
+/Adamantium/editors/vscode-auml/*.vsix
+
+# Rider AUML plugin build artifacts
+/Adamantium/editors/rider-auml/build/
+/Adamantium/editors/rider-auml/.gradle/
+/Adamantium/editors/rider-auml/.intellijPlatform/

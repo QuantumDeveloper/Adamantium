@@ -1,0 +1,51 @@
+<idea-plugin>
+    <id>com.adamantium.auml</id>
+    <name>Adamantium AUML</name>
+    <version>0.2.0</version>
+    <vendor>Adamantium</vendor>
+
+    <description><![CDATA[
+        Language support for Adamantium UI markup (<code>.auml</code>): XML-based syntax highlighting,
+        plus type-aware completion and diagnostics via the Adamantium AUML language server.
+        Requires the LSP4IJ plugin (installed automatically as a dependency).
+    ]]></description>
+
+    <!-- Declaration order matters: platform + xml, then lsp4ij, then the extensions below. -->
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.xml</depends>
+    <depends>com.redhat.devtools.lsp4ij</depends>
+
+    <!-- Register .auml as its own file type backed by the XML language => XML highlighting & structure. -->
+    <extensions defaultExtensionNs="com.intellij">
+        <fileType name="AUML"
+                  implementationClass="com.adamantium.auml.AumlFileType"
+                  fieldName="INSTANCE"
+                  language="XML"
+                  extensions="auml"/>
+        <!-- Mark the static AUML xmlns URIs as known so XML support doesn't flag "URI is not registered". -->
+        <standardResourceProvider implementation="com.adamantium.auml.AumlResourceProvider"/>
+        <!-- Dynamic clr-namespace: xmlns URIs can't be pre-registered. Two complementary nets:
+             the registrar resolves them upstream (mark ignored on open); the filter is an instant fallback. -->
+        <daemon.highlightInfoFilter implementation="com.adamantium.auml.AumlNamespaceHighlightFilter"/>
+    </extensions>
+
+    <!-- Mark each .auml file's clr-namespace: URIs as ignored XML resources when it opens. -->
+    <projectListeners>
+        <listener class="com.adamantium.auml.AumlClrNamespaceRegistrar"
+                  topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
+    </projectListeners>
+
+    <!-- Register the AUML language server and bind it to *.auml files. -->
+    <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
+        <server id="adamantium-auml"
+                name="Adamantium AUML"
+                factoryClass="com.adamantium.auml.AumlLanguageServerFactory">
+            <description><![CDATA[Adamantium UI markup language server]]></description>
+        </server>
+        <fileNamePatternMapping patterns="*.auml" serverId="adamantium-auml"/>
+        <!-- Paint the server's 'unknown' token (unresolved element) red; the rest get sensible colours.
+             serverId MUST match the <server id> above — the provider is bound per server definition. -->
+        <semanticTokensColorsProvider serverId="adamantium-auml"
+                                      class="com.adamantium.auml.AumlSemanticTokensColorsProvider"/>
+    </extensions>
+</idea-plugin>

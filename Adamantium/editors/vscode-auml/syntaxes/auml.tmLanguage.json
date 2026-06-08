@@ -1,0 +1,7 @@
+{
+  "name": "AUML",
+  "scopeName": "text.xml.auml",
+  "patterns": [
+    { "include": "text.xml" }
+  ]
+}
