@@ -4,6 +4,9 @@ public interface ITypeResolver
 {
     IReadOnlyList<IResolvedAssembly> ResolvedAssemblies { get; }
 
+    /// <summary>All xmlns namespace URIs registered via [XmlnsDefinition] (after <see cref="ScanXmlnsAttributes"/>).</summary>
+    IReadOnlyCollection<string> XmlnsDefinitions { get; }
+
     IResolvedAssembly GetResolvedAssembly(string assemblyName);
 
     IResolvedAssembly GetResolvedAssemblyByXmlDefinition(string xmlDefinition);

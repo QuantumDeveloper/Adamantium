@@ -1,55 +1,54 @@
-using System.Runtime.InteropServices;
 using Adamantium.UI.LanguageServer;
-using Adamantium.UI.Markup.CodeGeneration;
 
-const string xmlns = "http://adamantium/ui";
-
-// 1. Locate the target project's output assemblies (the playground we built).
-string? binDir = args.Length > 0 ? args[0] : FindDefaultBinDir();
-if (binDir is null || !Directory.Exists(binDir))
+// Modes:
+//   (no args)    run as an LSP server over stdio — this is how an editor launches us
+//   --selftest   run the in-process LSP integration test and exit
+//   --demo       run the console completion demo and exit
+if (args.Contains("--demo"))
 {
-    Console.Error.WriteLine($"Bin directory not found. Pass it as the first argument. Tried: {binDir}");
-    return 1;
+    var bin = FindDefaultBinDir();
+    if (bin is null)
+    {
+        Console.Error.WriteLine("[auml] playground bin not found; build Adamantium.UI.Playground first");
+        return 1;
+    }
+    RunDemo(new CompletionEngine(AumlWorkspace.BuildFromBin(bin)));
+    return 0;
 }
-Console.WriteLine($"Loading assemblies from: {binDir}");
-
-// App assemblies + the running runtime's assemblies (System.*); app wins on a name clash.
-var byName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-foreach (var dll in Directory.GetFiles(binDir, "*.dll"))
-    byName[Path.GetFileName(dll)] = dll;
-foreach (var dll in Directory.GetFiles(RuntimeEnvironment.GetRuntimeDirectory(), "*.dll"))
-    byName.TryAdd(Path.GetFileName(dll), dll);
-
-var model = AumlTypeModel.Build(byName.Values);
-
-// 2. Prove: element types are resolved under the AUML xmlns.
-var elements = model.GetElements(xmlns);
-Console.WriteLine($"\nElements under '{xmlns}': {elements.Count}");
-foreach (var name in new[] { "Window", "Border", "RenderTargetPanel", "Grid", "TextBlock" })
-    Console.WriteLine($"  [{(model.GetElement(xmlns, name) is not null ? "x" : " ")}] {name}");
-
-// 3. Prove: properties of a concrete element, with their types and enum detection.
-var border = model.GetElement(xmlns, "Border");
-if (border is not null)
+if (args.Contains("--selftest"))
 {
-    var props = model.GetProperties(border);
-    Console.WriteLine($"\n'Border' properties: {props.Count} (first 25, alphabetical)");
-    foreach (var p in props.OrderBy(p => p.Name).Take(25))
-    {
-        var tag = p.PropertyType?.TypeKind == ResolvedTypeKind.Enum ? "  [enum]" : "";
-        Console.WriteLine($"  {p.Name} : {p.PropertyType?.Name}{tag}");
-    }
-
-    // 4. Prove: enum value completion for the first enum-typed property.
-    var enumProp = props.FirstOrDefault(p => p.PropertyType?.TypeKind == ResolvedTypeKind.Enum);
-    if (enumProp is not null)
-    {
-        var values = model.GetEnumValues(enumProp.PropertyType).ToList();
-        Console.WriteLine($"\nEnum values for '{enumProp.Name}' ({enumProp.PropertyType.Name}): {string.Join(", ", values)}");
-    }
+    return LspSelfTest.Run();
 }
 
+// Project-aware: the workspace resolves a type model per project from the opened file's build output.
+var server = new LspServer(new AumlWorkspace(), Console.OpenStandardInput(), Console.OpenStandardOutput());
+server.Run();
 return 0;
+
+static void RunDemo(CompletionEngine engine)
+{
+    foreach (var marked in new[]
+    {
+        "<Bor|",
+        "<Border |",
+        "<Border Back|",
+        "<Border HorizontalAlignment=\"|\"",
+        "<Border ClipToBounds=\"|\"",
+        "<Border Background=\"|\"",
+        "<RenderTargetPanel>\n    <Bor|",
+    })
+    {
+        int caret = marked.IndexOf('|');
+        string text = marked.Remove(caret, 1);
+        var ctx = AumlCaretContext.Detect(text, caret);
+        var items = engine.Complete(text, caret);
+        Console.WriteLine($"\n>>> \"{marked.Replace("\n", "\\n")}\"  [{ctx.Kind}" +
+                          $"{(ctx.ElementName is { Length: > 0 } e ? $" {e}" : "")}" +
+                          $"{(ctx.AttributeName is { Length: > 0 } a ? $".{a}" : "")} '{ctx.Prefix}']");
+        var shown = items.Take(12).Select(i => i.Detail is null ? i.Label : $"{i.Label}:{i.Detail}");
+        Console.WriteLine($"    {items.Count}: {string.Join(", ", shown)}{(items.Count > 12 ? ", ..." : "")}");
+    }
+}
 
 static string? FindDefaultBinDir()
 {

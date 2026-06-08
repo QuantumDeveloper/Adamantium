@@ -50,7 +50,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<AdditionalFiles Include="$(ProjectDir)**\*.xml" />
+		<AdditionalFiles Include="$(ProjectDir)**\*.auml" />
 		<AdditionalFiles Include="$(ProjectDir)**\*.fx" />
 		<AdditionalFiles Include="$(ProjectDir)**\*.hlsl" />
 		<AdditionalFiles Include="ControlTemplateSchema.xsd" />

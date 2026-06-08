@@ -1,0 +1,115 @@
+namespace Adamantium.UI.LanguageServer;
+
+/// <summary>A semantic-highlighting token: a byte span in the buffer and its LSP token-type index.</summary>
+public sealed record SemToken(int Start, int Length, int TokenType);
+
+/// <summary>
+/// Type-aware highlighting for AUML. A lenient tag scanner (no full parse, so it survives mid-edit
+/// buffers — and works even when an undeclared prefix makes the doc invalid XML) classifies element
+/// names, xmlns prefixes, attribute names and x: directives. An element name that resolves gets
+/// 'type'; one that doesn't gets 'unknown' (painted red by the client, like ReSharper's unresolved
+/// types), so deleting an xmlns turns the controls red. Indices match the server's advertised legend.
+/// </summary>
+public static class SemanticTokensEngine
+{
+    public const int Namespace = 0, Type = 1, Property = 2, Macro = 3, Unknown = 4;
+
+    public static IReadOnlyList<SemToken> Tokenize(string text, AumlTypeModel? model)
+    {
+        var namespaces = AumlNamespaces.Scan(text);
+        var tokens = new List<SemToken>();
+        int i = 0;
+        while (i < text.Length)
+        {
+            if (text[i] != '<') { i++; continue; }
+
+            // Skip comments / processing instructions / CDATA / declarations.
+            if (StartsWith(text, i, "<!--")) { i = After(text, "-->", i); continue; }
+            if (StartsWith(text, i, "<?")) { i = After(text, "?>", i); continue; }
+            if (StartsWith(text, i, "<![CDATA[")) { i = After(text, "]]>", i); continue; }
+            if (i + 1 < text.Length && text[i + 1] == '!') { i = After(text, ">", i); continue; }
+
+            i++;                                              // past '<'
+            if (i < text.Length && text[i] == '/') i++;       // closing tag
+
+            int nameStart = i;
+            while (i < text.Length && IsNameChar(text[i])) i++;
+            if (i > nameStart) AddName(tokens, text, nameStart, i, element: true, namespaces, model);
+
+            // Attributes until the end of the tag.
+            while (i < text.Length && text[i] != '>')
+            {
+                char c = text[i];
+                if (c is '"' or '\'')                          // skip a quoted value
+                {
+                    i++;
+                    while (i < text.Length && text[i] != c) i++;
+                    if (i < text.Length) i++;
+                    continue;
+                }
+                if (IsNameStart(c))
+                {
+                    int attrStart = i;
+                    while (i < text.Length && IsNameChar(text[i])) i++;
+                    int j = i;
+                    while (j < text.Length && char.IsWhiteSpace(text[j])) j++;
+                    // Only an attribute name (followed by '='); xmlns declarations are left to XML syntax colouring.
+                    if (j < text.Length && text[j] == '=' && !StartsWith(text, attrStart, "xmlns"))
+                        AddName(tokens, text, attrStart, i, element: false, namespaces, model);
+                    continue;
+                }
+                i++;
+            }
+            if (i < text.Length) i++;                          // past '>'
+        }
+        return tokens;
+    }
+
+    private static void AddName(List<SemToken> tokens, string text, int start, int end, bool element,
+        IReadOnlyDictionary<string, string> namespaces, AumlTypeModel? model)
+    {
+        int colon = -1;
+        for (int k = start; k < end; k++) if (text[k] == ':') { colon = k; break; }
+
+        var prefix = colon >= 0 ? text[start..colon] : "";
+        if (colon >= 0) tokens.Add(new SemToken(start, colon - start, Namespace));
+
+        int localStart = colon >= 0 ? colon + 1 : start;
+        int localLength = end - localStart;
+        if (localLength <= 0) return;
+
+        int type;
+        if (element)
+        {
+            // A resolved type -> 'type'; an unresolved one -> 'unknown' (client paints it red). When the
+            // project model is unavailable we can't tell, so fall back to 'type' (no false red).
+            if (model is null)
+                type = Type;
+            else
+            {
+                var xmlns = namespaces.TryGetValue(prefix, out var uri) ? uri : "";
+                type = xmlns.Length > 0 && model.GetElement(xmlns, text.Substring(localStart, localLength)) is not null
+                    ? Type
+                    : Unknown;
+            }
+        }
+        else
+        {
+            type = prefix == "x" ? Macro : Property;
+        }
+
+        tokens.Add(new SemToken(localStart, localLength, type));
+    }
+
+    private static bool IsNameStart(char c) => char.IsLetter(c) || c == '_';
+    private static bool IsNameChar(char c) => char.IsLetterOrDigit(c) || c is '_' or '.' or ':' or '-';
+
+    private static bool StartsWith(string text, int i, string value) =>
+        i + value.Length <= text.Length && text.AsSpan(i, value.Length).SequenceEqual(value);
+
+    private static int After(string text, string marker, int from)
+    {
+        int idx = text.IndexOf(marker, from, StringComparison.Ordinal);
+        return idx < 0 ? text.Length : idx + marker.Length;
+    }
+}

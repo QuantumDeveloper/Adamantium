@@ -1,6 +1,7 @@
-<Window x:Namespace="Adamantium.UI.Playground.MainWindow"
-        xmlns:x="http://adamantium/ui/xaml/extensions"
-        xmlns="http://adamantium/ui"
+<Window
+    	xmlns="http://adamantium/ui"
+     	xmlns:x="http://adamantium/ui/xaml/extensions"        
+		x:Namespace="Adamantium.UI.Playground.MainWindow"
         Title="Adamantium Window"
         Width="1280"
         Height="720">
