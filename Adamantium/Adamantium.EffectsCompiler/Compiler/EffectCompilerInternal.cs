@@ -10,6 +10,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Adamantium.Core;
 using Adamantium.DXC;
+using Adamantium.EffectsCompiler.Compiler;
 using Adamantium.Mathematics;
 using AdamantiumVulkan.Spirv.Cross;
 using AdamantiumVulkan.Spirv.Reflection;
@@ -59,10 +60,12 @@ namespace Adamantium.EffectsCompiler
 
         private FileDependencyList dependencyList;
         private IDxcCompilerPlatform dxcCompiler;
+        private SlangShaderCompiler slangCompiler;
 
         public EffectCompilerInternal()
         {
             dxcCompiler = DxcCompiler.Create();
+            slangCompiler = new SlangShaderCompiler();
         }
 
         /// <summary>
@@ -202,8 +205,15 @@ namespace Adamantium.EffectsCompiler
         {
             var shaderType = TargetProfileToShaderStage(shaderBytecode.TargetProfile);
 
-            var shader = CreateEffectShader(shaderType, shaderBytecode.Name, shaderBytecode.EntryPoint, shaderBytecode);
-            ProcessShaderData(shaderType, shaderBytecode, shader);
+            var result = new ShaderCompilationResult
+            {
+                Bytecode = shaderBytecode.Bytecode,
+                HasErrors = shaderBytecode.HasErrors,
+                Errors = shaderBytecode.Errors
+            };
+
+            var shader = CreateEffectShader(shaderType, shaderBytecode.Name, shaderBytecode.EntryPoint, result);
+            ProcessShaderData(shaderType, result, shader);
         }
 
         private void InternalCompile(string sourceCode, string fileName)
@@ -1023,7 +1033,7 @@ namespace Adamantium.EffectsCompiler
             }
         }
 
-        private DxcCompilationResult CompileParsedShader(EffectShaderType shaderKind, string entryPoint, float profile)
+        private ShaderCompilationResult CompileParsedShader(EffectShaderType shaderKind, string entryPoint, float profile)
         {
             var sourcecodeBuilder = new StringBuilder();
             if (!string.IsNullOrEmpty(preprocessorText))
@@ -1033,7 +1043,31 @@ namespace Adamantium.EffectsCompiler
             var sourcecode = sourcecodeBuilder.ToString().TrimEnd('\r', '\n', ' ');
 
             var filePath = replaceBackSlash.Replace(parserResult.SourceFileName, @"\");
-            
+
+            // Slang is the primary backend; DXC stays as a fallback for HLSL Slang can't digest.
+            // Includes are already inlined into sourcecode by the preprocessor, so Slang needs no file callback.
+            // Slang's HLSL front-end does not understand the .fx `technique { pass { ... } }` blocks, so feed it
+            // a copy with those blanked out (DXC tolerates them, so its path keeps the original source).
+            var slangSourceBuilder = new StringBuilder();
+            if (!string.IsNullOrEmpty(preprocessorText))
+                slangSourceBuilder.Append(preprocessorText);
+            slangSourceBuilder.Append(BlankTechniqueBlocks(parserResult.PreprocessedSource, parserResult.Shader));
+            var slangSource = slangSourceBuilder.ToString().TrimEnd('\r', '\n', ' ');
+
+            try
+            {
+                var slangResult = slangCompiler.Compile(slangSource, entryPoint, shaderKind);
+                if (!slangResult.HasErrors && slangResult.Bytecode != null)
+                    return slangResult;
+
+                if (!string.IsNullOrWhiteSpace(slangResult.Errors))
+                    logger.Warnings($"Slang could not compile {shaderKind} '{entryPoint}', falling back to DXC: {slangResult.Errors}");
+            }
+            catch (Exception ex)
+            {
+                logger.Warnings($"Slang backend threw for {shaderKind} '{entryPoint}', falling back to DXC: {ex.Message}");
+            }
+
             var compilerOptions = new CompilerOptions();
             compilerOptions.Add(CompilerArguments.AllResourcesBound);
             compilerOptions.Add(CompilerArguments.SpvUseDxLayout);
@@ -1043,24 +1077,41 @@ namespace Adamantium.EffectsCompiler
             compilerOptions.Add(CompilerArguments.SpvReflect);
 
             var targetProfile = $"{StageTypeToString(shaderKind)}_{GetShaderModelFromProfile(profile)}";
-            DxcCompilationResult result = null;
 
-            try
+            var dxcResult = dxcCompiler.CompileIntoSpirvFromText(sourcecode, filePath, entryPoint, targetProfile, compilerOptions);
+            return new ShaderCompilationResult
             {
-                var timer = Stopwatch.StartNew();
-                result = dxcCompiler.CompileIntoSpirvFromText(sourcecode, filePath, entryPoint, targetProfile, compilerOptions);
-                timer.Stop();
-                var ms = timer.ElapsedMilliseconds;
-            }
-            catch(Exception ex)
-            {
-                throw;
-            }
-
-            return result;
+                Bytecode = dxcResult.Bytecode,
+                HasErrors = dxcResult.HasErrors,
+                Errors = dxcResult.Errors
+            };
         }
 
-        private EffectData.Shader CreateEffectShader(EffectShaderType type, string shaderName, string entryPoint, DxcCompilationResult compilationResult)
+        // Replaces every `technique { ... }` block with spaces (newlines kept so line numbers in Slang
+        // diagnostics stay aligned with the original source). Spans come from the effect parser's AST.
+        private static string BlankTechniqueBlocks(string source, Ast.Shader shader)
+        {
+            if (string.IsNullOrEmpty(source) || shader?.Techniques == null || shader.Techniques.Count == 0)
+                return source;
+
+            var chars = source.ToCharArray();
+            foreach (var technique in shader.Techniques)
+            {
+                var start = technique.Span.StartIndex;
+                var end = technique.Span.EndIndex;
+                if (start < 0) start = 0;
+                if (end > chars.Length) end = chars.Length;
+                for (var i = start; i < end; i++)
+                {
+                    if (chars[i] != '\n' && chars[i] != '\r')
+                        chars[i] = ' ';
+                }
+            }
+
+            return new string(chars);
+        }
+
+        private EffectData.Shader CreateEffectShader(EffectShaderType type, string shaderName, string entryPoint, ShaderCompilationResult compilationResult)
         {
             var shader = new EffectData.Shader()
             {
@@ -1089,7 +1140,7 @@ namespace Adamantium.EffectsCompiler
             return profile.ToString(CultureInfo.InvariantCulture).Replace('.', '_');
         }
 
-        private void ProcessShaderData(EffectShaderType type, DxcCompilationResult bytecode, EffectData.Shader shader)
+        private void ProcessShaderData(EffectShaderType type, ShaderCompilationResult bytecode, EffectData.Shader shader)
         {
             // if No debug is required, take the bytecode without any debug/reflection info.
             if ((compilerFlags & EffectCompilerFlags.Debug) == 0)

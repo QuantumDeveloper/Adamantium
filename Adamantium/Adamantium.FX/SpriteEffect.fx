@@ -3,7 +3,7 @@ const static int VERTICES_PER_SPRITE = 4;
 
 struct SpriteItem
 {
-    float4 Destination: SV_Position;
+    float4 Destination: Position;
     float4 Source: TEXCOORD0;
     float2 Origin:TEXCOORD1;
     float Depth : PSIZE0;

@@ -26,6 +26,7 @@
     <ItemGroup>
       <ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" />
       <ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
+      <ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.Slang\AdamantiumVulkan.Slang.csproj" />
     </ItemGroup>
 
     <ItemGroup>
