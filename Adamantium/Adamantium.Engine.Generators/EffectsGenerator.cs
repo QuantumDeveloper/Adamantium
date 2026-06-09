@@ -13,7 +13,7 @@ public class EffectsGenerator : IIncrementalGenerator
 {
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        DxcLibraryLoader.LoadNativeDxLibrary();
+        NativeLibraryLoader.LoadNativeLibraries();
         
         var effectFiles = context.AdditionalTextsProvider.Where(file => file.Path.EndsWith(".fx"));
         var includeFiles = context.AdditionalTextsProvider.Where(file => file.Path.EndsWith(".fxh"));

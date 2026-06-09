@@ -2,10 +2,11 @@
 float4 Color;
 
 Texture2D Texture;
-SamplerState TextureSampler: register(ps, s);
+SamplerState TextureSampler: register(s0);
 
-void VS(inout float4 position : SV_POSITION, inout float2 texCoord : TEXCOORD0)
+void VS(in float4 inputPosition : POSITION, out float4 position : SV_POSITION, inout float2 texCoord : TEXCOORD0)
 {
+   position = inputPosition;
    position.w = 1;
    position = mul(position, MatrixTransform);
 }

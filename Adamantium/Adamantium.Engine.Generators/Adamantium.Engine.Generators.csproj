@@ -42,6 +42,7 @@
 		
 		<PackageReference Include="Adamantium.DXC" Version="1.0.9" GeneratePathProperty="true" PrivateAssets="all" />
 		<PackageReference Include="AdamantiumVulkan.Spirv" Version="1.0.4" GeneratePathProperty="true" PrivateAssets="all" />
+		<PackageReference Include="AdamantiumVulkan.Slang" Version="1.0.2" GeneratePathProperty="true" PrivateAssets="all" />
         <PackageReference Include="QuantumBinding.Utils" Version="2.0.0" GeneratePathProperty="true" PrivateAssets="all" />
         <PackageReference Include="MessagePack" Version="2.5.168" GeneratePathProperty="true" PrivateAssets="all" />
         <PackageReference Include="MessagePack.Annotations" Version="2.5.168" GeneratePathProperty="true" PrivateAssets="all" />
@@ -53,6 +54,8 @@
     <ItemGroup>
         <EmbeddedResource Include="dxcompiler.dll"/>
         <EmbeddedResource Include="spirv-cross-c-shared.dll"/>
+        <EmbeddedResource Include="slang.dll"/>
+        <EmbeddedResource Include="slang-c-shared.dll"/>
     </ItemGroup>
 
 	<ItemGroup>
@@ -77,6 +80,7 @@
         <ItemGroup>
 			<TargetPathWithTargetPlatformMoniker Include="$(PKGAdamantium_DXC)\lib\netstandard2.0\Adamantium.DXC.dll" IncludeRuntimeDependency="false" />
             <TargetPathWithTargetPlatformMoniker Include="$(PKGAdamantiumVulkan_Spirv)\lib\netstandard2.0\AdamantiumVulkan.Spirv.dll" IncludeRuntimeDependency="false" />
+            <TargetPathWithTargetPlatformMoniker Include="$(PKGAdamantiumVulkan_Slang)\lib\netstandard2.0\AdamantiumVulkan.Slang.dll" IncludeRuntimeDependency="false" />
             <TargetPathWithTargetPlatformMoniker Include="$(PKGQuantumBinding_Utils)\lib\netstandard2.0\QuantumBinding.Utils.dll" IncludeRuntimeDependency="false" />
             <TargetPathWithTargetPlatformMoniker Include="$(PKGMessagePack)\lib\netstandard2.0\MessagePack.dll" IncludeRuntimeDependency="false" />
             <TargetPathWithTargetPlatformMoniker Include="$(PKGMessagePack_Annotations)\lib\netstandard2.0\MessagePack.Annotations.dll" IncludeRuntimeDependency="false" />

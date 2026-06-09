@@ -5,13 +5,29 @@ using System.Runtime.InteropServices;
 
 namespace Adamantium.Engine.Generators;
 
-public class DxcLibraryLoader
+/// <summary>
+/// Loads the native libraries the effect compiler needs into the generator (analyzer) process.
+/// The libraries are shipped as embedded resources and extracted next to the (possibly shadow-copied)
+/// generator assembly before loading — analyzers receive neither NuGet runtime/native assets nor a
+/// search-path entry, and netstandard2.0 has no <c>NativeLibrary</c> API, so this is the robust route.
+/// </summary>
+public class NativeLibraryLoader
 {
     private static readonly object LoadingLock = new();
 
     private static volatile bool IsLibraryLoaded;
 
-    public static void LoadNativeDxLibrary()
+    // Loaded in order; a shim must come after the runtime it imports
+    // (slang-c-shared.dll imports slang.dll), so list dependencies first.
+    private static readonly string[] NativeLibraries =
+    {
+        "dxcompiler.dll",
+        "spirv-cross-c-shared.dll",
+        "slang.dll",
+        "slang-c-shared.dll",
+    };
+
+    public static void LoadNativeLibraries()
     {
         static string ExtractLibrary(string @namespace, string dstPath, string dllName)
         {
@@ -24,7 +40,7 @@ public class DxcLibraryLoader
                 using Stream destinationStream = File.Open(finalPath, FileMode.OpenOrCreate, FileAccess.Write);
 
                 sourceStream.CopyTo(destinationStream);
-                
+
                 sourceStream.Close();
                 sourceStream.Dispose();
                 destinationStream.Dispose();
@@ -36,7 +52,7 @@ public class DxcLibraryLoader
 
             return finalPath;
         }
-        
+
         static unsafe void LoadLibrary(string filename)
         {
             [DllImport("kernel32", ExactSpelling = true, SetLastError = true)]
@@ -52,7 +68,7 @@ public class DxcLibraryLoader
                 }
             }
         }
-        
+
         if (IsLibraryLoaded)
         {
             return;
@@ -65,10 +81,13 @@ public class DxcLibraryLoader
                 return;
             }
 
-            var path = ExtractLibrary("Adamantium.Engine.Generators", Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "dxcompiler.dll");
-            LoadLibrary(path);
-            path = ExtractLibrary("Adamantium.Engine.Generators", Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "spirv-cross-c-shared.dll");
-            LoadLibrary(path);
+            var directory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+
+            foreach (var library in NativeLibraries)
+            {
+                var path = ExtractLibrary("Adamantium.Engine.Generators", directory, library);
+                LoadLibrary(path);
+            }
 
             IsLibraryLoaded = true;
         }
