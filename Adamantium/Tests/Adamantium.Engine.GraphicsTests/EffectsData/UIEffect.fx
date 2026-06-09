@@ -30,7 +30,7 @@ cbuffer PerlinParams : register(b0)
 
 struct VertexInputType
 {
-	float4 position : SV_POSITION;
+	float4 position : POSITION;
 	float4 color: COLOR;
 };
 
@@ -42,7 +42,7 @@ struct PixelInputType
 
 struct TexturedVertexInputType
 {
-	float4 position : SV_POSITION;
+	float4 position : POSITION;
 	float2 texcoord: TEXCOORD;
 };
 

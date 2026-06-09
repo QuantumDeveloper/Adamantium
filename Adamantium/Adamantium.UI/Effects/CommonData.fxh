@@ -1,6 +1,6 @@
 struct UI_VERTEX
 {
-    float4 position : SV_POSITION;
+    float4 position : POSITION;
     float3 normal: NORMAL;
     float2 uv0: TEXCOORD0;
     float2 uv1: TEXCOORD1;

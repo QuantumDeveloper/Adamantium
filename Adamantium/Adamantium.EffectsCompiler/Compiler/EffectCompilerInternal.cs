@@ -49,6 +49,7 @@ namespace Adamantium.EffectsCompiler
         private List<EffectData.ShaderMacro> macros;
         private ImmutableArray<ShaderFileInfo> includes;
         private EffectParserResult parserResult;
+        private string slangRawSource;
         private EffectData.Pass pass;
         private string preprocessorText;
         private EffectData.Technique technique;
@@ -227,7 +228,7 @@ namespace Adamantium.EffectsCompiler
             if (includes == null)
             {
                 var directory = Path.GetDirectoryName(fileName);
-                var includeFiles = Directory.GetFiles(directory, "*.hlsl");
+                var includeFiles = Directory.GetFiles(directory, "*.hlsl").Concat(Directory.GetFiles(directory, "*.fxh"));
                 includes = includeFiles.Select(x => new ShaderFileInfo()
                 { Content = File.ReadAllText(x), Path = x, FileName = Path.GetFileName(x) }).ToImmutableArray();
 
@@ -252,6 +253,10 @@ namespace Adamantium.EffectsCompiler
             
             sourceCode = Regex.Replace(sourceCode, commentPattern, String.Empty, RegexOptions.Multiline);
             sourceCode = Regex.Replace(sourceCode, multiLineCommentPattern, String.Empty, RegexOptions.Singleline);
+
+            // Keep the source with #include directives intact for the Slang backend, which resolves them
+            // itself via its VFS callback (the engine still flattens parserResult.PreprocessedSource for DXC).
+            slangRawSource = sourceCode;
 
             var parser = new EffectParser { Logger = logger };
             parser.Macros.AddRange(macros);
@@ -1045,18 +1050,18 @@ namespace Adamantium.EffectsCompiler
             var filePath = replaceBackSlash.Replace(parserResult.SourceFileName, @"\");
 
             // Slang is the primary backend; DXC stays as a fallback for HLSL Slang can't digest.
-            // Includes are already inlined into sourcecode by the preprocessor, so Slang needs no file callback.
-            // Slang's HLSL front-end does not understand the .fx `technique { pass { ... } }` blocks, so feed it
-            // a copy with those blanked out (DXC tolerates them, so its path keeps the original source).
+            // Slang gets the non-flattened source (its #include directives intact, resolved via the VFS
+            // callback) with the .fx `technique { pass { ... } }` blocks blanked out (Slang's HLSL front-end
+            // doesn't understand them). DXC keeps the flattened `sourcecode`.
             var slangSourceBuilder = new StringBuilder();
             if (!string.IsNullOrEmpty(preprocessorText))
                 slangSourceBuilder.Append(preprocessorText);
-            slangSourceBuilder.Append(BlankTechniqueBlocks(parserResult.PreprocessedSource, parserResult.Shader));
-            var slangSource = slangSourceBuilder.ToString().TrimEnd('\r', '\n', ' ');
+            slangSourceBuilder.Append(slangRawSource);
+            var slangSource = BlankTechniqueBlocks(slangSourceBuilder.ToString());
 
             try
             {
-                var slangResult = slangCompiler.Compile(slangSource, entryPoint, shaderKind);
+                var slangResult = slangCompiler.Compile(slangSource, entryPoint, shaderKind, ResolveSlangInclude);
                 if (!slangResult.HasErrors && slangResult.Bytecode != null)
                     return slangResult;
 
@@ -1087,28 +1092,102 @@ namespace Adamantium.EffectsCompiler
             };
         }
 
-        // Replaces every `technique { ... }` block with spaces (newlines kept so line numbers in Slang
-        // diagnostics stay aligned with the original source). Spans come from the effect parser's AST.
-        private static string BlankTechniqueBlocks(string source, Ast.Shader shader)
+        // Resolves a Slang #include request against the engine's include collection (same matching as
+        // IncludeParser: by path suffix or file name). Returns null if not found, so Slang reports it.
+        private string ResolveSlangInclude(string requestedPath)
         {
-            if (string.IsNullOrEmpty(source) || shader?.Techniques == null || shader.Techniques.Count == 0)
+            if (string.IsNullOrEmpty(requestedPath) || includes.IsDefaultOrEmpty)
+                return null;
+
+            var includePath = requestedPath.Replace("\"", string.Empty).Replace('/', '\\');
+            var fileName = Path.GetFileName(includePath);
+
+            foreach (var include in includes)
+            {
+                if (include.Path != null && include.Path.EndsWith(includePath, StringComparison.OrdinalIgnoreCase))
+                    return include.Content;
+                if (string.Equals(include.FileName, fileName, StringComparison.OrdinalIgnoreCase))
+                    return include.Content;
+            }
+
+            return null;
+        }
+
+        // Replaces every top-level `technique { ... }` block with spaces (newlines kept so line numbers in
+        // Slang diagnostics stay aligned with the source). Scans the exact string handed to Slang rather than
+        // relying on AST span offsets, which don't survive include expansion. Comments and strings are skipped
+        // so a stray `technique` inside them is never matched.
+        private static string BlankTechniqueBlocks(string source)
+        {
+            if (string.IsNullOrEmpty(source) || source.IndexOf("technique", StringComparison.Ordinal) < 0)
                 return source;
 
-            var chars = source.ToCharArray();
-            foreach (var technique in shader.Techniques)
+            var s = source.ToCharArray();
+            int i = 0, n = s.Length;
+            while (i < n)
             {
-                var start = technique.Span.StartIndex;
-                var end = technique.Span.EndIndex;
-                if (start < 0) start = 0;
-                if (end > chars.Length) end = chars.Length;
-                for (var i = start; i < end; i++)
+                var c = s[i];
+
+                if (c == '/' && i + 1 < n && s[i + 1] == '/')        // line comment
                 {
-                    if (chars[i] != '\n' && chars[i] != '\r')
-                        chars[i] = ' ';
+                    i += 2;
+                    while (i < n && s[i] != '\n') i++;
+                }
+                else if (c == '/' && i + 1 < n && s[i + 1] == '*')   // block comment
+                {
+                    i += 2;
+                    while (i + 1 < n && !(s[i] == '*' && s[i + 1] == '/')) i++;
+                    i = Math.Min(i + 2, n);
+                }
+                else if (c == '"')                                   // string literal
+                {
+                    i++;
+                    while (i < n && s[i] != '"') { if (s[i] == '\\') i++; i++; }
+                    i++;
+                }
+                else if (c == 't' && IsKeywordAt(s, i, "technique"))
+                {
+                    var end = FindBlockEnd(s, i + "technique".Length);
+                    if (end < 0) break; // unbalanced; leave the rest untouched
+                    for (var k = i; k < end; k++)
+                        if (s[k] != '\n' && s[k] != '\r') s[k] = ' ';
+                    i = end;
+                }
+                else
+                {
+                    i++;
                 }
             }
 
-            return new string(chars);
+            return new string(s);
+        }
+
+        private static bool IsKeywordAt(char[] s, int pos, string word)
+        {
+            if (pos + word.Length > s.Length) return false;
+            for (var j = 0; j < word.Length; j++)
+                if (s[pos + j] != word[j]) return false;
+            var before = pos > 0 ? s[pos - 1] : ' ';
+            var after = pos + word.Length < s.Length ? s[pos + word.Length] : ' ';
+            return !IsIdentChar(before) && !IsIdentChar(after);
+        }
+
+        private static bool IsIdentChar(char c) => char.IsLetterOrDigit(c) || c == '_';
+
+        // From just past the `technique` keyword, returns the index one past the matching closing brace.
+        private static int FindBlockEnd(char[] s, int pos)
+        {
+            var n = s.Length;
+            while (pos < n && s[pos] != '{') pos++;
+            if (pos >= n) return -1;
+
+            var depth = 0;
+            for (; pos < n; pos++)
+            {
+                if (s[pos] == '{') depth++;
+                else if (s[pos] == '}' && --depth == 0) return pos + 1;
+            }
+            return -1;
         }
 
         private EffectData.Shader CreateEffectShader(EffectShaderType type, string shaderName, string entryPoint, ShaderCompilationResult compilationResult)
