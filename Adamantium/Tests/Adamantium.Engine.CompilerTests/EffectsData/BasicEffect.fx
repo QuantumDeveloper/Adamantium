@@ -1,34 +1,30 @@
-
-
-float4x4 wvp;
+﻿float4x4 wvp;
 float3 meshColor;
 float transparency;
-//[[vk::binding(1)]] 
 sampler sampleType;
-//[[vk::binding(2)]] 
 Texture2D shaderTexture;
-float gamma;
 float4 foregroundColor;
+float gamma;
 float4 backgroundColor;
 uint atlasSize;
 
 struct TexturedVertexInputType
 {
-    float4 position : SV_POSITION;
-    float4 color: COLOR;
-    float2 texcoord: TEXCOORD;
+	float4 position : POSITION;
+	float4 color: COLOR;
+	float2 texcoord: TEXCOORD;
 };
 
 struct TexturedPixelInputType
 {
-    float4 position : SV_POSITION;
-    float2 texcoord: TEXCOORD;
-    float4 color: COLOR;
+	float4 position : SV_POSITION;
+	float2 texcoord: TEXCOORD;
+	float4 color: COLOR;
 };
 
 struct MESH_VERTEX
 {
-    float4 position : SV_POSITION;
+    float4 position : POSITION;
     float4 color : COLOR;
     float3 normal : NORMAL;
     float2 uv0 : TEXCOORD0;
@@ -45,6 +41,7 @@ struct PS_OUTPUT_BASIC
     float2 uv : TEXCOORD0;
     float4 color : COLOR0;
 };
+
 
 TexturedPixelInputType TexturedVertexShader(TexturedVertexInputType input)
 {
@@ -94,9 +91,20 @@ float median(float a, float b, float c)
     return max(min(a,b), min(max(a,b), c));
 }
 
-float4 MSDF_PS(PS_OUTPUT_BASIC input) : SV_TARGET
+float4 SmallGlyph_PS(PS_OUTPUT_BASIC input) : SV_TARGET
 {
-    float3 sample = shaderTexture.Sample(sampleType, input.uv).rgb;
+    float dist = shaderTexture.Sample(sampleType, input.uv).a;
+
+    float blendedAlpha = dist * foregroundColor.a;
+
+    float4 color = float4(foregroundColor.r, foregroundColor.g, foregroundColor.b, blendedAlpha);
+    
+    return color;
+}
+
+float4 LargeGlyph_PS(PS_OUTPUT_BASIC input) : SV_TARGET
+{
+    float4 sample = shaderTexture.Sample(sampleType, input.uv).rgba;
     int2 sz;
     shaderTexture.GetDimensions(sz.x, sz.y);
     float dx = ddx( input.uv.x ) * sz.x;
@@ -104,9 +112,39 @@ float4 MSDF_PS(PS_OUTPUT_BASIC input) : SV_TARGET
     float toPixels = 5.0 * rsqrt( dx * dx + dy * dy );
     float sigDist = median( sample.r, sample.g, sample.b ) - 0.5;
     float opacity = clamp( sigDist * toPixels + 0.5, 0.0, 1.0 );
+
+    //float4 color = float4(foregroundColor.r, foregroundColor.g, foregroundColor.b, opacity);
+
+    float4 color;
+    if (sample.a >= 0.55)
+    {
+        color = foregroundColor;
+    }
+    else
+    {
+        color = float4(foregroundColor.r, foregroundColor.g, foregroundColor.b, opacity);
+    }
+
+//float3 sample = shaderTexture.Sample(sampleType, input.uv).rgb;
+//    float sigDist = median( sample.r, sample.g, sample.b );
+//    
+//    float4 color;
+//    
+//    if (sigDist >= 0.5)
+//    {
+//        color = foregroundColor;
+//    }
+//    else
+//    {
+//        color = float4(0,0,0,0);
+//    }
     
-    float4 color = float4(foregroundColor.r, foregroundColor.g, foregroundColor.b, opacity);
-    
+    return color;
+}
+
+float4 BasicTextured_PS(PS_OUTPUT_BASIC input) : SV_TARGET
+{
+    float4 color = shaderTexture.Sample(sampleType, input.uv);
     return color;
 }
 
@@ -160,11 +198,6 @@ float4 Subpixel_PS(PS_OUTPUT_BASIC input) : SV_TARGET
     return color;
 }
 
-float4 BasicTextured_PS(PS_OUTPUT_BASIC input) : SV_TARGET
-{
-    float4 color = shaderTexture.Sample(sampleType, input.uv);
-    return color;
-}
 technique Render
 {
 	pass Textured
@@ -185,18 +218,18 @@ technique Basic
     }
     
     pass Textured
-        {
-            Profile = 5.1;
-            VertexShader = Basic_VS;
-            PixelShader = BasicTextured_PS;
-        }
+    {
+        Profile = 5.1;
+        VertexShader = Basic_VS;
+        PixelShader = BasicTextured_PS;
+    }
         
     pass Colored
-        {
-            Profile = 5.1;
-            VertexShader = Basic_VS;
-            PixelShader = BasicColored_PS;
-        }
+    {
+        Profile = 5.1;
+        VertexShader = Basic_VS;
+        PixelShader = BasicColored_PS;
+    }
         
     pass VertexColored
     {
@@ -204,18 +237,18 @@ technique Basic
         VertexShader = Basic_VS;
         PixelShader = BasicVertexColored_PS;
     }
-
-    pass MSDF
+    
+    pass SmallGlyph
     {
         Profile = 5.1;
         VertexShader = Basic_VS;
-        PixelShader = MSDF_PS;
+        PixelShader = SmallGlyph_PS;
     }
     
-    pass Subpixel
+    pass LargeGlyph
     {
         Profile = 5.1;
         VertexShader = Basic_VS;
-        PixelShader = Subpixel_PS;
+        PixelShader = LargeGlyph_PS;
     }
 }

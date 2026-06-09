@@ -10,7 +10,7 @@ uint atlasSize;
 
 struct TexturedVertexInputType
 {
-	float4 position : SV_POSITION;
+	float4 position : POSITION;
 	float4 color: COLOR;
 	float2 texcoord: TEXCOORD;
 };
@@ -24,7 +24,7 @@ struct TexturedPixelInputType
 
 struct MESH_VERTEX
 {
-    float4 position : SV_POSITION;
+    float4 position : POSITION;
     float4 color : COLOR;
     float3 normal : NORMAL;
     float2 uv0 : TEXCOORD0;
