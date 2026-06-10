@@ -45,14 +45,16 @@
 <!--            -->
 <!--        </Button>-->
 
-        <ContentControl Content="Ололоев!"
-                        Background="Red"
-                        
-                        Width="550"
-                        Height="50"
-                        HorizontalContentAlignment="Right"
-                        HorizontalAlignment="Center"
-        />
+<!--        <ContentControl Background="Red"                        -->
+<!--                        Width="550"-->
+<!--                        Height="50"-->
+<!--                        HorizontalContentAlignment="Right"-->
+<!--                        HorizontalAlignment="Center"-->
+<!--        >-->
+<!--            -->
+<!--        </ContentControl>-->
+        <TextBlock Text="Мелкий текст! - Проверка"
+                   FontSize="20"/>
         
         <Button Width="120"
             Height="80"

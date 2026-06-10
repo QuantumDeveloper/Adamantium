@@ -17,6 +17,12 @@ public static class ColorBlendEquations
     
     public static ColorBlendEquationEXT NonPremultiplied {get; private set;}
 
+    // Premultiplied-alpha "over": rgb = src + dst*(1-srcA), a = srcA + dstA*(1-srcA). Use this whenever the
+    // pixel shader already outputs premultiplied color (rgb * a), e.g. the font shaders rendering into the
+    // intermediate text target and that target being composited back. Using a straight-alpha blend
+    // (SrcAlpha,...) on premultiplied output multiplies by alpha a second time -> dark rim around glyphs.
+    public static ColorBlendEquationEXT Premultiplied {get; private set;}
+
     public static ColorBlendEquationEXT Default => Opaque;
 
     static ColorBlendEquations()
@@ -28,6 +34,8 @@ public static class ColorBlendEquations
         LightMap = New(BlendFactor.One, BlendFactor.One, BlendOp.Add, BlendOp.Add);
         Additive = New(BlendFactor.SrcAlpha, BlendFactor.One, BlendOp.Add, BlendOp.Add);
         NonPremultiplied = New(BlendFactor.SrcAlpha, BlendFactor.OneMinusSrcAlpha, BlendOp.Add, BlendOp.Add);
+        Premultiplied = New(BlendFactor.One, BlendFactor.OneMinusSrcAlpha, BlendOp.Add, BlendOp.Add,
+            BlendFactor.One, BlendFactor.OneMinusSrcAlpha);
     }
 
     private static ColorBlendEquationEXT New(

@@ -27,7 +27,7 @@ float2 TextureCornerCoords[4];
 float4 ForegroundColor;
 float FontSize;
 float FontSizeThreshold;
-float FontSharpness;
+float FontWeight;
 float PxRange;
 float2 MSDFAtlasSize;
 float4 StrokeColor;
@@ -133,9 +133,10 @@ float4 FontPixelShader(PSInput input) : SV_TARGET
         float2 Jdy = ddy(uv);
         float3 samp = Texture.Sample(TextureSampler, input.UV).rgb;
     
-        // Calculate the signed distance (in texels)
-        float sigDist = Median(samp.r, samp.g, samp.b) - 0.5f;
-    
+        // Calculate the signed distance (in texels). FontWeight shifts the contour (0.5) to make stems
+        // thinner/thicker; it's a constant, so it drops out of the ddx/ddy gradient below.
+        float sigDist = Median(samp.r, samp.g, samp.b) - 0.5f + FontWeight;
+
         // For proper anti-aliasing we need to calculate the signed distance in pixels.
         // We do this using the derivatives.
         float2 gradDist = SafeNormalize(float2(ddx(sigDist), ddy(sigDist)));
@@ -155,6 +156,22 @@ float4 FontPixelShader(PSInput input) : SV_TARGET
         color.rgb = ForegroundColor.rgb * color.a;
         return color;
     }
+}
+
+// Canonical MSDF reconstruction (Chlumsky). screenPxRange() gives the field slope in screen pixels.
+// FontWeight shifts the 0.5 contour INSIDE the screenPxRange term (a true distance bias, not an opacity
+// add), so it makes stems thinner/thicker without hazing the background. Selected via the RenderMsdf pass,
+// toggled from FontRenderer.UseCanonicalMsdf.
+float4 FontPixelShaderMsdf(PSInput input) : SV_TARGET
+{
+    float3 samp = Texture.Sample(TextureSampler, input.UV).rgb;
+    float sd = Median(samp.r, samp.g, samp.b);
+    float opacity = clamp(screenPxRange(input.UV) * (sd - 0.5f + FontWeight) + 0.5f, 0.0f, 1.0f);
+    // Gamma-boost the coverage (same as the gradient pass): raises partial opacities so thin stems keep
+    // their colour instead of washing out toward the background. The engine blends in sRGB, so this also
+    // compensates the perceptual lightening of un-gamma-corrected coverage AA.
+    float alpha = pow(ForegroundColor.a * opacity, 1.0f / 2.2f);
+    return float4(ForegroundColor.rgb * alpha, alpha);
 }
 
 float4 StrokedTextPS(PSInput input) : SV_TARGET
@@ -212,7 +229,16 @@ technique FontBatch
         GeometryShader = FontItemGenerationGS;
         PixelShader = FontPixelShader;
     }
-    
+
+    pass RenderMsdf
+    {
+        EffectName = "FontEffectMsdf";
+        Profile = 5.1;
+        VertexShader = FontVertexShader;
+        GeometryShader = FontItemGenerationGS;
+        PixelShader = FontPixelShaderMsdf;
+    }
+
     pass StrokedText
     {
         EffectName = "StrokedFontEffect";

@@ -583,7 +583,12 @@ public class TextLayout : DisposableObject
             //glyphLeft += fontSize * layoutContainer.GetAdvance((uint)position).X * scale;
         }
 
-        return new Rectangle((int)glyphLeft, (int)glyphTop, (int)glyphWidth, (int)glyphHeight);
+        // Round the top and the baseline-relative bottom independently (NOT top + height): truncating top
+        // and height separately lets their sum drift +/-1px per glyph, so glyphs that share a baseline land
+        // on different pixel rows ("jumping"). Deriving height from the rounded bottom keeps the baseline flat.
+        var top = (int)System.Math.Round(glyphTop);
+        var bottom = (int)System.Math.Round(glyphTop + glyphHeight);
+        return new Rectangle((int)glyphLeft, top, (int)glyphWidth, bottom - top);
     }
 }
 

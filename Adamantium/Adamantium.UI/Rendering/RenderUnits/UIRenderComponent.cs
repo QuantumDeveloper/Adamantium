@@ -195,7 +195,12 @@ public class ImageRenderComponent : UIRenderComponent
 public class TextRenderComponent : ImageRenderComponent
 {
     private IRenderTarget _renderTarget;
-    public TextRenderComponent(IGraphicsDevice device, 
+
+    // Render text into a supersampled target (this factor larger), then let it minify when composited onto
+    // the control = SSAA. The real fix for small unhinted text: gives sub-pixel stems enough pixels.
+    private const float TextSupersample = 2f;
+
+    public TextRenderComponent(IGraphicsDevice device,
         UIBasicEffect uiBasicEffect,
         Mesh mesh,
         FontRenderer fontRenderer,
@@ -249,7 +254,10 @@ public class TextRenderComponent : ImageRenderComponent
         Texture = resolveTexture;
         Sampler = GraphicsDevice.SamplerStates.LinearClampToEdge;
         //Background = new SolidColorBrush(Colors.Red);
-        ColorBlendEquation = ColorBlendEquations.AlphaBlend;
+        // The text target holds premultiplied color (the font shaders output rgb*alpha and it was rendered
+        // with a premultiplied blend), so it must be composited with a premultiplied blend too. A straight
+        // AlphaBlend here would multiply by alpha again -> the dark rim around the text.
+        ColorBlendEquation = ColorBlendEquations.Premultiplied;
         base.Render();
     }
 }
