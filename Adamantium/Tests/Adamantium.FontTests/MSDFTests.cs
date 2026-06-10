@@ -64,7 +64,21 @@ namespace Adamantium.FontTests
             var pixels = img.GetPixelBuffer(0, 0);
             pixels.SetPixels(atlasData.ImageData);
             img.Save("msdf2.png", ImageFileType.Png);
-            
+
+            // DIAGNOSTIC: median (coverage) preview — exactly what the shader thresholds.
+            // Solid glyph interior => white, exterior => black, edges => gray ramp.
+            var med = (byte[])atlasData.ImageData.Clone();
+            for (int i = 0; i < med.Length; i += 4)
+            {
+                byte r = atlasData.ImageData[i], g = atlasData.ImageData[i + 1], b = atlasData.ImageData[i + 2];
+                byte m = System.Math.Max(System.Math.Min(r, g), System.Math.Min(System.Math.Max(r, g), b));
+                med[i] = med[i + 1] = med[i + 2] = m;
+                med[i + 3] = 255;
+            }
+            var medImg = Image.New2D((uint)atlasData.AtlasSize.Width, (uint)atlasData.AtlasSize.Height, SurfaceFormat.R8G8B8A8.UNorm);
+            medImg.GetPixelBuffer(0, 0).SetPixels(med);
+            medImg.Save("msdf_median.png", ImageFileType.Png);
+
             Assert.Pass($"Atlas data for {font.GlyphCount} was generated in {timer.ElapsedMilliseconds}ms");
         }
 

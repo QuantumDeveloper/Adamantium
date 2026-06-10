@@ -21,7 +21,10 @@ public class FontParameters
         GlyphCount = glyphCount;
         SortingVariant = sortingVariant;
         PlacingVariant = placingVariant;
-        GlyphMargin = glyphMargin;
+        // Never let the margin drop below the field's outside ramp (pxRange/2 texels): a smaller margin
+        // lets the distance field bleed into the neighbouring atlas cell under bilinear sampling. Callers
+        // may pass a larger margin for extra padding, but not a smaller (unsafe) one.
+        GlyphMargin = Math.Max(glyphMargin, (uint)Math.Ceiling(pixelRange / 2.0));
     }
 
     public uint MsdfTextureSize { get; }
@@ -75,20 +78,26 @@ public class FontParameters
     }
 
     public static FontParameters Default(
-        uint glyphTextureSize = 64, 
+        uint glyphTextureSize = 64,
         byte sampleRate = 5, 
         GlyphSortingVariant sortingVariant = GlyphSortingVariant.ByIndex,
         GlyphPlacingVariant placingVariant = GlyphPlacingVariant.Square)
     {
+        // PixelRange: distance-field range in atlas texels. The canonical shader's screenPxRange() clamps
+        // to 1px (no AA -> jagged) once PixelRange is too small for the on-screen size; ~6 keeps
+        // screenPxRange >= 2 around 20pt. Larger = smoother AA but rounder fine details.
+        const byte pixelRange = 6;
+        const uint glyphMargin = 0;
+
         var fontParameters = new FontParameters(
             glyphTextureSize,
             sampleRate,
-            6,
+            pixelRange,
             0,
-            UInt32.MaxValue, 
+            UInt32.MaxValue,
             sortingVariant,
             placingVariant,
-            0
+            glyphMargin
         );
         return fontParameters;
     }

@@ -2,6 +2,7 @@ using System;
 using Adamantium.FX.Effects.Generated;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.EffectsFramework;
+using Adamantium.Imaging;
 using Adamantium.Mathematics;
 using AdamantiumVulkan.Core;
 
@@ -17,7 +18,19 @@ public class FontRenderer : GraphicsResource
     private Size dotGlyphsSize;
     
     private const float FontSizeThreshold = 14;
-    private float FontSharpness = 5;
+    // Glyph weight: a signed-distance contour bias (see FontEffect.fx). 0 = exact outline, > 0 = thicker
+    // stems, < 0 = thinner. Normalized units (the field spans PixelRange texels), useful range ~[-0.15, 0.15].
+    // Applied inside the screenPxRange term, so it scales with size and does not haze the background.
+    private float FontWeight = 0.0f;
+
+    // Supersampling factor for text. The text render target is RenderScale x bigger than the logical text
+    // area, so the ortho is divided by it (the viewport stays full size) -> glyphs rasterize RenderScale x
+    // larger and get downsampled when the texture is composited onto the control = SSAA. 1 = off.
+    public float RenderScale { get; set; } = 1f;
+
+    // Selects the glyph pixel shader: true = canonical MSDF (Chlumsky screenPxRange, RenderMsdf pass),
+    // false = the gradient-derivative AA (Render pass). See FontEffect.fx.
+    public bool UseCanonicalMsdf { get; set; } = false;
 
     private EffectParameter effectSampler;
     private EffectParameter effectTexture;
@@ -26,7 +39,7 @@ public class FontRenderer : GraphicsResource
     private EffectParameter effectForegroundColor;
     private EffectParameter effectFontSize;
     private EffectParameter effectFontSizeThreshold;
-    private EffectParameter effectFontSharpness;
+    private EffectParameter effectFontWeight;
     private EffectParameter effectPixelRange;
     private EffectParameter effectAtlasSize;
     private IEffectPass glyphEffectPass;
@@ -56,7 +69,7 @@ public class FontRenderer : GraphicsResource
         effectForegroundColor = fontEffect.ForegroundColor;
         effectFontSize = fontEffect.FontSize;
         effectFontSizeThreshold = fontEffect.FontSizeThreshold;
-        effectFontSharpness = fontEffect.FontSharpness;
+        effectFontWeight = fontEffect.FontWeight;
         effectPixelRange = fontEffect.PxRange;
         effectAtlasSize = fontEffect.MSDFAtlasSize;
         glyphEffectPass = fontEffect.FontBatchRenderPass;
@@ -180,7 +193,10 @@ public class FontRenderer : GraphicsResource
         GraphicsDevice.SetViewports(vp);
         GraphicsDevice.SetScissors(scissor);
         GraphicsDevice.ColorBlendEnabled = true;
-        GraphicsDevice.ColorBlendEquation = ColorBlendEquations.Fonts;
+        // The font pixel shaders output premultiplied color (rgb * alpha), so the target must use a
+        // premultiplied blend. The old straight-alpha "Fonts" blend multiplied by alpha a second time,
+        // darkening the anti-aliased edges into a rim around every glyph.
+        GraphicsDevice.ColorBlendEquation = ColorBlendEquations.Premultiplied;
         GraphicsDevice.PrimitiveRestartEnable = true;
         GraphicsDevice.MSAALevel = renderTarget.MSAALevel;
         GraphicsDevice.DepthTestEnabled = false;
@@ -194,7 +210,7 @@ public class FontRenderer : GraphicsResource
         effectForegroundColor.SetValue(foreground.ToVector4());
         effectFontSize.SetValue(layout.FontSize);
         effectFontSizeThreshold.SetValue(FontSizeThreshold);
-        effectFontSharpness.SetValue(FontSharpness);
+        effectFontWeight.SetValue(FontWeight);
         effectPixelRange.SetValue(layout.FontAtlas.PixelRange);
         effectAtlasSize.SetValue(new Vector2F(layout.FontAtlas.Atlas.Width, layout.FontAtlas.Atlas.Height));
         GraphicsDevice.VertexType = vertexType;
@@ -203,8 +219,8 @@ public class FontRenderer : GraphicsResource
         //GraphicsDevice.DepthTestEnabled = true;
         if (stroke == Colors.Transparent)
         {
-            //glyphEffectPass.Apply();
-            fontEffect.FontBatchRenderPass.Apply();
+            var pass = UseCanonicalMsdf ? fontEffect.FontBatchRenderMsdfPass : fontEffect.FontBatchRenderPass;
+            pass.Apply();
         }
         else
         {

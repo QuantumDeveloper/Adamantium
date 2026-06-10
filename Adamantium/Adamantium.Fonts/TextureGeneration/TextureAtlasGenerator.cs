@@ -12,10 +12,10 @@ namespace Adamantium.Fonts.TextureGeneration
         private Typeface typeface;
         private FontParameters parameters;
         private IFont font;
-        
+
         public TextureAtlasGenerator(
-            Typeface typeface, 
-            IFont font, 
+            Typeface typeface,
+            IFont font,
             FontAtlasData atlasData,
             FontParameters parameters)
         {
@@ -64,17 +64,27 @@ namespace Adamantium.Fonts.TextureGeneration
 
         private void CalculateTextureDataForAtlas(GlyphTextureData[] textureData)
         {
-            uint itemsInRow = (uint)atlasData.AtlasSize.Width / parameters.MsdfTextureSize;
+            // Step by the full cell (glyph + margin on both sides), not the bare MsdfTextureSize: the region
+            // uploaded to the atlas is FullGlyphSize = MsdfTextureSize + margin*2, so stepping by the bare
+            // size overlaps neighbours and runs the last column/row past the atlas edge (CopyBufferToImage
+            // overflow). itemsInRow must use the same cell size.
+            var cellSize = parameters.MsdfTextureSize + parameters.GlyphMargin * 2;
+            uint itemsInRow = (uint)atlasData.AtlasSize.Width / cellSize;
 
             foreach (var glyphData in textureData)
             {
                 var indexInAtlas = glyphData.IndexInAtlas;
                 var positionInRow = indexInAtlas % itemsInRow;
                 var positionInColumn = indexInAtlas / itemsInRow;
-                
-                glyphData.BoundingRect.Left = (int)(parameters.MsdfTextureSize * positionInRow);
-                glyphData.BoundingRect.Top = (int)(parameters.MsdfTextureSize * positionInColumn);
-                
+
+                // Bottom-align the glyph inside its fixed cell so the atlas reads like a row of glyphs on a
+                // common line instead of hanging from the top. The uploaded region is FullGlyphSize, so the
+                // vertical slack is cellSize - FullGlyphSize.Height. UV tracks BoundingRect.Top, so the
+                // shift is purely cosmetic and rendering is unaffected.
+                var bottomSlack = (int)(cellSize - glyphData.FullGlyphSize.Height);
+                glyphData.BoundingRect.Left = (int)(cellSize * positionInRow);
+                glyphData.BoundingRect.Top = (int)(cellSize * positionInColumn) + bottomSlack;
+
                 glyphData.CalculateUV(atlasData.AtlasSize);
             }
         }
@@ -235,7 +245,7 @@ namespace Adamantium.Fonts.TextureGeneration
         {
             glyph.CalculateEmRelatedMultipliers(font.UnitsPerEm);
             glyph.Sample(parameters.SampleRate);
-            var textureData = glyph.GenerateDirectMSDF(parameters.PlacingVariant, parameters.MsdfTextureSize, parameters.PixelRange, font.UnitsPerEm, parameters.GlyphMargin);
+            var textureData = glyph.GenerateDirectMSDF(parameters.MsdfTextureSize, parameters.PixelRange, font.UnitsPerEm, parameters.GlyphMargin);
             
             if (textureData == null) 
                 return;

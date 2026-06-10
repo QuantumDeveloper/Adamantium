@@ -285,8 +285,7 @@ namespace Adamantium.Fonts.TextureGeneration
         /// <returns>MSDF color data in for of single-dimension array</returns>
         public static GlyphTextureData GenerateDirectMSDF(
             this Glyph glyph,
-            GlyphPlacingVariant placingVariant,
-            uint originalSize, 
+            uint originalSize,
             double pxRange,
             ushort unitsPerEm,
             uint margin)
@@ -305,16 +304,26 @@ namespace Adamantium.Fonts.TextureGeneration
             }
 
             var glyphBoundingRectangle = glyph.BoundingRectangle;
-            
-            var size = new Size(originalSize, originalSize);
 
-            if (placingVariant == GlyphPlacingVariant.Packed)
+            // Isotropic scale relative to the EM square (the typographic design reference): the SAME factor
+            // for X and Y, so the distance field is NOT stretched anisotropically (the old square-fit used
+            // scaleX != scaleY) and relative glyph sizes are preserved (M larger than i). We scale against
+            // the em, NOT the font's global max-glyph bbox: that bbox is the union over all glyphs and is
+            // routinely inflated by a few outliers (ornaments, .notdef, composites), which would shrink
+            // every normal letter to a speck. The rare glyph taller/wider than the em is scaled down
+            // uniformly so it still fits the fixed cell while keeping scaleX == scaleY.
+            var unitScale = (double)originalSize / unitsPerEm;
+            var glyphWidth = glyphBoundingRectangle.Width * unitScale;
+            var glyphHeight = glyphBoundingRectangle.Height * unitScale;
+            var overflow = Math.Max(glyphWidth, glyphHeight) / originalSize;
+            if (overflow > 1.0)
             {
-                var widthRatio = (double)(glyphBoundingRectangle.Width) / unitsPerEm;
-                var heightRatio = (double)(glyphBoundingRectangle.Height) / unitsPerEm;
-                size = new Size(Math.Floor(originalSize * widthRatio),
-                    Math.Floor(originalSize * heightRatio));
+                glyphWidth /= overflow;
+                glyphHeight /= overflow;
             }
+            var size = new Size(
+                Math.Max(1, Math.Ceiling(glyphWidth)),
+                Math.Max(1, Math.Ceiling(glyphHeight)));
 
             // 1. Color all segments
             ColorEdges(segments);
@@ -384,12 +393,18 @@ namespace Adamantium.Fonts.TextureGeneration
             }
 
             // 5. Fix artifacts
-            //FixArtefacts(coloredDistances, size);
+            // FixArtifacts(coloredDistances, (int)size.Width, (int)size.Height); // disabled: the simple
+            // clash detector can collapse legitimate corners -> distorted/dark glyph chunks.
 
-            // 6. Normalize MSDF and SDF to [0 .. 255] range
-            int index = 0;
+            // 6. Normalize MSDF and SDF to [0 .. 255] range.
+            // Pixels is allocated for FullGlyphSize = (size + margin*2): write the field inset by `margin`
+            // on every side so the glyph sits centred with a margin border. Writing contiguously from 0
+            // (ignoring the row stride) garbles the glyph whenever margin > 0 and breaks the atlas layout.
+            var marginPx = (int)margin;
+            var rowStride = ((int)size.Width + marginPx * 2) * 4;
             for (var y = 0; y < size.Height; y++)
             {
+                var index = rowStride * (y + marginPx) + marginPx * 4;
                 for (var x = 0; x < size.Width; x++)
                 {
                     var distance = coloredDistances[x, y];
@@ -503,7 +518,8 @@ namespace Adamantium.Fonts.TextureGeneration
             }
 
             // 5. Fix artifacts
-            //FixArtefacts(coloredDistances, size);
+            // FixArtifacts(coloredDistances, (int)size.Width, (int)size.Height); // disabled: the simple
+            // clash detector can collapse legitimate corners -> distorted/dark glyph chunks.
 
             // 6. Normalize MSDF and SDF to [0 .. 255] range
             var margin = (int)textureData.Margin;
@@ -531,19 +547,18 @@ namespace Adamantium.Fonts.TextureGeneration
         
         // --- ARTIFACT FIXING ---
         // true - no collision, false - collision
-        private static bool CheckNeighbor(ColoredDistance neighbor, ColoredDistance current)
+        private static bool CheckNeighbor(ColoredDistance neighbor, ColoredDistance current, double threshold)
         {
-            const double threshold = 2.5;
-
             var cnt = 0;
 
-            bool isNeighborRedPositive = neighbor.RedDistance >= 0;
-            bool isNeighborGreenPositive = neighbor.GreenDistance >= 0;
-            bool isNeighborBluePositive = neighbor.BlueDistance >= 0;
+            // Distances are normalized (/range + 0.5), so the contour is at 0.5: inside >= 0.5, outside < 0.5.
+            bool isNeighborRedPositive = neighbor.RedDistance >= 0.5;
+            bool isNeighborGreenPositive = neighbor.GreenDistance >= 0.5;
+            bool isNeighborBluePositive = neighbor.BlueDistance >= 0.5;
 
-            bool isCurrentRedPositive = current.RedDistance >= 0;
-            bool isCurrentGreenPositive = current.GreenDistance >= 0;
-            bool isCurrentBluePositive = current.BlueDistance >= 0;
+            bool isCurrentRedPositive = current.RedDistance >= 0.5;
+            bool isCurrentGreenPositive = current.GreenDistance >= 0.5;
+            bool isCurrentBluePositive = current.BlueDistance >= 0.5;
 
             if (isNeighborRedPositive ^ isCurrentRedPositive &&
                 Math.Abs(neighbor.RedDistance - current.RedDistance) > threshold)
@@ -567,11 +582,11 @@ namespace Adamantium.Fonts.TextureGeneration
         }
 
         // true - no collision, false - collision
-        private static bool CheckForCollision(List<ColoredDistance> neighbors, ColoredDistance current)
+        private static bool CheckForCollision(List<ColoredDistance> neighbors, ColoredDistance current, double threshold)
         {
             foreach (var neighbor in neighbors)
             {
-                if (!CheckNeighbor(neighbor, current))
+                if (!CheckNeighbor(neighbor, current, threshold))
                 {
                     return false;
                 }
@@ -580,13 +595,17 @@ namespace Adamantium.Fonts.TextureGeneration
             return true;
         }
 
-        private static void FixArtifacts(ColoredDistance[,] data, SizeF textureSize)
+        private static void FixArtifacts(ColoredDistance[,] data, int width, int height)
         {
+            // Clash threshold in normalized units (field is /range + 0.5, so ~0.33 change per texel at
+            // PixelRange=3). Corners legitimately flip 2 channels by ~0.33; only flag clearly larger jumps
+            // as real clashes, otherwise normal edges/corners get destroyed. Retune if PixelRange changes.
+            var threshold = 0.5;
             var correctionList = new List<CorrectionLocation>();
 
-            for (var y = 1; y < textureSize.Height - 1; y++)
+            for (var y = 1; y < height - 1; y++)
             {
-                for (var x = 1; x < textureSize.Width - 1; x++)
+                for (var x = 1; x < width - 1; x++)
                 {
                     var current = data[x, y];
                     var neighbors = new List<ColoredDistance>
@@ -602,7 +621,7 @@ namespace Adamantium.Fonts.TextureGeneration
                         data[x + 1, y + 1]
                     };
 
-                    if (CheckForCollision(neighbors, current)) continue;
+                    if (CheckForCollision(neighbors, current, threshold)) continue;
 
                     var correction = new CorrectionLocation
                     {
