@@ -54,7 +54,7 @@
 <!--            -->
 <!--        </ContentControl>-->
         <TextBlock Text="Мелкий текст! - Проверка"
-                   FontSize="20"/>
+                   FontSize="24"/>
         
         <Button Width="120"
             Height="80"

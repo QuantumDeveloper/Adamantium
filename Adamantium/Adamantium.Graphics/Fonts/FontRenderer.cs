@@ -32,6 +32,20 @@ public class FontRenderer : GraphicsResource
     // false = the gradient-derivative AA (Render pass). See FontEffect.fx.
     public bool UseCanonicalMsdf { get; set; } = false;
 
+    // Outline test pass (RenderMsdfOutline). When on, draws OutlineColor as a ring OutlineWidth (normalized
+    // field units) outside each glyph - a functional check that the distance field is valid beyond the
+    // contour (only works because PxRange was widened; a thin field would have no data out there).
+    public bool UseOutline { get; set; } = false;
+    public Color OutlineColor { get; set; } = Colors.Black;
+    public float OutlineWidth { get; set; } = 0.15f;
+
+    // True-SDF blend band, in atlas texels per screen pixel. Below Lo the glyph is magnified -> MSDF median
+    // (sharp corners); above Hi it is minified -> single-channel true SDF (crisp small text where the median
+    // would soften); blended between. Defaults are the physical 1:1 .. 2:1 minification points. Set Lo >= Hi
+    // to disable the blend (stay pure MSDF) without touching the shader.
+    public float SdfBlendLo { get; set; } = 1.0f;
+    public float SdfBlendHi { get; set; } = 2.0f;
+
     private EffectParameter effectSampler;
     private EffectParameter effectTexture;
     private EffectParameter effectMatrixTransform;
@@ -42,6 +56,10 @@ public class FontRenderer : GraphicsResource
     private EffectParameter effectFontWeight;
     private EffectParameter effectPixelRange;
     private EffectParameter effectAtlasSize;
+    private EffectParameter effectOutlineColor;
+    private EffectParameter effectOutlineWidth;
+    private EffectParameter effectSdfBlendLo;
+    private EffectParameter effectSdfBlendHi;
     private IEffectPass glyphEffectPass;
 
     private Vector2F currentScreenSize;
@@ -72,6 +90,10 @@ public class FontRenderer : GraphicsResource
         effectFontWeight = fontEffect.FontWeight;
         effectPixelRange = fontEffect.PxRange;
         effectAtlasSize = fontEffect.MSDFAtlasSize;
+        effectOutlineColor = fontEffect.OutlineColor;
+        effectOutlineWidth = fontEffect.OutlineWidth;
+        effectSdfBlendLo = fontEffect.SdfBlendLo;
+        effectSdfBlendHi = fontEffect.SdfBlendHi;
         glyphEffectPass = fontEffect.FontBatchRenderPass;
     }
 
@@ -170,7 +192,7 @@ public class FontRenderer : GraphicsResource
     {
         if (layout.ElementsCount == 0) return;
         
-        // layout.FontAtlas.Atlas.Save("Atlas.png", ImageFileType.Png);
+        //layout.FontAtlas.Atlas.Save("Atlas.png", ImageFileType.Png);
         
         var vp = new Viewport();
         vp.Width = currentScreenSize.X;
@@ -188,7 +210,10 @@ public class FontRenderer : GraphicsResource
         scissor.Extent.Width = (uint)currentScreenSize.X;
         scissor.Extent.Height = (uint)currentScreenSize.Y;
         
-        var orthoProjection = Matrix4x4F.OrthoOffCenter(0, currentScreenSize.X, 0, currentScreenSize.Y, 0f, 100000f);
+        // Divide the ortho extent by RenderScale while the viewport stays the full (supersampled) target:
+        // the logical-size layout then maps across the whole target and rasterizes RenderScale x larger.
+        // Without this division RenderScale did nothing - the text drew at 1x in a corner of the 2x target.
+        var orthoProjection = Matrix4x4F.OrthoOffCenter(0, currentScreenSize.X / RenderScale, 0, currentScreenSize.Y / RenderScale, 0f, 100000f);
         finalMatrix = transformMatrix * orthoProjection;
         GraphicsDevice.SetViewports(vp);
         GraphicsDevice.SetScissors(scissor);
@@ -213,13 +238,21 @@ public class FontRenderer : GraphicsResource
         effectFontWeight.SetValue(FontWeight);
         effectPixelRange.SetValue(layout.FontAtlas.PixelRange);
         effectAtlasSize.SetValue(new Vector2F(layout.FontAtlas.Atlas.Width, layout.FontAtlas.Atlas.Height));
+        effectOutlineColor.SetValue(OutlineColor.ToVector4());
+        effectOutlineWidth.SetValue(OutlineWidth);
+        effectSdfBlendLo.SetValue(SdfBlendLo);
+        effectSdfBlendHi.SetValue(SdfBlendHi);
         GraphicsDevice.VertexType = vertexType;
         GraphicsDevice.SetVertexBuffer(layout.VertexBuffer);
         GraphicsDevice.PrimitiveTopology = PrimitiveTopology.PointList;
         //GraphicsDevice.DepthTestEnabled = true;
         if (stroke == Colors.Transparent)
         {
-            var pass = UseCanonicalMsdf ? fontEffect.FontBatchRenderMsdfPass : fontEffect.FontBatchRenderPass;
+            IEffectPass pass;
+            if (UseOutline)
+                pass = fontEffect.FontBatchRenderMsdfOutlinePass;
+            else
+                pass = UseCanonicalMsdf ? fontEffect.FontBatchRenderMsdfPass : fontEffect.FontBatchRenderPass;
             pass.Apply();
         }
         else

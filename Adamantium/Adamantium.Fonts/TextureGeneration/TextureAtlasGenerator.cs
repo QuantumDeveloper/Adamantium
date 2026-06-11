@@ -64,26 +64,33 @@ namespace Adamantium.Fonts.TextureGeneration
 
         private void CalculateTextureDataForAtlas(GlyphTextureData[] textureData)
         {
-            // Step by the full cell (glyph + margin on both sides), not the bare MsdfTextureSize: the region
-            // uploaded to the atlas is FullGlyphSize = MsdfTextureSize + margin*2, so stepping by the bare
-            // size overlaps neighbours and runs the last column/row past the atlas edge (CopyBufferToImage
-            // overflow). itemsInRow must use the same cell size.
-            var cellSize = parameters.MsdfTextureSize + parameters.GlyphMargin * 2;
-            uint itemsInRow = (uint)atlasData.AtlasSize.Width / cellSize;
+            // Tight shelf packing (next-fit): place each glyph's bitmap (FullGlyphSize) right after the
+            // previous one on the current shelf; when it would overflow the atlas width, drop to a new shelf
+            // just below the tallest bitmap on the shelf so far. The shelf is only as tall as its tallest
+            // glyph (no reserved per-row height), so vertical space isn't wasted and the texture holds the
+            // most glyphs. Each glyph is already centred inside its own cell (cell = body + margin on every
+            // side, body centred by the generator), so no extra alignment is needed here. The cursor lives on
+            // atlasData so packing continues correctly as the dynamic atlas keeps adding glyphs across calls.
+            var atlasWidth = (int)atlasData.AtlasSize.Width;
 
             foreach (var glyphData in textureData)
             {
-                var indexInAtlas = glyphData.IndexInAtlas;
-                var positionInRow = indexInAtlas % itemsInRow;
-                var positionInColumn = indexInAtlas / itemsInRow;
+                var w = (int)glyphData.FullGlyphSize.Width;
+                var h = (int)glyphData.FullGlyphSize.Height;
 
-                // Bottom-align the glyph inside its fixed cell so the atlas reads like a row of glyphs on a
-                // common line instead of hanging from the top. The uploaded region is FullGlyphSize, so the
-                // vertical slack is cellSize - FullGlyphSize.Height. UV tracks BoundingRect.Top, so the
-                // shift is purely cosmetic and rendering is unaffected.
-                var bottomSlack = (int)(cellSize - glyphData.FullGlyphSize.Height);
-                glyphData.BoundingRect.Left = (int)(cellSize * positionInRow);
-                glyphData.BoundingRect.Top = (int)(cellSize * positionInColumn) + bottomSlack;
+                if (atlasData.PackX + w > atlasWidth)
+                {
+                    atlasData.PackX = 0;
+                    atlasData.PackY += atlasData.ShelfHeight;
+                    atlasData.ShelfHeight = 0;
+                }
+
+                glyphData.BoundingRect.Left = atlasData.PackX;
+                glyphData.BoundingRect.Top = atlasData.PackY;
+
+                atlasData.PackX += w;
+                if (h > atlasData.ShelfHeight) 
+                    atlasData.ShelfHeight = h;
 
                 glyphData.CalculateUV(atlasData.AtlasSize);
             }
@@ -165,8 +172,12 @@ namespace Adamantium.Fonts.TextureGeneration
             foreach (var glyph in textureData)
             {
                 var glyphPixels = glyph.Pixels;
-                var glyphWidth = glyph.BoundingRect.Width;
-                var glyphHeight = glyph.BoundingRect.Height;
+                // Source bitmap is the FULL glyph (body + margin), not just the body BoundingRect. Copying by
+                // the body size clipped off the margin ring - exactly where the colored MSDF background lives -
+                // and (since the real row stride is FullGlyphSize.Width) misread the rows. Match the GPU upload
+                // path (FontAtlas.ProcessTextureData), which uses FullGlyphSize.
+                var glyphWidth = (int)glyph.FullGlyphSize.Width;
+                var glyphHeight = (int)glyph.FullGlyphSize.Height;
                 var glyphStride = glyphWidth * bytesPerPixel;
 
                 var destPixelX = glyph.BoundingRect.X;

@@ -73,7 +73,11 @@ namespace Adamantium.Graphics.Core
                 SamplerAddressMode.ClampToEdge));
             AnisotropicMirror = Add(GetSamplerSate(device, nameof(AnisotropicMirror), Filter.Linear,
                 SamplerAddressMode.MirrorClampToEdge));
-            LinearFont = Add(GetSamplerSate(device, nameof(LinearFont), Filter.Linear, SamplerAddressMode.Repeat));
+            // Plain bilinear, anisotropy OFF: MSDF must be sampled with a single bilinear tap. The atlas has
+            // no mips, so anisotropic filtering (the default) takes many taps along the minification axis,
+            // averaging the distance field over a wide footprint -> soft/mushy glyph edges and a corrupted
+            // median(R,G,B) reconstruction.
+            LinearFont = Add(GetSamplerSate(device, nameof(LinearFont), Filter.Linear, SamplerAddressMode.Repeat, false));
             NearestFont = Add(GetSamplerSate(device, nameof(NearestFont), Filter.Nearest, SamplerAddressMode.Repeat));
             
             Default = AnisotropicClampToBorder;

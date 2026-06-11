@@ -328,96 +328,60 @@ namespace Adamantium.Fonts.TextureGeneration
             // 1. Color all segments
             ColorEdges(segments);
 
-            // 2. Calculate boundaries for original glyph (the position of the EM square)
-            var emSquare = new Rectangle(0, 0, unitsPerEm, unitsPerEm);
-
-            // 3. Place EM square so that its center matches glyph center
-            var glyphCenter = glyphBoundingRectangle.Center;
-            var emSquareCenter = emSquare.Center;
-            var diff = glyphCenter - emSquareCenter;
-            diff.X = Math.Floor(diff.X);
-            diff.Y = Math.Floor(diff.Y);
-
-            emSquare.X += (int)diff.X;
-            emSquare.Y += (int)diff.Y;
-
-            // 4. Generate colored pseudo-distance field
-            var coloredDistances = new ColoredDistance[(int)size.Width, (int)size.Height];
-
-            // var scaleX = size.Width / emSquare.Width;
-            // var scaleY = size.Height / emSquare.Height;
-
+            // 2. Signed-distance normalization. 'range' (in glyph units) is the distance that maps to one
+            // normalized unit; GetRange ties it to pxRange so the field saturates ~pxRange/2 texels off the
+            // contour.
             var scaleX = size.Width / glyphBoundingRectangle.Width;
             var scaleY = size.Height / glyphBoundingRectangle.Height;
-
             var range = MsdfGeneratorHelper.GetRange(pxRange, scaleX, scaleY);
 
-            //var additionalSpace = glyphBoundingRectangle.Width * 0.02;
-            var additionalSpace = 0;
-            
-            var textureData = new GlyphTextureData((uint)size.Width, (uint)size.Height, glyph.Index, margin, glyph.RelatedCharacters.FirstOrDefault());
+            // Tight per-glyph bitmap = body + the field margin (= pxRange/2) on each side. The field is
+            // computed across the whole bitmap, so it is fully filled: glyph body + the outside ramp in the
+            // margin. The margin is exactly pxRange/2 wide, so the ramp stays a gradient to the edge (no flat
+            // black border). All derived from the params - nothing hardcoded.
+            var marginPx = (int)margin;
+            var fullWidth = (int)size.Width + marginPx * 2;
+            var fullHeight = (int)size.Height + marginPx * 2;
+            var textureData = new GlyphTextureData((uint)size.Width, (uint)size.Height, glyph.Index, margin,
+                glyph.RelatedCharacters.FirstOrDefault());
 
-            ColoredDistance minColoredDistance;
+            var coloredDistances = new ColoredDistance[fullWidth, fullHeight];
+            var isTtf = glyph.OutlineType == OutlineType.TrueType;
 
-            var value = -emSquare.Width / 2 / range + 0.5;
-            minColoredDistance.RedDistance = value;
-            minColoredDistance.GreenDistance = value;
-            minColoredDistance.BlueDistance = value;
-            minColoredDistance.AlphaDistance = value;
-
-            for (var y = 0; y < size.Height; ++y)
+            for (var y = 0; y < fullHeight; ++y)
             {
-                for (var x = 0; x < size.Width; ++x)
+                for (var x = 0; x < fullWidth; ++x)
                 {
-                    // determine the closest segment to current sampling point
-                    //var samplingPoint = new Vector2D(originalDimensions.X / size * (x + 0.5), originalDimensions.Y - (originalDimensions.Y / size * (y + 0.5)));
-                    //var samplingPoint = new Vector2(emSquare.Width / size.Width * (x + 0.5) + emSquare.X, emSquare.Height - emSquare.Height / size.Height * (y + 0.5) + emSquare.Y);
-
+                    // Texels [margin, margin+size) map onto the glyph bbox; the margin ring extrapolates
+                    // just outside it.
+                    var cx = x - marginPx;
+                    var cy = y - marginPx;
                     var samplingPoint =
-                        new Vector2(glyphBoundingRectangle.Width / size.Width * (x + 0.5) + glyphBoundingRectangle.X,
-                            glyphBoundingRectangle.Height - (glyphBoundingRectangle.Height / size.Height * (y + 0.5) -
+                        new Vector2(glyphBoundingRectangle.Width / size.Width * (cx + 0.5) + glyphBoundingRectangle.X,
+                            glyphBoundingRectangle.Height - (glyphBoundingRectangle.Height / size.Height * (cy + 0.5) -
                                                              glyphBoundingRectangle.Y));
 
-                    if (samplingPoint.X >= glyphBoundingRectangle.X - additionalSpace &&
-                        samplingPoint.X <= glyphBoundingRectangle.Right + additionalSpace &&
-                        samplingPoint.Y >= glyphBoundingRectangle.Y - additionalSpace &&
-                        samplingPoint.Y <= glyphBoundingRectangle.Bottom + additionalSpace)
-                    {
-                        coloredDistances[x, y] = GetColoredDistances(segments, samplingPoint, range, glyph.OutlineType == OutlineType.TrueType);
-                    }
-                    else
-                    {
-                        coloredDistances[x, y] = minColoredDistance;
-                    }
+                    // Full multichannel field everywhere (no collapse to the true distance): the R/G/B
+                    // pseudo-distances are the actual MSDF and must fill the cell - that's the colored field.
+                    coloredDistances[x, y] = GetColoredDistances(segments, samplingPoint, range, isTtf);
                 }
             }
 
-            // 5. Fix artifacts
-            // FixArtifacts(coloredDistances, (int)size.Width, (int)size.Height); // disabled: the simple
-            // clash detector can collapse legitimate corners -> distorted/dark glyph chunks.
+            // 4. Fix artifacts
+            // FixArtifacts(coloredDistances, fullWidth, fullHeight); // disabled: the simple clash detector
+            // can collapse legitimate corners -> distorted/dark glyph chunks.
 
-            // 6. Normalize MSDF and SDF to [0 .. 255] range.
-            // Pixels is allocated for FullGlyphSize = (size + margin*2): write the field inset by `margin`
-            // on every side so the glyph sits centred with a margin border. Writing contiguously from 0
-            // (ignoring the row stride) garbles the glyph whenever margin > 0 and breaks the atlas layout.
-            var marginPx = (int)margin;
-            var rowStride = ((int)size.Width + marginPx * 2) * 4;
-            for (var y = 0; y < size.Height; y++)
+            // 5. Normalize MSDF/SDF to [0 .. 255], written contiguously over the whole bitmap.
+            var index = 0;
+            for (var y = 0; y < fullHeight; y++)
             {
-                var index = rowStride * (y + marginPx) + marginPx * 4;
-                for (var x = 0; x < size.Width; x++)
+                for (var x = 0; x < fullWidth; x++)
                 {
                     var distance = coloredDistances[x, y];
-                    var red = MsdfGeneratorHelper.PixelFloatToByte(distance.RedDistance);
-                    var green = MsdfGeneratorHelper.PixelFloatToByte(distance.GreenDistance);
-                    var blue = MsdfGeneratorHelper.PixelFloatToByte(distance.BlueDistance);
-                    var alpha = MsdfGeneratorHelper.PixelFloatToByte(distance.AlphaDistance);
-
-                    textureData.Pixels[index + 0] = red;
-                    textureData.Pixels[index + 1] = green;
-                    textureData.Pixels[index + 2] = blue;
-                    textureData.Pixels[index + 3] = alpha;
-
+                    textureData.Pixels[index + 0] = MsdfGeneratorHelper.PixelFloatToByte(distance.RedDistance);
+                    textureData.Pixels[index + 1] = MsdfGeneratorHelper.PixelFloatToByte(distance.GreenDistance);
+                    textureData.Pixels[index + 2] = MsdfGeneratorHelper.PixelFloatToByte(distance.BlueDistance);
+                    textureData.Pixels[index + 3] = MsdfGeneratorHelper.PixelFloatToByte(distance.AlphaDistance);
                     index += 4;
                 }
             }
