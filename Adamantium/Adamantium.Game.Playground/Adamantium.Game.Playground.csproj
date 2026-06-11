@@ -240,6 +240,17 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<!-- Source-generator inputs (.auml/.fx/.hlsl) are fed to the generators as AdditionalFiles, not as
+		     Compile items. The IDE's fast up-to-date check doesn't treat AdditionalFiles as build inputs, so
+		     editing only one of them leaves the project "up to date": the IDE skips csc and runs a STALE
+		     assembly, even though the design-time generator shows fresh code. Listing them as
+		     UpToDateCheckInput makes the IDE rebuild when they change. (A CLI `dotnet build` already tracks
+		     them via CoreCompile inputs - this is purely for the IDE.) Placed after the AdditionalFiles are
+		     defined so @(AdditionalFiles) is the fully-resolved set. -->
+		<UpToDateCheckInput Include="@(AdditionalFiles)" />
+	</ItemGroup>
+
+	<ItemGroup>
 	  <Compile Remove="obj\**" />
 	</ItemGroup>
 

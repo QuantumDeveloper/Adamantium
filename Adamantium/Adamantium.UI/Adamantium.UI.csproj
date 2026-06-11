@@ -56,6 +56,8 @@
 		<AdditionalFiles Include="$(ProjectDir)**\*.fxh" />
 		<CompilerVisibleProperty Include="RootNamespace" />
 		<AdditionalFiles Remove="obj\**" />
+		<!-- IDE up-to-date check: rebuild when generator inputs (AdditionalFiles) change. -->
+		<UpToDateCheckInput Include="@(AdditionalFiles)" />
 	</ItemGroup>
 
 	<ItemGroup>

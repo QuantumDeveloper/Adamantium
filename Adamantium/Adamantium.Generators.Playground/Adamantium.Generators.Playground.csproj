@@ -27,6 +27,8 @@
 		<AdditionalFiles Include="$(ProjectDir)**\*.fx" />
 		<AdditionalFiles Include="$(ProjectDir)**\*.hlsl" />
 		<CompilerVisibleProperty Include="RootNamespace" />
+		<!-- IDE up-to-date check: rebuild when generator inputs (AdditionalFiles) change. -->
+		<UpToDateCheckInput Include="@(AdditionalFiles)" />
 	</ItemGroup>
 
 </Project>

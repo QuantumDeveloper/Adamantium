@@ -39,7 +39,17 @@ public class TextLayout : DisposableObject
     public string Text { get; private set; }
     
     public float FontSize { get; private set; }
-    
+
+    /// <summary>
+    /// How far (screen px) a glyph's effect (outline/glow/shadow) can reach beyond its body = the atlas
+    /// margin scaled to the current font size (same ratio the glyph quad is expanded by, constant across
+    /// glyphs). The text render target and composite quad are padded by this so effects on the edge glyphs
+    /// of the block aren't clipped at the text boundary. 0 when the atlas isn't built yet. 
+    /// </summary>
+    public int EffectPadding => FontAtlas == null
+        ? 0
+        : (int)Math.Ceiling(FontAtlas.GlyphMargin * FontSize / FontAtlas.MSDFTextureSize);
+
     public Size RealTextDimensions { get; private set; }
     
     private bool _textUpdated;
@@ -517,12 +527,43 @@ public class TextLayout : DisposableObject
         {
             var word = _wordData[i];
             if (word.Glyph == spaceGlyph) continue;
-            var item = new FontItem
+
+            // Render the glyph quad as the FULL cell (body + margin), not just the body, so effects that
+            // reach outside the contour (outline/glow/shadow) have geometry and field to draw into. The body
+            // keeps its exact screen position/size - we only add the margin ring around it, scaled from atlas
+            // texels to screen pixels by the glyph's own body scale. For plain text the margin samples
+            // median < 0.5 -> opacity 0 -> fully transparent, so this is visually identical.
+            var gd = FontAtlas.GetGlyphData(word.Glyph.Index);
+            FontItem item;
+            if (gd != null && gd.BoundingRect.Width > 0 && gd.BoundingRect.Height > 0)
             {
-                ArrangeRect = word.Rect,
-                Source = FontAtlas.GetUVCoordinatesForGlyph(word.Glyph.Index),
-                Depth = 1.0f
-            };
+                var rect = word.Rect;
+                // Per-axis margin: this maps the body EXACTLY onto [rect.X/Y .. +Width/Height], i.e. onto the
+                // integer, baseline-flat glyph rect produced by CalculateGlyphPosition. A uniform margin would
+                // instead map the body to its un-rounded sub-pixel position (via the cell proportions) and the
+                // baseline would wobble again. For a sub-pixel-thin glyph the rounded side can be 0, which
+                // would zero that axis' margin and collapse the quad (the glyph vanishes); fall back to the
+                // uniform font-scale margin there - a 0-px side has no integer baseline row to preserve anyway.
+                var uniform = gd.Margin * (double)FontSize / FontAtlas.MSDFTextureSize;
+                var mx = rect.Width > 0 ? gd.Margin * (double)rect.Width / gd.BoundingRect.Width : uniform;
+                var my = rect.Height > 0 ? gd.Margin * (double)rect.Height / gd.BoundingRect.Height : uniform;
+                item = new FontItem
+                {
+                    ArrangeRect = new Vector4F((float)(rect.X - mx), (float)(rect.Y - my),
+                        (float)(rect.Width + 2 * mx), (float)(rect.Height + 2 * my)),
+                    Source = gd.UVRectFull,
+                    Depth = 1.0f
+                };
+            }
+            else
+            {
+                item = new FontItem
+                {
+                    ArrangeRect = word.Rect,
+                    Source = FontAtlas.GetUVCoordinatesForGlyph(word.Glyph.Index),
+                    Depth = 1.0f
+                };
+            }
             fontItems[ElementsCount] = item;
             ElementsCount++;
         }
@@ -549,7 +590,7 @@ public class TextLayout : DisposableObject
         return wordWidth;
     }
 
-    private Rectangle CalculateGlyphPosition(
+    private RectangleF CalculateGlyphPosition(
         Glyph glyph,
         double glyphLeft,
         double glyphBase,
@@ -572,10 +613,10 @@ public class TextLayout : DisposableObject
         var glyphWidth = glyph.BoundingRectangle.Width * scale;
         var glyphHeight = glyph.BoundingRectangle.Height * scale;
         var glyphTop = (glyphBase - glyphHeight) + verticalShift;
-        if (position > 0)
-        {
-            glyphLeft += horizontalShift;
-        }
+        // Apply the left side bearing for EVERY glyph. Previously the first glyph skipped it, so its ink was
+        // shifted left while the pen still advanced by the full width - the gap after the first letter came
+        // out inflated by that bearing. Now the line just starts at the natural LSB indent.
+        glyphLeft += horizontalShift;
 
         // if GPOS kern is applied - modify the advance for current glyph
         if (kernApplied && position > 0)
@@ -583,12 +624,23 @@ public class TextLayout : DisposableObject
             //glyphLeft += fontSize * layoutContainer.GetAdvance((uint)position).X * scale;
         }
 
-        // Round the top and the baseline-relative bottom independently (NOT top + height): truncating top
-        // and height separately lets their sum drift +/-1px per glyph, so glyphs that share a baseline land
-        // on different pixel rows ("jumping"). Deriving height from the rounded bottom keeps the baseline flat.
-        var top = (int)System.Math.Round(glyphTop);
-        var bottom = (int)System.Math.Round(glyphTop + glyphHeight);
-        return new Rectangle((int)glyphLeft, top, (int)glyphWidth, bottom - top);
+        // Anchor every glyph to the line's baseline so they share an exact pixel row. Rounding glyphTop and
+        // the ink bottom independently rounds each glyph's own ink extremes, so a letter that overshoots the
+        // baseline (round bottoms: о е с а) lands a whole pixel below a flat-bottomed one (к и в) - the
+        // baseline visibly wobbles once the text is crisp. Instead round the baseline ONCE (it's the same for
+        // the whole line) and round the ascent/descent RELATIVE to it: sub-pixel overshoot is absorbed, real
+        // descenders (р у) are preserved, and every baseline-sitting glyph bottoms on the same row.
+        var baseR = (int)System.Math.Round(glyphBase);
+        var top = baseR - (int)System.Math.Round(glyphBase - glyphTop);
+        var bottom = baseR - (int)System.Math.Round(glyphBase - (glyphTop + glyphHeight));
+
+        // X axis stays SUB-PIXEL: keep the glyph at its exact fractional position/width (do NOT round). The
+        // pen advances are fractional, so snapping X to whole pixels makes equal metric gaps render 1px apart
+        // (the pixel-snap wobble, e.g. "Проверка"). At sub-pixel X the gaps match the metrics exactly and the
+        // MSDF anti-aliasing renders the fractional vertical edges cleanly. Y stays snapped (baseR above) so
+        // horizontal strokes and the baseline remain crisp - we only give up snapping on the axis where even
+        // spacing matters more than pixel-aligned stems.
+        return new RectangleF((float)glyphLeft, top, (float)glyphWidth, bottom - top);
     }
 }
 

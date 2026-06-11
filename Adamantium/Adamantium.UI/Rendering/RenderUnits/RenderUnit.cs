@@ -168,10 +168,7 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
         DrawCommand = drawCommand;
         Payload = inputPayload;
 
-        if (GeometryRenderer != null)
-        {
-            GeometryRenderer.RenderData = DrawCommand.RenderData;
-        }
+        GeometryRenderer?.RenderData = DrawCommand.RenderData;
 
         if (!Equals(Payload.Pen, inputPayload.Pen))
         {
@@ -253,11 +250,8 @@ public class ImageRenderUnit : RenderUnit<ImagePayload>
 
         DrawCommand = drawCommand;
         Payload = inputPayload;
-            
-        if (GeometryRenderer != null)
-        {
-            GeometryRenderer.RenderData = drawCommand.RenderData;
-        }
+
+        GeometryRenderer?.RenderData = drawCommand.RenderData;
     }
 }
 
@@ -266,10 +260,15 @@ public class TextRenderUnit : RenderUnit<TextPayload>
     public TextRenderUnit(IDrawCommand command, IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, IResourceFactory resourceFactory) : 
         base(command, graphicsDevice, uiBasicEffect, resourceFactory)
     {
-        var rectangleGeometry = new RectangleGeometry(Payload.DesiredSize);
-        rectangleGeometry.ProcessGeometry(GeometryType.Solid);
         Payload.TextLayout.Update(GraphicsDevice);
-        GeometryRenderer = new TextRenderComponent(GraphicsDevice, 
+        // Pad the text quad/RT so glyph effects (outline/glow) that reach beyond the body aren't clipped at
+        // the block edges. The body stays put: the rect is grown symmetrically (origin shifted by -pad), so
+        // its centre - and thus mesh-local (0,0) where the text is anchored - is unchanged.
+        var pad = Payload.TextLayout.EffectPadding;
+        var ds = Payload.DesiredSize;
+        var rectangleGeometry = new RectangleGeometry(new Rect(-pad, -pad, ds.Width + 2 * pad, ds.Height + 2 * pad));
+        rectangleGeometry.ProcessGeometry(GeometryType.Solid);
+        GeometryRenderer = new TextRenderComponent(GraphicsDevice,
             UIBasicEffect,
             rectangleGeometry.Mesh,
             ResourceFactory.GetFontRenderer(GraphicsDevice), 
@@ -287,8 +286,10 @@ public class TextRenderUnit : RenderUnit<TextPayload>
         
         if (Payload.RequiresBufferRebuild(inputPayload))
         {
-            var rectangleGeometry = new RectangleGeometry(inputPayload.DesiredSize);
             inputPayload.TextLayout.Update(GraphicsDevice);
+            var pad = inputPayload.TextLayout.EffectPadding;
+            var ds = inputPayload.DesiredSize;
+            var rectangleGeometry = new RectangleGeometry(new Rect(-pad, -pad, ds.Width + 2 * pad, ds.Height + 2 * pad));
             rectangleGeometry.ProcessGeometry(GeometryType.Both);
             GeometryRenderer?.DeferDispose();
             GeometryRenderer = new TextRenderComponent(GraphicsDevice, 

@@ -1,5 +1,4 @@
 ﻿using System;
-using Adamantium.Core;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Extensions;
 using Adamantium.Graphics.Core.Models;
@@ -198,7 +197,7 @@ public class TextRenderComponent : ImageRenderComponent
 
     // Render text into a supersampled target (this factor larger), then let it minify when composited onto
     // the control = SSAA. The real fix for small unhinted text: gives sub-pixel stems enough pixels.
-    private const float TextSupersample = 2f;
+    private const float TextSupersample = 1f;
 
     public TextRenderComponent(IGraphicsDevice device,
         UIBasicEffect uiBasicEffect,
@@ -215,8 +214,11 @@ public class TextRenderComponent : ImageRenderComponent
         RenderingParameters = renderingParameters;
         Foreground = foreground;
         Stroke = stroke;
-        _renderTarget = ToDispose(device.CreateRenderTarget((uint)mesh.Bounds.Width,
-            (uint)mesh.Bounds.Height,
+        // Supersampled target: TextSupersample x the logical text size. Must scale together with
+        // FontRenderer.RenderScale (set in Render) — RT and rasterization scale have to match or the glyphs
+        // and the target disagree (the earlier "crumpled" SSAA was exactly this mismatch).
+        _renderTarget = ToDispose(device.CreateRenderTarget((uint)(mesh.Bounds.Width * TextSupersample),
+            (uint)(mesh.Bounds.Height * TextSupersample),
             MSAALevel.X4,
             SurfaceFormat.R8G8B8A8.UNorm,
             name: "TextRenderer"));
@@ -234,7 +236,11 @@ public class TextRenderComponent : ImageRenderComponent
 
     public override void Render()
     {
-        var location = new Vector3F(RenderingParameters.TextArea.X, RenderingParameters.TextArea.Y, 5);
+        // Inset the text by the effect padding inside the (padded) target so edge glyphs' outline/glow have
+        // room. The composite quad was grown by the same pad with its origin shifted -pad (see RenderUnit),
+        // which cancels this inset, keeping the text body in its exact on-screen position.
+        var pad = TextLayout.EffectPadding;
+        var location = new Vector3F(RenderingParameters.TextArea.X + pad, RenderingParameters.TextArea.Y + pad, 5);
         
         var resolveTexture = _renderTarget.ResolveTexture;
         if (!_textRendered)
@@ -244,6 +250,9 @@ public class TextRenderComponent : ImageRenderComponent
             var previousColor = GraphicsDevice.ClearColor;
             stroke = Colors.Transparent;
             //Background = new SolidColorBrush(Colors.Transparent);
+            // Rasterize the (unchanged, logical-size) layout RenderScale x larger into the supersampled
+            // target; the composite below minifies it back = SSAA. Must equal the RT's TextSupersample.
+            FontRenderer.RenderScale = TextSupersample;
             FontRenderer.SetState(GraphicsDevice.SamplerStates.LinearFont, location, _renderTarget);
             FontRenderer.DrawLayout(TextLayout, foreground, stroke);
             FontRenderer.RestoreState();

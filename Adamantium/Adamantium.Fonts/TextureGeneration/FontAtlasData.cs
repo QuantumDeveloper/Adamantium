@@ -29,7 +29,15 @@ namespace Adamantium.Fonts.TextureGeneration
         public string Name { get; set; }
         
         public uint GlyphTextureSize { get; }
-        
+
+        // Running cursor for tight shelf packing of glyph bitmaps (shelf height = tallest glyph on it).
+        [IgnoreMember]
+        public int PackX { get; set; }
+        [IgnoreMember]
+        public int PackY { get; set; }
+        [IgnoreMember]
+        public int ShelfHeight { get; set; }
+
         public uint CurrentIndexInArray { get; private set; }
         
         public uint CurrentDepthLayer { get; private set; }

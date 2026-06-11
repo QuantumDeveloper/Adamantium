@@ -180,6 +180,11 @@ namespace Adamantium.Graphics.Fonts
             return AtlasData.GetUVCoordinatesForGlyph(glyphIndex);
         }
 
+        public GlyphTextureData GetGlyphData(uint glyphIndex)
+        {
+            return AtlasData.GetGlyphData(glyphIndex);
+        }
+
         public void Update(string text)
         {
             var uniqueSymbols = new string(text.Distinct().ToArray());
