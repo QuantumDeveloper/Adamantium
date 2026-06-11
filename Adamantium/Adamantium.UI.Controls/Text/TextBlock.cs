@@ -29,6 +29,10 @@ public class TextBlock : InputUIComponent
     public static readonly AdamantiumProperty VerticalTextAlignmentProperty = AdamantiumProperty.Register(nameof(VerticalTextAlignment),
         typeof(VerticalTextAlignment), typeof(TextBlock),
         new PropertyMetadata(VerticalTextAlignment.Bottom, PropertyMetadataOptions.AffectsRender, TextParametersChangedCallback));
+
+    public static readonly AdamantiumProperty JustifyLastLineProperty = AdamantiumProperty.Register(nameof(JustifyLastLine),
+        typeof(bool), typeof(TextBlock),
+        new PropertyMetadata(false, PropertyMetadataOptions.AffectsRender, TextParametersChangedCallback));
     
     public static readonly AdamantiumProperty FontFamilyProperty = AdamantiumProperty.Register(nameof(FontFamily),
         typeof(FontFamily), typeof(TextBlock),
@@ -100,6 +104,16 @@ public class TextBlock : InputUIComponent
         set => SetValue(VerticalTextAlignmentProperty, value);
     }
 
+    /// <summary>
+    /// When <see cref="HorizontalTextAlignment"/> is Justify, stretches the last (or only) line to
+    /// the full width as well. Default is <c>false</c> - the last line stays ragged (text-align-last).
+    /// </summary>
+    public bool JustifyLastLine
+    {
+        get => GetValue<bool>(JustifyLastLineProperty);
+        set => SetValue(JustifyLastLineProperty, value);
+    }
+
     public FontFamily FontFamily
     {
         get => GetValue<FontFamily>(FontFamilyProperty);
@@ -135,10 +149,11 @@ public class TextBlock : InputUIComponent
         var size = _textLayout.ProcessText(Text, 
             FontSize, 
             new Size(Width, Height), 
-            TextWrapping, 
+            TextWrapping,
             TextTrimming,
             HorizontalTextAlignment,
-            VerticalTextAlignment);
+            VerticalTextAlignment,
+            JustifyLastLine);
         
         return size;
     }
@@ -148,10 +163,11 @@ public class TextBlock : InputUIComponent
         var size = _textLayout.ProcessText(Text, 
             FontSize, 
             new Size(Width, Height), 
-            TextWrapping, 
+            TextWrapping,
             TextTrimming,
             HorizontalTextAlignment,
-            VerticalTextAlignment);
+            VerticalTextAlignment,
+            JustifyLastLine);
 
         return size;
     }
@@ -164,6 +180,7 @@ public class TextBlock : InputUIComponent
         {
             HorizontalTextAlignment = HorizontalTextAlignment,
             VerticalTextAlignment = VerticalTextAlignment,
+            JustifyLastLine = JustifyLastLine,
             TextTrimming = TextTrimming,
             TextWrapping = TextWrapping,
             Color = ((SolidColorBrush)Foreground).Color,

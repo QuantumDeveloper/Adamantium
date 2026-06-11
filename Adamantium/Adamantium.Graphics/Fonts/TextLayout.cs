@@ -94,7 +94,8 @@ public class TextLayout : DisposableObject
         TextWrapping textWrapping, 
         TextTrimming textTrimming,
         HorizontalTextAlignment horizontalTextAlignment,
-        VerticalTextAlignment verticalTextAlignment)
+        VerticalTextAlignment verticalTextAlignment,
+        bool justifyLastLine = false)
     {
         if (Double.IsNaN(textArea.Width))
         {
@@ -106,9 +107,10 @@ public class TextLayout : DisposableObject
         }
         var @params = new TextRenderingParameters()
             { 
-                HorizontalTextAlignment = horizontalTextAlignment, 
+                HorizontalTextAlignment = horizontalTextAlignment,
                 VerticalTextAlignment = verticalTextAlignment,
-                TextWrapping = textWrapping, 
+                JustifyLastLine = justifyLastLine,
+                TextWrapping = textWrapping,
                 TextTrimming = textTrimming,
                 TextArea = new Rectangle(Vector2F.Zero, textArea)
             };
@@ -139,6 +141,23 @@ public class TextLayout : DisposableObject
         // var subApp = font.FeatureService.ApplyFeature(Features.aalt, layoutContainer, 0, (uint)glyphs.Length);
 
         var scale = fontSize / Font.UnitsPerEm;
+
+        // Kerning (screen px) to add to the pen after the glyph at this global index = the kern between it
+        // and the next glyph; applying it to the cursor propagates it to every following glyph. With GPOS the
+        // feature stored the pair adjustment on the first glyph's advance (GetAdvance(pos)); without GPOS we
+        // fall back to the legacy TTF 'kern' table. Bounds-guarded against the displayed-glyph count.
+        double KernAdvance(int pos)
+        {
+            if (pos < 0 || pos >= (int)layoutContainer.Count) return 0;
+            if (kernApplied)
+                return layoutContainer.GetAdvance((uint)pos).X * scale;
+            if (pos + 1 < (int)layoutContainer.Count)
+                return Font.GetKerningValue(
+                    (ushort)layoutContainer.GetGlyph(pos).Index,
+                    (ushort)layoutContainer.GetGlyph(pos + 1).Index) * scale;
+            return 0;
+        }
+
         var lineHeight = Font.LineGap == 0 ? fontSize : Font.LineGap * scale;
         lineHeight += fontSize;
         //var capH = (font.UnitsPerEm - (font.Ascender - font.LineGap)) * scale;
@@ -170,16 +189,18 @@ public class TextLayout : DisposableObject
 
             if (wordIndex < words.Length - 1)
             {
-                var rect = new RectangleF((float)Math.Ceiling(cursorPosition),
-                    (float)Math.Ceiling(height + baseLine),
-                    (float)Math.Ceiling(spaceWidth),
+                // Sub-pixel like the glyphs (no Ceiling) so the space doesn't inflate the line bounds.
+                var rect = new RectangleF((float)cursorPosition,
+                    (float)(height + baseLine),
+                    (float)spaceWidth,
                     0f); 
                 // add space after word
                 glyphsData.Add(new GlyphWordData(spaceGlyph, ' ',
                     rect,
                     -1,
                     lineIndex));
-                cursorPosition += spaceWidth;
+                cursorPosition += spaceWidth + KernAdvance(positionInString);
+                positionInString++; // the space is one glyph in the displayed-glyph stream
             }
         }
 
@@ -221,11 +242,6 @@ public class TextLayout : DisposableObject
                         cursorPosition = 0;
                         lineIndex++;
                         break;
-                    case ' ':
-                    {
-                        cursorPosition += glyph.AdvanceWidth * scale;
-                        break;
-                    }
                     default:
                     {
                         var glyphLeft = cursorPosition;
@@ -234,21 +250,21 @@ public class TextLayout : DisposableObject
                         var glyphRect = CalculateGlyphPosition(glyph,
                             glyphLeft,
                             glyphBase,
-                            kernApplied,
-                            i,
-                            fontSize,
                             scale);
 
-                        cursorPosition += glyph.AdvanceWidth * scale;
-                        
-                        glyphsData.Add(new GlyphWordData(glyph, symbol, glyphRect, i, lineIndex));
+                        // Advance the pen by this glyph's advance plus its GPOS kern with the next glyph
+                        // (GetAdvance is stored on the first glyph of the pair); adding it to the cursor
+                        // propagates the kern to every following glyph.
+                        cursorPosition += glyph.AdvanceWidth * scale + KernAdvance(positionInString);
+
+                        glyphsData.Add(new GlyphWordData(glyph, symbol, glyphRect, positionInString, lineIndex));
 
                         switch (renderingParameters.TextWrapping)
                         {
                             case TextWrapping.NoWrap:
                                 if (cursorPosition > textArea.Width)
                                 {
-                                    if (!IsLastGlyph(i, text.Length))
+                                    if (!IsLastGlyph(positionInString, text.Length))
                                     {
                                         var glyphsDataCopy = glyphsData.ToArray();
                                         PrepareDataAndTrim(glyphsDataCopy, i, glyphBase);
@@ -269,7 +285,7 @@ public class TextLayout : DisposableObject
                                             glyphBase = height + baseLine;
                                             RearrangeData(glyphsDataCopy, glyphBase);
                                         }
-                                        else if (!IsLastGlyph(i, text.Length))
+                                        else if (!IsLastGlyph(positionInString, text.Length))
                                         {
                                             PrepareDataAndTrim(glyphsDataCopy, i, glyphBase);
                                             return false;
@@ -289,7 +305,7 @@ public class TextLayout : DisposableObject
                                         var glyphsDataCopy = glyphsData.ToArray();
                                         RearrangeData(glyphsDataCopy, glyphBase);
                                     }
-                                    else if (!IsLastGlyph(i, word.Length))
+                                    else if (!IsLastGlyph(positionInString, text.Length))
                                     {
                                         var glyphsDataCopy = glyphsData.ToArray();
                                         PrepareDataAndTrim(glyphsDataCopy, i, glyphBase);
@@ -301,6 +317,9 @@ public class TextLayout : DisposableObject
                         break;
                     }
                 }
+                // One displayed glyph consumed (letter, space or newline) - keep the global index in lockstep
+                // with layoutContainer's glyph stream so GPOS GetAdvance(pos) lines up.
+                positionInString++;
             }
             return true;
         }
@@ -320,11 +339,16 @@ public class TextLayout : DisposableObject
                     {
                         var glyphsForLine = _wordData.Where(x => x.LineIndex == i).ToArray();
                         if (glyphsForLine.Length == 0) break;
-                        
-                        minX = glyphsForLine.Min(x => x.Rect.Left);
-                        maxX = glyphsForLine.Max(x => x.Rect.Right);
+
+                        // Centre by the INK extent (ignore leading/trailing spaces) so they don't pull the
+                        // line off-centre - matching how Right alignment measures. diff places the ink left at
+                        // exactly (areaWidth - inkWidth)/2.
+                        var ink = glyphsForLine.Where(x => x.Symbol != ' ').ToArray();
+                        if (ink.Length == 0) continue;
+                        minX = ink.Min(x => x.Rect.Left);
+                        maxX = ink.Max(x => x.Rect.Right);
                         var lineWidth = maxX - minX;
-                        var diff = (finalRect.Width - lineWidth) / 2;
+                        var diff = (finalRect.Width - lineWidth) / 2 - minX;
                         foreach (var glyphWordData in glyphsForLine)
                         {
                             var rect = glyphWordData.Rect;
@@ -359,26 +383,45 @@ public class TextLayout : DisposableObject
                     var maxLines = _wordData.Max(x => x.LineIndex);
                     for (int i = 0; i <= maxLines; ++i)
                     {
-                        var glyphsForLine = _wordData.Where(x => x.LineIndex == i && x.Symbol != ' ').ToArray();
-                        if (glyphsForLine.Length == 0) break;
-                        
-                        var lineWidth = glyphsForLine.Take(glyphsForLine.Length - 1).Sum(x => x.Rect.Width);
-                        var diff = (finalRect.Width - lineWidth) / (glyphsForLine.Length - 1);
-                        var cursor = 0;
+                        // The last line of a justified block stays ragged (left-aligned), per typography
+                        // convention - so a single line is never stretched either. Opt out via
+                        // JustifyLastLine (text-align-last) to stretch the last/only line as well.
+                        if (i == maxLines && !renderingParameters.JustifyLastLine) break;
 
-                        int cnt = 0;
-                        foreach (var glyphWordData in glyphsForLine)
+                        // Word-spacing justification: widen the gaps BETWEEN words to fill the line, leaving
+                        // each word's internal layout (letter spacing + kerning) untouched. We only SHIFT
+                        // glyphs - never re-lay them - so sub-pixel positions and side bearings stay correct
+                        // (the old code re-laid every glyph: int-truncated the pen and dropped the first LSB).
+                        var lineGlyphs = _wordData.Where(x => x.LineIndex == i).OrderBy(x => x.Rect.X).ToArray();
+                        if (lineGlyphs.Length == 0) continue;
+
+                        int firstInk = -1, lastInk = -1;
+                        for (int k = 0; k < lineGlyphs.Length; k++)
                         {
-                            var leftSideBearing = glyphWordData.Glyph.LeftSideBearing * scale;
-                            if (cnt == 0)
-                            {
-                                leftSideBearing = 0;
-                            }
-                            var rect = glyphWordData.Rect;
-                            rect.X = (float)(cursor + leftSideBearing);
-                            glyphWordData.Rect = rect;
-                            cursor = (int)(rect.Right + diff);
-                            cnt++;
+                            if (lineGlyphs[k].Symbol == ' ') continue;
+                            if (firstInk < 0) firstInk = k;
+                            lastInk = k;
+                        }
+                        if (firstInk < 0) continue; // line has no ink to justify
+
+                        // expandable gaps = spaces strictly between the first and last ink glyph
+                        var spaceCount = 0;
+                        for (int k = firstInk + 1; k < lastInk; k++)
+                            if (lineGlyphs[k].Symbol == ' ') spaceCount++;
+                        if (spaceCount == 0) continue; // single word - nothing to stretch
+
+                        var extra = finalRect.Width - lineGlyphs[lastInk].Rect.Right;
+                        if (extra <= 0) continue; // already fills / overflows the line
+
+                        var perSpace = extra / spaceCount;
+                        double shift = 0;
+                        for (int k = 0; k < lineGlyphs.Length; k++)
+                        {
+                            var rect = lineGlyphs[k].Rect;
+                            rect.X += (float)shift;
+                            lineGlyphs[k].Rect = rect;
+                            if (k > firstInk && k < lastInk && lineGlyphs[k].Symbol == ' ')
+                                shift += perSpace;
                         }
                     }
                 }
@@ -398,7 +441,20 @@ public class TextLayout : DisposableObject
                         rect.Y += (float)diff;
                         glyphWordData.Rect = rect;
                     }
-                    
+
+                }
+                break;
+                case VerticalTextAlignment.Bottom:
+                {
+                    // Drop the block so its lowest point sits on the area's bottom edge. (Top is the default
+                    // no-op layout.)
+                    var diff = finalRect.Height - maxY;
+                    foreach (var glyphWordData in _wordData)
+                    {
+                        var rect = glyphWordData.Rect;
+                        rect.Y += (float)diff;
+                        glyphWordData.Rect = rect;
+                    }
                 }
                 break;
             }
@@ -444,14 +500,13 @@ public class TextLayout : DisposableObject
                 var glyphRect = CalculateGlyphPosition(glyphData.Glyph,
                     cursorPosition,
                     glyphBase,
-                    kernApplied,
-                    glyphData.PositionInString,
-                    fontSize,
                     scale);
 
                 glyphData.Rect = glyphRect;
                 glyphData.LineIndex = lineIndex;
-                cursorPosition += glyphData.Glyph.AdvanceWidth * scale;
+                // Same GPOS kern as the first-pass layout, so wrapped lines stay kerned. Spaces carry
+                // PositionInString = -1, for which KernAdvance returns 0.
+                cursorPosition += glyphData.Glyph.AdvanceWidth * scale + KernAdvance(glyphData.PositionInString);
             }
         }
 
@@ -503,9 +558,6 @@ public class TextLayout : DisposableObject
                 var glyphRect = CalculateGlyphPosition(dotGlyph,
                     cursorPosition,
                     glyphBase,
-                    kernApplied,
-                    position,
-                    fontSize,
                     scale);
                 glyphsData.Add(new GlyphWordData(dotGlyph, '.', glyphRect, -1, lineIndex));
 
@@ -594,19 +646,9 @@ public class TextLayout : DisposableObject
         Glyph glyph,
         double glyphLeft,
         double glyphBase,
-        bool kernApplied,
-        int position,
-        double fontSize,
         double scale)
     {
-        // if GPOS kern is not applied - try TTF kern approach
-        if (!kernApplied && position > 0)
-        {
-            var prevGlyph = layoutContainer.GetGlyph(position - 1);
-            glyphLeft += fontSize * Font.GetKerningValue((ushort)prevGlyph.Index, (ushort)glyph.Index) /
-                         Font.UnitsPerEm;
-        }
-
+        // Kerning is applied to the pen in ProcessWord (GPOS GetAdvance, propagated), not here.
         var verticalShift = -glyph.BoundingRectangle.Y * scale;
         var horizontalShift = glyph.LeftSideBearing * scale;
 
@@ -617,12 +659,6 @@ public class TextLayout : DisposableObject
         // shifted left while the pen still advanced by the full width - the gap after the first letter came
         // out inflated by that bearing. Now the line just starts at the natural LSB indent.
         glyphLeft += horizontalShift;
-
-        // if GPOS kern is applied - modify the advance for current glyph
-        if (kernApplied && position > 0)
-        {
-            //glyphLeft += fontSize * layoutContainer.GetAdvance((uint)position).X * scale;
-        }
 
         // Anchor every glyph to the line's baseline so they share an exact pixel row. Rounding glyphTop and
         // the ink bottom independently rounds each glyph's own ink extremes, so a letter that overshoots the

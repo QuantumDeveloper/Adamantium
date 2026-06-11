@@ -15,6 +15,14 @@ namespace Adamantium.Graphics.Fonts
         public HorizontalTextAlignment HorizontalTextAlignment { get; set; }
         
         public VerticalTextAlignment VerticalTextAlignment { get; set; }
+
+        /// <summary>
+        /// When <see cref="HorizontalTextAlignment.Justify"/> is used, the last line of a block
+        /// (and a single, only line) stays ragged by default, per typography convention. Set this
+        /// to <c>true</c> to stretch the last/only line to the full width as well (text-align-last).
+        /// </summary>
+        public bool JustifyLastLine { get; set; }
+
         public TextTrimming TextTrimming { get; set; }
         
         public Color Color { get; set; }
@@ -25,8 +33,9 @@ namespace Adamantium.Graphics.Fonts
             if (ReferenceEquals(this, other)) return true;
             return TextArea.Equals(other.TextArea) && 
                    TextWrapping == other.TextWrapping &&
-                   HorizontalTextAlignment == other.HorizontalTextAlignment && 
-                   VerticalTextAlignment == other.VerticalTextAlignment && 
+                   HorizontalTextAlignment == other.HorizontalTextAlignment &&
+                   VerticalTextAlignment == other.VerticalTextAlignment &&
+                   JustifyLastLine == other.JustifyLastLine &&
                    TextTrimming == other.TextTrimming &&
                    Color.Equals(other.Color);
         }
@@ -41,7 +50,7 @@ namespace Adamantium.Graphics.Fonts
         
         public override int GetHashCode()
         {
-            return HashCode.Combine(TextArea, (int)TextWrapping, (int)HorizontalTextAlignment, (int)VerticalTextAlignment, (int)TextTrimming, Color);
+            return HashCode.Combine(TextArea, (int)TextWrapping, (int)HorizontalTextAlignment, (int)VerticalTextAlignment, JustifyLastLine, (int)TextTrimming, Color);
         }
         
         public static bool operator ==(TextRenderingParameters @paramA, TextRenderingParameters @paramB)

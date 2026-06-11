@@ -30,7 +30,7 @@ public class FontRenderer : GraphicsResource
 
     // Selects the glyph pixel shader: true = canonical MSDF (Chlumsky screenPxRange, RenderMsdf pass),
     // false = the gradient-derivative AA (Render pass). See FontEffect.fx.
-    public bool UseCanonicalMsdf { get; set; } = false;
+    public bool UseCanonicalMsdf { get; set; } = true;
 
     // Outline test pass (RenderMsdfOutline). When on, draws OutlineColor as a ring OutlineWidth (normalized
     // field units) outside each glyph - a functional check that the distance field is valid beyond the
