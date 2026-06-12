@@ -70,10 +70,16 @@ public abstract class WindowRendererBase : IWindowRenderer
         InitializeWindowResources();
     }
 
+    /// <summary>
+    /// The presenter kind this renderer builds. Defaults to the on-screen swapchain; a headless renderer
+    /// overrides it to <see cref="PresenterType.Headless"/>, in which case the surface is window-less.
+    /// </summary>
+    protected virtual PresenterType PresenterKind => PresenterType.Swapchain;
+
     private void FillParameters()
     {
         Parameters = new PresentationParameters(
-            PresenterType.Swapchain,
+            PresenterKind,
             (uint)Window.ClientWidth,
             (uint)Window.ClientHeight,
             Window.SurfaceHandle,

@@ -147,6 +147,24 @@ namespace Adamantium.Graphics.Core
                 return createSurface;
             }
 
+            // Headless: a window-less surface (VK_EXT_headless_surface) with a normal swapchain on top, so the
+            // rest of the presentation path is unchanged. The extension isn't present everywhere - guard it so a
+            // missing one is a clean managed error instead of a native null-function-pointer crash.
+            if (parameters.PresenterType == PresenterType.Headless)
+            {
+                if (!Instance.EnumerateInstanceExtensionProperties()
+                        .Any(e => e.ExtensionName == Constants.VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME))
+                {
+                    throw new NotSupportedException(
+                        $"{Constants.VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME} is not available on this Vulkan loader. " +
+                        "Use PresenterType.RenderTarget for off-screen rendering instead.");
+                }
+
+                var headlessSurface = VkInstance.CreateHeadlessSurface(new HeadlessSurfaceCreateInfoEXT());
+                availableSurfaces.Add(parameters.OutputHandle, headlessSurface);
+                return headlessSurface;
+            }
+
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 var surfaceInfo = new Win32SurfaceCreateInfoKHR();
