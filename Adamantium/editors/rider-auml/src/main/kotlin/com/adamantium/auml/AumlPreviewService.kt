@@ -25,25 +25,34 @@ class AumlPreviewService : Disposable {
     private var writer: BufferedWriter? = null
     private var reader: BufferedReader? = null
 
-    /** Result of one render: a PNG path on success, or an error; diagnostics are non-fatal notes either way. */
-    data class RenderResult(val pngPath: String?, val error: String?, val diagnostics: List<String>)
+    /**
+     * Result of one render: a PNG path (+ its pixel size) on success, or an error; diagnostics are non-fatal
+     * notes either way. [width]/[height] are the rendered image's size (the window's design size × scale).
+     */
+    data class RenderResult(
+        val pngPath: String?,
+        val error: String?,
+        val diagnostics: List<String>,
+        val width: Int?,
+        val height: Int?,
+    )
 
     /**
-     * Renders [text] at [width]x[height] and returns the produced PNG path (or an error). Blocking and
-     * potentially slow on the very first call (the host boots the engine + graphics device), so call this
-     * off the EDT.
+     * Renders [text] at the window's design size × [scale] and returns the produced PNG path (or an error).
+     * Blocking and potentially slow on the very first call (the host boots the engine + graphics device), so
+     * call this off the EDT.
      */
-    fun render(text: String, width: Int, height: Int): RenderResult {
+    fun render(text: String, scale: Double): RenderResult {
         synchronized(lock) {
             return try {
                 ensureProcess()
-                val request = buildRenderRequest(text, width, height)
+                val request = buildRenderRequest(text, scale)
                 writer!!.apply { write(request); write("\n"); flush() }
                 val line = reader!!.readLine() ?: throw RuntimeException("designer host closed the connection")
                 parseResponse(line)
             } catch (e: Exception) {
                 stopProcess() // force a clean restart on the next render
-                RenderResult(null, e.message ?: e.toString(), emptyList())
+                RenderResult(null, e.message ?: e.toString(), emptyList(), null, null)
             }
         }
     }
@@ -97,14 +106,16 @@ class AumlPreviewService : Disposable {
 
     // --- protocol -------------------------------------------------------------------------------------
 
-    private fun buildRenderRequest(text: String, width: Int, height: Int): String =
-        """{"op":"render","text":"${jsonEscape(text)}","width":$width,"height":$height}"""
+    private fun buildRenderRequest(text: String, scale: Double): String =
+        """{"op":"render","text":"${jsonEscape(text)}","scale":$scale}"""
 
     private fun parseResponse(line: String): RenderResult {
         val obj = MiniJson.parse(line) as? Map<*, *>
-            ?: return RenderResult(null, "unexpected host response: $line", emptyList())
+            ?: return RenderResult(null, "unexpected host response: $line", emptyList(), null, null)
         val diagnostics = (obj["diagnostics"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
-        return RenderResult(obj["png"] as? String, obj["error"] as? String, diagnostics)
+        val width = (obj["width"] as? Double)?.toInt()
+        val height = (obj["height"] as? Double)?.toInt()
+        return RenderResult(obj["png"] as? String, obj["error"] as? String, diagnostics, width, height)
     }
 
     private fun jsonEscape(s: String): String {
