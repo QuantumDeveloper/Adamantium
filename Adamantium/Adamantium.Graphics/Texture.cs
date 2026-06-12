@@ -479,6 +479,10 @@ public unsafe class Texture : GraphicsResource, ITexture
 
         GraphicsDevice.Destroy(ImageView);
         GraphicsDevice.Destroy(ImageMemory);
+
+        // Dispose ToDispose'd children too (e.g. a RenderTarget's resolve texture): without calling base the
+        // DisposeCollector never runs and they leak.
+        base.Dispose(disposeManaged);
     }
         
     static ulong CalculateTextureSize(uint width, uint height, uint depth, uint mipLevels, uint blockSize)

@@ -26,7 +26,9 @@ public interface IUIComponent : IFundamentalUIComponent
     IRootVisualComponent RootVisual { get; }
     Int32 ZIndex { get; set; }
     bool IsAttachedToVisualTree { get; }
-    
+
+    bool IsRootComponent { get; }
+
     Transform LayoutTransform { get; set; }
     
     Transform RenderTransform { get; set; }

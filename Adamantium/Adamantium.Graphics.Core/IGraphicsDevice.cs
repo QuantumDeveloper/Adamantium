@@ -25,6 +25,9 @@ public interface IDrawableDevice
 
     void FrameEnded();
 
+    /// <summary>Blocks until the device has completed all pending work (e.g. before reading a target back).</summary>
+    Result DeviceWaitIdle();
+
     void Draw(ulong vertexCount, uint instanceCount, uint firstVertex = 0, uint firstInstance = 0);
     
     void DrawIndexed(IBuffer vertexBuffer, IBuffer indexBuffer, uint instanceCount = 1);
@@ -117,6 +120,9 @@ public unsafe interface IGraphicsDevice : IDrawableDevice, IDynamicStateDevice, 
     uint MaxFramesInFlight { get; }
     
     void AddResource(GraphicsResource resource);
+
+    /// <summary>Unregisters a resource (called from its Dispose) so it stops being rooted by the device.</summary>
+    void RemoveResource(GraphicsResource resource);
     
     void AddToDeferDisposeQueue(IDisposable obj);
     

@@ -52,6 +52,11 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<!-- Lets the render-cache test harness construct the internal DrawingContext directly. -->
+		<InternalsVisibleTo Include="Adamantium.UITests" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<AdditionalFiles Include="$(ProjectDir)**\*.fx" />
 		<AdditionalFiles Include="$(ProjectDir)**\*.fxh" />
 		<CompilerVisibleProperty Include="RootNamespace" />

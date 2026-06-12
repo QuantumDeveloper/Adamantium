@@ -28,6 +28,9 @@ public abstract class GraphicsResource: DisposableObject
       ArgumentNullException.ThrowIfNull(graphicsDevice);
       GraphicsDevice = graphicsDevice;
       GraphicsDevice.AddResource(this);
+      // Unregister on dispose so the wrapper isn't rooted by the device forever. Hooked via the Disposing event
+      // because subclasses (Buffer, Texture, ...) override Dispose(bool) without calling base.
+      Disposing += (_, _) => GraphicsDevice.RemoveResource(this);
       Name = name;
    }
 }

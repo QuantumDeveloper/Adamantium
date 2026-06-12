@@ -68,8 +68,7 @@ public abstract class UIRenderComponent : DeferredDisposableObject
     public virtual void Render()
     {
         if (VertexBuffer == null) return;
-        
-        GraphicsDevice.SetVertexBuffer(VertexBuffer);
+
         GraphicsDevice.VertexType = VertexType;
         GraphicsDevice.PolygonMode = PolygonMode.Fill;
         GraphicsDevice.PrimitiveTopology = Mesh.MeshTopology;
@@ -80,11 +79,12 @@ public abstract class UIRenderComponent : DeferredDisposableObject
 
         if (HasIndexBuffer)
         {
-            GraphicsDevice.SetIndexBuffer(IndexBuffer);
+            // DrawIndexed binds both the vertex and index buffers itself - don't bind them again.
             GraphicsDevice.DrawIndexed(VertexBuffer, IndexBuffer);
         }
         else
         {
+            GraphicsDevice.SetVertexBuffer(VertexBuffer);
             GraphicsDevice.Draw(VertexBuffer.ElementCount, 1);
         }
     }
@@ -231,8 +231,18 @@ public class TextRenderComponent : ImageRenderComponent
     public Brush Foreground { get; set; }
     
     public Brush Stroke { get; set; }
-    
+
     private bool _textRendered = false;
+
+    // Colour-only change: swap the brushes and force one re-rasterization, reusing the existing render
+    // target and geometry (no buffer/RT rebuild).
+    public void UpdateColors(Brush background, Brush foreground, Brush stroke)
+    {
+        Background = background;
+        Foreground = foreground;
+        Stroke = stroke;
+        _textRendered = false;
+    }
 
     public override void Render()
     {

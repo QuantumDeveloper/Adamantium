@@ -39,7 +39,7 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
         if (pen == null) return;
         
         var strokeGeometry = new StrokeGeometry(pen, geometry);
-        StrokeRenderer?.Dispose();
+        StrokeRenderer?.DeferDispose();
         StrokeRenderer = new StrokeRenderComponent(GraphicsDevice, UIBasicEffect, strokeGeometry.Mesh, pen);
         StrokeRenderer.RenderData = DrawCommand.RenderData;
     }
@@ -65,7 +65,16 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
     public abstract void UpdateWithDrawCommand(IDrawCommand drawCommand);
     public virtual bool Match(IDrawCommand drawCommand)
     {
-        return DrawCommand.Payload.GetType() == drawCommand.Payload.GetType(); 
+        return DrawCommand.Payload.GetType() == drawCommand.Payload.GetType();
+    }
+
+    protected override void Dispose(bool disposeManagedResources)
+    {
+        // The unit owns its renderers (their vertex/index buffers and text render targets), so dispose them too.
+        // The unit itself is disposed via the deferred queue (after the frame fence), so disposing them now is safe.
+        GeometryRenderer?.Dispose();
+        StrokeRenderer?.Dispose();
+        base.Dispose(disposeManagedResources);
     }
 }
 
@@ -83,30 +92,34 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
     public override void UpdateWithDrawCommand(IDrawCommand drawCommand)
     {
         if (drawCommand.Payload is not GeometryPayload inputPayload) return;
-        
-        Console.WriteLine($"Location: {drawCommand.RenderData.TransformMatrix.TranslationVector}");
-        if (Payload.RequiresBufferRebuild(inputPayload))
+
+        // Capture the old pen BEFORE reassigning Payload, otherwise the comparison below is always equal.
+        var oldPen = Payload.Pen;
+        var rebuild = Payload.RequiresBufferRebuild(inputPayload);
+
+        if (rebuild)
         {
             inputPayload.Geometry.ProcessGeometry(GeometryType.Both);
             GeometryRenderer?.DeferDispose();
-            GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, inputPayload.Geometry.Mesh, Payload.Brush);
+            GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, inputPayload.Geometry.Mesh, inputPayload.Brush);
         }
         else
         {
             var geometryRenderer = (GeometryRenderComponent)GeometryRenderer;
             geometryRenderer.Background = inputPayload.Brush;
         }
-            
+
         DrawCommand = drawCommand;
         Payload = inputPayload;
         if (GeometryRenderer != null)
         {
             GeometryRenderer.RenderData = DrawCommand.RenderData;
         }
-            
-        if (!Equals(Payload.Pen, inputPayload.Pen))
+
+        // The stroke wraps the geometry, so rebuild it when the geometry changed OR the pen changed.
+        if (rebuild || !Equals(oldPen, inputPayload.Pen))
         {
-            ProcessStrokeData(Payload.Pen, inputPayload.Geometry);
+            ProcessStrokeData(inputPayload.Pen, inputPayload.Geometry);
         }
     }
 }
@@ -124,15 +137,19 @@ public class LineRenderUnit : RenderUnit<LinePayload>
     public override void UpdateWithDrawCommand(IDrawCommand drawCommand)
     {
         if (drawCommand.Payload is not LinePayload inputPayload) return;
-        
+
+        // A line is pure stroke: its endpoints AND pen both feed RequiresBufferRebuild, so this single check
+        // covers a move/resize as well as a pen change.
+        var rebuild = Payload.RequiresBufferRebuild(inputPayload);
+
         DrawCommand = drawCommand;
         Payload = inputPayload;
-            
-        if (!Equals(Payload.Pen, inputPayload.Pen))
+
+        if (rebuild)
         {
-            var geometry = new LineGeometry(Payload.LineStart, Payload.LineEnd);
+            var geometry = new LineGeometry(inputPayload.LineStart, inputPayload.LineEnd);
             geometry.ProcessGeometry(GeometryType.Both);
-            ProcessStrokeData(Payload.Pen, geometry);
+            ProcessStrokeData(inputPayload.Pen, geometry);
         }
     }
 }
@@ -152,9 +169,12 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
     public override void UpdateWithDrawCommand(IDrawCommand drawCommand)
     {
         if (drawCommand.Payload is not RectanglePayload inputPayload) return;
-        
+
+        var oldPen = Payload.Pen;
+        var rebuild = Payload.RequiresBufferRebuild(inputPayload);
+
         var rectangleGeometry = new RectangleGeometry(inputPayload.DestinationRect, inputPayload.CornerRadius);
-        if (Payload.RequiresBufferRebuild(inputPayload))
+        if (rebuild)
         {
             rectangleGeometry.ProcessGeometry(GeometryType.Both);
             GeometryRenderer?.DeferDispose();
@@ -170,9 +190,12 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
 
         GeometryRenderer?.RenderData = DrawCommand.RenderData;
 
-        if (!Equals(Payload.Pen, inputPayload.Pen))
+        // Stroke wraps the geometry: rebuild on geometry change OR pen change. In the pen-only case the
+        // geometry wasn't processed above, so process it before building the stroke.
+        if (rebuild || !Equals(oldPen, inputPayload.Pen))
         {
-            ProcessStrokeData(Payload.Pen, rectangleGeometry);
+            if (!rebuild) rectangleGeometry.ProcessGeometry(GeometryType.Both);
+            ProcessStrokeData(inputPayload.Pen, rectangleGeometry);
         }
     }
 }
@@ -192,15 +215,23 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
     public override void UpdateWithDrawCommand(IDrawCommand drawCommand)
     {
         if (drawCommand.Payload is not EllipsePayload inputPayload) return;
-        
-        var rectangleGeometry = new EllipseGeometry(inputPayload.DestinationRect, inputPayload.StartAngle, inputPayload.SweepAngle,
-            Payload.EllipseType);
-        if (Payload.RequiresBufferRebuild(inputPayload))
+
+        var oldPen = Payload.Pen;
+        var rebuild = Payload.RequiresBufferRebuild(inputPayload);
+
+        var ellipseGeometry = new EllipseGeometry(inputPayload.DestinationRect, inputPayload.StartAngle, inputPayload.SweepAngle,
+            inputPayload.EllipseType);
+        if (rebuild)
         {
-            rectangleGeometry.ProcessGeometry(GeometryType.Both);
+            ellipseGeometry.ProcessGeometry(GeometryType.Both);
             GeometryRenderer?.DeferDispose();
-            GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, rectangleGeometry.Mesh,
+            GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, ellipseGeometry.Mesh,
                 inputPayload.Brush);
+        }
+        else
+        {
+            var renderer = (GeometryRenderComponent)GeometryRenderer;
+            renderer.Background = inputPayload.Brush;
         }
 
         DrawCommand = drawCommand;
@@ -211,9 +242,12 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
             GeometryRenderer.RenderData = drawCommand.RenderData;
         }
 
-        if (!Equals(Payload.Pen, inputPayload.Pen))
+        // Stroke wraps the geometry: rebuild on geometry change OR pen change; process geometry first in
+        // the pen-only case.
+        if (rebuild || !Equals(oldPen, inputPayload.Pen))
         {
-            ProcessStrokeData(Payload.Pen, rectangleGeometry);
+            if (!rebuild) ellipseGeometry.ProcessGeometry(GeometryType.Both);
+            ProcessStrokeData(inputPayload.Pen, ellipseGeometry);
         }
     }
 }
@@ -298,11 +332,21 @@ public class TextRenderUnit : RenderUnit<TextPayload>
                 ResourceFactory.GetFontRenderer(GraphicsDevice), 
                 inputPayload.TextLayout,
                 inputPayload.TextRenderingParameters, 
-                inputPayload.Background, 
+                inputPayload.Background,
                 inputPayload.Foreground,
                 inputPayload.Stroke);
         }
-            
+        else if (!Equals(Payload.Background, inputPayload.Background) ||
+                 !Equals(Payload.Foreground, inputPayload.Foreground) ||
+                 !Equals(Payload.Stroke, inputPayload.Stroke))
+        {
+            // Geometry/layout unchanged - only the colours differ. Swap brushes and force a re-raster,
+            // reusing the existing render target (RequiresBufferRebuild ignores colours, so without this
+            // a colour-only change would never repaint). Compared against the old Payload, before reassign.
+            ((TextRenderComponent)GeometryRenderer).UpdateColors(
+                inputPayload.Background, inputPayload.Foreground, inputPayload.Stroke);
+        }
+
         DrawCommand = drawCommand;
         Payload = inputPayload;
         GeometryRenderer.RenderData = drawCommand.RenderData;

@@ -21,6 +21,8 @@
     <ItemGroup>
       <ProjectReference Include="..\..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
       <ProjectReference Include="..\..\Adamantium.UI\Adamantium.UI.csproj" />
+      <!-- Needed by the [Category("Gpu")] integration tests to spin up a headless render device. -->
+      <ProjectReference Include="..\..\Adamantium.Graphics\Adamantium.Graphics.csproj" />
     </ItemGroup>
 
 </Project>

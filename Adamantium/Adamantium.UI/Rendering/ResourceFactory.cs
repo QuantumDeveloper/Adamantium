@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Fonts;
 using Adamantium.Imaging;
@@ -10,7 +11,8 @@ namespace Adamantium.UI.Rendering;
 public class ResourceFactory : IResourceFactory
 {
     private readonly IGraphicsDeviceService _graphicsDeviceService;
-    
+    private readonly Dictionary<IGraphicsDevice, FontRenderer> _fontRenderers = new();
+
     public ResourceFactory(IGraphicsDeviceService graphicsDeviceService)
     {
         _graphicsDeviceService = graphicsDeviceService;
@@ -32,6 +34,13 @@ public class ResourceFactory : IResourceFactory
 
     public FontRenderer GetFontRenderer(IGraphicsDevice graphicsDevice)
     {
-        return new FontRenderer(graphicsDevice);
+        // One FontRenderer per device, reused (rendering is sequential, so sharing is safe).
+        if (!_fontRenderers.TryGetValue(graphicsDevice, out var renderer))
+        {
+            renderer = new FontRenderer(graphicsDevice);
+            _fontRenderers[graphicsDevice] = renderer;
+        }
+
+        return renderer;
     }
 }

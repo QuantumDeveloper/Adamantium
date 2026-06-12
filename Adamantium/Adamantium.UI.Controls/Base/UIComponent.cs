@@ -98,6 +98,9 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         RenderId = Guid.NewGuid();
         VisualChildrenCollection = new TrackingCollection<IUIComponent>();
         VisualChildrenCollection.CollectionChanged += VisualChildrenCollectionChanged;
+        // A visual root (e.g. a window) has no parent, so SetVisualParent never attaches it. Seed RootVisual to
+        // itself here so the root reports IsAttachedToVisualTree = true.
+        if (this is IRootVisualComponent root) RootVisual = root;
     }
 
     public bool IsGeometryValid { get; protected set; }
@@ -215,6 +218,12 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     
     public IRootVisualComponent RootVisual { get; private set; }
 
+    /// <summary>
+    /// <c>true</c> when this component is its own visual root (e.g. a window). Allocation-free alternative to an
+    /// <c>is IRootVisualComponent</c> check.
+    /// </summary>
+    public bool IsRootComponent => ReferenceEquals(RootVisual, this);
+
     public Int32 ZIndex { get; set; }
 
     public Transform RenderTransform
@@ -300,7 +309,11 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         VisualChildrenCollection.Clear();
     }
 
-    public bool IsAttachedToVisualTree { get; private set; }
+    /// <summary>
+    /// <c>true</c> while this component is connected to a visual root. Backed by <see cref="RootVisual"/> (set on
+    /// attach, cleared on detach); a root component is seeded as its own <see cref="RootVisual"/>.
+    /// </summary>
+    public bool IsAttachedToVisualTree => RootVisual != null;
 
     protected void SetVisualParent(IUIComponent parent)
     {
@@ -330,7 +343,6 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
 
     private void AttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
-        IsAttachedToVisualTree = true;
         RootVisual = e.Root;
         
         OnAttachedToVisualTree(e);
@@ -349,7 +361,8 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
 
     private void DetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
-        IsAttachedToVisualTree = false;
+        // Clear the root link so IsAttachedToVisualTree (=> RootVisual != null) flips to false for this subtree.
+        RootVisual = null;
 
         OnDetachedFromVisualTree(e);
         DetachedFromVisualTreeEvent?.Invoke(this, e);

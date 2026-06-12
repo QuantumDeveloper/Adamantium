@@ -54,7 +54,8 @@ public sealed class EffectPass : DisposableObject, IEffectPass
 
     private DescriptorSetLayout[] descriptorSetLayouts;
 
-    private List<DescriptorBufferBindingInfoEXT> bindingInfos;
+    // Reused across draws so BindDescriptors doesn't allocate a fresh array (+ per-element objects) each draw.
+    private DescriptorBufferBindingInfoEXT[] bindingInfos;
 
     private readonly VkDeviceSize[] offsets = new VkDeviceSize[1];
     private readonly uint[] _bufferIndices = new uint[1];
@@ -89,8 +90,6 @@ public sealed class EffectPass : DisposableObject, IEffectPass
         layoutBindings = new List<DescriptorSetLayoutBinding>();
         PropertiesKey = PrepareProperties(logger, pass.Properties);
         graphicsDevice.MainDevice.FrameFinished += GraphicsDeviceOnFrameFinished;
-
-        bindingInfos = new List<DescriptorBufferBindingInfoEXT>();
     }
 
     private void GraphicsDeviceOnFrameFinished()
@@ -323,16 +322,21 @@ public sealed class EffectPass : DisposableObject, IEffectPass
 
     private void BindDescriptors()
     {
-        bindingInfos.Clear();
-        foreach (var descriptorData in DescriptorDataSets)
+        if (bindingInfos == null || bindingInfos.Length != DescriptorDataSets.Length)
         {
-            var bindingInfoExt = new DescriptorBufferBindingInfoEXT();
-            bindingInfoExt.Address = descriptorData.Buffer.GetDeviceAddress();
-            bindingInfoExt.Usage = (BufferUsageFlagBits)descriptorData.UsageFlags;
-            bindingInfos.Add(bindingInfoExt);
+            bindingInfos = new DescriptorBufferBindingInfoEXT[DescriptorDataSets.Length];
+            for (int i = 0; i < bindingInfos.Length; i++)
+                bindingInfos[i] = new DescriptorBufferBindingInfoEXT();
         }
 
-        graphicsDevice.CurrentCommandBuffer.BindDescriptorBuffersEXT((uint)bindingInfos.Count, bindingInfos.ToArray());
+        for (int i = 0; i < DescriptorDataSets.Length; i++)
+        {
+            var info = bindingInfos[i];
+            info.Address = DescriptorDataSets[i].Buffer.GetDeviceAddress();
+            info.Usage = (BufferUsageFlagBits)DescriptorDataSets[i].UsageFlags;
+        }
+
+        graphicsDevice.CurrentCommandBuffer.BindDescriptorBuffersEXT((uint)bindingInfos.Length, bindingInfos);
 
         for (int i = 0; i < DescriptorDataSets.Length; ++i)
         {

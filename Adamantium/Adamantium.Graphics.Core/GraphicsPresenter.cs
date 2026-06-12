@@ -156,6 +156,9 @@ namespace Adamantium.Graphics.Core
                 case PresenterType.RenderTarget:
                     return new RenderTargetGraphicsPresenter(graphicsDevice, parameters, name);
                     break;
+                case PresenterType.Headless:
+                    return new HeadlessPresenter(graphicsDevice, parameters, name);
+                    break;
                 default:
                     throw new NotSupportedException($"Presenter type: {parameters.PresenterType} is not supported");
             }

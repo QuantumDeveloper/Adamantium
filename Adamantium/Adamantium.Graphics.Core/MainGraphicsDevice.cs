@@ -254,7 +254,6 @@ namespace Adamantium.Graphics.Core
             createInfo.PNext = deviceFeatures2;
 
             LogicalDevice = GraphicsAdapter.Adapter.CreateDevice(createInfo);
-            LogicalDevice.InitializeExtensions();
             var fenceInfo = new FenceCreateInfo();
             fenceInfo.Flags = FenceCreateFlagBits.SignaledBit;
             InFlightFences ??= LogicalDevice.CreateFences(fenceInfo, BuffersCount);

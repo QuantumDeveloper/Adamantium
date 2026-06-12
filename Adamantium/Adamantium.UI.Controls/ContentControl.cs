@@ -107,6 +107,9 @@ public class ContentControl : Control, IContentControl
    {
       if (!_contentChanged)
          return;
+      // Mark the change consumed up-front so a clean measure does not re-run the detach/re-attach below.
+      // A later Content/Template change sets _contentChanged = true again (OnContentChangedInternal / OnApplyTemplate).
+      _contentChanged = false;
 
       if (_currentVisualChild != null)
       {
@@ -136,8 +139,6 @@ public class ContentControl : Control, IContentControl
     
       AddVisualChild(_currentVisualChild);
       AddLogicalChild(_currentVisualChild);
-      
-      _contentChanged = true;
    }
 
    protected override Size MeasureOverride(Size availableSize)
