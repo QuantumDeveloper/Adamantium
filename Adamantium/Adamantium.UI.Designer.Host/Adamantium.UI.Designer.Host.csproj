@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net10.0</TargetFramework>
+        <Platforms>x64</Platforms>
+        <Configurations>Debug;Release</Configurations>
+        <LangVersion>latest</LangVersion>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <Nullable>disable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <BaseOutputPath>..\..\output\Adamantium.UI.Designer.Host\bin</BaseOutputPath>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Adamantium.UI\Adamantium.UI.csproj" />
+        <ProjectReference Include="..\Adamantium.Game\Adamantium.Game.csproj" />
+        <ProjectReference Include="..\Adamantium.UI.Themes\Adamantium.UI.Themes.csproj" />
+    </ItemGroup>
+
+</Project>
