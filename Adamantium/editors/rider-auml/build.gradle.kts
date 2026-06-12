@@ -1,4 +1,5 @@
 import org.gradle.api.tasks.Exec
+import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.bundling.Zip
 
 plugins {
@@ -8,7 +9,7 @@ plugins {
 }
 
 group = "com.adamantium"
-version = "0.6.0"
+version = "0.6.1"
 
 repositories {
     mavenCentral()
@@ -82,4 +83,16 @@ tasks.processResources {
         include("server.zip")
         into("server")
     }
+}
+
+// --- Live preview host ------------------------------------------------------------------------
+// Point the AUML live preview at the locally built designer host so `runIde` works without manual
+// setup. AumlPreviewService also honours the ADAMANTIUM_DESIGNER_HOST env var if you set it yourself
+// (needed when installing the built plugin into a real Rider rather than the runIde sandbox).
+val designerHostExe = listOf("Debug", "Release")
+    .map { file("../../../output/Adamantium.UI.Designer.Host/bin/x64/$it/net10.0/Adamantium.UI.Designer.Host.exe") }
+    .firstOrNull { it.exists() }
+
+tasks.named<JavaExec>("runIde") {
+    designerHostExe?.let { environment("ADAMANTIUM_DESIGNER_HOST", it.absolutePath) }
 }
