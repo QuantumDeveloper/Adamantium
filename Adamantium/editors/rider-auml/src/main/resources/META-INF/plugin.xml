@@ -27,6 +27,9 @@
         <!-- Dynamic clr-namespace: xmlns URIs can't be pre-registered. Two complementary nets:
              the registrar resolves them upstream (mark ignored on open); the filter is an instant fallback. -->
         <daemon.highlightInfoFilter implementation="com.adamantium.auml.AumlNamespaceHighlightFilter"/>
+
+        <!-- WPF-style split editor for .auml: XML text on the left, live engine-rendered preview on the right. -->
+        <fileEditorProvider implementation="com.adamantium.auml.AumlPreviewFileEditorProvider"/>
     </extensions>
 
     <!-- Mark each .auml file's clr-namespace: URIs as ignored XML resources when it opens. -->
