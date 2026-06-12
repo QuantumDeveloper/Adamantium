@@ -97,6 +97,11 @@ public static class TextureExtensions
                 imageMemoryBarrier.SrcAccessMask = AccessFlagBits.None;
                 sourceStage = PipelineStageFlagBits.BottomOfPipeBit;
                 break;
+            case ImageLayout.General:
+                // Host image copy read the image (Texture.Save); the access happened on the host.
+                imageMemoryBarrier.SrcAccessMask = AccessFlagBits.HostReadBit;
+                sourceStage = PipelineStageFlagBits.HostBit;
+                break;
             default:
                 throw new ArgumentException(
                     $"Transferring from {texture.ImageLayout} image layout is not supported yet");
@@ -140,6 +145,11 @@ public static class TextureExtensions
             case ImageLayout.PresentSrcKhr:
                 imageMemoryBarrier.DstAccessMask = AccessFlagBits.None;
                 destinationStage = PipelineStageFlagBits.BottomOfPipeBit;
+                break;
+            case ImageLayout.General:
+                // Will be read by host image copy (Texture.Save) right after this transition.
+                imageMemoryBarrier.DstAccessMask = AccessFlagBits.HostReadBit;
+                destinationStage = PipelineStageFlagBits.HostBit;
                 break;
             default:
                 throw new ArgumentException($"Transferring to {newLayout} is not handled yet");

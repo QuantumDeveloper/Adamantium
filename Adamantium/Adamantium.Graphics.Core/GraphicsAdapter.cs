@@ -50,6 +50,18 @@ public unsafe class GraphicsAdapter
         var heapFeatures = *(VkPhysicalDeviceDescriptorHeapFeaturesEXT*)heapFeatPtr;
         SupportsDescriptorHeapCaptureReplay = heapFeatures.descriptorHeapCaptureReplay != 0;
         Console.WriteLine($"DescriptorHeap supported={heapFeatures.descriptorHeap != 0}, captureReplay supported={SupportsDescriptorHeapCaptureReplay}");
+
+        // Detect Vulkan 1.4 host image copy (vkCopyImageToMemory): lets a render target be read back straight to
+        // host memory, skipping the staging buffer + queue submit. Used by Texture.Save; falls back if absent.
+        var hostCopyNative = new VkPhysicalDeviceVulkan14Features();
+        hostCopyNative.sType = StructureType.PhysicalDeviceVulkan14Features;
+        var hostCopyPtr = (IntPtr)NativeUtils.StructOrEnumToPointer(hostCopyNative);
+        var hostCopyFeatures2 = new PhysicalDeviceFeatures2();
+        hostCopyFeatures2.PNext = hostCopyPtr;
+        _physicalDevice.GetPhysicalDeviceFeatures2(ref hostCopyFeatures2);
+        var hostCopyFeatures = *(VkPhysicalDeviceVulkan14Features*)hostCopyPtr;
+        SupportsHostImageCopy = hostCopyFeatures.hostImageCopy != 0;
+        Console.WriteLine($"HostImageCopy supported={SupportsHostImageCopy}");
     }
     
     public PhysicalDeviceProperties AdapterProperties { get; private set; }
@@ -59,6 +71,8 @@ public unsafe class GraphicsAdapter
     public PhysicalDeviceDescriptorHeapPropertiesEXT DeviceHeapProperties { get; private set; }
 
     public bool SupportsDescriptorHeapCaptureReplay { get; private set; }
+
+    public bool SupportsHostImageCopy { get; private set; }
 
     public PhysicalDeviceType DeviceType => AdapterProperties.DeviceType;
     

@@ -44,7 +44,7 @@ public static class ImageExtension
                     img.Header = new IHDR();
                     img.Header.Width = (int)image.Description.Width;
                     img.Header.Height = (int)image.Description.Height;
-                    img.Header.ColorType = PngColorType.RGB;
+                    img.Header.ColorType = PngColorType.RGBA;
                     var bitDepth = image.Description.Format.SizeOfInBits();
                     img.Header.BitDepth = (byte)bitDepth;
                     for (var index = 0; index < image.PixelBuffer.Count; index++)

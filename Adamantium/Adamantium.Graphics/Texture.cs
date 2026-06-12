@@ -424,38 +424,93 @@ public unsafe class Texture : GraphicsResource, ITexture
 
     public void Save(string path, ImageFileType fileType)
     {
-        // CopyImageToMemoryInfoEXT copy = new CopyImageToMemoryInfoEXT();
-        // var region = new ImageToMemoryCopyEXT();
-        // region.ImageSubresource = new ImageSubresourceLayers();
-        // region.ImageExtent = new Extent3D() { Width = Description.Width, Height = Description.Height, Depth = 1 };
-        // region.ImageOffset = new Offset3D();
-        // region.MemoryImageHeight = Description.Height;
-        // region.MemoryRowLength = Description.Width;
-        // region.PHostPointer = img.DataPointer.ToPointer();
-        // copy.SrcImage = this;
-        // copy.SrcImageLayout = ImageLayout.General;
-        // copy.PRegions = region;
-        // copy.RegionCount = 1;
-
-        //GraphicsDevice.LogicalDevice.CopyImageToMemoryEXT(copy);
         var img = Image.New2D(Width, Height, 1, Description.Format);
-        CreateBuffer(img.TotalSizeInBytes, BufferUsageFlagBits.TransferSrcBit | BufferUsageFlagBits.TransferDstBit,
+
+        if (GraphicsDevice.Adapter.SupportsHostImageCopy &&
+            Description.Usage.HasFlag(ImageUsageFlagBits.HostTransferBit))
+        {
+            CopyImageToHostMemory(img);
+        }
+        else
+        {
+            CopyImageThroughStagingBuffer(img);
+        }
+
+        // The render target is stored as B8G8R8A8; the image encoders read pixels as RGBA, so swap R<->B.
+        SwapRedBlueIfBgra(img);
+
+        img.Save(path, fileType);
+    }
+
+    /// <summary>
+    /// Reads the image straight into host memory via host image copy (Vulkan 1.4 <c>vkCopyImageToMemory</c>) -
+    /// no staging buffer and no queue submit. Requires the device feature and the <c>HostTransferBit</c> usage;
+    /// <see cref="CopyImageThroughStagingBuffer"/> is the fallback.
+    /// </summary>
+    private void CopyImageToHostMemory(Image destination)
+    {
+        this.TransitionImageLayout(ImageLayout.General);
+
+        var region = new ImageToMemoryCopy
+        {
+            PHostPointer = (nuint)destination.DataPointer.ToPointer(),
+            MemoryRowLength = Width,
+            MemoryImageHeight = Height,
+            ImageSubresource = new ImageSubresourceLayers
+            {
+                AspectMask = ImageAspectFlagBits.ColorBit,
+                MipLevel = 0,
+                BaseArrayLayer = 0,
+                LayerCount = 1
+            },
+            ImageOffset = new Offset3D { X = 0, Y = 0, Z = 0 },
+            ImageExtent = new Extent3D { Width = Width, Height = Height, Depth = 1 }
+        };
+
+        var copy = new CopyImageToMemoryInfo
+        {
+            SrcImage = this,
+            SrcImageLayout = ImageLayout.General,
+            RegionCount = 1,
+            PRegions = new[] { region }
+        };
+
+        GraphicsDevice.LogicalDevice.CopyImageToMemory(copy);
+        this.TransitionImageLayout(Description.DesiredImageLayout);
+    }
+
+    /// <summary>Fallback read-back: copy the image into a host-visible staging buffer on the GPU, then memcpy it out.</summary>
+    private void CopyImageThroughStagingBuffer(Image destination)
+    {
+        CreateBuffer(destination.TotalSizeInBytes, BufferUsageFlagBits.TransferSrcBit | BufferUsageFlagBits.TransferDstBit,
             MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent, out var stagingBuffer,
             out var stagingBufferMemory);
         this.TransitionImageLayout(ImageLayout.TransferSrcOptimal);
         CopyImageToBuffer(stagingBuffer);
         this.TransitionImageLayout(Description.DesiredImageLayout);
-        unsafe
-        {
-            var data = GraphicsDevice.MapMemory(stagingBufferMemory, 0, TotalSizeInBytes, 0);
-            System.Buffer.MemoryCopy((void*)data, img.DataPointer.ToPointer(),
-                img.TotalSizeInBytes, img.TotalSizeInBytes);
-            GraphicsDevice.UnmapMemory(stagingBufferMemory);
-        }
 
-        img.Save(path, fileType);
+        var data = GraphicsDevice.MapMemory(stagingBufferMemory, 0, TotalSizeInBytes, 0);
+        System.Buffer.MemoryCopy((void*)data, destination.DataPointer.ToPointer(),
+            destination.TotalSizeInBytes, destination.TotalSizeInBytes);
+        GraphicsDevice.UnmapMemory(stagingBufferMemory);
+
         GraphicsDevice.Destroy(stagingBuffer);
         GraphicsDevice.Destroy(stagingBufferMemory);
+    }
+
+    /// <summary>Swaps red and blue in place for a B8G8R8A8 image so the RGBA-oriented encoders save correct colours.</summary>
+    private static void SwapRedBlueIfBgra(Image image)
+    {
+        if (image.Description.Format != Format.B8G8R8A8_UNORM)
+            return;
+
+        var pixels = (byte*)image.DataPointer.ToPointer();
+        var pixelCount = image.TotalSizeInBytes / 4;
+        for (ulong i = 0; i < pixelCount; i++)
+        {
+            (pixels[0], pixels[2]) = (pixels[2], pixels[0]);
+            pixels += 4;
+        }
     }
 
     public ImageViewCreateInfo Info { get; private set; }

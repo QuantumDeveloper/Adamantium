@@ -204,7 +204,12 @@ namespace Adamantium.Graphics.Core
                 DynamicRendering = true,
             };
             
-            var features14 = new PhysicalDeviceVulkan14Features();
+            // Enable host image copy only when the device reports support — turning it on unconditionally would
+            // fail vkCreateDevice. Texture.Save uses it when available, otherwise falls back to a staging buffer.
+            var features14 = new PhysicalDeviceVulkan14Features
+            {
+                HostImageCopy = GraphicsAdapter.SupportsHostImageCopy
+            };
 
             var primitiveRestart = new PhysicalDevicePrimitiveTopologyListRestartFeaturesEXT
             {

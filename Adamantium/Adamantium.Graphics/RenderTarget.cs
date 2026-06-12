@@ -32,6 +32,11 @@ namespace Adamantium.Graphics
         {
             usage |= ImageUsageFlagBits.ColorAttachmentBit | ImageUsageFlagBits.SampledBit;
 
+            // Host image copy reads this target back to host memory without a staging buffer (Texture.Save).
+            // The usage flag is only valid when the device enabled the feature, so gate it on support.
+            if (graphicsDevice.Adapter.SupportsHostImageCopy)
+                usage |= ImageUsageFlagBits.HostTransferBit;
+
             var description = new TextureDescription
             {
                 Width = width,
