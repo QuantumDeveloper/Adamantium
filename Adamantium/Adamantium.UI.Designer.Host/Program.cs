@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Adamantium.UI.Designer.Host;
 
 public static class Program
@@ -12,8 +14,8 @@ public static class Program
 
         Console.Error.WriteLine(
             "usage:\n" +
-            "  host serve                               long-running JSON/stdio protocol (live preview)\n" +
-            "  host render <file.auml> <out.png> [w h]  one-shot render to PNG");
+            "  host serve                                long-running JSON/stdio protocol (live preview)\n" +
+            "  host render <file.auml> <out.png> [scale]  one-shot render at the window's design size x scale");
         return 2;
     }
 
@@ -21,11 +23,10 @@ public static class Program
     {
         var aumlPath = args[1];
         var outPath = args[2];
-        var width = args.Length > 3 ? uint.Parse(args[3]) : 1280u;
-        var height = args.Length > 4 ? uint.Parse(args[4]) : 720u;
+        var scale = args.Length > 3 ? double.Parse(args[3], CultureInfo.InvariantCulture) : 1.0;
 
         using var session = new DesignerSession();
-        var result = session.Render(File.ReadAllText(aumlPath), width, height, outPath);
+        var result = session.Render(File.ReadAllText(aumlPath), null, null, scale, outPath);
 
         foreach (var d in result.Diagnostics ?? Enumerable.Empty<string>())
             Console.Error.WriteLine($"[auml] {d}");
@@ -36,7 +37,7 @@ public static class Program
             return 1;
         }
 
-        Console.Error.WriteLine($"[auml] wrote {outPath} ({width}x{height})");
+        Console.Error.WriteLine($"[auml] wrote {outPath} ({result.Width}x{result.Height})");
         return 0;
     }
 }

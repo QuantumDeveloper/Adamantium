@@ -10,8 +10,10 @@ namespace Adamantium.UI.Designer.Host;
 /// Rider preview plugin talks to for live, rebuild-free updates.
 ///
 /// Protocol (one JSON object per line):
-///   -&gt; {"op":"render","text":"&lt;auml&gt;","width":1280,"height":720,"uri":"&lt;optional&gt;"}
-///   &lt;- {"png":"&lt;temp path&gt;","diagnostics":[...]}  or  {"error":"&lt;message&gt;","diagnostics":[...]}
+///   -&gt; {"op":"render","text":"&lt;auml&gt;","scale":1.0,"width":1280,"height":720,"uri":"&lt;optional&gt;"}
+///        (width/height are an optional design-size hint; scale (default 1) zooms the render. The window is
+///         laid out at its design size and the render target is design × scale.)
+///   &lt;- {"png":"&lt;temp path&gt;","width":1280,"height":720,"diagnostics":[...]}  or  {"error":"&lt;message&gt;","diagnostics":[...]}
 ///   -&gt; {"op":"shutdown"}   (exits the process)
 /// </summary>
 public static class DesignerHost
@@ -90,7 +92,7 @@ public static class DesignerHost
     {
         try
         {
-            var result = session.Render(request.Text ?? string.Empty, request.Width ?? 1280u, request.Height ?? 720u, outPath);
+            var result = session.Render(request.Text ?? string.Empty, request.Width, request.Height, request.Scale ?? 1.0, outPath);
             if (!result.Success)
                 return new Response { Error = result.Error, Diagnostics = NullIfEmpty(result.Diagnostics) };
 
@@ -101,7 +103,13 @@ public static class DesignerHost
             }
             previousPng = result.PngPath;
 
-            return new Response { Png = result.PngPath, Diagnostics = NullIfEmpty(result.Diagnostics) };
+            return new Response
+            {
+                Png = result.PngPath,
+                Width = result.Width,
+                Height = result.Height,
+                Diagnostics = NullIfEmpty(result.Diagnostics)
+            };
         }
         catch (Exception e)
         {
@@ -124,12 +132,15 @@ public static class DesignerHost
         public string Text { get; set; }
         public uint? Width { get; set; }
         public uint? Height { get; set; }
+        public double? Scale { get; set; }
         public string Uri { get; set; }
     }
 
     private sealed class Response
     {
         public string Png { get; set; }
+        public uint? Width { get; set; }
+        public uint? Height { get; set; }
         public string Error { get; set; }
         public List<string> Diagnostics { get; set; }
     }
