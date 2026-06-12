@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "com.adamantium"
-version = "0.5.6"
+version = "0.6.0"
 
 repositories {
     mavenCentral()
@@ -58,8 +58,12 @@ val publishServer by tasks.registering(Exec::class) {
         exclude("**/bin/**", "**/obj/**")
     })
     outputs.dir(serverPublishDir)
+    // --disable-build-servers runs MSBuild + the C# compiler in-process instead of reusing the persistent
+    // build-server nodes. Those nodes can wedge (especially while Rider is building the same solution),
+    // which made this publish hang indefinitely; in-process keeps it self-contained and fast.
     commandLine(
         "dotnet", "publish", serverCsproj.absolutePath,
+        "--disable-build-servers",
         "-c", serverConfiguration, "-p:Platform=x64",
         "-o", serverPublishDir.get().asFile.absolutePath
     )
