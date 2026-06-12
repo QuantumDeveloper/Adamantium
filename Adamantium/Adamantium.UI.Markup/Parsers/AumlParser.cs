@@ -33,7 +33,7 @@ public class AumlParser
             {
                 Logger = context.Logger,
                 HasErrors = true,
-                Root = rootNode,                                  // keep the AST; consumers gate on HasErrors, tooling can still inspect it
+                Root = rootNode, // keep the AST; consumers gate on HasErrors, tooling can still inspect it
                 NamespaceMappings = context.NamespaceMappings.ToArray(),
             };
         }
