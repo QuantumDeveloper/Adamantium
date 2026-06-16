@@ -64,7 +64,7 @@ public class RenderingProcessor : EntityProcessor<RenderingService>, IDisposable
         InputManager = EntityWorld.DependencyResolver.Resolve<GameInputManager>();
         CameraManager = EntityWorld.DependencyResolver.Resolve<CameraManager>();
         ToolsManager = EntityWorld.DependencyResolver.Resolve<ToolsManager>();
-        SpriteBatch = new SpriteBatch(GraphicsDevice, 80000);
+        //SpriteBatch = new SpriteBatch(GraphicsDevice, 80000);
         LoadContent();
     }
 

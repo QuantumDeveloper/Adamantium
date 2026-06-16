@@ -27,7 +27,14 @@ namespace Adamantium.Graphics.Core
          {
             return false;
          }
-         
+
+         // Resize frees and recreates GPU images the previous frame may still be reading (this render target and
+         // its resolve, plus the shared surface fed from the resolve). Idle the device first so nothing is in flight
+         // when we destroy them - freeing a resource mid-flight loses the device, and the next allocation then throws
+         // "failed to allocate image memory". Resize is rare, so a full wait-idle is the correct, simple guarantee
+         // (same as SwapChainGraphicsPresenter).
+         GraphicsDevice.DeviceWaitIdle();
+
          RemoveAndDispose(ref depthBuffer);
          RemoveAndDispose(ref renderTarget);
          

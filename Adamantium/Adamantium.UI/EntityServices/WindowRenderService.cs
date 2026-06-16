@@ -79,7 +79,9 @@ public class WindowRenderService : UiRenderService
         GraphicsDevice.SetDepthBuffer(windowRenderer.Presenter.DepthBuffer);
         GraphicsDevice.MSAALevel = windowRenderer.Presenter.MSAALevel;
         GraphicsDevice.Presenter = windowRenderer.Presenter;
-        return base.BeginDraw();
+        // Record shared-surface latch copies BEFORE BeginRendering so this frame's compositing samples the freshly
+        // latched private textures (zero latency), and the copies aren't recorded inside the render pass.
+        return GraphicsDevice.BeginDraw(beforeRenderPass: _ => windowRenderer.PreRender());
     }
 
     public override void Draw(AppTime gameTime)

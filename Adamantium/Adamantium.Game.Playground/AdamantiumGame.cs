@@ -9,6 +9,7 @@ using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Content;
 using Adamantium.Graphics.Core.Models;
+using Adamantium.Mathematics;
 
 namespace Adamantium.Game.Playground
 {
@@ -65,19 +66,20 @@ namespace Adamantium.Game.Playground
         public Task<Entity> ImportModel(SceneData scene)
         {
             return Task.Run(() =>
-                EntityWorld.CreateEntityFromTemplate(new EntityImportTemplate(scene, Content,
-                    CameraManager.UserControlledCamera)));
+                EntityWorld.CreateEntityFromTemplate(new EntityImportTemplate(scene, Content, new Vector3(0, 0, 2500))));
         }
 
-        public Task<Entity> ImportModel(String pathToFile, ContentLoadOptions options = null)
+        public async Task<Entity> ImportModel(String pathToFile, ContentLoadOptions options = null)
         {
-            return Task.Run(() => Content.Load<Entity>(pathToFile, options));
+            // Reader produces SceneData (parse now, deserialize a baked binary later); entity assembly stays here.
+            var scene = await Content.LoadAsync<SceneData>(pathToFile, options);
+            return await ImportModel(scene);
         }
 
         private async void LoadModels()
         {
-            //var entity = await ImportModel(@"Models\F15C\F-15C_Eagle.dae");
-            //EntityWorld.EntityManager.AddEntity(entity);
+            var entity = await ImportModel(@"Models\F15C\F-15C_Eagle.dae");
+            EntityWorld.EntityManager.AddEntity(entity);
         }
     }
 }

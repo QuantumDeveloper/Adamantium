@@ -97,7 +97,9 @@ namespace Adamantium.Graphics
             textureIds = new Dictionary<IntPtr, int>();
             texturesById = new Dictionary<int, Texture>();
 
-            vertexBuffer = ToDispose(Buffer.Vertex.New<SpriteBatchItem>(graphicsDevice, (uint)spriteItems.Length));
+            // Rewritten via SetData every frame → CPU-to-GPU upload (fast BAR window), not device-local.
+            vertexBuffer = ToDispose(Buffer.Vertex.New<SpriteBatchItem>(graphicsDevice, (uint)spriteItems.Length,
+                BufferMemoryUsage.UploadFromCpuToGpu));
             vertexType = typeof(SpriteBatchItem);
 
             var effect = new SpriteEffect(graphicsDevice);

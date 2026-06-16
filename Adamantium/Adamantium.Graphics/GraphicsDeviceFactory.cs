@@ -8,4 +8,9 @@ public class GraphicsDeviceFactory : IGraphicsDeviceFactory
     {
         return GraphicsDevice.Create(mainDevice, deviceType);
     }
+
+    public IDescriptorHeapManager CreateDescriptorHeapManager(IGraphicsDevice device)
+    {
+        return new DescriptorHeapManager(device);
+    }
 }

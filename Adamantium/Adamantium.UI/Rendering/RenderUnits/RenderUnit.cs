@@ -56,12 +56,18 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
         StrokeRenderer?.Update(transform, projection);
     }
 
+    public virtual void PreRender()
+    {
+        GeometryRenderer?.PreRender();
+        StrokeRenderer?.PreRender();
+    }
+
     public virtual void Render()
     {
         GeometryRenderer?.Render();
         StrokeRenderer?.Render();
     }
-    
+
     public abstract void UpdateWithDrawCommand(IDrawCommand drawCommand);
     public virtual bool Match(IDrawCommand drawCommand)
     {
@@ -254,31 +260,54 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
 
 public class ImageRenderUnit : RenderUnit<ImagePayload>
 {
-    public ImageRenderUnit(IDrawCommand command, IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, IResourceFactory resourceFactory) : 
+    public ImageRenderUnit(IDrawCommand command, IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, IResourceFactory resourceFactory) :
         base(command, graphicsDevice, uiBasicEffect, resourceFactory)
     {
         var rectangleGeometry = new RectangleGeometry(Payload.DestinationRect);
-        if (Payload.Image is BitmapImage bitmapImage)
+        // Generate the quad's vertices (every other render unit does this in its ctor too). Without it the mesh is
+        // empty -> the component's VertexBuffer is null -> UIRenderComponent.Render early-returns and the image is
+        // never drawn (this is why images never appeared while text/solid shapes did).
+        rectangleGeometry.ProcessGeometry(GeometryType.Solid);
+        if (Payload.Image is BitmapSource bitmapImage)
         {
-            var image = bitmapImage.GetOrCreateTexture(ResourceFactory);
-            GeometryRenderer = new ImageRenderComponent(GraphicsDevice, UIBasicEffect, rectangleGeometry.Mesh, image);
+            GeometryRenderer = CreateImageRenderer(rectangleGeometry.Mesh, bitmapImage);
             GeometryRenderer.RenderData = DrawCommand.RenderData;
         }
     }
-    
+
+    // BitmapSource (not just BitmapImage) so SharedSurfaceImage / RenderTargetImage also render. A live shared
+    // surface (game→panel) is sampled directly and synchronised via its Produce/Consume timeline (see
+    // ImageRenderComponent.SharedSource/PreRender); a regular bitmap is sampled directly.
+    private ImageRenderComponent CreateImageRenderer(Adamantium.Graphics.Core.Models.Mesh mesh, BitmapSource image)
+    {
+        var texture = image.GetOrCreateTexture(ResourceFactory);
+        var component = new ImageRenderComponent(GraphicsDevice, UIBasicEffect, mesh, texture)
+        {
+            Sampler = GraphicsDevice.SamplerStates.LinearClampToEdge
+        };
+        // A live shared surface (game→panel): sample it directly, and drive the producer/consumer timeline so the
+        // sample never races the producer's write (see ImageRenderComponent.PreRender). Composited with the default
+        // AlphaBlend so the panel's Opacity controls translucency; the producer now publishes an opaque frame
+        // (alpha=1, see RenderingService.BeginDraw) so at Opacity=1 it is fully solid.
+        if (texture is Adamantium.Graphics.SharedSurface shared)
+        {
+            component.SharedSource = shared;
+        }
+        return component;
+    }
+
     public override void UpdateWithDrawCommand(IDrawCommand drawCommand)
     {
         if (drawCommand.Payload is not ImagePayload inputPayload) return;
-        
+
         var rectangleGeometry = new RectangleGeometry(inputPayload.DestinationRect, inputPayload.CornerRadius);
         if (Payload.RequiresBufferRebuild(inputPayload))
         {
             rectangleGeometry.ProcessGeometry(GeometryType.Both);
             GeometryRenderer?.DeferDispose();
-            if (Payload.Image is BitmapImage bitmapImage)
+            if (inputPayload.Image is BitmapSource bitmapImage)
             {
-                var image = bitmapImage.GetOrCreateTexture(ResourceFactory);
-                GeometryRenderer = new ImageRenderComponent(GraphicsDevice, UIBasicEffect, rectangleGeometry.Mesh, image);
+                GeometryRenderer = CreateImageRenderer(rectangleGeometry.Mesh, bitmapImage);
             }
         }
 

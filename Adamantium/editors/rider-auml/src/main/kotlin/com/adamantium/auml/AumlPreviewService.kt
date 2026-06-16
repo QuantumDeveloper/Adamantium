@@ -35,6 +35,7 @@ class AumlPreviewService : Disposable {
         val diagnostics: List<String>,
         val width: Int?,
         val height: Int?,
+        val scale: Double?,
     )
 
     /**
@@ -52,7 +53,7 @@ class AumlPreviewService : Disposable {
                 parseResponse(line)
             } catch (e: Exception) {
                 stopProcess() // force a clean restart on the next render
-                RenderResult(null, e.message ?: e.toString(), emptyList(), null, null)
+                RenderResult(null, e.message ?: e.toString(), emptyList(), null, null, null)
             }
         }
     }
@@ -111,11 +112,12 @@ class AumlPreviewService : Disposable {
 
     private fun parseResponse(line: String): RenderResult {
         val obj = MiniJson.parse(line) as? Map<*, *>
-            ?: return RenderResult(null, "unexpected host response: $line", emptyList(), null, null)
+            ?: return RenderResult(null, "unexpected host response: $line", emptyList(), null, null, null)
         val diagnostics = (obj["diagnostics"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
         val width = (obj["width"] as? Double)?.toInt()
         val height = (obj["height"] as? Double)?.toInt()
-        return RenderResult(obj["png"] as? String, obj["error"] as? String, diagnostics, width, height)
+        val scale = obj["scale"] as? Double
+        return RenderResult(obj["png"] as? String, obj["error"] as? String, diagnostics, width, height, scale)
     }
 
     private fun jsonEscape(s: String): String {

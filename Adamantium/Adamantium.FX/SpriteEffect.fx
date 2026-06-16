@@ -31,8 +31,10 @@ void GenerateSprite(SpriteItem item, inout TriangleStream<PSInput> triStream)
     PSInput vertex;
     float2 origin = item.Origin;
 
-    float2 sourceXY = item.Source.xy / item.TextureInfo.xy;
-    float2 sourceZW = item.Source.zw / item.TextureInfo.xy;
+    // Source is already normalized by the size in SpriteVertexShader. Do NOT divide here: NVIDIA's Turing driver
+    // miscompiles a vector float divide inside a geometry shader (NVVM bug) and access-violates in vkCreateShadersEXT.
+    float2 sourceXY = item.Source.xy;
+    float2 sourceZW = item.Source.zw;
     float2 rotation = float2(cos(item.Rotation), sin(item.Rotation));
 
     for (int i = 0; i < VERTICES_PER_SPRITE; i++)
@@ -75,7 +77,13 @@ void GenerateSprite(SpriteItem item, inout TriangleStream<PSInput> triStream)
     }
 }
 
-void SpriteVertexShader(inout SpriteItem input) {}
+void SpriteVertexShader(inout SpriteItem input)
+{
+    // Normalize the source rectangle by the texture size in the VERTEX stage and stash it back into Source, so the
+    // geometry shader stays divide-free (the NVIDIA Turing driver crashes compiling a float divide in a GS).
+    float2 inv = 1.0 / (float2)input.TextureInfo.xy;
+    input.Source = float4(input.Source.xy * inv, input.Source.zw * inv);
+}
 
 [maxvertexcount(4)]
 void SpriteGenerationGS(point SpriteItem input[1], inout TriangleStream<PSInput> triStream)

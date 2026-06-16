@@ -23,6 +23,11 @@ public class ResourceFactory : IResourceFactory
         return _graphicsDeviceService.ResourceLoaderDevice.CreateTexture(description, pixelData);
     }
 
+    public ITexture ImportSharedSurface(SharedSurfaceDescriptor descriptor)
+    {
+        return _graphicsDeviceService.ResourceLoaderDevice.ImportSharedSurface(descriptor);
+    }
+
     public IRenderTarget CreateRenderTarget(UInt32 width, 
         UInt32 height, 
         MSAALevel msaa, 

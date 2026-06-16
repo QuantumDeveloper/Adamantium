@@ -26,7 +26,10 @@ public class RoslynTypeResolver : ITypeResolver
 
     public IResolvedAssembly GetResolvedAssembly(string assemblyName)
     {
-        return _resolvedAssemblies.FirstOrDefault(x => x.Name == assemblyName);
+        // Fall back to creating the container: the local/compiled assembly is populated lazily and may not be in
+        // _resolvedAssemblies yet when a local type (e.g. a Behavior referenced via clr-namespace) is used in markup.
+        return _resolvedAssemblies.FirstOrDefault(x => x.Name == assemblyName)
+            ?? GetOrCreateTypeContainerForAssembly(assemblyName);
     }
 
     public IResolvedAssembly GetResolvedAssemblyByXmlDefinition(string xmlDefinition)
@@ -134,7 +137,11 @@ public class RoslynTypeResolver : ITypeResolver
             return resolvedAssembly;
         }
         
-        var assemblySymbol = _compilation.SourceModule.ReferencedAssemblySymbols.FirstOrDefault(q => q.Name == assemblyName);
+        // The compiled assembly itself is not in ReferencedAssemblySymbols, so resolve local types (e.g. a
+        // GameHostBehavior declared in the same project and referenced via clr-namespace) against it explicitly.
+        var assemblySymbol = _compilation.Assembly.Name == assemblyName
+            ? _compilation.Assembly
+            : _compilation.SourceModule.ReferencedAssemblySymbols.FirstOrDefault(q => q.Name == assemblyName);
         return GetOrCreateTypeContainerForAssemblyInternal(assemblySymbol, xmlNamespace);
     }
 

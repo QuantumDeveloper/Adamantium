@@ -9,6 +9,9 @@ public interface IResourceFactory
 {
     ITexture CreateTexture(TextureDescription description, byte[] pixelData);
 
+    /// <summary>Imports an externally produced shared surface (zero-copy) on the UI resource device.</summary>
+    ITexture ImportSharedSurface(SharedSurfaceDescriptor descriptor);
+
     IRenderTarget CreateRenderTarget(UInt32 width,
         UInt32 height,
         MSAALevel msaa,

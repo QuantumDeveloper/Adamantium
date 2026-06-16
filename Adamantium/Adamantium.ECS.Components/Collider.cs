@@ -124,10 +124,10 @@ namespace Adamantium.ECS.Components
             var meshVertices = Geometry.ToMeshVertices();
 
             VertexBuffer?.Dispose();
-            VertexBuffer = ToDispose(Buffer.Vertex.New(renderContext, meshVertices));
+            VertexBuffer = ToDispose(Buffer.Vertex.New(renderContext, meshVertices, BufferMemoryUsage.GpuOnly));
 
             IndexBuffer?.Dispose();
-            IndexBuffer = ToDispose(Buffer.Index.New(renderContext, Geometry.Indices));
+            IndexBuffer = ToDispose(Buffer.Index.New(renderContext, Geometry.Indices, BufferMemoryUsage.GpuOnly));
 
             LayoutType = typeof(MeshVertex);
         }

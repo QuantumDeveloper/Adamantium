@@ -66,9 +66,9 @@ internal class EffectResourceLinker : IEffectResourceLinker
     private static ResourceInfo<Texture>[] EmptyResourceViews = [];
     private static ResourceInfo<Buffer>[] EmptyUAVs = [];
 
-    internal DescriptorHeapManager DescriptorHeapManager { get; }
+    internal IDescriptorHeapManager DescriptorHeapManager { get; }
 
-    public EffectResourceLinker(DescriptorHeapManager descriptorHeapManager)
+    public EffectResourceLinker(IDescriptorHeapManager descriptorHeapManager)
     {
         DescriptorHeapManager = descriptorHeapManager;
     }
@@ -213,7 +213,10 @@ internal class EffectResourceLinker : IEffectResourceLinker
 
                 states[index].Resource = state;
 
-                if (state != null)
+                // Descriptor-heap path only: in descriptor_buffer mode the GPU samples via per-pass descriptor
+                // buffers (EffectPass.Create*Descriptor reads .Resource directly), so writing into the global heap
+                // here is wasted work and the heap isn't even allocated. Skip it.
+                if (state != null && EffectPass.UseDescriptorHeap)
                 {
                     if (states[index].GlobalHeapOffset == uint.MaxValue)
                     {
@@ -247,18 +250,22 @@ internal class EffectResourceLinker : IEffectResourceLinker
                 {
                     views[index].Resource = texture;
 
-                    if (views[index].GlobalHeapOffset == uint.MaxValue)
+                    // Descriptor-heap path only (see SamplerState case above).
+                    if (EffectPass.UseDescriptorHeap)
                     {
-                        uint descSize = (uint)DescriptorHeapManager.DeviceHeapProperties.ImageDescriptorSize;
-                        uint descAlignment = (uint)DescriptorHeapManager.DeviceHeapProperties.ImageDescriptorAlignment;
-                        views[index].GlobalHeapOffset = DescriptorHeapManager.AllocateResourceOffset(descSize, descAlignment);
-                    }
+                        if (views[index].GlobalHeapOffset == uint.MaxValue)
+                        {
+                            uint descSize = (uint)DescriptorHeapManager.DeviceHeapProperties.ImageDescriptorSize;
+                            uint descAlignment = (uint)DescriptorHeapManager.DeviceHeapProperties.ImageDescriptorAlignment;
+                            views[index].GlobalHeapOffset = DescriptorHeapManager.AllocateResourceOffset(descSize, descAlignment);
+                        }
 
-                    if (views[index].IsDirty)
-                    {
-                        DescriptorHeapManager.WriteTexture(views[index].GlobalHeapOffset, texture,
-                            DescriptorType.SampledImage);
-                        views[index].IsDirty = false;
+                        if (views[index].IsDirty)
+                        {
+                            DescriptorHeapManager.WriteTexture(views[index].GlobalHeapOffset, texture,
+                                DescriptorType.SampledImage);
+                            views[index].IsDirty = false;
+                        }
                     }
                 }
             }
@@ -281,22 +288,26 @@ internal class EffectResourceLinker : IEffectResourceLinker
                     
                     uavs[index].Resource = buffer;
 
-                    if (uavs[index].GlobalHeapOffset == uint.MaxValue)
+                    // Descriptor-heap path only (see SamplerState case above).
+                    if (EffectPass.UseDescriptorHeap)
                     {
-                        uint descSize = (uint)DescriptorHeapManager.DeviceHeapProperties.BufferDescriptorSize;
-                        uint descAlignment = (uint)(ulong)DescriptorHeapManager.DeviceHeapProperties.BufferDescriptorAlignment;
-                        uavs[index].GlobalHeapOffset = DescriptorHeapManager.AllocateResourceOffset(descSize, descAlignment);
-                    }
+                        if (uavs[index].GlobalHeapOffset == uint.MaxValue)
+                        {
+                            uint descSize = (uint)DescriptorHeapManager.DeviceHeapProperties.BufferDescriptorSize;
+                            uint descAlignment = (uint)(ulong)DescriptorHeapManager.DeviceHeapProperties.BufferDescriptorAlignment;
+                            uavs[index].GlobalHeapOffset = DescriptorHeapManager.AllocateResourceOffset(descSize, descAlignment);
+                        }
 
-                    if (uavs[index].IsDirty)
-                    {
-                        DescriptorHeapManager.WriteBuffer(
-                            uavs[index].GlobalHeapOffset, 
-                            buffer,
-                            0,
-                            buffer.TotalSize,
-                            DescriptorType.StorageBuffer);
-                        uavs[index].IsDirty = false;
+                        if (uavs[index].IsDirty)
+                        {
+                            DescriptorHeapManager.WriteBuffer(
+                                uavs[index].GlobalHeapOffset,
+                                buffer,
+                                0,
+                                buffer.TotalSize,
+                                DescriptorType.StorageBuffer);
+                            uavs[index].IsDirty = false;
+                        }
                     }
                 }
             }

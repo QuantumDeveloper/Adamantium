@@ -6,43 +6,39 @@ using AdamantiumVulkan.Core;
 
 namespace Adamantium.Graphics;
 
-public class DescriptorHeapManager : DisposableObject
+public class DescriptorHeapManager : DisposableObject, IDescriptorHeapManager
 {
     private readonly IGraphicsDevice graphicsDevice;
     private ulong currentResourceOffset = 0;
     private ulong currentSamplerOffset = 0;
-    private EffectPass.DynamicBufferPool[] _dynamicBufferPool;
+    // The heap is shared by all render devices of one logical device, which may render concurrently (different
+    // games run in parallel). Serialize the offset allocators and heap writes so the heap path stays correct.
+    private readonly object _heapSync = new object();
 
-    public Buffer ResourceHeapBuffer { get; private set; }
-    public Buffer SamplerHeapBuffer { get; private set; }
+    public IBuffer ResourceHeapBuffer { get; private set; }
+    public IBuffer SamplerHeapBuffer { get; private set; }
     public ulong UsableResourceSpaceSize { get; private set; }
     public ulong UsableSamplerSpaceSize { get; private set; }
-    
+
     protected Guid Id { get; }
-    
+
     public PhysicalDeviceDescriptorHeapPropertiesEXT DeviceHeapProperties => graphicsDevice.Adapter.DeviceHeapProperties;
-    
-    public EffectPass.DynamicBufferPool CurrentBufferPool => _dynamicBufferPool[graphicsDevice.CurrentFrame];
-    
+
     public DescriptorHeapManager(IGraphicsDevice graphicsDevice)
     {
         Id = Guid.NewGuid();
         this.graphicsDevice = graphicsDevice;
         InitializeHeaps();
-        _dynamicBufferPool = new EffectPass.DynamicBufferPool[graphicsDevice.MaxFramesInFlight];
-        for (int i = 0; i < graphicsDevice.MaxFramesInFlight; i++)
-        {
-            _dynamicBufferPool[i] = new EffectPass.DynamicBufferPool(this, graphicsDevice);
-        }
     }
-    
-    public void BindDescriptorHeaps()
+
+    // Binds the shared heap onto the CALLING render device's command buffer (not the heap's construction device).
+    public void BindDescriptorHeaps(IGraphicsDevice device)
     {
-        IBuffer resourceBuffer = ResourceHeapBuffer; 
+        IBuffer resourceBuffer = ResourceHeapBuffer;
         IBuffer samplerBuffer = SamplerHeapBuffer;
-        
-        ulong resourceReservedSize = graphicsDevice.Adapter.DeviceHeapProperties.MinResourceHeapReservedRange;
-        ulong samplerReservedSize = graphicsDevice.Adapter.DeviceHeapProperties.MinSamplerHeapReservedRange;
+
+        ulong resourceReservedSize = device.Adapter.DeviceHeapProperties.MinResourceHeapReservedRange;
+        ulong samplerReservedSize = device.Adapter.DeviceHeapProperties.MinSamplerHeapReservedRange;
 
         var resourceAddressRange = new DeviceAddressRangeKHR();
         resourceAddressRange.Address = resourceBuffer.GetDeviceAddress();
@@ -64,19 +60,24 @@ public class DescriptorHeapManager : DisposableObject
         samplerBindInfo.ReservedRangeOffset = samplerBuffer.TotalSize - samplerReservedSize;
         samplerBindInfo.ReservedRangeSize = samplerReservedSize;
 
-        graphicsDevice.CurrentCommandBuffer.BindResourceHeapEXT(resourceBindInfo);
-        graphicsDevice.CurrentCommandBuffer.BindSamplerHeapEXT(samplerBindInfo);
+        device.CurrentCommandBuffer.BindResourceHeapEXT(resourceBindInfo);
+        device.CurrentCommandBuffer.BindSamplerHeapEXT(samplerBindInfo);
     }
     
     private void InitializeHeaps()
     {
+        // VK_EXT_descriptor_buffer (the default/working path, EffectPass.UseDescriptorHeap == false) never reads
+        // this heap: EffectResourceLinker's heap writes are gated off (see ProcessReferenceResources) and the GPU
+        // samples via per-pass descriptor buffers. So don't allocate it there at all — it would otherwise burn
+        // ~10 MB of the small BAR window (~256 MB on NVIDIA Turing) per render device and scale with window/panel
+        // count -> OutOfMemory. Only the heap path needs it (and is then bound via BindDescriptorHeaps).
+        if (!EffectPass.UseDescriptorHeap) return;
+
         var props = graphicsDevice.Adapter.DeviceHeapProperties;
 
-        // IMPORTANT: do not allocate a heap as large as the device maximum. host-visible + device-local
-        // memory lives in the BAR window (often only 256 MB), so an allocation of hundreds of MB/GB is
-        // either not resident (the GPU reads garbage from descriptors -> black screen) or prevents tools
-        // from making a replay copy of the heap. Use a sane bounded size, as the reference does.
-        ulong resourceHeapSize = Math.Min((ulong)props.MaxResourceHeapSize, 32UL * 1024 * 1024);
+        // IMPORTANT: do not allocate a heap as large as the device maximum. host-visible + device-local memory
+        // lives in the small BAR window, so keep it modest even in the heap path.
+        ulong resourceHeapSize = Math.Min((ulong)props.MaxResourceHeapSize, 8UL * 1024 * 1024);
         ulong samplerHeapSize = Math.Min((ulong)props.MaxSamplerHeapSize, 2UL * 1024 * 1024);
 
         resourceHeapSize = Utilities.AlignSize(resourceHeapSize, props.ResourceHeapAlignment);
@@ -86,7 +87,8 @@ public class DescriptorHeapManager : DisposableObject
         UsableSamplerSpaceSize = samplerHeapSize - props.MinSamplerHeapReservedRange;
 
         var flags = BufferUsageFlags.DescriptorHeapExt | BufferUsageFlags.ShaderDeviceAddress;
-        var memFlags = MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal | MemoryPropertyFlags.HostCoherent;
+        // Descriptor heaps are written by the CPU and read by the GPU each frame → CPU-to-GPU upload (BAR window).
+        var memFlags = BufferMemoryUsage.UploadFromCpuToGpu;
 
         ResourceHeapBuffer = Buffer.New(graphicsDevice, resourceHeapSize, flags, memFlags);
         SamplerHeapBuffer = Buffer.New(graphicsDevice, samplerHeapSize, flags, memFlags);
@@ -100,18 +102,21 @@ public class DescriptorHeapManager : DisposableObject
     /// <returns>The aligned byte offset to write the descriptor at.</returns>
     public uint AllocateResourceOffset(uint descriptorSize, uint alignment)
     {
-        ulong alignedOffset = Utilities.AlignSize(currentResourceOffset, alignment);
-
-        if (alignedOffset + descriptorSize > UsableResourceSpaceSize)
+        lock (_heapSync)
         {
-            throw new OutOfMemoryException(
-                $"Resource descriptor heap overflow: failed to allocate {descriptorSize} bytes. " +
-                $"Current offset: {alignedOffset}, usable heap limit: {UsableResourceSpaceSize} bytes."
-            );
-        }
+            ulong alignedOffset = Utilities.AlignSize(currentResourceOffset, alignment);
 
-        currentResourceOffset = alignedOffset + descriptorSize;
-        return (uint)alignedOffset;
+            if (alignedOffset + descriptorSize > UsableResourceSpaceSize)
+            {
+                throw new OutOfMemoryException(
+                    $"Resource descriptor heap overflow: failed to allocate {descriptorSize} bytes. " +
+                    $"Current offset: {alignedOffset}, usable heap limit: {UsableResourceSpaceSize} bytes."
+                );
+            }
+
+            currentResourceOffset = alignedOffset + descriptorSize;
+            return (uint)alignedOffset;
+        }
     }
     
     /// <summary>
@@ -119,16 +124,19 @@ public class DescriptorHeapManager : DisposableObject
     /// </summary>
     public uint AllocateSamplerOffset(uint descriptorSize)
     {
-        uint alignment = (uint)DeviceHeapProperties.SamplerDescriptorAlignment;
-        ulong alignedOffset = Utilities.AlignSize(currentSamplerOffset, alignment);
-
-        if (alignedOffset + descriptorSize > UsableSamplerSpaceSize)
+        lock (_heapSync)
         {
-            throw new OutOfMemoryException("Sampler descriptor heap overflow.");
-        }
+            uint alignment = (uint)DeviceHeapProperties.SamplerDescriptorAlignment;
+            ulong alignedOffset = Utilities.AlignSize(currentSamplerOffset, alignment);
 
-        currentSamplerOffset = alignedOffset + descriptorSize;
-        return (uint)alignedOffset;
+            if (alignedOffset + descriptorSize > UsableSamplerSpaceSize)
+            {
+                throw new OutOfMemoryException("Sampler descriptor heap overflow.");
+            }
+
+            currentSamplerOffset = alignedOffset + descriptorSize;
+            return (uint)alignedOffset;
+        }
     }
 
     public void WriteTexture(uint offset, ITexture texture, DescriptorType type)

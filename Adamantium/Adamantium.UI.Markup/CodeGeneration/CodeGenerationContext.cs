@@ -86,6 +86,11 @@ public class CodeGenerationContext
         bool isResource)
     {
         var typeContainer = Metadata.TypeResolver.GetResolvedAssembly(element.TypeReference.Assembly);
+        if (typeContainer == null)
+        {
+            diagnostics.ReportError(Metadata.ClassName, $"Could not resolve assembly '{element.TypeReference.Assembly}' for element '{element.TypeReference.Name}' (namespace '{element.TypeReference.Namespace}', resolved={element.TypeReference.IsResolved}).");
+            return string.Empty;
+        }
         var typeInfo = typeContainer.Types.FirstOrDefault(x => x.Name == element.TypeReference.Name);
         var properties = element.GetProperties();
         var children = element.GetLogicalChildrenObjects();

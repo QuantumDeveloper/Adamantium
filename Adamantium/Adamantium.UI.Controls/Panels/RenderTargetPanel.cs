@@ -1,22 +1,26 @@
-﻿using Adamantium.Graphics.Core;
-using Adamantium.Imaging;
+using Adamantium.Graphics.Core;
 using Adamantium.ProceduralGeometry;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
 using Adamantium.UI.Core.Media.Imaging;
 using Adamantium.UI.Core.RoutedEvents;
-using Serilog;
 
 namespace Adamantium.UI.Controls.Panels;
 
-public class RenderTargetPanel: Grid
+/// <summary>
+/// Displays frames produced by an external engine/process (possibly another graphics API). The producer renders
+/// into a shared surface and hands its <see cref="SharedSurfaceDescriptor"/> to this panel via
+/// <see cref="SetSource"/>; the panel imports it zero-copy and samples it during compositing. With no source the
+/// panel allocates nothing and draws its <see cref="Panel.Background"/> as a placeholder. Interop resources are
+/// freed when the source changes/clears and when the panel leaves the visual tree — the control stays
+/// non-disposable (its lifetime is the visual tree's, not the caller's).
+/// </summary>
+public class RenderTargetPanel : Grid
 {
-   private RenderTargetImage _currentRenderTarget;
-   private RenderTargetImage _nextRenderTarget;
-
-   public RenderTargetPanel()
-   {
-   }
+   private SharedSurfaceImage _image;
+   // The previous source, kept alive for one extra frame after a swap (see RetireCurrentSource). Disposed by the
+   // producer via DisposeRetiredSource once the GPU is idle and the compositor's submit referencing it is done.
+   private SharedSurfaceImage _retiredImage;
 
    static RenderTargetPanel()
    {
@@ -24,158 +28,87 @@ public class RenderTargetPanel: Grid
          new PropertyMetadata(true, PropertyMetadataOptions.AffectsMeasure));
    }
 
-   public static readonly AdamantiumProperty SurfaceFormatProperty = AdamantiumProperty.Register(nameof(SurfaceFormat),
-      typeof(SurfaceFormat), typeof(RenderTargetPanel),
-      new PropertyMetadata(SurfaceFormat.B8G8R8A8.UNorm, PropertyMetadataOptions.AffectsRender,
-         RenderTargetParametersChanged));
+   /// <summary>The descriptor of the currently bound source, or <c>null</c> when nothing is bound.</summary>
+   public SharedSurfaceDescriptor Source { get; private set; }
 
-   public static readonly AdamantiumProperty HandleProperty = AdamantiumProperty.RegisterReadOnly(nameof(Handle),
-      typeof (IntPtr), typeof (RenderTargetPanel),
-      new PropertyMetadata(IntPtr.Zero));
-
-   public static readonly AdamantiumProperty PixelWidthProperty =
-      AdamantiumProperty.RegisterReadOnly(nameof(PixelWidth), typeof(UInt32), typeof(RenderTargetPanel),
-         new PropertyMetadata(0U, PropertyMetadataOptions.AffectsMeasure|PropertyMetadataOptions.AffectsRender));
-
-   public static readonly AdamantiumProperty PixelHeightProperty =
-      AdamantiumProperty.RegisterReadOnly(nameof(PixelHeight), typeof(UInt32), typeof(RenderTargetPanel),
-         new PropertyMetadata(0U, PropertyMetadataOptions.AffectsMeasure|PropertyMetadataOptions.AffectsRender));
-
-   public static readonly AdamantiumProperty RenderTargetProperty = 
-      AdamantiumProperty.RegisterReadOnly(nameof(RenderTarget), typeof(RenderTargetImage), typeof(RenderTargetPanel),
-         new PropertyMetadata(null, OnRenderTargetChanged));
-
-   private static void OnRenderTargetChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+   /// <summary>
+   /// Binds an externally produced surface and triggers a redraw. Any previously bound surface is released first.
+   /// Pass <c>null</c> to unbind (equivalent to <see cref="ClearSource"/>).
+   /// </summary>
+   public void SetSource(SharedSurfaceDescriptor descriptor)
    {
-      if (a is RenderTargetPanel panel && e.NewValue is RenderTargetImage)
+      if (ReferenceEquals(Source, descriptor)) return;
+
+      RetireCurrentSource();
+      if (descriptor != null)
       {
-         panel.RaiseRenderTargetCreatedOrUpdatedEvent();
+         Source = descriptor;
+         _image = new SharedSurfaceImage(descriptor);
       }
+      InvalidateRender(false);
    }
 
-   private static void OnCanPresentChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+   /// <summary>Unbinds the current source, if any (deferred release — see <see cref="RetireCurrentSource"/>).</summary>
+   public void ClearSource()
    {
-      if (a is RenderTargetPanel panel && (bool)e.NewValue)
-      {
-         panel.InvalidateRender(false);
-      }
-   }
-
-   public RenderTargetImage RenderTarget
-   {
-      get => GetValue<RenderTargetImage>(RenderTargetProperty); 
-      private set => SetValue(RenderTargetProperty, value);
-   }
-
-   public SurfaceFormat SurfaceFormat
-   {
-      get => GetValue<SurfaceFormat>(SurfaceFormatProperty);
-      set => SetValue(SurfaceFormatProperty, value);
-   }
-      
-   public UInt32 PixelWidth
-   {
-      get => GetValue<UInt32>(PixelWidthProperty);
-      set => SetValue(PixelWidthProperty, value);
-   }
-
-   public UInt32 PixelHeight
-   {
-      get => GetValue<UInt32>(PixelHeightProperty);
-      set => SetValue(PixelHeightProperty, value);
-   }
-   
-   public static readonly RoutedEvent RenderTargetCreatedOrUpdatedEvent = 
-      EventManager.RegisterRoutedEvent(nameof(RenderTargetCreatedOrUpdated),
-         RoutingStrategy.Direct, typeof(RenderTargetChangedEventHandler), typeof(RenderTargetPanel));
-    
-   public event RenderTargetChangedEventHandler RenderTargetCreatedOrUpdated
-   {
-      add => AddHandler(RenderTargetCreatedOrUpdatedEvent, value);
-      remove => RemoveHandler(RenderTargetCreatedOrUpdatedEvent, value);
-   }
-
-   private static void RenderTargetParametersChanged(AdamantiumComponent adamantiumComponent, AdamantiumPropertyChangedEventArgs e)
-   {
-      var image = adamantiumComponent as RenderTargetPanel;
-      image?.UpdateOrCreateRenderTarget();
-   }
-
-   protected override void OnSizeChanged(SizeChangedEventArgs e)
-   {
-      if (e.OriginalSource == this)
-      {
-         Log.Logger.Debug($"Size changed event. New size: {e.NewSize}");
-         UpdateOrCreateRenderTarget();
-         sizeChanged = true;
-      }
+      if (Source == null) return;
+      RetireCurrentSource();
+      InvalidateRender(false);
    }
 
    /// <summary>
-   /// Handle to the render target texture
+   /// Defers disposal of the imported surface by one frame instead of freeing it now. The compositor samples this
+   /// surface and may have already queued its produce/consume semaphores into a submit that hasn't run yet
+   /// (PreRender queues them in BeginDraw; the submit happens at the end of the draw phase). Destroying the import
+   /// here would invalidate those handles (vkQueueSubmit Invalid VkSemaphore). The producer drains the retired image
+   /// next frame via <see cref="DisposeRetiredSource"/>, after a wait-idle that proves the submit is complete.
    /// </summary>
-   public IntPtr Handle
+   private void RetireCurrentSource()
    {
-      get => GetValue<IntPtr>(HandleProperty);
-      private set => SetValue(HandleProperty, value);
+      _retiredImage?.Dispose(); // a prior retired image (not yet drained) is two frames old - safe to drop now
+      _retiredImage = _image;
+      _image = null;
+      Source = null;
    }
 
-   private void UpdateOrCreateRenderTarget()
+   /// <summary>Disposes the surface retired by the previous source swap. The producer calls this one frame later,
+   /// with the GPU idle, so the compositor's submit that referenced it has finished.</summary>
+   public void DisposeRetiredSource()
    {
-      try
-      {
-         if ((int)ActualWidth <= 0 || (int)ActualHeight <= 0 || !IsAttachedToVisualTree) return;
-         
-         // here we need to multiply on current DPI
-         PixelWidth = (uint)ActualWidth;
-         PixelHeight = (uint)ActualHeight;
-         
-         _nextRenderTarget = new RenderTargetImage(PixelWidth, PixelHeight, MSAALevel.None, SurfaceFormat);
-         _nextRenderTarget.GetOrCreateTexture(UIAppContext.Current.GraphicsContext.GetResourceFactory());
-         unsafe
-         {
-            Handle = new IntPtr(_nextRenderTarget.NativePointer);
-         }
-         RenderTarget = _nextRenderTarget;
-      }
-      catch (Exception e)
-      {
-         Log.Error(e.ToString());
-         throw;
-      }
+      _retiredImage?.Dispose();
+      _retiredImage = null;
    }
 
-   private void RaiseRenderTargetCreatedOrUpdatedEvent()
+   /// <summary>Frees both the current and the retired imported surface immediately. Detach only (the visual tree is
+   /// being torn down, so nothing samples them anymore).</summary>
+   private void ReleaseSource()
    {
-      var pixelWidth = PixelWidth;
-      var pixelHeight = PixelHeight;
-      var args = new RenderTargetEventArgs(_nextRenderTarget, pixelWidth, pixelHeight, SurfaceFormat);
-      args.RoutedEvent = RenderTargetCreatedOrUpdatedEvent;
-      RaiseEvent(args);
-   }
-
-   protected override void OnInitialized()
-   {
-      base.OnInitialized();
-      UpdateOrCreateRenderTarget();
+      _image?.Dispose();
+      _image = null;
+      _retiredImage?.Dispose();
+      _retiredImage = null;
+      Source = null;
    }
 
    protected override void OnRender(IDrawingContext context)
    {
-      UpdateOrCreateRenderTarget();
-      _currentRenderTarget?.Dispose();
-      _currentRenderTarget = _nextRenderTarget;
-      unsafe
+      var rect = new Rect(new Size(ActualWidth, ActualHeight));
+      var session = context.ForControl(this);
+      if (_image != null)
       {
-         Handle = _currentRenderTarget == null ? IntPtr.Zero : new IntPtr(_currentRenderTarget.NativePointer);
+         // TODO(Phase 4): wait(produce) before sampling and signal(consume) after, wired into the compositor's
+         // queue submit (OnRender only records draw commands, so the semaphores can't be driven from here).
+         session.DrawImage(_image, Background, rect, CornerRadius.Empty);
       }
-      //context.ForControl(this).DrawImage(_currentRenderTarget, Background, new Rect(new Size(ActualWidth, ActualHeight)), CornerRadius.Empty);
-      context.ForControl(this)
-         .DrawRectangle(Background, new Rect(new Size(ActualWidth, ActualHeight)), CornerRadius.Empty);
+      else
+      {
+         session.DrawRectangle(Background, rect, CornerRadius.Empty);
+      }
    }
 
-   public async Task SaveCurrentFrame(Uri path, ImageFileType fileType)
+   protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
    {
-      await Task.Run(() => _currentRenderTarget.Save(path, fileType));
+      ReleaseSource();
+      base.OnDetachedFromVisualTree(e);
    }
 }

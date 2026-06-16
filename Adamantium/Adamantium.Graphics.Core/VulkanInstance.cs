@@ -10,7 +10,6 @@ using AdamantiumVulkan.Core;
 using AdamantiumVulkan.Core.Interop;
 using AdamantiumVulkan.MacOS;
 using AdamantiumVulkan.Windows;
-using QuantumBinding.Utils;
 using Serilog;
 
 namespace Adamantium.Graphics.Core
@@ -53,6 +52,30 @@ namespace Adamantium.Graphics.Core
                 discreteAdapter =
                     GraphicsAdapters.FirstOrDefault(x => x.DeviceType == PhysicalDeviceType.IntegratedGpu) ??
                     GraphicsAdapters[0];
+            }
+
+            // Hybrid-graphics laptops expose both an integrated (Intel, tiny device-local heap shared with system RAM)
+            // and a discrete GPU; pick the discrete one. Log the choice so an unexpected fallback to integrated (which
+            // OOMs on modest allocations) is visible at a glance.
+            foreach (var adapter in GraphicsAdapters)
+            {
+                Console.WriteLine($"[GPU] available: {adapter.AdapterProperties.DeviceName} ({adapter.DeviceType})");
+            }
+            Console.WriteLine($"[GPU] selected: {discreteAdapter.AdapterProperties.DeviceName} ({discreteAdapter.DeviceType})");
+
+            // Dump memory heaps/types so we can see the host-visible-DEVICE_LOCAL window size: ~256 MB heap => no
+            // Resizable BAR (the BAR window is the bottleneck); a heap ~= total VRAM with a DEVICE_LOCAL|HOST_VISIBLE
+            // type pointing at it => ReBAR is on (CPU can write the whole VRAM directly, no staging needed).
+            discreteAdapter.Adapter.GetPhysicalDeviceMemoryProperties(out var memProps);
+            for (uint h = 0; h < memProps.MemoryHeapCount; h++)
+            {
+                var heap = memProps.MemoryHeaps.Span[(int)h];
+                Console.WriteLine($"[MEM] heap {h}: {(ulong)heap.Size / (1024 * 1024)} MB flags={(MemoryHeapFlagBits)heap.Flags}");
+            }
+            for (uint t = 0; t < memProps.MemoryTypeCount; t++)
+            {
+                var mt = memProps.MemoryTypes.Span[(int)t];
+                Console.WriteLine($"[MEM] type {t}: heap {mt.HeapIndex} {(MemoryPropertyFlags)mt.PropertyFlags}");
             }
 
             return discreteAdapter;

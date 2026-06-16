@@ -69,8 +69,8 @@ class AumlPreviewFileEditor(
     }
     private val scrollPane = JBScrollPane(canvas).apply { isWheelScrollingEnabled = false }
     private val root = JPanel(BorderLayout()).apply {
-        add(buildToolbar(), BorderLayout.NORTH)
         add(scrollPane, BorderLayout.CENTER)
+        add(buildToolbar(), BorderLayout.SOUTH)
     }
 
     init {
@@ -128,9 +128,11 @@ class AumlPreviewFileEditor(
         }
     }
 
-    private fun applyResult(result: AumlPreviewService.RenderResult, image: BufferedImage?, renderedScale: Double) {
+    private fun applyResult(result: AumlPreviewService.RenderResult, image: BufferedImage?, requestedScale: Double) {
         if (image != null) {
-            canvas.setImage(image, renderedScale) // updating only on success keeps the last good frame on failure
+            // The host may render below the requested scale (size cap); use the scale it actually rendered at so
+            // the canvas upscales to the requested zoom. Updating only on success keeps the last good frame.
+            canvas.setImage(image, result.scale ?: requestedScale)
             errorLabel.isVisible = false
         } else {
             errorLabel.text = result.error ?: "render failed"
@@ -163,9 +165,12 @@ class AumlPreviewFileEditor(
             set(value) { field = value; revalidate(); repaint() }
 
         fun setImage(img: BufferedImage, scale: Double) {
+            // Do NOT touch displayScale here: it's the user's current zoom and may have moved on while this
+            // render was in flight. Overwriting it makes a late frame yank the view back to a stale scale.
             image = img
             renderedScale = scale
-            displayScale = scale
+            revalidate()
+            repaint()
         }
 
         private fun displayedSize(): Dimension {

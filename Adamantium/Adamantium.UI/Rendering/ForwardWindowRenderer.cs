@@ -72,6 +72,12 @@ public class ForwardWindowRenderer : WindowRendererBase
         GraphicsDevice.SetScissors(Scissor);
         _renderCache.Render();
     }
+
+    public override void PreRender()
+    {
+        if (Window == null) return;
+        _renderCache.PreRender();
+    }
     
     public override void PrepareData()
     {

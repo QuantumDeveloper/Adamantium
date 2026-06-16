@@ -573,7 +573,9 @@ public class TextLayout : DisposableObject
         FontAtlas ??= FontAtlasStore.GetOrCreateFrom(graphicsDevice, Typeface, FontParameters.Default(sortingVariant:GlyphSortingVariant.ByIndex));
         FontAtlas.Update(Text+".");
         ElementsCount = 0;
-        VertexBuffer ??= Adamantium.Graphics.Buffer.Vertex.New<FontItem>(graphicsDevice, MaxItemsCount);
+        // Rewritten via SetData when text changes → CPU-to-GPU upload (BAR window), not device-local.
+        VertexBuffer ??= Adamantium.Graphics.Buffer.Vertex.New<FontItem>(graphicsDevice, MaxItemsCount,
+            Adamantium.Graphics.BufferMemoryUsage.UploadFromCpuToGpu);
 
         for (int i = 0; i < _wordData.Count; ++i)
         {

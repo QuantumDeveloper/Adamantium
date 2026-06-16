@@ -13,7 +13,8 @@ public sealed class GraphicsDeviceService : PropertyChangedBase, IGraphicsDevice
 
     public MainGraphicsDevice MainGraphicsDevice { get; private set; }
 
-    public IGraphicsDevice ResourceLoaderDevice { get; private set; }
+    // Owned and created by the main device itself; just expose it.
+    public IGraphicsDevice ResourceLoaderDevice => MainGraphicsDevice?.ResourceLoaderDevice;
 
     public IReadOnlyList<IGraphicsDevice> GraphicsDevices => MainGraphicsDevice.GraphicsDevices;
         
@@ -50,8 +51,7 @@ public sealed class GraphicsDeviceService : PropertyChangedBase, IGraphicsDevice
         {
             MainGraphicsDevice.DeviceWaitIdle();
             OnDeviceChangeBegin();
-            ResourceLoaderDevice?.Dispose();
-
+            // The old resource-loader device is disposed when the old main device is disposed inside CreateMainDevice.
             CreateMainDevice(name, IsInDebugMode);
                 
             DeviceUpdateNeeded = false;
@@ -105,12 +105,9 @@ public sealed class GraphicsDeviceService : PropertyChangedBase, IGraphicsDevice
     {
         MainGraphicsDevice?.Dispose();
         MainGraphicsDevice = MainGraphicsDevice.Create(GraphicsDeviceFactory, 3, name, debugEnabled);
-           
-        ResourceLoaderDevice = MainGraphicsDevice.CreateResourceLoaderDevice();
-
-        MainGraphicsDevice.ResourceLoaderDevice = ResourceLoaderDevice;
+        // The main device now creates and owns its resource-loader device + shared descriptor heap; we only read them.
         MainGraphicsDevice.Disposing += GraphicsDeviceDisposing;
-            
+
         OnDeviceCreated();
     }
 

@@ -35,8 +35,6 @@
 		<ProjectReference Include="..\Adamantium.Win32\Adamantium.Win32.csproj" />
 		<ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan\AdamantiumVulkan.csproj" />
 		<ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.Core\AdamantiumVulkan.Core.csproj" />
-		<ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.MacOS\AdamantiumVulkan.MacOS.csproj" />
-		<ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.Windows\AdamantiumVulkan.Windows.csproj" />
 	</ItemGroup>
 	
 	<ItemGroup>
