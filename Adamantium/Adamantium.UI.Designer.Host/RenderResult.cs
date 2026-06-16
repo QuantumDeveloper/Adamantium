@@ -10,8 +10,11 @@ public sealed class RenderResult
     public uint Width { get; private init; }
     public uint Height { get; private init; }
 
-    public static RenderResult Ok(string pngPath, List<string> diagnostics, uint width, uint height) =>
-        new() { Success = true, PngPath = pngPath, Diagnostics = diagnostics, Width = width, Height = height };
+    /// <summary>The scale the render actually used (may be below the requested scale when clamped to the size cap).</summary>
+    public double Scale { get; private init; }
+
+    public static RenderResult Ok(string pngPath, List<string> diagnostics, uint width, uint height, double scale) =>
+        new() { Success = true, PngPath = pngPath, Diagnostics = diagnostics, Width = width, Height = height, Scale = scale };
 
     public static RenderResult Fail(string error, List<string> diagnostics) =>
         new() { Success = false, Error = error, Diagnostics = diagnostics };

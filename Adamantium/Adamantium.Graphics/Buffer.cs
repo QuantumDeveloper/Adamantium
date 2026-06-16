@@ -5,7 +5,6 @@ using Adamantium.Core;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Extensions;
 using AdamantiumVulkan.Core;
-using QuantumBinding.Utils;
 using VulkanBuffer = AdamantiumVulkan.Core.Buffer;
 
 namespace Adamantium.Graphics
@@ -86,29 +85,46 @@ namespace Adamantium.Graphics
             ElementSize = (uint)(size / count);
             ElementCount = count;
             
+            // Respect MemoryFlags literally (no forced HostVisible). A DeviceLocal-only buffer stays in the 8 GB VRAM
+            // heap (not the tiny ~214 MB BAR window); host-visible buffers (uniform/descriptor/sprite, which pass the
+            // flags explicitly) keep direct Map. A device-local buffer made without data here is filled via SetData
+            // (which uses a staging path for device-local).
             CreateBuffer(size,
                 BufferUsageFlags.TransferDst | Usage,
-                MemoryFlags | MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent,
+                MemoryFlags,
                 out VulkanBuffer,
                 out BufferMemory);
         }
 
-        private void Initialize(DataPointer dataPointer)
+        private bool IsHostVisible => MemoryFlags.HasFlag(MemoryPropertyFlags.HostVisible);
+
+        /// <summary>Uploads <paramref name="dataPointer"/> into this (device-local) buffer at <paramref name="dstOffset"/>
+        /// via a temporary host-visible staging buffer + GPU copy. Used when the buffer itself isn't host-mappable.</summary>
+        private void UploadViaStaging(DataPointer dataPointer, ulong dstOffset)
         {
-            var stagingMemoryFlags = MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent;
-
-            CreateBuffer(TotalSize, BufferUsageFlags.TransferSrc, stagingMemoryFlags, out var stagingBuffer, out var stagingBufferMemory);
-            
+            CreateBuffer(dataPointer.Size, BufferUsageFlags.TransferSrc,
+                MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent,
+                out var stagingBuffer, out var stagingBufferMemory);
             UpdateBufferContent(stagingBufferMemory, dataPointer);
-            CreateBuffer(TotalSize, 
-                BufferUsageFlags.TransferDst | Usage, 
-                MemoryFlags | MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent, 
-                out VulkanBuffer, 
-                out BufferMemory);
-            CopyBuffer(stagingBuffer, VulkanBuffer, TotalSize);
-
+            CopyBuffer(stagingBuffer, VulkanBuffer, dataPointer.Size, dstOffset);
             GraphicsDevice.Destroy(stagingBuffer);
             GraphicsDevice.Destroy(stagingBufferMemory);
+        }
+
+        private void Initialize(DataPointer dataPointer)
+        {
+            CreateBuffer(TotalSize, BufferUsageFlags.TransferDst | Usage, MemoryFlags, out VulkanBuffer, out BufferMemory);
+            if (IsHostVisible)
+            {
+                // Host-mappable (A): write the initial data straight in - no redundant full-size staging copy.
+                UpdateBufferContent(BufferMemory, dataPointer);
+            }
+            else
+            {
+                // Device-local, GPU-only (B): the buffer lives in the 8 GB VRAM heap (not the 214 MB BAR), so the CPU
+                // can't map it - upload the initial data through a temporary staging buffer.
+                UploadViaStaging(dataPointer, 0);
+            }
         }
 
         private unsafe void UpdateBufferContent(DeviceMemory bufferMemory, DataPointer dataPointer, ulong offset = 0)
@@ -163,12 +179,13 @@ namespace Adamantium.Graphics
             }
         }
 
-        private void CopyBuffer(VulkanBuffer srcBuffer, VulkanBuffer dstBuffer, ulong size)
+        private void CopyBuffer(VulkanBuffer srcBuffer, VulkanBuffer dstBuffer, ulong size, ulong dstOffset = 0)
         {
             var commandBuffer = GraphicsDevice.BeginSingleTimeCommand();
 
             var copyRegion = new BufferCopy();
             copyRegion.Size = size;
+            copyRegion.DstOffset = dstOffset;
             commandBuffer.CopyBuffer(srcBuffer, dstBuffer, 1, copyRegion);
 
             GraphicsDevice.EndSingleTimeCommand(commandBuffer);
@@ -259,6 +276,8 @@ namespace Adamantium.Graphics
             // Check size validity of data to copy to
             if (toData.Size > TotalSize)
                 throw new ArgumentException("Length of TData is larger than size of buffer");
+            if (!IsHostVisible)
+                throw new InvalidOperationException("GetData requires a host-visible buffer; this one is device-local (GPU-only).");
 
             var data = GraphicsDevice.MapMemory(BufferMemory, 0, toData.Size, 0);
             System.Buffer.MemoryCopy((void*)data, toData.Pointer.ToPointer(), toData.Size, toData.Size);
@@ -267,6 +286,8 @@ namespace Adamantium.Graphics
 
         public nuint MapMemory()
         {
+            if (!IsHostVisible)
+                throw new InvalidOperationException("MapMemory requires a host-visible buffer; this one is device-local (GPU-only). Use SetData instead.");
             return GraphicsDevice.MapMemory(BufferMemory, 0, TotalSize, 0);
         }
 
@@ -341,7 +362,10 @@ namespace Adamantium.Graphics
             if ((fromData.Size + offsetInBytes) > TotalSize)
                 throw new ArgumentException("Size of data to upload + offset is larger than size of buffer");
 
-            UpdateBufferContent(BufferMemory, fromData, offsetInBytes);
+            if (IsHostVisible)
+                UpdateBufferContent(BufferMemory, fromData, offsetInBytes);
+            else
+                UploadViaStaging(fromData, offsetInBytes); // device-local: can't map, go through staging
         }
         
         public UInt64 GetDeviceAddress()

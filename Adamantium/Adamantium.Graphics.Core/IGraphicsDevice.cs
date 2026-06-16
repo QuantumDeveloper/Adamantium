@@ -15,7 +15,7 @@ namespace Adamantium.Graphics.Core;
 
 public interface IDrawableDevice
 {
-    bool BeginDraw(float depth = 1.0f, uint stencil = 0);
+    bool BeginDraw(float depth = 1.0f, uint stencil = 0, Action<CommandBuffer> beforeRenderPass = null);
 
     void BeginRendering(CommandBuffer commandBuffer, bool continueRendering = false, float depth = 1.0f, uint stencil = 0);
     
@@ -135,7 +135,13 @@ public unsafe interface IGraphicsDevice : IDrawableDevice, IDynamicStateDevice, 
     DescriptorSetLayout CreateDescriptorSetLayout(DescriptorSetLayoutCreateInfo layoutCreateInfo);
     
     CommandBuffer CurrentCommandBuffer { get; }
-    
+
+    /// <summary>Register a semaphore the next <see cref="Submit"/> must wait on (timelineValue=0 for binary).</summary>
+    void AddWaitSemaphore(Semaphore semaphore, PipelineStageFlagBits stage, ulong timelineValue = 0);
+
+    /// <summary>Register a semaphore the next <see cref="Submit"/> must signal (timelineValue=0 for binary).</summary>
+    void AddSignalSemaphore(Semaphore semaphore, ulong timelineValue = 0);
+
     EffectPool DefaultEffectPool { get; }
 
     nuint MapMemory(DeviceMemory memory, ulong offset, ulong size, MemoryMapFlagBits flags);
@@ -149,7 +155,7 @@ public unsafe interface IGraphicsDevice : IDrawableDevice, IDynamicStateDevice, 
     uint GetDescriptorSetLayoutOffset(DescriptorSetLayout layout, uint bindingSlot);
 
     ShaderEXT CreateShader(ShaderCreateInfoEXT shaderCreateInfo);
-    
+
     void DestroyShader(ShaderEXT shaderObject);
 
     CommandBuffer BeginSingleTimeCommand();
@@ -219,7 +225,11 @@ public unsafe interface IGraphicsDevice : IDrawableDevice, IDynamicStateDevice, 
         string name = "");
 
     ITexture CreateTexture(TextureDescription description, byte[] pixelData);
-    
+
+    /// <summary>Imports an externally produced shared surface zero-copy and returns it as a sampleable texture.
+    /// The producer hands off the <paramref name="descriptor"/> after exporting its memory/semaphores.</summary>
+    ITexture ImportSharedSurface(SharedSurfaceDescriptor descriptor);
+
     SurfaceKHR GetOrCreateSurface(PresentationParameters parameters);
 
     void InsertImageMemoryBarrier(CommandBuffer commandBuffer,

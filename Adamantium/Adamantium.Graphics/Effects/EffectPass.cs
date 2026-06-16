@@ -62,7 +62,8 @@ public sealed class EffectPass : DisposableObject, IEffectPass
 
     private readonly List<StageBlock> stages = new List<StageBlock>();
 
-    private DescriptorHeapManager _descriptorHeapManager;
+    // The transient per-frame constant-buffer arena lives on the render device (not the shared heap manager).
+    private DynamicBufferPool CurrentBufferPool => ((GraphicsDevice)graphicsDevice).CurrentBufferPool;
 
     private uint appliesCounter = 0;
     private bool geometryStagePresent = false;
@@ -84,7 +85,6 @@ public sealed class EffectPass : DisposableObject, IEffectPass
         Effect = effect;
         graphicsDevice = effect.GraphicsDevice;
         pipelineStages = new List<StageBlock>();
-        _descriptorHeapManager = ((EffectResourceLinker)Effect.ResourceLinker).DescriptorHeapManager;
 
         shaderStages = new List<PipelineShaderStageCreateInfo>();
         layoutBindings = new List<DescriptorSetLayoutBinding>();
@@ -95,7 +95,7 @@ public sealed class EffectPass : DisposableObject, IEffectPass
     private void GraphicsDeviceOnFrameFinished()
     {
         appliesCounter = 0;
-        _descriptorHeapManager.CurrentBufferPool.Reset();
+        CurrentBufferPool.Reset();
     }
 
     private void ClearLayoutBindings()
@@ -147,7 +147,7 @@ public sealed class EffectPass : DisposableObject, IEffectPass
         byte* pushDataBytes = stackalloc byte[(int)totalPushDataSize];
 
         // Shared per-frame pool: sub-allocates CB data (a per-draw chunk), without a separate buffer per Apply.
-        var dynamicPool = _descriptorHeapManager.CurrentBufferPool;
+        var dynamicPool = CurrentBufferPool;
 
         for (int stageIndex = 0; stageIndex < pipelineStages.Count; stageIndex++)
         {
@@ -263,7 +263,7 @@ public sealed class EffectPass : DisposableObject, IEffectPass
         stages.Clear();
 
         var resourceLinker = (EffectResourceLinker)Effect.ResourceLinker;
-        var dynamicPool = _descriptorHeapManager.CurrentBufferPool;
+        var dynamicPool = CurrentBufferPool;
         ulong uboAlignment = graphicsDevice.Adapter.AdapterProperties.Limits.MinUniformBufferOffsetAlignment;
 
         for (int stageIndex = 0; stageIndex < pipelineStages.Count; stageIndex++)
@@ -1107,7 +1107,7 @@ public sealed class EffectPass : DisposableObject, IEffectPass
             shaderCreateInfo.CodeSize = (uint)ByteCode.Length;
             shaderCreateInfo.PCode = ByteCode;
             shaderCreateInfo.PName = EntryPoint;
-            
+
             if (!UseDescriptorHeap)
             {
                 // VK_EXT_descriptor_buffer: classic descriptor set layouts, without the heap flag or mappings.
@@ -1307,11 +1307,9 @@ public sealed class EffectPass : DisposableObject, IEffectPass
     
         private int currentPageIndex = 0;
         private ulong currentOffset = 0;
-        private DescriptorHeapManager _descriptorHeapManager;
 
-        public DynamicBufferPool(DescriptorHeapManager descriptorHeapManager, IGraphicsDevice device, ulong pageSize = 8 * 1024 * 1024) // 8 MB by default
+        public DynamicBufferPool(IGraphicsDevice device, ulong pageSize = 2 * 1024 * 1024) // 2 MB initial page; grows on demand per frame
         {
-            _descriptorHeapManager = descriptorHeapManager;
             graphicsDevice = device;
             this.pageSize = pageSize;
         
@@ -1356,8 +1354,9 @@ public sealed class EffectPass : DisposableObject, IEffectPass
         {
             // CRITICALLY IMPORTANT: the ShaderDeviceAddress flag is required for Vulkan to allow obtaining the buffer's GPU address
             var flags = BufferUsageFlags.UniformBuffer | BufferUsageFlags.ShaderDeviceAddress;
-            var memFlags = MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal | MemoryPropertyFlags.HostCoherent;
-        
+            // Constant-buffer pages: CPU writes them, GPU reads them each frame → CPU-to-GPU upload (BAR window).
+            var memFlags = BufferMemoryUsage.UploadFromCpuToGpu;
+
             var buffer = Buffer.New(graphicsDevice, pageSize, flags, memFlags);
             pages.Add(buffer);
         }

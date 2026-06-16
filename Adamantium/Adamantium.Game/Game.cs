@@ -15,6 +15,7 @@ using Adamantium.Game.Core.Input;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Content;
+using Adamantium.Graphics.Core.Models;
 using Adamantium.Imaging;
 using Adamantium.UI;
 using Adamantium.UI.Core;
@@ -67,6 +68,10 @@ public class Game : PropertyChangedBase, IGame
         Content = new ContentManager(Container);
         Content.Resolvers.Add(new FileSystemContentResolver());
         Content.Resolvers.Add(new EffectContentResolver());
+        // Model files -> SceneData (runtime parse); image files -> GPU Texture for material maps. The texture reader
+        // resolves the device lazily from ServiceProvider at load time (ResourceLoaderDevice exists by then).
+        Content.Readers.Add(typeof(SceneData), new SceneDataContentReader());
+        Content.Readers.Add(typeof(Texture), new TextureContentReader());
             
         ModelConverter = new ModelConverter();
         unloadContentCollector = new DisposeCollector();

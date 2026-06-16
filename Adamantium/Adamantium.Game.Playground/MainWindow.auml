@@ -1,11 +1,22 @@
 <Window x:Namespace="Adamantium.Game.Playground"
         xmlns="http://adamantium/ui"
 		xmlns:x="http://adamantium/ui/xaml/extensions"
+		xmlns:local="clr-namespace:Adamantium.Game.Playground"
         Title="Adamantium Window"
         Width="1280"
         Height="720">
-    <RenderTargetPanel x:Name="TestGrid1" 
+    <Grid>
+        <Button Width="150"
+                Height="150"
+                Background="Yellow"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"/>
+    <RenderTargetPanel x:Name="TestGrid1"
+                       Opacity="0.95"
                        Background="{ResourceReference ApproveBrush}">
+        <RenderTargetPanel.Behaviors>
+            <local:GameHostBehavior/>
+        </RenderTargetPanel.Behaviors>
 <!--		<Path StrokeThickness="2" -->
 <!--              Fill="Yellow"-->
 <!--              Name="Path1"-->
@@ -53,21 +64,30 @@
 <!--        >-->
 <!--            -->
 <!--        </ContentControl>-->
-        <TextBlock Text="Мелкий текст! - Проверка"
-                   FontSize="24"/>
+<!--        <TextBlock Text="Крупный текст1! - Проверка!?!"-->
+<!--                   FontSize="24"-->
+<!--                   VerticalAlignment="Bottom"-->
+<!--        Background="Transparent"/>-->
+
+        <Button Width="150"
+                Height="150"
+                Background="Cyan"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Bottom"/>
         
         <Button Width="120"
             Height="80"
             HorizontalAlignment="Right"
             VerticalAlignment="Bottom"/>
         
-<!--        <Image Grid.Column="0"-->
-<!--               HorizontalAlignment="Center"-->
-<!--               VerticalAlignment="Center"-->
-<!--               CornerRadius="0"-->
-<!--               MipLevel="3"-->
-<!--               Source="Textures\luxfon.tga"-->
-<!--        />-->
+<Image Grid.Column="0"
+       Width="200"
+       Height="200"
+       HorizontalAlignment="Left"
+       VerticalAlignment="Top"
+       CornerRadius="0"
+       MipLevel="3"
+       Source="Textures\\luxfon.tga"/>
 <!--        <Image Grid.Column="0" -->
 <!--			   HorizontalAlignment="Center"-->
 <!--               VerticalAlignment="Top"-->
@@ -104,4 +124,5 @@
 <!--                   HorizontalTextAlignment="Left"-->
 <!--                   FontSize="16"/>-->
     </RenderTargetPanel>
+    </Grid>
 </Window>

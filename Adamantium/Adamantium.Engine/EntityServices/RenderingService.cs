@@ -104,15 +104,36 @@ public class RenderingService : EntityService
 
     public override bool BeginDraw()
     {
-        if (!Window.IsUpToDate() || !GraphicsDevice.BeginDraw())
+        if (!Window.IsUpToDate())
+        {
+            return false;
+        }
+
+        // Render targets/depth are consumed by GraphicsDevice.BeginDraw() itself (it transitions them and begins
+        // rendering on them), so they must be bound BEFORE it — otherwise the very first frame transitions a null
+        // target (NRE). This mirrors the working UI path (WindowRenderService.BeginDraw). Viewports/scissors are
+        // recorded into the command buffer, so they must stay AFTER BeginDraw() has started it.
+        GraphicsDevice.SetRenderTargets(Window.Presenter.RenderTarget);
+        GraphicsDevice.SetDepthBuffer(Window.Presenter.DepthBuffer);
+        // Rasterization sample count must match the presenter's MSAA attachments, otherwise vkCmdSetRasterizationSamplesEXT
+        // stays at 1 while the render target is multisampled -> undefined rasterization (model not drawn on NVIDIA).
+        // The UI path does the same in WindowRenderService.BeginDraw.
+        GraphicsDevice.MSAALevel = Window.Presenter.MSAALevel;
+        // The game frame is an opaque scene presented into a UI panel that can be drawn semi-transparently. Mask
+        // ALPHA writes so the cleared alpha (1.0) is preserved across all game draws -> the shared surface is fully
+        // opaque -> the panel can scale it by its own Opacity (the model's own fragments would otherwise carry the
+        // unsampled-texture alpha ~0 and the panel would only ever show a faint outline / can't be made translucent).
+        GraphicsDevice.ColorComponentFlags = AdamantiumVulkan.Core.ColorComponentFlagBits.RBit |
+                                             AdamantiumVulkan.Core.ColorComponentFlagBits.GBit |
+                                             AdamantiumVulkan.Core.ColorComponentFlagBits.BBit;
+
+        if (!GraphicsDevice.BeginDraw())
         {
             return false;
         }
 
         GraphicsDevice.SetViewports(Window.Viewport);
         GraphicsDevice.SetScissors(Window.Scissor);
-        GraphicsDevice.SetRenderTargets(Window.Presenter.RenderTarget);
-        GraphicsDevice.SetDepthBuffer(Window.Presenter.DepthBuffer);
         return true;
     }
 

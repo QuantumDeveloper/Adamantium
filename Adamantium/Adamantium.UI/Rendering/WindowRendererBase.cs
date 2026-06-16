@@ -98,7 +98,9 @@ public abstract class WindowRendererBase : IWindowRenderer
     }
 
     public abstract void Render(AppTime appTime);
-    
+
+    public abstract void PreRender();
+
 
     public void ResizePresenter(PresentationParameters parameters)
     {

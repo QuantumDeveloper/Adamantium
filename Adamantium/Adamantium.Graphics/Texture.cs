@@ -47,8 +47,24 @@ public unsafe class Texture : GraphicsResource, ITexture
         Initialize();
         this.TransitionImageLayout(description.DesiredImageLayout);
     }
-    
-    protected Texture(IGraphicsDevice device, 
+
+    /// <summary>Creates a texture whose image and memory take part in a cross-API shared-surface chain. The
+    /// <paramref name="imagePNext"/> (external-memory image create info) and the <paramref name="allocPNextFactory"/>
+    /// (export/import + dedicated allocation, given the created image) make the backing memory exportable or
+    /// imported. The caller (see <see cref="SharedSurface"/>) owns layout transitions and handle export.</summary>
+    protected Texture(IGraphicsDevice device, TextureDescription description, object imagePNext, Func<VulkanImage, object> allocPNextFactory, string name = "") : base(device, name)
+    {
+        Description = description;
+        ImageLayout = description.InitialLayout;
+        CreateImage(Description, MemoryPropertyFlags.DeviceLocal, out vulkanImage, out vulkanImageMemory, imagePNext, allocPNextFactory);
+        CreateImageView(Description);
+        if (GraphicsDevice.MainDevice.IsInDebugMode)
+        {
+            GraphicsDevice.SetObjectDebugName((ulong)VulkanImage.NativePointer, ObjectType.Image, Name);
+        }
+    }
+
+    protected Texture(IGraphicsDevice device,
         VulkanImage vulkanImage, 
         TextureDescription description,
         ImageUsageFlagBits usage,
@@ -224,10 +240,15 @@ public unsafe class Texture : GraphicsResource, ITexture
         }
     }
 
-    protected void CreateImage(TextureDescription description, MemoryPropertyFlags memoryProperties, out VulkanImage image, out DeviceMemory imageMemory)
+    protected void CreateImage(TextureDescription description, MemoryPropertyFlags memoryProperties, out VulkanImage image, out DeviceMemory imageMemory,
+        object imagePNext = null, Func<VulkanImage, object> allocPNextFactory = null)
     {
         var device = GraphicsDevice.LogicalDevice;
         var imageInfo = description.ToImageCreateInfo();
+        if (imagePNext != null)
+        {
+            imageInfo.PNext = imagePNext;
+        }
         var result = device.CreateImage(imageInfo, null, out image);
         if (result != Result.Success)
         {
@@ -235,10 +256,10 @@ public unsafe class Texture : GraphicsResource, ITexture
         }
 
         device.GetImageMemoryRequirements(image, out var memRequirements);
-        TotalSizeInBytes = CalculateTextureSize(description.Width, 
-            description.Height, 
+        TotalSizeInBytes = CalculateTextureSize(description.Width,
+            description.Height,
             description.Depth,
-            description.MipLevels, 
+            description.MipLevels,
             (uint)description.Format.SizeOfInBytes());
 
         var allocInfo = new MemoryAllocateInfo
@@ -246,10 +267,22 @@ public unsafe class Texture : GraphicsResource, ITexture
             AllocationSize = memRequirements.Size,
             MemoryTypeIndex = GraphicsDevice.Adapter.FindMemoryIndex(memRequirements.MemoryTypeBits, memoryProperties)
         };
-
-        if (device.AllocateMemory(allocInfo, null, out imageMemory) != Result.Success)
+        // The factory is given the freshly created image so it can build a dedicated-allocation pNext (export and
+        // import of an image's memory both require a dedicated allocation that names the image).
+        if (allocPNextFactory != null)
         {
-            throw new Exception("failed to allocate image memory!");
+            allocInfo.PNext = allocPNextFactory(image);
+        }
+
+        var allocResult = device.AllocateMemory(allocInfo, null, out imageMemory);
+        if (allocResult != Result.Success)
+        {
+            var mb = memRequirements.Size / (1024.0 * 1024.0);
+            throw new Exception(
+                $"failed to allocate image memory: {allocResult}. Requested {mb:F1} MB " +
+                $"(memoryTypeIndex {allocInfo.MemoryTypeIndex}, typeBits 0x{memRequirements.MemoryTypeBits:X}); " +
+                $"image {description.Width}x{description.Height} {description.Format} " +
+                $"samples={description.Samples} mips={description.MipLevels}.");
         }
 
         device.BindImageMemory(image, imageMemory, 0);

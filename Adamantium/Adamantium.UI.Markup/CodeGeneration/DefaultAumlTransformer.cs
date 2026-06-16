@@ -244,6 +244,11 @@ public class DefaultAumlTransformer : IAumlTransformer
             }
             
             var type = typeInfo.Types.FirstOrDefault(x => x.FullName == typeReference.GetFullTypeName());
+            if (type == null)
+            {
+                diagnostics.ReportError(document.FileName, $"Type {typeReference.Name} could not be found in namespace {typeReference.Namespace}. {lineInfo}");
+                return typeReference;
+            }
 
             return CreateResolved(type, lineInfo);
         }

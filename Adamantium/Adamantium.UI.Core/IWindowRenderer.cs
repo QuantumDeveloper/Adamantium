@@ -15,6 +15,9 @@ public interface IWindowRenderer : IDisposable
         
     public void Render(AppTime appTime);
 
+    /// <summary>Records out-of-render-pass work (shared-surface latch copies) before BeginRendering.</summary>
+    public void PreRender();
+
     public void PrepareData();
     
     public GraphicsPresenter Presenter { get; }

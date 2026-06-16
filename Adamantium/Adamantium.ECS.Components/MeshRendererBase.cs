@@ -109,13 +109,13 @@ namespace Adamantium.ECS.Components
             else
             {
                 VertexBuffer?.Dispose();
-                VertexBuffer = ToDispose(Buffer.Vertex.New(graphicsContext, vertices));
+                VertexBuffer = ToDispose(Buffer.Vertex.New(graphicsContext, vertices, BufferMemoryUsage.GpuOnly));
             }
 
             if (MeshData.Mesh.HasIndices)
             {
                 IndexBuffer?.Dispose();
-                IndexBuffer = ToDispose(Buffer.Index.New(graphicsContext, MeshData.Mesh.Indices));
+                IndexBuffer = ToDispose(Buffer.Index.New(graphicsContext, MeshData.Mesh.Indices, BufferMemoryUsage.GpuOnly));
             }
 
             MeshData.Mesh.AcceptChanges();

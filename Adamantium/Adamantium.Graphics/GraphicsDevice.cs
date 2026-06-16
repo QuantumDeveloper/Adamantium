@@ -89,6 +89,29 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     private Semaphore[] waitSemaphoresArray = new Semaphore[1];
     private Semaphore[] signalSemaphoresArray = new Semaphore[1];
     private CommandBuffer[] commandBuffersArray = new CommandBuffer[1];
+
+    // Per-frame extra GPU sync registered by shared-surface producers/consumers, merged into the next Submit on
+    // top of the swapchain semaphores and cleared afterwards. Timeline values are 0 for binary semaphores.
+    private readonly System.Collections.Generic.List<Semaphore> _extraWaitSemaphores = new();
+    private readonly System.Collections.Generic.List<PipelineStageFlagBits> _extraWaitStages = new();
+    private readonly System.Collections.Generic.List<ulong> _extraWaitValues = new();
+    private readonly System.Collections.Generic.List<Semaphore> _extraSignalSemaphores = new();
+    private readonly System.Collections.Generic.List<ulong> _extraSignalValues = new();
+
+    /// <summary>Register a semaphore the next <see cref="Submit"/> must wait on (timelineValue=0 for binary).</summary>
+    public void AddWaitSemaphore(Semaphore semaphore, PipelineStageFlagBits stage, ulong timelineValue = 0)
+    {
+        _extraWaitSemaphores.Add(semaphore);
+        _extraWaitStages.Add(stage);
+        _extraWaitValues.Add(timelineValue);
+    }
+
+    /// <summary>Register a semaphore the next <see cref="Submit"/> must signal (timelineValue=0 for binary).</summary>
+    public void AddSignalSemaphore(Semaphore semaphore, ulong timelineValue = 0)
+    {
+        _extraSignalSemaphores.Add(semaphore);
+        _extraSignalValues.Add(timelineValue);
+    }
         
     private SyncObject _submissionSync;
     private static string SyncGuid = Guid.NewGuid().ToString();
@@ -135,7 +158,17 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
             
         InitializeRenderDevice();
         InitializePipeline();
-        DescriptorHeapManager = new DescriptorHeapManager(this);
+        // One global descriptor heap per logical device, owned by the main device and shared by every render-device
+        // wrapper (they share one VkDevice). Just reference it — no per-device allocation.
+        DescriptorHeapManager = mainDevice.DescriptorHeapManager;
+
+        // The per-frame constant-buffer arena stays per render device: devices render concurrently (parallel games)
+        // and cycle frames independently, so this can't be shared.
+        _dynamicBufferPools = new EffectPass.DynamicBufferPool[MaxFramesInFlight];
+        for (int i = 0; i < MaxFramesInFlight; i++)
+        {
+            _dynamicBufferPools[i] = new EffectPass.DynamicBufferPool(this);
+        }
 
         Log.Logger.Debug($"Primary render device created. Id: {DeviceId}");
 
@@ -178,7 +211,11 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
     public uint CurrentFrame => frame;
     
-    public DescriptorHeapManager DescriptorHeapManager { get; private set; }
+    public IDescriptorHeapManager DescriptorHeapManager { get; private set; }
+
+    // Per render device: the transient per-frame constant-buffer arena (see CreateRenderDevice for why it's not shared).
+    private EffectPass.DynamicBufferPool[] _dynamicBufferPools;
+    public EffectPass.DynamicBufferPool CurrentBufferPool => _dynamicBufferPools[CurrentFrame];
 
     public uint MaxFramesInFlight { get; private set; }
 
@@ -223,6 +260,11 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     public ITexture CreateTexture(TextureDescription description, byte[] pixelData)
     {
         return Texture.CreateFrom(this, description, pixelData);
+    }
+
+    public ITexture ImportSharedSurface(SharedSurfaceDescriptor descriptor)
+    {
+        return SharedSurface.Import(this, descriptor);
     }
 
     public ITexture CreateTextureFromImage(Image image, 
@@ -747,7 +789,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         queue.Clear();
     }
 
-    public bool BeginDraw(float depth = 1.0f, uint stencil = 0)
+    public bool BeginDraw(float depth = 1.0f, uint stencil = 0, Action<CommandBuffer> beforeRenderPass = null)
     {
         CanPresent = false;
         var renderFence = InFlightFences[CurrentFrame];
@@ -816,6 +858,10 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         
         TransitionImagesForRendering(commandBuffer, renderTargets);
         TransitionDepthBufferForRendering(commandBuffer, depthBuffer);
+
+        // Out-of-render-pass work (e.g. shared-surface latch copies) must be recorded here, before BeginRendering,
+        // so a later in-pass draw can sample the result the SAME frame (no latency).
+        beforeRenderPass?.Invoke(commandBuffer);
 
         BeginRendering(commandBuffer, false, depth, stencil);
 
@@ -914,7 +960,8 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
             // );
             
             commandBuffer.BeginRendering(renderingInfo);
-            DescriptorHeapManager.BindDescriptorHeaps();
+            if (EffectPass.UseDescriptorHeap)
+                DescriptorHeapManager.BindDescriptorHeaps(this);
         }
     }
 
@@ -1000,20 +1047,62 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         commandBuffersArray[0] = CurrentCommandBuffer;
         var submitInfo = new SubmitInfo();
 
-        
+        // Swapchain present-sync (binary) + per-frame extras from shared-surface compositing (timeline). The
+        // timeline value array must align 1:1 with the semaphore arrays (binary entries carry value 0, ignored).
+        var waitSems = new System.Collections.Generic.List<Semaphore>();
+        var waitStageList = new System.Collections.Generic.List<PipelineStageFlagBits>();
+        var waitValues = new System.Collections.Generic.List<ulong>();
+        var signalSems = new System.Collections.Generic.List<Semaphore>();
+        var signalValues = new System.Collections.Generic.List<ulong>();
+
         if (Presenter is SwapChainGraphicsPresenter swapChainGraphicsPresenter)
         {
-            waitSemaphoresArray[0] = ImageAvailableSemaphores[CurrentFrame];
-            submitInfo.WaitSemaphoreCount = (uint)waitSemaphoresArray.Length;
-            submitInfo.PWaitSemaphores = waitSemaphoresArray;
-                
-            signalSemaphoresArray[0] = swapChainGraphicsPresenter.CurrentRenderFinishedSemaphore;
-        
-            submitInfo.SignalSemaphoreCount = (uint)signalSemaphoresArray.Length;
-            submitInfo.PSignalSemaphores = signalSemaphoresArray;
+            waitSems.Add(ImageAvailableSemaphores[CurrentFrame]);
+            waitStageList.Add(PipelineStageFlagBits.ColorAttachmentOutputBit);
+            waitValues.Add(0);
+            signalSems.Add(swapChainGraphicsPresenter.CurrentRenderFinishedSemaphore);
+            signalValues.Add(0);
         }
 
-        submitInfo.PWaitDstStageMask = waitStages;
+        var hasTimeline = false;
+        for (int i = 0; i < _extraWaitSemaphores.Count; i++)
+        {
+            waitSems.Add(_extraWaitSemaphores[i]);
+            waitStageList.Add(_extraWaitStages[i]);
+            waitValues.Add(_extraWaitValues[i]);
+            if (_extraWaitValues[i] != 0) hasTimeline = true;
+        }
+        for (int i = 0; i < _extraSignalSemaphores.Count; i++)
+        {
+            signalSems.Add(_extraSignalSemaphores[i]);
+            signalValues.Add(_extraSignalValues[i]);
+            if (_extraSignalValues[i] != 0) hasTimeline = true;
+        }
+        _extraWaitSemaphores.Clear(); _extraWaitStages.Clear(); _extraWaitValues.Clear();
+        _extraSignalSemaphores.Clear(); _extraSignalValues.Clear();
+
+        if (waitSems.Count > 0)
+        {
+            submitInfo.WaitSemaphoreCount = (uint)waitSems.Count;
+            submitInfo.PWaitSemaphores = waitSems.ToArray();
+            submitInfo.PWaitDstStageMask = waitStageList.ToArray();
+        }
+        if (signalSems.Count > 0)
+        {
+            submitInfo.SignalSemaphoreCount = (uint)signalSems.Count;
+            submitInfo.PSignalSemaphores = signalSems.ToArray();
+        }
+        if (hasTimeline)
+        {
+            submitInfo.PNext = new TimelineSemaphoreSubmitInfo
+            {
+                WaitSemaphoreValueCount = (uint)waitValues.Count,
+                PWaitSemaphoreValues = waitValues.ToArray(),
+                SignalSemaphoreValueCount = (uint)signalValues.Count,
+                PSignalSemaphoreValues = signalValues.ToArray()
+            };
+        }
+
         submitInfo.CommandBufferCount = (uint)commandBuffersArray.Length;
         submitInfo.PCommandBuffers = commandBuffersArray;
 
@@ -1037,7 +1126,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         }
 
         CanPresent = true;
-            
+
         _submissionSync?.Release();
     }
 

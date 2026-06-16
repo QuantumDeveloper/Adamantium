@@ -1,4 +1,5 @@
 ﻿using System;
+using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Extensions;
 using Adamantium.Graphics.Core.Models;
@@ -23,15 +24,18 @@ public abstract class UIRenderComponent : DeferredDisposableObject
         UIBasicEffect = uiBasicEffect;
         ColorBlendEquation = ColorBlendEquations.AlphaBlend;
         
+        // UI quads are small and rebuilt often → CPU-to-GPU upload (BAR window), not device-local (which would
+        // stage+copy each quad). Large model geometry uses GpuOnly.
+        var uiMemoryFlags = BufferMemoryUsage.UploadFromCpuToGpu;
         var vertices = mesh?.ToUIVertices();
         if (vertices != null && vertices.Length != 0)
         {
-            VertexBuffer = ToDispose(Buffer.Vertex.New(device, vertices));
+            VertexBuffer = ToDispose(Buffer.Vertex.New(device, vertices, uiMemoryFlags));
         }
 
         if (mesh is { HasIndices: true } && VertexBuffer != null)
         {
-            IndexBuffer = ToDispose(Buffer.Index.New(device, mesh.Indices));
+            IndexBuffer = ToDispose(Buffer.Index.New(device, mesh.Indices, uiMemoryFlags));
         }
 
         VertexType = typeof(UIVertex);
@@ -64,6 +68,9 @@ public abstract class UIRenderComponent : DeferredDisposableObject
         RenderData.TransformMatrix = transform;
         RenderData.ProjectionMatrix = projectionMatrix;
     }
+
+    /// <summary>Out-of-render-pass work, recorded before BeginRendering. Base is a no-op.</summary>
+    public virtual void PreRender() { }
 
     public virtual void Render()
     {
@@ -157,10 +164,29 @@ public class ImageRenderComponent : UIRenderComponent
     }
     
     public Brush Background { get; set; }
-    
+
     public ITexture Texture { get; set; }
-    
+
     public SamplerState Sampler { get; set; }
+
+    /// <summary>When set, this image is backed by an externally produced shared surface. Sampled via the private
+    /// <see cref="UIRenderComponent.Texture"/>, refreshed each frame by the latch in <see cref="PreRender"/>.</summary>
+    public SharedSurface SharedSource { get; set; }
+    private ulong _lastLatched;
+
+    // The shared surface (Texture) is sampled directly. Register, for this frame's UI Submit: a wait on
+    // Produce>=latest (so the producer's write+transition-to-ShaderReadOnly is complete before the fragment sample)
+    // and a signal of Consume=latest (so the producer may reuse the surface). Producer/consumer run one frame in
+    // lockstep (the producer CPU-throttles on Consume), so there is no read-during-write race.
+    public override void PreRender()
+    {
+        if (SharedSource == null) return;
+        var latest = SharedSource.ProduceValue;
+        if (latest <= _lastLatched) return;
+        GraphicsDevice.AddWaitSemaphore(SharedSource.ProduceSemaphore, PipelineStageFlagBits.FragmentShaderBit, latest);
+        GraphicsDevice.AddSignalSemaphore(SharedSource.ConsumeSemaphore, latest);
+        _lastLatched = latest;
+    }
 
     public override void Render()
     {

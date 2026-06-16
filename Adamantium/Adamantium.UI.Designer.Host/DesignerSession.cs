@@ -32,6 +32,14 @@ public sealed class DesignerSession : IDisposable
     private const double DefaultWidth = 1280;
     private const double DefaultHeight = 720;
 
+    // Cap the render target so an extreme zoom can't exhaust GPU memory (a render target is design x scale, and
+    // memory grows with its area; 8192^2 BGRA is ~256 MB before the depth buffer). Past the cap the client
+    // upscales the last crisp frame - like a WPF/Avalonia designer that stops re-rasterising beyond a point.
+    // 8192 is plenty of crispness for a preview; the effective cap is clamped to the device's
+    // maxImageDimension2D (guaranteed >= 4096) so it never asks for an image the GPU can't create.
+    private const double PreferredMaxRenderDimension = 8192;
+    private readonly double _maxRenderDimension;
+
     public DesignerSession()
     {
         // Load every engine assembly so reflection type resolution can see all control types.
@@ -53,6 +61,10 @@ public sealed class DesignerSession : IDisposable
 
         _device = _app.GraphicsContext.CreateGraphicsDevice();
         _factory = new RenderUnitFactory(_device, _app.GraphicsContext.GetResourceFactory());
+
+        _maxRenderDimension = Math.Min(
+            PreferredMaxRenderDimension,
+            _device.Adapter.AdapterProperties.Limits.MaxImageDimension2D);
     }
 
     /// <summary>
@@ -85,15 +97,20 @@ public sealed class DesignerSession : IDisposable
         window.Update(_app.ThemeManager, new AppTime());
 
         if (scale <= 0) scale = 1.0;
-        var targetWidth = (uint)Math.Max(1.0, Math.Round(designWidth * scale));
-        var targetHeight = (uint)Math.Max(1.0, Math.Round(designHeight * scale));
+        var maxScale = Math.Max(1.0, Math.Min(_maxRenderDimension / designWidth, _maxRenderDimension / designHeight));
+        var renderScale = Math.Min(scale, maxScale);
+        var targetWidth = (uint)Math.Max(1.0, Math.Round(designWidth * renderScale));
+        var targetHeight = (uint)Math.Max(1.0, Math.Round(designHeight * renderScale));
 
         var renderer = GetRenderer(targetWidth, targetHeight);
+        // Each render is a fresh tree, so free the previous render's units now (the last frame left the GPU idle).
+        renderer.ResetCache();
         if (!renderer.RenderFrame((IRootVisualComponent)window))
             return RenderResult.Fail("render failed", load.Diagnostics);
 
         renderer.Save(outPath, ImageFileType.Png);
-        return RenderResult.Ok(outPath, load.Diagnostics, targetWidth, targetHeight);
+
+        return RenderResult.Ok(outPath, load.Diagnostics, targetWidth, targetHeight, renderScale);
     }
 
     /// <summary>Design size for a dimension: the declared value if set, else the request, else the default.</summary>
@@ -106,11 +123,17 @@ public sealed class DesignerSession : IDisposable
 
     private OffscreenRenderer GetRenderer(uint width, uint height)
     {
-        if (_renderer != null && _rendererWidth == width && _rendererHeight == height)
-            return _renderer;
+        // Reuse the one renderer across renders, only resizing its target when the size changes. Recreating it
+        // per zoom would abandon the render cache (its units leak) and churn large GPU allocations.
+        if (_renderer == null)
+        {
+            _renderer = new OffscreenRenderer(_device, _factory, width, height) { ClearColor = Colors.White };
+        }
+        else if (_rendererWidth != width || _rendererHeight != height)
+        {
+            _renderer.Resize(width, height);
+        }
 
-        _renderer?.Dispose();
-        _renderer = new OffscreenRenderer(_device, _factory, width, height) { ClearColor = Colors.White };
         _rendererWidth = width;
         _rendererHeight = height;
         return _renderer;

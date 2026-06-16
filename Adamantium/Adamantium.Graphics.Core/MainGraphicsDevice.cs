@@ -31,7 +31,12 @@ namespace Adamantium.Graphics.Core
 
         public GraphicsAdapter GraphicsAdapter { get; private set; }
 
-        public IGraphicsDevice ResourceLoaderDevice { get; set; }
+        // The resource-loader device and the global descriptor heap belong to the main (logical) device for its
+        // whole lifetime, so the main device creates and owns them itself (see ctor) — callers only read the getters.
+        public IGraphicsDevice ResourceLoaderDevice { get; private set; }
+
+        // One shared heap per logical device, used by every render-device wrapper (they share one VkDevice).
+        public IDescriptorHeapManager DescriptorHeapManager { get; private set; }
 
         public Device LogicalDevice { get; private set; }
 
@@ -40,6 +45,9 @@ namespace Adamantium.Graphics.Core
         public QueueFamilyContainer QueueFamilyContainer { get; private set; }
 
         public static ReadOnlyCollection<string> DeviceExtensions { get; private set; }
+
+        // Optional (best-effort) extensions: enabled if the device supports them, never required. See CreateLogicalDevice.
+        public static ReadOnlyCollection<string> OptionalDeviceExtensions { get; private set; }
 
         internal Fence[] InFlightFences { get; private set; }
 
@@ -65,6 +73,20 @@ namespace Adamantium.Graphics.Core
             deviceExt.Add(Constants.VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
             deviceExt.Add(Constants.VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
             DeviceExtensions = new ReadOnlyCollection<string>(deviceExt);
+
+            // Cross-API shared-surface interop is OPTIONAL: enable every external-memory/semaphore transport the
+            // driver actually supports — both Win32 NT handles AND POSIX fds — instead of hard-coding one per OS.
+            // The producer dictates the handle flavour, not the consumer's OS: a D3D11/D3D12/GL producer on Windows
+            // hands an NT handle, a GL/dma-buf producer hands an fd, and an fd producer can exist on Windows too.
+            // These are NOT required — a machine without them still runs, it just can't import external surfaces;
+            // the optional pass in CreateLogicalDevice adds the supported ones without throwing.
+            OptionalDeviceExtensions = new ReadOnlyCollection<string>(new List<string>
+            {
+                Constants.VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME,
+                Constants.VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME,
+                Constants.VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME,
+                Constants.VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME,
+            });
         }
 
         public bool IsInDebugMode
@@ -94,6 +116,11 @@ namespace Adamantium.Graphics.Core
                         $"Main device created. Vulkan Instance addr: {VulkanInstance.NativePointer} LogicalDevice addr: {new IntPtr(LogicalDevice.NativePointer)}");
                 }
             }
+
+            // The resource-loader device and the shared descriptor heap live for the whole logical-device lifetime,
+            // so the main device owns them. Created here (after the logical device exists); callers just read them.
+            ResourceLoaderDevice = CreateResourceLoaderDevice();
+            DescriptorHeapManager = _graphicsDeviceFactory.CreateDescriptorHeapManager(ResourceLoaderDevice);
         }
 
         public void RemoveDevice(IGraphicsDevice device)
@@ -182,6 +209,15 @@ namespace Adamantium.Graphics.Core
             {
                 var diff = DeviceExtensions.Except(finalDeviceExtensions).ToArray();
                 throw new ExtensionNotSupportedException(GraphicsAdapter.AdapterProperties.DeviceName, diff);
+            }
+
+            // Optional extensions: enable whatever the device supports, never throw on the missing ones.
+            foreach (var extension in OptionalDeviceExtensions)
+            {
+                if (availableDeviceExtensions.Contains(extension) && !finalDeviceExtensions.Contains(extension))
+                {
+                    finalDeviceExtensions.Add(extension);
+                }
             }
 
             var descriptorBufferFeature = new PhysicalDeviceDescriptorBufferFeaturesEXT
@@ -277,7 +313,7 @@ namespace Adamantium.Graphics.Core
             return renderDevice;
         }
 
-        public IGraphicsDevice CreateResourceLoaderDevice()
+        private IGraphicsDevice CreateResourceLoaderDevice()
         {
             return _graphicsDeviceFactory.Create(this, GraphicsDeviceType.ResourceLoader);
         }
@@ -372,6 +408,12 @@ namespace Adamantium.Graphics.Core
 
             graphicsDevices.Clear();
             deviceMap.Clear();
+
+            // The main device owns these now; dispose the resource-loader device before the logical device (it frees
+            // the shared heap's buffers, which were allocated through it).
+            ResourceLoaderDevice?.Dispose();
+            ResourceLoaderDevice = null;
+            DescriptorHeapManager = null;
 
             LogicalDevice?.Dispose();
             LogicalDevice = null;

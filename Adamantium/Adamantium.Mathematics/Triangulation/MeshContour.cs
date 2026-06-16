@@ -7,7 +7,7 @@ namespace Adamantium.Mathematics.Triangulation;
 public class MeshContour
 {
     public string Name { get; set; }
-    public Vector2[] Points { get; set; }
+    public Vector2[] Points { get; set; } = [];
 
     public List<GeometryIntersection> GeometryPoints { get; set; }
 

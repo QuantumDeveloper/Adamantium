@@ -89,21 +89,30 @@ namespace Adamantium.UI.Generators
                     }
                     
                     var diagnostics = new RoslynDiagnosticSink(spc);
-                    
-                    var aumlMetadataContainer = transformer.Transform(aumlDoc, typeResolver, diagnostics);
-                    if (diagnostics.HasErrors)
-                    {
-                        continue;
-                    }
-                    
-                    codeGenerator.GenerateSourceCode(aumlMetadataContainer, new RoslynOutputSink(spc), diagnostics);
 
-                    if (aumlMetadataContainer.RootEntityType == EntityType.ResourceDictionary)
+                    try
                     {
-                        var info = new ResourceDictionaryInfo(
-                            $"/{aumlDoc.RelativeFilePath}",
-                            $"{aumlMetadataContainer.FullClassName}");
-                        resourceDictionaries.Add(info);
+                        var aumlMetadataContainer = transformer.Transform(aumlDoc, typeResolver, diagnostics);
+                        if (diagnostics.HasErrors)
+                        {
+                            continue;
+                        }
+
+                        codeGenerator.GenerateSourceCode(aumlMetadataContainer, new RoslynOutputSink(spc), diagnostics);
+
+                        if (aumlMetadataContainer.RootEntityType == EntityType.ResourceDictionary)
+                        {
+                            var info = new ResourceDictionaryInfo(
+                                $"/{aumlDoc.RelativeFilePath}",
+                                $"{aumlMetadataContainer.FullClassName}");
+                            resourceDictionaries.Add(info);
+                        }
+                    }
+                    catch (System.Exception ex)
+                    {
+                        // Don't let one bad document silently abort generation (CS8785); surface where it broke.
+                        var flat = ex.ToString().Replace("\r", "").Replace("\n", " | ");
+                        spc.ReportDiagnostic(Diagnostic.Create("AUI900", "Build", $"AUML generation failed for {aumlDoc.RelativeFilePath}: {flat}", DiagnosticSeverity.Error, DiagnosticSeverity.Error, true, 0));
                     }
                 }
 

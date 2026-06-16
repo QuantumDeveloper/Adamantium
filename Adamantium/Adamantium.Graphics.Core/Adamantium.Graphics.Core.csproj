@@ -26,8 +26,6 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.Core\AdamantiumVulkan.Core.csproj" />
-		<ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.MacOS\AdamantiumVulkan.MacOS.csproj" />
-		<ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.Windows\AdamantiumVulkan.Windows.csproj" />
 		<ProjectReference Include="..\Adamantium.EffectsCompiler\Adamantium.EffectsCompiler.csproj" />
 		<ProjectReference Include="..\Adamantium.Imaging\Adamantium.Imaging.csproj" />
 		<ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />

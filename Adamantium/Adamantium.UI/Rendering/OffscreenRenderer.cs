@@ -102,5 +102,16 @@ public sealed class OffscreenRenderer : IDisposable
         UpdateViewportScissor(width, height);
     }
 
-    public void Dispose() => _presenter?.Dispose();
+    /// <summary>
+    /// Frees the cached render units (their GPU buffers) without tearing down the presenter. Call between renders
+    /// when each frame is a fresh visual tree (the AUML designer) so units don't accumulate. The caller must
+    /// ensure the GPU is idle - <see cref="RenderFrame"/> leaves it idle on return.
+    /// </summary>
+    public void ResetCache() => _renderCache.DisposeUnits();
+
+    public void Dispose()
+    {
+        _renderCache.DisposeUnits();
+        _presenter?.Dispose();
+    }
 }

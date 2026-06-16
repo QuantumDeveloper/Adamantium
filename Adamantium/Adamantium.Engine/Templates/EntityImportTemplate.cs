@@ -22,7 +22,7 @@ public class EntityImportTemplate : IEntityTemplate
     private Vector3 initialPosition;
     //private EntityFramework.Components.Camera camera;
 
-    public EntityImportTemplate(SceneData sceneData, IContentManager manager, ECS.Components.Camera camera)
+    public EntityImportTemplate(SceneData sceneData, IContentManager manager, Camera camera)
     {
         this.sceneData = sceneData;
         contentManager = manager;
@@ -51,10 +51,10 @@ public class EntityImportTemplate : IEntityTemplate
                 return null;
             }
 
-            Dictionary<String, Entity> nameToEntityId = new Dictionary<string, Entity>();
+            var nameToEntityId = new Dictionary<string, Entity>();
             owner.Name = sceneData.Name;
             nameToEntityId.Add(sceneData.Models.ToString(), owner);
-            Stack<SceneData.Model> stack = new Stack<SceneData.Model>();
+            var stack = new Stack<SceneData.Model>();
             stack.Push(sceneData.Models);
             while (stack.Count > 0)
             {
@@ -81,7 +81,7 @@ public class EntityImportTemplate : IEntityTemplate
                 //Если меш разбит на части, тогда создаём дополнительные энтити, которые будут дочерними по отношению к текущему
                 else
                 {
-                    int count = 1;
+                    var count = 1;
                     foreach (var mesh in currentMesh.Meshes)
                     {
                         var entityPart = new Entity(entity, $"{currentMesh.Name} ({count})");
@@ -99,7 +99,7 @@ public class EntityImportTemplate : IEntityTemplate
                 if (sceneData.Controllers.ContainsKey(currentMesh.ID))
                 {
                     var controllerData = sceneData.Controllers[currentMesh.ID];
-                    AnimationController controller = new AnimationController();
+                    var controller = new AnimationController();
                     controller.BindShapeMatrix = controllerData.BindShapeMatrix;
                     controller.ControllerId = controllerData.Name;
                     controller.JointDictionary = controllerData.JointDictionary;
@@ -115,7 +115,7 @@ public class EntityImportTemplate : IEntityTemplate
 
             if (sceneData.Animation.Count > 0)
             {
-                AnimationComponent animation = new AnimationComponent();
+                var animation = new AnimationComponent();
                 animation.Animations = sceneData.Animation;
                 animation.Skeletons = sceneData.Skeletons;
 
@@ -138,8 +138,8 @@ public class EntityImportTemplate : IEntityTemplate
 
     private void CalculateBoundBoxes(Entity root)
     {
-        List<Entity> roots = new List<Entity>();
-        Queue<Entity> queue = new Queue<Entity>();
+        var roots = new List<Entity>();
+        var queue = new Queue<Entity>();
         queue.Enqueue(root);
         if (root.Dependencies.Count > 0)
         {
@@ -160,7 +160,7 @@ public class EntityImportTemplate : IEntityTemplate
             }
         }
 
-        for (int i = roots.Count - 1; i >= 0; --i)
+        for (var i = roots.Count - 1; i >= 0; --i)
         {
             var rootCollider = roots[i].GetOrCreateComponent<BoxCollider>();
             foreach (var entity in roots[i].Dependencies)
@@ -182,7 +182,7 @@ public class EntityImportTemplate : IEntityTemplate
 
     private void WriteMeshData(Entity entity, Mesh mesh)
     {
-        MeshData meshData = new MeshData();
+        var meshData = new MeshData();
         meshData.Mesh = mesh;
         entity.AddComponent(meshData);
 
@@ -207,7 +207,7 @@ public class EntityImportTemplate : IEntityTemplate
             sceneData.Materials.TryGetValue(mesh.MaterialID, out materialData);
             if (materialData != null)
             {
-                Material material = new Material();
+                var material = new Material();
                 material.AmbientColor = materialData.AmbientColor;
                 material.DiffuseColor = materialData.DiffuseColor;
                 materialData.SpecularColor = materialData.SpecularColor;
@@ -224,7 +224,7 @@ public class EntityImportTemplate : IEntityTemplate
                     material.TexturePath = sceneData.Images[materialData.DiffuseMap].FilePath;
                     if (File.Exists(material.TexturePath))
                     {
-                        ContentLoadOptions options = new ContentLoadOptions()
+                        var options = new ContentLoadOptions()
                         {
                             AllowDuplication = false,
                             IgnoreRootDirectory = true
@@ -236,13 +236,13 @@ public class EntityImportTemplate : IEntityTemplate
             }
             else
             {
-                Material material = new Material();
+                var material = new Material();
                 entity.AddComponent(material);
             }
         }
         else
         {
-            Material material = new Material();
+            var material = new Material();
             entity.AddComponent(material);
         }
     }

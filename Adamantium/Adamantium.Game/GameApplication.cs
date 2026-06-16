@@ -34,7 +34,9 @@ public abstract class GameApplication : UIApplication
 
     private void ServiceManagerOnOnDrawFinished(IRenderService arg1, AppTime arg2)
     {
-        GameService.CopyOutput(arg1.GraphicsDevice);
+        // Shared-surface publish happens in each game's own render cycle (RenderingProcessor.EndDraw records the
+        // copy into that game's command buffer and its Submit signals Produce). Driving it from the UI service's
+        // OnDrawFinished would record onto the wrong device/queue.
     }
 
     protected override void RegisterServices(IContainerRegistry containerRegistry)

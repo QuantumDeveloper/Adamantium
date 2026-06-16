@@ -144,7 +144,7 @@ public class ForwardRenderingProcessor : RenderingProcessor
                 {
                     BasicEffect.BasicColoredPass.Apply();
                 }
-                
+
                 component.Draw(GraphicsDevice, gameTime);
             }
         }

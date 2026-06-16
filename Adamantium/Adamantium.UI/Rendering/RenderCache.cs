@@ -30,6 +30,24 @@ public class RenderCache
         BuildRenderCommands(visualRoot);
     }
 
+    /// <summary>
+    /// Immediately disposes every cached render unit and empties the cache. The caller must ensure the GPU is
+    /// idle first (e.g. after a DeviceWaitIdle). Used by the off-screen designer, which builds a brand-new tree
+    /// each render: those controls never detach (each owns its own root window), so the attachment-based
+    /// reconciliation can't reclaim them - the designer resets the cache between renders instead.
+    /// </summary>
+    public void DisposeUnits()
+    {
+        foreach (var units in _unitsByControl.Values)
+        {
+            foreach (var unit in units)
+                unit?.Dispose();
+        }
+
+        _unitsByControl.Clear();
+        _renderUnits.Clear();
+    }
+
     public void ProcessCommands(Matrix4x4F projectionMatrix)
     {
         foreach (var unit in _renderUnits)
@@ -39,6 +57,15 @@ public class RenderCache
         }
     }
     
+    /// <summary>Out-of-render-pass pass: recorded before BeginRendering (shared-surface latch copies).</summary>
+    public void PreRender()
+    {
+        foreach (var unit in _renderUnits)
+        {
+            unit.PreRender();
+        }
+    }
+
     public void Render()
     {
         foreach (var unit in _renderUnits)

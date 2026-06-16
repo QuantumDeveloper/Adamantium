@@ -34,12 +34,10 @@ float4 Textured_PS(VERTEX_OUTPUT input) : SV_TARGET
 {
    //float4 color = shaderTexture.Sample(sampleType, input.uv0) * fillColor;
    float4 color = shaderTexture.Sample(sampleType, input.uv0);
-   
-   /*if (color.a < 0.01)
-   {
-        color = fillColor;
-   }*/   
-   
+
+   // Apply the control's opacity so a textured element (image / RenderTargetPanel) honours Opacity, like SolidColor_PS.
+   color.a *= opacity;
+
    return color;
 }
 
