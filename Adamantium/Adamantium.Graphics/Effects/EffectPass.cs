@@ -26,7 +26,7 @@ public sealed class EffectPass : DisposableObject, IEffectPass
     /// <c>false</c> = VK_EXT_descriptor_buffer (the working path on current hardware);
     /// <c>true</c>  = VK_EXT_descriptor_heap (implementation is correct, but on Turing the screen is black due to an NVIDIA driver bug).
     /// </summary>
-    public static bool UseDescriptorHeap = false;
+    public static bool UseDescriptorHeap = true;
 
     /// <summary>
     ///   Gets the attributes associated with this pass.

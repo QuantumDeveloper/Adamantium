@@ -216,19 +216,11 @@ internal class EffectResourceLinker : IEffectResourceLinker
                 // Descriptor-heap path only: in descriptor_buffer mode the GPU samples via per-pass descriptor
                 // buffers (EffectPass.Create*Descriptor reads .Resource directly), so writing into the global heap
                 // here is wasted work and the heap isn't even allocated. Skip it.
+                // Same bindless fix as textures: each sampler gets its OWN stable heap slot instead of sharing one
+                // per-parameter slot (which made the last-bound sampler apply to every draw).
                 if (state != null && EffectPass.UseDescriptorHeap)
                 {
-                    if (states[index].GlobalHeapOffset == uint.MaxValue)
-                    {
-                        uint descSize = (uint)DescriptorHeapManager.DeviceHeapProperties.SamplerDescriptorSize;
-                        states[index].GlobalHeapOffset = DescriptorHeapManager.AllocateSamplerOffset(descSize);
-                    }
-
-                    if (states[index].IsDirty)
-                    {
-                        DescriptorHeapManager.WriteSampler(states[index].GlobalHeapOffset, state);
-                        states[index].IsDirty = false;
-                    }
+                    states[index].GlobalHeapOffset = DescriptorHeapManager.GetOrAllocateSamplerOffset(state);
                 }
             }
                 break;
@@ -250,22 +242,13 @@ internal class EffectResourceLinker : IEffectResourceLinker
                 {
                     views[index].Resource = texture;
 
-                    // Descriptor-heap path only (see SamplerState case above).
+                    // Descriptor-heap path: bind this texture's OWN stable heap slot (bindless). Previously the offset
+                    // was allocated per parameter, so every texture bound to ShaderTexture shared ONE slot and the
+                    // last-written one showed up on every draw. Now the slot belongs to the texture itself.
                     if (EffectPass.UseDescriptorHeap)
                     {
-                        if (views[index].GlobalHeapOffset == uint.MaxValue)
-                        {
-                            uint descSize = (uint)DescriptorHeapManager.DeviceHeapProperties.ImageDescriptorSize;
-                            uint descAlignment = (uint)DescriptorHeapManager.DeviceHeapProperties.ImageDescriptorAlignment;
-                            views[index].GlobalHeapOffset = DescriptorHeapManager.AllocateResourceOffset(descSize, descAlignment);
-                        }
-
-                        if (views[index].IsDirty)
-                        {
-                            DescriptorHeapManager.WriteTexture(views[index].GlobalHeapOffset, texture,
-                                DescriptorType.SampledImage);
-                            views[index].IsDirty = false;
-                        }
+                        views[index].GlobalHeapOffset =
+                            DescriptorHeapManager.GetOrAllocateTextureOffset(texture, DescriptorType.SampledImage);
                     }
                 }
             }
@@ -288,26 +271,13 @@ internal class EffectResourceLinker : IEffectResourceLinker
                     
                     uavs[index].Resource = buffer;
 
-                    // Descriptor-heap path only (see SamplerState case above).
+                    // Descriptor-heap path: bind this buffer's OWN stable heap slot (bindless) — same per-resource fix
+                    // as textures/samplers. The old per-parameter slot would make the last-bound UAV apply to every
+                    // draw once compute/UAV is actually used.
                     if (EffectPass.UseDescriptorHeap)
                     {
-                        if (uavs[index].GlobalHeapOffset == uint.MaxValue)
-                        {
-                            uint descSize = (uint)DescriptorHeapManager.DeviceHeapProperties.BufferDescriptorSize;
-                            uint descAlignment = (uint)(ulong)DescriptorHeapManager.DeviceHeapProperties.BufferDescriptorAlignment;
-                            uavs[index].GlobalHeapOffset = DescriptorHeapManager.AllocateResourceOffset(descSize, descAlignment);
-                        }
-
-                        if (uavs[index].IsDirty)
-                        {
-                            DescriptorHeapManager.WriteBuffer(
-                                uavs[index].GlobalHeapOffset,
-                                buffer,
-                                0,
-                                buffer.TotalSize,
-                                DescriptorType.StorageBuffer);
-                            uavs[index].IsDirty = false;
-                        }
+                        uavs[index].GlobalHeapOffset =
+                            DescriptorHeapManager.GetOrAllocateBufferOffset(buffer, DescriptorType.StorageBuffer);
                     }
                 }
             }
