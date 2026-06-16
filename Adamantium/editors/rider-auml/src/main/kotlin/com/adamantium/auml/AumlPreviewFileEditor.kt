@@ -26,15 +26,19 @@ import java.awt.Graphics
 import java.awt.Graphics2D
 import java.awt.Rectangle
 import java.awt.RenderingHints
+import java.awt.event.ComponentAdapter
+import java.awt.event.ComponentEvent
 import java.awt.image.BufferedImage
 import java.beans.PropertyChangeListener
 import java.io.File
 import javax.imageio.ImageIO
 import javax.swing.JButton
 import javax.swing.JComponent
+import javax.swing.JToggleButton
 import javax.swing.JPanel
 import javax.swing.JViewport
 import javax.swing.Scrollable
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -55,6 +59,7 @@ class AumlPreviewFileEditor(
 
     private var scale = 1.0
     private var updatingZoom = false
+    private var autoFit = true   // keep the frame fitted to the viewport until the user zooms manually
 
     private val canvas = ZoomableCanvas()
     private val zoomCombo = ComboBox(ZOOM_PRESETS.map { percent(it) }.toTypedArray()).apply {
@@ -66,6 +71,14 @@ class AumlPreviewFileEditor(
         foreground = JBColor.RED
         border = JBUI.Borders.emptyLeft(12)
         isVisible = false
+    }
+    private val sizeLabel = JBLabel().apply { border = JBUI.Borders.emptyLeft(8) }
+    // Stays "pressed" while auto-fit is tracking the window; pops out when you zoom manually — a visible
+    // indicator of the auto-fit state. Clicking it always (re-)fits and turns tracking back on.
+    private val fitToggle = JToggleButton("Fit").apply {
+        toolTipText = "Fit to window — stays on until you zoom manually"
+        isSelected = true
+        addActionListener { fitNow() }
     }
     private val scrollPane = JBScrollPane(canvas).apply { isWheelScrollingEnabled = false }
     private val root = JPanel(BorderLayout()).apply {
@@ -85,6 +98,10 @@ class AumlPreviewFileEditor(
                 bar.value += e.wheelRotation * bar.unitIncrement * 3
             }
         }
+        // While auto-fit is on, keep the frame fitted as the panel is resized.
+        scrollPane.viewport.addComponentListener(object : ComponentAdapter() {
+            override fun componentResized(e: ComponentEvent) { if (autoFit) applyFit() }
+        })
         scheduleRender()
     }
 
@@ -93,7 +110,35 @@ class AumlPreviewFileEditor(
         add(zoomCombo)
         add(JButton("+").apply { addActionListener { setScale(scale * ZOOM_STEP) } })
         add(JButton("100%").apply { addActionListener { setScale(1.0) } })
+        add(fitToggle)
+        add(JButton("⟳").apply { toolTipText = "Re-render now"; addActionListener { renderNow(announce = true) } })
+        add(JButton("Bg").apply { toolTipText = "Background: checkerboard / dark / light"; addActionListener { canvas.cycleBackground() } })
+        add(sizeLabel)
         add(errorLabel)
+    }
+
+    /** Fit button: fit the whole frame to the window AND re-enable auto-fit so it keeps tracking the window. */
+    private fun fitNow() {
+        autoFit = true
+        fitToggle.isSelected = true   // clicking when already on (Swing toggled it off) keeps it visibly on
+        applyFit()
+    }
+
+    /** Applies the fit scale (no-op if the frame already fits, so it never fights a manual zoom). */
+    private fun applyFit() {
+        val target = computeFitScale() ?: return
+        if (abs(target - scale) > 0.005) setScale(target, userInitiated = false)
+    }
+
+    /** Scale that fits the whole rendered frame into the viewport (with a small margin), clamped; null if empty. */
+    private fun computeFitScale(): Double? {
+        val design = canvas.designSize() ?: return null
+        val view = scrollPane.viewport.extentSize
+        if (design.width <= 0 || design.height <= 0 || view.width <= 0 || view.height <= 0) return null
+        val margin = 8   // a little breathing room so the frame isn't flush against the edges
+        val fit = minOf((view.width - margin).toDouble() / design.width,
+                        (view.height - margin).toDouble() / design.height)
+        return fit.coerceIn(MIN_SCALE, MAX_SCALE)
     }
 
     private fun applyZoomText(text: String) {
@@ -101,7 +146,8 @@ class AumlPreviewFileEditor(
         setScale(value / 100.0)
     }
 
-    private fun setScale(newScale: Double) {
+    private fun setScale(newScale: Double, userInitiated: Boolean = true) {
+        if (userInitiated) { autoFit = false; fitToggle.isSelected = false }   // manual zoom stops (and un-presses) auto-fit
         scale = newScale.coerceIn(MIN_SCALE, MAX_SCALE)
         canvas.displayScale = scale // instant feedback: scales the current frame until the re-render lands
         updatingZoom = true
@@ -116,9 +162,14 @@ class AumlPreviewFileEditor(
         alarm.addRequest({ renderNow() }, DEBOUNCE_MS)
     }
 
-    /** On the EDT: snapshot text + scale, then render off-thread and apply the result back on the EDT. */
-    private fun renderNow() {
+    /**
+     * On the EDT: snapshot text + scale, then render off-thread and apply the result back on the EDT.
+     * announce=true (manual ⟳) shows a transient "rendering…" so the click visibly takes effect even when
+     * the markup is unchanged and the resulting frame looks identical.
+     */
+    private fun renderNow(announce: Boolean = false) {
         val doc = document ?: return
+        if (announce) { sizeLabel.text = "rendering…"; errorLabel.isVisible = false }
         val text = doc.text
         val renderScale = scale
         ApplicationManager.getApplication().executeOnPooledThread {
@@ -132,8 +183,13 @@ class AumlPreviewFileEditor(
         if (image != null) {
             // The host may render below the requested scale (size cap); use the scale it actually rendered at so
             // the canvas upscales to the requested zoom. Updating only on success keeps the last good frame.
-            canvas.setImage(image, result.scale ?: requestedScale)
+            val frameScale = result.scale ?: requestedScale
+            canvas.setImage(image, frameScale)
+            sizeLabel.text = "${(image.width / frameScale).roundToInt()} × ${(image.height / frameScale).roundToInt()} px"
             errorLabel.isVisible = false
+            // Auto-fit: snap to fit on the first frame and while tracking. applyFit no-ops once we're already
+            // at the fit scale, so this can't loop re-rendering.
+            if (autoFit) applyFit()
         } else {
             errorLabel.text = result.error ?: "render failed"
             errorLabel.isVisible = true
@@ -179,11 +235,32 @@ class AumlPreviewFileEditor(
             return Dimension(max(1, (img.width * factor).roundToInt()), max(1, (img.height * factor).roundToInt()))
         }
 
+        /** The frame's design size in px (the image divided by the scale it was rendered at), or null if empty. */
+        fun designSize(): Dimension? {
+            val img = image ?: return null
+            return Dimension(max(1, (img.width / renderedScale).roundToInt()),
+                             max(1, (img.height / renderedScale).roundToInt()))
+        }
+
         override fun getPreferredSize(): Dimension = displayedSize()
+
+        enum class Background { CHECKERBOARD, DARK, LIGHT }
+
+        private var background = Background.CHECKERBOARD
+
+        /** Cycles the canvas backdrop: checkerboard (shows transparency) -> solid dark -> solid light. */
+        fun cycleBackground() {
+            background = Background.entries[(background.ordinal + 1) % Background.entries.size]
+            repaint()
+        }
 
         override fun paintComponent(g: Graphics) {
             val g2 = g as Graphics2D
-            paintCheckerboard(g2)
+            when (background) {
+                Background.CHECKERBOARD -> paintCheckerboard(g2)
+                Background.DARK -> { g2.color = SOLID_DARK; g2.fillRect(0, 0, width, height) }
+                Background.LIGHT -> { g2.color = SOLID_LIGHT; g2.fillRect(0, 0, width, height) }
+            }
             val img = image ?: return
             val size = displayedSize()
             val x = max(0, (width - size.width) / 2)
@@ -225,6 +302,8 @@ class AumlPreviewFileEditor(
         private const val CHECKER_TILE = 12
         private val CHECKER_DARK = JBColor(0xC8C8C8, 0x3C3F41)
         private val CHECKER_LIGHT = JBColor(0xE8E8E8, 0x4B4F52)
+        private val SOLID_DARK = JBColor(0x2B2B2B, 0x2B2B2B)
+        private val SOLID_LIGHT = JBColor(0xFFFFFF, 0xFFFFFF)
 
         private fun percent(scale: Double): String = "${(scale * 100).roundToInt()}%"
     }
