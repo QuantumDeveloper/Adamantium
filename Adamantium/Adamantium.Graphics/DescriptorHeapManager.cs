@@ -139,6 +139,57 @@ public class DescriptorHeapManager : DisposableObject, IDescriptorHeapManager
         }
     }
 
+    // Bindless slot caches: each unique texture/sampler gets ONE stable heap slot (its descriptor written once),
+    // instead of one slot per shader parameter that every bind overwrote (which made the last-bound texture/sampler
+    // show up on every draw). Keyed by the resource object; render targets keep a stable view, so the slot stays valid.
+    private readonly System.Collections.Generic.Dictionary<ITexture, uint> _textureHeapOffsets = new();
+    private readonly System.Collections.Generic.Dictionary<SamplerState, uint> _samplerHeapOffsets = new();
+    private readonly System.Collections.Generic.Dictionary<IBuffer, uint> _bufferHeapOffsets = new();
+
+    public uint GetOrAllocateBufferOffset(IBuffer buffer, DescriptorType type)
+    {
+        lock (_heapSync)
+        {
+            if (_bufferHeapOffsets.TryGetValue(buffer, out var existing)) return existing;
+
+            uint descSize = (uint)DeviceHeapProperties.BufferDescriptorSize;
+            uint descAlignment = (uint)(ulong)DeviceHeapProperties.BufferDescriptorAlignment;
+            uint offset = AllocateResourceOffset(descSize, descAlignment); // _heapSync is re-entrant
+            WriteBuffer(offset, buffer, 0, buffer.TotalSize, type);        // whole-buffer binding
+            _bufferHeapOffsets[buffer] = offset;
+            return offset;
+        }
+    }
+
+    public uint GetOrAllocateTextureOffset(ITexture texture, DescriptorType type)
+    {
+        lock (_heapSync)
+        {
+            if (_textureHeapOffsets.TryGetValue(texture, out var existing)) return existing;
+
+            uint descSize = (uint)DeviceHeapProperties.ImageDescriptorSize;
+            uint descAlignment = (uint)DeviceHeapProperties.ImageDescriptorAlignment;
+            uint offset = AllocateResourceOffset(descSize, descAlignment); // _heapSync is re-entrant
+            WriteTexture(offset, texture, type);
+            _textureHeapOffsets[texture] = offset;
+            return offset;
+        }
+    }
+
+    public uint GetOrAllocateSamplerOffset(SamplerState samplerState)
+    {
+        lock (_heapSync)
+        {
+            if (_samplerHeapOffsets.TryGetValue(samplerState, out var existing)) return existing;
+
+            uint descSize = (uint)DeviceHeapProperties.SamplerDescriptorSize;
+            uint offset = AllocateSamplerOffset(descSize);
+            WriteSampler(offset, samplerState);
+            _samplerHeapOffsets[samplerState] = offset;
+            return offset;
+        }
+    }
+
     public void WriteTexture(uint offset, ITexture texture, DescriptorType type)
     {
         uint descriptorSize = (uint)graphicsDevice.Adapter.DeviceHeapProperties.ImageDescriptorSize;
