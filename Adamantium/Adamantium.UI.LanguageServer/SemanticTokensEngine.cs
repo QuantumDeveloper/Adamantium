@@ -81,6 +81,25 @@ public static class SemanticTokensEngine
         int type;
         if (element)
         {
+            // Property-element syntax <Owner.Property> (e.g. <RenderTargetPanel.Behaviors>): the tag name is not a
+            // type, it's a type plus a property. Colour the owner like a type and the trailing .Property like a
+            // property, instead of trying (and failing) to resolve "Owner.Property" as a type and painting the
+            // whole tag red (Unknown). Split on the first '.', since the owner is always a simple type name.
+            int dot = -1;
+            for (int k = localStart; k < end; k++) if (text[k] == '.') { dot = k; break; }
+            if (dot > localStart && dot + 1 < end)
+            {
+                int ownerLength = dot - localStart;
+                var ownerXmlns = namespaces.TryGetValue(prefix, out var ownerUri) ? ownerUri : "";
+                int ownerType = model is null
+                    || (ownerXmlns.Length > 0 && model.GetElement(ownerXmlns, text.Substring(localStart, ownerLength)) is not null)
+                        ? Type
+                        : Unknown;
+                tokens.Add(new SemToken(localStart, ownerLength, ownerType));
+                tokens.Add(new SemToken(dot + 1, end - (dot + 1), Property));
+                return;
+            }
+
             // A resolved type -> 'type'; an unresolved one -> 'unknown' (client paints it red). When the
             // project model is unavailable we can't tell, so fall back to 'type' (no false red).
             if (model is null)
