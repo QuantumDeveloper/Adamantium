@@ -126,6 +126,9 @@ public class RenderingService : EntityService
         GraphicsDevice.ColorComponentFlags = AdamantiumVulkan.Core.ColorComponentFlagBits.RBit |
                                              AdamantiumVulkan.Core.ColorComponentFlagBits.GBit |
                                              AdamantiumVulkan.Core.ColorComponentFlagBits.BBit;
+        // The game scene is opaque (the model writes solid texels); render it with an opaque blend equation, not
+        // whatever blend state the UI pass left set (an alpha/premultiplied blend collapsed the model to black).
+        GraphicsDevice.ColorBlendEquation = Adamantium.Graphics.Core.ColorBlendEquations.Opaque;
 
         if (!GraphicsDevice.BeginDraw())
         {
