@@ -75,7 +75,8 @@ internal static class LspSelfTest
         var (themePropText, tpLine, tpChar) = Caret(
             """<Theme xmlns="http://adamantium/ui/resources"><Theme.Sty|</Theme>""");
         // Semantic tokens: resolved element -> 'type', prefix -> 'namespace', attribute -> 'property', x: -> 'macro'.
-        const string semanticDoc = """<StyleSet xmlns="http://adamantium/ui/resources" xmlns:controls="http://adamantium/ui" xmlns:x="http://adamantium/ui/xaml/extensions"><controls:Border Background="Red" x:Name="b"/><Bogus/></StyleSet>""";
+        // A property-element <Owner.Property> must colour as type + property (NOT one 'unknown' tag painted red).
+        const string semanticDoc = """<StyleSet xmlns="http://adamantium/ui/resources" xmlns:controls="http://adamantium/ui" xmlns:x="http://adamantium/ui/xaml/extensions"><controls:Border Background="Red" x:Name="b"/><controls:Border.Child/><Bogus/></StyleSet>""";
         // Undeclared x: prefix (xmlns:x deleted) -> Alt+Enter on x:Name offers to declare the directives namespace.
         const string xPrefixDoc = """<Border xmlns="http://adamantium/ui" x:Name="root"></Border>""";
         var xName = Pos(xPrefixDoc, "x:Name");
