@@ -64,12 +64,14 @@ internal sealed class FakeRenderUnit : IRenderUnit
     public Type PayloadType => _command.Payload.GetType();
 
     public int UpdateCount { get; private set; }
+    public int PreRenderCount { get; private set; }
     public int RenderCount { get; private set; }
     public int UpdateWithCommandCount { get; private set; }
     public int DisposeCount { get; private set; }
     public int DeferDisposeCount { get; private set; }
 
     public void Update(Matrix4x4F transform, Matrix4x4F projection) => UpdateCount++;
+    public void PreRender() => PreRenderCount++;
     public void Render() => RenderCount++;
 
     public void UpdateWithDrawCommand(IDrawCommand command)

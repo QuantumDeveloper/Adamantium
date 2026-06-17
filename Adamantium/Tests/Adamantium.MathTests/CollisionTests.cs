@@ -99,8 +99,10 @@ namespace Adamantium.MathTests
             var intersects = Collision2D.RaySegmentIntersection(ref ray, ref segment2D, out var point);
 
             Assert.IsTrue(intersects);
-            Assert.AreEqual(0.2, point.X);
-            Assert.AreEqual(0.2, point.Y);
+            // The intersection point is computed, so compare with a tolerance rather than for exact bit-equality
+            // (the Y came out as 0.2000000000000001 — last-ULP floating-point error, not a logic error).
+            Assert.AreEqual(0.2, point.X, 1e-9);
+            Assert.AreEqual(0.2, point.Y, 1e-9);
         }
 
 

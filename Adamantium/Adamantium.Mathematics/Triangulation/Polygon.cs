@@ -87,6 +87,12 @@ namespace Adamantium.Mathematics.Triangulation
         /// <returns></returns>
         public List<Vector3> FillIndirect(bool triangulate = true)
         {
+            // Fast-path: when every contour is a simple, closed ring and no two edges cross (pure nesting), resolve
+            // holes by containment + fill rule and earcut. O(n log n) detection + ~O(n) triangulation, bypassing
+            // both the O(n^2) self-intersection scan and the O(n^2) MergeContours. Crossings / self-intersections
+            // fall through to the full pipeline below.
+            if (TryFastTriangulate(triangulate, out var fast)) return fast;
+
             var localContourContainers = new List<ContoursContainer>();
 
             foreach (var container in contourContainers)
@@ -137,6 +143,8 @@ namespace Adamantium.Mathematics.Triangulation
             
                 if (triangulate)
                 {
+                    // Reached only for genuinely intersecting/overlapping contours (the clean nesting case was
+                    // handled by TryFastTriangulate above). The scanline resolves crossings per fill rule.
                     var result = Triangulator.Triangulate(this);
                     lock (vertexLocker)
                     {
@@ -144,8 +152,147 @@ namespace Adamantium.Mathematics.Triangulation
                     }
                 }
             }
-            
+
             return vertices;
+        }
+
+        /// <summary>
+        /// Fast path for clean geometry: every contour is a simple, closed ring and no two edges cross (pure
+        /// nesting). Resolves holes by containment + <see cref="FillRule"/> and triangulates with earcut, bypassing
+        /// the O(n^2) self-intersection scan and the O(n^2) MergeContours. Returns false (caller uses the full
+        /// pipeline) for anything with crossings or self-intersections.
+        /// </summary>
+        private bool TryFastTriangulate(bool triangulate, out List<Vector3> result)
+        {
+            result = null;
+
+            var rings = new List<Vector2[]>();
+            var processedContours = new List<MeshContour>();
+            foreach (var container in contourContainers)
+                foreach (var contour in container.Contours)
+                {
+                    if (!contour.IsGeometryClosed || contour.Points == null || contour.Points.Length < 3) return false;
+                    var copy = contour.Copy();
+                    copy.SplitOnSegments();
+                    if (copy.Points.Length < 3) return false;
+                    processedContours.Add(copy);
+                    rings.Add(copy.Points);
+                }
+            if (rings.Count == 0) return false;
+
+            // A single convex contour is provably simple with no holes -> fan directly, skipping the broad-phase
+            // intersection scan entirely (convexity already guarantees no self-intersection).
+            if (rings.Count == 1 && MathHelper.IsConvex(rings[0]))
+            {
+                ProcessedContours.AddRange(processedContours);
+                result = triangulate ? Triangulator.FanTriangulate(rings[0]) : new List<Vector3>();
+                return true;
+            }
+
+            // Reject anything that isn't pure nesting (self- or inter-contour crossings) -> full pipeline.
+            if (HasProperIntersections(rings)) return false;
+
+            ProcessedContours.AddRange(processedContours);
+            result = new List<Vector3>();
+            if (!triangulate) return true;
+
+            // Nesting depth of each ring (number of other rings that contain it).
+            var depth = new int[rings.Count];
+            for (var i = 0; i < rings.Count; i++)
+                for (var j = 0; j < rings.Count; j++)
+                    if (i != j && PointInPolygon(rings[i][0], rings[j])) depth[i]++;
+
+            // NonZero behaves as OuterContour here: outermost rings only, filled solid. EvenOdd / OuterContour:
+            // even-depth rings fill, odd-depth rings directly inside them are holes. (Matches the merge+scanline
+            // result for clean nesting — guarded by the fill-rule truth-table tests.)
+            var nonZero = FillRule == FillRule.NonZero;
+            for (var i = 0; i < rings.Count; i++)
+            {
+                var isFill = nonZero ? depth[i] == 0 : (depth[i] & 1) == 0;
+                if (!isFill) continue;
+
+                List<IReadOnlyList<Vector2>> holes = null;
+                if (!nonZero)
+                {
+                    for (var j = 0; j < rings.Count; j++)
+                    {
+                        if (i == j || depth[j] != depth[i] + 1) continue;
+                        if (PointInPolygon(rings[j][0], rings[i])) (holes ??= new List<IReadOnlyList<Vector2>>()).Add(rings[j]);
+                    }
+                }
+
+                if (holes == null)
+                    result.AddRange(MathHelper.IsConvex(rings[i]) ? Triangulator.FanTriangulate(rings[i]) : Triangulator.EarcutTriangulate(rings[i]));
+                else
+                    result.AddRange(Triangulator.EarcutWithHoles(rings[i], holes));
+            }
+            return true;
+        }
+
+        /// <summary>True if any two non-adjacent edges of the given rings cross or touch (T-junction). X-sweep
+        /// broad-phase, so ~O(n log n) for clean input instead of O(n^2).</summary>
+        private static bool HasProperIntersections(List<Vector2[]> rings)
+        {
+            var edges = new List<(Vector2 a, Vector2 b)>();
+            foreach (var ring in rings)
+            {
+                var n = ring.Length;
+                for (var i = 0; i < n; i++) edges.Add((ring[i], ring[(i + 1) % n]));
+            }
+            edges.Sort((e, f) => Math.Min(e.a.X, e.b.X).CompareTo(Math.Min(f.a.X, f.b.X)));
+
+            var active = new List<(Vector2 a, Vector2 b)>();
+            foreach (var e in edges)
+            {
+                var minX = Math.Min(e.a.X, e.b.X);
+                for (var i = active.Count - 1; i >= 0; i--)
+                    if (Math.Max(active[i].a.X, active[i].b.X) < minX) active.RemoveAt(i);
+
+                foreach (var o in active)
+                {
+                    if (e.a == o.a || e.a == o.b || e.b == o.a || e.b == o.b) continue; // adjacent (shared vertex) - fine
+                    if (SegmentsIntersect(e.a, e.b, o.a, o.b)) return true;
+                }
+                active.Add(e);
+            }
+            return false;
+        }
+
+        private static bool SegmentsIntersect(Vector2 p1, Vector2 p2, Vector2 p3, Vector2 p4)
+        {
+            int o1 = Orient(p1, p2, p3), o2 = Orient(p1, p2, p4), o3 = Orient(p3, p4, p1), o4 = Orient(p3, p4, p2);
+            if (o1 != o2 && o3 != o4) return true;
+            if (o1 == 0 && OnSegment(p1, p2, p3)) return true;
+            if (o2 == 0 && OnSegment(p1, p2, p4)) return true;
+            if (o3 == 0 && OnSegment(p3, p4, p1)) return true;
+            if (o4 == 0 && OnSegment(p3, p4, p2)) return true;
+            return false;
+        }
+
+        private static int Orient(Vector2 a, Vector2 b, Vector2 c)
+        {
+            var v = (b.X - a.X) * (c.Y - a.Y) - (b.Y - a.Y) * (c.X - a.X);
+            return v > 1e-9 ? 1 : (v < -1e-9 ? -1 : 0);
+        }
+
+        private static bool OnSegment(Vector2 a, Vector2 b, Vector2 p)
+        {
+            return Math.Min(a.X, b.X) - 1e-9 <= p.X && p.X <= Math.Max(a.X, b.X) + 1e-9 &&
+                   Math.Min(a.Y, b.Y) - 1e-9 <= p.Y && p.Y <= Math.Max(a.Y, b.Y) + 1e-9;
+        }
+
+        private static bool PointInPolygon(Vector2 p, IReadOnlyList<Vector2> polygon)
+        {
+            bool inside = false;
+            for (int i = 0, j = polygon.Count - 1; i < polygon.Count; j = i++)
+            {
+                var a = polygon[i];
+                var b = polygon[j];
+                if (((a.Y > p.Y) != (b.Y > p.Y)) &&
+                    (p.X < (b.X - a.X) * (p.Y - a.Y) / (b.Y - a.Y) + a.X))
+                    inside = !inside;
+            }
+            return inside;
         }
 
         public List<Vector3> FillDirect(List<GeometryIntersection> points, List<GeometrySegment> segments)
@@ -172,6 +319,14 @@ namespace Adamantium.Mathematics.Triangulation
 
         private List<Vector3> TriangulateContour(MeshContour item)
         {
+            // A simple (non-self-intersecting) contour triangulates with earcut in ~O(n), ~n-2 triangles (no
+            // slivers). Self-intersecting contours fall back to the scanline, which resolves the crossings per
+            // fill rule (earcut would mis-handle a non-simple ring).
+            if (!item.HadSelfIntersections)
+            {
+                return Triangulator.EarcutTriangulate(item.Points);
+            }
+
             var polygon = new Polygon
             {
                 Name = Name,
