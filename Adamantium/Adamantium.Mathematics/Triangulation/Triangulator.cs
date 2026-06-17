@@ -236,6 +236,100 @@ namespace Adamantium.Mathematics.Triangulation
             }
         }
 
+        /// <summary>
+        /// Triangulates a CONVEX simple polygon as a fan in O(n): triangles (v0, vi, vi+1). Each triangle is
+        /// emitted clockwise (same convention as <see cref="CreateTriangles"/>) so winding stays consistent.
+        /// Caller must guarantee convexity (see <see cref="MathHelper.IsConvex"/>).
+        /// </summary>
+        public static List<Vector3> FanTriangulate(IReadOnlyList<Vector2> points)
+        {
+            var triangles = new List<Vector3>();
+            for (var i = 1; i + 1 < points.Count; i++)
+            {
+                AddTriangleClockwise(triangles, points[0], points[i], points[i + 1]);
+            }
+            return triangles;
+        }
+
+        /// <summary>
+        /// Triangulates a single SIMPLE (non-self-intersecting) closed contour via earcut in ~O(n), producing
+        /// ~n-2 triangles (no slivers). Triangles are emitted clockwise (same convention as the scanline path).
+        /// </summary>
+        public static List<Vector3> EarcutTriangulate(IReadOnlyList<Vector2> ring)
+        {
+            var triangles = new List<Vector3>();
+            int n = ring.Count;
+            if (n < 3) return triangles;
+
+            var data = new double[n * 2];
+            for (var i = 0; i < n; i++)
+            {
+                data[i * 2] = ring[i].X;
+                data[i * 2 + 1] = ring[i].Y;
+            }
+
+            var indices = Earcut.Tessellate(data, null, 2);
+            for (var t = 0; t + 2 < indices.Count; t += 3)
+            {
+                AddTriangleClockwise(triangles, ring[indices[t]], ring[indices[t + 1]], ring[indices[t + 2]]);
+            }
+            return triangles;
+        }
+
+        /// <summary>
+        /// Triangulates an outer ring with holes via earcut (holes cut out). All rings must be simple and
+        /// non-crossing (caller guarantees). Triangles are emitted clockwise.
+        /// </summary>
+        public static List<Vector3> EarcutWithHoles(IReadOnlyList<Vector2> outer, IReadOnlyList<IReadOnlyList<Vector2>> holes)
+        {
+            var triangles = new List<Vector3>();
+            if (outer.Count < 3) return triangles;
+
+            var all = new List<Vector2>(outer);
+            int[] holeIndices = null;
+            if (holes != null && holes.Count > 0)
+            {
+                var starts = new List<int>();
+                foreach (var hole in holes)
+                {
+                    if (hole.Count < 3) continue;
+                    starts.Add(all.Count);
+                    all.AddRange(hole);
+                }
+                if (starts.Count > 0) holeIndices = starts.ToArray();
+            }
+
+            var data = new double[all.Count * 2];
+            for (var i = 0; i < all.Count; i++)
+            {
+                data[i * 2] = all[i].X;
+                data[i * 2 + 1] = all[i].Y;
+            }
+
+            var indices = Earcut.Tessellate(data, holeIndices, 2);
+            for (var t = 0; t + 2 < indices.Count; t += 3)
+            {
+                AddTriangleClockwise(triangles, all[indices[t]], all[indices[t + 1]], all[indices[t + 2]]);
+            }
+            return triangles;
+        }
+
+        private static void AddTriangleClockwise(List<Vector3> triangles, Vector2 a, Vector2 b, Vector2 c)
+        {
+            if (MathHelper.IsClockwise(a, b, c, Vector3.BackwardRH))
+            {
+                triangles.Add((Vector3)a);
+                triangles.Add((Vector3)b);
+                triangles.Add((Vector3)c);
+            }
+            else
+            {
+                triangles.Add((Vector3)a);
+                triangles.Add((Vector3)c);
+                triangles.Add((Vector3)b);
+            }
+        }
+
         private class VertexGeometryHorizontalComparer : IComparer<GeometryIntersection>
         {
             public static VertexGeometryHorizontalComparer Defaut => new ();

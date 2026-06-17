@@ -624,6 +624,40 @@ namespace Adamantium.Mathematics
 
         }
 
+        /// <summary>
+        /// True if a simple polygon (ordered vertices, closed) is convex. Uses a consistent turn-direction
+        /// test PLUS a single-revolution check (total turning ≈ ±2π), so star polygons such as a pentagram —
+        /// which turn consistently but self-intersect (total turning ±4π) — are correctly rejected.
+        /// </summary>
+        public static bool IsConvex(IReadOnlyList<Vector2> points)
+        {
+            int n = points?.Count ?? 0;
+            if (n < 3) return false;
+            if (n == 3) return true;
+
+            int sign = 0;
+            double totalTurn = 0;
+            for (int i = 0; i < n; i++)
+            {
+                var a = points[i];
+                var b = points[(i + 1) % n];
+                var c = points[(i + 2) % n];
+                var e0 = b - a;
+                var e1 = c - b;
+                double cross = e0.X * e1.Y - e0.Y * e1.X;
+                double dot = e0.X * e1.X + e0.Y * e1.Y;
+                if (cross == 0 && dot < 0) return false;            // 180° reversal (spike) -> not convex
+                int s = cross > 0 ? 1 : (cross < 0 ? -1 : 0);
+                if (s != 0)
+                {
+                    if (sign == 0) sign = s;
+                    else if (s != sign) return false;               // turn direction changed -> concave
+                }
+                totalTurn += Math.Atan2(cross, dot);
+            }
+            return Math.Abs(Math.Abs(totalTurn) - 2 * Math.PI) < 1e-3;  // exactly one revolution
+        }
+
         public static QuaternionF GetRotationFromMatrix(Matrix4x4F matrix)
         {
             matrix.Decompose(out var scale, out var orientation, out var pos);

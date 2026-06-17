@@ -15,6 +15,11 @@ public class MeshContour
 
     public bool IsGeometryClosed { get; set; }
 
+    /// <summary>True once <see cref="RemoveSelfIntersections"/> has split this contour at a self-crossing. A simple
+    /// (false) contour can be triangulated by earcut; a self-intersecting one must use the scanline (which resolves
+    /// crossings per fill rule).</summary>
+    public bool HadSelfIntersections { get; private set; }
+
     public RectangleF BoundingBox { get; private set; }
 
     public MeshContour()
@@ -175,32 +180,43 @@ public class MeshContour
     {
         var intersectionsList = new Dictionary<Vector2, GeometryIntersection>();
         var selfIntersections = new Dictionary<GeometrySegment, SortedList<double, GeometryIntersection>>();
+        foreach (var segment in Segments) selfIntersections[segment] = new SortedList<double, GeometryIntersection>();
 
-        foreach (var currentSegment in Segments)
+        void Record(GeometrySegment seg, Vector2 point)
         {
-            selfIntersections[currentSegment] = new SortedList<double, GeometryIntersection>();
-            
-            foreach (var intersectSegment in Segments)
+            if (point == seg.Start || point == seg.End) return;
+            if (!intersectionsList.TryGetValue(point, out var inter))
             {
-                if (Equals(intersectSegment, currentSegment)) continue;
-                
-                if (Collision2D.SegmentSegmentIntersection(currentSegment, intersectSegment, out var point))
-                {
-                    if (point != currentSegment.Start && point != currentSegment.End)
-                    {
-                        if (!intersectionsList.ContainsKey(point))
-                        {
-                            intersectionsList[point] = new GeometryIntersection(point);
-                        }
+                inter = new GeometryIntersection(point);
+                intersectionsList[point] = inter;
+            }
+            var distanceToStart = (point - seg.Start).Length();
+            if (!selfIntersections[seg].ContainsKey(distanceToStart)) selfIntersections[seg].Add(distanceToStart, inter);
+        }
 
-                        var distanceToStart = (point - currentSegment.Start).Length();
-                        if (!selfIntersections[currentSegment].ContainsKey(distanceToStart))
-                        {
-                            selfIntersections[currentSegment].Add(distanceToStart, intersectionsList[point]);
-                        }
-                    }
+        // Broad-phase: sort by min-X and sweep an active list, so only segments whose X-ranges overlap are tested.
+        // This finds exactly the same intersections as the old O(n^2) all-pairs scan (X-disjoint segments cannot
+        // cross), but prunes most pairs -> near-linear for simple contours instead of quadratic.
+        var ordered = new List<GeometrySegment>(Segments);
+        ordered.Sort((a, b) => Math.Min(a.Start.X, a.End.X).CompareTo(Math.Min(b.Start.X, b.End.X)));
+        var active = new List<GeometrySegment>();
+        foreach (var seg in ordered)
+        {
+            var segMinX = Math.Min(seg.Start.X, seg.End.X);
+            for (var i = active.Count - 1; i >= 0; i--)
+            {
+                if (Math.Max(active[i].Start.X, active[i].End.X) < segMinX) active.RemoveAt(i);
+            }
+
+            foreach (var other in active)
+            {
+                if (Collision2D.SegmentSegmentIntersection(seg, other, out var point))
+                {
+                    Record(seg, point);
+                    Record(other, point);
                 }
             }
+            active.Add(seg);
         }
 
         Segments.Clear();
@@ -213,6 +229,7 @@ public class MeshContour
                 continue;
             }
 
+            HadSelfIntersections = true;
             pair.Key.RemoveSelfFromConnectedSegments();
             
             var startPart = new GeometrySegment(pair.Key.Parent, pair.Key.SegmentEnds[0], pair.Value.Values.First());
