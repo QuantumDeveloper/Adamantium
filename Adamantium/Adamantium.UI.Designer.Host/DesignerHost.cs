@@ -94,7 +94,7 @@ public static class DesignerHost
     {
         try
         {
-            var result = session.Render(request.Text ?? string.Empty, request.Width, request.Height, request.Scale ?? 1.0, outPath);
+            var result = session.Render(request.Text ?? string.Empty, request.Width, request.Height, request.Scale ?? 1.0, outPath, request.Uri);
             if (!result.Success)
                 return new Response { Error = result.Error, Diagnostics = NullIfEmpty(result.Diagnostics) };
 

@@ -74,8 +74,14 @@ public sealed class DesignerSession : IDisposable
     /// else a default), and only the render target is scaled - so zooming re-rasterises the same layout crisply
     /// rather than reflowing it.
     /// </summary>
-    public RenderResult Render(string aumlText, uint? requestWidth, uint? requestHeight, double scale, string outPath)
+    public RenderResult Render(string aumlText, uint? requestWidth, uint? requestHeight, double scale, string outPath, string? aumlSourcePath = null)
     {
+        // Relative asset paths (e.g. <Image Source="Textures/foo.tga">) are loaded against the process working
+        // directory, exactly as in the running app (which runs from its output dir). Point the CWD at the edited
+        // file's project root so the live designer loads those assets straight from the project source.
+        var assetRoot = ResolveAssetRoot(aumlSourcePath);
+        if (assetRoot != null) Directory.SetCurrentDirectory(assetRoot);
+
         var load = AumlLoader.Load(
             aumlText,
             AppDomain.CurrentDomain.GetAssemblies(),
@@ -113,6 +119,30 @@ public sealed class DesignerSession : IDisposable
         return RenderResult.Ok(outPath, load.Diagnostics, targetWidth, targetHeight, renderScale);
     }
 
+    /// <summary>
+    /// The directory relative asset paths resolve against for the file being previewed: the nearest .csproj ancestor
+    /// (the project root, matching how the app finds assets relative to its output root), else the file's own folder.
+    /// Accepts a plain path or a file:// URI; null/blank yields null (CWD left unchanged).
+    /// </summary>
+    private static string? ResolveAssetRoot(string? sourcePath)
+    {
+        if (string.IsNullOrWhiteSpace(sourcePath)) return null;
+
+        string path;
+        try { path = sourcePath.StartsWith("file:", StringComparison.OrdinalIgnoreCase) ? new Uri(sourcePath).LocalPath : sourcePath; }
+        catch { path = sourcePath; }
+
+        string? dir;
+        try { dir = Path.GetDirectoryName(Path.GetFullPath(path)); }
+        catch { return null; }
+        if (dir == null) return null;
+
+        for (var d = new DirectoryInfo(dir); d != null; d = d.Parent)
+            if (d.GetFiles("*.csproj").Length > 0) return d.FullName;
+
+        return Directory.Exists(dir) ? dir : null;
+    }
+
     /// <summary>Design size for a dimension: the declared value if set, else the request, else the default.</summary>
     private static double ResolveDimension(double? declared, uint? request, double fallback)
     {
@@ -127,7 +157,7 @@ public sealed class DesignerSession : IDisposable
         // per zoom would abandon the render cache (its units leak) and churn large GPU allocations.
         if (_renderer == null)
         {
-            _renderer = new OffscreenRenderer(_device, _factory, width, height) { ClearColor = Colors.White };
+            _renderer = new OffscreenRenderer(_device, _factory, width, height, MSAALevel.X4) { ClearColor = Colors.White };
         }
         else if (_rendererWidth != width || _rendererHeight != height)
         {

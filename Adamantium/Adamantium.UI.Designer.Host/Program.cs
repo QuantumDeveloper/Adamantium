@@ -26,7 +26,7 @@ public static class Program
         var scale = args.Length > 3 ? double.Parse(args[3], CultureInfo.InvariantCulture) : 1.0;
 
         using var session = new DesignerSession();
-        var result = session.Render(File.ReadAllText(aumlPath), null, null, scale, outPath);
+        var result = session.Render(File.ReadAllText(aumlPath), null, null, scale, outPath, aumlPath);
 
         foreach (var d in result.Diagnostics ?? Enumerable.Empty<string>())
             Console.Error.WriteLine($"[auml] {d}");

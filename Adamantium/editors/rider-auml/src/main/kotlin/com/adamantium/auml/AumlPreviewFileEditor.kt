@@ -173,7 +173,7 @@ class AumlPreviewFileEditor(
         val text = doc.text
         val renderScale = scale
         ApplicationManager.getApplication().executeOnPooledThread {
-            val result = service.render(text, renderScale)
+            val result = service.render(text, renderScale, file.path)
             val image = result.pngPath?.let { runCatching { ImageIO.read(File(it)) }.getOrNull() }
             ApplicationManager.getApplication().invokeLater({ applyResult(result, image, renderScale) }, ModalityState.any())
         }

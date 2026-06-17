@@ -1,11 +1,14 @@
 ﻿using System.Globalization;
+using Adamantium.Core.TypeParsing;
 using Adamantium.Mathematics;
+using Adamantium.UI.Core.TypeParsers;
 
 namespace Adamantium.UI.Core;
 
 /// <summary>
 /// Defines a rectangle, which can be transformed by a matrix
 /// </summary>
+[TypeParser(typeof(RectParser))]
 public struct Rect : IEquatable<Rect>
 {
    /// <summary>

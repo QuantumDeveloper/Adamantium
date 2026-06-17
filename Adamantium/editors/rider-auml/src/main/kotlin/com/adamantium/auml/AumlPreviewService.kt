@@ -43,11 +43,11 @@ class AumlPreviewService : Disposable {
      * Blocking and potentially slow on the very first call (the host boots the engine + graphics device), so
      * call this off the EDT.
      */
-    fun render(text: String, scale: Double): RenderResult {
+    fun render(text: String, scale: Double, sourcePath: String? = null): RenderResult {
         synchronized(lock) {
             return try {
                 ensureProcess()
-                val request = buildRenderRequest(text, scale)
+                val request = buildRenderRequest(text, scale, sourcePath)
                 writer!!.apply { write(request); write("\n"); flush() }
                 val line = reader!!.readLine() ?: throw RuntimeException("designer host closed the connection")
                 parseResponse(line)
@@ -107,8 +107,12 @@ class AumlPreviewService : Disposable {
 
     // --- protocol -------------------------------------------------------------------------------------
 
-    private fun buildRenderRequest(text: String, scale: Double): String =
-        """{"op":"render","text":"${jsonEscape(text)}","scale":$scale}"""
+    // sourcePath (the edited .auml's path) lets the host resolve relative asset paths (e.g. an Image Source) against
+    // the file's project root, so the preview loads those assets from source just like the running app does.
+    private fun buildRenderRequest(text: String, scale: Double, sourcePath: String?): String {
+        val uriPart = if (sourcePath.isNullOrBlank()) "" else ",\"uri\":\"${jsonEscape(sourcePath)}\""
+        return "{\"op\":\"render\",\"text\":\"${jsonEscape(text)}\",\"scale\":$scale$uriPart}"
+    }
 
     private fun parseResponse(line: String): RenderResult {
         val obj = MiniJson.parse(line) as? Map<*, *>

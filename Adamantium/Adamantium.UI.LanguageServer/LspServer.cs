@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json.Nodes;
 
@@ -13,7 +14,8 @@ public sealed class LspServer
     private readonly AumlWorkspace _workspace;
     private readonly Stream _input;
     private readonly Stream _output;
-    private readonly Dictionary<string, string> _documents = new();
+    // Concurrent: the message loop mutates it while the workspace's bin-watcher thread reads it during auto-revalidation.
+    private readonly ConcurrentDictionary<string, string> _documents = new();
     private readonly object _writeLock = new();
 
     public LspServer(AumlWorkspace workspace, Stream input, Stream output)
@@ -21,6 +23,15 @@ public sealed class LspServer
         _workspace = workspace;
         _input = input;
         _output = output;
+        // A rebuild refreshes the type model -> re-validate open docs so stale "unknown property/type" squiggles
+        // clear automatically, without the user having to touch the file or restart the server.
+        _workspace.ModelsChanged += RevalidateOpenDocuments;
+    }
+
+    private void RevalidateOpenDocuments()
+    {
+        foreach (var uri in _documents.Keys)
+            PublishDiagnostics(uri);
     }
 
     public void Run()
@@ -70,7 +81,7 @@ public sealed class LspServer
             }
 
             case "textDocument/didClose":
-                _documents.Remove(msg["params"]!["textDocument"]!["uri"]!.GetValue<string>());
+                _documents.TryRemove(msg["params"]!["textDocument"]!["uri"]!.GetValue<string>(), out _);
                 break;
 
             case "textDocument/completion":
