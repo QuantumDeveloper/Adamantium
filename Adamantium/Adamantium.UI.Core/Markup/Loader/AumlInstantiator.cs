@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Reflection;
+using Adamantium.Core.TypeParsing;
 using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.Resources;
 using Adamantium.UI.Markup.AST;
@@ -145,6 +146,13 @@ internal sealed class AumlInstantiator
 
             var parse = t.GetMethod("Parse", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(string) }, null);
             if (parse != null) { result = parse.Invoke(null, new object[] { text }); return true; }
+
+            // Last resort: the engine's TypeParser, which honours [TypeParser] attributes and the ParserRegistry.
+            // This is exactly what the compiled code-behind generator emits (TypeParser.Parse<T>), so the live
+            // preview converts the same value types a build does - e.g. a Path's SVG "Data" string into a Geometry
+            // via GeometryParser (Geometry has no static Parse, so without this it stayed null and crashed the renderer).
+            var typeParser = typeof(TypeParser).GetMethod(nameof(TypeParser.Parse))?.MakeGenericMethod(t);
+            if (typeParser != null) { result = typeParser.Invoke(null, new object[] { text }); return true; }
         }
         catch { /* fall through */ }
 

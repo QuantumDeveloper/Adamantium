@@ -93,8 +93,11 @@ public sealed class OffscreenRenderer : IDisposable
         return true;
     }
 
-    /// <summary>Saves the last rendered frame to disk.</summary>
-    public void Save(string path, ImageFileType fileType) => _presenter.RenderTarget.Save(path, fileType);
+    /// <summary>Saves the last rendered frame to disk. Reads the resolve texture, not the render target itself:
+    /// with MSAA the render target is a multisampled image (not linearly readable - a raw read-back is garbled);
+    /// its resolved single-sample copy is what the render pass produces. With MSAA off ResolveTexture == the
+    /// render target, so this is also correct in the non-MSAA case.</summary>
+    public void Save(string path, ImageFileType fileType) => _presenter.RenderTarget.ResolveTexture.Save(path, fileType);
 
     public void Resize(uint width, uint height)
     {
