@@ -5,20 +5,18 @@ namespace Adamantium.Core.TypeParsing;
 
 public static class TypeParser
 {
-    public static TTarget Parse<TTarget>(string value)
-    {
-        var targetType = typeof(TTarget);
-        
-        Type parserType = ParserRegistry.GetParserFor(targetType);
+    public static TTarget Parse<TTarget>(string value) => (TTarget)Parse(value, typeof(TTarget));
 
-        if (parserType == null)
-        {
-            var attribute = targetType.GetCustomAttribute<TypeParserAttribute>();
-            if (attribute != null)
-            {
-                parserType = attribute.ParserType;
-            }
-        }
+    /// <summary>
+    /// Non-generic counterpart of <see cref="Parse{TTarget}"/>: parses <paramref name="value"/> into
+    /// <paramref name="targetType"/> using its registered parser (ParserRegistry) or its <c>[TypeParser]</c>
+    /// attribute. Lets callers that only have a runtime <see cref="Type"/> (e.g. value-to-property coercion) use
+    /// the same conversion a compiled build does.
+    /// </summary>
+    public static object Parse(string value, Type targetType)
+    {
+        var parserType = ParserRegistry.GetParserFor(targetType)
+                         ?? targetType.GetCustomAttribute<TypeParserAttribute>()?.ParserType;
 
         if (parserType == null)
         {
@@ -27,12 +25,14 @@ public static class TypeParser
 
         try
         {
-            var parser = (ITypeParser<TTarget>)Activator.CreateInstance(parserType);
-            return parser.Parse(value);
+            var parser = Activator.CreateInstance(parserType);
+            var parse = parserType.GetMethod(nameof(ITypeParser<object>.Parse), [typeof(string)]);
+            return parse!.Invoke(parser, [value]);
         }
         catch (Exception e)
         {
-            throw new InvalidOperationException($"Cannot parse {value} as input for {targetType.FullName}", e);
+            throw new InvalidOperationException($"Cannot parse {value} as input for {targetType.FullName}",
+                e is TargetInvocationException tie ? tie.InnerException : e);
         }
     }
 }

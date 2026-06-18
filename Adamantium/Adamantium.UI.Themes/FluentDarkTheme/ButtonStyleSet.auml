@@ -7,6 +7,8 @@
         <Setter Property="Height" Value="Auto"/>
         <Setter Property="Background" Value="DarkGray"/>
         <Setter Property="BorderBrush" Value="Yellow" />
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="4"/>
     </Style>
     
     <Style Selector="Button">
@@ -20,7 +22,7 @@
                                 CornerRadius="{TemplateBinding CornerRadius}" 
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{ResourceReference DeclineBrush}"
-                                BorderThickness="4">
+                                BorderThickness="{TemplateBinding BorderThickness}">
                                      <controls:ContentPresenter
                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"

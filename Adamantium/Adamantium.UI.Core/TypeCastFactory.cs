@@ -1,16 +1,13 @@
 using Adamantium.Core.TypeParsing;
-using Adamantium.Mathematics;
-using Adamantium.UI.Core.Media;
 
 namespace Adamantium.UI.Core;
 
 public static class TypeCastFactory
 {
-    // TODO: change this to TypeParser class
     public static object CastFromString(object input, Type finalType)
     {
-        if (input.GetType() == finalType) return input;
-        
+        if (input == null || input.GetType() == finalType) return input;
+
         if (finalType.IsPrimitive)
         {
             if (finalType == typeof(Double) && input.ToString() == "Auto")
@@ -19,15 +16,11 @@ public static class TypeCastFactory
             }
             return Convert.ChangeType(input, finalType);
         }
-        if (finalType.IsSubclassOf(typeof(Brush)) || finalType == typeof(Brush))
-        {
-            return TypeParser.Parse<Brush>(input.ToString());
-        }
-        if (finalType == typeof(Thickness))
-        {
-            return TypeParser.Parse<Thickness>(input.ToString());
-        }
 
-        throw new NotSupportedException($"Casting {input} to {finalType.Name} is not supported");
+        if (finalType.IsEnum) return Enum.Parse(finalType, input.ToString(), ignoreCase: true);
+
+        // Everything else (Brush, Thickness, CornerRadius, Color, Vector2, Geometry, …) converts through the engine's
+        // TypeParser - honouring [TypeParser] + the ParserRegistry - i.e. the same conversion a compiled build uses.
+        return TypeParser.Parse(input.ToString(), finalType);
     }
 }
