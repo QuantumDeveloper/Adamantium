@@ -41,16 +41,22 @@ public class CombinedGeometry : Geometry
 
     private static void Geometry1Changed(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
-            
+        if (a is CombinedGeometry combined)
+        {
+            // Was empty: Geometry1's own updates and replacement were silently ignored (asymmetric with Geometry2).
+            if (e.OldValue is Geometry oldGeometry) oldGeometry.ComponentUpdated -= combined.GeometryOnComponentUpdated;
+            if (e.NewValue is Geometry newGeometry) newGeometry.ComponentUpdated += combined.GeometryOnComponentUpdated;
+            combined.InvalidateGeometry();
+        }
     }
-        
+
     private static void Geometry2Changed(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
         if (a is CombinedGeometry combined)
         {
-            if (e.OldValue is Geometry geometry1) geometry1.ComponentUpdated -= combined.GeometryOnComponentUpdated;
-
-            if (e.NewValue is Geometry geometry2) geometry2.ComponentUpdated += combined.GeometryOnComponentUpdated;
+            if (e.OldValue is Geometry oldGeometry) oldGeometry.ComponentUpdated -= combined.GeometryOnComponentUpdated;
+            if (e.NewValue is Geometry newGeometry) newGeometry.ComponentUpdated += combined.GeometryOnComponentUpdated;
+            combined.InvalidateGeometry();
         }
     }
 
@@ -61,7 +67,8 @@ public class CombinedGeometry : Geometry
 
     private static void CombineModeChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
-            
+        // Changing the combine mode must re-run the boolean op, not reuse the stale mesh.
+        if (a is CombinedGeometry combined) combined.InvalidateGeometry();
     }
 
     public Geometry Geometry1
@@ -101,7 +108,7 @@ public class CombinedGeometry : Geometry
         if (Transform != null)
         {
             var matrix = Transform.Matrix;
-            rect.TransformToAABB(matrix);
+            rect = rect.TransformToAABB(matrix);   // was: result discarded (Rect is a value type)
         }
 
         bounds = rect;
@@ -193,7 +200,11 @@ public class CombinedGeometry : Geometry
                             }
 
                             break;
+                        // Intersect and Exclude both keep inner segments (RemoveSegmentsByRule(false)), so an
+                        // arguable border segment resolved as outer must be dropped. Intersect was missing here,
+                        // leaving spurious border edges in the result.
                         case GeometryCombineMode.Exclude:
+                        case GeometryCombineMode.Intersect:
                             if (!arguableSeg.IsInner)
                             {
                                 arguableSeg.RemoveSelfFromConnectedSegments();
@@ -258,24 +269,38 @@ public class CombinedGeometry : Geometry
         }
         else
         {
-            foreach (var contour1 in OutlineMesh1.Contours)
+            // Bounding boxes don't overlap -> the shapes are disjoint, so the result depends on the mode:
+            //   Union     -> both shapes
+            //   Exclude   -> Geometry1 only (subtracting a disjoint Geometry2 changes nothing)
+            //   Intersect -> empty (no overlap)
+            // (Xor is handled above.) The previous code added both for every mode, which was wrong for
+            // Intersect (should be empty) and Exclude (should be Geometry1 only).
+            if (GeometryCombineMode is GeometryCombineMode.Union or GeometryCombineMode.Exclude)
             {
-                Mesh.AddContour(contour1);
+                foreach (var contour1 in OutlineMesh1.Contours)
+                    Mesh.AddContour(contour1);
             }
-            
-            foreach (var contour2 in OutlineMesh2.Contours)
+
+            if (GeometryCombineMode == GeometryCombineMode.Union)
             {
-                Mesh.AddContour(contour2);
+                foreach (var contour2 in OutlineMesh2.Contours)
+                    Mesh.AddContour(contour2);
             }
 
             // Triangulate only if geometry type is not Outlined
             if (geometryType == GeometryType.Outlined) return;
 
+            if (Mesh.Contours.Count == 0)
+            {
+                Mesh.SetPoints(new List<Vector3>());
+                return;
+            }
+
             var mergedContourPoints = Mesh.MergeGeometryContourPoints();
             var mergedContourSegments = Mesh.MergeContourSegments();
 
             var polygon = new Polygon(FillRule.NonZero);
-            
+
             var triangulated = polygon.FillDirect(mergedContourPoints, mergedContourSegments);
             Mesh.SetPoints(triangulated);
         }

@@ -202,9 +202,9 @@ namespace Adamantium.Mathematics.Triangulation
                 for (var j = 0; j < rings.Count; j++)
                     if (i != j && PointInPolygon(rings[i][0], rings[j])) depth[i]++;
 
-            // NonZero behaves as OuterContour here: outermost rings only, filled solid. EvenOdd / OuterContour:
-            // even-depth rings fill, odd-depth rings directly inside them are holes. (Matches the merge+scanline
-            // result for clean nesting — guarded by the fill-rule truth-table tests.)
+            // NonZero here fills only the outermost rings, solid (drops holes). EvenOdd: even-depth rings fill,
+            // odd-depth rings directly inside them are holes. (Matches the merge+scanline result for clean
+            // nesting — guarded by the fill-rule truth-table tests.)
             var nonZero = FillRule == FillRule.NonZero;
             for (var i = 0; i < rings.Count; i++)
             {

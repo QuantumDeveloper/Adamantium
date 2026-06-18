@@ -86,6 +86,7 @@ public class PathGeometry : Geometry
     protected internal override void ProcessGeometryCore(GeometryType geometryType)
     {
         figureToPolygon.Clear();
+        outlines.Clear();   // was leaked: stale outlines of removed figures lingered and got re-added below
         Mesh.ClearContours();
         
         foreach (var figure in Figures)

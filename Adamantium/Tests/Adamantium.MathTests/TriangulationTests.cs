@@ -17,7 +17,7 @@ namespace Adamantium.MathTests
         public void Star_NonZero_FillsSolidBody()
         {
             // A 5-point star is a single self-intersecting contour -> the scanline fallback resolves it.
-            // NonZero (== OuterContour) fills the whole star solid, so the centre is covered.
+            // NonZero fills the whole star solid, so the centre is covered.
             var tris = Fill(Star5(), FillRule.NonZero);
             Assert.Greater(tris.Count, 0, "non-empty triangulation");
             Assert.IsTrue(Covered(tris, new Vector2(0, 13)), "star body filled");

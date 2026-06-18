@@ -47,7 +47,9 @@ public class LineGeometry : Geometry
 
    public override void RecalculateBounds()
    {
-      bounds = Rect.FromPoints(Mesh.MergeContourPoints());
+      // Derive bounds from the actual end points, not the mesh: the mesh is empty until ProcessGeometry runs,
+      // and bounds are queried earlier (e.g. Shape.MeasureOverride calls Data.RecalculateBounds()).
+      bounds = Rect.FromPoints([StartPoint, EndPoint]);
    }
       
    public override Geometry Clone()

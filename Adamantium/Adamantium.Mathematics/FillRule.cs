@@ -9,7 +9,6 @@ namespace Adamantium.Mathematics
     public enum FillRule
     {
         EvenOdd = 0,
-        NonZero = 1,
-        OuterContour = 2
+        NonZero = 1
     }
 }
