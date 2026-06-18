@@ -69,6 +69,11 @@ public class TemplateResult
             binding.CloseConnection();
         }
 
+        foreach (var binding in bindingExpressions)
+        {
+            binding.CloseConnection();
+        }
+
         if (Triggers.Count > 0)
         {
             foreach (var activator in Activators)

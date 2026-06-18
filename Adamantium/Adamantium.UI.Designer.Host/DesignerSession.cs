@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.RegularExpressions;
 using Adamantium.Core;
 using Adamantium.Game;
 using Adamantium.Graphics.Core;
@@ -115,6 +116,11 @@ public sealed class DesignerSession : IDisposable
 
         window.AttachContextAndInitialize(_app.UIContext);
 
+        // Design-time DataContext (x:DataType view-model): rendered with real sample data so {Binding} paths resolve
+        // in the preview - the WPF d:DesignInstance behaviour. Applied after the first layout (below), once the
+        // logical tree exists so it propagates to every element. Suppressed by x:DesignCreatable="false".
+        var designContext = CreateDesignDataContext(aumlText);
+
         var designWidth = ResolveDimension(sizeSource?.Width, requestWidth, DefaultWidth);
         var designHeight = ResolveDimension(sizeSource?.Height, requestHeight, DefaultHeight);
 
@@ -123,6 +129,14 @@ public sealed class DesignerSession : IDisposable
 
         // Layout (Measure/Arrange + theme) at the design size - geometry only, no native window.
         window.Update(_app.ThemeManager, new AppTime());
+
+        // The logical tree (and templates) now exist: assign the design-time DataContext so it propagates to every
+        // element and their {Binding}s resolve, then re-run layout so the bound values participate in measure/arrange.
+        if (designContext != null && load.Root is IFundamentalUIComponent rootComponent)
+        {
+            rootComponent.DataContext = designContext;
+            window.Update(_app.ThemeManager, new AppTime());
+        }
 
         // A hosted control with no declared size: shrink the design canvas to its natural (content) size so the
         // preview fits the control instead of a full default window. (Windows and explicitly-sized controls keep
@@ -181,6 +195,9 @@ public sealed class DesignerSession : IDisposable
         return Directory.Exists(dir) ? dir : null;
     }
 
+    // Project assemblies loaded this session: load each once so the warm host doesn't add duplicate type copies.
+    private static readonly HashSet<string> _loadedProjectAssemblies = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>
     /// Loads the previewed file's own project assembly from its build output, so the designer can resolve the
     /// project's own types (<c>clr-namespace:</c> controls, behaviors) - not only engine assemblies. Best-effort:
@@ -194,10 +211,16 @@ public sealed class DesignerSession : IDisposable
         if (csproj == null) return;   // ResolveAssetRoot fell back to a non-project folder
 
         var dll = FindProjectAssembly(csproj);
-        if (dll != null)
+        if (dll == null) return;
+        lock (_loadedProjectAssemblies)
         {
-            try { Assembly.LoadFrom(dll); } catch { /* ignore unloadable */ }
+            if (!_loadedProjectAssemblies.Add(dll)) return;   // already loaded this session
         }
+
+        // Load from a byte copy, not Assembly.LoadFrom: LoadFrom keeps the .dll file locked, which would stop the
+        // user rebuilding their project while this warm preview host has it open. Loaded once per session (a rebuild
+        // is picked up after a host restart; full hot-reload is a separate, deferred workstream).
+        try { Assembly.Load(File.ReadAllBytes(dll)); } catch { /* ignore unloadable */ }
     }
 
     /// <summary>
@@ -222,6 +245,69 @@ public sealed class DesignerSession : IDisposable
         return Directory.EnumerateFiles(binBase, dllName, SearchOption.AllDirectories)
             .OrderByDescending(File.GetLastWriteTimeUtc)
             .FirstOrDefault();
+    }
+
+    /// <summary>
+    /// Instantiates the markup's design-time view-model (<c>x:DataType="prefix:Type"</c>) so the preview shows real
+    /// sample data through its bindings - the WPF <c>d:DesignInstance</c> / <c>IsDesignTimeCreatable</c> behaviour.
+    /// Returns null when there is no x:DataType, when <c>x:DesignCreatable="false"</c> opts out, or when the type has
+    /// no public parameterless constructor (we never run a parameterised one at design time).
+    /// </summary>
+    private static object CreateDesignDataContext(string aumlText)
+    {
+        var dataType = MatchAttributeValue(aumlText, "DataType");
+        if (dataType == null) return null;
+        if (string.Equals(MatchAttributeValue(aumlText, "DesignCreatable"), "false", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        var type = ResolveMarkupType(aumlText, dataType);
+        if (type?.GetConstructor(Type.EmptyTypes) == null) return null;
+        try { return Activator.CreateInstance(type); } catch { return null; }
+    }
+
+    /// <summary>Value of the first <c>[prefix:]localName="..."</c> attribute in the text (prefix optional).</summary>
+    private static string MatchAttributeValue(string text, string localName)
+    {
+        var m = Regex.Match(text, $@"(?:\w+:)?{Regex.Escape(localName)}\s*=\s*""([^""]*)""");
+        return m.Success ? m.Groups[1].Value.Trim() : null;
+    }
+
+    /// <summary>Resolves a markup type reference (<c>prefix:Type</c>) to a CLR type using the buffer's xmlns
+    /// declarations (clr-namespace) against the assemblies loaded in this host (engine + the project assembly).</summary>
+    private static Type ResolveMarkupType(string aumlText, string qualified)
+    {
+        var prefix = "";
+        var local = qualified;
+        var colon = qualified.IndexOf(':');
+        if (colon >= 0) { prefix = qualified[..colon]; local = qualified[(colon + 1)..]; }
+
+        var xmlnsPattern = prefix.Length == 0 ? @"xmlns\s*=\s*""([^""]*)""" : $@"xmlns:{Regex.Escape(prefix)}\s*=\s*""([^""]*)""";
+        var xm = Regex.Match(aumlText, xmlnsPattern);
+        string clrNamespace = null, assemblyName = null;
+        if (xm.Success && xm.Groups[1].Value.StartsWith("clr-namespace:", StringComparison.Ordinal))
+        {
+            var rest = xm.Groups[1].Value["clr-namespace:".Length..];
+            var sc = rest.IndexOf(';');
+            clrNamespace = (sc < 0 ? rest : rest[..sc]).Trim();
+            var ai = rest.IndexOf("assembly=", StringComparison.Ordinal);
+            if (ai >= 0) assemblyName = rest[(ai + "assembly=".Length)..].Trim();
+        }
+
+        foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            if (assemblyName != null && !string.Equals(asm.GetName().Name, assemblyName, StringComparison.OrdinalIgnoreCase)) continue;
+            var type = clrNamespace != null
+                ? asm.GetType(clrNamespace + "." + local, throwOnError: false)
+                : SafeGetTypes(asm).FirstOrDefault(t => t.Name == local);
+            if (type != null) return type;
+        }
+        return null;
+    }
+
+    private static IEnumerable<Type> SafeGetTypes(Assembly asm)
+    {
+        try { return asm.GetTypes(); }
+        catch (ReflectionTypeLoadException ex) { return ex.Types.Where(t => t != null); }
     }
 
     /// <summary>Design size for a dimension: the declared value if set, else the request, else the default.</summary>

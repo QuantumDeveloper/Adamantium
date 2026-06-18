@@ -1,4 +1,5 @@
 ﻿using System.Collections.ObjectModel;
+using Adamantium.UI.Core.MarkupExtensions;
 
 namespace Adamantium.UI.Core.Data;
 
@@ -16,6 +17,8 @@ public class Binding : BindingBase
    internal bool PropertyPathChanged;
    private PropertyPath path;
 
+   // The positional argument of {Binding <path>} maps here (the markup-extension default property).
+   [DefaultProperty]
    public PropertyPath Path
    {
       get => path;

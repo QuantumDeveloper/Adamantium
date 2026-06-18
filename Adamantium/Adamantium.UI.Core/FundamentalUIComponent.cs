@@ -78,10 +78,14 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
 
     private void UpdateDataContext()
     {
+        // Re-resolve this element's DataContext bindings against the new context (the tree is built before its
+        // DataContext is assigned), then propagate to logical children so they re-resolve in turn.
+        BindingEngine.RefreshBindings(this);
+
         foreach (var logicalChild in LogicalChildren)
         {
             logicalChild.DataContext = DataContext;
-        } 
+        }
     }
 
     private void StylesOnCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
@@ -180,7 +184,8 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
     
     public BindingExpression SetBinding(AdamantiumProperty property, BindingBase bindingBase)
     {
-        return null;
+        // Bindings live in the central BindingEngine registry (queryable/refreshable), not as element-private state.
+        return (BindingExpression)BindingEngine.SetBinding(this, property, bindingBase);
     }
     
     public void RemoveBinding(string property)
