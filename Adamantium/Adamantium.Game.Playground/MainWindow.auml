@@ -30,7 +30,7 @@
 
 		<Path Name="Path3"
               Fill="Red"
-		      HorizontalAlignment="Center"
+              HorizontalAlignment="Center"
 			  VerticalAlignment="Center">
             <Path.Data>
                 <GeometryGroup>

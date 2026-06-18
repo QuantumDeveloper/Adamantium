@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Reflection;
 using Adamantium.Core.TypeParsing;
+using Adamantium.UI.Core.Data;
 using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.Resources;
 using Adamantium.UI.Markup.AST;
@@ -92,6 +93,12 @@ internal sealed class AumlInstantiator
             switch (value)
             {
                 case AumlAstMarkupExtensionNode markup:
+                    // {Binding Path} sets up a live binding to the element's DataContext rather than a plain value.
+                    if (markup.TypeReference?.Name is "Binding" or "BindingExtension" && instance is IFundamentalUIComponent bindable)
+                    {
+                        bindable.SetBinding(pref.Name, BuildBinding(markup));
+                        break;
+                    }
                     var resolved = ResolveMarkupExtension(markup, p.PropertyType);
                     if (resolved != null) p.SetValue(instance, resolved);
                     break;
@@ -132,10 +139,17 @@ internal sealed class AumlInstantiator
             if (child == null) continue;
 
             var add = addMethods.FirstOrDefault(m => m.GetParameters()[0].ParameterType.IsInstanceOfType(child));
-            if (add != null) add.Invoke(collection, new[] { child });
+            if (add != null) add.Invoke(collection, [child]);
             else _diagnostics.Add($"Cannot add {child.GetType().Name} to {p.Name}");
         }
         return true;   // a populatable read-only collection; per-child issues are reported individually
+    }
+
+    private static Binding BuildBinding(AumlAstMarkupExtensionNode markup)
+    {
+        // v1: the first positional argument is the path ({Binding User.Name}); a bare {Binding} binds to DataContext.
+        var path = (markup.Arguments.FirstOrDefault()?.Value as AumlAstTextNode)?.Text?.Trim();
+        return string.IsNullOrEmpty(path) ? new Binding() : new Binding(path);
     }
 
     private object ResolveMarkupExtension(AumlAstMarkupExtensionNode markup, Type targetType)
@@ -151,7 +165,7 @@ internal sealed class AumlInstantiator
             try
             {
                 var method = typeof(ResourceResolver).GetMethod(nameof(ResourceResolver.Resolve))?.MakeGenericMethod(targetType);
-                return method?.Invoke(null, new object[] { key });
+                return method?.Invoke(null, [key]);
             }
             catch { return null; }
         }
@@ -185,15 +199,15 @@ internal sealed class AumlInstantiator
                 if (field != null) { result = field.GetValue(null); return true; }
             }
 
-            var parse = t.GetMethod("Parse", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(string) }, null);
-            if (parse != null) { result = parse.Invoke(null, new object[] { text }); return true; }
+            var parse = t.GetMethod("Parse", BindingFlags.Public | BindingFlags.Static, null, [typeof(string)], null);
+            if (parse != null) { result = parse.Invoke(null, [text]); return true; }
 
             // Last resort: the engine's TypeParser, which honours [TypeParser] attributes and the ParserRegistry.
             // This is exactly what the compiled code-behind generator emits (TypeParser.Parse<T>), so the live
             // preview converts the same value types a build does - e.g. a Path's SVG "Data" string into a Geometry
             // via GeometryParser (Geometry has no static Parse, so without this it stayed null and crashed the renderer).
-            var typeParser = typeof(TypeParser).GetMethod(nameof(TypeParser.Parse))?.MakeGenericMethod(t);
-            if (typeParser != null) { result = typeParser.Invoke(null, new object[] { text }); return true; }
+            result = TypeParser.Parse(text, t);
+            return true;
         }
         catch { /* fall through */ }
 

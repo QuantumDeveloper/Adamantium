@@ -14,5 +14,6 @@ internal static class AumlXDirectives
         ("Namespace", "Full type name for the generated class (the WPF x:Class analog)."),
         ("Key", "Key under which this entry is stored in a resource dictionary."),
         ("Type", "A reference to a CLR type."),
+        ("DataType", "Design-time DataContext type: tools resolve {Binding} paths against this type's properties."),
     };
 }
