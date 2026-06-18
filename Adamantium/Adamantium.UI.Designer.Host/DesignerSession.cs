@@ -42,6 +42,9 @@ public sealed class DesignerSession : IDisposable
 
     public DesignerSession()
     {
+        // Tell design-unsafe code (game-hosting behaviors etc.) it is running in the previewer, so it stays dormant.
+        Design.IsDesignMode = true;
+
         // Load every engine assembly so reflection type resolution can see all control types.
         foreach (var dll in Directory.GetFiles(AppContext.BaseDirectory, "Adamantium*.dll"))
         {
@@ -82,25 +85,60 @@ public sealed class DesignerSession : IDisposable
         var assetRoot = ResolveAssetRoot(aumlSourcePath);
         if (assetRoot != null) Directory.SetCurrentDirectory(assetRoot);
 
+        // Load the edited file's own project assembly so its types (clr-namespace: controls, behaviors) resolve,
+        // not just engine types. Best-effort and idempotent (LoadFrom caches by path).
+        LoadProjectAssembly(aumlSourcePath);
+
         var load = AumlLoader.Load(
             aumlText,
             AppDomain.CurrentDomain.GetAssemblies(),
             t => typeof(IWindow).IsAssignableFrom(t) ? typeof(VirtualWindow) : t);
 
-        if (load.Root is not IWindow window)
-            return RenderResult.Fail($"root is not a window: {load.Root?.GetType().Name ?? "null"}", load.Diagnostics);
+        // The root may be a Window, or any visual control (a View / UserControl-style root, a panel, a single
+        // control). Non-window roots are hosted in a design-time VirtualWindow so the designer previews them too,
+        // the way WPF previews a UserControl. Non-visual roots (ResourceDictionary/StyleSet) aren't previewable.
+        IWindow window;
+        IMeasurableComponent sizeSource;
+        switch (load.Root)
+        {
+            case IWindow w:
+                window = w;
+                sizeSource = w as IMeasurableComponent;
+                break;
+            case IUIComponent control:
+                window = new VirtualWindow { Content = control };
+                sizeSource = control as IMeasurableComponent;
+                break;
+            default:
+                return RenderResult.Fail($"root is not a previewable visual: {load.Root?.GetType().Name ?? "null"}", load.Diagnostics);
+        }
 
         window.AttachContextAndInitialize(_app.UIContext);
 
-        var measurable = window as IMeasurableComponent;
-        var designWidth = ResolveDimension(measurable?.Width, requestWidth, DefaultWidth);
-        var designHeight = ResolveDimension(measurable?.Height, requestHeight, DefaultHeight);
+        var designWidth = ResolveDimension(sizeSource?.Width, requestWidth, DefaultWidth);
+        var designHeight = ResolveDimension(sizeSource?.Height, requestHeight, DefaultHeight);
 
         window.ClientWidth = designWidth;
         window.ClientHeight = designHeight;
 
         // Layout (Measure/Arrange + theme) at the design size - geometry only, no native window.
         window.Update(_app.ThemeManager, new AppTime());
+
+        // A hosted control with no declared size: shrink the design canvas to its natural (content) size so the
+        // preview fits the control instead of a full default window. (Windows and explicitly-sized controls keep
+        // their size.)
+        if (load.Root is not IWindow && sizeSource is { } s && double.IsNaN(s.Width) && double.IsNaN(s.Height))
+        {
+            var desired = s.DesiredSize;
+            if (desired.Width >= 1 && desired.Height >= 1 && (desired.Width < designWidth || desired.Height < designHeight))
+            {
+                designWidth = Math.Min(designWidth, desired.Width);
+                designHeight = Math.Min(designHeight, desired.Height);
+                window.ClientWidth = designWidth;
+                window.ClientHeight = designHeight;
+                window.Update(_app.ThemeManager, new AppTime());
+            }
+        }
 
         if (scale <= 0) scale = 1.0;
         var maxScale = Math.Max(1.0, Math.Min(_maxRenderDimension / designWidth, _maxRenderDimension / designHeight));
@@ -141,6 +179,49 @@ public sealed class DesignerSession : IDisposable
             if (d.GetFiles("*.csproj").Length > 0) return d.FullName;
 
         return Directory.Exists(dir) ? dir : null;
+    }
+
+    /// <summary>
+    /// Loads the previewed file's own project assembly from its build output, so the designer can resolve the
+    /// project's own types (<c>clr-namespace:</c> controls, behaviors) - not only engine assemblies. Best-effort:
+    /// no .csproj ancestor, an unbuilt project or an unloadable dll just leaves those types unresolved, as before.
+    /// </summary>
+    private static void LoadProjectAssembly(string? aumlSourcePath)
+    {
+        var projectDir = ResolveAssetRoot(aumlSourcePath);
+        if (projectDir == null) return;
+        var csproj = Directory.GetFiles(projectDir, "*.csproj").FirstOrDefault();
+        if (csproj == null) return;   // ResolveAssetRoot fell back to a non-project folder
+
+        var dll = FindProjectAssembly(csproj);
+        if (dll != null)
+        {
+            try { Assembly.LoadFrom(dll); } catch { /* ignore unloadable */ }
+        }
+    }
+
+    /// <summary>
+    /// The project's own compiled assembly under its build output, honouring this engine's
+    /// <c>&lt;BaseOutputPath&gt;</c> redirect (else the conventional <c>bin</c>). Searches for the project-named dll
+    /// and returns the most recently built one, so the current target framework wins over stale leftover TFM builds.
+    /// </summary>
+    private static string? FindProjectAssembly(string csprojPath)
+    {
+        var projectDir = Path.GetDirectoryName(csprojPath)!;
+        var dllName = Path.GetFileNameWithoutExtension(csprojPath) + ".dll";
+
+        string baseOutput = null;
+        try { baseOutput = System.Xml.Linq.XDocument.Load(csprojPath).Descendants("BaseOutputPath").FirstOrDefault()?.Value?.Trim(); }
+        catch { /* unreadable csproj - fall back to the default bin location */ }
+
+        var binBase = !string.IsNullOrEmpty(baseOutput)
+            ? Path.GetFullPath(Path.Combine(projectDir, baseOutput))
+            : Path.Combine(projectDir, "bin");
+        if (!Directory.Exists(binBase)) return null;
+
+        return Directory.EnumerateFiles(binBase, dllName, SearchOption.AllDirectories)
+            .OrderByDescending(File.GetLastWriteTimeUtc)
+            .FirstOrDefault();
     }
 
     /// <summary>Design size for a dimension: the declared value if set, else the request, else the default.</summary>

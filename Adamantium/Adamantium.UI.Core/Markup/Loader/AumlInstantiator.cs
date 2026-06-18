@@ -72,9 +72,18 @@ internal sealed class AumlInstantiator
         if (pref.IsAttachedProperty) return; // attached properties not supported in preview yet
 
         var p = instance.GetType().GetProperty(pref.Name, BindingFlags.Public | BindingFlags.Instance);
-        if (p == null || !p.CanWrite)
+        if (p == null)
         {
-            _diagnostics.Add($"Property '{pref.Name}' not found / not writable on {instance.GetType().Name}");
+            _diagnostics.Add($"Property '{pref.Name}' not found on {instance.GetType().Name}");
+            return;
+        }
+
+        // A read-only collection property-element (e.g. <RenderTargetPanel.Behaviors>, <Theme.StyleIncludes>) is
+        // never assigned - its child elements are added to the existing collection instance, like the generator does.
+        if (!p.CanWrite)
+        {
+            if (!TryAddToReadOnlyCollection(instance, p, prop))
+                _diagnostics.Add($"Property '{pref.Name}' is not writable on {instance.GetType().Name}");
             return;
         }
 
@@ -98,6 +107,35 @@ internal sealed class AumlInstantiator
                     break;
             }
         }
+    }
+
+    /// <summary>
+    /// Populates a read-only collection property (no setter, e.g. Behaviors / Theme.StyleIncludes) by adding each
+    /// child object element to the existing collection instance via its single-argument <c>Add</c>. Returns false
+    /// when the property isn't a populatable collection (no instance, or no matching Add) so the caller can report it.
+    /// </summary>
+    private bool TryAddToReadOnlyCollection(object instance, PropertyInfo p, AumlAstPropertyNode prop)
+    {
+        var collection = p.GetValue(instance);
+        if (collection == null) return false;
+
+        var addMethods = collection.GetType()
+            .GetMethods(BindingFlags.Public | BindingFlags.Instance)
+            .Where(m => m.Name == "Add" && m.GetParameters().Length == 1)
+            .ToArray();
+        if (addMethods.Length == 0) return false;
+
+        foreach (var value in prop.Values)
+        {
+            if (value is not AumlAstObjectNode objectNode) continue;
+            var child = Instantiate(objectNode);
+            if (child == null) continue;
+
+            var add = addMethods.FirstOrDefault(m => m.GetParameters()[0].ParameterType.IsInstanceOfType(child));
+            if (add != null) add.Invoke(collection, new[] { child });
+            else _diagnostics.Add($"Cannot add {child.GetType().Name} to {p.Name}");
+        }
+        return true;   // a populatable read-only collection; per-child issues are reported individually
     }
 
     private object ResolveMarkupExtension(AumlAstMarkupExtensionNode markup, Type targetType)
@@ -130,6 +168,9 @@ internal sealed class AumlInstantiator
         try
         {
             if (t == typeof(string)) { result = text; return true; }
+            // An object-typed property (e.g. Setter.Value="Auto") takes the raw string in markup; the real
+            // conversion happens later when the value is applied to its concrete target property.
+            if (t == typeof(object)) { result = text; return true; }
             if (t.IsEnum) { result = Enum.Parse(t, text, ignoreCase: true); return true; }
             if (t == typeof(bool)) { result = bool.Parse(text); return true; }
             if (t.IsPrimitive || t == typeof(decimal))
