@@ -1,5 +1,5 @@
 ﻿<ResourceDictionary xmlns:x="http://adamantium/ui/xaml/extensions"
-        xmlns="http://adamantium/ui/resources">
+        xmlns="http://adamantium/ui">
 
     <SolidColorBrush x:Key="GeneralIconBrush" Color="#9B9B9B"/>
 

@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<StyleSet xmlns="http://adamantium/ui/resources">
+<StyleSet xmlns="http://adamantium/ui">
     <Style Selector="Rectangle">
         <Setter Property="Width" Value="150"/>
         <Setter Property="Height" Value="50"/>

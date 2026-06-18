@@ -1,5 +1,4 @@
-<Window xmlns:resources="http://adamantium/ui/resources"
-        x:Namespace="Adamantium.Game.Playground"
+<Window x:Namespace="Adamantium.Game.Playground"
         xmlns="http://adamantium/ui"
 		xmlns:x="http://adamantium/ui/xaml/extensions"
 		xmlns:local="clr-namespace:Adamantium.Game.Playground"
@@ -32,9 +31,23 @@
 		<Path Name="Path3"
               Fill="Red"
 		      HorizontalAlignment="Center"
-			  VerticalAlignment="Center"
-              Data="M184,110 L209.14,123.05 L206.59,135.88 L178.37,138.32 L174.09,147 L189.34,170.88 L180.71,180.71 L155.05,168.71 L147,174.09 L148.27,202.39 L135.88,206.59 L119.66,183.37 L110,184 L96.95,209.14 L84.12,206.59 L81.68,178.37 L73,174.09 L49.12,189.34 L39.29,180.71 L51.29,155.05 L45.91,147 L17.61,148.27 L13.41,135.88 L36.63,119.66 L36,110 L10.86,96.95 L13.41,84.12 L41.63,81.68 L45.91,73 L30.66,49.12 L39.29,39.29 L64.95,51.29 L73,45.91 L71.73,17.61 L84.12,13.41 L100.34,36.63 L110,36 L123.05,10.86 L135.88,13.41 L138.32,41.63 L147,45.91 L170.88,30.66 L180.71,39.29 L168.71,64.95 L174.09,73 L202.39,71.73 L206.59,84.12 L183.37,100.34 Z
-L183.37,100.34 Z M142,110 L141.39,116.24 L139.56,122.25 L136.61,127.78 L132.63,132.63 L127.78,136.61 L122.25,139.56 L116.24,141.39 L110,142 L103.76,141.39 L97.75,139.56 L92.22,136.61 L87.37,132.63 L83.39,127.78 L80.44,122.25 L78.61,116.24 L78,110 L78.61,103.76 L80.44,97.75 L83.39,92.22 L87.37,87.37 L92.22,83.39 L97.75,80.44 L103.76,78.61 L110,78 L116.24,78.61 L122.25,80.44 L127.78,83.39 L132.63,87.37 L136.61,92.22 L139.56,97.75 L141.39,103.76 Z"/>
+			  VerticalAlignment="Center">
+            <Path.Data>
+                <GeometryGroup>
+                    <CombinedGeometry GeometryCombineMode="Xor">
+                        <CombinedGeometry.Geometry1>
+                            <EllipseGeometry RadiusX="40" RadiusY="40" Center="75,75"/>
+                        </CombinedGeometry.Geometry1>
+                        <CombinedGeometry.Geometry2>
+                            <EllipseGeometry RadiusX="40" RadiusY="40" Center="125,75" />
+                        </CombinedGeometry.Geometry2>
+                    </CombinedGeometry>
+                    <CombinedGeometry>
+                        
+                    </CombinedGeometry>
+                </GeometryGroup>
+            </Path.Data>
+        </Path>
 		
 <!--		<Border Width="200"-->
 <!--                Height="50"-->

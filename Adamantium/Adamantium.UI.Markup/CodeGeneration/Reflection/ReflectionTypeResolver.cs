@@ -12,7 +12,9 @@ public class ReflectionTypeResolver : ITypeResolver
     private readonly List<Assembly> _assemblies;
     private readonly Dictionary<string, IResolvedAssembly> _resolvedAssembliesMap = new();
     private readonly List<IResolvedAssembly> _resolvedAssemblies = new();
-    private readonly Dictionary<string, IResolvedAssembly> _resolvedXmlAssemblies = new();
+    // One xmlns URI may map to several assemblies (controls + core both under "http://adamantium/ui"); unioned
+    // via a CompositeResolvedAssembly on lookup.
+    private readonly Dictionary<string, List<IResolvedAssembly>> _resolvedXmlAssemblies = new();
 
     public ReflectionTypeResolver(IEnumerable<Assembly> assemblies = null)
     {
@@ -28,8 +30,9 @@ public class ReflectionTypeResolver : ITypeResolver
 
     public IResolvedAssembly GetResolvedAssemblyByXmlDefinition(string xmlDefinition)
     {
-        _resolvedXmlAssemblies.TryGetValue(xmlDefinition.Trim('/'), out var result);
-        return result;
+        if (!_resolvedXmlAssemblies.TryGetValue(xmlDefinition.Trim('/'), out var assemblies) || assemblies.Count == 0)
+            return null;
+        return assemblies.Count == 1 ? assemblies[0] : new CompositeResolvedAssembly(assemblies);
     }
 
     public IResolvedType Resolve(string metadataName)
@@ -149,11 +152,11 @@ public class ReflectionTypeResolver : ITypeResolver
 
     private void EnsureXmlDefinitionAssemblyAdded(IResolvedAssembly assembly, string xmlDefinition)
     {
-        if (!string.IsNullOrEmpty(xmlDefinition))
-        {
-            var key = xmlDefinition.Trim('/');
-            if (!_resolvedXmlAssemblies.ContainsKey(key))
-                _resolvedXmlAssemblies[key] = assembly;
-        }
+        if (string.IsNullOrEmpty(xmlDefinition)) return;
+        var key = xmlDefinition.Trim('/');
+        if (!_resolvedXmlAssemblies.TryGetValue(key, out var assemblies))
+            _resolvedXmlAssemblies[key] = assemblies = new List<IResolvedAssembly>();
+        if (!assemblies.Contains(assembly))
+            assemblies.Add(assembly);
     }
 }

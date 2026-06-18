@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <StyleSet
-        xmlns="http://adamantium/ui/resources"
-        xmlns:local="http://adamantium/ui/resources">
+        xmlns="http://adamantium/ui"
+        xmlns:local="http://adamantium/ui">
     <Style Selector="Border">
         <Setter Property="Thickness" Value="3"/>
         <Setter Property="Grid.Column" Value="2"/>

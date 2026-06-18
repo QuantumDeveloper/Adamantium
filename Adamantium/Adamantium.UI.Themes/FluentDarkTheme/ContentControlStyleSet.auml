@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<StyleSet xmlns="http://adamantium/ui/resources"
+<StyleSet xmlns="http://adamantium/ui"
           xmlns:x="http://adamantium/ui/xaml/extensions"
           xmlns:controls="http://adamantium/ui">
     <Style Selector="ContentControl">
