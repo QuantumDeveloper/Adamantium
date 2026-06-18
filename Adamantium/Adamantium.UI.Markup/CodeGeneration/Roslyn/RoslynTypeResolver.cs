@@ -8,15 +8,17 @@ public class RoslynTypeResolver : ITypeResolver
     private Compilation _compilation;
     private IDictionary<string, IResolvedAssembly> _resolvedAssembliesMap;
     private List<IResolvedAssembly> _resolvedAssemblies;
-    private IDictionary<string, IResolvedAssembly> _resolvedXmlAssemblies;
+    // One xmlns URI may map to several assemblies (e.g. controls + core both under "http://adamantium/ui");
+    // their types are unioned via a CompositeResolvedAssembly on lookup.
+    private IDictionary<string, List<IResolvedAssembly>> _resolvedXmlAssemblies;
     private IDictionary<string, IResolvedAssembly> _namespaceToAssembleMap;
-    
+
     public RoslynTypeResolver(Compilation compilation)
     {
         _compilation = compilation;
         _resolvedAssembliesMap = new Dictionary<string, IResolvedAssembly>();
         _resolvedAssemblies = new List<IResolvedAssembly>();
-        _resolvedXmlAssemblies = new Dictionary<string, IResolvedAssembly>();
+        _resolvedXmlAssemblies = new Dictionary<string, List<IResolvedAssembly>>();
         _namespaceToAssembleMap = new Dictionary<string, IResolvedAssembly>();
     }
     
@@ -34,8 +36,9 @@ public class RoslynTypeResolver : ITypeResolver
 
     public IResolvedAssembly GetResolvedAssemblyByXmlDefinition(string xmlDefinition)
     {
-        _resolvedXmlAssemblies.TryGetValue(xmlDefinition.Trim('/'), out var result);
-        return result;
+        if (!_resolvedXmlAssemblies.TryGetValue(xmlDefinition.Trim('/'), out var assemblies) || assemblies.Count == 0)
+            return null;
+        return assemblies.Count == 1 ? assemblies[0] : new CompositeResolvedAssembly(assemblies);
     }
 
     public IResolvedType Resolve(string metadataName)
@@ -161,10 +164,12 @@ public class RoslynTypeResolver : ITypeResolver
 
     private void EnsureXmlDefinitionAssemblyAdded(IResolvedAssembly assembly, string xmlDefinition)
     {
-        if (!string.IsNullOrEmpty(xmlDefinition) && !_resolvedXmlAssemblies.ContainsKey(xmlDefinition))
-        {
-            _resolvedXmlAssemblies[xmlDefinition] = assembly;
-        }
+        if (string.IsNullOrEmpty(xmlDefinition)) return;
+        var key = xmlDefinition.Trim('/');
+        if (!_resolvedXmlAssemblies.TryGetValue(key, out var assemblies))
+            _resolvedXmlAssemblies[key] = assemblies = new List<IResolvedAssembly>();
+        if (!assemblies.Contains(assembly))
+            assemblies.Add(assembly);
     }
     
     // Find assembly by namespace when assembly is not specified in the markup

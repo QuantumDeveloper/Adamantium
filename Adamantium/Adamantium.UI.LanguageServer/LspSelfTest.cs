@@ -33,10 +33,10 @@ internal static class LspSelfTest
         const string xPrefixUri = dir + "/XPrefix.auml";
         const string semanticUri = dir + "/Semantic.auml";
 
-        const string resourcesRoot = """<StyleSet xmlns="http://adamantium/ui/resources" xmlns:x="http://adamantium/ui/xaml/extensions" xmlns:controls="http://adamantium/ui">""";
+        const string resourcesRoot = """<StyleSet xmlns="http://adamantium/ui" xmlns:x="http://adamantium/ui/xaml/extensions" xmlns:controls="http://adamantium/ui">""";
 
         var (completionText, cLine, cChar) = Caret(
-            """<StyleSet xmlns="http://adamantium/ui/resources" xmlns:controls="http://adamantium/ui"><controls:Border |></controls:Border></StyleSet>""");
+            """<StyleSet xmlns="http://adamantium/ui" xmlns:controls="http://adamantium/ui"><controls:Border |></controls:Border></StyleSet>""");
 
         const string diagDoc = resourcesRoot +
             """<Style Selector="Button"><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><controls:Border Backgroud="Blue"/></ControlTemplate></Setter.Value></Setter></Style></StyleSet>""";
@@ -48,41 +48,41 @@ internal static class LspSelfTest
         var background = Pos(hoverDoc, "Background");
 
         var (brushText, brLine, brChar) = Caret(
-            """<StyleSet xmlns="http://adamantium/ui/resources" xmlns:controls="http://adamantium/ui"><controls:Border Background="|"></controls:Border></StyleSet>""");
+            """<StyleSet xmlns="http://adamantium/ui" xmlns:controls="http://adamantium/ui"><controls:Border Background="|"></controls:Border></StyleSet>""");
 
         const string missingDoc = "<Border></Border>";   // no xmlns -> "not in scope" + an import quick-fix
         var missingBorder = Pos(missingDoc, "Border");
 
         // <Border> uses the default 'resources' xmlns where it doesn't exist, but controls is already declared.
-        const string qualifyDoc = """<StyleSet xmlns="http://adamantium/ui/resources" xmlns:controls="http://adamantium/ui"><Border/></StyleSet>""";
+        const string qualifyDoc = """<StyleSet xmlns="http://adamantium/ui" xmlns:controls="http://adamantium/ui"><Border/></StyleSet>""";
         var qualify = Pos(qualifyDoc, "Border");
         // Same, but controls is NOT declared -> the fix must add the xmlns to the root.
-        const string importDoc = """<StyleSet xmlns="http://adamantium/ui/resources"><Border/></StyleSet>""";
+        const string importDoc = """<StyleSet xmlns="http://adamantium/ui"><Border/></StyleSet>""";
         var import = Pos(importDoc, "Border");
 
         // clr-namespace: a prefix bound straight to a CLR namespace (XAML-style) -> complete its types.
         const string clrNs = "clr-namespace:Adamantium.UI.Controls.Decorators";
         var (clrText, clrLine, clrChar) = Caret(
-            $"""<StyleSet xmlns="http://adamantium/ui/resources" xmlns:dec="{clrNs}"><dec:Bord|</StyleSet>""");
+            $"""<StyleSet xmlns="http://adamantium/ui" xmlns:dec="{clrNs}"><dec:Bord|</StyleSet>""");
         // Existence validation: a real CLR namespace -> no diagnostic; a bogus one -> "not found".
-        const string clrGoodDoc = $"""<StyleSet xmlns="http://adamantium/ui/resources" xmlns:dec="{clrNs}"><dec:Border/></StyleSet>""";
-        const string clrBadDoc = """<StyleSet xmlns="http://adamantium/ui/resources" xmlns:bad="clr-namespace:No.Such.Namespace.Xyz"><bad:Thing/></StyleSet>""";
+        const string clrGoodDoc = $"""<StyleSet xmlns="http://adamantium/ui" xmlns:dec="{clrNs}"><dec:Border/></StyleSet>""";
+        const string clrBadDoc = """<StyleSet xmlns="http://adamantium/ui" xmlns:bad="clr-namespace:No.Such.Namespace.Xyz"><bad:Thing/></StyleSet>""";
 
         // Property-element syntax <Owner.Property> -> complete the owner type's properties.
         var (propElementText, peLine, peChar) = Caret(
-            """<StyleSet xmlns="http://adamantium/ui/resources" xmlns:controls="http://adamantium/ui"><controls:Border.Chi|</StyleSet>""");
+            """<StyleSet xmlns="http://adamantium/ui" xmlns:controls="http://adamantium/ui"><controls:Border.Chi|</StyleSet>""");
         // Property element onto a get-only collection (Theme.StyleIncludes) — must still be offered.
         var (themePropText, tpLine, tpChar) = Caret(
-            """<Theme xmlns="http://adamantium/ui/resources"><Theme.Sty|</Theme>""");
+            """<Theme xmlns="http://adamantium/ui"><Theme.Sty|</Theme>""");
         // Semantic tokens: resolved element -> 'type', prefix -> 'namespace', attribute -> 'property', x: -> 'macro'.
         // A property-element <Owner.Property> must colour as type + property (NOT one 'unknown' tag painted red).
-        const string semanticDoc = """<StyleSet xmlns="http://adamantium/ui/resources" xmlns:controls="http://adamantium/ui" xmlns:x="http://adamantium/ui/xaml/extensions"><controls:Border Background="Red" x:Name="b"/><controls:Border.Child/><Bogus/></StyleSet>""";
+        const string semanticDoc = """<StyleSet xmlns="http://adamantium/ui" xmlns:controls="http://adamantium/ui" xmlns:x="http://adamantium/ui/xaml/extensions"><controls:Border Background="Red" x:Name="b"/><controls:Border.Child/><Bogus/></StyleSet>""";
         // Undeclared x: prefix (xmlns:x deleted) -> Alt+Enter on x:Name offers to declare the directives namespace.
         const string xPrefixDoc = """<Border xmlns="http://adamantium/ui" x:Name="root"></Border>""";
         var xName = Pos(xPrefixDoc, "x:Name");
         // Attached-property syntax Owner.Property="..." -> complete the owner type's attached properties.
         var (attachedText, atLine, atChar) = Caret(
-            """<StyleSet xmlns="http://adamantium/ui/resources" xmlns:controls="http://adamantium/ui"><controls:Border ResourceContext.Sou|/></StyleSet>""");
+            """<StyleSet xmlns="http://adamantium/ui" xmlns:controls="http://adamantium/ui"><controls:Border ResourceContext.Sou|/></StyleSet>""");
 
         JsonNode[] session =
         {
