@@ -6,6 +6,12 @@ namespace Adamantium.Mathematics.Triangulation;
 
 public class MeshContour
 {
+    /// <summary>Coordinates are snapped to this many decimals on ingestion. The triangulator compares points
+    /// exactly (==, Dictionary&lt;Vector2&gt; keys), so without snapping, coordinates that are equal up to
+    /// floating-point noise are treated as distinct points — producing spurious strips/holes (e.g. when combining
+    /// nested ellipses). 5 decimals is far finer than any 2D UI layout needs.</summary>
+    public const int CoordinatePrecision = 5;
+
     public string Name { get; set; }
     public Vector2[] Points { get; set; } = [];
 
@@ -73,7 +79,9 @@ public class MeshContour
     public void SetPoints(IEnumerable<Vector2> points, bool generateSegments = true)
     {
         var tmpList = new List<Vector2>();
-        var pts = points.ToArray();
+        // Snap to CoordinatePrecision first so floating-point-noise-equal coordinates become exactly equal for the
+        // triangulator's exact point comparisons (and the dedup below collapses the now-coincident points).
+        var pts = points.Select(p => Vector2.Round(p, CoordinatePrecision)).ToArray();
         // Check for duplicating points going together and remove them
         for (int i = 0; i < pts.Length - 1; i++)
         {
@@ -184,6 +192,9 @@ public class MeshContour
 
         void Record(GeometrySegment seg, Vector2 point)
         {
+            // Snap computed intersection points to the same precision as contour points, so they coincide cleanly
+            // with existing endpoints instead of landing a floating-point-epsilon away.
+            point = Vector2.Round(point, CoordinatePrecision);
             if (point == seg.Start || point == seg.End) return;
             if (!intersectionsList.TryGetValue(point, out var inter))
             {
@@ -292,7 +303,7 @@ public class MeshContour
         for (var i = 0; i < copy.Points.Length; i++)
         {
             var point = copy.Points[i];
-            copy.Points[i] = Vector2.Round(point, 3);
+            copy.Points[i] = Vector2.Round(point, CoordinatePrecision);
         }
         
         if (GeometryPoints != null) copy.GeometryPoints = new List<GeometryIntersection>(GeometryPoints);

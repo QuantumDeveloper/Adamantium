@@ -24,8 +24,8 @@ namespace Adamantium.MathTests
             Assert.IsFalse(MathHelper.IsConvex(new[] { V(0, 0), V(10, 0) }), "degenerate (2 pts)");
         }
 
-        // Locks CURRENT behaviour: EvenOdd = real even-odd, NonZero = OuterContour (holes dropped),
-        // OuterContour(enum) == EvenOdd. (After Phase 0 rename + true non-zero, update these expectations.)
+        // Locks CURRENT behaviour: EvenOdd = real even-odd; NonZero currently drops inner contours and fills the
+        // outermost solid (outer-contour semantics). (When a true non-zero winding lands, update these.)
         [Test]
         public void FillRule_TruthTable()
         {
@@ -41,11 +41,10 @@ namespace Adamantium.MathTests
 
             Donut(false, FillRule.EvenOdd, false);
             Donut(true, FillRule.EvenOdd, false);
-            Donut(false, FillRule.OuterContour, false);   // enum OuterContour currently == EvenOdd
-            Donut(false, FillRule.NonZero, true);          // NonZero currently = OuterContour behaviour
+            Donut(false, FillRule.NonZero, true);          // NonZero drops the inner ring -> solid
             Donut(true, FillRule.NonZero, true);
 
-            // Overlap of two same-wound squares: even-odd hollows it, NonZero (=OuterContour) fills it.
+            // Overlap of two same-wound squares: even-odd hollows it, NonZero fills it.
             void Overlap(FillRule rule, bool overlapFilled)
             {
                 var p = new Polygon { FillRule = rule };
@@ -98,7 +97,7 @@ namespace Adamantium.MathTests
             Assert.IsFalse(Covered(even, V(50, 50)), "centre hole");
             Assert.AreEqual(8, even.Count / 3, "quad with quad hole => 8 triangles");
 
-            // NonZero (== OuterContour today): inner dropped -> solid; outer quad => 2 triangles.
+            // NonZero (drops inner contour today): solid; outer quad => 2 triangles.
             var nz = FillDonut(FillRule.NonZero);
             Assert.IsTrue(Covered(nz, V(50, 50)), "hole filled solid");
             Assert.AreEqual(2, nz.Count / 3, "solid quad => 2 triangles");
