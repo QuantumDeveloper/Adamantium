@@ -24,6 +24,9 @@ public class GameHostBehavior : Behavior<RenderTargetPanel>
 
     protected override void OnAttached(RenderTargetPanel panel)
     {
+        // The designer/previewer has no game loop or window render service - never spin up the game there.
+        if (Design.IsDesignMode) return;
+
         // OnAttached fires while the AUML tree is being built, before the panel is in the visual tree. Defer the
         // wiring until it is attached, by which point its window and WindowRenderService exist.
         panel.AttachedToVisualTreeEvent += OnPanelAttachedToVisualTree;
