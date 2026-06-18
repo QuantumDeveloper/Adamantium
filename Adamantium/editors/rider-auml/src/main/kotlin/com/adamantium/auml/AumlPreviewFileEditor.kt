@@ -12,6 +12,7 @@ import com.intellij.openapi.fileEditor.FileEditorState
 import com.intellij.openapi.fileEditor.FileEditorStateLevel
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
+import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.util.UserDataHolderBase
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.JBColor
@@ -22,6 +23,7 @@ import com.intellij.util.ui.JBUI
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.FlowLayout
+import java.awt.Point
 import java.awt.Graphics
 import java.awt.Graphics2D
 import java.awt.Rectangle
@@ -32,8 +34,10 @@ import java.awt.image.BufferedImage
 import java.beans.PropertyChangeListener
 import java.io.File
 import javax.imageio.ImageIO
+import javax.swing.BorderFactory
 import javax.swing.JButton
 import javax.swing.JComponent
+import javax.swing.JLayeredPane
 import javax.swing.JToggleButton
 import javax.swing.JPanel
 import javax.swing.JViewport
@@ -73,6 +77,41 @@ class AumlPreviewFileEditor(
         isVisible = false
     }
     private val sizeLabel = JBLabel().apply { border = JBUI.Borders.emptyLeft(8) }
+    // Non-fatal designer diagnostics (e.g. "Cannot convert '75,75' to Vector2", unresolved behavior): the preview
+    // still renders, but the user must see what silently didn't apply. Kept as a compact "⚠ N" badge (fixed,
+    // tiny width so it never blocks the preview from shrinking); click it for the full list in a popup.
+    private var currentDiagnostics: List<String> = emptyList()
+    // Floating "⚠ N" badge over the canvas: drag to reposition, click (without dragging) opens the full list in a
+    // popup. Lives on canvasLayer (not the toolbar) so it floats over the preview and never affects layout width.
+    private var badgePos: Point? = null         // user-dragged position; null = default top-right corner
+    private var badgeDragOffset: Point? = null  // press point within the badge while dragging
+    private var badgeDragged = false
+    private val diagBadge = JBLabel().apply {
+        foreground = JBColor.ORANGE
+        isOpaque = true
+        background = JBColor.background()
+        border = BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(JBColor.ORANGE, 1, true),
+            JBUI.Borders.empty(2, 6))
+        isVisible = false
+        cursor = java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.MOVE_CURSOR)
+        toolTipText = "Designer diagnostics — drag to move, click for details"
+        val handler = object : java.awt.event.MouseAdapter() {
+            override fun mousePressed(e: java.awt.event.MouseEvent) { badgeDragOffset = e.point; badgeDragged = false }
+            override fun mouseDragged(e: java.awt.event.MouseEvent) {
+                val off = badgeDragOffset ?: return
+                badgeDragged = true
+                badgePos = Point(x + e.x - off.x, y + e.y - off.y)
+                layoutOverlay()
+            }
+            override fun mouseReleased(e: java.awt.event.MouseEvent) {
+                if (!badgeDragged) showDiagnosticsPopup()
+                badgeDragOffset = null
+            }
+        }
+        addMouseListener(handler)
+        addMouseMotionListener(handler)
+    }
     // Stays "pressed" while auto-fit is tracking the window; pops out when you zoom manually — a visible
     // indicator of the auto-fit state. Clicking it always (re-)fits and turns tracking back on.
     private val fitToggle = JToggleButton("Fit").apply {
@@ -81,8 +120,16 @@ class AumlPreviewFileEditor(
         addActionListener { fitNow() }
     }
     private val scrollPane = JBScrollPane(canvas).apply { isWheelScrollingEnabled = false }
+    // Layered host: the scroll pane fills the area, the diagnostics badge floats on top of it. doLayout (run on
+    // every validation/resize) keeps the scroll pane filled and the badge positioned.
+    private val canvasLayer = object : JLayeredPane() {
+        override fun doLayout() = layoutOverlay()
+    }.apply {
+        add(scrollPane, JLayeredPane.DEFAULT_LAYER as Any?)
+        add(diagBadge, JLayeredPane.PALETTE_LAYER as Any?)
+    }
     private val root = JPanel(BorderLayout()).apply {
-        add(scrollPane, BorderLayout.CENTER)
+        add(canvasLayer, BorderLayout.CENTER)
         add(buildToolbar(), BorderLayout.SOUTH)
     }
 
@@ -180,6 +227,7 @@ class AumlPreviewFileEditor(
     }
 
     private fun applyResult(result: AumlPreviewService.RenderResult, image: BufferedImage?, requestedScale: Double) {
+        showDiagnostics(result.diagnostics)
         if (image != null) {
             // The host may render below the requested scale (size cap); use the scale it actually rendered at so
             // the canvas upscales to the requested zoom. Updating only on success keeps the last good frame.
@@ -194,6 +242,46 @@ class AumlPreviewFileEditor(
             errorLabel.text = result.error ?: "render failed"
             errorLabel.isVisible = true
         }
+    }
+
+    // Surface non-fatal designer diagnostics as a compact "⚠ N" badge floating over the canvas (click for the
+    // full list). Floating (not inline) so it never affects the toolbar width / window minimum size.
+    private fun showDiagnostics(diagnostics: List<String>) {
+        currentDiagnostics = diagnostics
+        diagBadge.isVisible = diagnostics.isNotEmpty()
+        if (diagnostics.isNotEmpty()) diagBadge.text = "⚠ ${diagnostics.size}"
+        layoutOverlay()
+    }
+
+    // Keeps the scroll pane filling canvasLayer and the floating badge sized/positioned (default top-right, or the
+    // user's dragged position, always clamped inside the visible area).
+    private fun layoutOverlay() {
+        scrollPane.setBounds(0, 0, canvasLayer.width, canvasLayer.height)
+        if (!diagBadge.isVisible) return
+        val d = diagBadge.preferredSize
+        val p = badgePos ?: Point(canvasLayer.width - d.width - 10, 8)
+        val cx = p.x.coerceIn(0, max(0, canvasLayer.width - d.width))
+        val cy = p.y.coerceIn(0, max(0, canvasLayer.height - d.height))
+        diagBadge.setBounds(cx, cy, d.width, d.height)
+    }
+
+    private fun showDiagnosticsPopup() {
+        if (currentDiagnostics.isEmpty()) return
+        val area = javax.swing.JTextArea(currentDiagnostics.joinToString("\n\n")).apply {
+            isEditable = false
+            lineWrap = true
+            wrapStyleWord = true
+            border = JBUI.Borders.empty(8)
+        }
+        val scroll = JBScrollPane(area).apply { preferredSize = Dimension(520, 220) }
+        JBPopupFactory.getInstance()
+            .createComponentPopupBuilder(scroll, area)
+            .setTitle("Designer diagnostics (${currentDiagnostics.size})")
+            .setResizable(true)
+            .setMovable(true)
+            .setRequestFocus(true)
+            .createPopup()
+            .showUnderneathOf(diagBadge)
     }
 
     override fun getComponent(): JComponent = root

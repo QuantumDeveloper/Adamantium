@@ -26,8 +26,51 @@ public sealed class CompletionEngine
             AumlCompletionKind.ElementName => CompleteElements(ctx, namespaces),
             AumlCompletionKind.AttributeName => CompleteAttributes(ctx, namespaces),
             AumlCompletionKind.AttributeValue => CompleteValues(ctx, namespaces),
+            AumlCompletionKind.MarkupExtensionName => CompleteMarkupExtensionName(ctx),
+            AumlCompletionKind.MarkupExtensionArg => CompleteMarkupExtensionArg(ctx, namespaces, text, offset),
             _ => Array.Empty<AumlCompletionItem>()
         };
+    }
+
+    // After '{': offer the available markup-extension names (TemplateBinding, ResourceReference, …).
+    private IReadOnlyList<AumlCompletionItem> CompleteMarkupExtensionName(AumlCompletionContext ctx) =>
+        _model.GetMarkupExtensions()
+            .Where(n => Matches(n, ctx.Prefix))
+            .Select(n => new AumlCompletionItem(n, AumlCompletionItemKind.Element))
+            .ToList();
+
+    // Inside "{Name arg}": complete the argument. v1 handles {TemplateBinding <prop>} -> the templated parent's
+    // (enclosing ControlTemplate's TargetType) settable properties, which is the common case.
+    private IReadOnlyList<AumlCompletionItem> CompleteMarkupExtensionArg(
+        AumlCompletionContext ctx, IReadOnlyDictionary<string, string> namespaces, string text, int offset)
+    {
+        if (ctx.MarkupExtension is "TemplateBinding" or "TemplateBindingExtension")
+        {
+            var target = FindControlTemplateTargetType(text, offset, namespaces);
+            if (target is null) return Array.Empty<AumlCompletionItem>();
+            return _model.GetProperties(target)
+                .Where(p => Matches(p.Name, ctx.Prefix))
+                .OrderBy(p => p.Name)
+                .Select(p => new AumlCompletionItem(p.Name, AumlCompletionItemKind.Property, p.Type?.Name))
+                .ToList();
+        }
+        return Array.Empty<AumlCompletionItem>();
+    }
+
+    /// <summary>The TargetType of the ControlTemplate enclosing the caret — the nearest <c>TargetType="..."</c>
+    /// before the caret (pragmatic scan; good enough for completing a TemplateBinding inside a template).</summary>
+    private Adamantium.UI.Markup.CodeGeneration.IResolvedType? FindControlTemplateTargetType(
+        string text, int offset, IReadOnlyDictionary<string, string> namespaces)
+    {
+        int region = Math.Min(offset, text.Length);
+        int idx = text.LastIndexOf("TargetType", Math.Max(0, region - 1), StringComparison.Ordinal);
+        if (idx < 0) return null;
+        int q1 = text.IndexOf('"', idx);
+        if (q1 < 0 || q1 >= region) return null;
+        int q2 = text.IndexOf('"', q1 + 1);
+        if (q2 < 0) return null;
+        var (prefix, local) = SplitName(text.Substring(q1 + 1, q2 - q1 - 1).Trim());
+        return ResolveType(prefix, local, namespaces);
     }
 
     private IReadOnlyList<AumlCompletionItem> CompleteElements(AumlCompletionContext ctx, IReadOnlyDictionary<string, string> namespaces)
