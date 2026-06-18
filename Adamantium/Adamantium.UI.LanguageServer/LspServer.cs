@@ -160,6 +160,11 @@ public sealed class LspServer
         {
             var node = new JsonObject { ["label"] = item.Label, ["kind"] = LspKind(item.Kind) };
             if (item.Detail is not null) node["detail"] = item.Detail;
+            if (item.InsertText is not null)
+            {
+                node["insertText"] = item.InsertText;
+                node["insertTextFormat"] = 2;   // Snippet — the $0 places the caret between the inserted quotes
+            }
             result.Add(node);
         }
         return result;
