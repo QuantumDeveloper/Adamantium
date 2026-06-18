@@ -210,6 +210,23 @@ public sealed class AumlTypeModel
         return Array.Empty<string>();
     }
 
+    /// <summary>Names of usable markup extensions (<c>{Name ...}</c>): every type deriving from MarkupExtension,
+    /// with the conventional "Extension" suffix stripped (e.g. BitmapImageExtension -> BitmapImage).</summary>
+    public IReadOnlyList<string> GetMarkupExtensions()
+    {
+        const string baseFqn = "Adamantium.UI.Core.MarkupExtensions.MarkupExtension";
+        var names = new SortedSet<string>(StringComparer.Ordinal);
+        foreach (var assembly in _resolver.ResolvedAssemblies)
+            foreach (var type in assembly.Types)
+            {
+                if (type.Name == "MarkupExtension" || !type.InheritsFromMarkupExtension(baseFqn)) continue;
+                var name = type.Name;
+                if (name.EndsWith("Extension") && name.Length > "Extension".Length) name = name[..^"Extension".Length];
+                names.Add(name);
+            }
+        return names.ToList();
+    }
+
     private static readonly string[] CommonColors =
     {
         "Transparent", "Black", "White", "Gray", "Silver", "Red", "Green", "Blue", "Yellow",

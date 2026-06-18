@@ -1,13 +1,15 @@
 namespace Adamantium.UI.LanguageServer;
 
-public enum AumlCompletionKind { None, ElementName, AttributeName, AttributeValue }
+public enum AumlCompletionKind { None, ElementName, AttributeName, AttributeValue, MarkupExtensionName, MarkupExtensionArg }
 
-/// <summary>What the caret is positioned to complete, plus the surrounding element/attribute.</summary>
+/// <summary>What the caret is positioned to complete, plus the surrounding element/attribute. For a markup
+/// extension (<c>{Name arg}</c>) <see cref="MarkupExtension"/> holds the extension name when completing an argument.</summary>
 public sealed record AumlCompletionContext(
     AumlCompletionKind Kind,
     string Prefix,
     string? ElementName = null,
-    string? AttributeName = null);
+    string? AttributeName = null,
+    string? MarkupExtension = null);
 
 /// <summary>
 /// Lenient, caret-based context detector for AUML completion. Works on partial/malformed
@@ -51,8 +53,14 @@ public static class AumlCaretContext
         if (insideValue)
         {
             int openQuote = tag.LastIndexOf('"');
-            string prefix = tag.Substring(openQuote + 1);
-            return new(AumlCompletionKind.AttributeValue, prefix, elementName, AttributeNameBeforeQuote(tag, openQuote));
+            string value = tag.Substring(openQuote + 1);
+            var attrName = AttributeNameBeforeQuote(tag, openQuote);
+
+            // A markup extension: "{Name arg}". Up to the first space is the extension name; the rest are its args.
+            if (value.StartsWith("{"))
+                return DetectMarkupExtension(value, elementName, attrName);
+
+            return new(AumlCompletionKind.AttributeValue, value, elementName, attrName);
         }
 
         // Attribute name: prefix is the current token after the last whitespace.
@@ -62,6 +70,21 @@ public static class AumlCaretContext
         // A token already containing '=' or '"' means we are between attributes — offer all.
         string namePrefix = token.Contains('=') || token.Contains('"') ? "" : token;
         return new(AumlCompletionKind.AttributeName, namePrefix, elementName);
+    }
+
+    private static AumlCompletionContext DetectMarkupExtension(string value, string? elementName, string? attrName)
+    {
+        var body = value.Substring(1);   // drop the leading '{'
+        int space = body.IndexOf(' ');
+        if (space < 0)
+            return new(AumlCompletionKind.MarkupExtensionName, body.Trim(), elementName, attrName);
+
+        var extName = body.Substring(0, space).Trim();
+        var argPart = body.Substring(space + 1);
+        // Current argument token: text after the last separator (space / comma) up to the caret.
+        int tok = argPart.Length;
+        while (tok > 0 && argPart[tok - 1] is not (' ' or ',')) tok--;
+        return new(AumlCompletionKind.MarkupExtensionArg, argPart.Substring(tok), elementName, attrName, extName);
     }
 
     private static string? AttributeNameBeforeQuote(string tag, int openQuote)
