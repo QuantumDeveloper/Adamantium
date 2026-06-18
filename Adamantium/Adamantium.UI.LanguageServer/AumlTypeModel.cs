@@ -50,8 +50,15 @@ public sealed class AumlTypeModel
             return GetClrNamespaceTypes(xmlns, clrNamespace, assemblyName);
 
         var assembly = _resolver.GetResolvedAssemblyByXmlDefinition(xmlns);
-        return assembly?.Types ?? (IReadOnlyList<IResolvedType>)Array.Empty<IResolvedType>();
+        return assembly is null
+            ? []
+            : assembly.Types.Where(IsMarkupType).ToList();
     }
+
+    // Compiler-generated types (<Module>, <>c, <PrivateImplementationDetails>, <>z__ReadOnlyArray, …) are never
+    // valid markup elements; their names start with '<' (inexpressible in C#), so drop them from completion.
+    private static bool IsMarkupType(IResolvedType type) =>
+        !string.IsNullOrEmpty(type.Name) && type.Name[0] != '<';
 
     /// <summary>
     /// Resolves the types of a <c>clr-namespace:</c> xmlns — scoped to <c>;assembly=</c> when given,
@@ -67,8 +74,8 @@ public sealed class AumlTypeModel
             : _resolver.GetResolvedAssembly(assemblyName) ?? _resolver.ResolveAssembly(assemblyName);
 
         IReadOnlyList<IResolvedType> types = assembly is null
-            ? Array.Empty<IResolvedType>()
-            : assembly.Types.Where(t => t.Namespace == clrNamespace).ToList();
+            ? []
+            : assembly.Types.Where(t => t.Namespace == clrNamespace && IsMarkupType(t)).ToList();
 
         _clrNamespaceCache[uri] = types;
         return types;
@@ -150,6 +157,26 @@ public sealed class AumlTypeModel
     public IResolvedType? GetPropertyType(IResolvedType element, string propertyName) =>
         GetProperties(element).FirstOrDefault(p => p.Name == propertyName)?.Type;
 
+    /// <summary>
+    /// Readable properties for binding-path completion (<c>{Binding ...}</c> against an <c>x:DataType</c>): every
+    /// public instance property, inherited included, de-duplicated by name — unlike <see cref="GetProperties"/>
+    /// this does not require a setter, since one-way bindings read get-only properties too.
+    /// </summary>
+    public IReadOnlyList<AumlPropertyInfo> GetBindableProperties(IResolvedType type)
+    {
+        var result = new List<AumlPropertyInfo>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var property in type.GetAllProperties() ?? Enumerable.Empty<IResolvedProperty>())
+        {
+            if (property.Name.Contains('.') || property.Name.Contains('[')) continue;   // explicit impl / indexer
+            if (!seen.Add(property.Name)) continue;
+            var member = type.GetMemberByName(property.Name);
+            if (member is not { MemberKind: ResolvedMemberKind.Property }) continue;
+            result.Add(new AumlPropertyInfo(property.Name, property.PropertyType));
+        }
+        return result;
+    }
+
     /// <summary>First element type with this simple name across all registered xmlns namespaces — used
     /// to resolve an attached-property owner written without an xmlns prefix (e.g. <c>ResourceContext</c>).</summary>
     public IResolvedType? FindElement(string name)
@@ -202,12 +229,12 @@ public sealed class AumlTypeModel
                 .ToList();
 
         if (propertyType.SpecialType == ResolvedSpecialType.System_Boolean)
-            return new[] { "true", "false" };
+            return ["true", "false"];
 
         if (propertyType.Name is "Brush" or "IBrush")
             return CommonColors;
 
-        return Array.Empty<string>();
+        return [];
     }
 
     /// <summary>Names of usable markup extensions (<c>{Name ...}</c>): every type deriving from MarkupExtension,

@@ -1,8 +1,12 @@
+using System.Text.RegularExpressions;
+
 namespace Adamantium.UI.LanguageServer;
 
 public enum AumlCompletionItemKind { Element, Property, Value, Directive }
 
-public sealed record AumlCompletionItem(string Label, AumlCompletionItemKind Kind, string? Detail = null);
+/// <param name="InsertText">Optional snippet to insert instead of <paramref name="Label"/> (LSP snippet syntax,
+/// e.g. <c>Name="$0"</c> to drop the caret between the quotes). Null = insert the label verbatim.</param>
+public sealed record AumlCompletionItem(string Label, AumlCompletionItemKind Kind, string? Detail = null, string? InsertText = null);
 
 /// <summary>
 /// Produces AUML completions at a caret position: element names, an element's settable
@@ -24,11 +28,11 @@ public sealed class CompletionEngine
         return ctx.Kind switch
         {
             AumlCompletionKind.ElementName => CompleteElements(ctx, namespaces),
-            AumlCompletionKind.AttributeName => CompleteAttributes(ctx, namespaces),
+            AumlCompletionKind.AttributeName => CompleteAttributes(ctx, namespaces, text, offset),
             AumlCompletionKind.AttributeValue => CompleteValues(ctx, namespaces),
             AumlCompletionKind.MarkupExtensionName => CompleteMarkupExtensionName(ctx),
             AumlCompletionKind.MarkupExtensionArg => CompleteMarkupExtensionArg(ctx, namespaces, text, offset),
-            _ => Array.Empty<AumlCompletionItem>()
+            _ => []
         };
     }
 
@@ -44,26 +48,49 @@ public sealed class CompletionEngine
     private IReadOnlyList<AumlCompletionItem> CompleteMarkupExtensionArg(
         AumlCompletionContext ctx, IReadOnlyDictionary<string, string> namespaces, string text, int offset)
     {
-        if (ctx.MarkupExtension is "TemplateBinding" or "TemplateBindingExtension")
+        // The extension may be written with a prefix (e.g. {x:Type ...}); match on its local name.
+        var ext = ctx.MarkupExtension ?? "";
+        var extLocal = ext.Contains(':') ? ext[(ext.IndexOf(':') + 1)..] : ext;
+
+        if (extLocal is "TemplateBinding" or "TemplateBindingExtension")
         {
-            var target = FindControlTemplateTargetType(text, offset, namespaces);
-            if (target is null) return Array.Empty<AumlCompletionItem>();
+            var target = FindNearestAttributeType(text, offset, "TargetType", namespaces);
+            if (target is null) return [];
             return _model.GetProperties(target)
                 .Where(p => Matches(p.Name, ctx.Prefix))
                 .OrderBy(p => p.Name)
                 .Select(p => new AumlCompletionItem(p.Name, AumlCompletionItemKind.Property, p.Type?.Name))
                 .ToList();
         }
-        return Array.Empty<AumlCompletionItem>();
+
+        // {Binding <path>} -> properties of the enclosing x:DataType (design-time DataContext), walking dotted paths.
+        if (extLocal is "Binding" or "BindingExtension")
+            return CompleteBindingPath(ctx.Prefix, FindNearestAttributeType(text, offset, "DataType", namespaces));
+
+        // {x:Type <TypeName>} -> element type names, xmlns-prefixed or default, like element completion.
+        if (extLocal is "Type" or "TypeExtension")
+        {
+            var (prefix, partial) = SplitName(ctx.Prefix);
+            var xmlns = ResolveXmlns(prefix, namespaces);
+            if (xmlns.Length == 0) return [];
+            return _model.GetElements(xmlns)
+                .Where(t => Matches(t.Name, partial))
+                .OrderBy(t => t.Name)
+                .Select(t => new AumlCompletionItem(t.Name, AumlCompletionItemKind.Element))
+                .ToList();
+        }
+
+        return [];
     }
 
-    /// <summary>The TargetType of the ControlTemplate enclosing the caret — the nearest <c>TargetType="..."</c>
-    /// before the caret (pragmatic scan; good enough for completing a TemplateBinding inside a template).</summary>
-    private Adamantium.UI.Markup.CodeGeneration.IResolvedType? FindControlTemplateTargetType(
-        string text, int offset, IReadOnlyDictionary<string, string> namespaces)
+    /// <summary>The type named by the nearest <c>&lt;attrLocalName&gt;="..."</c> attribute before the caret
+    /// (pragmatic scan): the ControlTemplate's <c>TargetType</c> for a TemplateBinding, or the <c>x:DataType</c>
+    /// for a Binding. Good enough to scope completion to the enclosing template / data type.</summary>
+    private Adamantium.UI.Markup.CodeGeneration.IResolvedType? FindNearestAttributeType(
+        string text, int offset, string attrLocalName, IReadOnlyDictionary<string, string> namespaces)
     {
         int region = Math.Min(offset, text.Length);
-        int idx = text.LastIndexOf("TargetType", Math.Max(0, region - 1), StringComparison.Ordinal);
+        int idx = text.LastIndexOf(attrLocalName, Math.Max(0, region - 1), StringComparison.Ordinal);
         if (idx < 0) return null;
         int q1 = text.IndexOf('"', idx);
         if (q1 < 0 || q1 >= region) return null;
@@ -71,6 +98,35 @@ public sealed class CompletionEngine
         if (q2 < 0) return null;
         var (prefix, local) = SplitName(text.Substring(q1 + 1, q2 - q1 - 1).Trim());
         return ResolveType(prefix, local, namespaces);
+    }
+
+    /// <summary>Completes a (possibly dotted) binding path against <paramref name="dataType"/>: each segment before
+    /// the last narrows to that property's type; the last segment is completed against the narrowed type. Uses
+    /// readable properties (get-only included), since bindings read as well as write.</summary>
+    private IReadOnlyList<AumlCompletionItem> CompleteBindingPath(
+        string path, Adamantium.UI.Markup.CodeGeneration.IResolvedType? dataType)
+    {
+        if (dataType is null) return [];
+
+        var type = dataType;
+        var memberPartial = path;
+        int lastDot = path.LastIndexOf('.');
+        if (lastDot >= 0)
+        {
+            memberPartial = path[(lastDot + 1)..];
+            foreach (var seg in path[..lastDot].Split('.'))
+            {
+                var prop = _model.GetBindableProperties(type).FirstOrDefault(p => p.Name == seg);
+                if (prop?.Type is null) return [];
+                type = prop.Type;
+            }
+        }
+
+        return _model.GetBindableProperties(type)
+            .Where(p => Matches(p.Name, memberPartial))
+            .OrderBy(p => p.Name)
+            .Select(p => new AumlCompletionItem(p.Name, AumlCompletionItemKind.Property, p.Type?.Name))
+            .ToList();
     }
 
     private IReadOnlyList<AumlCompletionItem> CompleteElements(AumlCompletionContext ctx, IReadOnlyDictionary<string, string> namespaces)
@@ -82,7 +138,7 @@ public sealed class CompletionEngine
         if (dot >= 0)
         {
             var owner = ResolveType(prefix, partial[..dot], namespaces);
-            if (owner is null) return Array.Empty<AumlCompletionItem>();
+            if (owner is null) return [];
             var memberPartial = partial[(dot + 1)..];
             var ownerDot = partial[..(dot + 1)];   // "Owner." — kept so the inserted local name stays whole
             return _model.GetProperties(owner, includeReadOnlyCollections: true)
@@ -93,7 +149,7 @@ public sealed class CompletionEngine
         }
 
         var xmlns = ResolveXmlns(prefix, namespaces);
-        if (xmlns.Length == 0) return Array.Empty<AumlCompletionItem>();
+        if (xmlns.Length == 0) return [];
 
         return _model.GetElements(xmlns)
             .Where(t => Matches(t.Name, partial))
@@ -102,30 +158,33 @@ public sealed class CompletionEngine
             .ToList();
     }
 
-    private IReadOnlyList<AumlCompletionItem> CompleteAttributes(AumlCompletionContext ctx, IReadOnlyDictionary<string, string> namespaces)
+    private IReadOnlyList<AumlCompletionItem> CompleteAttributes(AumlCompletionContext ctx, IReadOnlyDictionary<string, string> namespaces, string text, int offset)
     {
         var (attrPrefix, partial) = SplitName(ctx.Prefix);
+
+        // Attributes already on this element are hidden so completion can't create a duplicate.
+        var used = CollectUsedAttributes(text, offset);
 
         // Attached-property syntax: Owner.Property="..." — complete the owner type's attached properties.
         int dot = partial.IndexOf('.');
         if (dot >= 0)
         {
             var owner = ResolveType(attrPrefix, partial[..dot], namespaces);
-            if (owner is null) return Array.Empty<AumlCompletionItem>();
+            if (owner is null) return [];
             var memberPartial = partial[(dot + 1)..];
             var ownerDot = partial[..(dot + 1)];   // "Owner."
             return _model.GetAttachedProperties(owner)
-                .Where(p => Matches(p.Name, memberPartial))
+                .Where(p => Matches(p.Name, memberPartial) && !used.Contains(ownerDot + p.Name))
                 .OrderBy(p => p.Name)
-                .Select(p => new AumlCompletionItem(ownerDot + p.Name, AumlCompletionItemKind.Property, p.Type?.Name))
+                .Select(p => AttrItem(ownerDot + p.Name, AumlCompletionItemKind.Property, p.Type?.Name))
                 .ToList();
         }
 
         // Typing "x:..." (an attribute in the directives namespace) -> offer x: directives only.
         if (attrPrefix.Length > 0 && namespaces.TryGetValue(attrPrefix, out var ns) && ns == AumlXDirectives.Xmlns)
             return AumlXDirectives.All
-                .Where(d => Matches(d.Name, partial))
-                .Select(d => new AumlCompletionItem(d.Name, AumlCompletionItemKind.Directive, d.Detail))
+                .Where(d => Matches(d.Name, partial) && !used.Contains($"{attrPrefix}:{d.Name}"))
+                .Select(d => AttrItem(d.Name, AumlCompletionItemKind.Directive, d.Detail))
                 .ToList();
 
         var items = new List<AumlCompletionItem>();
@@ -133,9 +192,9 @@ public sealed class CompletionEngine
         var element = ResolveElement(ctx.ElementName, namespaces);
         if (element is not null)
             items.AddRange(_model.GetProperties(element)
-                .Where(p => Matches(p.Name, ctx.Prefix))
+                .Where(p => Matches(p.Name, ctx.Prefix) && !used.Contains(p.Name))
                 .OrderBy(p => p.Name)
-                .Select(p => new AumlCompletionItem(p.Name, AumlCompletionItemKind.Property, p.Type?.Name)));
+                .Select(p => AttrItem(p.Name, AumlCompletionItemKind.Property, p.Type?.Name)));
 
         // Also surface the x: directives (prefixed) when no prefix is being typed yet.
         var directivePrefix = namespaces.FirstOrDefault(kv => kv.Value == AumlXDirectives.Xmlns).Key;
@@ -143,18 +202,46 @@ public sealed class CompletionEngine
             foreach (var d in AumlXDirectives.All)
             {
                 var label = $"{directivePrefix}:{d.Name}";
-                if (Matches(label, ctx.Prefix))
-                    items.Add(new AumlCompletionItem(label, AumlCompletionItemKind.Directive, d.Detail));
+                if (Matches(label, ctx.Prefix) && !used.Contains(label))
+                    items.Add(AttrItem(label, AumlCompletionItemKind.Directive, d.Detail));
             }
 
         return items;
+    }
+
+    /// <summary>
+    /// Attribute names already present on the element whose opening tag holds the caret, so completion can exclude
+    /// them and never offer a duplicate. Scans from the element's '&lt;' to the tag end (quote-aware) and takes the
+    /// identifier before each '=' - covering attributes both before and after the caret.
+    /// </summary>
+    private static HashSet<string> CollectUsedAttributes(string text, int offset)
+    {
+        var used = new HashSet<string>(StringComparer.Ordinal);
+        int region = Math.Min(offset, text.Length);
+        int lt = text.LastIndexOf('<', Math.Max(0, region - 1));
+        if (lt < 0) return used;
+
+        int i = lt + 1;
+        bool inQuote = false;
+        for (; i < text.Length; i++)
+        {
+            char c = text[i];
+            if (c == '"') inQuote = !inQuote;
+            else if (!inQuote && (c == '>' || (c == '<' && i > lt + 1))) break;
+        }
+
+        var tag = text.Substring(lt, i - lt);
+        tag = Regex.Replace(tag, "\"[^\"]*\"", m => new string(' ', m.Length));   // blank quoted values so '=' in a value can't look like an attribute
+        foreach (Match m in Regex.Matches(tag, @"([A-Za-z_][\w:.\-]*)\s*="))
+            used.Add(m.Groups[1].Value);
+        return used;
     }
 
     private IReadOnlyList<AumlCompletionItem> CompleteValues(AumlCompletionContext ctx, IReadOnlyDictionary<string, string> namespaces)
     {
         var element = ResolveElement(ctx.ElementName, namespaces);
         var propertyType = element is null ? null : _model.GetPropertyType(element, ctx.AttributeName ?? "");
-        if (propertyType is null) return Array.Empty<AumlCompletionItem>();
+        if (propertyType is null) return [];
 
         return _model.GetValueCompletions(propertyType)
             .Where(v => Matches(v, ctx.Prefix))
@@ -188,6 +275,11 @@ public sealed class CompletionEngine
         int colon = name.IndexOf(':');
         return colon < 0 ? ("", name) : (name[..colon], name[(colon + 1)..]);
     }
+
+    // An attribute completion that auto-inserts ="" and drops the caret between the quotes (LSP snippet),
+    // so picking a property doesn't leave the author to type =" " themselves.
+    private static AumlCompletionItem AttrItem(string label, AumlCompletionItemKind kind, string? detail) =>
+        new(label, kind, detail, $"{label}=\"$0\"");
 
     private static bool Matches(string candidate, string prefix) =>
         string.IsNullOrEmpty(prefix) || candidate.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);

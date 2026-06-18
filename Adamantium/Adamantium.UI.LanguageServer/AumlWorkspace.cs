@@ -150,8 +150,17 @@ public sealed class AumlWorkspace : IDisposable
             : Path.Combine(projectDir, "bin");
         if (!Directory.Exists(binBase)) return null;
 
-        // The real output leaf is the directory holding the most dlls (the project + its closure),
-        // regardless of platform/config/tfm nesting or the assembly name.
+        // Prefer the leaf holding the freshest build of the project's own assembly, so a stale leftover
+        // target-framework build can't shadow the current one. (This bit: an old net8.0 leaf with a fuller
+        // dll closure than a freshly-rebuilt net10.0 leaf won the "most dlls" race below, so the model was
+        // built from months-old assemblies and newly added types showed as unknown/red.)
+        var ownDll = Path.GetFileNameWithoutExtension(csprojPath) + ".dll";
+        var byOwnDll = Directory.EnumerateFiles(binBase, ownDll, SearchOption.AllDirectories)
+            .OrderByDescending(File.GetLastWriteTimeUtc)
+            .FirstOrDefault();
+        if (byOwnDll is not null) return Path.GetDirectoryName(byOwnDll);
+
+        // Fallback (e.g. a custom AssemblyName != project name): the dir with the most dlls, newest first.
         return Directory.EnumerateDirectories(binBase, "*", SearchOption.AllDirectories)
             .Prepend(binBase)
             .Where(d => Directory.EnumerateFiles(d, "*.dll").Any())
