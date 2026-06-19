@@ -100,7 +100,7 @@ public class RoslynTypeResolver : ITypeResolver
     public List<IResolvedAssembly> ScanXmlnsAttributes()
     {
         var xmlnsAttrSymbol = _compilation.GetTypeByMetadataName("Adamantium.UI.Core.Markup.XmlnsDefinitionAttribute");
-            
+
         if (xmlnsAttrSymbol == null)
             return null;
 
@@ -130,6 +130,20 @@ public class RoslynTypeResolver : ITypeResolver
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Registers an xmlns -> assembly mapping discovered outside this compilation. Needed for source-graph
+    /// tooling: a referenced project supplied as a <see cref="CompilationReference"/> exposes its
+    /// [XmlnsDefinition] attribute class but not its constructor arguments, so the mapping is read from the
+    /// defining sub-compilation (where the arguments are materialized) and injected here. <paramref name="clrNamespaceSpec"/>
+    /// is the attribute's clr-namespace string, e.g. <c>clr-namespace:Adamantium.UI.Controls;assembly=Adamantium.UI.Controls</c>.
+    /// </summary>
+    public void AddXmlnsMapping(string xmlNamespace, string clrNamespaceSpec)
+    {
+        if (string.IsNullOrEmpty(xmlNamespace) || string.IsNullOrEmpty(clrNamespaceSpec)) return;
+        var clr = clrNamespaceSpec.ParseXmlNamespace();
+        GetOrCreateTypeContainerForAssembly(clr.Assembly, xmlNamespace);
     }
     
     public IResolvedAssembly GetOrCreateTypeContainerForAssembly(string assemblyName, string xmlNamespace = "")
