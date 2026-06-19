@@ -161,6 +161,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.UI.LanguageServe
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.UI.Designer.Host", "Adamantium.UI.Designer.Host\Adamantium.UI.Designer.Host.csproj", "{77AD097A-9A5D-4EFA-9FE6-9C1B543A4EAB}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.Content.Pipeline", "Adamantium.Content.Pipeline\Adamantium.Content.Pipeline.csproj", "{BFB542D2-BB80-4F8C-A72B-1BDA00575FA8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -829,6 +831,22 @@ Global
 		{77AD097A-9A5D-4EFA-9FE6-9C1B543A4EAB}.Release|x64.Build.0 = Release|x64
 		{77AD097A-9A5D-4EFA-9FE6-9C1B543A4EAB}.Release|x86.ActiveCfg = Release|x64
 		{77AD097A-9A5D-4EFA-9FE6-9C1B543A4EAB}.Release|x86.Build.0 = Release|x64
+		{BFB542D2-BB80-4F8C-A72B-1BDA00575FA8}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{BFB542D2-BB80-4F8C-A72B-1BDA00575FA8}.Debug|Any CPU.Build.0 = Debug|x64
+		{BFB542D2-BB80-4F8C-A72B-1BDA00575FA8}.Debug|arm64.ActiveCfg = Debug|x64
+		{BFB542D2-BB80-4F8C-A72B-1BDA00575FA8}.Debug|arm64.Build.0 = Debug|x64
+		{BFB542D2-BB80-4F8C-A72B-1BDA00575FA8}.Debug|x64.ActiveCfg = Debug|x64
+		{BFB542D2-BB80-4F8C-A72B-1BDA00575FA8}.Debug|x64.Build.0 = Debug|x64
+		{BFB542D2-BB80-4F8C-A72B-1BDA00575FA8}.Debug|x86.ActiveCfg = Debug|x64
+		{BFB542D2-BB80-4F8C-A72B-1BDA00575FA8}.Debug|x86.Build.0 = Debug|x64
+		{BFB542D2-BB80-4F8C-A72B-1BDA00575FA8}.Release|Any CPU.ActiveCfg = Release|x64
+		{BFB542D2-BB80-4F8C-A72B-1BDA00575FA8}.Release|Any CPU.Build.0 = Release|x64
+		{BFB542D2-BB80-4F8C-A72B-1BDA00575FA8}.Release|arm64.ActiveCfg = Release|x64
+		{BFB542D2-BB80-4F8C-A72B-1BDA00575FA8}.Release|arm64.Build.0 = Release|x64
+		{BFB542D2-BB80-4F8C-A72B-1BDA00575FA8}.Release|x64.ActiveCfg = Release|x64
+		{BFB542D2-BB80-4F8C-A72B-1BDA00575FA8}.Release|x64.Build.0 = Release|x64
+		{BFB542D2-BB80-4F8C-A72B-1BDA00575FA8}.Release|x86.ActiveCfg = Release|x64
+		{BFB542D2-BB80-4F8C-A72B-1BDA00575FA8}.Release|x86.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

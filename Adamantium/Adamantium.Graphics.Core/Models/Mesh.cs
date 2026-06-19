@@ -312,6 +312,18 @@ public class Mesh
         return this;
     }
 
+    public Mesh SetTangentsAndBiTangents(IEnumerable<Vector4F> inTangents, IEnumerable<Vector3F> inBiTangents)
+    {
+        if (inTangents == null || inBiTangents == null) return this;
+
+        Tangents = inTangents as Vector4F[] ?? inTangents.ToArray();
+        BiTangents = inBiTangents as Vector3F[] ?? inBiTangents.ToArray();
+        Semantic |= VertexSemantic.TangentBiNormal;
+        IsModified = true;
+
+        return this;
+    }
+
     public Mesh SetJointIndices(IEnumerable<Vector4F> inJointIndices)
     {
         if (inJointIndices == null) return this;

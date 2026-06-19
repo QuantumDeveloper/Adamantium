@@ -1,0 +1,18 @@
+using System.IO;
+using Adamantium.Graphics.Core.Models;
+
+namespace Adamantium.Content.Pipeline.Writers;
+
+/// <summary>
+/// Writes cooked <see cref="SceneData"/> to the baked model format (.aemf) via
+/// <see cref="SceneDataSerializer"/>. The runtime counterpart deserializes it back into <see cref="SceneData"/>.
+/// </summary>
+public sealed class SceneDataWriter : IContentWriter
+{
+    public string OutputExtension => ".aemf";
+
+    public void Write(Stream stream, object content)
+    {
+        SceneDataSerializer.Serialize(stream, (SceneData)content);
+    }
+}

@@ -5,5 +5,14 @@
           EngineContentAndCompileTarget;-->
       </AssignTargetPathsDependsOn>
   </PropertyGroup>
-  
+
+  <!-- Cooked content produced by the content pipeline (Adamantium.Engine.ContentCompiler.CLI). The .aemf
+       files live under Content\ (gitignored, regenerated); copy them next to the executable preserving the
+       Content\ prefix so CookedContentResolver finds them at runtime. -->
+  <ItemGroup>
+    <Content Include="Content\**\*.aemf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>

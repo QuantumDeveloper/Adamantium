@@ -1,0 +1,31 @@
+{
+  "OutputDirectory": "Content",
+  "IntermediateDirectory": "obj/Content",
+  "Assets": [
+    {
+      "Source": "Models/swordman.dae",
+      "Importer": "Model",
+      "Parameters": {}
+    },
+    {
+      "Source": "Models/F15C/F-15C_Eagle.3ds",
+      "Importer": "Model",
+      "Parameters": {}
+    },
+    {
+      "Source": "Models/F15C/F-15C_Eagle.dae",
+      "Importer": "Model",
+      "Parameters": {}
+    },
+    {
+      "Source": "Models/monkey/monkey.dae",
+      "Importer": "Model",
+      "Parameters": {}
+    },
+    {
+      "Source": "Models/monkey/треугольник.DAE",
+      "Importer": "Model",
+      "Parameters": {}
+    }
+  ]
+}

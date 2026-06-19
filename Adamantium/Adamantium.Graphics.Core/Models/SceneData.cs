@@ -111,6 +111,60 @@ namespace Adamantium.Graphics.Core.Models
          }
       }
 
+      /// <summary>
+      /// Rebuilds state that is skipped during serialization: re-links each <see cref="Model.Parent"/> and
+      /// <see cref="Joint.ParentJoint"/> back-reference by walking the hierarchies, and repopulates the mesh
+      /// lookup tables. Call after deserializing a <see cref="SceneData"/> (see <see cref="SceneDataSerializer"/>).
+      /// </summary>
+      public void RebuildHierarchy()
+      {
+         meshesDictionary.Clear();
+         meshToId.Clear();
+
+         if (Models != null)
+         {
+            var stack = new Stack<Model>();
+            stack.Push(Models);
+            while (stack.Count > 0)
+            {
+               var node = stack.Pop();
+               meshesDictionary[node.ToString()] = node;
+               if (!String.IsNullOrEmpty(node.ID) && !meshToId.ContainsKey(node.ID))
+               {
+                  meshToId[node.ID] = node;
+               }
+
+               foreach (var child in node.Dependencies)
+               {
+                  child.Parent = node;
+                  stack.Push(child);
+               }
+            }
+         }
+
+         if (Skeletons != null)
+         {
+            foreach (var joints in Skeletons.Values)
+            {
+               foreach (var joint in joints)
+               {
+                  RelinkJoints(joint);
+               }
+            }
+         }
+      }
+
+      private static void RelinkJoints(Joint joint)
+      {
+         if (joint.Children == null) return;
+
+         foreach (var child in joint.Children)
+         {
+            child.ParentJoint = joint;
+            RelinkJoints(child);
+         }
+      }
+
       public String Name { get; set; }
       public Unit Units { get; set; }
 

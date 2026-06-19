@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Adamantium.Mathematics;
+using MessagePack;
 
 namespace Adamantium.Graphics.Core.Models
 {
@@ -34,6 +35,7 @@ namespace Adamantium.Graphics.Core.Models
 
          public Matrix4x4F LocalMatrix { get; set; }
 
+         [IgnoreMember]
          public Joint ParentJoint { get; set; }
 
          public List<Joint> Children { get; set; }
