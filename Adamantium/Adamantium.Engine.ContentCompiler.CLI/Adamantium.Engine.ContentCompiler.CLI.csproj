@@ -2,17 +2,14 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
-    <Platforms>AnyCPU;x64</Platforms>
+    <TargetFramework>net10.0</TargetFramework>
+    <Platforms>x64</Platforms>
+    <Configurations>Debug;Release</Configurations>
+    <LangVersion>latest</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" />
-    <ProjectReference Include="..\Adamantium.Engine.Compiler\Adamantium.Engine.Compiler.csproj" />
+    <ProjectReference Include="..\Adamantium.Content.Pipeline\Adamantium.Content.Pipeline.csproj" />
   </ItemGroup>
 
 </Project>

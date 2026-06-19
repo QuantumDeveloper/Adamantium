@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Adamantium.Mathematics;
+using MessagePack;
 
 namespace Adamantium.Graphics.Core.Models
 {
@@ -10,16 +11,20 @@ namespace Adamantium.Graphics.Core.Models
       //Содержит в себе всю информацию о геометрии, положении меша в пространстве и его видимости, а так же анимацию, если она присутствует.
       public class Model
       {
-         public Model(Model parent = null, String id = "", String name = "")
+         [SerializationConstructor]
+         public Model()
          {
-            ID = id;
-            Name = name;
-
-            Parent = parent;
             Dependencies = new List<Model>();
             Meshes = new List<Mesh>();
             Rotation = QuaternionF.Identity;
             Scale = Vector3F.One;
+         }
+
+         public Model(Model parent = null, String id = "", String name = "") : this()
+         {
+            ID = id;
+            Name = name;
+            Parent = parent;
          }
 
          internal void AddDependency(Model data)
@@ -35,13 +40,14 @@ namespace Adamantium.Graphics.Core.Models
             return Name + ID;
          }
 
+         [IgnoreMember]
          public Model Parent { get; set; }
 
          public List<Model> Dependencies { get; set; }
 
-         public String Name { get; }
+         public String Name { get; set; }
 
-         public String ID { get; }
+         public String ID { get; set; }
 
          public Vector3F Scale { get; set; }
 

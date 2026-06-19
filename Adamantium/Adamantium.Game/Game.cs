@@ -66,6 +66,8 @@ public class Game : PropertyChangedBase, IGame
         IsFixedTimeStep = false;
         DesiredFPS = 60;
         Content = new ContentManager(Container);
+        // Cooked artifacts (.aemf etc.) take precedence over raw source; falls back to the file system.
+        Content.Resolvers.Add(new CookedContentResolver());
         Content.Resolvers.Add(new FileSystemContentResolver());
         Content.Resolvers.Add(new EffectContentResolver());
         // Model files -> SceneData (runtime parse); image files -> GPU Texture for material maps. The texture reader
