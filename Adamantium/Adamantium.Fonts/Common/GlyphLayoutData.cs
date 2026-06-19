@@ -1,19 +1,14 @@
-﻿using MessagePack;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace Adamantium.Fonts.Common
 {
-    [MessagePackObject]
     public class GlyphLayoutData
     {
-        [Key(0)]
         private List<uint> substitutions;
 
-        [Key(1)]
         public GlyphPosition Position { get; set; }
 
-        [IgnoreMember]
         public IReadOnlyCollection<uint> Substitutions => substitutions.AsReadOnly();
 
         public GlyphLayoutData()

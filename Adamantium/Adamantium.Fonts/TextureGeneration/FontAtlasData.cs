@@ -1,41 +1,28 @@
 ﻿using System;
 using Adamantium.Mathematics;
-using MessagePack;
-using MessagePack.Formatters;
-using MessagePack.Resolvers;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace Adamantium.Fonts.TextureGeneration
 {
-    [MessagePackObject]
     public class FontAtlasData
     {
         private object lockObject = new Object();
         
-        [Key(0)]
         public Size AtlasSize { get; set; }
-        [Key(1)]
         private List<GlyphTextureData> glyphData { get; }
 
         public IReadOnlyList<GlyphTextureData> GlyphData => glyphData.AsReadOnly();
-        [IgnoreMember] 
         private Dictionary<uint, GlyphTextureData> glyphDataMap;
-        [Key(2)]
         public byte[] ImageData { get; set; }
-        [Key(3)]
         public byte[] FontData { get; set; }
-        [Key(4)]
         public string Name { get; set; }
         
         public uint GlyphTextureSize { get; }
 
         // Running cursor for tight shelf packing of glyph bitmaps (shelf height = tallest glyph on it).
-        [IgnoreMember]
         public int PackX { get; set; }
-        [IgnoreMember]
         public int PackY { get; set; }
-        [IgnoreMember]
         public int ShelfHeight { get; set; }
 
         public uint CurrentIndexInArray { get; private set; }
@@ -114,34 +101,5 @@ namespace Adamantium.Fonts.TextureGeneration
             return default;
         }
 
-        public static FontAtlasData Load(byte[] data)
-        {
-            var resolver = CompositeResolver.Create(
-                [TypelessFormatter.Instance],
-                [StandardResolverAllowPrivate.Instance]);
-
-            var options = MessagePackSerializerOptions.Standard
-                .WithCompression(MessagePackCompression.Lz4BlockArray)
-                .WithResolver(resolver);
-
-            var instance = MessagePackSerializer.Deserialize<FontAtlasData>(data, options);
-            instance.GenerateGlyphDataMap();
-            return instance;
-        }
-
-        public byte[] Save()
-        {
-            var resolver = CompositeResolver.Create(
-                [TypelessFormatter.Instance],
-                [StandardResolverAllowPrivate.Instance]);
-
-            var options = MessagePackSerializerOptions.Standard
-                .WithCompression(MessagePackCompression.Lz4BlockArray)
-                .WithResolver(resolver);
-
-            var compressedData = MessagePackSerializer.Serialize(this, options);
-
-            return compressedData;
-        }
     }
 }

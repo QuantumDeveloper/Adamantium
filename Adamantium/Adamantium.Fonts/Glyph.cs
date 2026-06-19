@@ -8,79 +8,46 @@ using Adamantium.Fonts.Parsers.CFF;
 using Adamantium.Fonts.Tables.CFF;
 using Adamantium.Fonts.TextureGeneration;
 using Adamantium.Mathematics;
-using MessagePack;
 using Matrix3x2 = Adamantium.Mathematics.Matrix3x2;
 using Vector2 = Adamantium.Mathematics.Vector2;
 
 namespace Adamantium.Fonts
 {
-    [MessagePackObject]
     public class Glyph
     {
-        [IgnoreMember]
         private readonly object lockObject = new object();
 
-        [Key(9)]
         private HashSet<UInt32> uniqueUnicodes;
-        [Key(20)]
         private List<UInt32> unicodes;
-        [Key(2)]
         private List<Outline> outlines;
-        [Key(3)]
         private bool isSplitOnSegments;
-        [Key(4)]
         private List<LineSegment2D> mergedOutlinesSegments;
-        [IgnoreMember]
         internal IReadOnlyCollection<Outline> Outlines => outlines.AsReadOnly();
-        [IgnoreMember]
         private readonly Dictionary<uint, SampledOutline[]> sampledOutlinesCache;
-        [Key(5)]
         private List<Command> commandList;
-        [Key(0)]
         public uint Index { get; }
-        [Key(1)]
         public OutlineType OutlineType { get; internal set; }
-        [Key(6)]
         public double LeftSideBearingMultiplier { get; private set; }
         public double TopSideBearingMultiplier { get; private set; }
-        [Key(7)]
         public double AdvanceWidthMultiplier { get; private set; }
         
-        [Key(8)]
         public Vector2 CenterToBaseLineMultiplier { get; private set; }
-        [Key(10)]
         public bool IsEmpty { get; }
-        [IgnoreMember]
         public uint Unicode => unicodes.FirstOrDefault();
-        [IgnoreMember]
         public IReadOnlyCollection<UInt32> Unicodes => unicodes.AsReadOnly();
-        [Key(11)]
         public string Name { get; internal set; }
-        [Key(12)]
         internal UInt32 SID { get; set; }
-        [Key(13)]
         public bool IsInvalid { get; set; } // set this flag if glyph was not properly loaded
-        [Key(14)]
         public ushort AdvanceWidth { get; internal set; }
-        [Key(15)]
         public ushort AdvanceHeight { get; internal set; }
-        [Key(16)]
         public short LeftSideBearing { get; internal set; }
-        [Key(17)]
         public short TopSideBearing { get; internal set; }
-        [Key(18)]
         public bool IsComposite { get; internal set; } // For TTF
-        [Key(19)]
         public Rectangle BoundingRectangle { get; internal set; }
-        [Key(21)]
         public GlyphClassDefinition ClassDefinition { get; internal set; }
-        [Key(22)]
         internal List<CompositeGlyphComponent> CompositeGlyphComponents;
-        [Key(23)]
         public GlyphLayoutData Layout { get; internal set; }
-        [IgnoreMember]
         public bool HasOutlines => outlines.Count > 0;
-        [Key(24)]
         internal byte[] Instructions { get; private set; }
         
         public List<char> RelatedCharacters { get; }
@@ -90,7 +57,6 @@ namespace Adamantium.Fonts
             return new Glyph(index, true, OutlineType.Unknown);
         }
 
-        [SerializationConstructor]
         public Glyph(uint index, OutlineType outlineType)
         {
             Index = index;
