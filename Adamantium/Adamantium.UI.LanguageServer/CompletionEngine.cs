@@ -6,7 +6,11 @@ public enum AumlCompletionItemKind { Element, Property, Value, Directive }
 
 /// <param name="InsertText">Optional snippet to insert instead of <paramref name="Label"/> (LSP snippet syntax,
 /// e.g. <c>Name="$0"</c> to drop the caret between the quotes). Null = insert the label verbatim.</param>
-public sealed record AumlCompletionItem(string Label, AumlCompletionItemKind Kind, string? Detail = null, string? InsertText = null);
+/// <param name="ReplaceBack">When set, the item replaces this many characters immediately before the caret (an
+/// explicit edit range) instead of letting the client guess the word boundary. Needed for path segments: after
+/// <c>Textures/</c> the client would otherwise filter bare file names against the whole "Textures/" prefix and
+/// hide them — here only the segment after the last '/' is the prefix/replacement.</param>
+public sealed record AumlCompletionItem(string Label, AumlCompletionItemKind Kind, string? Detail = null, string? InsertText = null, int? ReplaceBack = null);
 
 /// <summary>
 /// Produces AUML completions at a caret position: element names, an element's settable
@@ -21,7 +25,7 @@ public sealed class CompletionEngine
 
     public CompletionEngine(AumlTypeModel model) => _model = model;
 
-    public IReadOnlyList<AumlCompletionItem> Complete(string text, int offset)
+    public IReadOnlyList<AumlCompletionItem> Complete(string text, int offset, string? documentPath = null)
     {
         var ctx = AumlCaretContext.Detect(text, offset);
         var namespaces = AumlNamespaces.Scan(text);
@@ -29,7 +33,7 @@ public sealed class CompletionEngine
         {
             AumlCompletionKind.ElementName => CompleteElements(ctx, namespaces),
             AumlCompletionKind.AttributeName => CompleteAttributes(ctx, namespaces, text, offset),
-            AumlCompletionKind.AttributeValue => CompleteValues(ctx, namespaces),
+            AumlCompletionKind.AttributeValue => CompleteValues(ctx, namespaces, documentPath),
             AumlCompletionKind.MarkupExtensionName => CompleteMarkupExtensionName(ctx),
             AumlCompletionKind.MarkupExtensionArg => CompleteMarkupExtensionArg(ctx, namespaces, text, offset),
             _ => []
@@ -237,16 +241,77 @@ public sealed class CompletionEngine
         return used;
     }
 
-    private IReadOnlyList<AumlCompletionItem> CompleteValues(AumlCompletionContext ctx, IReadOnlyDictionary<string, string> namespaces)
+    private IReadOnlyList<AumlCompletionItem> CompleteValues(AumlCompletionContext ctx, IReadOnlyDictionary<string, string> namespaces, string? documentPath)
     {
         var element = ResolveElement(ctx.ElementName, namespaces);
         var propertyType = element is null ? null : _model.GetPropertyType(element, ctx.AttributeName ?? "");
         if (propertyType is null) return [];
 
+        // Path-typed properties (e.g. Image.Source : ImageSource) take a file path relative to the project root —
+        // complete the filesystem instead of enum/bool/brush values.
+        if (IsPathLike(propertyType))
+            return CompletePaths(ctx.Prefix, documentPath);
+
         return _model.GetValueCompletions(propertyType)
             .Where(v => Matches(v, ctx.Prefix))
             .Select(v => new AumlCompletionItem(v, AumlCompletionItemKind.Value, propertyType.Name))
             .ToList();
+    }
+
+    // Properties whose markup value is a file path (the engine converts the string to the real resource on load).
+    private static bool IsPathLike(Adamantium.UI.Markup.CodeGeneration.IResolvedType type) =>
+        type.Name is "ImageSource" or "BitmapImage" or "BitmapSource" or "Uri";
+
+    /// <summary>
+    /// Completes a (possibly sub-foldered) file path written in an attribute value against the project root — the
+    /// directory relative paths load against (the nearest <c>.csproj</c> ancestor of the edited file). The value
+    /// so far is split into an already-typed directory part and a final-segment prefix; folders are offered with a
+    /// trailing '/' so the path can be drilled into. Returns nothing without a known document/project.
+    /// </summary>
+    private IReadOnlyList<AumlCompletionItem> CompletePaths(string partial, string? documentPath)
+    {
+        var root = FindProjectRoot(documentPath);
+        if (root is null) return [];
+
+        partial = partial.Replace('\\', '/');
+        int slash = partial.LastIndexOf('/');
+        var dirPart = slash >= 0 ? partial[..(slash + 1)] : "";          // "Textures/" (kept, never re-inserted)
+        var namePrefix = slash >= 0 ? partial[(slash + 1)..] : partial;  // the segment being typed
+
+        string lookupDir;
+        try { lookupDir = Path.GetFullPath(Path.Combine(root, dirPart)); }
+        catch { return []; }
+        if (!Directory.Exists(lookupDir)) return [];
+
+        // Replace only the segment typed after the last '/' (so the client filters/replaces on the segment, not the
+        // whole "Textures/..." value — otherwise bare file names get filtered out and nothing shows).
+        var replaceBack = namePrefix.Length;
+        var items = new List<AumlCompletionItem>();
+        foreach (var dir in Directory.GetDirectories(lookupDir).OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase))
+        {
+            var name = Path.GetFileName(dir);
+            if (name is "bin" or "obj" || name.StartsWith('.') || !Matches(name, namePrefix)) continue;
+            items.Add(new AumlCompletionItem(name + "/", AumlCompletionItemKind.Value, "folder", ReplaceBack: replaceBack));
+        }
+        foreach (var file in Directory.GetFiles(lookupDir).OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase))
+        {
+            var name = Path.GetFileName(file);
+            if (name.StartsWith('.') || !Matches(name, namePrefix)) continue;
+            items.Add(new AumlCompletionItem(name, AumlCompletionItemKind.Value, "file", ReplaceBack: replaceBack));
+        }
+        return items;
+    }
+
+    // The project root a relative asset path resolves against: the nearest .csproj ancestor of the edited file.
+    private static string? FindProjectRoot(string? documentPath)
+    {
+        if (string.IsNullOrEmpty(documentPath)) return null;
+        DirectoryInfo? dir;
+        try { dir = new DirectoryInfo(Path.GetDirectoryName(Path.GetFullPath(documentPath))!); }
+        catch { return null; }
+        for (; dir is not null; dir = dir.Parent)
+            if (dir.GetFiles("*.csproj").Length > 0) return dir.FullName;
+        return null;
     }
 
     private Adamantium.UI.Markup.CodeGeneration.IResolvedType? ResolveElement(string? qualifiedName, IReadOnlyDictionary<string, string> namespaces)

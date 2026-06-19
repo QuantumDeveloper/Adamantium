@@ -130,7 +130,7 @@ public sealed class LspServer
             ["textDocumentSync"] = 1,                    // 1 = full document sync
             ["completionProvider"] = new JsonObject
             {
-                ["triggerCharacters"] = new JsonArray { "<", " ", "\"", "=", ".", ":" }
+                ["triggerCharacters"] = new JsonArray { "<", " ", "\"", "=", ".", ":", "/" }
             },
             ["hoverProvider"] = true,
             ["definitionProvider"] = true,
@@ -159,13 +159,31 @@ public sealed class LspServer
         var model = ResolveModel(uri);
         if (model is null) return new JsonArray();
 
-        int offset = OffsetAt(text, pos["line"]!.GetValue<int>(), pos["character"]!.GetValue<int>());
+        int line = pos["line"]!.GetValue<int>();
+        int character = pos["character"]!.GetValue<int>();
+        int offset = OffsetAt(text, line, character);
         var result = new JsonArray();
-        foreach (var item in new CompletionEngine(model).Complete(text, offset))
+        foreach (var item in new CompletionEngine(model).Complete(text, offset, UriToLocalPath(uri)))
         {
             var node = new JsonObject { ["label"] = item.Label, ["kind"] = LspKind(item.Kind) };
             if (item.Detail is not null) node["detail"] = item.Detail;
-            if (item.InsertText is not null)
+            if (item.ReplaceBack is { } back)
+            {
+                // Explicit edit range over the last typed segment, so the client filters/replaces on it (not the
+                // whole value) — without this, path items after "Textures/" are filtered out and nothing shows.
+                int startChar = Math.Max(0, character - back);
+                node["textEdit"] = new JsonObject
+                {
+                    ["range"] = new JsonObject
+                    {
+                        ["start"] = new JsonObject { ["line"] = line, ["character"] = startChar },
+                        ["end"] = new JsonObject { ["line"] = line, ["character"] = character }
+                    },
+                    ["newText"] = item.InsertText ?? item.Label
+                };
+                node["filterText"] = item.Label;
+            }
+            else if (item.InsertText is not null)
             {
                 node["insertText"] = item.InsertText;
                 node["insertTextFormat"] = 2;   // Snippet — the $0 places the caret between the inserted quotes

@@ -2,11 +2,13 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using Adamantium.Core;
 using Adamantium.Game;
+using Adamantium.Game.Core;
 using Adamantium.Graphics.Core;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Markup;
 using Adamantium.UI.Core.Media;
 using Adamantium.UI.Extensions;
@@ -25,10 +27,16 @@ public sealed class DesignerSession : IDisposable
     private readonly DesignerApplication _app;
     private readonly IGraphicsDevice _device;
     private readonly RenderUnitFactory _factory;
+    private readonly IGameService _gameService;
 
     private OffscreenRenderer _renderer;
     private uint _rendererWidth;
     private uint _rendererHeight;
+
+    // The last rendered tree, kept so a follow-up hittest request (designer click/hover) can map a point back to
+    // the authored element and its markup position without re-rendering.
+    private IWindow _lastWindow;
+    private IReadOnlyDictionary<object, AumlSourceSpan> _lastSourceMap;
 
     private const double DefaultWidth = 1280;
     private const double DefaultHeight = 720;
@@ -53,6 +61,12 @@ public sealed class DesignerSession : IDisposable
         }
 
         _app = new DesignerApplication();
+
+        // The engine's game services are normally registered by GameApplication.RegisterServices, which only runs
+        // via Run()/Initialize() - which the headless designer skips. Register the game service explicitly so a
+        // design-aware behavior can resolve IGameService and host a game in the preview (see DriveDesignTimeGames).
+        _gameService = new GameService();
+        _app.Container.RegisterInstance<IGameService>(_gameService);
 
         // Headless: nothing opens a window, so trigger device creation explicitly.
         _app.Container.Resolve<IGraphicsDeviceService>().CreateMainDevice("Designer");
@@ -153,6 +167,15 @@ public sealed class DesignerSession : IDisposable
                 window.Update(_app.ThemeManager, new AppTime());
             }
         }
+
+        // Keep the laid-out tree + source map for a follow-up hittest (designer click → go-to-source / hover frame).
+        _lastWindow = window;
+        _lastSourceMap = load.SourceMap;
+
+        // Design-time game preview: a design-aware behavior (e.g. GameHostBehavior) created+bound a game to its
+        // RenderTargetPanel while the tree was built. Drive a short snapshot now so the game loads its content and
+        // publishes a frame to the panel; the OffscreenRenderer composites that below. No-op when no game is hosted.
+        DriveDesignTimeGames();
 
         if (scale <= 0) scale = 1.0;
         var maxScale = Math.Max(1.0, Math.Min(_maxRenderDimension / designWidth, _maxRenderDimension / designHeight));
@@ -316,6 +339,74 @@ public sealed class DesignerSession : IDisposable
         if (declared is > 0 && !double.IsNaN(declared.Value)) return declared.Value;
         if (request is > 0) return request.Value;
         return fallback;
+    }
+
+    // Wall-clock budget for the design-time game snapshot: enough for the game to parse+load its model content
+    // (async) and publish a stable frame. A one-shot preview, so a few seconds is acceptable.
+    private const double GameSnapshotSeconds = 15.0;
+
+    /// <summary>
+    /// Drives every game hosted in the markup (a design-aware behavior created it bound to a RenderTargetPanel) for a
+    /// short snapshot: each iteration runs one game frame and waits the device idle, with a tiny sleep so the game's
+    /// async content load completes. RunOnce publishes the frame to the panel (CopyOutput), so the panel samples it
+    /// when the OffscreenRenderer composites below. No-op when the markup hosts no game.
+    /// </summary>
+    private void DriveDesignTimeGames()
+    {
+        var games = _gameService.Games;
+        if (games.Count == 0) return;
+
+        var total = TimeSpan.Zero;
+        const double dt = 1.0 / 60.0;
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(GameSnapshotSeconds);
+        ulong frame = 0;
+        while (DateTime.UtcNow < deadline)
+        {
+            total += TimeSpan.FromSeconds(dt);
+            var time = new AppTime { FramesCount = ++frame, FrameTime = dt, TotalTime = total };
+            foreach (var game in games)
+            {
+                game.RunOnce(time);
+                game.Submit();
+            }
+            _device.DeviceWaitIdle();
+            Thread.Sleep(8);   // let the async content-load tasks make progress between frames
+        }
+        _device.DeviceWaitIdle();
+    }
+
+    /// <summary>
+    /// Maps a point in the rendered frame's design space to the authored element under it (designer go-to-source /
+    /// hover frame): hit-tests the last rendered tree, walks up to the nearest element that came from the AUML
+    /// (template-internal parts have no source position), and returns its markup line/column plus its rect in design
+    /// space. Null when nothing is rendered or nothing authored sits under the point.
+    /// </summary>
+    public HitTestResult HitTest(double x, double y)
+    {
+        if (_lastWindow is not IInputComponent root || _lastSourceMap is null) return null;
+
+        var hit = root.HitTest(new Vector2(x, y));
+        for (var current = hit as IUIComponent; current is not null; current = current.VisualParent)
+        {
+            if (_lastSourceMap.TryGetValue(current, out var span))
+            {
+                // WorldTransform is already accumulated up the tree → its translation is the element's origin in
+                // design space; most controls' rect is origin + RenderSize. A shape's layout box, though, spans from
+                // (0,0) to the geometry's max (it reserves space for the geometry's coordinate origin, like WPF
+                // Stretch=None), so for a Path we draw the selection frame from the geometry's tight bounds instead —
+                // the Blend/WPF designer approach (a designer-side adorner, the engine's layout is left untouched).
+                var pos = current.WorldTransform.TranslationVector;
+                if (current is Adamantium.UI.Controls.Shapes.Path { Data: { } geometry })
+                {
+                    geometry.RecalculateBounds();
+                    var b = geometry.Bounds;
+                    return new HitTestResult(span.Line, span.Position, pos.X + b.X, pos.Y + b.Y, b.Width, b.Height);
+                }
+                var size = current.RenderSize;
+                return new HitTestResult(span.Line, span.Position, pos.X, pos.Y, size.Width, size.Height);
+            }
+        }
+        return null;
     }
 
     private OffscreenRenderer GetRenderer(uint width, uint height)

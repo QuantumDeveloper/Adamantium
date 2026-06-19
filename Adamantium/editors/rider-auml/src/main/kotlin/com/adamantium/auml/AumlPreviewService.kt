@@ -38,6 +38,45 @@ class AumlPreviewService : Disposable {
         val scale: Double?,
     )
 
+    /** A designer hit-test result: the authored element's markup position (1-based line/column) and its rect in
+     * the frame's design space (for the hover frame). */
+    data class HitResult(
+        val line: Int,
+        val column: Int,
+        val x: Double,
+        val y: Double,
+        val width: Double,
+        val height: Double,
+    )
+
+    /**
+     * Maps a point in the last render's design space to the authored element under it (go-to-source / hover frame).
+     * Must follow a [render] of the current buffer (the host hit-tests the last rendered tree). Off-EDT; returns
+     * null when nothing authored sits there or on any error.
+     */
+    fun hitTest(x: Double, y: Double): HitResult? {
+        synchronized(lock) {
+            return try {
+                ensureProcess()
+                writer!!.apply { write("{\"op\":\"hittest\",\"x\":$x,\"y\":$y}"); write("\n"); flush() }
+                val line = reader!!.readLine() ?: throw RuntimeException("designer host closed the connection")
+                val obj = MiniJson.parse(line) as? Map<*, *> ?: return null
+                val hit = obj["hit"] as? Map<*, *> ?: return null
+                HitResult(
+                    (hit["line"] as? Double)?.toInt() ?: return null,
+                    (hit["column"] as? Double)?.toInt() ?: 0,
+                    hit["x"] as? Double ?: 0.0,
+                    hit["y"] as? Double ?: 0.0,
+                    hit["width"] as? Double ?: 0.0,
+                    hit["height"] as? Double ?: 0.0,
+                )
+            } catch (e: Exception) {
+                stopProcess()
+                null
+            }
+        }
+    }
+
     /**
      * Renders [text] at the window's design size × [scale] and returns the produced PNG path (or an error).
      * Blocking and potentially slow on the very first call (the host boots the engine + graphics device), so

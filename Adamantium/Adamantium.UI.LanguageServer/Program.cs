@@ -21,6 +21,8 @@ if (args.Contains("--selftest"))
 }
 
 // Project-aware: the workspace resolves a type model per project from the opened file's build output.
+// One-line startup marker (stderr → LSP4IJ server console) so it's obvious which server build is actually running.
+Console.Error.WriteLine($"[auml-ls] server started — {Environment.ProcessPath}");
 var server = new LspServer(new AumlWorkspace(), Console.OpenStandardInput(), Console.OpenStandardOutput());
 server.Run();
 return 0;
