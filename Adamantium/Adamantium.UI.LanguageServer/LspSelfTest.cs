@@ -98,6 +98,8 @@ internal static class LspSelfTest
             DidOpen(hoverUri, hoverDoc),
             Hover(5, hoverUri, border.Line, border.Ch),
             Hover(6, hoverUri, background.Line, background.Ch),
+            Definition(20, hoverUri, border.Line, border.Ch),
+            Definition(21, hoverUri, background.Line, background.Ch),
             DidOpen(brushUri, brushText),
             Completion(7, brushUri, brLine, brChar),
             DocumentSymbol(8, hoverUri),
@@ -198,6 +200,16 @@ internal static class LspSelfTest
                 var value = response["result"]?["contents"]?["value"]?.GetValue<string>();
                 Console.WriteLine($"<- hover (id {id}): {(value is null ? "(none)" : value.Replace("\n", " "))}");
             }
+            else if (id is "20" or "21")
+            {
+                if (response["result"] is JsonObject def)
+                {
+                    var path = new Uri(def["uri"]!.GetValue<string>()).LocalPath;
+                    int startLine = def["range"]!["start"]!["line"]!.GetValue<int>();
+                    Console.WriteLine($"<- definition (id {id}): {Path.GetFileName(path)}:{startLine}");
+                }
+                else Console.WriteLine($"<- definition (id {id}): (none)");
+            }
             else if (method == "textDocument/publishDiagnostics")
             {
                 var @params = response["params"]!;
@@ -211,6 +223,22 @@ internal static class LspSelfTest
                 Console.WriteLine($"<- {method ?? $"response id {id}"}");
             }
         }
+
+        // Phase 2 smoke: go-to into an external (metadata-only) type decompiles it to a temp .cs.
+        try
+        {
+            var model = new AumlWorkspace().GetModelForFile(
+                @"c:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Sandbox\Completion.auml");
+            var objectSymbol = model?.Compilation.GetTypeByMetadataName("System.Object");
+            if (objectSymbol is not null)
+            {
+                var loc = MetadataDecompiler.Locate(objectSymbol, model!.Compilation);
+                Console.WriteLine($"<- definition metadata (System.Object): " +
+                    $"{(loc is null ? "(none)" : Path.GetFileName(loc.FilePath) + ":" + loc.StartLine)}");
+            }
+            else Console.WriteLine("<- definition metadata (System.Object): symbol not found");
+        }
+        catch (Exception ex) { Console.WriteLine($"<- definition metadata: error {ex.Message}"); }
 
         return 0;
 
@@ -266,6 +294,9 @@ internal static class LspSelfTest
 
         static JsonObject Hover(int id, string uri, int line, int character) =>
             Positional(id, "textDocument/hover", uri, line, character);
+
+        static JsonObject Definition(int id, string uri, int line, int character) =>
+            Positional(id, "textDocument/definition", uri, line, character);
 
         static JsonObject DocumentSymbol(int id, string uri) => new()
         {

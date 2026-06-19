@@ -12,6 +12,9 @@ public class RoslynResolvedMember : IResolvedMember
         DeclaringType = declaringType;
     }
 
+    /// <summary>The underlying Roslyn symbol — used by tooling (go-to-definition) to read source/metadata locations.</summary>
+    public ISymbol Symbol => _symbol;
+
     public string Name => _symbol.Name;
 
     public IResolvedType MemberType

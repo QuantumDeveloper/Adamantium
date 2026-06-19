@@ -10,7 +10,10 @@ public class RoslynResolvedType : IResolvedType
     {
         _symbol = symbol;
     }
-    
+
+    /// <summary>The underlying Roslyn symbol — used by tooling (go-to-definition) to read source/metadata locations.</summary>
+    public ITypeSymbol Symbol => _symbol;
+
     public string Name => _symbol.Name;
     public string Namespace => _symbol.ContainingNamespace.ToDisplayString();
 

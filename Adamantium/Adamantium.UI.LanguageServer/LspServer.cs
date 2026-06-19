@@ -92,6 +92,10 @@ public sealed class LspServer
                 Reply(id, HoverResult(msg["params"]!));
                 break;
 
+            case "textDocument/definition":
+                Reply(id, DefinitionResult(msg["params"]!));
+                break;
+
             case "textDocument/documentSymbol":
                 Reply(id, DocumentSymbolResult(msg["params"]!));
                 break;
@@ -129,6 +133,7 @@ public sealed class LspServer
                 ["triggerCharacters"] = new JsonArray { "<", " ", "\"", "=", ".", ":" }
             },
             ["hoverProvider"] = true,
+            ["definitionProvider"] = true,
             ["documentSymbolProvider"] = true,
             ["codeActionProvider"] = true,
             ["semanticTokensProvider"] = new JsonObject
@@ -210,6 +215,30 @@ public sealed class LspServer
         return new JsonObject
         {
             ["contents"] = new JsonObject { ["kind"] = "markdown", ["value"] = hover }
+        };
+    }
+
+    private JsonNode? DefinitionResult(JsonNode @params)
+    {
+        var uri = @params["textDocument"]!["uri"]!.GetValue<string>();
+        var pos = @params["position"]!;
+        if (!_documents.TryGetValue(uri, out var text)) return null;
+
+        var model = ResolveModel(uri);
+        if (model is null) return null;
+
+        int offset = OffsetAt(text, pos["line"]!.GetValue<int>(), pos["character"]!.GetValue<int>());
+        var location = new DefinitionEngine(model).Definition(text, offset);
+        if (location is null) return null;
+
+        return new JsonObject
+        {
+            ["uri"] = new Uri(location.FilePath).AbsoluteUri,
+            ["range"] = new JsonObject
+            {
+                ["start"] = new JsonObject { ["line"] = location.StartLine, ["character"] = location.StartCharacter },
+                ["end"] = new JsonObject { ["line"] = location.EndLine, ["character"] = location.EndCharacter }
+            }
         };
     }
 
