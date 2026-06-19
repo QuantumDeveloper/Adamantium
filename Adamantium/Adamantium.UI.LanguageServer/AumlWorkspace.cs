@@ -141,32 +141,52 @@ public sealed class AumlWorkspace : IDisposable
     private static string? FindProjectBinDir(string csprojPath)
     {
         var projectDir = Path.GetDirectoryName(csprojPath)!;
-
-        // This engine redirects output via <BaseOutputPath> (e.g. ..\..\output\Name\bin); honour it,
-        // otherwise fall back to the conventional <projectDir>\bin.
-        var baseOutput = ReadBaseOutputPath(csprojPath);
-        var binBase = baseOutput is not null
-            ? Path.GetFullPath(Path.Combine(projectDir, baseOutput))
-            : Path.Combine(projectDir, "bin");
-        if (!Directory.Exists(binBase)) return null;
-
-        // Prefer the leaf holding the freshest build of the project's own assembly, so a stale leftover
-        // target-framework build can't shadow the current one. (This bit: an old net8.0 leaf with a fuller
-        // dll closure than a freshly-rebuilt net10.0 leaf won the "most dlls" race below, so the model was
-        // built from months-old assemblies and newly added types showed as unknown/red.)
         var ownDll = Path.GetFileNameWithoutExtension(csprojPath) + ".dll";
-        var byOwnDll = Directory.EnumerateFiles(binBase, ownDll, SearchOption.AllDirectories)
+
+        // Candidate output roots, covering every scheme this engine has used:
+        //  - the conventional <projectDir>\bin;
+        //  - a <BaseOutputPath> redirect (older scheme, e.g. ..\..\output\Name\bin);
+        //  - a single solution-wide artifacts\bin root (current scheme — set via <OutputPath> in the root
+        //    Directory.Build.props, so individual csproj files carry no hint of it; found by walking up).
+        List<string> roots = [Path.Combine(projectDir, "bin")];
+        var baseOutput = ReadBaseOutputPath(csprojPath);
+        if (baseOutput is not null)
+            roots.Add(Path.GetFullPath(Path.Combine(projectDir, baseOutput)));
+        var artifactsBin = FindAncestorArtifactsBin(projectDir);
+        if (artifactsBin is not null)
+            roots.Add(artifactsBin);
+
+        var existing = roots.Where(Directory.Exists).ToList();
+        if (existing.Count == 0) return null;
+
+        // Prefer the leaf holding the freshest build of the project's own assembly, so a stale leftover (an
+        // old scheme, or an old target-framework leaf with a fuller dll closure) can't shadow the current
+        // build and serve months-old types that then show up as unknown/red.
+        var byOwnDll = existing
+            .SelectMany(root => Directory.EnumerateFiles(root, ownDll, SearchOption.AllDirectories))
             .OrderByDescending(File.GetLastWriteTimeUtc)
             .FirstOrDefault();
         if (byOwnDll is not null) return Path.GetDirectoryName(byOwnDll);
 
         // Fallback (e.g. a custom AssemblyName != project name): the dir with the most dlls, newest first.
-        return Directory.EnumerateDirectories(binBase, "*", SearchOption.AllDirectories)
-            .Prepend(binBase)
+        return existing
+            .SelectMany(root => Directory.EnumerateDirectories(root, "*", SearchOption.AllDirectories).Prepend(root))
             .Where(d => Directory.EnumerateFiles(d, "*.dll").Any())
             .OrderByDescending(d => Directory.GetFiles(d, "*.dll").Length)
             .ThenByDescending(Directory.GetLastWriteTimeUtc)
             .FirstOrDefault();
+    }
+
+    // Walk up from the project looking for a solution-wide artifacts\bin (the current consolidated output root).
+    private static string? FindAncestorArtifactsBin(string startDir)
+    {
+        for (var dir = new DirectoryInfo(startDir); dir is not null; dir = dir.Parent)
+        {
+            var artifactsBin = Path.Combine(dir.FullName, "artifacts", "bin");
+            if (Directory.Exists(artifactsBin)) return artifactsBin;
+        }
+
+        return null;
     }
 
     private static string? ReadBaseOutputPath(string csprojPath)
