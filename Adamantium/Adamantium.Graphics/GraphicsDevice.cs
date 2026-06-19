@@ -11,14 +11,14 @@ using Adamantium.Graphics.Core.Presentation;
 using Adamantium.Graphics.Effects;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
-using AdamantiumVulkan.Core;
-using AdamantiumVulkan.Core.Interop;
+using Adamantium.Vulkan.Core;
+using Adamantium.Vulkan.Core.Interop;
 using QuantumBinding.Utils;
 using Serilog;
 using EffectTechnique = Adamantium.Graphics.Core.EffectsFramework.EffectTechnique;
-using Semaphore = AdamantiumVulkan.Core.Semaphore;
+using Semaphore = Adamantium.Vulkan.Core.Semaphore;
 using Exception = System.Exception;
-using Image = AdamantiumVulkan.Core.Image;
+using Image = Adamantium.Vulkan.Core.Image;
 
 namespace Adamantium.Graphics;
 
@@ -1388,7 +1388,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         LogicalDevice.DestroySampler(sampler);
     }
 
-    public void Destroy(AdamantiumVulkan.Core.Buffer buffer)
+    public void Destroy(Adamantium.Vulkan.Core.Buffer buffer)
     {
         buffer?.Destroy(LogicalDevice);
     }

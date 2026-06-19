@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using Adamantium.Core;
 using Adamantium.Graphics.Core.Presentation;
 using Adamantium.Imaging;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.Graphics.Core
 {

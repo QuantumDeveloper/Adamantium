@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading;
 
-namespace Adamantium.XInput.Playground
+namespace Adamantium.XInput.Sandbox
 {
     class Program
     {

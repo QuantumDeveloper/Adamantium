@@ -1,5 +1,0 @@
-﻿<Project>
-	<PropertyGroup>
-		<BaseIntermediateOutputPath>..\..\output\Adamantium.Win32\obj\</BaseIntermediateOutputPath>
-	</PropertyGroup>
-</Project>

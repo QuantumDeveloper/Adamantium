@@ -20,7 +20,7 @@
 
 using System;
 using System.Runtime.InteropServices;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 #pragma warning disable 1584,1581,1580
 
 namespace Adamantium.Imaging
@@ -91,7 +91,7 @@ namespace Adamantium.Imaging
         public uint MipLevels;
 
         /// <summary>	
-        /// <dd> <p>Texture format (see <strong><see cref="AdamantiumVulkan.Core.Format"/></strong>).</p> </dd>	
+        /// <dd> <p>Texture format (see <strong><see cref="Adamantium.Vulkan.Core.Format"/></strong>).</p> </dd>	
         /// </summary>	
         /// <unmanaged>Vulkan imange Format</unmanaged>	
         public Format Format;

@@ -1,5 +1,0 @@
-﻿<Project>
-	<PropertyGroup>
-		<BaseIntermediateOutputPath>..\..\output\Adamantium.Engine.Generators\obj\</BaseIntermediateOutputPath>
-	</PropertyGroup>
-</Project>

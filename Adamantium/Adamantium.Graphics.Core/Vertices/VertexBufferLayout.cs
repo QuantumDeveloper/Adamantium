@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.ObjectModel;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.Graphics.Core.Vertices
 {

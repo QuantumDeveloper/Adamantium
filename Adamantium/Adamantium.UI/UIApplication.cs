@@ -23,7 +23,7 @@ using Adamantium.UI.Platforms.Windows;
 using Adamantium.UI.Rendering;
 using Adamantium.UI.Services;
 using Adamantium.UI.Themes.FluentDarkTheme;
-using AdamantiumVulkan;
+using Adamantium.Vulkan.Loader;
 using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;
 using UnhandledExceptionEventArgs = Adamantium.UI.Core.RoutedEvents.UnhandledExceptionEventArgs;

@@ -1,7 +1,7 @@
-<Window x:Namespace="Adamantium.Game.Playground"
+<Window x:Namespace="Adamantium.Game.Sandbox"
         xmlns="http://adamantium/ui"
 		xmlns:x="http://adamantium/ui/xaml/extensions"
-		xmlns:local="clr-namespace:Adamantium.Game.Playground"
+		xmlns:local="clr-namespace:Adamantium.Game.Sandbox"
         Title="Adamantium Window"
         Width="1280"
         Height="720">

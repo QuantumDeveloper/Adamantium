@@ -1,5 +1,5 @@
 using System;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.Graphics.Core
 {

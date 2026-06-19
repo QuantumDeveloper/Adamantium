@@ -5,7 +5,6 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Platforms>x64</Platforms>
         <Nullable>disable</Nullable>
-        <BaseOutputPath>..\..\output\Adamantium.FX\bin</BaseOutputPath>
         <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
         <CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
         <LangVersion>latest</LangVersion>

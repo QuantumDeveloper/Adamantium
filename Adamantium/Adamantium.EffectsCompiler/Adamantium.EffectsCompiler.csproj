@@ -4,7 +4,6 @@
         <TargetFramework>netstandard2.0</TargetFramework>
         <LangVersion>latest</LangVersion>
         <Platforms>x64</Platforms>
-	<BaseOutputPath>..\..\output\Adamantium.Engine.Effects\bin</BaseOutputPath>
     </PropertyGroup>
 
 	<PropertyGroup>
@@ -17,8 +16,8 @@
 
     <ItemGroup>
       <PackageReference Include="Adamantium.DXC" Version="1.0.9" />
-      <PackageReference Include="AdamantiumVulkan.Spirv" Version="1.0.4" />
-      <PackageReference Include="AdamantiumVulkan.Slang" Version="1.0.2" />
+      <PackageReference Include="Adamantium.Vulkan.Spirv" Version="1.0.4" />
+      <PackageReference Include="Adamantium.Vulkan.Slang" Version="1.0.3" />
       <PackageReference Include="MessagePack" Version="2.5.129" />
       <PackageReference Include="MessagePack.Annotations" Version="2.5.129" />
       <PackageReference Include="QuantumBinding.Utils" Version="2.0.0" />

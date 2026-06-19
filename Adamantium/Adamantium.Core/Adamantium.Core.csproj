@@ -5,8 +5,6 @@
     <Configurations>Debug;Release</Configurations>
     <LangVersion>latest</LangVersion>
     <TargetFrameworks>netstandard2.0;net10.0</TargetFrameworks>
-    <BaseOutputPath>..\..\output\Adamantium.Core\bin</BaseOutputPath>
-    <!--<BaseIntermediateOutputPath>..\..\output\Adamantium.Core\obj\</BaseIntermediateOutputPath>-->
   </PropertyGroup>
 
 	<PropertyGroup>

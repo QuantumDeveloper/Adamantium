@@ -12,7 +12,6 @@
 		<Configurations>Debug;Release</Configurations>
 		<LangVersion>latest</LangVersion>
 		<Nullable>disable</Nullable>
-		<BaseOutputPath>..\..\output\Adamantium.UI\bin</BaseOutputPath>
 	</PropertyGroup>
 
 	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x64' ">
@@ -33,8 +32,8 @@
 		<ProjectReference Include="..\Adamantium.UI.Markup\Adamantium.UI.Markup.csproj" />
 		<ProjectReference Include="..\Adamantium.UI.Themes\Adamantium.UI.Themes.csproj" />
 		<ProjectReference Include="..\Adamantium.Win32\Adamantium.Win32.csproj" />
-		<ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan\AdamantiumVulkan.csproj" />
-		<ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.Core\AdamantiumVulkan.Core.csproj" />
+		<ProjectReference Include="..\..\..\AdamantiumVulkan\Adamantium.Vulkan.Loader\Adamantium.Vulkan.Loader.csproj" />
+		<ProjectReference Include="..\..\..\AdamantiumVulkan\Adamantium.Vulkan\Adamantium.Vulkan.csproj" />
 	</ItemGroup>
 	
 	<ItemGroup>

@@ -1,5 +1,0 @@
-﻿<Project>
-	<PropertyGroup>
-		<BaseIntermediateOutputPath>..\..\output\Adamantium.Graphics.Core\obj\</BaseIntermediateOutputPath>
-	</PropertyGroup>
-</Project>

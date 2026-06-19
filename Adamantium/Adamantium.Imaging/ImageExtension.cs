@@ -8,7 +8,7 @@ using Adamantium.Imaging.Jpeg.Decoder;
 using Adamantium.Imaging.Png;
 using Adamantium.Imaging.Png.Chunks;
 using Adamantium.Imaging.Tga;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.Imaging;
 

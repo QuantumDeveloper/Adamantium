@@ -7,8 +7,8 @@ using Adamantium.Core;
 using Adamantium.EffectsCompiler;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.EffectsFramework;
-using AdamantiumVulkan.Core;
-using AdamantiumVulkan.Core.Interop;
+using Adamantium.Vulkan.Core;
+using Adamantium.Vulkan.Core.Interop;
 using Serilog;
 using EffectTechnique = Adamantium.Graphics.Core.EffectsFramework.EffectTechnique;
 

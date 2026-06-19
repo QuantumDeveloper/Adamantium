@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Imaging.Png.Chunks;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.Imaging.Png
 {

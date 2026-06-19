@@ -1,134 +1,62 @@
 using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
-using System.Text;
-using AdamantiumVulkan.Slang;
+using Adamantium.Vulkan.Slang;
 
 namespace Adamantium.EffectsCompiler.Compiler
 {
     /// <summary>
-    /// Compiles HLSL/Slang source to SPIR-V via the Slang runtime (AdamantiumVulkan.Slang).
-    /// Unlike the DXC path, the source is handed to Slang with its <c>#include</c> directives intact and
-    /// resolved by Slang itself through a VFS callback wired to the engine's include collection — Slang has
-    /// proper include processing, so no flattening is needed. One instance per effect compile; the Slang
-    /// session is reused across that effect's stages (each gets a unique module name).
+    /// Engine-side adapter over the shared <see cref="Adamantium.Vulkan.Slang.SlangCompiler"/>: the native Slang
+    /// session, <c>#include</c> callback and SPIR-V extraction live in that one class (reused by the Vulkan demo too),
+    /// while this wrapper supplies the engine's configuration and translates between engine and Slang types - it maps
+    /// <see cref="EffectShaderType"/> to <see cref="SlangcStage"/>, routes the engine's include collection through the
+    /// compiler's resolver, and wraps the output as a <see cref="ShaderCompilationResult"/>. One instance per effect
+    /// compile; the session is reused across that effect's stages.
     /// </summary>
     internal sealed class SlangShaderCompiler : IDisposable
     {
-        // Matches the DXC path's target (CompilerArguments.SpvTargetEnvVulkan1_3 -> SPIR-V 1.6) so both
-        // backends emit for the same Vulkan environment.
+        // Matches the DXC path's target (SPIR-V 1.6) so both backends emit for the same Vulkan environment.
         private const string SpirvProfile = "spirv_1_6";
 
-        // Legacy HLSL spellings the engine's .fx files use but Slang's stricter front-end doesn't define.
-        // Applied as session-wide preprocessor macros (cleaner than prepending source, and leaves the
-        // source untouched so diagnostics line numbers stay correct). DXC tolerates these as-is.
-        private static readonly string[] CompatibilityDefineNames = { "sampler" };
-        private static readonly string[] CompatibilityDefineValues = { "SamplerState" };
-
-        // Slang compiler options, configurable here without touching the native shim. VulkanUseEntryPointName
-        // keeps the real entry-point name in the SPIR-V (instead of "main") so Vulkan can create pipelines by
-        // the shader's name. Add more options to this array as needed.
-        private static readonly SlangcCompilerOption[] CompilerOptions =
-        {
-            new SlangcCompilerOption
-            {
-                Name = (int)SlangcCompilerOptionName.VulkanUseEntryPointName,
-                ValueKind = 0, // int / bool
-                IntValue0 = 1
-            }
-        };
-
-        // Native VFS callback: int(void* userData, const char* path, const unsigned char** outData, size_t* outSize).
-        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        private delegate int SlangcLoadFile(IntPtr userData, IntPtr path, out IntPtr outData, out UIntPtr outSize);
-
-        private readonly SlangcSession session;
-        private readonly SlangcLoadFile loadFileDelegate; // kept alive for the session's lifetime
-        private readonly List<IntPtr> pendingBuffers = new List<IntPtr>();
-
-        private Func<string, string> includeResolver;
-        private int moduleCounter;
+        private readonly SlangCompiler compiler;
 
         public SlangShaderCompiler()
         {
-            loadFileDelegate = LoadFile;
-            var loadFilePtr = unchecked((nuint)Marshal.GetFunctionPointerForDelegate(loadFileDelegate).ToInt64());
-
-            nuint userData = 0;
-            session = SlangNative.SessionCreate(
-                null, 0,
-                CompatibilityDefineNames, CompatibilityDefineValues, CompatibilityDefineNames.Length,
-                SpirvProfile, CompilerOptions, CompilerOptions.Length, loadFilePtr, ref userData);
+            compiler = new SlangCompiler(
+                SpirvProfile,
+                // VulkanUseEntryPointName keeps the real entry-point name in the SPIR-V (instead of "main") so Vulkan
+                // can create pipelines by the shader's name.
+                options:
+                [
+                    new SlangcCompilerOption
+                    {
+                        Name = (int)SlangcCompilerOptionName.VulkanUseEntryPointName,
+                        ValueKind = 0,
+                        IntValue0 = 1
+                    }
+                ],
+                // Legacy HLSL spellings the engine's .fx files use but Slang's stricter front-end doesn't define
+                // (DXC tolerated these as-is); applied as session-wide preprocessor macros.
+                defines: new Dictionary<string, string> { ["sampler"] = "SamplerState" });
         }
 
         /// <param name="resolveInclude">Maps an <c>#include</c> path to file contents (null = not found).</param>
         public ShaderCompilationResult Compile(string source, string entryPoint, EffectShaderType stage, Func<string, string> resolveInclude)
         {
-            includeResolver = resolveInclude;
-
-            // Unique module name per compile so Slang's per-session module cache never collides.
-            var moduleName = $"m{moduleCounter++}_{entryPoint}";
-
-            var result = session.Compile(moduleName, source, entryPoint, MapStage(stage));
+            compiler.IncludeResolver = resolveInclude;
             try
             {
-                var ok = result.ResultOk() != 0;
-                var diagnostics = result.ResultDiagnostics();
-
-                byte[] spirv = null;
-                if (ok)
-                {
-                    var ptr = result.ResultSpirv(out var size);
-                    if (ptr != 0 && size > 0)
-                    {
-                        spirv = new byte[size];
-                        Marshal.Copy(new IntPtr((long)(ulong)ptr), spirv, 0, (int)size);
-                    }
-                }
-
+                var result = compiler.Compile(source, entryPoint, MapStage(stage));
                 return new ShaderCompilationResult
                 {
-                    Bytecode = spirv,
-                    HasErrors = !ok || spirv == null,
-                    Errors = diagnostics
+                    Bytecode = result.Spirv,
+                    HasErrors = !result.Success,
+                    Errors = result.Diagnostics
                 };
             }
             finally
             {
-                result.ResultRelease();
-                // The shim copies callback buffers synchronously during compilation, so they are safe to free now.
-                FreePendingBuffers();
-                includeResolver = null;
+                compiler.IncludeResolver = null;
             }
-        }
-
-        // Called by Slang (native) for every #include it can't already satisfy. The returned buffer must stay
-        // valid until the call returns; the shim copies it immediately, so we free after the compile completes.
-        private int LoadFile(IntPtr userData, IntPtr path, out IntPtr outData, out UIntPtr outSize)
-        {
-            outData = IntPtr.Zero;
-            outSize = UIntPtr.Zero;
-
-            var requested = Marshal.PtrToStringAnsi(path);
-            var content = string.IsNullOrEmpty(requested) ? null : includeResolver?.Invoke(requested);
-            if (content == null)
-                return 0;
-
-            var bytes = Encoding.UTF8.GetBytes(content);
-            var buffer = Marshal.AllocHGlobal(bytes.Length);
-            Marshal.Copy(bytes, 0, buffer, bytes.Length);
-            pendingBuffers.Add(buffer);
-
-            outData = buffer;
-            outSize = (UIntPtr)bytes.Length;
-            return 1;
-        }
-
-        private void FreePendingBuffers()
-        {
-            foreach (var buffer in pendingBuffers)
-                Marshal.FreeHGlobal(buffer);
-            pendingBuffers.Clear();
         }
 
         private static SlangcStage MapStage(EffectShaderType type)
@@ -145,10 +73,6 @@ namespace Adamantium.EffectsCompiler.Compiler
             }
         }
 
-        public void Dispose()
-        {
-            FreePendingBuffers();
-            session?.SessionRelease();
-        }
+        public void Dispose() => compiler.Dispose();
     }
 }

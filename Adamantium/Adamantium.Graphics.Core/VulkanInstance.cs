@@ -6,10 +6,10 @@ using System.Runtime.InteropServices;
 using Adamantium.Core;
 using Adamantium.Core.Collections;
 using Adamantium.Graphics.Core.Presentation;
-using AdamantiumVulkan.Core;
-using AdamantiumVulkan.Core.Interop;
-using AdamantiumVulkan.MacOS;
-using AdamantiumVulkan.Windows;
+using Adamantium.Vulkan.Core;
+using Adamantium.Vulkan.Core.Interop;
+using Adamantium.Vulkan.MacOS;
+using Adamantium.Vulkan.Windows;
 using Serilog;
 
 namespace Adamantium.Graphics.Core

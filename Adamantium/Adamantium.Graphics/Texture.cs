@@ -5,10 +5,10 @@ using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Extensions;
 using Adamantium.Imaging;
 using Adamantium.Win32;
-using AdamantiumVulkan.Core;
-using VulkanImage = AdamantiumVulkan.Core.Image;
+using Adamantium.Vulkan.Core;
+using VulkanImage = Adamantium.Vulkan.Core.Image;
 using Image = Adamantium.Imaging.Image;
-using VkBuffer = AdamantiumVulkan.Core.Buffer;
+using VkBuffer = Adamantium.Vulkan.Core.Buffer;
 
 namespace Adamantium.Graphics;
 

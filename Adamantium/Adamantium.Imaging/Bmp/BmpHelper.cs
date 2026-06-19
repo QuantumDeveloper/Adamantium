@@ -3,7 +3,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using Adamantium.Core;
 using Adamantium.Mathematics;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.Imaging.Bmp
 {

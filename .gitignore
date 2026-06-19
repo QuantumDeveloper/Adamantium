@@ -343,3 +343,6 @@ Adamantium/Adamantium.Imaging/Adamantium.Imaging.xml
 /Adamantium/editors/rider-auml/build/
 /Adamantium/editors/rider-auml/.gradle/
 /Adamantium/editors/rider-auml/.intellijPlatform/
+
+# runtime logs
+logs/

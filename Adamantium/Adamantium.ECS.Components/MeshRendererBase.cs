@@ -3,7 +3,7 @@ using Adamantium.Core;
 using Adamantium.ECS.ComponentsBasics;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 using Buffer = Adamantium.Graphics.Buffer;
 
 namespace Adamantium.ECS.Components

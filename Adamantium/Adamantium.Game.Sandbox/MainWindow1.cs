@@ -9,7 +9,7 @@ using Adamantium.UI.Controls.Shapes;
 using Adamantium.UI.Core.Resources;
 using Adamantium.UI.EntityServices;
 
-namespace Adamantium.Game.Playground;
+namespace Adamantium.Game.Sandbox;
 
 public class MainWindow1 : Window
 {

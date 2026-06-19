@@ -12,8 +12,8 @@ using Adamantium.Core;
 using Adamantium.DXC;
 using Adamantium.EffectsCompiler.Compiler;
 using Adamantium.Mathematics;
-using AdamantiumVulkan.Spirv.Cross;
-using AdamantiumVulkan.Spirv.Reflection;
+using Adamantium.Vulkan.Spirv.Cross;
+using Adamantium.Vulkan.Spirv.Reflection;
 
 namespace Adamantium.EffectsCompiler
 {

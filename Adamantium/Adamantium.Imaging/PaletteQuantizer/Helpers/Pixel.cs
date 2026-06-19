@@ -2,7 +2,7 @@
 using Adamantium.Core;
 using Adamantium.Imaging.PaletteQuantizer.Helpers.Pixels;
 using Adamantium.Mathematics;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.Imaging.PaletteQuantizer.Helpers
 {

@@ -123,9 +123,9 @@ public class RenderingService : EntityService
         // ALPHA writes so the cleared alpha (1.0) is preserved across all game draws -> the shared surface is fully
         // opaque -> the panel can scale it by its own Opacity (the model's own fragments would otherwise carry the
         // unsampled-texture alpha ~0 and the panel would only ever show a faint outline / can't be made translucent).
-        GraphicsDevice.ColorComponentFlags = AdamantiumVulkan.Core.ColorComponentFlagBits.RBit |
-                                             AdamantiumVulkan.Core.ColorComponentFlagBits.GBit |
-                                             AdamantiumVulkan.Core.ColorComponentFlagBits.BBit;
+        GraphicsDevice.ColorComponentFlags = Adamantium.Vulkan.Core.ColorComponentFlagBits.RBit |
+                                             Adamantium.Vulkan.Core.ColorComponentFlagBits.GBit |
+                                             Adamantium.Vulkan.Core.ColorComponentFlagBits.BBit;
         // The game scene is opaque (the model writes solid texels); render it with an opaque blend equation, not
         // whatever blend state the UI pass left set (an alpha/premultiplied blend collapsed the model to black).
         GraphicsDevice.ColorBlendEquation = Adamantium.Graphics.Core.ColorBlendEquations.Opaque;

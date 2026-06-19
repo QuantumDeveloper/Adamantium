@@ -5,7 +5,7 @@ using System.Linq;
 using System.Threading;
 using Adamantium.Core;
 using Adamantium.Graphics.Core.Extensions;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 using QuantumBinding.Utils;
 using Serilog;
 

@@ -4,7 +4,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using Adamantium.Core.Exceptions;
 using Adamantium.Graphics.Core.Vertices;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.Graphics.Core.Extensions
 {

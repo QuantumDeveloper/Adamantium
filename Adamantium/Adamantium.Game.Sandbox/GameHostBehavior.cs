@@ -7,7 +7,7 @@ using Adamantium.UI.Core.Behaviors;
 using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.UI.EntityServices;
 
-namespace Adamantium.Game.Playground;
+namespace Adamantium.Game.Sandbox;
 
 /// <summary>
 /// Declaratively (from AUML) runs <see cref="AdamantiumGame"/> into the <see cref="RenderTargetPanel"/> it is

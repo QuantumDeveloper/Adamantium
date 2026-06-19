@@ -5,11 +5,11 @@ using Adamantium.Graphics.Core.EffectsFramework;
 using Adamantium.Graphics.Core.Presentation;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
-using AdamantiumVulkan.Core;
-using AdamantiumVulkan.Core.Interop;
-using Buffer = AdamantiumVulkan.Core.Buffer;
+using Adamantium.Vulkan.Core;
+using Adamantium.Vulkan.Core.Interop;
+using Buffer = Adamantium.Vulkan.Core.Buffer;
 using EffectTechnique = Adamantium.Graphics.Core.EffectsFramework.EffectTechnique;
-using Image = AdamantiumVulkan.Core.Image;
+using Image = Adamantium.Vulkan.Core.Image;
 
 namespace Adamantium.Graphics.Core;
 

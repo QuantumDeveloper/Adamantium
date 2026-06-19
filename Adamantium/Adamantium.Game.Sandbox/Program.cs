@@ -1,7 +1,7 @@
 ﻿using Adamantium.UI;
 using System;
 
-namespace Adamantium.Game.Playground;
+namespace Adamantium.Game.Sandbox;
 
 public class Program
 {

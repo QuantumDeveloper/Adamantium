@@ -2,7 +2,7 @@
 using Adamantium.Graphics.Core;
 using Adamantium.Imaging;
 using Adamantium.UI.Core.Graphics;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.UI.Core.Media.Imaging;
 

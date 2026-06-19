@@ -12,9 +12,9 @@ internal static class LspSelfTest
 {
     public static int Run()
     {
-        const string dir = "file:///c:/AdamantiumEngine/Adamantium/Adamantium/Adamantium.UI.Playground";
+        const string dir = "file:///c:/AdamantiumEngine/Adamantium/Adamantium/Adamantium.UI.Sandbox";
         // VS Code percent-encodes the drive colon (file:///c%3A/...) — UriToLocalPath must still resolve the project.
-        const string dirEncoded = "file:///c%3A/AdamantiumEngine/Adamantium/Adamantium/Adamantium.UI.Playground";
+        const string dirEncoded = "file:///c%3A/AdamantiumEngine/Adamantium/Adamantium/Adamantium.UI.Sandbox";
         const string encodedUri = dirEncoded + "/Encoded.auml";
         const string completionUri = dir + "/Completion.auml";
         const string diagUri = dir + "/Diag.auml";

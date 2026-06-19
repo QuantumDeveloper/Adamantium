@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Runtime.InteropServices;
 using Adamantium.Imaging;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.Graphics.Core
 {
@@ -72,7 +72,7 @@ namespace Adamantium.Graphics.Core
         public uint MipLevels;
 
         /// <summary>	
-        /// <dd> <p>Texture format (see <strong><see cref="AdamantiumVulkan.Core.Format"/></strong>).</p> </dd>	
+        /// <dd> <p>Texture format (see <strong><see cref="Adamantium.Vulkan.Core.Format"/></strong>).</p> </dd>	
         /// </summary>	
         /// <msdn-id>ff476252</msdn-id>	
         /// <unmanaged>DXGI_FORMAT Format</unmanaged>	

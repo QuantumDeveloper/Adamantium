@@ -11,7 +11,7 @@ using Adamantium.Graphics.Core.Content;
 using Adamantium.Graphics.Core.Models;
 using Adamantium.Mathematics;
 
-namespace Adamantium.Game.Playground
+namespace Adamantium.Game.Sandbox
 {
     public class AdamantiumGame : Game
     {

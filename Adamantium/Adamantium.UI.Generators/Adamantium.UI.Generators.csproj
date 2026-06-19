@@ -6,7 +6,6 @@
 		<Platforms>x64</Platforms>
 		<LangVersion>latest</LangVersion>
 		<Nullable>disable</Nullable>
-		<BaseOutputPath>..\..\output\Adamantium.UI.Generators\bin</BaseOutputPath>
 		<EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
 		<IsRoslynComponent>true</IsRoslynComponent>
     </PropertyGroup>

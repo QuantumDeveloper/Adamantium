@@ -9,7 +9,7 @@ using Adamantium.Imaging.PaletteQuantizer.Extensions;
 using Adamantium.Imaging.PaletteQuantizer.PathProviders;
 using Adamantium.Imaging.PaletteQuantizer.Quantizers;
 using Adamantium.Mathematics;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.Imaging.PaletteQuantizer.Helpers
 {

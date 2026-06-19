@@ -8,7 +8,6 @@
 		<LangVersion>latest</LangVersion>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
-		<BaseOutputPath>..\..\output\Adamantium.UI.LanguageServer\bin</BaseOutputPath>
 	</PropertyGroup>
 
 	<ItemGroup>

@@ -6,7 +6,6 @@
         <Platforms>x64</Platforms>
         <Configurations>Debug;Release</Configurations>
         <LangVersion>latest</LangVersion>
-        <BaseOutputPath>..\..\output\Adamantium.UI.Theming\bin</BaseOutputPath>
         <EmitCompilerGeneratedFiles>false</EmitCompilerGeneratedFiles>
         <CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
         <OutputType>Exe</OutputType>

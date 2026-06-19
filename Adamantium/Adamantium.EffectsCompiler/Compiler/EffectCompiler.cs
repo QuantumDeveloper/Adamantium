@@ -3,7 +3,7 @@ using System.Collections.Immutable;
 using System.IO;
 using System.Text;
 using Adamantium.DXC;
-using AdamantiumVulkan.Spirv.Reflection;
+using Adamantium.Vulkan.Spirv.Reflection;
 
 namespace Adamantium.EffectsCompiler
 {

@@ -2,7 +2,7 @@
 using System.IO;
 using System.Runtime.InteropServices;
 using Adamantium.Imaging.Png.IO;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.Imaging.Png
 {

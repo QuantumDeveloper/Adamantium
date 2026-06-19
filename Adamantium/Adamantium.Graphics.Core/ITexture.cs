@@ -2,8 +2,8 @@
 using System.ComponentModel;
 using Adamantium.Core;
 using Adamantium.Imaging;
-using AdamantiumVulkan.Core;
-using Image = AdamantiumVulkan.Core.Image;
+using Adamantium.Vulkan.Core;
+using Image = Adamantium.Vulkan.Core.Image;
 
 namespace Adamantium.Graphics.Core;
 

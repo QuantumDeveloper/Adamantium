@@ -1,6 +1,6 @@
 using Adamantium.Core;
 using Adamantium.Graphics.Core;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.Graphics
 {

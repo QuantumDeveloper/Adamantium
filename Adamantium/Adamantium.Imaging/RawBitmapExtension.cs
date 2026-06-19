@@ -1,6 +1,6 @@
 using System.IO;
 using Adamantium.Imaging.Jpeg;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.Imaging;
 
