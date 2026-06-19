@@ -78,7 +78,7 @@ namespace Adamantium.Game.Sandbox
 
         private async void LoadModels()
         {
-            var entity = await ImportModel(@"Models\F15C\F-15C_Eagle.dae");
+            var entity = await ImportModel(SandboxAssets.Models.F15C.F_15C_Eagle_dae);
             EntityWorld.EntityManager.AddEntity(entity);
         }
     }

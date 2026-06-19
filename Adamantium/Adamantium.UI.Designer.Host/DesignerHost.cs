@@ -73,6 +73,10 @@ public static class DesignerHost
                     WriteResponse(protocol, RenderOne(session, request, outPath, ref previousPng));
                     break;
 
+                case "hittest":
+                    WriteResponse(protocol, HitTestOne(session, request));
+                    break;
+
                 default:
                     WriteResponse(protocol, new Response { Error = $"unknown op '{request?.Op}'" });
                     break;
@@ -120,6 +124,35 @@ public static class DesignerHost
         }
     }
 
+    // Maps a point (in the last render's design space) to the authored element under it: its markup position
+    // (line/column) and rect, for the designer's go-to-source (click) and hover frame. 'hit' is omitted when
+    // nothing authored sits there.
+    private static Response HitTestOne(DesignerSession session, Request request)
+    {
+        try
+        {
+            var hit = session.HitTest(request.X ?? 0, request.Y ?? 0);
+            return hit is null
+                ? new Response()
+                : new Response
+                {
+                    Hit = new HitInfo
+                    {
+                        Line = hit.Line,
+                        Column = hit.Position,
+                        X = hit.X,
+                        Y = hit.Y,
+                        Width = hit.Width,
+                        Height = hit.Height
+                    }
+                };
+        }
+        catch (Exception e)
+        {
+            return new Response { Error = e.Message };
+        }
+    }
+
     private static List<string> NullIfEmpty(List<string> diagnostics) =>
         diagnostics is { Count: > 0 } ? diagnostics : null;
 
@@ -137,6 +170,9 @@ public static class DesignerHost
         public uint? Height { get; set; }
         public double? Scale { get; set; }
         public string Uri { get; set; }
+        // hittest: a point in the last render's design space.
+        public double? X { get; set; }
+        public double? Y { get; set; }
     }
 
     private sealed class Response
@@ -147,5 +183,16 @@ public static class DesignerHost
         public double? Scale { get; set; }
         public string Error { get; set; }
         public List<string> Diagnostics { get; set; }
+        public HitInfo Hit { get; set; }
+    }
+
+    private sealed class HitInfo
+    {
+        public int Line { get; set; }
+        public int Column { get; set; }
+        public double X { get; set; }
+        public double Y { get; set; }
+        public double Width { get; set; }
+        public double Height { get; set; }
     }
 }

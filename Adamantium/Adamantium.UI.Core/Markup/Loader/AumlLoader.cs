@@ -37,6 +37,7 @@ public static class AumlLoader
         var instantiator = new AumlInstantiator(resolver, asmList, typeMapper, result.Diagnostics);
         try { result.Root = instantiator.Instantiate(doc.Root); }
         catch (Exception e) { result.Diagnostics.Add($"Instantiate error: {e.Message}"); }
+        result.SourceMap = instantiator.SourceMap;   // for the designer's go-to-source / hover (may be partial on error)
 
         return result;
     }

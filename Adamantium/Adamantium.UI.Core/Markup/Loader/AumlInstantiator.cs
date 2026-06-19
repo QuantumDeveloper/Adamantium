@@ -33,6 +33,10 @@ internal sealed class AumlInstantiator
         _diagnostics = diagnostics;
     }
 
+    /// <summary>Each instantiated element mapped to its AUML source position (designer go-to-source / hover).
+    /// Reference-keyed so controls that override Equals/GetHashCode don't collide.</summary>
+    public Dictionary<object, AumlSourceSpan> SourceMap { get; } = new(ReferenceEqualityComparer.Instance);
+
     public object Instantiate(AumlAstObjectNode node)
     {
         var clrType = ResolveClrType(node.TypeReference);
@@ -44,6 +48,7 @@ internal sealed class AumlInstantiator
 
         var actualType = _typeMapper?.Invoke(clrType) ?? clrType;
         var instance = Activator.CreateInstance(actualType);
+        if (instance != null) SourceMap[instance] = new AumlSourceSpan(node.Line, node.Position);
 
         foreach (var child in node.Children)
         {

@@ -83,6 +83,12 @@ internal static class LspSelfTest
         // Attached-property syntax Owner.Property="..." -> complete the owner type's attached properties.
         var (attachedText, atLine, atChar) = Caret(
             """<StyleSet xmlns="http://adamantium/ui" xmlns:controls="http://adamantium/ui"><controls:Border ResourceContext.Sou|/></StyleSet>""");
+        // Path-typed property (Image.Source : ImageSource) -> complete files/folders under the project root.
+        var (imagePathText, ipLine, ipChar) = Caret(
+            """<Window xmlns="http://adamantium/ui"><Image Source="|"/></Window>""");
+        // Drilling into a folder ("Textures/") -> complete the files inside it.
+        var (imageDirText, idLine, idChar) = Caret(
+            """<Window xmlns="http://adamantium/ui"><Image Source="Textures/|"/></Window>""");
 
         JsonNode[] session =
         {
@@ -119,6 +125,10 @@ internal static class LspSelfTest
             Completion(15, themePropUri, tpLine, tpChar),
             DidOpen(attachedUri, attachedText),
             Completion(14, attachedUri, atLine, atChar),
+            DidOpen(dir + "/ImagePath.auml", imagePathText),
+            Completion(22, dir + "/ImagePath.auml", ipLine, ipChar),
+            DidOpen(dir + "/ImageDir.auml", imageDirText),
+            Completion(23, dir + "/ImageDir.auml", idLine, idChar),
             DidOpen(xPrefixUri, xPrefixDoc),
             CodeAction(17, xPrefixUri, xName.Line, xName.Ch),
             DidOpen(semanticUri, semanticDoc),
@@ -144,7 +154,7 @@ internal static class LspSelfTest
             var method = response["method"]?.GetValue<string>();
             var id = response["id"]?.ToJsonString();
 
-            if (response["result"] is JsonArray array && id is "2" or "4" or "7" or "12" or "13" or "14" or "15" or "19")
+            if (response["result"] is JsonArray array && id is "2" or "4" or "7" or "12" or "13" or "14" or "15" or "19" or "22" or "23")
             {
                 var labels = array.Select(c => c!["label"]!.GetValue<string>()).ToList();
                 var tag = id switch
@@ -156,6 +166,8 @@ internal static class LspSelfTest
                     "14" => "attached property",
                     "15" => "property-element (collection)",
                     "19" => "encoded-URI (%3A) props",
+                    "22" => "path values",
+                    "23" => "path values (in folder)",
                     _ => "controls:Border props"
                 };
                 Console.WriteLine($"<- completion ({tag}, id {id}): {labels.Count}: {string.Join(", ", labels.Take(8))}");

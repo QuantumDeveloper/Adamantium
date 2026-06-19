@@ -53,7 +53,6 @@ public sealed class AumlWorkspace : IDisposable
 
             // In-repo dependency projects are compiled from source (CompilationReference), so edits to control
             // types/properties anywhere in the engine show up on save without a build; the rest stay as dlls.
-            Console.Error.WriteLine($"[auml] {Path.GetFileName(project)} -> source graph (external refs from {binDir})");
             var (compilation, repoRoot, xmlnsMappings) = SourceProjectGraph.Build(project, binDir, _syntaxCache, _metadataCache);
             var model = AumlTypeModel.FromCompilation(compilation, xmlnsMappings);
             _byProject[project] = model;

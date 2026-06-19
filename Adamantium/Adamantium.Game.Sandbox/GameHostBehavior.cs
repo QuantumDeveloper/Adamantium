@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using Adamantium.Graphics.Core;
 using Adamantium.UI;
@@ -24,12 +25,45 @@ public class GameHostBehavior : Behavior<RenderTargetPanel>
 
     protected override void OnAttached(RenderTargetPanel panel)
     {
-        // The designer/previewer has no game loop or window render service - never spin up the game there.
-        if (Design.IsDesignMode) return;
+        // Design-time game preview is WIP and OFF by default: driving a game per render is expensive, so the
+        // interactive designer stays responsive (panel shows its placeholder). Opt in with ADAMANTIUM_DESIGN_GAME=1
+        // while working on the feature. The designer (DesignerSession) drives the snapshot and composites it.
+        if (Design.IsDesignMode)
+        {
+            if (Environment.GetEnvironmentVariable("ADAMANTIUM_DESIGN_GAME") == "1")
+                AttachDesignTimeGame(panel);
+            return;
+        }
 
         // OnAttached fires while the AUML tree is being built, before the panel is in the visual tree. Defer the
         // wiring until it is attached, by which point its window and WindowRenderService exist.
         panel.AttachedToVisualTreeEvent += OnPanelAttachedToVisualTree;
+    }
+
+    private void AttachDesignTimeGame(RenderTargetPanel panel)
+    {
+        if (_gameAttached) return;
+        // Guarded: a design-time game-setup failure must degrade to a panel-without-game, never break the whole
+        // preview (this runs inside the markup instantiation, where an exception would null the entire tree).
+        try
+        {
+            var app = UIApplication.Current;
+            if (app == null) return;
+
+            var gameService = app.UIContext.Resolve<IGameService>();
+            var graphicsDeviceService = app.UIContext.Resolve<IGraphicsDeviceService>();
+
+            // Slave-mode game sharing the designer's device service; no render service (the designer drives it
+            // directly, not via GameService.RunGames). The GameContext device is only a key, so reuse an existing one.
+            var game = gameService.CreateGame<AdamantiumGame>(
+                "AdamantiumGame", panel.RootVisual as IWindow, null, graphicsDeviceService, app.EnableGraphicsDebug);
+            game.CreateOutputFromContext(panel, graphicsDeviceService.ResourceLoaderDevice);
+            _gameAttached = true;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[design-game] setup failed: {ex}");
+        }
     }
 
     protected override void OnDetached(RenderTargetPanel panel)

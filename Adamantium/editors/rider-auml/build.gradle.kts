@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "com.adamantium"
-version = "0.8.5"
+version = "0.8.9"
 
 repositories {
     mavenCentral()

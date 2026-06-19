@@ -10,6 +10,7 @@ import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.fileEditor.FileEditorLocation
 import com.intellij.openapi.fileEditor.FileEditorState
 import com.intellij.openapi.fileEditor.FileEditorStateLevel
+import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.popup.JBPopupFactory
@@ -20,6 +21,7 @@ import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.Alarm
 import com.intellij.util.ui.JBUI
+import java.awt.BasicStroke
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.FlowLayout
@@ -30,6 +32,11 @@ import java.awt.Rectangle
 import java.awt.RenderingHints
 import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseEvent
+import java.awt.event.MouseMotionAdapter
+import java.awt.geom.Point2D
+import java.awt.geom.Rectangle2D
 import java.awt.image.BufferedImage
 import java.beans.PropertyChangeListener
 import java.io.File
@@ -60,6 +67,8 @@ class AumlPreviewFileEditor(
     private val service = project.getService(AumlPreviewService::class.java)
     private val document: Document? = FileDocumentManager.getInstance().getDocument(file)
     private val alarm = Alarm(Alarm.ThreadToUse.SWING_THREAD, this)
+    // Hover hit-tests are throttled off-EDT so moving the mouse doesn't flood the designer host with requests.
+    private val hoverAlarm = Alarm(Alarm.ThreadToUse.POOLED_THREAD, this)
 
     private var scale = 1.0
     private var updatingZoom = false
@@ -178,7 +187,40 @@ class AumlPreviewFileEditor(
         scrollPane.viewport.addComponentListener(object : ComponentAdapter() {
             override fun componentResized(e: ComponentEvent) { if (autoFit) applyFit() }
         })
+        // Designer interaction: hover highlights the element under the cursor; click jumps to its markup.
+        canvas.addMouseMotionListener(object : MouseMotionAdapter() {
+            override fun mouseMoved(e: MouseEvent) = scheduleHover(e.point)
+        })
+        canvas.addMouseListener(object : MouseAdapter() {
+            override fun mouseClicked(e: MouseEvent) = navigateAt(e.point)
+            override fun mouseExited(e: MouseEvent) = canvas.setHoverRect(null)
+        })
         scheduleRender()
+    }
+
+    // Hover frame: throttle host hit-tests (one per ~60 ms of movement), then highlight the hit element's rect.
+    // Always re-queries (the host returns the deepest element under the point) so moving onto a child of a large
+    // container switches the frame to the child; setHoverRect repaints only when the rect actually changes.
+    private fun scheduleHover(p: Point) {
+        val design = canvas.canvasToDesign(p)
+        if (design == null) { canvas.setHoverRect(null); return }
+        hoverAlarm.cancelAllRequests()
+        hoverAlarm.addRequest({
+            val hit = service.hitTest(design.x, design.y)
+            val rect = hit?.let { Rectangle2D.Double(it.x, it.y, it.width, it.height) }
+            ApplicationManager.getApplication().invokeLater({ canvas.setHoverRect(rect) }, ModalityState.any())
+        }, HOVER_DEBOUNCE_MS)
+    }
+
+    // Click -> jump the text editor (the split's code half) to the clicked element's markup line/column.
+    private fun navigateAt(p: Point) {
+        val design = canvas.canvasToDesign(p) ?: return
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val hit = service.hitTest(design.x, design.y) ?: return@executeOnPooledThread
+            ApplicationManager.getApplication().invokeLater(
+                { OpenFileDescriptor(project, file, (hit.line - 1).coerceAtLeast(0), (hit.column - 1).coerceAtLeast(0)).navigate(true) },
+                ModalityState.any())
+        }
     }
 
     private fun buildToolbar(): JComponent = JPanel(FlowLayout(FlowLayout.LEFT, 4, 2)).apply {
@@ -382,6 +424,29 @@ class AumlPreviewFileEditor(
             repaint()
         }
 
+        // Hover frame rectangle in DESIGN space (image px / renderedScale); null = no highlight.
+        private var hoverRect: Rectangle2D? = null
+
+        fun setHoverRect(rect: Rectangle2D?) {
+            if (hoverRect == rect) return
+            hoverRect = rect
+            repaint()
+        }
+
+        /** Maps a canvas point to the frame's design space (the coordinates the host hit-tests in), or null when
+         * the point is outside the drawn frame (so hovering the checkerboard clears the highlight). */
+        fun canvasToDesign(p: Point): Point2D.Double? {
+            val ds = designSize() ?: return null
+            if (displayScale <= 0) return null
+            val size = displayedSize()
+            val ox = max(0, (width - size.width) / 2)
+            val oy = max(0, (height - size.height) / 2)
+            val dx = (p.x - ox) / displayScale
+            val dy = (p.y - oy) / displayScale
+            if (dx < 0 || dy < 0 || dx > ds.width || dy > ds.height) return null
+            return Point2D.Double(dx, dy)
+        }
+
         private fun displayedSize(): Dimension {
             val img = image ?: return Dimension(0, 0)
             val factor = displayScale / renderedScale
@@ -420,6 +485,16 @@ class AumlPreviewFileEditor(
             val y = max(0, (height - size.height) / 2)
             g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
             g2.drawImage(img, x, y, size.width, size.height, null)
+            // Designer hover frame: the element's design-space rect, scaled into the canvas with the same offset.
+            hoverRect?.let { r ->
+                g2.color = HOVER_COLOR
+                g2.stroke = BasicStroke(3f)
+                g2.drawRect(
+                    (x + r.x * displayScale).roundToInt(),
+                    (y + r.y * displayScale).roundToInt(),
+                    (r.width * displayScale).roundToInt().coerceAtLeast(1),
+                    (r.height * displayScale).roundToInt().coerceAtLeast(1))
+            }
         }
 
         private fun paintCheckerboard(g2: Graphics2D) {
@@ -448,6 +523,8 @@ class AumlPreviewFileEditor(
 
     companion object {
         private const val DEBOUNCE_MS = 250
+        private const val HOVER_DEBOUNCE_MS = 60
+        private val HOVER_COLOR = JBColor(0x3399FF, 0x3399FF)
         private const val ZOOM_STEP = 1.25
         private const val MIN_SCALE = 0.05
         private const val MAX_SCALE = 8.0
