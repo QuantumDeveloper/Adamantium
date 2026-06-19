@@ -17,6 +17,8 @@ public sealed class AumlWorkspace : IDisposable
     private readonly Dictionary<string, AumlTypeModel?> _byProject = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, FileSystemWatcher> _watchers = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Timer> _debounce = new(StringComparer.OrdinalIgnoreCase);
+    private readonly SyntaxTreeCache _syntaxCache = new();
+    private readonly MetadataReferenceCache _metadataCache = new();
 
     // A build writes/copies many dlls in a burst; collapse the burst into one refresh once it goes quiet.
     private static readonly TimeSpan DebounceDelay = TimeSpan.FromMilliseconds(800);
@@ -49,15 +51,22 @@ public sealed class AumlWorkspace : IDisposable
                 return null;
             }
 
-            Console.Error.WriteLine($"[auml] {Path.GetFileName(project)} -> types from {binDir}");
-            var model = BuildFromBin(binDir);
+            // In-repo dependency projects are compiled from source (CompilationReference), so edits to control
+            // types/properties anywhere in the engine show up on save without a build; the rest stay as dlls.
+            Console.Error.WriteLine($"[auml] {Path.GetFileName(project)} -> source graph (external refs from {binDir})");
+            var (compilation, repoRoot, xmlnsMappings) = SourceProjectGraph.Build(project, binDir, _syntaxCache, _metadataCache);
+            var model = AumlTypeModel.FromCompilation(compilation, xmlnsMappings);
             _byProject[project] = model;
             WatchBin(project, binDir);
+            WatchSources(project, repoRoot);
             return model;
         }
     }
 
-    /// <summary>Builds a type model from every managed dll in <paramref name="binDir"/> plus the runtime.</summary>
+    /// <summary>
+    /// Builds an assembly-only type model from every managed dll in <paramref name="binDir"/> plus the runtime
+    /// (used by the console --demo). The per-project path uses <see cref="SourceProjectGraph"/> for live source.
+    /// </summary>
     public static AumlTypeModel BuildFromBin(string binDir)
     {
         var byName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -92,6 +101,46 @@ public sealed class AumlWorkspace : IDisposable
         {
             Console.Error.WriteLine($"[auml] could not watch {binDir} ({ex.Message}); completion won't auto-refresh for {Path.GetFileName(project)}");
         }
+    }
+
+    // Watch the project's C# source so a save (no build needed) refreshes the type model — edits to
+    // properties/types/classes show up in completion. One watcher per project, kept for the session.
+    private void WatchSources(string project, string projectDir)
+    {
+        var key = project + "|src";
+        if (_watchers.ContainsKey(key)) return;
+        try
+        {
+            var watcher = new FileSystemWatcher(projectDir, "*.cs")
+            {
+                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.Size,
+                IncludeSubdirectories = true,
+            };
+            FileSystemEventHandler onChange = (_, e) =>
+            {
+                if (!IsInObjOrBin(e.FullPath, projectDir)) ScheduleInvalidate(project);
+            };
+            watcher.Changed += onChange;
+            watcher.Created += onChange;
+            watcher.Deleted += onChange;
+            watcher.Renamed += (_, e) =>
+            {
+                if (!IsInObjOrBin(e.FullPath, projectDir)) ScheduleInvalidate(project);
+            };
+            watcher.EnableRaisingEvents = true;
+            _watchers[key] = watcher;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[auml] could not watch {projectDir} (*.cs) ({ex.Message}); source edits won't auto-refresh completion for {Path.GetFileName(project)}");
+        }
+    }
+
+    private static bool IsInObjOrBin(string file, string projectDir)
+    {
+        var relative = file.Substring(projectDir.Length).TrimStart('/', '\\').Replace('\\', '/');
+        return relative.StartsWith("obj/", StringComparison.OrdinalIgnoreCase)
+            || relative.StartsWith("bin/", StringComparison.OrdinalIgnoreCase);
     }
 
     private void ScheduleInvalidate(string project)

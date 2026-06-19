@@ -20,7 +20,7 @@ public sealed class AumlTypeModel
 
     private AumlTypeModel(ITypeResolver resolver) => _resolver = resolver;
 
-    public static AumlTypeModel Build(IEnumerable<string> assemblyPaths)
+    public static AumlTypeModel Build(IEnumerable<string> assemblyPaths, IEnumerable<string> sourceFiles = null)
     {
         var references = new List<MetadataReference>();
         foreach (var path in assemblyPaths)
@@ -30,13 +30,43 @@ public sealed class AumlTypeModel
             catch { /* native or otherwise non-managed dll — skip */ }
         }
 
+        // The project's own C# source is compiled in as syntax trees so its types/properties resolve live
+        // from source (no build needed) — its compiled dll is excluded from the references by the caller so a
+        // type isn't defined twice. Type lookups go through Compilation.GetTypeByMetadataName, which is
+        // source-aware, so bindings/property-type completion reflect saved source edits immediately.
+        var syntaxTrees = new List<SyntaxTree>();
+        if (sourceFiles is not null)
+        {
+            foreach (var file in sourceFiles)
+            {
+                try { syntaxTrees.Add(CSharpSyntaxTree.ParseText(File.ReadAllText(file), path: file)); }
+                catch { /* unreadable/locked file — skip */ }
+            }
+        }
+
         var compilation = CSharpCompilation.Create(
             "AumlTooling",
-            references: references,
-            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            syntaxTrees,
+            references,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
+        return FromCompilation(compilation);
+    }
+
+    /// <summary>
+    /// Wraps a ready compilation (e.g. the source-graph root from <see cref="SourceProjectGraph"/>). The
+    /// optional <paramref name="xmlnsMappings"/> are xmlns -> assembly mappings read from sub-compilations
+    /// (where their constructor arguments are materialized) and injected, since they can't be read back through
+    /// a CompilationReference.
+    /// </summary>
+    public static AumlTypeModel FromCompilation(
+        Compilation compilation, IEnumerable<(string XmlNamespace, string ClrSpec)> xmlnsMappings = null)
+    {
         var resolver = new RoslynTypeResolver(compilation);
         resolver.ScanXmlnsAttributes();
+        if (xmlnsMappings is not null)
+            foreach (var (xmlNamespace, clrSpec) in xmlnsMappings)
+                resolver.AddXmlnsMapping(xmlNamespace, clrSpec);
         return new AumlTypeModel(resolver);
     }
 
