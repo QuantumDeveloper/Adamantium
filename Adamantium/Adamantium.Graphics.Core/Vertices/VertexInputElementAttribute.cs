@@ -1,5 +1,5 @@
 ﻿using System;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.Graphics.Core.Vertices
 {
@@ -30,7 +30,7 @@ namespace Adamantium.Graphics.Core.Vertices
       public Int32 SemanticIndex { get; private set; }
 
       /// <summary>	
-      /// <dd> <p>The data type of the element data. See <strong><see cref="AdamantiumVulkan.Core"/></strong>.</p> </dd>	
+      /// <dd> <p>The data type of the element data. See <strong><see cref="Adamantium.Vulkan.Core"/></strong>.</p> </dd>	
       /// </summary>	
       /// <msdn-id>ff476180</msdn-id>	
       /// <unmanaged>Vulkan Format</unmanaged>	
@@ -51,7 +51,7 @@ namespace Adamantium.Graphics.Core.Vertices
       /// <param name="semanticName">Name of the semantic.</param>
       /// <remarks>
       /// If the semantic name contains a postfix number, this number will be used as a semantic index. 
-      /// The <see cref="AdamantiumVulkan.Core"/> will be mapped from the field type.
+      /// The <see cref="Adamantium.Vulkan.Core"/> will be mapped from the field type.
       /// </remarks>
       public VertexInputElementAttribute(String semanticName)
       {

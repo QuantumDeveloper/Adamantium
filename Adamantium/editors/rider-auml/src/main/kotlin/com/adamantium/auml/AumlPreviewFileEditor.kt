@@ -71,10 +71,38 @@ class AumlPreviewFileEditor(
         selectedItem = percent(1.0)
         addActionListener { if (!updatingZoom) (selectedItem as? String)?.let(::applyZoomText) }
     }
-    private val errorLabel = JBLabel().apply {
+    // Fatal render/host errors (host missing, render failure) surface as a compact red badge floating over the
+    // canvas — drag to move, click for the full message in a popup (mirrors the diagnostics badge below). Never
+    // sits in the toolbar.
+    private var currentError: String? = null
+    private var errorBadgePos: Point? = null
+    private var errorBadgeDragOffset: Point? = null
+    private var errorBadgeDragged = false
+    private val errorBadge = JBLabel("⚠ designer error").apply {
         foreground = JBColor.RED
-        border = JBUI.Borders.emptyLeft(12)
+        isOpaque = true
+        background = JBColor.background()
+        border = BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(JBColor.RED, 1, true),
+            JBUI.Borders.empty(2, 6))
         isVisible = false
+        cursor = java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.MOVE_CURSOR)
+        toolTipText = "Designer error — drag to move, click for details"
+        val handler = object : java.awt.event.MouseAdapter() {
+            override fun mousePressed(e: java.awt.event.MouseEvent) { errorBadgeDragOffset = e.point; errorBadgeDragged = false }
+            override fun mouseDragged(e: java.awt.event.MouseEvent) {
+                val off = errorBadgeDragOffset ?: return
+                errorBadgeDragged = true
+                errorBadgePos = Point(x + e.x - off.x, y + e.y - off.y)
+                layoutOverlay()
+            }
+            override fun mouseReleased(e: java.awt.event.MouseEvent) {
+                if (!errorBadgeDragged) showErrorPopup()
+                errorBadgeDragOffset = null
+            }
+        }
+        addMouseListener(handler)
+        addMouseMotionListener(handler)
     }
     private val sizeLabel = JBLabel().apply { border = JBUI.Borders.emptyLeft(8) }
     // Non-fatal designer diagnostics (e.g. "Cannot convert '75,75' to Vector2", unresolved behavior): the preview
@@ -127,6 +155,7 @@ class AumlPreviewFileEditor(
     }.apply {
         add(scrollPane, JLayeredPane.DEFAULT_LAYER as Any?)
         add(diagBadge, JLayeredPane.PALETTE_LAYER as Any?)
+        add(errorBadge, JLayeredPane.PALETTE_LAYER as Any?)
     }
     private val root = JPanel(BorderLayout()).apply {
         add(canvasLayer, BorderLayout.CENTER)
@@ -161,7 +190,6 @@ class AumlPreviewFileEditor(
         add(JButton("⟳").apply { toolTipText = "Re-render now"; addActionListener { renderNow(announce = true) } })
         add(JButton("Bg").apply { toolTipText = "Background: checkerboard / dark / light"; addActionListener { canvas.cycleBackground() } })
         add(sizeLabel)
-        add(errorLabel)
     }
 
     /** Fit button: fit the whole frame to the window AND re-enable auto-fit so it keeps tracking the window. */
@@ -216,7 +244,7 @@ class AumlPreviewFileEditor(
      */
     private fun renderNow(announce: Boolean = false) {
         val doc = document ?: return
-        if (announce) { sizeLabel.text = "rendering…"; errorLabel.isVisible = false }
+        if (announce) { sizeLabel.text = "rendering…"; hideError() }
         val text = doc.text
         val renderScale = scale
         ApplicationManager.getApplication().executeOnPooledThread {
@@ -234,13 +262,12 @@ class AumlPreviewFileEditor(
             val frameScale = result.scale ?: requestedScale
             canvas.setImage(image, frameScale)
             sizeLabel.text = "${(image.width / frameScale).roundToInt()} × ${(image.height / frameScale).roundToInt()} px"
-            errorLabel.isVisible = false
+            hideError()
             // Auto-fit: snap to fit on the first frame and while tracking. applyFit no-ops once we're already
             // at the fit scale, so this can't loop re-rendering.
             if (autoFit) applyFit()
         } else {
-            errorLabel.text = result.error ?: "render failed"
-            errorLabel.isVisible = true
+            showError(result.error ?: "render failed")
         }
     }
 
@@ -253,16 +280,54 @@ class AumlPreviewFileEditor(
         layoutOverlay()
     }
 
+    // Fatal errors float as a draggable red badge (click for the full message) instead of sitting in the toolbar.
+    private fun showError(message: String) {
+        currentError = message
+        errorBadge.isVisible = true
+        layoutOverlay()
+    }
+
+    private fun hideError() {
+        if (errorBadge.isVisible) { errorBadge.isVisible = false; layoutOverlay() }
+    }
+
+    private fun showErrorPopup() {
+        val msg = currentError ?: return
+        val area = javax.swing.JTextArea(msg).apply {
+            isEditable = false
+            lineWrap = true
+            wrapStyleWord = true
+            border = JBUI.Borders.empty(8)
+        }
+        val scroll = JBScrollPane(area).apply { preferredSize = Dimension(560, 160) }
+        JBPopupFactory.getInstance()
+            .createComponentPopupBuilder(scroll, area)
+            .setTitle("Designer error")
+            .setResizable(true)
+            .setMovable(true)
+            .setRequestFocus(true)
+            .createPopup()
+            .showUnderneathOf(errorBadge)
+    }
+
     // Keeps the scroll pane filling canvasLayer and the floating badge sized/positioned (default top-right, or the
     // user's dragged position, always clamped inside the visible area).
     private fun layoutOverlay() {
         scrollPane.setBounds(0, 0, canvasLayer.width, canvasLayer.height)
-        if (!diagBadge.isVisible) return
-        val d = diagBadge.preferredSize
-        val p = badgePos ?: Point(canvasLayer.width - d.width - 10, 8)
-        val cx = p.x.coerceIn(0, max(0, canvasLayer.width - d.width))
-        val cy = p.y.coerceIn(0, max(0, canvasLayer.height - d.height))
-        diagBadge.setBounds(cx, cy, d.width, d.height)
+        if (errorBadge.isVisible) {
+            val d = errorBadge.preferredSize
+            val p = errorBadgePos ?: Point(10, 8)
+            val cx = p.x.coerceIn(0, max(0, canvasLayer.width - d.width))
+            val cy = p.y.coerceIn(0, max(0, canvasLayer.height - d.height))
+            errorBadge.setBounds(cx, cy, d.width, d.height)
+        }
+        if (diagBadge.isVisible) {
+            val d = diagBadge.preferredSize
+            val p = badgePos ?: Point(canvasLayer.width - d.width - 10, 8)
+            val cx = p.x.coerceIn(0, max(0, canvasLayer.width - d.width))
+            val cy = p.y.coerceIn(0, max(0, canvasLayer.height - d.height))
+            diagBadge.setBounds(cx, cy, d.width, d.height)
+        }
     }
 
     private fun showDiagnosticsPopup() {

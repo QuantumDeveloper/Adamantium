@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Mathematics;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.Imaging.Gif
 {

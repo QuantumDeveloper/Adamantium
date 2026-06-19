@@ -5,7 +5,6 @@
 		<Platforms>x64</Platforms>
 		<Configurations>Debug;Release</Configurations>
 		<LangVersion>latest</LangVersion>
-		<BaseOutputPath>..\..\output\Adamantium.EntityFramework\bin</BaseOutputPath>
 	</PropertyGroup>
 
 	<ItemGroup>

@@ -46,7 +46,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using Adamantium.Core;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.Imaging.Dds
 {

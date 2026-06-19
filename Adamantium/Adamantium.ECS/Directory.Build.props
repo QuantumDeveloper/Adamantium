@@ -1,5 +1,0 @@
-﻿<Project>
-	<PropertyGroup>
-		<BaseIntermediateOutputPath>..\..\output\Adamantium.ECS\obj\</BaseIntermediateOutputPath>
-	</PropertyGroup>
-</Project>

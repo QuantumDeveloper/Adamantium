@@ -1,4 +1,4 @@
-namespace Adamantium.Game.Playground;
+namespace Adamantium.Game.Sandbox;
 
 public class AdamantiumGameApplication : GameApplication
 {

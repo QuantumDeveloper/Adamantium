@@ -1,6 +1,6 @@
 using System;
-using AdamantiumVulkan.Core;
-using AdamantiumVulkan.Core.Interop;
+using Adamantium.Vulkan.Core;
+using Adamantium.Vulkan.Core.Interop;
 using QuantumBinding.Utils;
 
 namespace Adamantium.Graphics.Core;

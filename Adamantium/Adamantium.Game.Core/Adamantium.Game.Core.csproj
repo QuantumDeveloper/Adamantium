@@ -5,7 +5,6 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>disable</Nullable>
         <Platforms>x64</Platforms>
-		<BaseOutputPath>..\..\output\Adamantium.Game.Core\bin</BaseOutputPath>
 		<LangVersion>latest</LangVersion>
     </PropertyGroup>
 

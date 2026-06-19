@@ -4,7 +4,7 @@ using Adamantium.Game;
 using Adamantium.UI.Controls;
 using Serilog;
 
-namespace Adamantium.UI.Playground
+namespace Adamantium.UI.Sandbox
 {
     public class App : UIApplication
     {

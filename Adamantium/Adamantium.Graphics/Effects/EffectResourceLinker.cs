@@ -3,8 +3,8 @@ using Adamantium.Core;
 using Adamantium.EffectsCompiler;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.EffectsFramework;
-using AdamantiumVulkan.Core;
-using VulkanBuffer = AdamantiumVulkan.Core.Buffer;
+using Adamantium.Vulkan.Core;
+using VulkanBuffer = Adamantium.Vulkan.Core.Buffer;
 
 namespace Adamantium.Graphics.Effects;
 

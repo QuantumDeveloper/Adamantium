@@ -6,7 +6,6 @@
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<Configurations>Debug;Release</Configurations>
 		<LangVersion>latestmajor</LangVersion>
-		<BaseOutputPath>..\..\output\Adamantium.EntityFramework.Components\bin</BaseOutputPath>
 	</PropertyGroup>
 
 	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x64' ">

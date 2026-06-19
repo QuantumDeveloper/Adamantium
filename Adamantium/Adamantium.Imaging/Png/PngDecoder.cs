@@ -59,9 +59,9 @@ namespace Adamantium.Imaging.Png
             descr.Dimension = TextureDimension.Texture2D;
             descr.Format = bitsPerPixel switch
             {
-                8 => AdamantiumVulkan.Core.Format.R8_UNORM,
-                24 => AdamantiumVulkan.Core.Format.R8G8B8_UNORM,
-                32 => AdamantiumVulkan.Core.Format.R8G8B8A8_UNORM,
+                8 => Adamantium.Vulkan.Core.Format.R8_UNORM,
+                24 => Adamantium.Vulkan.Core.Format.R8G8B8_UNORM,
+                32 => Adamantium.Vulkan.Core.Format.R8G8B8A8_UNORM,
                 _ => descr.Format
             };
 

@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Extensions;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.Graphics;
 

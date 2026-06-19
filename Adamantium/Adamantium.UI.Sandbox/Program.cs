@@ -4,7 +4,7 @@ using System.IO;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Threading;
 
-namespace Adamantium.UI.Playground
+namespace Adamantium.UI.Sandbox
 {
     class Program
     {

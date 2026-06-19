@@ -10,7 +10,7 @@ using Adamantium.Mathematics;
 using Adamantium.UI.Core.Graphics;
 using Adamantium.UI.Core.Media;
 using Adamantium.UI.Effects.Generated;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 using Buffer = Adamantium.Graphics.Buffer;
 
 namespace Adamantium.UI.Rendering.RenderUnits;

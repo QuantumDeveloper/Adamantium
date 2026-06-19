@@ -23,7 +23,7 @@ using System.IO;
 using Adamantium.Core;
 using Adamantium.Imaging.Jpeg;
 using Adamantium.Mathematics;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.Imaging
 {

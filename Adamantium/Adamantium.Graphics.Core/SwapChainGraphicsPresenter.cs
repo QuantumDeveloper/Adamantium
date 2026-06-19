@@ -1,7 +1,7 @@
 ﻿using System;
 using Adamantium.Graphics.Core.Extensions;
 using Adamantium.Graphics.Core.Presentation;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 using Serilog;
 
 namespace Adamantium.Graphics.Core

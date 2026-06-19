@@ -2,7 +2,7 @@
 using Adamantium.Core;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Effects;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.Graphics;
 

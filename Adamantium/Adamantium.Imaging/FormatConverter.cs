@@ -1,4 +1,4 @@
-﻿using AdamantiumVulkan.Core;
+﻿using Adamantium.Vulkan.Core;
 using System;
 using Adamantium.Imaging.Dds;
 

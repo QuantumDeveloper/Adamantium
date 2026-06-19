@@ -5,7 +5,6 @@
     <Platforms>x64</Platforms>
     <Configurations>Debug;Release</Configurations>
     <LangVersion>latestmajor</LangVersion>
-	  <BaseOutputPath>..\..\output\Adamantium.Engine\bin</BaseOutputPath>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Adamantium.Engine.Compiler\Adamantium.Engine.Compiler.csproj" />

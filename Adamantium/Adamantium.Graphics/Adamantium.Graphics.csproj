@@ -6,12 +6,11 @@
 		<LangVersion>latestmajor</LangVersion>
 		<Configurations>Debug;Release</Configurations>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-		<BaseOutputPath>..\..\output\Adamantium.Engine.Graphics\bin</BaseOutputPath>
 		<OutputType>Library</OutputType>
 	</PropertyGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.Core\AdamantiumVulkan.Core.csproj" />
+		<ProjectReference Include="..\..\..\AdamantiumVulkan\Adamantium.Vulkan\Adamantium.Vulkan.csproj" />
 		<ProjectReference Include="..\..\..\QuantumBinding\QuantumBinding.Utils\QuantumBinding.Utils.csproj" />
 		<ProjectReference Include="..\Adamantium.Engine.Compiler\Adamantium.Engine.Compiler.csproj" />
 		<ProjectReference Include="..\Adamantium.FX\Adamantium.FX.csproj" />

@@ -9,7 +9,6 @@
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <Nullable>disable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
-        <BaseOutputPath>..\..\output\Adamantium.UI.Designer.Host\bin</BaseOutputPath>
     </PropertyGroup>
 
     <ItemGroup>

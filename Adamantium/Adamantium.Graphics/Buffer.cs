@@ -4,8 +4,8 @@ using System.Runtime.InteropServices;
 using Adamantium.Core;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Extensions;
-using AdamantiumVulkan.Core;
-using VulkanBuffer = AdamantiumVulkan.Core.Buffer;
+using Adamantium.Vulkan.Core;
+using VulkanBuffer = Adamantium.Vulkan.Core.Buffer;
 
 namespace Adamantium.Graphics
 {

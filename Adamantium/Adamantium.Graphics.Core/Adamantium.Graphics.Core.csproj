@@ -5,8 +5,6 @@
 		<Platforms>x64</Platforms>
 		<Configurations>Debug;Release</Configurations>
 		<LangVersion>latest</LangVersion>
-		<BaseOutputPath>..\..\output\Adamantium.Engine.Core\bin</BaseOutputPath>
-		<BaseIntermediateOutputPath>..\..\output\Adamantium.Engine.Core\obj\</BaseIntermediateOutputPath>
 	</PropertyGroup>
 
 	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x64' ">
@@ -25,7 +23,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\..\..\AdamantiumVulkan\AdamantiumVulkan.Core\AdamantiumVulkan.Core.csproj" />
+		<ProjectReference Include="..\..\..\AdamantiumVulkan\Adamantium.Vulkan\Adamantium.Vulkan.csproj" />
 		<ProjectReference Include="..\Adamantium.EffectsCompiler\Adamantium.EffectsCompiler.csproj" />
 		<ProjectReference Include="..\Adamantium.Imaging\Adamantium.Imaging.csproj" />
 		<ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />

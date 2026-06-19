@@ -5,9 +5,9 @@ using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Extensions;
 using Adamantium.Imaging;
 using Adamantium.Win32;
-using AdamantiumVulkan.Core;
-using AdamantiumVulkan.Windows;
-using VulkanImage = AdamantiumVulkan.Core.Image;
+using Adamantium.Vulkan.Core;
+using Adamantium.Vulkan.Windows;
+using VulkanImage = Adamantium.Vulkan.Core.Image;
 
 namespace Adamantium.Graphics;
 

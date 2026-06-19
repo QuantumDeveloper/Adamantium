@@ -8,7 +8,7 @@ using Adamantium.Graphics.Core.Extensions;
 using Adamantium.Imaging;
 using Adamantium.Imaging.PaletteQuantizer.Extensions;
 using Adamantium.Mathematics;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.Graphics.Fonts
 {

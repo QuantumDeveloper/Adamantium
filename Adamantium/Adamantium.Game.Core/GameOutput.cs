@@ -10,7 +10,7 @@ using Adamantium.Mathematics;
 using Adamantium.UI;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Core;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 using Rectangle = Adamantium.Mathematics.Rectangle;
 
 namespace Adamantium.Game.Core

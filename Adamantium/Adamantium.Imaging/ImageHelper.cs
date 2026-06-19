@@ -1,6 +1,6 @@
 ﻿using System;
 using Adamantium.Core;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.Imaging
 {

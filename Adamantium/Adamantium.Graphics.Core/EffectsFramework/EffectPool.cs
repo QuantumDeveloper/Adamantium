@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Adamantium.Core;
 using Adamantium.Core.Collections;
 using Adamantium.EffectsCompiler;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 using Serilog;
 
 namespace Adamantium.Graphics.Core.EffectsFramework;

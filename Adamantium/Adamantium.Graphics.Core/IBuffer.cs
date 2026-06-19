@@ -1,8 +1,8 @@
 ﻿using System;
 using System.ComponentModel;
 using Adamantium.Core;
-using AdamantiumVulkan.Core;
-using Buffer = AdamantiumVulkan.Core.Buffer;
+using Adamantium.Vulkan.Core;
+using Buffer = Adamantium.Vulkan.Core.Buffer;
 
 namespace Adamantium.Graphics.Core;
 

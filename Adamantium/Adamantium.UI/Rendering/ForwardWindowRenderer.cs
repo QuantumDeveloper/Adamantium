@@ -4,7 +4,7 @@ using Adamantium.Graphics.Core;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
 using Adamantium.UI.Core.RoutedEvents;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.UI.Rendering;
 

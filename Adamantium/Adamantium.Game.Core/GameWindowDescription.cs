@@ -3,7 +3,7 @@ using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Presentation;
 using Adamantium.Imaging;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.Game.Core
 {

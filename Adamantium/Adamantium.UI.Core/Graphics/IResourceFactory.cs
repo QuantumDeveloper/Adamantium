@@ -1,7 +1,7 @@
 ﻿using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Fonts;
 using Adamantium.Imaging;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.UI.Core.Graphics;
 

@@ -1,6 +1,6 @@
 ﻿using System;
 using Adamantium.Imaging;
-using AdamantiumVulkan.Core;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.Graphics.Core.Presentation
 {
