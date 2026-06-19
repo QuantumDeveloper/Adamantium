@@ -42,7 +42,7 @@
                             <EllipseGeometry RadiusX="40" RadiusY="40" Center="125,75" />
                         </CombinedGeometry.Geometry2>
                     </CombinedGeometry>
-                    <CombinedGeometry GeometryCombineMode="Xor">
+                    <CombinedGeometry GeometryCombineMode="Intersect">
                         <CombinedGeometry.Geometry1>
                             <EllipseGeometry RadiusX="40" RadiusY="40" Center="175,75"/>
                         </CombinedGeometry.Geometry1>
