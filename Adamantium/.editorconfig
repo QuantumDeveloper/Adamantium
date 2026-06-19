@@ -1,0 +1,22 @@
+# MessagePack v3 pulls a strict analyzer (MessagePackAnalyzer, transitive) that turns full
+# [Key]/[IgnoreMember] coverage, [Union], partial types and a public ctor into BUILD ERRORS.
+# This engine serializes via the runtime reflection resolver (StandardResolverAllowPrivate), not the
+# source generator, so these compile-time gates don't apply. Silence them engine-wide (behaviour
+# matches MessagePack v2). Remove these if/when the types are migrated to v3's source-gen contract.
+[*.cs]
+dotnet_diagnostic.MsgPack001.severity = none
+dotnet_diagnostic.MsgPack002.severity = none
+dotnet_diagnostic.MsgPack003.severity = none
+dotnet_diagnostic.MsgPack004.severity = none
+dotnet_diagnostic.MsgPack005.severity = none
+dotnet_diagnostic.MsgPack006.severity = none
+dotnet_diagnostic.MsgPack007.severity = none
+dotnet_diagnostic.MsgPack008.severity = none
+dotnet_diagnostic.MsgPack009.severity = none
+dotnet_diagnostic.MsgPack010.severity = none
+dotnet_diagnostic.MsgPack011.severity = none
+dotnet_diagnostic.MsgPack012.severity = none
+dotnet_diagnostic.MsgPack013.severity = none
+dotnet_diagnostic.MsgPack014.severity = none
+dotnet_diagnostic.MsgPack015.severity = none
+dotnet_diagnostic.MsgPack016.severity = none

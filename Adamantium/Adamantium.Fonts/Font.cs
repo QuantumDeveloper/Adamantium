@@ -4,28 +4,18 @@ using Adamantium.Fonts.Common;
 using Adamantium.Fonts.Parsers;
 using Adamantium.Fonts.Tables;
 using Adamantium.Fonts.Tables.CFF;
-using MessagePack;
 
 namespace Adamantium.Fonts
 {
-    [MessagePackObject]
     public class Font : IFont
     {
-        [Key(5)]
         private List<Glyph> glyphs;
-        [Key(1)]
         private List<UInt32> unicodes;
-        [Key(2)]
         private Dictionary<string, Glyph> nameToGlyph;
-        [Key(3)]
         private Dictionary<UInt32, Glyph> unicodeToGlyph;
-        [Key(4)]
         private Dictionary<string, List<Feature>> featuresMap;
-        [IgnoreMember]
         internal Typeface Typeface { get; }
-        [Key(6)]
         internal VariationStore VariationData { get; set; }
-        [Key(7)]
         internal List<InstanceRecord> InstanceData { get; set; }
 
         public Font(Typeface typeface)
@@ -65,59 +55,34 @@ namespace Adamantium.Fonts
             FeatureService = new FeatureService();
         }
 
-        [Key(8)]
         public bool IsGlyphNamesProvided { get; internal set; }
 
         // Name info section ---
-        [Key(9)]
         public string Copyright { get; internal set; }
-        [Key(10)]
         public string FontFamily { get; internal set; }
-        [Key(11)]
         public string FontSubfamily { get; internal set; }
-        [Key(12)]
         public string UniqueId { get; internal set; }
-        [Key(13)]
         public string FullName { get; internal set; }
-        [Key(14)]
         public string Version { get; internal set; }
-        [Key(15)]
         public string Trademark { get; internal set; }
-        [Key(16)]
         public string Manufacturer { get; internal set; }
-        [Key(17)]
         public string Designer { get; internal set; }
-        [Key(18)]
         public string Description { get; internal set; }
-        [Key(19)]
         public string VendorUrl { get; internal set; }
-        [Key(20)]
         public string DesignerUrl { get; internal set; }
-        [Key(21)]
         public string LicenseDescription { get; internal set; }
-        [Key(22)]
         public string LicenseInfoUrl { get; internal set; }
-        [Key(23)]
         public string TypographicFamilyName { get; internal set; }
-        [Key(24)]
         public string TypographicSubfamilyName { get; internal set; }
-        [Key(25)]
         public string WwsFamilyName { get; internal set; }
-        [Key(26)]
         public string WwsSubfamilyName { get; internal set; }
-        [Key(27)]
         public string LightBackgroundPalette { get; internal set; }
-        [Key(28)]
         public string DarkBackgroundPalette { get; internal set; }
 
         // ------
-        [IgnoreMember]
         public FeatureService FeatureService { get; }
-        [IgnoreMember]
         public uint GlyphCount => (uint)glyphs.Count;
-        [Key(29)]
         public ushort UnitsPerEm { get; internal set; }
-        [Key(30)]
         public Int16 Ascender { get; internal set; }
         public Int16 Descender { get; internal set; }
         public Int16 CapsHeight { get; internal set; }
@@ -129,28 +94,20 @@ namespace Adamantium.Fonts
         /// <summary>
         /// smallest readable size in pixels
         /// </summary>
-        [Key(31)]
         public UInt16 LowestRecPPEM { get; internal set; }
 
         /// <summary>
         /// space between lines
         /// </summary>
-        [Key(32)]
         public Double LineSpacingMultiplier { get; internal set; }
 
-        [Key(33)]
         public DateTime Created { get; internal set; }
 
-        [Key(34)]
         public DateTime Modified { get; internal set; }
 
-        [IgnoreMember]
         public IReadOnlyCollection<Glyph> Glyphs => glyphs.AsReadOnly();
-        [IgnoreMember]
         public IReadOnlyCollection<uint> Unicodes => unicodes.AsReadOnly();
-        [IgnoreMember]
         public GlyphLayoutData NotDefLayoutData { get; }
-        [Key(35)]
         internal KerningSubtable[] KerningData { get; set; }
 
         internal void SetGlyphs(IEnumerable<Glyph> inputGlyphs)

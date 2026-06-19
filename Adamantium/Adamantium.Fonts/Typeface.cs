@@ -5,25 +5,17 @@ using System.Linq;
 using System.Threading.Tasks;
 using Adamantium.Fonts.Common;
 using Adamantium.Fonts.Parsers;
-using MessagePack;
 
 namespace Adamantium.Fonts
 {
-    [MessagePackObject]
     public class Typeface
     {
-        [Key(0)]
         private readonly List<IFont> fonts;
-        [Key(1)]
         private List<Glyph> glyphs;
-        [Key(2)]
         private List<UInt32> unicodes;
-        [Key(3)]
         private readonly List<string> errorMessages;
-        [IgnoreMember]
         internal IFontParser Parser { get; set; }
 
-        [IgnoreMember]
         public IFont CurrentFont { get; private set; }
 
         public Typeface()
@@ -35,14 +27,10 @@ namespace Adamantium.Fonts
             errorMessages = new List<string>();
         }
 
-        [IgnoreMember]
         public IReadOnlyList<IFont> Fonts => fonts.AsReadOnly();
 
-        [IgnoreMember]
         public uint GlyphCount => (uint)glyphs.Count;
-        [IgnoreMember]
         public IReadOnlyCollection<Glyph> Glyphs => glyphs.AsReadOnly();
-        [IgnoreMember]
         public IReadOnlyCollection<string> ErrorMessages => errorMessages.AsReadOnly();
 
         internal void AddFont(IFont font)

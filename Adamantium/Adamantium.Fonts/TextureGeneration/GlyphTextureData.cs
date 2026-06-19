@@ -1,12 +1,9 @@
 ﻿using Adamantium.Mathematics;
-using MessagePack;
 
 namespace Adamantium.Fonts.TextureGeneration
 {
-    [MessagePackObject]
     public class GlyphTextureData
     {
-        [SerializationConstructor]
         public GlyphTextureData()
         {
 
@@ -29,7 +26,6 @@ namespace Adamantium.Fonts.TextureGeneration
         
         public char Character { get; set; }
 
-        [Key(0)]
         public Rectangle BoundingRect;
 
         public RectangleF UVRect;
@@ -39,10 +35,8 @@ namespace Adamantium.Fonts.TextureGeneration
         // using UVRect (body only).
         public RectangleF UVRectFull;
 
-        [Key(1)]
         public uint GlyphIndex { get; }
 
-        [IgnoreMember]
         public byte[] Pixels { get; set; }
 
         public bool IsEmpty => Pixels == null || Pixels.Length == 0;

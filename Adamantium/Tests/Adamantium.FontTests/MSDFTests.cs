@@ -1,8 +1,5 @@
 ﻿using Adamantium.Fonts;
 using Adamantium.Fonts.TextureGeneration;
-using MessagePack;
-using MessagePack.Formatters;
-using MessagePack.Resolvers;
 using NUnit.Framework;
 using System.Diagnostics;
 using System.IO;
@@ -104,34 +101,6 @@ namespace Adamantium.FontTests
             SaveAtlasPng(atlasData, outline, "msdf2_outline.png");
         }
 
-        [Test]
-        public void TypeFaceSerializationTest()
-        {
-            var resolver = CompositeResolver.Create(
-                new IMessagePackFormatter[] { TypelessFormatter.Instance },
-                new IFormatterResolver[] { StandardResolverAllowPrivate.Instance });
-
-            var options = MessagePackSerializerOptions.Standard
-                .WithCompression(MessagePackCompression.Lz4BlockArray)
-                .WithResolver(resolver);
-            var stream = new MemoryStream();
-
-            var timer = Stopwatch.StartNew();
-            var typeface = Typeface.LoadFont(@"OTFFonts/SourceSans3-Regular.otf", 3);
-            
-            var result = MessagePackSerializer.Serialize<Typeface>(typeface, StandardResolverAllowPrivate.Options);
-            timer.Stop();
-            typeface.GetGlyphByIndex(150, out var glyph);
-            //var result = MessagePackSerializer.Serialize<Glyph>(glyph, options);
-
-            //MessagePackSerializer.Serialize(stream, typeface);
-            //stream.Position = 0;
-            //var typeface2 = MessagePackSerializer.Deserialize<TypeFace>(stream);
-            var timer2 = Stopwatch.StartNew();
-            var glyph2 = MessagePackSerializer.Deserialize<Glyph>(result, options);
-            timer2.Stop();
-            Debug.WriteLine("");
-        }
 
         // Builds the dynamic atlas for a sample string and copies the RGBA MSDF field into
         // atlasData.ImageData. Shared setup for the atlas-preview tests above.

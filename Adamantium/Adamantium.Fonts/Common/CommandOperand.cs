@@ -1,14 +1,10 @@
-﻿using MessagePack;
 using System;
 
 namespace Adamantium.Fonts.Common
 {
-    [MessagePackObject]
     internal class CommandOperand
     {
-        [Key(0)]
         public double Value { get; set; }
-        [Key(1)]
         public RegionData BlendData { get; set; }
 
         public CommandOperand(double value)
