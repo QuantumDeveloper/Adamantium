@@ -235,7 +235,13 @@
 		<AdditionalFiles Include="$(ProjectDir)**\*.fx" />
 		<AdditionalFiles Include="$(ProjectDir)**\*.hlsl" />
 		<AdditionalFiles Remove="$(ProjectDir)ControlTemplate.auml" />
+		<!-- Content resources fed to AssetsGenerator (it filters by extension and skips cooked .aemf). -->
+		<AdditionalFiles Include="$(ProjectDir)Models\**\*.*" />
+		<AdditionalFiles Include="$(ProjectDir)Textures\**\*.*" />
+		<AdditionalFiles Include="$(ProjectDir)Fonts\**\*.*" />
 		<CompilerVisibleProperty Include="RootNamespace" />
+		<CompilerVisibleProperty Include="ProjectDir" />
+		<CompilerVisibleProperty Include="MSBuildProjectName" />
 	</ItemGroup>
 
 	<ItemGroup>
