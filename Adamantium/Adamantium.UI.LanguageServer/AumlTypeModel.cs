@@ -18,7 +18,14 @@ public sealed class AumlTypeModel
     private readonly ITypeResolver _resolver;
     private readonly Dictionary<string, IReadOnlyList<IResolvedType>> _clrNamespaceCache = new(StringComparer.Ordinal);
 
-    private AumlTypeModel(ITypeResolver resolver) => _resolver = resolver;
+    private AumlTypeModel(ITypeResolver resolver, Compilation compilation)
+    {
+        _resolver = resolver;
+        Compilation = compilation;
+    }
+
+    /// <summary>The backing compilation — go-to-definition uses it to map a metadata symbol back to its source dll.</summary>
+    public Compilation Compilation { get; }
 
     public static AumlTypeModel Build(IEnumerable<string> assemblyPaths, IEnumerable<string> sourceFiles = null)
     {
@@ -67,7 +74,7 @@ public sealed class AumlTypeModel
         if (xmlnsMappings is not null)
             foreach (var (xmlNamespace, clrSpec) in xmlnsMappings)
                 resolver.AddXmlnsMapping(xmlNamespace, clrSpec);
-        return new AumlTypeModel(resolver);
+        return new AumlTypeModel(resolver, compilation);
     }
 
     /// <summary>
