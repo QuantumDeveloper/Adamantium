@@ -124,7 +124,7 @@ class AumlPreviewService : Disposable {
         val override = System.getenv(HOST_ENV)?.takeIf { it.isNotBlank() }
             ?: error(
                 "Set the $HOST_ENV environment variable to the built designer host, e.g. " +
-                    "…/artifacts/bin/Debug/net10.0/Adamantium.UI.Designer.Host.exe"
+                    "…/artifacts/designer-host/Debug/net10.0/Adamantium.UI.Designer.Host.exe"
             )
         val path = Path.of(override)
         if (!path.exists()) error("$HOST_ENV points to a missing file: $override")
