@@ -90,7 +90,7 @@ tasks.processResources {
 // setup. AumlPreviewService also honours the ADAMANTIUM_DESIGNER_HOST env var if you set it yourself
 // (needed when installing the built plugin into a real Rider rather than the runIde sandbox).
 val designerHostExe = listOf("Debug", "Release")
-    .map { file("../../artifacts/bin/$it/net10.0/Adamantium.UI.Designer.Host.exe") }
+    .map { file("../../artifacts/designer-host/$it/net10.0/Adamantium.UI.Designer.Host.exe") }
     .firstOrNull { it.exists() }
 
 tasks.named<JavaExec>("runIde") {
