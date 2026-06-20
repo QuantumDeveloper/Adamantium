@@ -1,6 +1,7 @@
 ﻿using System;
 using Adamantium.ProceduralGeometry;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Commands;
 using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.RoutedEvents;
@@ -95,12 +96,14 @@ public class Button : ContentControl
         set => SetValue(CommandParameterProperty, value);
     }
 
-    // Track the command's CanExecuteChanged so the button auto-enables/disables. (Direct subscription for now;
-    // a weak-event scheme is a later refinement, like the binding engine's.)
+    // Track the command's CanExecuteChanged so the button auto-enables/disables. The subscription is weak (the relay
+    // holds the button weakly), so a command owned by a long-lived view-model doesn't keep a removed button alive.
+    private WeakCanExecuteChangedRelay<Button> _commandRelay;
+
     private static void OnCommandChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
         if (a is Button button)
-            button.OnCommandChanged(e.OldValue as ICommand, e.NewValue as ICommand);
+            button.OnCommandChanged(e.NewValue as ICommand);
     }
 
     private static void OnCommandParameterChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
@@ -108,14 +111,14 @@ public class Button : ContentControl
         if (a is Button button) button.UpdateCanExecute();
     }
 
-    private void OnCommandChanged(ICommand oldCommand, ICommand newCommand)
+    private void OnCommandChanged(ICommand newCommand)
     {
-        if (oldCommand != null) oldCommand.CanExecuteChanged -= OnCommandCanExecuteChanged;
-        if (newCommand != null) newCommand.CanExecuteChanged += OnCommandCanExecuteChanged;
+        _commandRelay?.Detach();
+        _commandRelay = newCommand != null
+            ? new WeakCanExecuteChangedRelay<Button>(newCommand, this, static b => b.UpdateCanExecute())
+            : null;
         UpdateCanExecute();
     }
-
-    private void OnCommandCanExecuteChanged(object sender, EventArgs e) => UpdateCanExecute();
 
     private void UpdateCanExecute()
     {
