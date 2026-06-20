@@ -96,4 +96,99 @@ public class MultiBindingTests
 
         Assert.That(expression.ProducedValue, Is.EqualTo("3+7"));
     }
+
+    // --- boolean-logic nesting: a nested MultiBinding acts as a condition that can flip the outer result -----------
+
+    private sealed class Gate : INotifyPropertyChanged
+    {
+        private bool _isEnabled, _isVisible, _isAdmin, _maintenance;
+        public bool IsEnabled { get => _isEnabled; set => Set(ref _isEnabled, value, nameof(IsEnabled)); }
+        public bool IsVisible { get => _isVisible; set => Set(ref _isVisible, value, nameof(IsVisible)); }
+        public bool IsAdmin { get => _isAdmin; set => Set(ref _isAdmin, value, nameof(IsAdmin)); }
+        public bool Maintenance { get => _maintenance; set => Set(ref _maintenance, value, nameof(Maintenance)); }
+
+        private void Set(ref bool field, bool value, string name)
+        {
+            if (field == value) return;
+            field = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        }
+        public event PropertyChangedEventHandler PropertyChanged;
+    }
+
+    private sealed class AllTrueConverter : IMultiValueConverter
+    {
+        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+            => values.All(v => v is true);
+        public object[] ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            => throw new NotSupportedException();
+    }
+
+    // base = AND of every value except the last; the last value is an "invert" flag (from a nested condition) that
+    // flips the result 180 degrees when true.
+    private sealed class AndWithOverrideConverter : IMultiValueConverter
+    {
+        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+        {
+            var invert = values.Length > 0 && values[^1] is true;
+            var result = values.Take(values.Length - 1).All(v => v is true);
+            return invert ? !result : result;
+        }
+        public object[] ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            => throw new NotSupportedException();
+    }
+
+    [Test]
+    public void NestedMultiBinding_OverrideConditionFlipsResult()
+    {
+        var gate = new Gate { IsEnabled = true, IsVisible = true, IsAdmin = false, Maintenance = false };
+
+        // Nested condition: "invert when an admin is in maintenance mode" — a check over several properties.
+        var invert = new MultiBinding { Converter = new AllTrueConverter() };
+        invert.Bindings.Add(new Binding("IsAdmin") { Source = gate });
+        invert.Bindings.Add(new Binding("Maintenance") { Source = gate });
+
+        var outer = new MultiBinding { Converter = new AndWithOverrideConverter() };
+        outer.Bindings.Add(new Binding("IsEnabled") { Source = gate });
+        outer.Bindings.Add(new Binding("IsVisible") { Source = gate });
+        outer.Bindings.Add(invert);   // the nested MultiBinding is one of the outer's children
+
+        var expression = Producer(outer, out var current);
+
+        Assert.That(expression.ProducedValue, Is.EqualTo(true));   // base true, condition not met
+
+        gate.IsAdmin = true;                                       // condition still incomplete (Maintenance false)
+        Assert.That(current(), Is.EqualTo(true));
+
+        gate.Maintenance = true;                                   // condition now met -> flip 180
+        Assert.That(current(), Is.EqualTo(false));
+
+        gate.Maintenance = false;                                  // flip off -> back to base
+        Assert.That(current(), Is.EqualTo(true));
+
+        gate.IsVisible = false;                                    // base now false, condition off
+        Assert.That(current(), Is.EqualTo(false));
+    }
+
+    [Test]
+    public void NestedMultiBinding_FlipAppliesEvenWhenBaseIsFalse()
+    {
+        var gate = new Gate { IsEnabled = false, IsVisible = true, IsAdmin = true, Maintenance = true };
+
+        var invert = new MultiBinding { Converter = new AllTrueConverter() };
+        invert.Bindings.Add(new Binding("IsAdmin") { Source = gate });
+        invert.Bindings.Add(new Binding("Maintenance") { Source = gate });
+
+        var outer = new MultiBinding { Converter = new AndWithOverrideConverter() };
+        outer.Bindings.Add(new Binding("IsEnabled") { Source = gate });
+        outer.Bindings.Add(new Binding("IsVisible") { Source = gate });
+        outer.Bindings.Add(invert);
+
+        var expression = Producer(outer, out var current);
+
+        Assert.That(expression.ProducedValue, Is.EqualTo(true));   // base false, but condition flips it to true
+
+        gate.IsAdmin = false;                                      // condition off -> back to base false
+        Assert.That(current(), Is.EqualTo(false));
+    }
 }

@@ -162,8 +162,8 @@ internal sealed class AumlInstantiator
         {
             AumlAstMarkupExtensionNode me => me.TypeReference?.Name switch
             {
-                "Binding" or "BindingExtension" => BuildBindingFromMarkup(me),
-                "MultiBinding" or "MultiBindingExtension" => BuildMultiBindingFromMarkup(me),
+                "Binding" => BuildBindingFromMarkup(me),
+                "MultiBinding" => BuildMultiBindingFromMarkup(me),
                 _ => null,
             },
             AumlAstObjectNode obj => obj.TypeReference?.Name switch

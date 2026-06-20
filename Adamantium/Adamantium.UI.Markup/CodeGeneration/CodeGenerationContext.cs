@@ -287,6 +287,14 @@ public class CodeGenerationContext
 
                             break;
                         }
+                        case "Binding":
+                        case "MultiBinding":
+                        {
+                            var bindingVar = EmitBinding(extension, diagnostics, isResource);
+                            var bindingTarget = isRoot ? "this" : CurrentParent;
+                            TextGenerator.WriteLine($"{bindingTarget}.SetBinding(\"{propRef.Name}\", {bindingVar});");
+                            break;
+                        }
                         default:
                             string nestedName = ProcessNestedValue(extension, diagnostics, isResource);
                             if (propRef.IsAttachedProperty)
@@ -339,6 +347,14 @@ public class CodeGenerationContext
                 {
                     foreach (var propertyValue in prop.Values)
                     {
+                        // <X.Y><Binding/></X.Y> or <X.Y><MultiBinding>...</MultiBinding></X.Y> -> a live binding.
+                        if (IsBindingNode(propertyValue))
+                        {
+                            var bindingVar = EmitBinding(propertyValue, diagnostics, isResource);
+                            var bindingTarget = isRoot ? "this" : CurrentParent;
+                            TextGenerator.WriteLine($"{bindingTarget}.SetBinding(\"{propRef.Name}\", {bindingVar});");
+                            continue;
+                        }
                         string nestedName = ProcessNestedValue(propertyValue, diagnostics, isResource);
                         TextGenerator.WriteLine($"{symbolName} = {nestedName};");
                     }
@@ -496,6 +512,153 @@ public class CodeGenerationContext
         }
 
         return "null";
+    }
+
+    // ---- bindings -------------------------------------------------------------------------------------------------
+
+    private const string BindingFqn = "global::Adamantium.UI.Core.Data.Binding";
+    private const string MultiBindingFqn = "global::Adamantium.UI.Core.Data.MultiBinding";
+    private const string PropertyPathFqn = "global::Adamantium.UI.Core.PropertyPath";
+    private const string BindingModeFqn = "global::Adamantium.UI.Core.Data.BindingMode";
+    private const string ValueConverterFqn = "global::Adamantium.UI.Core.Data.IValueConverter";
+    private const string MultiValueConverterFqn = "global::Adamantium.UI.Core.Data.IMultiValueConverter";
+    private const string ResourceResolverFqn = "global::Adamantium.UI.Core.Resources.ResourceResolver";
+
+    // A Binding/MultiBinding written as a markup extension ({Binding}/{MultiBinding}) or as an element
+    // (<Binding/>, <MultiBinding>...</MultiBinding>). The codegen treats these by NAME (like ResourceReference).
+    private static bool IsBindingNode(IAumlAstNode node) => node switch
+    {
+        AumlAstMarkupExtensionNode me => me.TypeReference?.Name is "Binding" or "MultiBinding",
+        AumlAstObjectNode obj => obj.TypeReference?.Name is "Binding" or "MultiBinding",
+        _ => false,
+    };
+
+    // Emits the code that constructs a Binding/MultiBinding and returns the variable holding it. Recurses for nested
+    // multi-bindings, so multibinding-inside-multibinding generates correctly.
+    private string EmitBinding(IAumlAstNode node, IDiagnosticSink diagnostics, bool isResource) => node switch
+    {
+        AumlAstMarkupExtensionNode me when me.TypeReference?.Name == "MultiBinding"
+            => EmitMultiBindingFromMarkup(me, diagnostics, isResource),
+        AumlAstMarkupExtensionNode me => EmitBindingFromMarkup(me, diagnostics, isResource),
+        AumlAstObjectNode obj when obj.TypeReference?.Name == "MultiBinding"
+            => EmitMultiBindingFromObject(obj, diagnostics, isResource),
+        AumlAstObjectNode obj => EmitBindingFromObject(obj, diagnostics, isResource),
+        _ => "null",
+    };
+
+    private string EmitBindingFromMarkup(AumlAstMarkupExtensionNode me, IDiagnosticSink diagnostics, bool isResource)
+    {
+        var name = GenerateNextElementName("binding");
+        TextGenerator.WriteLine($"var {name} = new {BindingFqn}();");
+        foreach (var arg in me.Arguments)
+            EmitBindingProperty(name, string.IsNullOrEmpty(arg.Name) ? "Path" : arg.Name, arg.Value, isMulti: false, diagnostics, isResource);
+        return name;
+    }
+
+    private string EmitBindingFromObject(AumlAstObjectNode obj, IDiagnosticSink diagnostics, bool isResource)
+    {
+        var name = GenerateNextElementName("binding");
+        TextGenerator.WriteLine($"var {name} = new {BindingFqn}();");
+        foreach (var child in obj.Children)
+            if (child is AumlAstPropertyNode { Property: AumlAstPropertyReference pref } pn && pn.Values.Count > 0)
+                EmitBindingProperty(name, pref.Name, pn.Values[0], isMulti: false, diagnostics, isResource);
+        return name;
+    }
+
+    private string EmitMultiBindingFromMarkup(AumlAstMarkupExtensionNode me, IDiagnosticSink diagnostics, bool isResource)
+    {
+        var name = GenerateNextElementName("multiBinding");
+        TextGenerator.WriteLine($"var {name} = new {MultiBindingFqn}();");
+        foreach (var arg in me.Arguments)
+        {
+            if (string.IsNullOrEmpty(arg.Name))                       // positional = a child binding
+            {
+                if (IsBindingNode(arg.Value))
+                    TextGenerator.WriteLine($"{name}.Bindings.Add({EmitBinding(arg.Value, diagnostics, isResource)});");
+            }
+            else EmitBindingProperty(name, arg.Name, arg.Value, isMulti: true, diagnostics, isResource);
+        }
+        return name;
+    }
+
+    private string EmitMultiBindingFromObject(AumlAstObjectNode obj, IDiagnosticSink diagnostics, bool isResource)
+    {
+        var name = GenerateNextElementName("multiBinding");
+        TextGenerator.WriteLine($"var {name} = new {MultiBindingFqn}();");
+        foreach (var child in obj.Children)
+        {
+            switch (child)
+            {
+                case AumlAstObjectNode childObj when IsBindingNode(childObj):
+                    TextGenerator.WriteLine($"{name}.Bindings.Add({EmitBinding(childObj, diagnostics, isResource)});");
+                    break;
+                case AumlAstPropertyNode { Property: AumlAstPropertyReference pref } pn when pn.Values.Count > 0:
+                    if (pref.Name == "Bindings")
+                    {
+                        foreach (var v in pn.Values)
+                            if (IsBindingNode(v))
+                                TextGenerator.WriteLine($"{name}.Bindings.Add({EmitBinding(v, diagnostics, isResource)});");
+                    }
+                    else EmitBindingProperty(name, pref.Name, pn.Values[0], isMulti: true, diagnostics, isResource);
+                    break;
+            }
+        }
+        return name;
+    }
+
+    private void EmitBindingProperty(string bindingVar, string name, IAumlAstValueNode value, bool isMulti,
+        IDiagnosticSink diagnostics, bool isResource)
+    {
+        switch (name)
+        {
+            case "Path":
+                if ((value as AumlAstTextNode)?.Text?.Trim() is { Length: > 0 } path)
+                    TextGenerator.WriteLine($"{bindingVar}.Path = new {PropertyPathFqn}(\"{path}\");");
+                break;
+            case "Mode":
+                if ((value as AumlAstTextNode)?.Text is { Length: > 0 } mode)
+                    TextGenerator.WriteLine($"{bindingVar}.Mode = {BindingModeFqn}.{mode};");
+                break;
+            case "Converter":
+                var converter = EmitValueExpression(value, isMulti ? MultiValueConverterFqn : ValueConverterFqn, diagnostics, isResource);
+                if (converter != null) TextGenerator.WriteLine($"{bindingVar}.Converter = {converter};");
+                break;
+            case "ConverterParameter":
+                var parameter = EmitValueExpression(value, "object", diagnostics, isResource);
+                if (parameter != null) TextGenerator.WriteLine($"{bindingVar}.ConverterParameter = {parameter};");
+                break;
+            case "StringFormat":
+                if ((value as AumlAstTextNode)?.Text is { } format)
+                    TextGenerator.WriteLine($"{bindingVar}.StringFormat = \"{format}\";");
+                break;
+            case "Source":
+                var source = EmitValueExpression(value, "object", diagnostics, isResource);
+                if (source != null) TextGenerator.WriteLine($"{bindingVar}.Source = {source};");
+                break;
+            default:
+                diagnostics.ReportWarning(Metadata.ClassName, $"Unknown binding property '{name}'");
+                break;
+        }
+    }
+
+    // A binding sub-value (Converter / ConverterParameter / Source) as a C# expression: a {ResourceReference}, an
+    // inline element, a converter authored as a markup extension ({local:MyConverter} -> new MyConverter()), or a literal.
+    private string EmitValueExpression(IAumlAstValueNode value, string targetTypeFqn, IDiagnosticSink diagnostics, bool isResource)
+    {
+        switch (value)
+        {
+            case AumlAstMarkupExtensionNode me when me.TypeReference?.Name?.StartsWith("ResourceReference") == true:
+                var key = (me.Arguments.FirstOrDefault()?.Value as AumlAstTextNode)?.Text;
+                return string.IsNullOrEmpty(key) ? null : $"{ResourceResolverFqn}.Resolve<{targetTypeFqn}>(\"{key}\")";
+            case AumlAstMarkupExtensionNode me:
+                return ProcessNestedValue(me, diagnostics, isResource);          // converter authored as a markup extension
+            case AumlAstObjectNode obj:
+                return ProcessControlElements(obj, diagnostics, isResource);     // inline element
+            case AumlAstTextNode text:
+                return $"\"{text.Text}\"";
+            default:
+                return null;
+        }
     }
 
     private class StubResolvedMember : IResolvedMember
