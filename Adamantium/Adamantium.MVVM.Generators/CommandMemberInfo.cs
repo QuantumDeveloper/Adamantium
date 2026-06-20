@@ -1,13 +1,16 @@
 namespace Adamantium.MVVM.Generators;
 
-/// <summary>Value-equatable model for a <c>[Command]</c> method's generated <c>ICommand</c> property.
-/// <see cref="CanExecuteExpression"/> is the prebuilt argument (e.g. <c>() => CanSave()</c>) or null.</summary>
+/// <summary>Value-equatable model for a <c>[Command]</c> method's generated command property.
+/// <see cref="CommandTypeFqn"/> is AdamantiumCommand (sync) or AdamantiumAsyncCommand (async);
+/// <see cref="ExecuteExpression"/> is the prebuilt ctor delegate (e.g. <c>() => Save()</c> or <c>ct => Save(ct)</c>);
+/// <see cref="CanExecuteExpression"/> is the CanExecute argument (e.g. <c>() => CanSave()</c>) or null.</summary>
 internal sealed record CommandMemberInfo(
     string Namespace,
     string TypeKeyword,
     string TypeName,
-    string MethodName,
     string CommandName,
     string FieldName,
+    string CommandTypeFqn,
+    string ExecuteExpression,
     string CanExecuteExpression,
     string HintName);

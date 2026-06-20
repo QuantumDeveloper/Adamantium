@@ -1,4 +1,5 @@
-﻿using Adamantium.ProceduralGeometry;
+﻿using System;
+using Adamantium.ProceduralGeometry;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Media;
@@ -33,7 +34,11 @@ public class Button : ContentControl
     
     public static readonly AdamantiumProperty CommandProperty = AdamantiumProperty.Register(nameof(Command),
         typeof(ICommand), typeof(Button),
-        new PropertyMetadata(null));
+        new PropertyMetadata(null, OnCommandChanged));
+
+    public static readonly AdamantiumProperty CommandParameterProperty = AdamantiumProperty.Register(nameof(CommandParameter),
+        typeof(object), typeof(Button),
+        new PropertyMetadata(null, OnCommandParameterChanged));
     
     public static readonly AdamantiumProperty IsPressedProperty = AdamantiumProperty.Register(nameof(IsPressed),
         typeof(bool), typeof(Button), new PropertyMetadata(false));
@@ -84,6 +89,40 @@ public class Button : ContentControl
         set => SetValue(CommandProperty, value);
     }
 
+    public object CommandParameter
+    {
+        get => GetValue<object>(CommandParameterProperty);
+        set => SetValue(CommandParameterProperty, value);
+    }
+
+    // Track the command's CanExecuteChanged so the button auto-enables/disables. (Direct subscription for now;
+    // a weak-event scheme is a later refinement, like the binding engine's.)
+    private static void OnCommandChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (a is Button button)
+            button.OnCommandChanged(e.OldValue as ICommand, e.NewValue as ICommand);
+    }
+
+    private static void OnCommandParameterChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (a is Button button) button.UpdateCanExecute();
+    }
+
+    private void OnCommandChanged(ICommand oldCommand, ICommand newCommand)
+    {
+        if (oldCommand != null) oldCommand.CanExecuteChanged -= OnCommandCanExecuteChanged;
+        if (newCommand != null) newCommand.CanExecuteChanged += OnCommandCanExecuteChanged;
+        UpdateCanExecute();
+    }
+
+    private void OnCommandCanExecuteChanged(object sender, EventArgs e) => UpdateCanExecute();
+
+    private void UpdateCanExecute()
+    {
+        var command = Command;
+        IsEnabled = command == null || command.CanExecute(CommandParameter);
+    }
+
     protected override void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         e.Handled = true;
@@ -92,9 +131,10 @@ public class Button : ContentControl
 
     protected virtual void OnClick()
     {
-        if (Command != null && Command.CanExecute())
+        var parameter = CommandParameter;
+        if (Command != null && Command.CanExecute(parameter))
         {
-            Command.Execute();
+            Command.Execute(parameter);
         }
         
         var eventArgs = new RoutedEventArgs(ClickEvent, this)
