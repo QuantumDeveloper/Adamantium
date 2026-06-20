@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Threading.Tasks;
 using Adamantium.UI.Core.Commands;
 using NUnit.Framework;
@@ -161,6 +162,54 @@ public class MvvmFunctionalTests
 
         Assert.That(command.IsRunning, Is.False);
         Assert.That(vm.LoadedName, Is.EqualTo("Morpheus"));
+    }
+
+    [Test]
+    public void PartialProperty_NotifiesAndCallsHook()
+    {
+        var vm = new PartialPropertyViewModel();
+        var raised = new List<string>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        vm.Title = "Hello";
+
+        Assert.That(vm.Title, Is.EqualTo("Hello"));
+        Assert.That(raised, Does.Contain("Title"));
+        Assert.That(vm.LastChanged, Is.EqualTo("Hello"));   // OnTitleChanged hook fired
+
+        raised.Clear();
+        vm.Title = "Hello";                                  // same value → no notify
+        Assert.That(raised, Is.Empty);
+    }
+
+    [Test]
+    public void Validation_SurfacesErrorsViaINotifyDataErrorInfo()
+    {
+        var vm = new RegistrationViewModel();
+        Assert.That(vm.HasErrors, Is.False);          // nothing validated yet
+
+        vm.Age = 200;                                  // out of [Range(0,120)]
+        Assert.That(vm.HasErrors, Is.True);
+        Assert.That(vm.GetErrors(nameof(vm.Age)).Cast<string>().Any(), Is.True);
+
+        vm.Age = 30;                                   // back in range → error cleared
+        Assert.That(vm.GetErrors(nameof(vm.Age)).Cast<string>().Any(), Is.False);
+        Assert.That(vm.HasErrors, Is.False);
+    }
+
+    [Test]
+    public void Validation_RaisesErrorsChanged()
+    {
+        var vm = new RegistrationViewModel();
+        var changed = new List<string>();
+        vm.ErrorsChanged += (_, e) => changed.Add(e.PropertyName);
+
+        vm.Name = "";                                  // [Required] fails on empty
+        Assert.That(changed, Does.Contain(nameof(vm.Name)));
+        Assert.That(vm.GetErrors(nameof(vm.Name)).Cast<string>().Any(), Is.True);
+
+        vm.Name = "Bob";                               // valid → cleared
+        Assert.That(vm.GetErrors(nameof(vm.Name)).Cast<string>().Any(), Is.False);
     }
 
     [Test]

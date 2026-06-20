@@ -39,75 +39,155 @@ public sealed class MvvmGenerator : IIncrementalGenerator
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true);
 
+    private static readonly DiagnosticDescriptor NestedTypeNotSupported = new(
+        "AMVVM002",
+        "MVVM types must be top-level",
+        "Type '{0}' uses an MVVM attribute ([Bindable]/[Command]/[ViewModel]) but is nested; move it to the top level (nested types are not supported)",
+        "Adamantium.MVVM",
+        DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    private static readonly DiagnosticDescriptor ValidationNeedsValidatingBase = new(
+        "AMVVM003",
+        "Validation needs AdamantiumValidatingViewModel",
+        "Member '{0}' has validation attributes, but its class does not derive from AdamantiumValidatingViewModel; no validation will run",
+        "Adamantium.MVVM",
+        DiagnosticSeverity.Warning,
+        isEnabledByDefault: true);
+
+    private const string ValidatingBaseName = "Adamantium.MVVM.AdamantiumValidatingViewModel";
+    private const string ValidationAttributeName = "System.ComponentModel.DataAnnotations.ValidationAttribute";
+
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         var bindable = context.SyntaxProvider
             .ForAttributeWithMetadataName(BindableAttr, static (_, _) => true, static (ctx, ct) => GetBindable(ctx, ct))
-            .Where(static m => m is not null);
-        context.RegisterSourceOutput(bindable, static (spc, m) =>
+            .Where(static r => r is not null);
+        context.RegisterSourceOutput(bindable, static (spc, r) =>
         {
+            if (Report(spc, r)) return;
+            var m = r.Value;
             if (!m.HasInpcBase)
             {
                 spc.ReportDiagnostic(Diagnostic.Create(MissingInpc, Location.None, m.FieldName));
                 return;
             }
+            if (m.Warning is not null) spc.ReportDiagnostic(m.Warning.ToDiagnostic());   // e.g. AMVVM003; still emit
             spc.AddSource(m.HintName, EmitBindable(m));
         });
 
         var command = context.SyntaxProvider
             .ForAttributeWithMetadataName(CommandAttr, static (_, _) => true, static (ctx, ct) => GetCommand(ctx, ct))
-            .Where(static m => m is not null);
-        context.RegisterSourceOutput(command, static (spc, m) => spc.AddSource(m.HintName, EmitCommand(m)));
+            .Where(static r => r is not null);
+        context.RegisterSourceOutput(command, static (spc, r) =>
+        {
+            if (Report(spc, r)) return;
+            spc.AddSource(r.Value.HintName, EmitCommand(r.Value));
+        });
 
         var viewModel = context.SyntaxProvider
             .ForAttributeWithMetadataName(ViewModelAttr, static (_, _) => true, static (ctx, ct) => GetViewModel(ctx, ct))
-            .Where(static m => m is not null);
-        context.RegisterSourceOutput(viewModel, static (spc, m) => spc.AddSource(m.HintName, EmitViewModel(m)));
+            .Where(static r => r is not null);
+        context.RegisterSourceOutput(viewModel, static (spc, r) =>
+        {
+            if (Report(spc, r)) return;
+            spc.AddSource(r.Value.HintName, EmitViewModel(r.Value));
+        });
     }
 
     // ---- transforms (run on the symbol; extract ONLY equatable primitives) -------------------------------------
 
-    private static BindableMemberInfo GetBindable(GeneratorAttributeSyntaxContext ctx, CancellationToken ct)
+    private static Result<BindableMemberInfo> GetBindable(GeneratorAttributeSyntaxContext ctx, CancellationToken ct)
     {
-        if (ctx.TargetSymbol is not IFieldSymbol field) return null;
-        var type = field.ContainingType;
-        if (type is null || type.ContainingType is not null) return null;   // Phase 1: top-level types only
+        INamedTypeSymbol type;
+        ISymbol member;
+        string fieldName, propName, propType;
+        bool isPartialProperty;
 
-        var propName = ToPropertyName(field.Name);
-        if (propName is null) return null;
+        switch (ctx.TargetSymbol)
+        {
+            case IFieldSymbol field:
+                type = field.ContainingType;
+                if (type is null) return null;
+                if (type.ContainingType is not null) return Nested<BindableMemberInfo>(type);
+                propName = ToPropertyName(field.Name);
+                if (propName is null) return null;
+                member = field;
+                fieldName = field.Name;
+                propType = field.Type.ToDisplayString(FqnFormat);
+                isPartialProperty = false;
+                break;
+
+            case IPropertySymbol property:
+                type = property.ContainingType;
+                if (type is null) return null;
+                if (type.ContainingType is not null) return Nested<BindableMemberInfo>(type);
+                if (!property.IsPartialDefinition || property.GetMethod is null || property.SetMethod is null) return null;
+                member = property;
+                fieldName = "";
+                propName = property.Name;
+                propType = property.Type.ToDisplayString(FqnFormat);
+                isPartialProperty = true;
+                break;
+
+            default:
+                return null;
+        }
 
         var commandNames = GetCommandNames(type);
         var affectsProperties = new List<string>();
         var affectsCommands = new List<string>();
-        foreach (var attr in field.GetAttributes())
+        var validationAttributes = new List<string>();
+        var hasValidationAttributes = false;
+        var validates = DerivesFrom(type, ValidatingBaseName);
+        foreach (var attr in member.GetAttributes())
         {
-            if (attr.AttributeClass?.ToDisplayString() != AffectsAttr) continue;
-            foreach (var arg in attr.ConstructorArguments)
-                foreach (var value in arg.Values)
-                {
-                    if (value.Value is not string s || s.Length == 0) continue;
-                    (commandNames.Contains(s) ? affectsCommands : affectsProperties).Add(s);
-                }
+            var attrName = attr.AttributeClass?.ToDisplayString();
+            if (attrName == AffectsAttr)
+            {
+                foreach (var arg in attr.ConstructorArguments)
+                    foreach (var value in arg.Values)
+                    {
+                        if (value.Value is not string s || s.Length == 0) continue;
+                        (commandNames.Contains(s) ? affectsCommands : affectsProperties).Add(s);
+                    }
+            }
+            else if (attr.AttributeClass is not null && IsValidationAttribute(attr.AttributeClass))
+            {
+                hasValidationAttributes = true;
+                // Re-emit onto the property only for the field path; a partial property already carries them.
+                if (validates && !isPartialProperty) validationAttributes.Add(ReconstructAttribute(attr));
+            }
         }
 
-        return new BindableMemberInfo(
+        // Validation attributes without a validating base would silently do nothing — warn, but still emit the property.
+        var warning = hasValidationAttributes && !validates
+            ? new DiagnosticInfo(ValidationNeedsValidatingBase, LocationInfo.CreateFrom(member), member.Name)
+            : null;
+
+        return new(new BindableMemberInfo(
             NamespaceOf(type),
             TypeKeyword(type),
             TypeNameWithGenerics(type),
-            field.Name,
+            fieldName,
             propName,
-            field.Type.ToDisplayString(FqnFormat),
+            propType,
             HasInpcHost(type),
+            isPartialProperty,
+            hasValidationAttributes && validates,
             new EquatableArray<string>(affectsProperties.ToArray()),
             new EquatableArray<string>(affectsCommands.ToArray()),
-            Hint(type, propName, "Bindable"));
+            new EquatableArray<string>(validationAttributes.ToArray()),
+            Hint(type, propName, "Bindable"),
+            warning), null);
     }
 
-    private static CommandMemberInfo GetCommand(GeneratorAttributeSyntaxContext ctx, CancellationToken ct)
+    private static Result<CommandMemberInfo> GetCommand(GeneratorAttributeSyntaxContext ctx, CancellationToken ct)
     {
         if (ctx.TargetSymbol is not IMethodSymbol method) return null;
         var type = method.ContainingType;
-        if (type is null || type.ContainingType is not null) return null;
+        if (type is null) return null;
+        if (type.ContainingType is not null) return Nested<CommandMemberInfo>(type);
 
         var isAsync = IsTaskReturning(method.ReturnType);
         var isVoid = method.ReturnType.SpecialType == SpecialType.System_Void;
@@ -152,7 +232,7 @@ public sealed class MvvmGenerator : IIncrementalGenerator
 
         var canExecuteExpr = BuildCanExecute(type, canExecute, hasParam);
 
-        return new CommandMemberInfo(
+        return new(new CommandMemberInfo(
             NamespaceOf(type),
             TypeKeyword(type),
             TypeNameWithGenerics(type),
@@ -161,20 +241,20 @@ public sealed class MvvmGenerator : IIncrementalGenerator
             commandTypeFqn,
             executeExpr,
             canExecuteExpr,
-            Hint(type, commandName, "Command"));
+            Hint(type, commandName, "Command")), null);
     }
 
-    private static ViewModelClassInfo GetViewModel(GeneratorAttributeSyntaxContext ctx, CancellationToken ct)
+    private static Result<ViewModelClassInfo> GetViewModel(GeneratorAttributeSyntaxContext ctx, CancellationToken ct)
     {
         if (ctx.TargetSymbol is not INamedTypeSymbol type) return null;
-        if (type.ContainingType is not null) return null;                     // Phase 1: top-level
+        if (type.ContainingType is not null) return Nested<ViewModelClassInfo>(type);
         if (ImplementsInpc(type)) return null;                                // already has INPC via a base → nothing to inject
 
-        return new ViewModelClassInfo(
+        return new(new ViewModelClassInfo(
             NamespaceOf(type),
             TypeKeyword(type),
             TypeNameWithGenerics(type),
-            Hint(type, "ViewModel", "INPC"));
+            Hint(type, "ViewModel", "INPC")), null);
     }
 
     // ---- emit ---------------------------------------------------------------------------------------------------
@@ -183,6 +263,22 @@ public sealed class MvvmGenerator : IIncrementalGenerator
     {
         var sb = new StringBuilder();
         OpenType(sb, m.Namespace, m.TypeKeyword, m.TypeName);
+        foreach (var attribute in m.ValidationAttributes)            // field path only; empty for partial properties
+            sb.AppendLine($"    [{attribute}]");
+
+        if (m.IsPartialProperty) EmitPartialProperty(sb, m);
+        else EmitFieldProperty(sb, m);
+
+        sb.AppendLine();
+        sb.AppendLine($"    partial void On{m.PropertyName}Changing({m.PropertyType} value);");
+        sb.AppendLine($"    partial void On{m.PropertyName}Changed({m.PropertyType} value);");
+        CloseType(sb);
+        return SourceText.From(sb.ToString(), Encoding.UTF8);
+    }
+
+    // Field-backed property: wraps the user's field with SetProperty (raises PropertyChanged for us).
+    private static void EmitFieldProperty(StringBuilder sb, BindableMemberInfo m)
+    {
         sb.AppendLine($"    public {m.PropertyType} {m.PropertyName}");
         sb.AppendLine("    {");
         sb.AppendLine($"        get => {m.FieldName};");
@@ -192,18 +288,42 @@ public sealed class MvvmGenerator : IIncrementalGenerator
         sb.AppendLine($"            if (SetProperty(ref {m.FieldName}, value))");
         sb.AppendLine("            {");
         sb.AppendLine($"                On{m.PropertyName}Changed(value);");
-        foreach (var affected in m.AffectsProperties)
-            sb.AppendLine($"                RaisePropertyChanged(\"{affected}\");");
-        foreach (var command in m.AffectsCommands)
-            sb.AppendLine($"                _{command}?.RaiseCanExecuteChanged();");
+        EmitSetBody(sb, m, "                ");
         sb.AppendLine("            }");
         sb.AppendLine("        }");
         sb.AppendLine("    }");
-        sb.AppendLine();
-        sb.AppendLine($"    partial void On{m.PropertyName}Changing({m.PropertyType} value);");
-        sb.AppendLine($"    partial void On{m.PropertyName}Changed({m.PropertyType} value);");
-        CloseType(sb);
-        return SourceText.From(sb.ToString(), Encoding.UTF8);
+    }
+
+    // Partial property: implements the user's `public partial T Name { get; set; }` using the `field` keyword,
+    // so there is no separately declared backing field.
+    private static void EmitPartialProperty(StringBuilder sb, BindableMemberInfo m)
+    {
+        sb.AppendLine($"    public partial {m.PropertyType} {m.PropertyName}");
+        sb.AppendLine("    {");
+        sb.AppendLine("        get => field;");
+        sb.AppendLine("        set");
+        sb.AppendLine("        {");
+        sb.AppendLine($"            On{m.PropertyName}Changing(value);");
+        sb.AppendLine($"            if (!global::System.Collections.Generic.EqualityComparer<{m.PropertyType}>.Default.Equals(field, value))");
+        sb.AppendLine("            {");
+        sb.AppendLine("                field = value;");
+        sb.AppendLine($"                RaisePropertyChanged(\"{m.PropertyName}\");");
+        sb.AppendLine($"                On{m.PropertyName}Changed(value);");
+        EmitSetBody(sb, m, "                ");
+        sb.AppendLine("            }");
+        sb.AppendLine("        }");
+        sb.AppendLine("    }");
+    }
+
+    // Shared tail of the setter's changed-branch: validation + dependent property/command notifications.
+    private static void EmitSetBody(StringBuilder sb, BindableMemberInfo m, string indent)
+    {
+        if (m.Validates)
+            sb.AppendLine($"{indent}ValidateProperty(value, \"{m.PropertyName}\");");
+        foreach (var affected in m.AffectsProperties)
+            sb.AppendLine($"{indent}RaisePropertyChanged(\"{affected}\");");
+        foreach (var command in m.AffectsCommands)
+            sb.AppendLine($"{indent}_{command}?.RaiseCanExecuteChanged();");
     }
 
     private static SourceText EmitCommand(CommandMemberInfo m)
@@ -254,6 +374,19 @@ public sealed class MvvmGenerator : IIncrementalGenerator
 
     private static void CloseType(StringBuilder sb) => sb.AppendLine("}");
 
+    // A nested-type result: no emit, just the AMVVM002 error (located on the type, so duplicates across members of
+    // the same type collapse to one). T is the would-be emit model.
+    private static Result<T> Nested<T>(INamedTypeSymbol type) where T : class =>
+        new(null, new DiagnosticInfo(NestedTypeNotSupported, LocationInfo.CreateFrom(type), type.Name));
+
+    // Reports a transform's diagnostic if it carries one; returns true when the caller should stop (no emit).
+    private static bool Report<T>(SourceProductionContext spc, Result<T> result) where T : class
+    {
+        if (result.Diagnostic is null) return false;
+        spc.ReportDiagnostic(result.Diagnostic.ToDiagnostic());
+        return true;
+    }
+
     // ---- symbol helpers ----------------------------------------------------------------------------------------
 
     private static string NamespaceOf(INamedTypeSymbol type) =>
@@ -265,12 +398,40 @@ public sealed class MvvmGenerator : IIncrementalGenerator
     private static string TypeNameWithGenerics(INamedTypeSymbol type) =>
         type.TypeParameters.Length == 0 ? type.Name : $"{type.Name}<{string.Join(", ", type.TypeParameters.Select(p => p.Name))}>";
 
-    private static bool HasInpcHost(INamedTypeSymbol type)
+    private static bool HasInpcHost(INamedTypeSymbol type) =>
+        DerivesFrom(type, PropertyChangedBaseName) ||
+        type.GetAttributes().Any(a => a.AttributeClass?.ToDisplayString() == ViewModelAttr);
+
+    private static bool DerivesFrom(INamedTypeSymbol type, string baseFqn)
     {
         for (var b = type.BaseType; b is not null; b = b.BaseType)
-            if (b.ToDisplayString() == PropertyChangedBaseName)
+            if (b.ToDisplayString() == baseFqn)
                 return true;
-        return type.GetAttributes().Any(a => a.AttributeClass?.ToDisplayString() == ViewModelAttr);
+        return false;
+    }
+
+    private static bool IsValidationAttribute(INamedTypeSymbol attributeClass)
+    {
+        for (var t = attributeClass; t is not null; t = t.BaseType)
+            if (t.ToDisplayString() == ValidationAttributeName)
+                return true;
+        return false;
+    }
+
+    // Reconstructs an attribute as fully-qualified C# text to re-emit on the generated property. TypedConstant's
+    // ToCSharpString() renders literals/enums/typeof/arrays correctly and fully-qualified, so the result is valid
+    // regardless of the using-directives in the user's file (which the generated file doesn't inherit).
+    private static string ReconstructAttribute(AttributeData attribute)
+    {
+        var sb = new StringBuilder(attribute.AttributeClass.ToDisplayString(FqnFormat));
+        var args = new List<string>();
+        foreach (var ca in attribute.ConstructorArguments)
+            args.Add(ca.ToCSharpString());
+        foreach (var na in attribute.NamedArguments)
+            args.Add($"{na.Key} = {na.Value.ToCSharpString()}");
+        if (args.Count > 0)
+            sb.Append('(').Append(string.Join(", ", args)).Append(')');
+        return sb.ToString();
     }
 
     private static bool ImplementsInpc(INamedTypeSymbol type) =>
