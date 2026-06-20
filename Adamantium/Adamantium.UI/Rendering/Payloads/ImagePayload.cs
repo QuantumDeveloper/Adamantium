@@ -18,8 +18,12 @@ public class ImagePayload(Brush filter, ImageSource image, Rect destinationRect,
     public bool RequiresBufferRebuild(IRenderCachePolicy newState)
     {
         if (newState is not ImagePayload payload) return true;
-        
-        return DestinationRect != payload.DestinationRect || CornerRadius != payload.CornerRadius;
+
+        // Rebuild when the image itself changes too, not just its rect/corner — an animated bitmap draws a different
+        // frame (its own BitmapSource + texture) each tick, so without this the render unit keeps the first frame.
+        return DestinationRect != payload.DestinationRect
+               || CornerRadius != payload.CornerRadius
+               || !Equals(Image, payload.Image);
     }
 
     public override int GetHashCode()

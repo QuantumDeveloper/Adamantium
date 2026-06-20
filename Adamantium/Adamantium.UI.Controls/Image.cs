@@ -342,8 +342,12 @@ public class Image : InputUIComponent
    {
       base.OnRender(context);
       if (Source == null) return;
-      
-      context.ForControl(this).DrawImage(Source, FilterBrush, new Rect(Bounds.Size), CornerRadius);
+
+      // Draw the current animation frame, not the static source: each frame is its own BitmapSource (texture cached
+      // per frame index), so advancing _frame makes animated images play. _frame is null for non-bitmap sources
+      // (RenderTargetImage / SharedSurfaceImage) and before the first tick, where we draw the source directly.
+      ImageSource image = _frame ?? Source;
+      context.ForControl(this).DrawImage(image, FilterBrush, new Rect(Bounds.Size), CornerRadius);
    }
 
    protected override void OnRenderCompleted()
