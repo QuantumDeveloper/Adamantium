@@ -10,5 +10,6 @@ internal sealed record BindableMemberInfo(
     string PropertyName,
     string PropertyType,
     bool HasInpcBase,
-    EquatableArray<string> Affects,
+    EquatableArray<string> AffectsProperties,
+    EquatableArray<string> AffectsCommands,
     string HintName);

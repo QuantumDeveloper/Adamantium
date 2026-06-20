@@ -76,14 +76,18 @@ public sealed class MvvmGenerator : IIncrementalGenerator
         var propName = ToPropertyName(field.Name);
         if (propName is null) return null;
 
-        var affects = new List<string>();
+        var commandNames = GetCommandNames(type);
+        var affectsProperties = new List<string>();
+        var affectsCommands = new List<string>();
         foreach (var attr in field.GetAttributes())
         {
             if (attr.AttributeClass?.ToDisplayString() != AffectsAttr) continue;
             foreach (var arg in attr.ConstructorArguments)
                 foreach (var value in arg.Values)
-                    if (value.Value is string s && s.Length > 0)
-                        affects.Add(s);
+                {
+                    if (value.Value is not string s || s.Length == 0) continue;
+                    (commandNames.Contains(s) ? affectsCommands : affectsProperties).Add(s);
+                }
         }
 
         return new BindableMemberInfo(
@@ -94,17 +98,31 @@ public sealed class MvvmGenerator : IIncrementalGenerator
             propName,
             field.Type.ToDisplayString(FqnFormat),
             HasInpcHost(type),
-            new EquatableArray<string>(affects.ToArray()),
+            new EquatableArray<string>(affectsProperties.ToArray()),
+            new EquatableArray<string>(affectsCommands.ToArray()),
             Hint(type, propName, "Bindable"));
     }
 
     private static CommandMemberInfo GetCommand(GeneratorAttributeSyntaxContext ctx, CancellationToken ct)
     {
         if (ctx.TargetSymbol is not IMethodSymbol method) return null;
-        if (method.Parameters.Length != 0) return null;                       // Phase 1: parameterless
-        if (method.ReturnType.SpecialType != SpecialType.System_Void) return null; // Phase 1: sync void
         var type = method.ContainingType;
         if (type is null || type.ContainingType is not null) return null;
+
+        var isAsync = IsTaskReturning(method.ReturnType);
+        var isVoid = method.ReturnType.SpecialType == SpecialType.System_Void;
+        if (!isAsync && !isVoid) return null;                                 // only void or Task(-returning)
+
+        // A single optional trailing CancellationToken (async only) is the command's token, not a parameter;
+        // everything else counts as the typed parameter. We support at most one typed parameter.
+        var parameters = method.Parameters;
+        var hasCt = isAsync && parameters.Length > 0 && IsCancellationToken(parameters[parameters.Length - 1].Type);
+        var significant = hasCt ? parameters.Length - 1 : parameters.Length;
+        if (significant > 1) return null;                                     // multi-parameter commands unsupported
+        var hasParam = significant == 1;
+        if (hasParam && IsCancellationToken(parameters[0].Type)) return null; // a lone token is the token, not a parameter
+
+        var paramTypeFqn = hasParam ? parameters[0].Type.ToDisplayString(FqnFormat) : null;
 
         string customName = null, canExecute = null;
         var attr = ctx.Attributes[0];
@@ -115,20 +133,33 @@ public sealed class MvvmGenerator : IIncrementalGenerator
         }
 
         var commandName = string.IsNullOrEmpty(customName) ? method.Name + "Command" : customName;
-        string canExecuteExpr = null;
-        if (!string.IsNullOrEmpty(canExecute))
+        var commandTypeFqn = (isAsync, hasParam) switch
         {
-            var member = type.GetMembers(canExecute).FirstOrDefault();
-            canExecuteExpr = member is IPropertySymbol ? $"() => {canExecute}" : $"() => {canExecute}()";
-        }
+            (false, false) => "global::Adamantium.MVVM.AdamantiumCommand",
+            (false, true) => $"global::Adamantium.MVVM.AdamantiumCommand<{paramTypeFqn}>",
+            (true, false) => "global::Adamantium.MVVM.AdamantiumAsyncCommand",
+            (true, true) => $"global::Adamantium.MVVM.AdamantiumAsyncCommand<{paramTypeFqn}>",
+        };
+        var executeExpr = (isAsync, hasParam, hasCt) switch
+        {
+            (false, false, _) => $"() => {method.Name}()",
+            (false, true, _) => $"arg => {method.Name}(arg)",
+            (true, false, false) => $"_ => {method.Name}()",
+            (true, false, true) => $"ct => {method.Name}(ct)",
+            (true, true, false) => $"(arg, _) => {method.Name}(arg)",
+            (true, true, true) => $"(arg, ct) => {method.Name}(arg, ct)",
+        };
+
+        var canExecuteExpr = BuildCanExecute(type, canExecute, hasParam);
 
         return new CommandMemberInfo(
             NamespaceOf(type),
             TypeKeyword(type),
             TypeNameWithGenerics(type),
-            method.Name,
             commandName,
             "_" + commandName,
+            commandTypeFqn,
+            executeExpr,
             canExecuteExpr,
             Hint(type, commandName, "Command"));
     }
@@ -161,8 +192,10 @@ public sealed class MvvmGenerator : IIncrementalGenerator
         sb.AppendLine($"            if (SetProperty(ref {m.FieldName}, value))");
         sb.AppendLine("            {");
         sb.AppendLine($"                On{m.PropertyName}Changed(value);");
-        foreach (var affected in m.Affects)
+        foreach (var affected in m.AffectsProperties)
             sb.AppendLine($"                RaisePropertyChanged(\"{affected}\");");
+        foreach (var command in m.AffectsCommands)
+            sb.AppendLine($"                _{command}?.RaiseCanExecuteChanged();");
         sb.AppendLine("            }");
         sb.AppendLine("        }");
         sb.AppendLine("    }");
@@ -178,9 +211,9 @@ public sealed class MvvmGenerator : IIncrementalGenerator
         var canExec = m.CanExecuteExpression is null ? "" : ", " + m.CanExecuteExpression;
         var sb = new StringBuilder();
         OpenType(sb, m.Namespace, m.TypeKeyword, m.TypeName);
-        sb.AppendLine($"    private global::Adamantium.MVVM.RelayCommand {m.FieldName};");
-        sb.AppendLine($"    public global::Adamantium.UI.Core.Commands.ICommand {m.CommandName} =>");
-        sb.AppendLine($"        {m.FieldName} ??= new global::Adamantium.MVVM.RelayCommand(() => {m.MethodName}(){canExec});");
+        sb.AppendLine($"    private {m.CommandTypeFqn} {m.FieldName};");
+        sb.AppendLine($"    public {m.CommandTypeFqn} {m.CommandName} =>");
+        sb.AppendLine($"        {m.FieldName} ??= new {m.CommandTypeFqn}({m.ExecuteExpression}{canExec});");
         CloseType(sb);
         return SourceText.From(sb.ToString(), Encoding.UTF8);
     }
@@ -242,6 +275,53 @@ public sealed class MvvmGenerator : IIncrementalGenerator
 
     private static bool ImplementsInpc(INamedTypeSymbol type) =>
         type.AllInterfaces.Any(i => i.ToDisplayString() == InpcName);
+
+    // Task or Task<T> (not ValueTask — async commands need a started Task to await; ValueTask isn't required yet).
+    private static bool IsTaskReturning(ITypeSymbol type)
+    {
+        if (type is null) return false;
+        if (type.ToDisplayString() == "System.Threading.Tasks.Task") return true;
+        return type is INamedTypeSymbol named && named.IsGenericType &&
+               named.ConstructedFrom.ToDisplayString() == "System.Threading.Tasks.Task<TResult>";
+    }
+
+    private static bool IsCancellationToken(ITypeSymbol type) =>
+        type?.ToDisplayString() == "System.Threading.CancellationToken";
+
+    // Builds the CanExecute delegate argument. A typed command needs a Func<T,bool>: pass the arg through if the
+    // user's CanExecute takes one, else ignore it ('_'); a non-typed command needs a parameterless Func<bool>.
+    private static string BuildCanExecute(INamedTypeSymbol type, string canExecute, bool hasParam)
+    {
+        if (string.IsNullOrEmpty(canExecute)) return null;
+        var member = type.GetMembers(canExecute).FirstOrDefault();
+        var isProperty = member is IPropertySymbol;
+        var takesArg = member is IMethodSymbol m && m.Parameters.Length == 1;
+        if (hasParam)
+        {
+            if (isProperty) return $"_ => {canExecute}";
+            return takesArg ? $"arg => {canExecute}(arg)" : $"_ => {canExecute}()";
+        }
+        return isProperty ? $"() => {canExecute}" : $"() => {canExecute}()";
+    }
+
+    // Generated command property names of the type, so [Affects] can tell a command from a property.
+    private static HashSet<string> GetCommandNames(INamedTypeSymbol type)
+    {
+        var names = new HashSet<string>();
+        foreach (var member in type.GetMembers())
+        {
+            if (member is not IMethodSymbol method) continue;
+            foreach (var attr in method.GetAttributes())
+            {
+                if (attr.AttributeClass?.ToDisplayString() != CommandAttr) continue;
+                string custom = null;
+                foreach (var na in attr.NamedArguments)
+                    if (na.Key == "Name") custom = na.Value.Value as string;
+                names.Add(string.IsNullOrEmpty(custom) ? method.Name + "Command" : custom);
+            }
+        }
+        return names;
+    }
 
     // _title / m_title / title -> Title; null if no distinct property name can be derived.
     private static string ToPropertyName(string fieldName)
