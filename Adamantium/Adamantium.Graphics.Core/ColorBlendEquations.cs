@@ -30,7 +30,12 @@ public static class ColorBlendEquations
         Opaque = New(BlendFactor.One, BlendFactor.Zero, BlendOp.Add, BlendOp.Add);
         Fonts = New(BlendFactor.SrcAlpha, BlendFactor.OneMinusSrcAlpha, BlendOp.Add, BlendOp.Subtract);
         Fonts2 = New2();
-        AlphaBlend = New(BlendFactor.SrcAlpha, BlendFactor.OneMinusSrcAlpha, BlendOp.Add, BlendOp.Add);
+        // Straight-alpha "over": rgb = src*srcA + dst*(1-srcA), a = srcA + dstA*(1-srcA). The alpha-channel factors
+        // MUST be (One, OneMinusSrcAlpha) — with the default (One, Zero) the destination alpha is replaced by the
+        // source alpha, so a transparent source pixel (srcA=0) zeroes an opaque background's alpha and punches a hole
+        // through it (the transparent-texture-over-background artifact).
+        AlphaBlend = New(BlendFactor.SrcAlpha, BlendFactor.OneMinusSrcAlpha, BlendOp.Add, BlendOp.Add,
+            BlendFactor.One, BlendFactor.OneMinusSrcAlpha);
         LightMap = New(BlendFactor.One, BlendFactor.One, BlendOp.Add, BlendOp.Add);
         Additive = New(BlendFactor.SrcAlpha, BlendFactor.One, BlendOp.Add, BlendOp.Add);
         NonPremultiplied = New(BlendFactor.SrcAlpha, BlendFactor.OneMinusSrcAlpha, BlendOp.Add, BlendOp.Add);
