@@ -9,6 +9,14 @@
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <Nullable>disable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
+
+        <!-- Build into a PRIVATE folder instead of the shared artifacts/bin the engine builds into. The designer host
+             is a long-running process that loads (and so file-locks) the engine dlls; running from its own copy it
+             never locks the engine's build output, so the engine can be rebuilt while the designer is open (no more
+             MSB3027 "being used by another process"). MSBuild copies the full dependency closure here, so the host
+             still finds everything, and assembly Location stays valid (unlike a byte-load) so reflection/themes work.
+             Point the ADAMANTIUM_DESIGNER_HOST env var at the exe under this folder. -->
+        <OutputPath>$(MSBuildProjectDirectory)\..\artifacts\designer-host\$(Configuration)\</OutputPath>
     </PropertyGroup>
 
     <ItemGroup>
