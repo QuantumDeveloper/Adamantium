@@ -29,11 +29,6 @@ public class Binding : BindingBase
       }
    }
    
-   protected override BindingExpressionBase CreateBindingExpression()
-   {
-      throw new NotImplementedException();
-   }
-
    public override object Clone()
    {
       return new Binding()

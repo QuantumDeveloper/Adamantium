@@ -13,6 +13,10 @@ namespace Adamantium.UI.Core.Data;
 /// target back. Dotted paths (<c>A.B.C</c>) are walked by reflection and the leaf object is observed.
 /// <see cref="EstablishConnection"/> is idempotent, so it is re-run when the target's DataContext changes (the tree is
 /// usually built before its DataContext is assigned).
+/// <para>When created with a null <see cref="BindingExpressionBase.TargetProperty"/> the expression runs in
+/// <em>producer</em> mode: instead of writing to a target it exposes the converted value via
+/// <see cref="BindingExpressionBase.ProducedValue"/> and raises <see cref="BindingExpressionBase.ValueChanged"/> — this
+/// is how a child of a <see cref="MultiBinding"/> feeds the parent converter.</para>
 /// </summary>
 public class BindingExpression : BindingExpressionBase
 {
@@ -24,6 +28,8 @@ public class BindingExpression : BindingExpressionBase
 
    public Binding Binding { get; set; }
    public BindingMode Mode { get; set; }
+
+   private bool IsProducer => TargetProperty == null;
 
    public BindingExpression(IFundamentalUIComponent target, AdamantiumProperty targetProperty, BindingBase bindingBase)
    {
@@ -39,10 +45,14 @@ public class BindingExpression : BindingExpressionBase
    {
    }
 
+   // Factory + dispatch: a MultiBinding becomes a MultiBindingExpression, anything else a plain BindingExpression.
+   // This is the single place that turns a BindingBase into a live, connected expression.
    public static BindingExpressionBase CreateBindingExpression(IFundamentalUIComponent target,
       AdamantiumProperty targetProperty, BindingBase bindingBase)
    {
-      var expression = new BindingExpression(target, targetProperty, bindingBase);
+      BindingExpressionBase expression = bindingBase is MultiBinding
+         ? new MultiBindingExpression(target, targetProperty, bindingBase)
+         : new BindingExpression(target, targetProperty, bindingBase);
       expression.EstablishConnection();
       return expression;
    }
@@ -55,13 +65,13 @@ public class BindingExpression : BindingExpressionBase
    {
       CloseConnection();            // idempotent: a DataContext change re-establishes against the new source
       ResolveSource();
-      UpdateTarget();               // initial push
+      Refresh();                    // initial push (or produce)
       if (ResolvedSource is INotifyPropertyChanged notify)
       {
          _observed = notify;
          notify.PropertyChanged += OnSourcePropertyChanged;
       }
-      if (Mode == BindingMode.TwoWay && Target != null)
+      if (Mode == BindingMode.TwoWay && !IsProducer && Target != null)
          Target.PropertyChanged += OnTargetPropertyChanged;
    }
 
@@ -72,7 +82,7 @@ public class BindingExpression : BindingExpressionBase
          _observed.PropertyChanged -= OnSourcePropertyChanged;
          _observed = null;
       }
-      if (Mode == BindingMode.TwoWay && Target != null)
+      if (Mode == BindingMode.TwoWay && !IsProducer && Target != null)
          Target.PropertyChanged -= OnTargetPropertyChanged;
    }
 
@@ -93,9 +103,9 @@ public class BindingExpression : BindingExpressionBase
       for (var i = 0; i < segments.Length - 1 && current != null; i++)
          current = current.GetType().GetProperty(segments[i])?.GetValue(current);
 
-      if (current == null) 
+      if (current == null)
          return;
-      
+
       ResolvedSource = current;
       SourcePropertyName = segments[^1];
       _sourceProperty = current.GetType().GetProperty(SourcePropertyName);
@@ -104,7 +114,7 @@ public class BindingExpression : BindingExpressionBase
    private void OnSourcePropertyChanged(object sender, PropertyChangedEventArgs e)
    {
       if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == SourcePropertyName)
-         UpdateTarget();
+         Refresh();
    }
 
    private void OnTargetPropertyChanged(object sender, AdamantiumPropertyChangedEventArgs e)
@@ -113,12 +123,34 @@ public class BindingExpression : BindingExpressionBase
          UpdateSource();
    }
 
+   // Top-level: push to the target property. Producer: publish ProducedValue for a parent MultiBinding.
+   private void Refresh()
+   {
+      if (IsProducer)
+      {
+         ProducedValue = ComputeValue(typeof(object));
+         RaiseValueChanged();
+      }
+      else
+      {
+         UpdateTarget();
+      }
+   }
+
+   // Reads the source value through the (optional) converter. targetType drives the converter's requested type.
+   private object ComputeValue(Type targetType)
+   {
+      if (_sourceProperty == null) return null;
+      var value = _sourceProperty.GetValue(ResolvedSource);
+      if (Binding.Converter != null)
+         value = Binding.Converter.Convert(value, targetType, Binding.ConverterParameter, CultureInfo.CurrentCulture);
+      return value;
+   }
+
    public override void UpdateTarget()
    {
       if (_sourceProperty == null || TargetProperty == null) return;
-      var value = _sourceProperty.GetValue(ResolvedSource);
-      if (Binding.Converter != null)
-         value = Binding.Converter.Convert(value, TargetProperty.PropertyType, Binding.ConverterParameter, CultureInfo.CurrentCulture);
+      var value = ComputeValue(TargetProperty.PropertyType);
       Target.SetValue(TargetProperty, Coerce(value, TargetProperty.PropertyType), ValuePriority.Binding);
    }
 

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Reflection;
 using Adamantium.Core.TypeParsing;
 using Adamantium.UI.Core.Data;
+using Adamantium.UI.Core.MarkupExtensions;
 using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.Resources;
 using Adamantium.UI.Markup.AST;
@@ -95,15 +96,16 @@ internal sealed class AumlInstantiator
 
         foreach (var value in prop.Values)
         {
+            // A Binding/MultiBinding (markup-extension OR element syntax) sets up a live binding, not a plain value.
+            if (instance is IFundamentalUIComponent bindable && TryBuildBindingBase(value, out var binding))
+            {
+                bindable.SetBinding(pref.Name, binding);
+                continue;
+            }
+
             switch (value)
             {
                 case AumlAstMarkupExtensionNode markup:
-                    // {Binding Path} sets up a live binding to the element's DataContext rather than a plain value.
-                    if (markup.TypeReference?.Name is "Binding" or "BindingExtension" && instance is IFundamentalUIComponent bindable)
-                    {
-                        bindable.SetBinding(pref.Name, BuildBinding(markup));
-                        break;
-                    }
                     var resolved = ResolveMarkupExtension(markup, p.PropertyType);
                     if (resolved != null) p.SetValue(instance, resolved);
                     break;
@@ -150,12 +152,138 @@ internal sealed class AumlInstantiator
         return true;   // a populatable read-only collection; per-child issues are reported individually
     }
 
-    private static Binding BuildBinding(AumlAstMarkupExtensionNode markup)
+    // ---- bindings -------------------------------------------------------------------------------------------------
+
+    // A Binding or MultiBinding written either as a markup extension ({Binding ...}/{MultiBinding ...}) or as an
+    // element (<Binding .../>, <MultiBinding>...</MultiBinding>). Returns false for anything that isn't a binding.
+    private bool TryBuildBindingBase(IAumlAstNode node, out BindingBase binding)
     {
-        // v1: the first positional argument is the path ({Binding User.Name}); a bare {Binding} binds to DataContext.
-        var path = (markup.Arguments.FirstOrDefault()?.Value as AumlAstTextNode)?.Text?.Trim();
-        return string.IsNullOrEmpty(path) ? new Binding() : new Binding(path);
+        binding = node switch
+        {
+            AumlAstMarkupExtensionNode me => me.TypeReference?.Name switch
+            {
+                "Binding" or "BindingExtension" => BuildBindingFromMarkup(me),
+                "MultiBinding" or "MultiBindingExtension" => BuildMultiBindingFromMarkup(me),
+                _ => null,
+            },
+            AumlAstObjectNode obj => obj.TypeReference?.Name switch
+            {
+                "Binding" => BuildBindingFromObject(obj),
+                "MultiBinding" => BuildMultiBindingFromObject(obj),
+                _ => null,
+            },
+            _ => null,
+        };
+        return binding != null;
     }
+
+    private Binding BuildBindingFromMarkup(AumlAstMarkupExtensionNode me)
+    {
+        var binding = new Binding();
+        foreach (var arg in me.Arguments)
+        {
+            if (string.IsNullOrEmpty(arg.Name))   // positional = Path ({Binding User.Name})
+            {
+                var path = (arg.Value as AumlAstTextNode)?.Text?.Trim();
+                if (!string.IsNullOrEmpty(path)) binding.Path = new PropertyPath(path);
+            }
+            else ApplyBindingArg(binding, arg.Name, arg.Value);
+        }
+        return binding;
+    }
+
+    private Binding BuildBindingFromObject(AumlAstObjectNode obj)
+    {
+        var binding = new Binding();
+        foreach (var child in obj.Children)
+            if (child is AumlAstPropertyNode { Property: AumlAstPropertyReference pref } pn && pn.Values.Count > 0)
+                ApplyBindingArg(binding, pref.Name, pn.Values[0]);
+        return binding;
+    }
+
+    private MultiBinding BuildMultiBindingFromMarkup(AumlAstMarkupExtensionNode me)
+    {
+        var multi = new MultiBinding();
+        foreach (var arg in me.Arguments)
+        {
+            if (string.IsNullOrEmpty(arg.Name))                       // positional = a child binding
+            {
+                if (TryBuildBindingBase(arg.Value, out var child)) multi.Bindings.Add(child);
+            }
+            else ApplyMultiBindingArg(multi, arg.Name, arg.Value);
+        }
+        return multi;
+    }
+
+    private MultiBinding BuildMultiBindingFromObject(AumlAstObjectNode obj)
+    {
+        var multi = new MultiBinding();
+        foreach (var child in obj.Children)
+        {
+            switch (child)
+            {
+                case AumlAstObjectNode childObj when TryBuildBindingBase(childObj, out var nested):
+                    multi.Bindings.Add(nested);                       // direct child <Binding/>/<MultiBinding/>
+                    break;
+                case AumlAstPropertyNode { Property: AumlAstPropertyReference pref } pn when pn.Values.Count > 0:
+                    if (pref.Name == "Bindings")                       // explicit <MultiBinding.Bindings> element
+                    {
+                        foreach (var v in pn.Values)
+                            if (TryBuildBindingBase(v, out var listed)) multi.Bindings.Add(listed);
+                    }
+                    else ApplyMultiBindingArg(multi, pref.Name, pn.Values[0]);
+                    break;
+            }
+        }
+        return multi;
+    }
+
+    private void ApplyBindingArg(Binding binding, string name, IAumlAstValueNode value)
+    {
+        switch (name)
+        {
+            case "Path": if ((value as AumlAstTextNode)?.Text is { } p) binding.Path = new PropertyPath(p.Trim()); break;
+            case "Mode": if (TryEnum<BindingMode>(value, out var mode)) binding.Mode = mode; break;
+            case "Converter": if (ResolveValue(value, typeof(IValueConverter)) is IValueConverter c) binding.Converter = c; break;
+            case "ConverterParameter": binding.ConverterParameter = ResolveValue(value, typeof(object)); break;
+            case "Source": binding.Source = ResolveValue(value, typeof(object)); break;
+            case "StringFormat": binding.StringFormat = (value as AumlAstTextNode)?.Text; break;
+            case "FallbackValue": binding.FallbackValue = ResolveValue(value, typeof(object)); break;
+            case "TargetNullValue": binding.TargetNullValue = ResolveValue(value, typeof(object)); break;
+            default: _diagnostics.Add($"Unknown Binding property '{name}'"); break;
+        }
+    }
+
+    private void ApplyMultiBindingArg(MultiBinding multi, string name, IAumlAstValueNode value)
+    {
+        switch (name)
+        {
+            case "Mode": if (TryEnum<BindingMode>(value, out var mode)) multi.Mode = mode; break;
+            case "Converter": if (ResolveValue(value, typeof(IMultiValueConverter)) is IMultiValueConverter c) multi.Converter = c; break;
+            case "ConverterParameter": multi.ConverterParameter = ResolveValue(value, typeof(object)); break;
+            case "StringFormat": multi.StringFormat = (value as AumlAstTextNode)?.Text; break;
+            case "FallbackValue": multi.FallbackValue = ResolveValue(value, typeof(object)); break;
+            case "TargetNullValue": multi.TargetNullValue = ResolveValue(value, typeof(object)); break;
+            default: _diagnostics.Add($"Unknown MultiBinding property '{name}'"); break;
+        }
+    }
+
+    private static bool TryEnum<T>(IAumlAstValueNode value, out T result) where T : struct
+    {
+        result = default;
+        var text = (value as AumlAstTextNode)?.Text;
+        return !string.IsNullOrEmpty(text) && Enum.TryParse(text, ignoreCase: true, out result);
+    }
+
+    // Resolves a markup value node to a runtime object: a markup extension (incl. a converter authored AS a markup
+    // extension, or {ResourceReference}), an inline element (<...><local:MyConverter/></...>), or a text literal.
+    private object ResolveValue(IAumlAstValueNode value, Type targetType) => value switch
+    {
+        AumlAstMarkupExtensionNode me => ResolveMarkupExtension(me, targetType),
+        AumlAstObjectNode obj => Instantiate(obj),
+        AumlAstTextNode text => TryConvert(text.Text, targetType, out var r) ? r : null,
+        _ => null,
+    };
 
     private object ResolveMarkupExtension(AumlAstMarkupExtensionNode markup, Type targetType)
     {
@@ -175,8 +303,29 @@ internal sealed class AumlInstantiator
             catch { return null; }
         }
 
-        _diagnostics.Add($"Markup extension '{name}' is not supported in the preview");
-        return null;
+        // General markup extension - e.g. a converter authored AS a MarkupExtension ({local:MyConverter}). Instantiate
+        // it, set its named args, then call ProvideObject (a converter's ProvideObject typically returns itself).
+        var clrType = ResolveClrType(markup.TypeReference);
+        if (clrType == null)
+        {
+            _diagnostics.Add($"Markup extension '{name}' is not supported in the preview");
+            return null;
+        }
+
+        object instance;
+        try { instance = Activator.CreateInstance(clrType); }
+        catch { _diagnostics.Add($"Cannot create markup extension '{name}'"); return null; }
+
+        foreach (var arg in markup.Arguments)
+        {
+            if (string.IsNullOrEmpty(arg.Name)) continue;
+            var prop = clrType.GetProperty(arg.Name, BindingFlags.Public | BindingFlags.Instance);
+            if (prop is not { CanWrite: true }) continue;
+            var argValue = ResolveValue(arg.Value, prop.PropertyType);
+            if (argValue != null) prop.SetValue(instance, argValue);
+        }
+
+        return instance is MarkupExtension ext ? ext.ProvideObject(new MarkupContext()) : instance;
     }
 
     private bool TryConvert(string text, Type targetType, out object result)
