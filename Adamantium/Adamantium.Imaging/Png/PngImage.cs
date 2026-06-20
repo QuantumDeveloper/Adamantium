@@ -276,52 +276,53 @@ namespace Adamantium.Imaging.Png
                 return;
             }
 
-            var baseFrame = Frames[(int)index];
-            byte[] pixels = new byte[baseFrame.RawPixelBuffer.Length];
-            if (frame.DisposeOp == DisposeOp.None)
-            {
-                Array.Copy(baseFrame.RawPixelBuffer, pixels, pixels.Length);
-            }
-
             var bytesPerPixel = (int)(PngColorConversion.GetBitsPerPixel(State.ColorModeRaw) / 8);
             int lineLength = Header.Width * bytesPerPixel;
+            int canvasSize = lineLength * Header.Height;
 
+            // APNG frames are sub-regions composited onto a full-size canvas. The buffer MUST be the full
+            // canvas (PixelWidth*PixelHeight*bpp), not the sub-region: a sub-region-sized buffer overruns the
+            // texture upload (vkCmdCopyBufferToImage reads past the staging buffer) and loses the device.
+            // The canvas starts from the previous frame's result, unless that frame disposed it.
+            byte[] pixels = new byte[canvasSize];
+            if (index > 0)
+            {
+                var previous = Frames[(int)index - 1];
+                if (previous.DisposeOp == DisposeOp.None && previous.RawPixelBuffer != null)
+                {
+                    Array.Copy(previous.RawPixelBuffer, pixels, Math.Min(previous.RawPixelBuffer.Length, canvasSize));
+                }
+            }
+
+            var src = frame.RawPixelBuffer;
+            int rowBytes = (int)frame.EncodedWidth * bytesPerPixel;
             for (int k = 0; k < frame.EncodedHeight; ++k)
             {
-                try
+                int dstIndex = (((int)frame.YOffset + k) * lineLength) + ((int)frame.XOffset * bytesPerPixel);
+                int srcIndex = k * rowBytes;
+                if (dstIndex < 0 || dstIndex + rowBytes > canvasSize || srcIndex + rowBytes > src.Length)
                 {
-                    var dstIndex = ((frame.YOffset + k) * lineLength) + (frame.XOffset * bytesPerPixel);
-                    var srcIndex = k * frame.EncodedWidth * bytesPerPixel;
-
-                    if (frame.BlendOp == BlendOp.Over)
-                    {
-                        var basePixelBuffer = baseFrame.RawPixelBuffer;
-                        var pixelBuffer = frame.RawPixelBuffer;
-                        // output = alpha * foreground + (1-alpha) * background for each color channel 
-                        // where the alpha value and the input and output sample values are expressed as fractions in the range 0 to 1
-                        int offset = 0;
-                        for (var n = srcIndex; n < pixelBuffer.Length; n += 4)
-                        {
-                            var alpha = pixelBuffer[n + 3] / 255.0f;
-                            var baseAlpha = basePixelBuffer[dstIndex + 3] / 255.0f;
-                            pixelBuffer[n + 0] = (byte)(alpha * (pixelBuffer[n + 0] / 255.0f) +
-                                                        (1 - baseAlpha) *
-                                                        (basePixelBuffer[dstIndex + offset + 0] / 255.0f) * 255);
-                            pixelBuffer[n + 1] = (byte)(alpha * (pixelBuffer[n + 1] / 255.0f) +
-                                                        (1 - baseAlpha) *
-                                                        (basePixelBuffer[dstIndex + offset + 1] / 255.0f) * 255);
-                            pixelBuffer[n + 2] = (byte)(alpha * (pixelBuffer[n + 2] / 255.0f) +
-                                                        (1 - baseAlpha) *
-                                                        (basePixelBuffer[dstIndex + offset + 2] / 255.0f) * 255);
-                            offset += 4;
-                        }
-                    }
-
-                    Array.Copy(frame.RawPixelBuffer, srcIndex, pixels, dstIndex, frame.EncodedWidth * bytesPerPixel);
+                    continue;
                 }
-                catch (Exception e)
+
+                if (frame.BlendOp == BlendOp.Over && bytesPerPixel == 4)
                 {
-                    
+                    // straight-alpha source-over: out = src*srcA + dst*(1-srcA)
+                    for (int x = 0; x < rowBytes; x += 4)
+                    {
+                        int s = srcIndex + x;
+                        int d = dstIndex + x;
+                        float srcA = src[s + 3] / 255.0f;
+                        float invA = 1.0f - srcA;
+                        pixels[d + 0] = (byte)(src[s + 0] * srcA + pixels[d + 0] * invA);
+                        pixels[d + 1] = (byte)(src[s + 1] * srcA + pixels[d + 1] * invA);
+                        pixels[d + 2] = (byte)(src[s + 2] * srcA + pixels[d + 2] * invA);
+                        pixels[d + 3] = (byte)(src[s + 3] + pixels[d + 3] * invA);
+                    }
+                }
+                else // BlendOp.Source: replace the region as-is
+                {
+                    Array.Copy(src, srcIndex, pixels, dstIndex, rowBytes);
                 }
             }
 
