@@ -78,14 +78,10 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
 
     private void UpdateDataContext()
     {
-        // Re-resolve this element's DataContext bindings against the new context (the tree is built before its
-        // DataContext is assigned), then propagate to logical children so they re-resolve in turn.
+        // Re-resolve this element's own bindings against the new context. Propagation to logical children is handled by
+        // value inheritance (InheritanceParent -> ParentPropertyChanged), not an explicit push — which also keeps a
+        // child's locally-set DataContext intact and works regardless of build order.
         BindingEngine.RefreshBindings(this);
-
-        foreach (var logicalChild in LogicalChildren)
-        {
-            logicalChild.DataContext = DataContext;
-        }
     }
 
     private void StylesOnCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
@@ -303,10 +299,10 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
                                                     LogicalParent);
             }
 
-
-            // TODO: define do we actually need InheritanceParent property
-            //InheritanceParent = parent;
             parent = logicalParent;
+            // Wire value inheritance (DataContext and any other Inherits property) to the new logical parent; null on
+            // detach. This is what carries a window's DataContext down to its children so their {Binding}s resolve.
+            InheritanceParent = logicalParent as AdamantiumComponent;
 
             //var root = FindStyleRoot(old);
 
