@@ -303,6 +303,9 @@ class AumlPreviewFileEditor(
             // the canvas upscales to the requested zoom. Updating only on success keeps the last good frame.
             val frameScale = result.scale ?: requestedScale
             canvas.setImage(image, frameScale)
+            // The layout just changed, so any hover/selection frame is now at a stale rect (e.g. the element resized).
+            // Drop it; the next mouse move re-runs the hit-test and draws the frame at the correct size.
+            canvas.setHoverRect(null)
             sizeLabel.text = "${(image.width / frameScale).roundToInt()} × ${(image.height / frameScale).roundToInt()} px"
             hideError()
             // Auto-fit: snap to fit on the first frame and while tracking. applyFit no-ops once we're already
