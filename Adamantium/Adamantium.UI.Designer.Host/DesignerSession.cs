@@ -191,7 +191,8 @@ public sealed class DesignerSession : IDisposable
 
         renderer.Save(outPath, ImageFileType.Png);
 
-        return RenderResult.Ok(outPath, load.Diagnostics, targetWidth, targetHeight, renderScale);
+        return RenderResult.Ok(outPath, load.Diagnostics, targetWidth, targetHeight, renderScale,
+            (uint)Math.Round(designWidth), (uint)Math.Round(designHeight));
     }
 
     /// <summary>
@@ -247,27 +248,48 @@ public sealed class DesignerSession : IDisposable
     }
 
     /// <summary>
-    /// The project's own compiled assembly under its build output, honouring this engine's
-    /// <c>&lt;BaseOutputPath&gt;</c> redirect (else the conventional <c>bin</c>). Searches for the project-named dll
-    /// and returns the most recently built one, so the current target framework wins over stale leftover TFM builds.
+    /// The project's own compiled assembly under its build output. Looks in (in order) an explicit
+    /// <c>&lt;BaseOutputPath&gt;</c>, the conventional per-project <c>bin</c>, and a consolidated <c>artifacts/bin</c>
+    /// found by walking up from the project (this engine builds every project into one such folder via a root
+    /// Directory.Build.props). Returns the most recently built match, so the current target framework wins over stale
+    /// leftover TFM builds.
     /// </summary>
     private static string? FindProjectAssembly(string csprojPath)
     {
-        var projectDir = Path.GetDirectoryName(csprojPath)!;
         var dllName = Path.GetFileNameWithoutExtension(csprojPath) + ".dll";
 
+        foreach (var binBase in CandidateOutputRoots(csprojPath))
+        {
+            if (!Directory.Exists(binBase)) continue;
+            var dll = Directory.EnumerateFiles(binBase, dllName, SearchOption.AllDirectories)
+                .OrderByDescending(File.GetLastWriteTimeUtc)
+                .FirstOrDefault();
+            if (dll != null) return dll;
+        }
+        return null;
+    }
+
+    private static IEnumerable<string> CandidateOutputRoots(string csprojPath)
+    {
+        var projectDir = Path.GetDirectoryName(csprojPath)!;
+
+        // 1. An explicit <BaseOutputPath> in the csproj.
         string baseOutput = null;
         try { baseOutput = System.Xml.Linq.XDocument.Load(csprojPath).Descendants("BaseOutputPath").FirstOrDefault()?.Value?.Trim(); }
-        catch { /* unreadable csproj - fall back to the default bin location */ }
+        catch { /* unreadable csproj - skip */ }
+        if (!string.IsNullOrEmpty(baseOutput))
+            yield return Path.GetFullPath(Path.Combine(projectDir, baseOutput));
 
-        var binBase = !string.IsNullOrEmpty(baseOutput)
-            ? Path.GetFullPath(Path.Combine(projectDir, baseOutput))
-            : Path.Combine(projectDir, "bin");
-        if (!Directory.Exists(binBase)) return null;
+        // 2. The conventional per-project bin.
+        yield return Path.Combine(projectDir, "bin");
 
-        return Directory.EnumerateFiles(binBase, dllName, SearchOption.AllDirectories)
-            .OrderByDescending(File.GetLastWriteTimeUtc)
-            .FirstOrDefault();
+        // 3. A consolidated artifacts/bin (this engine's layout: a root Directory.Build.props redirects every
+        //    project's OutputPath there, so the project has no local bin). Walk up from the project to find it.
+        for (var dir = new DirectoryInfo(projectDir); dir != null; dir = dir.Parent)
+        {
+            var artifactsBin = Path.Combine(dir.FullName, "artifacts", "bin");
+            if (Directory.Exists(artifactsBin)) { yield return artifactsBin; break; }
+        }
     }
 
     /// <summary>

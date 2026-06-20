@@ -306,7 +306,11 @@ class AumlPreviewFileEditor(
             // The layout just changed, so any hover/selection frame is now at a stale rect (e.g. the element resized).
             // Drop it; the next mouse move re-runs the hit-test and draws the frame at the correct size.
             canvas.setHoverRect(null)
-            sizeLabel.text = "${(image.width / frameScale).roundToInt()} × ${(image.height / frameScale).roundToInt()} px"
+            // Prefer the host's authored design size; only fall back to reconstructing it from the scaled pixels
+            // (which loses ±1px at fractional auto-fit scales) for older hosts that don't report it.
+            val labelW = result.designWidth ?: (image.width / frameScale).roundToInt()
+            val labelH = result.designHeight ?: (image.height / frameScale).roundToInt()
+            sizeLabel.text = "$labelW × $labelH px"
             hideError()
             // Auto-fit: snap to fit on the first frame and while tracking. applyFit no-ops once we're already
             // at the fit scale, so this can't loop re-rendering.

@@ -114,6 +114,8 @@ public static class DesignerHost
                 Png = result.PngPath,
                 Width = result.Width,
                 Height = result.Height,
+                DesignWidth = result.DesignWidth,
+                DesignHeight = result.DesignHeight,
                 Scale = result.Scale,
                 Diagnostics = NullIfEmpty(result.Diagnostics)
             };
@@ -180,6 +182,8 @@ public static class DesignerHost
         public string Png { get; set; }
         public uint? Width { get; set; }
         public uint? Height { get; set; }
+        public uint? DesignWidth { get; set; }
+        public uint? DesignHeight { get; set; }
         public double? Scale { get; set; }
         public string Error { get; set; }
         public List<string> Diagnostics { get; set; }
