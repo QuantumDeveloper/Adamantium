@@ -36,6 +36,10 @@ class AumlPreviewService : Disposable {
         val width: Int?,
         val height: Int?,
         val scale: Double?,
+        // The window's authored design size (before scale). Used for the size readout so it shows the true size
+        // instead of pixelSize / scale, which loses ±1px at fractional (auto-fit) scales. Null from older hosts.
+        val designWidth: Int? = null,
+        val designHeight: Int? = null,
     )
 
     /** A designer hit-test result: the authored element's markup position (1-based line/column) and its rect in
@@ -160,7 +164,9 @@ class AumlPreviewService : Disposable {
         val width = (obj["width"] as? Double)?.toInt()
         val height = (obj["height"] as? Double)?.toInt()
         val scale = obj["scale"] as? Double
-        return RenderResult(obj["png"] as? String, obj["error"] as? String, diagnostics, width, height, scale)
+        val designWidth = (obj["designWidth"] as? Double)?.toInt()
+        val designHeight = (obj["designHeight"] as? Double)?.toInt()
+        return RenderResult(obj["png"] as? String, obj["error"] as? String, diagnostics, width, height, scale, designWidth, designHeight)
     }
 
     private fun jsonEscape(s: String): String {
