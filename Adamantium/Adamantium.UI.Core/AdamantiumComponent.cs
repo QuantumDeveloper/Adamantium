@@ -128,12 +128,9 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         }
 
         var metadata = e.Property.GetDefaultMetadata(GetType());
-        if (metadata == null) return;
-        
-        if (metadata.Inherits && !IsSet(e.Property))
-        {
-            RaisePropertyChanged(e.Property, e.OldValue, e.NewValue);
-        }
+        if (metadata is not { Inherits: true } || HasExplicitValue(e.Property)) return;
+
+        RaiseInheritedChange(e.Property, metadata, e.OldValue, e.NewValue);
     }
 
     /// <summary>
@@ -147,20 +144,32 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         get => inheritanceParent;
         set
         {
-            if (inheritanceParent != value)
+            if (inheritanceParent == value) return;
+
+            var oldParent = inheritanceParent;
+            if (oldParent != null)
+                oldParent.PropertyChanged -= ParentPropertyChanged;
+
+            inheritanceParent = value;
+
+            if (inheritanceParent != null)
+                inheritanceParent.PropertyChanged += ParentPropertyChanged;
+
+            // The new parent (or null) brings a different set of inherited values. For every inherited property this
+            // component hasn't set locally, raise a change from the old inherited value to the new one so the value AND
+            // its callbacks (e.g. DataContext -> refresh bindings) apply. This makes inheritance order-independent: an
+            // element attached AFTER its parent's value was assigned still picks it up here.
+            foreach (var property in AdamantiumPropertyMap.GetRegistered(GetType()))
             {
-                if (inheritanceParent != null)
+                var metadata = property.GetDefaultMetadata(GetType());
+                if (metadata is not { Inherits: true } || HasExplicitValue(property)) 
+                    continue;
+
+                var oldValue = oldParent?.GetValue(property) ?? metadata.DefaultValue;
+                var newValue = inheritanceParent?.GetValue(property) ?? metadata.DefaultValue;
+                if (!Equals(oldValue, newValue))
                 {
-                    inheritanceParent.PropertyChanged -= ParentPropertyChanged;
-                }
-
-                //TODO: Dont forget to get all inherited properties for new object and raise property changed events for them
-
-                inheritanceParent = value;
-
-                if (inheritanceParent != null)
-                {
-                    inheritanceParent.PropertyChanged += ParentPropertyChanged;
+                    RaiseInheritedChange(property, metadata, oldValue, newValue);
                 }
             }
         }
@@ -221,24 +230,59 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
     public object GetValue(AdamantiumProperty property)
     {
         ArgumentNullException.ThrowIfNull(property);
-        
-        object result;
+
         if (!AdamantiumPropertyMap.IsRegistered(this, property))
         {
             ThrowNotRegistered(property);
         }
 
+        object result;
+        bool hasExplicit;
         lock (values)
         {
             result = GetOrCalculateEffectiveValue(property);
+            hasExplicit = HasExplicitValue(property);
         }
 
         if (result == AdamantiumProperty.UnsetValue)
         {
             result = GetDefaultValue(property);
         }
+        else if (inheritanceParent != null && !hasExplicit)
+        {
+            // The constructor seeds every property with its Default value, so the effective value never falls through
+            // to GetDefaultValue's inheritance path. When an Inherits property has no explicit (locally-set) value,
+            // defer to the inheritance parent here instead — this is what carries DataContext down the tree.
+            var metadata = property.GetDefaultMetadata(GetType());
+            if (metadata is { Inherits: true })
+            {
+                result = inheritanceParent.GetValue(property);
+            }
+        }
 
         return result;
+    }
+
+    // "Explicit" = a value set from a real source (Animation..Style); the seeded Default and the computed Effective/
+    // Inherited slots don't count. Used to decide whether an Inherits property should defer to its parent.
+    private bool HasExplicitValue(AdamantiumProperty property)
+    {
+        lock (values)
+        {
+            if (!values.TryGetValue(property, out var container)) return false;
+            for (var p = ValuePriority.Animation; p <= ValuePriority.Style; p++)
+                if (container.GetValue(p) != AdamantiumProperty.UnsetValue)
+                    return true;
+        }
+        return false;
+    }
+
+    // An inherited value changed (parent assigned/attached): fire the metadata callback (e.g. DataContext -> refresh
+    // bindings) and re-raise so this element's own descendants inherit in turn.
+    private void RaiseInheritedChange(AdamantiumProperty property, PropertyMetadata metadata, object oldValue, object newValue)
+    {
+        metadata.PropertyChangedCallback?.Invoke(this, new AdamantiumPropertyChangedEventArgs(property, oldValue, newValue));
+        RaisePropertyChanged(property, oldValue, newValue);
     }
 
     /// <summary>
