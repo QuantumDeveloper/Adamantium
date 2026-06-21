@@ -14,7 +14,12 @@
                 Height="150"
                 Background="Yellow"
                 HorizontalAlignment="Center"
-                VerticalAlignment="Center"/>
+                VerticalAlignment="Center">
+            <!-- CSS-style implicit transition: any change to Opacity (code/binding/state) eases over 0.4s. -->
+            <Button.Transitions>
+                <DoubleTransition Property="Opacity" Duration="0:0:0.4"/>
+            </Button.Transitions>
+        </Button>
     <RenderTargetPanel x:Name="TestGrid1"
                        Opacity="0.95"
                        Background="{ResourceReference ApproveBrush}">
