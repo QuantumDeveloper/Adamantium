@@ -761,8 +761,10 @@ public class Grid: Panel
          {
             if (cell.RowSpan == 1)
             {
-               // TODO revisit this code in future to make sure that clamping code is correct
-               row.Min = ClampSegment(desired.Height, 0, row.Max);
+               // Pixel rows are fixed by their definition - content does not resize them. Auto/Star rows grow to fit
+               // the LARGEST child in the row (hence Math.Max, not an overwrite that lets the last child win).
+               if (!row.IsPixel)
+                  row.Min = Math.Max(row.Min, ClampSegment(desired.Height, 0, row.Max));
             }
             else
             {
@@ -774,8 +776,8 @@ public class Grid: Panel
          {
             if (cell.ColSpan == 1)
             {
-               // TODO revisit this code in future to make sure that clamping code is correct
-               col.Min = ClampSegment(desired.Width, 0, col.Max);
+               if (!col.IsPixel)
+                  col.Min = Math.Max(col.Min, ClampSegment(desired.Width, 0, col.Max));
             }
             else
             {
@@ -934,6 +936,8 @@ public class Grid: Panel
       public Boolean IsAuto => OriginalType == GridUnitType.Auto;
 
       public Boolean IsStar => OriginalType == GridUnitType.Star;
+
+      public Boolean IsPixel => OriginalType == GridUnitType.Pixel;
 
       public GridSegment(double size, double min, double max, GridUnitType originalType, int index)
       {
