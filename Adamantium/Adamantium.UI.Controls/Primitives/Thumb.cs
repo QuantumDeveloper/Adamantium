@@ -161,7 +161,9 @@ public class Thumb : Control
          }
       }
 
-      return sizes[0];
+      // No measurable children (e.g. a thumb/splitter with no template applied): desire nothing rather than indexing
+      // an empty list. The element's own explicit Width/Height is still applied by Measure (Constrain).
+      return sizes.Count > 0 ? sizes[0] : new Size();
    }
 
    protected override Size ArrangeOverride(Size finalSize)
