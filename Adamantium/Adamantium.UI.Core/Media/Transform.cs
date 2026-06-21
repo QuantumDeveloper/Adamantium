@@ -3,7 +3,7 @@ using Adamantium.UI.Core.RoutedEvents;
 
 namespace Adamantium.UI.Core.Media;
 
-public class Transform : AdamantiumComponent
+public class Transform : AnimatableUIComponent
 {
     public static readonly AdamantiumProperty ScaleXProperty = AdamantiumProperty.Register(nameof(ScaleX),
         typeof (Double), typeof (Transform), new PropertyMetadata(1.0, TransformPropertyChangedCallback));
@@ -55,13 +55,13 @@ public class Transform : AdamantiumComponent
     public Double TranslateX
     {
         get => GetValue<Double>(TranslateXProperty);
-        set => SetValue(ScaleXProperty, value);
+        set => SetValue(TranslateXProperty, value);
     }
-        
+
     public Double TranslateY
     {
         get => GetValue<Double>(TranslateYProperty);
-        set => SetValue(ScaleYProperty, value);
+        set => SetValue(TranslateYProperty, value);
     }
         
     public Double RotationCenterX
@@ -76,7 +76,7 @@ public class Transform : AdamantiumComponent
         set => SetValue(RotationCenterYProperty, value);
     }
         
-    public Matrix4x4 Matrix { get; private set; }
+    public Matrix4x4 Matrix { get; private set; } = Matrix4x4.Identity;
 
     private void UpdateTransform()
     {

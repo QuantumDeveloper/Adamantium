@@ -237,6 +237,14 @@ public class AumlSourceGenerator : IAumlSourceGenerator
 
         textGenerator.NewLine();
 
+        if (!string.IsNullOrEmpty(container.RootViewModelTypeName))
+        {
+            // x:ViewModel: declare the view-model type as metadata. The framework resolves an instance from the app's
+            // dependency resolver and assigns it as DataContext when the view goes live (FundamentalUIComponent.ApplyViewModel).
+            textGenerator.WriteLine($"public override global::System.Type ViewModelType => typeof(global::{container.RootViewModelTypeName});");
+            textGenerator.NewLine();
+        }
+
         textGenerator.WriteLine($"protected override void InitializeComponent()");
         textGenerator.WriteOpenBraceAndIndent();
 

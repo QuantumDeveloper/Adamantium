@@ -18,6 +18,10 @@ public class AumlMetadataContainer
 
     public string RootClassName { get; set; }
 
+    /// <summary>Full CLR name of the view-model declared via <c>x:ViewModel</c> on the root, or null. When set, the
+    /// generated InitializeComponent resolves it from the DI container and assigns it to DataContext.</summary>
+    public string RootViewModelTypeName { get; set; }
+
     public List<string> Usings { get; }
 
     public Dictionary<IAumlAstNode, string> NamedElementsMap { get; set; }

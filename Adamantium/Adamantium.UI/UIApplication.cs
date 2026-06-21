@@ -592,6 +592,8 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
 
     protected void Update(AppTime frameTime)
     {
+        // Drive time-based animations once per frame (FrameTime is in seconds) before the services update/layout.
+        Adamantium.UI.Core.Media.Animation.AnimationManager.Tick(frameTime.FrameTime);
         EntityWorld.ServiceManager.Update(frameTime);
     }
 

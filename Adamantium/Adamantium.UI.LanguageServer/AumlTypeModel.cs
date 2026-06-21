@@ -195,7 +195,7 @@ public sealed class AumlTypeModel
         GetProperties(element).FirstOrDefault(p => p.Name == propertyName)?.Type;
 
     /// <summary>
-    /// Readable properties for binding-path completion (<c>{Binding ...}</c> against an <c>x:DataType</c>): every
+    /// Readable properties for binding-path completion (<c>{Binding ...}</c> against an <c>x:ViewModel</c>): every
     /// public instance property, inherited included, de-duplicated by name — unlike <see cref="GetProperties"/>
     /// this does not require a setter, since one-way bindings read get-only properties too.
     /// </summary>
@@ -211,7 +211,41 @@ public sealed class AumlTypeModel
             if (member is not { MemberKind: ResolvedMemberKind.Property }) continue;
             result.Add(new AumlPropertyInfo(property.Name, property.PropertyType));
         }
+        AddGeneratedMvvmMembers(type, result, seen);
         return result;
+    }
+
+    // The no-build type model doesn't run source generators, so members the Adamantium.MVVM generator would emit
+    // aren't real symbols. Synthesize them from the attributes the author wrote (matching the generator's naming) so
+    // {Binding} still completes them: [Command] method M -> "MCommand"; [Bindable] field _x -> property "X".
+    private static void AddGeneratedMvvmMembers(IResolvedType type, List<AumlPropertyInfo> result, HashSet<string> seen)
+    {
+        const string commandAttr = "Adamantium.MVVM.CommandAttribute";
+        const string bindableAttr = "Adamantium.MVVM.BindableAttribute";
+        foreach (var member in type.Members ?? Enumerable.Empty<IResolvedMember>())
+        {
+            if (member.MemberKind == ResolvedMemberKind.Method && member.HasAttribute(commandAttr))
+            {
+                var name = member.Name + "Command";
+                if (seen.Add(name)) result.Add(new AumlPropertyInfo(name, null));
+            }
+            else if (member.MemberKind == ResolvedMemberKind.Field && member.HasAttribute(bindableAttr))
+            {
+                var name = MvvmPropertyName(member.Name);
+                if (name is not null && seen.Add(name)) result.Add(new AumlPropertyInfo(name, member.MemberType));
+            }
+        }
+    }
+
+    // Field-name -> generated property name, as the MVVM generator does it: drop a leading "_" or "m_", upper-case the
+    // first letter. "_title"/"m_title"/"title" -> "Title".
+    private static string MvvmPropertyName(string fieldName)
+    {
+        var n = fieldName;
+        if (n.StartsWith("m_", StringComparison.Ordinal)) n = n[2..];
+        else if (n.StartsWith("_", StringComparison.Ordinal)) n = n[1..];
+        if (n.Length == 0) return null;
+        return char.ToUpperInvariant(n[0]) + n[1..];
     }
 
     /// <summary>First element type with this simple name across all registered xmlns namespaces — used
