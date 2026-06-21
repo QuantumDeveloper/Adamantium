@@ -12,7 +12,9 @@
                         VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                         Content="{TemplateBinding Content}"
                         ContentTemplate="{TemplateBinding ContentTemplate}"
-                        ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                        ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"
+                        ContentTransition="{TemplateBinding ContentTransition}"
+                        TransitionDuration="{TemplateBinding TransitionDuration}"/>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

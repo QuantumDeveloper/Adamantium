@@ -13,8 +13,6 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     
     protected bool sizeChanged;
     protected Size previousRenderSize;
-    private Matrix4x4F _cachedWorldTransform;
-    private bool _isTransformDirty = true;
 
     #region Adamantium properties
     
@@ -242,49 +240,23 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     {
         get
         {
-            if (_isTransformDirty)
+            // Local transform: the render transform (applied in the element's local space, may be animating) followed
+            // by the layout offset that positions the element inside its parent.
+            var localTransform = Matrix4x4F.Translation((float)Bounds.Location.X, (float)Bounds.Location.Y, 0);
+
+            var renderTransform = RenderTransform;
+            if (renderTransform != null)
             {
-                // Локальная трансформация (смещение относительно родителя)
-                var localTransform = Matrix4x4F.Translation((float)Bounds.Location.X, (float)Bounds.Location.Y, 0);
-
-                if (VisualParent != null)
-                {
-                    // Рекурсивно получаем трансформацию родителя и умножаем на свою
-                    _cachedWorldTransform = localTransform * VisualParent.WorldTransform;
-                }
-                else
-                {
-                    // Если родителя нет, наша локальная трансформация и есть мировая
-                    _cachedWorldTransform = localTransform;
-                }
-
-                // Сбрасываем флаг, теперь данные актуальны
-                _isTransformDirty = false;
+                localTransform = (Matrix4x4F)renderTransform.Matrix * localTransform;
             }
 
-            return _cachedWorldTransform;
-        }
-    }
-    
-    protected void InvalidateTransform()
-    {
-        // Если уже помечен, ничего не делаем, чтобы избежать лишней работы
-        if (_isTransformDirty)
-        {
-            return;
-        }
-
-        _isTransformDirty = true;
-
-        // Рекурсивно инвалидируем всех визуальных потомков
-        foreach (var child in VisualChildren)
-        {
-            // Предполагая, что у потомка тоже есть этот метод
-            (child as UIComponent)?.InvalidateTransform();
+            // Compose up the visual tree. Computed live each call (not cached): RenderTransform animates per-frame, and
+            // an animated ancestor must carry its whole subtree - a dirty-flag cache would freeze descendants mid-flight.
+            return VisualParent != null ? localTransform * VisualParent.WorldTransform : localTransform;
         }
     }
 
-    
+
     public IReadOnlyCollection<IUIComponent> GetVisualDescendants()
     {
         return VisualChildren;

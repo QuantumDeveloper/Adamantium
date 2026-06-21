@@ -189,6 +189,9 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals
     {
         UIContext = context;
         InitializeComponent();
+        // The root window has no logical parent, so OnAttachedToLogicalTree never fires for it - resolve its
+        // x:ViewModel here, once its tree is built and the context is set. Nested views self-resolve on attach.
+        ApplyViewModel();
         WindowWorkerService = UIAppContext.PlatformService.GetWindowWorker(context);
         WindowWorkerService.SetWindow(this);
     }

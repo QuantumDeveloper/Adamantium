@@ -130,9 +130,9 @@ public sealed class DesignerSession : IDisposable
 
         window.AttachContextAndInitialize(_app.UIContext);
 
-        // Design-time DataContext (x:DataType view-model): rendered with real sample data so {Binding} paths resolve
-        // in the preview - the WPF d:DesignInstance behaviour. Applied after the first layout (below), once the
-        // logical tree exists so it propagates to every element. Suppressed by x:DesignCreatable="false".
+        // Design-time DataContext (x:ViewModel, opt-in via x:CreateInDesignTime="True"): rendered with real sample
+        // data so {Binding} paths resolve in the preview - the WPF d:DesignInstance behaviour. Applied after the first
+        // layout (below), once the logical tree exists so it propagates to every element.
         var designContext = CreateDesignDataContext(aumlText);
 
         var designWidth = ResolveDimension(sizeSource?.Width, requestWidth, DefaultWidth);
@@ -293,21 +293,35 @@ public sealed class DesignerSession : IDisposable
     }
 
     /// <summary>
-    /// Instantiates the markup's design-time view-model (<c>x:DataType="prefix:Type"</c>) so the preview shows real
-    /// sample data through its bindings - the WPF <c>d:DesignInstance</c> / <c>IsDesignTimeCreatable</c> behaviour.
-    /// Returns null when there is no x:DataType, when <c>x:DesignCreatable="false"</c> opts out, or when the type has
-    /// no public parameterless constructor (we never run a parameterised one at design time).
+    /// Instantiates the markup's view-model (<c>x:ViewModel="prefix:Type"</c>) so the preview shows real sample data
+    /// through its bindings - the WPF <c>d:DesignInstance</c> / <c>IsDesignTimeCreatable</c> behaviour. This is opt-in:
+    /// it runs only when <c>x:CreateInDesignTime="True"</c> is set, so a DI view-model (no parameterless ctor in the
+    /// headless designer) or a ctor with side effects is never instantiated unless asked. Returns null when not opted
+    /// in, when there is no x:ViewModel, or when the type has no public parameterless constructor.
     /// </summary>
     private static object CreateDesignDataContext(string aumlText)
     {
-        var dataType = MatchAttributeValue(aumlText, "DataType");
-        if (dataType == null) return null;
-        if (string.Equals(MatchAttributeValue(aumlText, "DesignCreatable"), "false", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(MatchAttributeValue(aumlText, "CreateInDesignTime"), "true", StringComparison.OrdinalIgnoreCase))
             return null;
 
-        var type = ResolveMarkupType(aumlText, dataType);
+        var viewModel = MatchAttributeValue(aumlText, "ViewModel");
+        if (viewModel == null) return null;
+        viewModel = UnwrapTypeExtension(viewModel);   // accept both "prefix:Type" and "{x:Type prefix:Type}"
+
+        var type = ResolveMarkupType(aumlText, viewModel);
         if (type?.GetConstructor(Type.EmptyTypes) == null) return null;
         try { return Activator.CreateInstance(type); } catch { return null; }
+    }
+
+    /// <summary>Unwraps the x:Type markup extension: <c>{x:Type prefix:Type}</c> -> <c>prefix:Type</c>. A plain
+    /// <c>prefix:Type</c> is returned unchanged. (The canonical form is positional with a space, not <c>=</c>.)</summary>
+    private static string UnwrapTypeExtension(string value)
+    {
+        value = value.Trim();
+        if (!value.StartsWith("{") || !value.EndsWith("}")) return value;
+        var inner = value[1..^1].Trim();                 // e.g. "x:Type prefix:Type"
+        var space = inner.IndexOf(' ');
+        return space < 0 ? inner : inner[(space + 1)..].Trim();
     }
 
     /// <summary>Value of the first <c>[prefix:]localName="..."</c> attribute in the text (prefix optional).</summary>

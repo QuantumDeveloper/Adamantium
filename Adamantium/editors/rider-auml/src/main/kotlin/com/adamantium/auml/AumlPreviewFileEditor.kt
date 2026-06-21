@@ -303,6 +303,7 @@ class AumlPreviewFileEditor(
             // the canvas upscales to the requested zoom. Updating only on success keeps the last good frame.
             val frameScale = result.scale ?: requestedScale
             canvas.setImage(image, frameScale)
+            canvas.setStale(false)   // fresh frame: undim
             // The layout just changed, so any hover/selection frame is now at a stale rect (e.g. the element resized).
             // Drop it; the next mouse move re-runs the hit-test and draws the frame at the correct size.
             canvas.setHoverRect(null)
@@ -316,6 +317,8 @@ class AumlPreviewFileEditor(
             // at the fit scale, so this can't loop re-rendering.
             if (autoFit) applyFit()
         } else {
+            // Keep the last good frame (don't clear it) but dim it, and surface the error as a non-blocking badge.
+            canvas.setStale(true)
             showError(result.error ?: "render failed")
         }
     }
@@ -440,6 +443,16 @@ class AumlPreviewFileEditor(
             repaint()
         }
 
+        // When a render fails (transiently invalid markup mid-edit), the last good frame is kept but dimmed, so it's
+        // clear the preview is frozen at the last successful state rather than reflecting the current broken markup.
+        private var stale = false
+
+        fun setStale(value: Boolean) {
+            if (stale == value) return
+            stale = value
+            repaint()
+        }
+
         /** Maps a canvas point to the frame's design space (the coordinates the host hit-tests in), or null when
          * the point is outside the drawn frame (so hovering the checkerboard clears the highlight). */
         fun canvasToDesign(p: Point): Point2D.Double? {
@@ -492,6 +505,11 @@ class AumlPreviewFileEditor(
             val y = max(0, (height - size.height) / 2)
             g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
             g2.drawImage(img, x, y, size.width, size.height, null)
+            // Stale: the current markup didn't render (transiently invalid); dim the kept last-good frame.
+            if (stale) {
+                g2.color = STALE_OVERLAY
+                g2.fillRect(x, y, size.width, size.height)
+            }
             // Designer hover frame: the element's design-space rect, scaled into the canvas with the same offset.
             hoverRect?.let { r ->
                 g2.color = HOVER_COLOR
@@ -537,6 +555,7 @@ class AumlPreviewFileEditor(
         private const val MAX_SCALE = 8.0
         private val ZOOM_PRESETS = listOf(0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0)
         private const val CHECKER_TILE = 12
+        private val STALE_OVERLAY = java.awt.Color(0, 0, 0, 90)   // ~35% dim over the kept frame when the markup is broken
         private val CHECKER_DARK = JBColor(0xC8C8C8, 0x3C3F41)
         private val CHECKER_LIGHT = JBColor(0xE8E8E8, 0x4B4F52)
         private val SOLID_DARK = JBColor(0x2B2B2B, 0x2B2B2B)

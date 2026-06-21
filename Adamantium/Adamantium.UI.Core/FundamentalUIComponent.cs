@@ -122,8 +122,45 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
 
     public object DataContext
     {
-        get => GetValue(DataContextProperty); 
+        get => GetValue(DataContextProperty);
         set => SetValue(DataContextProperty, value);
+    }
+
+    private bool _viewModelApplied;
+
+    /// <summary>
+    /// The view-model type declared in markup via <c>x:ViewModel</c>. Generated code-behind overrides this to return
+    /// the authored type; the default is null. It is pure metadata - the control does NOT hold a container. When the
+    /// element becomes live (attached to the tree / window initialized) the framework resolves an instance from the
+    /// app's dependency resolver and assigns it as <see cref="DataContext"/> (see <see cref="ApplyViewModel"/>).
+    /// </summary>
+    public virtual Type ViewModelType => null;
+
+    /// <summary>
+    /// Resolves the <see cref="ViewModelType"/> (if any) from the application's dependency resolver and assigns it as
+    /// the DataContext - but only the first time, and only if the DataContext wasn't set explicitly (so x:ViewModel is
+    /// the default, an explicit DataContext or binding still wins, which keeps a view reusable across view-models).
+    /// Reached through the same ambient <see cref="UIAppContext.Current"/> the framework already uses for theming, so
+    /// the control never stores the container. No-op when no resolver is available (e.g. the headless designer).
+    /// </summary>
+    protected void ApplyViewModel()
+    {
+        if (_viewModelApplied) return;
+
+        var viewModelType = ViewModelType;
+        if (viewModelType == null) return;
+
+        if (HasExplicitValue(DataContextProperty))
+        {
+            _viewModelApplied = true;   // caller already provided a DataContext; don't override it
+            return;
+        }
+
+        var context = UIAppContext.Current?.UIContext;
+        if (context == null) return;    // app context not ready yet; a later attach will retry
+
+        DataContext = context.Resolve(viewModelType);
+        _viewModelApplied = true;
     }
 
     public string Id
@@ -353,7 +390,9 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
 
     protected virtual void OnAttachedToLogicalTree(LogicalTreeAttachmentEventArgs e)
     {
-        
+        // A nested view (created via 'new' by its parent's generated code) declares its view-model with x:ViewModel;
+        // resolve it now that the element is part of a live tree and the app context is reachable.
+        ApplyViewModel();
     }
 
     protected virtual void OnDetachedFromLogicalTree(LogicalTreeAttachmentEventArgs e)

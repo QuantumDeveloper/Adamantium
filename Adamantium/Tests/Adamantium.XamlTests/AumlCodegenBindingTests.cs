@@ -170,6 +170,37 @@ public class AumlCodegenBindingTests
     }
 
     [Test]
+    public void ViewModel_EmitsViewModelTypeOverride()
+    {
+        // x:ViewModel binds a view-model type to the view; for codegen any resolvable type works, so TextBlock
+        // stands in for a VM. The generated class declares the type as a ViewModelType override (pure metadata) -
+        // the framework resolves the instance from the DI resolver at attach time, not in generated code.
+        var code = Generate(WindowHeader + "x:ViewModel=\"TextBlock\"><Grid /></Window>", out var errors);
+
+        Assert.That(errors, Is.Empty, Errors(errors));
+        Assert.That(code, Does.Contain("public override global::System.Type ViewModelType => typeof("));
+        Assert.That(code, Does.Contain("TextBlock"));
+    }
+
+    [Test]
+    public void ViewModel_GeneratedCodeCompiles()
+    {
+        var errors = Compile(WindowHeader + "x:ViewModel=\"TextBlock\"><Grid /></Window>");
+        Assert.That(errors, Is.Empty, "generated code did not compile: " + string.Join(" | ", errors.Select(d => d.ToString())));
+    }
+
+    [Test]
+    public void ViewModel_AcceptsXTypeMarkupExtensionForm()
+    {
+        // x:ViewModel="{x:Type ...}" must work too (lets the editor complete types in the braces).
+        var code = Generate(WindowHeader + "x:ViewModel=\"{x:Type TextBlock}\"><Grid /></Window>", out var errors);
+
+        Assert.That(errors, Is.Empty, Errors(errors));
+        Assert.That(code, Does.Contain("public override global::System.Type ViewModelType => typeof("));
+        Assert.That(code, Does.Contain("TextBlock"));
+    }
+
+    [Test]
     public void NestedMultiBinding_GeneratedCodeCompiles()
     {
         var auml = WindowHeader + ">" +

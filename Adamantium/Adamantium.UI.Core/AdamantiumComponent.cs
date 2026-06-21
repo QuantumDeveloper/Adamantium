@@ -265,7 +265,7 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
 
     // "Explicit" = a value set from a real source (Animation..Style); the seeded Default and the computed Effective/
     // Inherited slots don't count. Used to decide whether an Inherits property should defer to its parent.
-    private bool HasExplicitValue(AdamantiumProperty property)
+    protected bool HasExplicitValue(AdamantiumProperty property)
     {
         lock (values)
         {

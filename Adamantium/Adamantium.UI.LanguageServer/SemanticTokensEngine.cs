@@ -40,11 +40,12 @@ public static class SemanticTokensEngine
             while (i < text.Length && text[i] != '>')
             {
                 char c = text[i];
-                if (c is '"' or '\'')                          // skip a quoted value
+                if (c is '"' or '\'')                          // a quoted value
                 {
-                    i++;
+                    int valStart = ++i;
                     while (i < text.Length && text[i] != c) i++;
-                    if (i < text.Length) i++;
+                    TokenizeValue(tokens, text, valStart, i, namespaces, model);   // colour {Binding}/{x:Type}/… inside
+                    if (i < text.Length) i++;                  // past the closing quote
                     continue;
                 }
                 if (IsNameStart(c))
@@ -118,6 +119,70 @@ public static class SemanticTokensEngine
         }
 
         tokens.Add(new SemToken(localStart, localLength, type));
+    }
+
+    // Colours a markup extension written inside an attribute value (e.g. "{Binding ShowMessageCommand}",
+    // "{x:Type vm:MainViewModel}"); a plain string value is left to the client's default string colour.
+    private static void TokenizeValue(List<SemToken> tokens, string text, int start, int end,
+        IReadOnlyDictionary<string, string> namespaces, AumlTypeModel? model)
+    {
+        int i = start;
+        while (i < end && char.IsWhiteSpace(text[i])) i++;
+        if (i < end && text[i] == '{') TokenizeMarkupExtension(tokens, text, i, end, namespaces, model);
+    }
+
+    private static void TokenizeMarkupExtension(List<SemToken> tokens, string text, int start, int end,
+        IReadOnlyDictionary<string, string> namespaces, AumlTypeModel? model)
+    {
+        int i = start + 1;   // past '{'
+        while (i < end && char.IsWhiteSpace(text[i])) i++;
+
+        // Extension name (Binding / x:Type / ResourceReference / …): the local part reads as a 'macro', like an
+        // x: directive; an x: prefix on it reads as a namespace.
+        int nameStart = i;
+        while (i < end && IsNameChar(text[i])) i++;
+        if (i > nameStart) AddQualifiedName(tokens, text, nameStart, i, bareKind: Macro, prefixedKind: Macro);
+
+        // Body: type references (prefix:Type -> 'type'), binding paths (bare identifiers -> 'property'), nested
+        // extensions ({StaticResource …}). Bounded by 'end' (the closing quote), so a missing '}' mid-edit is safe.
+        while (i < end)
+        {
+            char c = text[i];
+            if (c == '}') break;
+            if (c == '{')
+            {
+                int close = i + 1, depth = 1;
+                while (close < end && depth > 0) { if (text[close] == '{') depth++; else if (text[close] == '}') depth--; close++; }
+                TokenizeMarkupExtension(tokens, text, i, close, namespaces, model);
+                i = close;
+                continue;
+            }
+            if (IsNameStart(c))
+            {
+                int s = i;
+                while (i < end && IsNameChar(text[i])) i++;
+                AddQualifiedName(tokens, text, s, i, bareKind: Property, prefixedKind: Type);
+                continue;
+            }
+            i++;
+        }
+    }
+
+    // Colours a "[prefix:]name" token: the prefix as a namespace; the local part as prefixedKind when it has a prefix
+    // (a value's prefix:name is always a type reference), else bareKind.
+    private static void AddQualifiedName(List<SemToken> tokens, string text, int start, int end, int bareKind, int prefixedKind)
+    {
+        int colon = -1;
+        for (int k = start; k < end; k++) if (text[k] == ':') { colon = k; break; }
+        if (colon >= 0)
+        {
+            if (colon > start) tokens.Add(new SemToken(start, colon - start, Namespace));
+            if (colon + 1 < end) tokens.Add(new SemToken(colon + 1, end - (colon + 1), prefixedKind));
+        }
+        else
+        {
+            tokens.Add(new SemToken(start, end - start, bareKind));
+        }
     }
 
     private static bool IsNameStart(char c) => char.IsLetter(c) || c == '_';

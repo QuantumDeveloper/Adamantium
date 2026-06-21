@@ -496,7 +496,6 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
             if (Bounds != newBounds)
             {
                 Bounds = newBounds;
-                InvalidateTransform();
             }
 
             if (sizeChanged)

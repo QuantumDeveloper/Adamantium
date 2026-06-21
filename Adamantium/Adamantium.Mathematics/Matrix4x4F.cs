@@ -3275,22 +3275,43 @@ namespace Adamantium.Mathematics
         public static explicit operator Matrix4x4(Matrix4x4F matrixF)
         {
             return new Matrix4x4(
-                matrixF.M11, 
-                matrixF.M12, 
-                matrixF.M13, 
-                matrixF.M14, 
-                matrixF.M21, 
-                matrixF.M22, 
+                matrixF.M11,
+                matrixF.M12,
+                matrixF.M13,
+                matrixF.M14,
+                matrixF.M21,
+                matrixF.M22,
                 matrixF.M23,
-                matrixF.M24, 
-                matrixF.M31, 
-                matrixF.M32, 
-                matrixF.M33, 
-                matrixF.M34, 
-                matrixF.M41, 
-                matrixF.M42, 
+                matrixF.M24,
+                matrixF.M31,
+                matrixF.M32,
+                matrixF.M33,
+                matrixF.M34,
+                matrixF.M41,
+                matrixF.M42,
                 matrixF.M43,
                 matrixF.M44);
+        }
+
+        public static explicit operator Matrix4x4F(Matrix4x4 matrix)
+        {
+            return new Matrix4x4F(
+                (float)matrix.M11,
+                (float)matrix.M12,
+                (float)matrix.M13,
+                (float)matrix.M14,
+                (float)matrix.M21,
+                (float)matrix.M22,
+                (float)matrix.M23,
+                (float)matrix.M24,
+                (float)matrix.M31,
+                (float)matrix.M32,
+                (float)matrix.M33,
+                (float)matrix.M34,
+                (float)matrix.M41,
+                (float)matrix.M42,
+                (float)matrix.M43,
+                (float)matrix.M44);
         }
 
         /// <summary>

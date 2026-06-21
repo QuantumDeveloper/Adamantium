@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Adamantium.UI.Markup.AST;
 
 namespace Adamantium.UI.LanguageServer;
 
@@ -40,11 +41,13 @@ public sealed class CompletionEngine
         };
     }
 
-    // After '{': offer the available markup-extension names (TemplateBinding, ResourceReference, …).
+    // After '{': offer the available markup-extension names (TemplateBinding, ResourceReference, …). ReplaceBack only
+    // covers the partial name typed after '{' (so the '{' is preserved, not eaten by the client's word guess), and the
+    // snippet closes the brace + drops the caret where the argument goes: "{Binding |}".
     private IReadOnlyList<AumlCompletionItem> CompleteMarkupExtensionName(AumlCompletionContext ctx) =>
         _model.GetMarkupExtensions()
             .Where(n => Matches(n, ctx.Prefix))
-            .Select(n => new AumlCompletionItem(n, AumlCompletionItemKind.Element))
+            .Select(n => new AumlCompletionItem(n, AumlCompletionItemKind.Element, InsertText: n + " $0}", ReplaceBack: ctx.Prefix.Length))
             .ToList();
 
     // Inside "{Name arg}": complete the argument. v1 handles {TemplateBinding <prop>} -> the templated parent's
@@ -67,41 +70,44 @@ public sealed class CompletionEngine
                 .ToList();
         }
 
-        // {Binding <path>} -> properties of the enclosing x:DataType (design-time DataContext), walking dotted paths.
+        // {Binding <path>} -> properties of the enclosing x:ViewModel (the DataContext type), walking dotted paths.
         if (extLocal is "Binding" or "BindingExtension")
-            return CompleteBindingPath(ctx.Prefix, FindNearestAttributeType(text, offset, "DataType", namespaces));
+            return CompleteBindingPath(ctx.Prefix, FindNearestAttributeType(text, offset, "ViewModel", namespaces));
 
-        // {x:Type <TypeName>} -> element type names, xmlns-prefixed or default, like element completion.
+        // {x:Type <TypeName>} -> type names (xmlns-prefixed or default), like element completion.
         if (extLocal is "Type" or "TypeExtension")
-        {
-            var (prefix, partial) = SplitName(ctx.Prefix);
-            var xmlns = ResolveXmlns(prefix, namespaces);
-            if (xmlns.Length == 0) return [];
-            return _model.GetElements(xmlns)
-                .Where(t => Matches(t.Name, partial))
-                .OrderBy(t => t.Name)
-                .Select(t => new AumlCompletionItem(t.Name, AumlCompletionItemKind.Element))
-                .ToList();
-        }
+            return CompleteTypeNames(ctx.Prefix, namespaces);
 
         return [];
     }
 
     /// <summary>The type named by the nearest <c>&lt;attrLocalName&gt;="..."</c> attribute before the caret
-    /// (pragmatic scan): the ControlTemplate's <c>TargetType</c> for a TemplateBinding, or the <c>x:DataType</c>
+    /// (pragmatic scan): the ControlTemplate's <c>TargetType</c> for a TemplateBinding, or the <c>x:ViewModel</c>
     /// for a Binding. Good enough to scope completion to the enclosing template / data type.</summary>
     private Adamantium.UI.Markup.CodeGeneration.IResolvedType? FindNearestAttributeType(
         string text, int offset, string attrLocalName, IReadOnlyDictionary<string, string> namespaces)
     {
         int region = Math.Min(offset, text.Length);
-        int idx = text.LastIndexOf(attrLocalName, Math.Max(0, region - 1), StringComparison.Ordinal);
-        if (idx < 0) return null;
-        int q1 = text.IndexOf('"', idx);
-        if (q1 < 0 || q1 >= region) return null;
-        int q2 = text.IndexOf('"', q1 + 1);
-        if (q2 < 0) return null;
-        var (prefix, local) = SplitName(text.Substring(q1 + 1, q2 - q1 - 1).Trim());
+        var head = text.Substring(0, region);
+        // Match the attribute by NAME (optionally xmlns-prefixed) followed by ="...". Anchoring on `name="` is what
+        // makes this robust: a plain substring search would match the local name inside a VALUE - e.g. "ViewModel"
+        // inside "MainViewModel" - and resolve the wrong text, which is exactly why {Binding} completion went blank.
+        var matches = Regex.Matches(head, $@"(?:\w+:)?{Regex.Escape(attrLocalName)}\s*=\s*""([^""]*)""");
+        if (matches.Count == 0) return null;
+        var value = matches[^1].Groups[1].Value.Trim();   // nearest (last) such attribute before the caret
+        var (prefix, local) = SplitName(UnwrapTypeExtension(value));
         return ResolveType(prefix, local, namespaces);
+    }
+
+    // Accepts both "prefix:Type" and the x:Type markup-extension form "{x:Type prefix:Type}" (positional, space-
+    // separated). Without this, a ViewModel written as {x:Type ...} wouldn't resolve and {Binding} path completion
+    // would offer nothing.
+    private static string UnwrapTypeExtension(string value)
+    {
+        if (!value.StartsWith('{') || !value.EndsWith('}')) return value;
+        var inner = value[1..^1].Trim();
+        var space = inner.IndexOf(' ');
+        return space < 0 ? inner : inner[(space + 1)..].Trim();
     }
 
     /// <summary>Completes a (possibly dotted) binding path against <paramref name="dataType"/>: each segment before
@@ -129,7 +135,9 @@ public sealed class CompletionEngine
         return _model.GetBindableProperties(type)
             .Where(p => Matches(p.Name, memberPartial))
             .OrderBy(p => p.Name)
-            .Select(p => new AumlCompletionItem(p.Name, AumlCompletionItemKind.Property, p.Type?.Name))
+            // ReplaceBack covers only the current path segment, so picking an item replaces just "Sh" (not the whole
+            // "{Binding Sh"), and the client filters the list by this segment as you type instead of the whole value.
+            .Select(p => new AumlCompletionItem(p.Name, AumlCompletionItemKind.Property, p.Type?.Name, ReplaceBack: memberPartial.Length))
             .ToList();
     }
 
@@ -243,6 +251,11 @@ public sealed class CompletionEngine
 
     private IReadOnlyList<AumlCompletionItem> CompleteValues(AumlCompletionContext ctx, IReadOnlyDictionary<string, string> namespaces, string? documentPath)
     {
+        // A type-valued x: directive (x:ViewModel) completes type names directly in its value - the simplified form
+        // without {x:Type}. Same type set used inside {x:Type}.
+        if (IsTypeReferenceDirective(ctx.AttributeName, namespaces))
+            return CompleteTypeNames(ctx.Prefix, namespaces);
+
         var element = ResolveElement(ctx.ElementName, namespaces);
         var propertyType = element is null ? null : _model.GetPropertyType(element, ctx.AttributeName ?? "");
         if (propertyType is null) return [];
@@ -256,6 +269,56 @@ public sealed class CompletionEngine
             .Where(v => Matches(v, ctx.Prefix))
             .Select(v => new AumlCompletionItem(v, AumlCompletionItemKind.Value, propertyType.Name))
             .ToList();
+    }
+
+    // Completes a type reference written as "[prefix:]Partial": offers the types of the prefix's xmlns (a
+    // clr-namespace includes its view-models). Shared by {x:Type ...} and the plain type-valued x: directives.
+    private IReadOnlyList<AumlCompletionItem> CompleteTypeNames(string prefixText, IReadOnlyDictionary<string, string> namespaces)
+    {
+        var (prefix, partial) = SplitName(prefixText);
+
+        // Prefix already typed (e.g. "vm:Ma"): complete within that namespace, replacing only the name part.
+        if (prefix.Length > 0)
+        {
+            var xmlns = ResolveXmlns(prefix, namespaces);
+            if (xmlns.Length == 0) return [];
+            return _model.GetElements(xmlns)
+                .Where(t => Matches(t.Name, partial))
+                .OrderBy(t => t.Name)
+                .Select(t => new AumlCompletionItem(t.Name, AumlCompletionItemKind.Element, ReplaceBack: partial.Length))
+                .ToList();
+        }
+
+        // No prefix yet: offer types from EVERY declared namespace so a view-model in a clr-namespace shows while you
+        // type its bare name (without it, only the default xmlns was offered, so the list kept vanishing). A type
+        // outside the default xmlns is inserted prefix-qualified ("vm:MainViewModel") so it resolves; filterText (the
+        // bare name) keeps the client filtering the list as you type.
+        var items = new List<AumlCompletionItem>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var ns in namespaces)
+        {
+            foreach (var t in _model.GetElements(ns.Value))
+            {
+                if (!Matches(t.Name, partial)) continue;
+                var insert = ns.Key.Length > 0 ? $"{ns.Key}:{t.Name}" : t.Name;
+                if (!seen.Add(insert)) continue;
+                items.Add(new AumlCompletionItem(t.Name, AumlCompletionItemKind.Element,
+                    ns.Key.Length > 0 ? ns.Key : null, InsertText: insert, ReplaceBack: partial.Length));
+            }
+        }
+        return items.OrderBy(i => i.Label).ToList();
+    }
+
+    // True when the attribute is an x: directive whose value names a CLR type (x:ViewModel), per the single-source
+    // registry AumlDirectives. Lets the plain "prefix:Type" value complete types, like inside {x:Type}.
+    private static bool IsTypeReferenceDirective(string? attributeName, IReadOnlyDictionary<string, string> namespaces)
+    {
+        if (string.IsNullOrEmpty(attributeName)) return false;
+        int colon = attributeName.IndexOf(':');
+        if (colon < 0) return false;
+        if (!namespaces.TryGetValue(attributeName[..colon], out var ns) || ns != AumlXDirectives.Xmlns) return false;
+        var local = attributeName[(colon + 1)..];
+        return AumlDirectives.All.Any(d => d.Name == local && d.IsTypeReference);
     }
 
     // Properties whose markup value is a file path (the engine converts the string to the real resource on load).

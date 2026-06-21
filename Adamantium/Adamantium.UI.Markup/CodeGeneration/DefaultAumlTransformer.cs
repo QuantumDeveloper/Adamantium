@@ -392,11 +392,40 @@ public class DefaultAumlTransformer : IAumlTransformer
                     
                     break;
                 case AumlAstDirective directive:
-                    if (directive.Name == "Name")
+                    if (directive.Name == AumlDirectives.Name)
                     {
                         if (directive.Value is AumlAstTextNode textNode)
                         {
                             container.NamedElements.Add(new NamedElement(textNode.Text, directive.ParentNode));
+                        }
+                    }
+                    else if (directive.Name == AumlDirectives.ViewModel && directive.ParentNode == document.Root)
+                    {
+                        // x:ViewModel="prefix:Vm" on the root records the view-model type as metadata; the framework
+                        // resolves it from the DI container and assigns it as DataContext when the view goes live.
+                        if (directive.Value is AumlAstTextNode vmNode && !string.IsNullOrWhiteSpace(vmNode.Text))
+                        {
+                            // Accept both a plain type reference (x:ViewModel="local:Vm") and the x:Type markup-extension
+                            // form (x:ViewModel="{x:Type local:Vm}"). The parser turns {x:Type body} into a 'Type'
+                            // directive whose value is the inner type text.
+                            var typeText = vmNode.Text.Trim();
+                            if (typeText.StartsWith("{"))
+                            {
+                                var parsed = MarkupExtensionParser.Parse(new ParserContext(null), typeText, directive.GetLineInfo(), document.NamespaceMappings.ToList());
+                                if (parsed is AumlAstDirective { Name: AumlDirectives.Type, Value: AumlAstTextNode innerType })
+                                    typeText = innerType.Text.Trim();
+                            }
+
+                            var vmTypeRef = MarkupExtensionParser.ParseTypeName(new ParserContext(null), typeText, directive.GetLineInfo(), document.NamespaceMappings.ToList());
+                            var resolvedVmType = ProcessTypeReference(vmTypeRef, directive.GetLineInfo());
+                            if (resolvedVmType is { IsResolved: true })
+                            {
+                                container.RootViewModelTypeName = resolvedVmType.GetFullTypeName();
+                            }
+                            else
+                            {
+                                diagnostics.ReportError(document.FileName, $"x:ViewModel type '{vmNode.Text}' could not be resolved. {directive.GetLineInfo()}");
+                            }
                         }
                     }
                     break;

@@ -182,6 +182,8 @@ public sealed class LspServer
                     ["newText"] = item.InsertText ?? item.Label
                 };
                 node["filterText"] = item.Label;
+                if (item.InsertText is not null && item.InsertText.Contains('$'))
+                    node["insertTextFormat"] = 2;   // Snippet — e.g. "Binding $0}" closes the brace and places the caret
             }
             else if (item.InsertText is not null)
             {

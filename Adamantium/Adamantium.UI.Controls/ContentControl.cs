@@ -11,12 +11,14 @@ namespace Adamantium.UI.Controls;
 public class ContentControl : Control, IContentControl
 {
    private IUIComponent _currentVisualChild;
-   
+   private IUIComponent _outgoingVisualChild;
+   private bool _transitionPending;
+
    private ContentPresenter _contentPresenter;
    private bool _contentChanged;
-   
+
    public static readonly AdamantiumProperty ContentProperty = AdamantiumProperty.Register(nameof(Content),
-      typeof(object), typeof(ContentControl), new PropertyMetadata(null, ContentChangedCallback));
+      typeof(object), typeof(ContentControl), new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure, ContentChangedCallback));
    
    public static readonly AdamantiumProperty HorizontalContentAlignmentProperty = AdamantiumProperty.Register(nameof(HorizontalContentAlignment),
       typeof(HorizontalAlignment), typeof(MeasurableUIComponent), new PropertyMetadata(HorizontalAlignment.Stretch, PropertyMetadataOptions.AffectsArrange));
@@ -29,7 +31,13 @@ public class ContentControl : Control, IContentControl
     
    public static readonly AdamantiumProperty ContentTemplateSelectorProperty = AdamantiumProperty.Register(nameof(ContentTemplateSelector),
       typeof(DataTemplateSelector), typeof(ContentControl), new PropertyMetadata(null, OnContentTemplateSelectorChanged));
-    
+
+   public static readonly AdamantiumProperty ContentTransitionProperty = AdamantiumProperty.Register(nameof(ContentTransition),
+      typeof(ContentTransition), typeof(ContentControl), new PropertyMetadata(ContentTransition.None));
+
+   public static readonly AdamantiumProperty TransitionDurationProperty = AdamantiumProperty.Register(nameof(TransitionDuration),
+      typeof(Double), typeof(ContentControl), new PropertyMetadata(0.25));
+
    private static void ContentChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
    {
       if (a is ContentControl o)
@@ -84,7 +92,21 @@ public class ContentControl : Control, IContentControl
       get => GetValue<HorizontalAlignment>(HorizontalContentAlignmentProperty);
       set => SetValue(HorizontalContentAlignmentProperty, value);
    }
-   
+
+   /// <summary>The animation played when <see cref="Content"/> is replaced. Defaults to <see cref="ContentTransition.None"/>.</summary>
+   public ContentTransition ContentTransition
+   {
+      get => GetValue<ContentTransition>(ContentTransitionProperty);
+      set => SetValue(ContentTransitionProperty, value);
+   }
+
+   /// <summary>Duration of the content transition, in seconds. Defaults to 0.25.</summary>
+   public Double TransitionDuration
+   {
+      get => GetValue<Double>(TransitionDurationProperty);
+      set => SetValue(TransitionDurationProperty, value);
+   }
+
    public override void OnApplyTemplate()
    {
       base.OnApplyTemplate();
@@ -111,34 +133,54 @@ public class ContentControl : Control, IContentControl
       // A later Content/Template change sets _contentChanged = true again (OnContentChangedInternal / OnApplyTemplate).
       _contentChanged = false;
 
-      if (_currentVisualChild != null)
+      // A new swap supersedes one still mid-flight: finish the previous transition instantly first.
+      RemoveOutgoing();
+
+      // Templated path: PART_ContentPresenter hosts the content (and runs its own transition). Drop any direct child.
+      if (Template != null)
+      {
+         if (_currentVisualChild != null)
+         {
+            RemoveVisualChild(_currentVisualChild);
+            RemoveLogicalChild(_currentVisualChild);
+            _currentVisualChild = null;
+         }
+         return;
+      }
+
+      // Animate when a transition is selected and there is new content - including the FIRST content (slides in from
+      // the side and settles, MahApps-style). Off in the designer: it renders a single frame, so a live slide would be
+      // caught mid-flight; show the settled state instead (like the WPF designer).
+      var animate = ContentTransition != ContentTransition.None && content != null && !Design.IsDesignMode;
+
+      if (animate && _currentVisualChild != null)
+      {
+         _outgoingVisualChild = _currentVisualChild;   // keep the old child to slide it out
+      }
+      else if (_currentVisualChild != null)
       {
          RemoveVisualChild(_currentVisualChild);
          RemoveLogicalChild(_currentVisualChild);
-         _currentVisualChild = null;
+      }
+      _currentVisualChild = null;
+
+      if (content != null)
+      {
+         _currentVisualChild = content as IUIComponent ?? new TextBlock { FontSize = 28, Text = content.ToString() };
+         AddVisualChild(_currentVisualChild);
+         AddLogicalChild(_currentVisualChild);
       }
 
-      if (Template != null)
-      {
-         return;
-      }
+      _transitionPending = animate && _currentVisualChild != null;
+   }
 
-      if (content == null)
-      {
+   private void RemoveOutgoing()
+   {
+      if (_outgoingVisualChild == null)
          return;
-      }
-    
-      if (content is IUIComponent uiComponent)
-      {
-         _currentVisualChild = uiComponent;
-      }
-      else
-      {
-         _currentVisualChild = new TextBlock { FontSize = 28, Text = content.ToString()};
-      }
-    
-      AddVisualChild(_currentVisualChild);
-      AddLogicalChild(_currentVisualChild);
+      RemoveVisualChild(_outgoingVisualChild);
+      RemoveLogicalChild(_outgoingVisualChild);
+      _outgoingVisualChild = null;
    }
 
    protected override Size MeasureOverride(Size availableSize)
@@ -178,13 +220,17 @@ public class ContentControl : Control, IContentControl
                 
          child.Arrange(childRect);
       }
-        
-      return finalSize;
 
-      
-      return new Size(0, 0);
-      // var size = base.ArrangeOverride(finalSize);
-      // return size;
+      if (_transitionPending)
+      {
+         // Start the slide now that both children are arranged at their final rects (size known here). Sliding content
+         // can extend past the control while it moves; clip it (enforcement depends on renderer clip support).
+         _transitionPending = false;
+         ClipToBounds = true;
+         ContentTransitions.Run(ContentTransition, TransitionDuration, finalSize, _currentVisualChild, _outgoingVisualChild, RemoveOutgoing);
+      }
+
+      return finalSize;
    }
    
    protected static Rect CalculateChildArrangeRect(
