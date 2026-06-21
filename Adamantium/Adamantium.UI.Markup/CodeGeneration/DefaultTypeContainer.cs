@@ -4,7 +4,9 @@ public class DefaultTypeContainer
 {
     private DefaultTypeContainer(ITypeResolver typeResolver)
     {
-        TypeParser = typeResolver.ResolveByShortName("TypeParser");
+        // Full name, not short: "TypeParser" also matches Mono.Cecil.TypeParser (an internal type in a transitive
+        // reference), which the generator would emit as an inaccessible call (CS0122).
+        TypeParser = typeResolver.Resolve("Adamantium.Core.TypeParsing.TypeParser");
         ResourceReference = typeResolver.ResolveByShortName("ResourceReference");
         ResourceDictionary = typeResolver.ResolveByShortName("ResourceDictionary");
         ResourceResolver = typeResolver.ResolveByShortName("ResourceResolver");

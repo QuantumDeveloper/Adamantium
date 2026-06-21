@@ -69,6 +69,77 @@ public class AnimationTests
     }
 
     [Test]
+    public void Transition_AnimatesBaseValueChangeFromCurrentToNew()
+    {
+        var transform = new Transform
+        {
+            Transitions = new Transitions
+            {
+                new DoubleTransition { Property = "TranslateX", Duration = TimeSpan.FromSeconds(1), Easing = new LinearEasing() }
+            }
+        };
+
+        transform.TranslateX = 100;   // base change 0 -> 100: the transition eases instead of snapping
+        Assert.That(transform.TranslateX, Is.EqualTo(0).Within(0.001), "starts from the current value (0), not the target");
+
+        AnimationManager.Tick(0.5);
+        Assert.That(transform.TranslateX, Is.EqualTo(50).Within(1.0), "halfway");
+
+        AnimationManager.Tick(0.6);
+        Assert.That(transform.TranslateX, Is.EqualTo(100).Within(0.001), "settles at the new base value");
+    }
+
+    [Test]
+    public void DoubleAnimation_AutoReverse_PingPongsAndEndsAtFrom()
+    {
+        var transform = new Transform();
+        transform.BeginAnimation(Transform.TranslateXProperty,
+            new DoubleAnimation { From = 0, To = 100, Duration = TimeSpan.FromSeconds(1), Easing = new LinearEasing(),
+                                  IterationCount = 2, AutoReverse = true });
+
+        AnimationManager.Tick(0.5);    // iteration 0 forward @0.5 -> 50
+        Assert.That(transform.TranslateX, Is.EqualTo(50).Within(1.0), "first iteration plays forward");
+
+        AnimationManager.Tick(0.75);   // total 1.25 -> iteration 1 (reversed) @0.25 -> 75
+        Assert.That(transform.TranslateX, Is.EqualTo(75).Within(1.0), "second iteration plays backwards");
+
+        AnimationManager.Tick(1.0);    // total 2.25 >= 2 iterations -> finished at From (even ping-pong count)
+        Assert.That(transform.TranslateX, Is.EqualTo(0).Within(0.001), "ends back at From");
+    }
+
+    [Test]
+    public void DoubleAnimation_Delay_HoldsFromThenAnimates()
+    {
+        var transform = new Transform();
+        transform.BeginAnimation(Transform.TranslateXProperty,
+            new DoubleAnimation { From = 0, To = 100, Duration = TimeSpan.FromSeconds(1), Easing = new LinearEasing(),
+                                  Delay = TimeSpan.FromSeconds(0.5) });
+
+        AnimationManager.Tick(0.4);    // within the delay -> holds From
+        Assert.That(transform.TranslateX, Is.EqualTo(0).Within(0.001), "holds From during the delay");
+
+        AnimationManager.Tick(0.6);    // total 1.0 -> active 0.5 -> 50
+        Assert.That(transform.TranslateX, Is.EqualTo(50).Within(1.0), "animates after the delay");
+    }
+
+    [Test]
+    public void DoubleAnimation_InfiniteIteration_NeverCompletes()
+    {
+        var transform = new Transform();
+        var completed = false;
+        transform.BeginAnimation(Transform.TranslateXProperty,
+            new DoubleAnimation { From = 0, To = 100, Duration = TimeSpan.FromSeconds(1), Easing = new LinearEasing(),
+                                  IterationCount = double.PositiveInfinity },
+            () => completed = true);
+
+        AnimationManager.Tick(10.5);   // many iterations later
+        Assert.That(completed, Is.False, "an infinite animation never fires completion");
+        Assert.That(transform.TranslateX, Is.EqualTo(50).Within(1.0), "still cycling (10.5 -> iteration 10 @0.5)");
+
+        transform.CancelAnimation(Transform.TranslateXProperty);   // stop it so it doesn't advance in later tests
+    }
+
+    [Test]
     public void WorldTransform_HonorsRenderTransform()
     {
         var element = new Border();

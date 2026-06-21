@@ -15,6 +15,7 @@ public static class ParserRegistry
         Register(typeof(Thickness), typeof(ThicknessParser));
         Register(typeof(Vector2), typeof(Vector2Parser));
         Register(typeof(Uri), typeof(UriParser));
+        Register(typeof(TimeSpan), typeof(TimeSpanParser));
     }
 
     public static void Register(Type targetType, Type parserType)

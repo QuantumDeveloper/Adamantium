@@ -77,6 +77,16 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
     {
     }
 
+    /// <summary>
+    /// Called right after a value is set at a NON-animation priority (the "base" value intended by code/binding/style),
+    /// even when a higher-priority animation currently masks the effective value. <paramref name="oldEffectiveValue"/>
+    /// is the displayed value before the set (a transition's "from"); <paramref name="newValue"/> is the value just set
+    /// (the "to"). Used by <see cref="AnimatableUIComponent"/> to drive implicit property transitions.
+    /// </summary>
+    protected virtual void OnValueSet(AdamantiumProperty property, object oldEffectiveValue, object newValue, ValuePriority priority)
+    {
+    }
+
     protected virtual void OnComponentUpdated()
     {
         
@@ -505,7 +515,15 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         }
         values[property].SetValue(value, priority);
         metadata.PropertyChangedCallback?.Invoke(this, args);
-        
+
+        // Implicit transitions: let an animatable element turn this base-value change into a smooth animation. Skipped
+        // for animation-priority writes (those ARE the transition) so there is no recursion. May start an animation
+        // re-entrantly (it writes the Animation slot) - that resolves cleanly via the equal-effective early-return below.
+        if (priority != ValuePriority.Animation)
+        {
+            OnValueSet(property, oldEffectiveValue, value, priority);
+        }
+
         var newEffectiveValue = GetOrCalculateEffectiveValue(property);
         if (Equals(oldEffectiveValue, newEffectiveValue))
         {
