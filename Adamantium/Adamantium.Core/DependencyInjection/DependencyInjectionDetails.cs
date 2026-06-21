@@ -69,12 +69,8 @@ namespace Adamantium.Core.DependencyInjection
                 {
                     foreach (var parameter in item.Ctor.GetParameters())
                     {
-                        if (!container.IsRegistered(parameter.ParameterType))
-                        {
-                            throw new ArgumentException(
-                                $"{parameter.ParameterType.Name} is not registered in {item.ImplementationType.Name}");
-                        }
-
+                        // The container resolves the dependency, handling an alias redirect, the auto-register
+                        // fallback, or a strict-mode throw - see AdamantiumDependencyContainer.Resolve.
                         parameters.Add(container.Resolve(parameter.ParameterType));
                     }
                 }
