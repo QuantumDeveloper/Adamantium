@@ -27,6 +27,7 @@ public class AumlCodegenBindingTests
         typeof(Adamantium.UI.Controls.Text.TextBlock),
         typeof(Adamantium.UI.Core.Data.Binding),
         typeof(Adamantium.UI.Core.Data.MultiBinding),
+        typeof(Adamantium.Core.TypeParsing.TypeParser),   // force-load Adamantium.Core so codegen resolves OUR TypeParser
     ];
 
     private sealed class InMemoryAdditionalText(string path, string content) : AdditionalText
@@ -186,6 +187,30 @@ public class AumlCodegenBindingTests
     public void ViewModel_GeneratedCodeCompiles()
     {
         var errors = Compile(WindowHeader + "x:ViewModel=\"TextBlock\"><Grid /></Window>");
+        Assert.That(errors, Is.Empty, "generated code did not compile: " + string.Join(" | ", errors.Select(d => d.ToString())));
+    }
+
+    [Test]
+    public void Transition_EmitsCollectionItemAndTimeSpanDuration()
+    {
+        var code = Generate(WindowHeader +
+            "><Grid><Grid.Transitions><DoubleTransition Property=\"Width\" Duration=\"0:0:0.3\"/></Grid.Transitions></Grid></Window>",
+            out var errors);
+
+        Assert.That(errors, Is.Empty, Errors(errors));
+        Assert.That(code, Does.Contain("DoubleTransition"), "the transition element is instantiated");
+        Assert.That(code, Does.Contain("Property = \"Width\""), "Property is a plain string name");
+        Assert.That(code, Does.Contain("0:0:0.3"), "Duration text is passed to the TimeSpan parser");
+        Assert.That(code, Does.Contain(".Add("), "the transition is added to the Transitions collection");
+    }
+
+    [Test]
+    public void Transition_GeneratedCodeCompiles()
+    {
+        // Proves the whole chain compiles against the real API: Transitions collection (new + Add), DoubleTransition,
+        // string Property, and TimeSpan Duration via the registered TimeSpanParser.
+        var errors = Compile(WindowHeader +
+            "><Grid><Grid.Transitions><DoubleTransition Property=\"Width\" Duration=\"0:0:0.3\"/></Grid.Transitions></Grid></Window>");
         Assert.That(errors, Is.Empty, "generated code did not compile: " + string.Join(" | ", errors.Select(d => d.ToString())));
     }
 

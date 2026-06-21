@@ -27,12 +27,55 @@ public interface IAnimatableUIComponent
 /// </summary>
 public class AnimatableUIComponent : AdamantiumComponent, IAnimatableUIComponent
 {
+    public static readonly AdamantiumProperty TransitionsProperty = AdamantiumProperty.Register(nameof(Transitions),
+        typeof(Media.Animation.Transitions), typeof(AnimatableUIComponent));
+
+    /// <summary>
+    /// Implicit transitions for this element: when a watched property's base value changes (from code, binding, style
+    /// or state), the displayed value animates from its current value to the new one instead of snapping. Lazily
+    /// created on first access (markup populates it via Add), so elements without transitions - e.g. most Transforms -
+    /// allocate nothing. (No change-tracking needed: transitions are passive, read on demand, with no attach/detach.)
+    /// </summary>
+    public Media.Animation.Transitions Transitions
+    {
+        get
+        {
+            var transitions = GetValue<Media.Animation.Transitions>(TransitionsProperty);
+            if (transitions == null)
+            {
+                transitions = new Media.Animation.Transitions();
+                SetValue(TransitionsProperty, transitions);
+            }
+            return transitions;
+        }
+        set => SetValue(TransitionsProperty, value);
+    }
+
     /// <inheritdoc />
     public void BeginAnimation(AdamantiumProperty property, Media.Animation.DoubleAnimation animation, Action completed = null)
     {
         ArgumentNullException.ThrowIfNull(property);
         ArgumentNullException.ThrowIfNull(animation);
         Media.Animation.AnimationManager.Begin(this, property, animation, completed);
+    }
+
+    /// <summary>Drives implicit transitions: a base-value change on a property with a matching transition becomes a
+    /// smooth current-&gt;new animation instead of an instant set.</summary>
+    protected override void OnValueSet(AdamantiumProperty property, object oldEffectiveValue, object newValue, ValuePriority priority)
+    {
+        // Raw read (not the lazy getter) so an element that never declared transitions allocates nothing on a value set.
+        var transitions = GetValue<Media.Animation.Transitions>(TransitionsProperty);
+        if (transitions == null || transitions.Count == 0)
+            return;
+
+        foreach (var transition in transitions)
+        {
+            if (transition.Property == property.Name)
+            {
+                transition.TryApply(this, property, oldEffectiveValue, newValue);
+                break;
+            }
+        }
     }
 
     /// <inheritdoc />
