@@ -5,7 +5,7 @@ namespace Adamantium.UI.Core.Media.Animation;
 /// <summary>One in-flight <see cref="DoubleAnimation"/> bound to a target property. Advanced each frame by
 /// <see cref="AnimationManager"/>; writes the interpolated value at <see cref="ValuePriority.Animation"/> (the highest
 /// priority, so it overrides Local/Binding while it runs) and holds the final value on completion.</summary>
-internal sealed class RunningAnimation
+internal sealed class RunningAnimation : IRunningAnimation
 {
     private readonly AdamantiumComponent _target;
     private readonly AdamantiumProperty _property;
@@ -33,7 +33,7 @@ internal sealed class RunningAnimation
         _completed = completed;
     }
 
-    public bool Is(AdamantiumComponent target, AdamantiumProperty property) =>
+    public bool Animates(AdamantiumComponent target, AdamantiumProperty property) =>
         ReferenceEquals(_target, target) && _property == property;
 
     /// <summary>Advances by <paramref name="deltaSeconds"/>; returns true once finished (final value applied,

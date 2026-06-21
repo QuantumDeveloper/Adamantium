@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Adamantium.UI.Core.Data;
 
 namespace Adamantium.UI.Core.Resources.Triggers;
@@ -48,6 +49,12 @@ public abstract class TriggerBase : ITrigger
     }
 
     public SetterCollection Setters { get; set; }
+
+    /// <summary>Actions run when the trigger's condition becomes true (e.g. start an animation). WPF EnterActions analog.</summary>
+    public List<ITriggerAction> EnterActions { get; } = new();
+
+    /// <summary>Actions run when the trigger's condition becomes false again. WPF ExitActions analog.</summary>
+    public List<ITriggerAction> ExitActions { get; } = new();
 
     public void Add(ISetter setter)
     {

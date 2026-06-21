@@ -205,6 +205,32 @@ public class AumlCodegenBindingTests
     }
 
     [Test]
+    public void TriggerAnimation_GeneratedCodeCompiles()
+    {
+        // The full declarative chain: a template trigger whose EnterActions start a keyframe Animation.
+        var auml = WindowHeader + "><Button><Button.Template>" +
+                   "<ControlTemplate TargetType=\"Button\">" +
+                   "<Grid />" +
+                   "<ControlTemplate.Triggers>" +
+                   "<PropertyTrigger Property=\"IsMouseOver\" Value=\"true\">" +
+                   "<PropertyTrigger.EnterActions>" +
+                   "<RunAnimationAction>" +
+                   "<Animation Duration=\"0:0:0.3\" Easing=\"CubicOut\">" +
+                   "<KeyFrame Cue=\"0\"><Setter Property=\"Opacity\" Value=\"0.5\"/></KeyFrame>" +
+                   "<KeyFrame Cue=\"1\"><Setter Property=\"Opacity\" Value=\"1\"/></KeyFrame>" +
+                   "</Animation>" +
+                   "</RunAnimationAction>" +
+                   "</PropertyTrigger.EnterActions>" +
+                   "</PropertyTrigger>" +
+                   "</ControlTemplate.Triggers>" +
+                   "</ControlTemplate>" +
+                   "</Button.Template></Button></Window>";
+
+        var errors = Compile(auml);
+        Assert.That(errors, Is.Empty, "generated code did not compile: " + string.Join(" | ", errors.Select(d => d.ToString())));
+    }
+
+    [Test]
     public void Transition_GeneratedCodeCompiles()
     {
         // Proves the whole chain compiles against the real API: Transitions collection (new + Add), DoubleTransition,

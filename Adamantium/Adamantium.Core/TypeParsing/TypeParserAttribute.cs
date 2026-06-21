@@ -2,7 +2,7 @@
 
 namespace Adamantium.Core.TypeParsing;
 
-[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface)]
 public class TypeParserAttribute : Attribute
 {
     public Type ParserType { get; }
