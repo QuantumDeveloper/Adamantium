@@ -102,7 +102,29 @@
         <Button Width="120"
             Height="80"
             HorizontalAlignment="Right"
-            VerticalAlignment="Bottom"/>
+            VerticalAlignment="Bottom">
+            <!-- Logical (control-level) trigger: dim on hover, restore on exit - keyframe animations via Enter/Exit actions. -->
+            <Button.Triggers>
+                <PropertyTrigger Property="IsMouseOver" Value="true">
+                    <PropertyTrigger.EnterActions>
+                        <RunAnimationAction>
+                            <Animation Duration="0:0:0.2" Easing="CubicOut">
+                                <KeyFrame Cue="0%"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                                <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0.6"/></KeyFrame>
+                            </Animation>
+                        </RunAnimationAction>
+                    </PropertyTrigger.EnterActions>
+                    <PropertyTrigger.ExitActions>
+                        <RunAnimationAction>
+                            <Animation Duration="0:0:0.2" Easing="CubicOut">
+                                <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0.6"/></KeyFrame>
+                                <KeyFrame Cue="100%"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                            </Animation>
+                        </RunAnimationAction>
+                    </PropertyTrigger.ExitActions>
+                </PropertyTrigger>
+            </Button.Triggers>
+        </Button>
         
 <Image Grid.Column="0"
        Width="200"

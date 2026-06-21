@@ -194,6 +194,13 @@ public class AnimationTests
     }
 
     [Test]
+    public void CueParser_ParsesFractionAndPercent()
+    {
+        Assert.That(TypeParser.Parse<Cue>("0.5").Value, Is.EqualTo(0.5).Within(1e-9));
+        Assert.That(TypeParser.Parse<Cue>("50%").Value, Is.EqualTo(0.5).Within(1e-9));
+    }
+
+    [Test]
     public void EasingParser_ParsesNamedEasings()
     {
         // Goes through TypeParser, so it also proves the [TypeParser] attribute on IEasingFunction is wired (same path

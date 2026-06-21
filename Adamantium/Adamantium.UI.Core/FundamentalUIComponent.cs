@@ -1,8 +1,10 @@
-﻿using System.Collections.Specialized;
+﻿using System.Collections.Generic;
+using System.Collections.Specialized;
 using Adamantium.Core.Collections;
 using Adamantium.UI.Core.Collections;
 using Adamantium.UI.Core.Data;
 using Adamantium.UI.Core.Resources;
+using Adamantium.UI.Core.Resources.Triggers;
 using Adamantium.UI.Core.RoutedEvents;
 
 namespace Adamantium.UI.Core;
@@ -21,6 +23,9 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
     
     public static readonly AdamantiumProperty BehaviorsProperty =
         AdamantiumProperty.RegisterReadOnly(nameof(Behaviors), typeof(BehaviorCollection), typeof(FundamentalUIComponent));
+
+    public static readonly AdamantiumProperty TriggersProperty =
+        AdamantiumProperty.RegisterReadOnly(nameof(Triggers), typeof(TriggerCollection), typeof(FundamentalUIComponent));
     
     public static readonly AdamantiumProperty DataContextProperty = AdamantiumProperty.Register(nameof(DataContext),
         typeof(object), typeof(FundamentalUIComponent),
@@ -68,12 +73,26 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
         Styles.CollectionChanged += StylesOnCollectionChanged;
         _attachedStyles = new StylesCollection();
         Behaviors = new BehaviorCollection(this);
+        Triggers = new TriggerCollection();
     }
 
     public BehaviorCollection Behaviors
     {
         get => GetValue<BehaviorCollection>(BehaviorsProperty);
         private init => SetValue(BehaviorsProperty, value);
+    }
+
+    private List<ITriggerActivator> _triggerActivators;
+
+    /// <summary>
+    /// Triggers declared directly on this control - the logical, theme-independent layer (vs template/style triggers
+    /// which belong to a theme). They act on the control itself (self scope), are applied when it joins a live logical
+    /// tree, and are deactivated when it leaves.
+    /// </summary>
+    public TriggerCollection Triggers
+    {
+        get => GetValue<TriggerCollection>(TriggersProperty);
+        private init => SetValue(TriggersProperty, value);
     }
 
     private void UpdateDataContext()
@@ -393,10 +412,38 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
         // A nested view (created via 'new' by its parent's generated code) declares its view-model with x:ViewModel;
         // resolve it now that the element is part of a live tree and the app context is reachable.
         ApplyViewModel();
+        ApplyTriggers();
     }
 
     protected virtual void OnDetachedFromLogicalTree(LogicalTreeAttachmentEventArgs e)
-    { }
+    {
+        DeactivateTriggers();
+    }
+
+    // Logical (control-level) triggers: activated against the control itself (StyleTriggerExecutionContext = self scope),
+    // not template parts. Idempotent - skipped if already applied (e.g. a re-attach without an intervening detach).
+    private void ApplyTriggers()
+    {
+        if (_triggerActivators != null || Triggers == null || Triggers.Count == 0)
+            return;
+
+        var theme = UIAppContext.Current?.ThemeManager?.CurrentTheme;
+        _triggerActivators = new List<ITriggerActivator>();
+        foreach (var trigger in Triggers)
+        {
+            _triggerActivators.Add(trigger.Apply(new StyleTriggerExecutionContext(this, theme)));
+        }
+    }
+
+    private void DeactivateTriggers()
+    {
+        if (_triggerActivators == null)
+            return;
+
+        foreach (var activator in _triggerActivators)
+            activator.Deactivate();
+        _triggerActivators = null;
+    }
 
     /// <summary>
     /// Raised when the control is attached to a rooted logical tree.

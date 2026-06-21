@@ -216,8 +216,8 @@ public class AumlCodegenBindingTests
                    "<PropertyTrigger.EnterActions>" +
                    "<RunAnimationAction>" +
                    "<Animation Duration=\"0:0:0.3\" Easing=\"CubicOut\">" +
-                   "<KeyFrame Cue=\"0\"><Setter Property=\"Opacity\" Value=\"0.5\"/></KeyFrame>" +
-                   "<KeyFrame Cue=\"1\"><Setter Property=\"Opacity\" Value=\"1\"/></KeyFrame>" +
+                   "<KeyFrame Cue=\"0%\"><Setter Property=\"Opacity\" Value=\"0.5\"/></KeyFrame>" +
+                   "<KeyFrame Cue=\"100%\"><Setter Property=\"Opacity\" Value=\"1\"/></KeyFrame>" +
                    "</Animation>" +
                    "</RunAnimationAction>" +
                    "</PropertyTrigger.EnterActions>" +
@@ -225,6 +225,27 @@ public class AumlCodegenBindingTests
                    "</ControlTemplate.Triggers>" +
                    "</ControlTemplate>" +
                    "</Button.Template></Button></Window>";
+
+        var errors = Compile(auml);
+        Assert.That(errors, Is.Empty, "generated code did not compile: " + string.Join(" | ", errors.Select(d => d.ToString())));
+    }
+
+    [Test]
+    public void LogicalTriggerAnimation_GeneratedCodeCompiles()
+    {
+        // Triggers declared directly on a control (the logical layer) whose EnterActions run a keyframe Animation.
+        var auml = WindowHeader + "><Button><Button.Triggers>" +
+                   "<PropertyTrigger Property=\"IsMouseOver\" Value=\"true\">" +
+                   "<PropertyTrigger.EnterActions>" +
+                   "<RunAnimationAction>" +
+                   "<Animation Duration=\"0:0:0.2\" Easing=\"CubicOut\">" +
+                   "<KeyFrame Cue=\"0%\"><Setter Property=\"Opacity\" Value=\"0.5\"/></KeyFrame>" +
+                   "<KeyFrame Cue=\"100%\"><Setter Property=\"Opacity\" Value=\"1\"/></KeyFrame>" +
+                   "</Animation>" +
+                   "</RunAnimationAction>" +
+                   "</PropertyTrigger.EnterActions>" +
+                   "</PropertyTrigger>" +
+                   "</Button.Triggers></Button></Window>";
 
         var errors = Compile(auml);
         Assert.That(errors, Is.Empty, "generated code did not compile: " + string.Join(" | ", errors.Select(d => d.ToString())));

@@ -131,7 +131,7 @@ internal sealed class RunningKeyFrameAnimation : IRunningAnimation
                     continue;
                 if (!byProperty.TryGetValue(setter.Property, out var stops))
                     byProperty[setter.Property] = stops = new List<(double, double)>();
-                stops.Add((keyFrame.Cue, value));
+                stops.Add((keyFrame.Cue.Value, value));
             }
         }
 
