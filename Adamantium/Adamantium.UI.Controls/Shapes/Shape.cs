@@ -132,6 +132,14 @@ public abstract class Shape : InputUIComponent
    protected override Size MeasureOverride(Size availableSize)
    {
       Size shapeSize = Rect.Size;
+
+      // The shape's natural (intrinsic) size, captured before Rect is recomputed below. This is what the shape reports
+      // to layout: a Stretch-aligned shape with no explicit size desires its intrinsic size (0 for a box shape like
+      // Rectangle/Ellipse), NOT the available space - stretching fills the box via Rect (render), at arrange/render time,
+      // not by inflating the desired size. (WPF behaviour; previously a Stretch shape desired the whole available area.)
+      double naturalWidth = Rect.Width + Rect.X;
+      double naturalHeight = Rect.Height + Rect.Y;
+
       Size desiredSize = new Size(availableSize.Width, availableSize.Height).Deflate(new Thickness(StrokeThickness/2));
 
       if (double.IsInfinity(availableSize.Width))
@@ -184,7 +192,11 @@ public abstract class Shape : InputUIComponent
             break;
       }
       Rect = new Rect(shapeSize);
-      return Rect.Size;
+
+      // Report the intrinsic size to layout (explicit Width/Height win); Rect above still fills for rendering.
+      return new Size(
+         double.IsNaN(Width) ? naturalWidth : Width,
+         double.IsNaN(Height) ? naturalHeight : Height);
    }
 
    protected override Size ArrangeOverride(Size finalSize)
