@@ -1,10 +1,14 @@
 using System;
+using Adamantium.Core.TypeParsing;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Controls.Decorators;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.Media.Animation;
+using Adamantium.UI.Core.Resources;
+using Adamantium.UI.Core.Resources.Triggers;
+using Adamantium.UI.Core.Templates;
 using NUnit.Framework;
 
 namespace Adamantium.UITests;
@@ -137,6 +141,85 @@ public class AnimationTests
         Assert.That(transform.TranslateX, Is.EqualTo(50).Within(1.0), "still cycling (10.5 -> iteration 10 @0.5)");
 
         transform.CancelAnimation(Transform.TranslateXProperty);   // stop it so it doesn't advance in later tests
+    }
+
+    [Test]
+    public void Animation_KeyFrames_InterpolateThroughStops()
+    {
+        var transform = new Transform();
+        var anim = new Animation { Duration = TimeSpan.FromSeconds(1), Easing = new LinearEasing() };
+        anim.KeyFrames.Add(KeyFrameAt(0.0, 0.0));     // 0%   -> 0
+        anim.KeyFrames.Add(KeyFrameAt(0.5, 100.0));   // 50%  -> 100
+        anim.KeyFrames.Add(KeyFrameAt(1.0, 0.0));     // 100% -> 0
+        anim.Apply(transform);
+
+        Assert.That(transform.TranslateX, Is.EqualTo(0).Within(0.001), "starts at the first keyframe");
+
+        AnimationManager.Tick(0.25);   // between 0% and 50% -> 50
+        Assert.That(transform.TranslateX, Is.EqualTo(50).Within(1.0), "rises toward the middle keyframe");
+
+        AnimationManager.Tick(0.25);   // 50% -> 100
+        Assert.That(transform.TranslateX, Is.EqualTo(100).Within(1.0), "peaks at the middle keyframe");
+
+        AnimationManager.Tick(0.25);   // between 50% and 100% -> 50
+        Assert.That(transform.TranslateX, Is.EqualTo(50).Within(1.0), "falls back toward the last keyframe");
+
+        AnimationManager.Tick(0.5);    // past the end -> last keyframe
+        Assert.That(transform.TranslateX, Is.EqualTo(0).Within(0.001), "ends at the last keyframe");
+    }
+
+    private static KeyFrame KeyFrameAt(double cue, double translateX)
+    {
+        var keyFrame = new KeyFrame { Cue = cue };
+        keyFrame.Setters.Add(new Setter("TranslateX", translateX));
+        return keyFrame;
+    }
+
+    [Test]
+    public void PropertyTrigger_EnterAction_RunsAnimation()
+    {
+        var border = new Border();
+
+        var trigger = new PropertyTrigger { Property = "Width", Value = 200.0 };
+        var anim = new Animation { Duration = TimeSpan.FromSeconds(1), Easing = new LinearEasing() };
+        anim.KeyFrames.Add(KeyFrameWith("Height", 0.0, 0.0));
+        anim.KeyFrames.Add(KeyFrameWith("Height", 1.0, 100.0));
+        trigger.EnterActions.Add(new RunAnimationAction { Animation = anim });
+
+        trigger.Apply(new SelfTriggerContext(border));   // condition not met yet (Width = NaN)
+
+        border.Width = 200;   // condition becomes true -> EnterAction starts the animation
+        AnimationManager.Tick(0.5);
+        Assert.That(border.Height, Is.EqualTo(50).Within(1.0), "trigger enter action runs the animation");
+    }
+
+    [Test]
+    public void EasingParser_ParsesNamedEasings()
+    {
+        // Goes through TypeParser, so it also proves the [TypeParser] attribute on IEasingFunction is wired (same path
+        // codegen + the runtime loader use for Easing="...").
+        Assert.That(TypeParser.Parse<IEasingFunction>("Linear"), Is.InstanceOf<LinearEasing>());
+
+        var cubicOut = TypeParser.Parse<IEasingFunction>("CubicOut");
+        Assert.That(cubicOut, Is.InstanceOf<CubicEasing>());
+        Assert.That(((CubicEasing)cubicOut).Mode, Is.EqualTo(EasingMode.Out));
+    }
+
+    private static KeyFrame KeyFrameWith(string property, double cue, double value)
+    {
+        var keyFrame = new KeyFrame { Cue = cue };
+        keyFrame.Setters.Add(new Setter(property, value));
+        return keyFrame;
+    }
+
+    // Minimal style/logical execution context (StyleTriggerExecutionContext is internal): the host is the only target.
+    private sealed class SelfTriggerContext : ITriggerExecutionContext
+    {
+        private readonly IFundamentalUIComponent _host;
+        public SelfTriggerContext(IFundamentalUIComponent host) => _host = host;
+        public IFundamentalUIComponent HostComponent => _host;
+        public ITheme Theme => null;
+        public IAdamantiumComponent FindTarget(string targetName) => _host;
     }
 
     [Test]

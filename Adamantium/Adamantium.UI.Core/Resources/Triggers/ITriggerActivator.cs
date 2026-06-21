@@ -40,7 +40,8 @@ internal class PropertyTriggerActivator : ITriggerActivator
         if (_targetProperty == null) return;
                 
         _context.HostComponent.PropertyChanged -= OnPropertyChanged;
-                
+
+        if (_blueprint.Setters == null) return;
         foreach (var setter in _blueprint.Setters)
         {
             RemoveSetter(setter, _context.HostComponent);
@@ -55,27 +56,38 @@ internal class PropertyTriggerActivator : ITriggerActivator
         }
     }
 
+    private bool _conditionMet;
+
     private void EvaluateCondition()
     {
         var currentValue = _context.HostComponent.GetValue(_targetProperty);
         bool conditionMet = Equals(currentValue, _typedValue);
-        
-        if (conditionMet)
+
+        // Setters apply/remove idempotently for as long as the condition holds.
+        if (_blueprint.Setters != null)
         {
             foreach (var setter in _blueprint.Setters)
             {
                 var component = _context.FindTarget(setter.TargetName);
-                ApplySetter(setter, (IFundamentalUIComponent)component, _context.Theme);
+                if (conditionMet)
+                    ApplySetter(setter, (IFundamentalUIComponent)component, _context.Theme);
+                else
+                    RemoveSetter(setter, (IFundamentalUIComponent)component);
             }
         }
-        else
-        {
-            foreach (var setter in _blueprint.Setters)
-            {
-                var component = _context.FindTarget(setter.TargetName);
-                RemoveSetter(setter, (IFundamentalUIComponent)component);
-            }
-        }
+
+        // Enter/Exit actions (e.g. animations) fire only on the EDGE - when the condition crosses, not on every change.
+        if (conditionMet && !_conditionMet)
+            InvokeActions(_blueprint.EnterActions);
+        else if (!conditionMet && _conditionMet)
+            InvokeActions(_blueprint.ExitActions);
+        _conditionMet = conditionMet;
+    }
+
+    private void InvokeActions(System.Collections.Generic.IEnumerable<ITriggerAction> actions)
+    {
+        foreach (var action in actions)
+            action.Invoke(_context);
     }
 
     private static void ApplySetter(ISetter setter, IFundamentalUIComponent component, ITheme theme) 

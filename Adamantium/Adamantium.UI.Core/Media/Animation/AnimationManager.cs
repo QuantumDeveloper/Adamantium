@@ -11,7 +11,7 @@ namespace Adamantium.UI.Core.Media.Animation;
 /// </summary>
 public static class AnimationManager
 {
-    private static readonly List<RunningAnimation> Active = new();
+    private static readonly List<IRunningAnimation> Active = new();
 
     /// <summary>Advances every running animation by <paramref name="deltaSeconds"/>. Called once per frame.</summary>
     public static void Tick(double deltaSeconds)
@@ -26,9 +26,20 @@ public static class AnimationManager
     internal static void Begin(AdamantiumComponent target, AdamantiumProperty property, DoubleAnimation animation, Action completed)
     {
         // Re-animating the same property restarts from the new animation - drop any in-flight one first.
-        Active.RemoveAll(a => a.Is(target, property));
+        Active.RemoveAll(a => a.Animates(target, property));
         var running = new RunningAnimation(target, property, animation, completed);
         running.Advance(0);   // apply the From value immediately so there is no one-frame flash before the first tick
+        Active.Add(running);
+    }
+
+    /// <summary>Starts a keyframe <see cref="Animation"/> on <paramref name="target"/>, dropping any in-flight animation
+    /// that drives one of the same properties.</summary>
+    internal static void BeginKeyFrame(AnimatableUIComponent target, Animation animation, Action completed)
+    {
+        var running = new RunningKeyFrameAnimation(target, animation, completed);
+        foreach (var property in running.Properties)
+            Active.RemoveAll(a => a.Animates(target, property));
+        running.Advance(0);   // apply the start values immediately so there is no one-frame flash
         Active.Add(running);
     }
 
@@ -36,6 +47,6 @@ public static class AnimationManager
     /// firing its completion callback. Returns true if one was running. The caller releases the held animation value.</summary>
     internal static bool Cancel(AdamantiumComponent target, AdamantiumProperty property)
     {
-        return Active.RemoveAll(a => a.Is(target, property)) > 0;
+        return Active.RemoveAll(a => a.Animates(target, property)) > 0;
     }
 }
