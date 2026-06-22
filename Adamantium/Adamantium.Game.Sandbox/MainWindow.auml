@@ -22,7 +22,10 @@
         <RenderTargetPanel.Behaviors>
             <local:GameHostBehavior/>
         </RenderTargetPanel.Behaviors>
-		<Path StrokeThickness="2" 
+		<!-- Closed-contour GPU stroke demo: this star is one closed contour, so its outline is built by the compute
+		     expander's wrap-around miter path (sharp star tips exercise the miter-length clamp). -->
+		<Path StrokeThickness="5"
+              Stroke="Cyan"
               Fill="Magenta"
               Name="Path1"
               Data="F0 M110,10 L168.78,190.9 L14.89,79.1 L205.11,79.1 L51.22,190.9 Z"
@@ -30,11 +33,15 @@
    
         <Path Name="Path2"
               Fill="Orange"
+              StrokeThickness="5"
+              Stroke="Cyan"
 		      HorizontalAlignment="Right"
               Data="M184,110 L209.14,123.05 L206.59,135.88 L178.37,138.32 L174.09,147 L189.34,170.88 L180.71,180.71 L155.05,168.71 L147,174.09 L148.27,202.39 L135.88,206.59 L119.66,183.37 L110,184 L96.95,209.14 L84.12,206.59 L81.68,178.37 L73,174.09 L49.12,189.34 L39.29,180.71 L51.29,155.05 L45.91,147 L17.61,148.27 L13.41,135.88 L36.63,119.66 L36,110 L10.86,96.95 L13.41,84.12 L41.63,81.68 L45.91,73 L30.66,49.12 L39.29,39.29 L64.95,51.29 L73,45.91 L71.73,17.61 L84.12,13.41 L100.34,36.63 L110,36 L123.05,10.86 L135.88,13.41 L138.32,41.63 L147,45.91 L170.88,30.66 L180.71,39.29 L168.71,64.95 L174.09,73 L202.39,71.73 L206.59,84.12 L183.37,100.34 Z"/>
 
 		<Path Name="Path3"
               Fill="Red"
+              StrokeThickness="5"
+              Stroke="Cyan"
               HorizontalAlignment="Center"
 			  VerticalAlignment="Center">
             <Path.Data>
@@ -180,6 +187,8 @@
         <Line X1="80" Y1="80" X2="700" Y2="520"
               Stroke="Lime"
               StrokeThickness="12"
+              StartLineCap="Square"
+              EndLineCap="Square"
               HorizontalAlignment="Left"
               VerticalAlignment="Top"/>
     </Grid>
