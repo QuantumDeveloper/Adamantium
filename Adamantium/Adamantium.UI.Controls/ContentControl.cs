@@ -287,6 +287,13 @@ public class ContentControl : Control, IContentControl
    {
       Content = null;
    }
+
+   IReadOnlyList<object> IContainer.GetChildComponents() =>
+      Content != null ? new[] { Content } : System.Array.Empty<object>();
+
+   void IContainer.InsertChildComponent(int index, object component) => Content = component;
+
+   void IContainer.RemoveChildComponentAt(int index) => Content = null;
    
    protected override void OnRender(IDrawingContext context)
    {

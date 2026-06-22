@@ -50,11 +50,6 @@ namespace Adamantium.UI.Generators
                 {
                     var diagnostics = new RoslynDiagnosticSink(spc);
 
-                    if (file.Path.EndsWith("FluentDark.auml"))
-                    {
-                        int x = 0;
-                    }
-
                     var aumlDoc = AumlParser.Parse(file.Content);
                     if (aumlDoc.HasErrors)
                     {
@@ -83,11 +78,6 @@ namespace Adamantium.UI.Generators
 
                 foreach (var aumlDoc in sortedMetadata)
                 {
-                    if (aumlDoc.Root.TypeReference.Name == "Window")
-                    {
-                        int x = 0;
-                    }
-                    
                     var diagnostics = new RoslynDiagnosticSink(spc);
 
                     try

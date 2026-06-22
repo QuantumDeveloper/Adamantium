@@ -88,8 +88,8 @@
 <!--                   VerticalAlignment="Bottom"-->
 <!--        Background="Transparent"/>-->
 
-        <Button Width="550"
-                Height="150"
+        <Button Width="150"
+                Height="130"
                 Background="Yellow"
                 Command="{Binding ShowMessageCommand, FallbackValue=50, Mode=OneWay}"
                 HorizontalAlignment="Left"
@@ -97,7 +97,7 @@
                 VerticalAlignment="Bottom">
             <Button.Transitions>
                 <!-- CSS-style implicit transition: any change to Opacity (code/binding/state) eases over 0.4s. -->
-                <DoubleTransition Property="Width" Duration="0:0:3.4"/>
+                <DoubleTransition Property="Width" Duration="0:0:0.6"/>
             </Button.Transitions>
         </Button>
         
@@ -111,16 +111,16 @@
                     <PropertyTrigger.EnterActions>
                         <RunAnimationAction>
                             <Animation Duration="0:0:0.2" Easing="CubicOut">
-                                <KeyFrame Cue="0%"><Setter Property="Opacity" Value="1"/></KeyFrame>
-                                <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0.6"/></KeyFrame>
+                                <KeyFrame Cue="0%"><Setter Property="Width" Value="120"/></KeyFrame>
+                                <KeyFrame Cue="100%"><Setter Property="Width" Value="150"/></KeyFrame>
                             </Animation>
                         </RunAnimationAction>
                     </PropertyTrigger.EnterActions>
                     <PropertyTrigger.ExitActions>
                         <RunAnimationAction>
                             <Animation Duration="0:0:0.2" Easing="CubicOut">
-                                <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0.6"/></KeyFrame>
-                                <KeyFrame Cue="100%"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                                <KeyFrame Cue="0%"><Setter Property="Width" Value="150"/></KeyFrame>
+                                <KeyFrame Cue="100%"><Setter Property="Width" Value="120"/></KeyFrame>
                             </Animation>
                         </RunAnimationAction>
                     </PropertyTrigger.ExitActions>

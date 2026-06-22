@@ -73,6 +73,13 @@ public static class DesignerHost
                     WriteResponse(protocol, RenderOne(session, request, outPath, previousFrames));
                     break;
 
+                case "frame":
+                    // Advance the live preview one frame (real-time animation streaming). The client calls this in a
+                    // loop while the previous response said Animating; each frame is a fresh file (old ones cleaned up).
+                    var framePath = Path.Combine(tempDir, $"preview-{counter++}.bgra");
+                    WriteResponse(protocol, FrameOne(session, framePath, previousFrames));
+                    break;
+
                 case "hittest":
                     WriteResponse(protocol, HitTestOne(session, request));
                     break;
@@ -111,15 +118,45 @@ public static class DesignerHost
             return new Response
             {
                 Frames = result.Frames.ToArray(),
-                FrameMs = result.FrameMs,
-                Looped = result.Looped,
-                LoopStart = result.LoopStart,
+                Animating = result.Animating,
                 Width = result.Width,
                 Height = result.Height,
                 DesignWidth = result.DesignWidth,
                 DesignHeight = result.DesignHeight,
                 Scale = result.Scale,
                 Diagnostics = NullIfEmpty(result.Diagnostics)
+            };
+        }
+        catch (Exception e)
+        {
+            return new Response { Error = e.Message };
+        }
+    }
+
+    // Advances the live preview one frame for the animation stream (op "frame"). Deletes the previous frame file (the
+    // client has already loaded it) and returns the new one plus whether anything is still animating.
+    private static Response FrameOne(DesignerSession session, string outPath, List<string> previousFrames)
+    {
+        try
+        {
+            var result = session.RenderNextFrame(outPath);
+            if (!result.Success)
+                return new Response { Error = result.Error };
+
+            foreach (var f in previousFrames)
+                if (File.Exists(f)) { try { File.Delete(f); } catch { /* best effort */ } }
+            previousFrames.Clear();
+            previousFrames.AddRange(result.Frames);
+
+            return new Response
+            {
+                Frames = result.Frames.ToArray(),
+                Animating = result.Animating,
+                Width = result.Width,
+                Height = result.Height,
+                DesignWidth = result.DesignWidth,
+                DesignHeight = result.DesignHeight,
+                Scale = result.Scale
             };
         }
         catch (Exception e)
@@ -184,9 +221,7 @@ public static class DesignerHost
     private sealed class Response
     {
         public string[] Frames { get; set; }
-        public double? FrameMs { get; set; }
-        public bool? Looped { get; set; }
-        public int? LoopStart { get; set; }
+        public bool? Animating { get; set; }
         public uint? Width { get; set; }
         public uint? Height { get; set; }
         public uint? DesignWidth { get; set; }

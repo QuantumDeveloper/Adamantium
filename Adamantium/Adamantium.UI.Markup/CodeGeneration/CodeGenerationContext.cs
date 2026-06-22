@@ -380,7 +380,7 @@ public class CodeGenerationContext
                 {
                     TextGenerator.WriteLine($"(({typeInfo.GetInterface("IContainer").FullName}){elementName}).AddOrSetChildComponent({childName});");
                 }
-                else if (typeInfo.FindPropertyWithAttribute("ContentAttribute", out var contentProp))
+                else if (typeInfo.FindPropertyWithAttribute("Adamantium.UI.Core.ContentAttribute", out var contentProp))
                 {
                     if (contentProp.PropertyType.IsCollection())
                     {
