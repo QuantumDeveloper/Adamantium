@@ -14,9 +14,10 @@ namespace Adamantium.UI.Rendering.RenderUnits;
 public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUnit where TPayload : class
 {
     protected RenderUnit(
-        IDrawCommand command, 
-        IGraphicsDevice graphicsDevice, 
+        IDrawCommand command,
+        IGraphicsDevice graphicsDevice,
         UIBasicEffect uiBasicEffect,
+        StrokeEffect strokeEffect,
         IResourceFactory resourceFactory) : base(graphicsDevice)
     {
         DrawCommand = command;
@@ -24,24 +25,58 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
         GraphicsDevice = graphicsDevice;
         ResourceFactory = resourceFactory;
         UIBasicEffect = uiBasicEffect;
+        StrokeEffect = strokeEffect;
     }
 
     public TPayload Payload { get; protected set; }
-    
+
     public UIBasicEffect UIBasicEffect { get; }
-    
+
+    // Global toggle: lets the stroke fall back to the CPU path on the fly if anything is wrong with the GPU path.
+    public static bool UseGpuStroke { get; set; } = true;
+
+    protected StrokeEffect StrokeEffect { get; }
+
     public UIRenderComponent StrokeRenderer { get; set; }
-    
+
     public UIRenderComponent GeometryRenderer { get; set; }
-    
+
     protected void ProcessStrokeData(Pen pen, Geometry geometry)
     {
         if (pen == null) return;
-        
-        var strokeGeometry = new StrokeGeometry(pen, geometry);
+
         StrokeRenderer?.DeferDispose();
-        StrokeRenderer = new StrokeRenderComponent(GraphicsDevice, UIBasicEffect, strokeGeometry.Mesh, pen);
+
+        // The GPU path (iteration 1) covers only the case the miter expander handles cleanly: a single OPEN contour
+        // with a solid colour and no dashes. Everything else (closed loops, dashes, non-solid brushes, multiple
+        // contours) falls back to the CPU StrokeGeometry path.
+        if (UseGpuStroke && StrokeEffect != null && TryGetOpenSolidPolyline(pen, geometry, out var points))
+        {
+            StrokeRenderer = new GpuStrokeRenderComponent(GraphicsDevice, UIBasicEffect, StrokeEffect, points, pen);
+        }
+        else
+        {
+            var strokeGeometry = new StrokeGeometry(pen, geometry);
+            StrokeRenderer = new StrokeRenderComponent(GraphicsDevice, UIBasicEffect, strokeGeometry.Mesh, pen);
+        }
         StrokeRenderer.RenderData = DrawCommand.RenderData;
+    }
+
+    private static bool TryGetOpenSolidPolyline(Pen pen, Geometry geometry, out Adamantium.Mathematics.Vector2[] points)
+    {
+        points = null;
+        if (pen.Brush is not SolidColorBrush) return false;
+        if (pen.DashStrokeArray is { Count: > 0 }) return false;
+
+        var mesh = geometry?.Mesh;
+        if (mesh == null || mesh.Contours.Count != 1) return false;
+
+        var contour = mesh.GetContour(0);
+        if (contour.IsGeometryClosed) return false;
+        if (contour.Points == null || contour.Points.Length < 2) return false;
+
+        points = contour.Points;
+        return true;
     }
     
     protected IResourceFactory ResourceFactory { get; set; }
@@ -86,8 +121,8 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
 
 public class GeometryRenderUnit : RenderUnit<GeometryPayload>
 {
-    public GeometryRenderUnit(IDrawCommand command, IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, IResourceFactory resourceFactory) : 
-        base(command, graphicsDevice, uiBasicEffect, resourceFactory)
+    public GeometryRenderUnit(IDrawCommand command, IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, StrokeEffect strokeEffect, IResourceFactory resourceFactory) :
+        base(command, graphicsDevice, uiBasicEffect, strokeEffect, resourceFactory)
     {
         Payload.Geometry.ProcessGeometry(GeometryType.Both);
         GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, Payload.Geometry.Mesh, Payload.Brush);
@@ -132,8 +167,8 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
 
 public class LineRenderUnit : RenderUnit<LinePayload>
 {
-    public LineRenderUnit(IDrawCommand command, IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, IResourceFactory resourceFactory) : 
-        base(command, graphicsDevice, uiBasicEffect, resourceFactory)
+    public LineRenderUnit(IDrawCommand command, IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, StrokeEffect strokeEffect, IResourceFactory resourceFactory) :
+        base(command, graphicsDevice, uiBasicEffect, strokeEffect, resourceFactory)
     {
         var geometry = new LineGeometry(Payload.LineStart, Payload.LineEnd);
         geometry.ProcessGeometry(GeometryType.Both);
@@ -162,8 +197,8 @@ public class LineRenderUnit : RenderUnit<LinePayload>
 
 public class RectangleRenderUnit : RenderUnit<RectanglePayload>
 {
-    public RectangleRenderUnit(IDrawCommand command, IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, IResourceFactory resourceFactory) : 
-        base(command, graphicsDevice, uiBasicEffect, resourceFactory)
+    public RectangleRenderUnit(IDrawCommand command, IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, StrokeEffect strokeEffect, IResourceFactory resourceFactory) :
+        base(command, graphicsDevice, uiBasicEffect, strokeEffect, resourceFactory)
     {
         var rectangleGeometry = new RectangleGeometry(Payload.DestinationRect, Payload.CornerRadius);
         rectangleGeometry.ProcessGeometry(GeometryType.Both);
@@ -208,8 +243,8 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
 
 public class EllipseRenderUnit : RenderUnit<EllipsePayload>
 {
-    public EllipseRenderUnit(IDrawCommand command, IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, IResourceFactory resourceFactory) : 
-        base(command, graphicsDevice, uiBasicEffect, resourceFactory)
+    public EllipseRenderUnit(IDrawCommand command, IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, StrokeEffect strokeEffect, IResourceFactory resourceFactory) :
+        base(command, graphicsDevice, uiBasicEffect, strokeEffect, resourceFactory)
     {
         var ellipseGeometry = new EllipseGeometry(Payload.DestinationRect, Payload.StartAngle, Payload.SweepAngle, Payload.EllipseType);
         ellipseGeometry.ProcessGeometry(GeometryType.Both);
@@ -260,8 +295,8 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
 
 public class ImageRenderUnit : RenderUnit<ImagePayload>
 {
-    public ImageRenderUnit(IDrawCommand command, IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, IResourceFactory resourceFactory) :
-        base(command, graphicsDevice, uiBasicEffect, resourceFactory)
+    public ImageRenderUnit(IDrawCommand command, IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, StrokeEffect strokeEffect, IResourceFactory resourceFactory) :
+        base(command, graphicsDevice, uiBasicEffect, strokeEffect, resourceFactory)
     {
         var rectangleGeometry = new RectangleGeometry(Payload.DestinationRect);
         // Generate the quad's vertices (every other render unit does this in its ctor too). Without it the mesh is
@@ -320,8 +355,8 @@ public class ImageRenderUnit : RenderUnit<ImagePayload>
 
 public class TextRenderUnit : RenderUnit<TextPayload>
 {
-    public TextRenderUnit(IDrawCommand command, IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, IResourceFactory resourceFactory) : 
-        base(command, graphicsDevice, uiBasicEffect, resourceFactory)
+    public TextRenderUnit(IDrawCommand command, IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, StrokeEffect strokeEffect, IResourceFactory resourceFactory) :
+        base(command, graphicsDevice, uiBasicEffect, strokeEffect, resourceFactory)
     {
         Payload.TextLayout.Update(GraphicsDevice);
         // Pad the text quad/RT so glyph effects (outline/glow) that reach beyond the body aren't clipped at
