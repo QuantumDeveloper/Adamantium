@@ -295,6 +295,9 @@ namespace Adamantium.Graphics.Core
             deviceFeatures2.Features.SamplerAnisotropy = true;
             deviceFeatures2.Features.SampleRateShading = true;
             deviceFeatures2.Features.GeometryShader = true;
+            // The GPU stroke expander dereferences BDA pointers (uint64_t) in its compute shader, which declares the
+            // SPIR-V Int64 capability - that requires the shaderInt64 device feature.
+            deviceFeatures2.Features.ShaderInt64 = true;
 
             var createInfo = new DeviceCreateInfo();
             createInfo.QueueCreateInfoCount = (uint)queueInfos.Count;

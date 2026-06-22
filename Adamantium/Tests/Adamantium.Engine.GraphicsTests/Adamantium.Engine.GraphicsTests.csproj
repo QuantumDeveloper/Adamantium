@@ -9,14 +9,25 @@
 
   <ItemGroup>
     <None Remove="EffectsData\UIEffect.fx" />
+    <None Remove="EffectsData\ComputeSmoke.fx" />
+    <None Remove="EffectsData\StrokeExpand.fx" />
+    <None Remove="EffectsData\StrokeDraw.fx" />
   </ItemGroup>
 
   <ItemGroup>
     <Content Include="EffectsData\UIEffect.fx">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <!-- Linked (not duplicated) from Adamantium.FX so the compute smoke test compiles the real shader. -->
-    <Content Include="..\..\Adamantium.FX\ComputeSmoke.fx" Link="EffectsData\ComputeSmoke.fx">
+    <!-- Test-only effect fixtures (compute smoke + the GPU stroke expander/draw). They live here, NOT in the working
+         Adamantium.FX project, so the engine isn't cluttered with test shaders and the generator doesn't emit phantom
+         duplicate classes. Compiled at runtime via Effect.CompileFromFile from EffectsData. -->
+    <Content Include="EffectsData\ComputeSmoke.fx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="EffectsData\StrokeExpand.fx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="EffectsData\StrokeDraw.fx">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

@@ -14,19 +14,21 @@ public class RenderUnitFactory : IRenderUnitFactory
     private readonly IGraphicsDevice _graphicsDevice;
     private readonly IResourceFactory _resourceFactory;
     private UIBasicEffect _uiBasicEffect;
+    private StrokeEffect _strokeEffect;
 
     public RenderUnitFactory(IGraphicsDevice graphicsDevice, IResourceFactory resourceFactory)
     {
         _graphicsDevice = graphicsDevice;
         _resourceFactory = resourceFactory;
         _uiBasicEffect = new UIBasicEffect(_graphicsDevice);
+        _strokeEffect = new StrokeEffect(_graphicsDevice);
         _registeredFactories = new Dictionary<Type, Func<IDrawCommand, IRenderUnit>>();
-        RegisterFactory<RectanglePayload>(command => new RectangleRenderUnit(command, _graphicsDevice, _uiBasicEffect, _resourceFactory));
-        RegisterFactory<EllipsePayload>(command => new EllipseRenderUnit(command, _graphicsDevice, _uiBasicEffect, _resourceFactory));
-        RegisterFactory<LinePayload>(command => new LineRenderUnit(command, _graphicsDevice, _uiBasicEffect, _resourceFactory));
-        RegisterFactory<ImagePayload>(command => new ImageRenderUnit(command, _graphicsDevice, _uiBasicEffect, _resourceFactory));
-        RegisterFactory<GeometryPayload>(command => new GeometryRenderUnit(command, _graphicsDevice, _uiBasicEffect, _resourceFactory));
-        RegisterFactory<TextPayload>(command => new TextRenderUnit(command, _graphicsDevice, _uiBasicEffect, _resourceFactory));
+        RegisterFactory<RectanglePayload>(command => new RectangleRenderUnit(command, _graphicsDevice, _uiBasicEffect, _strokeEffect, _resourceFactory));
+        RegisterFactory<EllipsePayload>(command => new EllipseRenderUnit(command, _graphicsDevice, _uiBasicEffect, _strokeEffect, _resourceFactory));
+        RegisterFactory<LinePayload>(command => new LineRenderUnit(command, _graphicsDevice, _uiBasicEffect, _strokeEffect, _resourceFactory));
+        RegisterFactory<ImagePayload>(command => new ImageRenderUnit(command, _graphicsDevice, _uiBasicEffect, _strokeEffect, _resourceFactory));
+        RegisterFactory<GeometryPayload>(command => new GeometryRenderUnit(command, _graphicsDevice, _uiBasicEffect, _strokeEffect, _resourceFactory));
+        RegisterFactory<TextPayload>(command => new TextRenderUnit(command, _graphicsDevice, _uiBasicEffect, _strokeEffect, _resourceFactory));
     }
 
     public void RegisterFactory<T>(Func<IDrawCommand, IRenderUnit> factory)

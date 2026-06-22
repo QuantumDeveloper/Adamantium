@@ -173,5 +173,14 @@
 <!--                   HorizontalTextAlignment="Left"-->
 <!--                   FontSize="16"/>-->
     </RenderTargetPanel>
+
+        <!-- GPU stroke smoke test: this line's ribbon is built by the compute expander (StrokeExpand) and drawn by
+             StrokeDraw, NOT the CPU StrokeGeometry. An open, single-segment, solid stroke routes to
+             GpuStrokeRenderComponent (RenderUnit.UseGpuStroke). Drawn last in the Grid, so it sits on top. -->
+        <Line X1="80" Y1="80" X2="700" Y2="520"
+              Stroke="Lime"
+              StrokeThickness="12"
+              HorizontalAlignment="Left"
+              VerticalAlignment="Top"/>
     </Grid>
 </Window>
