@@ -41,6 +41,11 @@ public interface ITexture : INamedObject
     void SetImageView(ImageView imageView);
 
     void Save(string path, ImageFileType fileType);
+
+    /// <summary>Reads the texture back to host memory and writes its RAW pixels (native B8G8R8A8 layout, no colour
+    /// swap and no image encoding) to <paramref name="path"/>. Far faster than <see cref="Save"/> for repeated
+    /// read-back (no per-frame PNG zlib) - used by the live designer's frame transport, which converts the bytes itself.</summary>
+    void SaveRaw(string path);
     
     ImageViewCreateInfo Info { get; }
 

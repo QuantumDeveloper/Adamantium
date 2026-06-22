@@ -40,13 +40,16 @@ namespace Adamantium.ProceduralGeometry.Shapes
                 int tessellation = 20,
                 Matrix4x4? transform = null)
             {
-                if (width == 0 || height == 0) return null;
-                
                 var primitiveType = PrimitiveType.TriangleList;
                 if (type == GeometryType.Outlined)
                 {
                     primitiveType = PrimitiveType.LineStrip;
                 }
+
+                // Degenerate (zero/negative width or height) rectangle: return an EMPTY mesh, not null. A 0-size element
+                // (e.g. an Auto-width control with no content) must render nothing rather than feed a null mesh into
+                // downstream geometry processing (combined-geometry borders / SplitContoursOnSegments) which would NRE.
+                if (width <= 0 || height <= 0) return new Mesh(primitiveType);
 
                 var min = Math.Min(width, height);
                 ValidateCorners(ref corners, min);

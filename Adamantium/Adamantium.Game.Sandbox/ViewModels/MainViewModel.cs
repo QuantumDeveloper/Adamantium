@@ -9,6 +9,9 @@ public partial class MainViewModel
     [Command]
     private void ShowMessage()
     {
-        MessageBox.Show("Hello World!");
+        Width += 150;
     }
+
+    [Bindable]
+    private double _width = 150;
 }

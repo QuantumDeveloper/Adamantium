@@ -39,8 +39,6 @@ import java.awt.geom.Point2D
 import java.awt.geom.Rectangle2D
 import java.awt.image.BufferedImage
 import java.beans.PropertyChangeListener
-import java.io.File
-import javax.imageio.ImageIO
 import javax.swing.BorderFactory
 import javax.swing.JButton
 import javax.swing.JComponent
@@ -69,6 +67,11 @@ class AumlPreviewFileEditor(
     private val alarm = Alarm(Alarm.ThreadToUse.SWING_THREAD, this)
     // Hover hit-tests are throttled off-EDT so moving the mouse doesn't flood the designer host with requests.
     private val hoverAlarm = Alarm(Alarm.ThreadToUse.POOLED_THREAD, this)
+    // Bumped by every render (and dispose) so a stale render/playback from a previous request supersedes itself.
+    private var renderToken = 0
+    // Plays a live render's pre-rendered animation frames (cycles BufferedImages on the EDT). The host renders the
+    // WHOLE animation in one request; the editor just flips frames here - no per-frame round-trip, no auto-fit churn.
+    private var playTimer: javax.swing.Timer? = null
 
     private var scale = 1.0
     private var updatingZoom = false
@@ -173,6 +176,10 @@ class AumlPreviewFileEditor(
 
     init {
         document?.addDocumentListener(object : DocumentListener {
+            // Edits render SETTLED (live=false): instant (~one frame) and showing the final state, with no multi-second
+            // capture freeze and without restarting the window's entrance animation on every keystroke. The design-time
+            // animations play on first load and on ⟳ (a live capture). (A continuous live stream would let edits ease
+            // transitions in place without a capture - that's a separate, larger change.)
             override fun documentChanged(event: DocumentEvent) = scheduleRender()
         }, this)
         scrollPane.addMouseWheelListener { e ->
@@ -195,7 +202,7 @@ class AumlPreviewFileEditor(
             override fun mouseClicked(e: MouseEvent) = navigateAt(e.point)
             override fun mouseExited(e: MouseEvent) = canvas.setHoverRect(null)
         })
-        scheduleRender()
+        scheduleRender(live = true)   // play the design-time animations on first load
     }
 
     // Hover frame: throttle host hit-tests (one per ~60 ms of movement), then highlight the hit element's rect.
@@ -229,7 +236,7 @@ class AumlPreviewFileEditor(
         add(JButton("+").apply { addActionListener { setScale(scale * ZOOM_STEP) } })
         add(JButton("100%").apply { addActionListener { setScale(1.0) } })
         add(fitToggle)
-        add(JButton("⟳").apply { toolTipText = "Re-render now"; addActionListener { renderNow(announce = true) } })
+        add(JButton("⟳").apply { toolTipText = "Re-render & replay animations"; addActionListener { renderNow(announce = true, live = true) } })
         add(JButton("Bg").apply { toolTipText = "Background: checkerboard / dark / light"; addActionListener { canvas.cycleBackground() } })
         add(sizeLabel)
     }
@@ -241,10 +248,17 @@ class AumlPreviewFileEditor(
         applyFit()
     }
 
-    /** Applies the fit scale (no-op if the frame already fits, so it never fights a manual zoom). */
+    /** Auto-fit: fit the frame to the viewport by adjusting ONLY the display scale - the canvas scales the shown frame
+     * (downscaling to fit stays crisp). It never schedules a re-render, so it can't bump the render token or interrupt
+     * an animation playback. (Manual zoom, via setScale, DOES re-render at the new scale - crisp when zooming in.) */
     private fun applyFit() {
         val target = computeFitScale() ?: return
-        if (abs(target - scale) > 0.005) setScale(target, userInitiated = false)
+        if (abs(target - scale) <= 0.005) return
+        scale = target
+        canvas.displayScale = scale
+        updatingZoom = true
+        zoomCombo.selectedItem = percent(scale)
+        updatingZoom = false
     }
 
     /** Scale that fits the whole rendered frame into the viewport (with a small margin), clamped; null if empty. */
@@ -273,10 +287,15 @@ class AumlPreviewFileEditor(
         scheduleRender()
     }
 
-    private fun scheduleRender() {
+    // live=true captures+plays the design-time animations (first load, ⟳); edits/zoom schedule a SETTLED render
+    // (live=false) so editing is instant and never replays the entrance animation. Bumping the token + stopping
+    // playback here freezes any running animation the instant an edit starts, rather than letting it run out the debounce.
+    private fun scheduleRender(live: Boolean = false) {
         if (document == null) return
+        renderToken++
+        stopPlayback()
         alarm.cancelAllRequests()
-        alarm.addRequest({ renderNow() }, DEBOUNCE_MS)
+        alarm.addRequest({ renderNow(live = live) }, DEBOUNCE_MS)
     }
 
     /**
@@ -284,16 +303,86 @@ class AumlPreviewFileEditor(
      * announce=true (manual ⟳) shows a transient "rendering…" so the click visibly takes effect even when
      * the markup is unchanged and the resulting frame looks identical.
      */
-    private fun renderNow(announce: Boolean = false) {
+    private fun renderNow(announce: Boolean = false, live: Boolean = false) {
         val doc = document ?: return
+        // A fresh render supersedes any running playback (a later edit/zoom/replay render stops the previous one).
+        val token = ++renderToken
+        stopPlayback()
         if (announce) { sizeLabel.text = "rendering…"; hideError() }
         val text = doc.text
         val renderScale = scale
         ApplicationManager.getApplication().executeOnPooledThread {
-            val result = service.render(text, renderScale, file.path)
-            val image = result.pngPath?.let { runCatching { ImageIO.read(File(it)) }.getOrNull() }
-            ApplicationManager.getApplication().invokeLater({ applyResult(result, image, renderScale) }, ModalityState.any())
+            val result = service.render(text, renderScale, file.path, live)
+            // Decode every frame off the EDT: a settled render has one, a live render the whole animation sequence.
+            val w = result.width ?: 0
+            val h = result.height ?: 0
+            val images = result.frames.mapNotNull { loadRawBgra(it, w, h) }
+            ApplicationManager.getApplication().invokeLater({
+                if (token != renderToken) return@invokeLater   // superseded by a newer render
+                applyResult(result, images.firstOrNull(), renderScale)
+                if (images.size > 1) startPlayback(images, result, renderScale, token)
+            }, ModalityState.any())
         }
+    }
+
+    // Plays a live render's pre-rendered animation frames (frame 0 was already shown by applyResult): swaps the canvas
+    // image on the EDT at the host's capture interval, stopping on the last frame (or looping if the host couldn't
+    // settle it). No host round-trip per frame; auto-fit can't interrupt it (applyFit never re-renders).
+    private fun startPlayback(images: List<BufferedImage>, result: AumlPreviewService.RenderResult, renderScale: Double, token: Int) {
+        val frameScale = result.scale ?: renderScale
+        val intervalMs = result.frameMs.takeIf { it >= 1.0 }?.roundToInt() ?: 16
+        var index = 1
+        val timer = javax.swing.Timer(intervalMs, null)
+        timer.isRepeats = true
+        timer.addActionListener {
+            if (token != renderToken) { timer.stop(); return@addActionListener }
+            if (index >= images.size) {
+                // Loop back to loopStart, not 0: one-shot window animations occupy [0, loopStart) and play only once,
+                // while the looping tail [loopStart, size) (animated images) repeats.
+                if (result.looped) index = result.loopStart.coerceIn(0, images.size - 1) else { timer.stop(); return@addActionListener }
+            }
+            canvas.setImage(images[index], frameScale)
+            canvas.setStale(false)
+            index++
+        }
+        playTimer = timer
+        timer.start()
+    }
+
+    private fun stopPlayback() {
+        playTimer?.stop()
+        playTimer = null
+    }
+
+    // Reads a raw B8G8R8A8 frame (width*height*4 bytes, native render-target layout) and packs it into an ARGB image.
+    // Allocates per call (no shared buffers) so a concurrent edit-render and animation-tick can't race on a frame.
+    private fun loadRawBgra(path: String, w: Int, h: Int): BufferedImage? {
+        val need = w * h * 4
+        val buf = ByteArray(need)
+        val ok = runCatching {
+            java.io.FileInputStream(path).use { fis ->
+                var off = 0
+                while (off < need) {
+                    val n = fis.read(buf, off, need - off)
+                    if (n < 0) return@runCatching false
+                    off += n
+                }
+                true
+            }
+        }.getOrDefault(false)
+        if (!ok) return null
+
+        val img = BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB)
+        val argb = (img.raster.dataBuffer as java.awt.image.DataBufferInt).data
+        var p = 0
+        for (i in 0 until w * h) {
+            argb[i] = ((buf[p + 3].toInt() and 0xFF) shl 24) or   // A
+                      ((buf[p + 2].toInt() and 0xFF) shl 16) or   // R
+                      ((buf[p + 1].toInt() and 0xFF) shl 8) or    // G
+                      (buf[p].toInt() and 0xFF)                   // B
+            p += 4
+        }
+        return img
     }
 
     private fun applyResult(result: AumlPreviewService.RenderResult, image: BufferedImage?, requestedScale: Double) {
@@ -313,8 +402,8 @@ class AumlPreviewFileEditor(
             val labelH = result.designHeight ?: (image.height / frameScale).roundToInt()
             sizeLabel.text = "$labelW × $labelH px"
             hideError()
-            // Auto-fit: snap to fit on the first frame and while tracking. applyFit no-ops once we're already
-            // at the fit scale, so this can't loop re-rendering.
+            // Auto-fit: snap to fit. applyFit no-ops once already at fit (can't loop re-rendering) and, while an
+            // animation is playing, only rescales the display (no re-render) so it can't interrupt the animation.
             if (autoFit) applyFit()
         } else {
             // Keep the last good frame (don't clear it) but dim it, and surface the error as a non-blocking badge.
@@ -412,7 +501,7 @@ class AumlPreviewFileEditor(
     override fun getCurrentLocation(): FileEditorLocation? = null
     override fun addPropertyChangeListener(listener: PropertyChangeListener) {}
     override fun removePropertyChangeListener(listener: PropertyChangeListener) {}
-    override fun dispose() {}
+    override fun dispose() { renderToken++; stopPlayback() }   // stop any running animation playback
 
     /**
      * Paints the rendered frame on a checkerboard, scaled by displayScale/renderedScale (so a zoom shows the

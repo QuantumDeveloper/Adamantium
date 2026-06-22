@@ -250,10 +250,17 @@ public sealed class MvvmGenerator : IIncrementalGenerator
         if (type.ContainingType is not null) return Nested<ViewModelClassInfo>(type);
         if (ImplementsInpc(type)) return null;                                // already has INPC via a base → nothing to inject
 
+        // A plain class with no explicit base can simply derive from the ready AdamantiumViewModel (which supplies INPC
+        // + SetProperty/RaisePropertyChanged) - no per-VM INPC boilerplate. A struct/record, or a class that already
+        // keeps a different base, can't change its base, so fall back to injecting INPC in place.
+        var hasExplicitBase = type.BaseType is { SpecialType: not SpecialType.System_Object };
+        var inheritBase = type.TypeKind == TypeKind.Class && !type.IsRecord && !hasExplicitBase;
+
         return new(new ViewModelClassInfo(
             NamespaceOf(type),
             TypeKeyword(type),
             TypeNameWithGenerics(type),
+            inheritBase,
             Hint(type, "ViewModel", "INPC")), null);
     }
 
@@ -341,6 +348,17 @@ public sealed class MvvmGenerator : IIncrementalGenerator
     private static SourceText EmitViewModel(ViewModelClassInfo m)
     {
         var sb = new StringBuilder();
+
+        // Preferred path: just derive from the ready base view-model. It already provides INPC + SetProperty /
+        // RaisePropertyChanged (what the [Bindable] partials call), so we emit only the base declaration - no per-VM
+        // boilerplate (which would be N copies of the same INPC plumbing across a large project).
+        if (m.InheritBase)
+        {
+            OpenType(sb, m.Namespace, m.TypeKeyword, m.TypeName, " : global::Adamantium.MVVM.AdamantiumViewModel");
+            CloseType(sb);
+            return SourceText.From(sb.ToString(), Encoding.UTF8);
+        }
+
         OpenType(sb, m.Namespace, m.TypeKeyword, m.TypeName, " : global::System.ComponentModel.INotifyPropertyChanged");
         sb.AppendLine("    public event global::System.ComponentModel.PropertyChangedEventHandler PropertyChanged;");
         sb.AppendLine();

@@ -85,8 +85,18 @@ internal sealed class AumlInstantiator
             return;
         }
 
-        // A read-only collection property-element (e.g. <RenderTargetPanel.Behaviors>, <Theme.StyleIncludes>) is
-        // never assigned - its child elements are added to the existing collection instance, like the generator does.
+        // A collection-typed property-element (writable like <Button.Transitions>, or read-only like
+        // <Theme.StyleIncludes>): its child ELEMENTS are added to the collection, never assigned - mirroring the
+        // generator's IsCollection() path. Without this a writable collection (Transitions has a setter) takes the
+        // assignment path below and fails ("DoubleTransition cannot be converted to Transitions").
+        if (IsPopulatableCollection(p.PropertyType) && prop.Values.Any(v => v is AumlAstObjectNode))
+        {
+            PopulateCollection(instance, p, prop);
+            return;
+        }
+
+        // A read-only collection property-element (e.g. <RenderTargetPanel.Behaviors>) whose declared type isn't a
+        // concrete IList/ICollection is never assigned - its child elements are added to the existing collection instance.
         if (!p.CanWrite)
         {
             if (!TryAddToReadOnlyCollection(instance, p, prop))
@@ -120,6 +130,50 @@ internal sealed class AumlInstantiator
                     if (nested != null) p.SetValue(instance, nested);
                     break;
             }
+        }
+    }
+
+    /// <summary>A property whose declared type is a concrete collection (non-generic IList/ICollection, as
+    /// <c>List&lt;T&gt;</c> is) and isn't parsed from text via [TypeParser] - mirrors the generator's IsCollection().</summary>
+    private static bool IsPopulatableCollection(Type t) =>
+        t != typeof(string)
+        && (typeof(System.Collections.IList).IsAssignableFrom(t) || typeof(System.Collections.ICollection).IsAssignableFrom(t))
+        && t.GetCustomAttribute<TypeParserAttribute>() == null;
+
+    /// <summary>
+    /// Populates a collection-typed property by ADDING each child element (mirrors the generator's IsCollection path):
+    /// a settable collection (e.g. Transitions) gets a fresh instance, a read-only one (e.g. RowDefinitions) is added
+    /// to in place. Per-child failures are reported individually so a partly-valid buffer still previews.
+    /// </summary>
+    private void PopulateCollection(object instance, PropertyInfo p, AumlAstPropertyNode prop)
+    {
+        object collection;
+        if (p.CanWrite)
+        {
+            try { collection = Activator.CreateInstance(p.PropertyType); }
+            catch { _diagnostics.Add($"Cannot create collection for '{p.Name}'"); return; }
+            p.SetValue(instance, collection);
+        }
+        else
+        {
+            collection = p.GetValue(instance);
+            if (collection == null) { _diagnostics.Add($"Collection '{p.Name}' is null on {instance.GetType().Name}"); return; }
+        }
+
+        var addMethods = collection.GetType()
+            .GetMethods(BindingFlags.Public | BindingFlags.Instance)
+            .Where(m => m.Name == "Add" && m.GetParameters().Length == 1)
+            .ToArray();
+
+        foreach (var value in prop.Values)
+        {
+            if (value is not AumlAstObjectNode objectNode) continue;
+            var child = Instantiate(objectNode);
+            if (child == null) continue;
+
+            var add = addMethods.FirstOrDefault(m => m.GetParameters()[0].ParameterType.IsInstanceOfType(child));
+            if (add != null) add.Invoke(collection, [child]);
+            else _diagnostics.Add($"Cannot add {child.GetType().Name} to {p.Name}");
         }
     }
 

@@ -4,13 +4,14 @@ using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
 using Adamantium.UI.Core.Media;
+using Adamantium.UI.Core.Media.Animation;
 using Adamantium.UI.Core.Media.Imaging;
 using Adamantium.UI.Core.RoutedEvents;
 using Timer = System.Timers.Timer;
 
 namespace Adamantium.UI.Controls;
 
-public class Image : InputUIComponent
+public class Image : InputUIComponent, IDesignTimeAnimatedMedia
 {
    private Timer _timer;
    private BitmapImage _bitmap;
@@ -202,7 +203,12 @@ public class Image : InputUIComponent
          
          if (_bitmap.FrameCount > 1)
          {
-            RestartTimer(Delay);
+            // At runtime a real timer advances frames. In the headless designer there is no real clock, so register
+            // with the design-time clock the live previewer ticks (a static shot leaves the clock un-ticked -> frame 0).
+            if (Design.IsDesignMode)
+               DesignTimeMediaClock.Register(this);
+            else
+               RestartTimer(Delay);
          }
          else
          {
@@ -232,7 +238,13 @@ public class Image : InputUIComponent
    private void TimerOnElapsed(object sender, ElapsedEventArgs e)
    {
       _timer.Stop();
+      AdvanceFrame();
+      UIAppContext.Current.Dispatcher.Invoke(() => { InvalidateRender(false); });
+   }
 
+   // Advances _frame by one step in the current ReplayDirection. Shared by the runtime timer and the design-time clock.
+   private void AdvanceFrame()
+   {
       _oldFrame = _frame;
       try
       {
@@ -309,8 +321,30 @@ public class Image : InputUIComponent
       {
 
       }
+   }
 
-      UIAppContext.Current.Dispatcher.Invoke(() => { InvalidateRender(false); });
+   private double _designTimeElapsedMs;
+
+   // Design-time playback: the live previewer ticks this with virtual time instead of the runtime timer. Accumulate the
+   // delta and advance whole frames at the configured Delay, then invalidate render directly (no dispatcher - the
+   // designer drives this synchronously on its render thread). Keeps playing while replays remain (loops forever by
+   // default); the previewer caps total captured frames.
+   public bool AdvanceDesignTime(double deltaSeconds)
+   {
+      if (_bitmap is not { FrameCount: > 1 }) return false;
+
+      _designTimeElapsedMs += deltaSeconds * 1000.0;
+      var delay = Math.Max(1u, Delay);
+      var advanced = false;
+      while (_designTimeElapsedMs >= delay)
+      {
+         _designTimeElapsedMs -= delay;
+         AdvanceFrame();
+         advanced = true;
+      }
+
+      if (advanced) InvalidateRender(false);
+      return NumberOfReplays == UInt64.MaxValue || _currentReplayIteration <= NumberOfReplays;
    }
 
    protected override Size MeasureOverride(Size availableSize)

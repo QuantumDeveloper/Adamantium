@@ -149,9 +149,10 @@ public class ContentControl : Control, IContentControl
       }
 
       // Animate when a transition is selected and there is new content - including the FIRST content (slides in from
-      // the side and settles, MahApps-style). Off in the designer: it renders a single frame, so a live slide would be
-      // caught mid-flight; show the settled state instead (like the WPF designer).
-      var animate = ContentTransition != ContentTransition.None && content != null && !Design.IsDesignMode;
+      // the side and settles, MahApps-style). In the designer it plays only for the LIVE previewer (frame stream); a
+      // one-shot render shows the settled state instead (like the WPF designer), since it would catch a mid-slide frame.
+      var animate = ContentTransition != ContentTransition.None && content != null
+                    && (!Design.IsDesignMode || Design.IsLivePreview);
 
       if (animate && _currentVisualChild != null)
       {

@@ -82,12 +82,17 @@ public class MultiBindingExpression : BindingExpressionBase
          values[i] = _children[i].ProducedValue;
 
       var targetType = TargetProperty?.PropertyType ?? typeof(object);
+      object result;
       if (MultiBinding.Converter != null)
-         return MultiBinding.Converter.Convert(values, targetType, MultiBinding.ConverterParameter, CultureInfo.CurrentCulture);
-      if (!string.IsNullOrEmpty(MultiBinding.StringFormat))
-         return string.Format(MultiBinding.StringFormat, values);
-      // No converter and no StringFormat: a multi-binding has no single natural value — hand back the array.
-      return values;
+         result = MultiBinding.Converter.Convert(values, targetType, MultiBinding.ConverterParameter, CultureInfo.CurrentCulture);
+      else if (!string.IsNullOrEmpty(MultiBinding.StringFormat))
+         result = string.Format(MultiBinding.StringFormat, values);
+      else
+         // No converter and no StringFormat: a multi-binding has no single natural value — hand back the array.
+         return values;
+
+      // Converter produced no value: fall back (TargetNullValue first, then FallbackValue) - WPF semantics.
+      return result ?? MultiBinding.TargetNullValue ?? MultiBinding.FallbackValue;
    }
 
    public override void CloseConnection()

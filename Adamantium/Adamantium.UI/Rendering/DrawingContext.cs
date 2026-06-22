@@ -122,11 +122,22 @@ public class DrawingContext : IDrawingContext, IDrawingContextInternal, IDrawing
 
    private RenderData GetRenderDataFromComponent()
    {
-      var renderData = new RenderData((float)_currentComponent.Opacity, 
+      var renderData = new RenderData(GetEffectiveOpacity(),
          _currentComponent.WorldTransform,
-         _currentComponent.ClipToBounds, 
+         _currentComponent.ClipToBounds,
          _currentComponent.ClipRectangle);
       //renderData.CustomEffect = _currentComponent.Effect TODO: implement custom effects for controls
       return renderData;
+   }
+
+   // Opacity composites DOWN the visual tree (WPF semantics): a control's effective opacity is its own Opacity times
+   // every ancestor's. Without this a COMPOSITE control ignores its own Opacity - e.g. a Button draws nothing itself,
+   // its pixels come from its template's Border child (Opacity 1), so Button.Opacity never reached those draw commands.
+   private float GetEffectiveOpacity()
+   {
+      var opacity = _currentComponent.Opacity;
+      for (var parent = _currentComponent.VisualParent; parent != null; parent = parent.VisualParent)
+         opacity *= parent.Opacity;
+      return (float)opacity;
    }
 }

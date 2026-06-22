@@ -1,4 +1,5 @@
 ﻿using Adamantium.UI.Core;
+using Adamantium.UI.Core.Diagnostics;
 using Adamantium.UI.Core.RoutedEvents;
 
 namespace Adamantium.UI.Controls.Base;
@@ -259,8 +260,16 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
 
             DesiredSize = desiredSize;
             _previousMeasure = DesiredSize;
+            if (LayoutTrace.Enabled) LayoutTrace.Log($"  MEASURE {LayoutName}: avail={availableSize} -> desired={DesiredSize}");
+        }
+        else if (LayoutTrace.Enabled)
+        {
+            LayoutTrace.Log($"  MEASURE {LayoutName}: SKIP avail={availableSize} desired={DesiredSize}");
         }
     }
+
+    /// <summary>Name (or type) for layout trace messages.</summary>
+    private string LayoutName => string.IsNullOrEmpty(Name) ? GetType().Name : Name;
 
     /// <summary>
     /// Positions child elements as part of a layout pass.
@@ -303,6 +312,7 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
         // be re-run.
         if (!IsMeasureValid)
         {
+            if (LayoutTrace.Enabled) LayoutTrace.Log($"  ARRANGE {LayoutName}: ABORT (measure invalid) rect={rect}");
             return;
         }
 
@@ -311,6 +321,11 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
             IsArrangeValid = true;
             ArrangeCore(rect);
             _previousArrange = rect;
+            if (LayoutTrace.Enabled) LayoutTrace.Log($"  ARRANGE {LayoutName}: rect={rect} -> bounds={Bounds} render={RenderSize}");
+        }
+        else if (LayoutTrace.Enabled)
+        {
+            LayoutTrace.Log($"  ARRANGE {LayoutName}: SKIP rect={rect} bounds={Bounds}");
         }
         
         // if (LogicalParent != null)
@@ -414,14 +429,18 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
             double clipOriginX = originX;
             double clipOriginY = originY;
 
+            // A non-Stretch element does NOT fill the slot its parent gave it: it shrinks to its own desired (content)
+            // size. WPF clamps the arrange size to the unclipped DesiredSize (minus margins) here. Clamping to
+            // finalRect (as before) was a no-op - size is already finalRect minus margins - so a Left/Top/etc.-aligned
+            // element with no explicit size (Width/Height = Auto/NaN) wrongly stretched to the whole parent.
             if (HorizontalAlignment != HorizontalAlignment.Stretch)
             {
-                size.Width = Math.Min(size.Width, finalRect.Width);
+                size.Width = Math.Min(size.Width, Math.Max(0, DesiredSize.Width - margin.Left - margin.Right));
             }
 
             if (VerticalAlignment != VerticalAlignment.Stretch)
             {
-                size.Height = Math.Min(size.Height, finalRect.Height);
+                size.Height = Math.Min(size.Height, Math.Max(0, DesiredSize.Height - margin.Top - margin.Bottom));
             }
 
             size = this.ApplyLayoutConstraints(size);

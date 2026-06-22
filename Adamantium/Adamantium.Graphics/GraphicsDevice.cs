@@ -397,7 +397,12 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
     private void InitializeSyncObject()
     {
-        _submissionSync = new SyncObject(SyncGuid, MainDevice.QueueFamilyContainer.IsGraphicsQueueEqualsTransferQueue());
+        // Always enabled. The old condition (only sync when graphics == transfer queue) wrongly assumed separate queues
+        // never need host synchronization - but our devices (primary render + resource loader) submit and record from
+        // different threads, and command pools / a shared VkQueue require external sync regardless of queue families.
+        // Leaving it off on separate-queue hardware produced vkQueueSubmit / vkAllocate/Free/EndCommandBuffer
+        // THREADING ERRORs during concurrent content-load uploads. The mutex is process-shared (SyncGuid) + reentrant.
+        _submissionSync = new SyncObject(SyncGuid, true);
     }
 
     public CommandBuffer CurrentCommandBuffer => commandBuffers[CurrentFrame]; 
@@ -1322,6 +1327,8 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
     public CommandBuffer BeginSingleTimeCommand()
     {
+        // Held across the whole single-time scope (until EndSingleTimeCommand): serializes command-pool access AND the
+        // queue submit in EndSingleTimeCommand against the main render submit and other uploads (see _submissionSync).
         _submissionSync?.Wait();
         return LogicalDevice.BeginSingleTimeCommand(TransferCommandPool);
     }
