@@ -67,11 +67,10 @@ class AumlPreviewFileEditor(
     private val alarm = Alarm(Alarm.ThreadToUse.SWING_THREAD, this)
     // Hover hit-tests are throttled off-EDT so moving the mouse doesn't flood the designer host with requests.
     private val hoverAlarm = Alarm(Alarm.ThreadToUse.POOLED_THREAD, this)
-    // Bumped by every render (and dispose) so a stale render/playback from a previous request supersedes itself.
-    private var renderToken = 0
-    // Plays a live render's pre-rendered animation frames (cycles BufferedImages on the EDT). The host renders the
-    // WHOLE animation in one request; the editor just flips frames here - no per-frame round-trip, no auto-fit churn.
-    private var playTimer: javax.swing.Timer? = null
+    // Bumped by every render (and dispose) so a stale render/streaming loop from a previous request supersedes itself:
+    // the streaming loop exits as soon as it sees renderToken has moved on. Written on the EDT, read by the streaming
+    // loop on a pooled thread -> @Volatile so the loop sees a new render promptly.
+    @Volatile private var renderToken = 0
 
     private var scale = 1.0
     private var updatingZoom = false
@@ -176,10 +175,8 @@ class AumlPreviewFileEditor(
 
     init {
         document?.addDocumentListener(object : DocumentListener {
-            // Edits render SETTLED (live=false): instant (~one frame) and showing the final state, with no multi-second
-            // capture freeze and without restarting the window's entrance animation on every keystroke. The design-time
-            // animations play on first load and on ⟳ (a live capture). (A continuous live stream would let edits ease
-            // transitions in place without a capture - that's a separate, larger change.)
+            // Edits render LIVE (stream): the host returns one frame fast (no batch capture, no multi-second freeze),
+            // then the editor streams the animation frame-by-frame, so animations keep playing after a change.
             override fun documentChanged(event: DocumentEvent) = scheduleRender()
         }, this)
         scrollPane.addMouseWheelListener { e ->
@@ -287,10 +284,9 @@ class AumlPreviewFileEditor(
         scheduleRender()
     }
 
-    // live=true captures+plays the design-time animations (first load, ⟳); edits/zoom schedule a SETTLED render
-    // (live=false) so editing is instant and never replays the entrance animation. Bumping the token + stopping
-    // playback here freezes any running animation the instant an edit starts, rather than letting it run out the debounce.
-    private fun scheduleRender(live: Boolean = false) {
+    // live=true renders one frame and then streams the design-time animations (first load, ⟳, edits, zoom). Bumping the
+    // token here makes the current streaming loop exit at once, rather than letting it run out the debounce.
+    private fun scheduleRender(live: Boolean = true) {
         if (document == null) return
         renderToken++
         stopPlayback()
@@ -303,9 +299,9 @@ class AumlPreviewFileEditor(
      * announce=true (manual ⟳) shows a transient "rendering…" so the click visibly takes effect even when
      * the markup is unchanged and the resulting frame looks identical.
      */
-    private fun renderNow(announce: Boolean = false, live: Boolean = false) {
+    private fun renderNow(announce: Boolean = false, live: Boolean = true) {
         val doc = document ?: return
-        // A fresh render supersedes any running playback (a later edit/zoom/replay render stops the previous one).
+        // A fresh render supersedes any running stream (a later edit/zoom/replay render stops the previous one).
         val token = ++renderToken
         stopPlayback()
         if (announce) { sizeLabel.text = "rendering…"; hideError() }
@@ -313,45 +309,42 @@ class AumlPreviewFileEditor(
         val renderScale = scale
         ApplicationManager.getApplication().executeOnPooledThread {
             val result = service.render(text, renderScale, file.path, live)
-            // Decode every frame off the EDT: a settled render has one, a live render the whole animation sequence.
             val w = result.width ?: 0
             val h = result.height ?: 0
-            val images = result.frames.mapNotNull { loadRawBgra(it, w, h) }
+            val image = result.frames.firstOrNull()?.let { loadRawBgra(it, w, h) }
             ApplicationManager.getApplication().invokeLater({
                 if (token != renderToken) return@invokeLater   // superseded by a newer render
-                applyResult(result, images.firstOrNull(), renderScale)
-                if (images.size > 1) startPlayback(images, result, renderScale, token)
+                applyResult(result, image, renderScale)
+                if (result.animating) startStreaming(token, renderScale)
             }, ModalityState.any())
         }
     }
 
-    // Plays a live render's pre-rendered animation frames (frame 0 was already shown by applyResult): swaps the canvas
-    // image on the EDT at the host's capture interval, stopping on the last frame (or looping if the host couldn't
-    // settle it). No host round-trip per frame; auto-fit can't interrupt it (applyFit never re-renders).
-    private fun startPlayback(images: List<BufferedImage>, result: AumlPreviewService.RenderResult, renderScale: Double, token: Int) {
-        val frameScale = result.scale ?: renderScale
-        val intervalMs = result.frameMs.takeIf { it >= 1.0 }?.roundToInt() ?: 16
-        var index = 1
-        val timer = javax.swing.Timer(intervalMs, null)
-        timer.isRepeats = true
-        timer.addActionListener {
-            if (token != renderToken) { timer.stop(); return@addActionListener }
-            if (index >= images.size) {
-                // Loop back to loopStart, not 0: one-shot window animations occupy [0, loopStart) and play only once,
-                // while the looping tail [loopStart, size) (animated images) repeats.
-                if (result.looped) index = result.loopStart.coerceIn(0, images.size - 1) else { timer.stop(); return@addActionListener }
+    // Streams the live animation: requests the next frame from the host in a loop (off the EDT) and shows each as it
+    // arrives, until the host reports it is no longer animating or a newer render supersedes this one (token). Unlike
+    // the old batch playback, the scene stays live on the host, so an edit just keeps animating instead of re-capturing
+    // a whole sequence (no freeze) and a one-shot transition isn't restarted by an unrelated change.
+    private fun startStreaming(token: Int, renderScale: Double) {
+        ApplicationManager.getApplication().executeOnPooledThread {
+            while (token == renderToken) {
+                val r = service.frame()
+                if (token != renderToken || r.error != null) break
+                val w = r.width ?: 0
+                val h = r.height ?: 0
+                val img = r.frames.firstOrNull()?.let { loadRawBgra(it, w, h) }
+                val frameScale = r.scale ?: renderScale
+                if (img != null) {
+                    ApplicationManager.getApplication().invokeLater({
+                        if (token == renderToken) { canvas.setImage(img, frameScale); canvas.setStale(false) }
+                    }, ModalityState.any())
+                }
+                if (!r.animating) break
             }
-            canvas.setImage(images[index], frameScale)
-            canvas.setStale(false)
-            index++
         }
-        playTimer = timer
-        timer.start()
     }
 
+    // A newer render bumps renderToken, which makes any running streaming loop exit on its next check; nothing else to stop.
     private fun stopPlayback() {
-        playTimer?.stop()
-        playTimer = null
     }
 
     // Reads a raw B8G8R8A8 frame (width*height*4 bytes, native render-target layout) and packs it into an ARGB image.

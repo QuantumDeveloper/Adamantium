@@ -83,4 +83,14 @@ public abstract class Decorator : MeasurableUIComponent, IContainer
    {
       Child = null;
    }
+
+   public IReadOnlyList<object> GetChildComponents() =>
+      Child != null ? new object[] { Child } : System.Array.Empty<object>();
+
+   public void InsertChildComponent(int index, object component)
+   {
+      if (component is IMeasurableComponent measurable) Child = measurable;
+   }
+
+   public void RemoveChildComponentAt(int index) => Child = null;
 }

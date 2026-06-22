@@ -30,8 +30,8 @@ class AumlPreviewService : Disposable {
      * notes either way. [width]/[height] are the rendered image's size (the window's design size × scale).
      */
     data class RenderResult(
-        // Frame file path(s), RAW B8G8R8A8 (width*height*4 bytes each, no encode): one for a settled render, the whole
-        // animation sequence for a live render. The client converts the bytes itself and plays them at [frameMs].
+        // The current frame file path(s), RAW B8G8R8A8 (width*height*4 bytes, no encode). A single-element list; the
+        // editor converts the bytes itself. Animations are streamed: while [animating], call frame() for the next one.
         val frames: List<String>,
         val error: String?,
         val diagnostics: List<String>,
@@ -42,13 +42,9 @@ class AumlPreviewService : Disposable {
         // instead of pixelSize / scale, which loses ±1px at fractional (auto-fit) scales. Null from older hosts.
         val designWidth: Int? = null,
         val designHeight: Int? = null,
-        // Playback interval between sequence frames, ms (0 for a single frame).
-        val frameMs: Double = 0.0,
-        // The animation hit the frame cap without settling - the client loops the captured frames.
-        val looped: Boolean = false,
-        // Frame index the loop restarts from (not 0): one-shot window animations play over [0, loopStart) once, then
-        // the looping tail [loopStart, end) (animated images) repeats - so window animations don't replay each cycle.
-        val loopStart: Int = 0,
+        // True while the live scene still has something to animate. The editor keeps requesting the next frame (frame())
+        // at ~60fps while this is true, then stops - a live stream rather than a pre-captured sequence.
+        val animating: Boolean = false,
     )
 
     /** A designer hit-test result: the authored element's markup position (1-based line/column) and its rect in
@@ -101,6 +97,25 @@ class AumlPreviewService : Disposable {
                 ensureProcess()
                 val request = buildRenderRequest(text, scale, sourcePath, live)
                 writer!!.apply { write(request); write("\n"); flush() }
+                val line = reader!!.readLine() ?: throw RuntimeException("designer host closed the connection")
+                parseResponse(line)
+            } catch (e: Exception) {
+                stopProcess() // force a clean restart on the next render
+                RenderResult(emptyList(), e.message ?: e.toString(), emptyList(), null, null, null)
+            }
+        }
+    }
+
+    /**
+     * Advances the live preview by one frame (op "frame") and returns it. The editor calls this in a loop (off the EDT)
+     * while [RenderResult.animating] is true to play design-time animations in real time. Shares [lock] with [render]
+     * so a new render and the streaming loop never interleave on the host's stdio.
+     */
+    fun frame(): RenderResult {
+        synchronized(lock) {
+            return try {
+                ensureProcess()
+                writer!!.apply { write("{\"op\":\"frame\"}"); write("\n"); flush() }
                 val line = reader!!.readLine() ?: throw RuntimeException("designer host closed the connection")
                 parseResponse(line)
             } catch (e: Exception) {
@@ -177,10 +192,8 @@ class AumlPreviewService : Disposable {
         val scale = obj["scale"] as? Double
         val designWidth = (obj["designWidth"] as? Double)?.toInt()
         val designHeight = (obj["designHeight"] as? Double)?.toInt()
-        val frameMs = obj["frameMs"] as? Double ?: 0.0
-        val looped = obj["looped"] as? Boolean ?: false
-        val loopStart = (obj["loopStart"] as? Double)?.toInt() ?: 0
-        return RenderResult(frames, obj["error"] as? String, diagnostics, width, height, scale, designWidth, designHeight, frameMs, looped, loopStart)
+        val animating = obj["animating"] as? Boolean ?: false
+        return RenderResult(frames, obj["error"] as? String, diagnostics, width, height, scale, designWidth, designHeight, animating)
     }
 
     private fun jsonEscape(s: String): String {

@@ -1,13 +1,13 @@
 namespace Adamantium.UI.Designer.Host;
 
-/// <summary>Outcome of a designer render: one or more RAW B8G8R8A8 frame files (a single settled frame, or the whole
-/// animation sequence for a live render) or an error, always with loader diagnostics.</summary>
+/// <summary>Outcome of a designer render: a single RAW B8G8R8A8 frame file (the current state of the live scene) or an
+/// error, with loader diagnostics. Animations are played as a live stream - the client calls the "frame" op repeatedly
+/// while <see cref="Animating"/> is true - rather than capturing a fixed sequence.</summary>
 public sealed class RenderResult
 {
     public bool Success { get; private init; }
 
-    /// <summary>The rendered frame file(s), raw B8G8R8A8 (no encode). One for a settled render; the full animation
-    /// sequence (frame 0 = start) for a live render. The client plays them at <see cref="FrameMs"/>.</summary>
+    /// <summary>The rendered frame file, raw B8G8R8A8 (no encode). A single-element list (the current frame).</summary>
     public List<string> Frames { get; private init; }
 
     public string Error { get; private init; }
@@ -23,20 +23,14 @@ public sealed class RenderResult
     /// <summary>The scale the render actually used (may be below the requested scale when clamped to the size cap).</summary>
     public double Scale { get; private init; }
 
-    /// <summary>Playback interval between sequence frames, in ms (0 for a single settled frame).</summary>
-    public double FrameMs { get; private init; }
-
-    /// <summary>True when the animation hit the frame cap without settling - the client loops the captured frames.</summary>
-    public bool Looped { get; private init; }
-
-    /// <summary>Frame index the client restarts the loop from (not 0): the point where one-shot window animations have
-    /// settled, so they play once while looping media (animated images) keep cycling in the [LoopStart, end) tail.</summary>
-    public int LoopStart { get; private init; }
+    /// <summary>True while the live scene still has something to animate (a property animation/transition or an animated
+    /// image). The client keeps requesting the next frame (op "frame") at ~60fps while this is true, then stops.</summary>
+    public bool Animating { get; private init; }
 
     public static RenderResult Ok(List<string> frames, List<string> diagnostics, uint width, uint height, double scale,
-        uint designWidth, uint designHeight, double frameMs = 0, bool looped = false, int loopStart = 0) =>
+        uint designWidth, uint designHeight, bool animating = false) =>
         new() { Success = true, Frames = frames, Diagnostics = diagnostics, Width = width, Height = height, Scale = scale,
-            DesignWidth = designWidth, DesignHeight = designHeight, FrameMs = frameMs, Looped = looped, LoopStart = loopStart };
+            DesignWidth = designWidth, DesignHeight = designHeight, Animating = animating };
 
     public static RenderResult Fail(string error, List<string> diagnostics) =>
         new() { Success = false, Error = error, Diagnostics = diagnostics };

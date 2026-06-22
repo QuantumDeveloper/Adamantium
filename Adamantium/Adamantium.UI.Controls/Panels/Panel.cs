@@ -78,4 +78,17 @@ public abstract class Panel: InputUIComponent, IContainer
    {
       Children.Clear();
    }
+
+   public IReadOnlyList<object> GetChildComponents() => Children.Cast<object>().ToList();
+
+   public void InsertChildComponent(int index, object component)
+   {
+      if (component is IMeasurableComponent measurable)
+         Children.Insert(Math.Clamp(index, 0, Children.Count), measurable);
+   }
+
+   public void RemoveChildComponentAt(int index)
+   {
+      if (index >= 0 && index < Children.Count) Children.RemoveAt(index);
+   }
 }

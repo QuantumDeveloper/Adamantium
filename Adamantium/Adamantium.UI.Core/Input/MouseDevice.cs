@@ -277,11 +277,10 @@ public class MouseDevice
 
     private void LeaveWindow(IInputComponent rootComponent, Vector2 p, InputModifiers inputModifiers, uint timestamp)
     {
-        MouseEventArgs args = new MouseEventArgs(this, inputModifiers, timestamp)
-        {
-            RoutedEvent = Mouse.MouseLeaveEvent
-        };
-        rootComponent.RaiseEvent(args);
+        // Mouse left the window entirely: everything in the hovered chain leaves, nothing enters - so IsMouseOver is
+        // cleared along the whole chain, not just the root (where it used to stick on inner elements).
+        AncestorState.Transition(DirectlyOver, null, Mouse.MouseEnterEvent, Mouse.MouseLeaveEvent,
+            evt => new MouseEventArgs(this, inputModifiers, timestamp) { RoutedEvent = evt });
         DirectlyOver = null;
     }
 
@@ -311,34 +310,17 @@ public class MouseDevice
         return SetMouseOver(rootComponent, element, modifiers, timestamp);
     }
 
+    // IsMouseOver is true for an element when the pointer is over it OR any of its visual descendants (WPF semantics).
+    // MouseEnter/MouseLeave are Direct routed events, so they must be raised individually along the ancestor chain - not
+    // just on the single deepest hit element. Otherwise a control whose hit target is one of its own template parts
+    // (e.g. a templated Button) never sees its own IsMouseOver change, so element-level triggers on it never fire while
+    // template/part triggers do. AncestorState does the chain diff (reused by the other "...Within"/"...Over" states).
     private IInputComponent SetMouseOver(IInputComponent root, IInputComponent component, InputModifiers modifiers, uint timestamp)
     {
-        if (component != null)
-        {
-            if (DirectlyOver != component)
-            {
-                MouseEventArgs args = new MouseEventArgs(this, modifiers, timestamp)
-                {
-                    RoutedEvent = Mouse.MouseLeaveEvent
-                };
-                if (DirectlyOver != root && DirectlyOver != null)
-                {
-                    if (DirectlyOver.IsMouseOver)
-                    {
-                        DirectlyOver.RaiseEvent(args);
-                    }
-                }
-
-                args.RoutedEvent = Mouse.MouseEnterEvent;
-
-                if (!component.IsMouseOver)
-                {
-                    component.RaiseEvent(args);
-                }
-            }
-        }
-
-        DirectlyOver = component ?? root;
+        var newOver = component ?? root;
+        AncestorState.Transition(DirectlyOver, newOver, Mouse.MouseEnterEvent, Mouse.MouseLeaveEvent,
+            evt => new MouseEventArgs(this, modifiers, timestamp) { RoutedEvent = evt });
+        DirectlyOver = newOver;
         return DirectlyOver;
     }
 

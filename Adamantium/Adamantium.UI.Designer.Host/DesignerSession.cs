@@ -13,6 +13,7 @@ using Adamantium.UI.Core.Markup;
 using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.Media.Animation;
 using Adamantium.UI.Extensions;
+using Adamantium.UI.Markup.AST;
 using Adamantium.UI.Rendering;
 
 namespace Adamantium.UI.Designer.Host;
@@ -38,6 +39,22 @@ public sealed class DesignerSession : IDisposable
     // the authored element and its markup position without re-rendering.
     private IWindow _lastWindow;
     private IReadOnlyDictionary<object, AumlSourceSpan> _lastSourceMap;
+
+    // The live preview session: the tree/renderer/target from the last Render, kept alive so the streaming "frame" op
+    // (RenderNextFrame) advances and re-renders the SAME scene each tick instead of re-capturing a batch.
+    private OffscreenRenderer _liveRenderer;
+    private IRootVisualComponent _liveRoot;
+    private uint _liveTargetWidth;
+    private uint _liveTargetHeight;
+    private double _liveScale;
+    private uint _liveDesignWidth;
+    private uint _liveDesignHeight;
+
+    // Hot reload: the AST the live tree was built from, the authored root instance, and the file it came from. An edit
+    // to the SAME file reconciles this tree in place (keeping animations) instead of rebuilding it.
+    private AumlAstObjectNode _lastAst;
+    private object _liveAuthoredRoot;
+    private string _lastUri;
 
     private const double DefaultWidth = 1280;
     private const double DefaultHeight = 720;
@@ -98,12 +115,6 @@ public sealed class DesignerSession : IDisposable
         // Live preview lets design-mode animations run (a one-shot render keeps them settled). Set before layout below.
         Design.IsLivePreview = live;
 
-        // A fresh tree: drop any animations the previous preview tree left in the shared static AnimationManager, so a
-        // later tick never advances stale animations bound to now-discarded controls (which black-screens / crashes it).
-        // Same for animated images registered with the design-time media clock.
-        AnimationManager.Reset();
-        DesignTimeMediaClock.Reset();
-
         // Relative asset paths (e.g. <Image Source="Textures/foo.tga">) are loaded against the process working
         // directory, exactly as in the running app (which runs from its output dir). Point the CWD at the edited
         // file's project root so the live designer loads those assets straight from the project source.
@@ -113,6 +124,39 @@ public sealed class DesignerSession : IDisposable
         // Load the edited file's own project assembly so its types (clr-namespace: controls, behaviors) resolve,
         // not just engine types. Best-effort and idempotent (LoadFrom caches by path).
         LoadProjectAssembly(aumlSourcePath);
+
+        // Hot reload: an edit to a file we already have live -> reconcile the EXISTING tree in place (changed properties
+        // re-applied so transitions ease, added/removed children spliced in) instead of rebuilding it. The animation
+        // clocks are NOT reset, so everything that was running keeps running. Only a full (first) build resets them.
+        if (live && _lastWindow != null && _lastAst != null && _liveAuthoredRoot != null
+            && string.Equals(aumlSourcePath, _lastUri, StringComparison.Ordinal))
+        {
+            var rec = AumlLoader.Reconcile(_liveAuthoredRoot, _lastAst, aumlText,
+                AppDomain.CurrentDomain.GetAssemblies(),
+                t => typeof(IWindow).IsAssignableFrom(t) ? typeof(VirtualWindow) : t);
+            if (rec.Reconciled)
+            {
+                _lastAst = rec.Ast;
+                var win = _lastWindow;
+                var src = (_liveAuthoredRoot as IMeasurableComponent) ?? (win as IMeasurableComponent);
+                var dw = ResolveDimension(src?.Width, requestWidth, DefaultWidth);
+                var dh = ResolveDimension(src?.Height, requestHeight, DefaultHeight);
+                win.ClientWidth = dw;
+                win.ClientHeight = dh;
+                win.Update(_app.ThemeManager, new AppTime());
+                (dw, dh) = ShrinkToContent(win, _liveAuthoredRoot, src, dw, dh);
+                // Reconcile keeps the SAME control instances (same RenderIds), so their cached render units are still
+                // valid - do NOT reset the cache (that would dispose every unit, and unchanged/clean controls record
+                // nothing to rebuild them -> white screen). The changed control re-renders itself via its invalidation.
+                return RenderTail(win, dw, dh, scale, outPath, live, rec.Diagnostics, resetCache: false);
+            }
+            // reconcile declined (root element type changed) -> fall through to a full rebuild
+        }
+
+        // Full (re)build: drop any animations/images the previous tree left in the shared static clocks so the fresh
+        // tree starts clean and a later tick never advances stale animations bound to now-discarded controls.
+        AnimationManager.Reset();
+        DesignTimeMediaClock.Reset();
 
         var load = AumlLoader.Load(
             aumlText,
@@ -141,8 +185,7 @@ public sealed class DesignerSession : IDisposable
         window.AttachContextAndInitialize(_app.UIContext);
 
         // Design-time DataContext (x:ViewModel, opt-in via x:CreateInDesignTime="True"): rendered with real sample
-        // data so {Binding} paths resolve in the preview - the WPF d:DesignInstance behaviour. Applied after the first
-        // layout (below), once the logical tree exists so it propagates to every element.
+        // data so {Binding} paths resolve in the preview - the WPF d:DesignInstance behaviour.
         var designContext = CreateDesignDataContext(aumlText);
 
         var designWidth = ResolveDimension(sizeSource?.Width, requestWidth, DefaultWidth);
@@ -151,40 +194,55 @@ public sealed class DesignerSession : IDisposable
         window.ClientWidth = designWidth;
         window.ClientHeight = designHeight;
 
-        // Layout (Measure/Arrange + theme) at the design size - geometry only, no native window.
+        // Layout (Measure/Arrange + theme) at the design size - geometry only, no native window. Done first so the
+        // templates expand before the DataContext is assigned, then re-run so bound values participate in layout.
         window.Update(_app.ThemeManager, new AppTime());
 
-        // The logical tree (and templates) now exist: assign the design-time DataContext so it propagates to every
-        // element and their {Binding}s resolve, then re-run layout so the bound values participate in measure/arrange.
         if (designContext != null && load.Root is IFundamentalUIComponent rootComponent)
         {
             rootComponent.DataContext = designContext;
             window.Update(_app.ThemeManager, new AppTime());
         }
 
-        // A hosted control with no declared size: shrink the design canvas to its natural (content) size so the
-        // preview fits the control instead of a full default window. (Windows and explicitly-sized controls keep
-        // their size.)
-        if (load.Root is not IWindow && sizeSource is { } s && double.IsNaN(s.Width) && double.IsNaN(s.Height))
-        {
-            var desired = s.DesiredSize;
-            if (desired.Width >= 1 && desired.Height >= 1 && (desired.Width < designWidth || desired.Height < designHeight))
-            {
-                designWidth = Math.Min(designWidth, desired.Width);
-                designHeight = Math.Min(designHeight, desired.Height);
-                window.ClientWidth = designWidth;
-                window.ClientHeight = designHeight;
-                window.Update(_app.ThemeManager, new AppTime());
-            }
-        }
+        (designWidth, designHeight) = ShrinkToContent(window, load.Root, sizeSource, designWidth, designHeight);
 
-        // Keep the laid-out tree + source map for a follow-up hittest (designer click → go-to-source / hover frame).
+        // Keep the laid-out tree + source map + AST for a follow-up hittest and for reconciling the next edit.
         _lastWindow = window;
         _lastSourceMap = load.SourceMap;
+        _lastAst = load.Ast;
+        _liveAuthoredRoot = load.Root;
+        _lastUri = aumlSourcePath;
 
+        return RenderTail(window, designWidth, designHeight, scale, outPath, live, load.Diagnostics, resetCache: true);
+    }
+
+    // A hosted control with no declared size: shrink the design canvas to its natural (content) size so the preview
+    // fits the control instead of a full default window. Windows and explicitly-sized controls keep their size.
+    private (double Width, double Height) ShrinkToContent(IWindow window, object authoredRoot, IMeasurableComponent sizeSource, double designWidth, double designHeight)
+    {
+        if (authoredRoot is IWindow || sizeSource is not { } s || !double.IsNaN(s.Width) || !double.IsNaN(s.Height))
+            return (designWidth, designHeight);
+
+        var desired = s.DesiredSize;
+        if (desired.Width >= 1 && desired.Height >= 1 && (desired.Width < designWidth || desired.Height < designHeight))
+        {
+            designWidth = Math.Min(designWidth, desired.Width);
+            designHeight = Math.Min(designHeight, desired.Height);
+            window.ClientWidth = designWidth;
+            window.ClientHeight = designHeight;
+            window.Update(_app.ThemeManager, new AppTime());
+        }
+        return (designWidth, designHeight);
+    }
+
+    // The shared rendering tail: drives any design-time game, picks the render scale/target, renders the current frame
+    // and remembers the live session so the streaming "frame" op can advance it. Used by both the full build and the
+    // hot-reload reconcile path.
+    private RenderResult RenderTail(IWindow window, double designWidth, double designHeight, double scale, string outPath, bool live, List<string> diagnostics, bool resetCache)
+    {
         // Design-time game preview: a design-aware behavior (e.g. GameHostBehavior) created+bound a game to its
-        // RenderTargetPanel while the tree was built. Drive a short snapshot now so the game loads its content and
-        // publishes a frame to the panel; the OffscreenRenderer composites that below. No-op when no game is hosted.
+        // RenderTargetPanel while the tree was built. Drive a short snapshot so the game loads content and publishes a
+        // frame to the panel; the OffscreenRenderer composites that below. No-op when no game is hosted.
         DriveDesignTimeGames();
 
         if (scale <= 0) scale = 1.0;
@@ -194,60 +252,55 @@ public sealed class DesignerSession : IDisposable
         var targetHeight = (uint)Math.Max(1.0, Math.Round(designHeight * renderScale));
 
         var renderer = GetRenderer(targetWidth, targetHeight);
-        // A fresh tree each Render: free the previous render's units. (Within the animation loop below we do NOT reset -
-        // it re-renders the SAME tree, so units are reused and ProcessCommands re-applies each animated WorldTransform.)
-        renderer.ResetCache();
+        // Only a full build needs to drop the previous tree's units (new instances/RenderIds). On a reconcile the
+        // instances are unchanged, so their cached units stay valid - resetting here would white out every clean control.
+        if (resetCache) renderer.ResetCache();
 
         var root = (IRootVisualComponent)window;
         var designW = (uint)Math.Round(designWidth);
         var designH = (uint)Math.Round(designHeight);
 
-        // Live render with animations OR animated images in flight: capture the WHOLE animation as a frame sequence
-        // (frame 0 = start) so the editor plays it back locally with a simple timer - no per-frame round-trip. A settled
-        // render (or a live one with nothing animating) is a single frame.
-        if (live && (AnimationManager.HasActiveAnimations || DesignTimeMediaClock.HasActiveMedia))
-        {
-            const double dt = 1.0 / 60.0;   // capture at 60 fps
-            const int maxFrames = 120;      // cap (~2s); a non-settling animation is looped by the client
-            var frames = new List<string>();
-            var settled = false;
-            // The frame the client loops back to. One-shot window animations (e.g. a content transition) play over
-            // frames [0, loopStart); after they settle the looping tail [loopStart, end) holds only the animated image,
-            // so the loop replays just the image - the window animation isn't restarted on each image cycle.
-            var loopStart = 0;
-            var windowSettled = !AnimationManager.HasActiveAnimations;
-            for (var i = 0; i < maxFrames; i++)
-            {
-                if (!renderer.RenderFrame(root))
-                    return RenderResult.Fail("render failed", load.Diagnostics);
-                var framePath = FrameVariant(outPath, i);
-                renderer.SaveRaw(framePath);
-                frames.Add(framePath);
-
-                if (!AnimationManager.HasActiveAnimations && !DesignTimeMediaClock.HasActiveMedia) { settled = true; break; }
-
-                // First frame at which the one-shot window animations are done: the looping client restarts here, not 0.
-                if (!windowSettled && !AnimationManager.HasActiveAnimations) { windowSettled = true; loopStart = i; }
-
-                AnimationManager.Tick(dt);
-                DesignTimeMediaClock.Tick(dt);                     // advance animated images by virtual time
-                window.Update(_app.ThemeManager, new AppTime());   // re-run layout for any animation-driven size change
-            }
-            return RenderResult.Ok(frames, load.Diagnostics, targetWidth, targetHeight, renderScale,
-                designW, designH, frameMs: dt * 1000.0, looped: !settled, loopStart: loopStart);
-        }
-
+        // Render the current frame. If anything is animating, the client drives the animation in REAL TIME by calling
+        // the "frame" op (RenderNextFrame) repeatedly - a live stream, not a pre-captured batch.
         if (!renderer.RenderFrame(root))
-            return RenderResult.Fail("render failed", load.Diagnostics);
+            return RenderResult.Fail("render failed", diagnostics);
         renderer.SaveRaw(outPath);   // raw B8G8R8A8 - no PNG encode (the editor converts the bytes)
-        return RenderResult.Ok([outPath], load.Diagnostics, targetWidth, targetHeight, renderScale, designW, designH);
+
+        _liveRenderer = renderer;
+        _liveRoot = root;
+        _liveTargetWidth = targetWidth;
+        _liveTargetHeight = targetHeight;
+        _liveScale = renderScale;
+        _liveDesignWidth = designW;
+        _liveDesignHeight = designH;
+
+        var animating = live && (AnimationManager.HasActiveAnimations || DesignTimeMediaClock.HasActiveMedia);
+        return RenderResult.Ok([outPath], diagnostics, targetWidth, targetHeight, renderScale, designW, designH, animating);
     }
 
-    // Derives the i-th sequence frame's path from the base out path: ".../preview-5.bgra" -> ".../preview-5-3.bgra".
-    private static string FrameVariant(string outPath, int index)
+    /// <summary>
+    /// Advances the live preview by one frame: ticks the design-time animation clocks, re-lays-out and re-renders the
+    /// SAME tree captured by the last <see cref="Render"/>, and writes the frame. The client calls this ~60fps while
+    /// <see cref="RenderResult.Animating"/> is true to play animations live (no batch capture). Returns Animating=false
+    /// once nothing is left to animate, so the client stops streaming.
+    /// </summary>
+    public RenderResult RenderNextFrame(string outPath)
     {
-        var dir = Path.GetDirectoryName(outPath) ?? string.Empty;
-        return Path.Combine(dir, Path.GetFileNameWithoutExtension(outPath) + "-" + index + ".bgra");
+        if (_lastWindow == null || _liveRenderer == null || _liveRoot == null)
+            return RenderResult.Fail("no live session to advance", null);
+
+        const double dt = 1.0 / 60.0;
+        AnimationManager.Tick(dt);
+        DesignTimeMediaClock.Tick(dt);                     // advance animated images by virtual time
+        _lastWindow.Update(_app.ThemeManager, new AppTime());   // re-run layout for any animation-driven size change
+
+        if (!_liveRenderer.RenderFrame(_liveRoot))
+            return RenderResult.Fail("render failed", null);
+        _liveRenderer.SaveRaw(outPath);
+
+        var animating = AnimationManager.HasActiveAnimations || DesignTimeMediaClock.HasActiveMedia;
+        return RenderResult.Ok([outPath], null, _liveTargetWidth, _liveTargetHeight, _liveScale,
+            _liveDesignWidth, _liveDesignHeight, animating);
     }
 
     /// <summary>

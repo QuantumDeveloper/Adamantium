@@ -434,4 +434,185 @@ internal sealed class AumlInstantiator
             .SelectMany(ReflectionResolvedAssembly.SafeGetTypes)
             .FirstOrDefault(x => x.Name == typeRef.Name && x.Namespace == typeRef.Namespace);
     }
+
+    // ==== hot reload: live-tree reconciliation ====================================================================
+    // Apply edited markup to an EXISTING object tree IN PLACE instead of rebuilding it: changed properties are
+    // re-applied to the live instances (so a transition eases and animations elsewhere keep running) and added /
+    // removed / replaced / reordered child elements are spliced into the live tree. <paramref name="oldNode"/> is the
+    // AST the live tree was built from; <paramref name="newNode"/> the edited markup. The two are diffed - only real
+    // changes touch the tree.
+
+    public void Reconcile(object live, AumlAstObjectNode oldNode, AumlAstObjectNode newNode)
+    {
+        if (live == null || oldNode == null || newNode == null) return;
+        ReconcileProperties(live, oldNode, newNode);
+        ReconcileChildren(live, oldNode, newNode);
+    }
+
+    private void ReconcileProperties(object live, AumlAstObjectNode oldNode, AumlAstObjectNode newNode)
+    {
+        var oldProps = PropertyNodes(oldNode);
+        var newProps = PropertyNodes(newNode);
+
+        // Removed (present in the old markup, gone in the new): clear back to default.
+        foreach (var name in oldProps.Keys)
+            if (!newProps.ContainsKey(name)) ResetProperty(live, name);
+
+        // Added / changed: re-apply ONLY when the value actually changed, so unchanged properties don't re-fire their
+        // transitions (re-applying every property on each edit is exactly what made "the whole tree restart").
+        foreach (var (name, newProp) in newProps)
+        {
+            if (oldProps.TryGetValue(name, out var oldProp) && NodeSignature(oldProp) == NodeSignature(newProp))
+                continue;
+            ApplyPropertyNode(live, newProp);
+        }
+    }
+
+    private void ReconcileChildren(object live, AumlAstObjectNode oldNode, AumlAstObjectNode newNode)
+    {
+        if (live is not IContainer container) return;
+
+        var oldKids = ObjectChildren(oldNode);
+        var newKids = ObjectChildren(newNode);
+        var liveKids = container.GetChildComponents();
+
+        // The live children were built from oldKids in order. If that no longer lines up (e.g. a container that didn't
+        // expose its children), we can't splice precisely - rebuild just this container's content.
+        if (liveKids.Count != oldKids.Count)
+        {
+            RebuildChildren(container, newKids);
+            return;
+        }
+
+        // Key each old child to its live instance; a new child with the same key reuses (and reconciles) it.
+        var oldKeys = ChildKeys(oldKids);
+        var newKeys = ChildKeys(newKids);
+        var byKey = new Dictionary<string, (AumlAstObjectNode Node, object Instance)>(StringComparer.Ordinal);
+        for (var i = 0; i < oldKids.Count; i++)
+            byKey[oldKeys[i]] = (oldKids[i], liveKids[i]);
+
+        // The desired final child instances, in the NEW order: reuse+reconcile matches, instantiate the rest.
+        var desired = new List<object>(newKids.Count);
+        for (var j = 0; j < newKids.Count; j++)
+        {
+            if (byKey.TryGetValue(newKeys[j], out var match))
+            {
+                Reconcile(match.Instance, match.Node, newKids[j]);
+                desired.Add(match.Instance);
+            }
+            else
+            {
+                var created = Instantiate(newKids[j]);
+                if (created != null) desired.Add(created);
+            }
+        }
+
+        ApplyChildOrder(container, desired);
+    }
+
+    // Splices the container's children to match `desired` (a mix of reused live instances and freshly built ones),
+    // preserving reused instances (so their animations keep running) and inserting/removing/reordering minimally.
+    private static void ApplyChildOrder(IContainer container, List<object> desired)
+    {
+        // Drop live children no longer wanted (back-to-front to keep indices valid).
+        var current = container.GetChildComponents();
+        for (var i = current.Count - 1; i >= 0; i--)
+            if (!desired.Any(d => ReferenceEquals(d, current[i])))
+                container.RemoveChildComponentAt(i);
+
+        // Position each desired child, moving reused instances and inserting new ones.
+        for (var i = 0; i < desired.Count; i++)
+        {
+            current = container.GetChildComponents();
+            if (i < current.Count && ReferenceEquals(current[i], desired[i])) continue;
+
+            var existing = -1;
+            for (var k = 0; k < current.Count; k++)
+                if (ReferenceEquals(current[k], desired[i])) { existing = k; break; }
+            if (existing >= 0) container.RemoveChildComponentAt(existing);
+            container.InsertChildComponent(i, desired[i]);
+        }
+    }
+
+    private void RebuildChildren(IContainer container, List<AumlAstObjectNode> newKids)
+    {
+        container.RemoveAllChildComponents();
+        foreach (var kid in newKids)
+        {
+            var created = Instantiate(kid);
+            if (created is IAdamantiumComponent) container.AddOrSetChildComponent(created);
+        }
+    }
+
+    private void ApplyPropertyNode(object instance, AumlAstPropertyNode prop)
+    {
+        if (prop.Property is AumlAstPropertyReference pref) ApplyProperty(instance, pref, prop);
+    }
+
+    private static void ResetProperty(object instance, string name)
+    {
+        if (instance is not AdamantiumComponent comp) return;
+        var p = comp.GetProperty(name);
+        if (p != null) comp.ClearValue(p);   // clears the Local value -> back to default / style
+    }
+
+    private static Dictionary<string, AumlAstPropertyNode> PropertyNodes(AumlAstObjectNode node)
+    {
+        var result = new Dictionary<string, AumlAstPropertyNode>(StringComparer.Ordinal);
+        foreach (var child in node.Children)
+            if (child is AumlAstPropertyNode { Property: AumlAstPropertyReference pref } prop && !pref.IsAttachedProperty)
+                result[pref.Name] = prop;
+        return result;
+    }
+
+    private static List<AumlAstObjectNode> ObjectChildren(AumlAstObjectNode node)
+    {
+        var result = new List<AumlAstObjectNode>();
+        foreach (var child in node.Children)
+            if (child is AumlAstObjectNode obj) result.Add(obj);
+        return result;
+    }
+
+    // A stable identity for each child: x:Name (or a Name property) when present, else type + occurrence index among
+    // same-typed siblings. Lets reorders/renames reuse the same live instance instead of rebuilding it.
+    private static List<string> ChildKeys(List<AumlAstObjectNode> kids)
+    {
+        var keys = new List<string>(kids.Count);
+        var typeCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var kid in kids)
+        {
+            var type = kid.TypeReference?.Name ?? "?";
+            var name = NameKeyOf(kid);
+            if (!string.IsNullOrEmpty(name)) { keys.Add(type + "#" + name); continue; }
+            var n = typeCounts.TryGetValue(type, out var c) ? c : 0;
+            typeCounts[type] = n + 1;
+            keys.Add(type + "@" + n);
+        }
+        return keys;
+    }
+
+    private static string NameKeyOf(AumlAstObjectNode node)
+    {
+        foreach (var child in node.Children)
+        {
+            if (child is AumlAstDirective { Name: "Name" } dir) return (dir.Value as AumlAstTextNode)?.Text;
+            if (child is AumlAstPropertyNode { Property: AumlAstPropertyReference { Name: "Name" } } p)
+                return (p.Values.FirstOrDefault() as AumlAstTextNode)?.Text;
+        }
+        return null;
+    }
+
+    // A textual signature of an AST node so old vs new property values can be compared for "did it actually change".
+    private static string NodeSignature(IAumlAstNode node) => node switch
+    {
+        AumlAstPropertyNode p => "P:" + (p.Property is AumlAstPropertyReference r ? r.Name : "") + "=" +
+                                 string.Join("|", p.Values.Select(NodeSignature)),
+        AumlAstTextNode t => "T:" + t.Text,
+        AumlAstMarkupExtensionNode m => "M:" + (m.TypeReference?.Name ?? "") + "(" +
+                                        string.Join(",", m.Arguments.Select(a => a.Name + "=" + NodeSignature(a.Value))) + ")",
+        AumlAstObjectNode o => "O:" + (o.TypeReference?.Name ?? "") + "{" +
+                               string.Join(";", o.Children.Select(NodeSignature)) + "}",
+        AumlAstDirective d => "D:" + d.Name + "=" + NodeSignature(d.Value),
+        _ => node?.ToString() ?? ""
+    };
 }
