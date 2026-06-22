@@ -99,6 +99,11 @@ public sealed class OffscreenRenderer : IDisposable
     /// render target, so this is also correct in the non-MSAA case.</summary>
     public void Save(string path, ImageFileType fileType) => _presenter.RenderTarget.ResolveTexture.Save(path, fileType);
 
+    /// <summary>Writes the last rendered frame's RAW pixels (native B8G8R8A8, no PNG encode) to <paramref name="path"/>.
+    /// Much faster than <see cref="Save"/> for repeated read-back (the live designer's per-frame transport); the
+    /// consumer converts the BGRA bytes itself.</summary>
+    public void SaveRaw(string path) => _presenter.RenderTarget.ResolveTexture.SaveRaw(path);
+
     public void Resize(uint width, uint height)
     {
         _presenter.Resize(new PresentationParameters(_presenterKind, width, height, IntPtr.Zero, _presenter.MSAALevel));

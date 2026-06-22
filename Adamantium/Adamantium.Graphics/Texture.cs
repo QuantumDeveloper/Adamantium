@@ -458,21 +458,48 @@ public unsafe class Texture : GraphicsResource, ITexture
     public void Save(string path, ImageFileType fileType)
     {
         var img = Image.New2D(Width, Height, 1, Description.Format);
-
-        if (GraphicsDevice.Adapter.SupportsHostImageCopy &&
-            Description.Usage.HasFlag(ImageUsageFlagBits.HostTransferBit))
-        {
-            CopyImageToHostMemory(img);
-        }
-        else
-        {
-            CopyImageThroughStagingBuffer(img);
-        }
+        ReadbackInto(img);
 
         // The render target is stored as B8G8R8A8; the image encoders read pixels as RGBA, so swap R<->B.
         SwapRedBlueIfBgra(img);
 
         img.Save(path, fileType);
+    }
+
+    // Reusable host-side read-back buffer for SaveRaw, so the per-frame live preview doesn't allocate an Image each
+    // frame. Owned by this texture (so it tracks the texture's size and is disposed with it); a resize recreates the
+    // whole render target, hence a fresh texture and buffer.
+    private Image _rawReadback;
+
+    public void SaveRaw(string path)
+    {
+        // (Re)create the read-back buffer if missing or sized for a previous resolution (in case the texture was
+        // resized in place rather than recreated), so the read-back always copies into a correctly-sized buffer.
+        if (_rawReadback == null || _rawReadback.Description.Width != Width || _rawReadback.Description.Height != Height)
+        {
+            _rawReadback?.Dispose();
+            _rawReadback = ToDispose(Image.New2D(Width, Height, 1, Description.Format));
+        }
+        ReadbackInto(_rawReadback);
+
+        // Write the native bytes straight out (no R<->B swap, no encode); the consumer interprets them as B8G8R8A8.
+        using var fs = new FileStream(path, FileMode.Create, FileAccess.Write);
+        fs.Write(new ReadOnlySpan<byte>((void*)_rawReadback.DataPointer, (int)_rawReadback.TotalSizeInBytes));
+    }
+
+    /// <summary>Reads this texture's pixels into <paramref name="destination"/> via host image copy (fast path) or a
+    /// staging buffer, with no colour swap or encoding.</summary>
+    private void ReadbackInto(Image destination)
+    {
+        if (GraphicsDevice.Adapter.SupportsHostImageCopy &&
+            Description.Usage.HasFlag(ImageUsageFlagBits.HostTransferBit))
+        {
+            CopyImageToHostMemory(destination);
+        }
+        else
+        {
+            CopyImageThroughStagingBuffer(destination);
+        }
     }
 
     /// <summary>

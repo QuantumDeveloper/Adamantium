@@ -139,11 +139,21 @@ public class RenderTargetGameOutput : AdamantiumGameOutputBase
 
     private void NativeWindowOnSizeChanged(object sender, SizeChangedEventArgs e)
     {
-        RaiseSizeChangedEvent(new GameOutputSizeChangedPayload(this, e.NewSize));
-        Width = (uint)nativeWindow.ActualWidth;
-        Height = (uint)nativeWindow.ActualHeight;
-        ClientBounds = new Rectangle(0, 0, (int)e.NewSize.Width, (int)e.NewSize.Height);
-        UpdateViewportAndScissor((uint)ClientBounds.Width, (uint)ClientBounds.Height);
+        // SizeChanged is a BUBBLING routed event, so a CHILD's resize (e.g. a Button growing inside the panel) reaches
+        // this handler too. We must react ONLY to the panel's OWN size change: use the panel's actual size (NOT
+        // e.NewSize, which is the originating element's), and bail when it hasn't changed. Otherwise a child resize set
+        // the game's ClientBounds/viewport to the child's size and the game rendered into a child-sized region pinned to
+        // the top-left - jumping there and "stretching" with the button. (The window resize triggered the panel's own
+        // SizeChanged, which is why it restored the picture.)
+        var width = (uint)nativeWindow.ActualWidth;
+        var height = (uint)nativeWindow.ActualHeight;
+        if (width == Width && height == Height) return;
+
+        Width = width;
+        Height = height;
+        ClientBounds = new Rectangle(0, 0, (int)width, (int)height);
+        UpdateViewportAndScissor(width, height);
+        RaiseSizeChangedEvent(new GameOutputSizeChangedPayload(this, new Adamantium.Mathematics.Size(width, height)));
         ResizeRequested = true;
         EventAggregator.GetEvent<GameOutputChangesRequestedEvent>().Publish(new GameOutputParametersPayload(this, Description, ChangeReason.Resize));
         // The surface is re-created on the next CopyOutput (size mismatch) and re-handed to the control.

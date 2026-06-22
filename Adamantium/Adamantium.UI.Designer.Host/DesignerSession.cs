@@ -11,6 +11,7 @@ using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Markup;
 using Adamantium.UI.Core.Media;
+using Adamantium.UI.Core.Media.Animation;
 using Adamantium.UI.Extensions;
 using Adamantium.UI.Rendering;
 
@@ -92,8 +93,17 @@ public sealed class DesignerSession : IDisposable
     /// else a default), and only the render target is scaled - so zooming re-rasterises the same layout crisply
     /// rather than reflowing it.
     /// </summary>
-    public RenderResult Render(string aumlText, uint? requestWidth, uint? requestHeight, double scale, string outPath, string? aumlSourcePath = null)
+    public RenderResult Render(string aumlText, uint? requestWidth, uint? requestHeight, double scale, string outPath, string? aumlSourcePath = null, bool live = false)
     {
+        // Live preview lets design-mode animations run (a one-shot render keeps them settled). Set before layout below.
+        Design.IsLivePreview = live;
+
+        // A fresh tree: drop any animations the previous preview tree left in the shared static AnimationManager, so a
+        // later tick never advances stale animations bound to now-discarded controls (which black-screens / crashes it).
+        // Same for animated images registered with the design-time media clock.
+        AnimationManager.Reset();
+        DesignTimeMediaClock.Reset();
+
         // Relative asset paths (e.g. <Image Source="Textures/foo.tga">) are loaded against the process working
         // directory, exactly as in the running app (which runs from its output dir). Point the CWD at the edited
         // file's project root so the live designer loads those assets straight from the project source.
@@ -184,15 +194,60 @@ public sealed class DesignerSession : IDisposable
         var targetHeight = (uint)Math.Max(1.0, Math.Round(designHeight * renderScale));
 
         var renderer = GetRenderer(targetWidth, targetHeight);
-        // Each render is a fresh tree, so free the previous render's units now (the last frame left the GPU idle).
+        // A fresh tree each Render: free the previous render's units. (Within the animation loop below we do NOT reset -
+        // it re-renders the SAME tree, so units are reused and ProcessCommands re-applies each animated WorldTransform.)
         renderer.ResetCache();
-        if (!renderer.RenderFrame((IRootVisualComponent)window))
+
+        var root = (IRootVisualComponent)window;
+        var designW = (uint)Math.Round(designWidth);
+        var designH = (uint)Math.Round(designHeight);
+
+        // Live render with animations OR animated images in flight: capture the WHOLE animation as a frame sequence
+        // (frame 0 = start) so the editor plays it back locally with a simple timer - no per-frame round-trip. A settled
+        // render (or a live one with nothing animating) is a single frame.
+        if (live && (AnimationManager.HasActiveAnimations || DesignTimeMediaClock.HasActiveMedia))
+        {
+            const double dt = 1.0 / 60.0;   // capture at 60 fps
+            const int maxFrames = 120;      // cap (~2s); a non-settling animation is looped by the client
+            var frames = new List<string>();
+            var settled = false;
+            // The frame the client loops back to. One-shot window animations (e.g. a content transition) play over
+            // frames [0, loopStart); after they settle the looping tail [loopStart, end) holds only the animated image,
+            // so the loop replays just the image - the window animation isn't restarted on each image cycle.
+            var loopStart = 0;
+            var windowSettled = !AnimationManager.HasActiveAnimations;
+            for (var i = 0; i < maxFrames; i++)
+            {
+                if (!renderer.RenderFrame(root))
+                    return RenderResult.Fail("render failed", load.Diagnostics);
+                var framePath = FrameVariant(outPath, i);
+                renderer.SaveRaw(framePath);
+                frames.Add(framePath);
+
+                if (!AnimationManager.HasActiveAnimations && !DesignTimeMediaClock.HasActiveMedia) { settled = true; break; }
+
+                // First frame at which the one-shot window animations are done: the looping client restarts here, not 0.
+                if (!windowSettled && !AnimationManager.HasActiveAnimations) { windowSettled = true; loopStart = i; }
+
+                AnimationManager.Tick(dt);
+                DesignTimeMediaClock.Tick(dt);                     // advance animated images by virtual time
+                window.Update(_app.ThemeManager, new AppTime());   // re-run layout for any animation-driven size change
+            }
+            return RenderResult.Ok(frames, load.Diagnostics, targetWidth, targetHeight, renderScale,
+                designW, designH, frameMs: dt * 1000.0, looped: !settled, loopStart: loopStart);
+        }
+
+        if (!renderer.RenderFrame(root))
             return RenderResult.Fail("render failed", load.Diagnostics);
+        renderer.SaveRaw(outPath);   // raw B8G8R8A8 - no PNG encode (the editor converts the bytes)
+        return RenderResult.Ok([outPath], load.Diagnostics, targetWidth, targetHeight, renderScale, designW, designH);
+    }
 
-        renderer.Save(outPath, ImageFileType.Png);
-
-        return RenderResult.Ok(outPath, load.Diagnostics, targetWidth, targetHeight, renderScale,
-            (uint)Math.Round(designWidth), (uint)Math.Round(designHeight));
+    // Derives the i-th sequence frame's path from the base out path: ".../preview-5.bgra" -> ".../preview-5-3.bgra".
+    private static string FrameVariant(string outPath, int index)
+    {
+        var dir = Path.GetDirectoryName(outPath) ?? string.Empty;
+        return Path.Combine(dir, Path.GetFileNameWithoutExtension(outPath) + "-" + index + ".bgra");
     }
 
     /// <summary>
@@ -236,8 +291,20 @@ public sealed class DesignerSession : IDisposable
 
         var dll = FindProjectAssembly(csproj);
         if (dll == null) return;
+
+        // The project's output dir is where its OWN dependencies live (notably Adamantium.MVVM, which a generated
+        // [ViewModel] derives from and whose commands it returns) - assemblies the designer host doesn't reference, so
+        // they're not on its probing path. Register a resolver that satisfies any missing assembly from there: without
+        // it, reflection can't load the VM's base/member types, silently drops the WHOLE type from GetTypes(), and the
+        // x:ViewModel / {Binding} resolves to nothing (e.g. a bound Width stays NaN -> the control stretches).
+        _projectOutputDir = Path.GetDirectoryName(dll);
         lock (_loadedProjectAssemblies)
         {
+            if (!_resolverRegistered)
+            {
+                AppDomain.CurrentDomain.AssemblyResolve += ResolveFromProjectOutput;
+                _resolverRegistered = true;
+            }
             if (!_loadedProjectAssemblies.Add(dll)) return;   // already loaded this session
         }
 
@@ -245,6 +312,21 @@ public sealed class DesignerSession : IDisposable
         // user rebuilding their project while this warm preview host has it open. Loaded once per session (a rebuild
         // is picked up after a host restart; full hot-reload is a separate, deferred workstream).
         try { Assembly.Load(File.ReadAllBytes(dll)); } catch { /* ignore unloadable */ }
+    }
+
+    // Output dir of the last previewed project; probed by ResolveFromProjectOutput for the project's own dependencies.
+    private static string _projectOutputDir;
+    private static bool _resolverRegistered;
+
+    /// <summary>Resolves an assembly the host can't find on its own probing path from the previewed project's output
+    /// directory (where the project's dependencies, e.g. Adamantium.MVVM, sit). Loaded by bytes so the file isn't locked.</summary>
+    private static Assembly ResolveFromProjectOutput(object sender, ResolveEventArgs args)
+    {
+        var dir = _projectOutputDir;
+        if (dir == null) return null;
+        var path = Path.Combine(dir, new AssemblyName(args.Name).Name + ".dll");
+        if (!File.Exists(path)) return null;
+        try { return Assembly.Load(File.ReadAllBytes(path)); } catch { return null; }
     }
 
     /// <summary>

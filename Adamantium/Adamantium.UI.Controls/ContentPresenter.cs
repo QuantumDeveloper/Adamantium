@@ -60,9 +60,10 @@ public class ContentPresenter : InputUIComponent
         if (_outgoingRoot != null)
             RemoveOutgoing();
 
-        // Animate when a transition is selected and there is new content - including the FIRST content (slides in and
-        // settles). Off in the designer: it renders one frame, so show the settled state, not a mid-slide capture.
-        var animate = ContentTransition != ContentTransition.None && newContent != null && !Design.IsDesignMode;
+        // Animate when a transition is selected and there is new content - including the FIRST content. In the designer
+        // it plays only for the LIVE previewer; a one-shot render shows the settled state (not a mid-slide capture).
+        var animate = ContentTransition != ContentTransition.None && newContent != null
+                      && (!Design.IsDesignMode || Design.IsLivePreview);
 
         if (animate)
         {

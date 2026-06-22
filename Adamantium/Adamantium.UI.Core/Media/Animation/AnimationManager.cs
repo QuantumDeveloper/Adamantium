@@ -13,6 +13,14 @@ public static class AnimationManager
 {
     private static readonly List<IRunningAnimation> Active = new();
 
+    /// <summary>True while any animation is in flight - the live designer polls this to decide whether to keep ticking.</summary>
+    public static bool HasActiveAnimations => Active.Count > 0;
+
+    /// <summary>Drops every running animation without firing completion callbacks. The live designer calls this when it
+    /// builds a fresh preview tree, so animations bound to the previous (discarded) tree don't linger in this shared
+    /// static manager and get advanced against dead controls on the next tick.</summary>
+    public static void Reset() => Active.Clear();
+
     /// <summary>Advances every running animation by <paramref name="deltaSeconds"/>. Called once per frame.</summary>
     public static void Tick(double deltaSeconds)
     {

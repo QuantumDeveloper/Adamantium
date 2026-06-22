@@ -89,6 +89,15 @@ internal static class LspSelfTest
         // Drilling into a folder ("Textures/") -> complete the files inside it.
         var (imageDirText, idLine, idChar) = Caret(
             """<Window xmlns="http://adamantium/ui"><Image Source="Textures/|"/></Window>""");
+        // Markup-extension named args: after a comma in {Binding} -> the binding's settable property NAMES.
+        var (bindNameText, bnLine, bnChar) = Caret(
+            """<StyleSet xmlns="http://adamantium/ui" xmlns:controls="http://adamantium/ui"><controls:Border Width="{Binding Foo, |}"/></StyleSet>""");
+        // Named-arg VALUE: {Binding Foo, Mode=|} -> the BindingMode enum members.
+        var (bindModeText, bmLine, bmChar) = Caret(
+            """<StyleSet xmlns="http://adamantium/ui" xmlns:controls="http://adamantium/ui"><controls:Border Width="{Binding Foo, Mode=|}"/></StyleSet>""");
+        // MultiBinding has no positional arg -> the first segment already offers its property names.
+        var (multiNameText, mnLine, mnChar) = Caret(
+            """<StyleSet xmlns="http://adamantium/ui" xmlns:controls="http://adamantium/ui"><controls:Border Width="{MultiBinding |}"/></StyleSet>""");
 
         JsonNode[] session =
         {
@@ -129,6 +138,12 @@ internal static class LspSelfTest
             Completion(22, dir + "/ImagePath.auml", ipLine, ipChar),
             DidOpen(dir + "/ImageDir.auml", imageDirText),
             Completion(23, dir + "/ImageDir.auml", idLine, idChar),
+            DidOpen(dir + "/BindName.auml", bindNameText),
+            Completion(24, dir + "/BindName.auml", bnLine, bnChar),
+            DidOpen(dir + "/BindMode.auml", bindModeText),
+            Completion(25, dir + "/BindMode.auml", bmLine, bmChar),
+            DidOpen(dir + "/MultiName.auml", multiNameText),
+            Completion(26, dir + "/MultiName.auml", mnLine, mnChar),
             DidOpen(xPrefixUri, xPrefixDoc),
             CodeAction(17, xPrefixUri, xName.Line, xName.Ch),
             DidOpen(semanticUri, semanticDoc),
@@ -154,7 +169,7 @@ internal static class LspSelfTest
             var method = response["method"]?.GetValue<string>();
             var id = response["id"]?.ToJsonString();
 
-            if (response["result"] is JsonArray array && id is "2" or "4" or "7" or "12" or "13" or "14" or "15" or "19" or "22" or "23")
+            if (response["result"] is JsonArray array && id is "2" or "4" or "7" or "12" or "13" or "14" or "15" or "19" or "22" or "23" or "24" or "25" or "26")
             {
                 var labels = array.Select(c => c!["label"]!.GetValue<string>()).ToList();
                 var tag = id switch
@@ -168,6 +183,9 @@ internal static class LspSelfTest
                     "19" => "encoded-URI (%3A) props",
                     "22" => "path values",
                     "23" => "path values (in folder)",
+                    "24" => "{Binding} named args",
+                    "25" => "{Binding Mode=} enum values",
+                    "26" => "{MultiBinding} named args",
                     _ => "controls:Border props"
                 };
                 Console.WriteLine($"<- completion ({tag}, id {id}): {labels.Count}: {string.Join(", ", labels.Take(8))}");

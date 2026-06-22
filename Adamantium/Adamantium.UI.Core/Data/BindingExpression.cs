@@ -138,20 +138,29 @@ public class BindingExpression : BindingExpressionBase
    }
 
    // Reads the source value through the (optional) converter. targetType drives the converter's requested type.
+   // FallbackValue is used when the binding can't resolve a source/path (WPF semantics); TargetNullValue when the
+   // resolved value is null (falling back to FallbackValue if no TargetNullValue is set).
    private object ComputeValue(Type targetType)
    {
-      if (_sourceProperty == null) return null;
+      if (_sourceProperty == null) return BindingBase.FallbackValue;
       var value = _sourceProperty.GetValue(ResolvedSource);
       if (Binding.Converter != null)
          value = Binding.Converter.Convert(value, targetType, Binding.ConverterParameter, CultureInfo.CurrentCulture);
+      if (value == null)
+         value = BindingBase.TargetNullValue ?? BindingBase.FallbackValue;
       return value;
    }
 
    public override void UpdateTarget()
    {
-      if (_sourceProperty == null || TargetProperty == null) return;
+      if (TargetProperty == null) return;
       var value = ComputeValue(TargetProperty.PropertyType);
-      Target.SetValue(TargetProperty, Coerce(value, TargetProperty.PropertyType), ValuePriority.Binding);
+      // No source value and no fallback: leave the target at its default (don't clobber with null).
+      if (value == null) return;
+      // Can't make the value fit the target type (e.g. a FallbackValue="50" on an ICommand property)? Leave the target
+      // at its default instead of pushing an incompatible value, which would throw in SetValue and abort the whole load.
+      if (!TryCoerce(value, TargetProperty.PropertyType, out var coerced)) return;
+      Target.SetValue(TargetProperty, coerced, ValuePriority.Binding);
    }
 
    public override void UpdateSource()
@@ -164,12 +173,23 @@ public class BindingExpression : BindingExpressionBase
    }
 
    // Minimal target-type coercion (no full converter pipeline): pass-through when assignable, ToString for a string
-   // target, else a best-effort Convert.ChangeType; on failure keep the raw value.
+   // target, else a best-effort Convert.ChangeType; on failure keep the raw value (lenient - used writing back to source).
    private static object Coerce(object value, Type targetType)
+      => TryCoerce(value, targetType, out var result) ? result : value;
+
+   // Strict coercion: pass-through when assignable, ToString for a string target, else Convert.ChangeType. Returns
+   // false (with result=null) when the value can't be made to fit - the caller skips the assignment rather than push an
+   // incompatible value (which would throw, e.g. a string FallbackValue onto an ICommand/Brush property).
+   private static bool TryCoerce(object value, Type targetType, out object result)
    {
-      if (value == null || targetType == null || targetType.IsInstanceOfType(value)) return value;
-      if (targetType == typeof(string)) return value.ToString();
-      try { return Convert.ChangeType(value, Nullable.GetUnderlyingType(targetType) ?? targetType, CultureInfo.CurrentCulture); }
-      catch { return value; }
+      result = value;
+      if (value == null || targetType == null || targetType.IsInstanceOfType(value)) return true;
+      if (targetType == typeof(string)) { result = value.ToString(); return true; }
+      try
+      {
+         result = Convert.ChangeType(value, Nullable.GetUnderlyingType(targetType) ?? targetType, CultureInfo.CurrentCulture);
+         return true;
+      }
+      catch { result = null; return false; }
    }
 }

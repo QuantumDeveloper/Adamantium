@@ -325,6 +325,25 @@ public sealed class AumlTypeModel
         return names.ToList();
     }
 
+    /// <summary>Resolves a markup-extension type from the name used in <c>{Name ...}</c>: matches either the exact type
+    /// name or the conventional <c>NameExtension</c> form (so both <c>{Binding}</c> and <c>{BindingExtension}</c> work).</summary>
+    public IResolvedType? ResolveMarkupExtensionType(string localName)
+    {
+        const string baseFqn = "Adamantium.UI.Core.MarkupExtensions.MarkupExtension";
+        foreach (var assembly in _resolver.ResolvedAssemblies)
+            foreach (var type in assembly.Types)
+            {
+                if (type.Name == "MarkupExtension" || !type.InheritsFromMarkupExtension(baseFqn)) continue;
+                if (type.Name == localName || type.Name == localName + "Extension") return type;
+            }
+        return null;
+    }
+
+    /// <summary>The markup extension's positional/default argument property (the one marked
+    /// <c>[DefaultProperty]</c>, e.g. <c>Binding.Path</c>), or null when the extension has none.</summary>
+    public IResolvedProperty? GetDefaultProperty(IResolvedType extensionType) =>
+        extensionType.FindPropertyWithAttribute("Adamantium.UI.Core.MarkupExtensions.DefaultPropertyAttribute", out var p) ? p : null;
+
     private static readonly string[] CommonColors =
     {
         "Transparent", "Black", "White", "Gray", "Silver", "Red", "Green", "Blue", "Yellow",

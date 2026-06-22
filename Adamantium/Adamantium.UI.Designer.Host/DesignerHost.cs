@@ -10,12 +10,12 @@ namespace Adamantium.UI.Designer.Host;
 /// Rider preview plugin talks to for live, rebuild-free updates.
 ///
 /// Protocol (one JSON object per line):
-///   -&gt; {"op":"render","text":"&lt;auml&gt;","scale":1.0,"width":1280,"height":720,"uri":"&lt;optional&gt;"}
-///        (width/height are an optional design-size hint; scale (default 1) zooms the render. The window is
-///         laid out at its design size and the render target is design × scale.)
-///   &lt;- {"png":"&lt;temp path&gt;","width":1280,"height":720,"scale":1.0,"diagnostics":[...]}  or  {"error":"&lt;message&gt;","diagnostics":[...]}
-///        (scale is the scale actually rendered; it can be below the requested scale when clamped to the size cap,
-///         in which case the client upscales the frame to the requested zoom.)
+///   -&gt; {"op":"render","text":"&lt;auml&gt;","scale":1.0,"width":1280,"height":720,"uri":"&lt;optional&gt;","live":true}
+///        (width/height are an optional design-size hint; scale (default 1) zooms the render. The window is laid out
+///         at its design size and the render target is design × scale. live=true captures the whole animation.)
+///   &lt;- {"frames":["&lt;path0&gt;",...],"frameMs":16.7,"looped":false,"width":1280,"height":720,"scale":1.0,"diagnostics":[...]}
+///        or {"error":"&lt;message&gt;","diagnostics":[...]}. Frames are RAW B8G8R8A8 (width*height*4 bytes, no encode);
+///        a settled render returns one, a live render the full animation sequence the client plays at frameMs.
 ///   -&gt; {"op":"shutdown"}   (exits the process)
 /// </summary>
 public static class DesignerHost
@@ -50,7 +50,7 @@ public static class DesignerHost
 
         var tempDir = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "adamantium-designer")).FullName;
         long counter = 0;
-        string previousPng = null;
+        var previousFrames = new List<string>();
 
         string line;
         while ((line = Console.In.ReadLine()) != null)
@@ -69,8 +69,8 @@ public static class DesignerHost
                     return 0;
 
                 case "render":
-                    var outPath = Path.Combine(tempDir, $"preview-{counter++}.png");
-                    WriteResponse(protocol, RenderOne(session, request, outPath, ref previousPng));
+                    var outPath = Path.Combine(tempDir, $"preview-{counter++}.bgra");
+                    WriteResponse(protocol, RenderOne(session, request, outPath, previousFrames));
                     break;
 
                 case "hittest":
@@ -94,24 +94,26 @@ public static class DesignerHost
         try { Console.OutputEncoding = utf8NoBom; } catch { /* stdout may be redirected */ }
     }
 
-    private static Response RenderOne(DesignerSession session, Request request, string outPath, ref string previousPng)
+    private static Response RenderOne(DesignerSession session, Request request, string outPath, List<string> previousFrames)
     {
         try
         {
-            var result = session.Render(request.Text ?? string.Empty, request.Width, request.Height, request.Scale ?? 1.0, outPath, request.Uri);
+            var result = session.Render(request.Text ?? string.Empty, request.Width, request.Height, request.Scale ?? 1.0, outPath, request.Uri, request.Live ?? false);
             if (!result.Success)
                 return new Response { Error = result.Error, Diagnostics = NullIfEmpty(result.Diagnostics) };
 
-            // The plugin loads the PNG fully on receipt, so the previous frame is safe to delete now.
-            if (previousPng != null && File.Exists(previousPng))
-            {
-                try { File.Delete(previousPng); } catch { /* best effort */ }
-            }
-            previousPng = result.PngPath;
+            // The plugin loads each frame fully on receipt, so the previous render's frames are safe to delete now.
+            foreach (var f in previousFrames)
+                if (File.Exists(f)) { try { File.Delete(f); } catch { /* best effort */ } }
+            previousFrames.Clear();
+            previousFrames.AddRange(result.Frames);
 
             return new Response
             {
-                Png = result.PngPath,
+                Frames = result.Frames.ToArray(),
+                FrameMs = result.FrameMs,
+                Looped = result.Looped,
+                LoopStart = result.LoopStart,
                 Width = result.Width,
                 Height = result.Height,
                 DesignWidth = result.DesignWidth,
@@ -172,6 +174,8 @@ public static class DesignerHost
         public uint? Height { get; set; }
         public double? Scale { get; set; }
         public string Uri { get; set; }
+        // render: capture design-time animations (live preview) instead of the settled state.
+        public bool? Live { get; set; }
         // hittest: a point in the last render's design space.
         public double? X { get; set; }
         public double? Y { get; set; }
@@ -179,7 +183,10 @@ public static class DesignerHost
 
     private sealed class Response
     {
-        public string Png { get; set; }
+        public string[] Frames { get; set; }
+        public double? FrameMs { get; set; }
+        public bool? Looped { get; set; }
+        public int? LoopStart { get; set; }
         public uint? Width { get; set; }
         public uint? Height { get; set; }
         public uint? DesignWidth { get; set; }

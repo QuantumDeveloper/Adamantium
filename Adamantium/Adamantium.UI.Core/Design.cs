@@ -9,4 +9,11 @@ public static class Design
 {
     /// <summary>True while markup is being loaded for the designer/previewer rather than the running app.</summary>
     public static bool IsDesignMode { get; set; }
+
+    /// <summary>
+    /// True while the designer is rendering a LIVE preview (a continuously-ticked frame stream) rather than a single
+    /// static shot. Animations play in design mode only when this is set, so a one-shot render still captures the
+    /// settled state while the live previewer animates.
+    /// </summary>
+    public static bool IsLivePreview { get; set; }
 }

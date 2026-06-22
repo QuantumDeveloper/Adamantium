@@ -30,7 +30,9 @@ class AumlPreviewService : Disposable {
      * notes either way. [width]/[height] are the rendered image's size (the window's design size × scale).
      */
     data class RenderResult(
-        val pngPath: String?,
+        // Frame file path(s), RAW B8G8R8A8 (width*height*4 bytes each, no encode): one for a settled render, the whole
+        // animation sequence for a live render. The client converts the bytes itself and plays them at [frameMs].
+        val frames: List<String>,
         val error: String?,
         val diagnostics: List<String>,
         val width: Int?,
@@ -40,6 +42,13 @@ class AumlPreviewService : Disposable {
         // instead of pixelSize / scale, which loses ±1px at fractional (auto-fit) scales. Null from older hosts.
         val designWidth: Int? = null,
         val designHeight: Int? = null,
+        // Playback interval between sequence frames, ms (0 for a single frame).
+        val frameMs: Double = 0.0,
+        // The animation hit the frame cap without settling - the client loops the captured frames.
+        val looped: Boolean = false,
+        // Frame index the loop restarts from (not 0): one-shot window animations play over [0, loopStart) once, then
+        // the looping tail [loopStart, end) (animated images) repeats - so window animations don't replay each cycle.
+        val loopStart: Int = 0,
     )
 
     /** A designer hit-test result: the authored element's markup position (1-based line/column) and its rect in
@@ -82,21 +91,21 @@ class AumlPreviewService : Disposable {
     }
 
     /**
-     * Renders [text] at the window's design size × [scale] and returns the produced PNG path (or an error).
-     * Blocking and potentially slow on the very first call (the host boots the engine + graphics device), so
-     * call this off the EDT.
+     * Renders [text] at the window's design size × [scale]. A settled render returns one frame; a [live] render returns
+     * the whole animation sequence (the host renders it all in this one call). Blocking and potentially slow on the very
+     * first call (the host boots the engine + graphics device), so call this off the EDT.
      */
-    fun render(text: String, scale: Double, sourcePath: String? = null): RenderResult {
+    fun render(text: String, scale: Double, sourcePath: String? = null, live: Boolean = false): RenderResult {
         synchronized(lock) {
             return try {
                 ensureProcess()
-                val request = buildRenderRequest(text, scale, sourcePath)
+                val request = buildRenderRequest(text, scale, sourcePath, live)
                 writer!!.apply { write(request); write("\n"); flush() }
                 val line = reader!!.readLine() ?: throw RuntimeException("designer host closed the connection")
                 parseResponse(line)
             } catch (e: Exception) {
                 stopProcess() // force a clean restart on the next render
-                RenderResult(null, e.message ?: e.toString(), emptyList(), null, null, null)
+                RenderResult(emptyList(), e.message ?: e.toString(), emptyList(), null, null, null)
             }
         }
     }
@@ -152,21 +161,26 @@ class AumlPreviewService : Disposable {
 
     // sourcePath (the edited .auml's path) lets the host resolve relative asset paths (e.g. an Image Source) against
     // the file's project root, so the preview loads those assets from source just like the running app does.
-    private fun buildRenderRequest(text: String, scale: Double, sourcePath: String?): String {
+    private fun buildRenderRequest(text: String, scale: Double, sourcePath: String?, live: Boolean): String {
         val uriPart = if (sourcePath.isNullOrBlank()) "" else ",\"uri\":\"${jsonEscape(sourcePath)}\""
-        return "{\"op\":\"render\",\"text\":\"${jsonEscape(text)}\",\"scale\":$scale$uriPart}"
+        val livePart = if (live) ",\"live\":true" else ""
+        return "{\"op\":\"render\",\"text\":\"${jsonEscape(text)}\",\"scale\":$scale$uriPart$livePart}"
     }
 
     private fun parseResponse(line: String): RenderResult {
         val obj = MiniJson.parse(line) as? Map<*, *>
-            ?: return RenderResult(null, "unexpected host response: $line", emptyList(), null, null, null)
+            ?: return RenderResult(emptyList(), "unexpected host response: $line", emptyList(), null, null, null)
         val diagnostics = (obj["diagnostics"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+        val frames = (obj["frames"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
         val width = (obj["width"] as? Double)?.toInt()
         val height = (obj["height"] as? Double)?.toInt()
         val scale = obj["scale"] as? Double
         val designWidth = (obj["designWidth"] as? Double)?.toInt()
         val designHeight = (obj["designHeight"] as? Double)?.toInt()
-        return RenderResult(obj["png"] as? String, obj["error"] as? String, diagnostics, width, height, scale, designWidth, designHeight)
+        val frameMs = obj["frameMs"] as? Double ?: 0.0
+        val looped = obj["looped"] as? Boolean ?: false
+        val loopStart = (obj["loopStart"] as? Double)?.toInt() ?: 0
+        return RenderResult(frames, obj["error"] as? String, diagnostics, width, height, scale, designWidth, designHeight, frameMs, looped, loopStart)
     }
 
     private fun jsonEscape(s: String): String {

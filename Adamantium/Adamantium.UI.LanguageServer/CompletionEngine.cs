@@ -50,35 +50,114 @@ public sealed class CompletionEngine
             .Select(n => new AumlCompletionItem(n, AumlCompletionItemKind.Element, InsertText: n + " $0}", ReplaceBack: ctx.Prefix.Length))
             .ToList();
 
-    // Inside "{Name arg}": complete the argument. v1 handles {TemplateBinding <prop>} -> the templated parent's
-    // (enclosing ControlTemplate's TargetType) settable properties, which is the common case.
+    // Inside "{Name arg}": complete the argument generically for ANY markup extension. The extension's own settable
+    // properties drive the NAMED arguments (after the first comma); the value of the positional (default) argument and
+    // of each named argument is completed by its TYPE from the appropriate external source - a view-model path for a
+    // PropertyPath, type names for a Type, enum members / booleans / brush colors for those. Extensions whose value
+    // isn't a plain CLR property on the extension (TemplateBinding -> the templated parent's properties; x:Type -> type
+    // names; resources -> resource keys) are dispatched by name. Before, only TemplateBinding/Binding-path/x:Type were
+    // special-cased and named arguments (Mode/Converter/FallbackValue/...) had no completion at all.
     private IReadOnlyList<AumlCompletionItem> CompleteMarkupExtensionArg(
         AumlCompletionContext ctx, IReadOnlyDictionary<string, string> namespaces, string text, int offset)
     {
         // The extension may be written with a prefix (e.g. {x:Type ...}); match on its local name.
         var ext = ctx.MarkupExtension ?? "";
         var extLocal = ext.Contains(':') ? ext[(ext.IndexOf(':') + 1)..] : ext;
+        var extType = _model.ResolveMarkupExtensionType(extLocal);
 
+        var (segment, hasComma) = CurrentExtensionSegment(text, offset);
+
+        // "Name=value" -> complete the value of that named property by its type.
+        int eq = segment.IndexOf('=');
+        if (eq >= 0)
+        {
+            var propName = segment[..eq].Trim();
+            var partial = segment[(eq + 1)..].TrimStart();
+            var propType = extType is null ? null : _model.GetPropertyType(extType, propName);
+            return CompleteExtensionValue(extLocal, propType, partial, text, offset, namespaces);
+        }
+
+        var seg = segment.Trim();
+        var defaultProp = extType is null ? null : _model.GetDefaultProperty(extType);
+
+        // First (positional) segment: complete the extension's default-argument value (its [DefaultProperty], or a
+        // name-dispatched source for extensions whose positional value isn't a CLR property of their own).
+        if (!hasComma && (defaultProp is not null || IsPositionalValueExtension(extLocal)))
+            return CompleteExtensionValue(extLocal, defaultProp?.PropertyType, seg, text, offset, namespaces);
+
+        // After a comma (or an extension with no positional arg) -> the extension's settable property NAMES.
+        if (extType is null) return [];
+        return _model.GetProperties(extType)
+            .Where(p => Matches(p.Name, seg))
+            .OrderBy(p => p.Name)
+            .Select(p => new AumlCompletionItem(p.Name, AumlCompletionItemKind.Property, p.Type?.Name,
+                InsertText: p.Name + "=", ReplaceBack: seg.Length))
+            .ToList();
+    }
+
+    // Extensions whose positional argument isn't a CLR property on the extension (so no [DefaultProperty]) but which
+    // still complete a positional value, dispatched by name in CompleteExtensionValue.
+    private static bool IsPositionalValueExtension(string extLocal) =>
+        extLocal is "TemplateBinding" or "TemplateBindingExtension" or "Type" or "TypeExtension"
+            or "ResourceReference" or "ResourceReferenceExtension";
+
+    /// <summary>Completes the VALUE of a markup-extension argument from the appropriate external source. Special
+    /// extensions are dispatched by name (TemplateBinding -> the ControlTemplate TargetType's properties; x:Type ->
+    /// type names; resources -> resource keys); everything else is driven by the property's CLR type: a view-model path
+    /// for a PropertyPath, type names for a Type, enum members / booleans / brush colors via the type model.</summary>
+    private IReadOnlyList<AumlCompletionItem> CompleteExtensionValue(
+        string extLocal, Adamantium.UI.Markup.CodeGeneration.IResolvedType? propType,
+        string partial, string text, int offset, IReadOnlyDictionary<string, string> namespaces)
+    {
         if (extLocal is "TemplateBinding" or "TemplateBindingExtension")
         {
             var target = FindNearestAttributeType(text, offset, "TargetType", namespaces);
             if (target is null) return [];
             return _model.GetProperties(target)
-                .Where(p => Matches(p.Name, ctx.Prefix))
+                .Where(p => Matches(p.Name, partial))
                 .OrderBy(p => p.Name)
-                .Select(p => new AumlCompletionItem(p.Name, AumlCompletionItemKind.Property, p.Type?.Name))
+                .Select(p => new AumlCompletionItem(p.Name, AumlCompletionItemKind.Property, p.Type?.Name, ReplaceBack: partial.Length))
                 .ToList();
         }
 
-        // {Binding <path>} -> properties of the enclosing x:ViewModel (the DataContext type), walking dotted paths.
-        if (extLocal is "Binding" or "BindingExtension")
-            return CompleteBindingPath(ctx.Prefix, FindNearestAttributeType(text, offset, "ViewModel", namespaces));
-
-        // {x:Type <TypeName>} -> type names (xmlns-prefixed or default), like element completion.
         if (extLocal is "Type" or "TypeExtension")
-            return CompleteTypeNames(ctx.Prefix, namespaces);
+            return CompleteTypeNames(partial, namespaces);
 
-        return [];
+        // Resource keys (ResourceReference): no resource index in the type model yet -> nothing to offer.
+        if (extLocal is "ResourceReference" or "ResourceReferenceExtension")
+            return [];
+
+        if (propType is null) return [];
+
+        // PropertyPath value (e.g. Binding.Path) -> view-model bindable path completion.
+        if (propType.Name == "PropertyPath")
+            return CompleteBindingPath(partial, FindNearestAttributeType(text, offset, "ViewModel", namespaces));
+
+        // A System.Type-valued property -> type names.
+        if (propType.Name == "Type")
+            return CompleteTypeNames(partial, namespaces);
+
+        // Enum members / booleans / brush colors handled uniformly by the type model.
+        var values = _model.GetValueCompletions(propType);
+        if (values.Count == 0) return [];
+        return values
+            .Where(v => Matches(v, partial))
+            .Select(v => new AumlCompletionItem(v, AumlCompletionItemKind.Value, propType.Name, ReplaceBack: partial.Length))
+            .ToList();
+    }
+
+    // The current comma-separated argument segment of a "{Name ...}" body up to the caret (top-level commas only;
+    // nested {} are not split for v1), plus whether any comma preceded it (i.e. it isn't the positional first arg).
+    private static (string Segment, bool HasComma) CurrentExtensionSegment(string text, int offset)
+    {
+        int end = Math.Min(offset, text.Length);
+        int brace = text.LastIndexOf('{', Math.Max(0, end - 1));
+        if (brace < 0) return ("", false);
+        var body = text.Substring(brace + 1, end - brace - 1);
+        int sp = body.IndexOf(' ');
+        var argText = sp < 0 ? "" : body[(sp + 1)..];     // after the extension name
+        int comma = argText.LastIndexOf(',');
+        return comma >= 0 ? (argText[(comma + 1)..], true) : (argText, false);
     }
 
     /// <summary>The type named by the nearest <c>&lt;attrLocalName&gt;="..."</c> attribute before the caret

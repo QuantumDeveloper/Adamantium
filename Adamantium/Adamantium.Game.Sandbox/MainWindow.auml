@@ -4,7 +4,7 @@
 		xmlns:local="clr-namespace:Adamantium.Game.Sandbox"
 		xmlns:vm="clr-namespace:Adamantium.Game.Sandbox.ViewModels"
         x:ViewModel="{x:Type vm:MainViewModel}"
-        x:CreateInDesignTime="True"
+        x:CreateInDesignTime="False"
         Title="Adamantium Window"
         ContentTransition="SlideLeft"
         Width="1280"
@@ -15,10 +15,6 @@
                 Background="Yellow"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center">
-            <!-- CSS-style implicit transition: any change to Opacity (code/binding/state) eases over 0.4s. -->
-            <Button.Transitions>
-                <DoubleTransition Property="Opacity" Duration="0:0:0.4"/>
-            </Button.Transitions>
         </Button>
     <RenderTargetPanel x:Name="TestGrid1"
                        Opacity="0.95"
@@ -92,12 +88,18 @@
 <!--                   VerticalAlignment="Bottom"-->
 <!--        Background="Transparent"/>-->
 
-        <Button Width="150"
+        <Button Width="550"
                 Height="150"
                 Background="Yellow"
-                Command="{Binding ShowMessageCommand}"
+                Command="{Binding ShowMessageCommand, FallbackValue=50, Mode=OneWay}"
                 HorizontalAlignment="Left"
-                VerticalAlignment="Bottom"/>
+                Opacity="0.8"
+                VerticalAlignment="Bottom">
+            <Button.Transitions>
+                <!-- CSS-style implicit transition: any change to Opacity (code/binding/state) eases over 0.4s. -->
+                <DoubleTransition Property="Width" Duration="0:0:3.4"/>
+            </Button.Transitions>
+        </Button>
         
         <Button Width="120"
             Height="80"
