@@ -6,9 +6,11 @@ using Adamantium.Mathematics;
 namespace Adamantium.Graphics;
 
 /// <summary>
-/// Describes one sprite batch item
+/// Describes one sprite batch item. Bound as per-instance data ([PerInstanceData]): one item = one sprite quad,
+/// expanded in the vertex shader from SV_VertexID (no geometry shader).
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
+[PerInstanceData]
 public struct SpriteBatchItem
 {
     /// <summary>

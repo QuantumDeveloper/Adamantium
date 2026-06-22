@@ -14,6 +14,9 @@ namespace Adamantium.Graphics
         private const UInt32 MaxBatchSize = 1000000;
         private const UInt16 MinBatchSize = 1024;
 
+        // One sprite = a 4-vertex triangle strip (corners from SV_VertexID), drawn instanced - one instance per item.
+        private const uint VERTICES_PER_SPRITE = 4;
+
         private IGraphicsDevice graphicsDevice;
 
         private Buffer<SpriteBatchItem> vertexBuffer;
@@ -604,8 +607,10 @@ namespace Adamantium.Graphics
                 graphicsDevice.VertexType = vertexType;
                 graphicsDevice.SetVertexBuffer(vertexBuffer);
                 spriteBatchEffectPass.Apply();
-                graphicsDevice.PrimitiveTopology = PrimitiveTopology.PointList;
-                graphicsDevice.Draw( elementsCount, 1, startIndex);
+                // Instanced quad: 4-vertex triangle strip per sprite (corners from SV_VertexID), one instance per item.
+                // firstInstance = startIndex offsets the per-instance fetch into the batch (replaces the GS point list).
+                graphicsDevice.PrimitiveTopology = PrimitiveTopology.TriangleStrip;
+                graphicsDevice.Draw(VERTICES_PER_SPRITE, elementsCount, 0, startIndex);
                 spriteBatchEffectPass.UnApply(true);
             }
         }

@@ -226,6 +226,14 @@ namespace Adamantium.Graphics.Core
                 DescriptorBufferCaptureReplay = true
             };
 
+            var vulkan11Features = new PhysicalDeviceVulkan11Features
+            {
+                // SV_VertexID / SV_InstanceID make Slang emit the SPIR-V DrawParameters capability (BaseVertex/
+                // BaseInstance correction) used by the instanced sprite/glyph expansion that replaced the geometry
+                // shaders; without this feature vkCreateShadersEXT rejects those shaders (and the NV driver AVs).
+                ShaderDrawParameters = true,
+            };
+
             var vulkan12Features = new PhysicalDeviceVulkan12Features
             {
                 TimelineSemaphore = true,
@@ -261,7 +269,8 @@ namespace Adamantium.Graphics.Core
 
             var deviceFeatures2 = GraphicsAdapter.Adapter.GetPhysicalDeviceFeatures2();
 
-            deviceFeatures2.PNext = vulkan12Features;
+            deviceFeatures2.PNext = vulkan11Features;
+            vulkan11Features.PNext = vulkan12Features;
             vulkan12Features.PNext = vulkan13Features;
             vulkan13Features.PNext = features14;
             //vulkan13Features.PNext = descriptorBufferFeature;

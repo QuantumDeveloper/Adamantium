@@ -45,49 +45,40 @@ float4 OutlineColor;
 float SdfBlendLo;
 float SdfBlendHi;
 
-void GenerateSprite(FontItem item, inout TriangleStream<PSInput> triStream)
+// Per-glyph quad expansion, now in the VERTEX stage (corner from SV_VertexID), so the geometry shader is gone:
+// plain instanced rendering (4-vertex triangle strip x N glyphs), portable to Metal/MoltenVK and free of the
+// NVIDIA Turing GS NVVM bug.
+PSInput ExpandGlyphCorner(FontItem item, int corner)
 {
     PSInput vertex;
     float2 origin = item.Origin;
-
     float2 rotation = float2(cos(item.Rotation), sin(item.Rotation));
 
-    for (int i = 0; i < VERTICES_PER_SPRITE; i++)
+    float2 cornerCoord = TextureCornerCoords[corner];
+    float2 size = cornerCoord * item.Destination.zw;
+    float2 position = size - origin;
+
+    [flatten]
+    if (item.Rotation != 0.0)
     {
-        // Gets the corner and take into account the Flip mode.
-        float2 corner = TextureCornerCoords[i];
-
-        //Calculate size of sprite in current point 
-        float2 size = corner * item.Destination.zw;
-        //origin of sprite for current point
-        float2 position = size - origin;
-
-        [flatten]
-        if (item.Rotation != 0.0)
-        {
-            vertex.Position.x = item.Destination.x + (position.x * rotation.x) - (position.y * rotation.y);
-            vertex.Position.y = item.Destination.y + (position.x * rotation.y) + (position.y * rotation.x);
-
-            //Because earlier we made "position - origin", now we move point back to its original position 
-            vertex.Position.xy += origin;
-        }
-        else
-        {
-            vertex.Position.xy = item.Destination.xy + size;
-        }
-
-        vertex.Position.z = item.Depth;
-        vertex.Position.w = 1;
-        vertex.Color = item.Color;
-
-        corner = TextureCornerCoords[i ^ item.SpriteEffect];
-        vertex.UV = item.Source.xy + corner * item.Source.zw;
-
-        float4 pos = mul(vertex.Position, MatrixTransform);
-        vertex.Position = pos;
-
-        triStream.Append(vertex);
+        vertex.Position.x = item.Destination.x + (position.x * rotation.x) - (position.y * rotation.y);
+        vertex.Position.y = item.Destination.y + (position.x * rotation.y) + (position.y * rotation.x);
+        vertex.Position.xy += origin;
     }
+    else
+    {
+        vertex.Position.xy = item.Destination.xy + size;
+    }
+
+    vertex.Position.z = item.Depth;
+    vertex.Position.w = 1;
+    vertex.Color = item.Color;
+
+    float2 uvCorner = TextureCornerCoords[corner ^ item.SpriteEffect];
+    vertex.UV = item.Source.xy + uvCorner * item.Source.zw;
+
+    vertex.Position = mul(vertex.Position, MatrixTransform);
+    return vertex;
 }
 
 float Median(float r, float g, float b)
@@ -116,15 +107,9 @@ float SampleGlyphCoverage(float4 samp, float2 uv)
     return lerp(msdf, samp.a, t);
 }
 
-FontItem FontVertexShader(FontItem input) 
+PSInput FontVertexShader(FontItem item, uint vertexId : SV_VertexID)
 {
-    return input;
-}
-
-[maxvertexcount(4)]
-void FontItemGenerationGS(point FontItem input[1], inout TriangleStream<PSInput> triStream)
-{
-    GenerateSprite(input[0], triStream);
+    return ExpandGlyphCorner(item, (int)vertexId);   // vertexId 0..3 = strip corner
 }
 
 
@@ -269,7 +254,6 @@ technique FontBatch
         EffectName = "FontEffect";
         Profile = 5.1;
         VertexShader = FontVertexShader;
-        GeometryShader = FontItemGenerationGS;
         PixelShader = FontPixelShader;
     }
 
@@ -278,7 +262,6 @@ technique FontBatch
         EffectName = "FontEffectMsdf";
         Profile = 5.1;
         VertexShader = FontVertexShader;
-        GeometryShader = FontItemGenerationGS;
         PixelShader = FontPixelShaderMsdf;
     }
 
@@ -287,7 +270,6 @@ technique FontBatch
         EffectName = "FontEffectMsdfOutline";
         Profile = 5.1;
         VertexShader = FontVertexShader;
-        GeometryShader = FontItemGenerationGS;
         PixelShader = FontPixelShaderMsdfOutline;
     }
 
@@ -296,7 +278,6 @@ technique FontBatch
         EffectName = "StrokedFontEffect";
         Profile = 5.1;
         VertexShader = FontVertexShader;
-        GeometryShader = FontItemGenerationGS;
         PixelShader = StrokedTextPS;
     }
 }

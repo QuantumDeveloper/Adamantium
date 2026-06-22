@@ -34,9 +34,10 @@ namespace Adamantium.Graphics.Core.Extensions
             
             var desc = new VertexInputBindingDescription
             {
-                Binding = 0, 
-                Stride = (uint) Marshal.SizeOf(vertexType), 
-                InputRate = VertexInputRate.Vertex
+                Binding = 0,
+                Stride = (uint) Marshal.SizeOf(vertexType),
+                InputRate = vertexType.IsDefined(typeof(PerInstanceDataAttribute), false)
+                    ? VertexInputRate.Instance : VertexInputRate.Vertex
             };
 
             vertexInputDescriptions.Add(vertexType, desc);
@@ -92,9 +93,10 @@ namespace Adamantium.Graphics.Core.Extensions
             
             var desc = new VertexInputBindingDescription2EXT
             {
-                Binding = 0, 
-                Stride = (uint) Marshal.SizeOf(vertexType), 
-                InputRate = VertexInputRate.Vertex,
+                Binding = 0,
+                Stride = (uint) Marshal.SizeOf(vertexType),
+                InputRate = vertexType.IsDefined(typeof(PerInstanceDataAttribute), false)
+                    ? VertexInputRate.Instance : VertexInputRate.Vertex,
                 Divisor = 1
             };
 
