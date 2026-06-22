@@ -15,6 +15,10 @@
     <Content Include="EffectsData\UIEffect.fx">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <!-- Linked (not duplicated) from Adamantium.FX so the compute smoke test compiles the real shader. -->
+    <Content Include="..\..\Adamantium.FX\ComputeSmoke.fx" Link="EffectsData\ComputeSmoke.fx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

@@ -83,10 +83,10 @@
 <!--        >-->
 <!--            -->
 <!--        </ContentControl>-->
-<!--        <TextBlock Text="Крупный текст1! - Проверка!?!"-->
-<!--                   FontSize="24"-->
-<!--                   VerticalAlignment="Bottom"-->
-<!--        Background="Transparent"/>-->
+        <TextBlock Text="Крупный текст1! - Проверка!?!"
+                   FontSize="24"
+                   VerticalAlignment="Bottom"
+        Background="Transparent"/>
 
         <Button Width="150"
                 Height="130"

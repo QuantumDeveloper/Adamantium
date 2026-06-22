@@ -244,7 +244,8 @@ public class FontRenderer : GraphicsResource
         effectSdfBlendHi.SetValue(SdfBlendHi);
         GraphicsDevice.VertexType = vertexType;
         GraphicsDevice.SetVertexBuffer(layout.VertexBuffer);
-        GraphicsDevice.PrimitiveTopology = PrimitiveTopology.PointList;
+        // Instanced quad: 4-vertex triangle strip per glyph (corners from SV_VertexID), one instance per glyph.
+        GraphicsDevice.PrimitiveTopology = PrimitiveTopology.TriangleStrip;
         //GraphicsDevice.DepthTestEnabled = true;
         if (stroke == Colors.Transparent)
         {
@@ -261,7 +262,7 @@ public class FontRenderer : GraphicsResource
             fontEffect.FontBatchStrokedTextPass.Apply();
         }
         
-        GraphicsDevice.Draw(layout.ElementsCount, 1);
+        GraphicsDevice.Draw(4, layout.ElementsCount);   // 4 strip verts x ElementsCount glyph instances
         //glyphEffectPass.UnApply(true);
     }
 

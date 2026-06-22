@@ -1,6 +1,9 @@
 const static float EPSILON = 1.401298E-45;
 const static int VERTICES_PER_SPRITE = 4;
 
+// Per-instance sprite data (one element = one sprite quad). The quad corners come from SV_VertexID, so the old
+// geometry-shader expansion is gone: this runs as plain instanced rendering (4-vertex triangle strip x N instances),
+// which is portable (no GS on Metal/MoltenVK) and dodges the NVIDIA Turing GS NVVM bug.
 struct SpriteItem
 {
     float4 Destination: Position;
@@ -26,69 +29,50 @@ SamplerState TextureSampler;
 float2 TextureCornerCoords[4];
 matrix MatrixTransform;
 
-void GenerateSprite(SpriteItem item, inout TriangleStream<PSInput> triStream)
+PSInput SpriteVertexShader(SpriteItem item, uint vertexId : SV_VertexID)
 {
     PSInput vertex;
+    int corner = (int)vertexId;   // 0..3, one quad corner per strip vertex
     float2 origin = item.Origin;
 
-    // Source is already normalized by the size in SpriteVertexShader. Do NOT divide here: NVIDIA's Turing driver
-    // miscompiles a vector float divide inside a geometry shader (NVVM bug) and access-violates in vkCreateShadersEXT.
-    float2 sourceXY = item.Source.xy;
-    float2 sourceZW = item.Source.zw;
+    // Normalize the source rectangle by the texture size here (it used to live in a separate VS to keep the geometry
+    // shader divide-free; there is no GS now, so do it directly).
+    float2 inv = 1.0 / (float2)item.TextureInfo.xy;
+    float2 sourceXY = item.Source.xy * inv;
+    float2 sourceZW = item.Source.zw * inv;
+
     float2 rotation = float2(cos(item.Rotation), sin(item.Rotation));
+    float2 cornerCoord = TextureCornerCoords[corner];
 
-    for (int i = 0; i < VERTICES_PER_SPRITE; i++)
+    // Size of the sprite at this corner, then the corner's position relative to the rotation origin.
+    float2 size = cornerCoord * item.Destination.zw;
+    float2 position = size - origin;
+
+    [flatten]
+    if (item.Rotation != 0.0)
     {
-        // Gets the corner and take into account the Flip mode.
-        float2 corner = TextureCornerCoords[i];
+        vertex.Position.x = item.Destination.x + (position.x * rotation.x) - (position.y * rotation.y);
+        vertex.Position.y = item.Destination.y + (position.x * rotation.y) + (position.y * rotation.x);
 
-        //Calculate size of sprite in current point 
-        float2 size = corner * item.Destination.zw;
-        //origin of sprite for current point
-        float2 position = size - origin;
-
-        [flatten]
-        if (item.Rotation != 0.0)
-        {
-            vertex.Position.x = item.Destination.x + (position.x * rotation.x) - (position.y * rotation.y);
-            vertex.Position.y = item.Destination.y + (position.x * rotation.y) + (position.y * rotation.x);
-
-            //Because earlier we made "position - origin", now we move point back to its original position 
-            vertex.Position.xy += origin;
-        }
-        else
-        {
-            vertex.Position.xy = item.Destination.xy + size;
-        }
-
-        vertex.Position.z = item.Depth;
-        vertex.Position.w = 1;
-        vertex.Color = item.Color;
-
-        corner = TextureCornerCoords[i ^ item.SpriteEffect];
-        vertex.UV = sourceXY + corner * sourceZW;
-
-        vertex.TextureId = item.TextureInfo.z;
-
-        float4 pos = mul(vertex.Position, MatrixTransform);
-        vertex.Position = pos;
-
-        triStream.Append(vertex);
+        // We subtracted the origin above; move the point back to its original place.
+        vertex.Position.xy += origin;
     }
-}
+    else
+    {
+        vertex.Position.xy = item.Destination.xy + size;
+    }
 
-void SpriteVertexShader(inout SpriteItem input)
-{
-    // Normalize the source rectangle by the texture size in the VERTEX stage and stash it back into Source, so the
-    // geometry shader stays divide-free (the NVIDIA Turing driver crashes compiling a float divide in a GS).
-    float2 inv = 1.0 / (float2)input.TextureInfo.xy;
-    input.Source = float4(input.Source.xy * inv, input.Source.zw * inv);
-}
+    vertex.Position.z = item.Depth;
+    vertex.Position.w = 1;
+    vertex.Color = item.Color;
 
-[maxvertexcount(4)]
-void SpriteGenerationGS(point SpriteItem input[1], inout TriangleStream<PSInput> triStream)
-{
-    GenerateSprite(input[0], triStream);
+    float2 uvCorner = TextureCornerCoords[corner ^ item.SpriteEffect];
+    vertex.UV = sourceXY + uvCorner * sourceZW;
+
+    vertex.TextureId = item.TextureInfo.z;
+
+    vertex.Position = mul(vertex.Position, MatrixTransform);
+    return vertex;
 }
 
 float4 SpritePixelShader(PSInput input) : SV_TARGET
@@ -109,7 +93,6 @@ technique SpriteBatch
         EffectName = "SpriteEffect";
         Profile = 5.1;
         VertexShader = SpriteVertexShader;
-        GeometryShader = SpriteGenerationGS;
         PixelShader = SpritePixelShader;
     }
 }

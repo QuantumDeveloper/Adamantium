@@ -1325,6 +1325,57 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         commandBuffer.DrawIndexed((uint)indexBuffer.ElementCount, instanceCount, 0, 0, 0);
     }
 
+    // --- GPU-driven geometry (compute amplification -> indirect draw) ---------------------------------------------
+    // Building blocks for the stroke/line compute pipeline: a compute pass writes vertices + a draw-args buffer into
+    // SSBOs, a barrier makes those writes visible, then an indirect draw consumes them. The amount of geometry is
+    // decided on the GPU, so the CPU never re-tessellates per frame.
+
+    /// <summary>Dispatches the currently-bound compute shader. The compute pass (its shader + resource bindings) must
+    /// be applied first, just as a draw needs an effect pass. Record this OUTSIDE a dynamic-rendering pass.</summary>
+    public void Dispatch(uint groupCountX, uint groupCountY = 1, uint groupCountZ = 1)
+    {
+        commandBuffers[CurrentFrame].Dispatch(groupCountX, groupCountY, groupCountZ);
+    }
+
+    /// <summary>Indirect draw: vertexCount/instanceCount/firstVertex/firstInstance come from <paramref name="indirectBuffer"/>
+    /// (an array of VkDrawIndirectCommand, 16 bytes each), so a compute pass can size the draw on the GPU.
+    /// </summary>
+    public void DrawIndirect(IBuffer vertexBuffer, IBuffer indirectBuffer, uint drawCount = 1, uint stride = 16)
+    {
+        var commandBuffer = commandBuffers[CurrentFrame];
+        SetDrawingState(commandBuffer);
+        commandBuffer.BindVertexBuffers(0, 1, vertexBuffer.GetBuffer(), 0UL);
+        commandBuffer.DrawIndirect(indirectBuffer.GetBuffer(), 0, drawCount, stride);
+    }
+
+    /// <summary>Buffer memory barrier on the current frame's command buffer (synchronization2). Used to make a compute
+    /// SSBO write visible to a later read - e.g. compute write -> vertex-attribute / indirect-command read.
+    /// </summary>
+    public void BufferBarrier(IBuffer buffer, PipelineStageFlagBits2 srcStage, AccessFlagBits2 srcAccess,
+        PipelineStageFlagBits2 dstStage, AccessFlagBits2 dstAccess)
+    {
+        // BufferMemoryBarrier2 exposes the raw interop flag types (unlike ImageMemoryBarrier2, which takes the friendly
+        // enums); they implicitly-convert from ulong, so cast the enums through ulong.
+        var barrier = new BufferMemoryBarrier2
+        {
+            SrcStageMask = (ulong)srcStage,
+            SrcAccessMask = (ulong)srcAccess,
+            DstStageMask = (ulong)dstStage,
+            DstAccessMask = (ulong)dstAccess,
+            SrcQueueFamilyIndex = ~0U,
+            DstQueueFamilyIndex = ~0U,
+            Buffer = buffer.GetBuffer(),
+            Offset = 0,
+            Size = ~0UL,   // VK_WHOLE_SIZE
+        };
+        var dependencyInfo = new DependencyInfo
+        {
+            PBufferMemoryBarriers = new[] { barrier },
+            BufferMemoryBarrierCount = 1,
+        };
+        commandBuffers[CurrentFrame].PipelineBarrier2(dependencyInfo);
+    }
+
     public CommandBuffer BeginSingleTimeCommand()
     {
         // Held across the whole single-time scope (until EndSingleTimeCommand): serializes command-pool access AND the

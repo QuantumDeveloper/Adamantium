@@ -6,9 +6,11 @@ using Adamantium.Mathematics;
 namespace Adamantium.Graphics.Fonts;
 
 /// <summary>
-/// Describes one sprite batch item
+/// Describes one glyph batch item. Bound as per-instance data ([PerInstanceData]): one item = one glyph quad,
+/// expanded in the vertex shader from SV_VertexID (no geometry shader).
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
+[PerInstanceData]
 public struct FontItem
 {
     /// <summary>
