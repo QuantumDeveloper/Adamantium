@@ -47,12 +47,12 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
 
         StrokeRenderer?.DeferDispose();
 
-        // The GPU path (iteration 1) covers only the case the miter expander handles cleanly: a single OPEN contour
-        // with a solid colour and no dashes. Everything else (closed loops, dashes, non-solid brushes, multiple
-        // contours) falls back to the CPU StrokeGeometry path.
-        if (UseGpuStroke && StrokeEffect != null && TryGetOpenSolidPolyline(pen, geometry, out var points))
+        // The GPU path covers the case the miter expander handles cleanly: a single contour (open OR closed) with a
+        // solid colour and no dashes. Everything else (dashes, non-solid brushes, multiple contours, caps) falls back
+        // to the CPU StrokeGeometry path.
+        if (UseGpuStroke && StrokeEffect != null && TryGetSolidPolyline(pen, geometry, out var points, out var isClosed))
         {
-            StrokeRenderer = new GpuStrokeRenderComponent(GraphicsDevice, UIBasicEffect, StrokeEffect, points, pen);
+            StrokeRenderer = new GpuStrokeRenderComponent(GraphicsDevice, UIBasicEffect, StrokeEffect, points, isClosed, pen);
         }
         else
         {
@@ -62,9 +62,10 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
         StrokeRenderer.RenderData = DrawCommand.RenderData;
     }
 
-    private static bool TryGetOpenSolidPolyline(Pen pen, Geometry geometry, out Adamantium.Mathematics.Vector2[] points)
+    private static bool TryGetSolidPolyline(Pen pen, Geometry geometry, out Adamantium.Mathematics.Vector2[] points, out bool isClosed)
     {
         points = null;
+        isClosed = false;
         if (pen.Brush is not SolidColorBrush) return false;
         if (pen.DashStrokeArray is { Count: > 0 }) return false;
 
@@ -72,12 +73,20 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
         if (mesh == null || mesh.Contours.Count != 1) return false;
 
         var contour = mesh.GetContour(0);
-        if (contour.IsGeometryClosed) return false;
         if (contour.Points == null || contour.Points.Length < 2) return false;
+
+        isClosed = contour.IsGeometryClosed;
+
+        // Open ends honour the pen's caps; the GPU expander only does flat/square so far. Round/triangle caps
+        // (and any other non-flat/square) fall back to the CPU StrokeGeometry path.
+        if (!isClosed && (!IsGpuCap(pen.StartLineCap) || !IsGpuCap(pen.EndLineCap)))
+            return false;
 
         points = contour.Points;
         return true;
     }
+
+    private static bool IsGpuCap(PenLineCap cap) => cap is PenLineCap.Flat or PenLineCap.Square;
     
     protected IResourceFactory ResourceFactory { get; set; }
     protected IDrawCommand DrawCommand { get; set; }

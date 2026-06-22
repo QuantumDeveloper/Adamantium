@@ -61,8 +61,10 @@ public class GpuRenderUnitTests
         return new Adamantium.UI.Rendering.DrawCommand(component, component.RenderId, payload, renderData);
     }
 
+    // StrokeEffect is null on purpose: these tests exercise the CPU stroke path (StrokeRenderComponent). With a null
+    // GPU stroke effect ProcessStrokeData falls back to CPU, so the unit's update/dispose behaviour is what's asserted.
     private RectangleRenderUnit NewRectUnit(RectanglePayload payload) =>
-        new RectangleRenderUnit(Command(payload), _device, (UIBasicEffect)_effect.Clone(), _resourceFactory);
+        new RectangleRenderUnit(Command(payload), _device, (UIBasicEffect)_effect.Clone(), null, _resourceFactory);
 
     [Test]
     public void Pen_Added_BuildsStroke()
@@ -174,10 +176,10 @@ public class GpuRenderUnitTests
         using var presenter = GraphicsPresenter.Create(_device, prms, "blend_test");
 
         var left = new RectangleRenderUnit(Command(Rect(Brushes.White, new Rect(4, 20, 24, 24), null), 0.5f),
-            _device, _effect, _resourceFactory);
+            _device, _effect, null, _resourceFactory);
         left.GeometryRenderer.ColorBlendEquation = ColorBlendEquations.AlphaBlend;
         var right = new RectangleRenderUnit(Command(Rect(Brushes.White, new Rect(36, 20, 24, 24), null), 0.5f),
-            _device, _effect, _resourceFactory);
+            _device, _effect, null, _resourceFactory);
         right.GeometryRenderer.ColorBlendEquation = ColorBlendEquations.Premultiplied;
 
         var proj = Matrix4x4F.OrthoOffCenter(0, 64, 0, 64, 0, 100000);
@@ -255,7 +257,7 @@ public class GpuRenderUnitTests
 
         var unit = new RectangleRenderUnit(
             Command(Rect(Brushes.Red, new Rect(0, 0, 32, 32), new Pen(Brushes.Black, 2))),
-            _device, _effect, _resourceFactory);
+            _device, _effect, null, _resourceFactory);
         Assert.That(device.RegisteredResourceCount, Is.GreaterThan(before), "unit creates geometry + stroke buffers");
 
         unit.Dispose();
