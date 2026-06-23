@@ -21,7 +21,6 @@ import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.Alarm
 import com.intellij.util.ui.JBUI
-import java.awt.BasicStroke
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.FlowLayout
@@ -36,7 +35,6 @@ import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.awt.event.MouseMotionAdapter
 import java.awt.geom.Point2D
-import java.awt.geom.Rectangle2D
 import java.awt.image.BufferedImage
 import java.beans.PropertyChangeListener
 import javax.swing.BorderFactory
@@ -191,39 +189,69 @@ class AumlPreviewFileEditor(
         scrollPane.viewport.addComponentListener(object : ComponentAdapter() {
             override fun componentResized(e: ComponentEvent) { if (autoFit) applyFit() }
         })
-        // Designer interaction: hover highlights the element under the cursor; click jumps to its markup.
+        // Designer interaction: hover highlights the element under the cursor (cheap plugin hint); click SELECTS it -
+        // the framework draws the stroke-aware selection frame into the rendered frame - and jumps to its markup.
         canvas.addMouseMotionListener(object : MouseMotionAdapter() {
             override fun mouseMoved(e: MouseEvent) = scheduleHover(e.point)
         })
         canvas.addMouseListener(object : MouseAdapter() {
             override fun mouseClicked(e: MouseEvent) = navigateAt(e.point)
-            override fun mouseExited(e: MouseEvent) = canvas.setHoverRect(null)
+            override fun mouseExited(e: MouseEvent) = scheduleHover(null)   // clear the framework hover frame
         })
         scheduleRender(live = true)   // play the design-time animations on first load
     }
 
-    // Hover frame: throttle host hit-tests (one per ~60 ms of movement), then highlight the hit element's rect.
-    // Always re-queries (the host returns the deepest element under the point) so moving onto a child of a large
-    // container switches the frame to the child; setHoverRect repaints only when the rect actually changes.
-    private fun scheduleHover(p: Point) {
-        val design = canvas.canvasToDesign(p)
-        if (design == null) { canvas.setHoverRect(null); return }
+    // Hover frame (FRAMEWORK-drawn): throttle (one per ~60 ms of movement), then ask the host to hover the element under
+    // the point - the framework re-renders the frame with its stroke-aware hover adorner - and show that frame. A null
+    // point (or off the rendered frame) clears the hover. The host returns the deepest element, so moving onto a child
+    // of a large container switches the hover to the child.
+    private fun scheduleHover(p: Point?) {
+        val design = p?.let { canvas.canvasToDesign(it) }
+        val token = renderToken          // captured on the EDT; a later render/select supersedes this hover frame
+        val renderScale = scale
         hoverAlarm.cancelAllRequests()
-        hoverAlarm.addRequest({
-            val hit = service.hitTest(design.x, design.y)
-            val rect = hit?.let { Rectangle2D.Double(it.x, it.y, it.width, it.height) }
-            ApplicationManager.getApplication().invokeLater({ canvas.setHoverRect(rect) }, ModalityState.any())
-        }, HOVER_DEBOUNCE_MS)
+        hoverAlarm.addRequest({ requestHover(design?.x, design?.y, token, renderScale) }, HOVER_DEBOUNCE_MS)
     }
 
-    // Click -> jump the text editor (the split's code half) to the clicked element's markup line/column.
+    // Off-EDT (hoverAlarm pool): drive the framework hover frame and show the re-rendered result. Does NOT bump
+    // renderToken (so it can't kill a running animation stream); discards its frame if a render/select happened meanwhile.
+    private fun requestHover(x: Double?, y: Double?, token: Int, renderScale: Double) {
+        val r = service.hover(x, y)
+        val w = r.width ?: 0
+        val h = r.height ?: 0
+        val image = r.frames.firstOrNull()?.let { loadRawBgra(it, w, h) } ?: return
+        ApplicationManager.getApplication().invokeLater({
+            if (token != renderToken) return@invokeLater
+            canvas.setImage(image, r.scale ?: renderScale)
+            canvas.setStale(false)
+        }, ModalityState.any())
+    }
+
+    // Click -> select the element: the host drives the framework AdornerLayer so the FRAMEWORK draws the (stroke-aware)
+    // selection frame INTO the rendered frame (not a plugin-side rect); show that frame and jump the text editor (the
+    // split's code half) to the element's markup line/column. Clicking empty space clears the selection.
     private fun navigateAt(p: Point) {
         val design = canvas.canvasToDesign(p) ?: return
+        val token = ++renderToken   // a select re-renders; supersede any running stream so it doesn't fight the select frame
+        stopPlayback()
+        val renderScale = scale
         ApplicationManager.getApplication().executeOnPooledThread {
-            val hit = service.hitTest(design.x, design.y) ?: return@executeOnPooledThread
-            ApplicationManager.getApplication().invokeLater(
-                { OpenFileDescriptor(project, file, (hit.line - 1).coerceAtLeast(0), (hit.column - 1).coerceAtLeast(0)).navigate(true) },
-                ModalityState.any())
+            val result = service.select(design.x, design.y)
+            val r = result.render
+            val w = r.width ?: 0
+            val h = r.height ?: 0
+            val image = r.frames.firstOrNull()?.let { loadRawBgra(it, w, h) }
+            ApplicationManager.getApplication().invokeLater({
+                if (token != renderToken) return@invokeLater   // superseded by a newer render/select
+                if (image != null) {
+                    canvas.setImage(image, r.scale ?: renderScale)
+                    canvas.setStale(false)
+                }
+                result.hit?.let { hit ->
+                    OpenFileDescriptor(project, file, (hit.line - 1).coerceAtLeast(0), (hit.column - 1).coerceAtLeast(0)).navigate(true)
+                }
+                if (r.animating) startStreaming(token, renderScale)
+            }, ModalityState.any())
         }
     }
 
@@ -327,7 +355,7 @@ class AumlPreviewFileEditor(
     private fun startStreaming(token: Int, renderScale: Double) {
         ApplicationManager.getApplication().executeOnPooledThread {
             while (token == renderToken) {
-                val r = service.frame()
+                val r = service.frame(file.path)
                 if (token != renderToken || r.error != null) break
                 val w = r.width ?: 0
                 val h = r.height ?: 0
@@ -386,9 +414,6 @@ class AumlPreviewFileEditor(
             val frameScale = result.scale ?: requestedScale
             canvas.setImage(image, frameScale)
             canvas.setStale(false)   // fresh frame: undim
-            // The layout just changed, so any hover/selection frame is now at a stale rect (e.g. the element resized).
-            // Drop it; the next mouse move re-runs the hit-test and draws the frame at the correct size.
-            canvas.setHoverRect(null)
             // Prefer the host's authored design size; only fall back to reconstructing it from the scaled pixels
             // (which loses ±1px at fractional auto-fit scales) for older hosts that don't report it.
             val labelW = result.designWidth ?: (image.width / frameScale).roundToInt()
@@ -488,6 +513,11 @@ class AumlPreviewFileEditor(
     override fun getName(): String = "Preview"
     override fun getFile(): VirtualFile = file
     override fun setState(state: FileEditorState) {}
+
+    // The shared designer host keeps ONE warm scene = the last preview rendered, and only its owner streams frames.
+    // Re-render when this preview is (re)selected so it re-acquires that ownership and its live animation resumes
+    // after another preview took over - otherwise a backgrounded preview would stay frozen on its last frame.
+    override fun selectNotify() { scheduleRender() }
     override fun getState(level: FileEditorStateLevel): FileEditorState = FileEditorState.INSTANCE
     override fun isModified(): Boolean = false
     override fun isValid(): Boolean = true
@@ -513,15 +543,6 @@ class AumlPreviewFileEditor(
             image = img
             renderedScale = scale
             revalidate()
-            repaint()
-        }
-
-        // Hover frame rectangle in DESIGN space (image px / renderedScale); null = no highlight.
-        private var hoverRect: Rectangle2D? = null
-
-        fun setHoverRect(rect: Rectangle2D?) {
-            if (hoverRect == rect) return
-            hoverRect = rect
             repaint()
         }
 
@@ -592,16 +613,7 @@ class AumlPreviewFileEditor(
                 g2.color = STALE_OVERLAY
                 g2.fillRect(x, y, size.width, size.height)
             }
-            // Designer hover frame: the element's design-space rect, scaled into the canvas with the same offset.
-            hoverRect?.let { r ->
-                g2.color = HOVER_COLOR
-                g2.stroke = BasicStroke(3f)
-                g2.drawRect(
-                    (x + r.x * displayScale).roundToInt(),
-                    (y + r.y * displayScale).roundToInt(),
-                    (r.width * displayScale).roundToInt().coerceAtLeast(1),
-                    (r.height * displayScale).roundToInt().coerceAtLeast(1))
-            }
+            // The hover and selection frames are drawn by the FRAMEWORK (into the rendered image), not here.
         }
 
         private fun paintCheckerboard(g2: Graphics2D) {
@@ -631,7 +643,6 @@ class AumlPreviewFileEditor(
     companion object {
         private const val DEBOUNCE_MS = 250
         private const val HOVER_DEBOUNCE_MS = 60
-        private val HOVER_COLOR = JBColor(0x3399FF, 0x3399FF)
         private const val ZOOM_STEP = 1.25
         private const val MIN_SCALE = 0.05
         private const val MAX_SCALE = 8.0

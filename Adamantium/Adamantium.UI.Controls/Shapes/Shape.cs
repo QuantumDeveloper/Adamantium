@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using Adamantium.Core.Collections;
+using Adamantium.Graphics.Core.Models;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Core;
@@ -10,10 +11,171 @@ namespace Adamantium.UI.Controls.Shapes;
 public abstract class Shape : InputUIComponent
 {
    protected Rect Rect;
-     
+
+   // The actual painted rectangle of the stroke in the control's local space (the geometry's authored coordinates grown
+   // by the pen, including miter spikes). Drives the framework adorner/selection frame so it hugs the real stroked
+   // bounds, not the bare geometry box. Distinct from the layout Bounds, which spans from the origin (WPF Stretch=None).
+   public Rect RenderBounds { get; protected set; }
+
    protected Shape()
    {
    }
+
+   // Measures a shape defined by intrinsic geometry (Line/Polygon/Path). The painted bounds are the GPU stroke's exact
+   // extent (TryComputeStrokeBounds mirrors StrokeEffect.fx, including the clamped miter spikes at sharp corners such as
+   // star tips). The geometry keeps its authored coordinates (WPF Stretch=None); the element grows to include the stroke
+   // so it no longer pokes past the control. With no visible stroke the bounds collapse to the bare geometry.
+   protected Size MeasureStrokedGeometry(Rect geometryBounds, IReadOnlyList<(Vector2[] Points, bool IsClosed)> contours = null)
+   {
+      var thickness = IsVisibleBrush(Stroke) ? StrokeThickness : 0.0;
+      var half = thickness / 2.0;
+
+      var min = new Vector2(double.MaxValue);
+      var max = new Vector2(double.MinValue);
+
+      // Floor: the geometry bbox grown by half the stroke. Always valid (a non-empty geometry never collapses to 0) and
+      // exact for round/bevel joins and smooth outlines. Combined/group geometries whose contours aren't exposed at
+      // measure time rely on this floor instead of collapsing.
+      if (geometryBounds.Width > 0 || geometryBounds.Height > 0)
+      {
+         min = new Vector2(geometryBounds.X - half, geometryBounds.Y - half);
+         max = new Vector2(geometryBounds.X + geometryBounds.Width + half, geometryBounds.Y + geometryBounds.Height + half);
+      }
+
+      // Refinement: union the exact stroke extent, which reaches past the bbox floor at sharp MITER corners (star tips).
+      if (TryComputeStrokeBounds(contours, thickness, StrokeLineJoin, StartLineCap, EndLineCap, out var smin, out var smax))
+      {
+         min = Vector2.Min(min, smin);
+         max = Vector2.Max(max, smax);
+      }
+
+      if (max.X < min.X || max.Y < min.Y)
+      {
+         RenderBounds = default;
+         Rect = default;
+         return new Size(0, 0);
+      }
+
+      // WPF Stretch=None: the geometry keeps its authored coordinates (a Line's X1/Y1, a Path's points), so the element
+      // spans from its origin to the painted stroke's bottom-right - the size includes BOTH the geometry's own offset
+      // and the stroke overhang (which fixes the stroke poking past the control without moving the shape). RenderBounds
+      // is the stroke's actual bbox in that same local space, used by the adorner to frame it tightly.
+      RenderBounds = new Rect(min, max);
+      var size = new Size(Math.Max(max.X, 0), Math.Max(max.Y, 0));
+      Rect = new Rect(size);
+      return size;
+   }
+
+   // Extracts the outline contours (raw polyline points + closed flag) from a processed geometry mesh, mirroring the
+   // stroke render path (RenderUnit.TryGetSolidContours) so the measured bounds match what is actually stroked.
+   protected static List<(Vector2[] Points, bool IsClosed)> GetContours(Mesh mesh)
+   {
+      List<(Vector2[], bool)> list = [];
+      if (mesh?.Contours != null)
+      {
+         foreach (var contour in mesh.Contours)
+            if (contour.Points is { Length: >= 2 })
+               list.Add((contour.Points, contour.IsGeometryClosed));
+      }
+      return list;
+   }
+
+   // CPU mirror of StrokeEffect.fx (OffsetPair + join/cap extents): the exact bounding box of the GPU stroke, so
+   // RenderBounds/size hug it - including the clamped miter spike (capped at 4*half via the 0.25 clamp) that a flat
+   // half-thickness inflate misses at sharp corners. A closed contour has no caps (every vertex is a join); an open one
+   // caps its two ends. MUST stay in sync with StrokeEffect.fx / GpuStrokeRenderComponent.
+   protected static bool TryComputeStrokeBounds(
+      IReadOnlyList<(Vector2[] Points, bool IsClosed)> contours,
+      double thickness, PenLineJoin join, PenLineCap startCap, PenLineCap endCap,
+      out Vector2 min, out Vector2 max)
+   {
+      min = new Vector2(double.MaxValue);
+      max = new Vector2(double.MinValue);
+      var any = false;
+      var half = thickness / 2.0;
+
+      foreach (var (points, isClosed) in contours ?? [])
+      {
+         var n = points?.Length ?? 0;
+         if (n < 2) continue;
+
+         for (var i = 0; i < n; i++)
+         {
+            var p = points[i];
+            var isStart = !isClosed && i == 0;
+            var isEnd = !isClosed && i == n - 1;
+
+            if (isStart || isEnd)
+            {
+               var dir = SafeNormalize(isStart ? points[1] - points[0] : points[n - 1] - points[n - 2]);
+               var cap = isStart ? startCap : endCap;
+               var p0 = isStart ? p - dir * (CapShift(cap) * half) : p + dir * (CapShift(cap) * half);
+               var perp = new Vector2(-dir.Y, dir.X);
+               Include(ref min, ref max, ref any, p0 + perp * half);
+               Include(ref min, ref max, ref any, p0 - perp * half);
+               if (cap != PenLineCap.Flat)   // round/triangle cap fans reach up to half beyond the endpoint
+               {
+                  Include(ref min, ref max, ref any, p + new Vector2(half, half));
+                  Include(ref min, ref max, ref any, p - new Vector2(half, half));
+               }
+            }
+            else
+            {
+               var d0 = SafeNormalize(p - points[(i - 1 + n) % n]);
+               var d1 = SafeNormalize(points[(i + 1) % n] - p);
+               if ((d0.X == 0 && d0.Y == 0) || (d1.X == 0 && d1.Y == 0))   // degenerate segment: basic half disc
+               {
+                  Include(ref min, ref max, ref any, p + new Vector2(half, half));
+                  Include(ref min, ref max, ref any, p - new Vector2(half, half));
+                  continue;
+               }
+
+               var n0 = new Vector2(-d0.Y, d0.X);
+               var n1 = new Vector2(-d1.Y, d1.X);
+               if (join == PenLineJoin.Miter)
+               {
+                  var miter = SafeNormalize(n0 + n1);
+                  var denom = Math.Max(Vector2.Dot(miter, n0), 0.25);   // matches the shader: spike capped at 4*half
+                  var len = half / denom;
+                  Include(ref min, ref max, ref any, p + miter * len);
+                  Include(ref min, ref max, ref any, p - miter * len);
+               }
+               else
+               {
+                  Include(ref min, ref max, ref any, p + n0 * half);
+                  Include(ref min, ref max, ref any, p - n0 * half);
+                  Include(ref min, ref max, ref any, p + n1 * half);
+                  Include(ref min, ref max, ref any, p - n1 * half);
+                  if (join == PenLineJoin.Round)
+                  {
+                     Include(ref min, ref max, ref any, p + new Vector2(half, half));
+                     Include(ref min, ref max, ref any, p - new Vector2(half, half));
+                  }
+               }
+            }
+         }
+      }
+
+      return any;
+   }
+
+   private static void Include(ref Vector2 min, ref Vector2 max, ref bool any, Vector2 p)
+   {
+      min = Vector2.Min(min, p);
+      max = Vector2.Max(max, p);
+      any = true;
+   }
+
+   private static Vector2 SafeNormalize(Vector2 v)
+   {
+      var len = Math.Sqrt(v.X * v.X + v.Y * v.Y);
+      return len < 1e-9 ? default : new Vector2(v.X / len, v.Y / len);
+   }
+
+   // Cap shift along the segment direction in units of half-thickness (matches StrokeEffect.fx CapShift): square
+   // extends out by half, concave insets by half, others none.
+   private static double CapShift(PenLineCap cap) =>
+      cap == PenLineCap.Square ? 1.0 : cap is PenLineCap.ConcaveTriangle or PenLineCap.ConcaveRound ? -1.0 : 0.0;
 
    public static readonly AdamantiumProperty FillProperty = AdamantiumProperty.Register(nameof(Fill),
       typeof (Brush), typeof (Shape),
@@ -308,6 +470,10 @@ public abstract class Shape : InputUIComponent
             break;
       }
       Rect = new Rect(shapeSize);
+
+      // Box shapes (Ellipse/Rectangle) inset their geometry by half the stroke via Deflate, so the painted bounds are
+      // the box itself; geometry shapes use MeasureStrokedGeometry instead and never reach here.
+      RenderBounds = new Rect(shapeSize);
 
       // Report the intrinsic size to layout (explicit Width/Height win); Rect above still fills for rendering.
       return new Size(

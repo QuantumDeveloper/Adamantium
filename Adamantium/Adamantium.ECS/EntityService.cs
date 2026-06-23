@@ -6,6 +6,7 @@ using Adamantium.Core.Events;
 using Adamantium.ECS.Events;
 using Adamantium.ECS.Payloads;
 using Adamantium.Graphics.Core;
+using Serilog;
 
 namespace Adamantium.ECS
 {
@@ -119,26 +120,39 @@ namespace Adamantium.ECS
 
         public virtual bool CanDisplayContent => true;
         
-        public IEntityProcessor Processor { get; set; }
+        private readonly List<IEntityProcessor> processors = [];
+
+        public IReadOnlyList<IEntityProcessor> Processors => processors;
 
         public virtual void Initialize()
         {
         }
-        
+
         public void AttachProcessor(IEntityProcessor processor)
         {
-            Processor = processor;
-            Processor?.Attach(this);
+            if (processor == null || processors.Contains(processor)) return;
+            processor.Attach(this);
+            // Insert keeping the collection ordered by Order (stable: equal Order keeps attach order),
+            // so draw/update order is deterministic (content < adorner < debug overlays ...).
+            var index = processors.Count;
+            while (index > 0 && processors[index - 1].Order > processor.Order) index--;
+            processors.Insert(index, processor);
         }
 
-        public void DetachProcessor()
+        public void DetachProcessor(IEntityProcessor processor)
         {
-            Processor?.Detach();
+            if (processor == null || !processors.Remove(processor)) return;
+            processor.Detach();
         }
 
         public virtual void Update(AppTime gameTime)
         {
-            Processor?.Update(gameTime);
+            foreach (var processor in processors)
+            {
+                if (!processor.IsEnabled) continue;
+                try { processor.Update(gameTime); }
+                catch (Exception ex) { Log.Logger.Error(ex, "Processor Update failed: {Processor}", processor.GetType().Name); }
+            }
         }
 
         public virtual bool BeginDraw()
@@ -148,22 +162,75 @@ namespace Adamantium.ECS
 
         public virtual void Draw(AppTime gameTime)
         {
-            Processor?.Draw(gameTime);
+            DrawProcessors(gameTime);
         }
 
         public virtual void EndDraw()
         {
-            Processor?.EndDraw();
+            EndDrawProcessors();
+        }
+
+        // Runs processors' Update explicitly (e.g. a synchronous one-shot render that doesn't go through the
+        // service's own Update loop). Guarded so one processor can't take down the rest.
+        protected void UpdateProcessors(AppTime gameTime)
+        {
+            foreach (var processor in processors)
+            {
+                if (!processor.IsEnabled) continue;
+                try { processor.Update(gameTime); }
+                catch (Exception ex) { Log.Logger.Error(ex, "Processor Update failed: {Processor}", processor.GetType().Name); }
+            }
+        }
+
+        // Out-of-render-pass pass: a rendering service calls this from its BeginDraw beforeRenderPass hook so
+        // processors can dispatch compute (e.g. the GPU stroke expander) before the render pass begins.
+        protected void PreRenderProcessors()
+        {
+            foreach (var processor in processors)
+            {
+                if (!processor.IsEnabled) continue;
+                try { processor.PreRender(); }
+                catch (Exception ex) { Log.Logger.Error(ex, "Processor PreRender failed: {Processor}", processor.GetType().Name); }
+            }
+        }
+
+        // Guarded, ordered iteration shared with rendering services that own the frame and call these
+        // between their own BeginDraw/EndDraw. A throwing processor is logged and skipped so it cannot
+        // take down the rest of the frame.
+        protected void DrawProcessors(AppTime gameTime)
+        {
+            foreach (var processor in processors)
+            {
+                if (!processor.IsEnabled) continue;
+                try { processor.Draw(gameTime); }
+                catch (Exception ex) { Log.Logger.Error(ex, "Processor Draw failed: {Processor}", processor.GetType().Name); }
+            }
+        }
+
+        protected void EndDrawProcessors()
+        {
+            foreach (var processor in processors)
+            {
+                if (!processor.IsEnabled) continue;
+                try { processor.EndDraw(); }
+                catch (Exception ex) { Log.Logger.Error(ex, "Processor EndDraw failed: {Processor}", processor.GetType().Name); }
+            }
         }
 
         public virtual void LoadContent()
         {
-            Processor?.LoadContent();
+            foreach (var processor in processors)
+            {
+                processor.LoadContent();
+            }
         }
 
         public virtual void UnloadContent()
         {
-            Processor?.UnloadContent();
+            foreach (var processor in processors)
+            {
+                processor.UnloadContent();
+            }
         }
 
         public virtual void Present()

@@ -88,7 +88,7 @@ public class Ellipse : Shape
    {
       if (IsGeometryValid) return;
       
-      var destRect = Rect.Deflate(StrokeThickness);
+      var destRect = Rect.Deflate(StrokeThickness / 2);
       context.ForControl(this).DrawEllipse(destRect, Fill, StartAngle, StopAngle, EllipseType, GetPen());
    }
 

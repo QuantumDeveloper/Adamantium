@@ -28,6 +28,13 @@ public abstract class WindowRendererBase : IWindowRenderer
         
     }
 
+    // No-op by default: the on-screen renderer keeps its cache across frames (attachment-based reconciliation). A
+    // renderer that rebuilds a fresh tree every frame (headless designer) overrides this to drop its units.
+    public virtual void ResetCache()
+    {
+
+    }
+
     public GraphicsPresenter Presenter { get; private set; }
     
     protected WindowRendererBase(IGraphicsDevice device, IRenderUnitFactory renderUnitFactory)
@@ -48,6 +55,10 @@ public abstract class WindowRendererBase : IWindowRenderer
     public bool IsRendererUpToDate { get; protected set; }
     public bool FirstFrameProcessed { get; private set; }
 
+    // Render resolution multiplier (1 = on-screen 1:1). The presenter + viewport are sized ClientSize x RenderScale,
+    // the projection stays ClientSize - so the designer renders crisply at design x scale (zoom) without changing layout.
+    public double RenderScale { get; set; } = 1.0;
+
     protected virtual void UnsubscribeFromEvents()
     {
         
@@ -61,12 +72,28 @@ public abstract class WindowRendererBase : IWindowRenderer
     public virtual void SetWindow(IWindow window)
     {
         if (window == null) return;
-            
+
         UnsubscribeFromEvents();
         Window = window;
         Window.Renderer = this;
         FillParameters();
         SubscribeToEvents();
+        InitializeWindowResources();
+    }
+
+    // Re-points the renderer at a different window REUSING the existing presenter (just resized to the new window's
+    // size) instead of recreating it like SetWindow. The designer switches the previewed window this way - one
+    // presenter for the whole session, no render-target churn. First call (no presenter yet) falls back to SetWindow.
+    public virtual void Retarget(IWindow window)
+    {
+        if (window == null) return;
+        if (Presenter == null) { SetWindow(window); return; }
+
+        UnsubscribeFromEvents();
+        Window = window;
+        Window.Renderer = this;
+        SubscribeToEvents();
+        ResizePresenter((uint)(window.ClientWidth * RenderScale), (uint)(window.ClientHeight * RenderScale));
         InitializeWindowResources();
     }
 
@@ -80,8 +107,8 @@ public abstract class WindowRendererBase : IWindowRenderer
     {
         Parameters = new PresentationParameters(
             PresenterKind,
-            (uint)Window.ClientWidth,
-            (uint)Window.ClientHeight,
+            (uint)(Window.ClientWidth * RenderScale),
+            (uint)(Window.ClientHeight * RenderScale),
             Window.SurfaceHandle,
             Window.MSAALevel
         )

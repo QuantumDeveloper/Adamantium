@@ -1,4 +1,5 @@
 using Adamantium.Graphics.Core;
+using Adamantium.UI.Controls.Adorners;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Controls;
 using Adamantium.UI.Core.Graphics;
@@ -7,7 +8,7 @@ using Adamantium.Win32;
 
 namespace Adamantium.UI.Controls;
 
-public abstract class WindowBase : ContentControl, IWindow, IWindowInternals
+public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IAdornerHost
 {
     private IWindowRenderer _renderer;
     protected IWindowWorkerService WindowWorkerService { get; private set; }
@@ -32,6 +33,12 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals
         var args = new WindowRendererChangedEventArgs(oldRenderer, newRenderer);
         RendererChanged?.Invoke(this, args);
     }
+
+    /// <summary>The window's adorner layer: tooling overlays (selection frames etc.) the renderer draws on top of the
+    /// content. The WPF analog of the per-window AdornerLayer; add adorners here to have them rendered.</summary>
+    public AdornerLayer AdornerLayer { get; } = new AdornerLayer();
+
+    public IReadOnlyList<IUIComponent> Adorners => AdornerLayer.Adorners;
 
     public WindowBase()
     {

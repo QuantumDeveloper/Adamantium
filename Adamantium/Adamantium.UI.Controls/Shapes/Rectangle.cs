@@ -25,7 +25,7 @@ public class Rectangle : Shape
    {
       base.OnRender(context);
 
-      var dstRect = Rect.Deflate(StrokeThickness);
+      var dstRect = Rect.Deflate(StrokeThickness / 2);
       context.ForControl(this).DrawRectangle(Fill, dstRect, CornerRadius, GetPen());
    }
 

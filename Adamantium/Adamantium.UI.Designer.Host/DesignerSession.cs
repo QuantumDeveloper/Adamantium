@@ -2,48 +2,50 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using Adamantium.Core;
 using Adamantium.Game;
-using Adamantium.Game.Core;
 using Adamantium.Graphics.Core;
-using Adamantium.Imaging;
 using Adamantium.Mathematics;
-using Adamantium.UI.Controls;
+using Adamantium.UI.Controls.Adorners;
+using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
+using Adamantium.UI.Core.Resources;
 using Adamantium.UI.Core.Markup;
-using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.Media.Animation;
 using Adamantium.UI.Extensions;
+using Adamantium.UI.EntityServices;
 using Adamantium.UI.Markup.AST;
-using Adamantium.UI.Rendering;
 
 namespace Adamantium.UI.Designer.Host;
 
 /// <summary>
 /// A warm headless engine session. Its constructor boots the engine once - loads every engine assembly (so
 /// reflection type resolution sees all controls), creates the graphics device and applies a theme - then
-/// <see cref="Render"/> turns an AUML buffer into a PNG on demand. The device and the <see cref="OffscreenRenderer"/>
-/// stay alive between calls so live edits are cheap; the renderer is only rebuilt when the requested size changes.
+/// <see cref="Render"/> turns an AUML buffer into a PNG on demand. The device and the
+/// <see cref="DesignerRenderService"/> stay alive between calls so live edits are cheap; the previewed window is
+/// rebound (presenter resized) when the requested size/scale changes, never recreated.
 /// </summary>
 public sealed class DesignerSession : IDisposable
 {
     private readonly DesignerApplication _app;
     private readonly IGraphicsDevice _device;
-    private readonly RenderUnitFactory _factory;
     private readonly IGameService _gameService;
 
-    private OffscreenRenderer _renderer;
-    private uint _rendererWidth;
-    private uint _rendererHeight;
+    // One render service for the whole designer session: ONE device (the shared _device) + one renderer/presenter,
+    // re-pointed/resized per previewed window (WindowRenderService.RenderHeadlessFrame). It drives the content
+    // renderer AND the adorner processor (selection frames), exactly like the runtime path.
+    private DesignerRenderService _renderService;
 
     // The last rendered tree, kept so a follow-up hittest request (designer click/hover) can map a point back to
     // the authored element and its markup position without re-rendering.
     private IWindow _lastWindow;
     private IReadOnlyDictionary<object, AumlSourceSpan> _lastSourceMap;
+    // The element the hover frame currently decorates. Hover re-renders the whole scene, so we skip it while the cursor
+    // stays over the same element (the common case) - only an element CHANGE warrants a new frame.
+    private object _lastHoverElement;
 
     // The live preview session: the tree/renderer/target from the last Render, kept alive so the streaming "frame" op
     // (RenderNextFrame) advances and re-renders the SAME scene each tick instead of re-capturing a batch.
-    private OffscreenRenderer _liveRenderer;
-    private IRootVisualComponent _liveRoot;
+    private IWindow _liveWindow;
     private uint _liveTargetWidth;
     private uint _liveTargetHeight;
     private double _liveScale;
@@ -95,8 +97,12 @@ public sealed class DesignerSession : IDisposable
         _app.ThemeManager.AddTheme(theme.Name, theme);
         _app.ThemeManager.SetTheme(theme);
 
+        // WindowRenderService (the designer's render path) resolves IThemeManager from the container; the headless app
+        // skips the normal registration (no Run()), so register the theme manager it already has. (IResourceFactory is
+        // already registered by the graphics context.)
+        _app.Container.RegisterInstance<IThemeManager>(_app.ThemeManager);
+
         _device = _app.GraphicsContext.CreateGraphicsDevice();
-        _factory = new RenderUnitFactory(_device, _app.GraphicsContext.GetResourceFactory());
 
         _maxRenderDimension = Math.Min(
             PreferredMaxRenderDimension,
@@ -242,32 +248,38 @@ public sealed class DesignerSession : IDisposable
     {
         // Design-time game preview: a design-aware behavior (e.g. GameHostBehavior) created+bound a game to its
         // RenderTargetPanel while the tree was built. Drive a short snapshot so the game loads content and publishes a
-        // frame to the panel; the OffscreenRenderer composites that below. No-op when no game is hosted.
+        // frame to the panel; the content render path composites that below. No-op when no game is hosted.
         DriveDesignTimeGames();
 
         if (scale <= 0) scale = 1.0;
         var maxScale = Math.Max(1.0, Math.Min(_maxRenderDimension / designWidth, _maxRenderDimension / designHeight));
         var renderScale = Math.Min(scale, maxScale);
-        var targetWidth = (uint)Math.Max(1.0, Math.Round(designWidth * renderScale));
-        var targetHeight = (uint)Math.Max(1.0, Math.Round(designHeight * renderScale));
+        // TRUNCATE (not round): the renderer sizes the presenter/render-target with (uint)(ClientSize * scale) =
+        // truncation, so the frame file is truncate(design*scale) px. Reporting a rounded (1px larger) size makes the
+        // editor read width*height*4 bytes from a smaller file -> the read underruns -> a bogus "render failed". The
+        // reported size MUST equal the bytes actually written.
+        var targetWidth = (uint)Math.Max(1.0, Math.Floor(designWidth * renderScale));
+        var targetHeight = (uint)Math.Max(1.0, Math.Floor(designHeight * renderScale));
 
-        var renderer = GetRenderer(targetWidth, targetHeight);
-        // Only a full build needs to drop the previous tree's units (new instances/RenderIds). On a reconcile the
-        // instances are unchanged, so their cached units stay valid - resetting here would white out every clean control.
-        if (resetCache) renderer.ResetCache();
-
-        var root = (IRootVisualComponent)window;
         var designW = (uint)Math.Round(designWidth);
         var designH = (uint)Math.Round(designHeight);
 
-        // Render the current frame. If anything is animating, the client drives the animation in REAL TIME by calling
-        // the "frame" op (RenderNextFrame) repeatedly - a live stream, not a pre-captured batch.
-        if (!renderer.RenderFrame(root))
-            return RenderResult.Fail("render failed", diagnostics);
-        renderer.SaveRaw(outPath);   // raw B8G8R8A8 - no PNG encode (the editor converts the bytes)
+        // MSAA x4 for crisp edges. Set before the service binds its presenter (the sample count is fixed at presenter
+        // creation, so every previewed window uses the same).
+        window.MSAALevel = MSAALevel.X4;
 
-        _liveRenderer = renderer;
-        _liveRoot = root;
+        var service = GetRenderService(window);
+        // Only a full build needs to drop the previous tree's units (new instances/RenderIds). On a reconcile the
+        // instances are unchanged, so their cached units stay valid - resetting here would white out every clean control.
+        if (resetCache) service.ResetFrameCache();
+
+        // One device + one presenter for the whole session: the service re-points/resizes to this window + scale (no
+        // recreation), renders content + adorner overlays (its processor), and the frame is read from the resolve texture.
+        if (!service.RenderHeadlessFrame(window, renderScale, new AppTime()))
+            return RenderResult.Fail("render failed", diagnostics);
+        service.SaveFrameRaw(outPath);   // raw B8G8R8A8 - no PNG encode (the editor converts the bytes)
+
+        _liveWindow = window;
         _liveTargetWidth = targetWidth;
         _liveTargetHeight = targetHeight;
         _liveScale = renderScale;
@@ -286,7 +298,7 @@ public sealed class DesignerSession : IDisposable
     /// </summary>
     public RenderResult RenderNextFrame(string outPath)
     {
-        if (_lastWindow == null || _liveRenderer == null || _liveRoot == null)
+        if (_lastWindow == null || _renderService == null || _liveWindow == null)
             return RenderResult.Fail("no live session to advance", null);
 
         const double dt = 1.0 / 60.0;
@@ -294,9 +306,9 @@ public sealed class DesignerSession : IDisposable
         DesignTimeMediaClock.Tick(dt);                     // advance animated images by virtual time
         _lastWindow.Update(_app.ThemeManager, new AppTime());   // re-run layout for any animation-driven size change
 
-        if (!_liveRenderer.RenderFrame(_liveRoot))
+        if (!_renderService.RenderHeadlessFrame(_liveWindow, _liveScale, new AppTime()))
             return RenderResult.Fail("render failed", null);
-        _liveRenderer.SaveRaw(outPath);
+        _renderService.SaveFrameRaw(outPath);
 
         var animating = AnimationManager.HasActiveAnimations || DesignTimeMediaClock.HasActiveMedia;
         return RenderResult.Ok([outPath], null, _liveTargetWidth, _liveTargetHeight, _liveScale,
@@ -520,7 +532,7 @@ public sealed class DesignerSession : IDisposable
     /// Drives every game hosted in the markup (a design-aware behavior created it bound to a RenderTargetPanel) for a
     /// short snapshot: each iteration runs one game frame and waits the device idle, with a tiny sleep so the game's
     /// async content load completes. RunOnce publishes the frame to the panel (CopyOutput), so the panel samples it
-    /// when the OffscreenRenderer composites below. No-op when the markup hosts no game.
+    /// when the content render path composites below. No-op when the markup hosts no game.
     /// </summary>
     private void DriveDesignTimeGames()
     {
@@ -554,57 +566,126 @@ public sealed class DesignerSession : IDisposable
     /// </summary>
     public HitTestResult HitTest(double x, double y)
     {
+        if (FindAuthoredAt(x, y) is not { } found) return null;
+        var (current, span) = found;
+
+        // WorldTransform is already accumulated up the tree → its translation is the element's origin in design space;
+        // most controls' rect is origin + RenderSize. A shape's layout box, though, spans from (0,0) to the geometry's
+        // max (it reserves space for the geometry's coordinate origin, like WPF Stretch=None), so for a Path/Line we
+        // report the geometry's tight bounds instead.
+        var pos = current.WorldTransform.TranslationVector;
+        if (current is Adamantium.UI.Controls.Shapes.Path { Data: { } geometry })
+        {
+            geometry.RecalculateBounds();
+            var b = geometry.Bounds;
+            return new HitTestResult(span.Line, span.Position, pos.X + b.X, pos.Y + b.Y, b.Width, b.Height);
+        }
+        if (current is Adamantium.UI.Controls.Shapes.Line ln)
+        {
+            double minX = Math.Min(ln.X1, ln.X2), minY = Math.Min(ln.Y1, ln.Y2);
+            return new HitTestResult(span.Line, span.Position,
+                pos.X + minX, pos.Y + minY, Math.Abs(ln.X2 - ln.X1), Math.Abs(ln.Y2 - ln.Y1));
+        }
+        var size = current.RenderSize;
+        return new HitTestResult(span.Line, span.Position, pos.X, pos.Y, size.Width, size.Height);
+    }
+
+    // Hit-tests the last rendered tree at (x,y) in design space and walks up to the nearest element that came from the
+    // AUML (template-internal parts have no source position). Shared by HitTest (hover/go-to-source) and SelectAt.
+    private (IUIComponent Component, AumlSourceSpan Span)? FindAuthoredAt(double x, double y)
+    {
         if (_lastWindow is not IInputComponent root || _lastSourceMap is null) return null;
 
         var hit = root.HitTest(new Vector2(x, y));
         for (var current = hit as IUIComponent; current is not null; current = current.VisualParent)
-        {
             if (_lastSourceMap.TryGetValue(current, out var span))
-            {
-                // WorldTransform is already accumulated up the tree → its translation is the element's origin in
-                // design space; most controls' rect is origin + RenderSize. A shape's layout box, though, spans from
-                // (0,0) to the geometry's max (it reserves space for the geometry's coordinate origin, like WPF
-                // Stretch=None), so for a Path we draw the selection frame from the geometry's tight bounds instead —
-                // the Blend/WPF designer approach (a designer-side adorner, the engine's layout is left untouched).
-                var pos = current.WorldTransform.TranslationVector;
-                if (current is Adamantium.UI.Controls.Shapes.Path { Data: { } geometry })
-                {
-                    geometry.RecalculateBounds();
-                    var b = geometry.Bounds;
-                    return new HitTestResult(span.Line, span.Position, pos.X + b.X, pos.Y + b.Y, b.Width, b.Height);
-                }
-                // A Line's layout box also spans from (0,0) to its far point, so frame it by the segment's tight bounds
-                // (min..max of its endpoints) instead of the origin-anchored layout box.
-                if (current is Adamantium.UI.Controls.Shapes.Line ln)
-                {
-                    double minX = Math.Min(ln.X1, ln.X2), minY = Math.Min(ln.Y1, ln.Y2);
-                    return new HitTestResult(span.Line, span.Position,
-                        pos.X + minX, pos.Y + minY, Math.Abs(ln.X2 - ln.X1), Math.Abs(ln.Y2 - ln.Y1));
-                }
-                var size = current.RenderSize;
-                return new HitTestResult(span.Line, span.Position, pos.X, pos.Y, size.Width, size.Height);
-            }
-        }
+                return (current, span);
         return null;
     }
 
-    private OffscreenRenderer GetRenderer(uint width, uint height)
+    /// <summary>
+    /// Designer selection: hit-tests the last rendered tree at (x,y) in design space and selects the nearest authored
+    /// element by driving the previewed window's framework <see cref="AdornerLayer"/> - so the FRAMEWORK draws the
+    /// selection frame from the element's RenderBounds (no host-side frame) - then re-renders one frame and returns it
+    /// plus the element's markup position so the editor can sync its caret. A miss clears the selection.
+    /// </summary>
+    public RenderResult SelectAt(double x, double y, string outPath)
     {
-        // Reuse the one renderer across renders, only resizing its target when the size changes. Recreating it
-        // per zoom would abandon the render cache (its units leak) and churn large GPU allocations.
-        if (_renderer == null)
-        {
-            _renderer = new OffscreenRenderer(_device, _factory, width, height, MSAALevel.X4) { ClearColor = Colors.White };
-        }
-        else if (_rendererWidth != width || _rendererHeight != height)
-        {
-            _renderer.Resize(width, height);
-        }
+        if (_lastWindow == null || _renderService == null || _liveWindow == null)
+            return RenderResult.Fail("no live session to select in", null);
 
-        _rendererWidth = width;
-        _rendererHeight = height;
-        return _renderer;
+        var found = FindAuthoredAt(x, y);
+        SetWindowSelection(found?.Component as UIComponent);   // null clears the selection
+
+        if (!_renderService.RenderHeadlessFrame(_liveWindow, _liveScale, new AppTime()))
+            return RenderResult.Fail("render failed", null);
+        _renderService.SaveFrameRaw(outPath);
+
+        var hit = found is { } f ? new HitTestResult(f.Span.Line, f.Span.Position, 0, 0, 0, 0) : null;
+        // Report the real animation state so the editor keeps streaming after a click - the selection frame persists on
+        // the AdornerLayer, so the resumed stream's frames carry it; the preview doesn't freeze on selecting.
+        var animating = AnimationManager.HasActiveAnimations || DesignTimeMediaClock.HasActiveMedia;
+        return RenderResult.Ok([outPath], null, _liveTargetWidth, _liveTargetHeight, _liveScale,
+            _liveDesignWidth, _liveDesignHeight, animating: animating, hit: hit);
     }
 
-    public void Dispose() => _renderer?.Dispose();
+    // Drives the previewed window's framework AdornerLayer via the IAdornerHost contract (works for the VirtualWindow
+    // the designer hosts in AND a real WindowBase). Passing null clears the selection; the adorner processor reads
+    // window.Adorners on the next render and draws the frame on top.
+    private void SetWindowSelection(UIComponent element)
+    {
+        if (_lastWindow is not IAdornerHost host) return;
+        if (element is null) host.AdornerLayer.SetSelection(null);
+        else host.AdornerLayer.SetSelection([element]);
+    }
+
+    /// <summary>
+    /// Designer hover: like <see cref="SelectAt"/> but for the transient hover frame - drives the previewed window's
+    /// AdornerLayer hover (so the FRAMEWORK draws the stroke-aware hover frame, not a host-side rect), re-renders one
+    /// frame and returns it. A null point, a miss, or hovering an already-selected element clears the hover frame.
+    /// </summary>
+    public RenderResult Hover(double? x, double? y, string outPath)
+    {
+        if (_lastWindow == null || _renderService == null || _liveWindow == null)
+            return RenderResult.Fail("no live session to hover in", null);
+
+        var element = x.HasValue && y.HasValue ? FindAuthoredAt(x.Value, y.Value)?.Component as UIComponent : null;
+
+        // Moving the cursor WITHIN the same element changes nothing visible, so skip the (whole-scene) re-render and
+        // return no frame - the editor keeps its current one. Only an element change actually re-renders. This keeps a
+        // mouse sweep / a wheel-zoom burst from flooding the GPU with full-size renders.
+        if (ReferenceEquals(element, _lastHoverElement))
+            return RenderResult.Ok([], null, _liveTargetWidth, _liveTargetHeight, _liveScale, _liveDesignWidth, _liveDesignHeight);
+        _lastHoverElement = element;
+
+        SetWindowHover(element);   // null/miss clears the hover frame
+
+        if (!_renderService.RenderHeadlessFrame(_liveWindow, _liveScale, new AppTime()))
+            return RenderResult.Fail("render failed", null);
+        _renderService.SaveFrameRaw(outPath);
+
+        var animating = AnimationManager.HasActiveAnimations || DesignTimeMediaClock.HasActiveMedia;
+        return RenderResult.Ok([outPath], null, _liveTargetWidth, _liveTargetHeight, _liveScale,
+            _liveDesignWidth, _liveDesignHeight, animating: animating);
+    }
+
+    // Drives the previewed window's framework AdornerLayer hover via IAdornerHost. Null clears it.
+    private void SetWindowHover(UIComponent element)
+    {
+        if (_lastWindow is IAdornerHost host) host.AdornerLayer.SetHover(element);
+    }
+
+    private DesignerRenderService GetRenderService(IWindow window)
+    {
+        // One service for the whole session: created lazily with the SHARED device, then re-pointed/resized per window
+        // (RenderHeadlessFrame). Recreating it per render would churn the device/presenter and leak the render cache.
+        if (_renderService == null)
+        {
+            _renderService = new DesignerRenderService(_app.EntityWorld, window, _device);
+            _renderService.GraphicsDevice.ClearColor = Colors.White;   // designer canvas (matches the old OffscreenRenderer)
+        }
+        return _renderService;
+    }
+
+    public void Dispose() => _renderService?.UnloadContent();
 }

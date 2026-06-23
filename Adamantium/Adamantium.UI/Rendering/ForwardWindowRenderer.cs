@@ -29,8 +29,10 @@ public class ForwardWindowRenderer : WindowRendererBase
 
     protected override void InitializeWindowResources()
     {
-        var width = (uint)Window.ClientWidth;
-        var height = (uint)Window.ClientHeight;
+        // Viewport/scissor at the render resolution (ClientSize x RenderScale); the projection stays the logical
+        // ClientSize, so RenderScale > 1 rasterises the same layout into a larger target (crisp designer zoom).
+        var width = (uint)(Window.ClientWidth * RenderScale);
+        var height = (uint)(Window.ClientHeight * RenderScale);
 
         Viewport.Width = width;
         Viewport.Height = height;
@@ -67,7 +69,7 @@ public class ForwardWindowRenderer : WindowRendererBase
     public override void Render(AppTime appTime)
     {
         if (Window == null) return;
-        
+
         GraphicsDevice.SetViewports(Viewport);
         GraphicsDevice.SetScissors(Scissor);
         _renderCache.Render();
@@ -78,14 +80,18 @@ public class ForwardWindowRenderer : WindowRendererBase
         if (Window == null) return;
         _renderCache.PreRender();
     }
-    
+
     public override void PrepareData()
     {
         if (Window == null) return;
-        
+
         _renderCache.BuildFromVisualTree(Window);
         _renderCache.ProcessCommands(Window.GetProjectionMatrix());
     }
+
+    // Headless designer: each render is a fresh tree (new RenderIds), so drop the cached units between renders instead
+    // of relying on attachment-based reconciliation. Caller must ensure the GPU is idle first (the designer waits).
+    public override void ResetCache() => _renderCache.DisposeUnits();
 
     private void RenderComponent(IUIComponent component)
     {

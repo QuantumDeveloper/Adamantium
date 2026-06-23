@@ -124,7 +124,7 @@ public class GpuRenderUnitTests
     public void OffscreenRenderer_RendersFrame_AndReadsBackAnImage()
     {
         var factory = new RenderUnitFactory(_device, _resourceFactory);
-        using var renderer = new OffscreenRenderer(_device, factory, 64, 64);
+        using var renderer = new OffscreenTestRenderer(_device, factory, 64, 64);
 
         // Headless extension is absent on this box -> RenderTarget fallback (would be Headless on Linux/Mesa).
         TestContext.WriteLine($"Offscreen presenter kind = {renderer.PresenterKind}");
@@ -164,6 +164,46 @@ public class GpuRenderUnitTests
         {
             System.IO.File.Delete(path);
         }
+    }
+
+    // The framework adorner stage: a SelectionAdorner drawn as a SECOND pass on top of the content. Proves the
+    // overlay renders over the content (white corner handle sits outside the red box, on a cleared background) -
+    // i.e. RenderBounds-driven tooling frames from the framework, not the host. Raw BGRA read-back avoids Image.Load.
+    [Test]
+    public void Adorner_DrawsSelectionFrame_OnTopOfContent()
+    {
+        var factory = new RenderUnitFactory(_device, _resourceFactory);
+        using var renderer = new OffscreenTestRenderer(_device, factory, 64, 64) { ClearColor = Colors.Black };
+
+        var box = new Adamantium.UI.Controls.Shapes.Rectangle { Width = 40, Height = 40, Fill = Brushes.Red };
+        box.Measure(new Size(64, 64));
+        box.Arrange(new Rect(10, 10, 40, 40));
+
+        var root = new TestRoot(64, 64);
+        root.Add(box);
+
+        // Selection frame on the box: drawn on top, a couple px outside its bounds, with white corner handles.
+        renderer.Adorners = [new Adamantium.UI.Controls.Adorners.SelectionAdorner(box)];
+
+        Assert.That(renderer.RenderFrame(root), Is.True, "off-screen frame must render");
+
+        var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"adorner_{System.Guid.NewGuid():N}.bgra");
+        renderer.SaveRaw(path);
+        try
+        {
+            var bytes = System.IO.File.ReadAllBytes(path);   // native B8G8R8A8, top-left origin (no Y flip)
+            bool Black(int x, int y) { var o = (y * 64 + x) * 4; return bytes[o] < 40 && bytes[o + 1] < 40 && bytes[o + 2] < 40; }
+            bool Red(int x, int y)   { var o = (y * 64 + x) * 4; return bytes[o] < 100 && bytes[o + 1] < 100 && bytes[o + 2] > 140; }
+            bool White(int x, int y) { var o = (y * 64 + x) * 4; return bytes[o] > 180 && bytes[o + 1] > 180 && bytes[o + 2] > 180; }
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(Red(30, 30), Is.True, "content (red box) must render");
+                Assert.That(Black(2, 2), Is.True, "background outside the adorned area stays cleared");
+                Assert.That(White(8, 8), Is.True, "selection handle must render ON TOP, outside the box corner");
+            });
+        }
+        finally { System.IO.File.Delete(path); }
     }
 
     // Multi-state oracle for the dynamic-state cache: two draws with DIFFERENT blend equations must each honour

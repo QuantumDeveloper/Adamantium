@@ -27,10 +27,14 @@ public sealed class RenderResult
     /// image). The client keeps requesting the next frame (op "frame") at ~60fps while this is true, then stops.</summary>
     public bool Animating { get; private init; }
 
+    /// <summary>The element a selection (op "select") landed on - its markup line/column - so the editor can sync its
+    /// caret. Null for ordinary renders and for a selection that hit nothing (the selection was cleared).</summary>
+    public HitTestResult Hit { get; private init; }
+
     public static RenderResult Ok(List<string> frames, List<string> diagnostics, uint width, uint height, double scale,
-        uint designWidth, uint designHeight, bool animating = false) =>
+        uint designWidth, uint designHeight, bool animating = false, HitTestResult hit = null) =>
         new() { Success = true, Frames = frames, Diagnostics = diagnostics, Width = width, Height = height, Scale = scale,
-            DesignWidth = designWidth, DesignHeight = designHeight, Animating = animating };
+            DesignWidth = designWidth, DesignHeight = designHeight, Animating = animating, Hit = hit };
 
     public static RenderResult Fail(string error, List<string> diagnostics) =>
         new() { Success = false, Error = error, Diagnostics = diagnostics };

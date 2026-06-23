@@ -1,7 +1,9 @@
+using System.Linq;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Presentation;
 using Adamantium.Imaging;
 using Adamantium.UI.Core.Graphics;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.UI.Rendering;
 
@@ -19,9 +21,17 @@ public class HeadlessWindowRenderer : ForwardWindowRenderer
     {
     }
 
-    protected override PresenterType PresenterKind => PresenterType.Headless;
+    // A real headless surface where the loader/driver provides VK_EXT_headless_surface (Linux/Mesa, software ICDs),
+    // otherwise a plain offscreen RenderTarget (Windows and everywhere else). Both produce the same readable texture.
+    protected override PresenterType PresenterKind =>
+        HeadlessSurfaceAvailable() ? PresenterType.Headless : PresenterType.RenderTarget;
 
-    /// <summary>Saves the last rendered frame (the headless swapchain image) to disk.</summary>
+    private static bool HeadlessSurfaceAvailable() =>
+        Instance.EnumerateInstanceExtensionProperties()
+            .Any(e => e.ExtensionName == Constants.VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME);
+
+    /// <summary>Saves the last rendered frame to disk. Reads the resolve texture (MSAA-safe; equals the render target
+    /// when MSAA is off), matching the on-screen read-back path.</summary>
     public void SaveFrame(string path, ImageFileType fileType) =>
-        Presenter.GetCurrentImage().Save(path, fileType);
+        Presenter.RenderTarget.ResolveTexture.Save(path, fileType);
 }

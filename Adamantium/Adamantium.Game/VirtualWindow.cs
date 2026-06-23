@@ -1,10 +1,12 @@
 using System;
+using System.Collections.Generic;
 using Adamantium.Game.Core;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Mathematics;
 using Adamantium.UI;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Controls.Adorners;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
 using Adamantium.UI.Core.RoutedEvents;
@@ -13,7 +15,7 @@ using Adamantium.UI.Rendering;
 
 namespace Adamantium.Game;
 
-public class VirtualWindow : ContentControl, IVirtualWindow
+public class VirtualWindow : ContentControl, IVirtualWindow, IAdornerHost
 {
     public Vector2 PointToClient(Vector2 point)
     {
@@ -59,7 +61,12 @@ public class VirtualWindow : ContentControl, IVirtualWindow
     public WindowState State { get; set; }
     public IWindowRenderer DefaultRenderer { get; set; }
     public IWindowRenderer Renderer { get; set; }
-    
+
+    // Framework tooling overlays (selection frames etc.). The designer drives this via AdornerLayer.SetSelection; the
+    // render service's adorner processor draws Adorners on top of the content. Mirrors WindowBase.
+    public AdornerLayer AdornerLayer { get; } = new AdornerLayer();
+    public IReadOnlyList<IUIComponent> Adorners => AdornerLayer.Adorners;
+
     public GameOutput RootWindow { get; set; }
 
     public bool ShouldDisplayWindow { get; }
