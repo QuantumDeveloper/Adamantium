@@ -15,8 +15,9 @@ uint64_t PointsAddress;   // float2[] polyline points (PointCount of them)
 uint64_t OutputAddress;   // float2[] output vertices
 uint PointCount;          // continuous mode: polyline points. dash mode: piece-points (2 per dash piece).
 uint IsClosed;            // 0 = open polyline (flat ends), 1 = closed loop (wrap-around miters + closing pair)
-uint StartCap;            // start cap: 0 = flat, 1 = square, 2 = round (a disc fan at the start point)
-uint EndCap;              // end cap:   0 = flat, 1 = square, 2 = round
+uint StartCap;            // start cap: 0 = flat, 1 = square, 2 = round, 3 = convex-tri, 4 = concave-tri, 5 = concave-round
+uint EndCap;              // end cap (same codes)
+uint DashCap;             // cap on each DASH/dot piece's ends (cut path); the contour's real ends use Start/EndCap
 uint JoinType;            // 0 = miter (bisector ribbon, clamped), 1 = bevel (per-segment rectangles + corner wedge), 2 = round (rectangles + disc fan)
 uint RoundSegments;       // disc-fan subdivision for round joins/caps; 0 = no round geometry (no disc slots)
 uint DashMode;            // 0 = continuous polyline (per-point), 1 = one-pass GPU cut (dash/trim, single-thread + DrawIndirect)
@@ -381,12 +382,12 @@ void StrokeDashCutCS(uint3 tid : SV_DispatchThreadID)
             {
                 float2 p0 = a + (drawA - arc) * dir;
                 float2 p1 = a + (drawB - arc) * dir;
-                // Per-end cap: a piece's start-facing end (p0, toward the line start) uses StartCap, its end-facing end
-                // (p1, toward the line end) uses EndCap - so BOTH StartLineCap and EndLineCap show on every dash (and on
-                // the single trim-only piece). CapShift shapes the quad (square out / concave inset); EmitCapTris adds
-                // the disc / triangle / concave-lobe geometry. Outward dir is -dir at p0, +dir at p1.
-                uint capA = StartCap;
-                uint capB = EndCap;
+                // Per-end cap: the contour's REAL ends (the first piece's start at tStart, the last piece's end at tEnd)
+                // use StartCap/EndCap; every other (dash-internal) piece end uses DashCap - so dots/dashes are capped by
+                // DashCap (round -> round dots) while the stroke's actual ends keep Start/EndLineCap. CapShift shapes the
+                // quad (square out / concave inset); EmitCapTris adds the disc/triangle/concave geometry.
+                uint capA = (drawA <= tStart + 1e-4) ? StartCap : DashCap;
+                uint capB = (drawB >= tEnd - 1e-4) ? EndCap : DashCap;
                 float2 e0 = p0 - dir * CapShift(capA);
                 float2 e1 = p1 + dir * CapShift(capB);
                 if (vCount + 6u <= MaxVertices)

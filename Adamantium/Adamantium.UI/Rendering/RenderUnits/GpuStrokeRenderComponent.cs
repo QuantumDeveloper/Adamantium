@@ -59,27 +59,30 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
         _useCut = _hasDashes || pen.TrimStart > 0.0 || pen.TrimEnd < 1.0;
         _joinType = MapJoin(pen.PenLineJoin);
 
+        // Start/EndLineCap apply on both paths (continuous ends, cut terminal ends); DashCap only on the cut path
+        // (each dash/dot piece end), so it's kept separate - otherwise the round DashCap default would force a disc fan
+        // onto every plain solid stroke.
         var capNeedsFan = IsFanCap(pen.StartLineCap) || IsFanCap(pen.EndLineCap);
+        var dashCapNeedsFan = IsFanCap(pen.DashCap);
         foreach (var (points, isClosed) in contours)
         {
-            var contour = BuildContour(points, isClosed, capNeedsFan);
+            var contour = BuildContour(points, isClosed, capNeedsFan, dashCapNeedsFan);
             if (contour != null) _contours.Add(contour);
         }
     }
 
     // Builds the GPU buffers for one contour. Returns null for a degenerate contour (no thread/vertex work).
-    private Contour BuildContour(Vector2[] points, bool isClosed, bool capNeedsFan)
+    private Contour BuildContour(Vector2[] points, bool isClosed, bool capNeedsFan, bool dashCapNeedsFan)
     {
         if (points.Length < 2) return null;
 
         var c = new Contour { IsClosed = isClosed, PointCount = (uint)points.Length };
 
         // Disc segments are needed when a join is round (disc) or bevel (wedge), OR a cap needs emitted geometry
-        // (round / triangle / concave). On the cut path a ROUND JOIN also needs the disc, emitted at every corner the
-        // dash crosses (without it a dashed polygon's teeth corners gap). Caps appear on both paths; closed contours
-        // have no caps.
+        // (round / triangle / concave). On the cut path a ROUND JOIN also needs the disc (emitted at every corner the
+        // dash crosses), as does a fan DashCap (round dots). Caps appear on both paths; closed contours have no caps.
         var needsFan = !_useCut && (_joinType == 2u || _joinType == 1u || (!isClosed && capNeedsFan));
-        c.RoundSegments = (needsFan || (_useCut && (capNeedsFan || _joinType == 2u))) ? RoundSegmentsCount : 0u;
+        c.RoundSegments = (needsFan || (_useCut && (capNeedsFan || dashCapNeedsFan || _joinType == 2u))) ? RoundSegmentsCount : 0u;
 
         // Raw contour -> BDA storage buffer (the GPU reads it; dashing/trim happen on the GPU, not here).
         var floats = new float[points.Length * 2];
@@ -199,6 +202,7 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
             // continuous loop has no ends, so both are 0 there.
             _effect.StartCap.SetValue(_useCut || !c.IsClosed ? MapCap(_pen.StartLineCap) : 0u);
             _effect.EndCap.SetValue(_useCut || !c.IsClosed ? MapCap(_pen.EndLineCap) : 0u);
+            _effect.DashCap.SetValue(MapCap(_pen.DashCap));   // dash/dot piece caps (cut path only)
             _effect.HalfThickness.SetValue((float)(_pen.Thickness / 2.0));
 
             if (_useCut)

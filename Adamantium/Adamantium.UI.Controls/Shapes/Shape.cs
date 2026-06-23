@@ -1,4 +1,5 @@
-﻿using Adamantium.Core.Collections;
+﻿using System.Globalization;
+using Adamantium.Core.Collections;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Core;
@@ -60,6 +61,22 @@ public abstract class Shape : InputUIComponent
    public static readonly AdamantiumProperty StrokeTrimEndProperty =
       AdamantiumProperty.Register(nameof(StrokeTrimEnd), typeof(Double), typeof(Shape),
          new PropertyMetadata(1d, PropertyMetadataOptions.AffectsRender));
+
+   // Symbolic dash pattern: a named sequence (StrokeDashSymbols, e.g. "Dash Dot Dot Dash") whose glyph widths + gap
+   // come from StrokeDashGlyphs (e.g. "Dash=18, Dot=3, Gap=6", in pixels). When set it expands to the regular
+   // StrokeDashArray, so you compose the pattern by name (Morse-codeable) instead of raw numbers.
+   public static readonly AdamantiumProperty StrokeDashSymbolsProperty =
+      AdamantiumProperty.Register(nameof(StrokeDashSymbols), typeof(String), typeof(Shape),
+         new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender));
+
+   public static readonly AdamantiumProperty StrokeDashGlyphsProperty =
+      AdamantiumProperty.Register(nameof(StrokeDashGlyphs), typeof(String), typeof(Shape),
+         new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender));
+
+   // Cap on each dash/dot piece's ends (the contour's real ends use Start/EndLineCap). Round -> round dots.
+   public static readonly AdamantiumProperty StrokeDashCapProperty =
+      AdamantiumProperty.Register(nameof(StrokeDashCap), typeof(PenLineCap), typeof(Shape),
+         new PropertyMetadata(PenLineCap.ConvexRound, PropertyMetadataOptions.AffectsRender));
 
    public Brush Fill
    {
@@ -126,6 +143,24 @@ public abstract class Shape : InputUIComponent
       get => GetValue<Double>(StrokeTrimEndProperty);
       set => SetValue(StrokeTrimEndProperty, value);
    }
+
+   public String StrokeDashSymbols
+   {
+      get => GetValue<String>(StrokeDashSymbolsProperty);
+      set => SetValue(StrokeDashSymbolsProperty, value);
+   }
+
+   public String StrokeDashGlyphs
+   {
+      get => GetValue<String>(StrokeDashGlyphsProperty);
+      set => SetValue(StrokeDashGlyphsProperty, value);
+   }
+
+   public PenLineCap StrokeDashCap
+   {
+      get => GetValue<PenLineCap>(StrokeDashCapProperty);
+      set => SetValue(StrokeDashCapProperty, value);
+   }
       
    private static object CoerceStrokeThickness(AdamantiumComponent adamantiumAdamantiumComponent, object baseValue)
    {
@@ -139,16 +174,54 @@ public abstract class Shape : InputUIComponent
 
    public Pen GetPen()
    {
+      // A symbolic pattern (StrokeDashSymbols) expands into the dash array; otherwise the raw StrokeDashArray is used.
       return new Pen(
          Stroke,
          StrokeThickness,
          StrokeDashOffset,
-         StrokeDashArray,
+         ExpandDashSymbols() ?? (IEnumerable<double>)StrokeDashArray,
          StartLineCap,
          EndLineCap,
          StrokeLineJoin,
          StrokeTrimStart,
-         StrokeTrimEnd);
+         StrokeTrimEnd,
+         StrokeDashCap);
+   }
+
+   // Expands StrokeDashSymbols ("Dash Dot Dot Dash") into a dash array using the named widths + gap from
+   // StrokeDashGlyphs ("Dash=18, Dot=3, Gap=6", in pixels). Each symbol contributes [width, gap]; an unknown or
+   // zero-width symbol becomes a hair-width "dot" that the round dash cap renders as a circle. Returns null when no
+   // symbolic pattern is set, so GetPen falls back to the raw StrokeDashArray.
+   private List<double> ExpandDashSymbols()
+   {
+      var symbols = StrokeDashSymbols;
+      if (string.IsNullOrWhiteSpace(symbols)) return null;
+
+      var glyphs = ParseDashGlyphs(StrokeDashGlyphs);
+      var gap = glyphs.TryGetValue("Gap", out var g) ? g : Math.Max(StrokeThickness, 1.0);
+
+      var result = new List<double>();
+      foreach (var token in symbols.Split([' ', ',', '\t', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries))
+      {
+         var width = glyphs.TryGetValue(token, out var w) ? w : 0.0;
+         result.Add(Math.Max(width, 0.01));   // zero width -> epsilon; the round dash cap draws it as a dot
+         result.Add(gap);
+      }
+      return result.Count > 0 ? result : null;
+   }
+
+   // Parses "Name=px, Name=px, Gap=px" into a name->pixels map (case-insensitive, invariant numbers).
+   private static Dictionary<string, double> ParseDashGlyphs(string spec)
+   {
+      var map = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+      if (string.IsNullOrWhiteSpace(spec)) return map;
+      foreach (var pair in spec.Split([',', ';'], StringSplitOptions.RemoveEmptyEntries))
+      {
+         var kv = pair.Split('=', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+         if (kv.Length == 2 && double.TryParse(kv[1], NumberStyles.Any, CultureInfo.InvariantCulture, out var v))
+            map[kv[0]] = v;
+      }
+      return map;
    }
 
    // --- Tight hit-testing helpers (narrow phase) -----------------------------------------------------------------

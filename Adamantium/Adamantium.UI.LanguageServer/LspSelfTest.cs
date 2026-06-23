@@ -102,6 +102,10 @@ internal static class LspSelfTest
         // would offer nothing here. Verifies the widened CompletionEngine.Matches.
         var (substrText, ssLine, ssChar) = Caret(
             """<StyleSet xmlns="http://adamantium/ui" xmlns:controls="http://adamantium/ui"><controls:Border ound|></controls:Border></StyleSet>""");
+        // StrokeDashSymbols value: offers the built-in Dash/Dot plus the names declared in this element's
+        // StrokeDashGlyphs ("Beat"), completing the token after the last space.
+        var (dashSymText, dsLine, dsChar) = Caret(
+            """<StyleSet xmlns="http://adamantium/ui" xmlns:controls="http://adamantium/ui"><controls:Line StrokeDashGlyphs="Dash=18, Beat=4, Gap=6" StrokeDashSymbols="Dash |"/></StyleSet>""");
 
         JsonNode[] session =
         {
@@ -150,6 +154,8 @@ internal static class LspSelfTest
             Completion(26, dir + "/MultiName.auml", mnLine, mnChar),
             DidOpen(dir + "/Substr.auml", substrText),
             Completion(27, dir + "/Substr.auml", ssLine, ssChar),
+            DidOpen(dir + "/DashSym.auml", dashSymText),
+            Completion(28, dir + "/DashSym.auml", dsLine, dsChar),
             DidOpen(xPrefixUri, xPrefixDoc),
             CodeAction(17, xPrefixUri, xName.Line, xName.Ch),
             DidOpen(semanticUri, semanticDoc),
@@ -175,7 +181,7 @@ internal static class LspSelfTest
             var method = response["method"]?.GetValue<string>();
             var id = response["id"]?.ToJsonString();
 
-            if (response["result"] is JsonArray array && id is "2" or "4" or "7" or "12" or "13" or "14" or "15" or "19" or "22" or "23" or "24" or "25" or "26" or "27")
+            if (response["result"] is JsonArray array && id is "2" or "4" or "7" or "12" or "13" or "14" or "15" or "19" or "22" or "23" or "24" or "25" or "26" or "27" or "28")
             {
                 var labels = array.Select(c => c!["label"]!.GetValue<string>()).ToList();
                 var tag = id switch
@@ -193,6 +199,7 @@ internal static class LspSelfTest
                     "25" => "{Binding Mode=} enum values",
                     "26" => "{MultiBinding} named args",
                     "27" => "substring match (mid-word)",
+                    "28" => "StrokeDashSymbols glyphs",
                     _ => "controls:Border props"
                 };
                 Console.WriteLine($"<- completion ({tag}, id {id}): {labels.Count}: {string.Join(", ", labels.Take(8))}");
