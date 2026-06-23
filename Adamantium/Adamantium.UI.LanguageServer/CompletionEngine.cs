@@ -34,7 +34,7 @@ public sealed class CompletionEngine
         {
             AumlCompletionKind.ElementName => CompleteElements(ctx, namespaces),
             AumlCompletionKind.AttributeName => CompleteAttributes(ctx, namespaces, text, offset),
-            AumlCompletionKind.AttributeValue => CompleteValues(ctx, namespaces, documentPath),
+            AumlCompletionKind.AttributeValue => CompleteValues(ctx, namespaces, text, offset, documentPath),
             AumlCompletionKind.MarkupExtensionName => CompleteMarkupExtensionName(ctx),
             AumlCompletionKind.MarkupExtensionArg => CompleteMarkupExtensionArg(ctx, namespaces, text, offset),
             _ => []
@@ -243,7 +243,7 @@ public sealed class CompletionEngine
         if (xmlns.Length == 0) return [];
 
         return _model.GetElements(xmlns)
-            .Where(t => Matches(t.Name, partial))
+            .Where(t => MatchesStart(t.Name, partial))
             .OrderBy(t => t.Name)
             .Select(t => new AumlCompletionItem(t.Name, AumlCompletionItemKind.Element))
             .ToList();
@@ -328,12 +328,17 @@ public sealed class CompletionEngine
         return used;
     }
 
-    private IReadOnlyList<AumlCompletionItem> CompleteValues(AumlCompletionContext ctx, IReadOnlyDictionary<string, string> namespaces, string? documentPath)
+    private IReadOnlyList<AumlCompletionItem> CompleteValues(AumlCompletionContext ctx, IReadOnlyDictionary<string, string> namespaces, string text, int offset, string? documentPath)
     {
         // A type-valued x: directive (x:ViewModel) completes type names directly in its value - the simplified form
         // without {x:Type}. Same type set used inside {x:Type}.
         if (IsTypeReferenceDirective(ctx.AttributeName, namespaces))
             return CompleteTypeNames(ctx.Prefix, namespaces);
+
+        // StrokeDashSymbols: a space-separated sequence of glyph names. Offer the names declared in this element's
+        // StrokeDashGlyphs (plus the built-in Dash/Dot), completing the token after the last space.
+        if (string.Equals(ctx.AttributeName, "StrokeDashSymbols", StringComparison.Ordinal))
+            return CompleteDashSymbols(ctx.Prefix, text, offset);
 
         var element = ResolveElement(ctx.ElementName, namespaces);
         var propertyType = element is null ? null : _model.GetPropertyType(element, ctx.AttributeName ?? "");
@@ -348,6 +353,46 @@ public sealed class CompletionEngine
             .Where(v => Matches(v, ctx.Prefix))
             .Select(v => new AumlCompletionItem(v, AumlCompletionItemKind.Value, propertyType.Name))
             .ToList();
+    }
+
+    // Glyph names for a StrokeDashSymbols value: the built-in Dash/Dot plus any names declared in this element's
+    // StrokeDashGlyphs (minus "Gap", the off-length, not a symbol). Completes the token after the last space, so
+    // "Dash Do|" replaces just "Do".
+    private IReadOnlyList<AumlCompletionItem> CompleteDashSymbols(string value, string text, int offset)
+    {
+        value ??= "";
+        int sp = value.LastIndexOfAny([' ', '\t', '\n', '\r']);
+        var token = sp >= 0 ? value[(sp + 1)..] : value;
+
+        var names = new List<string> { "Dash", "Dot" };
+        var glyphs = CurrentElementAttributeValue(text, offset, "StrokeDashGlyphs");
+        if (glyphs is not null)
+            foreach (var pair in glyphs.Split([',', ';'], StringSplitOptions.RemoveEmptyEntries))
+            {
+                int eq = pair.IndexOf('=');
+                var name = (eq >= 0 ? pair[..eq] : pair).Trim();
+                if (name.Length > 0 && !name.Equals("Gap", StringComparison.OrdinalIgnoreCase)
+                    && !names.Contains(name, StringComparer.OrdinalIgnoreCase))
+                    names.Add(name);
+            }
+
+        return names
+            .Where(n => Matches(n, token))
+            .Select(n => new AumlCompletionItem(n, AumlCompletionItemKind.Value, "dash glyph", ReplaceBack: token.Length))
+            .ToList();
+    }
+
+    // The value of an attribute on the SAME element whose opening tag holds the caret (e.g. read StrokeDashGlyphs while
+    // completing StrokeDashSymbols). Scans from the element's '<' to the first '>'. Null when the attribute isn't there.
+    private static string? CurrentElementAttributeValue(string text, int offset, string attrLocalName)
+    {
+        int region = Math.Min(offset, text.Length);
+        int lt = text.LastIndexOf('<', Math.Max(0, region - 1));
+        if (lt < 0) return null;
+        int gt = text.IndexOf('>', lt);
+        var tag = gt < 0 ? text[lt..] : text[lt..(gt + 1)];
+        var m = Regex.Match(tag, $@"(?:\w+:)?{Regex.Escape(attrLocalName)}\s*=\s*""([^""]*)""");
+        return m.Success ? m.Groups[1].Value : null;
     }
 
     // Completes a type reference written as "[prefix:]Partial": offers the types of the prefix's xmlns (a
@@ -378,7 +423,7 @@ public sealed class CompletionEngine
         {
             foreach (var t in _model.GetElements(ns.Value))
             {
-                if (!Matches(t.Name, partial)) continue;
+                if (!MatchesStart(t.Name, partial)) continue;
                 var insert = ns.Key.Length > 0 ? $"{ns.Key}:{t.Name}" : t.Name;
                 if (!seen.Add(insert)) continue;
                 items.Add(new AumlCompletionItem(t.Name, AumlCompletionItemKind.Element,
@@ -489,12 +534,18 @@ public sealed class CompletionEngine
         new(label, kind, detail, $"{label}=\"$0\"");
 
     // Substring match (case-insensitive): the typed text may appear ANYWHERE in the candidate, not only at the start,
-    // so a half-remembered name still finds it ("Dash" -> StrokeDashArray, "Alignment" -> HorizontalAlignment, "ound"
-    // -> Background). This only widens WHICH items the server offers; the matched letters are highlighted by the CLIENT
-    // (LSP has no field to send highlight ranges - the client re-matches the typed text against filterText/label and
-    // bolds the run). For PascalCase names both VS Code and Rider highlight the camel-boundary match out of the box;
-    // to also keep matches that start mid-word (not on a word/camel boundary) VS Code needs
-    // `editor.suggest.matchOnWordStartOnly: false`.
+    // so a half-remembered name still finds it ("Dash" -> StrokeDashArray, "ound" -> Background). Used for NARROW,
+    // already-scoped lists - an element's own properties, an enum's members, brush colours, binding-path segments -
+    // where matching in the middle is helpful and the list is short. NOT used for the big global catalogs (control /
+    // type names across every namespace): there substring floods the list, so those use MatchesStart instead.
+    // The matched letters are highlighted by the CLIENT (LSP has no field to send highlight ranges - the client
+    // re-matches the typed text against filterText/label and bolds the run).
     private static bool Matches(string candidate, string prefix) =>
         string.IsNullOrEmpty(prefix) || candidate.Contains(prefix, StringComparison.OrdinalIgnoreCase);
+
+    // Prefix match (case-insensitive): for the LARGE, framework-wide catalogs (control names per xmlns, type names
+    // across all namespaces) so completion only offers what's in scope as you type the start of the name, instead of
+    // every type that merely contains the letters.
+    private static bool MatchesStart(string candidate, string prefix) =>
+        string.IsNullOrEmpty(prefix) || candidate.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
 }
