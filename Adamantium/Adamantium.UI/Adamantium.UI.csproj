@@ -37,11 +37,16 @@
 	</ItemGroup>
 	
 	<ItemGroup>
-		<ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" SetTargetFramework="TargetFramework=netstandard2.0"/>
+		<ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj"/>
 		<ProjectReference Include="..\Adamantium.Graphics.Core\Adamantium.Graphics.Core.csproj"/>
-		<ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true" SetTargetFramework="TargetFramework=netstandard2.0"/>
+		<ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj"/>
 		<ProjectReference Include="..\Adamantium.EffectsCompiler\Adamantium.EffectsCompiler.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="true"/>
 		<ProjectReference Include="..\Adamantium.Engine.Generators\Adamantium.Engine.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=netstandard2.0"/>
+		<!-- netstandard2.0 analyzer deps for the source generators above (Roslyn analyzers must be netstandard2.0).
+		     Analyzer-ONLY so the netstandard2.0 build isn't copied into this net10.0 output - runtime/compile
+		     Core+Mathematics come from the normal net10.0 refs above. -->
+		<ProjectReference Include="..\Adamantium.Core\Adamantium.Core.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=netstandard2.0"/>
+		<ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=netstandard2.0"/>
 	</ItemGroup>
 
 	<ItemGroup>
