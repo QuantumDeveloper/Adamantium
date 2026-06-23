@@ -51,10 +51,8 @@ public class Line : Shape
    {
       var point1 = new Vector2(X1, Y1);
       var point2 = new Vector2(X2, Y2);
-      var min = Vector2.Min(point1, point2);
-      var max = Vector2.Max(point1, point2);
-      Rect = new Rect(min, max);
-      return base.MeasureOverride(availableSize);
+      var bounds = new Rect(Vector2.Min(point1, point2), Vector2.Max(point1, point2));
+      return MeasureStrokedGeometry(bounds, [([point1, point2], false)]);
    }
 
    protected override void OnRender(IDrawingContext context)

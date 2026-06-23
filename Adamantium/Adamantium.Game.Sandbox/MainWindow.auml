@@ -211,20 +211,20 @@
              GpuStrokeRenderComponent (RenderUnit.UseGpuStroke). Drawn last in the Grid, so it sits on top. -->
         <!-- One-pass GPU cut demo: dashes (StrokeDashArray) AND trim (StrokeTrimStart/End) both done by the single
              DashCut compute kernel + DrawIndirect - zero per-frame CPU. Shows the middle 10%..70% of the dashed line. -->
-        <Line X1="80" 
-              Y1="80" 
-              X2="700" 
+        <Line X1="200" 
+              Y1="200" 
+              X2="500" 
               Y2="520"
               StrokeDashSymbols="Dash Dot Dot Dash Dot"
               StrokeDashGlyphs="Dash=18, Dot=3, Gap=16"
+              StrokeDashArray="36 25"
               StrokeDashCap="ConvexRound"
               Stroke="Lime"
-              StrokeThickness="12"
-              StrokeDashArray="36 25"
-              StartLineCap="ConvexTriangle"
-              EndLineCap="ConcaveTriangle"
-              StrokeTrimStart="0.1"
-              StrokeTrimEnd="0.7"
+              StrokeThickness="12"              
+              StartLineCap="ConvexRound"
+              EndLineCap="ConvexRound"
+              StrokeTrimStart="0"
+              StrokeTrimEnd="1"
               HorizontalAlignment="Left"
               VerticalAlignment="Top">
             <Line.Triggers>

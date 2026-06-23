@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Presentation;
@@ -6,36 +7,44 @@ using Adamantium.Imaging;
 using Adamantium.Mathematics;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
+using Adamantium.UI.Rendering;
 using Adamantium.Vulkan.Core;
 
-namespace Adamantium.UI.Rendering;
+namespace Adamantium.UITests.Rendering;
 
 /// <summary>
-/// Renders a visual tree off-screen (no OS window) into a render target whose pixels can be read back - e.g.
-/// the AUML live designer feeding an image to the editor extension. The presenter is chosen automatically: a
-/// real window-less swapchain via VK_EXT_headless_surface where the loader/driver provides it (Linux/Mesa,
-/// software ICDs), otherwise a plain offscreen RenderTarget (Windows and everywhere else). Both produce the
-/// same readable image; only the Linux path goes through the headless extension.
+/// Test-only harness that drives the PRODUCTION <see cref="RenderCache"/> to a read-back texture so pixel-level
+/// assertions can run without an OS window. It is NOT a second render path - production renders only through the
+/// services (<c>WindowRenderService</c> / its headless designer variant). This just wraps the same RenderCache the
+/// services use, plus a window-less presenter, so a unit/cache test can render a tree and read the pixels.
+/// The presenter is chosen automatically: a real window-less swapchain via VK_EXT_headless_surface where the
+/// loader provides it (Linux/Mesa), otherwise a plain offscreen RenderTarget (Windows). Both produce the same image.
 /// </summary>
-public sealed class OffscreenRenderer : IDisposable
+internal sealed class OffscreenTestRenderer : IDisposable
 {
     private readonly IGraphicsDevice _device;
     private readonly RenderCache _renderCache;
+    private readonly RenderCache _adornerCache;
     private GraphicsPresenter _presenter;
     private PresenterType _presenterKind;
     private Viewport _viewport;
     private Rect2D _scissor;
 
-    public OffscreenRenderer(IGraphicsDevice device, IRenderUnitFactory renderUnitFactory, uint width, uint height,
+    public OffscreenTestRenderer(IGraphicsDevice device, IRenderUnitFactory renderUnitFactory, uint width, uint height,
         MSAALevel msaa = MSAALevel.None)
     {
         _device = device;
         _renderCache = new RenderCache(new DrawingContext(), renderUnitFactory);
+        _adornerCache = new RenderCache(new DrawingContext(), renderUnitFactory);
         CreatePresenter(width, height, msaa);
     }
 
     /// <summary>Colour the target is cleared to before drawing. Default transparent.</summary>
     public Color ClearColor { get; set; } = Colors.Transparent;
+
+    /// <summary>Framework tooling overlays (selection frames etc.) drawn ON TOP of the content in the same frame.
+    /// Set from an <c>AdornerLayer.Adorners</c>; null/empty draws nothing.</summary>
+    public IReadOnlyList<IUIComponent> Adorners { get; set; }
 
     public GraphicsPresenter Presenter => _presenter;
 
@@ -69,8 +78,19 @@ public sealed class OffscreenRenderer : IDisposable
     /// </summary>
     public bool RenderFrame(IRootVisualComponent root)
     {
+        var projection = root.GetProjectionMatrix();
         _renderCache.BuildFromVisualTree(root);
-        _renderCache.ProcessCommands(root.GetProjectionMatrix());
+        _renderCache.ProcessCommands(projection);
+
+        // Tooling overlays (selection frames) are a SECOND stage built from a flat list, rendered after the content
+        // in the same frame so they sit on top. They share the projection and target; only the draw order differs.
+        var adorners = Adorners;
+        var hasAdorners = adorners is { Count: > 0 };
+        if (hasAdorners)
+        {
+            _adornerCache.BuildFromComponents(adorners, projection);
+            _adornerCache.ProcessCommands(projection);
+        }
 
         _device.ClearColor = ClearColor;
         _device.SetRenderTargets(_presenter.RenderTarget);
@@ -78,14 +98,19 @@ public sealed class OffscreenRenderer : IDisposable
         _device.MSAALevel = _presenter.MSAALevel;
         _device.Presenter = _presenter;
 
-        // Out-of-render-pass work recorded BEFORE the render pass begins (the same hook the on-screen
-        // WindowRenderService uses): the GPU stroke expander dispatches its compute here to fill the vertex buffer,
-        // so without this the designer's strokes never get their geometry. Also drives shared-surface latches.
-        if (!_device.BeginDraw(beforeRenderPass: _ => _renderCache.PreRender())) return false;
+        // Out-of-render-pass work recorded BEFORE the render pass begins (the same hook the WindowRenderService uses):
+        // the GPU stroke expander dispatches its compute here to fill the vertex buffer. Both content and adorner
+        // stages dispatch their compute here.
+        if (!_device.BeginDraw(beforeRenderPass: _ =>
+            {
+                _renderCache.PreRender();
+                if (hasAdorners) _adornerCache.PreRender();
+            })) return false;
 
         _device.SetViewports(_viewport);
         _device.SetScissors(_scissor);
-        _renderCache.Render();
+        _renderCache.Render();                    // content
+        if (hasAdorners) _adornerCache.Render();  // tooling overlays, on top
 
         _device.EndDraw();
         _device.Submit();
@@ -97,32 +122,17 @@ public sealed class OffscreenRenderer : IDisposable
     }
 
     /// <summary>Saves the last rendered frame to disk. Reads the resolve texture, not the render target itself:
-    /// with MSAA the render target is a multisampled image (not linearly readable - a raw read-back is garbled);
-    /// its resolved single-sample copy is what the render pass produces. With MSAA off ResolveTexture == the
-    /// render target, so this is also correct in the non-MSAA case.</summary>
+    /// with MSAA the render target is a multisampled image (not linearly readable); its resolved single-sample copy
+    /// is what the render pass produces. With MSAA off ResolveTexture == the render target, so this is correct too.</summary>
     public void Save(string path, ImageFileType fileType) => _presenter.RenderTarget.ResolveTexture.Save(path, fileType);
 
-    /// <summary>Writes the last rendered frame's RAW pixels (native B8G8R8A8, no PNG encode) to <paramref name="path"/>.
-    /// Much faster than <see cref="Save"/> for repeated read-back (the live designer's per-frame transport); the
-    /// consumer converts the BGRA bytes itself.</summary>
+    /// <summary>Writes the last rendered frame's RAW pixels (native B8G8R8A8, no PNG encode) to <paramref name="path"/>.</summary>
     public void SaveRaw(string path) => _presenter.RenderTarget.ResolveTexture.SaveRaw(path);
-
-    public void Resize(uint width, uint height)
-    {
-        _presenter.Resize(new PresentationParameters(_presenterKind, width, height, IntPtr.Zero, _presenter.MSAALevel));
-        UpdateViewportScissor(width, height);
-    }
-
-    /// <summary>
-    /// Frees the cached render units (their GPU buffers) without tearing down the presenter. Call between renders
-    /// when each frame is a fresh visual tree (the AUML designer) so units don't accumulate. The caller must
-    /// ensure the GPU is idle - <see cref="RenderFrame"/> leaves it idle on return.
-    /// </summary>
-    public void ResetCache() => _renderCache.DisposeUnits();
 
     public void Dispose()
     {
         _renderCache.DisposeUnits();
+        _adornerCache.DisposeUnits();
         _presenter?.Dispose();
     }
 }

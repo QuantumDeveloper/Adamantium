@@ -241,7 +241,8 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         set => SetValue(LayoutTransformProperty, value);
     }
     
-    public Matrix4x4F WorldTransform
+    // Virtual so an Adorner can return its adorned element's transform (it draws in that element's coordinate space).
+    public virtual Matrix4x4F WorldTransform
     {
         get
         {

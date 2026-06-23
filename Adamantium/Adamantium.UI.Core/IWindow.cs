@@ -26,6 +26,10 @@ public interface IWindow : IRootVisualComponent, IContentControl
     IWindowRenderer DefaultRenderer { get; set; }
 
     IWindowRenderer Renderer { get; set; }
+
+    /// <summary>Framework tooling overlays (selection frames etc.) drawn ON TOP of the window's content in the same
+    /// frame by the renderer's adorner stage. Empty by default; the WPF-equivalent of an AdornerLayer's adorners.</summary>
+    IReadOnlyList<IUIComponent> Adorners { get; }
     
     bool ShouldDisplayWindow { get; }
     

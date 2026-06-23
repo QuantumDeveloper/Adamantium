@@ -80,13 +80,14 @@ public class Path : Shape
 
     protected override Size MeasureOverride(Size availableSize)
     {
-        if (Data != null)
-        {
-            Data.RecalculateBounds();
-
-            Rect = Data.Bounds;
-        }
-        return base.MeasureOverride(Rect.Size);
+        if (Data == null) return new Size(0, 0);
+        Data.RecalculateBounds();
+        // Use the mesh contours for the exact miter extent only if the geometry is already tessellated (e.g. by a
+        // prior render). Forcing ProcessGeometry here is unsafe: a boolean CombinedGeometry yields an empty mesh at
+        // measure time, which both collapses the size and (via the IsProcessed cache) would break its rendering. The
+        // bbox floor from Data.Bounds always holds, so combined/group geometries size correctly without contours.
+        var contours = Data.IsProcessed ? GetContours(Data.Mesh) : null;
+        return MeasureStrokedGeometry(Data.Bounds, contours);
     }
 
     protected override void OnRender(IDrawingContext context)

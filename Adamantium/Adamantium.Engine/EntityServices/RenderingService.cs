@@ -155,8 +155,8 @@ public class RenderingService : EntityService
         }
 
         ActiveCamera = CameraManager.GetActive(Window);
-            
-        Processor?.Draw(gameTime);
+
+        DrawProcessors(gameTime);
     }
 
     protected virtual void Debug() { }
@@ -164,7 +164,7 @@ public class RenderingService : EntityService
     public override void EndDraw()
     {
         GraphicsDevice.EndDraw();
-        Processor?.EndDraw();
+        EndDrawProcessors();
     }
 
     public override void Submit()

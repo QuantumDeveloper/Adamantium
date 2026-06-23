@@ -24,6 +24,10 @@ class AumlPreviewService : Disposable {
     private var process: Process? = null
     private var writer: BufferedWriter? = null
     private var reader: BufferedReader? = null
+    // The sourcePath of the last successful render = the owner of the host's single warm scene. Only that preview may
+    // stream frames; a different (background) preview's frame() would advance and return THIS scene - i.e. show the
+    // wrong file. Reset whenever the host process restarts.
+    private var lastRenderPath: String? = null
 
     /**
      * Result of one render: a PNG path (+ its pixel size) on success, or an error; diagnostics are non-fatal
@@ -58,33 +62,10 @@ class AumlPreviewService : Disposable {
         val height: Double,
     )
 
-    /**
-     * Maps a point in the last render's design space to the authored element under it (go-to-source / hover frame).
-     * Must follow a [render] of the current buffer (the host hit-tests the last rendered tree). Off-EDT; returns
-     * null when nothing authored sits there or on any error.
-     */
-    fun hitTest(x: Double, y: Double): HitResult? {
-        synchronized(lock) {
-            return try {
-                ensureProcess()
-                writer!!.apply { write("{\"op\":\"hittest\",\"x\":$x,\"y\":$y}"); write("\n"); flush() }
-                val line = reader!!.readLine() ?: throw RuntimeException("designer host closed the connection")
-                val obj = MiniJson.parse(line) as? Map<*, *> ?: return null
-                val hit = obj["hit"] as? Map<*, *> ?: return null
-                HitResult(
-                    (hit["line"] as? Double)?.toInt() ?: return null,
-                    (hit["column"] as? Double)?.toInt() ?: 0,
-                    hit["x"] as? Double ?: 0.0,
-                    hit["y"] as? Double ?: 0.0,
-                    hit["width"] as? Double ?: 0.0,
-                    hit["height"] as? Double ?: 0.0,
-                )
-            } catch (e: Exception) {
-                stopProcess()
-                null
-            }
-        }
-    }
+    /** Result of a designer selection (op "select"): the re-rendered frame WITH the framework's selection frame drawn
+     * on it ([render]) and the selected element's markup position for editor caret sync ([hit]; null = nothing selected,
+     * i.e. the selection was cleared). */
+    data class SelectResult(val render: RenderResult, val hit: HitResult?)
 
     /**
      * Renders [text] at the window's design size × [scale]. A settled render returns one frame; a [live] render returns
@@ -98,7 +79,10 @@ class AumlPreviewService : Disposable {
                 val request = buildRenderRequest(text, scale, sourcePath, live)
                 writer!!.apply { write(request); write("\n"); flush() }
                 val line = reader!!.readLine() ?: throw RuntimeException("designer host closed the connection")
-                parseResponse(line)
+                val result = parseResponse(line)
+                // A successful render makes this preview the owner of the host's single warm scene (see frame()).
+                if (result.error == null) lastRenderPath = sourcePath
+                result
             } catch (e: Exception) {
                 stopProcess() // force a clean restart on the next render
                 RenderResult(emptyList(), e.message ?: e.toString(), emptyList(), null, null, null)
@@ -111,8 +95,14 @@ class AumlPreviewService : Disposable {
      * while [RenderResult.animating] is true to play design-time animations in real time. Shares [lock] with [render]
      * so a new render and the streaming loop never interleave on the host's stdio.
      */
-    fun frame(): RenderResult {
+    fun frame(ownerPath: String?): RenderResult {
         synchronized(lock) {
+            // Only the most-recently-rendered preview owns the host's single warm scene. If a different (background)
+            // preview asks for a frame, advancing the host would hand it THIS scene's frame (the wrong file), so report
+            // "not animating" - its stream stops and it freezes on its last frame until it is re-rendered (re-owns).
+            if (ownerPath != null && lastRenderPath != null && ownerPath != lastRenderPath) {
+                return RenderResult(emptyList(), null, emptyList(), null, null, null, animating = false)
+            }
             return try {
                 ensureProcess()
                 writer!!.apply { write("{\"op\":\"frame\"}"); write("\n"); flush() }
@@ -120,6 +110,54 @@ class AumlPreviewService : Disposable {
                 parseResponse(line)
             } catch (e: Exception) {
                 stopProcess() // force a clean restart on the next render
+                RenderResult(emptyList(), e.message ?: e.toString(), emptyList(), null, null, null)
+            }
+        }
+    }
+
+    /**
+     * Selects the authored element at a point in the last render's design space: the host drives the framework
+     * AdornerLayer (so the FRAMEWORK draws the selection frame from the element's stroke-aware RenderBounds) and
+     * re-renders, returning the updated frame plus the element's markup line/column. A miss clears the selection.
+     * Must follow a [render]; off-EDT; on error returns an error RenderResult and a null hit.
+     */
+    fun select(x: Double, y: Double): SelectResult {
+        synchronized(lock) {
+            return try {
+                ensureProcess()
+                writer!!.apply { write("{\"op\":\"select\",\"x\":$x,\"y\":$y}"); write("\n"); flush() }
+                val line = reader!!.readLine() ?: throw RuntimeException("designer host closed the connection")
+                val render = parseResponse(line)
+                val obj = MiniJson.parse(line) as? Map<*, *>
+                val hit = (obj?.get("hit") as? Map<*, *>)?.let { h ->
+                    val ln = (h["line"] as? Double)?.toInt() ?: return@let null
+                    HitResult(ln, (h["column"] as? Double)?.toInt() ?: 0,
+                        h["x"] as? Double ?: 0.0, h["y"] as? Double ?: 0.0,
+                        h["width"] as? Double ?: 0.0, h["height"] as? Double ?: 0.0)
+                }
+                SelectResult(render, hit)
+            } catch (e: Exception) {
+                stopProcess()
+                SelectResult(RenderResult(emptyList(), e.message ?: e.toString(), emptyList(), null, null, null), null)
+            }
+        }
+    }
+
+    /**
+     * Hovers the element at a point in the last render's design space: the host drives the framework AdornerLayer hover
+     * (so the FRAMEWORK draws the stroke-aware hover frame) and re-renders, returning the updated frame. Null coords
+     * clear the hover frame. Must follow a [render]; off-EDT; on error returns an error RenderResult.
+     */
+    fun hover(x: Double?, y: Double?): RenderResult {
+        synchronized(lock) {
+            return try {
+                ensureProcess()
+                val coords = if (x != null && y != null) ",\"x\":$x,\"y\":$y" else ""
+                writer!!.apply { write("{\"op\":\"hover\"$coords}"); write("\n"); flush() }
+                val line = reader!!.readLine() ?: throw RuntimeException("designer host closed the connection")
+                parseResponse(line)
+            } catch (e: Exception) {
+                stopProcess()
                 RenderResult(emptyList(), e.message ?: e.toString(), emptyList(), null, null, null)
             }
         }
@@ -146,6 +184,7 @@ class AumlPreviewService : Disposable {
         writer = null
         reader = null
         process = null
+        lastRenderPath = null   // the warm scene died with the process; the next render re-establishes ownership
     }
 
     private fun resolveHostExecutable(): Path {

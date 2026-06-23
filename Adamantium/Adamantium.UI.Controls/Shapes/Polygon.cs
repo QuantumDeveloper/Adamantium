@@ -71,8 +71,8 @@ public class Polygon : Shape
 
     protected override Size MeasureOverride(Size availableSize)
     {
-        Rect = Rect.FromPoints(Points);
-        return base.MeasureOverride(availableSize);
+        if (Points == null || Points.Count < 2) return new Size(0, 0);
+        return MeasureStrokedGeometry(Rect.FromPoints(Points), [(Points.ToArray(), true)]);
     }
 
     protected override void OnRender(IDrawingContext context)

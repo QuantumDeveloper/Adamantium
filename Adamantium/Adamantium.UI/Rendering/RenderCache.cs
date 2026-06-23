@@ -31,6 +31,39 @@ public class RenderCache
     }
 
     /// <summary>
+    /// Builds units from a FLAT list of components (the adorner stage), instead of walking a visual tree. Each
+    /// component renders and is cached by RenderId exactly as in the tree build; units of components no longer in the
+    /// list (e.g. a deselected adorner) are disposed. Used for overlays that aren't part of the content tree.
+    /// </summary>
+    public void BuildFromComponents(IReadOnlyList<IUIComponent> components, Matrix4x4F projectionMatrix)
+    {
+        _commands.Clear();
+        _renderUnits.Clear();
+
+        var present = new HashSet<Guid>();
+        if (components != null)
+        {
+            foreach (var component in components)
+            {
+                if (component.Visibility != Visibility.Visible) continue;
+                present.Add(component.RenderId);
+
+                var wasGeometryValid = component.IsGeometryValid;
+                _drawingContextInternal.Clear();
+                component.Render(_drawingContext);
+                ProcessRenderCommands(component, projectionMatrix, wasGeometryValid);
+            }
+        }
+
+        // Free the units of any component dropped from the list since the last build.
+        List<Guid> stale = null;
+        foreach (var id in _unitsByControl.Keys)
+            if (!present.Contains(id)) (stale ??= new List<Guid>()).Add(id);
+        if (stale != null)
+            foreach (var id in stale) RemoveAndDeferDispose(id);
+    }
+
+    /// <summary>
     /// Immediately disposes every cached render unit and empties the cache. The caller must ensure the GPU is
     /// idle first (e.g. after a DeviceWaitIdle). Used by the off-screen designer, which builds a brand-new tree
     /// each render: those controls never detach (each owns its own root window), so the attachment-based

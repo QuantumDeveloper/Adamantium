@@ -16,6 +16,13 @@ namespace Adamantium.UI.Designer.Host;
 ///   &lt;- {"frames":["&lt;path0&gt;",...],"frameMs":16.7,"looped":false,"width":1280,"height":720,"scale":1.0,"diagnostics":[...]}
 ///        or {"error":"&lt;message&gt;","diagnostics":[...]}. Frames are RAW B8G8R8A8 (width*height*4 bytes, no encode);
 ///        a settled render returns one, a live render the full animation sequence the client plays at frameMs.
+///   -&gt; {"op":"hittest","x":..,"y":..}   &lt;- {"hit":{"line":..,"column":..,"x":..,"y":..,"width":..,"height":..}}
+///        (maps a design-space point to the authored element's markup position + rect; for hover / go-to-source)
+///   -&gt; {"op":"select","x":..,"y":..}   &lt;- {"frames":[..],"hit":{"line":..,"column":..},..}
+///        (selects the authored element at the point - the FRAMEWORK draws the selection frame - and returns the
+///         updated frame plus the element's markup line/col for editor caret sync; a miss clears the selection)
+///   -&gt; {"op":"hover","x":..,"y":..}   &lt;- {"frames":[..],..}
+///        (the transient hover frame, also drawn by the FRAMEWORK; returns the updated frame. Omit x/y to clear it)
 ///   -&gt; {"op":"shutdown"}   (exits the process)
 /// </summary>
 public static class DesignerHost
@@ -36,6 +43,19 @@ public static class DesignerHost
         // corrupt the stream the plugin parses.
         var protocol = Console.Out;
         Console.SetOut(Console.Error);
+
+        // Also mirror all engine chatter + any crash/exception output to a log file, so a designer failure is
+        // diagnosable even when the IDE swallows the host's stderr. The protocol stays on the real stdout (saved above).
+        try
+        {
+            // Per-PID file so a crash + respawn doesn't clobber the failing session's log.
+            var logPath = Path.Combine(Path.GetTempPath(), $"adamantium-designer-host-{Environment.ProcessId}.log");
+            var fileLog = new StreamWriter(new FileStream(logPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite)) { AutoFlush = true };
+            var sink = TextWriter.Synchronized(fileLog);
+            Console.SetError(sink);
+            Console.SetOut(sink);
+        }
+        catch { /* logging is best-effort; never block the host on it */ }
 
         DesignerSession session;
         try
@@ -62,6 +82,10 @@ public static class DesignerHost
             try { request = JsonSerializer.Deserialize<Request>(line, JsonOptions); }
             catch (Exception e) { WriteResponse(protocol, new Response { Error = $"bad request: {e.Message}" }); continue; }
 
+            // Log everything except the high-frequency streaming "frame" op (would flood the log 60x/s).
+            if (request?.Op != "frame")
+                Console.Error.WriteLine($"[req] op={request?.Op} scale={request?.Scale} x={request?.X} y={request?.Y}");
+
             switch (request?.Op)
             {
                 case "shutdown":
@@ -82,6 +106,16 @@ public static class DesignerHost
 
                 case "hittest":
                     WriteResponse(protocol, HitTestOne(session, request));
+                    break;
+
+                case "select":
+                    var selPath = Path.Combine(tempDir, $"preview-{counter++}.bgra");
+                    WriteResponse(protocol, SelectOne(session, request, selPath, previousFrames));
+                    break;
+
+                case "hover":
+                    var hovPath = Path.Combine(tempDir, $"preview-{counter++}.bgra");
+                    WriteResponse(protocol, HoverOne(session, request, hovPath, previousFrames));
                     break;
 
                 default:
@@ -194,11 +228,80 @@ public static class DesignerHost
         }
     }
 
+    // Selects the authored element at a design-space point: the FRAMEWORK draws the selection frame (the window's
+    // AdornerLayer), so the response carries the updated frame plus the element's markup line/col for editor caret
+    // sync. A miss clears the selection (frame returned without a Hit).
+    private static Response SelectOne(DesignerSession session, Request request, string outPath, List<string> previousFrames)
+    {
+        try
+        {
+            var result = session.SelectAt(request.X ?? 0, request.Y ?? 0, outPath);
+            if (!result.Success)
+                return new Response { Error = result.Error };
+
+            foreach (var f in previousFrames)
+                if (File.Exists(f)) { try { File.Delete(f); } catch { /* best effort */ } }
+            previousFrames.Clear();
+            previousFrames.AddRange(result.Frames);
+
+            return new Response
+            {
+                Frames = result.Frames.ToArray(),
+                Animating = result.Animating,
+                Width = result.Width,
+                Height = result.Height,
+                DesignWidth = result.DesignWidth,
+                DesignHeight = result.DesignHeight,
+                Scale = result.Scale,
+                Hit = result.Hit is { } h
+                    ? new HitInfo { Line = h.Line, Column = h.Position, X = h.X, Y = h.Y, Width = h.Width, Height = h.Height }
+                    : null
+            };
+        }
+        catch (Exception e)
+        {
+            return new Response { Error = e.Message };
+        }
+    }
+
+    // Hovers the authored element at a design-space point: the FRAMEWORK draws the (stroke-aware) hover frame, so the
+    // response carries the updated frame. An absent point (no x/y), a miss, or an already-selected element clears it.
+    private static Response HoverOne(DesignerSession session, Request request, string outPath, List<string> previousFrames)
+    {
+        try
+        {
+            var result = session.Hover(request.X, request.Y, outPath);
+            if (!result.Success)
+                return new Response { Error = result.Error };
+
+            foreach (var f in previousFrames)
+                if (File.Exists(f)) { try { File.Delete(f); } catch { /* best effort */ } }
+            previousFrames.Clear();
+            previousFrames.AddRange(result.Frames);
+
+            return new Response
+            {
+                Frames = result.Frames.ToArray(),
+                Animating = result.Animating,
+                Width = result.Width,
+                Height = result.Height,
+                DesignWidth = result.DesignWidth,
+                DesignHeight = result.DesignHeight,
+                Scale = result.Scale
+            };
+        }
+        catch (Exception e)
+        {
+            return new Response { Error = e.Message };
+        }
+    }
+
     private static List<string> NullIfEmpty(List<string> diagnostics) =>
         diagnostics is { Count: > 0 } ? diagnostics : null;
 
     private static void WriteResponse(TextWriter protocol, Response response)
     {
+        if (response.Error != null) Console.Error.WriteLine($"[resp] ERROR: {response.Error}");
         protocol.WriteLine(JsonSerializer.Serialize(response, JsonOptions));
         protocol.Flush();
     }
