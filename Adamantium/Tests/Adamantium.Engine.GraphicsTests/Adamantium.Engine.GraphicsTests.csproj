@@ -12,6 +12,9 @@
     <None Remove="EffectsData\ComputeSmoke.fx" />
     <None Remove="EffectsData\StrokeExpand.fx" />
     <None Remove="EffectsData\StrokeDraw.fx" />
+    <None Remove="EffectsData\AtomicAppend.fx" />
+    <None Remove="EffectsData\IndirectDraw.fx" />
+    <None Remove="EffectsData\DashCut.fx" />
   </ItemGroup>
 
   <ItemGroup>
@@ -28,6 +31,15 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="EffectsData\StrokeDraw.fx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="EffectsData\AtomicAppend.fx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="EffectsData\IndirectDraw.fx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="EffectsData\DashCut.fx">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

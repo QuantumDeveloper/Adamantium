@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Adamantium.Graphics.Core;
 using Adamantium.Mathematics;
 using Adamantium.ProceduralGeometry;
@@ -47,12 +48,12 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
 
         StrokeRenderer?.DeferDispose();
 
-        // The GPU path covers the case the miter expander handles cleanly: a single contour (open OR closed) with a
-        // solid colour and no dashes. Everything else (dashes, non-solid brushes, multiple contours, caps) falls back
-        // to the CPU StrokeGeometry path.
-        if (UseGpuStroke && StrokeEffect != null && TryGetSolidPolyline(pen, geometry, out var points, out var isClosed))
+        // The GPU path handles any solid-colour stroke: one OR many contours (combined/group geometry, shapes with
+        // holes), open or closed, with dashes/trim and every cap/join - all as real geometry. Only a non-solid brush
+        // (e.g. a gradient stroke) still falls back to the CPU StrokeGeometry path.
+        if (UseGpuStroke && StrokeEffect != null && TryGetSolidContours(pen, geometry, out var contours))
         {
-            StrokeRenderer = new GpuStrokeRenderComponent(GraphicsDevice, UIBasicEffect, StrokeEffect, points, isClosed, pen);
+            StrokeRenderer = new GpuStrokeRenderComponent(GraphicsDevice, UIBasicEffect, StrokeEffect, contours, pen);
         }
         else
         {
@@ -62,31 +63,25 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
         StrokeRenderer.RenderData = DrawCommand.RenderData;
     }
 
-    private static bool TryGetSolidPolyline(Pen pen, Geometry geometry, out Adamantium.Mathematics.Vector2[] points, out bool isClosed)
+    // Every outline contour of a solid-colour stroke (combined/group geometry yields several), each as its raw points
+    // plus whether it is a closed loop. False (CPU fallback) only for a non-solid brush or a geometry with no contour.
+    private static bool TryGetSolidContours(Pen pen, Geometry geometry, out List<(Adamantium.Mathematics.Vector2[] Points, bool IsClosed)> contours)
     {
-        points = null;
-        isClosed = false;
+        contours = null;
         if (pen.Brush is not SolidColorBrush) return false;
-        if (pen.DashStrokeArray is { Count: > 0 }) return false;
 
         var mesh = geometry?.Mesh;
-        if (mesh == null || mesh.Contours.Count != 1) return false;
+        if (mesh == null || mesh.Contours.Count == 0) return false;
 
-        var contour = mesh.GetContour(0);
-        if (contour.Points == null || contour.Points.Length < 2) return false;
+        List<(Adamantium.Mathematics.Vector2[], bool)> list = [];
+        foreach (var contour in mesh.Contours)
+            if (contour.Points is { Length: >= 2 })
+                list.Add((contour.Points, contour.IsGeometryClosed));
 
-        isClosed = contour.IsGeometryClosed;
-
-        // Open ends honour the pen's caps; the GPU expander only does flat/square so far. Round/triangle caps
-        // (and any other non-flat/square) fall back to the CPU StrokeGeometry path.
-        if (!isClosed && (!IsGpuCap(pen.StartLineCap) || !IsGpuCap(pen.EndLineCap)))
-            return false;
-
-        points = contour.Points;
+        if (list.Count == 0) return false;
+        contours = list;
         return true;
     }
-
-    private static bool IsGpuCap(PenLineCap cap) => cap is PenLineCap.Flat or PenLineCap.Square;
     
     protected IResourceFactory ResourceFactory { get; set; }
     protected IDrawCommand DrawCommand { get; set; }

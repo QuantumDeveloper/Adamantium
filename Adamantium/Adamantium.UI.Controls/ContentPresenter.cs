@@ -60,10 +60,13 @@ public class ContentPresenter : InputUIComponent
         if (_outgoingRoot != null)
             RemoveOutgoing();
 
-        // Animate when a transition is selected and there is new content - including the FIRST content. In the designer
-        // it plays only for the LIVE previewer; a one-shot render shows the settled state (not a mid-slide capture).
+        // Animate when a transition is selected and there is new content - including the FIRST content. NEVER in the
+        // designer (live or one-shot): a content transition is triggered by content replacement, but in the previewer
+        // that only happens on initial load / a live-reconcile re-apply, not a real user-driven swap - so playing it
+        // just slides the content off-screen and the captured frame(s) come back blank (the white-screen the live
+        // designer showed). The designer shows the settled content instead, the way the WPF designer does.
         var animate = ContentTransition != ContentTransition.None && newContent != null
-                      && (!Design.IsDesignMode || Design.IsLivePreview);
+                      && !Design.IsDesignMode;
 
         if (animate)
         {

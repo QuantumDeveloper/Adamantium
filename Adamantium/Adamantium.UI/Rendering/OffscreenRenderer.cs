@@ -78,7 +78,10 @@ public sealed class OffscreenRenderer : IDisposable
         _device.MSAALevel = _presenter.MSAALevel;
         _device.Presenter = _presenter;
 
-        if (!_device.BeginDraw()) return false;
+        // Out-of-render-pass work recorded BEFORE the render pass begins (the same hook the on-screen
+        // WindowRenderService uses): the GPU stroke expander dispatches its compute here to fill the vertex buffer,
+        // so without this the designer's strokes never get their geometry. Also drives shared-surface latches.
+        if (!_device.BeginDraw(beforeRenderPass: _ => _renderCache.PreRender())) return false;
 
         _device.SetViewports(_viewport);
         _device.SetScissors(_scissor);

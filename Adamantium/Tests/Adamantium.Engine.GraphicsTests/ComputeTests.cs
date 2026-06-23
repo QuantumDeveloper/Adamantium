@@ -274,5 +274,239 @@ namespace Adamantium.Engine.GraphicsTests
 
             main.Dispose();
         }
+
+        // De-risk for one-pass variable-output geometry (dashes / round joins / caps in a single dispatch): every
+        // thread atomically reserves a slot in an output buffer via a BDA-addressed counter (InterlockedAdd) and
+        // scatters tid+1 there. Proves the atomic on a PhysicalStorageBuffer pointer works: the counter must equal the
+        // thread count and the output must be a permutation of 1..count (no two threads got the same slot).
+        [Test]
+        public void AtomicAppend_ScatterViaBdaCounter()
+        {
+            const int count = 200;
+
+            var main = MainGraphicsDevice.Create(new GraphicsDeviceFactory(), 3, "TestApp", true);
+            var device = main.CreateRenderDevice();
+            var gd = (GraphicsDevice)device;
+
+            var effect = Effect.CompileFromFile(Path.Combine("EffectsData", "AtomicAppend.fx"), device);
+            var pass = effect.Techniques[0].Passes[0];
+
+            var counter = Adamantium.Graphics.Buffer.New(gd, (ulong)sizeof(uint),
+                BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress,
+                MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal);
+            var cinit = counter.MapMemory();              // zero-initialise the counter before dispatch
+            Marshal.WriteInt32((IntPtr)(nint)cinit, 0);
+            counter.UnmapMemory();
+
+            var output = Adamantium.Graphics.Buffer.New(gd, (ulong)(count * sizeof(uint)),
+                BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress,
+                MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal);
+
+            effect.Parameters["CounterAddress"].SetValue(counter.GetDeviceAddress());
+            effect.Parameters["OutputAddress"].SetValue(output.GetDeviceAddress());
+            effect.Parameters["Count"].SetValue((uint)count);
+
+            var prms = new PresentationParameters(PresenterType.RenderTarget, 16, 16, IntPtr.Zero);
+            using var presenter = GraphicsPresenter.Create(device, prms, "atomic_append");
+            device.SetRenderTargets(presenter.RenderTarget);
+            device.SetDepthBuffer(presenter.DepthBuffer);
+            device.MSAALevel = presenter.MSAALevel;
+            device.Presenter = presenter;
+
+            uint groups = (count + 63) / 64;
+            Assert.That(device.BeginDraw(beforeRenderPass: cmd =>
+            {
+                pass.Apply();
+                gd.Dispatch(groups);
+                gd.BufferBarrier(output,
+                    PipelineStageFlagBits2.ComputeShaderBit, AccessFlagBits2.ShaderWriteBit,
+                    PipelineStageFlagBits2.HostBit, AccessFlagBits2.HostReadBit);
+                gd.BufferBarrier(counter,
+                    PipelineStageFlagBits2.ComputeShaderBit, AccessFlagBits2.ShaderWriteBit,
+                    PipelineStageFlagBits2.HostBit, AccessFlagBits2.HostReadBit);
+            }), Is.True);
+            device.EndDraw();
+            device.Submit();
+            presenter.Present();
+            device.FrameEnded();
+            device.DeviceWaitIdle();
+
+            var cval = new int[1];
+            var cm = counter.MapMemory();
+            Marshal.Copy((IntPtr)(nint)cm, cval, 0, 1);
+            counter.UnmapMemory();
+            Assert.That(cval[0], Is.EqualTo(count), "atomic counter must equal the number of appends");
+
+            var data = new int[count];
+            var op = output.MapMemory();
+            Marshal.Copy((IntPtr)(nint)op, data, 0, count);
+            output.UnmapMemory();
+            Array.Sort(data);
+            for (int i = 0; i < count; i++)
+                Assert.That(data[i], Is.EqualTo(i + 1), $"slot [{i}] - each thread must scatter tid+1 to a unique slot");
+
+            main.Dispose();
+        }
+
+        // De-risk DrawIndirect: a compute shader writes the draw arguments (VkDrawIndirectCommand) AND the vertices
+        // into BDA buffers, then DrawIndirect reads that GPU-produced count and rasterizes. The frame completing without
+        // a GPU/validation error IS the assertion (atomic correctness is covered by AtomicAppend; geometry by the
+        // stroke tests). Together they prove "the GPU decides how much to draw, in one dispatch" end to end.
+        [Test]
+        public void DrawIndirect_RendersGpuProducedDraw()
+        {
+            var main = MainGraphicsDevice.Create(new GraphicsDeviceFactory(), 3, "TestApp", true);
+            var device = main.CreateRenderDevice();
+            var gd = (GraphicsDevice)device;
+
+            var fill = Effect.CompileFromFile(Path.Combine("EffectsData", "IndirectDraw.fx"), device);
+            var fillPass = fill.Techniques[0].Passes[0];
+            var draw = Effect.CompileFromFile(Path.Combine("EffectsData", "StrokeDraw.fx"), device);
+            var drawPass = draw.Techniques[0].Passes[0];
+
+            var indirect = Adamantium.Graphics.Buffer.New(gd, (ulong)(4 * sizeof(uint)),
+                BufferUsageFlags.IndirectBuffer | BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress,
+                MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal);
+            var verts = Adamantium.Graphics.Buffer.New(gd, (ulong)(6 * 2 * sizeof(float)),
+                BufferUsageFlags.VertexBuffer | BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress,
+                MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal);
+
+            fill.Parameters["IndirectAddress"].SetValue(indirect.GetDeviceAddress());
+            fill.Parameters["OutputAddress"].SetValue(verts.GetDeviceAddress());
+
+            var proj = Matrix4x4F.OrthoOffCenter(0, 64, 0, 64, 0, 100000);
+            draw.Parameters["Projection"].SetValue(proj);
+            draw.Parameters["StrokeColor"].SetValue(new Vector4F(1, 1, 1, 1));
+
+            var prms = new PresentationParameters(PresenterType.RenderTarget, 64, 64, IntPtr.Zero);
+            using var presenter = GraphicsPresenter.Create(device, prms, "indirect_draw");
+            device.ClearColor = Colors.Black;
+            device.SetRenderTargets(presenter.RenderTarget);
+            device.SetDepthBuffer(presenter.DepthBuffer);
+            device.MSAALevel = presenter.MSAALevel;
+            device.Presenter = presenter;
+            device.CullMode = CullModeFlagBits.None;
+
+            var vp = new Viewport { Width = 64, Height = 64, MinDepth = 0, MaxDepth = 1 };
+            var sc = new Rect2D { Offset = new Offset2D(), Extent = new Extent2D { Width = 64, Height = 64 } };
+
+            Assert.That(device.BeginDraw(beforeRenderPass: cmd =>
+            {
+                fillPass.Apply();
+                gd.Dispatch(1);
+                gd.BufferBarrier(indirect,
+                    PipelineStageFlagBits2.ComputeShaderBit, AccessFlagBits2.ShaderWriteBit,
+                    PipelineStageFlagBits2.DrawIndirectBit, AccessFlagBits2.IndirectCommandReadBit);
+                gd.BufferBarrier(verts,
+                    PipelineStageFlagBits2.ComputeShaderBit, AccessFlagBits2.ShaderWriteBit,
+                    PipelineStageFlagBits2.VertexAttributeInputBit, AccessFlagBits2.VertexAttributeReadBit);
+            }), Is.True);
+            device.SetViewports(vp);
+            device.SetScissors(sc);
+            device.VertexType = typeof(StrokeVertex);
+            device.PrimitiveTopology = PrimitiveTopology.TriangleList;
+            drawPass.Apply();
+            gd.DrawIndirect(verts, indirect);
+            device.EndDraw();
+            device.Submit();
+            presenter.Present();
+            device.FrameEnded();
+            device.DeviceWaitIdle();
+
+            main.Dispose();
+        }
+
+        // One-pass GPU "cutting" (dashes + trim) prototype: a single compute thread walks a contour by arc length and
+        // emits a quad per visible dash piece, writing the vertex count into a VkDrawIndirectCommand. Deterministic
+        // (sequential, no atomics) so we can check the count and the first piece's exact corners against the CPU walk.
+        // Line (0,0)->(100,0), pattern [20 on, 10 off], offset 0, full trim => pieces [0,20] [30,50] [60,80] [90,100]
+        // = 4 pieces = 24 vertices; half-thickness 5 -> the first quad is the rectangle x in [0,20], y in [-5,5].
+        [Test]
+        public void DashCut_OnePassWalk_MatchesCpu()
+        {
+            float[] pts = { 0f, 0f, 100f, 0f };
+            float[] pattern = { 20f, 10f };
+            const float half = 5f;
+
+            var main = MainGraphicsDevice.Create(new GraphicsDeviceFactory(), 3, "TestApp", true);
+            var device = main.CreateRenderDevice();
+            var gd = (GraphicsDevice)device;
+
+            var effect = Effect.CompileFromFile(Path.Combine("EffectsData", "DashCut.fx"), device);
+            var pass = effect.Techniques[0].Passes[0];
+
+            var pointsBuf = MakeBuffer(gd, pts);
+            var patternBuf = MakeBuffer(gd, pattern);
+            var indirect = Adamantium.Graphics.Buffer.New(gd, (ulong)(4 * sizeof(uint)),
+                BufferUsageFlags.IndirectBuffer | BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress,
+                MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal);
+            var output = Adamantium.Graphics.Buffer.New(gd, (ulong)(256 * 2 * sizeof(float)),
+                BufferUsageFlags.VertexBuffer | BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress,
+                MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal);
+
+            effect.Parameters["PointsAddress"].SetValue(pointsBuf.GetDeviceAddress());
+            effect.Parameters["PatternAddress"].SetValue(patternBuf.GetDeviceAddress());
+            effect.Parameters["OutputAddress"].SetValue(output.GetDeviceAddress());
+            effect.Parameters["IndirectAddress"].SetValue(indirect.GetDeviceAddress());
+            effect.Parameters["PointCount"].SetValue(2u);
+            effect.Parameters["IsClosed"].SetValue(0u);
+            effect.Parameters["PatternCount"].SetValue((uint)pattern.Length);
+            effect.Parameters["DashOffset"].SetValue(0f);
+            effect.Parameters["HalfThickness"].SetValue(half);
+            effect.Parameters["TrimStart"].SetValue(0f);
+            effect.Parameters["TrimEnd"].SetValue(1f);
+
+            var prms = new PresentationParameters(PresenterType.RenderTarget, 16, 16, IntPtr.Zero);
+            using var presenter = GraphicsPresenter.Create(device, prms, "dash_cut");
+            device.SetRenderTargets(presenter.RenderTarget);
+            device.SetDepthBuffer(presenter.DepthBuffer);
+            device.MSAALevel = presenter.MSAALevel;
+            device.Presenter = presenter;
+
+            Assert.That(device.BeginDraw(beforeRenderPass: cmd =>
+            {
+                pass.Apply();
+                gd.Dispatch(1);
+                gd.BufferBarrier(indirect,
+                    PipelineStageFlagBits2.ComputeShaderBit, AccessFlagBits2.ShaderWriteBit,
+                    PipelineStageFlagBits2.HostBit, AccessFlagBits2.HostReadBit);
+                gd.BufferBarrier(output,
+                    PipelineStageFlagBits2.ComputeShaderBit, AccessFlagBits2.ShaderWriteBit,
+                    PipelineStageFlagBits2.HostBit, AccessFlagBits2.HostReadBit);
+            }), Is.True);
+            device.EndDraw();
+            device.Submit();
+            presenter.Present();
+            device.FrameEnded();
+            device.DeviceWaitIdle();
+
+            var cmd4 = new int[4];
+            var cp = indirect.MapMemory();
+            Marshal.Copy((IntPtr)(nint)cp, cmd4, 0, 4);
+            indirect.UnmapMemory();
+            Assert.That(cmd4[0], Is.EqualTo(24), "vertexCount: 4 dash pieces * 6 verts");
+            Assert.That(cmd4[1], Is.EqualTo(1), "instanceCount");
+
+            var verts = new float[12];   // first piece = 6 verts = 12 floats
+            var op = output.MapMemory();
+            Marshal.Copy((IntPtr)(nint)op, verts, 0, 12);
+            output.UnmapMemory();
+            float[] expected = { 0, 5, 0, -5, 20, 5, 20, 5, 0, -5, 20, -5 };
+            for (int i = 0; i < 12; i++)
+                Assert.That(verts[i], Is.EqualTo(expected[i]).Within(0.01f), $"first piece float [{i}]");
+
+            main.Dispose();
+        }
+
+        private static Adamantium.Graphics.Buffer MakeBuffer(GraphicsDevice gd, float[] data)
+        {
+            var buf = Adamantium.Graphics.Buffer.New(gd, (ulong)(data.Length * sizeof(float)),
+                BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress,
+                MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal);
+            var p = buf.MapMemory();
+            Marshal.Copy(data, 0, (IntPtr)(nint)p, data.Length);
+            buf.UnmapMemory();
+            return buf;
+        }
     }
 }

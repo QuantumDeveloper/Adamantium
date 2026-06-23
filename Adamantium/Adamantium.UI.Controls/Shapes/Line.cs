@@ -61,7 +61,15 @@ public class Line : Shape
    {
       var start = new Vector2(X1, Y1);
       var end = new Vector2(X2, Y2);
-         
+
       context.ForControl(this).DrawLine(start, end, GetPen());
+   }
+
+   // Tight hit test: on the actual segment within half the stroke width (+1px so a hair-thin line stays clickable),
+   // not the (often huge) diagonal bounding box.
+   public override bool HitTestCore(Vector2 localPoint)
+   {
+      var half = Math.Max(StrokeThickness, 1.0) / 2.0 + 1.0;
+      return DistanceToSegment(localPoint, new Vector2(X1, Y1), new Vector2(X2, Y2)) <= half;
    }
 }

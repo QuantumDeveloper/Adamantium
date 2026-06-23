@@ -573,6 +573,14 @@ public sealed class DesignerSession : IDisposable
                     var b = geometry.Bounds;
                     return new HitTestResult(span.Line, span.Position, pos.X + b.X, pos.Y + b.Y, b.Width, b.Height);
                 }
+                // A Line's layout box also spans from (0,0) to its far point, so frame it by the segment's tight bounds
+                // (min..max of its endpoints) instead of the origin-anchored layout box.
+                if (current is Adamantium.UI.Controls.Shapes.Line ln)
+                {
+                    double minX = Math.Min(ln.X1, ln.X2), minY = Math.Min(ln.Y1, ln.Y2);
+                    return new HitTestResult(span.Line, span.Position,
+                        pos.X + minX, pos.Y + minY, Math.Abs(ln.X2 - ln.X1), Math.Abs(ln.Y2 - ln.Y1));
+                }
                 var size = current.RenderSize;
                 return new HitTestResult(span.Line, span.Position, pos.X, pos.Y, size.Width, size.Height);
             }

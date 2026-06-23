@@ -488,6 +488,13 @@ public sealed class CompletionEngine
     private static AumlCompletionItem AttrItem(string label, AumlCompletionItemKind kind, string? detail) =>
         new(label, kind, detail, $"{label}=\"$0\"");
 
+    // Substring match (case-insensitive): the typed text may appear ANYWHERE in the candidate, not only at the start,
+    // so a half-remembered name still finds it ("Dash" -> StrokeDashArray, "Alignment" -> HorizontalAlignment, "ound"
+    // -> Background). This only widens WHICH items the server offers; the matched letters are highlighted by the CLIENT
+    // (LSP has no field to send highlight ranges - the client re-matches the typed text against filterText/label and
+    // bolds the run). For PascalCase names both VS Code and Rider highlight the camel-boundary match out of the box;
+    // to also keep matches that start mid-word (not on a word/camel boundary) VS Code needs
+    // `editor.suggest.matchOnWordStartOnly: false`.
     private static bool Matches(string candidate, string prefix) =>
-        string.IsNullOrEmpty(prefix) || candidate.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+        string.IsNullOrEmpty(prefix) || candidate.Contains(prefix, StringComparison.OrdinalIgnoreCase);
 }
