@@ -1,3 +1,4 @@
+using System;
 using Adamantium.Mathematics;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
@@ -95,5 +96,35 @@ public class Path : Shape
         if (Data == null) return;
 
         context.ForControl(this).DrawGeometry(Fill, Data, GetPen());
+    }
+
+    // Tight hit test: point-in-geometry over the mesh contours (even-odd) for a filled path, plus proximity to a
+    // contour edge for the stroke. Falls back to the bounding box only if the mesh isn't built yet. This excludes the
+    // empty parts of the (often large) bounding box - e.g. between the teeth/inside the gaps of a combined geometry.
+    public override bool HitTestCore(Vector2 localPoint)
+    {
+        var mesh = Data?.Mesh;
+        if (mesh?.Contours == null || mesh.Contours.Count == 0) return base.HitTestCore(localPoint);
+
+        var inside = false;
+        var minDist = double.MaxValue;
+        foreach (var contour in mesh.Contours)
+        {
+            var pts = contour.Points;
+            if (pts == null || pts.Length < 2) continue;
+            int n = pts.Length;
+            for (int i = 0, j = n - 1; i < n; j = i++)
+            {
+                var pi = pts[i];
+                var pj = pts[j];
+                if (((pi.Y > localPoint.Y) != (pj.Y > localPoint.Y)) &&
+                    (localPoint.X < (pj.X - pi.X) * (localPoint.Y - pi.Y) / (pj.Y - pi.Y) + pi.X))
+                    inside = !inside;
+                minDist = Math.Min(minDist, DistanceToSegment(localPoint, pi, pj));
+            }
+        }
+
+        if (IsVisibleBrush(Fill) && inside) return true;
+        return IsVisibleBrush(Stroke) && minDist <= StrokeThickness / 2.0 + 1.0;
     }
 }

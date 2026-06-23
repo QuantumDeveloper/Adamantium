@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
@@ -10,86 +11,234 @@ using Buffer = Adamantium.Graphics.Buffer;
 
 namespace Adamantium.UI.Rendering.RenderUnits;
 
-// GPU stroke path (Phase B): a compute shader (StrokeExpand) turns the source polyline + half-thickness into a
-// miter-joined triangle-strip ribbon, written straight into a vertex buffer via a BDA device address; the same frame
-// binds that buffer and draws it (StrokeDraw). No CPU re-tessellation. Handles a single contour, open OR closed
-// (closed = wrap-around miters + one closing pair); solid colour. Caps / dashes still use the CPU path.
+// GPU stroke path (Phase B/C). A compute shader (StrokeExpand) turns the source polyline + half-thickness into a
+// triangle-LIST ribbon written via a BDA device address, the same frame draws it (StrokeDraw). No CPU re-tessellation
+// of the 2D geometry - the CPU only uploads the raw contour once and sets uniforms per frame, so animation-heavy
+// scenes don't pay CPU per stroke. Two modes:
+//   - continuous: one thread per point -> miter ribbon + round-join/round-cap disc fans; fixed count, plain Draw.
+//   - dash/trim:  a single thread walks the contour by arc length, cuts dash/trim pieces, writes the vertex count into
+//                 a VkDrawIndirectCommand; DrawIndirect reads that GPU-decided count (zero per-frame CPU for dashes).
+// A geometry can have SEVERAL contours (combined/group geometry, shapes with holes); each is expanded and drawn on its
+// own - the pen (colour, thickness, dashes, caps, join) is shared, only the points/closedness differ per contour.
 public sealed class GpuStrokeRenderComponent : UIRenderComponent
 {
+    // Disc-fan subdivision for round joins/caps (a smooth-enough circle); 0 when the contour has no round geometry.
+    private const uint RoundSegmentsCount = 16;
+    private const int MaxDashVertices = 8192 * 6;   // safety cap on the dash output buffer (per contour)
+
     private readonly GraphicsDevice _device;
     private readonly StrokeEffect _effect;
     private readonly Pen _pen;
-    private readonly bool _isClosed;
-    private readonly uint _pointCount;
-    private readonly uint _pairCount;     // offset pairs emitted: pointCount (open) or pointCount + 1 (closed, closing pair)
-    private readonly uint _vertexCount;   // pairCount * 2 (two offset verts per pair, triangle strip)
-    private readonly Buffer _pointsBuffer;
-    private readonly Buffer _vertexBuffer;
+    private readonly bool _useCut;          // dash and/or trim -> the single-thread DashCut kernel + DrawIndirect
+    private readonly bool _hasDashes;
+    private readonly uint _joinType;        // 0 miter, 1 bevel, 2 round
+    private readonly List<Contour> _contours = [];
+
+    // Per-contour GPU state. The expander runs once per contour (its own points + output buffers), so combined/group
+    // geometry strokes every contour instead of falling back to the CPU path.
+    private sealed class Contour
+    {
+        public bool IsClosed;
+        public uint RoundSegments;   // 0 (no fan) or RoundSegmentsCount - depends on this contour's closedness + caps
+        public uint PointCount;
+        public uint ThreadCount;     // compute threads: points (continuous) or 1 (dash, single-thread cut)
+        public uint VertexCount;     // continuous: exact draw count; dash: output capacity (actual count is on GPU)
+        public Buffer PointsBuffer;
+        public Buffer VertexBuffer;
+        public Buffer PatternBuffer;     // dash only
+        public Buffer IndirectBuffer;    // dash only (VkDrawIndirectCommand)
+    }
 
     public GpuStrokeRenderComponent(IGraphicsDevice device, UIBasicEffect uiBasicEffect, StrokeEffect effect,
-        Vector2[] points, bool isClosed, Pen pen) : base(device, uiBasicEffect, null)
+        IReadOnlyList<(Vector2[] Points, bool IsClosed)> contours, Pen pen) : base(device, uiBasicEffect, null)
     {
-        _device = (GraphicsDevice)device;   // Dispatch/BufferBarrier live on the concrete device
+        _device = (GraphicsDevice)device;   // Dispatch/BufferBarrier/DrawIndirect live on the concrete device
         _effect = effect;
         _pen = pen;
-        _isClosed = isClosed;
-        _pointCount = (uint)points.Length;
-        _pairCount = _pointCount + (isClosed ? 1u : 0u);
-        _vertexCount = _pairCount * 2;
+        _hasDashes = pen.DashStrokeArray is { Count: > 0 };
+        _useCut = _hasDashes || pen.TrimStart > 0.0 || pen.TrimEnd < 1.0;
+        _joinType = MapJoin(pen.PenLineJoin);
 
-        // float2[] points -> BDA storage buffer (compute input).
+        var capNeedsFan = IsFanCap(pen.StartLineCap) || IsFanCap(pen.EndLineCap);
+        foreach (var (points, isClosed) in contours)
+        {
+            var contour = BuildContour(points, isClosed, capNeedsFan);
+            if (contour != null) _contours.Add(contour);
+        }
+    }
+
+    // Builds the GPU buffers for one contour. Returns null for a degenerate contour (no thread/vertex work).
+    private Contour BuildContour(Vector2[] points, bool isClosed, bool capNeedsFan)
+    {
+        if (points.Length < 2) return null;
+
+        var c = new Contour { IsClosed = isClosed, PointCount = (uint)points.Length };
+
+        // Disc segments are needed when a join is round (disc) or bevel (wedge), OR a cap needs emitted geometry
+        // (round / triangle / concave). On the cut path a ROUND JOIN also needs the disc, emitted at every corner the
+        // dash crosses (without it a dashed polygon's teeth corners gap). Caps appear on both paths; closed contours
+        // have no caps.
+        var needsFan = !_useCut && (_joinType == 2u || _joinType == 1u || (!isClosed && capNeedsFan));
+        c.RoundSegments = (needsFan || (_useCut && (capNeedsFan || _joinType == 2u))) ? RoundSegmentsCount : 0u;
+
+        // Raw contour -> BDA storage buffer (the GPU reads it; dashing/trim happen on the GPU, not here).
         var floats = new float[points.Length * 2];
         for (var i = 0; i < points.Length; i++)
         {
             floats[i * 2] = (float)points[i].X;
             floats[i * 2 + 1] = (float)points[i].Y;
         }
-        _pointsBuffer = ToDispose(Buffer.New(_device, (ulong)(floats.Length * sizeof(float)),
+        c.PointsBuffer = ToDispose(Buffer.New(_device, (ulong)(floats.Length * sizeof(float)),
             BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress,
             MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal));
-        var ptr = _pointsBuffer.MapMemory();
+        var ptr = c.PointsBuffer.MapMemory();
         Marshal.Copy(floats, 0, (IntPtr)(nint)ptr, floats.Length);
-        _pointsBuffer.UnmapMemory();
+        c.PointsBuffer.UnmapMemory();
 
-        // float2[] ribbon vertices -> BDA + vertex buffer (compute output, draw input).
-        _vertexBuffer = ToDispose(Buffer.New(_device, (ulong)(_vertexCount * 2 * sizeof(float)),
+        if (_useCut)
+        {
+            c.ThreadCount = 1;   // a single thread walks the whole contour and cuts the dash/trim pieces
+            c.VertexCount = DashOutputCapacity(points, isClosed, _pen, c.RoundSegments);   // worst-case piece bound
+
+            // Pattern buffer: the real dash array, or a 1-element dummy for trim-only (PatternCount=0 -> not read).
+            var patternArr = _hasDashes ? new float[_pen.DashStrokeArray.Count] : new float[1];
+            for (var i = 0; i < _pen.DashStrokeArray.Count; i++) patternArr[i] = (float)_pen.DashStrokeArray[i];
+            c.PatternBuffer = ToDispose(Buffer.New(_device, (ulong)(patternArr.Length * sizeof(float)),
+                BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress,
+                MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal));
+            var pp = c.PatternBuffer.MapMemory();
+            Marshal.Copy(patternArr, 0, (IntPtr)(nint)pp, patternArr.Length);
+            c.PatternBuffer.UnmapMemory();
+
+            c.IndirectBuffer = ToDispose(Buffer.New(_device, (ulong)(4 * sizeof(uint)),
+                BufferUsageFlags.IndirectBuffer | BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress,
+                MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal));
+        }
+        else
+        {
+            c.ThreadCount = c.PointCount;   // one thread per point (segment quad + join/cap fan)
+            c.VertexCount = c.PointCount * (6u + c.RoundSegments * 3u);
+        }
+
+        if (c.ThreadCount == 0 || c.VertexCount == 0) return null;
+
+        c.VertexBuffer = ToDispose(Buffer.New(_device, (ulong)(c.VertexCount * 2 * sizeof(float)),
             BufferUsageFlags.VertexBuffer | BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress,
             MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal));
+        return c;
     }
 
-    // Square is the only non-flat cap the strip expander handles for now; round/triangle caps take the CPU path
-    // (the gating in RenderUnit.TryGetSolidPolyline rejects them), so anything not Square maps to flat (0).
-    private static uint MapCap(PenLineCap cap) => cap == PenLineCap.Square ? 1u : 0u;
+    // Worst-case vertex count for the dash output buffer: total arc length / shortest "on" dash, plus a per-segment
+    // allowance for corner splits. Per piece that's 6 quad verts plus, for round caps, up to two disc fans
+    // (2 * roundSegments * 3); plus one corner join per segment (a round disc, or up to 3 bevel/miter triangles).
+    // Capped. This is the only CPU work dashing does - an O(points) length sum, no per-piece tessellation - so animated
+    // dashes (DashOffset) cost the CPU nothing per frame.
+    private static uint DashOutputCapacity(Vector2[] pts, bool closed, Pen pen, uint roundSegments)
+    {
+        int n = pts.Length;
+        int segs = closed ? n : n - 1;
+        long perPiece = 6 + (roundSegments > 0 ? 2L * roundSegments * 3 : 0);   // quad + up to two round-cap discs
+        long joinVerts = (long)segs * (roundSegments > 0 ? roundSegments * 3 : 9);   // one join per corner
+
+        // Trim-only (no dashes): trim clips to at most one run, so segs + 2 boundary splits is the bound.
+        if (pen.DashStrokeArray is not { Count: > 0 })
+            return (uint)Math.Clamp((segs + 2) * perPiece + joinVerts, 6, MaxDashVertices);
+
+        double total = 0;
+        for (var s = 0; s < segs; s++) total += (pts[(s + 1) % n] - pts[s]).Length();
+
+        double minOn = double.MaxValue;
+        for (var k = 0; k < pen.DashStrokeArray.Count; k += 2)
+            if (pen.DashStrokeArray[k] > 0) minOn = Math.Min(minOn, pen.DashStrokeArray[k]);
+        if (minOn is double.MaxValue or <= 0) minOn = 1;
+
+        long pieces = (long)(total / minOn) + segs + 4;
+        long verts = Math.Clamp(pieces * perPiece + joinVerts, 6, MaxDashVertices);
+        return (uint)verts;
+    }
+
+    // Cap mapping for the expander shaders. Every cap renders as its true shape: 0 = flat, 1 = square, 2 = convex round
+    // (disc), 3 = convex triangle (tip), 4 = concave triangle (V notch), 5 = concave round (carved arc). The shader
+    // shapes the end quad (CapShift) and emits the cap geometry (EmitCapTris).
+    private static uint MapCap(PenLineCap cap) => cap switch
+    {
+        PenLineCap.Square => 1u,
+        PenLineCap.ConvexRound => 2u,
+        PenLineCap.ConvexTriangle => 3u,
+        PenLineCap.ConcaveTriangle => 4u,
+        PenLineCap.ConcaveRound => 5u,
+        _ => 0u   // Flat
+    };
+
+    // Caps whose geometry is emitted as fan triangles (everything except flat and the quad-handled square).
+    private static bool IsFanCap(PenLineCap cap) => cap is not (PenLineCap.Flat or PenLineCap.Square);
+
+    // Join mapping: 0 = miter (bisector ribbon, clamped), 1 = bevel (per-segment rectangles + corner wedge), 2 = round (rectangles + disc fan).
+    private static uint MapJoin(PenLineJoin join) => join switch
+    {
+        PenLineJoin.Round => 2u,
+        PenLineJoin.Bevel => 1u,
+        _ => 0u
+    };
 
     // Compute runs OUT of the render pass: PreRender is recorded from BeginDraw's beforeRenderPass hook
-    // (WindowRenderService.BeginDraw -> ForwardWindowRenderer.PreRender -> RenderUnit.PreRender -> here).
+    // (WindowRenderService.BeginDraw -> ForwardWindowRenderer.PreRender -> RenderUnit.PreRender -> here). Each contour
+    // sets its own uniforms, dispatches the expander, and barriers its output for the draw.
     public override void PreRender()
     {
-        if (_pointCount < 2) return;
+        foreach (var c in _contours)
+        {
+            _effect.PointsAddress.SetValue(c.PointsBuffer.GetDeviceAddress());
+            _effect.OutputAddress.SetValue(c.VertexBuffer.GetDeviceAddress());
+            _effect.PointCount.SetValue(c.PointCount);
+            _effect.IsClosed.SetValue(c.IsClosed ? 1u : 0u);
+            _effect.DashMode.SetValue(_useCut ? 1u : 0u);
+            _effect.JoinType.SetValue(_joinType);
+            _effect.RoundSegments.SetValue(c.RoundSegments);
+            // Caps apply on the cut path (each dash piece has two ends) and on an OPEN continuous contour. A closed
+            // continuous loop has no ends, so both are 0 there.
+            _effect.StartCap.SetValue(_useCut || !c.IsClosed ? MapCap(_pen.StartLineCap) : 0u);
+            _effect.EndCap.SetValue(_useCut || !c.IsClosed ? MapCap(_pen.EndLineCap) : 0u);
+            _effect.HalfThickness.SetValue((float)(_pen.Thickness / 2.0));
 
-        _effect.PointsAddress.SetValue(_pointsBuffer.GetDeviceAddress());
-        _effect.OutputAddress.SetValue(_vertexBuffer.GetDeviceAddress());
-        _effect.PointCount.SetValue(_pointCount);
-        _effect.IsClosed.SetValue(_isClosed ? 1u : 0u);
-        // Caps only apply to open ends; closed loops have none.
-        _effect.StartCap.SetValue(_isClosed ? 0u : MapCap(_pen.StartLineCap));
-        _effect.EndCap.SetValue(_isClosed ? 0u : MapCap(_pen.EndLineCap));
-        _effect.HalfThickness.SetValue((float)(_pen.Thickness / 2.0));
-        _effect.StrokeExpandPass.Apply();
+            if (_useCut)
+            {
+                _effect.IndirectAddress.SetValue(c.IndirectBuffer.GetDeviceAddress());
+                _effect.PatternAddress.SetValue(c.PatternBuffer.GetDeviceAddress());
+                _effect.PatternCount.SetValue(_hasDashes ? (uint)_pen.DashStrokeArray.Count : 0u);
+                _effect.MaxVertices.SetValue(c.VertexCount);
+                _effect.DashOffset.SetValue((float)_pen.DashOffset);
+                _effect.TrimStart.SetValue((float)Math.Clamp(_pen.TrimStart, 0.0, 1.0));
+                _effect.TrimEnd.SetValue((float)Math.Clamp(_pen.TrimEnd, 0.0, 1.0));
+                _effect.StrokeDashCutPass.Apply();   // separate compute kernel for the dash/trim cut
+            }
+            else
+            {
+                _effect.StrokeExpandPass.Apply();
+            }
 
-        _device.Dispatch((_pairCount + 63) / 64);
+            _device.Dispatch((c.ThreadCount + 63) / 64);
 
-        // Compute write -> vertex-attribute read: the barrier makes the result visible to input assembly.
-        _device.BufferBarrier(_vertexBuffer,
-            PipelineStageFlagBits2.ComputeShaderBit, AccessFlagBits2.ShaderWriteBit,
-            PipelineStageFlagBits2.VertexAttributeInputBit, AccessFlagBits2.VertexAttributeReadBit);
+            // Make the compute output visible to the draw: vertex-attribute read (both modes) and, for the cut, the
+            // indirect-command read.
+            _device.BufferBarrier(c.VertexBuffer,
+                PipelineStageFlagBits2.ComputeShaderBit, AccessFlagBits2.ShaderWriteBit,
+                PipelineStageFlagBits2.VertexAttributeInputBit, AccessFlagBits2.VertexAttributeReadBit);
+            if (_useCut)
+            {
+                _device.BufferBarrier(c.IndirectBuffer,
+                    PipelineStageFlagBits2.ComputeShaderBit, AccessFlagBits2.ShaderWriteBit,
+                    PipelineStageFlagBits2.DrawIndirectBit, AccessFlagBits2.IndirectCommandReadBit);
+            }
+        }
     }
 
     public override void Render()
     {
-        if (_pointCount < 2) return;
+        if (_contours.Count == 0) return;
 
-        // Points are in geometry-local space: WVP = transform(local->world) * projection(world->clip).
+        // Points are in geometry-local space: WVP = transform(local->world) * projection(world->clip). The pen colour
+        // and transform are shared by every contour, so set them once, then draw each contour's expanded ribbon.
         _effect.Projection.SetValue(RenderData.TransformMatrix * RenderData.ProjectionMatrix);
         var color = (_pen.Brush as SolidColorBrush)?.Color.ToVector4() ?? new Vector4F(0, 0, 0, 1);
         color.W *= RenderData.Opacity;   // StrokeDraw has no separate opacity uniform - fold it into alpha
@@ -97,13 +246,20 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
 
         _device.VertexType = typeof(StrokeVertex);
         _device.PolygonMode = PolygonMode.Fill;
-        _device.PrimitiveTopology = PrimitiveTopology.TriangleStrip;
+        _device.PrimitiveTopology = PrimitiveTopology.TriangleList;
         _device.ColorBlendEquation = ColorBlendEquations.AlphaBlend;
         _device.DepthCompareFunction = CompareOp.Always;
         _device.DepthTestEnabled = true;
         _device.DepthWriteEnable = true;
-        _device.SetVertexBuffer(_vertexBuffer);
         _effect.StrokeDrawPass.Apply();
-        _device.Draw(_vertexCount, 1);
+
+        foreach (var c in _contours)
+        {
+            _device.SetVertexBuffer(c.VertexBuffer);
+            if (_useCut)
+                _device.DrawIndirect(c.VertexBuffer, c.IndirectBuffer);   // GPU-decided vertex count (dash/trim)
+            else
+                _device.Draw(c.VertexCount, 1);
+        }
     }
 }

@@ -53,6 +53,14 @@ public abstract class Shape : InputUIComponent
       AdamantiumProperty.Register(nameof(StrokeDashOffset), typeof(Double), typeof(Shape),
          new PropertyMetadata(0d, PropertyMetadataOptions.AffectsRender));
 
+   public static readonly AdamantiumProperty StrokeTrimStartProperty =
+      AdamantiumProperty.Register(nameof(StrokeTrimStart), typeof(Double), typeof(Shape),
+         new PropertyMetadata(0d, PropertyMetadataOptions.AffectsRender));
+
+   public static readonly AdamantiumProperty StrokeTrimEndProperty =
+      AdamantiumProperty.Register(nameof(StrokeTrimEnd), typeof(Double), typeof(Shape),
+         new PropertyMetadata(1d, PropertyMetadataOptions.AffectsRender));
+
    public Brush Fill
    {
       get => GetValue<Brush>(FillProperty);
@@ -106,6 +114,18 @@ public abstract class Shape : InputUIComponent
       get => GetValue<Double>(StrokeDashOffsetProperty);
       set => SetValue(StrokeDashOffsetProperty, value);
    }
+
+   public Double StrokeTrimStart
+   {
+      get => GetValue<Double>(StrokeTrimStartProperty);
+      set => SetValue(StrokeTrimStartProperty, value);
+   }
+
+   public Double StrokeTrimEnd
+   {
+      get => GetValue<Double>(StrokeTrimEndProperty);
+      set => SetValue(StrokeTrimEndProperty, value);
+   }
       
    private static object CoerceStrokeThickness(AdamantiumComponent adamantiumAdamantiumComponent, object baseValue)
    {
@@ -126,8 +146,31 @@ public abstract class Shape : InputUIComponent
          StrokeDashArray,
          StartLineCap,
          EndLineCap,
-         StrokeLineJoin);
+         StrokeLineJoin,
+         StrokeTrimStart,
+         StrokeTrimEnd);
    }
+
+   // --- Tight hit-testing helpers (narrow phase) -----------------------------------------------------------------
+   // Shapes override IUIComponent.HitTestCore with their real geometry (see Line/Ellipse/Path) so a click inside a
+   // shape's bounding box but off the shape itself doesn't select it. These helpers are the shared 2D math.
+
+   /// <summary>Shortest distance from <paramref name="p"/> to the segment a-b (both in the shape's local space).</summary>
+   protected static double DistanceToSegment(Vector2 p, Vector2 a, Vector2 b)
+   {
+      var abx = b.X - a.X;
+      var aby = b.Y - a.Y;
+      var lenSq = abx * abx + aby * aby;
+      double t = lenSq < 1e-9 ? 0.0 : Math.Clamp(((p.X - a.X) * abx + (p.Y - a.Y) * aby) / lenSq, 0.0, 1.0);
+      var dx = p.X - (a.X + t * abx);
+      var dy = p.Y - (a.Y + t * aby);
+      return Math.Sqrt(dx * dx + dy * dy);
+   }
+
+   /// <summary>A brush that paints something (non-null, not the transparent brush, non-zero alpha) - so an unfilled
+   /// shape doesn't hit-test on its empty interior, only on its stroke.</summary>
+   protected static bool IsVisibleBrush(Brush brush) =>
+      brush != null && brush != Brushes.Transparent && !(brush is SolidColorBrush { Color.A: 0 });
 
    protected override Size MeasureOverride(Size availableSize)
    {

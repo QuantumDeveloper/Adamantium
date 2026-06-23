@@ -210,6 +210,11 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
 
     public Rect ClipRectangle { get; internal set; }
 
+    /// <summary>Narrow-phase hit test (see <see cref="IUIComponent.HitTestCore"/>). Default: anywhere inside the
+    /// element's box - the hit-test walk already broad-phase-checked the bounds. Shapes override this with their real
+    /// geometry so a click off the shape (but inside its bounding box) doesn't select it.</summary>
+    public virtual bool HitTestCore(Vector2 localPoint) => true;
+
     public Vector2 ClipPosition { get; set; }
 
     public IUIComponent VisualParent { get; private set; }

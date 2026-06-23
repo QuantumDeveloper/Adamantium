@@ -1,4 +1,5 @@
-﻿using Adamantium.ProceduralGeometry.Shapes;
+﻿using Adamantium.Mathematics;
+using Adamantium.ProceduralGeometry.Shapes;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
 
@@ -89,5 +90,22 @@ public class Ellipse : Shape
       
       var destRect = Rect.Deflate(StrokeThickness);
       context.ForControl(this).DrawEllipse(destRect, Fill, StartAngle, StopAngle, EllipseType, GetPen());
+   }
+
+   // Tight hit test: inside the ellipse (the bounding-box corners are excluded - the main false positive), and for an
+   // unfilled ellipse only the stroke ring, not the hollow centre.
+   public override bool HitTestCore(Vector2 localPoint)
+   {
+      double rx = Rect.Width / 2.0, ry = Rect.Height / 2.0;
+      if (rx <= 0 || ry <= 0) return false;
+      double cx = Rect.X + rx, cy = Rect.Y + ry;
+
+      double ndx = (localPoint.X - cx) / rx, ndy = (localPoint.Y - cy) / ry;
+      if (ndx * ndx + ndy * ndy > 1.0) return false;          // outside the ellipse
+      if (IsVisibleBrush(Fill)) return true;                  // filled: anywhere inside
+
+      double irx = Math.Max(rx - StrokeThickness, 0.01), iry = Math.Max(ry - StrokeThickness, 0.01);
+      double idx = (localPoint.X - cx) / irx, idy = (localPoint.Y - cy) / iry;
+      return idx * idx + idy * idy >= 1.0;                    // stroke-only: just the ring
    }
 }

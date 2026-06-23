@@ -316,13 +316,16 @@ public class CodeGenerationContext
                     TextGenerator.WriteLine(
                         $"{propRef.OwnerType.GetFullTypeName()}.Set{propRef.Name}({CurrentParent}, {textVale});");
                 }
-                else if (resolvedType.IsCollection() && !resolvedType.HasAttribute("TypeParserAttribute"))
+                // A collection populated by CHILD ELEMENTS (<Foo.Items><Item/>...</Foo.Items>) -> new + Add per child.
+                // A collection set by a STRING ATTRIBUTE (StrokeDashArray="10,6") is NOT handled here: it falls through
+                // to the text-node branch below, which routes it through TypeParser (e.g. DoubleCollectionParser).
+                else if (resolvedType.IsCollection() && !resolvedType.HasAttribute("TypeParserAttribute") && !value.IsTextNode())
                 {
                     if (resolvedMember.MemberKind == ResolvedMemberKind.Property && resolvedMember.HasSetter())
                     {
                         TextGenerator.WriteLine($"{symbolName} = new {resolvedType.FullName}();");
                     }
-                    
+
                     foreach (var propertyValue in prop.Values)
                     {
                         string nestedName = ProcessNestedValue(propertyValue, diagnostics, isResource);

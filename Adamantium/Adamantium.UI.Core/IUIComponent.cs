@@ -41,6 +41,15 @@ public interface IUIComponent : IFundamentalUIComponent
 
     void InvalidateRender(bool invalidateChildren);
 
+    /// <summary>
+    /// Narrow-phase hit test: is <paramref name="localPoint"/> (in this element's local coordinates) actually on the
+    /// element's geometry? The hit-test walk uses <see cref="ClipRectangle"/> as the cheap broad-phase (and to descend
+    /// into children); this is the tight test for whether the element ITSELF is hit. The default is the bounding box
+    /// (always true within it); shapes override it for their real geometry (a Line by distance to its segment, an
+    /// Ellipse by the ellipse equation, a Path by point-in-geometry) so clicks off the shape don't select it.
+    /// </summary>
+    bool HitTestCore(Vector2 localPoint);
+
     void Render(IDrawingContext context);
     
     /// <summary>

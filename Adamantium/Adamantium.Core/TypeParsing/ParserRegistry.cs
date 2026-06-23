@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Adamantium.Core.Collections;
 using Adamantium.Mathematics;
 
 namespace Adamantium.Core.TypeParsing;
@@ -16,6 +17,7 @@ public static class ParserRegistry
         Register(typeof(Vector2), typeof(Vector2Parser));
         Register(typeof(Uri), typeof(UriParser));
         Register(typeof(TimeSpan), typeof(TimeSpanParser));
+        Register(typeof(TrackingCollection<double>), typeof(DoubleCollectionParser));
     }
 
     public static void Register(Type targetType, Type parserType)

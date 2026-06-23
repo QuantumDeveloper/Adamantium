@@ -98,6 +98,10 @@ internal static class LspSelfTest
         // MultiBinding has no positional arg -> the first segment already offers its property names.
         var (multiNameText, mnLine, mnChar) = Caret(
             """<StyleSet xmlns="http://adamantium/ui" xmlns:controls="http://adamantium/ui"><controls:Border Width="{MultiBinding |}"/></StyleSet>""");
+        // Substring match: a half-remembered name typed mid-word ("ound") still finds "Background" - prefix matching
+        // would offer nothing here. Verifies the widened CompletionEngine.Matches.
+        var (substrText, ssLine, ssChar) = Caret(
+            """<StyleSet xmlns="http://adamantium/ui" xmlns:controls="http://adamantium/ui"><controls:Border ound|></controls:Border></StyleSet>""");
 
         JsonNode[] session =
         {
@@ -144,6 +148,8 @@ internal static class LspSelfTest
             Completion(25, dir + "/BindMode.auml", bmLine, bmChar),
             DidOpen(dir + "/MultiName.auml", multiNameText),
             Completion(26, dir + "/MultiName.auml", mnLine, mnChar),
+            DidOpen(dir + "/Substr.auml", substrText),
+            Completion(27, dir + "/Substr.auml", ssLine, ssChar),
             DidOpen(xPrefixUri, xPrefixDoc),
             CodeAction(17, xPrefixUri, xName.Line, xName.Ch),
             DidOpen(semanticUri, semanticDoc),
@@ -169,7 +175,7 @@ internal static class LspSelfTest
             var method = response["method"]?.GetValue<string>();
             var id = response["id"]?.ToJsonString();
 
-            if (response["result"] is JsonArray array && id is "2" or "4" or "7" or "12" or "13" or "14" or "15" or "19" or "22" or "23" or "24" or "25" or "26")
+            if (response["result"] is JsonArray array && id is "2" or "4" or "7" or "12" or "13" or "14" or "15" or "19" or "22" or "23" or "24" or "25" or "26" or "27")
             {
                 var labels = array.Select(c => c!["label"]!.GetValue<string>()).ToList();
                 var tag = id switch
@@ -186,6 +192,7 @@ internal static class LspSelfTest
                     "24" => "{Binding} named args",
                     "25" => "{Binding Mode=} enum values",
                     "26" => "{MultiBinding} named args",
+                    "27" => "substring match (mid-word)",
                     _ => "controls:Border props"
                 };
                 Console.WriteLine($"<- completion ({tag}, id {id}): {labels.Count}: {string.Join(", ", labels.Take(8))}");
