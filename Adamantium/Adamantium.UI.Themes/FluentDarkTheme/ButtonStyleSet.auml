@@ -7,7 +7,7 @@
         <Setter Property="Height" Value="Auto"/>
         <Setter Property="Background" Value="DarkGray"/>
         <Setter Property="BorderBrush" Value="Yellow" />
-        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="BorderThickness" Value="2"/>
         <Setter Property="CornerRadius" Value="4"/>
     </Style>
     

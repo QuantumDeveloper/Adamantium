@@ -954,6 +954,8 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
         IsMouseOver = false;
     }
     
+    public bool IsMouseCaptured => Mouse.Captured == this;
+
     public bool CaptureMouse()
     {
         return Mouse.Capture(this);
@@ -971,7 +973,10 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     
     public void ReleaseMouseCapture()
     {
-        throw new NotImplementedException();
+        if (IsMouseCaptured)
+        {
+            Mouse.Capture(null);
+        }
     }
 
     public void ReleaseStylusCapture()

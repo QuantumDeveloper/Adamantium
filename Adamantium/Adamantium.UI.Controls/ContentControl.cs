@@ -299,10 +299,14 @@ public class ContentControl : Control, IContentControl
    
    protected override void OnRender(IDrawingContext context)
    {
+      // A templated control's chrome is its template (e.g. a Border draws the rounded background/border). Filling a
+      // square Background here too would double-render under the template - the square's corners show through a rounded
+      // template Border. Only the untemplated convenience path paints the background directly.
+      if (Template != null) return;
+
       var size = new Size(ActualWidth, ActualHeight);
 
       context.ForControl(this)
          .DrawRectangle(Background, new Rect(size));
-
    }
 }
