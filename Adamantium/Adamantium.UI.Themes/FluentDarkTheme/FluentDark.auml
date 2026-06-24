@@ -10,6 +10,8 @@
 		<StyleInclude Source="{x:Type fluentDark:BorderStyleSet}"/>
 		<StyleInclude Source="{x:Type fluentDark:ButtonStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:ContentControlStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:ThumbStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:ScrollBarStyleSet}"/>
 	</Theme.StyleIncludes>
 
 	<!-- Accent / focus: the theme's runtime-mutable identity. Referenced via {ThemeResource Key}; change any of these

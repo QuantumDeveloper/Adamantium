@@ -258,5 +258,16 @@
                 </PropertyTrigger>
             </Line.Triggers>
         </Line>
+
+        <!-- ScrollBar demo (vertical + horizontal). The thumb's size follows ViewportSize; drag it, or press the
+             trough either side to page (auto-repeating). Last Grid children so they sit on top and stay interactive. -->
+        <ScrollBar Orientation="Vertical"
+                   HorizontalAlignment="Right" VerticalAlignment="Stretch"
+                   Minimum="0" Maximum="100" ViewportSize="20" Value="30"
+                   SmallChange="5" LargeChange="20"/>
+        <ScrollBar Orientation="Horizontal"
+                   HorizontalAlignment="Stretch" VerticalAlignment="Bottom"
+                   Minimum="0" Maximum="100" ViewportSize="25" Value="40"
+                   SmallChange="5" LargeChange="20"/>
     </Grid>
 </Window>

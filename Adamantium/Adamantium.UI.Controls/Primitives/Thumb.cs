@@ -168,17 +168,17 @@ public class Thumb : Control
 
    protected override Size ArrangeOverride(Size finalSize)
    {
-      Size size = new Size();
+      // The thumb fills the slot it was arranged into (e.g. the rect a Track computed for it), with its template child
+      // - if any - stretched to fill. Returning the child's size instead collapsed an untemplated thumb to nothing.
       foreach (var child in VisualChildren)
       {
          if (child is IMeasurableComponent measurableComponent)
          {
             measurableComponent.Arrange(new Rect(finalSize));
-            size = measurableComponent.Bounds.Size;
          }
       }
 
-      return size;
+      return finalSize;
    }
 
    // protected override void OnRender(DrawingContext context)
